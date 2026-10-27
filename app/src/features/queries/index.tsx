@@ -328,6 +328,7 @@ const TRIGGERS: Array<[QueryRuleSource, string]> = [
   ["missing_clock_out", "Missing Clock-Out"],
   ["unenrolled_device", "Unregistered Device"],
   ["overdue_task", "Overdue Task"],
+  ["low_performance", "Low Monthly Score"],
   ["missed_target", "Missed Target"],
 ];
 const TRIGGER_NAME = Object.fromEntries(TRIGGERS) as Record<QueryRuleSource, string>;

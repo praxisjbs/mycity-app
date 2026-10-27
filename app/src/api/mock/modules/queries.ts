@@ -472,7 +472,7 @@ const RULES: QueryRule[] = (
   state, active: state === "active", activated_at: state === "draft" ? null : at(40, "09:00"),
   fired_this_month: i === 0 ? 2 : 0, created_at: at(41, "09:00"), updated_at: at(40, "09:00"),
 }));
-const COUNTED = new Set(["lateness", "absence", "missing_clock_out", "unenrolled_device"]);
+const COUNTED = new Set(["lateness", "absence", "missing_clock_out", "unenrolled_device", "overdue_task", "low_performance"]);
 
 route("GET /api/v1/query-rules/summary", () =>
   ok({

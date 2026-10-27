@@ -2,14 +2,16 @@
 /**
  * The query rule evaluator: N offences in a window raise one query (docs/guides/queries.md
  * §6.3). Runs in the worker (job `query-rule-evaluate`), after an attendance event has
- * committed, for one person and the day of that event.
+ * committed (or the daily sweep of overdue tasks, or a month closed rated Below), for one person
+ * and the day of that event.
  *
  * For each active rule of the triggers the event set off:
  *   1. the window is the rule's `window_days` Lagos days ending on the event's day
  *      (shared/rules/window-counter), started no earlier than the rule's activation and
  *      no earlier than the day after the last breach this rule raised a query for, so the
  *      offences behind one query never count towards the next;
- *   2. attendance counts the person's offences in it (attendance.auto-query.js);
+ *   2. the module that owns the trigger counts the person's offences in it (attendance,
+ *      tasks or reviews, each in its own `<module>.auto-query.js`);
  *   3. at the threshold (offences, or late minutes summed), one query is raised through
  *      the queries service, the counted days as its evidence, its dedup key the rule, the
  *      person and the breach day. A second delivery of the same event finds the breach
@@ -24,6 +26,8 @@ const windowCounter = require("../../shared/rules/window-counter");
 const lagos = require("../../shared/time/lagos");
 const { formatDate } = require("../../shared/time/day-first");
 const attendance = require("../attendance/attendance.auto-query");
+const tasks = require("../tasks/tasks.auto-query");
+const reviews = require("../reviews/reviews.auto-query");
 const queries = require("../queries/queries.service");
 const repo = require("./query_rules.repo");
 const { EVENTS } = require("./query_rules.events");
@@ -34,7 +38,17 @@ const OFFENCE = Object.freeze({
   absence: "Absent",
   missing_clock_out: "No clock-out",
   unenrolled_device: "Punch from an unregistered device",
+  overdue_task: "Task overdue",
+  low_performance: "Month rated Below",
 });
+
+/** The module that counts each trigger. */
+const PROVIDERS = Object.freeze(
+  Object.fromEntries([attendance, tasks, reviews].flatMap((p) => p.SOURCES.map((s) => [s, p]))),
+);
+
+/** Every trigger something counts now. */
+const COUNTED = Object.freeze(Object.keys(PROVIDERS));
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -47,9 +61,9 @@ async function tx(fn) {
 
 const later = (a, b) => (a > b ? a : b);
 
-/** "02/10/2026, 15/10/2026 and 31/10/2026". */
+/** "02/10/2026, 15/10/2026 and 31/10/2026", each day once. */
 function dayList(dates) {
-  const days = dates.map((d) => formatDate(d));
+  const days = [...new Set(dates)].map((d) => formatDate(d));
   return days.length > 1 ? `${days.slice(0, -1).join(", ")} and ${days[days.length - 1]}` : days[0];
 }
 
@@ -76,7 +90,7 @@ function queryOf(rule, offences, total) {
     subject: rule.name,
     details: `${label} on ${dayList(offences.map((o) => o.date))} (${counted}). Please explain.`,
     evidence: offences.map((o) => ({
-      label: rule.source_event === "lateness" ? `${label}, ${o.minutes} minutes` : label,
+      label: o.label || (rule.source_event === "lateness" ? `${label}, ${o.minutes} minutes` : label),
       date: o.date,
     })),
   };
@@ -90,7 +104,7 @@ async function evaluateRule(rule, employeeId, date) {
     const last = await repo.lastBreach(client, rule.query_rule_id, employeeId);
     const start = later(later(from, lagos.dateOf(rule.activated_at)), last ? lagos.addDays(last, 1) : from);
     if (start > date) return null;
-    const offences = await attendance.offences(client, {
+    const offences = await PROVIDERS[rule.source_event].offences(client, {
       source: rule.source_event,
       employee_id: employeeId,
       from: start,
@@ -126,7 +140,7 @@ async function evaluateRule(rule, employeeId, date) {
  * @returns {Promise<{rules: number, raised: string[]}>}
  */
 async function evaluate({ sources, employee_id: employeeId, date }) {
-  const wanted = sources.filter((s) => attendance.SOURCES.includes(s));
+  const wanted = sources.filter((s) => COUNTED.includes(s));
   if (!wanted.length) return { rules: 0, raised: [] };
   const rules = await repo.activeFor(pool, wanted);
   const raised = [];
@@ -137,4 +151,4 @@ async function evaluate({ sources, employee_id: employeeId, date }) {
   return { rules: rules.length, raised };
 }
 
-module.exports = { evaluate, reached, queryOf, dayList };
+module.exports = { COUNTED, evaluate, reached, queryOf, dayList };

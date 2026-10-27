@@ -144,10 +144,10 @@ const JOBS = Object.freeze([
   {
     queue: "query-rule-evaluate",
     concurrency: 2,
-    summary: "A person's query rules counted after an attendance event, one query per breach",
+    summary: "A person's query rules counted after an attendance or review event, one query per breach",
   },
   // query-rule-evaluate is queued by src/modules/query_rules/query_rules.events.js, beside the
-  // attendance events it listens to.
+  // attendance and review events it listens to, and by the query-rule-sweep schedule.
 ]);
 
 /** Files in jobs/schedulers/. */
@@ -179,6 +179,7 @@ const SCHEDULERS = Object.freeze([
   "places-name",
   "targets-lock",
   "review-cycles",
+  "query-rule-sweep",
   "user-guide-index",
 ]);
 

@@ -72,6 +72,7 @@ describe("job registry", () => {
       "media-reconcile",
       "outbox-dispatch",
       "places-name",
+      "query-rule-sweep",
       "reminders",
       "review-cycles",
       "scheduled-reports",

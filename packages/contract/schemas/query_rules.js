@@ -26,6 +26,7 @@ const QueryRuleSource = z.enum([
   "missing_clock_out",
   "unenrolled_device",
   "overdue_task",
+  "low_performance",
   "missed_target",
 ]);
 const QueryRuleMeasure = z.enum(["count", "minutes"]);

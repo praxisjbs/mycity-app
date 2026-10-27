@@ -5,8 +5,8 @@
  * back), and paused rather than deleted once it has fired. Its trigger and measure are
  * fixed once it has raised a query: the queries it raised were counted that way.
  *
- * Triggers whose records arrive with a later milestone (overdue tasks, missed targets:
- * M2) may be drafted but not switched on until their module counts them.
+ * A trigger nothing counts yet (missed targets: M2's KPIs) may be drafted but not switched on
+ * until its module counts it.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -14,6 +14,8 @@ const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const lagos = require("../../shared/time/lagos");
 const attendance = require("../attendance/attendance.auto-query");
+const tasks = require("../tasks/tasks.auto-query");
+const reviews = require("../reviews/reviews.auto-query");
 const repo = require("./query_rules.repo");
 const { EVENTS } = require("./query_rules.events");
 
@@ -42,7 +44,8 @@ function codeFrom(name) {
 }
 
 /** Whether something counts this trigger yet. */
-const countable = (source) => attendance.SOURCES.includes(source);
+const COUNTED = [...attendance.SOURCES, ...tasks.SOURCES, ...reviews.SOURCES];
+const countable = (source) => COUNTED.includes(source);
 
 const policies = () => require("../policies/policies.service");
 

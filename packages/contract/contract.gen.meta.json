@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "e1c0a40e35aeb40b882fa14639cf4e190dffa45cec53087bfa65643df753fc11",
+  "source_hash": "7248c366a1941db1b190c20b358650ac93cb3ce1add8238f6492a085c33838c6",
   "schemas": 1268,
   "endpoints": 615,
   "inputs": {
@@ -54,7 +54,7 @@
     "packages/contract/schemas/projects.js": "6a097f5cf78f3b14da91e6521d83d8176ce02c5b4d3207503d09b15add2476b2",
     "packages/contract/schemas/proposals.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/queries.js": "afbaa1953e301312a89db62a8d75c04b13561f86082e44bf70bd5523035a0229",
-    "packages/contract/schemas/query_rules.js": "c7b4c99eb9274952d97cd8b4400cd892dd20c03629e82e934d9f5ea56c9f0c84",
+    "packages/contract/schemas/query_rules.js": "6ce68025b243538516d26b3a6201e11c1c71d5c8d8e52ed5558a420388412e4c",
     "packages/contract/schemas/reports.js": "db69fc43acc0164baaec4a000a17f3a6a3cc8dd7749c7cd276543e1fbb13ce99",
     "packages/contract/schemas/requisitions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/reviews.js": "c1682de462c4444729ce94af47ab0357d261fef269cded147331419d1fff1c3f",

@@ -716,7 +716,7 @@ describeDb("queries and sanctions against the real migrations", () => {
       });
       expect(minutesOnAbsence.status).toBe(422);
 
-      const tasks = await as("ops").post("/query-rules", { name: "Overdue Tasks", source_event: "overdue_task", threshold: 2, window_days: 7 });
+      const tasks = await as("ops").post("/query-rules", { name: "Missed Targets", source_event: "missed_target", threshold: 2, window_days: 7 });
       const refused = await as("ops").post(`/query-rules/${tasks.body.query_rule_id}/activate`);
       expect(refused.status).toBe(409);
       expect(refused.body.error.code).toBe("TRIGGER_NOT_AVAILABLE");
@@ -833,6 +833,81 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(sent.filter((j) => j.queue === "query-rule-evaluate").map((j) => j.data)).toEqual([
         { sources: ["lateness"], employee_id: who, date: today },
       ]);
+    });
+
+    test("overdue tasks count on their due day: open past it or done late; cancelled and on time never", async () => {
+      const { formatDate } = require("../../src/shared/time/day-first");
+      const who = people.other.employee.employee_id;
+      const task = (title, due, { status = "todo", completed = null, archived = null } = {}) =>
+        q(
+          `INSERT INTO task (title, status, created_by, primary_assignee_id, due_at, completed_at, archived_at, cancelled_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $2 = 'cancelled' THEN now() END)`,
+          [title, status, people.other.user.user_id, who, lagos.instant(due, "17:00"), completed, archived],
+        );
+      await task("Send the stock count", day(4));
+      await task("File the site report", day(3), { status: "done", completed: lagos.instant(day(2), "09:00") });
+      await task("Call the landlord", day(3), { status: "done", completed: lagos.instant(day(3), "12:00") });
+      await task("Order diesel", day(2), { status: "cancelled" });
+      await task("Old errand", day(2), { archived: lagos.instant(day(1), "09:00") });
+      await task("Due today", today);
+
+      const rule = await as("ops").post("/query-rules", { name: "Overdue Tasks", source_event: "overdue_task", threshold: 2, window_days: 7 });
+      expect((await as("ops").post(`/query-rules/${rule.body.query_rule_id}/activate`)).body.state).toBe("active");
+      await q("UPDATE query_rule SET activated_at = $2 WHERE query_rule_id = $1", [rule.body.query_rule_id, lagos.startOfDay(day(10))]);
+
+      // The sweep queues the person who had a task due yesterday still open or done late.
+      const tasks = require("../../src/modules/tasks/tasks.auto-query");
+      expect(await tasks.dueYesterday(pool, lagos.addDays(day(3), 1))).toEqual([who]);
+      expect(await tasks.dueYesterday(pool, lagos.addDays(day(2), 1))).toEqual([]);
+
+      const r = await evaluator.evaluate({ sources: ["overdue_task"], employee_id: who, date: day(1) });
+      expect(r.raised).toHaveLength(1);
+      const raised = await as("ops").get(`/queries/${r.raised[0]}`);
+      expect(raised.body.subject).toBe("Overdue Tasks");
+      expect(raised.body.details).toBe(`Task overdue on ${formatDate(day(4))} and ${formatDate(day(3))} (2 in 7 days). Please explain.`);
+      expect(raised.body.evidence.map((e) => e.label)).toEqual([
+        "Task overdue: Send the stock count",
+        "Task overdue: File the site report",
+      ]);
+      // A second run finds the breach raised.
+      expect((await evaluator.evaluate({ sources: ["overdue_task"], employee_id: who, date: day(1) })).raised).toEqual([]);
+    });
+
+    test("a month closed rated Below counts on the day it closed, through review.closed", async () => {
+      const who = people.manager.employee.employee_id;
+      const round = async (name, month) =>
+        (
+          await q(
+            `INSERT INTO performance_cycle (name, starts_on, ends_on, status, month)
+             VALUES ($1, $2, ($2::date + interval '1 month' - interval '1 day')::date, 'closed', $2) RETURNING performance_cycle_id`,
+            [name, month],
+          )
+        ).rows[0].performance_cycle_id;
+      const review = (roundId, kind, rating) =>
+        q(
+          `INSERT INTO performance_review (performance_cycle_id, employee_id, reviewer_employee_id, review_type, status,
+                                           review_kind, closed_at, rating)
+           VALUES ($1, $2, $3, 'manager', 'closed', $4, now(), $5)`,
+          [roundId, who, people.hod.employee.employee_id, kind, rating],
+        );
+      await review(await round("August 2026", "2026-08-01"), "monthly", "partly_meets");
+      await review(null, "probation", "below");
+      const rule = await as("ops").post("/query-rules", { name: "Low Monthly Score", source_event: "low_performance", threshold: 1, window_days: 90 });
+      await as("ops").post(`/query-rules/${rule.body.query_rule_id}/activate`);
+      await q("UPDATE query_rule SET activated_at = $2 WHERE query_rule_id = $1", [rule.body.query_rule_id, lagos.startOfDay(day(10))]);
+      expect((await evaluator.evaluate({ sources: ["low_performance"], employee_id: who, date: today })).raised).toEqual([]);
+
+      await review(await round("September 2026", "2026-09-01"), "monthly", "below");
+      const { jobOf } = require("../../src/modules/query_rules/query_rules.events");
+      const closed = (payload) => jobOf({ key: "review.closed", occurred_at: new Date(), payload: { employee_id: who, ...payload } });
+      expect(closed({ review_kind: "monthly", rating: "below" })).toEqual({ sources: ["low_performance"], employee_id: who, date: today });
+      expect(closed({ review_kind: "monthly", rating: "meets" })).toBeNull();
+      expect(closed({ review_kind: "probation", rating: "below" })).toBeNull();
+
+      const r = await evaluator.evaluate({ sources: ["low_performance"], employee_id: who, date: today });
+      expect(r.raised).toHaveLength(1);
+      const raised = await as("ops").get(`/queries/${r.raised[0]}`);
+      expect(raised.body.evidence.map((e) => e.label)).toEqual(["September 2026 rated Below"]);
     });
   });
 

@@ -59,7 +59,7 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'query_rule_source_event_check') THEN
     ALTER TABLE query_rule ADD CONSTRAINT query_rule_source_event_check CHECK (source_event IN
-      ('lateness', 'absence', 'missing_clock_out', 'unenrolled_device', 'overdue_task', 'missed_target'));
+      ('lateness', 'absence', 'missing_clock_out', 'unenrolled_device', 'overdue_task', 'low_performance', 'missed_target'));
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'query_rule_minutes_lateness_check') THEN
     ALTER TABLE query_rule ADD CONSTRAINT query_rule_minutes_lateness_check CHECK (measure = 'count' OR source_event = 'lateness');

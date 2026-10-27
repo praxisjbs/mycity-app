@@ -605,6 +605,7 @@ describe("schedules and heartbeat", () => {
       "mail-sync",
       "media-reconcile",
       "places-name",
+      "query-rule-sweep",
       "reminders",
       "review-cycles",
       "scheduled-reports",

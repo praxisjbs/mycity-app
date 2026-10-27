@@ -191,7 +191,9 @@ here.
 - A rule is `{ source_event, measure, threshold, window_days, letter_template }`. Triggers:
   `lateness` (a late punch), `absence` (an absent day at the day-close), `missing_clock_out` (the
   day-close opened one), `unenrolled_device` (a punch from a device not on the person's list),
-  `overdue_task` (M2 tasks), `missed_target` (an M2 KPI closed below its target).
+  `overdue_task` (a Workspace task whose due day passed before it was done: still open, or done
+  late, counted on its due day), `low_performance` (a month's review closed rated Below, counted on
+  the day it closed), `missed_target` (an M2 KPI closed below its target; not counted yet).
 - `measure` is `count` (events) or `minutes` (late minutes summed, `lateness` only), so "three late
   arrivals in thirty days" and "five cumulative hours in a month" are both settings
   (MILESTONES §8 left the number open).
@@ -203,9 +205,10 @@ here.
 - `dedup_key` is `<query_rule_id>:<employee_id>:<breach date>`; the outbox delivers at least once,
   and the unique key makes the second delivery a no-op.
 - Counts come from the owning module, never their tables: attendance answers in
-  `attendance.auto-query.js` (`offences()`); an exception People accepted ("the record stands") is not
-  an offence. `overdue_task` and `missed_target` may be drafted but not switched on until M2's
-  tasks and KPIs count them (409 `TRIGGER_NOT_AVAILABLE`).
+  `attendance.auto-query.js`, tasks in `tasks.auto-query.js`, reviews in `reviews.auto-query.js`
+  (each `offences()`); an exception People accepted ("the record stands") is not an offence. A task
+  counts against its primary assignee; a cancelled or archived task never counts. `missed_target`
+  may be drafted but not switched on until M2's KPIs count it (409 `TRIGGER_NOT_AVAILABLE`).
 - A rule may name the policy it enforces (`policy_id`, `policy_clause`): its queries cite the
   version in force on the breach day, and their letters quote it, as a manual query's (§6.2). A
   rule whose policy has no version in force still raises its query, without the citation.
@@ -306,7 +309,8 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
 | `consequence_step.saved` | Chain Settings writes | Audit |
 | `sanction_fine.accepted`, `.settled`, `.waived` | M6 takes, deducts or waives a fine (`sanctions.fines`) | Audit |
 | `letter_template.saved`, `letter_template.activated` | Letter Templates writes | Audit |
-| job `query-rule-evaluate` | Queued by `query_rules.events` on `attendance.punched` (a clock-in), `attendance.day_closed` (absent) and `attendance.review_required` (a missing clock-out, an unknown device), once per event | Counts the person's active rules as of the event's day and raises one query per breach (§6.3); idempotent |
+| job `query-rule-evaluate` | Queued by `query_rules.events` on `attendance.punched` (a clock-in), `attendance.day_closed` (absent), `attendance.review_required` (a missing clock-out, an unknown device) and `review.closed` (a month rated Below), once per event, and by the schedule below | Counts the person's active rules as of the event's day and raises one query per breach (§6.3); idempotent |
+| schedule `query-rule-sweep` | Every day at 06:20 Lagos | For each person with a task due yesterday that is still open or was done late, queues `query-rule-evaluate` for `overdue_task` as of yesterday; only while an `overdue_task` rule is active |
 
 ## 8 · Permissions and visibility by role
 
@@ -436,6 +440,10 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · Rules count overdue Workspace tasks and low monthly performance (meeting 26/10;
+  §6.3, §7): `overdue_task` from `tasks.auto-query.js` through the daily `query-rule-sweep`, and
+  the new trigger `low_performance` (a month closed rated Below) from `reviews.auto-query.js` on
+  `review.closed`. `missed_target` still waits for M2's KPIs.
 - 26/10/2026 · GE · Write With AI on Raise a Query and the letter editor (meeting 26/10; §5, §9):
   prompts `query-draft` (Default) and `letter-draft` (Deep Reasoning), chosen by GE; nothing kept
   until Use Draft; the mailbox's placeholder guard moved to `services/ai/drafts.js` for both.
