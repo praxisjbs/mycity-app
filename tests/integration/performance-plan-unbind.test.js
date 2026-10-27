@@ -92,6 +92,8 @@ describeDb("performance plans unbound for changes, against the real migrations",
     await make("head", "Tolu", "Ade", "head_of_department", "Head, Brand", "Branding & Marketing");
     await make("ada", "Ada", "Nwosu", "employee", "Social Media Manager", "Branding & Marketing");
     await make("other", "Bisi", "Lawal", "head_of_department", "Head, Tech", "Technology & Back-office Ops");
+    // The build account: the Implementation Team holds every capability, goals.organisation among them, but is not the CEO.
+    await make("impl", "Seun", "Phillips", "implementation", "Implementation Partner", "General Management");
     await q("UPDATE employee SET line_manager_id = $1 WHERE employee_id = $2", [emp("head"), emp("ada")]);
     ids.bm = (await one("SELECT department_id FROM department WHERE name = 'Branding & Marketing'")).department_id;
     ids.tbo = (await one("SELECT department_id FROM department WHERE name = 'Technology & Back-office Ops'")).department_id;
@@ -406,6 +408,26 @@ describeDb("performance plans unbound for changes, against the real migrations",
     expect(shut.status).toBe(409);
     expect(shut.body.error).toMatchObject({ code: "PLAN_BINDING", fields: { department_id: ["Plan is binding"] } });
     expect(await tboRow("other")).toMatchObject({ plan_status: "binding", can_request_unbind: true });
+    ids.tboPlan = planId;
+  });
+
+  test("only the CEO is left out of Request To Unbind: the build account, which holds goals.organisation too, asks and the CEO decides (JBS Praxis, 27/10/2026)", async () => {
+    const row = async (who) => (await as(who).get(`/performance/functions?period_id=${ids.q4}`)).body.data.find((f) => f.department_id === ids.tbo);
+    // It holds the capability the CEO's exclusion used to key on, and sets every function: offered it all the same.
+    expect(await row("impl")).toMatchObject({ may_set: true, plan_status: "binding", can_request_unbind: true });
+    expect(await row("ceo")).toMatchObject({ may_set: true, plan_status: "binding", can_request_unbind: false });
+
+    const asked = await as("impl").post(`/performance/plans/${ids.tboPlan}/unbind`, { reason: "Add a platform objective" });
+    expect(asked.status).toBe(201);
+    expect(await row("impl")).toMatchObject({ can_request_unbind: false });
+    const mine = (await waiting("ceo")).filter((r) => r.kind === "unbind");
+    expect(mine.map((r) => [r.record_id, r.department])).toEqual([[asked.body.plan_unbind_id, "Technology & Back-office Ops"]]);
+    expect(mine[0].requested_by.display_name).toContain("Seun");
+    const instance = await one("SELECT workflow_instance_id FROM workflow_instance WHERE entity_id = $1", [asked.body.plan_unbind_id]);
+    expect((await as("impl").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(403);
+    expect((await as("ceo").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(200);
+    await drain();
+    expect((await one("SELECT status FROM performance_plan WHERE performance_plan_id = $1", [ids.tboPlan])).status).toBe("unbound");
   });
 
   test("a closed quarter, or a plan that is not binding, takes no request", async () => {
