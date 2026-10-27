@@ -51,7 +51,7 @@ const PERFORMANCE_DATES = `
            FROM okr_key_result kr
            JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
            JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id
-          WHERE kr.accountable_employee_id = $1 AND pl.status = 'binding'
+          WHERE kr.accountable_employee_id = $1 AND pl.status IN ('binding', 'unbound', 'revising')
             AND kr.finishes_on BETWEEN $4::date AND $5::date
          UNION ALL
          SELECT 'performance', ip.improvement_plan_id,

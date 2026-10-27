@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ModalProvider } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { invalidate } from "@/api/hooks";
@@ -82,6 +82,16 @@ describe("Performance · Analytics", () => {
     // The people, highest score first.
     await screen.findByText("Adedotun Oyinloye");
     expect(await axe(document.body)).toHaveNoViolations();
+  }, 30000);
+
+  it("the Function filter offers a manager only the functions of the people they reach, and a member of staff none", async () => {
+    await analyticsAs("ngozi@mycityapp.io");
+    fireEvent.click(screen.getByRole("combobox", { name: "Function" }));
+    expect(within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)).toEqual(["All Functions", "Finance", "Marketing & Sales", "Studio"]);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    cleanup();
+    await analyticsAs("kemi@mycityapp.io");
+    expect(screen.queryByRole("combobox", { name: "Function" })).toBeNull();
   }, 30000);
 
   it("on a phone: no Self Against Final; the people as cards, five at most, with no pager", async () => {

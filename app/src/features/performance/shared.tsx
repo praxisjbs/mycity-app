@@ -21,6 +21,20 @@ export function useSettableFunctions(periodId: string | null) {
   return { rows: list.rows.filter((f) => f.may_set), loading: list.loading, error: list.error, reload: list.reload };
 }
 
+/**
+ * The Department (or Function) filter of a list that shows people: the `all` choice, then the
+ * departments the reader's `performance` scope reaches (GET /performance/departments, the server's
+ * answer: everyone's for a reader who sees everyone, else their own, their team's and those they
+ * review or head). `pick` is false when there is nothing to choose between, so the select is left
+ * off; `value` is the picked department while it is still one of the choices, else none.
+ */
+export function useDepartmentFilter(all: string, picked: string) {
+  const list = usePaged("GET /api/v1/performance/departments");
+  const options: Array<[string, string]> = [["", all], ...list.rows.map((d) => [d.department_id, d.name] as [string, string])];
+  const known = list.loading || list.rows.some((d) => d.department_id === picked);
+  return { options, pick: list.rows.length > 1, value: known ? picked : "" };
+}
+
 /** The quarter the screen shows: the current one until another is picked. */
 export function useQuarter(): {
   period: PerformancePeriod | null;
@@ -134,6 +148,9 @@ const PLAN: Record<string, [string, Tone]> = {
   submitted: ["Awaiting Approval", "warn"],
   binding: ["Binding", "ok"],
   returned: ["Returned", "err"],
+  // Unbound: live and open for changes; revising: its changes are with the CEO (§6.22).
+  unbound: ["Unbound", "info"],
+  revising: ["Awaiting Approval", "warn"],
 };
 
 /** A plan's status as a pill. */

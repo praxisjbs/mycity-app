@@ -10,6 +10,11 @@
  *   performance.target_change approved  the new target applies from its month; earlier months keep
  *                                       their scores; the original stays in the history
  *   performance.target_change rejected  nothing changes but the request
+ *   performance.plan_change approved    a request to unbind a binding plan: the plan is unbound, live and
+ *                                       open for changes (§6.22); the changes an unbound plan then sends:
+ *                                       the plan is binding again
+ *   performance.plan_change rejected    the request is refused and the plan stays binding; the changes
+ *                                       are returned and the plan stays unbound, with the reason
  *
  * Each runs once, after the decision commits, as an outbox handler (workflow.onCompleted); each is
  * safe to run again.
@@ -23,6 +28,9 @@ const { EVENTS } = require("./goals.events");
 
 const PLAN_FLOW = "performance.plan";
 const CHANGE_FLOW = "performance.target_change";
+const PLAN_CHANGE_FLOW = "performance.plan_change";
+
+const isApproved = (state) => state === "approved" || state === "timeout_approved";
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -117,6 +125,64 @@ async function settleChange(changeId, { state }) {
   });
 }
 
+/**
+ * Settle a request to unbind a plan: approved, the plan is unbound; refused, it stays as it is. A plan
+ * that is no longer binding when the CEO approves (it was reset meanwhile) has nothing to unbind: the
+ * request is closed refused, saying so. Either way the request keeps the decision, and its sender is told.
+ */
+async function settleUnbind(unbindId, { state, reason = null }) {
+  return tx(async (client) => {
+    const request = await repo.getUnbindRow(client, unbindId);
+    if (!request || request.status !== "pending") return null;
+    const plan = await repo.getPlan(client, request.performance_plan_id);
+    const unbound = isApproved(state) && Boolean(plan) && plan.status === "binding";
+    if (unbound) await repo.updatePlan(client, plan.performance_plan_id, { status: "unbound", returned_reason: null });
+    const why = unbound ? null : isApproved(state) ? "The plan is no longer binding" : reason;
+    await repo.updateUnbind(client, unbindId, { status: unbound ? "approved" : "rejected", decided_at: new Date(), decision_reason: why });
+    await emit(client, {
+      key: EVENTS.PLAN_UNBIND_DECIDED,
+      entity: { type: "plan_unbind", id: unbindId },
+      actor: null,
+      payload: {
+        plan_unbind_id: unbindId,
+        performance_plan_id: request.performance_plan_id,
+        status: unbound ? "approved" : "rejected",
+        department: plan ? plan.department : null,
+        period: plan ? plan.period_name : null,
+        reason: why,
+        requested_by_employee_id: await employeeOfUser(client, request.requested_by),
+      },
+    });
+    return unbound ? "approved" : "rejected";
+  });
+}
+
+/**
+ * Settle an unbound plan's changes: approved, the plan is binding again (its first approval date
+ * stays); returned, it is unbound with the reason, for its head to change and send again.
+ */
+async function settleRevision(planId, { state, reason = null }) {
+  return tx(async (client) => {
+    const plan = await repo.getPlan(client, planId);
+    if (!plan || plan.status !== "revising") return null;
+    const approved = isApproved(state);
+    await repo.updatePlan(client, planId, approved ? { status: "binding", returned_reason: null } : { status: "unbound", returned_reason: reason || null });
+    await emit(client, {
+      key: approved ? EVENTS.PLAN_REVISED : EVENTS.PLAN_REVISION_RETURNED,
+      entity: { type: "performance_plan", id: planId },
+      actor: null,
+      payload: {
+        performance_plan_id: planId,
+        department: plan.department,
+        period: plan.period_name,
+        reason,
+        submitted_by_employee_id: await employeeOfUser(client, plan.submitted_by),
+      },
+    });
+    return approved ? "binding" : "unbound";
+  });
+}
+
 // A plan, or a mid-quarter scorecard sent on its own as an amendment of its plan (§11).
 workflow.onCompleted(PLAN_FLOW, "goals.settle_plan", (event) =>
   event.entity.type === "scorecard"
@@ -132,4 +198,10 @@ workflow.onCompleted(CHANGE_FLOW, "goals.settle_target_change", (event) =>
   settleChange(event.entity.id, { state: event.payload.state }),
 );
 
-module.exports = { PLAN_FLOW, CHANGE_FLOW, settlePlan, settleChange };
+// A request to unbind a plan, or the changes made to the plan once it is unbound (§6.22).
+workflow.onCompleted(PLAN_CHANGE_FLOW, "goals.settle_plan_change", (event) => {
+  const outcome = { state: event.payload.state, reason: event.payload.reason || null };
+  return event.entity.type === "plan_unbind" ? settleUnbind(event.entity.id, outcome) : settleRevision(event.entity.id, outcome);
+});
+
+module.exports = { PLAN_FLOW, CHANGE_FLOW, PLAN_CHANGE_FLOW, settlePlan, settleChange, settleUnbind, settleRevision };

@@ -28,6 +28,8 @@
  * `performance.target_change` (the CEO), `performance.commitments` (the person's reviewer, or the
  * CEO for a function head) and `performance.review` (the reviewer's own manager, skipped when the
  * reviewer is the CEO, then Operations & People; the reviewee is excluded from deciding it).
+ * A fifth, `performance.plan_change` (§6.22, seeded in 2321), is the CEO's decision on a request to
+ * unbind a binding plan and on the changes then made to it.
  *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
@@ -173,6 +175,15 @@ const DEFAULTS = Object.freeze({
     module: "performance",
     name: "Target Change",
     description: "The CEO approves a change to a binding target.",
+    context: {},
+    stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
+  },
+  // M2, seeded in 2321 (docs/guides/performance.md §6.22).
+  "performance.plan_change": {
+    key: "performance.plan_change",
+    module: "performance",
+    name: "Plan Change",
+    description: "The CEO approves unbinding a binding plan, then the changes made to it.",
     context: {},
     stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
   },

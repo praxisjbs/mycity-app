@@ -33,7 +33,7 @@ import {
   useIsPhone,
   useModal,
 } from "@mycity/ui";
-import { monthShort, person, rating, score, useQuarter } from "./shared";
+import { monthShort, person, rating, score, useDepartmentFilter, useQuarter } from "./shared";
 
 type Filters = { period_id?: string; department_id?: string };
 type ExportBody = Endpoints["POST /api/v1/performance/analytics/people/export"]["body"];
@@ -74,13 +74,13 @@ export function Analytics() {
   const phone = useIsPhone();
   const quarter = useQuarter();
   const period = quarter.period;
-  const departments = useApi("GET /api/v1/departments", { query: { active: "true" } });
-  const [dept, setDept] = useState("");
+  const [pickedDept, setDept] = useState("");
+  const departments = useDepartmentFilter("All Functions", pickedDept);
+  const dept = departments.value;
   const filters: Filters = { ...(quarter.periodId ? { period_id: quarter.periodId } : {}), ...(dept ? { department_id: dept } : {}) };
   // Wait for the quarter, so the current one is read once by its id rather than twice.
   const read = useApi("GET /api/v1/performance/analytics", { query: filters, enabled: !quarter.loading });
   const people = usePaged("GET /api/v1/performance/analytics/people", { filters, sort: "-score_to_date", enabled: !quarter.loading });
-  const functions: Array<[string, string]> = [["", "All Functions"], ...(departments.data?.data ?? []).map((d) => [d.department_id, d.name] as [string, string])];
   const mayExport = me.grants.performance?.includes("export") ?? false;
   const exportPeople = () => saveExport(api.call("POST /api/v1/performance/analytics/people/export", { body: { ...filters, ...(people.q ? { q: people.q } : {}) } as ExportBody }));
 
@@ -89,7 +89,7 @@ export function Analytics() {
       <PageHeader title="Analytics" sub={period ? `${period.name} · ${formatDate(period.starts_on)} to ${formatDate(period.ends_on)}` : undefined} />
       <Toolbar>
         <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} />
-        <FilterSelect label="Function" value={dept} onChange={setDept} options={functions} />
+        {departments.pick && <FilterSelect label="Function" value={dept} onChange={setDept} options={departments.options} />}
       </Toolbar>
     </>
   );
