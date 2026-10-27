@@ -1,7 +1,7 @@
--- M2 Performance: every organisational goal carries its ID (docs/guides/performance.md §6.1; JBS
--- Praxis, 27/10/2026). From this release the service numbers each new goal from the scheme seeded
--- in 2291 and the Goal ID is no longer typed; this file gives an ID to a goal recorded before,
--- while it was typed and optional.
+-- M2 Performance: every organisational goal carries its ID (docs/guides/performance.md §6.1;
+-- JBS Praxis, 27/10/2026). From this release the service numbers each new goal from the scheme
+-- seeded in 2291 and the Goal ID is no longer typed; this file gives an ID to a goal recorded
+-- before, while it was typed and optional.
 --
 --   organisational_goal.code_given_at   when the system gave the goal its ID; null for one a person
 --                                       typed before this file. Written by the service with the ID.
