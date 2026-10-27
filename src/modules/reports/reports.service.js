@@ -14,6 +14,8 @@
  *   runs()          GET   /home/report-runs           Recent Runs, newest first
  *   getRun()        GET   /home/report-runs/:id       one run on the reader's Recent Runs, else 404
  *   exportOverview() POST /home/overview/export       the caller's own Overview, as Run Now
+ *   exportPersonal() a personal export of any source never offered on the form: the
+ *                    Overview's, and POST /workspace/analytics/export (workspace.md §6)
  *
  *   queueDue()      the `scheduled-reports` tick: a `scheduled-report` job per schedule now due
  *   fireSlot()      that job: one run per recipient and format for the slot, the next slot set
@@ -23,8 +25,8 @@
  * WHO SEES A REPORT (home.md §6): its owner; its recipients and, when it is shared, every
  * holder of `home.reports`, while they may open its source; the CEO every report. Only the
  * owner and the CEO change, pause or archive it; anyone who sees it may run it for themselves
- * while they may open its source. A person's own Overview report (the Overview Export) is
- * never listed. readerOf() works out the sources a reader may open once per request, and
+ * while they may open its source. A person's own report of a personal export (the Overview
+ * Export, Workspace Analytics' Export) is never listed. readerOf() works out the sources a reader may open once per request, and
  * reports.repo.js seenWhere() turns it into the one condition every read here uses.
  *
  * A SCHEDULE is a recurrence rule from a start day at a time of day in Lagos
@@ -55,10 +57,10 @@ const { EVENTS, ENTITY } = require("./reports.events");
 /** The schedules one `scheduled-reports` tick queues at most; the rest are queued at the next. */
 const DUE_BATCH = 200;
 
-/** The name a person's own Overview report takes, with a number on the end when they hold it. */
-const OVERVIEW_NAME = "Overview";
-
 const { SOURCES } = reportSources;
+
+/** The name a person's own report of a personal export takes ("Overview", "Workspace Analytics"), with a number on the end when they hold it. */
+const personalName = (key) => SOURCES[key].label;
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -102,7 +104,7 @@ async function mayReport(db, user) {
 
 /**
  * Why a person may not receive a report's file, or null when they may: an active login, who
- * may open the report's source and, for any source but the Overview, holds `home.reports`.
+ * may open the report's source and, for any source but a personal export's, holds `home.reports`.
  * The rule a schedule's recipients are held to when it is saved, and each file when it is made.
  * @param {{query: Function}} db
  * @param {object|null} person  grants-cache getAuthUser
@@ -112,7 +114,7 @@ async function mayReport(db, user) {
 async function whyNot(db, person, sourceKey) {
   if (!person || person.status !== "active") return "inactive";
   if (!(await reportSources.scopeOn(db, person, sourceKey))) return "source";
-  if (sourceKey === repo.OVERVIEW || (await mayReport(db, person))) return null;
+  if (repo.PERSONAL.includes(sourceKey) || (await mayReport(db, person))) return null;
   return "capability";
 }
 
@@ -266,15 +268,21 @@ async function getRun(user, id) {
 }
 
 /**
- * GET /home/overview/export/:id: one of the reader's own Overview Export runs, which the screen
- * that pressed Export waits on to download its file. Open to every Home reader, as the Export
- * is; any other run is a 404.
+ * One of the reader's own runs of a personal export, which the screen that pressed Export waits
+ * on to download its file: GET /home/overview/export/:id (the Overview's, open to every Home
+ * reader) and GET /workspace/analytics/export/:id. Any other run is a 404.
+ * @param {object} user
+ * @param {string} id
+ * @param {string} [key]  the personal source, the Overview's by default
  */
-async function getOverviewRun(user, id) {
+async function getPersonalRun(user, id, key = repo.OVERVIEW) {
   const row = await repo.runById(pool, id, { seen: { all: false, user_id: user.user_id } });
-  if (!row || row.report_key !== repo.OVERVIEW || row.recipient_user_id !== user.user_id) throw runNotFound();
+  if (!row || row.report_key !== key || row.recipient_user_id !== user.user_id) throw runNotFound();
   return presentRun(row);
 }
+
+/** GET /home/overview/export/:id: one of the reader's own Overview Export runs. */
+const getOverviewRun = (user, id) => getPersonalRun(user, id, repo.OVERVIEW);
 
 /* ------------------------------------------------------------------ *
  * Building and changing a report
@@ -282,23 +290,27 @@ async function getOverviewRun(user, id) {
 
 /**
  * The owner may give a report this name: no other report of theirs has it, case aside. Their
- * own Overview report is never listed, so a name they choose always wins it: that report
- * takes the next free name instead. The table's own unique key is exact, so one owner's saves
+ * own personal exports' reports are never listed, so a name they choose always wins it: such a
+ * report takes the next free name instead. The table's own unique key is exact, so one owner's saves
  * take turns here: two at once with "Late" and "late" are one name, not two.
  */
 async function claimName(client, ownerUserId, name, { except = null } = {}) {
   await repo.lockOwner(client, ownerUserId);
   if (await repo.nameTaken(client, ownerUserId, name, { except })) throw nameTaken();
-  const overview = await repo.overviewReportOf(client, ownerUserId);
-  if (overview && overview.name === name && overview.saved_report_id !== except)
-    await repo.updateReport(client, overview.saved_report_id, { name: await freeName(client, ownerUserId) });
+  // One after the other: `client` is a transaction's, which runs one query at a time.
+  for (const key of repo.PERSONAL) {
+    const personal = await repo.personalReportOf(client, ownerUserId, key);
+    if (personal && personal.name === name && personal.saved_report_id !== except)
+      await repo.updateReport(client, personal.saved_report_id, { name: await freeName(client, ownerUserId, key) });
+  }
 }
 
-/** The first of "Overview", "Overview 2", ... the owner does not hold, case aside. */
-async function freeName(client, ownerUserId) {
-  const used = new Set(await repo.namesLike(client, ownerUserId, OVERVIEW_NAME));
-  if (!used.has(OVERVIEW_NAME.toLowerCase())) return OVERVIEW_NAME;
-  for (let n = 2; ; n += 1) if (!used.has(`${OVERVIEW_NAME} ${n}`.toLowerCase())) return `${OVERVIEW_NAME} ${n}`;
+/** The first of "Overview", "Overview 2", ... (a personal source's name) the owner does not hold, case aside. */
+async function freeName(client, ownerUserId, key = repo.OVERVIEW) {
+  const base = personalName(key);
+  const used = new Set(await repo.namesLike(client, ownerUserId, base));
+  if (!used.has(base.toLowerCase())) return base;
+  for (let n = 2; ; n += 1) if (!used.has(`${base} ${n}`.toLowerCase())) return `${base} ${n}`;
 }
 
 /**
@@ -546,7 +558,8 @@ async function archive(actor, id) {
  * A new numbered run, waiting for its file, and the event that has it built.
  * @param {import("pg").PoolClient} client  inside atomically()
  * @param {{saved_report_id: string, report_schedule_id?: string|null, scheduled_for?: Date|null,
- *          recipient_user_id: string, requested_by: string|null, format: string}} run
+ *          recipient_user_id: string, requested_by: string|null, format: string, filters?: object|null}} run
+ *   filters: the run's own (a personal export's period), or none to read its report's
  * @param {object|null} actor  the caller, or null for a schedule
  * @returns {Promise<string|null>} its id; null when the slot already holds it
  */
@@ -560,6 +573,7 @@ async function queueRun(client, run, actor) {
     recipient_user_id: run.recipient_user_id,
     requested_by: run.requested_by,
     format: run.format,
+    filters: run.filters || null,
   });
   if (!id) return null;
   await emit(client, {
@@ -573,6 +587,8 @@ async function queueRun(client, run, actor) {
       recipient_user_id: run.recipient_user_id,
       format: run.format,
       scheduled_for: run.scheduled_for || null,
+      // The ledger keeps what a personal export's file was asked for (its period).
+      ...(run.filters ? { filters: run.filters } : {}),
     },
     dedup_key: `report_run:${id}`,
   });
@@ -580,20 +596,23 @@ async function queueRun(client, run, actor) {
 }
 
 /**
- * One file of a report for the caller, or the one already waiting for them in that format.
+ * One file of a report for the caller, or the one already waiting for them in that format with
+ * the same filters of its own.
  * @param {import("pg").PoolClient} client  inside atomically(), the report held
+ * @param {object|null} [filters]  the run's own (a personal export's period), or none
  */
-async function runFor(client, actor, report, format) {
+async function runFor(client, actor, report, format, filters = null) {
   const waiting = await repo.pendingOnDemand(client, {
     saved_report_id: report.saved_report_id,
     recipient_user_id: actor.user_id,
     format,
+    filters,
   });
   const id =
     waiting ||
     (await queueRun(
       client,
-      { saved_report_id: report.saved_report_id, recipient_user_id: actor.user_id, requested_by: actor.user_id, format },
+      { saved_report_id: report.saved_report_id, recipient_user_id: actor.user_id, requested_by: actor.user_id, format, filters },
       actor,
     ));
   return presentRun(await repo.runById(client, id));
@@ -620,36 +639,52 @@ async function runNow(actor, id, { format }) {
 }
 
 /**
- * POST /home/overview/export: a file of the caller's own Overview, through the same runs. The
- * report behind it is made the first time they export, theirs alone and never listed.
+ * A personal export: a file for the caller of a source never offered on the form, through the
+ * same runs. The report behind it is made the first time they export, theirs alone and never
+ * listed. Each run keeps the filters it was pressed with (Workspace Analytics' whose-work and
+ * period; migration 2530), so a file is built with its own and a run still waiting never holds
+ * up a press for others: pressing again with the same filters and format answers the waiting
+ * run, and with others makes a run of its own. The route has checked that the caller may export
+ * this source.
  * @param {object} actor  withActor(req)
- * @param {{format: "pdf"|"xlsx"}} body  a validated HomeReportRunNow
+ * @param {string} key  one of repo.PERSONAL
+ * @param {{format: "pdf"|"xlsx"}} body
+ * @param {object} [filters]  the source's filters (HomeReportFilters); none for the Overview
  */
-async function exportOverview(actor, { format }) {
+async function exportPersonal(actor, key, { format }, filters = {}) {
+  if (!repo.PERSONAL.includes(key)) throw new Error(`reports.exportPersonal: "${key}" is not a personal export`);
+  const wanted = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined));
   return tx(async (client) => {
     // One person exporting from two tabs at once makes one report, not two.
     await repo.lockOwner(client, actor.user_id);
-    let report = await repo.overviewReportOf(client, actor.user_id);
+    let report = await repo.personalReportOf(client, actor.user_id, key);
     if (!report) {
       const id = await insertReport(client, {
         owner_user_id: actor.user_id,
-        name: await freeName(client, actor.user_id),
-        report_key: repo.OVERVIEW,
+        name: await freeName(client, actor.user_id, key),
+        report_key: key,
         definition: { filters: {} },
         shared: false,
       });
-      report = await repo.overviewReportOf(client, actor.user_id);
+      report = await repo.personalReportOf(client, actor.user_id, key);
       await emit(client, {
         key: EVENTS.HOME_REPORT_CREATED,
         entity: { type: "home_report", id },
         actor,
         after: auditOf(report),
-        payload: { saved_report_id: id, report_key: repo.OVERVIEW, scheduled: false },
+        payload: { saved_report_id: id, report_key: key, scheduled: false },
       });
     }
-    return runFor(client, actor, report, format);
+    return runFor(client, actor, report, format, Object.keys(wanted).length ? wanted : null);
   });
 }
+
+/**
+ * POST /home/overview/export: a file of the caller's own Overview, through the same runs.
+ * @param {object} actor  withActor(req)
+ * @param {{format: "pdf"|"xlsx"}} body  a validated HomeReportRunNow
+ */
+const exportOverview = (actor, body) => exportPersonal(actor, repo.OVERVIEW, body);
 
 /* ------------------------------------------------------------------ *
  * Schedules firing
@@ -793,12 +828,14 @@ module.exports = {
   runs,
   getRun,
   getOverviewRun,
+  getPersonalRun,
   create,
   update,
   setActive,
   archive,
   runNow,
   exportOverview,
+  exportPersonal,
   queueDue,
   fireSlot,
   forAssistant,

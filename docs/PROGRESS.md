@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 101 screens (95 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 102 screens (96 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 35 items below: 34 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
-| M2 Productivity & Performance | 11 | 0 | 0 | 11 | 0 | 0 |
+| M2 Productivity & Performance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **101** | **40** | **0** | **61** | **0** | **0** |
+| **Total** | **102** | **40** | **0** | **62** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -672,11 +672,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Notes**
 
+- 27/10/2026 · AJ · Reports (#3): a second personal export runs through the engine, My Workspace · Analytics' (`workspace_analytics`, `docs/guides/home.md` §6); what was the Overview's alone (never listed, its name giving way, its runs read by the screen that pressed) is now each personal source's, and a snapshot source receives its filters. Recent Runs names its runs Workspace Analytics. Run Now and the Overview's Export use the shared `FormatButton` from `@mycity/ui`; nothing a person sees changed. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #2 Alerts' Category chips carry the unread notices about the open alerts in each category · nothing left
 - 26/10/2026 · JP · Overview (#1), QA DEF-01 finished: Need You (`/workflow/mine` and its count) never lists a request about a record whose screen has not shipped (an expense before Milestone 8), decided on the server by the plan the app was built with · nothing left
 - 26/10/2026 · JP · Overview (#1), QA DEF-01: Overview cards and Choose Cards leave out a card whose module is Coming Soon in this build (Expenses before M8), for every role; cards and options carry `module`, and a `?kpi=` link to a held-back card opens nothing · Need You can still list an expense approval that opens Coming Soon (its paging is the server's, and the server does not know what is released)
@@ -782,10 +783,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 101 | Projects | `projects` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
-| 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
+| 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
 
+- 27/10/2026 · AJ · Analytics (#7) Export, after a refresh mid-export answered "Your last export is still being made": each report run keeps the period it was pressed for (migration `2530_home_report_run_filters.sql`, `home_report_run.filters`, Home's table, TB to review), the file is built with it, and a waiting run never holds up another press; the refusal is gone, from the API, the mock and the User Guide. The ledger has each file's period on its `home.report_run` line. Custom Period is a `Form` (Enter shows it). Tests: workspace integration (two periods at once, each file with its own; the period on the ledger), the migration round trip. Left: nothing; a stuck run on a laptop means no worker is running (`npm run dev:worker`).
+- 27/10/2026 · AJ · Analytics (#7), asked for by TB at the internal meeting of 26/10/2026: the period is This Week, 30 Days, 90 Days, This Year or Custom (Custom Period: From and To, at most 366 days, ending today at the latest, checked by the contract as filled and by the API; Change Dates reopens it), and Export (desktop, holders of `workspace` export) makes a PDF or an XLSX of the figures through Home's reports engine, as the Overview's Export does: source `workspace_analytics` on the reader's own hidden report, `POST` and `GET /workspace/analytics/export`, a numbered run built in the worker as the reader, Workload by Person and Blocked Work every page. Home's `FormatButton` moved into `packages/ui` (Data) so both screens share it, its press handing back its work (F26). Tests: workspace integration 6 new (periods, refusals, who exports, the file's sheets against the screen's figures, a second period while one waits, a lost grant skipped), reports unit 1, `FormatButton` 4, the screen 3; the User Guide's Analytics section, a new picture, the chapters' stale pictures retaken. Not verified: a click-through on staging. Left: nothing.
 - 27/10/2026 · JP · Tasks (#5), fault #4 of the 27/10 staging brief: Wait On Task left out the task itself and those it waits on, but offered tasks already waiting on it, which the service refuses as a loop; it now leaves those out too. Add Link's four refusals have their own codes (`TASK_LINK_SELF`, `TASK_LINK_UNSEEN`, `TASK_LINK_CANCELLED`, `TASK_LINK_LOOP`), so System Health names the rule met. Tests: `workspace/Workspace.test.tsx`, `tests/integration/workspace.test.js`. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #5 Tasks' Mine and My Team and each board column (a phone's stage) carry the unread notices about the tasks there; the board opens on My Team when only others' tasks hold them, Show Cancelled turns on when a cancelled one does, and a new card has a row's dot · nothing left
 - 26/10/2026 · JP · Tasks (#5), QA OBS-06 finished: a waiting card moved out of To Do (a drag, its menu, a phone's Move To) opens Waiting On before anything is sent, naming each task it waits on with Open Task, and Go Ahead for whoever plans it, which then moves the card where it was put; Close leaves it in To Do; the mock refuses as the API does. QA DEF-06 acceptance tested: an empty Add Comment is marked and sends nothing, a refused one keeps its words, one press (even two) adds exactly one · nothing left
@@ -992,9 +995,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 25/10/2026 |
+| 103 | Departments | `departments` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
 
+- 27/10/2026 · JP · People · Departments (#103), JBS Praxis's four answers of 27/10/2026 (`docs/guides/organogram.md` §6.1, §10): departments are kept on screen, with nothing about them in code. Add Department (the code offered from the name), Edit Department, Set Head (a person, an open role of the department, or nobody), Add People, Move To, Merge Department, Retire Department, Restore Department and Delete Department (only one nothing names), on `GET /departments/:id`, `POST /departments/:id/people`, `POST /departments/:id/merge` and `DELETE /departments/:id` beside the old routes; a change needs `people` over everyone. Reporting lines follow the head: a new head takes the old head's place and their people, and someone moved in reports to the head unless their manager is there or moves with them (Edit Record's Department too). The head, or whoever acts for an open head role, holds Head of Department while they head (`user_role.from_headship`, migration 2600), given and taken back with the head, on Invite User, Save Roles and each deploy, so a head sets their function's goals with no second step. People · Employees gains Move To Department on the rows picked (desktop). ⌘K opens a department here (it opened Settings · Organisation) and offers Add Department. The deploy loader gives departments and heads only to a database that never had them. Tests: `tests/integration/departments.test.js` (14), the loader's screen edits surviving a deploy, `Departments.test.tsx` (5). One level only. Left: a Head mark on the organogram's cards, if wanted.
 - 26/10/2026 · JP · Where it waits, inside a tab (the QA register's Worksites 2): #28 Worksites' Permanent and Temporary, Temporary's Sites, Requests and Field and their chips carry the unread notices about what they hold, and the screen opens there; a link that arrives while Worksites is open picks its side. #25 Attendance's views and chips likewise (Register rows keyed by the day, so a notice about one dots it), #26 Leave's and #27 Devices' chips by status · nothing left
 - 26/10/2026 · JP · Attendance (#25), QA DEF-02 finished: ⌘K's attendance days end with All Days of each person listed, opening People · Attendance's All Days panel (`?person=`): their days by month, newest first, a day opening over it (`GET /attendance/days`, `people` view, in scope) · nothing left
 - 26/10/2026 · JP · QA DEF-04 finished: Attendance (#25) export Period's From and To each carry their own label and error, At most 31 days shows once under both. QA OBS-05: Leave (#26) Waiting On agrees with the request's history on every route, tested against Postgres · nothing left
@@ -1099,6 +1104,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 **Notes**
 
 - 27/10/2026 · JP · Goals (#29), Request To Unbind (P23, JBS Praxis, 27/10/2026): while a function's plan is binding, its head (Management for the company's) sees Request To Unbind in place of New Goal; a modal asks the Reason and Send Request goes to the CEO (`POST /performance/plans/:id/unbind`, `performance.plan_change`, one stage), who decides it on Waiting On You (Approve Request or Refuse Request, `?unbind=`). Approved, the plan is **Unbound**: live (Report Month, reviews, Counts Towards, Home carry on), open for objectives and key results to be added and changed, nothing with a reported month deleted and a reported key result's target changed only by Change Target; Send Plan then goes to the CEO alone and the plan is Revising (locked, live) until they approve or ask for changes. Migration 2320 (the plan's status check, `plan_unbind`), seed 2321 (the flow); `can_request_unbind` on `GET /performance/functions`; `live` on the OKR filter; guide §6.22; the Performance chapter (Ask to change a binding plan) and its pictures. Tests: `performance-plan-unbind.test.js` (real migrations), `Approvals.test.tsx`, `Goals.test.tsx`, `performance-flows.test.js`. Left: nothing.
+- 27/10/2026 · JP · Performance's functions and heads now come from People · Departments (#103, `docs/guides/organogram.md` §6.1): a head set there sets the function's goals at once, holding Head of Department while they head; reporting lines follow the head, so the next month's reviews go to them. No Performance code changed: `organisation.headOf` is read live. `performance.md` P4, §2, §6.3, §6.20 and §11 updated · nothing left
 - 27/10/2026 · JP · Goals (#29): an organisational goal's ID is the system's (JBS Praxis, 27/10/2026): New Goal no longer asks for a Goal ID; the service gives the next of the plan year from the new `organisational_goal` numbering scheme (`ORG-2026-01`, seed 2291, editable on Settings · Documents & Numbering #76), the toast names it, and neither body takes it. Migration 2295 gives each goal of the plan without an ID the next of its year (`code_given_at`) and moves the counter past those typed, which they keep. Tests: `Goals.test.tsx`, `performance-plan.test.js` (and the goal tests that typed `OG1`). Left: nothing.
 - 27/10/2026 · JP · Scorecards (#30) and Reviews (#32), the 27/10 staging faults brief: Edit Lines checks its lines against `ScorecardLinesSave` before Save Lines sends them, so a line added without its Goal reads Required and nothing is sent (fault #1); Open Round lists a month still running with the day it ends, unpickable, and with none ended marks the Month Not ended yet and sends nothing (fault #8: on 26/10 its first choice was October); the round's month rules have their own codes (`ROUND_MONTH_NOT_IN_QUARTER`, `ROUND_MONTH_NOT_ENDED`). Fault #9 (Report Month's Actual) was already fixed by #12. Tests: `Scorecards.test.tsx`, `Reviews.test.tsx`, `reviews.test.js`. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #30 Scorecards' Scorecards and Commitments, #32 Reviews' Reviews and PIPs carry the unread notices about what each holds, and the screen opens where they wait · nothing left

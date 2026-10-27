@@ -46,15 +46,45 @@ const TodayView = z
   })
   .strict();
 
-const AnalyticsPeriod = z.enum(["30d", "90d", "year"]);
+/**
+ * The periods Analytics reads, in Africa/Lagos (docs/guides/workspace.md §6): this week, Monday
+ * to today; the last 30 or 90 days; the calendar year from 1 January; or `custom`, the reader's
+ * own From and To (TB, 26/10/2026).
+ */
+const AnalyticsPeriod = z.enum(["week", "30d", "90d", "year", "custom"]);
+
+/** The longest custom period, both days counted: a year with its leap day. */
+const ANALYTICS_MAX_DAYS = 366;
+
+const daysFrom = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+
+/**
+ * A custom period's two days: both given, in order, at most ANALYTICS_MAX_DAYS; neither with a
+ * preset. That To is no later than today is the server's to say, which knows the day.
+ */
+function analyticsPeriodFits(v, ctx) {
+  const issue = (path, message) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+  if (v.period !== "custom") {
+    for (const key of ["from", "to"]) if (v[key] !== undefined) issue(key, "Only with Custom");
+    return;
+  }
+  if (!v.from) issue("from", "Required");
+  if (!v.to) issue("to", "Required");
+  if (!v.from || !v.to) return;
+  if (v.to < v.from) issue("to", "Ends before it starts");
+  else if (daysFrom(v.from, v.to) + 1 > ANALYTICS_MAX_DAYS) issue("to", `At most ${ANALYTICS_MAX_DAYS} days`);
+}
+
+/** Whose work and over which days: the query and an Export's body share them. */
+const analyticsFields = {
+  scope: TaskScope.default("mine"),
+  period: AnalyticsPeriod.default("30d"),
+  from: isoDate.optional(),
+  to: isoDate.optional(),
+};
 
 /** GET /workspace/analytics */
-const AnalyticsQuery = z
-  .object({
-    scope: TaskScope.default("mine"),
-    period: AnalyticsPeriod.default("30d"),
-  })
-  .strict();
+const AnalyticsQuery = z.object(analyticsFields).strict().superRefine(analyticsPeriodFits);
 
 const WeekCount = z.object({ week_start: isoDate, count: z.number().int().min(0) }).strict();
 const PersonLoad = z.object({ employee: PersonRef, open: z.number().int().min(0) }).strict();
@@ -198,6 +228,9 @@ module.exports = {
   TodayActivity,
   TodayView,
   AnalyticsPeriod,
+  ANALYTICS_MAX_DAYS,
+  analyticsFields,
+  analyticsPeriodFits,
   AnalyticsQuery,
   WeekCount,
   PersonLoad,

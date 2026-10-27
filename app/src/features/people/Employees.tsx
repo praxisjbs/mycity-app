@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { usePhotos } from "@/api/download";
-import { useApi, usePaged } from "@/api/hooks";
+import { invalidate, useApi, usePaged } from "@/api/hooks";
 import type { EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -22,8 +22,10 @@ import {
   StatStrip,
   Toolbar,
   Who,
+  useIsPhone,
   useModal,
 } from "@mycity/ui";
+import { MoveForm } from "./Departments";
 import { AddEmployee } from "./EmployeeForm";
 import { employmentStatus, INVITED_HELP, loginStatus, workPattern } from "./status";
 
@@ -32,7 +34,9 @@ import { employmentStatus, INVITED_HELP, loginStatus, workPattern } from "./stat
  *
  * The server pages, searches, filters and sorts (25 a row, F20); nothing here slices
  * rows. A row opens that person's record. Import Staff opens the Import wizard on
- * Settings · Imports, already set to the employees importer.
+ * Settings · Imports, already set to the employees importer. On a computer, People who may
+ * edit tick rows and Move To Department moves them, as People · Departments does
+ * (docs/guides/organogram.md §6.1); a phone has no bulk actions.
  */
 export function Employees() {
   const me = useMe();
@@ -56,6 +60,25 @@ export function Employees() {
   });
   const photo = usePhotos(list.rows.map((r) => r.photo_url));
   const canCreate = me.grants.people?.includes("create");
+  const phone = useIsPhone();
+  const [picked, setPicked] = useState<string[]>([]);
+  const canMove = Boolean(me.grants.people?.includes("edit")) && !phone;
+  const moveSelected = () =>
+    modal.open({
+      title: "Move People",
+      body: (close) => (
+        <MoveForm
+          people={list.rows.filter((r) => picked.includes(r.employee_id))}
+          close={close}
+          onDone={() => {
+            setPicked([]);
+            invalidate("/api/v1/employees");
+            invalidate("/api/v1/departments");
+            invalidate("/api/v1/org-chart");
+          }}
+        />
+      ),
+    });
   const open = (r: EmployeeRow) => navigate(hrefFor("people", "employees", { id: r.employee_id }));
   const add = () => modal.open({ title: "Add Employee", wide: true, body: (close) => <AddEmployee close={close} /> });
   useScreenAction(canCreate ? { label: "Add Employee", onSelect: add } : null);
@@ -130,6 +153,19 @@ export function Employees() {
         list={list}
         rowKey={(r) => r.employee_id}
         onRowClick={open}
+        selection={
+          canMove
+            ? {
+                keys: picked,
+                onChange: setPicked,
+                actions: (
+                  <Button icon="users" onClick={moveSelected}>
+                    Move To Department
+                  </Button>
+                ),
+              }
+            : undefined
+        }
         empty={{ icon: "srch", title: "Nobody Matches", text: "Clear the search or filters." }}
         columns={[
           { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.display_name} sub={r.job_title} src={photo(r.photo_url)} /> },

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
-import { formatDate, ModalProvider } from "@mycity/ui";
+import { formatDate, ModalProvider, Toaster } from "@mycity/ui";
 import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { clear, invalidate } from "@/api/hooks";
@@ -168,6 +168,91 @@ describe("my workspace", () => {
     // A reader who sets others work opens on My Team.
     expect(screen.getByRole("radio", { name: "My Team" }).getAttribute("aria-checked")).toBe("true");
   }, 20000);
+
+  it("Analytics' period: This Week runs from Monday; Custom asks for its days, and Cancel keeps the period", async () => {
+    await signedIn(<Workspace tab="analytics" id={null} />);
+    await screen.findByText("Open Tasks", undefined, { timeout: 8000 });
+    const periods = within(screen.getByRole("radiogroup", { name: "Period" })).getAllByRole("radio").map((r) => r.textContent);
+    expect(periods).toEqual(["This Week", "30 Days", "90 Days", "This Year", "Custom"]);
+
+    fireEvent.click(screen.getByRole("radio", { name: "This Week" }));
+    const today = isoDaysAgo(0);
+    const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+    const monday = isoDaysAgo(weekday === 0 ? 6 : weekday - 1);
+    await screen.findByText(`${formatDate(monday)} to ${formatDate(today)}`);
+
+    // Custom opens its days; Cancel leaves This Week as it was.
+    fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
+    let sheet = await screen.findByRole("dialog", { name: "Custom Period" });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Cancel" }));
+    await closed("Custom Period");
+    expect(screen.getByRole("radio", { name: "This Week" }).getAttribute("aria-checked")).toBe("true");
+
+    // To before From is marked on its field, and Show Period shows nothing new.
+    fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
+    sheet = await screen.findByRole("dialog", { name: "Custom Period" });
+    const from = within(sheet).getByRole("textbox", { name: "Period From" });
+    const to = within(sheet).getByRole("textbox", { name: "Period To" });
+    await userEvent.clear(from);
+    await userEvent.type(from, typed(isoDaysAgo(3)));
+    await userEvent.clear(to);
+    await userEvent.type(to, typed(isoDaysAgo(9)));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Show Period" }));
+    // The field itself holds To to From or later, in its own words.
+    await within(sheet).findByText(`Pick ${formatDate(isoDaysAgo(3))} or later`);
+    await userEvent.clear(to);
+    await userEvent.type(to, typed(isoDaysAgo(1)));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Show Period" }));
+    await closed("Custom Period");
+    await screen.findByText(`${formatDate(isoDaysAgo(3))} to ${formatDate(isoDaysAgo(1))}`);
+    expect(screen.getByRole("radio", { name: "Custom" }).getAttribute("aria-checked")).toBe("true");
+    // Change Dates opens them again, as they were picked.
+    fireEvent.click(screen.getByRole("button", { name: "Change Dates" }));
+    sheet = await screen.findByRole("dialog", { name: "Custom Period" });
+    expect((within(sheet).getByRole("textbox", { name: "Period From" }) as HTMLInputElement).value).toBe(typed(isoDaysAgo(3)));
+  }, 30000);
+
+  it("Export makes a file of the figures with the period shown, waits for it and downloads it here", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      render(<Toaster />);
+      await signedIn(<Workspace tab="analytics" id={null} />);
+      await screen.findByText("Open Tasks", undefined, { timeout: 8000 });
+      fireEvent.click(screen.getByRole("radio", { name: "90 Days" }));
+      fireEvent.keyDown(screen.getByRole("button", { name: "Export" }), { key: "Enter" });
+      const menu = await screen.findByRole("menu");
+      expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Export PDF", "Export XLSX"]);
+      fireEvent.click(within(menu).getByRole("menuitem", { name: "Export XLSX" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Export" }).getAttribute("aria-busy")).toBe("true"));
+      // The mock makes the file a few seconds later and holds no bytes, and says so once it is saved.
+      await waitFor(
+        () => {
+          vi.setSystemTime(new Date(Date.now() + 1_000));
+          expect(screen.getByText("Files download once the API is connected")).toBeTruthy();
+        },
+        { timeout: 12000, interval: 250 },
+      );
+      const runs = await api.call("GET /api/v1/home/report-runs");
+      const run = runs.data.reduce((a, b) => (b.number > a.number ? b : a));
+      expect(run).toMatchObject({ report_key: "workspace_analytics", report_name: "Workspace Analytics", format: "xlsx", status: "done", emailed_at: null });
+      const listed = await api.call("GET /api/v1/home/reports");
+      expect(listed.data.some((r) => r.report_key === "workspace_analytics")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it("Export is for holders of workspace export, on a computer", async () => {
+    // Chidera is Staff: no export on My Workspace (seed 0290).
+    await signedIn(<Workspace tab="analytics" id={null} />, "chidera@mycityapp.io");
+    await screen.findByText("Open Tasks", undefined, { timeout: 8000 });
+    expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
+    cleanup();
+    setViewport(390);
+    await signedIn(<Workspace tab="analytics" id={null} />);
+    await screen.findByText("Open Tasks", undefined, { timeout: 8000 });
+    expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
+  }, 30000);
 
   it("a card moves up within its column from its menu", async () => {
     await board();

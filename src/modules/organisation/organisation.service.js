@@ -24,6 +24,7 @@ const managerText = require("./manager-text");
 const { layout } = require("./org-chart.layout");
 const repo = require("./organisation.repo");
 const places = require("../../shared/places/places");
+const access = require("../access/access.service");
 const { employeeDateProblems, ON_SITE_PATTERNS } = require("@mycity/contract").organisation;
 
 /** A person's home address field (shared/places/owners.js). */
@@ -31,6 +32,7 @@ const HOME = "employee.home_address";
 const { EVENTS, CHART_DOC_TYPE, CHART_EXPORT } = require("./organisation.events");
 
 const findDepartmentByName = (client, name) => repo.findDepartmentByName(client, name);
+const findDepartmentByCode = (client, code) => repo.findDepartmentByCode(client, code);
 const findEmployeeByWorkEmail = (client, email) => repo.findEmployeeByWorkEmail(client, email);
 const findEmployeeById = (client, employeeId) => repo.findEmployeeById(client, employeeId);
 
@@ -49,72 +51,139 @@ async function departmentCode(client, name) {
   throw new AppError("DEPARTMENT_CODE", "Could not name this department.", 409);
 }
 
+/* ------------------------------------------------------------------ *
+ * Departments (docs/guides/organogram.md §6.1, JBS Praxis 27/10/2026)
+ *
+ * People keep them on People · Departments: one level, each a function on Performance. The
+ * head may be a person or an open role of the department; a head's rights and the reporting
+ * lines follow the head, so setting one is a single step.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Whoever heads a department in use, or acts for its open head role, holds Head of Department
+ * while they do, unless a role of theirs already sets a function's goals.
+ */
+const HEAD_ROLE = Object.freeze({ role: "head_of_department", unless: "goals.function" });
+
+const departmentExists = () =>
+  new AppError("DEPARTMENT_EXISTS", "There is already a department with this name.", 409, {
+    name: ["Already in use"],
+  });
+
 /**
  * @param {import("pg").PoolClient} client  inside atomically()
- * @param {{name: string, parent_department_id?: string, description?: string}} input
+ * @param {{name: string, code?: string, description?: string, head_employee_id?: string|null, head_seat_id?: string|null}} input
  * @param {object} actor
  */
 async function createDepartment(client, input, actor) {
   const name = String(input.name).trim();
-  const existing = await repo.findDepartmentByName(client, name);
-  if (existing)
-    throw new AppError("DEPARTMENT_EXISTS", "There is already a department with this name.", 409, {
-      name: ["Already in use"],
+  if (await repo.findDepartmentByName(client, name)) throw departmentExists();
+  // A department made now has no roles of its own yet, so its head can only be a person.
+  if (input.head_seat_id)
+    throw new AppError("SEAT_NOT_FOUND", "Pick an open role in this department.", 422, {
+      head_seat_id: ["Not in this department"],
     });
-  await assertHead(client, input);
+  if (input.head_employee_id) await assertHeadPerson(client, input.head_employee_id);
   const inserted = await repo.insertDepartment(client, {
     code: input.code ? await freeDepartmentCode(client, input.code) : await departmentCode(client, name),
     name,
-    parent_department_id: input.parent_department_id ?? null,
     description: input.description ?? null,
-    head_employee_id: input.head_employee_id ?? null,
-    head_seat_id: input.head_seat_id ?? null,
   });
-  const department = await withActingHead(client, await repo.departmentRow(client, inserted.department_id));
+  if (input.head_employee_id)
+    await applyHead(client, inserted, { head_employee_id: input.head_employee_id, head_seat_id: null }, actor);
   await emit(client, {
     key: EVENTS.DEPARTMENT_CREATED,
-    entity: { type: "department", id: department.department_id },
+    entity: { type: "department", id: inserted.department_id },
     actor,
-    after: inserted,
+    after: await repo.findDepartmentById(client, inserted.department_id),
   });
-  return department;
+  if (input.head_employee_id) await syncHeadRoles(client, actor);
+  return departmentOf(client, inserted.department_id);
 }
 
+/**
+ * PATCH /departments/:id: Edit Department (name, code), Set Head (a person, an open role of
+ * this department, or none), Retire (`active: false`, only once empty) and Restore.
+ */
 async function updateDepartment(client, departmentId, patch, actor) {
   const before = await repo.findDepartmentById(client, departmentId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
-  if (patch.parent_department_id && patch.parent_department_id === departmentId)
-    throw new AppError("DEPARTMENT_PARENT", "A department cannot sit inside itself.", 422, {
-      parent_department_id: ["Not itself"],
-    });
   const change = { ...patch };
-  // A head is a person or a vacant seat: naming one clears the other.
-  if (change.head_employee_id) change.head_seat_id = null;
-  if (change.head_seat_id) change.head_employee_id = null;
-  await assertHead(client, change);
+  delete change.head_employee_id;
+  delete change.head_seat_id;
+  if (change.name !== undefined) {
+    change.name = String(change.name).trim();
+    const other = await repo.findDepartmentByName(client, change.name);
+    if (other && other.department_id !== departmentId) throw departmentExists();
+  }
   if (change.code !== undefined) {
     const code = change.code.toUpperCase();
     if (code !== before.code && (await repo.codeTaken(client, code)))
       throw new AppError("DEPARTMENT_CODE", "Another department has this code.", 409, { code: ["Already in use"] });
     change.code = code;
   }
-  const after = await repo.updateDepartment(client, departmentId, change);
+  const retiring = change.active === false && before.active;
+  const restoring = change.active === true && !before.active;
+  if (retiring) {
+    const load = await repo.departmentLoad(client, departmentId);
+    if (load.people || load.open_roles)
+      throw new AppError("DEPARTMENT_NOT_EMPTY", `Still has ${stillHere(load)}.`, 409);
+    // A retired department heads nothing: its head, and the head's role, go with it.
+    change.head_employee_id = null;
+    change.head_seat_id = null;
+  }
+  if (restoring) change.merged_into_department_id = null;
+  const headChange = "head_employee_id" in patch || "head_seat_id" in patch;
+  if (headChange && !retiring) {
+    if (!before.active && !restoring)
+      throw new AppError("DEPARTMENT_RETIRED", "Restore this department before giving it a head.", 409);
+    // A head is a person or a vacant seat: naming one clears the other.
+    const next = {
+      head_employee_id: "head_employee_id" in patch ? patch.head_employee_id : before.head_employee_id,
+      head_seat_id: "head_seat_id" in patch ? patch.head_seat_id : before.head_seat_id,
+    };
+    if (patch.head_employee_id) next.head_seat_id = null;
+    if (patch.head_seat_id) next.head_employee_id = null;
+    await applyHead(client, { ...before, name: change.name ?? before.name }, next, actor);
+  }
+  if (Object.keys(change).length) await repo.updateDepartment(client, departmentId, change);
   await emit(client, {
     key: EVENTS.DEPARTMENT_UPDATED,
     entity: { type: "department", id: departmentId },
     actor,
     before,
-    after,
+    after: await repo.findDepartmentById(client, departmentId),
   });
-  return withActingHead(client, await repo.departmentRow(client, departmentId));
+  if (headChange || retiring || restoring) await syncHeadRoles(client, actor);
+  return departmentOf(client, departmentId);
 }
 
-/** The head named must exist: an employee, or a seat. */
-async function assertHead(client, input) {
-  if (input.head_employee_id && !(await repo.findEmployeeById(client, input.head_employee_id)))
-    throw new AppError("VALIDATION_FAILED", "Pick someone who works here.", 422, { head_employee_id: ["Not found"] });
-  if (input.head_seat_id && !(await repo.findSeatById(client, input.head_seat_id)))
-    throw new AppError("VALIDATION_FAILED", "Pick a seat on the chart.", 422, { head_seat_id: ["Not found"] });
+/** "2 people and 1 open role", for a department that cannot retire yet. */
+function stillHere({ people, open_roles: roles }) {
+  const parts = [];
+  if (people) parts.push(`${people} ${people === 1 ? "person" : "people"}`);
+  if (roles) parts.push(`${roles} open ${roles === 1 ? "role" : "roles"}`);
+  return parts.join(" and ");
+}
+
+/** A head who is a person must work here now. */
+async function assertHeadPerson(client, employeeId) {
+  const person = await repo.findEmployeeById(client, employeeId);
+  if (!person || person.status !== "active")
+    throw new AppError("MANAGER_NOT_FOUND", "Pick someone who works here now.", 422, {
+      head_employee_id: ["Not working here now"],
+    });
+  return person;
+}
+
+/** A head that is a role must be one of this department's, not closed. */
+async function assertHeadSeat(client, seatId, departmentId) {
+  const seat = await repo.findSeatById(client, seatId);
+  if (!seat || seat.status === "closed" || seat.department_id !== departmentId)
+    throw new AppError("SEAT_NOT_FOUND", "Pick an open role in this department.", 422, {
+      head_seat_id: ["Not in this department"],
+    });
+  return seat;
 }
 
 /** A code a person chose, upper-cased, refused when another department has it. */
@@ -123,6 +192,288 @@ async function freeDepartmentCode(client, code) {
   if (await repo.codeTaken(client, wanted))
     throw new AppError("DEPARTMENT_CODE", "Another department has this code.", 409, { code: ["Already in use"] });
   return wanted;
+}
+
+/** Where a person reports to (their line), or where a seat does, as a reporting write names it. */
+const lineOfPerson = (e) => (e ? { line_manager_id: e.line_manager_id || null, line_manager_seat_id: e.line_manager_seat_id || null } : null);
+const lineOfSeat = (s) =>
+  s && s.line_manager
+    ? { line_manager_id: s.line_manager.employee_id || null, line_manager_seat_id: s.line_manager.org_seat_id || null }
+    : null;
+const hasLine = (line) => Boolean(line && (line.line_manager_id || line.line_manager_seat_id));
+
+/**
+ * Where the people of a department report when they report to its head: the head, the person
+ * filling its head seat, or the open head role itself. Null when it has none.
+ */
+async function headLineOf(client, dept) {
+  if (dept.head_employee_id) {
+    const head = await repo.findEmployeeById(client, dept.head_employee_id);
+    return head && head.status === "active" ? { line_manager_id: head.employee_id } : null;
+  }
+  if (dept.head_seat_id) {
+    const seat = await repo.findSeatById(client, dept.head_seat_id);
+    if (!seat || seat.status === "closed") return null;
+    if (seat.status === "filled" && seat.filled_by_employee_id) return { line_manager_id: seat.filled_by_employee_id };
+    return { line_manager_seat_id: seat.org_seat_id };
+  }
+  return null;
+}
+
+/**
+ * Point someone's solid line at `line` through the reporting write, so it is audited with its
+ * reason and approvals and team scope follow. Skipped, saying so, when it changes nothing, would
+ * report to themselves, would make a loop, or names a manager who has left.
+ * @returns {Promise<boolean>} whether it moved
+ */
+async function followLine(client, employeeId, line, reason, actor) {
+  const person = await repo.findEmployeeById(client, employeeId);
+  if (!person || person.status === "archived" || !hasLine(line)) return false;
+  const to = line.line_manager_id || null;
+  const toSeat = to ? null : line.line_manager_seat_id;
+  if ((person.line_manager_id || null) === to && (person.line_manager_seat_id || null) === (toSeat || null)) return false;
+  if (to === employeeId || (await repo.wouldLoop(client, employeeId, to || toSeat))) return false;
+  if (to) {
+    const manager = await repo.findEmployeeById(client, to);
+    if (!manager || manager.status !== "active") return false;
+  }
+  await setReportingLine(client, employeeId, to ? { line_manager_id: to, reason } : { line_manager_seat_id: toSeat, reason }, actor);
+  return true;
+}
+
+/** The same for an open role's line (Edit Role's write). */
+async function followSeatLine(client, seatId, line, actor) {
+  const seat = await repo.findSeatById(client, seatId);
+  if (!seat || seat.status === "closed" || !hasLine(line)) return false;
+  const now = lineOfSeat(seat) || {};
+  const to = line.line_manager_id || null;
+  const toSeat = to ? null : line.line_manager_seat_id;
+  if ((now.line_manager_id || null) === to && (now.line_manager_seat_id || null) === (toSeat || null)) return false;
+  if (toSeat === seatId || (await repo.wouldLoop(client, seatId, to || toSeat))) return false;
+  await changeSeat(client, seatId, to ? { line_manager_id: to } : { line_manager_seat_id: toSeat }, actor);
+  return true;
+}
+
+/**
+ * Give a department its head and move the lines with it (docs/guides/organogram.md §6.1):
+ *   1. a new head who works in another department and heads none moves into this one;
+ *   2. the new head takes the old head's place, reporting to whoever the old head reported to
+ *      (one who heads another department too keeps their own line);
+ *   3. everyone here who reported to the old head, people and open roles, reports to the new one;
+ *   4. the old head, still working here, reports to the new head.
+ * Clearing the head moves no line, and the CEO's own line never changes. The head is saved last;
+ * the caller records the change and gives the head their role (syncHeadRoles).
+ * @param {object} dept  the department as it is now (findDepartmentById, or the row just made)
+ * @param {{head_employee_id: string|null, head_seat_id: string|null}} next
+ */
+async function applyHead(client, dept, next, actor) {
+  const departmentId = dept.department_id;
+  const was = { person: dept.head_employee_id || null, seat: dept.head_seat_id || null };
+  const will = { person: next.head_employee_id || null, seat: next.head_seat_id || null };
+  if (was.person === will.person && was.seat === will.seat) return;
+  const newPerson = will.person ? await assertHeadPerson(client, will.person) : null;
+  const newSeat = will.seat ? await assertHeadSeat(client, will.seat, departmentId) : null;
+  const target = { ...dept, head_employee_id: will.person, head_seat_id: will.seat };
+  const newLine = await headLineOf(client, target);
+  if (newLine) {
+    const reason = `Head of ${dept.name} changed`;
+    const ceo = await repo.findCeoEmployee(client);
+    const ceoId = ceo ? ceo.employee_id : null;
+    const oldSeat = was.seat ? await repo.findSeatById(client, was.seat) : null;
+    const oldPerson = was.person || (oldSeat && oldSeat.status === "filled" ? oldSeat.filled_by_employee_id : null);
+    const oldLine = was.person ? lineOfPerson(await repo.findEmployeeById(client, was.person)) : lineOfSeat(oldSeat);
+    const headId = newLine.line_manager_id || null;
+
+    // Someone who heads another department too keeps where they work and whom they report to.
+    const headsOther =
+      newPerson && (await repo.departmentsHeadedBy(client, newPerson.employee_id)).some((id) => id !== departmentId);
+
+    // 1. The new head joins the department, unless they head another one.
+    if (newPerson && newPerson.department_id !== departmentId && !headsOther)
+      await updateEmployee(client, newPerson.employee_id, { department_id: departmentId }, actor);
+
+    // 2. The new head takes the old head's place in the tree.
+    if (hasLine(oldLine)) {
+      if (newPerson && newPerson.employee_id !== ceoId && !headsOther) await followLine(client, newPerson.employee_id, oldLine, reason, actor);
+      if (newSeat) await followSeatLine(client, newSeat.org_seat_id, oldLine, actor);
+    }
+
+    if (oldPerson || was.seat) {
+      const reportedToOld = (r) =>
+        (oldPerson && r.line_manager_id === oldPerson) || (was.seat && r.line_manager_seat_id === was.seat);
+      // 3. Whoever reported to the old head, people and open roles, reports to the new head.
+      for (const m of await repo.departmentMembers(client, departmentId)) {
+        if (m.employee_id === headId || m.employee_id === oldPerson || m.employee_id === ceoId) continue;
+        if (reportedToOld(m)) await followLine(client, m.employee_id, newLine, reason, actor);
+      }
+      for (const s of await repo.departmentSeats(client, departmentId)) {
+        if (s.org_seat_id === will.seat || s.org_seat_id === was.seat) continue;
+        if (reportedToOld(s)) await followSeatLine(client, s.org_seat_id, newLine, actor);
+      }
+      // 4. The old head, still here, reports to the new head.
+      if (oldPerson && oldPerson !== headId && oldPerson !== ceoId) {
+        const old = await repo.findEmployeeById(client, oldPerson);
+        if (old && old.status !== "archived" && old.department_id === departmentId)
+          await followLine(client, oldPerson, newLine, reason, actor);
+      }
+    }
+  }
+  await repo.updateDepartment(client, departmentId, { head_employee_id: will.person, head_seat_id: will.seat });
+}
+
+/**
+ * Lines follow the head for the people (and open roles) who just joined a department: each
+ * reports to its head unless they are its head, it has none, or their manager is already here
+ * or joined with them, so a team moved together keeps its lines. The CEO's line never changes.
+ * `people` and `seats` carry their lines as they were before the move.
+ */
+async function linesFollowHead(client, dept, people, seats, reason, actor) {
+  const headLine = await headLineOf(client, dept);
+  if (!headLine) return;
+  const departmentId = dept.department_id;
+  const ceo = await repo.findCeoEmployee(client);
+  const joined = new Set(people.map((p) => p.employee_id));
+  const joinedSeats = new Set(seats.map((s) => s.org_seat_id));
+  const managerHere = async (r) => {
+    if (r.line_manager_id) {
+      if (joined.has(r.line_manager_id)) return true;
+      const m = await repo.findEmployeeById(client, r.line_manager_id);
+      return Boolean(m && m.department_id === departmentId);
+    }
+    if (r.line_manager_seat_id) {
+      if (joinedSeats.has(r.line_manager_seat_id)) return true;
+      const s = await repo.findSeatById(client, r.line_manager_seat_id);
+      return Boolean(s && s.department_id === departmentId);
+    }
+    return false;
+  };
+  for (const p of people) {
+    if ((ceo && p.employee_id === ceo.employee_id) || p.employee_id === headLine.line_manager_id) continue;
+    if (await managerHere(p)) continue;
+    await followLine(client, p.employee_id, headLine, reason, actor);
+  }
+  for (const s of seats) {
+    if (s.org_seat_id === dept.head_seat_id || s.org_seat_id === headLine.line_manager_seat_id) continue;
+    if (await managerHere(s)) continue;
+    await followSeatLine(client, s.org_seat_id, headLine, actor);
+  }
+}
+
+/**
+ * Add People and Move To: these people join the department, and each line follows its head
+ * (linesFollowHead). One transaction: all of them, or none.
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @param {string} departmentId
+ * @param {string[]} employeeIds  at most 25 (DepartmentPeopleMove)
+ */
+async function moveToDepartment(client, departmentId, employeeIds, actor) {
+  const dept = await repo.findDepartmentById(client, departmentId);
+  if (!dept) throw new AppError("NOT_FOUND", "Not found", 404);
+  if (!dept.active)
+    throw new AppError("DEPARTMENT_RETIRED", "Restore this department before moving anyone into it.", 409);
+  const ids = [...new Set(employeeIds)];
+  const people = await repo.employeesByIds(client, ids);
+  if (people.length !== ids.length || people.some((p) => p.status === "archived"))
+    throw new AppError("EMPLOYEE_NOT_FOUND", "Pick people on the staff list.", 422, {
+      employee_ids: ["Not on the staff list"],
+    });
+  const moving = people.filter((p) => p.department_id !== departmentId);
+  for (const p of moving) await updateEmployee(client, p.employee_id, { department_id: departmentId }, actor);
+  await linesFollowHead(client, dept, moving, [], `Moved to ${dept.name}`, actor);
+  if (moving.length)
+    await emit(client, {
+      key: EVENTS.DEPARTMENT_PEOPLE_MOVED,
+      entity: { type: "department", id: departmentId },
+      actor,
+      payload: {
+        department_id: departmentId,
+        moved: moving.map((p) => ({ employee_id: p.employee_id, from_department_id: p.department_id })),
+      },
+    });
+  return departmentOf(client, departmentId);
+}
+
+/**
+ * Merge Department: every person on its books and every role not closed move into another in
+ * use, as Add People moves them, and it retires with no head, marked merged. Its plans, goals,
+ * KPIs and scorecards stay with it for their quarters.
+ * @returns {Promise<object>} the department it went into
+ */
+async function mergeDepartment(client, departmentId, intoId, actor) {
+  const from = await repo.findDepartmentById(client, departmentId);
+  if (!from) throw new AppError("NOT_FOUND", "Not found", 404);
+  if (!from.active) throw new AppError("DEPARTMENT_RETIRED", "This department is retired already.", 409);
+  if (intoId === departmentId)
+    throw new AppError("DEPARTMENT_MERGE", "Pick another department to merge into.", 422, {
+      into_department_id: ["Pick another department"],
+    });
+  const into = await repo.findDepartmentById(client, intoId);
+  if (!into || !into.active)
+    throw new AppError("DEPARTMENT_NOT_FOUND", "Pick a department in use.", 422, {
+      into_department_id: ["Not in use"],
+    });
+  const people = await repo.departmentMembers(client, departmentId);
+  const seats = await repo.departmentSeats(client, departmentId);
+  for (const p of people) await updateEmployee(client, p.employee_id, { department_id: intoId }, actor);
+  for (const s of seats) await changeSeat(client, s.org_seat_id, { department_id: intoId }, actor);
+  await linesFollowHead(client, into, people, seats, `${from.name} merged into ${into.name}`, actor);
+  await repo.updateDepartment(client, departmentId, {
+    active: false,
+    head_employee_id: null,
+    head_seat_id: null,
+    merged_into_department_id: intoId,
+  });
+  await emit(client, {
+    key: EVENTS.DEPARTMENT_MERGED,
+    entity: { type: "department", id: departmentId },
+    actor,
+    before: from,
+    after: await repo.findDepartmentById(client, departmentId),
+    payload: { department_id: departmentId, into_department_id: intoId, people: people.length, roles: seats.length },
+  });
+  await syncHeadRoles(client, actor);
+  return departmentOf(client, intoId);
+}
+
+/**
+ * Delete Department: only one nothing names (`can_delete`): no row behind a foreign key, no
+ * announcement's audience, and not merged away. Otherwise Retire keeps its history.
+ */
+async function deleteDepartment(client, departmentId, actor) {
+  const before = await repo.findDepartmentById(client, departmentId);
+  if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
+  const inUse = () => new AppError("DEPARTMENT_IN_USE", "Used before. Retire it instead.", 409);
+  // A merged one keeps its record of where it went.
+  if (before.merged_into_department_id || (await repo.usedDepartmentIds(client, [departmentId])).has(departmentId)) throw inUse();
+  try {
+    await repo.deleteDepartment(client, departmentId);
+  } catch (err) {
+    // Something began naming it since the check: the same answer.
+    if (err && err.code === "23503") throw inUse();
+    throw err;
+  }
+  await emit(client, {
+    key: EVENTS.DEPARTMENT_DELETED,
+    entity: { type: "department", id: departmentId },
+    actor,
+    before,
+  });
+  if (before.head_employee_id || before.head_seat_id) await syncHeadRoles(client, actor);
+}
+
+/**
+ * Give Head of Department to whoever heads a department in use, or acts for its open head role,
+ * and take back the ones it gave that no longer do (access.syncHeadshipRole). Run after every
+ * write that can move a head, in the same transaction.
+ */
+async function syncHeadRoles(client, actor) {
+  const heads = [];
+  for (const departmentId of await repo.activeDepartmentIds(client)) {
+    const who = await repo.headOf(client, departmentId);
+    if (who) heads.push(who);
+  }
+  const working = heads.length ? (await repo.employeesByIds(client, [...new Set(heads)])).filter((e) => e.status === "active") : [];
+  return access.syncHeadshipRole(client, working.map((e) => e.employee_id), HEAD_ROLE, actor);
 }
 
 /**
@@ -139,6 +490,21 @@ async function withActingHead(db, row) {
   if (!row) return row;
   const acting = await repo.headOf(db, row.department_id);
   return { ...row, acting_head: await repo.personRef(db, acting) };
+}
+
+/** One department as the contract gives it: its acting head, and whether Delete may be offered. */
+async function departmentOf(db, departmentId) {
+  const row = await repo.departmentRow(db, departmentId);
+  if (!row) return null;
+  const used = await repo.usedDepartmentIds(db, [departmentId]);
+  return { ...(await withActingHead(db, row)), can_delete: !used.has(departmentId) && !row.merged_into };
+}
+
+/** GET /departments/:id. */
+async function getDepartment(db, departmentId) {
+  const found = await departmentOf(db, departmentId);
+  if (!found) throw new AppError("NOT_FOUND", "Not found", 404);
+  return found;
 }
 
 /** The department with this name, or a new one. Used by create-admin and the importer. */
@@ -311,8 +677,13 @@ async function createEmployee(client, body, actor) {
   return employee;
 }
 
-/** PATCH /employees/:id: correct a record. */
-async function updateEmployee(client, employeeId, patch, actor) {
+/**
+ * PATCH /employees/:id: correct a record. With `followHead` (the screen's Edit Record), a new
+ * department moves the person as People · Departments does: their line follows its head unless
+ * this same write names one (docs/guides/organogram.md §6.1). The importer and the deploy loader
+ * set lines from their sheet and leave it off.
+ */
+async function updateEmployee(client, employeeId, patch, actor, { followHead = false } = {}) {
   const before = await repo.auditRow(client, employeeId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
   if (patch.work_email && patch.work_email.toLowerCase() !== String(before.work_email).toLowerCase())
@@ -357,6 +728,12 @@ async function updateEmployee(client, employeeId, patch, actor) {
     // identity follows a corrected work email with a login nobody has used yet (identity.events.js).
     payload: changedEmail ? { employee_id: employeeId, work_email: { from: before.work_email, to: after.work_email } } : { employee_id: employeeId },
   });
+  const moved = patch.department_id && patch.department_id !== before.department_id;
+  if (followHead && moved && !("line_manager_id" in patch) && !("line_manager_seat_id" in patch)) {
+    const dept = await repo.findDepartmentById(client, patch.department_id);
+    await linesFollowHead(client, dept, [before], [], `Moved to ${dept.name}`, actor);
+    return repo.findEmployeeById(client, employeeId);
+  }
   return after;
 }
 
@@ -437,6 +814,8 @@ async function archiveEmployee(client, employeeId, reason, actor, leftOn = null)
     after,
     metadata: { archive_reason: reason, ...(leftOn && { left_on: leftOn }) },
   });
+  // Someone who headed or acted for a department no longer does: the role headship gave goes.
+  await syncHeadRoles(client, actor);
   return after;
 }
 
@@ -453,6 +832,7 @@ async function restoreEmployee(client, employeeId, actor) {
     before,
     after,
   });
+  await syncHeadRoles(client, actor);
   return after;
 }
 
@@ -555,7 +935,17 @@ async function createSeat(client, input, actor) {
   return seat;
 }
 
+/**
+ * Edit Role, and the line or department a head change or a merge gives a seat. An open head role's
+ * line decides who acts as head, so the heads' roles are worked out again (syncHeadRoles).
+ */
 async function updateSeat(client, seatId, patch, actor) {
+  const seat = await changeSeat(client, seatId, patch, actor);
+  await syncHeadRoles(client, actor);
+  return seat;
+}
+
+async function changeSeat(client, seatId, patch, actor) {
   const before = await repo.findSeatById(client, seatId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
   if (patch.line_manager_seat_id && patch.line_manager_seat_id === seatId)
@@ -609,8 +999,10 @@ async function findOrCreateSeat(client, { title, department_id: departmentId }, 
 const list = (client, query, scope) => repo.list(client, query, scope);
 async function departments(client, query) {
   const page = await repo.departments(client, query);
+  const used = await repo.usedDepartmentIds(client, page.data.map((d) => d.department_id));
   const data = [];
-  for (const row of page.data) data.push(await withActingHead(client, row));
+  for (const row of page.data)
+    data.push({ ...(await withActingHead(client, row)), can_delete: !used.has(row.department_id) && !row.merged_into });
   return { ...page, data };
 }
 const seats = (client, query) => repo.seats(client, query);
@@ -1073,10 +1465,16 @@ const namesApplied = (client, sha256) => repo.namesApplied(client, sha256);
 module.exports = {
   setBirthday,
   findDepartmentByName,
+  findDepartmentByCode,
   findOrCreateDepartment,
   createDepartment,
   headOf,
   updateDepartment,
+  moveToDepartment,
+  mergeDepartment,
+  deleteDepartment,
+  syncHeadRoles,
+  getDepartment,
   departments,
   findEmployeeByWorkEmail,
   findEmployeeById,

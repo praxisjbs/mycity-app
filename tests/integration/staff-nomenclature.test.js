@@ -193,6 +193,50 @@ describeDb("staff nomenclature against the real migrations", () => {
     expect((await department("Branding & Marketing")).head_employee_id).toBe(someone.employee_id);
   });
 
+  test("a department renamed, a head cleared and the heads' roles set on screen stay after the next deploy, even with new names", async () => {
+    const { atomically } = require("../../src/shared/db/tx");
+    const organisation = require("../../src/modules/organisation/organisation.service");
+    const tx = async (fn) => {
+      const client = await pool.connect();
+      try {
+        return await atomically(client, () => fn(client));
+      } finally {
+        client.release();
+      }
+    };
+    const bm = await department("Branding & Marketing");
+    const pc = await department("People & Culture");
+    await tx((client) => organisation.updateDepartment(client, bm.department_id, { name: "Brand & Marketing" }, loader.SYSTEM));
+    await tx((client) => organisation.updateDepartment(client, pc.department_id, { head_employee_id: null }, loader.SYSTEM));
+
+    // A new version of the names: a later deploy applies its post changes, never a department or a head.
+    const next = JSON.parse(fs.readFileSync(names.FILE, "utf8"));
+    next.job_titles = { ...next.job_titles, "Junior Analyst": "Analyst" };
+    const file = path.join(temp, "nomenclature-next.json");
+    fs.writeFileSync(file, JSON.stringify(next));
+    const log = [];
+    const again = await loader.loadStaff({ db: pool, log: (m) => log.push(m), nomenclatureFile: file });
+    expect(again.status).toBe("already_loaded");
+    expect(again.names).toMatchObject({ renamed: 0, created: 0, codes: 0, heads: 0 });
+    expect((await department("Brand & Marketing")).department_id).toBe(bm.department_id);
+    expect(await department("Branding & Marketing")).toBeUndefined();
+    expect((await department("People & Culture")).head_employee_id).toBeNull();
+
+    // The head who is left holds Head of Department; the CEO, who heads General Management, does not need it.
+    const head = await rows(
+      `SELECT r.code::text AS code FROM user_role ur JOIN role r ON r.role_id = ur.role_id JOIN app_user u ON u.user_id = ur.user_id
+        WHERE u.employee_id = $1 AND ur.from_headship`,
+      [bm.head_employee_id],
+    );
+    const holds = await rows(
+      `SELECT r.code::text AS code FROM user_role ur JOIN role r ON r.role_id = ur.role_id JOIN app_user u ON u.user_id = ur.user_id
+        WHERE u.employee_id = $1`,
+      [bm.head_employee_id],
+    );
+    expect(holds.map((r) => r.code)).toContain("head_of_department");
+    expect(head.length).toBeLessThanOrEqual(1);
+  });
+
   test("patterns read a post the way the file writes it", () => {
     expect(names.retitle({ "Marketing & Growth Officer - *": "Growth Officer - *" }, "Marketing & Growth Officer - Cross River")).toBe(
       "Growth Officer - Cross River",

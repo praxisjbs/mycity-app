@@ -471,6 +471,55 @@ async function setRoles(client, userId, codes, actor) {
   return after;
 }
 
+/**
+ * Give a role to the logins of the people who hold a post, and take back only what this gave
+ * once they no longer do (`user_role.from_headship`). The organisation keeps it for department
+ * heads (docs/guides/organogram.md §6.1): Head of Department, unless they set a function's goals
+ * another way. The CEO, and anyone who holds `unless` through a role given by hand or directly,
+ * is not given it. Runs in the caller's transaction; a login whose roles change is recorded as
+ * Save Roles records it (access.roles_set) and its cached grants are dropped.
+ *
+ * @param {import("pg").PoolClient} client
+ * @param {string[]} employeeIds  everyone who holds the post now
+ * @param {{role: string, unless: string}} rule  the role's code, and the capability that makes it needless
+ * @param {object} actor
+ * @returns {Promise<{given: string[], taken: string[]}>} the user ids changed
+ */
+async function syncHeadshipRole(client, employeeIds, { role: code, unless }, actor) {
+  const role = await repo.findRoleByCode(client, code);
+  if (!role) return { given: [], taken: [] };
+  const holders = [...new Set(employeeIds.filter(Boolean))];
+  const before = new Map();
+  const remember = async (userId) => {
+    if (!before.has(userId)) before.set(userId, await repo.roleCodesOf(client, userId));
+  };
+  const given = [];
+  for (const s of await repo.headshipStates(client, holders, role.role_id, unless)) {
+    if (s.is_ceo || s.holds_role || s.sets_otherwise) continue;
+    await remember(s.user_id);
+    await repo.insertUserRole(client, { userId: s.user_id, roleId: role.role_id, grantedBy: null, fromHeadship: true });
+    given.push(s.user_id);
+  }
+  const stale = await repo.staleHeadshipRows(client, holders, role.role_id, unless);
+  for (const r of stale) await remember(r.user_id);
+  if (stale.length) await repo.deleteUserRoles(client, stale.map((r) => r.user_role_id));
+  for (const [userId, was] of before) {
+    const now = await repo.roleCodesOf(client, userId);
+    if (now.join() !== was.join())
+      await emit(client, {
+        key: EVENTS.ACCESS_ROLES_SET,
+        entity: { type: "app_user", id: userId },
+        actor,
+        before: { roles: was },
+        after: { roles: now },
+        payload: { roles: now },
+        metadata: { reason: "headship" },
+      });
+    await grantsCache.invalidateUser(userId);
+  }
+  return { given, taken: [...new Set(stale.map((r) => r.user_id))] };
+}
+
 /* ------------------------------------------------------------------ *
  * Two-step sign-in required by role (edited on Settings · Security)
  * ------------------------------------------------------------------ */
@@ -513,6 +562,7 @@ module.exports = {
   deleteRole,
   assignRole,
   setRoles,
+  syncHeadshipRole,
   requiresTwoStep,
   twoStepRoles,
   setTwoStepRoles,

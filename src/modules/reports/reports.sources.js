@@ -21,6 +21,11 @@
  *   recruitment       the records behind Open Vacancies
  *   overview          the reader's own Overview (dashboard.service overview), each part a
  *                     table: the Overview Export, never offered on the form
+ *   workspace_analytics  My Workspace · Analytics as the reader sees it with the filters they
+ *                     exported with (workspace.analytics), each figure a line and each chart
+ *                     or list a table, Workload by Person and Blocked Work every page:
+ *                     Analytics' Export, never offered on the form, and only for a reader who
+ *                     may export My Workspace (docs/guides/workspace.md §6)
  *
  * The four forward sources read their KPI card's records (kpi-catalog), which read the
  * source adapters of the milestones that build those tables (dashboard/sources): they hold no
@@ -32,12 +37,15 @@
  *   label         its name on the file and in the email
  *   capabilities  null, or the capabilities of which the reader must hold one, besides the
  *                 module's `view` grant: the ones that open the source's screen
+ *   action        optional: an action of the module's grant the reader must hold too, besides
+ *                 `view` (Workspace Analytics: `export`)
  *   columns       [{ key, header, kind }], kind text, date (day-first), datetime, number or
  *                 money (Naira)
  *   read          (db, reader, filters, page, at) => one page of 25 raw rows
  *   row           a raw row as the columns name it
- *   snapshot      overview only: (db, reader, at) => the reader's HomeOverview
- *   tables        overview only: the snapshot as { lines, tables }
+ *   snapshot      a screen's export: (db, reader, at, filters) => what the screen reads (the
+ *                 reader's HomeOverview, their WorkspaceAnalytics)
+ *   tables        with a snapshot: the snapshot as { lines, tables }
  *
  * `reader` is { user, scope }: the person the file is built as (grants-cache getAuthUser) and
  * their scope on the source's module. `at` is the moment the report describes.
@@ -60,6 +68,7 @@ const organisation = require("../organisation/organisation.service");
 const alerts = require("../alerts/alerts.service");
 const dashboard = require("../dashboard/dashboard.service");
 const kpi = require("../dashboard/kpi-catalog");
+const workspace = require("../workspace/workspace.analytics");
 
 /** The most rows one table of a file holds: eighty pages of the screen's list. */
 const ROW_CEILING = 2000;
@@ -494,6 +503,130 @@ const overview = {
 };
 
 /* ------------------------------------------------------------------ *
+ * My Workspace · Analytics' Export
+ * ------------------------------------------------------------------ */
+
+/** What each period is called on the file, as the screen's switch names it. */
+const ANALYTICS_PERIOD = Object.freeze({
+  week: "This Week",
+  "30d": "30 Days",
+  "90d": "90 Days",
+  year: "This Year",
+  custom: "Custom",
+});
+
+const AGING_BAND = Object.freeze({ "1_3": "1 to 3 Days", "4_7": "4 to 7 Days", "8_14": "8 to 14 Days", "15_plus": "15 Days or More" });
+
+/** The report's filters as Analytics' own query (AnalyticsQuery). */
+const analyticsQueryOf = (filters) => {
+  const f = filters || {};
+  const period = f.analytics_period || "30d";
+  return {
+    scope: f.task_scope || "mine",
+    period,
+    ...(period === "custom" ? { from: f.period_from, to: f.period_to } : {}),
+  };
+};
+
+/**
+ * The days the report's period covers at `at`: a preset is read as at that moment.
+ * @returns {{from: string, to: string}}
+ */
+function analyticsDays(filters, at) {
+  const q = analyticsQueryOf(filters);
+  return workspace.periodOf(q.period, lagos.today(at), q);
+}
+
+/** Analytics as the reader's screen reads it at `at`, with every page of its two lists. */
+async function analyticsSnapshot(_db, reader, at, filters) {
+  const query = analyticsQueryOf(filters);
+  const figures = await workspace.analytics(query, reader.scope, at);
+  const load = await allPages((n) => workspace.workloadPage(query, reader.scope, n, at));
+  const held = await allPages((n) => workspace.blockedPage(query, reader.scope, n, at));
+  return { ...figures, workload_all: load, blocked_all: held };
+}
+
+const inDays = (n) => (n === null || n === undefined ? "None yet" : days(n));
+
+/**
+ * Analytics as a file draws it: the figures as lines, then a table for each chart and list,
+ * in the screen's order. Workload by Person and Blocked Work hold every row, not the screen's
+ * first page.
+ * @param {object} a  WorkspaceAnalytics, with workload_all and blocked_all
+ */
+function analyticsTables(a) {
+  const lines = [
+    `Completion Rate: ${a.completion_rate === null ? "None yet" : `${a.completion_rate}%`}.`,
+    `Overdue: ${a.overdue}.`,
+    `Avg Completion: ${inDays(a.avg_completion_days)}.`,
+    `Open Tasks: ${a.open}.`,
+    `Done: ${a.done}.`,
+    `Cancelled: ${a.cancelled}.`,
+    `Avg Cycle Time: ${inDays(a.cycle_days)}.`,
+  ];
+  const reasons = a.overdue_by_reason.reduce((n, r) => n + r.count, 0);
+  const tables = [
+    table(
+      "Tasks Completed per Week",
+      [col("week_start", "Week Of", "date"), col("count", "Done", "number")],
+      a.completed_per_week.map((w) => ({ week_start: w.week_start, count: w.count })),
+    ),
+    {
+      title: "Workload by Person",
+      columns: [col("employee", "Employee"), col("department", "Department"), col("open", "Open", "number")],
+      rows: a.workload_all.rows.map((w) => ({ employee: w.employee.display_name, department: w.employee.department, open: w.open })),
+      total: a.workload_all.total,
+    },
+    table(
+      "Tasks by Priority",
+      [col("priority", "Priority"), col("open", "Open", "number")],
+      a.by_priority.map((p) => ({ priority: words(p.priority), open: p.open })),
+    ),
+    table(
+      "Overdue Tasks by Reason",
+      [col("reason", "Reason"), col("count", "Count", "number"), col("share", "Share %", "number")],
+      a.overdue_by_reason.map((r) => ({
+        reason: r.reason ? r.label || words(r.reason) : "No Reason Recorded",
+        count: r.count,
+        share: Math.round((r.count / Math.max(1, reasons)) * 100),
+      })),
+    ),
+    table(
+      "Overdue Aging",
+      [col("band", "Days Late"), col("count", "Count", "number")],
+      a.overdue_aging.map((x) => ({ band: AGING_BAND[x.band] || x.band, count: x.count })),
+    ),
+    {
+      title: "Blocked Work",
+      columns: [
+        col("task", "Task"),
+        col("assignee", "Assignee"),
+        col("note", "Blocked By"),
+        col("raised_at", "Blocked Since", "datetime"),
+        col("blocked_days", "Held For Days", "number"),
+      ],
+      rows: a.blocked_all.rows.map((b) => ({
+        task: `${b.task.number} ${b.task.title}`,
+        assignee: b.assignee ? b.assignee.display_name : null,
+        note: b.note,
+        raised_at: b.raised_at,
+        blocked_days: b.blocked_days,
+      })),
+      total: a.blocked_all.total,
+    },
+  ];
+  return { lines, tables };
+}
+
+const workspaceAnalytics = {
+  label: "Workspace Analytics",
+  capabilities: null,
+  action: "export",
+  snapshot: analyticsSnapshot,
+  tables: analyticsTables,
+};
+
+/* ------------------------------------------------------------------ *
  * The registry
  * ------------------------------------------------------------------ */
 
@@ -507,6 +640,7 @@ const BUILT = {
   expenses,
   recruitment,
   overview,
+  workspace_analytics: workspaceAnalytics,
 };
 
 /** Each source, its contract half (module, filters, offered) beside how it is read. */
@@ -562,8 +696,9 @@ assertSources();
 
 /**
  * The person's scope on a source's module, when they may open the source: its module's
- * `view` grant (rbac.scopeFor, as a route checks it) and, for a source whose screen a
- * capability opens, one of those capabilities. The CEO opens every source.
+ * `view` grant (rbac.scopeFor, as a route checks it), the source's own `action` on that grant
+ * when it names one, and, for a source whose screen a capability opens, one of those
+ * capabilities. The CEO opens every source.
  * @param {{query: Function}} db
  * @param {{user_id: string, employee_id: string|null, role_ids: string[], is_ceo?: boolean}} user
  * @param {string} key  a source key
@@ -574,6 +709,7 @@ async function scopeOn(db, user, key) {
   if (!source || !user) return null;
   const scope = await rbac.scopeFor(user, source.module, "view");
   if (!scope) return null;
+  if (source.action && !(await rbac.scopeFor(user, source.module, source.action))) return null;
   if (!source.capabilities || user.is_ceo === true) return scope;
   const held = await grantsCache.getCapabilities(db, user.user_id);
   return source.capabilities.some((code) => held.includes(code)) ? scope : null;
@@ -612,12 +748,23 @@ async function allPages(read) {
  * they are, read from the rows when they say it; a filter is shown even when it matched none.
  * @param {string} key
  * @param {object} filters  saved_report.definition.filters
- * Daily Attendance always names its day, with the date it read when the caller knows it.
- * @param {{departmentName?: string|null, leaveTypeName?: string|null, rosterOn?: string|null}} [names]
+ * Daily Attendance always names its day, with the date it read when the caller knows it, and
+ * Workspace Analytics its whose-work and its period, with the days it covered.
+ * @param {{departmentName?: string|null, leaveTypeName?: string|null, rosterOn?: string|null,
+ *          analyticsOn?: {from: string, to: string}|null}} [names]
  */
-function describeFilters(key, filters, { departmentName = null, leaveTypeName = null, rosterOn = null } = {}) {
+function describeFilters(key, filters, { departmentName = null, leaveTypeName = null, rosterOn = null, analyticsOn = null } = {}) {
   const out = [];
   const f = filters || {};
+  if (key === "workspace_analytics") {
+    const period = ANALYTICS_PERIOD[f.analytics_period || "30d"];
+    out.push({ label: "Whose Work", value: f.task_scope === "team" ? "My Team" : "Mine" });
+    out.push({
+      label: "Period",
+      value: analyticsOn ? `${period}, ${formatDate(analyticsOn.from)} to ${formatDate(analyticsOn.to)}` : period,
+    });
+    return out;
+  }
   if (key === "daily_attendance") {
     const day = f.roster_day === "last_working_day" ? "Last Working Day" : "Today So Far";
     out.push({ label: "Day", value: rosterOn ? `${day}, ${formatDate(rosterOn)}` : day });
@@ -652,7 +799,8 @@ async function gather(db, user, key, filters, { at }) {
   if (!scope) throw new Error(`reports.sources: ${user.user_id} may not open "${key}"`);
   const masked = await fieldMask.maskedKeysFor(db, user);
   const reader = { user, scope };
-  if (source.snapshot) return source.tables(fieldMask.maskData(await source.snapshot(db, reader, at), masked));
+  if (source.snapshot)
+    return source.tables(fieldMask.maskData(await source.snapshot(db, reader, at, filters || {}), masked));
 
   const { rows, total } = await allPages(async (n) => {
     const page = await source.read(db, reader, filters || {}, n, at);
@@ -672,4 +820,5 @@ module.exports = {
   gather,
   rosterDate,
   describeFilters,
+  analyticsDays,
 };

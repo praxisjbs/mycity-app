@@ -12,7 +12,9 @@
  * and becomes `done`, `failed`, or `skipped` when the recipient can no longer open it.
  *
  * Who reads what (home.md §5, §8): every route needs the `home.reports` capability except
- * the Overview Export, which any Home reader runs on their own Overview.
+ * the two personal exports: the Overview Export, which any Home reader runs on their own
+ * Overview, and My Workspace · Analytics' Export, run by holders of `workspace` export on their
+ * own figures (docs/guides/workspace.md §6).
  */
 const { z } = require("zod");
 const { uuid, text, isoDate, isoDateTime, listQuery, Paged } = require("./common");
@@ -20,6 +22,8 @@ const { TimeOfDay } = require("./settings");
 const { LeaveStatus } = require("./leave");
 const { HomeRosterStatus } = require("./dashboard");
 const { HomeAlertCategory, HomeAlertSeverity } = require("./alerts");
+const { TaskScope } = require("./tasks");
+const { AnalyticsPeriod, analyticsFields, analyticsPeriodFits } = require("./workspace");
 
 const count = z.number().int().min(0);
 
@@ -69,6 +73,11 @@ const HomeReportFilters = z
     /** Open Alerts. */
     category: HomeAlertCategory.optional(),
     severity: HomeAlertSeverity.optional(),
+    /** Workspace Analytics: whose work, the period, and a custom period's days. */
+    task_scope: TaskScope.optional(),
+    analytics_period: AnalyticsPeriod.optional(),
+    period_from: isoDate.optional(),
+    period_to: isoDate.optional(),
   })
   .strict();
 
@@ -90,6 +99,11 @@ const HOME_REPORT_SOURCES = Object.freeze({
   expenses: Object.freeze({ module: "expenses", filters: Object.freeze([]), offered: true }),
   recruitment: Object.freeze({ module: "recruitment", filters: Object.freeze([]), offered: true }),
   overview: Object.freeze({ module: "home", filters: Object.freeze([]), offered: false }),
+  workspace_analytics: Object.freeze({
+    module: "workspace",
+    filters: Object.freeze(["task_scope", "analytics_period", "period_from", "period_to"]),
+    offered: false,
+  }),
 });
 const HomeReportSource = z.enum(Object.keys(HOME_REPORT_SOURCES));
 
@@ -405,6 +419,16 @@ const HomeReportEmailVars = z
   })
   .strict();
 
+/**
+ * POST /workspace/analytics/export: My Workspace · Analytics as one file for the caller, with
+ * the screen's whose-work and period (docs/guides/workspace.md §5, §6), answered as a pending
+ * HomeReportRun of their own Workspace Analytics report.
+ */
+const WorkspaceAnalyticsExport = z
+  .object({ ...analyticsFields, format: HomeReportFormat })
+  .strict()
+  .superRefine(analyticsPeriodFits);
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   HomeReportFilters: {
@@ -476,6 +500,10 @@ const TABLES = {
     table: null,
     reason: "the variables of templates/email/scheduled-report.html, not a row",
   },
+  WorkspaceAnalyticsExport: {
+    table: null,
+    reason: "Analytics' whose-work and period, kept as the person's own report's filters, and the file's format",
+  },
 };
 
 module.exports = {
@@ -508,4 +536,5 @@ module.exports = {
   HomeReportRunNow,
   HomeReportDocumentVars,
   HomeReportEmailVars,
+  WorkspaceAnalyticsExport,
 };

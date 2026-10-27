@@ -35,6 +35,8 @@ async function invite(client, { employee_id, role_codes }, actor) {
     actor,
   );
   await access.setRoles(client, user.user_id, role_codes, actor);
+  // Someone who heads a department gets Head of Department with their login (organogram.md §6.1).
+  await organisation.syncHeadRoles(client, actor);
   await identity.requestLink(client, user.user_id, "invite", actor);
   return user.user_id;
 }
