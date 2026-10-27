@@ -273,7 +273,8 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
   every read. M2 allows `entity_type` `partner`, `vacancy`, `goal`, `key_result`, `scorecard`,
   `performance_review`, `improvement_plan` and `task`; a type the route map does not know is a 422.
 - **Counts Towards** (performance.md §6.18): one of the assignee's lines on their binding scorecard for
-  the quarter of the task's month, or a key result they own in a binding plan; a line that is not the
+  the quarter of the task's month, or a key result they own in a live plan (binding, or unbound or
+  revising while its head changes it, performance.md §6.22); a line that is not the
   assignee's is a 422 ("Not one of their lines"). Picking a key result sets the task's record to it.
 - **Commitments** (performance.md §6.11): a commitment needs acceptance criteria and a due date in its
   month. The assignee, as well as whoever manages the task, may mark it, unmark it and change its
@@ -587,6 +588,8 @@ None. Projects, the late reasons and invitations by email were decided by JBS Pr
 and are built (§6).
 
 ## 14 · Change log
+
+- 27/10/2026 · JP · A plan the CEO has unbound for changes (performance.md §6.22, P23) is still live: Counts Towards lists a key result its owner holds in a binding, unbound or revising plan (`tasks.repo`), and the calendar's key result dates (§6.18 of performance.md) read the same plans (`calendar.repo`), so neither goes dark while a head adds to a plan. No screen or route changed.
 
 - 27/10/2026 · AJ · Analytics' custom period and Export, asked for by TB at the internal meeting of 26/10/2026: the period is This Week, 30 Days, 90 Days, This Year or Custom (the reader's own From and To, at most 366 days, ending today at the latest; §5, §6, §10, §11), and holders of `workspace` export Export the figures as a PDF or an Excel workbook, a run of Home's reports engine like the Overview's Export (source `workspace_analytics`, `POST` and `GET /workspace/analytics/export`; §2, §5, §6, §7, §8, §10, home.md §6). Workload by Person and Blocked Work are read a page of 25 at a time for the file, every row up to the engine's 2,000. Each run keeps its own period (`home_report_run.filters`, migration 2530), so no export waits on another, and the ledger has the period on the run's `home.report_run` line. Custom Period is a `Form`, so Enter shows the period.
 - 27/10/2026 · JP · From the 27/10 staging faults brief (fault #4, `VALIDATION_FAILED: depends_on_task_id` at `POST /api/v1/tasks/:id/waiting-on`): Wait On Task offered the tasks already waiting on this one, which the service refuses as a loop; it now leaves them out, as it left out the task itself and those it already waits on. Each of Add Link's four refusals has its own code (`TASK_LINK_SELF`, `TASK_LINK_UNSEEN`, `TASK_LINK_CANCELLED`, `TASK_LINK_LOOP`), so System Health names the rule a person met (§3 step 10).

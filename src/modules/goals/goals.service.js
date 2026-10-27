@@ -316,19 +316,25 @@ async function listPlans(query) {
 
 /**
  * GET /performance/functions: a page of the company and the functions, each with whether the
- * reader may set its goals and KPIs (goals.authority, the one rule) and its plan's status in the
- * quarter. New Objective and New KPI offer only those the reader may set (§6.4).
+ * reader may set its goals and KPIs (goals.authority, the one rule), its plan's status in the
+ * quarter and whether Request To Unbind is theirs to offer: the plan is binding, they set it, no
+ * request waits, and they do not record organisational goals (the CEO keeps New Goal, §6.22).
+ * New Objective and New KPI offer only those the reader may set (§6.4).
  */
 async function listFunctions(actor, query) {
   const page = await repo.listFunctions(pool, query);
+  const asksToUnbind = !(await authority.holds(actor, "goals.organisation"));
   const data = [];
-  for (const f of page.data)
+  for (const f of page.data) {
+    const maySet = await authority.maySetGoals(pool, actor, f.department_id);
     data.push({
       department_id: f.department_id,
       name: f.name,
-      may_set: await authority.maySetGoals(pool, actor, f.department_id),
+      may_set: maySet,
       plan_status: f.plan_status,
+      can_request_unbind: asksToUnbind && maySet && f.plan_status === "binding" && !f.unbind_pending,
     });
+  }
   return { ...page, data };
 }
 
@@ -389,7 +395,8 @@ async function planDetail(id, actor, scope = null) {
     ),
     contributions,
     problems,
-    can_submit: mayAct && ["draft", "returned"].includes(plan.status) && !problems.some((p) => p.blocking),
+    can_submit: mayAct && plansLib.isOpen(plan.status) && !problems.some((p) => p.blocking),
+    unbind: await repo.latestUnbind(pool, id).then((u) => (u ? unbindView(u) : null)),
   };
 }
 
@@ -406,49 +413,126 @@ const isOperationsPeople = (db, actor) =>
 
 /**
  * POST /performance/plans/:id/submit: Send Plan. Refuses while anything blocks; opens
- * `performance.plan` over the head (or acting head), whose line manager is its first stage.
+ * `performance.plan` over the head (or acting head), whose line manager is its first stage. An
+ * unbound plan's changes go to the CEO alone, through `performance.plan_change` (§6.22), and the
+ * plan is revising, locked but live, while they decide.
  */
 async function submitPlan(actor, id, scope = null) {
   const plan = await repo.getPlan(pool, id);
   if (!plan) throw new AppError("NOT_FOUND", "That plan does not exist", 404);
   await authority.assertSetsGoals(pool, actor, plan.department_id);
-  if (!["draft", "returned"].includes(plan.status)) throw new AppError("PLAN_NOT_DRAFT", "This plan is already sent", 409);
+  if (!plansLib.isOpen(plan.status)) throw new AppError("PLAN_NOT_DRAFT", "This plan is already sent", 409);
   const detail = await planDetail(id, actor);
   const blocking = detail.problems.filter((p) => p.blocking);
   if (blocking.length)
     throw new AppError(blocking[0].code, blocking[0].message, 409, { problems: blocking.map((p) => p.message) });
+  const revision = plan.status === "unbound";
   const organisation = require("../organisation/organisation.service");
   const head = plan.department_id ? await organisation.headOf(pool, plan.department_id) : null;
-  const headManager = head ? await repo.effectiveManagerOf(pool, head) : null;
-  const context = {
-    head_reports_to_ceo: !headManager || (await repo.isCeoEmployee(pool, headManager)),
-    by_operations_people: await isOperationsPeople(pool, actor),
-    is_company: !plan.department_id,
-  };
+  let flow = { definition_key: "performance.plan_change", context: {} };
+  if (!revision) {
+    const headManager = head ? await repo.effectiveManagerOf(pool, head) : null;
+    flow = {
+      definition_key: "performance.plan",
+      context: {
+        head_reports_to_ceo: !headManager || (await repo.isCeoEmployee(pool, headManager)),
+        by_operations_people: await isOperationsPeople(pool, actor),
+        is_company: !plan.department_id,
+      },
+    };
+  }
   const workflow = require("../../shared/workflow/engine");
   await tx(async (client) => {
     const instance = await workflow.openInstance(client, {
-      definition_key: "performance.plan",
+      ...flow,
       entity: { type: "performance_plan", id },
       subject_employee_id: head,
-      context,
       actor,
     });
     await repo.updatePlan(client, id, {
-      status: "submitted",
+      status: revision ? "revising" : "submitted",
       workflow_instance_id: instance.workflow_instance_id,
       submitted_by: actor && actor.user_id,
       submitted_at: new Date(),
       returned_reason: null,
     });
     await emit(client, {
-      key: EVENTS.PLAN_SUBMITTED,
+      key: revision ? EVENTS.PLAN_REVISION_SUBMITTED : EVENTS.PLAN_SUBMITTED,
       entity: { type: "performance_plan", id },
       actor,
       payload: { performance_plan_id: id, department: plan.department, period: plan.period_name },
     });
   });
   return planDetail(id, actor, scope);
+}
+
+/* ------------------------------------------------------------------ *
+ * Requests to unbind a binding plan (§6.22)
+ * ------------------------------------------------------------------ */
+
+/** A plan_unbind row as PlanUnbind. */
+function unbindView(u) {
+  return {
+    plan_unbind_id: u.plan_unbind_id,
+    performance_plan_id: u.performance_plan_id,
+    reason: u.reason,
+    status: u.status,
+    workflow_instance_id: u.workflow_instance_id,
+    requested_by: u.requested_by || null,
+    decided_at: iso(u.decided_at),
+    decision_reason: u.decision_reason,
+    created_at: iso(u.created_at),
+  };
+}
+
+/**
+ * POST /performance/plans/:id/unbind: Request To Unbind. A binding plan only, by whoever sets its goals,
+ * with a reason, in a quarter still open; one request waits at a time. It goes to the CEO through
+ * `performance.plan_change`; their approval makes the plan unbound (goals.approval.js).
+ */
+async function requestUnbind(actor, id, body) {
+  const plan = await repo.getPlan(pool, id);
+  if (!plan) throw new AppError("NOT_FOUND", "That plan does not exist", 404);
+  await authority.assertSetsGoals(pool, actor, plan.department_id);
+  if ((await plansLib.periodOf(pool, plan.performance_period_id)).status === "closed")
+    throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409);
+  if (plan.status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Only a binding plan can be unbound", 409);
+  const waiting = () => new AppError("UNBIND_PENDING", "An unbind request is already waiting", 409);
+  if (await repo.unbindPending(pool, id)) throw waiting();
+  const workflow = require("../../shared/workflow/engine");
+  let requestId;
+  try {
+    requestId = await tx(async (client) => {
+      const unbindId = await repo.insertUnbind(client, { performance_plan_id: id, reason: body.reason, requested_by: actor && actor.user_id });
+      const instance = await workflow.openInstance(client, {
+        definition_key: "performance.plan_change",
+        entity: { type: "plan_unbind", id: unbindId },
+        subject_employee_id: actor && actor.employee_id,
+        context: {},
+        actor,
+      });
+      await repo.updateUnbind(client, unbindId, { workflow_instance_id: instance.workflow_instance_id });
+      await emit(client, {
+        key: EVENTS.PLAN_UNBIND_REQUESTED,
+        entity: { type: "plan_unbind", id: unbindId },
+        actor,
+        payload: { plan_unbind_id: unbindId, performance_plan_id: id, department: plan.department, period: plan.period_name },
+      });
+      return unbindId;
+    });
+  } catch (err) {
+    // Two presses at once: the second meets the one-pending-per-plan index.
+    if (err.code === "23505") throw waiting();
+    throw err;
+  }
+  return unbindView(await repo.getUnbind(pool, requestId));
+}
+
+/** GET /performance/unbinds/:id: one request, named in full, for its sheet. */
+async function unbindDetail(id) {
+  const row = await repo.getUnbindDetail(pool, id);
+  if (!row) throw new AppError("NOT_FOUND", "That unbind request does not exist", 404);
+  return { ...unbindView(row), department_id: row.department_id, department: row.department, period_name: row.period_name };
 }
 
 /* ------------------------------------------------------------------ *
@@ -492,10 +576,10 @@ async function changeDetail(id, actor, scope) {
  * ------------------------------------------------------------------ */
 
 /**
- * GET /performance/approvals: the plan stages, target changes and mid-quarter scorecards (sent on
- * their own through the plan's flow, §11) the reader decides, oldest first; a scorecard is named by
- * its person. Deciding stays the engine's (POST /workflow/instances/:id/approve or reject); the
- * outcome is goals.approval.js's.
+ * GET /performance/approvals: the plan stages, unbind requests, target changes and mid-quarter
+ * scorecards (sent on their own through the plan's flow, §11) the reader decides, oldest first; a
+ * scorecard is named by its person. Deciding stays the engine's (POST /workflow/instances/:id/approve
+ * or reject); the outcome is goals.approval.js's.
  */
 async function approvals(query, actor) {
   const approvers = require("../../shared/workflow/approvers");
@@ -534,7 +618,7 @@ async function requestChange(actor, scope, body) {
   if (body.okr_key_result_id) {
     const ctx = await repo.keyResultContext(pool, body.okr_key_result_id);
     if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404);
-    if (ctx.plan_status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
+    if (!plansLib.isLive(ctx.plan_status)) throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
     if (okrs.tbcOpen(ctx))
       throw new AppError("TARGET_TBC", "Set this TBC target directly", 409);
     const owner = actor && actor.employee_id === ctx.accountable_employee_id;
@@ -626,6 +710,8 @@ module.exports = {
   listFunctions,
   planDetail,
   submitPlan,
+  requestUnbind,
+  unbindDetail,
   listChanges,
   changeDetail,
   approvals,
