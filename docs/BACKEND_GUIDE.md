@@ -539,7 +539,8 @@ ran out of memory as it did on Node 20 in CI, so a laptop passed what GitHub fai
 replaces its worker once it has grown past 1 GB after a file (`workerIdleMemoryLimit` in
 `jest.config.js`). Set `RUN_DB_TESTS=1`, `DATABASE_URL` and `REDIS_URL` against a local PostgreSQL
 16 with pgvector and Redis, as CI's backend job does; without them the run skips the integration
-files and gate 4's live round trip, which CI always runs. A Claude Code cloud session does all of
+files and gate 4's live round trip, which CI always runs; with them set, `npm run ci` says at once
+when PostgreSQL or Redis is not answering. A Claude Code cloud session does all of
 this as it starts (`.claude/hooks/session-start.sh`) and names the image's Chromium for the screen
 gates; if PostgreSQL or Redis stops during a session, run the hook again by hand. On GitHub the
 backend job's PostgreSQL logs fatal errors only, so a red backend log ends with its failing test.
@@ -554,6 +555,9 @@ and why):
 - **After a merge**, `main` runs the whole suite again only when its tree is not the one the PR's
   last run passed. When nothing reached `main` in between, it is the same tree, and the document
   gates are enough; Release then deploys it as before.
+- **An edit to the PR description** re-runs the document gates alone once a full run on the PR's
+  head has passed this tree; before that (still running, red, or `main` moved), the whole run
+  (27/10/2026).
 
 In both cases only the **checks** job runs; backend, frontend and screens are skipped and start no
 runner.
@@ -580,7 +584,10 @@ Guide-unchanged: tests only, behaviour as the guide describes
 ```
 
 A line with no reason does not count. Editing the PR description re-runs CI (not on a draft, and
-not for a new title alone).
+not for a new title alone): the document gates alone when a full run has passed this tree. A run
+that does no work (a draft, a new title) never cancels one that does, and a run cancelled by a
+newer one reports **ci** as cancelled, not failed. The screens job's Chromium install tries twice,
+capped, before it fails saying the runner's mirror is not answering.
 
 `npm run ci` also lists gates as **NOT BUILT**. Those are rules whose check is not written yet
 (money, dates, migrations and others during M0). They do not fail your PR today, but the rules

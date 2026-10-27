@@ -45,6 +45,7 @@
  * documents, and report the rest as skipped. Unset, or on a laptop, it is full.
  */
 const { spawn } = require("node:child_process");
+const net = require("node:net");
 const os = require("node:os");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -252,8 +253,33 @@ async function lane(gates, tag) {
   return out;
 }
 
+/** Whether something answers on a URL's host and port within two seconds. */
+function answers(url, port) {
+  const u = new URL(url);
+  return new Promise((resolve) => {
+    const socket = net.connect({ host: u.hostname, port: Number(u.port) || port });
+    const done = (ok) => (socket.destroy(), resolve(ok));
+    socket.setTimeout(2000, () => done(false));
+    socket.once("connect", () => done(true));
+    socket.once("error", () => done(false));
+  });
+}
+
 async function main() {
   const chosen = GATES.filter((g) => (!ONLY || ONLY.has(g.id)) && (!GROUP || groupOf(g) === GROUP));
+  /*
+   * With RUN_DB_TESTS=1 the backend group needs PostgreSQL and Redis. One that had stopped cost a
+   * ten-minute run that failed every integration file (27/10/2026): say so before starting.
+   */
+  if (process.env.RUN_DB_TESTS === "1" && chosen.some((g) => groupOf(g) === "backend")) {
+    const down = [];
+    if (process.env.DATABASE_URL && !(await answers(process.env.DATABASE_URL, 5432))) down.push("PostgreSQL");
+    if (process.env.REDIS_URL && !(await answers(process.env.REDIS_URL, 6379))) down.push("Redis");
+    if (down.length) {
+      console.error(`npm run ci: ${down.join(" and ")} not answering. Start ${down.length > 1 ? "them" : "it"} first (a cloud session: bash .claude/hooks/session-start.sh).`);
+      process.exit(2);
+    }
+  }
   const groups = GROUPS.map((g) => chosen.filter((x) => groupOf(x) === g)).filter((l) => l.length);
   const together = !SERIAL && groups.length > 1;
   if (together) console.log(`Running ${groups.length} groups at once: ${groups.map((l) => groupOf(l[0])).join(", ")}. --serial runs one gate at a time.\n`);
