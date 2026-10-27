@@ -106,6 +106,26 @@ const ACTIONS = Object.freeze({
     built: true,
   }),
   // Mailbox (docs/guides/mailbox.md §1.1, §9): each only when the mailbox's owner presses it.
+  // Write With AI on Raise a Query (docs/guides/queries.md §9): Subject and What Happened.
+  "query-draft": Object.freeze({
+    label: "Write Query",
+    module: "queries",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-10-26",
+    built: true,
+  }),
+  // Write With AI on the letter editor (queries.md §9): a disciplinary letter's wording, with care.
+  "letter-draft": Object.freeze({
+    label: "Write Letter",
+    module: "queries",
+    job: "deep_reasoning",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-10-26",
+    built: true,
+  }),
   "mail-draft": Object.freeze({
     label: "Write Email",
     module: "mailbox",

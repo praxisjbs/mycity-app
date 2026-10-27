@@ -33,6 +33,7 @@ const { formatDateTime } = require("../../shared/time/day-first");
 const ai = require("../../services/ai/llm.service");
 const transcription = require("../../services/ai/transcription");
 const redact = require("../../services/ai/redact");
+const { placeholdersIn, textsOf } = require("../../services/ai/drafts");
 const repo = require("./mailbox.repo");
 const mailbox = require("./mailbox.service");
 const signatures = require("./signature/signature.service");
@@ -149,47 +150,6 @@ function conversationOf(rows, me) {
 /* ------------------------------------------------------------------ *
  * Ready to send: what an answer may not hold
  * ------------------------------------------------------------------ */
-
-/** A gap left for someone to fill, and how the model is told about it. */
-const GAPS = [
-  [/\[[^\]\n]{1,60}\](?!\()/, "a gap in square brackets"],
-  [/\{\{?[^}\n]{1,60}\}?\}/, "a gap in curly braces"],
-  [/<\s*[A-Za-z][A-Za-z _-]{0,40}\s*>/, "a gap in angle brackets"],
-  [/^\s*(?:your|sender'?s?|recipient'?s?)\s+(?:full\s+)?name\s*$/im, "a name left to fill in"],
-  [/\binsert\b[^.\n]{0,40}\bhere\b/i, "an instruction to insert something"],
-  [/\bX{3,}\b/, "XXX left to fill in"],
-  [/_{3,}/, "a blank line left to fill in"],
-  [/\b(?:DD|MM)\/(?:MM|DD)\/(?:YYYY|YY)\b/, "a date pattern left to fill in"],
-];
-
-/**
- * Every problem that keeps a text from being sent as it is (§6): a placeholder, a redaction mark,
- * or a token the shield never handed out.
- * @param {string} text
- * @param {(token: string) => boolean} [known]  whether a KEPT token stands for something
- * @returns {string[]} what is wrong, worded for the model's corrective retry
- */
-function placeholdersIn(text, known = () => false) {
-  const s = String(text || "");
-  const out = [];
-  for (const [re, what] of GAPS) {
-    const m = re.exec(s);
-    if (m) out.push(`has "${m[0].trim().slice(0, 40)}", ${what}: write it without the gap`);
-  }
-  for (const m of s.matchAll(redact.TOKEN))
-    if (!known(m[0])) out.push(`has "${m[0]}", which stands for nothing you were given: leave it out`);
-  return out;
-}
-
-/** Each text an answer carries, with its path. */
-function textsOf(v) {
-  const out = [];
-  for (const [key, value] of Object.entries(v || {})) {
-    if (typeof value === "string" && key !== "kind") out.push([[key], value]);
-    else if (Array.isArray(value)) value.forEach((x, i) => typeof x === "string" && out.push([[key, i], x]));
-  }
-  return out;
-}
 
 /**
  * The contract's answer schema, held to "ready to send" with this call's tokens: llm.service sends

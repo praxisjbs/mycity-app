@@ -20,4 +20,6 @@ module.exports = {
   create: async (req, res) => created(res, await service.create(withActor(req), req.validated.body)),
   saveBody: async (req, res) => ok(res, await service.saveBody(withActor(req), id(req), req.validated.body)),
   activate: async (req, res) => ok(res, await service.activate(withActor(req), id(req))),
+  assistStatus: async (_req, res) => ok(res, await require("./templates.assist").status()),
+  assist: async (req, res) => ok(res, await require("./templates.assist").draft(req.user, req.validated.body)),
 };

@@ -28,6 +28,14 @@ route(router, "get", "/",
   { query: qs.QueryListQuery, response: qs.QueryPage, summary: "Queries the reader may see" },
   requirePermission("queries", "view"), controller.list);
 
+route(router, "get", "/assist",
+  { response: qs.AiAvailability, summary: "Whether Write With AI may answer now" },
+  requirePermission("queries", "create"), controller.assistStatus);
+
+route(router, "post", "/assist",
+  { body: qs.QueryDraftRequest, response: qs.QueryDraft, summary: "Draft a query's subject and what happened; nothing is kept" },
+  requirePermission("queries", "create"), controller.assist);
+
 route(router, "get", "/policies",
   { query: qs.CitablePolicyListQuery, response: qs.CitablePolicyPage, summary: "Policies a query or rule may cite" },
   requirePermission("queries", "view"), controller.policies);

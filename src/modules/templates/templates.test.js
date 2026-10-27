@@ -43,10 +43,13 @@ describe("the routes", () => {
   const routes = routesOf(require("./templates.routes").router);
 
   test("reads need the queries grant; every write needs queries.configure too", () => {
-    expect(routes.length).toBe(7);
+    expect(routes.length).toBe(9);
     for (const r of routes) {
       expect(r.permission.key).toBe("queries");
-      if (r.method === "GET") {
+      // Write With AI belongs to whoever writes letters: its status is asked with the same grant.
+      if (r.path === "/assist") {
+        expect([r.permission.action, r.capability]).toEqual(["edit", "queries.configure"]);
+      } else if (r.method === "GET") {
         expect([r.permission.action, r.capability]).toEqual(["view", null]);
       } else {
         expect(["create", "edit"]).toContain(r.permission.action);

@@ -837,6 +837,73 @@ describeDb("queries and sanctions against the real migrations", () => {
   });
 
   /* ---------------------------------------------------------------- *
+   * Write With AI (guide §9; meeting 26/10): nothing is kept
+   * ---------------------------------------------------------------- */
+
+  describe("write with AI", () => {
+    const ai = require("../../src/services/ai/llm.service");
+    const drafts = require("../../src/services/ai/drafts");
+    const governance = require("../../src/services/ai/governance");
+    const { AppError } = require("../../src/shared/errors");
+    const ask = { employee_id: null, instruction: "He clocked in late three times this month, call him on 08031234567." };
+    beforeAll(() => {
+      ask.employee_id = people.other.employee.employee_id;
+    });
+    afterEach(() => jest.restoreAllMocks());
+    const count = async () => (await q("SELECT count(*)::int AS n FROM employee_query")).rows[0].n;
+
+    test("with no provider set up it says it is off, and nothing is drafted or kept", async () => {
+      expect((await as("hod").get("/queries/assist")).body).toEqual({ available: false, reason: "off" });
+      const before = await count();
+      const res = await as("hod").post("/queries/assist", ask);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ available: false, reason: "off", subject: null, details: null, ai_run_id: null });
+      expect(await count()).toBe(before);
+    });
+
+    test("this month's budget spent reads as the limit", async () => {
+      jest.spyOn(governance, "check").mockRejectedValue(new AppError("AI_CAP_REACHED", "Spent", 429));
+      expect((await as("hod").get("/queries/assist")).body).toEqual({ available: false, reason: "limit" });
+    });
+
+    test("a draft comes back with the number put back; a gap left to fill is refused by its guard; nothing is kept", async () => {
+      jest.spyOn(drafts, "availability").mockResolvedValue({ available: true, reason: null });
+      let asked;
+      jest.spyOn(ai, "complete").mockImplementation(async (opts) => {
+        asked = opts;
+        const token = JSON.stringify(opts.input).match(/KEPT\d+/)[0];
+        // The guard refuses a placeholder: the call's own output schema says so.
+        expect(opts.output.safeParse({ subject: "Late Arrivals", details: "Dear [Name], you were late." }).success).toBe(false);
+        return { output: { subject: "Three Late Arrivals This Month", details: `You clocked in late three times this month. Call ${token} if needed. Please explain in writing.` }, run_id: null };
+      });
+      const before = await count();
+      const res = await as("hod").post("/queries/assist", ask);
+      expect(res.body).toMatchObject({ available: true, subject: "Three Late Arrivals This Month" });
+      expect(res.body.details).toContain("08031234567");
+      // The model never saw the number, only its token.
+      expect(JSON.stringify(asked.input)).not.toContain("08031234567");
+      expect(asked).toMatchObject({ purpose: "query-draft", module: "queries" });
+      expect(await count()).toBe(before);
+    });
+
+    test("the letter editor drafts with the letter's own names, through queries.configure only", async () => {
+      expect((await as("manager").post("/letter-templates/assist", { name: "Final Warning", purpose: "sanction", instruction: "A firm final warning." })).status).toBe(403);
+      jest.spyOn(drafts, "availability").mockResolvedValue({ available: true, reason: null });
+      jest.spyOn(ai, "complete").mockImplementation(async (opts) => {
+        expect(opts.purpose).toBe("letter-draft");
+        expect(opts.output.safeParse({ body_markdown: "Dear {{ employee.first_name }}, your {{ salary }} is cut after this query." }).success).toBe(false);
+        return {
+          output: { body_markdown: "Dear {{ employee.first_name }},\n\nFollowing query {{ query_number }}, this is a **final warning**: {{ reason }}." },
+          run_id: null,
+        };
+      });
+      const res = await as("ops").post("/letter-templates/assist", { name: "Final Warning", purpose: "sanction", instruction: "A firm final warning." });
+      expect(res.status).toBe(200);
+      expect(res.body.body_html).toBe("<p>Dear {{ employee.first_name }},</p>\n<p>Following query {{ query_number }}, this is a <strong>final warning</strong>: {{ reason }}.</p>");
+    });
+  });
+
+  /* ---------------------------------------------------------------- *
    * Policies a query cites (guide §6.2, §6.3; meeting 26/10)
    * ---------------------------------------------------------------- */
 

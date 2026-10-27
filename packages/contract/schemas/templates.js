@@ -165,6 +165,31 @@ const ConsequenceLetterVars = z
   })
   .strict();
 
+/** POST /letter-templates/assist: the letter being written and what to say (queries guide §9). */
+const LetterDraftRequest = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    purpose: LetterPurpose,
+    body_html: z.string().max(60_000).default(""),
+    instruction: z.string().trim().min(10, "Say what to write").max(2000, "At most 2000 characters"),
+  })
+  .strict();
+
+/** The drafted wording as the editor's HTML, or why there is none. Nothing changes until Use Draft. */
+const LetterDraft = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    body_html: z.string().nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** The model's answer: Markdown with only the names a letter may fill. */
+const LetterDraftOutput = z
+  .object({ body_markdown: z.string().trim().min(40).max(12_000) })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   LetterTemplate: {
@@ -202,6 +227,9 @@ const TABLES = {
   },
   LetterTemplatesSummary: { table: null, reason: "counts over letter_template and the letters sent" },
   LetterPreview: { table: null, reason: "a render with sample values; nothing is stored" },
+  LetterDraftRequest: { table: null, reason: "the letter being written and what to say; nothing is kept" },
+  LetterDraft: { table: null, reason: "a draft shown before anything changes; nothing is kept" },
+  LetterDraftOutput: { table: null, reason: "the model's answer, checked before anyone sees it" },
   ConsequenceLetterVars: {
     table: null,
     reason: "template variables for query and sanction letters",
@@ -210,6 +238,9 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  LetterDraftRequest,
+  LetterDraft,
+  LetterDraftOutput,
   LetterPurpose,
   LetterTemplateStatus,
   LetterTemplate,

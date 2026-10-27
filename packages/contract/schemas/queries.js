@@ -271,6 +271,46 @@ const QueryRaisedEmailVars = z
   })
   .strict();
 
+/* ------------------------------------------------------------------ *
+ * Write With AI (guide §9): nothing here is kept
+ * ------------------------------------------------------------------ */
+
+/** Whether Write With AI may answer now; `off` (switched off or no provider) or `limit` (the month's budget). */
+const AiAvailability = z
+  .object({ available: z.boolean(), reason: z.enum(["off", "limit"]).nullable() })
+  .strict();
+
+/** POST /queries/assist: what the form holds, and what happened in the raiser's own words. */
+const QueryDraftRequest = z
+  .object({
+    employee_id: uuid,
+    instruction: z.string().trim().min(10, "Say what happened").max(2000, "At most 2000 characters"),
+    subject: z.string().trim().max(150).default(""),
+    details: z.string().trim().max(4000).default(""),
+    policy_id: uuid.optional(),
+    policy_clause: policyClause.optional(),
+  })
+  .strict();
+
+/** A drafted Subject and What Happened, or why there is none. Nothing changes until Use Draft. */
+const QueryDraft = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    subject: z.string().nullable(),
+    details: z.string().nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** The model's answer, held to the form's own limits and to "no gap left to fill". */
+const QueryDraftOutput = z
+  .object({
+    subject: z.string().trim().min(4).max(150),
+    details: z.string().trim().min(20).max(4000),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   EvidenceItem: { table: null, reason: "one item of employee_query.evidence or sanction.evidence (jsonb)" },
@@ -338,12 +378,20 @@ const TABLES = {
   QueryRaisedEmailVars: { table: null, reason: "the variables of templates/email/query-raised.html, not a row" },
   PolicyCitation: { table: null, reason: "a policy_version as a query cites it, read through the policies service" },
   CitablePolicy: { table: null, reason: "a policy_version in force, read through the policies service" },
+  AiAvailability: { table: null, reason: "whether Write With AI may answer now; nothing is stored" },
+  QueryDraftRequest: { table: null, reason: "what the Raise a Query form holds; nothing is kept" },
+  QueryDraft: { table: null, reason: "a draft shown before anything changes; nothing is kept" },
+  QueryDraftOutput: { table: null, reason: "the model's answer, checked before anyone sees it" },
   CitablePolicyPage: { table: null, reason: "a page of citable policies" },
   CitablePolicyListQuery: { table: null, reason: "list controls for the policy picker" },
 };
 
 module.exports = {
   TABLES,
+  AiAvailability,
+  QueryDraftRequest,
+  QueryDraft,
+  QueryDraftOutput,
   PolicyCitation,
   CitablePolicy,
   CitablePolicyPage,

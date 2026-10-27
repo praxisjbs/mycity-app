@@ -4,7 +4,7 @@ import sanctions from "@mycity/contract/schemas/sanctions.js";
 import templates from "@mycity/contract/schemas/templates.js";
 import type { CitablePolicy, ConsequenceStep, LetterTemplate, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
@@ -16,6 +16,7 @@ import { BarsCard, PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
   ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, DetailPane, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
   KeyValue, ListDetail, LoadingRows, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
@@ -169,6 +170,25 @@ function RaiseQuery({ close }: { close: () => void }) {
     withSignature({ safeParse: (v: unknown) => queries.QueryCreate.safeParse({ employee_id: employee || undefined, ...cited(v as RaiseValues) }) }, pad),
   );
   const save = useMutation("POST /api/v1/queries");
+  const ai = useApi("GET /api/v1/queries/assist");
+  // Write With AI: mounted from its first opening, so Back keeps what was typed in it (mailbox §10).
+  const [step, setStep] = useState<{ mounted: boolean; open: boolean }>({ mounted: false, open: false });
+  const draft = async (instruction: string) => {
+    if (!employee) {
+      setTried(true);
+      toast("Pick the employee first");
+      return null;
+    }
+    const { policy_id: policyId, policy_clause: clause } = cited(f.values) as { policy_id?: string; policy_clause?: string };
+    const r = await api.call("POST /api/v1/queries/assist", {
+      body: { employee_id: employee, instruction, subject: f.values.subject.trim(), details: f.values.details.trim(), ...(policyId && { policy_id: policyId }), ...(clause && { policy_clause: clause }) },
+    });
+    if (!r.available) {
+      offToast(r.reason);
+      return null;
+    }
+    return { subject: r.subject ?? "", details: r.details ?? "" };
+  };
   const submit = async () => {
     setTried(true);
     if (!f.check() || !employee) return;
@@ -185,6 +205,23 @@ function RaiseQuery({ close }: { close: () => void }) {
   };
   return (
     <>
+      {step.mounted && (
+        <div className={step.open ? undefined : "hidden"}>
+          <WriteWithAiStep
+            ask={draft}
+            show={(d) => (
+              <>
+                <p className="mb-1 text-xs font-semibold" data-copy="content">{d.subject}</p>
+                <p className="text-sm" data-copy="content">{d.details}</p>
+              </>
+            )}
+            use={(d) => (f.set("subject", d.subject), f.set("details", d.details), setStep({ mounted: true, open: false }))}
+            back={() => setStep({ mounted: true, open: false })}
+          />
+        </div>
+      )}
+      <div className={step.open ? "hidden" : undefined}>
+      <WriteWithAiButton status={ai.data} open={() => setStep({ mounted: true, open: true })} />
       <Field label="Employee" state={tried && !employee ? "bad" : undefined} message={tried && !employee ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Subject" {...f.status("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out" /></Field>
       <Field label="What Happened" {...f.status("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
@@ -199,6 +236,7 @@ function RaiseQuery({ close }: { close: () => void }) {
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="send" busy={save.pending} onClick={submit}>Raise Query</Button>
       </FormFooter>
+      </div>
     </>
   );
 }
@@ -652,7 +690,11 @@ function TemplateForm({ close }: { close: () => void }) {
     }
   };
   return (
-    <>
+    <LetterAi
+      letter={() => ({ name: f.values.name.trim() || "New Letter", purpose: f.values.purpose as LetterPurposeKey })}
+      body={() => f.values.body_html}
+      use={(html) => f.set("body_html", html)}
+    >
       <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Final Warning" /></Field>
       <Field label="Used For" {...f.status("purpose")}><ChoiceField {...f.field("purpose")} options={[["query", "Queries"], ["sanction", "Sanctions"]]} /></Field>
       <LetterBody f={f} />
@@ -660,6 +702,43 @@ function TemplateForm({ close }: { close: () => void }) {
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Save Template</Button>
       </FormFooter>
+    </LetterAi>
+  );
+}
+
+type LetterPurposeKey = "query" | "sanction" | "fine";
+
+/**
+ * Write With AI on the letter editor (guide §9): the step in the form's own window, its draft shown
+ * read-only, Use Draft putting it in the editor. Nothing is saved until the person saves the letter.
+ */
+function LetterAi({ letter, body, use, children }: { letter: () => { name: string; purpose: LetterPurposeKey }; body: () => string; use: (html: string) => void; children: React.ReactNode }) {
+  const ai = useApi("GET /api/v1/letter-templates/assist");
+  const [step, setStep] = useState<{ mounted: boolean; open: boolean }>({ mounted: false, open: false });
+  const ask = async (instruction: string) => {
+    const r = await api.call("POST /api/v1/letter-templates/assist", { body: { ...letter(), body_html: body(), instruction } });
+    if (!r.available) {
+      offToast(r.reason);
+      return null;
+    }
+    return r.body_html ?? "";
+  };
+  return (
+    <>
+      {step.mounted && (
+        <div className={step.open ? undefined : "hidden"}>
+          <WriteWithAiStep
+            ask={ask}
+            show={(html) => <RichTextField label="Draft" value={html} onChange={() => undefined} readOnly />}
+            use={(html) => (use(html), setStep({ mounted: true, open: false }))}
+            back={() => setStep({ mounted: true, open: false })}
+          />
+        </div>
+      )}
+      <div className={step.open ? "hidden" : undefined}>
+        <WriteWithAiButton status={ai.data} open={() => setStep({ mounted: true, open: true })} />
+        {children}
+      </div>
     </>
   );
 }
@@ -676,10 +755,10 @@ function EditTemplate({ id, close }: { id: string; close: () => void }) {
   const t = useApi("GET /api/v1/letter-templates/:id", { params: { id } });
   if (t.error) return <ErrorState error={t.error} onRetry={t.reload} />;
   if (!t.data) return <LoadingRows count={6} />;
-  return <EditTemplateForm id={id} body={t.data.body_html ?? ""} close={close} />;
+  return <EditTemplateForm id={id} name={t.data.name} purpose={t.data.purpose} body={t.data.body_html ?? ""} close={close} />;
 }
 
-function EditTemplateForm({ id, body, close }: { id: string; body: string; close: () => void }) {
+function EditTemplateForm({ id, name, purpose, body, close }: { id: string; name: string; purpose: LetterPurposeKey; body: string; close: () => void }) {
   const f = useContractForm<{ body_html: string }>({ body_html: body }, templates.LetterTemplateBodySave);
   const save = useMutation("PUT /api/v1/letter-templates/:id/body");
   const submit = async () => {
@@ -694,12 +773,12 @@ function EditTemplateForm({ id, body, close }: { id: string; body: string; close
     }
   };
   return (
-    <>
+    <LetterAi letter={() => ({ name, purpose })} body={() => f.values.body_html} use={(html) => f.set("body_html", html)}>
       <LetterBody f={f} />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Save Letter</Button>
       </FormFooter>
-    </>
+    </LetterAi>
   );
 }

@@ -116,6 +116,10 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `POST /api/v1/queries/:id/remind` | `EmptyBody` → `QueryDetail` | `queries` create · §6.1 | | Once a day, while awaiting a response |
 | `POST /api/v1/queries/:id/decision` | `QueryDecision` → `QueryDetail` | `queries` edit · §6.1 | | §6.4 |
 | `GET /api/v1/queries/policies` | `CitablePolicyListQuery` (`q`) → `CitablePolicyPage` | `queries` view | yes, 25 | The policies a query or rule may cite: each with a published version in force, through `policies.service.citable()` |
+| `GET /api/v1/queries/assist` | → `AiAvailability` | `queries` create | no | Whether Write With AI may answer now: `off` or `limit` otherwise |
+| `POST /api/v1/queries/assist` | `QueryDraftRequest` → `QueryDraft` | `queries` create | no | A Subject and What Happened; nothing is kept (§9) |
+| `GET /api/v1/letter-templates/assist` | → `AiAvailability` | `queries` edit, `queries.configure` | no | As above, for the letter editor |
+| `POST /api/v1/letter-templates/assist` | `LetterDraftRequest` → `LetterDraft` | `queries` edit, `queries.configure` | no | The letter's wording as HTML for the editor; nothing is kept (§9) |
 | `GET /api/v1/query-rules/summary` | → `QueryRulesSummary` | `queries` view | no | |
 | `GET /api/v1/query-rules` | `QueryRuleListQuery` (`state`, `source_event`, `q`, `sort`) → `QueryRulePage` | `queries` view | yes, 25 | |
 | `POST /api/v1/query-rules` | `QueryRuleCreate` → `QueryRule` | `queries` create, `queries.configure` | | Saved as a draft |
@@ -326,6 +330,20 @@ counts, never coordinates or device identifiers.
   closed queries the reader may see, §6.1), `sanctions.list`, `sanctions.standing` (a person's rungs
   in force and the next one; scope all only). `queries` view, paged at 25, cited by number. `query_rules` and
   `templates` carry `// ai:none` (configuration, nothing a question needs).
+- **Write With AI** (meeting 26/10; built like the mailbox's, `mailbox.assist.js`): on Raise a Query
+  (`POST /queries/assist`, prompt `query-draft`, job Default) the Subject and What Happened from the
+  raiser's own words, the employee's first name, job title and department, the raiser's name and
+  title, today and the policy cited; on the letter editor (`POST /letter-templates/assist`, prompt
+  `letter-draft`, job Deep Reasoning, `queries.configure`) the wording from the letter's name,
+  purpose, current wording and an instruction, using only the names a letter may fill. Both chosen by
+  GE (26/10/2026), registered in `services/ai/actions.js`, `personal_data` true (DeepSeek passed by).
+  Contact details and numbers leave as tokens (`redact.shield`) and are put back. An answer with a
+  gap left to fill (`services/ai/drafts.js`, the mailbox's guard, a letter's own names allowed) goes
+  back once, then fails. **Nothing is kept**: the form takes the draft only when the person presses
+  Use Draft, and raising or saving is their own press. With AI off, switched off for Queries, out of
+  this month's budget or no provider set up, `GET /queries/assist` and `GET /letter-templates/assist`
+  say so (`available` false, `reason` `off` or `limit`), the button reads AI Is Off or AI Limit
+  Reached, and the form works as before.
 - **AI routes**: "raise a query for <person>" → `queries.queries` with `new: 1` and the employee
   prefilled; "issue a sanction" → `queries.sanctions`.
 - **Search** (`queries.search.js`, `sanctions.search.js`): queries by number, employee and subject
@@ -343,7 +361,7 @@ or tier 2.**
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature | None | Where the signature is kept, the version cited: §6.2 |
+| Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature; Write With AI (What To Say, Write Draft, the draft, Try Again, Use Draft), reading AI Is Off or AI Limit Reached when it cannot answer | None | Where the signature is kept, the version cited: §6.2 |
 | Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by, raised, response due, counted days, response, sanction); Raise a Query, Send Reminder, View Letter (the PDF the employee received), Record Decision | Help on Escalated: a sanction is waiting for approval. Help on Response Due: the 48 hour window | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
 | Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, fine, reason, Your Signature (for a sanction) | Help on the next rung: why it is offered | The approval route and its thresholds: Settings · Approvals, §6.5 |
 | Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 30 days", the policy it enforces, status); Recent Firings; New Rule, Activate, Pause | Help on Measure: count or late minutes | Counting after the last query, the dedup key: §6.3 |
@@ -418,6 +436,9 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · Write With AI on Raise a Query and the letter editor (meeting 26/10; §5, §9):
+  prompts `query-draft` (Default) and `letter-draft` (Deep Reasoning), chosen by GE; nothing kept
+  until Use Draft; the mailbox's placeholder guard moved to `services/ai/drafts.js` for both.
 - 26/10/2026 · GE · The letter editor is rich text (meeting 26/10): `body_html` in, kept as Markdown,
   `body_html` back for the editor (§5, §6.7).
 - 26/10/2026 · GE · Policies (meeting 26/10): a rule names the policy it enforces and a manual query

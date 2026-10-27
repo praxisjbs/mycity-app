@@ -83,6 +83,8 @@ describe("the routes", () => {
       "GET /summary": "view",
       "GET /": "view",
       "GET /:id": "view",
+      "GET /assist": "create",
+      "POST /assist": "create",
       "GET /policies": "view",
       "POST /": "create",
       "POST /:id/remind": "create",

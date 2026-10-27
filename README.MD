@@ -257,7 +257,8 @@ src/
 │   ├── secrets/       encryption.service
 │   ├── ai/            llm.service (complete; converse, the assistant's rounds with tools; search for
 │   │                  Find Prices) · governance (the switch,
-│   │                  the caps, the spend) · ledger · redact · structured · transcription (Groq, then
+│   │                  the caps, the spend) · ledger · redact · drafts (Write With AI's shared guard
+│   │                  and availability) · structured · transcription (Groq, then
 │   │                  Gemini, then the browser's captions) · catalogue (a provider's model list,
 │   │                  sorted into what the ERP uses) · actions (every AI feature, registered under
 │   │                  its job) · jobs (each action's chain and each model's state, AI Control) ·
@@ -463,10 +464,10 @@ and `performance-commitments-seed.test.js` (the staging seed).
 
 | Module | Files beyond the template |
 |---|---|
-| `queries` | `.visibility` (a manager sees only queries they raised), `.response`, `.escalate` |
+| `queries` | `.visibility` (a manager sees only queries they raised), `.response`, `.escalate`, `.assist` (Write With AI on Raise a Query, prompt `services/ai/prompts/query-draft.md`; on screen `app/src/features/queries/WriteWithAi.tsx`, shared with the letter editor) |
 | `query_rules` | `.evaluator` (outbox subscriber: N events in a window) |
 | `sanctions` | `.chain` (workflow definition), `.fines` (pending deduction for M6), `.letters` |
-| `templates` | Editable letter templates (M3), mail templates (M5) |
+| `templates` | Editable letter templates (M3), mail templates (M5); `.assist` (Write With AI on the letter editor, prompt `services/ai/prompts/letter-draft.md`) |
 
 Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
 `shared/templates`. Templates: `query-letter`, `warning-letter`, `question-letter`,

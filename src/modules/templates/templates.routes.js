@@ -6,6 +6,7 @@
  *   POST /                                 `queries` create + queries.configure: a new letter, a draft
  *   PUT  /:id/body                         `queries` edit + queries.configure: the next version
  *   POST /:id/activate                     `queries` edit + queries.configure
+ *   GET, POST /assist                      `queries` edit + queries.configure: Write With AI, nothing kept
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -23,6 +24,14 @@ route(router, "get", "/summary",
 route(router, "get", "/",
   { query: t.LetterTemplateListQuery, response: t.LetterTemplatePage, summary: "Letter templates" },
   requirePermission("queries", "view"), controller.list);
+
+route(router, "get", "/assist",
+  { response: c.queries.AiAvailability, summary: "Whether Write With AI may answer now" },
+  requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.assistStatus);
+
+route(router, "post", "/assist",
+  { body: t.LetterDraftRequest, response: t.LetterDraft, summary: "Draft a letter's wording; nothing is kept" },
+  requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.assist);
 
 route(router, "get", "/:id",
   { params: c.common.IdParams, response: t.LetterTemplateDetail, summary: "One letter template and its wording" },

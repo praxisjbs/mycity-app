@@ -123,6 +123,19 @@ route("GET /api/v1/letter-templates", (req) =>
   }),
 );
 const letterOf = (id: string) => LETTERS.find((t) => t.letter_template_id === id);
+route("GET /api/v1/letter-templates/assist", () => ok({ available: true, reason: null }));
+route("POST /api/v1/letter-templates/assist", (req) => {
+  const refused = configure(req);
+  if (refused) return refused;
+  const b = req.body as { name?: string; instruction?: string };
+  if (String(b.instruction ?? "").trim().length < 10) return invalid({ instruction: ["Say what to write"] });
+  return ok({
+    available: true,
+    reason: null,
+    body_html: `<p>Dear {{ employee.first_name }},</p><p>Following query {{ query_number }}, this is a ${b.name ?? "letter"}: {{ reason }}.</p><p>We expect this not to happen again.</p>`,
+    ai_run_id: null,
+  });
+});
 route("GET /api/v1/letter-templates/:id", (req) => {
   const t = letterOf(req.params.id);
   return t ? ok({ ...t, used_by: listed(t).used_by }) : notFound();
@@ -363,6 +376,23 @@ route("GET /api/v1/queries", (req) => {
       number: (a, b) => a.number.localeCompare(b.number),
       response_due_at: (a, b) => String(a.response_due_at).localeCompare(String(b.response_due_at)),
     },
+  });
+});
+/* Write With AI (guide §9): the demo drafts from what was asked; nothing is kept. */
+route("GET /api/v1/queries/assist", () => ok({ available: true, reason: null }));
+route("POST /api/v1/queries/assist", (req) => {
+  const b = req.body as { employee_id?: string; instruction?: string; policy_id?: string };
+  const p = byId(b.employee_id);
+  if (!p) return invalid({ employee_id: ["Required"] });
+  const said = String(b.instruction ?? "").trim();
+  if (said.length < 10) return invalid({ instruction: ["Say what happened"] });
+  const cited = b.policy_id ? policyCitation(b.policy_id) : null;
+  return ok({
+    available: true,
+    reason: null,
+    subject: "Late Arrivals This Month",
+    details: `${p.display_name.split(" ")[0]}, ${said.replace(/\.?$/, ".")}${cited ? ` This is against our ${cited.title}.` : ""} Please explain this in writing.`,
+    ai_run_id: null,
   });
 });
 route("GET /api/v1/queries/policies", (req) =>
