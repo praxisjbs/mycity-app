@@ -271,6 +271,50 @@ function listFunctions(db, query) {
   );
 }
 
+/**
+ * GET /performance/departments: the departments a reader's Performance lists can be filtered by.
+ * A reader with `all` gets every active one. Anyone else gets the departments of the people they
+ * reach: their scope (the caller first), those whose scorecards or reviews name them (reviewer, a
+ * holder of the reviewing role, dotted manager, second level), and themselves; each as the person's
+ * record and their scorecards give it (a person moved mid-quarter keeps the scorecard's), and the
+ * departments they head.
+ */
+function listDepartments(db, query, scope, reader) {
+  if (scope.scope === "all")
+    return pageQuery(
+      db,
+      `SELECT d.department_id, d.code, d.name, ${TOTAL_COL}
+         FROM department d
+        WHERE d.active
+        ORDER BY d.name, d.department_id`,
+      [],
+      query,
+    );
+  return pageQuery(
+    db,
+    `WITH reach AS (
+       SELECT unnest($1::uuid[]) AS employee_id
+       UNION SELECT $2::uuid
+       UNION SELECT s.employee_id FROM scorecard s
+              WHERE s.reviewer_employee_id = $2 OR s.dotted_employee_id = $2
+                 OR (s.reviewer_role_code IS NOT NULL AND s.employee_id <> $2
+                     AND s.reviewer_role_code::text IN (SELECT r.code::text FROM user_role ur JOIN role r ON r.role_id = ur.role_id WHERE ur.user_id = $3))
+       UNION SELECT pr.employee_id FROM performance_review pr
+              WHERE pr.reviewer_employee_id = $2 OR pr.dotted_employee_id = $2 OR pr.second_level_employee_id = $2
+     ), places AS (
+       SELECT e.department_id FROM employee e JOIN reach USING (employee_id)
+       UNION SELECT s.department_id FROM scorecard s JOIN reach USING (employee_id)
+       UNION SELECT h.department_id FROM department h WHERE h.head_employee_id = $2
+     )
+     SELECT d.department_id, d.code, d.name, ${TOTAL_COL}
+       FROM department d
+      WHERE d.active AND d.department_id IN (SELECT department_id FROM places)
+      ORDER BY d.name, d.department_id`,
+    [Array.isArray(scope.scope_ids) ? scope.scope_ids : [], reader.employee_id || null, reader.user_id || null],
+    query,
+  );
+}
+
 async function updatePlan(client, id, patch) {
   const keys = ["status", "workflow_instance_id", "submitted_by", "submitted_at", "returned_reason", "binding_at"].filter(
     (k) => patch[k] !== undefined,
@@ -1026,6 +1070,7 @@ module.exports = {
   holdsRoleCode,
   listPlans,
   listFunctions,
+  listDepartments,
   getPlan,
   getChangeDetail,
   approvalsWaiting,

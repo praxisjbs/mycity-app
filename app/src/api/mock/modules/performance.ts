@@ -1,5 +1,5 @@
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
-import { byId, byKey, DEPARTMENTS, managerOf, refKey, teamOf } from "../data/people";
+import { byId, byKey, DEPARTMENTS, managerOf, refKey, SIGN_INS, teamOf } from "../data/people";
 import { me } from "./identity";
 import type {
   AnalyticsPerson,
@@ -585,6 +585,32 @@ route("GET /api/v1/performance/functions", (req) => {
   });
   // The quarter names each plan; it narrows nothing.
   return paged(rows, req, { filters: { period_id: () => true } });
+});
+/**
+ * GET /performance/departments: the departments the reader's Scorecards, Commitments, Reviews and
+ * Analytics filter by. The CEO and Operations & People reach everyone, so every department; anyone
+ * else the department of themselves, their team and the people whose scorecards they review, and
+ * the ones their scorecards name.
+ */
+route("GET /api/v1/performance/departments", (req) => {
+  const everyone = isCeo(req) || SIGN_INS[req.user ?? ""]?.view === "operations";
+  const person = meOf(req);
+  const reach = new Set<string>();
+  if (person) {
+    reach.add(person.employee_id);
+    for (const p of teamOf(person.user_key)) reach.add(p.employee_id);
+    for (const c of SCORECARDS) if (reviewerOf(c, req)) reach.add(c.employee.employee_id);
+  }
+  const names = new Set<string>();
+  if (!everyone) {
+    for (const key of DEPARTMENTS) if ([...reach].some((id) => byId(id)?.department === key)) names.add(key);
+    for (const c of SCORECARDS) if (reach.has(c.employee.employee_id) && c.department) names.add(c.department);
+  }
+  const rows = [...DEPARTMENTS]
+    .filter((name) => everyone || names.has(name))
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => ({ department_id: sid(`dept:${name}`), code: name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase(), name }));
+  return paged(rows, req, {});
 });
 route("GET /api/v1/performance/plans/:id", (req) => {
   const p = PLANS.find((x) => x.performance_plan_id === req.params.id);

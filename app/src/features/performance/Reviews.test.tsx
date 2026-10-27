@@ -164,6 +164,32 @@ describe("Performance · Reviews", () => {
     expect(within(form).getByText("Not ended yet")).toBeTruthy();
   }, 30000);
 
+  /** What the Department filter offers, in order; null when the screen shows no such filter. */
+  const departmentChoices = () => {
+    const filter = screen.queryByRole("combobox", { name: "Department" });
+    if (!filter) return null;
+    fireEvent.click(filter);
+    const names = within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    return names;
+  };
+
+  it("the Department filter offers Operations & People every department", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=reviews");
+    expect(departmentChoices()).toEqual(["All Departments", "Content", "Engineering", "Executive", "Finance", "Marketing & Sales", "Operations & People", "Studio", "Support"]);
+  }, 30000);
+
+  it("the Department filter offers a manager only the departments of the people they reach", async () => {
+    await openAs("ngozi@mycityapp.io", "/performance?tab=reviews");
+    expect(departmentChoices()).toEqual(["All Departments", "Finance", "Marketing & Sales", "Studio"]);
+  }, 30000);
+
+  it("a member of staff with one department to reach is not offered a Department filter", async () => {
+    await openAs("kemi@mycityapp.io", "/performance?tab=reviews");
+    expect(screen.getByRole("heading", { level: 1, name: "Reviews" })).toBeTruthy();
+    expect(departmentChoices()).toBeNull();
+  }, 30000);
+
   it("opens on the newest round, which the API lists first", async () => {
     const real = vi.mocked(dispatch).getMockImplementation()!;
     vi.mocked(dispatch).mockImplementation(async (req) => {

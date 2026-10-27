@@ -209,6 +209,14 @@ describe("Performance · a mid-quarter scorecard, a scorecard's link and a line'
     expect(await screen.findByRole("button", { name: "Export Report" })).toBeTruthy();
   }, 30000);
 
+  it("a department in the Commitments address that the reader's scope does not reach filters nothing and is not offered", async () => {
+    await openAs("kemi@mycityapp.io", `/performance?tab=targets&view=commitments&department_id=${sid("dept:Finance")}`);
+    expect((await screen.findAllByRole("heading", { name: "Commitments" })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("combobox", { name: "Department" })).toBeNull();
+    const asked = vi.mocked(dispatch).mock.calls.map(([r]) => r).filter((r) => r.method === "GET" && r.path.endsWith("/performance/commitments"));
+    expect(asked.at(-1)?.query).not.toHaveProperty("department_id");
+  }, 30000);
+
   it("on a phone: scorecards and lines are cards; a line opens its own sheet with Change Target at its foot", async () => {
     setViewport(390);
     await openAs("ngozi@mycityapp.io", "/performance?tab=targets");
