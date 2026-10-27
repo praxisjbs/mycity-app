@@ -7,6 +7,7 @@
  *
  *   GET   /rounds                        `performance` view: each with its reviews by stage
  *   POST  /rounds · /rounds/:id/close    create · edit, performance.manage: a late start; closing
+ *   POST  /rounds/:id/reopen             edit, performance.manage: a closed round is open again
  *   GET   /reviews · /reviews/:id        `performance` view · scope, and those naming the reader
  *   PUT   /reviews/:id/scores            the reviewer, after the check-in (409 CHECK_IN_FIRST)
  *   POST  /reviews/:id/submit            the reviewer: opens performance.review
@@ -45,6 +46,10 @@ route(router, "post", "/rounds",
 route(router, "post", "/rounds/:id/close",
   { params: c.common.IdParams, body: c.common.EmptyBody, response: r.Round, summary: "Close a round" },
   requirePermission("performance", "edit"), requireCapability("performance.manage"), controller.closeRound);
+
+route(router, "post", "/rounds/:id/reopen",
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: r.Round, summary: "Reopen a closed round" },
+  requirePermission("performance", "edit"), requireCapability("performance.manage"), controller.reopenRound);
 
 route(router, "get", "/reviews",
   { query: r.ReviewListQuery, response: r.ReviewPage, summary: "Reviews" },

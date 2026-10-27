@@ -266,6 +266,7 @@ describe("the routes", () => {
     const manage = [
       ["POST", "/rounds"],
       ["POST", "/rounds/:id/close"],
+      ["POST", "/rounds/:id/reopen"],
       ["POST", "/reviews/:id/conduct"],
       ["POST", "/reviews/:id/probation-outcome"],
       ["POST", "/reviews/:id/withdraw"],

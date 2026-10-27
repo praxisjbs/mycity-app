@@ -19,6 +19,7 @@ module.exports = {
   listRounds: async (req, res) => sendPaged(res, await cycle.listRounds(req.validated.query, withActor(req), scopeOf(req))),
   createRound: async (req, res) => created(res, await cycle.createRound(withActor(req), req.validated.body)),
   closeRound: async (req, res) => ok(res, await cycle.closeRound(withActor(req), id(req))),
+  reopenRound: async (req, res) => ok(res, await cycle.reopenRound(withActor(req), id(req))),
 
   list: async (req, res) => sendPaged(res, await service.list(withActor(req), req.validated.query, scopeOf(req))),
   get: async (req, res) => ok(res, await service.get(withActor(req), scopeOf(req), id(req))),

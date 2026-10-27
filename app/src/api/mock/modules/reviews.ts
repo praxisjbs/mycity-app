@@ -258,6 +258,13 @@ route("POST /api/v1/performance/rounds/:id/close", (req) => {
   round.status = "closed";
   return ok({ ...round, counts: countsOf(round, req.user) });
 });
+route("POST /api/v1/performance/rounds/:id/reopen", (req) => {
+  if (!isHr(req.user)) return fail(403, "PERMISSION_DENIED", "Operations & People reopen rounds");
+  const round = ROUNDS.find((r) => r.performance_cycle_id === req.params.id);
+  if (!round) return notFound();
+  round.status = "open";
+  return ok({ ...round, counts: countsOf(round, req.user) });
+});
 
 /* Reviews */
 
