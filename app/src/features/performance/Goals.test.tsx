@@ -157,6 +157,93 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(ORG_GOALS.at(-1)).toMatchObject({ code: "ORG-2026-04", title: "Open in four more cities" });
   }, 60000);
 
+  it("New Key Result offers only what its measure needs: Dated and Yes or No take away Target, Unit and Direction, and what was typed there is not saved (JBS Praxis, 27/10/2026)", async () => {
+    const made: { objective?: string } = {};
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals", async () => {
+      const o = (await api.call("POST /api/v1/performance/objectives", { body: { performance_period_id: quarter, title: "A trusted view" } })) as { okr_objective_id: string };
+      made.objective = o.okr_objective_id;
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    await settled();
+    const form = dialog();
+    await chooseOption(within(form).getByLabelText("What"), "Key Result");
+    await settled();
+    const target = /^Target(?! in Words| to be)/;
+    const measure = (name: string) => fireEvent.click(within(form).getByRole("radio", { name }));
+
+    // Numeric asks for the figure, its unit and, behind More, which way is better.
+    expect(within(form).getByLabelText(target)).toBeTruthy();
+    expect(within(form).getByLabelText(/^Unit/)).toBeTruthy();
+    expect(within(form).getByText("Direction")).toBeTruthy();
+    type(form, target, "7000");
+    type(form, /^Unit/, "users");
+
+    // Yes or No and Dated have no figure to reach: the words, TBC, finish and owner remain.
+    for (const name of ["Yes or No", "Dated"]) {
+      measure(name);
+      await settled();
+      expect(within(form).queryByLabelText(target)).toBeNull();
+      expect(within(form).queryByLabelText(/^Unit/)).toBeNull();
+      expect(within(form).queryByText("Direction")).toBeNull();
+      expect(within(form).getByLabelText(/^Target in Words/)).toBeTruthy();
+      expect(within(form).getByRole("checkbox", { name: "Target to be confirmed" })).toBeTruthy();
+      expect(within(form).getByLabelText(/^Finish/)).toBeTruthy();
+      expect(within(form).getByLabelText(/^Baseline/)).toBeTruthy();
+    }
+    expect(copyProblems()).toEqual([]);
+
+    // Back on Numeric, what was typed is still there.
+    measure("Numeric");
+    await settled();
+    expect(valueOf(form, target)).toBe("7000");
+    expect(valueOf(form, /^Unit/)).toBe("users");
+
+    // Saved as Yes or No, the figure and unit typed before the change are left out.
+    measure("Yes or No");
+    await settled();
+    type(form, "Key Result", "Sign the Lagos partnership");
+    type(form, /^Target in Words/, "Contract signed");
+    await press(form, "Set Key Result");
+    const saved = OBJECTIVES.find((o) => o.okr_objective_id === made.objective)!.key_results.at(-1)!;
+    expect(saved).toMatchObject({ statement: "Sign the Lagos partnership", measure: "yes_no", target_text: "Contract signed", target_value: null, unit: null, direction: "higher" });
+    // The objective goes with its key result: later tests start from the demo's plan.
+    await api.call("DELETE /api/v1/performance/objectives/:id", { params: { id: made.objective! } });
+  }, 60000);
+
+  it("New Key Result's Unit suggests the units in use, offers what is typed, and offers a new unit the next time (JBS Praxis, 27/10/2026)", async () => {
+    const made: { objective?: string } = {};
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals", async () => {
+      const o = (await api.call("POST /api/v1/performance/objectives", { body: { performance_period_id: quarter, title: "A full house" } })) as { okr_objective_id: string };
+      made.objective = o.okr_objective_id;
+    });
+    const openForm = async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+      await settled();
+      const form = dialog();
+      await chooseOption(within(form).getByLabelText("What"), "Key Result");
+      await settled();
+      return form;
+    };
+    const options = (root: HTMLElement) => within(root).queryAllByRole("option").map((o) => o.textContent ?? "");
+
+    // A unit nobody has used is offered as typed, beside the units in use.
+    let form = await openForm();
+    type(form, /^Unit/, "tickets");
+    await settled();
+    expect(options(form).some((o) => /^Add\s*“tickets”/.test(o))).toBe(true);
+    type(form, "Key Result", "Sell out the launch night");
+    type(form, /^Target(?! in Words| to be)/, "500");
+    await press(form, "Set Key Result");
+    expect(OBJECTIVES.find((o) => o.okr_objective_id === made.objective)!.key_results.at(-1)).toMatchObject({ unit: "tickets", target_value: "500" });
+
+    // Next time it is a suggestion, with how often it is used.
+    form = await openForm();
+    type(form, /^Unit/, "tick");
+    await settled();
+    expect(options(form).some((o) => /^tickets/.test(o) && /1 use/.test(o))).toBe(true);
+    await api.call("DELETE /api/v1/performance/objectives/:id", { params: { id: made.objective! } });
+  }, 60000);
+
   it("New Objective marks a function whose plan is binding as it is picked, and sends nothing (QA DEF-10)", async () => {
     await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
     fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);

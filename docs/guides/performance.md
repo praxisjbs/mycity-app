@@ -454,10 +454,13 @@ and Home rows of §2 and §10.
    unbound, whoever sets that function's goals (§6.3) edits or deletes an objective from its card
    (Edit Objective, Delete Objective) and a key result from its panel (Edit Key Result, Delete Key
    Result); a delete is a confirmation naming
-   the item. New Key Result and Edit Key Result are one form: objective, key result, measure, target,
-   target in words, TBC, unit, finish, owner and, for a function's key result, Feeds (the company key
-   results it feeds, picked 25 at a time); behind More, Scored From (a company key result's function
-   key result), co-owner, direction, baseline, start, type and owner note.
+   the item. New Key Result and Edit Key Result are one form that follows its measure. Always:
+   objective, key result, measure, target in words, TBC, finish, owner and, for a function's key
+   result, Feeds (the company key results it feeds, picked 25 at a time); behind More, Scored From (a
+   company key result's function key result), co-owner, baseline, start, type and owner note. A
+   **Numeric** key result also has target and unit open and direction behind More; **Dated** and **Yes
+   or No** have no number to reach, so those three are not offered (§6.8 scores them on done, not a
+   figure).
 3. **Managers draft their people's scorecards** (Scorecards, New Scorecard; Copy Last Quarter or
    Copy From Colleague): Results, KPIs and Accountability lines, each linked to a key result or KPI,
    with its target, how it is measured, due or frequency, weight and source (§6.5). Accountability
@@ -1710,7 +1713,14 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
   each delete is a ConfirmDialog naming the item; an edit's empty field clears it. **The key result
   form carries every field**: New Key Result and Edit Key Result are one form (`KeyResultForm.tsx`),
   Feeds picked from `GET /key-results` (25 a page), TBC and target in words open, the rest behind
-  More (`MoreFields`, new in `@mycity/ui`); `KeyResultDetail` names its quarter. **Set Target** on a
+  More (`MoreFields`, new in `@mycity/ui`); `KeyResultDetail` names its quarter. **The form follows
+  its measure**: only a Numeric key result (and a multi-part one, whose measure is not edited) shows
+  Target, Unit and Direction; choosing Dated or Yes or No removes them, and what was typed stays in the
+  form for the way back but is not sent. A key result changed to Dated or Yes or No clears its stored
+  target, unit and direction (`editBody`); one already so keeps what it holds. **Unit** on a key result
+  is the KPI form's `UnitField` (`shared.tsx`, a `ComboField`): a menu of the units in use, narrowed as it
+  is typed, and a unit typed that it does not know is saved with the key result and offered from then on
+  (§5). No contract or API change. **Set Target** on a
   TBC key result before its lock date, by its owner or the head, with no approval (it stays TBC until
   the lock date, `can_set_target`); Change Target is offered and accepted only after the lock (409
   `TARGET_TBC`). **One number formatter**, `formatNumber` in `@mycity/ui` (64,000; 40%; 12 partners),

@@ -1,12 +1,21 @@
 /** What the Performance tabs share: the quarter switcher, the words for codes, a person in a cell. */
 import { useState } from "react";
-import type { PerformancePeriod } from "@mycity/contract/contract.gen.ts";
+import type { KpiUnit, PerformancePeriod } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useApi, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
-import { formatMonth, formatNumber, shortMessage, todayIso, Who, type ContractSchema, type ServerFields } from "@mycity/ui";
+import { ComboField, formatMonth, formatNumber, plural, shortMessage, todayIso, Who, type ComboFieldProps, type ContractSchema, type ServerFields } from "@mycity/ui";
 
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
+
+/**
+ * The Unit field of a KPI and of a key result: it suggests the units already in use, 25 at a time, narrowed as
+ * it is typed, and a unit it does not know is kept as typed and offered from then on (§5).
+ */
+export function UnitField(binding: Omit<ComboFieldProps<KpiUnit>, "list" | "option" | "sub" | "placeholder">) {
+  const units = usePaged("GET /api/v1/performance/kpis/units", { filters: {} });
+  return <ComboField {...binding} list={units} option={(u) => u.unit} sub={(u) => plural(u.uses, "use")} placeholder="users" />;
+}
 
 /** A person in a table cell: their name, and their department beneath it. */
 export const person = (p: PersonRef) => <Who name={p.display_name} sub={p.department ?? undefined} />;
