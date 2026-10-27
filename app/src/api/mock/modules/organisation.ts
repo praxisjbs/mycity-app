@@ -6,7 +6,7 @@ import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_IN
 import roster from "../data/roster.json";
 import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
-import { decidePlan, decideTargetChange, performanceInstance, performanceWaitingOn } from "./performance";
+import { decidePlan, decideTargetChange, decideUnbind, performanceInstance, performanceWaitingOn } from "./performance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
 import { decideCommitment } from "./workspace";
 import { assignSite, siteOf, WORKSITES } from "./worksites";
@@ -993,6 +993,7 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
       decideReview(req.user!, req.params.id, approve, reason) ??
       decideCommitment(req.user!, req.params.id, approve, reason) ??
       decidePlan(req.user!, req.params.id, approve, reason) ??
+      decideUnbind(req.user!, req.params.id, approve, reason) ??
       decideTargetChange(req.user!, req.params.id, approve, reason) ??
       notFound()
     );

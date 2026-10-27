@@ -13,7 +13,7 @@
  * AS THE RECIPIENT. The report is gathered with the recipient's own grants, scope and masked
  * fields (reports.sources gather), never its owner's or the caller's, so a file never holds a
  * row its recipient could not open on screen. A recipient who is no longer active, may no
- * longer open the report's source, or (for any source but the Overview) no longer holds
+ * longer open the report's source, or (for any source but a personal export's) no longer holds
  * `home.reports`, gets no file: the run is skipped and nothing is emailed. They are asked
  * before the file is built and again before it is emailed, since a PDF renders in between.
  *
@@ -158,7 +158,8 @@ async function deliver(run, { last }) {
  */
 async function build(run, person) {
   const at = run.scheduled_for || run.run_at;
-  const filters = (run.definition && run.definition.filters) || {};
+  // A personal export's run keeps its own filters (its period, migration 2530); any other run reads its report's.
+  const filters = run.filters || (run.definition && run.definition.filters) || {};
   const gathered = await sources.gather(pool, person, run.report_key, filters, { at });
   const names = await repo.filterNames(pool, filters);
   const meta = {
@@ -171,6 +172,7 @@ async function build(run, person) {
       departmentName: names.department,
       leaveTypeName: names.leave_type,
       rosterOn: run.report_key === "daily_attendance" ? await sources.rosterDate(pool, filters, at) : null,
+      analyticsOn: run.report_key === "workspace_analytics" ? sources.analyticsDays(filters, at) : null,
     }),
   };
   const entity = { type: ENTITY, id: run.home_report_run_id };

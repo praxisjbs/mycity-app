@@ -13,15 +13,24 @@
  * service works out which sources the reader may open; this file turns it into SQL. A run is
  * seen by its recipient and by the report's owner (runSeenWhere); the CEO sees every run.
  *
- * The Overview Export keeps a report of source `overview` for each person who exports. It is
- * theirs alone and never listed: every read of reports here leaves it out.
+ * A personal export keeps a report of its own source for each person who exports: the
+ * Overview Export (`overview`) and My Workspace · Analytics' Export (`workspace_analytics`). It
+ * is theirs alone and never listed: every read of reports here leaves those sources out.
  */
+const c = require("@mycity/contract");
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
 /** The source of the Overview Export's own reports, never listed with the others. */
 const OVERVIEW = "overview";
+
+/** The sources of the personal exports (never offered on the form), never listed. */
+const PERSONAL = Object.freeze(
+  Object.entries(c.reports.HOME_REPORT_SOURCES)
+    .filter(([, source]) => !source.offered)
+    .map(([key]) => key),
+);
 
 /* ------------------------------------------------------------------ *
  * Who sees what
@@ -35,8 +44,8 @@ const OVERVIEW = "overview";
  * @param {Array} params
  */
 function seenWhere(seen, params) {
-  params.push(OVERVIEW);
-  const overview = `r.report_key <> $${params.length}`;
+  params.push(PERSONAL);
+  const overview = `r.report_key <> ALL($${params.length}::text[])`;
   if (seen.all) return overview;
   params.push(seen.user_id);
   const me = `$${params.length}::uuid`;
@@ -143,15 +152,16 @@ function reportById(db, seen, id, { lock = false } = {}) {
 }
 
 /**
- * The person's own Overview Export report, or null.
+ * The person's own report of a personal export's source (the Overview's by default), or null.
  * @param {{query: Function}} db
  * @param {string} ownerUserId
+ * @param {string} [key]  one of PERSONAL
  */
-function overviewReportOf(db, ownerUserId) {
+function personalReportOf(db, ownerUserId, key = OVERVIEW) {
   return one(
     db,
     `${REPORT_SELECT} ${REPORT_FROM} WHERE r.owner_user_id = $1 AND r.report_key = $2 ORDER BY r.created_at LIMIT 1`,
-    [ownerUserId, OVERVIEW],
+    [ownerUserId, key],
   );
 }
 
@@ -183,8 +193,8 @@ function counts(db, seen) {
 }
 
 /**
- * Whether the owner already has a report of this name, case aside. Their Overview Export's
- * report is not listed, so it never holds a name against them.
+ * Whether the owner already has a report of this name, case aside. Their personal exports'
+ * reports are not listed, so they never hold a name against them.
  * @param {{query: Function}} db
  * @param {string} ownerUserId
  * @param {string} name
@@ -195,9 +205,9 @@ async function nameTaken(db, ownerUserId, name, { except = null } = {}) {
     db,
     `SELECT EXISTS (
        SELECT 1 FROM saved_report
-        WHERE owner_user_id = $1 AND lower(name) = lower($2) AND report_key <> $3
+        WHERE owner_user_id = $1 AND lower(name) = lower($2) AND report_key <> ALL($3::text[])
           AND ($4::uuid IS NULL OR saved_report_id <> $4::uuid)) AS taken`,
-    [ownerUserId, name, OVERVIEW, except],
+    [ownerUserId, name, PERSONAL, except],
   );
   return row.taken;
 }
@@ -262,7 +272,7 @@ async function updateReport(db, id, changes) {
 
 /**
  * Hold one owner's reports for the rest of the transaction: two saves claiming a name take
- * turns, and two Overview Exports at once make one report between them.
+ * turns, and two exports at once make one personal report between them.
  * @param {{query: Function}} db  inside a transaction
  * @param {string} ownerUserId
  */
@@ -514,20 +524,22 @@ async function filesSince(db, seen, since) {
 
 /**
  * The run on demand this person asked for that is still waiting, for this report and format,
- * or null: pressing Run Now again while it waits is the same run. Only a run they asked for: a
- * scheduled run keeps its slot when its schedule is removed, and is never answered here.
+ * and with the same filters of its own (a personal export's period; none for any other run), or
+ * null: pressing Run Now or Export again while it waits is the same run. Only a run they asked
+ * for: a scheduled run keeps its slot when its schedule is removed, and is never answered here.
  * @param {{query: Function}} db
- * @param {{saved_report_id: string, recipient_user_id: string, format: string}} run
+ * @param {{saved_report_id: string, recipient_user_id: string, format: string, filters?: object|null}} run
  */
-async function pendingOnDemand(db, { saved_report_id: reportId, recipient_user_id: recipient, format }) {
+async function pendingOnDemand(db, { saved_report_id: reportId, recipient_user_id: recipient, format, filters = null }) {
   const row = await one(
     db,
     `SELECT home_report_run_id FROM home_report_run
       WHERE saved_report_id = $1 AND recipient_user_id = $2 AND format = $3
         AND requested_by = $2 AND scheduled_for IS NULL AND status = 'pending'
+        AND filters IS NOT DISTINCT FROM $4::jsonb
       ORDER BY run_at DESC
       LIMIT 1`,
-    [reportId, recipient, format],
+    [reportId, recipient, format, filters === null ? null : JSON.stringify(filters)],
   );
   return row ? row.home_report_run_id : null;
 }
@@ -537,7 +549,8 @@ async function pendingOnDemand(db, { saved_report_id: reportId, recipient_user_i
  * one that slot already holds is not added again, and null comes back.
  * @param {{query: Function}} db
  * @param {{number: string, saved_report_id: string, report_schedule_id: string|null, scheduled_for: Date|null,
- *          recipient_user_id: string, requested_by: string|null, format: string}} run
+ *          recipient_user_id: string, requested_by: string|null, format: string, filters?: object|null}} run
+ *   filters: the run's own (a personal export's period), or null to read its report's
  * @returns {Promise<string|null>} its id
  */
 async function insertRun(db, run) {
@@ -545,8 +558,8 @@ async function insertRun(db, run) {
   const row = await one(
     db,
     `INSERT INTO home_report_run (number, saved_report_id, report_schedule_id, scheduled_for, recipient_user_id,
-                                  requested_by, format, run_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, clock_timestamp())
+                                  requested_by, format, filters, run_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, clock_timestamp())
      ON CONFLICT (report_schedule_id, scheduled_for, recipient_user_id, format)
        WHERE report_schedule_id IS NOT NULL DO NOTHING
      RETURNING home_report_run_id`,
@@ -558,6 +571,7 @@ async function insertRun(db, run) {
       run.recipient_user_id,
       run.requested_by,
       run.format,
+      run.filters ? JSON.stringify(run.filters) : null,
     ],
   );
   return row ? row.home_report_run_id : null;
@@ -593,7 +607,7 @@ function runToGenerate(db, id, { lock = false } = {}) {
   return one(
     db,
     `SELECT x.home_report_run_id, x.number::text AS number, x.saved_report_id, x.report_schedule_id, x.scheduled_for,
-            x.recipient_user_id, x.requested_by, x.format, x.status, x.document_id, x.run_at,
+            x.recipient_user_id, x.requested_by, x.format, x.filters, x.status, x.document_id, x.run_at,
             r.name AS report_name, r.report_key, r.definition, r.owner_user_id
        FROM home_report_run x
        JOIN saved_report r ON r.saved_report_id = x.saved_report_id
@@ -657,11 +671,12 @@ function runReaders(db, runId) {
 
 module.exports = {
   OVERVIEW,
+  PERSONAL,
   seenWhere,
   runSeenWhere,
   reportPage,
   reportById,
-  overviewReportOf,
+  personalReportOf,
   counts,
   nameTaken,
   namesLike,

@@ -1,23 +1,148 @@
-/** My Workspace · Analytics (docs/guides/workspace.md §10.1): how work is moving, mine or my team's. */
+/**
+ * My Workspace · Analytics (docs/guides/workspace.md §10.1): how work is moving, mine or my team's,
+ * over This Week, 30 or 90 days, This Year, or the reader's own dates (Custom Period). Export, for
+ * holders of `workspace` export on a computer, makes a file of the figures through Home's reports
+ * engine (POST /workspace/analytics/export): numbered, and downloaded here once it is made.
+ */
 import { useState } from "react";
-import { useApi } from "@/api/hooks";
+import reports from "@mycity/contract/schemas/reports.js";
+import type { HomeReportFormat } from "@mycity/contract/contract.gen.ts";
+import { api, ApiError } from "@/api/client";
+import { saveRun } from "@/api/exports";
+import { invalidate, useApi, useMutation } from "@/api/hooks";
+import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { AreaChart, Bars, Card, CardHeader, DataView, ErrorState, formatDate, Grid, KeyValue, LoadingRows, PageHeader, SegmentedControl, useIsPhone } from "@mycity/ui";
+import {
+  AreaChart,
+  Bars,
+  Button,
+  Card,
+  CardHeader,
+  DataView,
+  DateRangeField,
+  ErrorState,
+  Field,
+  Form,
+  formatDate,
+  FormatButton,
+  FormFooter,
+  Grid,
+  KeyValue,
+  LoadingRows,
+  PageHeader,
+  SegmentedControl,
+  todayIso,
+  toast,
+  useContractForm,
+  useIsPhone,
+  useModal,
+} from "@mycity/ui";
 import { PRIORITY, useSetsForOthers } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
 
 const BAND: Record<string, string> = { "1_3": "1 to 3 Days", "4_7": "4 to 7 Days", "8_14": "8 to 14 Days", "15_plus": "15 Days or More" };
 const days = (n: number | null, none = "None yet") => (n === null ? none : `${n} days`);
 
+type Period = "week" | "30d" | "90d" | "year" | "custom";
+type Scope = "mine" | "team";
+type Dates = { from: string; to: string };
+/** What the screen reads and an Export makes: whose work, the period, a custom period's days. */
+type Query = { scope: Scope; period: Period } & Partial<Dates>;
+
+const PERIODS: Array<[Period, string]> = [
+  ["week", "This Week"],
+  ["30d", "30 Days"],
+  ["90d", "90 Days"],
+  ["year", "This Year"],
+  ["custom", "Custom"],
+];
+
+/** Custom Period: From and To, checked as filled by the contract's own rule (at most 366 days, in order). */
+function CustomPeriodForm({ initial, close, onPick }: { initial: Dates; close: () => void; onPick: (d: Dates) => void }) {
+  const f = useContractForm(
+    { period: initial },
+    {
+      safeParse: (v: { period: Dates }) => {
+        const r = reports.WorkspaceAnalyticsExport.safeParse({ period: "custom", from: v.period.from || undefined, to: v.period.to || undefined, format: "xlsx" });
+        return r.success ? r : { success: false, error: { issues: (r.error?.issues ?? []).map((i) => ({ ...i, path: ["period"] })) } };
+      },
+    },
+  );
+  const show = () => {
+    if (!f.check()) return;
+    onPick(f.values.period);
+    close();
+  };
+  return (
+    <Form onSubmit={show}>
+      <Field label="Period" {...f.status("period")}>
+        <DateRangeField value={f.values.period} onChange={(p) => f.set("period", p)} onProblem={f.field("period").onProblem} max={todayIso()} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" type="submit">
+          Show Period
+        </Button>
+      </FormFooter>
+    </Form>
+  );
+}
+
+/** Each format's choice under Export, as the Overview's Export words it. */
+const EXPORT_AS: Record<HomeReportFormat, string> = { pdf: "Export PDF", xlsx: "Export XLSX" };
+
+/**
+ * Export: the figures as the screen reads them, in the format chosen, waited on and downloaded
+ * here, toasted with its run's number. Desktop only (§10.2).
+ */
+function ExportAnalytics({ query }: { query: Query }) {
+  const exporting = useMutation("POST /api/v1/workspace/analytics/export");
+  const run = async (format: HomeReportFormat) => {
+    try {
+      const { run: done, saved } = await saveRun(
+        exporting.run({ body: { ...query, format }, idempotencyKey: crypto.randomUUID() }),
+        (id) => api.call("GET /api/v1/workspace/analytics/export/:id", { params: { id } }),
+      );
+      invalidate("/api/v1/home/report-runs");
+      if (saved) toast(`${done.number} downloaded`);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Export failed. Try again.");
+    }
+  };
+  return <FormatButton label="Export" formats={["pdf", "xlsx"]} busy={exporting.pending} onRun={run} item={(format) => EXPORT_AS[format]} size="md" />;
+}
+
 export function Analytics() {
   const others = useSetsForOthers();
   const phone = useIsPhone();
+  const me = useMe();
+  const modal = useModal();
   // My Team first for whoever may set work for others, once that is known; the person's choice after.
-  const [picked, setScope] = useState<"mine" | "team" | null>(null);
+  const [picked, setScope] = useState<Scope | null>(null);
   const scope = picked ?? (others === undefined ? null : others ? "team" : "mine");
-  const [period, setPeriod] = useState<"30d" | "90d" | "year">("30d");
+  const [period, setPeriod] = useState<Period>("30d");
+  // A custom period's days, kept once picked; the screen reads Custom only with them.
+  const [dates, setDates] = useState<Dates | null>(null);
   const [allLoad, setAllLoad] = useState(false);
-  const { data, error, reload } = useApi("GET /api/v1/workspace/analytics", { query: { scope: scope ?? "mine", period }, enabled: scope !== null });
+  const query: Query = { scope: scope ?? "mine", period, ...(period === "custom" && dates ? dates : {}) };
+  const { data, error, reload } = useApi("GET /api/v1/workspace/analytics", { query, enabled: scope !== null });
+  const mayExport = me.grants.workspace?.includes("export") ?? false;
+  // Custom asks for its days first; Cancel leaves the period as it was.
+  const pickDates = () =>
+    modal.open({
+      title: "Custom Period",
+      body: (close) => (
+        <CustomPeriodForm
+          initial={dates ?? { from: data?.from ?? "", to: data?.to ?? todayIso() }}
+          close={close}
+          onPick={(d) => {
+            setDates(d);
+            setPeriod("custom");
+          }}
+        />
+      ),
+    });
+  const choosePeriod = (v: Period) => (v === "custom" ? pickDates() : setPeriod(v));
   const panel = useTaskPanel();
   const max = Math.max(1, ...(data?.workload.map((w) => w.open) ?? [1]));
   const maxPrio = Math.max(1, ...(data?.by_priority.map((p) => p.open) ?? [1]));
@@ -32,7 +157,9 @@ export function Analytics() {
         actions={
           <>
             {others && scope && <SegmentedControl label="Whose Work" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
-            <SegmentedControl label="Period" value={period} onChange={setPeriod} options={[["30d", "30 Days"], ["90d", "90 Days"], ["year", "This Year"]]} />
+            <SegmentedControl label="Period" value={period} onChange={choosePeriod} options={PERIODS} />
+            {period === "custom" && <Button onClick={pickDates}>Change Dates</Button>}
+            {mayExport && !phone && scope && <ExportAnalytics query={query} />}
           </>
         }
       />

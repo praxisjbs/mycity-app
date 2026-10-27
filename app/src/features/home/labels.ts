@@ -204,6 +204,7 @@ export const REPORT_SOURCE: Record<ReportSourceKey, string> = {
   expenses: "Expenses",
   recruitment: "Recruitment",
   overview: "Overview",
+  workspace_analytics: "Workspace Analytics",
 };
 
 /** A source's name; one the contract no longer lists reads as Other, never as its key. */

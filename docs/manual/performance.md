@@ -134,10 +134,12 @@ The CEO records the year's organisational goals.
 
 The CEO and Management set the company's objectives; each function's head sets the function's.
 Operations and People and the CEO may set any function's. They can be added and changed while the
-plan is a draft, or after it comes back. A new objective goes into the quarter chosen in
-**Quarter** on Goals.
+plan is a draft, after it comes back, or once the CEO has unbound it (see
+[Ask to change a binding plan](#performance-plan-unbind)). A new objective goes into the quarter
+chosen in **Quarter** on Goals.
 
-**New Goal** shows only if you may set goals for a function or the company.
+**New Goal** shows only if you may set goals for a function or the company. While your function's
+plan is binding, **Request To Unbind** takes its place.
 
 ![New Goal, an objective](shot:performance-new-goal)
 
@@ -152,8 +154,8 @@ plan is a draft, or after it comes back. A new objective goes into the quarter c
 3. {needs="cap goals.company"} For a company objective, choose **Company** in **Function**.
 4. For a key result, press **New Goal** and choose **Key Result**.
 5. Pick its **Objective**, and type the **Key Result**, such as `Grow monthly active users to
-   64,000`. The **Objective** list holds every objective of the quarter whose plan is a draft or
-   returned and that you may add to, whatever **Function** Goals shows. If the form reads
+   64,000`. The **Objective** list holds every objective of the quarter whose plan is a draft,
+   returned or unbound and that you may add to, whatever **Function** Goals shows. If the form reads
    **No Objectives Yet**, set an objective first, or the plan is already sent.
 6. Choose its **Measure**: **Numeric**, **Dated** or **Yes or No**.
 7. Fill in the **Target** as a number, and **Target in Words** as people say it, such as
@@ -181,9 +183,9 @@ example, *BM-O1 deleted*.
 | **An objective holds at most four key results** | The objective has four already | Add it to another objective |
 | **Finishes before it starts** under **Finish** | **Finish** is before **Start** | Change one of the two dates |
 | **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
-| **Plan is binding** under **Function** | That function's plan for the quarter is approved | Pick another function, or change a target |
+| **Plan is binding** under **Function** | That function's plan for the quarter is approved | Pick another function, ask to unbind its plan, or change a target |
 | **Plan awaits approval** under **Function** | That function's plan is with its approvers | Wait until it is returned or binding |
-| **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, or change a target |
+| **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, ask to unbind the plan, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
 | **Only the function's head sets its goals** | Your role changed since the page opened | Reload the page and pick again |
 | **Pick a function** under **Function** | No function picked, and your role does not set the company's | Pick your function |
@@ -226,17 +228,60 @@ card reads **Awaiting Approval**.
 | **Awaiting Approval** | Sent, with one of its approvers |
 | **Returned** | An approver asked for changes |
 | **Binding** | Approved by the CEO; the quarter runs on it |
+| **Unbound** | The CEO opened a binding plan for changes; the quarter still runs on it |
 
 Once a plan is binding, each person and their reviewer is asked to agree the scorecard.
 
-### Decide a plan, a target change or a scorecard {#performance-decide needs="performance approve"}
+### Ask to change a binding plan {#performance-plan-unbind needs="performance create, cap goals.function"}
+
+Once a plan is binding, no objective or key result can be added or changed. To change one, ask the
+CEO to unbind the plan. A function's head asks for the function's plan. Management ask for the
+company's. The CEO does not need to ask.
+
+![Request To Unbind](shot:performance-unbind-request)
+
+1. Open [Performance · Goals](/performance?tab=goals). Pick your function in **Function** if the
+   page does not show it already.
+2. While the plan reads **Binding**, **Request To Unbind** is at the top right, where **New Goal**
+   would be.
+3. Press **Request To Unbind**, type the **Reason**, and press **Send Request**. The hub says
+   **Request sent to the CEO**.
+4. The plan card shows **Unbind Request** as **Waiting On CEO**. The button is gone until the CEO
+   decides.
+5. If the CEO refuses, the card shows **Unbind Refused** and their reason. Press **Request To
+   Unbind** to ask again.
+6. If the CEO approves, the hub tells you and the plan reads **Unbound**. **New Goal** is back. Add
+   objectives and key results as in [Set objectives and key results](#performance-goals-set), and
+   change the ones you have.
+7. Press **Send Plan** on the plan card. It goes to the CEO alone. The plan reads **Awaiting
+   Approval** and cannot be changed until they decide.
+8. When the CEO approves, the plan reads **Binding** again. If they ask for changes, it reads
+   **Unbound** with their reason. Change it and press **Send Plan** again.
+
+While a plan is unbound the quarter carries on. Report Month and the monthly reviews work as
+before. A key result with a reported month keeps its **Target**, **Measure**, **Direction** and
+**Unit**: change its target with **Change Target**. It cannot be deleted, and nor can its
+objective.
+
+| The hub says | What it means | What to do |
+|---|---|---|
+| **An unbind request is already waiting** | A request for this plan has not been decided | Wait for the CEO |
+| **Only a binding plan can be unbound** | The plan is a draft, sent or already unbound | Change it as a draft or unbound plan |
+| **That quarter is closed** | The quarter has ended | Nothing in it can change |
+| **Use Change Target** under a field | The key result has a reported month | Press **Change Target** on the key result |
+| **This key result has a reported month** | A month is reported on it, so it stays | Keep it, or change its target |
+| **A key result of this objective has a reported month** | A month is reported on one of its key results | Keep the objective |
+| **Something depends on this key result** | A scorecard line, a target change, an initiative or a company key result relies on it | Keep it |
+| **Something depends on a key result of this objective** | One of its key results is relied on in the same way | Keep the objective |
+
+### Decide a plan, an unbind request, a target change or a scorecard {#performance-decide needs="performance approve"}
 
 What waits for you sits in **Waiting On You** near the top of
 [Performance · Goals](/performance?tab=goals). It shows only when something waits.
 
 ![A quarter plan waiting for a decision](shot:performance-plan-approval)
 
-1. Read the **Request** (a function's plan, a target change or a scorecard), who it is **From**,
+1. Read the **Request** (a function's plan, an unbind request, a target change or a scorecard), who it is **From**,
    its **Stage** and how long it has been **Waiting Since**. A **Stage** in red has waited longer
    than it should.
 2. Press the row. Its sheet opens.
@@ -250,7 +295,11 @@ What waits for you sits in **Waiting On You** near the top of
    **Reason**. Press **Approve Change**: the hub says **Change approved**. Or press
    **Refuse Change**, type the **Reason** and press **Refuse Change**: the hub says
    **Change refused**.
-7. A scorecard opens its own sheet. Press **Approve Scorecard**: the hub says
+7. {needs="ceo"} An **Unbind Request** shows the **Function**, **Quarter**, **Reason**, **Asked By**
+   and **Asked On**. Press **Approve Request**: the hub says **Request approved**, and the plan is
+   unbound for its head to change. Or press **Refuse Request**, type the **Reason** and press
+   **Refuse Request**: the hub says **Request refused**, and the head reads your reason.
+8. A scorecard opens its own sheet. Press **Approve Scorecard**: the hub says
    **Scorecard approved**, or names the next approver. Or press **Request Changes** with a reason:
    the hub says **Scorecard sent back**.
 
@@ -1184,6 +1233,18 @@ marks:
   1: label "What" | Objective or key result
   2: label "Function" | Whose objective
   3: button "Set Objective" | Save it
+```
+
+```shot performance-unbind-request
+open: /performance?tab=goals
+as: manager
+do:
+  - click: button "Request To Unbind"
+  - wait: label "Reason"
+crop: modal
+marks:
+  1: label "Reason" | Why the plan must change
+  2: button "Send Request" | Send it to the CEO
 ```
 
 ```shot performance-report

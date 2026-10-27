@@ -332,11 +332,17 @@ the defaults; a review's second level (`second_level_employee_id`) and each item
 `2310` a review scored without its check-in (`no_check_in_at`, `no_check_in_reason`) and closed as
 Withdrawn (`withdrawn_at`, `withdrawn_reason`; the status `withdrawn`, `NOT VALID`) (after PR #130,
 `docs/guides/performance.md` §11) ·
+`2320` a request to unbind a binding plan (`plan_unbind`: reason, status `pending`, `approved` or
+`rejected`, the instance, who asked, the decision and its reason; one pending request per plan) and the
+plan's two states `unbound` and `revising` on the `performance_plan` status check (`docs/guides/performance.md`
+§6.22, JBS Praxis, 27/10/2026) · `2321` seed: the flow `performance.plan_change`, the CEO alone ·
 `2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
 missed commitment's Recovery task (Performance PR 4) · `2500` projects get a screen: `project.created_by`,
 its status CHECK (`active`, `completed`) and indexes · `2510` Why Late's reasons (`task_late_reason`,
 switched off rather than deleted; the CHECK on `task.late_reason` gives way to it) · `2520` an event's
-invitation SEQUENCE (`calendar_event.ics_sequence`) · `2590` seed: the six starting late reasons and the
+invitation SEQUENCE (`calendar_event.ics_sequence`) · `2530` a report run keeps the filters it was
+asked with (`home_report_run.filters`, jsonb, null but for My Workspace · Analytics' Export; Home's
+table, 1150, reviewed by TB; docs/guides/workspace.md §6) · `2590` seed: the six starting late reasons and the
 `workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit) ·
 `2600` departments kept on People · Departments (`docs/guides/organogram.md` §6.1, JBS Praxis
 27/10/2026): where a merged department went (`department.merged_into_department_id`, indexed) and

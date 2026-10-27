@@ -81,6 +81,24 @@ describe("the source registry", () => {
     expect(typeof sources.SOURCES.overview.snapshot).toBe("function");
   });
 
+  test("Workspace Analytics is a personal export: never on the form, opened by the workspace export grant", () => {
+    expect(sources.SOURCES.workspace_analytics).toMatchObject({ offered: false, module: "workspace", action: "export" });
+    expect(typeof sources.SOURCES.workspace_analytics.snapshot).toBe("function");
+    const at = new Date("2026-10-27T10:00:00+01:00");
+    expect(sources.analyticsDays({ analytics_period: "week" }, at)).toEqual({ from: "2026-10-26", to: "2026-10-27" });
+    expect(sources.analyticsDays({}, at)).toEqual({ from: "2026-09-28", to: "2026-10-27" });
+    expect(
+      sources.describeFilters(
+        "workspace_analytics",
+        { task_scope: "team", analytics_period: "custom", period_from: "2026-10-01", period_to: "2026-10-20" },
+        { analyticsOn: { from: "2026-10-01", to: "2026-10-20" } },
+      ),
+    ).toEqual([
+      { label: "Whose Work", value: "My Team" },
+      { label: "Period", value: "Custom, 01/10/2026 to 20/10/2026" },
+    ]);
+  });
+
   test("a card's cell becomes the value its column formats", () => {
     const person = { employee_id: ID, display_name: "Ada Obi", job_title: null, department: null };
     expect(sources.cellValue({ kind: "person", person })).toBe("Ada Obi");

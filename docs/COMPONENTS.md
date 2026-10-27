@@ -121,6 +121,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Data | [Calendar](#calendar) | `Calendar` | A month at a glance, Monday first, with what happens on each day. | stable |
 | Data | [DataView](#dataview) | `DataView`, `LoadingRows` | THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export. | stable |
 | Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file and saves it on the device that pressed, once the worker has made it. | stable |
+| Data | [FormatButton](#formatbutton) | `FormatButton` | A button that makes one file in a format: the format straight away when there is one, a choice of formats when there are two or more. | stable |
 | Data | [Kanban](#kanban) | `Kanban`, `KanbanCardBody` | A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19). | stable |
 | Data | [Pager](#pager) | `Pager` | Page controls under a list, showing the server's true total ("312 employees") and Previous and Next. | stable |
 | Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
@@ -3891,6 +3892,39 @@ Asks the server for the whole filtered list as a file and saves it on the device
 
 ```tsx
 <ExportButton onExport={() => saveExport(api.call("POST /api/v1/audit/exports", { body: filters }))} />
+```
+
+### FormatButton
+
+A button that makes one file in a format: the format straight away when there is one, a choice of formats when there are two or more.
+
+| | |
+|---|---|
+| Use | A screen's own export of what it shows, in a format the person picks (the Overview's and Workspace Analytics' Export, Run Now on a report). |
+| Avoid | A list's export of its filtered rows in one format (ExportButton); several unrelated actions behind one button (Menu). |
+| Phone | The choice opens as an action sheet from the bottom, large rows; one format is a plain button. |
+| Accessibility | A Button, busy from the press until the file is saved and pressable rather than disabled; the choice is a Radix menu (arrow keys, Enter, Esc returns focus) named by `label`. |
+| Status | stable |
+| Exports | `FormatButton` |
+| Import | `import { FormatButton } from "@mycity/ui";` |
+| File | `packages/ui/src/data/FormatButton.tsx` |
+| Test | `packages/ui/src/data/FormatButton.test.tsx` |
+| Gallery | `packages/ui/src/data/FormatButton.gallery.tsx` (`npm run gallery`, `#/FormatButton`) |
+
+**FormatButton** props (`FormatButtonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | The button's words: Verb Noun, at most 3 words ("Export", "Run Now"). |
+| `formats` | `readonly F[]` | yes | The formats it can make, in the order offered; one makes the button press straight to it. |
+| `onRun` | `(format: F) => Promise<unknown>` | yes | Makes the file in the chosen format and saves it; the button is busy until it settles. |
+| `item` | `(format: F) => string` | yes | A choice's words, from its format ("Export PDF", "Run as XLSX"). |
+| `busy` | `boolean` |  | Busy for work the press did not hand back (a request already waiting). |
+| `size` | `"sm" \| "md"` |  | Small on a card (the default); the page header's own size beside its other actions. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<FormatButton label="Export" formats={["pdf", "xlsx"]} onRun={exportAs} item={(f) => `Export ${f.toUpperCase()}`} />
 ```
 
 ### Kanban
