@@ -18,7 +18,7 @@ const { z } = require("zod");
 const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
 const { ScoreValue, Quantity, Direction, KrBand, Rating, ScoringRules } = require("./scoring");
-const { MonthStart, Kpi, KpiMonth, KpiResult } = require("./kpis");
+const { MonthStart, Kpi, KpiMonth, KpiResult, hasActual, ACTUAL_REQUIRED } = require("./kpis");
 const { KeyResultRef, Scorecard, Contribution } = require("./targets");
 
 /* ------------------------------------------------------------------ *
@@ -313,7 +313,7 @@ const Objective = z
     plan_status: PlanStatus,
     score: ScoreValue.nullable(),
     key_results: z.array(KeyResult),
-    /** The reader may edit or delete it and its key results: its plan is draft, returned or unbound, and they set its goals. */
+    /** The reader may edit or delete it and its key results: its plan is draft, returned, unbound or awaiting approval, and they set its goals. */
     can_edit: z.boolean(),
   })
   .strict();
@@ -322,13 +322,15 @@ const ObjectivePage = Paged(Objective);
 
 /**
  * GET /performance/okrs. `department_id` "company" lists the company's objectives. `status` is a plan's
- * state, or `live` for the plans the quarter runs on: binding, unbound and revising (Report Month's).
+ * state, `live` for the plans the quarter runs on (binding, unbound and revising: Report Month's), or
+ * `editable` for the plans whose goals their head may still add to and change (draft, returned,
+ * unbound, submitted and revising: New Key Result's).
  */
 const OkrListQuery = listQuery(
   {
     period_id: uuid.optional(),
     department_id: z.union([uuid, z.literal("company")]).optional(),
-    status: z.union([PlanStatus, z.literal("live")]).optional(),
+    status: z.union([PlanStatus, z.literal("live"), z.literal("editable")]).optional(),
   },
   ["position", "code"],
 );
@@ -542,7 +544,7 @@ const KeyResultReport = z
   })
   .strict();
 
-/** One KPI's figure in a month's report. */
+/** One KPI's figure in a month's report; Met and Not Met need it, as on Record Actual. */
 const KpiReport = z
   .object({
     kpi_definition_id: uuid,
@@ -551,7 +553,8 @@ const KpiReport = z
     actual_text: optionalText(500),
     comment: optionalText(2000),
   })
-  .strict();
+  .strict()
+  .refine(hasActual, ACTUAL_REQUIRED);
 
 /** POST /performance/reports: a function's (or the company's) month, in one save. */
 const MonthReport = z

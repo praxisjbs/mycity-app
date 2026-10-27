@@ -134,7 +134,7 @@ describeDb("performance reviews against the real migrations", () => {
     expect(o.status).toBe(201);
     const kr = await as("head").post("/performance/key-results", { okr_objective_id: o.body.okr_objective_id, statement: "Publish 36 city stories", target_value: "36", accountable_employee_id: emp("head") });
     expect(kr.status).toBe(201);
-    const kpi = await as("head").post("/performance/kpis", { department_id: ids.bm, name: "Assets on time", unit: "%", target_value: "95" });
+    const kpi = await as("head").post("/performance/kpis", { department_id: ids.bm, name: "Assets on time", unit: "%", target_value: "95", target_text: "≥95%" });
     expect(kpi.status).toBe(201);
     ids.kpi = kpi.body.kpi_definition_id;
     for (const who of ["ada", "musa"]) {

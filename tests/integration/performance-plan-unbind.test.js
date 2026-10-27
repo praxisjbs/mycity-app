@@ -92,6 +92,8 @@ describeDb("performance plans unbound for changes, against the real migrations",
     await make("head", "Tolu", "Ade", "head_of_department", "Head, Brand", "Branding & Marketing");
     await make("ada", "Ada", "Nwosu", "employee", "Social Media Manager", "Branding & Marketing");
     await make("other", "Bisi", "Lawal", "head_of_department", "Head, Tech", "Technology & Back-office Ops");
+    // The build account: the Implementation Team holds every capability, goals.organisation among them, but is not the CEO.
+    await make("impl", "Seun", "Phillips", "implementation", "Implementation Partner", "General Management");
     await q("UPDATE employee SET line_manager_id = $1 WHERE employee_id = $2", [emp("head"), emp("ada")]);
     ids.bm = (await one("SELECT department_id FROM department WHERE name = 'Branding & Marketing'")).department_id;
     ids.tbo = (await one("SELECT department_id FROM department WHERE name = 'Technology & Back-office Ops'")).department_id;
@@ -292,12 +294,19 @@ describeDb("performance plans unbound for changes, against the real migrations",
     expect(instance).toMatchObject({ definition_key: "performance.plan_change", current_stage: "ceo", entity_type: "performance_plan" });
     expect((await as("head").post(`/performance/plans/${ids.plan}/submit`)).status).toBe(409);
 
-    // Locked: no edit, no new objective, and the head's own Send Plan is gone. Still live: the month reports.
-    const locked = await as("head").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.bm, title: "More" });
-    expect(locked.status).toBe(409);
-    expect(locked.body.error).toMatchObject({ code: "PLAN_BINDING", fields: { department_id: ["Plan awaits approval"] } });
-    expect((await as("head").patch(`/performance/objectives/${ids.added}`, { title: "Changed" })).status).toBe(409);
+    // Awaiting the CEO: Send Plan is gone, but the plan stays the head's to change, what is added joining the
+    // plan sent with the request still the CEO's alone (§6.4, §6.22). Still live: the month reports.
     expect((await as("head").get(`/performance/plans/${ids.plan}`)).body.can_submit).toBe(false);
+    const more = await as("head").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.bm, title: "More" });
+    expect(more.status).toBe(201);
+    expect(more.body).toMatchObject({ plan_status: "revising", can_edit: true });
+    expect((await as("head").patch(`/performance/objectives/${ids.added}`, { title: "Changed" })).status).toBe(200);
+    expect((await as("head").patch(`/performance/objectives/${ids.added}`, { title: "Open every state" })).status).toBe(200);
+    expect((await one("SELECT workflow_instance_id FROM workflow_instance WHERE entity_id = $1 AND state = 'pending'", [ids.plan])).workflow_instance_id).toBe(instance.workflow_instance_id);
+    // What a reported month sits on is kept while the changes wait, as when unbound.
+    expect((await as("head").del(`/performance/objectives/${ids.objective}`)).status).toBe(409);
+    expect((await as("head").patch(`/performance/key-results/${ids.kr}`, { target_value: "70000" })).body.error.code).toBe("KEY_RESULT_REPORTED");
+    expect((await as("head").del(`/performance/objectives/${more.body.okr_objective_id}`)).status).toBe(204);
     const report = await as("head").post("/performance/reports", {
       month: "2026-10-01",
       department_id: ids.bm,
@@ -347,6 +356,78 @@ describeDb("performance plans unbound for changes, against the real migrations",
     });
     expect(await planStatus()).toBe("draft");
     await q("UPDATE performance_plan SET status = 'binding' WHERE performance_plan_id = $1", [ids.plan]);
+  });
+
+  test("a plan awaiting approval takes objectives and key results into the plan sent, and its approval carries on (JBS Praxis, 27/10/2026)", async () => {
+    // Technology & Back-office Ops: one objective, sent, then added to and changed while its approvers hold it.
+    const first = await as("other").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.tbo, title: "Keep every service up" });
+    expect(first.status).toBe(201);
+    const planId = first.body.performance_plan_id;
+    expect((await as("other").post(`/performance/plans/${planId}/submit`)).body.status).toBe("submitted");
+    const instance = await one("SELECT workflow_instance_id FROM workflow_instance WHERE entity_id = $1 AND state = 'pending'", [planId]);
+    const tboRow = async (who) => (await as(who).get(`/performance/functions?period_id=${ids.q4}`)).body.data.find((f) => f.department_id === ids.tbo);
+    // Sent: not sent twice and not unbound, yet the head's to change.
+    expect(await tboRow("other")).toMatchObject({ plan_status: "submitted", can_request_unbind: false });
+    expect((await as("other").get(`/performance/plans/${planId}`)).body).toMatchObject({ status: "submitted", can_submit: false });
+    expect((await as("other").post(`/performance/plans/${planId}/submit`)).status).toBe(409);
+
+    const added = await as("other").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.tbo, title: "Ship the release calendar" });
+    expect(added.status).toBe(201);
+    expect(added.body).toMatchObject({ code: "TBO-O2", plan_status: "submitted", can_edit: true });
+    const result = await as("other").post("/performance/key-results", { okr_objective_id: added.body.okr_objective_id, statement: "A release every fortnight" });
+    expect(result.status).toBe(201);
+    expect(result.body.code).toBe("TBO-KR2.1");
+    expect((await as("other").patch(`/performance/objectives/${first.body.okr_objective_id}`, { title: "Keep every service up, always" })).status).toBe(200);
+    expect((await as("other").patch(`/performance/key-results/${result.body.okr_key_result_id}`, { statement: "A release every two weeks" })).status).toBe(200);
+    // Not for anyone who does not set this function's goals.
+    expect((await as("head").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.tbo, title: "Nope" })).status).toBe(403);
+    expect((await as("ada").patch(`/performance/objectives/${added.body.okr_objective_id}`, { title: "Nope" })).status).toBe(403);
+
+    // The plan it joined is the one sent: the same request, still pending, and the approvers read it as it now stands.
+    expect((await one("SELECT workflow_instance_id FROM workflow_instance WHERE entity_id = $1 AND state = 'pending'", [planId])).workflow_instance_id).toBe(instance.workflow_instance_id);
+    const read = (await as("ops").get(`/performance/plans/${planId}`)).body;
+    expect(read).toMatchObject({ status: "submitted", objective_count: 2 });
+    expect(read.objectives.map((o) => [o.code, o.title, o.key_results.length])).toEqual([["TBO-O1", "Keep every service up, always", 0], ["TBO-O2", "Ship the release calendar", 1]]);
+    expect((await as("other").get(`/performance/okrs?period_id=${ids.q4}&department_id=${ids.tbo}&status=editable`)).body.data).toHaveLength(2);
+
+    // It was sent holding something to approve, and keeps it.
+    expect((await as("other").del(`/performance/objectives/${added.body.okr_objective_id}`)).status).toBe(204);
+    const last = await as("other").del(`/performance/objectives/${first.body.okr_objective_id}`);
+    expect(last.status).toBe(409);
+    expect(last.body.error.code).toBe("PLAN_EMPTY");
+    expect((await as("other").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.tbo, title: "Ship the release calendar" })).body.code).toBe("TBO-O2");
+
+    // Approved, it binds with what was added, and is then shut as any binding plan.
+    const approve = (who) => as(who).post(`/workflow/instances/${instance.workflow_instance_id}/approve`);
+    expect((await approve("ops")).status).toBe(200);
+    expect((await approve("ceo")).status).toBe(200);
+    await drain();
+    expect((await one("SELECT status FROM performance_plan WHERE performance_plan_id = $1", [planId])).status).toBe("binding");
+    expect((await as("other").get(`/performance/okrs?period_id=${ids.q4}&department_id=${ids.tbo}&status=binding`)).body.data.map((o) => o.code)).toEqual(["TBO-O1", "TBO-O2"]);
+    const shut = await as("other").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.tbo, title: "Too late" });
+    expect(shut.status).toBe(409);
+    expect(shut.body.error).toMatchObject({ code: "PLAN_BINDING", fields: { department_id: ["Plan is binding"] } });
+    expect(await tboRow("other")).toMatchObject({ plan_status: "binding", can_request_unbind: true });
+    ids.tboPlan = planId;
+  });
+
+  test("only the CEO is left out of Request To Unbind: the build account, which holds goals.organisation too, asks and the CEO decides (JBS Praxis, 27/10/2026)", async () => {
+    const row = async (who) => (await as(who).get(`/performance/functions?period_id=${ids.q4}`)).body.data.find((f) => f.department_id === ids.tbo);
+    // It holds the capability the CEO's exclusion used to key on, and sets every function: offered it all the same.
+    expect(await row("impl")).toMatchObject({ may_set: true, plan_status: "binding", can_request_unbind: true });
+    expect(await row("ceo")).toMatchObject({ may_set: true, plan_status: "binding", can_request_unbind: false });
+
+    const asked = await as("impl").post(`/performance/plans/${ids.tboPlan}/unbind`, { reason: "Add a platform objective" });
+    expect(asked.status).toBe(201);
+    expect(await row("impl")).toMatchObject({ can_request_unbind: false });
+    const mine = (await waiting("ceo")).filter((r) => r.kind === "unbind");
+    expect(mine.map((r) => [r.record_id, r.department])).toEqual([[asked.body.plan_unbind_id, "Technology & Back-office Ops"]]);
+    expect(mine[0].requested_by.display_name).toContain("Seun");
+    const instance = await one("SELECT workflow_instance_id FROM workflow_instance WHERE entity_id = $1", [asked.body.plan_unbind_id]);
+    expect((await as("impl").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(403);
+    expect((await as("ceo").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(200);
+    await drain();
+    expect((await one("SELECT status FROM performance_plan WHERE performance_plan_id = $1", [ids.tboPlan])).status).toBe("unbound");
   });
 
   test("a closed quarter, or a plan that is not binding, takes no request", async () => {

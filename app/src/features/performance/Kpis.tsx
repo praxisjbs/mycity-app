@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import kpisContract from "@mycity/contract/schemas/kpis.js";
-import type { Endpoints, Kpi } from "@mycity/contract/contract.gen.ts";
+import type { Endpoints, Kpi, KpiUnit } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -14,6 +14,8 @@ import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Button,
+  ComboField,
+  type ComboFieldProps,
   DataView,
   ErrorState,
   Field,
@@ -27,6 +29,7 @@ import {
   LoadingRows,
   NumberField,
   PageHeader,
+  plural,
   SelectField,
   StatusPill,
   TextField,
@@ -44,6 +47,12 @@ const RESULTS: Array<[string, string]> = [["met", "Met"], ["not_met", "Not Met"]
 const DIRECTIONS: Array<[string, string]> = [["higher", "Higher Is Better"], ["lower", "Lower Is Better"]];
 const FREQUENCIES: Array<[string, string]> = [["monthly", "Monthly"], ["weekly", "Weekly"], ["quarterly", "Quarterly"]];
 const naHelp = "No eligible cases this month. It never counts as met.";
+
+/** The Unit field's suggestions: the units already in use, 25 at a time, narrowed as it is typed. */
+function UnitField(binding: Omit<ComboFieldProps<KpiUnit>, "list" | "option" | "sub" | "placeholder">) {
+  const units = usePaged("GET /api/v1/performance/kpis/units", { filters: {} });
+  return <ComboField {...binding} list={units} option={(u) => u.unit} sub={(u) => plural(u.uses, "use")} placeholder="users" />;
+}
 
 export function Kpis() {
   const modal = useModal();
@@ -229,10 +238,10 @@ function KpiFields({ close, periodId, departmentId, options }: { close: () => vo
       </Field>
       <Field label="KPI" {...f.status("name")}><TextField {...f.field("name")} /></Field>
       <Field label="Formula" optional {...f.status("formula")}><TextField {...f.field("formula")} /></Field>
-      <Field label="Unit" optional {...f.status("unit")}><TextField {...f.field("unit")} /></Field>
+      <Field label="Unit" optional {...f.status("unit")}><UnitField {...f.field("unit")} /></Field>
       <Field label="Direction" {...f.status("direction")}><SelectField options={DIRECTIONS} {...f.field("direction")} /></Field>
       <Field label="Target" optional {...f.status("target_value")}><NumberField decimal signed {...f.field("target_value")} /></Field>
-      <Field label="Target Wording" optional {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
+      <Field label="Target Wording" {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
       <Field label="Frequency" {...f.status("frequency")}><SelectField options={FREQUENCIES} {...f.field("frequency")} /></Field>
       <Field label="Data Source" optional {...f.status("data_source")}><TextField {...f.field("data_source")} /></Field>
       <FormError>{problem}</FormError>
@@ -246,7 +255,8 @@ function KpiFields({ close, periodId, departmentId, options }: { close: () => vo
 
 type KpiEditValues = { name: string; formula: string; unit: string; target_text: string; data_source: string };
 const or = (v: string) => (v.trim() === "" ? null : v.trim());
-const kpiEditBody = (v: KpiEditValues) => ({ name: v.name, formula: or(v.formula), unit: or(v.unit), target_text: or(v.target_text), data_source: or(v.data_source) });
+// The target's wording is sent as typed: the contract refuses it empty, and a KPI never loses it.
+const kpiEditBody = (v: KpiEditValues) => ({ name: v.name, formula: or(v.formula), unit: or(v.unit), target_text: v.target_text, data_source: or(v.data_source) });
 
 /** Edit KPI: the contract's KpiEdit checks each field as it is filled, and a refusal lands on its field. */
 function KpiEditForm({ kpi, close }: { kpi: Kpi; close: () => void }) {
@@ -270,8 +280,8 @@ function KpiEditForm({ kpi, close }: { kpi: Kpi; close: () => void }) {
     <>
       <Field label="KPI" {...f.status("name")}><TextField {...f.field("name")} /></Field>
       <Field label="Formula" optional {...f.status("formula")}><TextField {...f.field("formula")} /></Field>
-      <Field label="Unit" optional {...f.status("unit")}><TextField {...f.field("unit")} /></Field>
-      <Field label="Target Wording" optional {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
+      <Field label="Unit" optional {...f.status("unit")}><UnitField {...f.field("unit")} /></Field>
+      <Field label="Target Wording" {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
       <Field label="Data Source" optional {...f.status("data_source")}><TextField {...f.field("data_source")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -295,11 +305,17 @@ function ActualForm({ id, months, close }: { id: string; months: string[]; close
       else say(e);
     }
   };
+  // A month with no eligible cases has no figure; Met and Not Met need one.
+  const noCases = f.values.result === "na";
+  const chooseResult = (result: string) => {
+    f.set("result", result);
+    if (result === "na") f.set("actual_value", "");
+  };
   return (
     <>
       <Field label="Month" {...f.status("month")}><SelectField options={months.map((m) => [m, formatMonth(m)] as [string, string])} {...f.field("month")} /></Field>
-      <Field label="Result" {...f.status("result")}><SelectField options={RESULTS} {...f.field("result")} /></Field>
-      <Field label="Actual" optional {...f.status("actual_value")}><NumberField decimal signed {...f.field("actual_value")} /></Field>
+      <Field label="Result" {...f.status("result")}><SelectField options={RESULTS} {...f.field("result")} onChange={chooseResult} /></Field>
+      {!noCases && <Field label="Actual" {...f.status("actual_value")}><NumberField decimal signed {...f.field("actual_value")} /></Field>}
       <Field label="Comment" optional {...f.status("comment")}><TextField {...f.field("comment")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

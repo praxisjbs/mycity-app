@@ -151,10 +151,18 @@ export const mockSession = {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/*
+ * How long an answer takes. In a browser, 90 to 250 ms at random, as a server's would: screens are
+ * seen loading, and answers arrive out of order. Under the test runner, the same 90 ms for every
+ * answer, so answers arrive in the order asked and no test hangs on the draw (four CI failures
+ * from three tests that read one answer before another, 24 to 26/10/2026).
+ */
+const latency = import.meta.env.MODE === "test" ? () => 90 : () => 90 + Math.random() * 160;
+
 export async function dispatch(req: RawRequest): Promise<RawResponse> {
   /* Who asks is fixed when the request arrives, as on the server: an answer still on its way when someone else signs in is the sender's. */
   const sender = mockSession.get();
-  await wait(90 + Math.random() * 160);
+  await wait(latency());
   /* A literal path beats a parameter: /queries/rules is never /queries/:id. */
   const ordered = [...routes].sort((a, b) => a.names.length - b.names.length);
   for (const r of ordered) {

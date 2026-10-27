@@ -375,16 +375,17 @@ describe("Download PDF's drawing", () => {
     expect(layout([node("M", null), ...leaves, node("X", "L5")]).chart.width).toBe(250);
   });
 
-  test("a card says what the screen's does: initials, title, department, dotted line, an open role", () => {
+  test("a card says what the screen's does: initials, title, department, Head marks, dotted line, an open role", () => {
+    const head = (mark, acting = false) => ({ department_id: "d", name: "Finance", code: "FIN", acting, mark });
     const drawing = layout([
-      node("A", null, { display_name: "Ifeoma Mbonu", is_ceo: true, meta: "Since 2023 · Remote" }),
-      node("S", "A", { node_kind: "seat", employee_id: null, display_name: "Head of Finance", department: "Finance", vacant: true }),
-      node("B", "A", { display_name: "Rabi'a Zawiya", dotted_line_to: "Ifeoma Mbonu" }),
+      node("A", null, { display_name: "Ifeoma Mbonu", is_ceo: true, meta: "Since 2023 · Remote", heads: [head("Head"), head("Acting Head · FIN", true)] }),
+      node("S", "A", { node_kind: "seat", employee_id: null, display_name: "Head of Finance", department: "Finance", vacant: true, heads: [head("Head")] }),
+      node("B", "A", { display_name: "Rabi'a Zawiya", dotted_line_to: "Ifeoma Mbonu", heads: [] }),
     ]);
     expect(drawing.cards).toEqual([
-      expect.objectContaining({ initials: "IM", title: "Post A", ceo: true, meta: "Since 2023 · Remote", vacant: false }),
-      expect.objectContaining({ initials: "", name: "Head of Finance", title: "Vacant · Finance", vacant: true, ceo: false }),
-      expect.objectContaining({ initials: "RZ", dotted: "Ifeoma Mbonu", meta: null }),
+      expect.objectContaining({ initials: "IM", title: "Post A", ceo: true, meta: "Since 2023 · Remote", vacant: false, heads: [{ mark: "Head" }, { mark: "Acting Head · FIN" }] }),
+      expect.objectContaining({ initials: "", name: "Head of Finance", title: "Vacant · Finance", vacant: true, ceo: false, heads: [{ mark: "Head" }] }),
+      expect.objectContaining({ initials: "RZ", dotted: "Ifeoma Mbonu", meta: null, heads: [] }),
     ]);
     expect(initialsOf("Sade")).toBe("S");
     expect(initialsOf("  Tobiloba Iyanuoluwa Dada ")).toBe("TD");
@@ -402,9 +403,14 @@ describe("Download PDF's drawing", () => {
   test("the template names only its declared variables and places every card and line", () => {
     const t = store.shipped("document", "org-chart");
     expect(() => variables.assertTemplate("document", "org-chart", t.body)).not.toThrow();
-    const drawing = layout([node("A", null, { is_ceo: true }), node("B", "A", { dotted_line_to: "Ada A" })]);
+    const drawing = layout([
+      node("A", null, { is_ceo: true, heads: [{ department_id: "d", name: "Growth", code: "PG", acting: true, mark: "Acting Head · PG" }] }),
+      node("B", "A", { dotted_line_to: "Ada A" }),
+    ]);
     const data = variables.parseData("document", "org-chart", { ...drawing, seats: 2, filled: 2, open: 0 });
     const html = render(t.body, data);
+    expect(html).toContain('<span class="oc-head">Acting Head · PG</span>');
+    expect(html.match(/class="oc-head"/g)).toHaveLength(1);
     expect(html).toContain("size: 297mm 210mm");
     expect(html).toContain("left: 3mm; top: 0mm;");
     expect(html).toContain("left: 3mm; top: 50mm;");

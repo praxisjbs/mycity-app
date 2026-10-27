@@ -11,7 +11,9 @@
  *   tested  a push to main whose tree a pull request's full run already passed. That run tested
  *           the pull request merged into main as main then was; the same tree means main has not
  *           moved since, so nothing it passed can fail now. The document gates run again: on a
- *           push they read the merged pull request's trailers
+ *           push they read the merged pull request's trailers. Likewise an edit to a pull
+ *           request's description when a full run on its head already passed this tree: only the
+ *           document gates read a description, so only they run again (27/10/2026)
  *
  * A draft pull request runs no CI at all (ci.yml): its author runs `npm run ci` while working,
  * and the run starts when the pull request is marked ready.
@@ -83,42 +85,62 @@ function testedRun({ repo, sha, tree, call = gh, treeOf = treeOfRun }) {
   const pulls = call(["api", `repos/${repo}/commits/${sha}/pulls`, "--jq", '.[] | "\\(.number) \\(.head.sha)"']);
   for (const line of (pulls || "").split("\n").filter(Boolean)) {
     const [pull, head] = line.split(" ");
-    const runs = call([
-      "api",
-      `repos/${repo}/actions/workflows/ci.yml/runs?event=pull_request&head_sha=${head}&status=success&per_page=20`,
-      "--jq",
-      ".workflow_runs[].id",
-    ]);
-    for (const runId of (runs || "").split("\n").filter(Boolean)) {
-      if (treeOf(repo, runId, call) === tree) return { runId, pull };
-    }
+    const runId = passedRun({ repo, head, tree, call, treeOf });
+    if (runId) return { runId, pull };
+  }
+  return null;
+}
+
+/**
+ * A successful pull request run of CI on this head that passed exactly this tree (it left the
+ * tree as its artifact, which only a full run does), or null.
+ * @param {{repo: string, head: string, tree: string, call?: Function, treeOf?: Function}} p
+ * @returns {string|null} the run's id
+ */
+function passedRun({ repo, head, tree, call = gh, treeOf = treeOfRun }) {
+  const runs = call([
+    "api",
+    `repos/${repo}/actions/workflows/ci.yml/runs?event=pull_request&head_sha=${head}&status=success&per_page=20`,
+    "--jq",
+    ".workflow_runs[].id",
+  ]);
+  for (const runId of (runs || "").split("\n").filter(Boolean)) {
+    if (treeOf(repo, runId, call) === tree) return runId;
   }
   return null;
 }
 
 /**
  * The scope of this run, and why.
- * @param {{event?: string, files: Array<{path: string}>, repo?: string, sha?: string, tree?: string, tested?: Function}} p
+ * @param {{event?: string, action?: string, files: Array<{path: string}>, repo?: string, sha?: string,
+ *          head?: string, tree?: string, tested?: Function, passed?: Function}} p
  * @returns {{scope: "full"|"docs"|"tested", reason: string}}
  */
-function decide({ event, files, repo, sha, tree, tested = testedRun }) {
+function decide({ event, action, files, repo, sha, head, tree, tested = testedRun, passed = passedRun }) {
   if (event !== "pull_request" && event !== "push") return { scope: "full", reason: "not a pull request or a push" };
   if (scopeOfFiles(files) === "docs") return { scope: "docs", reason: `${files.length} document(s) changed, nothing else` };
   if (event === "push" && repo && sha && tree) {
     const run = tested({ repo, sha, tree });
     if (run) return { scope: "tested", reason: `pull request #${run.pull} passed this tree in CI run ${run.runId}` };
   }
+  if (event === "pull_request" && action === "edited" && repo && head && tree) {
+    const runId = passed({ repo, head, tree });
+    if (runId) return { scope: "tested", reason: `the description changed, and CI run ${runId} passed this tree` };
+  }
   return { scope: "full", reason: "the change touches code, or this tree was not tested" };
 }
 
 /** ci-local.js --decide-scope: prints the scope, and hands it to the workflow step in Actions. */
 function main() {
+  const event = changes.githubEvent() || {};
   const out = changes.IN_CI
     ? decide({
         event: process.env.GITHUB_EVENT_NAME,
+        action: event.action,
         files: changes.changedFiles(),
         repo: process.env.GITHUB_REPOSITORY,
         sha: process.env.GITHUB_SHA,
+        head: event.pull_request && event.pull_request.head ? event.pull_request.head.sha : undefined,
         tree: changes.git(["rev-parse", "HEAD^{tree}"]).trim(),
       })
     : { scope: "full", reason: "not in GitHub Actions" };
@@ -128,4 +150,4 @@ function main() {
   return out;
 }
 
-module.exports = { DOC_GATES, READ_BY_CODE, TREE_ARTIFACT, TREE_FILE, isDocument, scopeOfFiles, testedRun, treeOfRun, decide, main };
+module.exports = { DOC_GATES, READ_BY_CODE, TREE_ARTIFACT, TREE_FILE, isDocument, scopeOfFiles, testedRun, passedRun, treeOfRun, decide, main };

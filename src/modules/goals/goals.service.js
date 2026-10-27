@@ -318,12 +318,13 @@ async function listPlans(query) {
  * GET /performance/functions: a page of the company and the functions, each with whether the
  * reader may set its goals and KPIs (goals.authority, the one rule), its plan's status in the
  * quarter and whether Request To Unbind is theirs to offer: the plan is binding, they set it, no
- * request waits, and they do not record organisational goals (the CEO keeps New Goal, §6.22).
+ * request waits, and they are not the CEO (who keeps New Goal, §6.22). It is the person that is
+ * excluded, not a capability: the build account holds `goals.organisation` too and is offered it.
  * New Objective and New KPI offer only those the reader may set (§6.4).
  */
 async function listFunctions(actor, query) {
   const page = await repo.listFunctions(pool, query);
-  const asksToUnbind = !(await authority.holds(actor, "goals.organisation"));
+  const asksToUnbind = !(actor && actor.is_ceo === true);
   const data = [];
   for (const f of page.data) {
     const maySet = await authority.maySetGoals(pool, actor, f.department_id);

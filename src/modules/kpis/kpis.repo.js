@@ -62,6 +62,27 @@ const summary = (db, { department_id: departmentId, month }) =>
     [departmentId, month],
   );
 
+/**
+ * One page of the units in use on KPIs, key results and scorecard lines, most used first, for the
+ * Unit field's suggestions. `q` narrows by what the unit contains, as text (a `%` is a `%`).
+ * @param {object} query  KpiUnitListQuery
+ */
+function units(db, query) {
+  return pageQuery(
+    db,
+    `SELECT u.unit, count(*)::int AS uses, ${TOTAL_COL}
+       FROM (SELECT btrim(unit) AS unit FROM kpi_definition
+             UNION ALL SELECT btrim(unit) FROM okr_key_result
+             UNION ALL SELECT btrim(unit) FROM employee_target) u
+      WHERE u.unit <> ''
+        AND ($1::text IS NULL OR strpos(search_fold(u.unit), search_fold($1)) > 0)
+      GROUP BY u.unit
+      ORDER BY count(*) DESC, u.unit`,
+    [query.q || null],
+    query,
+  );
+}
+
 const get = (db, id, until = null) => one(db, `SELECT ${ROW} ${FROM} WHERE k.kpi_definition_id = $2`, [until, id]);
 
 /** Every KPI of a function, for a plan (bounded by the function's own list). */
@@ -170,4 +191,4 @@ const inUse = async (db, id) =>
 /** A KPI gone with an import that is reverted; its months and former codes go with it (ON DELETE CASCADE). */
 const remove = (client, id) => client.query("DELETE FROM kpi_definition WHERE kpi_definition_id = $1", [id]);
 
-module.exports = { list, summary, get, ofDepartment, months, lines, codesWithPrefix, insert, update, upsertMonth, month, findByCode, inUse, remove };
+module.exports = { list, summary, units, get, ofDepartment, months, lines, codesWithPrefix, insert, update, upsertMonth, month, findByCode, inUse, remove };

@@ -16,6 +16,8 @@ coverage/
 releases/
 *.log
 npm-debug.log*
+# A local Redis started in the repository saves here (one was committed by mistake, 26/10/2026)
+dump.rdb
 
 # Local tooling
 .claude/settings.local.json

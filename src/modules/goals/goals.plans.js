@@ -16,11 +16,24 @@ const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || 
  * all three as binding.
  */
 const LIVE = Object.freeze(["binding", "unbound", "revising"]);
-/** The states in which its head may add to a plan and change it: before its first approval, or unbound. */
+/** The states in which Send Plan is offered: before its first approval, or unbound. A plan already sent is not sent twice. */
 const OPEN = Object.freeze(["draft", "returned", "unbound"]);
+/** The states of a plan with the approvers: sent, or an unbound plan's changes sent. */
+const AWAITING = Object.freeze(["submitted", "revising"]);
+/**
+ * The states in which its head may add to a plan and change it: those above, and while the plan awaits
+ * approval. What is added joins the plan already sent: its approval carries on and decides the plan as
+ * it then stands (§6.4).
+ */
+const EDITABLE = Object.freeze([...OPEN, ...AWAITING]);
+/** A plan that was binding and is being changed: what was reported on it is kept (§6.22). */
+const AMENDED = Object.freeze(["unbound", "revising"]);
 
 const isLive = (status) => LIVE.includes(status);
 const isOpen = (status) => OPEN.includes(status);
+const isAwaiting = (status) => AWAITING.includes(status);
+const isEditable = (status) => EDITABLE.includes(status);
+const isAmended = (status) => AMENDED.includes(status);
 
 /** A quarter, or a 422 naming it. */
 async function periodOf(db, periodId) {
@@ -91,4 +104,4 @@ async function foreignLinks(db, plan) {
   return rows;
 }
 
-module.exports = { LIVE, OPEN, isLive, isOpen, periodOf, planFor, ensurePlan, objectiveCounts, foreignLinks };
+module.exports = { LIVE, OPEN, EDITABLE, isLive, isOpen, isAwaiting, isEditable, isAmended, periodOf, planFor, ensurePlan, objectiveCounts, foreignLinks };
