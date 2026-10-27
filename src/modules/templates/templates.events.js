@@ -27,9 +27,8 @@ const EVENTS = defineEvents("queries", {
 /** The letters the code ships, one file each in templates/documents/ (seed 3190 lists them). */
 const SHIPPED = Object.freeze([
   "query-letter",
+  "caution-letter",
   "warning-letter",
-  "question-letter",
-  "suspension-letter",
   "suspension-without-pay-letter",
   "termination-letter",
   "salary-deduction-letter",

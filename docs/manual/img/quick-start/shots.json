@@ -1,7 +1,7 @@
 {
   "qs-add-employee": {
     "spec": "ecaa81f3ffa184d4",
-    "source": "c17b7dc759faa398",
+    "source": "52feef0e747d23f6",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "qs-add-task": {
     "spec": "221d9119480a0a72",
-    "source": "4b3638f75e3d4e1f",
+    "source": "e68f57aea6374fa3",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "qs-agree": {
     "spec": "663deb49e9bb88ca",
-    "source": "0013accb6a4ea89b",
+    "source": "7ad3dd3a48a70334",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "qs-approve-commitments": {
     "spec": "670035074f4610c2",
-    "source": "1a75ea067c897c87",
+    "source": "975c4ca945605f62",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "qs-approve-leave": {
     "spec": "f974e711363d9efc",
-    "source": "5d09c696f212e218",
+    "source": "5181fe21abd2917c",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "qs-check-in": {
     "spec": "590035331c4ca0f0",
-    "source": "da47a44db36a3797",
+    "source": "56070571afc27f1b",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "qs-clock-in": {
     "spec": "51edfe0fed8ea055",
-    "source": "5aac01d677f3f434",
+    "source": "287457f779a3b0b5",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "qs-close-review": {
     "spec": "604a2fce10313447",
-    "source": "1a75ea067c897c87",
+    "source": "975c4ca945605f62",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,15 @@
   },
   "qs-commitments": {
     "spec": "16ba03ab7983c1b5",
-    "source": "4b3638f75e3d4e1f",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-department-head": {
+    "spec": "068ea5be43f180ff",
+    "source": "52feef0e747d23f6",
     "devices": [
       "desktop",
       "phone"
@@ -97,7 +105,7 @@
   },
   "qs-help": {
     "spec": "6f0c9af78d68e4fb",
-    "source": "f681864e006d30af",
+    "source": "66cc22158e774c63",
     "devices": [
       "desktop",
       "phone"
@@ -105,7 +113,7 @@
   },
   "qs-import": {
     "spec": "402734ecb1661d71",
-    "source": "c17b7dc759faa398",
+    "source": "52feef0e747d23f6",
     "devices": [
       "desktop",
       "phone"
@@ -137,7 +145,7 @@
   },
   "qs-notifications": {
     "spec": "41982194c80e9106",
-    "source": "f681864e006d30af",
+    "source": "66cc22158e774c63",
     "devices": [
       "desktop",
       "phone"
@@ -145,7 +153,7 @@
   },
   "qs-plan-day": {
     "spec": "0abe755a36a0bce0",
-    "source": "4b3638f75e3d4e1f",
+    "source": "e68f57aea6374fa3",
     "devices": [
       "desktop",
       "phone"
@@ -169,7 +177,7 @@
   },
   "qs-quarter": {
     "spec": "f235478418d3f1d1",
-    "source": "1a75ea067c897c87",
+    "source": "975c4ca945605f62",
     "devices": [
       "desktop",
       "phone"
@@ -177,7 +185,7 @@
   },
   "qs-report-month": {
     "spec": "6e78bdb9be20b6f0",
-    "source": "1a75ea067c897c87",
+    "source": "975c4ca945605f62",
     "devices": [
       "desktop",
       "phone"
@@ -185,7 +193,7 @@
   },
   "qs-request-leave": {
     "spec": "0db81a71cb5f5bc5",
-    "source": "5496a2a0d65056c7",
+    "source": "1079fbd9650ccc88",
     "devices": [
       "desktop",
       "phone"
@@ -201,7 +209,7 @@
   },
   "qs-score-review": {
     "spec": "dea01acb415b7670",
-    "source": "1a75ea067c897c87",
+    "source": "975c4ca945605f62",
     "devices": [
       "desktop",
       "phone"
@@ -209,7 +217,7 @@
   },
   "qs-search": {
     "spec": "eee935c1ee9404c8",
-    "source": "f681864e006d30af",
+    "source": "66cc22158e774c63",
     "devices": [
       "desktop",
       "phone"
@@ -233,7 +241,7 @@
   },
   "qs-team": {
     "spec": "fb8093ebf06b841e",
-    "source": "f681864e006d30af",
+    "source": "66cc22158e774c63",
     "devices": [
       "desktop",
       "phone"
@@ -241,7 +249,7 @@
   },
   "qs-team-tasks": {
     "spec": "62cb18ba88056ba8",
-    "source": "4b3638f75e3d4e1f",
+    "source": "e68f57aea6374fa3",
     "devices": [
       "desktop",
       "phone"

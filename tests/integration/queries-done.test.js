@@ -3,20 +3,23 @@
  * M3's definition of done (MILESTONES §8), walked once from start to finish on the real
  * migrations, through HTTP, every response parsed with its contract (APP_ENV=test):
  *
- *   1. a rule is configured from the UI in two calls: "three late arrivals in thirty
- *      days raises a query";
+ *   1. a rule is configured: "three late arrivals in thirty days raises a query", the
+ *      Attendance policy's late-arrival row with Raise Query on (queries.md §6.3; the policy's
+ *      screen and its publishing are attendance's and policies' own suites);
  *   2. three late arrivals raise exactly one query, not three;
  *   3. the employee responds in ESS;
  *   4. HR upholds it, and a warning letter generates, files and sends;
  *   5. a second offence escalates to the second warning without code;
  *   6. a new step is inserted into the chain from the UI and the next case walks it;
- *   7. an approved financial consequence waits for the payroll run as a pending deduction
- *      (the inserted fourth rung is approved by Management too, as the approval says).
+ *   7. an approved financial consequence waits for the payroll run as a pending deduction.
  *
- * The late arrivals are attendance days written as the register writes them, announced
- * by the event attendance commits with a clock-in; from that event on, everything is the
- * system's own path: the outbox, the evaluation job, the evaluator, the query, its letter.
- * A clock-in through the punch route is attendance's own suite (tests/integration/attendance).
+ * HR upholds a query as MyCity does: Operations & People propose the sanction, and another of
+ * them approves it on the query's card, signing its letters (queries.md §6.4).
+ *
+ * The late arrivals are attendance days written as the register writes them, counted by the
+ * Attendance policy's rules as a recalculated day is (attendance.rules-engine countDay); from the
+ * breach on, everything is the system's own path: the outbox, queries.raise_from_breach, the
+ * query, its letter. A clock-in through the punch route is attendance's own suite.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/queries-done
  *
@@ -26,7 +29,6 @@ const request = require("supertest");
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
-const { emit } = require("../../src/shared/events/emit");
 const { rebuild } = require("./helpers/schema");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
@@ -35,8 +37,10 @@ const documents = require("../../src/shared/documents/generate");
 const chromium = require("../../src/services/pdf/chromium");
 const realtime = require("../../src/services/realtime/emitter");
 const lagos = require("../../src/shared/time/lagos");
-const evaluateJob = require("../../src/jobs/handlers/query-rule-evaluate");
 const fines = require("../../src/modules/sanctions/sanctions.fines");
+const attendanceEngine = require("../../src/modules/attendance/attendance.rules-engine");
+const attendanceRepo = require("../../src/modules/attendance/attendance.repo");
+const { attendanceVersion } = require("./helpers/policies");
 
 const sent = [];
 jest.mock("../../src/jobs/queues", () => ({
@@ -65,19 +69,11 @@ async function tx(fn) {
   }
 }
 
-/** Run the outbox until it is empty, then any evaluation jobs it queued, as the worker would. */
+/** Run the outbox until it is empty, as the worker would. */
 async function settle() {
-  for (let round = 0; round < 5; round += 1) {
-    for (let i = 0; i < 10; i += 1) {
-      await q("UPDATE event_outbox SET next_attempt_at = now() WHERE status = 'pending'");
-      if ((await outbox.dispatchDue({ db: pool })).claimed === 0) break;
-    }
-    const jobs = sent.filter((j) => j.queue === "query-rule-evaluate" && !j.done);
-    if (!jobs.length) return;
-    for (const j of jobs) {
-      j.done = true;
-      await evaluateJob({ data: j.data });
-    }
+  for (let i = 0; i < 10; i += 1) {
+    await q("UPDATE event_outbox SET next_attempt_at = now() WHERE status = 'pending'");
+    if ((await outbox.dispatchDue({ db: pool })).claimed === 0) return;
   }
 }
 
@@ -100,7 +96,7 @@ describeDb("M3 definition of done", () => {
     };
   };
 
-  /** A late clock-in, as attendance records it: the day, then the committed event. */
+  /** A late clock-in, as attendance records it: the day, then the policy's rules counted on it. */
   async function lateArrival(date, minutes) {
     const who = people.staff.employee.employee_id;
     await q(
@@ -108,37 +104,29 @@ describeDb("M3 definition of done", () => {
        VALUES ($1, $2, 'late', $3, $4)`,
       [who, date, minutes, lagos.instant(date, "09:20")],
     );
-    await tx((client) =>
-      emit(client, {
-        key: "attendance.punched",
-        entity: { type: "attendance_event", id: require("node:crypto").randomUUID() },
-        actor: null,
-        payload: { employee_id: who, subject_employee_id: who, event_type: "clock_in", result: "accepted", work_date: date },
-      }),
-    );
+    await tx(async (client) => attendanceEngine.countDay(client, await attendanceRepo.person(client, who), date));
     await settle();
   }
 
   const queriesOf = async () =>
     (await as("ops").get(`/queries?employee_id=${people.staff.employee.employee_id}&sort=created_at`)).body.data;
 
-  /** HR upholds a query with a rung: proposed by Operations & People, approved by another of them. */
+  /**
+   * HR upholds a query with a rung: proposed by Operations & People, approved on the query's card
+   * by another of them, who signs it (queries.md §6.4).
+   */
   async function uphold(queryId, step, extra = {}) {
     const res = await as("ops").post(`/queries/${queryId}/decision`, {
       outcome: "sanction",
       consequence_step_id: step,
       reason: "The explanation does not account for the late arrivals.",
-      signature: SIGNATURE,
       ...extra,
     });
     expect(res.status).toBe(200);
-    const approved = await as("ops2").post(`/workflow/instances/${res.body.workflow_instance_id}/approve`, {});
+    const card = (await as("ops2").get(`/queries/${queryId}`)).body;
+    expect(card.approval).toEqual({ stage: "operations_people", stage_name: "Operations & People", can_decide: true, signs: true });
+    const approved = await as("ops2").post(`/sanctions/${card.sanction.sanction_id}/approve`, { signature: SIGNATURE });
     expect(approved.status).toBe(200);
-    // From the fourth rung up, Management approve too (queries.consequence).
-    if (approved.body.state === "pending") {
-      const second = await as("mgmt").post(`/workflow/instances/${res.body.workflow_instance_id}/approve`, {});
-      expect(second.status).toBe(200);
-    }
     await settle();
     return (await as("ops").get(`/queries/${queryId}`)).body;
   }
@@ -188,16 +176,8 @@ describeDb("M3 definition of done", () => {
       tokens[key] = res.body.access_token;
     }
 
-    // MyCity's ladder and its letters, entered on the screens (A26: nothing of it is seeded).
-    const letters = (await as("ops").get("/letter-templates?sort=name")).body.data;
-    for (const key of ["warning-letter"]) {
-      const id = letters.find((t) => t.key === key).letter_template_id;
-      await as("ops").put(`/letter-templates/${id}/body`, {
-        body: "Dear {{ employee.first_name }}, following query {{ query_number }} this is a {{ step_name }}: {{ reason }}",
-      });
-      await as("ops").post(`/letter-templates/${id}/activate`);
-    }
-    // MILESTONES §8's walk: a Warning, then a Second Warning (MyCity's ladder adds the Question between).
+    // The ladder, entered on Chain Settings (A26: nothing of it is seeded); its letter ships ready,
+    // in MyCity's own wording. MILESTONES §8's walk: a Warning, then a Second Warning.
     for (const [name, letter] of [
       ["Warning", "warning-letter"],
       ["Second Warning", "warning-letter"],
@@ -213,19 +193,16 @@ describeDb("M3 definition of done", () => {
     await pool.end();
   });
 
-  test("1. a rule is configured in two calls: three late arrivals in thirty days raises a query", async () => {
-    const rule = await as("ops").post("/query-rules", {
-      name: "Repeated Lateness",
-      source_event: "lateness",
-      threshold: 3,
-      window_days: 30,
-    });
-    expect(rule.status).toBe(201);
-    const on = await as("ops").post(`/query-rules/${rule.body.query_rule_id}/activate`);
-    expect(on.body.state).toBe("active");
-    ids.rule = rule.body.query_rule_id;
-    // It counts from its activation; the story below happens over the week after it.
-    await q("UPDATE query_rule SET activated_at = $2 WHERE query_rule_id = $1", [ids.rule, lagos.startOfDay(day(14))]);
+  test("1. a rule is configured: three late arrivals in thirty days raises a query", async () => {
+    // The Attendance policy's late-arrival row, Raise Query on, in force from before the story.
+    await attendanceVersion(
+      pool,
+      { late_rule: { on: true, count: 3, period: "days_30", hours: null, alert: false, query: true } },
+      day(30),
+    );
+    // Rules on Queries & Sanctions no longer count lateness: one pattern never raises two queries.
+    const refused = await as("ops").post("/query-rules", { name: "Repeated Lateness", source_event: "lateness", threshold: 3, window_days: 30 });
+    expect(refused.status).toBe(422);
   });
 
   test("2. three late arrivals raise exactly one query, not three", async () => {
@@ -234,11 +211,17 @@ describeDb("M3 definition of done", () => {
     expect(await queriesOf()).toEqual([]);
     await lateArrival(day(10), 9);
     const raised = await queriesOf();
-    expect(raised.map((r) => [r.number, r.rule_name, r.status])).toEqual([["QRY-0001", "Repeated Lateness", "awaiting_response"]]);
+    expect(raised.map((r) => [r.number, r.source, r.rule_name, r.status])).toEqual([
+      ["QRY-0001", "attendance", "Attendance Policy", "awaiting_response"],
+    ]);
     ids.first = raised[0].employee_query_id;
+    expect(raised[0].subject).toBe("3 late arrivals in 30 days");
+    // The breach keeps its query.
+    const breach = await q("SELECT employee_query_id FROM attendance_rule_breach WHERE employee_id = $1", [people.staff.employee.employee_id]);
+    expect(breach.rows).toEqual([{ employee_query_id: ids.first }]);
 
-    // The same event delivered twice more raises nothing new.
-    sent.filter((j) => j.queue === "query-rule-evaluate").forEach((j) => (j.done = false));
+    // The breach delivered again raises nothing new.
+    await q("UPDATE event_outbox SET status = 'pending', completed_handlers = '{}', next_attempt_at = now() WHERE event_key = 'attendance.rule_breached'");
     await settle();
     expect(await queriesOf()).toHaveLength(1);
   });
@@ -257,7 +240,9 @@ describeDb("M3 definition of done", () => {
 
     const sanction = (await as("ops").get(`/sanctions/${after.sanction.sanction_id}`)).body;
     const html = (await q("SELECT render_html FROM document WHERE document_id = $1", [sanction.letter_document_id])).rows[0];
-    expect(html.render_html).toContain("this is a Warning");
+    expect(html.render_html).toContain("Management frowns at this");
+    // Signed by the Operations & People approver who let it stand.
+    expect(html.render_html).toContain('alt="Signature of Amaka Nwosu"');
     // Generates: the worker renders the PDF, numbered and locked.
     const doc = await documents.renderPending(sanction.letter_document_id, { db: pool });
     expect([doc.number, Boolean(doc.locked_at)]).toEqual(["LTR-0002", true]);

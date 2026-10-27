@@ -53,8 +53,20 @@ describe("the query a breach raises", () => {
 describe("a rule", () => {
   test("its code is made from its name; only what a module counts can be switched on", () => {
     expect(codeFrom("Repeated Lateness")).toBe("repeated_lateness");
-    expect(["lateness", "absence", "missing_clock_out", "unenrolled_device", "overdue_task", "low_performance"].every(countable)).toBe(true);
+    expect(["unenrolled_device", "overdue_task", "low_performance"].every(countable)).toBe(true);
     expect(countable("missed_target")).toBe(false);
+    // Late arrivals, absences and missing clock-outs are the Attendance policy's rules (guide §6.3).
+    expect(["lateness", "absence", "missing_clock_out"].some(countable)).toBe(false);
+  });
+
+  test("a new or edited rule never counts what the Attendance policy counts", () => {
+    const c = require("@mycity/contract");
+    const base = { name: "Late Again", threshold: 3, window_days: 30 };
+    for (const source of ["lateness", "absence", "missing_clock_out"]) {
+      expect(c.query_rules.QueryRuleCreate.safeParse({ ...base, source_event: source }).success).toBe(false);
+      expect(c.query_rules.QueryRuleUpdate.safeParse({ source_event: source }).success).toBe(false);
+    }
+    expect(c.query_rules.QueryRuleCreate.safeParse({ ...base, source_event: "overdue_task" }).success).toBe(true);
   });
 
   test("reads need the queries grant; every write needs queries.configure too", () => {

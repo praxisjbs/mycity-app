@@ -10,6 +10,18 @@ const { AppError } = require("../../shared/errors");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
+/**
+ * The states of a plan the quarter runs on (§6.22): approved, and then unbound while its head changes it
+ * and revising while the CEO decides the changes. Report Month, reviews, Counts Towards and the rest treat
+ * all three as binding.
+ */
+const LIVE = Object.freeze(["binding", "unbound", "revising"]);
+/** The states in which its head may add to a plan and change it: before its first approval, or unbound. */
+const OPEN = Object.freeze(["draft", "returned", "unbound"]);
+
+const isLive = (status) => LIVE.includes(status);
+const isOpen = (status) => OPEN.includes(status);
+
 /** A quarter, or a 422 naming it. */
 async function periodOf(db, periodId) {
   const p = await one(
@@ -79,4 +91,4 @@ async function foreignLinks(db, plan) {
   return rows;
 }
 
-module.exports = { periodOf, planFor, ensurePlan, objectiveCounts, foreignLinks };
+module.exports = { LIVE, OPEN, isLive, isOpen, periodOf, planFor, ensurePlan, objectiveCounts, foreignLinks };

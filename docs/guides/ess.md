@@ -77,7 +77,7 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    to 17:00, Saturday 09:00 to 15:00). The person is told when it changes. Attendance judges
    lateness and absence against the same schedule. One source.
 3. **Lateness to payslip.** A late punch raises a query (attendance auto-query, LA) → it appears in
-   My Queries · Queries → the employee responds within 48 hours → if it is upheld a sanction is
+   My Queries · Queries → the employee responds within 24 hours → if it is upheld a sanction is
    recorded (My Queries · Sanctions) and any deduction is accepted into the payroll run (M6) → the
    approved payslip shows it in My Payslips, and the Deductions figure opens the list of months with
    deductions, each with its query. If the query is waived nothing is deducted.
@@ -397,6 +397,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 27/10/2026 · AJ · A query's response window is 24 hours, as MyCity's handbook sets it (queries.md §6.2).
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): People · Leave's chips carry the unread notices about the requests under each status, read as the list reads it, approved as soon as its approval is (`leave.views.js`, `leave.repo.js` `statusesOf`).
 - 26/10/2026 · JP · QA OBS-05, checked end to end (tests/integration/leave.test.js): the answer Send Request's message reads, My Requests' Approver, People · Leave's Waiting On, and the approval's route and history (`GET /workflow/instances/:id`) name the same approver on the line manager's stage, on a stage reassigned to a delegate (its history line names who gave it and why), and on a stage a role decides, named Admin Override, where no one person is named and the stage says who everywhere.
 - 26/10/2026 · JP · From the QA bug register (Milestone 1). DEF-08: a request past the allowance is marked on the Last Day "32 working days, 19 left" (the days asked for and the days left), for My Leave and Record Leave alike; "More than you have left", five words, was cut by the form to "Check this value". OBS-05: `LeaveRequest.approver_name`, the one person the waiting stage names (null when a role decides it); Send Request's message reads "Sent to <name>", else "Sent to <stage>", else "Leave approved", and My Requests' Approver and People · Leave's Waiting On read the same. §6 and both §10 rows updated; the ESS and People chapters with them.

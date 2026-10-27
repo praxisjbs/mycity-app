@@ -3,7 +3,7 @@
  * Sanctions: the HTTP edge for Queries & Sanctions · Sanctions and Chain Settings
  * (docs/guides/queries.md §5). A sanction is seen by whoever may see its query
  * (queries.visibility.js); the chain's writes need queries.configure (the routes).
- * A sanction is proposed from its query's decision and decided in its approval, never here.
+ * A sanction is proposed from its query's decision and decided by its approvers here (guide §6.4).
  */
 const { ok, created } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
@@ -24,4 +24,6 @@ module.exports = {
   listChain: async (req, res) => sendPaged(res, await chain.list(req.validated.query)),
   addStep: async (req, res) => created(res, await chain.create(withActor(req), req.validated.body)),
   updateStep: async (req, res) => ok(res, await chain.update(withActor(req), id(req), req.validated.body)),
+  approve: async (req, res) => ok(res, await service.approve(withActor(req), reader(req), id(req), req.validated.body)),
+  reject: async (req, res) => ok(res, await service.reject(withActor(req), reader(req), id(req), req.validated.body)),
 };

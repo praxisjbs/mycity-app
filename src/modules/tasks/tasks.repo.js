@@ -659,7 +659,7 @@ function countsTowards(db, { assigneeId, month }, query) {
            JOIN performance_period p ON p.performance_period_id = o.performance_period_id
            JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id
           WHERE (kr.accountable_employee_id = $1 OR kr.co_accountable_employee_id = $1)
-            AND pl.status = 'binding' AND $2::date BETWEEN p.starts_on AND p.ends_on
+            AND pl.status IN ('binding', 'unbound', 'revising') AND $2::date BETWEEN p.starts_on AND p.ends_on
        ) v
       WHERE ($3::text IS NULL OR search_fold(v.title) LIKE '%' || search_fold($3) || '%')
       ORDER BY v.grp, v.sec, v.pos, v.title, COALESCE(v.employee_target_id, v.okr_key_result_id)`,

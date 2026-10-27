@@ -11,7 +11,7 @@ module.exports = recordProvider({
   type: "sanction",
   module: "queries",
   label: "Sanctions",
-  words: ["sanction", "sanctions", "warning", "question", "suspension", "san"],
+  words: ["sanction", "sanctions", "caution", "warning", "suspension", "dismissal", "san"],
   from: `sanction x
     JOIN employee_query q ON q.employee_query_id = x.employee_query_id
     JOIN employee e ON e.employee_id = x.employee_id

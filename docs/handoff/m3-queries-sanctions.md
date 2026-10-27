@@ -66,6 +66,25 @@ The M3 build from TB's branch (`claude/dreamy-bell-6wlskq`, 9 commits) brought o
 
 ---
 
+### Decisions of 27/10/2026, afternoon (AJ, with GE and TB; from MyCity's samples and handbook)
+
+These replace §2 decision 1 and the §4 answers they name. Each is in `docs/guides/queries.md` §13.
+
+1. **Attendance owns its rules.** A breach with Raise Query on raises its query
+   (`queries.raise_from_breach`, migration 3040's FK). Rules drops Late Arrival, Absence and
+   Missing Clock-Out; MILESTONES' "three late arrivals" is the Attendance policy's row.
+2. **Ladder in MILESTONES' order:** Caution, Warning, Second Warning, Suspension Without Pay,
+   Dismissal or Termination. "Question" was the transcript mishearing "Caution".
+3. **24 hour response window** (handbook §4.7.1, both query samples). Replaces §4 answer 7.
+4. **Migrations keep their numbers** (MIGRATIONS §3: below the head applies, with a warning).
+5. **Operations & People sign a sanction's letters when they approve it** (every sample is signed so).
+   Replaces §4 answer 2. Approve Sanction and Reject sit on the query's card.
+6. **One suspension, without pay**; the CEO approves from it up (handbook §4.7.4).
+7. Edit Rule; a review shows its month's queries; Dismissal records the sanction and People archive
+   the record; the ladder is entered at go-live; the three unused fine columns stay.
+8. The six letters' wording is MyCity's samples, shipped active; redacted copies in
+   `docs/MyCity-ERP-Documents/letter-samples/`.
+
 ## 3 · How each screen works (as built)
 
 ### 3.1 Raise a Query (Queries · Raise a Query)
@@ -180,6 +199,29 @@ deleted. "N offences in D days raise one query", the counted days or tasks as it
 
 Record each answer here with its date, and change the guide first if an answer changes behaviour.
 
+**Agreed 27/10/2026 (GE and AJ/Victor):**
+
+1. Ladder order: kept as built. Warning, Question, Second Warning, Suspension, Suspension Without
+   Pay, Dismissal or Termination.
+2. A sanction letter is signed by its proposer, as built.
+3. Every manual query is signed, as built. No unsigned Operations & People query.
+4. The Salary Deduction letter keeps our wording; MyCity's HR reads it before go-live.
+5. **Change:** the rule form gains an Optional **Clause** (at most 300 characters), quoted on the
+   rule's query letters. The table, contract, repo and evaluator already carry `policy_clause`;
+   only the rule form and the mock change. `queries.md` §13 updated first.
+6. Overdue Task and Low Monthly Score count as §3.7 says, as built.
+7. The 48 hour window and one reminder a day, as built.
+
+Also agreed the same day:
+
+- The User Guide chapter and its sections go in this PR (#22), not a later one; the
+  `User-guide-unchanged` line leaves #22's description once they are in.
+- The staging seed carries the six rungs, at least one rule, and demo queries and sanctions.
+  Staging only, never production.
+- Suspension, Suspension Without Pay and Termination stay Needs a Letter until MyCity sends the
+  samples. The demo and the pictures show Warning and Question (and a fine) only; no placeholder
+  wording.
+
 ---
 
 ## 5 · Checklist
@@ -195,12 +237,26 @@ Record each answer here with its date, and change the guide first if an answer c
 - [x] 9: Write With AI, `query-draft` and `letter-draft` (26/10/2026)
 - [x] 10: `overdue_task` and `low_performance` (27/10/2026)
 - [x] Mechanics summarised for Victor (this file, §3 and §4) (27/10/2026)
-- [ ] §4 agreed with Victor
-- [ ] 11: demo queries and sanctions in the staging seed only, never production
-- [ ] 11: `docs/manual/queries-and-sanctions.md` (empty now) as a full chapter; the My Queries section
-  of `employee-self-service.md`; the Employee 360 sections of `people.md`; their pictures
-  (`npm run guide:shots`); the user-guide gate passing without a trailer
-- [ ] 12: `queries.md` §13 cleared of what §4 settles; PROGRESS note; `npm run ci`; #22 ready for review
+- [x] §4 agreed with Victor (27/10/2026)
+- [x] 5: Clause on the rule form (§4 answer 5): New Rule and Edit Rule, at most 300 characters, cleared
+  with the policy (27/10/2026)
+- [ ] MyCity's HR read the Salary Deduction letter's wording: at the show and tell
+- [x] 11: demo queries and sanctions in the staging seed only, never production: the five rungs
+  (Caution replacing Question, one suspension), a rule, queries and sanctions
+  (`seeds/staging/50_queries.js`, tested by `tests/integration/queries-staging-seed.test.js`)
+- [x] 11: `docs/manual/queries-and-sanctions.md` as a full chapter with its pictures, My Queries and a
+  person's Queries and Sanctions tabs included (in this chapter, as M2 put My Performance in
+  `performance.md`, so no other milestone's chapter changes); the user-guide gate passing without a
+  trailer (27/10/2026)
+- [x] 12: `queries.md` §13 cleared of what §4 settles; PROGRESS note (27/10/2026)
+- [ ] 12: `npm run ci` green on the committed merge; #22 ready for review
+- [x] Approve Sanction and Reject on the query's card for whoever `queries.consequence` waits on
+  (`POST /sanctions/:id/approve|reject`), Operations & People signing there (27/10/2026)
+- [x] The afternoon decisions (§2): the Attendance policy raises its queries (`3040`), 24 hours,
+  Caution, one suspension without pay with the CEO, MyCity's wording, Queries This Month, Edit Rule
+  (27/10/2026)
+- [x] User Guide: the chapter and the review section updated for the above, pictures retaken
+  (27/10/2026)
 
 ---
 
@@ -217,6 +273,9 @@ Record each answer here with its date, and change the guide first if an answer c
   locally with `NODE_OPTIONS=--max-old-space-size=4096`. GitHub's runners are fine.
 - The browser gates need `MYCITY_CHROMIUM=/opt/pw-browsers/chromium` in a cloud session.
 - Not this branch: the Knowledge Hub's duplicate Announcements tab is to be removed.
+- The demo build (the in-browser mock) lacked `queries.configure`, so nobody there saw New Rule,
+  Add Step or New Template; it now holds it for Operations & People, as seed 3190 does. Its staff
+  account (Kemi) has two queries, one closed with a Warning, for My Queries' pictures.
 
 ---
 
@@ -226,3 +285,16 @@ Record each answer here with its date, and change the guide first if an answer c
   before each push.
 - 27/10/2026 · GE · Item 10 built; main merged; PROGRESS #13 Built, #34 to #37 dated; draft PR #22
   opened; this handoff written for Victor.
+- 27/10/2026 · AJ · §4 agreed with GE: six points as built, a Clause added to the rule form; the
+  chapter goes in #22; the staging seed carries the rungs and a rule; the three awaited letters stay
+  Needs a Letter.
+- 27/10/2026 · AJ · Main merged again (#21, #24 to #26); the generated contract regenerated and 32
+  stale pictures retaken. The chapter written with 20 pictures; the demo's `queries.configure` and
+  Kemi's queries added. Found: no screen approves a proposed sanction. The staging seed waits on the
+  two sample letters.
+- 27/10/2026 · AJ · The afternoon decisions (§2): built together, guide first; see PROGRESS.
+- 27/10/2026 · AJ · Staging seed `50_queries.js` and redacted letter samples; the User Guide
+  updated (Approve or reject a sanction, Change a rule, 24 hours, Queries This Month) and pictures
+  retaken. Nothing committed. Left: the Clause (AJ), `npm run ci` on the committed merge.
+- 27/10/2026 · AJ · The rule form's Clause built (guide §6.3), tested in `queries.test.js` and
+  `Queries.test.tsx`; User Guide steps added. Nothing committed.

@@ -47,13 +47,17 @@ import { ALERT_CATEGORY, isoWeekday, LEAVE_STATUS, REPORT_SOURCE, ROSTER_STATUS,
  * schedule adds, and a refusal names the person, on Recipients.
  */
 
-type FilterKey = keyof HomeReportFilters;
+/** The filters of Workspace Analytics' Export, a personal source the form never offers. */
+const PERSONAL_FILTERS = ["task_scope", "analytics_period", "period_from", "period_to"] as const;
+type FilterKey = Exclude<keyof HomeReportFilters, (typeof PERSONAL_FILTERS)[number]>;
 type Freq = HomeReportRecurrence["freq"];
 export type Repeats = Freq | "on_demand";
 export type FormatChoice = HomeReportFormat | "both";
 
-/** The filters the contract knows, each meaning one thing whichever source takes it. */
-const FILTER_KEYS = Object.keys(reports.HomeReportFilters.shape) as FilterKey[];
+/** The filters the contract knows that a source on the form takes, each meaning one thing whichever source takes it. */
+const FILTER_KEYS = (Object.keys(reports.HomeReportFilters.shape) as Array<keyof HomeReportFilters>).filter(
+  (k): k is FilterKey => !(PERSONAL_FILTERS as readonly string[]).includes(k),
+);
 
 /** Someone a report goes to: their login (what the report is generated as), and the person the picker found, when it did. */
 export interface Recipient {

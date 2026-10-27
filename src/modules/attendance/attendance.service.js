@@ -655,7 +655,33 @@ function requestRegisterExport(actor, body) {
   return requestExport(actor, { kind: "register", filters: { from, to, ...filters } });
 }
 
+/* ------------------------------------------------------------------ *
+ * For Queries & Sanctions (queries.md §6.2): a breach's query
+ * ------------------------------------------------------------------ */
+
+/**
+ * What the query for a breach needs, read on the caller's transaction: the breach, its person,
+ * the policy version in force when it was crossed, and the query's words. Null when the breach is
+ * not there, did not ask for a query, or already has one.
+ */
+async function breachForQuery(client, breachId) {
+  const breach = await repo.getBreach(client, breachId);
+  if (!breach || !breach.raise_query || breach.employee_query_id) return null;
+  const words = require("./attendance.rules-engine").queryWordsOf(breach);
+  return {
+    attendance_rule_breach_id: breach.attendance_rule_breach_id,
+    employee_id: breach.employee_id,
+    policy_version_id: breach.policy_version_id,
+    ...words,
+  };
+}
+
+/** Keep the query raised for a breach on it, in the caller's transaction. */
+const attachQuery = (client, breachId, queryId) => repo.setBreachQuery(client, breachId, queryId);
+
 module.exports = {
+  breachForQuery,
+  attachQuery,
   openSession,
   today,
   punch,

@@ -57,7 +57,7 @@ import {
   useModal,
 } from "@mycity/ui";
 import { Commitments } from "./Commitments";
-import { cardStatus, figureOf, fieldMessage, monthChoices, monthScores, monthShort, person, rating, score, SECTION_NAMES, startMonth, targetOf, useQuarter } from "./shared";
+import { cardStatus, figureOf, fieldMessage, monthChoices, monthScores, monthShort, person, rating, score, SECTION_NAMES, startMonth, targetOf, useDepartmentFilter, useQuarter } from "./shared";
 
 const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
@@ -125,8 +125,9 @@ function ScorecardsView() {
   const modal = useModal();
   const quarter = useQuarter();
   const period = quarter.period;
-  const departments = useApi("GET /api/v1/departments", { query: {} });
-  const [dept, setDept] = useState("");
+  const [pickedDept, setDept] = useState("");
+  const departments = useDepartmentFilter("All Departments", pickedDept);
+  const dept = departments.value;
   const [status, setStatus] = useState("");
   const filters = {
     ...(quarter.periodId ? { period_id: quarter.periodId } : {}),
@@ -138,7 +139,6 @@ function ScorecardsView() {
   const agreed = usePaged("GET /api/v1/performance/scorecards", { filters: { ...(quarter.periodId ? { period_id: quarter.periodId } : {}), status: "agreed" }, enabled: Boolean(quarter.periodId) });
   const waiting = usePaged("GET /api/v1/performance/scorecards", { filters: { ...(quarter.periodId ? { period_id: quarter.periodId } : {}), status: "binding" }, enabled: Boolean(quarter.periodId) });
   const below = usePaged("GET /api/v1/performance/scorecards", { filters: { ...(quarter.periodId ? { period_id: quarter.periodId } : {}), rating: "below" }, enabled: Boolean(quarter.periodId) });
-  const deptOptions: Array<[string, string]> = [["", "All Departments"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
 
   const mayDraft = (me.manages_people || hasCapability(me, "performance.manage")) && Boolean(me.grants.performance?.includes("create"));
   const newCard = () => modal.open({ title: "New Scorecard", body: (close) => <NewScorecardForm close={close} periodId={quarter.periodId} onOpen={openCard} /> });
@@ -160,7 +160,7 @@ function ScorecardsView() {
       />
       <Toolbar>
         <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} />
-        <FilterSelect label="Department" value={dept} onChange={setDept} options={deptOptions} />
+        {departments.pick && <FilterSelect label="Department" value={dept} onChange={setDept} options={departments.options} />}
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
       </Toolbar>
       <KpiTiles

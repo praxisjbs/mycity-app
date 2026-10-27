@@ -112,7 +112,8 @@ const ROWS = `
          x.consequence_step_id, x.sanction_type, COALESCE(s.name, x.sanction_type) AS step_name,
          s.position, s.valid_days, s.letter_template::text AS letter_template, s.financial_effect,
          x.reason, x.decided_by, ${NAME("de")} AS decided_by_name, de.job_title AS decided_by_title,
-         x.signature_document_id, q.policy_version_id AS query_policy_version_id, q.policy_clause AS query_policy_clause,
+         x.signature_document_id, x.signed_by, ${NAME("se")} AS signed_by_name, se.job_title AS signed_by_title,
+         q.policy_version_id AS query_policy_version_id, q.policy_clause AS query_policy_clause,
          x.effective_on, x.ends_on, x.status, x.evidence, x.workflow_instance_id,
          CASE WHEN f.sanction_fine_id IS NULL THEN NULL
               ELSE json_build_object('amount_ngn', f.amount_ngn::text, 'settlement_status', f.settlement_status,
@@ -134,6 +135,8 @@ const ROWS = `
     LEFT JOIN consequence_step s ON s.consequence_step_id = x.consequence_step_id
     LEFT JOIN app_user du ON du.user_id = x.decided_by
     LEFT JOIN employee de ON de.employee_id = du.employee_id
+    LEFT JOIN app_user su ON su.user_id = x.signed_by
+    LEFT JOIN employee se ON se.employee_id = su.employee_id
     LEFT JOIN sanction_fine f ON f.sanction_id = x.sanction_id
     LEFT JOIN sanction_letter l ON l.sanction_id = x.sanction_id AND l.letter_type <> '${FINE_LETTER_KEY}'
     LEFT JOIN sanction_letter fl ON fl.sanction_id = x.sanction_id AND fl.letter_type = '${FINE_LETTER_KEY}'
@@ -148,6 +151,7 @@ const LIST_OUT = `v.sanction_id, v.number, v.employee, v.employee_query_id, v.qu
 const DETAIL_OUT = `${LIST_OUT}, v.evidence, v.letter_document_id, v.fine_letter_document_id, v.workflow_instance_id, v.waiting_on,
   v.employee_id, v.raised_by, v.query_subject, v.query_details, v.query_raised_at, v.position,
   v.letter_template, v.financial_effect, v.fine_amount, v.signature_document_id, v.decided_by_title,
+  v.signed_by, v.signed_by_name, v.signed_by_title,
   v.query_policy_version_id, v.query_policy_clause`;
 
 const SORTS = { effective_on: "v.effective_on", created_at: "v.created_at" };
@@ -238,8 +242,8 @@ async function close(db, id, status) {
   return rowCount === 1;
 }
 
-async function setSignature(db, id, documentId) {
-  await db.query("UPDATE sanction SET signature_document_id = $2 WHERE sanction_id = $1", [id, documentId]);
+async function setSignature(db, id, documentId, signedBy = null) {
+  await db.query("UPDATE sanction SET signature_document_id = $2, signed_by = $3 WHERE sanction_id = $1", [id, documentId, signedBy]);
 }
 
 async function insertLetter(db, { sanction_id, document_id, letter_type }) {

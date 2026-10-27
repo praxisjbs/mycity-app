@@ -28,8 +28,10 @@
  * `performance.target_change` (the CEO), `performance.commitments` (the person's reviewer, or the
  * CEO for a function head) and `performance.review` (the reviewer's own manager, skipped when the
  * reviewer is the CEO, then Operations & People; the reviewee is excluded from deciding it).
+ * A fifth, `performance.plan_change` (§6.22, seeded in 2321), is the CEO's decision on a request to
+ * unbind a binding plan and on the changes then made to it.
  * M3 adds `queries.consequence` (docs/guides/queries.md §6.5, seeded in 3190): a proposed
- * sanction, Operations & People, then Management from the fourth rung.
+ * sanction, Operations & People, then the CEO from the fourth rung.
  *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
@@ -178,6 +180,15 @@ const DEFAULTS = Object.freeze({
     context: {},
     stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
   },
+  // M2, seeded in 2321 (docs/guides/performance.md §6.22).
+  "performance.plan_change": {
+    key: "performance.plan_change",
+    module: "performance",
+    name: "Plan Change",
+    description: "The CEO approves unbinding a binding plan, then the changes made to it.",
+    context: {},
+    stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
+  },
   // M2, seeded in 2190 (docs/guides/performance.md §6.11).
   "performance.commitments": {
     key: "performance.commitments",
@@ -231,7 +242,7 @@ const DEFAULTS = Object.freeze({
     key: "queries.consequence",
     module: "queries",
     name: "Sanction",
-    description: "Operations & People, then Management from Suspension up.",
+    description: "Operations & People, then the CEO from Suspension Without Pay up.",
     context: { rank: "number", fine_amount: "money" },
     stages: [
       {
@@ -241,9 +252,10 @@ const DEFAULTS = Object.freeze({
         sla_hours: 48,
       },
       {
-        key: "management",
-        name: "Management",
-        approver: { type: "role", value: "management" },
+        // MyCity's handbook (§4.7.4): the CEO and the HR Manager decide a suspension.
+        key: "ceo",
+        name: "CEO",
+        approver: { type: "ceo" },
         condition: { field: "rank", op: ">=", value: 4 },
         sla_hours: 48,
       },

@@ -6,6 +6,8 @@
  *   raise()          a manager or People, from Raise a Query (POST /queries)
  *   raiseForRule()   a query rule's breach (query_rules.evaluator), with its counted days
  *                    as evidence and a dedup key, so a breach delivered twice is one query
+ *   raiseFromBreach() an Attendance policy breach with Raise Query on (query_rules.events),
+ *                    linked back on the breach through the attendance service
  *   remind()         Send Reminder, once a Lagos day, while the query waits for an answer
  *   decide()         Close With No Action, or propose a sanction (queries.escalate.js)
  *   respond()        the employee's answer, from ESS · My Queries (queries.response.js)
@@ -30,8 +32,11 @@ const repo = require("./queries.repo");
 const visibility = require("./queries.visibility");
 const { EVENTS, SIGNATURE_DOC_TYPE } = require("./queries.events");
 
-/** How long the employee has to answer (guide §6.2), until Settings · Queries (M9) holds it. */
-const RESPONSE_HOURS = 48;
+/**
+ * How long the employee has to answer (guide §6.2): MyCity's handbook (§4.7.1) and its query
+ * letters give 24 hours. Until Settings · Queries (M9) holds it.
+ */
+const RESPONSE_HOURS = 24;
 
 /** Who signs a letter a rule raised. */
 const PEOPLE_SIGNER = Object.freeze({ name: "Operations & People", role: "Operations & People" });
@@ -73,7 +78,18 @@ const quoted = (citation, clause) =>
  * Reading
  * ------------------------------------------------------------------ */
 
-const list = (query, reader) => repo.list(pool, query, reader);
+/** A Lagos day's first instant, and the next day's: a raised_from/raised_to filter as instants. */
+const nextDay = (date) => lagos.addDays(date, 1);
+const list = (query, reader) =>
+  repo.list(
+    pool,
+    {
+      ...query,
+      raised_since: query.raised_from ? lagos.startOfDay(query.raised_from) : null,
+      raised_before: query.raised_to ? lagos.startOfDay(nextDay(query.raised_to)) : null,
+    },
+    reader,
+  );
 
 const summary = (reader) => repo.summary(pool, reader, lagos.startOfDay(`${lagos.today().slice(0, 7)}-01`));
 
@@ -103,6 +119,31 @@ function remindable(row, canCreate) {
   return !row.reminded_at || lagos.dateOf(row.reminded_at) < lagos.today();
 }
 
+/** The Operations & People stage of queries.consequence: deciding it signs the letters (§6.4). */
+const SIGNING_STAGE = "operations_people";
+
+/**
+ * A pending sanction's approval as this reader meets it (guide §6.4): the stage it waits on,
+ * whether they may decide it, whether deciding signs. Read through the workflow service, which
+ * alone says who may act; null when nothing waits or the reader may not read the approval.
+ */
+async function approvalFor(row, user) {
+  if (!row.sanction || row.sanction.status !== "pending_approval" || !row.workflow_instance_id) return null;
+  try {
+    const flow = await require("../workflow/workflow.service").getInstance(user, row.workflow_instance_id);
+    if (flow.state !== "pending" || !flow.current_stage) return null;
+    return {
+      stage: flow.current_stage,
+      stage_name: flow.stage_name || flow.current_stage,
+      can_decide: Boolean(flow.can_decide),
+      signs: flow.current_stage === SIGNING_STAGE,
+    };
+  } catch (err) {
+    if (err && err.status === 404) return null;
+    throw err;
+  }
+}
+
 /** One query as its card shows it, for this reader. */
 async function get(id, user, scope) {
   const reader = visibility.readerOf(scope, user);
@@ -117,6 +158,7 @@ async function get(id, user, scope) {
     next_step: row.status === "resolved" ? null : await nextStepFor(employeeId),
     can_decide: decidable(row, user, Boolean(canEdit)),
     can_remind: remindable(row, Boolean(canCreate)),
+    approval: await approvalFor(row, user),
   };
 }
 
@@ -165,7 +207,7 @@ function letterData(person, row, signer, policy = null) {
  * The insert, the letter and the event, on the caller's transaction. Returns the new id,
  * or null when `dedup_key` was already taken.
  */
-async function insertQuery(client, { person, subject, details, evidence, rule, raisedBy, dedupKey, letterKey, signer, signature = null, citation = null, clause = null, actor }) {
+async function insertQuery(client, { person, subject, details, evidence, rule, raisedBy, source, dedupKey, letterKey, signer, signature = null, citation = null, clause = null, actor }) {
   if (dedupKey && (await repo.dedupTaken(client, dedupKey))) return null;
   const number = (await numbering.allocate(client, "query")).number;
   const responseDue = new Date(Date.now() + RESPONSE_HOURS * 3600 * 1000).toISOString();
@@ -174,6 +216,7 @@ async function insertQuery(client, { person, subject, details, evidence, rule, r
     employee_id: person.employee_id,
     query_rule_id: rule ? rule.query_rule_id : null,
     raised_by: raisedBy,
+    source,
     subject,
     details,
     evidence,
@@ -241,6 +284,7 @@ async function raise(actor, scope, body) {
       evidence: [],
       rule: null,
       raisedBy: actor.user_id,
+      source: "person",
       dedupKey: null,
       letterKey,
       signer: me
@@ -276,12 +320,48 @@ async function raiseForRule(client, breach) {
     evidence: breach.evidence,
     rule: breach.rule,
     raisedBy: null,
+    source: "rule",
     dedupKey: breach.dedup_key,
     letterKey,
     signer: PEOPLE_SIGNER,
     citation,
     clause: breach.rule.policy_clause || null,
     actor: null,
+  });
+}
+
+/**
+ * An Attendance policy breach with Raise Query on raises one query (guide §6.2), its days as
+ * evidence and the policy version in force when it was crossed cited, then the breach keeps it.
+ * The attendance service reads the breach and links it back: this module never touches its table.
+ * A breach already answered, not asking for a query, or about someone who has left raises nothing.
+ * @returns {Promise<string|null>} the new query's id
+ */
+async function raiseFromBreach(breachId) {
+  const attendance = require("../attendance/attendance.service");
+  return tx(async (client) => {
+    const breach = await attendance.breachForQuery(client, breachId);
+    if (!breach) return null;
+    const person = await repo.employeeOf(client, breach.employee_id);
+    if (!person || person.status !== "active") return null;
+    const citation = breach.policy_version_id ? await policies().citationOfVersion(client, breach.policy_version_id) : null;
+    const id = await insertQuery(client, {
+      person,
+      subject: breach.subject,
+      details: breach.details,
+      evidence: breach.evidence,
+      rule: null,
+      raisedBy: null,
+      source: "attendance",
+      dedupKey: `attendance-breach:${breach.attendance_rule_breach_id}`,
+      letterKey: await templates.usable(client, "query-letter", "query"),
+      signer: PEOPLE_SIGNER,
+      citation,
+      clause: null,
+      actor: null,
+    });
+    if (id) await attendance.attachQuery(client, breach.attendance_rule_breach_id, id);
+    return id;
   });
 }
 
@@ -406,6 +486,7 @@ module.exports = {
   get,
   raise,
   raiseForRule,
+  raiseFromBreach,
   remind,
   decide,
   rowFor,

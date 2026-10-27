@@ -30,6 +30,7 @@ const {
 } = require("./common");
 const { PersonRef } = require("./organisation");
 const { EvidenceItem } = require("./queries");
+const { SignaturePng } = require("./policies");
 
 const SanctionStatus = z.enum(["pending_approval", "issued", "rejected", "withdrawn"]);
 const FinancialEffect = z.enum(["none", "unpaid_days", "ends_employment"]);
@@ -143,6 +144,17 @@ const SanctionDetail = Sanction.extend({
   workflow_instance_id: uuid.nullable(),
   waiting_on: z.string().nullable(),
 }).strict();
+
+/**
+ * POST /sanctions/:id/approve: the approver the stage waits on lets it stand. At the Operations &
+ * People stage they sign it (guide §6.4): the drawn PNG, kept in the vault, printed on its letters.
+ */
+const SanctionApprove = z.object({ signature: SignaturePng.optional() }).strict();
+
+/** POST /sanctions/:id/reject: refused with a reason; the query goes back under review. */
+const SanctionReject = z
+  .object({ reason: z.string().trim().min(10, "Give the reason").max(2000) })
+  .strict();
 
 /** GET /sanctions */
 const SanctionListQuery = listQuery(
@@ -264,6 +276,11 @@ const TABLES = {
     },
   },
   SanctionListQuery: { table: null, reason: "list controls and filters for Sanction History" },
+  SanctionApprove: {
+    table: "sanction",
+    virtual: { signature: "the drawn PNG, stored through the vault as signature_document_id, signed_by the approver" },
+  },
+  SanctionReject: { table: null, reason: "the approval's decision reason, kept on workflow_decision" },
   SanctionsSummary: { table: null, reason: "counts and sums over sanction and sanction_fine" },
   SanctionStandingQuery: { table: null, reason: "whose standing to read" },
   SanctionStanding: { table: null, reason: "worked out from sanction and consequence_step" },
@@ -295,6 +312,8 @@ module.exports = {
   Sanction,
   SanctionPage,
   SanctionDetail,
+  SanctionApprove,
+  SanctionReject,
   SanctionListQuery,
   SanctionsSummary,
   SanctionStandingQuery,

@@ -228,7 +228,7 @@ table frozen · `1425` a day judged once: on `attendance_day` its `early_minutes
 (`policy_version_id`, `attendance_work_schedule_id`, `shift_working`, `shift_starts_at`,
 `shift_ends_at`, `judged_at`) · `1430` `attendance_rule_breach` (one row per breach of the Attendance
 policy's five consequence rules, unique on the person, the rule and its last counted day; the Home
-alert it raised; `employee_query_id` for M3, no key yet) · `1435` `attendance_pay_item` (one pending
+alert it raised; `employee_query_id`, keyed to the query by M3's `3040`) · `1435` `attendance_pay_item` (one pending
 deduction or overtime per person, day and kind, its amount `numeric(18,2)` masked as the salary is;
 `payroll_run_id` for M6, no key yet) and `attendance_overtime_approval` (overtime approved for a day
 beforehand, one per person and day) · `1440` reminders to clock out: `attendance_clock_reminder`'s
@@ -267,9 +267,9 @@ use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
 - Attendance (attendance.md §4, §13): the redesign's tables above are built (PR 2's in `1380` and
-  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign keys of
-  `attendance_rule_breach.employee_query_id` (M3) and `attendance_pay_item.payroll_run_id` (M6) once
-  their tables exist; dropping `attendance_location_request` and the field assignment tables once no
+  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign key of
+  `attendance_pay_item.payroll_run_id` (M6) once its table exists (the breach's query key is M3's
+  `3040`); dropping `attendance_location_request` and the field assignment tables once no
   request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)
   (MIGRATIONS §8); dropping
   `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
@@ -332,12 +332,22 @@ the defaults; a review's second level (`second_level_employee_id`) and each item
 `2310` a review scored without its check-in (`no_check_in_at`, `no_check_in_reason`) and closed as
 Withdrawn (`withdrawn_at`, `withdrawn_reason`; the status `withdrawn`, `NOT VALID`) (after PR #130,
 `docs/guides/performance.md` §11) ·
+`2320` a request to unbind a binding plan (`plan_unbind`: reason, status `pending`, `approved` or
+`rejected`, the instance, who asked, the decision and its reason; one pending request per plan) and the
+plan's two states `unbound` and `revising` on the `performance_plan` status check (`docs/guides/performance.md`
+§6.22, JBS Praxis, 27/10/2026) · `2321` seed: the flow `performance.plan_change`, the CEO alone ·
 `2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
 missed commitment's Recovery task (Performance PR 4) · `2500` projects get a screen: `project.created_by`,
 its status CHECK (`active`, `completed`) and indexes · `2510` Why Late's reasons (`task_late_reason`,
 switched off rather than deleted; the CHECK on `task.late_reason` gives way to it) · `2520` an event's
-invitation SEQUENCE (`calendar_event.ics_sequence`) · `2590` seed: the six starting late reasons and the
-`workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit).
+invitation SEQUENCE (`calendar_event.ics_sequence`) · `2530` a report run keeps the filters it was
+asked with (`home_report_run.filters`, jsonb, null but for My Workspace · Analytics' Export; Home's
+table, 1150, reviewed by TB; docs/guides/workspace.md §6) · `2590` seed: the six starting late reasons and the
+`workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit) ·
+`2600` departments kept on People · Departments (`docs/guides/organogram.md` §6.1, JBS Praxis
+27/10/2026): where a merged department went (`department.merged_into_department_id`, indexed) and
+which Head of Department roles the system gave with a headship (`user_role.from_headship`, false
+for a role given by hand).
 
 **Owes:**
 - PRs 3 and 5 of `docs/guides/performance.md` use 2300 to 2399 and 2500 to 2599 only for a gap. The numbers 2020, 2030 and
@@ -387,8 +397,11 @@ outcome and letter, a sanction's number, rung, evidence and approval; `letter_te
 (`query_rule.policy_id`, `policy_clause`) and the version a query cites (`employee_query.policy_version_id`,
 `policy_clause`) · `3190` the `queries.configure`
 capability, the `queries.consequence` approval (replacing `3099`'s invalid `employee_consequence`,
-switched off) and the shipped letters' rows, seven with the Question and Salary Deduction letters
-(docs/guides/queries.md §4).
+switched off; Operations & People, then the CEO from rank 4) and the shipped letters' rows, six,
+each active in MyCity's own wording (docs/guides/queries.md §4, §6.7) · `3040` the key from
+`attendance_rule_breach.employee_query_id` to the query raised for the breach (owed since 1430),
+`employee_query.source` (`person`, `rule`, `attendance`) and `sanction.signed_by` (the Operations &
+People approver who signed it).
 
 **Owes:**
 - Fines as pending deductions accepted into the M6 payroll run (MILESTONES §8): M6 reads

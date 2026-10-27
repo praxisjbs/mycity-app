@@ -43,14 +43,29 @@ function omit<T extends object, K extends keyof T>(row: T, keys: readonly K[]): 
  * Letter templates
  * ------------------------------------------------------------------ */
 
+/** MyCity's own wording, as the shipped letters carry it (templates/documents; guide §6.7). */
+const WORDING: Record<string, string> = {
+  "query-letter":
+    "Dear {{ employee.first_name }},\n\nThis is to formally query you on the following.\n\n{{ details }}\n\nYou are required to respond to this query in writing by {{ datetime response_due }}, in My Queries, stating why appropriate disciplinary action should not be taken against you.",
+  "caution-letter":
+    "Dear {{ employee.first_name }},\n\nA review of query {{ query_number }} ({{ subject }}) finds the following.\n\n{{ reason }}\n\nTo this effect, you are hereby advised to improve immediately.",
+  "warning-letter":
+    "Dear {{ employee.first_name }},\n\nFollowing query {{ query_number }} ({{ subject }}): {{ reason }}\n\nManagement frowns at this. You are to ensure that it is not repeated, to forestall further disciplinary action.",
+  "suspension-without-pay-letter":
+    "Dear {{ employee.first_name }},\n\nManagement has reviewed your response to query {{ query_number }} and finds it unacceptable. {{ reason }}\n\nYou are therefore suspended from duty without pay for {{ days }} days, beginning from {{ longdate effective_on }}.",
+  "termination-letter":
+    "Dear {{ employee.first_name }},\n\nFollowing query {{ query_number }} ({{ subject }}): {{ reason }}\n\nConsequently, your employment is terminated by way of dismissal, effective {{ longdate effective_on }}.",
+  "salary-deduction-letter":
+    "Dear {{ employee.first_name }},\n\nFollowing query {{ query_number }} ({{ subject }}), {{ money fine_amount }} will be deducted from your salary.",
+};
+
 const LETTERS: Array<LetterTemplateDetail> = (
   [
-    ["query-letter", "Query Letter", "query", "active", 1],
-    ["warning-letter", "Warning Letter", "sanction", "active", 2],
-    ["question-letter", "Question Letter", "sanction", "active", 1],
-    ["suspension-letter", "Suspension Letter", "sanction", "awaiting_sample", 0],
-    ["suspension-without-pay-letter", "Suspension Without Pay Letter", "sanction", "awaiting_sample", 0],
-    ["termination-letter", "Termination Letter", "sanction", "awaiting_sample", 0],
+    ["query-letter", "Query Letter", "query", "active", 0],
+    ["caution-letter", "Caution Letter", "sanction", "active", 0],
+    ["warning-letter", "Warning Letter", "sanction", "active", 0],
+    ["suspension-without-pay-letter", "Suspension Without Pay Letter", "sanction", "active", 0],
+    ["termination-letter", "Termination Letter", "sanction", "active", 0],
     ["salary-deduction-letter", "Salary Deduction Letter", "fine", "active", 0],
   ] as const
 ).map(([key, name, purpose, status, version], i) => ({
@@ -58,18 +73,13 @@ const LETTERS: Array<LetterTemplateDetail> = (
   key,
   name,
   purpose,
-  status,
+  status: status as LetterTemplateDetail["status"],
   version,
   used_by: [],
   updated_at: at(20 - i, "10:00"),
-  title: status === "awaiting_sample" ? null : name,
-  body:
-    status === "awaiting_sample"
-      ? null
-      : purpose === "query"
-        ? "Dear {{ employee.first_name }},\n\n{{ details }}\n\nPlease explain this in writing by {{ datetime response_due }}, in My Queries."
-        : "Dear {{ employee.first_name }},\n\nFollowing query {{ query_number }}, this is a {{ step_name }}: {{ reason }}",
-  format: status === "awaiting_sample" ? null : "markdown",
+  title: name,
+  body: WORDING[key] ?? null,
+  format: "markdown",
   body_html: null,
   variables: ["employee", "query_number", "subject", "details", "reason", "step_name", "raised_on", "response_due", "effective_on", "ends_on", "days", "fine_amount", "signer"],
 }));
@@ -188,11 +198,10 @@ route("POST /api/v1/letter-templates/:id/activate", (req) => {
 
 const STEPS: ConsequenceStep[] = (
   [
+    ["Caution", "caution-letter", "none", null, 365],
     ["Warning", "warning-letter", "none", null, 365],
-    ["Question", "question-letter", "none", null, 365],
     ["Second Warning", "warning-letter", "none", null, 365],
-    ["Suspension", "suspension-letter", "unpaid_days", 3, null],
-    ["Suspension Without Pay", "suspension-without-pay-letter", "unpaid_days", 5, null],
+    ["Suspension Without Pay", "suspension-without-pay-letter", "unpaid_days", 3, null],
     ["Dismissal or Termination", "termination-letter", "ends_employment", null, null],
   ] as const
 ).map(([name, letter, effect, days, valid], i) => ({
@@ -254,9 +263,11 @@ route("PATCH /api/v1/sanctions/chain/:id", (req) => {
  * ------------------------------------------------------------------ */
 
 type Row = QueryDetail & { _by: string | null };
-const RULE_NAME = "Repeated Lateness";
+const RULE_NAME = "Unregistered Device";
+/** MyCity's response window (its handbook §4.7.1). */
+const RESPONSE_MS = 24 * 3600 * 1000;
 
-function mk(n: number, who: string, subject: string, by: string | null, daysAgo: number, opts: { status?: QueryDetail["status"]; outcome?: QueryDetail["outcome"]; response?: string; evidence?: EvidenceItem[] } = {}): Row {
+function mk(n: number, who: string, subject: string, by: string | null, daysAgo: number, opts: { status?: QueryDetail["status"]; outcome?: QueryDetail["outcome"]; response?: string; evidence?: EvidenceItem[]; attendance?: boolean } = {}): Row {
   const raised = at(daysAgo, by ? "11:20" : "06:00");
   const status = opts.status ?? "awaiting_response";
   return {
@@ -266,15 +277,16 @@ function mk(n: number, who: string, subject: string, by: string | null, daysAgo:
     subject,
     raised_by: by ? uid(by) : null,
     raised_by_name: nameOf(by),
-    query_rule_id: by ? null : sid("rule:0"),
-    rule_name: by ? null : RULE_NAME,
+    source: by ? "person" : opts.attendance ? "attendance" : "rule",
+    query_rule_id: by || opts.attendance ? null : sid("rule:0"),
+    rule_name: by ? null : opts.attendance ? "Attendance Policy" : RULE_NAME,
     status,
     outcome: opts.outcome ?? null,
     escalated: false,
-    response_due_at: new Date(new Date(raised).getTime() + 48 * 3600 * 1000).toISOString(),
+    response_due_at: new Date(new Date(raised).getTime() + RESPONSE_MS).toISOString(),
     responded_at: opts.response ? at(daysAgo - 1, "08:30") : null,
     created_at: raised,
-    details: by ? "There is no clock-out for the shift at the Yaba site." : "Late arrival on three working days (3 in 30 days). Please explain.",
+    details: by ? "There is no clock-out for the shift at the Yaba site." : "Punch from an unregistered device on three days (3 in 30 days). Please explain.",
     evidence: opts.evidence ?? [],
     response: opts.response ? { body: opts.response, blocks: blocksOf(`<p>${opts.response}</p>`), submitted_at: at(daysAgo - 1, "08:30") } : null,
     letter_document_id: sid(`ltrdoc:${n}`),
@@ -288,19 +300,35 @@ function mk(n: number, who: string, subject: string, by: string | null, daysAgo:
     next_step: null,
     can_decide: false,
     can_remind: false,
+    approval: null,
     _by: by,
   };
 }
 /** The Attendance policy, which the lateness rule enforces in the demo. */
 const ATTENDANCE_CITED = () => citablePolicies().find((p) => /attendance/i.test(p.title)) ?? null;
-const LATENESS_CLAUSE = "Staff clock in by 09:00 on working days.";
-const late = (d: number, m: number): EvidenceItem => ({ label: `Late arrival, ${m} minutes`, date: isoDaysAgo(d) });
+const DEVICE_CLAUSE = "Clock in only from a device registered in My Devices.";
+const late = (d: number): EvidenceItem => ({ label: "Late arrival", date: isoDaysAgo(d) });
+const device = (d: number): EvidenceItem => ({ label: "Punch from an unregistered device", date: isoDaysAgo(d) });
 const QUERIES: Row[] = [
-  Object.assign(mk(14, "bashir", RULE_NAME, null, 2, { evidence: [late(20, 31), late(9, 22), late(2, 41)] }), { policy: ATTENDANCE_CITED(), policy_clause: LATENESS_CLAUSE }),
+  // An Attendance policy breach with Raise Query on (guide §6.2): its words, its days, the policy cited.
+  Object.assign(mk(14, "bashir", "3 late arrivals this month", null, 2, { attendance: true, evidence: [late(20), late(9), late(2)] }), {
+    details: "Our attendance records show 3 late arrivals this month. Late on the three days below.",
+    policy: ATTENDANCE_CITED(),
+    policy_clause: null,
+  }),
   mk(15, "chidera", "Missing clock-out on Thursday", "emeka", 1),
-  mk(13, "tobi", RULE_NAME, null, 6, { status: "under_review", response: "The bridge was closed on each of those mornings.", evidence: [late(25, 12), late(14, 18), late(6, 9)] }),
+  mk(13, "tobi", RULE_NAME, null, 6, { status: "under_review", response: "My new phone was not registered yet on those mornings.", evidence: [device(25), device(14), device(6)] }),
   mk(12, "seyi", "Punch from an unregistered phone", "cynthia", 12, { status: "resolved", outcome: "no_action", response: "My phone was replaced; the new one is now registered." }),
   mk(11, "chidera", "Deadline missed on the Enugu brief", "tolu", 16, { status: "resolved", outcome: "sanctioned", response: "The client changed the brief on the day." }),
+  // Kemi, the demo's staff account: an open query and a closed one that led to a Warning, for My Queries.
+  Object.assign(mk(16, "kemi", "Lagos guide sent two days late", "tolu", 1), { details: "The Lagos weekend guide was due on Wednesday and reached the editor on Friday." }),
+  Object.assign(mk(10, "kemi", "Second missed deadline this month", "tolu", 22, { status: "resolved", outcome: "sanctioned", response: "Two writers were off sick that week." }), {
+    details: "The Abuja listings were due on 1 October and were not sent until 6 October.",
+  }),
+  // A Caution Emeka proposed, waiting for Operations & People to sign and approve it.
+  Object.assign(mk(9, "yusuf", "Client shoot missed", "emeka", 4, { status: "under_review", response: "I was sent to another shoot that morning." }), {
+    details: "The Ikoyi client shoot on Monday started without a videographer.",
+  }),
 ];
 
 const SANCTIONS: SanctionDetail[] = [];
@@ -319,6 +347,14 @@ function issue(q: Row, stepName: string, daysAgo: number, fine: string | null): 
   return s;
 }
 issue(QUERIES[4], "Warning", 14, "12500.00");
+issue(QUERIES[6], "Warning", 20, null);
+{
+  const q = QUERIES[7];
+  const s = issue(q, "Caution", 1, null);
+  Object.assign(s, { number: null, status: "pending_approval", reason: "The explanation does not account for the missed shoot.", decided_by: uid("emeka"), decided_by_name: nameOf("emeka"), letter_document_id: null, waiting_on: "Operations & People", workflow_instance_id: sid(`wf:${s.sanction_id}`) });
+  q.sanction = { sanction_id: s.sanction_id, number: null, step_name: s.step_name, status: "pending_approval" };
+  Object.assign(q, { escalated: true, workflow_instance_id: s.workflow_instance_id });
+}
 
 const raisedBy = (q: Row) => q._by;
 const canSee = (user: string, q: { _by?: string | null }) => FULL.has(user) || (!!q._by && q._by === user);
@@ -334,6 +370,16 @@ function nextStepOf(employeeId: string) {
   return next ? { consequence_step_id: next.consequence_step_id, name: next.name, position: next.position } : null;
 }
 
+/** The stage a pending sanction waits on, as the approval says (guide §6.5): Operations & People, then the CEO from rank 4. */
+const pendingOf = (q: Row) => (q.sanction?.status === "pending_approval" ? SANCTIONS.find((s) => s.sanction_id === q.sanction!.sanction_id) ?? null : null);
+function approvalOf(q: Row, user: string): QueryDetail["approval"] {
+  const s = pendingOf(q);
+  if (!s) return null;
+  const ceo = s.waiting_on === "CEO";
+  const mayAct = ceo ? user === "ifeoma" : FULL.has(user) && s.decided_by !== uid(user);
+  return { stage: ceo ? "ceo" : "operations_people", stage_name: ceo ? "CEO" : "Operations & People", can_decide: mayAct, signs: !ceo };
+}
+
 function view(q: Row, user: string): QueryDetail {
   const rest = omit(q, ["_by"] as const);
   const overdue = new Date(q.response_due_at!).getTime() <= Date.now();
@@ -343,10 +389,11 @@ function view(q: Row, user: string): QueryDetail {
     next_step: q.status === "resolved" ? null : nextStepOf(q.employee.employee_id),
     can_decide: decides && q.status !== "resolved" && !q.escalated && (!!q.response || overdue) && byKey(user)?.employee_id !== q.employee.employee_id,
     can_remind: q.status === "awaiting_response" && !q.response && !q.reminded_at,
+    approval: approvalOf(q, user),
   };
 }
 const listRow = (q: QueryDetail) =>
-  omit(q, ["details", "evidence", "response", "letter_document_id", "reminded_at", "reviewed_by_name", "reviewed_at", "workflow_instance_id", "sanction", "next_step", "can_decide", "can_remind"] as const);
+  omit(q, ["details", "evidence", "response", "letter_document_id", "reminded_at", "reviewed_by_name", "reviewed_at", "workflow_instance_id", "sanction", "next_step", "can_decide", "can_remind", "approval"] as const);
 
 route("GET /api/v1/queries/summary", (req) => {
   const list = visible(req.user!);
@@ -369,7 +416,10 @@ route("GET /api/v1/queries", (req) => {
     filters: {
       status: (q, v) => q.status === v,
       employee_id: (q, v) => q.employee.employee_id === v,
-      raised: (q, v) => (v === "mine" ? q.raised_by === uid(user) : !!q.query_rule_id),
+      raised: (q, v) => (v === "mine" ? q.raised_by === uid(user) : q.source !== "person"),
+      // A review's month (performance.md §6.16): raised on these Lagos days, both inclusive.
+      raised_from: (q, v) => q.created_at.slice(0, 10) >= v,
+      raised_to: (q, v) => q.created_at.slice(0, 10) <= v,
     },
     sort: {
       created_at: (a, b) => b.created_at.localeCompare(a.created_at),
@@ -417,7 +467,7 @@ route("POST /api/v1/queries", (req) => {
   const n = Math.max(...QUERIES.map((q) => Number(q.number.slice(4)))) + 1;
   const q = mk(n, p!.user_key, b.subject!.trim(), req.user!, 0);
   Object.assign(q, {
-    details: b.details!.trim(), created_at: now(), response_due_at: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+    details: b.details!.trim(), created_at: now(), response_due_at: new Date(Date.now() + RESPONSE_MS).toISOString(),
     policy: cited, policy_clause: cited ? (b.policy_clause?.trim() || null) : null,
   });
   QUERIES.unshift(q);
@@ -435,9 +485,8 @@ route("POST /api/v1/queries/:id/decision", (req) => {
   const q = findQ(user, req.params.id);
   if (!q) return notFound();
   if (!view(q, user).can_decide) return fail(409, "QUERY_NOT_DECIDABLE", "Wait for the response or the deadline");
-  const b = req.body as { outcome?: string; reason?: string; consequence_step_id?: string; fine_amount?: string; effective_on?: string; ends_on?: string; signature?: string };
+  const b = req.body as { outcome?: string; reason?: string; consequence_step_id?: string; fine_amount?: string; effective_on?: string; ends_on?: string };
   if (!b.reason || b.reason.trim().length < 10) return invalid({ reason: ["Record the reason"] });
-  if (b.outcome === "sanction" && !/^data:image\/png;base64,/.test(b.signature ?? "")) return invalid({ signature: ["Sign in the box"] });
   if (b.outcome === "no_action") {
     Object.assign(q, { status: "resolved", outcome: "no_action", reviewed_at: now(), reviewed_by_name: nameOf(user) });
     return ok(view(q, user));
@@ -458,21 +507,22 @@ route("POST /api/v1/queries/:id/decision", (req) => {
 
 const RULES: QueryRule[] = (
   [
-    [RULE_NAME, "lateness", "count", 3, 30, "active"],
-    ["Late Hours", "lateness", "minutes", 300, 31, "draft"],
-    ["Missing Clock-Out", "missing_clock_out", "count", 2, 30, "active"],
-    ["Absence Without Notice", "absence", "count", 1, 30, "paused"],
+    [RULE_NAME, "unenrolled_device", "count", 3, 30, "active"],
     ["Overdue Tasks", "overdue_task", "count", 3, 14, "draft"],
+    ["Low Monthly Score", "low_performance", "count", 1, 90, "active"],
+    ["Missed Targets", "missed_target", "count", 2, 30, "draft"],
   ] as const
 ).map(([name, source, measure, threshold, window, state], i) => ({
   query_rule_id: sid(`rule:${i}`), code: name.toLowerCase().replace(/[^a-z0-9]+/g, "_"), name, source_event: source, measure, threshold,
   window_days: window, letter_template: null,
   policy: i === 0 && ATTENDANCE_CITED() ? { policy_id: ATTENDANCE_CITED()!.policy_id, number: ATTENDANCE_CITED()!.number, title: ATTENDANCE_CITED()!.title } : null,
-  policy_clause: i === 0 ? LATENESS_CLAUSE : null,
+  policy_clause: i === 0 && ATTENDANCE_CITED() ? DEVICE_CLAUSE : null,
   state, active: state === "active", activated_at: state === "draft" ? null : at(40, "09:00"),
   fired_this_month: i === 0 ? 2 : 0, created_at: at(41, "09:00"), updated_at: at(40, "09:00"),
 }));
-const COUNTED = new Set(["lateness", "absence", "missing_clock_out", "unenrolled_device", "overdue_task", "low_performance"]);
+const COUNTED = new Set(["unenrolled_device", "overdue_task", "low_performance"]);
+/** Late arrivals, absences and missing clock-outs are the Attendance policy's rules (guide §6.3). */
+const ATTENDANCE_COUNTS = new Set(["lateness", "absence", "missing_clock_out"]);
 
 route("GET /api/v1/query-rules/summary", () =>
   ok({
@@ -503,14 +553,14 @@ route("POST /api/v1/query-rules", (req) => {
   if (!b.name?.trim()) f.name = ["Required"];
   if (b.policy_id && !policyCitation(b.policy_id)) f.policy_id = ["Not in force"];
   if (!b.source_event) f.source_event = ["Choose one"];
+  else if (ATTENDANCE_COUNTS.has(b.source_event)) f.source_event = ["The Attendance policy counts that"];
   if (!(Number(b.threshold) >= 1)) f.threshold = ["At least 1"];
   if (!(Number(b.window_days) >= 1)) f.window_days = ["At least 1 day"];
-  if (b.measure === "minutes" && b.source_event !== "lateness") f.measure = ["Lateness only"];
   if (Object.keys(f).length) return invalid(f);
   const r: QueryRule = {
     query_rule_id: sid(`rule:new:${RULES.length}`), code: b.name!.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_"), name: b.name!.trim(), source_event: b.source_event!,
     measure: b.measure ?? "count", threshold: Number(b.threshold), window_days: Number(b.window_days), letter_template: b.letter_template ?? null,
-    policy: ruleNamed(b.policy_id), policy_clause: b.policy_id ? (b.policy_clause ?? null) : null, state: "draft",
+    policy: ruleNamed(b.policy_id), policy_clause: b.policy_id ? (b.policy_clause?.trim() || null) : null, state: "draft",
     active: false, activated_at: null, fired_this_month: 0, created_at: now(), updated_at: now(),
   };
   RULES.push(r);
@@ -526,9 +576,15 @@ route("PATCH /api/v1/query-rules/:id", (req) => {
   if (refused) return refused;
   const r = ruleOf(req.params.id);
   if (!r) return notFound();
-  const { policy_id: policyId, ...rest } = req.body as Partial<QueryRule> & { policy_id?: string | null };
+  const { policy_id: policyId, policy_clause: clause, ...rest } = req.body as Partial<QueryRule> & { policy_id?: string | null };
   if (policyId && !policyCitation(policyId)) return invalid({ policy_id: ["Not in force"] });
+  if (clause && clause.length > 300) return invalid({ policy_clause: ["At most 300 characters"] });
+  if (rest.source_event && ATTENDANCE_COUNTS.has(rest.source_event)) return invalid({ source_event: ["The Attendance policy counts that"] });
+  if (rest.source_event && rest.source_event !== r.source_event && QUERIES.some((q) => q.query_rule_id === r.query_rule_id))
+    return fail(409, "RULE_TRIGGER_FIXED", "This rule has fired; its trigger stays");
   Object.assign(r, rest, { updated_at: now() }, policyId !== undefined && { policy: ruleNamed(policyId) });
+  if (clause !== undefined) r.policy_clause = clause?.trim() || null;
+  if (!r.policy) r.policy_clause = null;
   return ok(r);
 });
 route("POST /api/v1/query-rules/:id/activate", (req) => {
@@ -587,6 +643,45 @@ route("GET /api/v1/sanctions", (req) =>
 route("GET /api/v1/sanctions/:id", (req) => {
   const s = visibleSanctions(req.user!).find((x) => x.sanction_id === req.params.id);
   return s ? ok(s) : notFound();
+});
+
+/** The query a pending sanction follows, and whether this reader may decide it now (guide §6.4). */
+function deciding(req: Req) {
+  const s = SANCTIONS.find((x) => x.sanction_id === req.params.id);
+  const q = s ? QUERIES.find((x) => x.employee_query_id === s.employee_query_id) : undefined;
+  if (!s || !q || !canSee(req.user!, q)) return { refused: notFound() };
+  if (s.status !== "pending_approval") return { refused: fail(409, "SANCTION_DECIDED", "This sanction was already decided") };
+  const a = approvalOf(q, req.user!);
+  if (!a?.can_decide) return { refused: fail(403, "NOT_YOUR_STAGE", "This is not waiting on you") };
+  return { s, q, a };
+}
+route("POST /api/v1/sanctions/:id/approve", (req) => {
+  const d = deciding(req);
+  if (d.refused) return d.refused;
+  const { s, q, a } = d;
+  if (a!.signs && !/^data:image\/png;base64,/.test(String((req.body as { signature?: string }).signature ?? "")))
+    return fail(422, "SIGNATURE_REQUIRED", "Sign in the box", { signature: ["Sign in the box"] });
+  const rank = STEPS.find((x) => x.consequence_step_id === s!.consequence_step_id)?.position ?? 1;
+  if (a!.stage === "operations_people" && rank >= 4) {
+    s!.waiting_on = "CEO";
+    return ok(s!);
+  }
+  const number = `SAN-${String(SANCTIONS.filter((x) => x.number).length + 1).padStart(4, "0")}`;
+  Object.assign(s!, { number, status: "issued", waiting_on: null, letter_document_id: sid(`sanltr:${q!.number}`), effective_on: isoDaysAgo(0) });
+  q!.sanction = { sanction_id: s!.sanction_id, number, step_name: s!.step_name, status: "issued" };
+  Object.assign(q!, { status: "resolved", outcome: "sanctioned", escalated: false, reviewed_at: now(), reviewed_by_name: s!.decided_by_name });
+  return ok(s!);
+});
+route("POST /api/v1/sanctions/:id/reject", (req) => {
+  const reason = String((req.body as { reason?: string }).reason ?? "").trim();
+  if (reason.length < 10) return invalid({ reason: ["Give the reason"] });
+  const d = deciding(req);
+  if (d.refused) return d.refused;
+  const { s, q } = d;
+  Object.assign(s!, { status: "rejected", waiting_on: null });
+  q!.sanction = { sanction_id: s!.sanction_id, number: null, step_name: s!.step_name, status: "rejected" };
+  Object.assign(q!, { status: "under_review", escalated: false });
+  return ok(s!);
 });
 
 /* ------------------------------------------------------------------ *

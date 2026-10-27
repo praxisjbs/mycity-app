@@ -312,13 +312,66 @@ async function settingsGrantsOf(db, roleIds) {
   return rows;
 }
 
-function insertUserRole(db, { userId, roleId, grantedBy }) {
+function insertUserRole(db, { userId, roleId, grantedBy, fromHeadship = false }) {
   return db.query(
-    `INSERT INTO user_role (user_id, role_id, granted_by)
-     VALUES ($1, $2, $3)
+    `INSERT INTO user_role (user_id, role_id, granted_by, from_headship)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (user_id, role_id, effective_from) DO NOTHING`,
-    [userId, roleId, grantedBy || null],
+    [userId, roleId, grantedBy || null, fromHeadship],
   );
+}
+
+/**
+ * Whether a login holds `capability` other than through a role headship gave: a role given by
+ * hand that carries it, or the capability given to them directly.
+ */
+const SETS_OTHERWISE = `(
+  EXISTS (SELECT 1 FROM user_role xr
+            JOIN role r ON r.role_id = xr.role_id AND r.active
+            JOIN role_capability rc ON rc.role_id = xr.role_id
+            JOIN capability c ON c.capability_id = rc.capability_id
+           WHERE xr.user_id = u.user_id AND NOT xr.from_headship AND c.code = $3
+             AND (xr.effective_to IS NULL OR xr.effective_to > CURRENT_DATE))
+  OR EXISTS (SELECT 1 FROM user_capability uc JOIN capability c ON c.capability_id = uc.capability_id
+              WHERE uc.user_id = u.user_id AND c.code = $3
+                AND (uc.expires_at IS NULL OR uc.expires_at > now())))`;
+
+/**
+ * The logins of the people who hold a post (organisation.syncHeadRoles), each with whether they
+ * hold the role now and whether they hold `capability` another way.
+ */
+async function headshipStates(db, employeeIds, roleId, capability) {
+  const { rows } = await db.query(
+    `SELECT u.user_id, u.employee_id, u.is_ceo,
+            EXISTS (SELECT 1 FROM user_role ur WHERE ur.user_id = u.user_id AND ur.role_id = $2
+                       AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE)) AS holds_role,
+            ${SETS_OTHERWISE} AS sets_otherwise
+       FROM app_user u
+      WHERE u.employee_id = ANY ($1::uuid[])
+      ORDER BY u.user_id`,
+    [employeeIds, roleId, capability],
+  );
+  return rows;
+}
+
+/**
+ * The role rows headship gave that should go: their login no longer belongs to someone who
+ * holds the post, belongs to the CEO, or holds `capability` another way.
+ */
+async function staleHeadshipRows(db, employeeIds, roleId, capability) {
+  const { rows } = await db.query(
+    `SELECT ur.user_role_id, ur.user_id
+       FROM user_role ur JOIN app_user u ON u.user_id = ur.user_id
+      WHERE ur.from_headship AND ur.role_id = $2
+        AND (u.employee_id IS NULL OR NOT (u.employee_id = ANY ($1::uuid[])) OR u.is_ceo OR ${SETS_OTHERWISE})
+      ORDER BY ur.user_id`,
+    [employeeIds, roleId, capability],
+  );
+  return rows;
+}
+
+function deleteUserRoles(db, userRoleIds) {
+  return db.query("DELETE FROM user_role WHERE user_role_id = ANY ($1::uuid[])", [userRoleIds]);
 }
 
 /** Remove the roles a person should no longer hold (not in `keepRoleIds`). */
@@ -403,6 +456,9 @@ module.exports = {
   settingsGrantsOf,
   insertUserRole,
   removeUserRolesExcept,
+  headshipStates,
+  staleHeadshipRows,
+  deleteUserRoles,
   requiresTwoStep,
   twoStepRoles,
   setTwoStepRoles,

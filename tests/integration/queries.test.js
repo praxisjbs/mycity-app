@@ -93,17 +93,18 @@ describeDb("queries and sanctions against the real migrations", () => {
       employment_type: "full_time",
       work_pattern: "on_site",
     });
-    const make = (key, first, last, role, job, department = "Programmes") =>
+    const make = (key, first, last, role, job, department = "Programmes", isCeo = false) =>
       tx(async (client) => {
         people[key] = await createAdmin(
           client,
-          { employee: sample(first, last, `${key}@mycity.test`, job, department), role_code: role, is_ceo: false },
+          { employee: sample(first, last, `${key}@mycity.test`, job, department), role_code: role, is_ceo: isCeo },
           PASSWORD,
           { allowAdditional: true },
         );
       });
     await make("ops", "Tunde", "Bakare", "operations_people", "Operations Lead", "Operations");
     await make("mgmt", "Ngozi", "Eze", "management", "General Manager", "Management");
+    await make("ceo", "Ada", "Okafor", "management", "Chief Executive Officer", "Management", true);
     await make("hod", "Ife", "Ojo", "head_of_department", "Head of Programmes");
     await make("manager", "Kemi", "Alade", "manager", "Programme Lead");
     await make("staff", "Musa", "Danjuma", "employee", "Field Officer");
@@ -140,21 +141,23 @@ describeDb("queries and sanctions against the real migrations", () => {
     const byKey = async (who, key) =>
       (await as(who).get("/letter-templates?sort=name")).body.data.find((t) => t.key === key);
 
-    test("the shipped letters are listed: the query letter ready, the sanction letters awaiting a sample", async () => {
+    test("the shipped letters are listed: all six ready, in MyCity's wording", async () => {
       const res = await as("manager").get("/letter-templates?sort=name");
       expect(res.status).toBe(200);
       expect(res.body.page.size).toBe(25);
       expect(Object.fromEntries(res.body.data.map((t) => [t.key, t.status]))).toEqual({
+        "caution-letter": "active",
         "query-letter": "active",
-        "question-letter": "awaiting_sample",
         "salary-deduction-letter": "active",
-        "suspension-letter": "awaiting_sample",
-        "suspension-without-pay-letter": "awaiting_sample",
-        "termination-letter": "awaiting_sample",
-        "warning-letter": "awaiting_sample",
+        "suspension-without-pay-letter": "active",
+        "termination-letter": "active",
+        "warning-letter": "active",
       });
       const summary = await as("manager").get("/letter-templates/summary");
-      expect(summary.body).toEqual({ templates: 7, active: 2, awaiting_sample: 5, sent_90d: 0 });
+      expect(summary.body).toEqual({ templates: 6, active: 6, awaiting_sample: 0, sent_90d: 0 });
+      // A letter added before its wording (a row People made, here by hand) waits for a sample.
+      await q("INSERT INTO letter_template (key, name, purpose, status) VALUES ('hearing-letter', 'Hearing Letter', 'sanction', 'draft'), ('panel-letter', 'Panel Letter', 'sanction', 'draft')");
+      expect((await byKey("manager", "hearing-letter")).status).toBe("awaiting_sample");
     });
 
     test("a template opens with its wording and the names a letter may use; the preview fills sample values", async () => {
@@ -174,8 +177,14 @@ describeDb("queries and sanctions against the real migrations", () => {
         { text: ",", filled: false },
       ]);
 
+      // MyCity's own wording (its WARNING sample), the record's facts filled in.
       const warning = await byKey("ops", "warning-letter");
-      const none = await as("ops").get(`/letter-templates/${warning.letter_template_id}/preview`);
+      const words = await as("ops").get(`/letter-templates/${warning.letter_template_id}/preview`);
+      expect(words.status).toBe(200);
+      expect(words.body.paragraphs.flat().map((r) => r.text).join("")).toContain("Management frowns at this");
+
+      const hearing = await byKey("ops", "hearing-letter");
+      const none = await as("ops").get(`/letter-templates/${hearing.letter_template_id}/preview`);
       expect(none.status).toBe(409);
       expect(none.body.error.code).toBe("TEMPLATE_AWAITING_SAMPLE");
     });
@@ -218,8 +227,8 @@ describeDb("queries and sanctions against the real migrations", () => {
     });
 
     test("a sample saved turns awaiting into a draft, a new version each time, and activation makes it usable", async () => {
-      const warning = await byKey("ops", "warning-letter");
-      const id = warning.letter_template_id;
+      const hearing = await byKey("ops", "hearing-letter");
+      const id = hearing.letter_template_id;
       expect((await as("ops").post(`/letter-templates/${id}/activate`)).status).toBe(409);
 
       const first = await as("ops").put(`/letter-templates/${id}/body`, {
@@ -310,7 +319,12 @@ describeDb("queries and sanctions against the real migrations", () => {
       });
       expect(res.body.employee.display_name).toBe("Musa Danjuma");
       expect(res.body.letter_document_id).toBeTruthy();
-      expect(new Date(res.body.response_due_at) - new Date(res.body.created_at)).toBeGreaterThan(47 * 3600 * 1000);
+      // MyCity's window: 24 hours (its handbook §4.7.1).
+      const window = new Date(res.body.response_due_at) - new Date(res.body.created_at);
+      expect(window).toBeGreaterThan(23.9 * 3600 * 1000);
+      expect(window).toBeLessThan(24.1 * 3600 * 1000);
+      expect(res.body.source).toBe("person");
+      expect(res.body.approval).toBeNull();
       ids.first = res.body.employee_query_id;
 
       await drain();
@@ -436,7 +450,7 @@ describeDb("queries and sanctions against the real migrations", () => {
     test("a decision needs edit; before the answer or the deadline it waits; the subject never decides", async () => {
       const close = { outcome: "no_action", reason: "The gate log shows the departure time." };
       expect((await as("manager").post(`/queries/${ids.first}/decision`, close)).status).toBe(403);
-      // HoD raised QRY-0002; Zainab has not answered and the 48 hours are not over.
+      // HoD raised QRY-0002; Zainab has not answered and the 24 hours are not over.
       const early = await as("hod").post(`/queries/${ids.hod}/decision`, close);
       expect(early.status).toBe(409);
       expect(early.body.error.code).toBe("QUERY_NOT_DECIDABLE");
@@ -468,15 +482,6 @@ describeDb("queries and sanctions against the real migrations", () => {
 
   describe("the chain and sanctions", () => {
     const steps = {};
-    const letterId = async (key) =>
-      (await as("ops").get("/letter-templates?sort=name")).body.data.find((t) => t.key === key).letter_template_id;
-    const ready = async (key) => {
-      const id = await letterId(key);
-      await as("ops").put(`/letter-templates/${id}/body`, {
-        body: `Dear {{ employee.first_name }}, following query {{ query_number }}: {{ step_name }}. {{ reason }}`,
-      });
-      await as("ops").post(`/letter-templates/${id}/activate`);
-    };
     const chain = async () => (await as("ops").get("/sanctions/chain?sort=position")).body.data.map((r) => [r.position, r.name]);
 
     /** HoD raises a query on Zainab, she answers, and it waits for a decision. */
@@ -500,31 +505,33 @@ describeDb("queries and sanctions against the real migrations", () => {
         outcome: "sanction",
         consequence_step_id: steps[step],
         reason: "The explanation does not account for the incident.",
-        signature: SIGNATURE,
         ...extra,
       });
-    const approve = async (who, instanceId) => {
-      const res = await as(who).post(`/workflow/instances/${instanceId}/approve`, {});
+    /** Approve on the query's card: Operations & People sign it; the CEO's stage has no signature. */
+    const approve = async (who, queryId, body = { signature: SIGNATURE }) => {
+      const card = (await as(who).get(`/queries/${queryId}`)).body;
+      const res = await as(who).post(`/sanctions/${card.sanction.sanction_id}/approve`, body);
       expect(res.status).toBe(200);
       await drain();
+      return res;
     };
 
     test("the chain starts empty; only queries.configure adds a rung", async () => {
       expect(await chain()).toEqual([]);
-      const refused = await as("manager").post("/sanctions/chain", { name: "Warning" });
+      const refused = await as("manager").post("/sanctions/chain", { name: "Caution" });
       expect(refused.status).toBe(403);
     });
 
     test("People build the ladder; a rung inserted at a position moves the ones below", async () => {
-      await ready("question-letter");
-      // MyCity's order (GE, 26/10/2026): the Warning, then the Question.
+      // MyCity's ladder in MILESTONES' order, each letter ready in its own wording.
       for (const [name, body] of [
+        ["Caution", { letter_template: "caution-letter", valid_days: 365 }],
         ["Warning", { letter_template: "warning-letter", valid_days: 365 }],
-        ["Question", { letter_template: "question-letter" }],
-        ["Suspension", { letter_template: "suspension-letter", financial_effect: "unpaid_days", default_days: 3 }],
+        ["Suspension Without Pay", { letter_template: "suspension-without-pay-letter", financial_effect: "unpaid_days", default_days: 3 }],
       ]) {
         const res = await as("ops").post("/sanctions/chain", { name, ...body });
         expect(res.status).toBe(201);
+        expect(res.body.letter_ready).toBe(true);
         steps[name] = res.body.consequence_step_id;
       }
       const second = await as("ops").post("/sanctions/chain", {
@@ -536,78 +543,89 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(second.body).toMatchObject({ code: "second_warning", position: 3, letter_ready: true });
       steps["Second Warning"] = second.body.consequence_step_id;
       expect(await chain()).toEqual([
-        [1, "Warning"],
-        [2, "Question"],
+        [1, "Caution"],
+        [2, "Warning"],
         [3, "Second Warning"],
-        [4, "Suspension"],
+        [4, "Suspension Without Pay"],
       ]);
 
-      const moved = await as("ops").patch(`/sanctions/chain/${steps.Suspension}`, { position: 1 });
+      const moved = await as("ops").patch(`/sanctions/chain/${steps["Suspension Without Pay"]}`, { position: 1 });
       expect(moved.body.position).toBe(1);
-      expect((await chain()).map((r) => r[1])).toEqual(["Suspension", "Warning", "Question", "Second Warning"]);
-      await as("ops").patch(`/sanctions/chain/${steps.Suspension}`, { position: 4 });
-      expect((await chain()).map((r) => r[1])).toEqual(["Warning", "Question", "Second Warning", "Suspension"]);
+      expect((await chain()).map((r) => r[1])).toEqual(["Suspension Without Pay", "Caution", "Warning", "Second Warning"]);
+      await as("ops").patch(`/sanctions/chain/${steps["Suspension Without Pay"]}`, { position: 4 });
+      expect((await chain()).map((r) => r[1])).toEqual(["Caution", "Warning", "Second Warning", "Suspension Without Pay"]);
 
       const bad = await as("ops").post("/sanctions/chain", { name: "Odd", letter_template: "query-letter" });
       expect(bad.status).toBe(422);
     });
 
-    test("a first offence is offered the first rung; proposed, it waits for Operations & People", async () => {
+    test("a first offence is offered the first rung; proposed unsigned, Operations & People sign it to let it stand", async () => {
       const id = await answered("Damaged the site generator");
       const card = await as("hod").get(`/queries/${id}`);
-      expect(card.body.next_step).toMatchObject({ name: "Warning", position: 1 });
+      expect(card.body.next_step).toMatchObject({ name: "Caution", position: 1 });
       expect(card.body.can_decide).toBe(true);
 
-      const res = await propose(id, "Warning");
+      // Nobody signs a proposal: a signature sent with it is refused by the contract.
+      const signed = await propose(id, "Caution", { signature: SIGNATURE });
+      expect(signed.status).toBe(422);
+      const res = await propose(id, "Caution");
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ status: "under_review", escalated: true, can_decide: false });
-      expect(res.body.sanction).toMatchObject({ step_name: "Warning", status: "pending_approval", number: null });
-      expect((await propose(id, "Warning")).status).toBe(409);
+      expect(res.body.sanction).toMatchObject({ step_name: "Caution", status: "pending_approval", number: null });
+      expect((await propose(id, "Caution")).status).toBe(409);
 
-      // The proposer never approves it; Operations & People do.
-      const instance = res.body.workflow_instance_id;
-      expect((await as("hod").post(`/workflow/instances/${instance}/approve`, {})).status).not.toBe(200);
-      await approve("ops", instance);
+      // The card says who it waits on: the proposer may not decide it, Operations & People may, and sign.
+      expect(res.body.approval).toEqual({ stage: "operations_people", stage_name: "Operations & People", can_decide: false, signs: true });
+      const opsCard = (await as("ops").get(`/queries/${id}`)).body;
+      expect(opsCard.approval).toEqual({ stage: "operations_people", stage_name: "Operations & People", can_decide: true, signs: true });
+      expect((await as("hod").post(`/sanctions/${opsCard.sanction.sanction_id}/approve`, { signature: SIGNATURE })).status).not.toBe(200);
+      const unsigned = await as("ops").post(`/sanctions/${opsCard.sanction.sanction_id}/approve`, {});
+      expect(unsigned.status).toBe(422);
+      expect(unsigned.body.error.code).toBe("SIGNATURE_REQUIRED");
+      await approve("ops", id);
 
       const after = await as("hod").get(`/queries/${id}`);
-      expect(after.body).toMatchObject({ status: "resolved", outcome: "sanctioned", escalated: false });
+      expect(after.body).toMatchObject({ status: "resolved", outcome: "sanctioned", escalated: false, approval: null });
       expect(after.body.sanction).toMatchObject({ number: "SAN-0001", status: "issued" });
       const issued = await as("ops").get(`/sanctions/${after.body.sanction.sanction_id}`);
-      expect(issued.body).toMatchObject({ step_name: "Warning", status: "issued", sanction_type: "warning", fine_letter_document_id: null });
+      expect(issued.body).toMatchObject({ step_name: "Caution", status: "issued", sanction_type: "caution", fine_letter_document_id: null });
       expect(issued.body.letter_document_id).toBeTruthy();
+      const kept = (await q("SELECT signed_by FROM sanction WHERE sanction_id = $1", [issued.body.sanction_id])).rows[0];
+      expect(kept.signed_by).toBe(people.ops.user.user_id);
 
       const mine = await as("other").get("/ess/sanctions");
-      expect(mine.body.data.map((r) => [r.number, r.step_name])).toEqual([["SAN-0001", "Warning"]]);
+      expect(mine.body.data.map((r) => [r.number, r.step_name])).toEqual([["SAN-0001", "Caution"]]);
       const told = await q("SELECT count(*)::int AS n FROM notification WHERE user_id = $1 AND event_key = 'sanction.issued'", [
         people.other.user.user_id,
       ]);
       expect(told.rows[0].n).toBe(1);
     });
 
-    test("the sanction letter renders from its rung's template and is emailed with the PDF", async () => {
+    test("the sanction letter is MyCity's wording, signed by Operations & People, and emailed with the PDF", async () => {
       const list = await as("ops").get("/sanctions");
       const docId = (await as("ops").get(`/sanctions/${list.body.data[0].sanction_id}`)).body.letter_document_id;
       const html = (await q("SELECT render_html FROM document WHERE document_id = $1", [docId])).rows[0].render_html;
-      expect(html).toContain("Dear Zainab, following query");
-      expect(html).toContain("this is a written warning: The explanation does not account for the incident.");
-      // Signed by its proposer (guide §6.4), with the signature they drew.
-      expect(html).toContain('alt="Signature of');
+      expect(html).toContain("Dear Zainab,");
+      expect(html).toContain("you are hereby advised to improve immediately");
+      expect(html).toContain("The explanation does not account for the incident.");
+      // Signed by the approver who let it stand (guide §6.4), with the signature they drew.
+      expect(html).toContain('alt="Signature of Tunde Bakare"');
       await documents.renderPending(docId, { db: pool });
       sent.length = 0;
       await drain();
       expect(sent.find((j) => j.name === "sanction-issued").data).toMatchObject({
         to: { email: "other@mycity.test" },
-        data: { sanction_number: "SAN-0001", step_name: "Warning", fine_amount: null },
+        data: { sanction_number: "SAN-0001", step_name: "Caution", fine_amount: null },
         attachments: [{ document_id: docId }],
       });
     });
 
     test("a second offence offers the next rung without code; a fine waits, pending, for payroll", async () => {
       const id = await answered("Damaged the site generator again");
-      expect((await as("hod").get(`/queries/${id}`)).body.next_step.name).toBe("Question");
-      const res = await propose(id, "Question", { fine_amount: "15000.00" });
+      expect((await as("hod").get(`/queries/${id}`)).body.next_step.name).toBe("Warning");
+      const res = await propose(id, "Warning", { fine_amount: "15000.00" });
       expect(res.status).toBe(200);
-      await approve("ops", res.body.workflow_instance_id);
+      await approve("ops", id);
 
       // A fine sends the Salary Deduction letter beside the rung's, the amount in the house format,
       // and both leave in one email once both PDFs exist.
@@ -624,7 +642,7 @@ describeDb("queries and sanctions against the real migrations", () => {
       await drain();
       const mail = sent.filter((j) => j.name === "sanction-issued");
       expect(mail).toHaveLength(1);
-      expect(mail[0].data.data).toMatchObject({ step_name: "Question", fine_amount: "15000.00" });
+      expect(mail[0].data.data).toMatchObject({ step_name: "Warning", fine_amount: "15000.00" });
       expect(mail[0].data.attachments).toEqual([{ document_id: issued.letter_document_id }, { document_id: issued.fine_letter_document_id }]);
 
       const fines = await require("../../src/modules/sanctions/sanctions.fines").pending();
@@ -634,38 +652,54 @@ describeDb("queries and sanctions against the real migrations", () => {
       const summary = await as("ops").get("/sanctions/summary");
       expect(summary.body).toMatchObject({ active: 2, pending_approval: 0, fines_this_year: "15000.00", fines_recovered: "0.00" });
       const standing = await as("ops").get(`/sanctions/standing?employee_id=${people.other.employee.employee_id}`);
-      expect(standing.body.in_force.map((r) => r.step_name)).toEqual(["Question", "Warning"]);
+      expect(standing.body.in_force.map((r) => r.step_name)).toEqual(["Warning", "Caution"]);
       expect(standing.body.next_step.name).toBe("Second Warning");
     });
 
-    test("a refusal sends the query back under review; a rung whose letter waits for a sample is not offered", async () => {
+    test("a refusal on the card sends the query back under review; a rung whose letter waits for a sample is not offered", async () => {
       const id = await answered("Left the site unattended");
-      const res = await propose(id, "Second Warning");
-      const reject = await as("ops").post(`/workflow/instances/${res.body.workflow_instance_id}/reject`, {
+      await propose(id, "Second Warning");
+      const card = (await as("ops").get(`/queries/${id}`)).body;
+      const short = await as("ops").post(`/sanctions/${card.sanction.sanction_id}/reject`, { reason: "Too much" });
+      expect(short.status).toBe(422);
+      const reject = await as("ops").post(`/sanctions/${card.sanction.sanction_id}/reject`, {
         reason: "A second warning is too much for this.",
       });
       expect(reject.status).toBe(200);
+      // The approval's end settles the sanction after commit, as every approval's does.
       await drain();
       const back = await as("hod").get(`/queries/${id}`);
-      expect(back.body).toMatchObject({ status: "under_review", escalated: false, can_decide: true });
+      expect(back.body).toMatchObject({ status: "under_review", escalated: false, can_decide: true, approval: null });
       expect(back.body.sanction).toMatchObject({ status: "rejected" });
+      expect((await as("ops").post(`/sanctions/${card.sanction.sanction_id}/approve`, { signature: SIGNATURE })).status).toBe(409);
 
-      const noLetter = await propose(id, "Suspension");
+      // A rung whose letter has no wording yet is offered to nobody.
+      const panel = await as("ops").post("/sanctions/chain", { name: "Disciplinary Panel", letter_template: "panel-letter" });
+      expect(panel.body.letter_ready).toBe(false);
+      steps["Disciplinary Panel"] = panel.body.consequence_step_id;
+      const noLetter = await propose(id, "Disciplinary Panel");
       expect(noLetter.status).toBe(422);
       expect(noLetter.body.error.code).toBe("LETTER_NOT_READY");
+      await as("ops").patch(`/sanctions/chain/${steps["Disciplinary Panel"]}`, { active: false });
     });
 
-    test("Suspension and above also need Management; its days follow the rung", async () => {
-      await ready("suspension-letter");
+    test("Suspension Without Pay also needs the CEO, who does not sign; its days follow the rung", async () => {
       const id = await answered("Left the site unattended again");
-      const res = await propose(id, "Suspension");
+      const res = await propose(id, "Suspension Without Pay");
       expect(res.status).toBe(200);
-      await approve("ops", res.body.workflow_instance_id);
-      expect((await as("hod").get(`/queries/${id}`)).body.sanction.status).toBe("pending_approval");
-      await approve("mgmt", res.body.workflow_instance_id);
+      await approve("ops", id);
+      const waiting = (await as("ceo").get(`/queries/${id}`)).body;
+      expect(waiting.sanction.status).toBe("pending_approval");
+      expect(waiting.approval).toEqual({ stage: "ceo", stage_name: "CEO", can_decide: true, signs: false });
+      // Management no longer approve sanctions; the CEO does (MyCity's handbook §4.7.4).
+      expect((await as("mgmt").get(`/queries/${id}`)).body.approval.can_decide).toBe(false);
+      await approve("ceo", id, {});
       const sanction = await as("ops").get(`/sanctions/${(await as("hod").get(`/queries/${id}`)).body.sanction.sanction_id}`);
       expect(sanction.body.status).toBe("issued");
       expect(lagosDays(sanction.body.effective_on, sanction.body.ends_on)).toBe(3);
+      const html = (await q("SELECT render_html FROM document WHERE document_id = $1", [sanction.body.letter_document_id])).rows[0].render_html;
+      expect(html).toContain("suspended from duty without pay for 3 days");
+      expect(html).toContain('alt="Signature of Tunde Bakare"');
     });
 
     test("sanctions follow their query's visibility; a standing is People's alone", async () => {
@@ -687,34 +721,36 @@ describeDb("queries and sanctions against the real migrations", () => {
     const today = lagos.today();
     const day = (n) => lagos.addDays(today, -n);
     const rules = {};
-    const late = (who, date, minutes) =>
-      q(
-        `INSERT INTO attendance_day (employee_id, attendance_date, status, late_minutes)
-         VALUES ($1, $2, 'late', $3)
-         ON CONFLICT (employee_id, attendance_date) DO UPDATE SET status = 'late', late_minutes = EXCLUDED.late_minutes`,
-        [people[who].employee.employee_id, date, minutes],
+    /** A punch from a device not on the person's list, as attendance records it: the day and its exception. */
+    const strangeDevice = async (who, date) => {
+      const d = await q(
+        `INSERT INTO attendance_day (employee_id, attendance_date, status) VALUES ($1, $2, 'present')
+         ON CONFLICT (employee_id, attendance_date) DO UPDATE SET status = attendance_day.status
+         RETURNING attendance_day_id`,
+        [people[who].employee.employee_id, date],
       );
+      await q("INSERT INTO attendance_exception (attendance_day_id, exception_type, severity) VALUES ($1, 'unknown_device', 'medium')", [
+        d.rows[0].attendance_day_id,
+      ]);
+    };
     const evaluate = (who, date) =>
-      evaluator.evaluate({ sources: ["lateness"], employee_id: people[who].employee.employee_id, date });
+      evaluator.evaluate({ sources: ["unenrolled_device"], employee_id: people[who].employee.employee_id, date });
     const ruleQueries = async (ruleId) =>
       (await q("SELECT employee_query_id FROM employee_query WHERE query_rule_id = $1", [ruleId])).rows;
 
-    test("People write rules, saved as drafts; a manager cannot; a trigger not counted yet stays a draft", async () => {
-      const body = { name: "Repeated Lateness", source_event: "lateness", threshold: 3, window_days: 30 };
+    test("People write rules, saved as drafts; a manager cannot; lateness is the Attendance policy's; a trigger not counted yet stays a draft", async () => {
+      const body = { name: "Unknown Phones", source_event: "unenrolled_device", threshold: 3, window_days: 30 };
       expect((await as("manager").post("/query-rules", body)).status).toBe(403);
       const res = await as("ops").post("/query-rules", body);
       expect(res.status).toBe(201);
-      expect(res.body).toMatchObject({ code: "repeated_lateness", state: "draft", active: false, measure: "count" });
-      rules.lateness = res.body.query_rule_id;
+      expect(res.body).toMatchObject({ code: "unknown_phones", state: "draft", active: false, measure: "count" });
+      rules.device = res.body.query_rule_id;
 
-      const minutesOnAbsence = await as("ops").post("/query-rules", {
-        name: "Absent Minutes",
-        source_event: "absence",
-        measure: "minutes",
-        threshold: 300,
-        window_days: 30,
-      });
-      expect(minutesOnAbsence.status).toBe(422);
+      // Late arrivals, absences and missing clock-outs raise their query from the Attendance policy.
+      for (const source of ["lateness", "absence", "missing_clock_out"]) {
+        const refused = await as("ops").post("/query-rules", { name: "Attendance Again", source_event: source, threshold: 3, window_days: 30 });
+        expect(refused.status).toBe(422);
+      }
 
       const tasks = await as("ops").post("/query-rules", { name: "Missed Targets", source_event: "missed_target", threshold: 2, window_days: 7 });
       const refused = await as("ops").post(`/query-rules/${tasks.body.query_rule_id}/activate`);
@@ -723,116 +759,146 @@ describeDb("queries and sanctions against the real migrations", () => {
     });
 
     test("a draft counts nothing; switched on, it counts from then, never back", async () => {
-      await late("staff", day(6), 10);
+      await strangeDevice("staff", day(6));
       expect((await evaluate("staff", day(6))).raised).toEqual([]);
-      const on = await as("ops").post(`/query-rules/${rules.lateness}/activate`);
+      const on = await as("ops").post(`/query-rules/${rules.device}/activate`);
       expect(on.body).toMatchObject({ state: "active", active: true });
-      // Switched on today: the late day before it does not count.
+      // Switched on today: the day before it does not count.
       expect((await evaluate("staff", day(6))).raised).toEqual([]);
       // For the rest of the test the rule was switched on a week ago.
-      await q("UPDATE query_rule SET activated_at = $2 WHERE query_rule_id = $1", [rules.lateness, lagos.startOfDay(day(5))]);
+      await q("UPDATE query_rule SET activated_at = $2 WHERE query_rule_id = $1", [rules.device, lagos.startOfDay(day(5))]);
     });
 
-    test("three late arrivals in thirty days raise exactly one query, not three", async () => {
-      await late("staff", day(5), 12);
+    test("three offences in thirty days raise exactly one query, not three", async () => {
+      await strangeDevice("staff", day(5));
       expect((await evaluate("staff", day(5))).raised).toEqual([]);
-      await late("staff", day(3), 25);
+      await strangeDevice("staff", day(3));
       expect((await evaluate("staff", day(3))).raised).toEqual([]);
-      await late("staff", day(1), 7);
+      await strangeDevice("staff", day(1));
       const third = await evaluate("staff", day(1));
       expect(third.raised).toHaveLength(1);
 
-      // The event delivered again, and a fourth late day: still one query.
+      // The event delivered again, and a fourth day: still one query.
       expect((await evaluate("staff", day(1))).raised).toEqual([]);
-      await late("staff", day(0), 9);
+      await strangeDevice("staff", day(0));
       expect((await evaluate("staff", day(0))).raised).toEqual([]);
-      expect(await ruleQueries(rules.lateness)).toHaveLength(1);
+      expect(await ruleQueries(rules.device)).toHaveLength(1);
 
       const id = third.raised[0];
       const query = await as("ops").get(`/queries/${id}`);
       expect(query.body).toMatchObject({
-        subject: "Repeated Lateness",
+        subject: "Unknown Phones",
         raised_by: null,
-        rule_name: "Repeated Lateness",
+        source: "rule",
+        rule_name: "Unknown Phones",
         status: "awaiting_response",
       });
       expect(query.body.evidence.map((e) => e.date)).toEqual([day(5), day(3), day(1)]);
-      expect(query.body.evidence[0].label).toBe("Late arrival, 12 minutes");
       expect(query.body.details).toContain("(3 in 30 days)");
       expect(query.body.letter_document_id).toBeTruthy();
     });
 
     test("a rule's query is People's to see: not the manager's, though the person is on their team", async () => {
-      const [{ employee_query_id: id }] = await ruleQueries(rules.lateness);
+      const [{ employee_query_id: id }] = await ruleQueries(rules.device);
       expect((await as("manager").get(`/queries/${id}`)).status).toBe(404);
       expect((await as("manager").get("/query-rules/firings")).body.page.total).toBe(0);
       const firings = await as("ops").get("/query-rules/firings");
-      expect(firings.body.data.map((f) => [f.rule_name, f.employee.display_name])).toEqual([["Repeated Lateness", "Musa Danjuma"]]);
+      expect(firings.body.data.map((f) => [f.rule_name, f.employee.display_name])).toEqual([["Unknown Phones", "Musa Danjuma"]]);
       const summary = await as("ops").get("/query-rules/summary");
       expect(summary.body).toMatchObject({ active: 1, draft: 1, queries_raised: 1 });
-      const list = await as("manager").get("/query-rules?sort=name");
-      expect(list.body.data.find((r) => r.code === "repeated_lateness").fired_this_month).toBeGreaterThanOrEqual(0);
     });
 
-    test("late minutes summed: five hours in a month is a setting too", async () => {
-      const res = await as("ops").post("/query-rules", {
-        name: "Late Hours",
-        source_event: "lateness",
-        measure: "minutes",
-        threshold: 300,
-        window_days: 31,
-      });
-      rules.minutes = res.body.query_rule_id;
-      await as("ops").post(`/query-rules/${rules.minutes}/activate`);
-      await q("UPDATE query_rule SET activated_at = $2 WHERE query_rule_id = $1", [rules.minutes, lagos.startOfDay(day(5))]);
-      await late("other", day(4), 200);
-      expect((await evaluate("other", day(4))).raised).toEqual([]);
-      await late("other", day(2), 110);
-      const breach = await evaluate("other", day(2));
-      expect(breach.raised).toHaveLength(1);
-      const query = await as("ops").get(`/queries/${breach.raised[0]}`);
-      expect(query.body.details).toContain("310 late minutes in 31 days");
-    });
-
-    test("once it has fired, a rule's trigger is fixed; it is paused, never deleted", async () => {
-      const change = await as("ops").patch(`/query-rules/${rules.lateness}`, { source_event: "absence" });
+    test("Edit Rule changes the threshold and window; once it has fired, its trigger is fixed; it is paused, never deleted", async () => {
+      const change = await as("ops").patch(`/query-rules/${rules.device}`, { source_event: "overdue_task" });
       expect(change.status).toBe(409);
-      const threshold = await as("ops").patch(`/query-rules/${rules.lateness}`, { threshold: 4 });
-      expect(threshold.body.threshold).toBe(4);
-      const off = await as("ops").post(`/query-rules/${rules.lateness}/pause`);
+      const edited = await as("ops").patch(`/query-rules/${rules.device}`, { name: "Unregistered Phones", threshold: 4, window_days: 14 });
+      expect(edited.body).toMatchObject({ name: "Unregistered Phones", threshold: 4, window_days: 14 });
+      const off = await as("ops").post(`/query-rules/${rules.device}/pause`);
       expect(off.body.state).toBe("paused");
-      await late("staff", day(-1), 30);
+      await strangeDevice("staff", day(-1));
       expect((await evaluate("staff", day(-1))).raised).toEqual([]);
     });
 
-    test("an attendance event becomes the evaluation job for the person and day", async () => {
+    test("an attendance event becomes the evaluation job only for what Rules counts", async () => {
       const { jobOf } = require("../../src/modules/query_rules/query_rules.events");
       const who = people.staff.employee.employee_id;
       const job = (key, payload) => jobOf({ key, payload: { employee_id: who, work_date: today, ...payload } });
-      expect(job("attendance.punched", { event_type: "clock_in" })).toEqual({ sources: ["lateness"], employee_id: who, date: today });
-      expect(job("attendance.punched", { event_type: "clock_out" })).toBeNull();
-      expect(job("attendance.day_closed", { status: "absent" }).sources).toEqual(["absence"]);
-      expect(job("attendance.day_closed", { status: "present" })).toBeNull();
-      expect(job("attendance.review_required", { types: ["unknown_device", "missing_clock_out"] }).sources).toEqual([
-        "missing_clock_out",
-        "unenrolled_device",
-      ]);
+      expect(job("attendance.punched", { event_type: "clock_in" })).toBeNull();
+      expect(job("attendance.day_closed", { status: "absent" })).toBeNull();
+      expect(job("attendance.review_required", { types: ["unknown_device", "missing_clock_out"] })).toEqual({
+        sources: ["unenrolled_device"],
+        employee_id: who,
+        date: today,
+      });
 
-      // Through the outbox: a committed late clock-in queues the job, once.
+      // Through the outbox: a committed review_required queues the job, once.
       sent.length = 0;
       await tx((client) =>
         require("../../src/shared/events/emit").emit(client, {
-          key: "attendance.punched",
-          entity: { type: "attendance_event", id: "00000000-0000-4000-8000-000000000001" },
+          key: "attendance.review_required",
+          entity: { type: "attendance_day", id: "00000000-0000-4000-8000-000000000001" },
           actor: null,
-          payload: { employee_id: who, subject_employee_id: who, event_type: "clock_in", work_date: today, result: "accepted" },
+          payload: { employee_id: who, subject_employee_id: who, work_date: today, types: ["unknown_device"] },
         }),
       );
       await drain();
       await drain();
       expect(sent.filter((j) => j.queue === "query-rule-evaluate").map((j) => j.data)).toEqual([
-        { sources: ["lateness"], employee_id: who, date: today },
+        { sources: ["unenrolled_device"], employee_id: who, date: today },
       ]);
+    });
+
+    test("an Attendance policy breach with Raise Query raises exactly one query, linked back on the breach", async () => {
+      const who = people.other.employee.employee_id;
+      const policyVersion = (await q("SELECT v.policy_version_id FROM policy_version v JOIN policy p ON p.policy_id = v.policy_id WHERE p.kind = 'attendance' ORDER BY v.version DESC LIMIT 1")).rows[0];
+      const breach = async (lastDay, raiseQuery) => {
+        const { rows } = await q(
+          `INSERT INTO attendance_rule_breach (employee_id, rule, policy_version_id, period, period_start, period_end, count, minutes,
+                                               reached, days, last_day, alert, raise_query)
+           VALUES ($1, 'late', $2, 'month', $3::date, $3::date, 3, 41, 'count', $4::date[], $3::date, false, $5)
+           RETURNING attendance_rule_breach_id`,
+          [who, policyVersion ? policyVersion.policy_version_id : null, lastDay, [day(9), day(8), lastDay], raiseQuery],
+        );
+        const id = rows[0].attendance_rule_breach_id;
+        await tx((client) =>
+          require("../../src/shared/events/emit").emit(client, {
+            key: "attendance.rule_breached",
+            entity: { type: "attendance_rule_breach", id },
+            actor: null,
+            payload: { attendance_rule_breach_id: id, employee_id: who, subject_employee_id: who, rule: "late", alert: false, raise_query: raiseQuery },
+            dedup_key: `attendance-breach:${id}`,
+          }),
+        );
+        await drain();
+        return id;
+      };
+      const quiet = await breach(day(7), false);
+      expect((await q("SELECT employee_query_id FROM attendance_rule_breach WHERE attendance_rule_breach_id = $1", [quiet])).rows[0].employee_query_id).toBeNull();
+
+      const id = await breach(day(6), true);
+      const linked = (await q("SELECT employee_query_id FROM attendance_rule_breach WHERE attendance_rule_breach_id = $1", [id])).rows[0].employee_query_id;
+      expect(linked).toBeTruthy();
+      const query = await as("ops").get(`/queries/${linked}`);
+      expect(query.body).toMatchObject({
+        source: "attendance",
+        rule_name: "Attendance Policy",
+        raised_by: null,
+        subject: "3 late arrivals this month",
+        status: "awaiting_response",
+      });
+      expect(query.body.evidence.map((e) => [e.label, e.date])).toEqual([
+        ["Late arrival", day(9)],
+        ["Late arrival", day(8)],
+        ["Late arrival", day(6)],
+      ]);
+      // Seen as a rule's query is: People, not the person's manager.
+      expect((await as("manager").get(`/queries/${linked}`)).status).toBe(404);
+      // Delivered again: still one.
+      await q("UPDATE event_outbox SET status = 'pending', completed_handlers = '{}', next_attempt_at = now() WHERE event_key = 'attendance.rule_breached'");
+      await drain();
+      expect((await q("SELECT count(*)::int AS n FROM employee_query WHERE source = 'attendance'")).rows[0].n).toBe(1);
+      const reasons = (await as("ops").get("/queries/summary")).body.by_reason.map((r) => r.label);
+      expect(reasons).toContain("Attendance Policy");
     });
 
     test("overdue tasks count on their due day: open past it or done late; cancelled and on time never", async () => {
@@ -1028,14 +1094,26 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(mine.body.data.find((r) => r.employee_query_id === res.body.employee_query_id).policy).toMatchObject({ number: "POL-0901" });
     });
 
-    test("a rule names the policy it enforces; one not in force is refused", async () => {
-      const rule = { name: "Punctuality", source_event: "lateness", threshold: 3, window_days: 30 };
+    test("a rule names the policy it enforces and the clause its letters quote; one not in force is refused", async () => {
+      const rule = { name: "Late Deliveries", source_event: "overdue_task", threshold: 3, window_days: 30 };
       expect((await as("ops").post("/query-rules", { ...rule, policy_id: policy.draft })).body.error.code).toBe("POLICY_NOT_IN_FORCE");
-      const res = await as("ops").post("/query-rules", { ...rule, policy_id: policy.live });
+      // A clause without a policy quotes nothing, so none is kept.
+      const bare = await as("ops").post("/query-rules", { ...rule, name: "Late Deliveries Bare", policy_clause: "Deliver on the day." });
+      expect(bare.body.policy_clause).toBeNull();
+      const tooLong = await as("ops").post("/query-rules", { ...rule, name: "Late Deliveries Long", policy_id: policy.live, policy_clause: "x".repeat(301) });
+      expect(tooLong.status).toBe(422);
+      const res = await as("ops").post("/query-rules", { ...rule, policy_id: policy.live, policy_clause: "Staff clock in by 09:00." });
       expect(res.status).toBe(201);
       expect(res.body.policy).toEqual({ policy_id: policy.live, number: "POL-0901", title: "Attendance and Punctuality" });
+      expect(res.body.policy_clause).toBe("Staff clock in by 09:00.");
+      const edited = await as("ops").patch(`/query-rules/${res.body.query_rule_id}`, { policy_clause: "Deliveries go out the same day." });
+      expect(edited.body.policy_clause).toBe("Deliveries go out the same day.");
+      const blank = await as("ops").patch(`/query-rules/${res.body.query_rule_id}`, { policy_clause: "" });
+      expect(blank.body.policy_clause).toBeNull();
+      await as("ops").patch(`/query-rules/${res.body.query_rule_id}`, { policy_clause: "Deliveries go out the same day." });
       const cleared = await as("ops").patch(`/query-rules/${res.body.query_rule_id}`, { policy_id: null });
       expect(cleared.body.policy).toBeNull();
+      expect(cleared.body.policy_clause).toBeNull();
     });
   });
 });

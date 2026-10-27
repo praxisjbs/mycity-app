@@ -20,7 +20,8 @@ const ROWS = `
          ${personJson("e", "d")} AS employee,
          q.employee_id, q.subject, q.details, q.evidence,
          q.raised_by, ${NAME("re")} AS raised_by_name,
-         q.query_rule_id, r.name AS rule_name,
+         q.source, q.query_rule_id,
+         COALESCE(r.name, CASE WHEN q.source = 'attendance' THEN 'Attendance Policy' END) AS rule_name,
          q.status, q.outcome,
          EXISTS (SELECT 1 FROM sanction s WHERE s.employee_query_id = q.employee_query_id
                   AND s.status = 'pending_approval') AS escalated,
@@ -49,7 +50,7 @@ const ROWS = `
 
 /** The keys of Query. */
 const LIST_OUT = `v.employee_query_id, v.number, v.employee, v.subject, v.raised_by, v.raised_by_name,
-  v.query_rule_id, v.rule_name, v.status, v.outcome, v.escalated, v.response_due_at, v.responded_at,
+  v.source, v.query_rule_id, v.rule_name, v.status, v.outcome, v.escalated, v.response_due_at, v.responded_at,
   v.created_at`;
 
 /** Everything get() hands the service: QueryDetail's keys and the ids the checks need. */
@@ -66,7 +67,8 @@ const SORTS = {
 /**
  * One page of queries the reader may see.
  * @param {{status?: string, employee_id?: string, raised?: "mine"|"rules", q?: string,
- *          page?: number, sort?: object}} query
+ *          raised_since?: string, raised_before?: string, page?: number, sort?: object}} query
+ *   raised_since and raised_before are instants (the service turns a Lagos day into one)
  * @param {{all: boolean, user_id: string}} reader
  */
 function list(db, query, reader) {
@@ -76,6 +78,8 @@ function list(db, query, reader) {
     query.raised === "mine" ? reader.user_id : null,
     query.raised === "rules",
     query.q || null,
+    query.raised_since || null,
+    query.raised_before || null,
   ];
   const v = visibility.clause(reader, params, "v.raised_by");
   return pageQuery(
@@ -85,8 +89,10 @@ function list(db, query, reader) {
       WHERE ($1::text IS NULL OR v.status = $1)
         AND ($2::uuid IS NULL OR v.employee_id = $2)
         AND ($3::uuid IS NULL OR v.raised_by = $3)
-        AND (NOT $4::boolean OR v.query_rule_id IS NOT NULL)
+        AND (NOT $4::boolean OR v.source <> 'person')
         AND ($5::text IS NULL OR v.haystack LIKE '%' || search_fold($5) || '%')
+        AND ($6::timestamptz IS NULL OR v.created_at >= $6)
+        AND ($7::timestamptz IS NULL OR v.created_at < $7)
         ${v.and}
       ORDER BY ${orderBy(query, SORTS, "v.employee_query_id")}`,
     params,
@@ -117,8 +123,8 @@ async function insert(db, row) {
   const { rows } = await db.query(
     `INSERT INTO employee_query
        (number, employee_id, query_rule_id, raised_by, subject, details, evidence, status, response_due_at, dedup_key,
-        policy_version_id, policy_clause)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, 'awaiting_response', $8, $9, $10, $11)
+        policy_version_id, policy_clause, source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, 'awaiting_response', $8, $9, $10, $11, $12)
      ON CONFLICT (dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING
      RETURNING employee_query_id`,
     [
@@ -133,6 +139,7 @@ async function insert(db, row) {
       row.dedup_key || null,
       row.policy_version_id || null,
       row.policy_clause || null,
+      row.source || (row.raised_by ? "person" : "rule"),
     ],
   );
   return rows[0] ? rows[0].employee_query_id : null;
@@ -211,7 +218,8 @@ async function summary(db, reader, monthStart) {
   // pagination:complete a chart's bars, one per rule, never listed; past 24 they fold into Other
   const reasons = await completeQuery(
     db,
-    `SELECT COALESCE(r.name, 'Raised by a Person') AS label, count(*)::int AS count
+    `SELECT COALESCE(r.name, CASE WHEN q.source = 'attendance' THEN 'Attendance Policy' END, 'Raised by a Person') AS label,
+            count(*)::int AS count
        FROM employee_query q LEFT JOIN query_rule r ON r.query_rule_id = q.query_rule_id
       WHERE q.created_at >= $1 ${v.and}
       GROUP BY 1 ORDER BY 2 DESC, 1`,

@@ -18,12 +18,12 @@ describe("the chain", () => {
     expect(codeFrom("***")).toBe("step");
   });
 
-  test("who approves is a valid shipped definition: Operations & People, then Management from rank 4", () => {
+  test("who approves is a valid shipped definition: Operations & People, then the CEO from rank 4", () => {
     const def = definitions.DEFAULTS[DEFINITION_KEY];
     expect(definitions.problemsOf(def)).toEqual([]);
-    expect(def.stages.map((s) => [s.key, s.condition || null])).toEqual([
-      ["operations_people", null],
-      ["management", { field: "rank", op: ">=", value: 4 }],
+    expect(def.stages.map((s) => [s.key, s.approver, s.condition || null])).toEqual([
+      ["operations_people", { type: "role", value: "operations_people" }, null],
+      ["ceo", { type: "ceo" }, { field: "rank", op: ">=", value: 4 }],
     ]);
   });
 });
@@ -51,7 +51,7 @@ describe("a suspension's days", () => {
 describe("the routes", () => {
   const routes = routesOf(require("./sanctions.routes").router);
 
-  test("every route carries the queries grant; the chain's writes need queries.configure; nothing approves here", () => {
+  test("every route carries the queries grant; the chain's writes need queries.configure; approvers decide here", () => {
     const grant = Object.fromEntries(
       routes.map((r) => [`${r.method} ${r.path}`, [r.permission.key, r.permission.action, r.capability]]),
     );
@@ -63,7 +63,8 @@ describe("the routes", () => {
       "PATCH /chain/:id": ["queries", "edit", "queries.configure"],
       "GET /": ["queries", "view", null],
       "GET /:id": ["queries", "view", null],
+      "POST /:id/approve": ["queries", "approve", null],
+      "POST /:id/reject": ["queries", "approve", null],
     });
-    for (const r of routes) expect(r.path).not.toMatch(/approve|reject|decision/);
   });
 });

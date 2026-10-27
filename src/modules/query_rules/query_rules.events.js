@@ -1,11 +1,13 @@
 "use strict";
 /**
- * What the query rules module records, and the attendance events it counts
- * (docs/guides/queries.md §6.3, §7). A late clock-in, an absent day, a missing clock-out,
- * a punch from an unknown device or a month's review closed rated Below queues the
+ * What the query rules module records, and the events it counts (docs/guides/queries.md
+ * §6.3, §7). A punch from an unknown device or a month's review closed rated Below queues the
  * `query-rule-evaluate` job for that person and day, once per event (the job id is the
  * event's); overdue tasks are queued by the daily sweep (jobs/schedulers/query-rule-sweep.js).
- * The query a breach raises tells the employee through query.raised.
+ *
+ * An Attendance policy breach with Raise Query on (attendance.rule_breached) raises its own query
+ * here, `queries.raise_from_breach` (§6.2): late arrivals, absences and missing clock-outs are
+ * that policy's rules, not ours. The query a breach raises tells the employee through query.raised.
  *
  *   query_rule.saved      a rule added or changed on Rules
  *   query_rule.activated  switched on: it counts from now
@@ -39,12 +41,7 @@ function jobOf(event) {
   return { sources, employee_id: event.payload.employee_id, date: event.payload.work_date };
 }
 
-for (const key of [
-  attendanceEvents.ATTENDANCE_PUNCHED,
-  attendanceEvents.ATTENDANCE_DAY_CLOSED,
-  attendanceEvents.ATTENDANCE_REVIEW_REQUIRED,
-  reviewEvents.REVIEW_CLOSED,
-]) {
+for (const key of [attendanceEvents.ATTENDANCE_REVIEW_REQUIRED, reviewEvents.REVIEW_CLOSED]) {
   outbox.register(key, `query_rules.evaluate.${key}`, async (event) => {
     const data = jobOf(event);
     if (!data) return;
@@ -53,5 +50,12 @@ for (const key of [
     });
   });
 }
+
+/** An Attendance policy breach that asks for a query raises exactly one (queries.md §6.2). */
+outbox.register(attendanceEvents.ATTENDANCE_RULE_BREACHED, "queries.raise_from_breach", async (event) => {
+  const p = event.payload || {};
+  if (!p.raise_query || !p.attendance_rule_breach_id) return;
+  await require("../queries/queries.service").raiseFromBreach(p.attendance_rule_breach_id);
+});
 
 module.exports = { EVENTS, jobOf };

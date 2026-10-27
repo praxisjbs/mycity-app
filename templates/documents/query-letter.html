@@ -11,7 +11,9 @@ title: "Query {{ query_number }}"
   <p>{{ employee.display_name }}<br>{{#if employee.job_title}}{{ employee.job_title }}{{/if}}{{#if employee.department}}, {{ employee.department }}{{/if}}</p>
   <h2>Query: {{ subject }}</h2>
   <p>Dear {{ employee.first_name }},</p>
+  <p>This is to formally query you on the following.</p>
   <p>{{ details }}</p>
   {{#if policy}}<p>This is against our {{ policy.title }} ({{ policy.number }}, version {{ policy.version }}){{#if policy.clause}}: "{{ policy.clause }}"{{else}}.{{/if}}</p>{{/if}}
-  <p>Please explain this in writing{{#if response_due}} by {{ datetime response_due }}{{/if}}, in My Queries on the MyCity hub. Your response is read before any decision is made.</p>
+  <p>You are required to respond to this query in writing{{#if response_due}} by {{ datetime response_due }}{{/if}}, in My Queries on the MyCity hub, explaining the circumstances and stating why appropriate disciplinary action should not be taken against you.</p>
+  <p>Please note that continued non-compliance with the company's policies may result in further disciplinary action. Your response will be reviewed accordingly.</p>
 </div>

@@ -10,7 +10,7 @@
 | Capabilities | `home.team` (open the Team tab and its figures), `home.reports` (build, schedule, run and receive reports), `alerts.manage` (create, change and switch off alert rules), `alerts.clear` (clear or dismiss an alert, together with the rule's own grant) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 26/10/2026 |
+| Last changed | 27/10/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -145,9 +145,9 @@ the owning modules, scoped by the reader's grants.
 |---|---|---|
 | `home_alert_rule` | `home_alert_rule_id`, `key`, `name`, `metric`, `threshold`, `window_days`, `severity`, `permission_key`, `enabled`, `created_by`, `updated_by` | A rule is data, not code: a number changes with no deploy. `key` is made by the server, `<metric>.<slug of the name>`, with a number on the end when taken. `metric` is a key of the metric registry (§6). `permission_key` is who may clear its alerts, `<module>.<action>` from the access catalogue. Rules are switched off, never deleted. `name`, `created_by`, `updated_by` came with `1150`; rules written before it took their key as their name |
 | `home_alert` | `home_alert_id`, `home_alert_rule_id`, `subject_type`, `subject_id`, `subject_employee_id`, `title`, `trigger`, `severity`, `over_by`, `due_on`, `raised_at`, `last_seen_at`, `escalated_at`, `cleared_at`, `cleared_by`, `outcome`, `note` | One open alert per rule and subject. `subject_employee_id` (`1150`) is the person it is about, null when it is about no one in particular (a budget, a partner). `over_by` (`numeric(18,2)`, `1100`) is how far past the threshold, or the days left for a deadline metric (0 on the day, below 0 once the date has passed). `due_on` (`1151`) is the date a deadline alert is about, null for a count metric: a person who cleared it dealt with that date. `outcome` is `cleared` or `dismissed`; a rule switched off dismisses its open alerts with `cleared_by` empty and the note "Rule switched off" (the audit entry names who switched it off). Written only by the shared alert engine (BACKEND_STRUCTURE §11.1) |
-| `saved_report` | `saved_report_id`, `owner_user_id`, `name`, `report_key`, `definition`, `shared`, `archived_at` | A report. `report_key` is its source (§6); `definition` holds its filters (`{ filters }`); `name` is unique per owner, case aside. A report with runs is archived (`archived_at`, `1150`), never deleted; archiving stops its schedule. A person's own Overview Export report (source `overview`) is made the first time they export and is never listed; a name its owner gives another report wins, and it takes the next free one ("Overview 2") |
+| `saved_report` | `saved_report_id`, `owner_user_id`, `name`, `report_key`, `definition`, `shared`, `archived_at` | A report. `report_key` is its source (§6); `definition` holds its filters (`{ filters }`); `name` is unique per owner, case aside. A report with runs is archived (`archived_at`, `1150`), never deleted; archiving stops its schedule. A person's own Overview Export report (source `overview`) is made the first time they export and is never listed; a name its owner gives another report wins, and it takes the next free one ("Overview 2"). A person's own Workspace Analytics report (source `workspace_analytics`, workspace.md §6) is kept the same way; each of its runs keeps its own period |
 | `report_schedule` | `report_schedule_id`, `saved_report_id`, `recurrence`, `starts_on`, `run_time`, `timezone`, `formats`, `recipient_user_ids`, `recipients`, `active`, `last_run_at`, `next_run_at` | One per report (unique index, `1150`); removed when the report goes back to on demand. `recurrence` is a rule of `src/shared/time/recurrence.js` counted from `starts_on`, fired at `run_time` in `timezone` (always Africa/Lagos); never cron. `formats` is `pdf`, `xlsx` or both. Recipients are logins (`recipient_user_ids`); `recipients` keeps their addresses as written, for display. `active` false is Paused, with no `next_run_at`; `last_run_at` is the last slot fired |
-| `home_report_run` | `home_report_run_id`, `number`, `saved_report_id`, `report_schedule_id`, `scheduled_for`, `recipient_user_id`, `requested_by`, `format`, `status`, `document_id`, `emailed_at`, `error`, `run_at`, `finished_at` | One generated file: one report, one recipient, one format. `number` from `numbering.allocate(client, "report_run")` (RPT-0001, never reset). `status` is `pending`, `done`, `failed` or `skipped`, and `error` says why a run failed or was skipped. A scheduled run names its schedule and slot, and a slot is generated once per recipient and format (unique index); a run on demand has neither. `document_id` is the vaulted file once it is made (a PDF's while it renders, so the run stays `pending`); `emailed_at` is when a schedule's file was handed to the mailer (a run on demand is never emailed); `run_at` is when the run was made, the order of Recent Runs; `finished_at` when it settled |
+| `home_report_run` | `home_report_run_id`, `number`, `saved_report_id`, `report_schedule_id`, `scheduled_for`, `recipient_user_id`, `requested_by`, `format`, `filters`, `status`, `document_id`, `emailed_at`, `error`, `run_at`, `finished_at` | One generated file: one report, one recipient, one format. `filters` (2530) is a personal export's own (Workspace Analytics' period), null on every other run, which reads its report's. `number` from `numbering.allocate(client, "report_run")` (RPT-0001, never reset). `status` is `pending`, `done`, `failed` or `skipped`, and `error` says why a run failed or was skipped. A scheduled run names its schedule and slot, and a slot is generated once per recipient and format (unique index); a run on demand has neither. `document_id` is the vaulted file once it is made (a PDF's while it renders, so the run stays `pending`); `emailed_at` is when a schedule's file was handed to the mailer (a run on demand is never emailed); `run_at` is when the run was made, the order of Recent Runs; `finished_at` when it settled |
 | `role_kpi` | `role_kpi_id`, `role_id`, `default_ids`, `locked_ids`, `updated_by` | A role's cards: up to four defaults in order, and the locked ones (always among the defaults). No row: the role follows its Home view's defaults. Removed with its role |
 | `home_kpi_pick` | `home_kpi_pick_id`, `user_id`, `kpi_ids` | A person's own cards, up to four, in order. No row: they follow their roles. An empty list: they chose to see none |
 
@@ -463,7 +463,7 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   - The alert's subject is the breach (`attendance_rule_breach`, its id) with `subject_employee_id`
     the person, so a second breach raises its own alert while the first is still open; it opens the
     breach's last day on People · Attendance. Its title says the count ("Ada Obi: 3 late arrivals
-    this month"), Query Due first while the query waits on M3; its trigger the days. Its category is
+    this month"); its trigger the days. Its category is
     attendance; it has no Over By.
   - Alert Rules lists the five read only on an Attendance Policy card, as the version in force today
     sets them (`GET /home/alert-rules/policy`, `HomeAlertPolicyRules`): each rule with its figures in
@@ -526,7 +526,10 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   department), `tasks`, `partnerships`, `expenses`, `recruitment` (the records behind Overdue
   Tasks, Active Partnerships, Expenses Awaiting Approval and Open Vacancies, read through their
   milestones' source adapters; empty until those are built and used, and no filters until then),
-  and `overview` (the Overview Export, never offered on the form). Each is the module whose
+  `overview` (the Overview Export, never offered on the form) and `workspace_analytics` (My
+  Workspace · Analytics' Export, never offered either; its filters `task_scope`, `analytics_period`,
+  `period_from`, `period_to`; it also needs the `workspace` export grant, so its file follows
+  who may export, workspace.md §6). Each is the module whose
   `view` grant it needs (Open Alerts also one of `alerts.clear` or `alerts.manage`, as its tab)
   plus the same query its screen uses, gathered page by page in the reader's scope and through
   their field mask. A table holds at most 2,000 rows; the file says when it holds the first of
@@ -547,7 +550,7 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   its source. An archived report is listed only when asked for, and neither changes nor runs.
 - **Generation is as the recipient.** Each run is built with the recipient's own grants, scope and
   masked fields, so a file never holds a row they could not open on screen. A recipient who is no
-  longer active, no longer holds the source's grant, or (for any source but the Overview) no longer
+  longer active, no longer holds the source's grant, or (for any source but the two personal exports, the Overview's and Workspace Analytics') no longer
   holds `home.reports`, gets no file: their run is `skipped`, with why, and nothing is emailed
   (asked as the file is built and again as it is delivered, since a PDF renders in between). A
   schedule's file is emailed only once it exists; a file somebody pressed for (Run Now, Export) is
@@ -575,7 +578,11 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   while it waits, or with the same idempotency key, is the same run. Only a run the caller asked for
   answers a press: a scheduled run never does, even once its schedule is removed. The Overview
   Export is a run of the reader's own Overview report (source `overview`, made the first time they
-  export, not listed on Reports), open to every Home reader.
+  export, not listed on Reports), open to every Home reader. My Workspace · Analytics' Export is
+  the same for its own source (`exportPersonal`), except that each run keeps the filters it was
+  pressed with (`home_report_run.filters`, 2530), so a file is built with its own period and a run
+  still waiting never holds up a press for another (workspace.md §5, §6). Its runs are on Recent
+  Runs as the Overview's are.
 - **Runs This Month** counts the files done since the 1st (Lagos) among the runs on the reader's
   Recent Runs; **Recipients** counts the people who receive at least one scheduled report the
   reader may see; **Scheduled** and **Paused** count the reports the reader may see by their
@@ -599,11 +606,11 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
 | `permission.changed`, `field_visibility.changed`, `capability.changed` (access) | a role's grants, masks or capabilities change | outbox `dashboard.prune-role-kpis`: takes the cards the role can no longer see out of `role_kpi`; idempotent |
 | `home.alert_rule_created`, `home.alert_rule_updated` | a rule is created or changed | audit; switching off also dismisses its open alerts in the same transaction (`home.alert_cleared` per alert) |
 | `home-alert-sweeps` (scheduler, daily 06:00 Lagos; and its queue, to re-run a morning by hand) | every morning | `alerts.sweeps.js`: reads each switched-on rule's metric, a batch at a time, and raises, refreshes or leaves an alert per subject, each in its own transaction; a rule it cannot read is logged and the others still run |
-| `attendance.rule_breached` (Attendance) | a policy rule is breached, in the transaction that crossed it (attendance.md §6.16) | Attendance's outbox handler `attendance.raise_breach_alert` raises its alert through `alerts.service.raisePolicyBreach` when Alert is on, or Query Due while Raise Query waits on M3; `home.alert_raised` follows as for any alert. Home no longer handles `attendance.punched` or `attendance.day_closed` |
+| `attendance.rule_breached` (Attendance) | a policy rule is breached, in the transaction that crossed it (attendance.md §6.16) | Attendance's outbox handler `attendance.raise_breach_alert` raises its alert through `alerts.service.raisePolicyBreach` when Alert is on (the query, with Raise Query on, is Queries & Sanctions', queries.md §6.2); `home.alert_raised` follows as for any alert. Home no longer handles `attendance.punched` or `attendance.day_closed` |
 | `home.alert_raised` | an alert is raised | notifies the holders of the rule's `permission_key` whose scope reaches the person it is about, never that person (a notification, separate from the alert) |
 | `home.alert_cleared` | an alert is cleared or dismissed | the audit entry (who, when, outcome) |
 | `alert-ageing` (scheduler, hourly at ten past, M0) | a High alert has been open 14 days | `home.alert_escalated`: notifies the CEO, once per alert |
-| `home.report_created`, `home.report_updated`, `home.report_archived` | a report or its schedule is saved, paused, resumed or archived (and a person's own Overview report, the first time they export) | audit |
+| `home.report_created`, `home.report_updated`, `home.report_archived` | a report or its schedule is saved, paused, resumed or archived (and a person's own Overview or Workspace Analytics report, the first time they export) | audit |
 | `scheduled-reports` (scheduler, every 5 minutes) | a schedule's `next_run_at` has come | queues `scheduled-report` per due schedule, at most 200 a tick, its job id the schedule's and its slot's (a slot whose job failed every attempt is queued again at the next tick) |
 | `scheduled-report` (handler) | queued by the scheduler | creates one run per recipient and format for the slot, advances `next_run_at`, emits `home.report_run` per run; a schedule paused, archived or moved past the slot makes nothing |
 | `home.report_run` | a run row is created: scheduled, Run Now or Export | outbox `reports.generate` (`reports.generate.js`): builds the file as the recipient, PDF through `documents.generate` (doc type `home_report`, landscape, the run's number on it) or XLSX through `shared/spreadsheet` and the vault, then emails a schedule's XLSX (a run on demand is done, for its screen to download); `skipped` when the recipient may no longer have it, `failed` on the outbox's last attempt |
@@ -838,6 +845,9 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 27/10/2026 · AJ · A policy breach's alert no longer reads Query Due and is raised only with Alert
+  on: Queries & Sanctions raises the query itself (attendance.md §6.16, queries.md §6.2).
+- 27/10/2026 · AJ · A second personal export through the engine (workspace.md §6, TB at the internal meeting of 26/10/2026): source `workspace_analytics`, never offered on the form, is My Workspace · Analytics' Export, run as the Overview's is on the reader's own hidden report, its filters the period pressed for, and needing the `workspace` export grant as well as the view (`scopeOn` reads a source's `action`); a snapshot source now receives its report's filters. What the Overview alone was in the repo and the service (never listed, its name giving way, its runs read by the screen that pressed, no `home.reports` needed) is now every personal source's (`PERSONAL`, `exportPersonal`, `getPersonalRun`); Reports' screens name the source Workspace Analytics (§4, §6, §7). The same day, after a refresh mid-export showed "still being made": each run keeps its own filters (`home_report_run.filters`, migration 2530), Run Now and Export answer a waiting run only when its filters match too, and the refusal is gone, so a run waiting on the worker never holds up another press (§4, §6).
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Home · Alerts' Category chips carry the unread notices about open alerts in each category, by the rule's metric (`alerts.views.js`, `alerts.repo.js` `placesOf`); a dismissed alert's notice counts on the tab, its list being behind View Dismissed.
 - 26/10/2026 · JP · QA DEF-01 finished: Need You leaves out, on the server, a request about a record whose screen has not shipped (an expense before Milestone 8), so its page and count hold only what opens; ⌘K's KPI Cards group leaves out a card whose module has not shipped, on the server as in the app (`shared/delivery-plan.js`, foundation.md §6.7).
 - 26/10/2026 · JP · QA DEF-01, §6: a card and a picker option name their module, and the Overview, Choose Cards and ⌘K leave out a card whose module is Coming Soon in that build (Expenses before Milestone 8), for every role.

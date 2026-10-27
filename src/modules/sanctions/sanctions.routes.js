@@ -8,8 +8,11 @@
  *   POST  /chain              `queries` create + queries.configure: add a rung at a position
  *   PATCH /chain/:id          `queries` edit + queries.configure: move, change or retire a rung
  *
- * A sanction is proposed from its query (POST /queries/:id/decision) and approved or
- * rejected in its approval (/workflow/instances/:id), never here.
+ *   POST  /:id/approve        the approver its stage waits on (the workflow service says who);
+ *                             Operations & People sign it there (guide §6.4)
+ *   POST  /:id/reject         the same approver, with a reason
+ *
+ * A sanction is proposed from its query (POST /queries/:id/decision).
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -48,5 +51,15 @@ route(router, "get", "/",
 route(router, "get", "/:id",
   { params: c.common.IdParams, response: s.SanctionDetail, summary: "One sanction" },
   requirePermission("queries", "view"), controller.get);
+
+route(router, "post", "/:id/approve",
+  { params: c.common.IdParams, body: s.SanctionApprove, response: s.SanctionDetail,
+    summary: "Approve the stage a sanction waits on; Operations & People sign it" },
+  requirePermission("queries", "approve"), controller.approve);
+
+route(router, "post", "/:id/reject",
+  { params: c.common.IdParams, body: s.SanctionReject, response: s.SanctionDetail,
+    summary: "Reject a proposed sanction, saying why" },
+  requirePermission("queries", "approve"), controller.reject);
 
 module.exports = { basePath: "/sanctions", surface: "staff", router };

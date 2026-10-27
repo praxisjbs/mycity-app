@@ -3,15 +3,17 @@
 --   capability        queries.configure (write query rules, the chain and letter templates), held by
 --                     Implementation and Operations & People; the CEO holds every capability.
 --   approval          queries.consequence version 1, as in shared/workflow/definitions.js DEFAULTS
---                     (validateDefinition() passes): Operations & People, then Management from rank 4.
+--                     (validateDefinition() passes): Operations & People, then the CEO from rank 4
+--                     (Suspension Without Pay up; MyCity's handbook §4.7.4, AJ 27/10/2026).
 --   approval, off     3099's employee_consequence fails validateDefinition() (its approvers have no
 --                     type) and is replaced by queries.consequence; it is switched off, not deleted.
 --   letter templates  one row per shipped file in templates/documents/, so the screen lists them and
 --                     a rung or rule can name them. Template defaults the generator needs (A26).
---                     query-letter and salary-deduction-letter (purpose fine, the letter a fine
---                     sends) ship with wording and are active, so a rule can raise a query and a
---                     fine can be sent on a fresh database; the sanction letters wait for MyCity's
---                     samples (drafts). The Caution Letter is the Question Letter (GE, 26/10/2026).
+--                     All six ship with wording and are active, so a rule can raise a query, every
+--                     rung is ready and a fine can be sent on a fresh database. The wording is
+--                     MyCity's own samples (27/10/2026): Query, Caution, Warning (the Second
+--                     Warning's too), Suspension Without Pay and Termination; the Salary Deduction
+--                     letter (purpose fine) is ours. One suspension, without pay (handbook §4.7.4).
 --
 -- The ladder itself (consequence_step) and every query rule are MyCity's choices, entered on
 -- Sanctions, Chain Settings and on Rules (A26): none are seeded. Rows people edit later are inserted
@@ -32,9 +34,9 @@ ON CONFLICT (role_id, capability_id) DO NOTHING;
 INSERT INTO workflow_definition (key, version, module_key, name, description, context_types, stages, active)
 VALUES (
   'queries.consequence', 1, 'queries', 'Sanction',
-  'Operations & People, then Management from Suspension up.',
+  'Operations & People, then the CEO from Suspension Without Pay up.',
   '{"rank":"number","fine_amount":"money"}'::jsonb,
-  '[{"key":"operations_people","name":"Operations & People","approver":{"type":"role","value":"operations_people"},"sla_hours":48},{"key":"management","name":"Management","approver":{"type":"role","value":"management"},"condition":{"field":"rank","op":">=","value":4},"sla_hours":48}]'::jsonb,
+  '[{"key":"operations_people","name":"Operations & People","approver":{"type":"role","value":"operations_people"},"sla_hours":48},{"key":"ceo","name":"CEO","approver":{"type":"ceo"},"condition":{"field":"rank","op":">=","value":4},"sla_hours":48}]'::jsonb,
   true
 )
 ON CONFLICT (key, version) DO NOTHING;
@@ -46,18 +48,17 @@ UPDATE workflow_definition
 INSERT INTO letter_template (key, name, purpose, status)
 VALUES
   ('query-letter', 'Query Letter', 'query', 'active'),
-  ('question-letter', 'Question Letter', 'sanction', 'draft'),
-  ('warning-letter', 'Warning Letter', 'sanction', 'draft'),
-  ('suspension-letter', 'Suspension Letter', 'sanction', 'draft'),
-  ('suspension-without-pay-letter', 'Suspension Without Pay Letter', 'sanction', 'draft'),
-  ('termination-letter', 'Termination Letter', 'sanction', 'draft'),
+  ('caution-letter', 'Caution Letter', 'sanction', 'active'),
+  ('warning-letter', 'Warning Letter', 'sanction', 'active'),
+  ('suspension-without-pay-letter', 'Suspension Without Pay Letter', 'sanction', 'active'),
+  ('termination-letter', 'Termination Letter', 'sanction', 'active'),
   ('salary-deduction-letter', 'Salary Deduction Letter', 'fine', 'active')
 ON CONFLICT (key) DO NOTHING;
 
 -- DOWN
 -- Only templates no rung, rule or saved wording uses: a letter someone has edited stays theirs.
 DELETE FROM letter_template t
- WHERE t.key IN ('query-letter', 'question-letter', 'warning-letter', 'suspension-letter',
+ WHERE t.key IN ('query-letter', 'caution-letter', 'warning-letter',
                  'suspension-without-pay-letter', 'termination-letter', 'salary-deduction-letter')
    AND t.created_by IS NULL
    AND NOT EXISTS (SELECT 1 FROM consequence_step s WHERE s.letter_template = t.key)

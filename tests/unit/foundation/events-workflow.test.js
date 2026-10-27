@@ -251,6 +251,7 @@ describe("route map", () => {
     expect(routeMap.linkFor("performance_plan", "pl1").path).toBe("/performance?tab=goals&plan=pl1");
     expect(routeMap.linkFor("performance_plan", "pl1", { self: true })).toMatchObject({ module: "ess", tab: "my-performance" });
     expect(routeMap.linkFor("target_change", "tc1").path).toBe("/performance?tab=goals&change=tc1");
+    expect(routeMap.linkFor("plan_unbind", "pu1").path).toBe("/performance?tab=goals&unbind=pu1");
     expect(routeMap.linkFor("unknown_type", "x")).toBeNull();
     expect(routeMap.linkFor("query", "")).toBeNull();
   });
@@ -291,7 +292,7 @@ describe("route map", () => {
       if (row && !/\| Dropped \|/.test(line)) (found[module] = found[module] || []).push(row[1]);
     }
     expect(found).toEqual(routeMap.SCREENS);
-    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(95);
+    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(96);
   });
 });
 

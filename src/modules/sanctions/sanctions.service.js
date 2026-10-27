@@ -42,7 +42,8 @@ function detailOf(row) {
   const {
     employee_id: _e, raised_by: _r, query_subject: _s, query_details: _d, query_raised_at: _a,
     position: _p, letter_template: _l, financial_effect: _f, fine_amount: _m,
-    signature_document_id: _sig, decided_by_title: _t, query_policy_version_id: _pv, query_policy_clause: _pc, ...out
+    signature_document_id: _sig, decided_by_title: _t, query_policy_version_id: _pv, query_policy_clause: _pc,
+    signed_by: _sb, signed_by_name: _sn, signed_by_title: _st, ...out
   } = row;
   return out;
 }
@@ -137,11 +138,7 @@ async function propose(client, actor, query, body) {
     ends_on: endsOn,
   });
   if (body.fine_amount) await repo.insertFine(client, id, body.fine_amount);
-  // The proposer signs it (guide §6.4); the issued letters print it.
-  if (body.signature) {
-    const queries = require("../queries/queries.service");
-    await repo.setSignature(client, id, await queries.storeSignature(client, body.signature, { type: "sanction", id }, actor));
-  }
+  // Nobody signs a proposal: Operations & People sign when they approve it (guide §6.4).
   const payload = {
     sanction_id: id,
     employee_query_id: query.employee_query_id,
@@ -167,6 +164,54 @@ async function propose(client, actor, query, body) {
   });
   await repo.setWorkflow(client, id, instance.workflow_instance_id);
   return { sanction_id: id, workflow_instance_id: instance.workflow_instance_id };
+}
+
+/* ------------------------------------------------------------------ *
+ * Approving and rejecting (the query's card, guide §6.4)
+ * ------------------------------------------------------------------ */
+
+/** The stage of queries.consequence whose approver signs the letters. */
+const SIGNING_STAGE = "operations_people";
+
+/** A pending sanction the reader may see, with its approval, locked for the decision. */
+async function pendingFor(client, id, reader) {
+  await repo.lock(client, id);
+  const row = visibility.assertVisible(reader, await repo.get(client, id), "sanction");
+  if (row.status !== "pending_approval" || !row.workflow_instance_id)
+    throw new AppError("SANCTION_DECIDED", "This sanction was already decided", 409);
+  return row;
+}
+
+/**
+ * Approve the stage the sanction waits on (POST /sanctions/:id/approve). At the Operations & People
+ * stage the approver signs: their drawn signature is kept through the vault and they become the
+ * letters' signer, in the same transaction as the decision. The workflow service says who may act.
+ */
+async function approve(actor, reader, id, body) {
+  const workflow = require("../workflow/workflow.service");
+  await tx(async (client) => {
+    const row = await pendingFor(client, id, reader);
+    const flow = await workflow.getInstance(actor, row.workflow_instance_id);
+    if (flow.current_stage === SIGNING_STAGE) {
+      if (!body.signature)
+        throw new AppError("SIGNATURE_REQUIRED", "Sign in the box", 422, { signature: ["Sign in the box"] });
+      const queries = require("../queries/queries.service");
+      const doc = await queries.storeSignature(client, body.signature, { type: "sanction", id }, actor);
+      await repo.setSignature(client, id, doc, actor.user_id);
+    }
+    await workflow.decideIn(client, actor, row.workflow_instance_id, "approve");
+  });
+  return get(id, reader);
+}
+
+/** Reject it with a reason (POST /sanctions/:id/reject): the query goes back under review. */
+async function reject(actor, reader, id, body) {
+  const workflow = require("../workflow/workflow.service");
+  await tx(async (client) => {
+    const row = await pendingFor(client, id, reader);
+    await workflow.decideIn(client, actor, row.workflow_instance_id, "reject", body.reason);
+  });
+  return get(id, reader);
 }
 
 /* ------------------------------------------------------------------ *
@@ -228,4 +273,4 @@ async function settle(id, outcome) {
 const listMine = (employeeId, query) => repo.listMine(pool, employeeId, query);
 const mineSummary = (employeeId) => repo.mineSummary(pool, employeeId);
 
-module.exports = { list, summary, get, nextStep, standing, propose, settle, listMine, mineSummary };
+module.exports = { list, summary, get, nextStep, standing, propose, approve, reject, settle, listMine, mineSummary };

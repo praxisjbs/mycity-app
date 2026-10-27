@@ -20,23 +20,26 @@ const {
 } = require("../templates/templates.events");
 const repo = require("./sanctions.repo");
 
-/** Who signs a sanction letter without a drawn signature on it (one proposed before 3020). */
+/** Who signs a sanction letter without a drawn signature on it (one decided before 3020). */
 const SIGNER = Object.freeze({
   name: "Operations & People",
   role: "Operations & People",
 });
 
 /**
- * The person who proposed the sanction signs its letters (guide §6.4): their name, job title
- * and the signature they drew, read back from the vault.
+ * Operations & People sign a sanction's letters when they approve it (guide §6.4), as MyCity's own
+ * letters are signed by its People & Operations Lead: their name, job title and the signature they
+ * drew, read back from the vault. A sanction signed by its proposer before that (signed_by empty)
+ * keeps the proposer's name.
  */
 async function signerOf(db, row) {
   if (!row.signature_document_id) return SIGNER;
   const doc = await vault.get(db, row.signature_document_id);
   const bytes = doc ? await storage.get(doc.storage_key).catch(() => null) : null;
+  const byApprover = Boolean(row.signed_by);
   return {
-    name: row.decided_by_name || SIGNER.name,
-    role: row.decided_by_title || SIGNER.role,
+    name: (byApprover ? row.signed_by_name : row.decided_by_name) || SIGNER.name,
+    role: (byApprover ? row.signed_by_title : row.decided_by_title) || SIGNER.role,
     signature: bytes ? `data:image/png;base64,${bytes.toString("base64")}` : null,
   };
 }

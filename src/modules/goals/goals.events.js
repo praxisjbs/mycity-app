@@ -3,9 +3,10 @@
  * What the goals module records, and who it tells (docs/guides/performance.md §7).
  *
  * Quarters, organisational goals, the OKR tree, monthly reports, plans and target changes. The
- * approval engine tells each stage of a plan or a target change itself; this tells the people a
- * decision concerns: a binding plan's employees and reviewers that their scorecard is ready to
- * agree, a returned plan's sender, and a target change's requester.
+ * approval engine tells each stage of a plan, an unbind request or a target change itself; this tells
+ * the people a decision concerns: a binding plan's employees and reviewers that their scorecard is
+ * ready to agree, a returned plan's sender, an unbound plan's sender of its changes, and the requester
+ * of an unbind request or a target change.
  */
 const { defineEvents } = require("../../shared/events/catalogue");
 const { defineNotification } = require("../../shared/notifications/fanout");
@@ -27,6 +28,11 @@ const EVENTS = defineEvents("performance", {
   "plan.binding": { summary: "A quarter plan was approved and is binding" },
   "plan.returned": { summary: "A quarter plan was returned for changes" },
   "plan.reopened": { summary: "A quarter plan went back to draft when the import of its objectives was reverted" },
+  "plan.revision_submitted": { summary: "An unbound plan's changes were sent to the CEO" },
+  "plan.revised": { summary: "An unbound plan's changes were approved and the plan is binding again" },
+  "plan.revision_returned": { summary: "An unbound plan's changes were returned, and the plan stays unbound" },
+  "plan_unbind.requested": { summary: "A request to unbind a binding plan was made" },
+  "plan_unbind.decided": { summary: "A request to unbind a binding plan was approved or refused" },
   "target_change.requested": { summary: "A change to a binding target was asked for" },
   "target_change.decided": { summary: "A target change was approved or refused" },
   "analytics.export_requested": { summary: "Performance Analytics' people table was asked for as a workbook" },
@@ -40,6 +46,28 @@ defineNotification(EVENTS.PLAN_BINDING, {
 });
 
 defineNotification(EVENTS.PLAN_RETURNED, {
+  to: [{ users: (e, client) => loginsOf(client, [e.payload.submitted_by_employee_id]) }],
+  title: (e) => `The ${e.payload.department || "company"} plan needs changes`,
+  body: (e) => e.payload.reason || "",
+  include_actor: true,
+});
+
+defineNotification(EVENTS.PLAN_UNBIND_DECIDED, {
+  to: [{ users: (e, client) => loginsOf(client, [e.payload.requested_by_employee_id]) }],
+  title: (e) => (e.payload.status === "approved" ? "Unbind request approved" : "Unbind request refused"),
+  body: (e) =>
+    e.payload.status === "approved" ? `The ${e.payload.department || "company"} plan is open for changes.` : e.payload.reason || "",
+  include_actor: true,
+});
+
+defineNotification(EVENTS.PLAN_REVISED, {
+  to: [{ users: (e, client) => loginsOf(client, [e.payload.submitted_by_employee_id]) }],
+  title: (e) => `The ${e.payload.department || "company"} plan is binding`,
+  body: () => "The CEO approved your changes.",
+  include_actor: true,
+});
+
+defineNotification(EVENTS.PLAN_REVISION_RETURNED, {
   to: [{ users: (e, client) => loginsOf(client, [e.payload.submitted_by_employee_id]) }],
   title: (e) => `The ${e.payload.department || "company"} plan needs changes`,
   body: (e) => e.payload.reason || "",

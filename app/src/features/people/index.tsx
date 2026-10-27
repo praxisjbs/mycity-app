@@ -6,6 +6,7 @@ import { OrgTree } from "@/features/organogram/OrgTree";
 import { Employee360 } from "./Employee360";
 import { Employees } from "./Employees";
 import { PeopleLeave } from "./Leave";
+import { Departments } from "./Departments";
 
 export default function People({ tab, id }: ModuleScreenProps) {
   switch (tab) {
@@ -21,6 +22,8 @@ export default function People({ tab, id }: ModuleScreenProps) {
       return <Devices />;
     case "worksites":
       return <Worksites />;
+    case "departments":
+      return <Departments />;
     default:
       return null;
   }

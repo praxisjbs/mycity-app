@@ -301,9 +301,15 @@ longer than 4.5 seconds.
   the deploy log lists what it changed. The changes to people and seats (merges, titles, seats, moves,
   lines) are applied **once per version of `nomenclature.json`** (the event `department.names_applied`
   carries its checksum), so a title, a department or a line People change on screen afterwards stays,
-  even one that matches an old name; the departments' names, codes and heads only fill what is
-  missing and run every time (25/10/2026). The sheet and `roles.json` carry the same names, so a
-  fresh database ends the same way.
+  even one that matches an old name. The departments, their codes and heads are given only to a
+  database that has never had MyCity's names, its first deploy (JBS Praxis, 27/10/2026): after that
+  they are People's, kept on People · Departments (`docs/guides/organogram.md` §6.1), and no deploy
+  renames a department, makes one again, changes a code or sets a head, even with a new version of
+  `nomenclature.json`. A department is found by its name or MyCity's code, so one renamed on screen
+  is still the same one for the moves. The sheet and `roles.json` carry the same names, so
+  a fresh database ends the same way. Each deploy then gives every department head their role
+  (organogram.md §6.1: Head of Department while they head, unless a role of theirs already sets a
+  function's goals).
 - **The sheet was corrected on 19/10/2026 (TB).** Aaron Agama's team is Sales & Marketing (the
   sheet said Marketing, a department of one); Markerting is Marketing in three titles; Operations&
   People Lead is Operations & People Lead, and its `roles.json` key with it; two work emails had a
@@ -359,7 +365,9 @@ longer than 4.5 seconds.
   again, adding what is new and leaving the rest alone.
 - **The roster makes no department by itself** but the ones `nomenclature.json` names (25/10/2026):
   a Team cell naming any other ("Partnership & Growh") leaves its rows for People, with a warning in
-  the deploy log, so a typo never becomes a production department. A department is found with case,
+  the deploy log, so a typo never becomes a production department. Nor does it make one of those
+  again once its code is held under another name, a department renamed on People · Departments
+  (27/10/2026): its rows are left for People the same way. A department is found with case,
   accents and punctuation set aside ("Technology & Back Office Ops" is the TBO). A build with no
   `nomenclature.json` creates every one, as before.
 - **A seat People closed stays closed** when the sheet still lists its VACANT row, and a VACANT row
@@ -681,7 +689,7 @@ device they pressed it on. Nothing pressed is emailed. Only a report schedule's 
   `GET /exports/:id` (the asker alone) and downloads `GET /documents/:id/content`.
 - **Which buttons.** Export Month (My Attendance), Export Register (People · Attendance), the Audit
   Log's Export, Download PDF (Org Chart and Organogram), Download My Data, Download Their Data. A
-  report run somebody pressed for (Run Now, the Overview's Export) is a numbered run, not an
+  report run somebody pressed for (Run Now, the Overview's Export, My Workspace · Analytics' Export) is a numbered run, not an
   export: its screen waits on the run (`GET /home/report-runs/:id`; the Overview's own run on
   `GET /home/overview/export/:id`, which Staff may read without `home.reports`) and downloads its
   file the same way. The screens of later milestones (Payroll, Expenses, Partnerships,
@@ -979,7 +987,7 @@ screen.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
+| People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; for `people` edit, a tick on each row and Move To Department on the rows picked (organogram.md §6.1); Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. That the people moved report to the department's head: organogram.md §6.1. Attendance Today, which returns to the list with the attendance API (LA, M1) |
 | Employee record | Profile, Job, Work Schedule (attendance.md §10, LA), Reporting Line, Login and History as tabs, then Queries and Sanctions for a viewer holding `queries` view (the person's queries and sanctions that viewer may see, `docs/guides/queries.md` §6.1; a row opens its query on Queries & Sanctions); the status, work pattern, manager and since chips; Edit Record, Archive Record (Reason and Last Day, today by default and never later, kept as `left_on`, which Attrition counts; not on the CEO's record, `is_ceo`) or Restore Record (which clears `left_on`), Send Invite, Change Manager; Download Their Data for the CEO alone (toast "Their data downloaded", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors (once previewed), Continue on an unfinished one (Uploaded, Mapped, Previewed: the wizard opens at Map, or Preview) and Revert, both for a reader who may run that importer | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; the drop zone's "Excel or CSV, up to 10 MB" (a workbook's limit in `shared/spreadsheet/parse.js`); on Map, Required (the fields a mapping needs, each marked once a column fills it); a field picked for one column leaves the column that had it, which goes back to Leave Out with the toast "Moved from" and its name, so no field is mapped twice; after a refused Next, one error banner naming the fields still without a column or the server's refusal, until it is put right; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
@@ -997,7 +1005,7 @@ screen.
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| People · Employees | Search, then employee cards (name, title, department, status pill) | Bulk actions, column choice | Add Employee in the floating button | More, People |
+| People · Employees | Search, then employee cards (name, title, department, status pill) | Bulk actions (Move To Department: a phone moves people from People · Departments' Add People), column choice | Add Employee in the floating button | More, People |
 | Employee record | Profile card, then sections as tabs that scroll sideways | History detail | Send Invite or Edit, full width in a sheet | Back to the list |
 | Settings · Imports (#93) | Import cards: reference, file, status pill | File, Who, Updated, Problems | Start Import in the floating button | More, Settings |
 | Settings · Imports, the wizard | One step per sheet, counts as cards | The rows with problems (Download Errors instead) | Commit Import, full width | From Employees or Settings |
@@ -1085,6 +1093,7 @@ screen.
 
 ## 14 · Change log
 
+- 27/10/2026 · JP · §6.1: the deploy loader gives the departments, their codes and heads only to a database that has never had MyCity's names, and then leaves them to People · Departments (#103, `docs/guides/organogram.md` §6.1, JBS Praxis 27/10/2026), even when `nomenclature.json` changes; it finds a department renamed on screen by MyCity's code, the roster never makes its old name again, and each deploy gives every department head their Head of Department role. §10: People · Employees gains Move To Department on the rows picked (desktop).
 - 27/10/2026 · JP · Documents & Numbering (#76) gains Organisational Goal (`organisational_goal`, ORG-2026-01, starting again each plan year, seeded by `2291`): a goal's ID is the system's now (`performance.md` §6.1). `DOC_TYPES` in the contract and the screen's labels carry it.
 - 27/10/2026 · JP · From the 27/10 staging faults brief (fault #2, `IMPORT_MAPPING_INVALID: mapping` at `PUT /api/v1/imports/:id/mapping`, three times in twelve minutes): the Map step let one field be picked for two columns, which only the server refused. A field now feeds one column: picked for another, it leaves the first, which reads Leave Out, and a toast names it (*Moved from Staff Name*). The server's own check stays for a mapping it is sent any other way (the import script). §10 updated.
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): a switch's and a row of chips' options take `unread` and `urgent` (`ChoiceOption`, drawn as the tab strip's yellow count, red while urgent, apart from an option's own count), and so do Kanban's columns, whose cards are marked as a list's rows are; the app's `useViewNews`, `withNews` and `useOpenWhereNews` (`features/notifications/marks.tsx`) give each screen its share and open it where the news is; `GET /notifications/views` and `shared/notifications/views.js` place each record by its module (`<module>.views.js`). People · Leave, Settings · Users and Settings · Integrations use them.

@@ -29,6 +29,14 @@ const QueryRuleSource = z.enum([
   "low_performance",
   "missed_target",
 ]);
+/**
+ * What a new or edited rule may count (guide §6.3). Late arrivals, absences and missing
+ * clock-outs are the Attendance policy's rules, which raise their own queries; a row kept with
+ * one of them is listed but never fires.
+ */
+const OfferedRuleSource = z.enum(["unenrolled_device", "overdue_task", "low_performance", "missed_target"], {
+  message: "The Attendance policy counts that",
+});
 const QueryRuleMeasure = z.enum(["count", "minutes"]);
 const QueryRuleState = z.enum(["draft", "active", "paused"]);
 
@@ -74,7 +82,7 @@ const MINUTES_ONLY = { message: "Minutes count lateness only", path: ["measure"]
 const QueryRuleCreate = z
   .object({
     name: text(80),
-    source_event: QueryRuleSource,
+    source_event: OfferedRuleSource,
     measure: QueryRuleMeasure.default("count"),
     threshold,
     window_days: windowDays,
@@ -94,7 +102,7 @@ const QueryRuleCreate = z
 const QueryRuleUpdate = z
   .object({
     name: text(80).optional(),
-    source_event: QueryRuleSource.optional(),
+    source_event: OfferedRuleSource.optional(),
     measure: QueryRuleMeasure.optional(),
     threshold: threshold.optional(),
     window_days: windowDays.optional(),
@@ -163,6 +171,7 @@ const TABLES = {
 module.exports = {
   TABLES,
   QueryRuleSource,
+  OfferedRuleSource,
   QueryRuleMeasure,
   QueryRuleState,
   QueryRule,

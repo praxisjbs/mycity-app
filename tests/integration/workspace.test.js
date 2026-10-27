@@ -26,6 +26,9 @@ const tasks = require("../../src/modules/tasks/tasks.service");
 const queues = require("../../src/jobs/queues");
 const realtime = require("../../src/services/realtime/emitter");
 const systemMail = require("../../src/services/mail/system-mail.service");
+const ExcelJS = require("exceljs");
+const storage = require("../../src/services/storage/storage.service");
+const contract = require("@mycity/contract");
 
 // The reminder engine's tick also queues the daily digests; no queue runs here.
 jest.mock("../../src/jobs/queues", () => ({
@@ -1102,5 +1105,159 @@ describeDb("my workspace against the real migrations", () => {
     });
     // For the person both are for, both are their own.
     expect(await told("staff")).toEqual({ mine: { unread: 2, urgent: false }, "mine/todo": { unread: 2, urgent: false } });
+  });
+
+  /* ---------------------------------------------------------------- *
+   * Analytics' periods and Export (workspace.md §5, §6; TB, 26/10/2026)
+   * ---------------------------------------------------------------- */
+
+  describe("Analytics' periods and Export", () => {
+    const monday = lagos.addDays(today, 1 - lagos.weekday(today));
+    const field = (res) => Object.fromEntries(Object.entries(res.body.error.fields).map(([k, v]) => [k, v[0]]));
+
+    test("This Week runs Monday to today; Custom is the reader's own days", async () => {
+      const week = await as("staff").get("/workspace/analytics?period=week");
+      expect(week.status).toBe(200);
+      expect(week.body).toMatchObject({ from: monday, to: today });
+      const from = lagos.addDays(today, -10);
+      const custom = await as("staff").get(`/workspace/analytics?period=custom&from=${from}&to=${today}`);
+      expect(custom.status).toBe(200);
+      expect(custom.body).toMatchObject({ from, to: today });
+    });
+
+    test("a custom period is both days, in order, at most 366 days, ending today at the latest", async () => {
+      const ask = (qs) => as("staff").get(`/workspace/analytics?${qs}`);
+      expect(field(await ask("period=custom"))).toEqual({ "query.from": "Required", "query.to": "Required" });
+      expect(field(await ask(`period=custom&from=${today}&to=${later(-1)}`))).toEqual({ "query.to": "Ends before it starts" });
+      expect(field(await ask(`period=custom&from=${later(-366)}&to=${today}`))).toEqual({ "query.to": "At most 366 days" });
+      expect(field(await ask(`period=30d&from=${today}`))).toEqual({ "query.from": "Only with Custom" });
+      const ahead = await ask(`period=custom&from=${today}&to=${later(1)}`);
+      expect([ahead.status, field(ahead)]).toEqual([422, { to: "Not after today" }]);
+      expect((await ask(`period=custom&from=${later(-365)}&to=${today}`)).status).toBe(200);
+    });
+
+    test("only a holder of workspace export exports, and only their own runs answer them", async () => {
+      // Staff and Line Managers hold no export on My Workspace (seed 0290).
+      expect((await as("staff").post("/workspace/analytics/export", { format: "xlsx" })).status).toBe(403);
+      expect((await as("manager").post("/workspace/analytics/export", { format: "xlsx" })).status).toBe(403);
+
+      const first = await as("director").post("/workspace/analytics/export", { format: "xlsx", scope: "team", period: "week" });
+      expect([first.status, first.body.error]).toEqual([202, undefined]);
+      ids.analyticsRun = contract.reports.HomeReportRun.parse(first.body);
+      expect(ids.analyticsRun).toMatchObject({
+        report_key: "workspace_analytics",
+        report_name: "Workspace Analytics",
+        status: "pending",
+        requested_by: people.director.user.user_id,
+      });
+      // Pressed again while it waits: the same run.
+      const again = await as("director").post("/workspace/analytics/export", { format: "xlsx", scope: "team", period: "week" });
+      expect(again.body.home_report_run_id).toBe(ids.analyticsRun.home_report_run_id);
+      // Another period while it waits is never held up: a run of its own, each keeping its period.
+      const other = await as("director").post("/workspace/analytics/export", { format: "xlsx", scope: "team", period: "90d" });
+      expect([other.status, other.body.error]).toEqual([202, undefined]);
+      ids.otherRun = contract.reports.HomeReportRun.parse(other.body);
+      expect(ids.otherRun.home_report_run_id).not.toBe(ids.analyticsRun.home_report_run_id);
+      expect(ids.otherRun.saved_report_id).toBe(ids.analyticsRun.saved_report_id);
+      const kept = async (id) => (await q("SELECT filters FROM home_report_run WHERE home_report_run_id = $1", [id])).rows[0].filters;
+      expect(await kept(ids.analyticsRun.home_report_run_id)).toEqual({ task_scope: "team", analytics_period: "week" });
+      expect(await kept(ids.otherRun.home_report_run_id)).toEqual({ task_scope: "team", analytics_period: "90d" });
+      // A custom period past today is refused before anything is made.
+      const ahead = await as("director").post("/workspace/analytics/export", { format: "pdf", period: "custom", from: today, to: later(1) });
+      expect([ahead.status, field(ahead)]).toEqual([422, { to: "Not after today" }]);
+
+      const path = `/workspace/analytics/export/${ids.analyticsRun.home_report_run_id}`;
+      expect((await as("director").get(path)).status).toBe(200);
+      expect((await as("ops").get(path)).status).toBe(404);
+      // The report behind them is never listed.
+      const listed = await as("director").get("/home/reports");
+      expect(listed.body.data.some((r) => r.report_key === "workspace_analytics")).toBe(false);
+    });
+
+    test("its file is Analytics as the exporter reads it, every person on the workload, built in the worker", async () => {
+      await drain();
+      const run = contract.reports.HomeReportRun.parse((await as("director").get(`/workspace/analytics/export/${ids.analyticsRun.home_report_run_id}`)).body);
+      expect(run).toMatchObject({ status: "done", emailed_at: null, document_id: expect.any(String) });
+      expect((await as("director").get(`/documents/${run.document_id}/content`)).status).toBe(200);
+
+      const doc = (await q("SELECT storage_key FROM document WHERE document_id = $1", [run.document_id])).rows[0];
+      const book = new ExcelJS.Workbook();
+      await book.xlsx.load(await storage.get(doc.storage_key));
+      expect(book.worksheets.map((w) => w.name)).toEqual([
+        "Cover",
+        "Summary",
+        "Tasks Completed per Week",
+        "Workload by Person",
+        "Tasks by Priority",
+        "Overdue Tasks by Reason",
+        "Overdue Aging",
+        "Blocked Work",
+      ]);
+      const rows = (name) => {
+        const out = [];
+        book.getWorksheet(name).eachRow((row) => out.push(row.values.slice(1)));
+        return out;
+      };
+      expect(rows("Summary")[1][0]).toMatch(/^Completion Rate: /);
+      const cover = rows("Cover").flat().map(String).join(" ");
+      expect(cover).toContain("My Team");
+      expect(cover).toContain("This Week");
+
+      // The workload is the same people the screen's figures count, here and on the API.
+      const screen = (await as("director").get("/workspace/analytics?scope=team&period=week")).body;
+      const named = rows("Workload by Person").slice(1).map((r) => r[0]);
+      expect(named.length).toBeGreaterThan(1);
+      expect(named).toEqual(screen.workload.map((w) => w.employee.display_name));
+      expect(rows("Blocked Work").length - 1).toBe(screen.blocked.total);
+
+      // The run pressed for 90 Days while this one waited is built with its own period.
+      const other = contract.reports.HomeReportRun.parse((await as("director").get(`/workspace/analytics/export/${ids.otherRun.home_report_run_id}`)).body);
+      expect(other.status).toBe("done");
+      const otherDoc = (await q("SELECT storage_key FROM document WHERE document_id = $1", [other.document_id])).rows[0];
+      const otherBook = new ExcelJS.Workbook();
+      await otherBook.xlsx.load(await storage.get(otherDoc.storage_key));
+      const otherCover = [];
+      otherBook.getWorksheet("Cover").eachRow((row) => otherCover.push(...row.values.slice(1).map(String)));
+      expect(otherCover.join(" ")).toContain("90 Days");
+    });
+
+    test("a custom period is built as pressed, and the ledger says which period each file was made with", async () => {
+      const from = lagos.addDays(today, -6);
+      const res = await as("director").post("/workspace/analytics/export", { format: "pdf", period: "custom", from, to: today });
+      expect(res.status).toBe(202);
+      expect(res.body.home_report_run_id).not.toBe(ids.analyticsRun.home_report_run_id);
+      const asked = { task_scope: "mine", analytics_period: "custom", period_from: from, period_to: today };
+      const event = (
+        await q("SELECT payload FROM event_log WHERE event_key = 'home.report_run' AND entity_id = $1", [res.body.home_report_run_id])
+      ).rows[0];
+      expect(event.payload.filters).toEqual(asked);
+      await drain();
+      const run = (await q("SELECT document_id FROM home_report_run WHERE home_report_run_id = $1", [res.body.home_report_run_id])).rows[0];
+      const pdf = (await q("SELECT render_html FROM document WHERE document_id = $1", [run.document_id])).rows[0];
+      expect(pdf.render_html).toContain("Workspace Analytics");
+      expect(pdf.render_html).toContain("Completion Rate: ");
+      expect(pdf.render_html).toContain("Mine");
+    });
+
+    test("one who loses the export grant before the file is made gets none: the run is skipped", async () => {
+      const res = await as("ops").post("/workspace/analytics/export", { format: "xlsx" });
+      expect(res.status).toBe(202);
+      await q(
+        `UPDATE permission SET can_export = false
+          WHERE module_key = 'workspace' AND role_id = (SELECT role_id FROM role WHERE code = 'operations_people')`,
+      );
+      await require("../../src/shared/rbac/grants-cache").bumpTeamVersion();
+      try {
+        await drain();
+        const run = (await q("SELECT status, error FROM home_report_run WHERE home_report_run_id = $1", [res.body.home_report_run_id])).rows[0];
+        expect(run).toEqual({ status: "skipped", error: "The recipient may no longer open this report's source." });
+      } finally {
+        await q(
+          `UPDATE permission SET can_export = true
+            WHERE module_key = 'workspace' AND role_id = (SELECT role_id FROM role WHERE code = 'operations_people')`,
+        );
+        await require("../../src/shared/rbac/grants-cache").bumpTeamVersion();
+      }
+    });
   });
 });

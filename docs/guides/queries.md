@@ -10,7 +10,7 @@
 | Capabilities | `queries.configure` (write query rules, the consequence chain and letter templates: the writes on Rules, Sanctions · Chain Settings and Letter Templates) |
 | Screens (PROGRESS.md rows) | #34 Queries, #35 Rules, #36 Sanctions, #37 Letter Templates; reads shared with #13 ESS · My Queries (AJ) and the employee 360 |
 | Status | Draft |
-| Last changed | 26/10/2026 |
+| Last changed | 27/10/2026 |
 
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
@@ -37,24 +37,32 @@ ESS · My Queries.
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | Queries & Sanctions · Queries (`queries`) | Staff app | `queries` view: scope `all` sees every query; anyone else only the queries they raised (§6.1) | KPI strip (open, awaiting response, closed this month, escalated), the query list, the open query's card (subject, raised by, due, the policy cited, the response, the letter), Queries by Reason | Raise a Query, Send Reminder, View Letter, Record Decision (close with no action, or propose a sanction) |
-| Queries & Sanctions · Rules (`rules`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip (active, draft, fired this month, queries raised), one card per rule with its threshold, Recent Firings | New Rule, Edit Rule, Activate, Pause |
+| Queries & Sanctions · Rules (`rules`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip (active, draft, fired this month, queries raised), one card per rule with its threshold, Recent Firings. Attendance's own rules are not here: they are the Attendance policy's (§6.3) | New Rule, Edit Rule, Activate, Pause |
 | Queries & Sanctions · Sanctions (`sanctions`) | Staff app | `queries` view, same visibility as the query a sanction follows | KPI strip (active, awaiting approval, fines this year, fines recovered), sanction history | Issue Sanction (opens Queries: a sanction starts from a query's decision), Chain Settings: the ladder in order; Add Step, Move Up, Move Down, Retire need `queries.configure` |
 | Queries & Sanctions · Letter Templates (`letter-templates`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip, the template list with status, the selected template's preview filled with sample values | New Template, Edit Template, Preview, Activate |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee, own records (ESS guide) | One tab with a Queries and Sanctions switch: their queries, open ones first, and their issued sanctions | Respond to an open query in rich text; open a query's or a sanction's letter. Sanctions are read only |
 | Employee 360 · Queries, Sanctions | Staff app | `people` view within scope, and `queries` view for the two tabs | Two tabs: the person's queries and their sanctions, each the ones the viewer may see (§6.1), newest first | Open the query (a sanction opens the query it follows) on Queries & Sanctions |
-| My Approvals (`approvals`) | Staff app | The approvers of `queries.consequence` | A proposed sanction waiting on them | Approve, Reject, Request Changes |
+| The query's card on Queries (`queries`) | Staff app | Whoever the `queries.consequence` approval waits on (§6.5) | A proposed sanction waiting on them: its step, reason, fine | Approve Sanction (Operations & People sign it), Reject with a reason |
 | Notification bell | Both shells | The employee; the raiser; People | Query raised, reminder, response in, sanction issued | Open the record |
 | ⌘K | Both shells | Within the reader's visibility | Queries by number, person and subject; sanctions by number and person | Open the record |
 
 ## 3 · How the screens relate
 
-1. **A rule raises a query.** Attendance commits a late punch (`attendance.punched`, result `late`).
-   The outbox hands it to the rule evaluator (`query_rules.evaluator`, job `query-rule-evaluate`),
-   which counts the person's late arrivals inside each active `lateness` rule's window, from the
-   attendance service, never its tables. On the third (the rule's threshold) it raises **one** query
-   through `queries.service.raise()`, the same function a manager's form calls, with the counted
-   days as evidence and the rule's query letter. The fourth and fifth late arrivals count towards the
-   next breach, not this one (§6.3). The rule's firing shows on Rules · Recent Firings.
+1. **A rule raises a query.** Two kinds of rule raise one, both through `queries.service`, never a
+   second path:
+   - **The Attendance policy's rules** (late arrivals, early departures, absences, forgotten
+     clock-outs, location flags; attendance.md §6.16, T3). Attendance counts them and records a
+     breach; when the version in force has Raise Query on, it emits `attendance.rule_breached` with
+     `raise_query`. The outbox hands it to `queries.raise_from_breach`, which raises **one** query for
+     the breach (its days as evidence, its policy version cited, dedup `attendance-breach:<id>`) and
+     links it back on the breach through the attendance service (`attachQuery`). Lateness is set
+     there and only there (AJ with GE and TB, 27/10/2026).
+   - **The rules on Rules** (§6.3): overdue tasks, low monthly scores, unregistered devices and,
+     with M2's KPIs, missed targets. The evaluator (`query_rules.evaluator`, job
+     `query-rule-evaluate`) counts each active rule's window from the owning module, never its
+     tables, and on the threshold raises **one** query through `raiseForRule()` with the counted
+     days or tasks as evidence. The next breach needs the threshold again (§6.3). The rule's firing
+     shows on Rules · Recent Firings.
 2. **A manager raises a query.** Queries · Raise a Query → `POST /queries` → the same `raise()`. The
    query is numbered (`QRY-0001`), its letter is generated and filed (§6.7), and `query.raised`
    notifies the employee (opening ESS · My Queries) and emails them the letter.
@@ -69,12 +77,17 @@ ESS · My Queries.
    action resolves the query. Propose a sanction names a rung of the chain (the next rung for this
    person is offered first, §6.5) with the reason, the evidence and an optional fine, writes a
    `sanction` waiting for approval and opens the `queries.consequence` approval in the same
-   transaction. The query shows as escalated.
-5. **The approval decides the sanction.** My Approvals → `POST /workflow/instances/:id/approve`.
-   `workflow.completed` for `queries.consequence` reaches `sanctions.events`: approved issues the
-   sanction (numbered `SAN-0001`), generates the rung's letter, files it and mails it; any fine
-   becomes pending for payroll (§6.6); the query is resolved. Rejected withdraws the proposal and
-   the query returns to Under Review so a different decision can be recorded.
+   transaction. The proposer does not sign it. The query shows as escalated.
+5. **The approval decides the sanction.** The query's card shows **Approve Sanction** and **Reject**
+   to whoever the approval waits on → `POST /sanctions/:id/approve` or `/reject`. At the Operations &
+   People stage the approver draws their signature: it is kept through the vault, and they sign the
+   letters (`sanction.signed_by`; MyCity's letters are signed by its People & Operations Lead, for the
+   company). The service records it and decides the stage through the workflow service in the same
+   transaction (`workflow.service.decideIn`). `workflow.completed` for `queries.consequence` reaches
+   `sanctions.events`: approved issues the sanction (numbered `SAN-0001`), generates the rung's
+   letter, files it and mails it; any fine becomes pending for payroll (§6.6); the query is resolved.
+   Rejected withdraws the proposal and the query returns to Under Review so a different decision can
+   be recorded.
 6. **Payroll takes the fine.** M6 reads pending fines through `sanctions.fines` and accepts each one
    into a run, or waives it with a reason. ESS · My Payslips shows the deduction with its query
    number (ESS guide §6).
@@ -84,18 +97,18 @@ ESS · My Queries.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `query_rule` (3000, extended by 3010, 3030) | `code`, `name`, `source_event`, `measure`, `threshold`, `window_days`, `letter_template`, `policy_id`, `policy_clause`, `active`, `activated_at` | One rule a row. `source_event` is the trigger (§6.3). A rule is a draft until first activated (`activated_at` null), active, or paused (`active` false after activation). No rule is seeded: thresholds are MyCity's choice (A26) |
-| `employee_query` (3000, 3010, 3020) | `number`, `employee_id`, `query_rule_id`, `raised_by`, `subject`, `details`, `evidence`, `status`, `outcome`, `response_due_at`, `reminded_at`, `dedup_key`, `letter_document_id`, `signature_document_id`, `policy_version_id`, `policy_clause`, `workflow_instance_id`, `reviewed_by`, `reviewed_at` | `raised_by` null means a rule raised it. `dedup_key` is unique, so a breach delivered twice raises one query. `status` is `awaiting_response`, `under_review`, `resolved`; `outcome` is `no_action` or `sanctioned` once resolved |
+| `query_rule` (3000, extended by 3010, 3030) | `code`, `name`, `source_event`, `measure`, `threshold`, `window_days`, `letter_template`, `policy_id`, `policy_clause`, `active`, `activated_at` | One rule a row. `source_event` is the trigger (§6.3); `lateness`, `absence` and `missing_clock_out` are no longer offered (the Attendance policy's, §6.3), and a row with one never fires. A rule is a draft until first activated (`activated_at` null), active, or paused (`active` false after activation). No rule is seeded: thresholds are MyCity's choice (A26) |
+| `employee_query` (3000, 3010, 3020, 3040) | `number`, `employee_id`, `query_rule_id`, `raised_by`, `source` (`person`, `rule` or `attendance`), `subject`, `details`, `evidence`, `status`, `outcome`, `response_due_at`, `reminded_at`, `dedup_key`, `letter_document_id`, `signature_document_id`, `policy_version_id`, `policy_clause`, `workflow_instance_id`, `reviewed_by`, `reviewed_at` | `raised_by` null means a rule raised it. `dedup_key` is unique, so a breach delivered twice raises one query. `status` is `awaiting_response`, `under_review`, `resolved`; `outcome` is `no_action` or `sanctioned` once resolved |
 | `query_response` (3000) | `employee_query_id`, `employee_id`, `body`, `submitted_at` | One per query, never updated |
 | `consequence_step` (3010) | `code`, `name`, `position`, `letter_template`, `financial_effect`, `default_days`, `valid_days`, `evidence_required`, `active` | MyCity's ladder, one rung a row, ordered by `position`. Entered on Chain Settings, not seeded (A26). `financial_effect`: `none`, `unpaid_days`, `ends_employment` |
-| `sanction` (3000, 3010, 3020) | `number`, `employee_query_id`, `employee_id`, `consequence_step_id`, `sanction_type`, `reason`, `evidence`, `decided_by`, `signature_document_id`, `effective_on`, `ends_on`, `status`, `workflow_instance_id` | Always from a query (NOT NULL). `sanction_type` is the rung's code at the time, kept if the rung is renamed. `status`: `pending_approval`, `issued`, `rejected`, `withdrawn` |
+| `sanction` (3000, 3010, 3020) | `number`, `employee_query_id`, `employee_id`, `consequence_step_id`, `sanction_type`, `reason`, `evidence`, `decided_by`, `signature_document_id` and `signed_by` (the Operations & People approver who signed it, §6.4), `effective_on`, `ends_on`, `status`, `workflow_instance_id` | Always from a query (NOT NULL). `sanction_type` is the rung's code at the time, kept if the rung is renamed. `status`: `pending_approval`, `issued`, `rejected`, `withdrawn` |
 | `sanction_fine` (3000) | `sanction_id`, `amount_ngn`, `settlement_status`, `settled_at` | An attachable outcome on any sanction, never a rung. `pending` until M6 accepts it into a run (`accepted`, then `settled`) or waives it |
 | `sanction_letter` (3000) | `sanction_id`, `document_id`, `letter_type` | The issued letters, from the vault: the rung's, and `salary-deduction-letter` when it carries a fine |
 | `letter_template` (3010) | `key`, `name`, `purpose`, `status` | The letters this module may send. The wording is `template_version` (0080) under the same key; the shipped default is `templates/documents/<key>.html`. `purpose`: `query`, `sanction` or `fine` (§6.6) |
 
 Schema migration file(s): `migrations/3000_queries_sanctions.sql` (merged), `migrations/3010_queries_chain.sql`,
 `migrations/3020_queries_signatures.sql` (the drawn signatures' `signature_document_id`),
-`migrations/3030_queries_policy.sql` (the policy a rule names and a query cites).
+`migrations/3030_queries_policy.sql` (the policy a rule names and a query cites), `migrations/3040_queries_attendance.sql` (the key from `attendance_rule_breach.employee_query_id` to the query it raised, owed since attendance's 1430, and a query's `source`).
 Reference-data file(s): `seeds/reference/3099_seed_queries_sanctions.sql` (merged),
 `seeds/reference/3190_seed_queries_chain.sql`: the `queries.configure` capability and its holders,
 the `queries.consequence` approval, the shipped letter templates' rows, and `3099`'s invalid
@@ -110,8 +123,8 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
 | `GET /api/v1/queries/summary` | → `QueriesSummary` | `queries` view · §6.1 | no | |
-| `GET /api/v1/queries` | `QueryListQuery` (`status`, `employee_id`, `raised`: `mine`, `rules`, `q`, `sort`) → `QueryPage` | `queries` view · §6.1 | yes, 25 | |
-| `GET /api/v1/queries/:id` | → `QueryDetail` | `queries` view · §6.1 | no | 404 outside visibility |
+| `GET /api/v1/queries` | `QueryListQuery` (`status`, `employee_id`, `raised`: `mine`, `rules`, `raised_from` and `raised_to` (Lagos days, both inclusive; a review's month), `q`, `sort`) → `QueryPage` | `queries` view · §6.1 | yes, 25 | |
+| `GET /api/v1/queries/:id` | → `QueryDetail` | `queries` view · §6.1 | no | 404 outside visibility. `approval` names the stage a proposed sanction waits on, whether the reader may decide it and whether they sign |
 | `POST /api/v1/queries` | `QueryCreate` → `QueryDetail` | `queries` create | | Idempotency-Key |
 | `POST /api/v1/queries/:id/remind` | `EmptyBody` → `QueryDetail` | `queries` create · §6.1 | | Once a day, while awaiting a response |
 | `POST /api/v1/queries/:id/decision` | `QueryDecision` → `QueryDetail` | `queries` edit · §6.1 | | §6.4 |
@@ -131,6 +144,8 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `GET /api/v1/sanctions` | `SanctionListQuery` (`status`, `employee_id`, `consequence_step_id`, `q`, `sort`) → `SanctionPage` | `queries` view · §6.1 | yes, 25 | |
 | `GET /api/v1/sanctions/:id` | → `SanctionDetail` | `queries` view · §6.1 | no | |
 | `GET /api/v1/sanctions/standing` | `SanctionStandingQuery` (`employee_id`) → `SanctionStanding` | `queries` view · §6.1 | no | The rungs in force and the next one |
+| `POST /api/v1/sanctions/:id/approve` | `SanctionApprove` (`signature` at the Operations & People stage) → `SanctionDetail` | the approver the stage waits on (§6.5) | | Signs and approves the stage in one transaction; 422 `SIGNATURE_REQUIRED` without it there |
+| `POST /api/v1/sanctions/:id/reject` | `SanctionReject` (`reason`, at least 10 characters) → `SanctionDetail` | the approver the stage waits on | | The query returns to Under Review |
 | `GET /api/v1/sanctions/chain` | `ConsequenceStepListQuery` (`active`) → `ConsequenceStepPage` | `queries` view | yes, 25 | In ladder order |
 | `POST /api/v1/sanctions/chain` | `ConsequenceStepCreate` → `ConsequenceStep` | `queries` create, `queries.configure` | | `position` inserts it there; the rungs below move down |
 | `PATCH /api/v1/sanctions/chain/:id` | `ConsequenceStepUpdate` → `ConsequenceStep` | `queries` edit, `queries.configure` | | Moving, renaming, retiring |
@@ -170,8 +185,9 @@ here.
 - One path: `queries.service.raise()` for the form, a rule, the AI's route and a script.
 - Subject 4 to 150 characters, details 20 to 4,000. The employee must be active and must not be the
   person raising it.
-- `response_due_at` is raised-at plus the response window, 48 hours unless Settings · Queries
-  (M9) says otherwise. After it passes without a response the query still waits, and a decision may
+- `response_due_at` is raised-at plus the response window, **24 hours** (MyCity's handbook §4.7.1:
+  "not later than 24 hours after receipt"; AJ, 27/10/2026) unless Settings · Queries (M9) says
+  otherwise. After it passes without a response the query still waits, and a decision may
   be recorded.
 - The query letter is generated in the same transaction (§6.7). A manual query uses the active
   letter template of purpose `query` chosen on the form, or the default `query-letter`.
@@ -184,36 +200,50 @@ here.
 - **Signed.** The person raising it draws their signature on the form (`SignatureField`, a PNG
   data URL, `signature`); the service stores it through the vault (`purpose: "signature"`, doc type
   `query_signature`) as `employee_query.signature_document_id` and prints it on the letter above
-  their name. A rule's query has no signer to draw one: its letter is signed Operations & People.
+  their name. A rule's or an attendance breach's query has no signer to draw one: its letter is
+  signed Operations & People.
+- **From an attendance breach** (§3 step 1): `queries.raise_from_breach` on `attendance.rule_breached`
+  with `raise_query` true. Subject "3 Late Arrivals This Month" (the breach's own words), details
+  naming the days, evidence the days, the Attendance policy version in force on the breach's last day
+  cited, `source` `attendance`, no `query_rule_id`, dedup `attendance-breach:<breach id>`. The breach
+  is linked to the query through the attendance service (`attachQuery`), in the same transaction. A
+  breach whose person has left raises nothing. Shown as raised by **Attendance Policy**, and seen as
+  a rule's query is (§6.1).
 
 ### 6.3 Rules
 
-- A rule is `{ source_event, measure, threshold, window_days, letter_template }`. Triggers:
-  `lateness` (a late punch), `absence` (an absent day at the day-close), `missing_clock_out` (the
-  day-close opened one), `unenrolled_device` (a punch from a device not on the person's list),
-  `overdue_task` (a Workspace task whose due day passed before it was done: still open, or done
-  late, counted on its due day), `low_performance` (a month's review closed rated Below, counted on
-  the day it closed), `missed_target` (an M2 KPI closed below its target; not counted yet).
-- `measure` is `count` (events) or `minutes` (late minutes summed, `lateness` only), so "three late
-  arrivals in thirty days" and "five cumulative hours in a month" are both settings
-  (MILESTONES §8 left the number open).
+- **Attendance counts its own rules.** Late arrivals, early departures, absences, forgotten clock-outs
+  and location flags are the Attendance policy's (attendance.md §6.16, T3: "a query is raised only
+  when its switch is on"; MyCity's handbook sets them as policy). MILESTONES §8's "three late arrivals
+  in thirty days raises a query" is met there: the policy's late-arrival row (3 in a month) with Raise
+  Query on, configured on its screen, and three late arrivals raise exactly one query (§6.2). The
+  Rules screen no longer offers `lateness`, `absence` or `missing_clock_out`, so one pattern never
+  raises two queries (AJ with GE and TB, 27/10/2026).
+- A rule on Rules is `{ source_event, threshold, window_days, letter_template }`. Triggers:
+  `unenrolled_device` (a punch from a device not on the person's list), `overdue_task` (a Workspace
+  task whose due day passed before it was done: still open, or done late, counted on its due day),
+  `low_performance` (a month's review closed rated Below, counted on the day it closed),
+  `missed_target` (an M2 KPI closed below its target; not counted yet). `measure` is always `count`.
 - The window is `shared/rules/window-counter`: the `window_days` days ending on the event's date,
   in Lagos dates.
-- Counting starts after the last query the same rule raised for the person, so three late arrivals
-  raise exactly one query, and the next query needs three more. The counted dates are the query's
+- Counting starts after the last query the same rule raised for the person, so a threshold of three
+  raises exactly one query, and the next query needs three more. The counted dates are the query's
   evidence.
 - `dedup_key` is `<query_rule_id>:<employee_id>:<breach date>`; the outbox delivers at least once,
   and the unique key makes the second delivery a no-op.
-- Counts come from the owning module, never their tables: attendance answers in
-  `attendance.auto-query.js`, tasks in `tasks.auto-query.js`, reviews in `reviews.auto-query.js`
+- Counts come from the owning module, never their tables: attendance answers unknown-device punches
+  in `attendance.auto-query.js`, tasks in `tasks.auto-query.js`, reviews in `reviews.auto-query.js`
   (each `offences()`); an exception People accepted ("the record stands") is not an offence. A task
   counts against its primary assignee; a cancelled or archived task never counts. `missed_target`
   may be drafted but not switched on until M2's KPIs count it (409 `TRIGGER_NOT_AVAILABLE`).
 - A rule may name the policy it enforces (`policy_id`, `policy_clause`): its queries cite the
   version in force on the breach day, and their letters quote it, as a manual query's (§6.2). A
-  rule whose policy has no version in force still raises its query, without the citation.
+  rule whose policy has no version in force still raises its query, without the citation. The
+  rule form's **Clause** (Optional, at most 300 characters, shown once a policy is picked) is the
+  line its letters quote; taking the policy off clears it.
 - A draft or paused rule never fires. Activating a rule does not reach back: it counts events from
-  its activation onwards.
+  its activation onwards. **Edit Rule** changes a rule's name, threshold, window, letter, policy and clause;
+  its trigger is fixed once it has fired.
 - A rule may not be deleted once it has fired; it is paused.
 
 ### 6.4 Deciding a query
@@ -222,18 +252,27 @@ here.
 - Before the response window ends, a decision needs the employee's response; after it, it does not.
 - **Close, no action**: a reason of at least 10 characters. Status `resolved`, outcome `no_action`.
 - **Propose a sanction**: a rung (`consequence_step_id`), a reason, evidence when the rung requires
-  it, the dates when its financial effect is `unpaid_days`, an optional fine, and the proposer's
-  drawn signature (`signature`, stored as `sanction.signature_document_id`). Writes the `sanction`
-  as `pending_approval` and opens `queries.consequence` with context `{ rank, fine_amount }`, in one
-  transaction. One open proposal a query. The issued letters (§6.7) carry the proposer's signature,
-  name and job title: they decided it; the approval only lets it stand.
+  it, the dates when its financial effect is `unpaid_days`, and an optional fine. Writes the
+  `sanction` as `pending_approval` and opens `queries.consequence` with context
+  `{ rank, fine_amount }`, in one transaction. One open proposal a query. The proposer is
+  `decided_by` and does not sign.
+- **Approve or reject** (`POST /sanctions/:id/approve`, `/reject`): only whoever the current stage
+  waits on. At the `operations_people` stage the approver draws their signature (`signature`, 422
+  `SIGNATURE_REQUIRED` without it), stored through the vault as `sanction.signature_document_id`,
+  with `signed_by` the approver. The issued letters (§6.7) carry that signature, name and job title,
+  "For" the company, as every sample MyCity sent is signed by its People & Operations Lead (AJ,
+  27/10/2026). A rejection needs a reason of at least 10 characters.
 
 ### 6.5 The chain
 
-- The rungs, top to bottom, are `consequence_step` rows in `position` order. MyCity's ladder (Cynthia,
-  10 October; the Caution renamed Question and moved after the Warning, GE 26/10/2026): Warning,
-  Question, Second Warning, Suspension, Suspension Without Pay, Dismissal or Termination. It is
-  entered on Chain Settings; adding a rung is inserting a row at a position.
+- The rungs, top to bottom, are `consequence_step` rows in `position` order. MyCity's ladder, in
+  MILESTONES §8's order (Cynthia, 10 October): **Caution, Warning, Second Warning, Suspension Without
+  Pay, Dismissal or Termination**. The Caution is MyCity's own letter (CAUTION, a performance
+  caution); "Question" was the meeting transcript mishearing it. A disciplinary suspension is always
+  without pay, 3 days the first time and up to 7 for a repeat (handbook §4.6.2, §4.7.4, and the one
+  sample, SUSPENSION); a suspension on full pay is a precaution during an investigation, not a rung.
+  So the ladder has one suspension (AJ, 27/10/2026, settling GE's 26/10 order). It is entered on
+  Chain Settings; adding a rung is inserting a row at a position.
 - A rung names: its letter template, its financial effect, its default length in days (suspensions),
   how long it stays in force for escalation (`valid_days`, null for ever) and whether evidence is
   required.
@@ -242,8 +281,9 @@ here.
   without code. People may choose a different rung; the choice and reason are recorded.
 - A retired rung keeps its sanctions; it is no longer offered. A rung with sanctions is never deleted.
 - Who decides is the `queries.consequence` approval, edited on Settings · Approvals: Operations &
-  People for every rung, then Management from rank 4 (Suspension and above, by position at the
-  time). The rank travels in the approval's context, so a definition change never needs code.
+  People for every rung (who sign it, §6.4), then the CEO from rank 4 (Suspension Without Pay and
+  above, by position at the time): the handbook has the CEO and the HR Manager decide a suspension
+  (§4.7.4). The rank travels in the approval's context, so a definition change never needs code.
 
 ### 6.6 Fines
 
@@ -269,13 +309,18 @@ here.
   written in the rich text editor (meeting 26/10) and kept as Markdown through the one renderer's
   whitelist (`htmlToMarkdown`), its `{{ names }}` as written; the detail hands it back as HTML
   (`body_html`) for the editor. A script may still send Markdown (`body`). A template is
-  `awaiting_sample` while it has no wording (the sanction letters' files stay empty until MyCity
-  sends the samples; `query-letter` and `salary-deduction-letter` ship with wording and are seeded
-  active, so a rule can raise a query and a fine can be sent on a fresh database), `draft` until
-  activated, `active`, or `retired`. Only an active template can be chosen.
+  `awaiting_sample` while it has no wording, `draft` until activated, `active`, or `retired`. Only
+  an active template can be chosen.
 - Purposes: `query` (a query's letter), `sanction` (a rung's letter), `fine` (the deduction letter
-  a fine sends, §6.6). Seven letters ship: Query, Warning, Question, Suspension, Suspension Without
-  Pay, Termination and Salary Deduction.
+  a fine sends, §6.6). Six letters ship, each with wording and seeded active, so every rung is ready
+  on a fresh database: Query, Caution, Warning (also the Second Warning's), Suspension Without Pay,
+  Termination and Salary Deduction.
+- **The wording is MyCity's** (the samples Cynthia's team sent, 27/10/2026; redacted copies in
+  `docs/MyCity-ERP-Documents/letter-samples/`): the Query letter follows QUER 2 and QUERY
+  NOTIFICATION (respond within the window, "stating why appropriate disciplinary action should not be
+  taken"); Caution, Warning, Suspension Without Pay and Termination follow CAUTION, WARNING,
+  SUSPENSION and DISMISSAL, with the record's facts where the samples name a person, a date or an
+  offence. The Salary Deduction letter is ours, for MyCity's HR to read before go-live.
 - **Layout** (meeting 26/10): a letter fits one page where its wording allows (the letterhead's
   margins and type are set for it, and the signature block never splits from its name). Past one
   page, the letterhead's header (logo, number, date) and footer (Settings · Organisation: name,
@@ -300,7 +345,7 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
 | `query.reminded` | Send Reminder | Notification and email to the employee |
 | `query.responded` | The employee responds | Notification to the raiser, or People when a rule raised it |
 | `query.closed` | Close, no action | Notification to the employee |
-| `sanction.proposed` | A sanction is proposed from a query's decision | Opens `queries.consequence`; the engine tells the first approvers |
+| `sanction.proposed` | A sanction is proposed from a query's decision | Opens `queries.consequence`; the engine tells the first approvers, who decide on the query's card |
 | `query_rule.fired` | A rule raised a query | Recent Firings refresh |
 | `query_rule.saved`, `query_rule.activated`, `query_rule.paused` | Rules writes | Audit |
 | `sanction.issued` | `queries.consequence` approved | Numbered; letter generated, filed, emailed with the PDF once rendered (`templates/email/sanction-issued.html`); fine pending; query resolved; notification to the employee |
@@ -309,7 +354,8 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
 | `consequence_step.saved` | Chain Settings writes | Audit |
 | `sanction_fine.accepted`, `.settled`, `.waived` | M6 takes, deducts or waives a fine (`sanctions.fines`) | Audit |
 | `letter_template.saved`, `letter_template.activated` | Letter Templates writes | Audit |
-| job `query-rule-evaluate` | Queued by `query_rules.events` on `attendance.punched` (a clock-in), `attendance.day_closed` (absent), `attendance.review_required` (a missing clock-out, an unknown device) and `review.closed` (a month rated Below), once per event, and by the schedule below | Counts the person's active rules as of the event's day and raises one query per breach (§6.3); idempotent |
+| `attendance.rule_breached` (Attendance) | A policy rule is reached with Raise Query on | Outbox `queries.raise_from_breach`: one query for the breach, linked back on it (§6.2) |
+| job `query-rule-evaluate` | Queued by `query_rules.events` on `attendance.review_required` (an unknown device) and `review.closed` (a month rated Below), once per event, and by the schedule below | Counts the person's active rules as of the event's day and raises one query per breach (§6.3); idempotent |
 | schedule `query-rule-sweep` | Every day at 06:20 Lagos | For each person with a task due yesterday that is still open or was done late, queues `query-rule-evaluate` for `overdue_task` as of yesterday; only while an `overdue_task` rule is active |
 
 ## 8 · Permissions and visibility by role
@@ -319,10 +365,10 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
 | Employee | Their own queries and sanctions, in ESS only | Respond |
 | Line Manager (`manager`, `queries` team, view and create) | Queries they raised | Raise, remind; read the response |
 | Head of Department (`queries` team, view, create, edit, approve) | Queries they raised | Raise, remind, decide their own queries |
-| Operations & People (`queries` all) | Everything | Everything, including rules, chain and letters (`queries.configure`); first approver of every sanction |
-| Management (`queries` all, no delete) | Everything | Decide; second approver from Suspension up |
+| Operations & People (`queries` all) | Everything | Everything, including rules, chain and letters (`queries.configure`); first approver of every sanction, who signs its letters |
+| Management (`queries` all, no delete) | Everything | Decide queries |
 | Implementation | Everything | Everything (`queries.configure`) |
-| CEO | Everything | Everything; holds every capability |
+| CEO | Everything | Everything; holds every capability; second approver from Suspension Without Pay up |
 
 `queries.configure` is held by default by Implementation and Operations & People (seed `3190`).
 Restricted fields: none beyond the employee's own masks; a query's evidence carries dates and
@@ -366,13 +412,13 @@ or tier 2.**
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature; Write With AI (What To Say, Write Draft, the draft, Try Again, Use Draft), reading AI Is Off or AI Limit Reached when it cannot answer | None | Where the signature is kept, the version cited: §6.2 |
-| Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by, raised, response due, counted days, response, sanction); Raise a Query, Send Reminder, View Letter (the PDF the employee received), Record Decision | Help on Escalated: a sanction is waiting for approval. Help on Response Due: the 48 hour window | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
-| Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, fine, reason, Your Signature (for a sanction) | Help on the next rung: why it is offered | The approval route and its thresholds: Settings · Approvals, §6.5 |
-| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 30 days", the policy it enforces, status); Recent Firings; New Rule, Activate, Pause | Help on Measure: count or late minutes | Counting after the last query, the dedup key: §6.3 |
+| Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by (a person, the rule, or Attendance Policy), raised, response due, counted days, response, sanction, and while a sanction waits: its step and who it waits on); Raise a Query, Send Reminder, View Letter (the PDF the employee received), Record Decision; Approve Sanction (Your Signature at the Operations & People stage) and Reject (Reason) for whoever it waits on | Help on Escalated: a sanction is waiting for approval. Help on Response Due: the 24 hour window. Help on Your Signature when approving: it signs the letters | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
+| Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, fine, reason | Help on the next rung: why it is offered | The approval route and its thresholds: Settings · Approvals, §6.5 |
+| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status); Recent Firings; New Rule, Edit Rule, Activate, Pause; the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional) | None | Counting after the last query, the dedup key: §6.3 |
 | Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
 | Letter Templates | Stat strip; the list (template, used by, status); the selected letter's preview on paper, the record's words underlined; New Template, Edit Template, Activate | Help on Letter: the names a letter can use | Versioning, the shipped defaults: §6.7 |
-| ESS · My Queries | The Queries and Sanctions switch with each one's count; Queries: the list (number, subject, raised, status), the picked query (subject, raised, respond by, what happened, your response, outcome, sanction), View Letter, Respond; Sanctions: the list (sanction, query, reason, date, fine), each opening its letter | Help on Respond By: the 48 hour window | The sanitising, the Markdown kept: §3 step 3 |
+| ESS · My Queries | The Queries and Sanctions switch with each one's count; Queries: the list (number, subject, raised, status), the picked query (subject, raised, respond by, what happened, your response, outcome, sanction), View Letter, Respond; Sanctions: the list (sanction, query, reason, date, fine), each opening its letter | Help on Respond By: the 24 hour window | The sanitising, the Markdown kept: §3 step 3 |
 
 ### 10.2 Phone layout
 
@@ -422,31 +468,52 @@ or tier 2.**
   Issue Sanction starts from an upheld query.
 - **Settled 19/10/2026 (GE).** A query a rule raised is seen by scope `all` and the CEO only
   (MILESTONES §8). The Queries empty state that says otherwise changes.
-- **The lateness threshold** (three, four, or five cumulative hours a month): MyCity, through
-  Cynthia. Built as a rule setting; no default is seeded.
-- **The ladder on production**: A26 keeps it out of the reference seed, so People enter the six
-  rungs on Chain Settings at go-live; staging gets them from its seed. TB to confirm.
-- **Dismissal or Termination** records the sanction and tells People; ending the employment stays
-  in People · Employees (organisation). GE and TB, before the M3 demo.
-- **Settled 26/10/2026 (GE).** The shipped Caution Letter is renamed Question Letter
-  (`question-letter`) and its rung sits after the Warning. Note for the demo: with that order a
-  second offence after a Warning is offered the Question rung; MILESTONES §8's "a second offence
-  escalates to second warning" holds on a ladder without it (the definition-of-done test's).
-- **The sample letters**: MyCity has sent the caution (now question) and warning letters;
-  suspension, suspension without pay and termination are awaited (Cynthia).
-- `sanction_fine.employee_accepted_at`, `employee_rejected_at` and `rejection_reason` (3000) are not
-  used: an employee disputes a fine in their query response. Drop in a later release, or keep for
-  M6. LA to say.
-
-- **To agree with Victor before the User Guide pictures (GE, 27/10/2026).** Who signs a sanction
-  letter (built: the proposer); whether a manual query may be raised unsigned by Operations & People
-  (built: always signed); the Salary Deduction letter's wording (ours, for MyCity's HR to read);
-  a Clause on the rule form (built: the policy only); the cut for `overdue_task` and
-  `low_performance` (built: the primary assignee, the due day, rating Below only); the 48 hour
-  window and one reminder a day.
+- **Settled 27/10/2026 (AJ, from MyCity's samples and handbook).** These replace the points they
+  name below and the 27/10 morning answers where they differ:
+  - **Lateness and the attendance rules are the Attendance policy's** (§3 step 1, §6.3). The
+    threshold is the policy's setting; MyCity's handbook reads 3 late arrivals in a month. Rules no
+    longer offers `lateness`, `absence` or `missing_clock_out`.
+  - **The ladder is MILESTONES §8's order:** Caution, Warning, Second Warning, Suspension Without Pay,
+    Dismissal or Termination (§6.5). The 26/10 "Question Letter" was the transcript mishearing
+    "Caution"; the shipped letter is `caution-letter` again.
+  - **One suspension, without pay** (handbook §4.7.4); the paid suspension is a precaution, not a rung.
+    The CEO approves from Suspension Without Pay up, after Operations & People (handbook §4.7.4).
+  - **The response window is 24 hours** (handbook §4.7.1, both query samples).
+  - **Operations & People sign a sanction's letters when they approve it**, "For" the company, as
+    every sample is signed; the proposer no longer signs (§6.4).
+  - **The letters' wording is MyCity's samples** (§6.7); all six ship active.
+  - **Dismissal or Termination** records the sanction and tells People; ending the employment stays
+    in People · Employees, where the letter's effective date is the Last Day (GE and TB, 27/10/2026).
+  - **The ladder on production** is entered on Chain Settings at go-live by Operations & People, on
+    the go-live checklist (TB, 27/10/2026); staging gets it from its seed.
+  - `sanction_fine.employee_accepted_at`, `employee_rejected_at` and `rejection_reason` (3000) stay,
+    unused, for a later milestone to use or drop (AJ, 27/10/2026).
+- **Settled 27/10/2026 (GE, AJ), the morning.** Every manual query is signed, Operations & People's
+  too; the Salary Deduction letter keeps our wording, for MyCity's HR to read before go-live (at the show
+  and tell, AJ 27/10/2026);
+  `overdue_task` counts the primary assignee on the due day and `low_performance` a month rated
+  Below only; one reminder a day. The rule form gains an Optional Clause (`policy_clause`, at most
+  300 characters) that the rule's query letters quote (§6.3).
+- **Settled 27/10/2026 (GE).** Staging's seed carries the five rungs, a rule, and demo queries and
+  sanctions. Built in `seeds/staging/50_queries.js`: the five rungs when the chain is empty, the
+  Unregistered Device rule switched on, and six queries the people's own line managers raised and
+  signed, one at each stage, two sanctions Management proposed and Operations & People approved and
+  signed (one with a fine), one waiting on them.
 
 ## 14 · Change log
 
+- 27/10/2026 · AJ · The rule form's Optional Clause built (§6.3): New Rule and Edit Rule, cleared with the policy.
+- 27/10/2026 · AJ · From MyCity's samples and handbook (§13): attendance breaches raise their query
+  (`queries.raise_from_breach`, migration 3040's key and `source`); Rules drops the three attendance
+  triggers; Caution, Warning, Second Warning, Suspension Without Pay, Dismissal or Termination; a
+  24 hour window; Approve Sanction and Reject on the query's card, Operations & People signing
+  (`signed_by`), the CEO from rank 4; Edit Rule; the six letters' wording from the samples, shipped
+  active; a review shows its month's queries (performance.md).
+- 27/10/2026 · AJ · The User Guide chapter `docs/manual/queries-and-sanctions.md` written, My Queries
+  and the person's tabs in it. Open: no screen lets the approvers of `queries.consequence` decide a
+  proposed sanction (§3 step 5 has the routes, §2's My Approvals row has no screen yet).
+- 27/10/2026 · AJ · §13's last point settled with GE: as built, except the rule form gains an
+  Optional Clause its letters quote (§6.3, §13).
 - 27/10/2026 · GE · Meeting 26/10 items 1 to 10 built; handed to Victor. Left: the staging seed's
   demo queries and sanctions, the User Guide chapter and its pictures, once §13's last point is agreed.
 - 26/10/2026 · GE · Rules count overdue Workspace tasks and low monthly performance (meeting 26/10;

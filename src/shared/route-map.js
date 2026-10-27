@@ -58,7 +58,7 @@ const SCREENS = Object.freeze({
   ],
   community: ["channels", "direct-messages", "announcements"],
   mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash", "signature"],
-  people: ["employees", "attendance", "leave", "devices", "worksites", "organogram"],
+  people: ["employees", "attendance", "leave", "devices", "worksites", "organogram", "departments"],
   performance: ["goals", "targets", "kpis", "reviews", "analytics"],
   queries: ["queries", "rules", "sanctions", "letter-templates"],
   recruitment: [
@@ -171,6 +171,8 @@ const ENTITY_ROUTES = Object.freeze({
   data_export: screen("ess", "my-profile"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   // A post nobody holds yet opens on the Organogram, focused on it.
   org_seat: screen("people", "organogram"),
+  // A department opens on People · Departments with its record open (docs/guides/organogram.md §9).
+  department: screen("people", "departments"),
   // A Download PDF file: its record opens the Org Chart, where it is asked for.
   org_chart_export: screen("ess", "org-chart"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   import_batch: screen("settings", "imports"),
@@ -294,6 +296,8 @@ const ENTITY_ROUTES = Object.freeze({
   performance_plan: { ...screen("performance", "goals"), param: "plan", self: screen("ess", "my-performance") },
   // search:none a target change is opened from its approval and from the key result it changes, which search finds
   target_change: { ...screen("performance", "goals"), param: "change" },
+  // search:none a request to unbind a plan is opened from its approval (the bell, Need You, ⌘K's Waiting on You) and read on Goals
+  plan_unbind: { ...screen("performance", "goals"), param: "unbind" },
   scorecard: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
@@ -389,7 +393,6 @@ const ENTITY_ROUTES = Object.freeze({
   ai_conversation: screen("praxis_ai", "ask"),
 
   // Settings
-  department: screen("settings", "organisation"),
   app_user: screen("settings", "users"),
   // A person's own login, as they see it: sign-ins, sessions, their password.
   account: screen("ess", "my-security"), // search:none a person's own login opens from My Security; logins are found as Users (app_user)

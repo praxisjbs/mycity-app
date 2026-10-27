@@ -8,6 +8,7 @@
  *   objective, key result           CO-O1 and CO-KR1.2 for the company; BM-O2, BM-KR2.1 for a function
  *   month                           one report per key result per month; the latest is "now"
  *   plan                            a function's (or the company's) quarter, approved as one
+ *   plan unbind                     a request to the CEO to reopen a binding plan for changes
  *   target change                   a binding target changed through the CEO
  *
  * Every link (a line to its key result, a function key result to a company one) is by id; codes
@@ -226,7 +227,11 @@ const KrType = z.enum([
 ]);
 const KrMeasure = z.enum(["numeric", "dated", "yes_no", "multi_part"]);
 const KrMonthStatus = z.enum(["not_started", "on_track", "at_risk", "off_track", "done", "missed"]);
-const PlanStatus = z.enum(["draft", "submitted", "binding", "returned"]);
+/**
+ * A plan's states. `unbound` and `revising` (§6.22) are binding's: the quarter keeps running on the plan
+ * while its head changes it and while the CEO decides the changes.
+ */
+const PlanStatus = z.enum(["draft", "submitted", "binding", "returned", "unbound", "revising"]);
 
 /** One part of a multi-part key result, scored on its own; the key result is their mean. */
 const KeyResultPart = z
@@ -308,19 +313,22 @@ const Objective = z
     plan_status: PlanStatus,
     score: ScoreValue.nullable(),
     key_results: z.array(KeyResult),
-    /** The reader may edit or delete it and its key results: its plan is draft or returned, and they set its goals. */
+    /** The reader may edit or delete it and its key results: its plan is draft, returned or unbound, and they set its goals. */
     can_edit: z.boolean(),
   })
   .strict();
 
 const ObjectivePage = Paged(Objective);
 
-/** GET /performance/okrs. `department_id` "company" lists the company's objectives. */
+/**
+ * GET /performance/okrs. `department_id` "company" lists the company's objectives. `status` is a plan's
+ * state, or `live` for the plans the quarter runs on: binding, unbound and revising (Report Month's).
+ */
 const OkrListQuery = listQuery(
   {
     period_id: uuid.optional(),
     department_id: z.union([uuid, z.literal("company")]).optional(),
-    status: PlanStatus.optional(),
+    status: z.union([PlanStatus, z.literal("live")]).optional(),
   },
   ["position", "code"],
 );
@@ -397,7 +405,8 @@ const KeyResultCreate = z
 
 /**
  * PATCH /performance/key-results/:id: every field while the plan is a draft or returned (an empty
- * one clears it); once binding, only an open TBC target, by its owner or the function's head (§6.7).
+ * one clears it), and unbound too, except a reported key result's target, measure, direction, unit
+ * and parts (§6.22); once binding, only an open TBC target, by its owner or the function's head (§6.7).
  */
 const KeyResultEdit = z
   .object({
@@ -618,12 +627,32 @@ const PerformanceFunction = z
     name: z.string().nullable(),
     may_set: z.boolean(),
     plan_status: PlanStatus.nullable(),
+    /** Its plan is binding, the reader sets it, no request waits: Goals shows Request To Unbind in place of New Goal (§6.22). */
+    can_request_unbind: z.boolean(),
   })
   .strict();
 
 const PerformanceFunctionPage = Paged(PerformanceFunction);
 
 const PerformanceFunctionListQuery = listQuery({ period_id: uuid.optional() });
+
+/**
+ * GET /performance/departments: the departments the reader's Performance lists can be filtered by:
+ * every active one for a reader with `all`, else those of the people in their scope, the people
+ * whose reviews and scorecards name them, their own and the ones they head. The Department and
+ * Function filters of Scorecards, Commitments, Reviews and Analytics offer only these.
+ */
+const PerformanceDepartment = z
+  .object({
+    department_id: uuid,
+    code: z.string(),
+    name: z.string(),
+  })
+  .strict();
+
+const PerformanceDepartmentPage = Paged(PerformanceDepartment);
+
+const PerformanceDepartmentListQuery = listQuery({});
 
 /** Why a plan cannot be sent yet (§6.4). */
 const PlanProblem = z
@@ -634,6 +663,37 @@ const PlanProblem = z
   })
   .strict();
 
+/* ------------------------------------------------------------------ *
+ * Unbinding a binding plan (§6.22)
+ * ------------------------------------------------------------------ */
+
+const PlanUnbindStatus = z.enum(["pending", "approved", "rejected"]);
+
+/** A request to unbind a binding plan, to the CEO. */
+const PlanUnbind = z
+  .object({
+    plan_unbind_id: uuid,
+    performance_plan_id: uuid,
+    reason: z.string(),
+    status: PlanUnbindStatus,
+    workflow_instance_id: uuid.nullable(),
+    requested_by: PersonRef.nullable(),
+    decided_at: isoDateTime.nullable(),
+    decision_reason: z.string().nullable(),
+    created_at: isoDateTime,
+  })
+  .strict();
+
+/** POST /performance/plans/:id/unbind: why the plan is to be unbound. */
+const PlanUnbindCreate = z.object({ reason: text(1000) }).strict();
+
+/** GET /performance/unbinds/:id: one request, named in full, for its sheet. */
+const PlanUnbindDetail = PlanUnbind.extend({
+  department_id: uuid.nullable(),
+  department: z.string().nullable(),
+  period_name: z.string(),
+}).strict();
+
 /** GET /performance/plans/:id: everything the plan binds, and what stops it being sent. */
 const PlanDetail = Plan.extend({
   objectives: z.array(Objective),
@@ -642,6 +702,8 @@ const PlanDetail = Plan.extend({
   contributions: z.array(Contribution),
   problems: z.array(PlanProblem),
   can_submit: z.boolean(),
+  /** The latest request to unbind it, pending or decided (null when none was made). */
+  unbind: PlanUnbind.nullable(),
 }).strict();
 
 /* ------------------------------------------------------------------ *
@@ -702,13 +764,13 @@ const TargetChangeDetail = TargetChange.extend({
  * Approvals waiting on the reader (§6.4, §6.7)
  * ------------------------------------------------------------------ */
 
-/** A function's plan, a target change, or a mid-quarter scorecard sent on its own (§11). */
-const PerformanceApprovalKind = z.enum(["plan", "target_change", "scorecard"]);
+/** A function's plan, a request to unbind one, a target change, or a mid-quarter scorecard sent on its own (§11). */
+const PerformanceApprovalKind = z.enum(["plan", "unbind", "target_change", "scorecard"]);
 
 /**
- * A plan stage, a target change or a mid-quarter scorecard the reader decides: Goals · Waiting On
- * You. `record_id` is the plan, the change or the scorecard; `employee` the person whose
- * scorecard it is (a scorecard, or a line's target change).
+ * A plan stage, an unbind request, a target change or a mid-quarter scorecard the reader decides: Goals ·
+ * Waiting On You. `record_id` is the plan, the request, the change or the scorecard; `employee` the person
+ * whose scorecard it is (a scorecard, or a line's target change).
  */
 const PerformanceApproval = z
   .object({
@@ -973,7 +1035,7 @@ const TABLES = {
       plan_status: "performance_plan.status",
       score: "the mean of its key results' latest scores (§6.8)",
       key_results: "its okr_key_result rows",
-      can_edit: "the reader may change it now: a draft or returned plan, and goals.authority",
+      can_edit: "the reader may change it now: a draft, returned or unbound plan, and goals.authority",
     },
   },
   ObjectivePage: { table: null, reason: "a page of objectives with their key results" },
@@ -1018,7 +1080,7 @@ const TABLES = {
       target_history: "its target_change rows",
       trace: "what it rolls up to",
       can_change_target: "the reader may ask to change its target now (goals.authority)",
-      can_edit: "the reader may change it now: a draft or returned plan, and goals.authority",
+      can_edit: "the reader may change it now: a draft, returned or unbound plan, and goals.authority",
       can_set_target: "the reader may set its TBC target in place before the lock date (§6.7)",
     },
   },
@@ -1045,10 +1107,14 @@ const TABLES = {
       name: "department.name; null for the company",
       may_set: "the reader may set its goals and KPIs (goals.authority)",
       plan_status: "the quarter's performance_plan.status, null without one",
+      can_request_unbind: "its plan is binding, the reader sets it and no plan_unbind waits (§6.22)",
     },
   },
   PerformanceFunctionPage: { table: null, reason: "a page of the functions a reader may set goals for" },
   PerformanceFunctionListQuery: { table: null, reason: "list controls and the quarter for the functions" },
+  PerformanceDepartment: { table: "department", virtual: {} },
+  PerformanceDepartmentPage: { table: null, reason: "a page of the departments a reader's Performance lists filter by" },
+  PerformanceDepartmentListQuery: { table: null, reason: "list controls for the departments" },
   PlanProblem: { table: null, reason: "a reason the plan cannot be sent, worked out" },
   PlanDetail: {
     table: "performance_plan",
@@ -1060,6 +1126,21 @@ const TABLES = {
       contributions: "its split key results",
       problems: "what stops it being sent",
       can_submit: "the reader may send it now",
+      unbind: "its latest plan_unbind row, null when none was made",
+    },
+  },
+  PlanUnbind: {
+    table: "plan_unbind",
+    virtual: { requested_by: "the employee of plan_unbind.requested_by" },
+  },
+  PlanUnbindCreate: { table: "plan_unbind" },
+  PlanUnbindDetail: {
+    table: "plan_unbind",
+    virtual: {
+      requested_by: "the employee of plan_unbind.requested_by",
+      department_id: "performance_plan.department_id; null for the company plan",
+      department: "department.name; null for the company plan",
+      period_name: "performance_period.name",
     },
   },
   TargetChangeCreate: { table: "target_change" },
@@ -1079,7 +1160,7 @@ const TABLES = {
   },
   PerformanceApproval: {
     table: null,
-    reason: "a pending performance.plan (a plan, or a scorecard sent on its own) or performance.target_change workflow_instance naming the reader, with its record",
+    reason: "a pending performance.plan (a plan, or a scorecard sent on its own), performance.plan_change (an unbind request, or an unbound plan's changes) or performance.target_change workflow_instance naming the reader, with its record",
   },
   PerformanceApprovalPage: { table: null, reason: "a page of approvals waiting on the reader" },
   PerformanceApprovalQuery: { table: null, reason: "list controls for the approvals waiting on the reader" },
@@ -1162,7 +1243,14 @@ module.exports = {
   PerformanceFunction,
   PerformanceFunctionPage,
   PerformanceFunctionListQuery,
+  PerformanceDepartment,
+  PerformanceDepartmentPage,
+  PerformanceDepartmentListQuery,
   PlanProblem,
+  PlanUnbindStatus,
+  PlanUnbind,
+  PlanUnbindCreate,
+  PlanUnbindDetail,
   PlanDetail,
   TargetChangeCreate,
   TargetChangePage,

@@ -156,6 +156,15 @@ icon: spark
 2. Upload the sheet, give every **Required** field a column, then read the **Preview**.
 3. Press **Commit Import**. Read [Import a spreadsheet](#settings-imports-run).
 
+## Set a Department's Head {#qs-department-head role="People & HR" icon=building screen=people/departments needs="people edit"}
+
+![A department, open](shot:qs-department-head)
+
+1. Open [People · Departments](/people?tab=departments) and press the department.
+2. Press **Set Head**, choose **A Person** and search for them under **Head**.
+3. Press **Set Head**. The old head's people now report to them. Read
+   [Set a department's head](#people-departments-head).
+
 ## Change a Role {#qs-roles role="Administrators" icon=shield screen=settings/roles-and-permissions needs="settings edit"}
 
 ![Settings, Roles & Permissions](shot:qs-roles)
@@ -596,6 +605,18 @@ open: /people?tab=employees
 as: operations
 marks:
   1: button "Import Staff" | Bring in a sheet
+```
+
+```shot qs-department-head
+open: /people?tab=departments
+as: operations
+sources:
+  - app/src/features/people/Departments.tsx
+do:
+  - phone click: row 1
+  - wait: button "Set Head"
+marks:
+  1: button "Set Head" | Give it a head
 ```
 
 ```shot qs-login-help

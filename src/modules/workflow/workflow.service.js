@@ -414,16 +414,23 @@ async function readable(client, id, user) {
   return found;
 }
 
+/**
+ * Approve, reject or request changes on the current stage, on the caller's transaction: a module
+ * that keeps something with the decision (a sanction's signature, queries.md §6.4) writes it and
+ * decides in one transaction. The same checks as decide().
+ */
+async function decideIn(client, user, id, decision, reason = null) {
+  const found = await readable(client, id, user);
+  if (!(await approveScope(user, found.module_key))) {
+    throw new AppError("PERMISSION_DENIED", "You do not approve these requests", 403);
+  }
+  await engine.act(client, { instance_id: id, actor: user, decision, reason });
+  return detail(client, id, user);
+}
+
 /** Approve, reject or request changes on the current stage. */
 async function decide(user, id, decision, reason = null) {
-  return tx(async (client) => {
-    const found = await readable(client, id, user);
-    if (!(await approveScope(user, found.module_key))) {
-      throw new AppError("PERMISSION_DENIED", "You do not approve these requests", 403);
-    }
-    await engine.act(client, { instance_id: id, actor: user, decision, reason });
-    return detail(client, id, user);
-  });
+  return tx((client) => decideIn(client, user, id, decision, reason));
 }
 
 /** The requester takes a pending request back. */
@@ -510,6 +517,7 @@ module.exports = {
   mineCount,
   getInstance,
   decide,
+  decideIn,
   withdraw,
   reassign,
 };

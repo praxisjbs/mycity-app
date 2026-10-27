@@ -12,6 +12,7 @@ const access = require("../access/access.service");
 const identity = require("../identity/identity.service");
 const policy = require("../identity/identity.session-policy");
 const security = require("../security/security.service");
+const organisation = require("../organisation/organisation.service");
 const invites = require("./users.invite");
 const repo = require("./users.repo");
 
@@ -90,6 +91,8 @@ async function setRoles(userId, codes, actor) {
     if (!(await identity.findUserById(client, userId)))
       throw new AppError("NOT_FOUND", "Not found", 404);
     await access.setRoles(client, userId, codes, actor);
+    // A department's head keeps Head of Department while they head (docs/guides/organogram.md §6.1).
+    await organisation.syncHeadRoles(client, actor);
   });
   return rowOf(userId);
 }

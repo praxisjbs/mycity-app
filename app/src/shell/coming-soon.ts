@@ -24,7 +24,7 @@ export const COMING: Record<string, string[]> = {
   "ess/my-performance": ["Your KPIs for the month, weighted to 100%", "The goal chain above your KPI, up to the CEO", "Self rating first, then your manager, then a second approval"],
   "ess/my-payslips": ["A payslip for every approved run, as a PDF", "Deductions, each linked to its query", "Any past year, from your start date"],
   "ess/my-leave": ["Your entitlement, what you have taken and what is left", "Request leave; your line manager decides", "Approved leave shows on the team calendar"],
-  "ess/my-queries": ["Open queries with a 48 hour response window", "Archived queries, with your response kept on record", "Sanctions, and any deduction they carried"],
+  "ess/my-queries": ["Open queries with a 24 hour response window", "Archived queries, with your response kept on record", "Sanctions, and any deduction they carried"],
   "ess/my-documents": ["Your documents in the vault: contract, ID, certificates", "Upload what is missing, with a progress bar", "Expiry dates, with a reminder before they lapse"],
   "ess/work-location-requests": ["Ask for a temporary home, a remote day or a client visit", "Your line manager, then People, approve it", "On those days your clock-in is matched to that place"],
   "ess/my-devices": ["The phones and laptops you clock in from", "Approve a new device, or remove a lost one", "Clock-in is refused from a device you have not approved"],
@@ -62,9 +62,9 @@ export const COMING: Record<string, string[]> = {
   "performance/analytics": ["Performance by department and by person", "Who is improving and who needs support", "Trends across review cycles"],
 
   /* Queries & Sanctions */
-  "queries/queries": ["Raise a query, with a 48 hour window to respond", "Missed clock-outs and lateness raise queries automatically", "Decide each one, with the response on record"],
-  "queries/rules": ["The rules that raise queries: lateness, missed clock-outs", "Thresholds per rule, changed without a deploy", "See what each rule raised this month"],
-  "queries/sanctions": ["Caution, warning, suspension, dismissal, in order", "Deductions that go to payroll automatically", "Each sanction linked to its query"],
+  "queries/queries": ["Raise a query, with a 24 hour window to respond", "The Attendance policy raises queries for lateness", "Decide each one, with the response on record"],
+  "queries/rules": ["The rules that raise queries: overdue tasks, low scores", "Thresholds per rule, changed without a deploy", "See what each rule raised this month"],
+  "queries/sanctions": ["Caution, warning, suspension, dismissal, in order", "Fines wait for payroll to accept them", "Each sanction linked to its query"],
   "queries/letter-templates": ["Query and sanction letters, on the letterhead", "Fields filled from the record", "Edit the wording; every letter keeps its version"],
 
   /* Recruitment */
@@ -123,4 +123,5 @@ export const COMING: Record<string, string[]> = {
   "settings/audit-log": ["Who did what, when, to which record", "Search by person, record, action or date", "Cannot be edited by anyone"],
   "settings/imports": ["Import a spreadsheet of records, column by column", "See what will be created before you commit", "Every import kept, with its error file and Revert"],
   "knowledge/user-guide": ["How to use every screen, step by step", "Pictures of each screen, numbered", "Open a screen from a step and come back"],
+  "people/departments": ["Every department, its head and its people", "Set a head, move people, merge or retire", "Reporting lines and rights follow the head"],
 };

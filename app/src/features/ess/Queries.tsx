@@ -105,7 +105,7 @@ function QueryRecord({ q }: { q: MyQuery }) {
       <KeyValue
         items={[
           ["Raised On", formatDate(q.created_at)],
-          [<HelpTerm key="due" help="You have 48 hours from when it was raised.">Respond By</HelpTerm>, q.response_due_at ? formatDateTime(q.response_due_at) : "None"],
+          [<HelpTerm key="due" help="You have 24 hours from when it was raised.">Respond By</HelpTerm>, q.response_due_at ? formatDateTime(q.response_due_at) : "None"],
           ["What Happened", <span key="d" data-copy="content">{q.details}</span>],
           ...(q.policy ? ([["Policy", <PolicyCited key="p" policy={q.policy} clause={q.policy_clause} />]] as Array<[string, React.ReactNode]>) : []),
           ["Your Response", q.response ? <RichText key="r" blocks={q.response.blocks} top={4} /> : "Not yet"],

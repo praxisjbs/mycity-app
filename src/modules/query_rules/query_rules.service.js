@@ -85,7 +85,8 @@ async function create(actor, body) {
     await assertPolicy(client, body.policy_id);
     let code = codeFrom(body.name);
     for (let n = 2; await repo.codeTaken(client, code); n += 1) code = codeFrom(`${body.name} ${n}`);
-    const ruleId = await repo.insert(client, { ...body, code, created_by: actor.user_id });
+    const clause = body.policy_id ? body.policy_clause || null : null;
+    const ruleId = await repo.insert(client, { ...body, policy_clause: clause, code, created_by: actor.user_id });
     await emit(client, {
       key: EVENTS.QUERY_RULE_SAVED,
       entity: { type: "query_rule", id: ruleId },
@@ -114,6 +115,9 @@ async function update(actor, id, body) {
       throw new AppError("RULE_INVALID", "Minutes count lateness only", 422, { measure: ["Lateness only"] });
     if (body.letter_template) await assertLetter(client, body.letter_template);
     await assertPolicy(client, body.policy_id);
+    // The clause is a line of the policy: blank is none, and taking the policy off clears it.
+    if (body.policy_clause !== undefined) body = { ...body, policy_clause: body.policy_clause || null };
+    if (body.policy_id === null) body = { ...body, policy_clause: null };
     await repo.update(client, id, body);
     await emit(client, {
       key: EVENTS.QUERY_RULE_SAVED,

@@ -134,11 +134,12 @@ function QueryCard({ id }: { id: string }) {
           ["Subject", d.subject],
           ["Raised By", d.raised_by_name ?? d.rule_name ?? "Rule"],
           ["Raised", formatDateTime(d.created_at)],
-          ...(d.status === "awaiting_response" && d.response_due_at ? ([[<HelpTerm key="due" help="The employee has 48 hours to respond in writing.">Response Due</HelpTerm>, formatDateTime(d.response_due_at)]] as Array<[React.ReactNode, string]>) : []),
+          ...(d.status === "awaiting_response" && d.response_due_at ? ([[<HelpTerm key="due" help="The employee has 24 hours to respond in writing.">Response Due</HelpTerm>, formatDateTime(d.response_due_at)]] as Array<[React.ReactNode, string]>) : []),
           ...(d.evidence.length ? ([["Counted", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),
           ...(d.policy ? ([["Policy", <PolicyCited key="p" policy={d.policy} clause={d.policy_clause} />]] as Array<[string, React.ReactNode]>) : []),
           ...(d.response ? ([["Response", <RichText key="r" blocks={d.response.blocks} top={4} />]] as Array<[string, React.ReactNode]>) : []),
           ...(d.sanction ? ([["Sanction", `${d.sanction.step_name}${d.sanction.number ? `, ${d.sanction.number}` : ""}`]] as Array<[string, string]>) : []),
+          ...(d.approval ? ([["Waiting On", d.approval.stage_name]] as Array<[string, string]>) : []),
         ]}
       />
       <ActionGroup>
@@ -146,6 +147,12 @@ function QueryCard({ id }: { id: string }) {
         <Button icon="doc" onClick={() => modal.open({ title: `${d.number} · Query Letter`, wide: true, body: <LetterFile documentId={d.letter_document_id} name={d.number} /> })}>View Letter</Button>
         {d.can_remind && <Button onClick={sendReminder}>Send Reminder</Button>}
         {d.can_decide && <Button variant="primary" onClick={() => modal.open({ title: `Decision on ${d.number}`, body: (close) => <Decide q={d} close={close} onDone={q.reload} /> })}>Record Decision</Button>}
+        {d.approval?.can_decide && d.sanction && (
+          <>
+            <Button onClick={() => modal.open({ title: `Reject ${d.sanction!.step_name}`, body: (close) => <RejectSanction id={d.sanction!.sanction_id} close={close} onDone={q.reload} /> })}>Reject</Button>
+            <Button variant="primary" onClick={() => modal.open({ title: `Approve ${d.sanction!.step_name}`, body: (close) => <ApproveSanction id={d.sanction!.sanction_id} signs={d.approval!.signs} close={close} onDone={q.reload} /> })}>Approve Sanction</Button>
+          </>
+        )}
         </div>
       </ActionGroup>
     </Card>
@@ -241,30 +248,25 @@ function RaiseQuery({ close }: { close: () => void }) {
   );
 }
 
-type DecideValues = { outcome: string; consequence_step_id: string; reason: string; fine_amount: string; effective_on: string; ends_on: string; signature: string };
+type DecideValues = { outcome: string; consequence_step_id: string; reason: string; fine_amount: string; effective_on: string; ends_on: string };
 const decisionOf = (v: DecideValues) => ({
   outcome: v.outcome as "no_action" | "sanction",
   reason: v.reason,
-  ...(v.outcome === "sanction" && { consequence_step_id: v.consequence_step_id || undefined, fine_amount: v.fine_amount.replace(/,/g, ""), effective_on: v.effective_on, ends_on: v.ends_on, signature: v.signature || undefined }),
+  ...(v.outcome === "sanction" && { consequence_step_id: v.consequence_step_id || undefined, fine_amount: v.fine_amount.replace(/,/g, ""), effective_on: v.effective_on, ends_on: v.ends_on }),
 });
 const money = (s: string) => (s && !s.includes(".") ? `${s}.00` : s && /\.\d$/.test(s) ? `${s}0` : s);
 
 function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDone: () => void }) {
   const chain = useApi("GET /api/v1/sanctions/chain", { query: { active: "true" } });
-  const pad = useRef<SignatureFieldHandle>(null);
+  // Nobody signs a proposal: Operations & People sign when they approve it (guide §6.4).
   const f = useContractForm<DecideValues>(
-    { outcome: "no_action", consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "", signature: "" },
-    withSignature(
-      {
-        safeParse: (value: unknown) => {
-          const v = value as DecideValues;
-          return queries.QueryDecision.safeParse({ ...decisionOf(v), ...(v.outcome === "sanction" && { fine_amount: money(v.fine_amount.replace(/,/g, "")) }) });
-        },
+    { outcome: "no_action", consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "" },
+    {
+      safeParse: (value: unknown) => {
+        const v = value as DecideValues;
+        return queries.QueryDecision.safeParse({ ...decisionOf(v), ...(v.outcome === "sanction" && { fine_amount: money(v.fine_amount.replace(/,/g, "")) }) });
       },
-      pad,
-      // Only a sanction is signed (guide §6.4).
-      (v) => v.outcome === "sanction",
-    ),
+    },
   );
   const save = useMutation("POST /api/v1/queries/:id/decision");
   const steps = (chain.data?.data ?? []).filter((s) => s.letter_ready);
@@ -274,7 +276,7 @@ function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDon
     try {
       const body = {
         ...decisionOf(f.values),
-        ...(f.values.outcome === "sanction" && { fine_amount: money(f.values.fine_amount.replace(/,/g, "")) || undefined, signature: pad.current?.toPng() ?? undefined }),
+        ...(f.values.outcome === "sanction" && { fine_amount: money(f.values.fine_amount.replace(/,/g, "")) || undefined }),
       };
       const r = await save.run({ params: { id: q.employee_query_id }, body });
       invalidate("/api/v1/queries");
@@ -307,14 +309,76 @@ function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDon
         </>
       )}
       <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} placeholder="Explanation accepted" /></Field>
-      {f.values.outcome === "sanction" && (
-        <Field label="Your Signature" {...f.status("signature")}>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Record Decision</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/**
+ * Approve Sanction (guide §6.4): whoever the approval waits on lets it stand. At the Operations &
+ * People stage they sign it, and their signature is printed on its letters.
+ */
+function ApproveSanction({ id, signs, close, onDone }: { id: string; signs: boolean; close: () => void; onDone: () => void }) {
+  const pad = useRef<SignatureFieldHandle>(null);
+  const f = useContractForm<{ signature: string }>(
+    { signature: "" },
+    withSignature(sanctions.SanctionApprove, pad, () => signs),
+  );
+  const save = useMutation("POST /api/v1/sanctions/:id/approve");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      const r = await save.run({ params: { id }, body: signs ? { signature: pad.current?.toPng() ?? "" } : {} });
+      invalidate("/api/v1/queries");
+      invalidate("/api/v1/sanctions");
+      onDone();
+      close();
+      toast(r.status === "issued" ? `${r.number} issued, letter sent` : "Approved, sent on to the CEO");
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
+  return (
+    <>
+      {signs && (
+        <Field label={<HelpTerm help="Your signature is printed on this sanction's letters.">Your Signature</HelpTerm>} {...f.status("signature")}>
           <SignatureField ref={pad} label="Your Signature" onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
         </Field>
       )}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Record Decision</Button>
+        <Button variant="primary" icon="ok" busy={save.pending} onClick={submit}>Approve Sanction</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/** Reject a proposed sanction with a reason: the query goes back under review (guide §6.4). */
+function RejectSanction({ id, close, onDone }: { id: string; close: () => void; onDone: () => void }) {
+  const f = useContractForm<{ reason: string }>({ reason: "" }, sanctions.SanctionReject);
+  const save = useMutation("POST /api/v1/sanctions/:id/reject");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id }, body: { reason: f.values.reason.trim() } });
+      invalidate("/api/v1/queries");
+      invalidate("/api/v1/sanctions");
+      onDone();
+      close();
+      toast("Sanction rejected");
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
+  return (
+    <>
+      <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} placeholder="Too heavy" /></Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="danger" busy={save.pending} onClick={submit}>Reject</Button>
       </FormFooter>
     </>
   );
@@ -332,6 +396,9 @@ const TRIGGERS: Array<[QueryRuleSource, string]> = [
   ["missed_target", "Missed Target"],
 ];
 const TRIGGER_NAME = Object.fromEntries(TRIGGERS) as Record<QueryRuleSource, string>;
+/** What a new or edited rule may count: late arrivals, absences and missing clock-outs are the Attendance policy's (guide §6.3). */
+const OFFERED = new Set<QueryRuleSource>(["unenrolled_device", "overdue_task", "low_performance", "missed_target"]);
+const OFFERED_TRIGGERS = TRIGGERS.filter(([key]) => OFFERED.has(key));
 const ruleState = (r: QueryRule) => (r.state === "active" ? pill("ok", "Active") : r.state === "paused" ? pill("neutral", "Paused") : pill("warn", "Draft"));
 const threshold = (r: QueryRule) => (r.measure === "minutes" ? `${r.threshold} min in ${r.window_days} days` : `${r.threshold} in ${r.window_days} days`);
 
@@ -368,9 +435,12 @@ function Rules() {
               <CardHeader record title={r.name} right={<StatusPill s={ruleState(r)} />} />
               <KeyValue items={[["Counts", TRIGGER_NAME[r.source_event]], ["Threshold", threshold(r)], ...(r.policy ? ([["Policy", r.policy.title]] as Array<[string, string]>) : [])]} />
               {configure && (
-                <div className="mt-2.5 flex justify-end">
-                  <Button size="sm" onClick={() => flip(r)}>{r.active ? "Pause" : "Activate"}</Button>
-                </div>
+                <ActionGroup>
+                  <div className="mt-2.5 flex justify-end gap-2">
+                    {OFFERED.has(r.source_event) && <Button size="sm" icon="edit" onClick={() => modal.open({ title: "Edit Rule", body: (close) => <RuleForm rule={r} close={close} /> })}>Edit Rule</Button>}
+                    <Button size="sm" onClick={() => flip(r)}>{r.active ? "Pause" : "Activate"}</Button>
+                  </div>
+                </ActionGroup>
               )}
             </Card>
           ))}
@@ -395,27 +465,49 @@ function Rules() {
   );
 }
 
-type RuleValues = { name: string; source_event: string; measure: string; threshold: string; window_days: string; policy_id: string };
+type RuleValues = { name: string; source_event: string; threshold: string; window_days: string; policy_id: string; policy_clause: string };
 const ruleOf = (v: RuleValues) => ({
   name: v.name,
   source_event: v.source_event as QueryRuleSource,
-  measure: v.measure as "count" | "minutes",
   threshold: v.threshold === "" ? undefined : Number(v.threshold),
   window_days: v.window_days === "" ? undefined : Number(v.window_days),
   ...(v.policy_id && { policy_id: v.policy_id }),
+  ...(v.policy_id && v.policy_clause.trim() && { policy_clause: v.policy_clause.trim() }),
 });
+type OfferedSource = "unenrolled_device" | "overdue_task" | "low_performance" | "missed_target";
 
-function RuleForm({ close }: { close: () => void }) {
+/**
+ * New Rule, or Edit Rule on a rule's card (guide §6.3): saved as a draft when new; an edit applies
+ * from the next event, and a rule that has fired keeps its trigger (the API refuses a change).
+ */
+function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
+  const editing = Boolean(rule);
   const f = useContractForm<RuleValues>(
-    { name: "", source_event: "lateness", measure: "count", threshold: "3", window_days: "30", policy_id: "" },
-    { safeParse: (v: RuleValues) => query_rules.QueryRuleCreate.safeParse(ruleOf(v)) },
+    {
+      name: rule?.name ?? "",
+      source_event: rule?.source_event ?? "overdue_task",
+      threshold: String(rule?.threshold ?? 3),
+      window_days: String(rule?.window_days ?? 14),
+      policy_id: rule?.policy?.policy_id ?? "",
+      policy_clause: rule?.policy_clause ?? "",
+    },
+    { safeParse: (v: RuleValues) => (editing ? query_rules.QueryRuleUpdate : query_rules.QueryRuleCreate).safeParse(ruleOf(v)) },
   );
-  const [policy, setPolicy] = useState<CitablePolicy[]>([]);
-  const save = useMutation("POST /api/v1/query-rules");
+  const [policy, setPolicy] = useState<CitablePolicy[]>(rule?.policy ? [{ ...rule.policy, policy_version_id: rule.policy.policy_id, version: 1 }] : []);
+  const create = useMutation("POST /api/v1/query-rules");
+  const update = useMutation("PATCH /api/v1/query-rules/:id");
   const submit = async () => {
     if (!f.check()) return;
+    const body = ruleOf(f.values) as { name: string; source_event: OfferedSource; threshold: number; window_days: number; policy_id?: string; policy_clause?: string };
     try {
-      const r = await save.run({ body: ruleOf(f.values) as { name: string; source_event: QueryRuleSource; measure: "count" | "minutes"; threshold: number; window_days: number; policy_id?: string } });
+      if (rule) {
+        const r = await update.run({ params: { id: rule.query_rule_id }, body: { ...body, policy_id: body.policy_id ?? null, policy_clause: body.policy_clause ?? null } });
+        invalidate("/api/v1/query-rules");
+        close();
+        toast(`${r.name} saved`);
+        return;
+      }
+      const r = await create.run({ body });
       invalidate("/api/v1/query-rules");
       close();
       toast(`${r.name} saved as a draft`);
@@ -425,23 +517,23 @@ function RuleForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Repeated Lateness" /></Field>
-      <Field label="What Sets It Off" {...f.status("source_event")}><SelectField options={TRIGGERS} {...f.field("source_event")} /></Field>
-      {f.values.source_event === "lateness" && (
-        <Field label={<HelpTerm help="Count late days, or add up the minutes late.">Measure</HelpTerm>} {...f.status("measure")}>
-          <ChoiceField {...f.field("measure")} options={[["count", "Days"], ["minutes", "Minutes"]]} />
-        </Field>
-      )}
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Overdue Tasks" /></Field>
+      <Field label="What Sets It Off" {...f.status("source_event")}><SelectField options={OFFERED_TRIGGERS} {...f.field("source_event")} /></Field>
       <Grid cols={2}>
-        <Field label={f.values.measure === "minutes" ? "Minutes" : "How Many Times"} {...f.status("threshold")}><NumberField {...f.field("threshold")} /></Field>
+        <Field label="How Many Times" {...f.status("threshold")}><NumberField {...f.field("threshold")} /></Field>
         <Field label="Within, Days" {...f.status("window_days")}><NumberField {...f.field("window_days")} /></Field>
       </Grid>
       <Field label={<HelpTerm help="The policy this rule enforces. Its queries' letters quote it.">Policy</HelpTerm>} optional {...f.status("policy_id")}>
-        <PolicyPicker value={policy} onChange={(p) => (setPolicy(p), f.set("policy_id", p[0]?.policy_id ?? ""))} />
+        <PolicyPicker value={policy} onChange={(p) => {
+          setPolicy(p);
+          f.set("policy_id", p[0]?.policy_id ?? "");
+          if (!p.length) f.set("policy_clause", "");
+        }} />
       </Field>
+      {policy.length > 0 && <Field label={<HelpTerm help="The line of the policy this rule's letters quote.">Clause</HelpTerm>} optional {...f.status("policy_clause")}><TextField {...f.field("policy_clause")} /></Field>}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Save Rule</Button>
+        <Button variant="primary" busy={create.pending || update.pending} onClick={submit}>Save Rule</Button>
       </FormFooter>
     </>
   );

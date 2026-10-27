@@ -186,26 +186,35 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(offered).toEqual(expect.arrayContaining(["Engineering", "Finance", "Marketing & Sales · Binding"]));
   }, 60000);
 
-  it("a head is offered their own function alone, and starts on it: New Objective marks its binding plan, New KPI offers nothing else (QA DEF-10, DEF-11)", async () => {
+  it("a head whose plan is binding is offered Request To Unbind in place of New Goal; New KPI offers their own function alone (QA DEF-11, JBS Praxis 27/10/2026)", async () => {
     await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
-    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "Request To Unbind" })[0]!);
     await settled();
-    let form = dialog();
-    await chooseOption(within(form).getByLabelText("What"), "Objective");
-    await settled();
-    expect(await optionLabels(within(form).getByLabelText("Function"))).toEqual(["Marketing & Sales · Binding"]);
-    expect(valueOf(form, "Function")).toBe(deptId);
-    expect(within(form).getByText("Plan is binding")).toBeTruthy();
-    fireEvent.click(within(form).getByRole("button", { name: "Cancel" }));
+    const request = dialog();
+    expect(within(request).getByText("Marketing & Sales · Q4 2026")).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
+    fireEvent.click(within(request).getByRole("button", { name: "Cancel" }));
     await settled();
     window.history.replaceState(null, "", "/performance?tab=kpis");
     window.dispatchEvent(new PopStateEvent("popstate"));
     await settled();
     fireEvent.click((await screen.findAllByRole("button", { name: /New KPI/ }, { timeout: 5000 }))[0]!);
     await settled();
-    form = dialog();
+    const form = dialog();
     expect(await optionLabels(within(form).getByLabelText("Function"))).toEqual(["Marketing & Sales"]);
     expect(valueOf(form, "Function")).toBe(deptId);
+  }, 60000);
+
+  it("Operations & People, who set every function, keep New Goal on a binding plan, and the CEO is never offered Request To Unbind", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+    expect(screen.getAllByRole("button", { name: "New Goal" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
+    cleanup();
+
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    expect(screen.getAllByRole("button", { name: "New Goal" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
   }, 60000);
 
   it("Operations & People set up Q1 2027 from ⌘K in October: the rules start as Q4's, and each is checked on its field", async () => {

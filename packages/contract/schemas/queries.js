@@ -29,6 +29,8 @@ const { PersonRef } = require("./organisation");
 const { RichTextBlock, SignaturePng } = require("./policies");
 
 const QueryStatus = z.enum(["awaiting_response", "under_review", "resolved"]);
+/** Who raised it (guide §3 step 1): a person, a rule on Rules, or an Attendance policy breach. */
+const QuerySource = z.enum(["person", "rule", "attendance"]);
 const QueryOutcome = z.enum(["no_action", "sanctioned"]);
 
 /** One piece of evidence: a counted day, a note, or a file from the vault. */
@@ -92,6 +94,7 @@ const Query = z
     subject: z.string(),
     raised_by: uuid.nullable(),
     raised_by_name: z.string().nullable(),
+    source: QuerySource,
     query_rule_id: uuid.nullable(),
     rule_name: z.string().nullable(),
     status: QueryStatus,
@@ -124,6 +127,12 @@ const QueryDetail = Query.extend({
     .nullable(),
   can_decide: z.boolean(),
   can_remind: z.boolean(),
+  // A proposed sanction's approval as the reader meets it (guide §6.4): the stage it waits on,
+  // whether they may decide it, and whether deciding it signs the letters (Operations & People).
+  approval: z
+    .object({ stage: z.string(), stage_name: z.string(), can_decide: z.boolean(), signs: z.boolean() })
+    .strict()
+    .nullable(),
 }).strict();
 
 /**
@@ -135,6 +144,9 @@ const QueryListQuery = listQuery(
     status: QueryStatus.optional(),
     employee_id: uuid.optional(),
     raised: z.enum(["mine", "rules"]).optional(),
+    // Raised on these Lagos days, both inclusive (a review's month, performance.md §6.16).
+    raised_from: isoDate.optional(),
+    raised_to: isoDate.optional(),
   },
   ["created_at", "number", "response_due_at"],
 );
@@ -168,14 +180,8 @@ const QueryDecision = z
     ends_on: blank(isoDate),
     evidence: evidence.optional(),
     fine_amount: blank(money),
-    // The proposer's drawn signature, for a sanction (guide §6.4); printed on its letters.
-    signature: SignaturePng.optional(),
   })
   .strict()
-  .refine((v) => v.outcome !== "sanction" || Boolean(v.signature), {
-    message: "Sign in the box",
-    path: ["signature"],
-  })
   .refine((v) => v.outcome !== "sanction" || Boolean(v.consequence_step_id), {
     message: "Pick the sanction",
     path: ["consequence_step_id"],
@@ -324,7 +330,7 @@ const TABLES = {
     virtual: {
       employee: "the person, from employee and department",
       raised_by_name: "the raiser's display name, from app_user and employee",
-      rule_name: "query_rule.name",
+      rule_name: "query_rule.name, or Attendance Policy for a breach's query",
       escalated: "a sanction on the query is pending_approval",
     },
   },
@@ -343,6 +349,7 @@ const TABLES = {
       next_step: "the rung after the highest one in force for the person (guide §6.5)",
       can_decide: "the reader may record a decision now (guide §6.4)",
       can_remind: "awaiting a response, raised by the reader or in scope all, not reminded today",
+      approval: "the pending sanction's workflow_instance stage, from the workflow service",
     },
   },
   QueryListQuery: { table: null, reason: "list controls and filters for the Queries list" },
@@ -397,6 +404,7 @@ module.exports = {
   CitablePolicyPage,
   CitablePolicyListQuery,
   QueryStatus,
+  QuerySource,
   QueryOutcome,
   EvidenceItem,
   QueryResponse,

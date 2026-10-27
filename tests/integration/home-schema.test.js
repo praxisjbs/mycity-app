@@ -162,6 +162,8 @@ describeDb("Home schema and reference data against the real migrations", () => {
         "finished_at",
         "created_at",
         "updated_at",
+        // 2530: a personal export's own filters (My Workspace · Analytics' period), null otherwise.
+        "filters",
       ]);
       expect((await columnsOf("role_kpi")).map((c) => c.column_name)).toEqual([
         "role_kpi_id",
