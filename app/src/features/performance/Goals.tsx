@@ -1,13 +1,15 @@
 /**
  * Performance · Goals (docs/guides/performance.md §2, §3.1, §3.2, §3.5, §10): the quarter's OKR
  * tree. Organisational goals, each opening its sheet (Edit Goal, Delete Goal for the CEO); the
- * company's and each function's objectives with their key results, edited and deleted while their
- * plan is draft or returned; the function's plan and its approval; Waiting On You, the plan stages
- * and target changes the reader decides (./Approvals); Report Month for the head, Confirm Score for
- * the CEO, Set Target on a TBC target before its lock date and Change Target after it; Set Up
- * Quarter and Edit Quarter (./Quarter) for whoever runs the cycle. ⌘K opens a goal (?goal=), an
- * objective (?objective=) and a key result (?id=). Everyone sees the whole tree; New Goal and Report
- * Month are offered only to a reader who may act on a function or the company (useSettableFunctions).
+ * company's and each function's objectives with their key results, added, edited and deleted while their
+ * plan is draft, returned, unbound or awaiting approval (what is added joins the plan sent); the function's
+ * plan and its approval; Waiting On You, the plan stages and target changes the reader decides
+ * (./Approvals); Report Month for the head, Confirm Score for the CEO, Set Target on a TBC target before
+ * its lock date and Change Target after it; Set Up Quarter and Edit Quarter (./Quarter) for whoever runs
+ * the cycle. ⌘K opens a goal (?goal=), an objective (?objective=) and a key result (?id=). Everyone sees
+ * the whole tree; New Goal and Report Month are offered only to a reader who may act on a function or the
+ * company (useSettableFunctions), and Request To Unbind takes New Goal's place where every plan in view is
+ * binding (not for the CEO).
  */
 import { useEffect, useRef, useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
@@ -103,20 +105,24 @@ export function Goals() {
   // Month are offered only to a reader with something to act on, so everyone else reads and nothing more.
   const settable = useSettableFunctions(quarter.periodId || null);
   const mayGoal = hasCapability(me, "goals.organisation") || settable.rows.length > 0;
-  // While the plan of the function the reader sets is binding, Request To Unbind takes New Goal's place (§6.22): the
-  // function the Function select names, else their only one. The CEO, who records organisational goals, keeps New Goal.
+  // Where there is nothing to add to, Request To Unbind takes New Goal's place (§6.22): every plan in view is binding, the
+  // plan in view being the function the Function select names, else the reader's only one, else all they set. The CEO,
+  // who records organisational goals, keeps New Goal and is not offered it.
   const named = dept ? settable.rows.find((x) => (dept === "company" ? x.department_id === null : x.department_id === dept)) : undefined;
   const aimed = named ?? (settable.rows.length === 1 ? settable.rows[0] : undefined);
-  const boundPlan = !hasCapability(me, "goals.organisation") && aimed?.plan_status === "binding" ? plans.rows.find((p) => p.department_id === aimed.department_id) : undefined;
-  const mayUnbind = Boolean(boundPlan && aimed?.can_request_unbind);
-  const mayNewGoal = mayGoal && !boundPlan;
+  const inView = aimed ? [aimed] : settable.rows;
+  const shut = !hasCapability(me, "goals.organisation") && inView.length > 0 && inView.every((x) => x.plan_status === "binding");
+  // The plans they may ask about: binding, and no request waiting on one.
+  const unbindable = shut ? inView.filter((x) => x.can_request_unbind).flatMap((x) => plans.rows.filter((p) => p.department_id === x.department_id)) : [];
+  const mayUnbind = unbindable.length > 0;
+  const mayNewGoal = mayGoal && !shut;
   const { can } = useAuth();
   // Setting up a quarter is `performance` create, changing one `performance` edit, both with the capability (goals.routes).
   const manage = hasCapability(me, "performance.manage");
   const maySetUp = manage && can("performance", "create");
   const mayEditQuarter = manage && can("performance", "edit");
   const newGoal = () => modal.open({ title: "New Goal", full: true, body: (close) => <NewGoalForm close={close} period={period} objectives={okrs.rows} /> });
-  const requestUnbind = () => boundPlan && modal.open({ title: "Request To Unbind", body: (close) => <UnbindForm close={close} plan={boundPlan} /> });
+  const requestUnbind = () => mayUnbind && modal.open({ title: "Request To Unbind", body: (close) => <UnbindForm close={close} plans={unbindable} /> });
   const latest = quarter.periods[0];
   const setUpQuarter = () =>
     modal.open({ title: "Set Up Quarter", wide: true, full: true, body: (close) => <QuarterWizard close={close} latest={latest} onSaved={(p) => quarter.setPeriodId(p.performance_period_id)} /> });
@@ -135,7 +141,7 @@ export function Goals() {
     });
   // The floating button on a phone (§10.2): Report Month for a function's head, else New Goal (or Request To Unbind in its place).
   const heads = hasCapability(me, "goals.function") && !hasCapability(me, "goals.company");
-  // search:none Request To Unbind asks about the one binding plan the page names, so it is reached from Goals, where New Goal sits
+  // search:none Request To Unbind asks about the binding plan the page shows, so it is reached from Goals, where New Goal sits
   useScreenAction(
     period
       ? heads && mayReport
@@ -230,7 +236,7 @@ function useRecordLinks(open: { id: (id: string) => void; goal: (id: string) => 
   }, [key]);
 }
 
-/** Edit Objective and Delete Objective, while its plan is draft or returned and the reader sets its goals. */
+/** Edit Objective and Delete Objective, while its plan is not binding (draft, returned, unbound or awaiting approval) and the reader sets its goals. */
 function useObjectiveActions(objective: Objective, done?: () => void) {
   const modal = useModal();
   const confirm = useConfirm();
@@ -305,7 +311,7 @@ function ObjectiveCard({ objective, onOpen }: { objective: Objective; onOpen: (k
   );
 }
 
-/** An objective opened from ⌘K: what it serves and its key results; Edit Objective and Delete Objective while its plan is a draft. */
+/** An objective opened from ⌘K: what it serves and its key results; Edit Objective and Delete Objective while its plan is not binding. */
 function ObjectiveSheet({ id, close, onOpen }: { id: string; close: () => void; onOpen: (kr: KeyResult) => void }) {
   const read = useApi("GET /api/v1/performance/objectives/:id", { params: { id } });
   const o = read.data;
@@ -499,8 +505,10 @@ function PlanCard({ id }: { id: string }) {
   );
 }
 
-/** Request To Unbind: why a binding plan is to be opened for changes; to the CEO (§6.22). */
-function UnbindForm({ plan, close }: { plan: Plan; close: () => void }) {
+/** Request To Unbind: why a binding plan is to be opened for changes; to the CEO (§6.22). One plan is named; several are picked from by Function. */
+function UnbindForm({ plans, close }: { plans: Plan[]; close: () => void }) {
+  const [picked, setPicked] = useState(plans[0]!.performance_plan_id);
+  const plan = plans.find((p) => p.performance_plan_id === picked) ?? plans[0]!;
   const f = useContractForm({ reason: "" }, goalsContract.PlanUnbindCreate);
   const save = useMutation("POST /api/v1/performance/plans/:id/unbind");
   const [problem, setProblem] = useState<string | null>(null);
@@ -518,7 +526,13 @@ function UnbindForm({ plan, close }: { plan: Plan; close: () => void }) {
   };
   return (
     <>
-      <KeyValue className="mb-3" items={[["Plan", `${plan.department ?? "Company"} · ${plan.period_name}`]]} />
+      {plans.length > 1 ? (
+        <Field label="Function">
+          <SelectField options={plans.map((p) => [p.performance_plan_id, p.department ?? "Company"] as [string, string])} value={picked} onChange={setPicked} />
+        </Field>
+      ) : (
+        <KeyValue className="mb-3" items={[["Plan", `${plan.department ?? "Company"} · ${plan.period_name}`]]} />
+      )}
       <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} rows={4} /></Field>
       <FormError>{problem}</FormError>
       <FormFooter>
@@ -954,17 +968,16 @@ function NewGoalForm({ close, period, objectives }: { close: () => void; period:
 }
 
 /**
- * New Key Result's objectives: every draft, returned or unbound objective of the quarter the reader may add
- * to, whatever function the Goals page is filtered to (the page's own list is one function's page).
+ * New Key Result's objectives: every objective of the quarter the reader may add to (its plan a draft, returned,
+ * unbound or awaiting approval), whatever function the Goals page is filtered to (the page's own list is one
+ * function's page).
  */
 function NewKeyResult({ close, period, objectives }: { close: () => void; period: PerformancePeriod | null; objectives: Objective[] }) {
   const id = period?.performance_period_id ?? "";
-  const drafts = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: id, status: "draft" }, enabled: Boolean(id) });
-  const returned = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: id, status: "returned" }, enabled: Boolean(id) });
-  const unbound = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: id, status: "unbound" }, enabled: Boolean(id) });
-  if (drafts.loading || returned.loading || unbound.loading) return <LoadingRows count={3} />;
+  const open = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: id, status: "editable" }, enabled: Boolean(id) });
+  if (open.loading) return <LoadingRows count={3} />;
   const seen = new Set<string>();
-  const editable = [...drafts.rows, ...returned.rows, ...unbound.rows, ...objectives].filter((o) => o.can_edit && !seen.has(o.okr_objective_id) && Boolean(seen.add(o.okr_objective_id)));
+  const editable = [...open.rows, ...objectives].filter((o) => o.can_edit && !seen.has(o.okr_objective_id) && Boolean(seen.add(o.okr_objective_id)));
   return <KeyResultForm close={close} objectives={editable} />;
 }
 
@@ -1005,8 +1018,8 @@ function ObjectiveForm({ close, period, objective, onSaved }: { close: () => voi
   return <ObjectiveNewForm close={close} period={period ?? null} />;
 }
 
-/** What a plan already sent or binding says on Function: it takes no new objective (§6.4). */
-const SHUT: Record<string, string> = { submitted: "Plan awaits approval", revising: "Plan awaits approval", binding: "Plan is binding" };
+/** What a binding plan says on Function: it takes no new objective (§6.4); one awaiting approval takes it into the plan sent. */
+const SHUT: Record<string, string> = { binding: "Plan is binding" };
 
 /** The organisational goals an objective may serve: its quarter's plan year when it is known. */
 function useGoalOptions(period: PerformancePeriod | null): Array<[string, string]> {
@@ -1029,7 +1042,7 @@ function ObjectiveNewForm({ close, period }: { close: () => void; period: Perfor
 function ObjectiveNewFields({ close, period, functions }: { close: () => void; period: PerformancePeriod | null; functions: PerformanceFunction[] }) {
   const goalOptions = useGoalOptions(period);
   const company = functions.some((x) => x.department_id === null);
-  // A function (or the company, "") whose plan this quarter is sent or binding: named so in its option, and marked as picked.
+  // A function (or the company, "") whose plan this quarter is binding: named so in its option, and marked as picked.
   const statusOf = (departmentId: string) => functions.find((x) => (x.department_id ?? "") === departmentId)?.plan_status ?? null;
   const shut = (departmentId: string) => SHUT[statusOf(departmentId) ?? ""];
   const options: Array<[string, string]> = functions.map((x) => {

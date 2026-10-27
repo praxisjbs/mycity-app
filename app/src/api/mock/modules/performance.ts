@@ -123,12 +123,16 @@ const planOf = (periodId: string, departmentId: string | null) => {
   }
   return p;
 };
-/** A plan its head may change: before its first approval, or unbound (§6.22). */
+/** A plan Send Plan is offered on: before its first approval, or unbound (§6.22). */
 const open = (status: string) => status === "draft" || status === "returned" || status === "unbound";
 /** A plan the quarter runs on: binding, unbound, or revising while the CEO decides the changes. */
 const live = (status: string) => status === "binding" || status === "unbound" || status === "revising";
 /** A plan sent for the CEO's decision. */
 const waiting = (status: string) => status === "submitted" || status === "revising";
+/** A plan its head may add to and change: those above and while it awaits approval, what is added joining the plan sent (§6.4). */
+const editable = (status: string) => open(status) || waiting(status);
+/** A plan that was binding and is being changed: what was reported on it is kept (§6.22). */
+const amended = (status: string) => status === "unbound" || status === "revising";
 const allKrs = () => OBJECTIVES.flatMap((o) => o.key_results);
 const krById = (id: string) => allKrs().find((k) => k.okr_key_result_id === id);
 const objectiveOf = (kr: KeyResult) => OBJECTIVES.find((o) => o.okr_objective_id === kr.okr_objective_id)!;
@@ -152,8 +156,8 @@ const traceOf = (kr: KeyResult) => {
 };
 /** Who may set a function's goals here: the CEO, or the demonstration function's head. */
 const setsGoalsFor = (req: Req, departmentId: string | null) => isCeo(req) || (departmentId === deptId && meOf(req)?.user_key === "ngozi");
-/** An objective as the reader gets it: may they edit it now (a draft or returned plan whose goals they set)? */
-const withCan = (o: Objective, req: Req): Objective => ({ ...o, score: objectiveScore(o), can_edit: open(o.plan_status) && setsGoalsFor(req, o.department_id) });
+/** An objective as the reader gets it: may they edit it now (a plan not yet binding, or unbound, whose goals they set)? */
+const withCan = (o: Objective, req: Req): Objective => ({ ...o, score: objectiveScore(o), can_edit: editable(o.plan_status) && setsGoalsFor(req, o.department_id) });
 /** A TBC target still open: provisional, not locked, its quarter's lock date not come (§6.7). */
 const tbcOpen = (kr: KeyResult) => {
   const lock = (PERIODS.find((p) => p.performance_period_id === objectiveOf(kr).performance_period_id) ?? PERIOD).targets_lock_on;
@@ -192,7 +196,7 @@ const krDetail = (kr: KeyResult, req: Req): KeyResultDetail => {
       !tbcOpen(kr) &&
       !TARGET_CHANGES.some((c) => c.okr_key_result_id === kr.okr_key_result_id && c.status === "pending") &&
       (isOwner(kr, req) || setsGoalsFor(req, o.department_id)),
-    can_edit: open(o.plan_status) && setsGoalsFor(req, o.department_id),
+    can_edit: editable(o.plan_status) && setsGoalsFor(req, o.department_id),
     can_set_target: o.plan_status === "binding" && tbcOpen(kr) && (isOwner(kr, req) || setsGoalsFor(req, o.department_id)),
   };
 };
@@ -288,7 +292,7 @@ route("GET /api/v1/performance/okrs", (req) =>
       filters: {
         period_id: (o, v) => o.performance_period_id === v,
         department_id: (o, v) => (v === "company" ? o.department_id === null : o.department_id === v),
-        status: (o, v) => o.plan_status === v || (v === "live" && live(o.plan_status)),
+        status: (o, v) => o.plan_status === v || (v === "live" && live(o.plan_status)) || (v === "editable" && editable(o.plan_status)),
       },
       sort: { position: (a, b) => (a.department ?? "").localeCompare(b.department ?? "") || a.position - b.position, code: (a, b) => a.code.localeCompare(b.code) },
     },
@@ -314,10 +318,7 @@ route("POST /api/v1/performance/objectives", (req) => {
   const periodId = b.performance_period_id || PERIOD.performance_period_id;
   const dept = b.department_id || null;
   const plan = planOf(periodId, dept);
-  if (!open(plan.status))
-    return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead", {
-      department_id: [waiting(plan.status) ? "Plan awaits approval" : "Plan is binding"],
-    });
+  if (!editable(plan.status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead", { department_id: ["Plan is binding"] });
   const prefix = dept === null ? "CO" : dept === deptId ? "BM" : "FN";
   const used = new Set(OBJECTIVES.filter((o) => o.code.startsWith(`${prefix}-O`)).map((o) => Number(o.code.split("-O")[1])));
   let n = 1;
@@ -348,7 +349,7 @@ route("GET /api/v1/performance/objectives/:id", (req) => {
 route("PATCH /api/v1/performance/objectives/:id", (req) => {
   const o = OBJECTIVES.find((x) => x.okr_objective_id === req.params.id);
   if (!o) return notFound();
-  if (!open(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead");
+  if (!editable(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead");
   if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
   Object.assign(o, fieldsOf(req.body, ["title", "organisational_goal_id", "position"]));
   return ok(withCan(o, req));
@@ -356,10 +357,13 @@ route("PATCH /api/v1/performance/objectives/:id", (req) => {
 route("DELETE /api/v1/performance/objectives/:id", (req) => {
   const i = OBJECTIVES.findIndex((x) => x.okr_objective_id === req.params.id);
   if (i < 0) return notFound();
-  if (!open(OBJECTIVES[i].plan_status)) return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead");
+  if (!editable(OBJECTIVES[i].plan_status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead");
   if (!setsGoalsFor(req, OBJECTIVES[i].department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
-  if (OBJECTIVES[i].plan_status === "unbound" && OBJECTIVES[i].key_results.some((k) => k.latest))
+  if (amended(OBJECTIVES[i].plan_status) && OBJECTIVES[i].key_results.some((k) => k.latest))
     return fail(409, "KEY_RESULT_REPORTED", "A key result of this objective has a reported month");
+  // A plan awaiting approval was sent with something to approve: it never loses its last objective.
+  if (waiting(OBJECTIVES[i].plan_status) && OBJECTIVES.filter((x) => x.performance_plan_id === OBJECTIVES[i].performance_plan_id).length <= 1)
+    return fail(409, "PLAN_EMPTY", "A plan awaiting approval keeps an objective");
   const plan = PLANS.find((p) => p.performance_plan_id === OBJECTIVES[i].performance_plan_id);
   if (plan) plan.objective_count = Math.max(0, plan.objective_count - 1);
   OBJECTIVES.splice(i, 1);
@@ -370,7 +374,7 @@ route("POST /api/v1/performance/key-results", (req) => {
   const o = OBJECTIVES.find((x) => x.okr_objective_id === b.okr_objective_id);
   if (!o) return invalid({ okr_objective_id: ["Pick an objective"] });
   if (!String(b.statement ?? "").trim()) return invalid({ statement: ["Required"] });
-  if (!open(o.plan_status)) return fail(409, "PLAN_NOT_OPEN", "The plan is sent or binding");
+  if (!editable(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead");
   if (o.key_results.length >= 4) return fail(422, "OBJECTIVE_TOO_MANY", "An objective holds at most 4 key results", { okr_objective_id: ["Already has 4"] });
   const used = new Set(o.key_results.map((k) => Number(k.code.split(".")[1])));
   let n = 1;
@@ -430,13 +434,13 @@ route("PATCH /api/v1/performance/key-results/:id", (req) => {
   if (!k) return notFound();
   const o = objectiveOf(k);
   const b = req.body as Record<string, unknown>;
-  if (open(o.plan_status)) {
+  if (editable(o.plan_status)) {
     if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
     // An unbound plan keeps what a reported month was scored on in place: the target changes through Change Target (§6.22).
     const scored = ["target_value", "target_text", "target_provisional", "measure", "direction", "unit", "parts"].filter(
       (x) => x in b && JSON.stringify(b[x] === "" ? null : b[x]) !== JSON.stringify((k as unknown as Record<string, unknown>)[x] ?? null),
     );
-    if (o.plan_status === "unbound" && k.latest && scored.length)
+    if (amended(o.plan_status) && k.latest && scored.length)
       return fail(409, "KEY_RESULT_REPORTED", "This key result has a reported month: change its target instead", Object.fromEntries(scored.map((x) => [x, ["Use Change Target"]])));
   } else {
     const onlyTarget = Object.keys(b).every((x) => ["target_value", "target_text", "target_provisional"].includes(x));
@@ -449,9 +453,9 @@ route("DELETE /api/v1/performance/key-results/:id", (req) => {
   const k = krById(req.params.id);
   if (!k) return notFound();
   const o = objectiveOf(k);
-  if (!open(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead");
+  if (!editable(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead");
   if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
-  if (o.plan_status === "unbound" && k.latest) return fail(409, "KEY_RESULT_REPORTED", "This key result has a reported month");
+  if (amended(o.plan_status) && k.latest) return fail(409, "KEY_RESULT_REPORTED", "This key result has a reported month");
   o.key_results = o.key_results.filter((x) => x !== k);
   return noContent();
 });

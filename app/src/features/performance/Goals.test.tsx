@@ -206,8 +206,46 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(valueOf(form, "Function")).toBe(deptId);
   }, 60000);
 
-  it("Operations & People, who set every function, keep New Goal on a binding plan, and the CEO is never offered Request To Unbind", async () => {
+  it("a plan awaiting approval takes a new objective into the plan sent, which stays with its approvers (JBS Praxis, 27/10/2026)", async () => {
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    await settled();
+    const form = dialog();
+    await chooseOption(within(form).getByLabelText("What"), "Objective");
+    await settled();
+    // Content's plan is sent: its option says nothing of it, and picking it is not refused.
+    expect(await optionLabels(within(form).getByLabelText("Function"))).toContain("Content");
+    await chooseOption(within(form).getByLabelText("Function"), "Content");
+    type(form, "Objective", "Publish a weekly city guide");
+    await press(form, "Set Objective");
+    const sent = sid("perf:plan:content");
+    const plan = (await api.call("GET /api/v1/performance/plans/:id", { params: { id: sent } })) as { status: string; objective_count: number; workflow_instance_id: string | null; can_submit: boolean };
+    expect(plan).toMatchObject({ status: "submitted", objective_count: 1, workflow_instance_id: sid("perf:wf:plan:content"), can_submit: false });
+    expect(OBJECTIVES.at(-1)).toMatchObject({ title: "Publish a weekly city guide", plan_status: "submitted" });
+    // The head's own edit and delete are open on it too; the last objective of a sent plan is kept.
+    const mine = OBJECTIVES.at(-1)!.okr_objective_id;
+    const read = (await api.call("GET /api/v1/performance/objectives/:id", { params: { id: mine } })) as { can_edit: boolean };
+    expect(read.can_edit).toBe(true);
+    expect(await status(api.call("PATCH /api/v1/performance/objectives/:id", { params: { id: mine }, body: { title: "Publish a city guide each week" } }))).toBe(200);
+    expect(await status(api.call("DELETE /api/v1/performance/objectives/:id", { params: { id: mine } }))).toBe(409);
+  }, 60000);
+
+  it("Operations & People keep New Goal while a plan can take one and are offered Request To Unbind for a binding function they pick; the CEO is never offered it", async () => {
     await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+    expect(screen.getAllByRole("button", { name: "New Goal" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
+    // A binding function in view takes no goal: Request To Unbind is its button.
+    await chooseOption(screen.getByLabelText("Function"), "Marketing & Sales");
+    await settled();
+    expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "Request To Unbind" })[0]!);
+    await settled();
+    expect(within(dialog()).getByText("Marketing & Sales · Q4 2026")).toBeTruthy();
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Cancel" }));
+    await settled();
+    // A function whose plan is not binding is back to New Goal.
+    await chooseOption(screen.getByLabelText("Function"), "Content");
+    await settled();
     expect(screen.getAllByRole("button", { name: "New Goal" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
     cleanup();
