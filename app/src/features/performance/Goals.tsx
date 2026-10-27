@@ -107,11 +107,12 @@ export function Goals() {
   const mayGoal = hasCapability(me, "goals.organisation") || settable.rows.length > 0;
   // Where there is nothing to add to, Request To Unbind takes New Goal's place (§6.22): every plan in view is binding, the
   // plan in view being the function the Function select names, else the reader's only one, else all they set. The CEO,
-  // who records organisational goals, keeps New Goal and is not offered it.
+  // who records organisational goals, keeps New Goal and is not offered it: the person, not whoever holds the capability
+  // (the build account does, and asks like anyone else).
   const named = dept ? settable.rows.find((x) => (dept === "company" ? x.department_id === null : x.department_id === dept)) : undefined;
   const aimed = named ?? (settable.rows.length === 1 ? settable.rows[0] : undefined);
   const inView = aimed ? [aimed] : settable.rows;
-  const shut = !hasCapability(me, "goals.organisation") && inView.length > 0 && inView.every((x) => x.plan_status === "binding");
+  const shut = !me.is_ceo && inView.length > 0 && inView.every((x) => x.plan_status === "binding");
   // The plans they may ask about: binding, and no request waiting on one.
   const unbindable = shut ? inView.filter((x) => x.can_request_unbind).flatMap((x) => plans.rows.filter((p) => p.department_id === x.department_id)) : [];
   const mayUnbind = unbindable.length > 0;

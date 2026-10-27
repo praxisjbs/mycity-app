@@ -255,6 +255,26 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
   }, 60000);
 
+  it("only the CEO is left out of Request To Unbind: the build account, which holds goals.organisation too, is offered it on a binding plan (JBS Praxis, 27/10/2026)", async () => {
+    // The Operations demo account, given the one capability the Implementation Team holds that it does not: not the CEO.
+    const real = vi.mocked(dispatch).getMockImplementation()!;
+    vi.mocked(dispatch).mockImplementation(async (req) => {
+      const res = await real(req);
+      if (req.method !== "GET" || !req.path.endsWith("/auth/me")) return res;
+      const me = res.body as { capabilities: string[] };
+      return { ...res, body: { ...me, capabilities: [...me.capabilities, "goals.organisation"] } };
+    });
+    try {
+      await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+      await chooseOption(screen.getByLabelText("Function"), "Marketing & Sales");
+      await settled();
+      expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+      expect(screen.getAllByRole("button", { name: "Request To Unbind" }).length).toBeGreaterThan(0);
+    } finally {
+      vi.mocked(dispatch).mockImplementation(real);
+    }
+  }, 60000);
+
   it("Operations & People set up Q1 2027 from ⌘K in October: the rules start as Q4's, and each is checked on its field", async () => {
     await openAs("cynthia@mycityapp.io", "/performance?tab=goals&action=quarter");
     let wizard = dialog();
