@@ -40,7 +40,7 @@ const ART: A[] = [
   ["sop", "Attendance", "How do I fix a missing clock-out?", 1, 18, stub("Fixing a missing clock-out"), "ok"],
   ["sop", "Money", "How do I raise an expense?", 2, 9, EXPENSE, "ok"],
   ["sop", "Money", "How do I log a disbursement?", 1, 22, stub("Logging a disbursement with its bank reference"), "ok"],
-  ["sop", "People", "How do I respond to a query?", 1, 33, stub("Responding to a query within 48 hours"), "ok"],
+  ["sop", "People", "How do I respond to a query?", 1, 33, stub("Responding to a query within 24 hours"), "ok"],
   ["sop", "People", "How do I set my team’s KPIs?", 1, 27, stub("Setting KPIs that total 100%"), "ok"],
   ["sop", "Recruitment", "How do I publish a vacancy?", 1, 40, stub("Publishing a vacancy to the careers page"), "ok"],
   ["sop", "Data", "How do I import a tracker?", 1, 50, stub("Importing a spreadsheet tracker"), "ok"],

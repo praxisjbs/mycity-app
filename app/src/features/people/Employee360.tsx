@@ -1,5 +1,6 @@
 import { useState } from "react";
 import organisation from "@mycity/contract/schemas/organisation.js";
+import type { Query, Sanction } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { usePhoto } from "@/api/download";
 import { saveExport } from "@/api/exports";
@@ -44,8 +45,9 @@ import { employmentStatus, employmentType, loginStatus, RESTRICTED_HELP, workPat
 
 /**
  * The employee 360 (docs/guides/foundation.md §2, §10): one person, with their profile,
- * job, work schedule (their week, attendance.md §6.13), reporting line, login and history as tabs.
- * Documents arrive with the documents module's own tab.
+ * job, work schedule (their week, attendance.md §6.13), reporting line, login and history as tabs,
+ * and their queries and sanctions for a viewer holding `queries` view (queries.md §2, §6.1: only
+ * the ones that viewer may see). Documents arrive with the documents module's own tab.
  *
  * A field the viewer may not see comes back null and shows Restricted, with a help term
  * naming who may see it (§10.1). A person's own record is never masked from them.
@@ -57,6 +59,11 @@ const TABS = [
   { value: "line", label: "Reporting Line" },
   { value: "login", label: "Login" },
   { value: "history", label: "History" },
+];
+/** Shown only to a viewer holding `queries` view; the lists keep the query visibility rule. */
+const QUERY_TABS = [
+  { value: "queries", label: "Queries" },
+  { value: "sanctions", label: "Sanctions" },
 ];
 
 /** A restricted value: the value itself, or Restricted with the help term. */
@@ -95,6 +102,7 @@ export function Employee360({ id }: { id: string }) {
   if (!e) return <LoadingRows count={8} />;
 
   const canEdit = me.grants.people?.includes("edit");
+  const seesQueries = Boolean(me.grants.queries?.includes("view"));
   const canArchive = me.grants.people?.includes("delete");
   // Only someone on the active staff list is invited (the API refuses anyone else, users.invite.js).
   const canInvite = me.grants.settings?.includes("create") && e.login.state === "none" && e.status === "active";
@@ -187,13 +195,15 @@ export function Employee360({ id }: { id: string }) {
           </ActionGroup>
         }
       />
-      <Tabs items={TABS} value={tab} onValueChange={setTab} label="Employee Record" className="mb-3" />
+      <Tabs items={seesQueries ? [...TABS, ...QUERY_TABS] : TABS} value={tab} onValueChange={setTab} label="Employee Record" className="mb-3" />
       {tab === "profile" && <Profile employee={e} />}
       {tab === "job" && <Job employee={e} />}
       {tab === "schedule" && <EmployeeWorkSchedule id={id} />}
       {tab === "line" && <ReportingLine employee={e} onChanged={reload} />}
       {tab === "login" && <Login employee={e} onChanged={reload} />}
       {tab === "history" && <History id={id} />}
+      {seesQueries && tab === "queries" && <PersonQueries id={id} />}
+      {seesQueries && tab === "sanctions" && <PersonSanctions id={id} />}
     </>
   );
 }
@@ -438,6 +448,73 @@ function History({ id }: { id: string }) {
         { key: "w", label: "What", render: (r) => r.summary },
         { key: "a", label: "Who", render: (r) => r.actor_name ?? "System" },
         { key: "d", label: "When", render: (r) => formatDate(r.occurred_at.slice(0, 10)) },
+      ]}
+    />
+  );
+}
+
+const QUERY_STATUS = {
+  awaiting_response: { tone: "warn", text: "Awaiting Response" },
+  under_review: { tone: "info", text: "Under Review" },
+} as const;
+
+/** A query's status in the words Queries & Sanctions uses: a closed one says how it ended. */
+function queryPill(q: Query) {
+  if (q.status === "resolved") return q.outcome === "sanctioned" ? <Pill tone="neutral">Sanctioned</Pill> : <Pill tone="ok">Closed, No Action</Pill>;
+  if (q.escalated) return <Pill tone="err">Escalated</Pill>;
+  return <Pill tone={QUERY_STATUS[q.status].tone}>{QUERY_STATUS[q.status].text}</Pill>;
+}
+
+/** The person's queries the viewer may see (queries.md §6.1); a row opens it on Queries & Sanctions. */
+function PersonQueries({ id }: { id: string }) {
+  const { navigate } = useRouter();
+  const list = usePaged("GET /api/v1/queries", { filters: { employee_id: id }, sort: "-created_at" });
+  return (
+    <DataView
+      title="Queries"
+      list={list}
+      rowKey={(q: Query) => q.employee_query_id}
+      noun="query"
+      nounPlural="queries"
+      onRowClick={(q: Query) => navigate(hrefFor("queries", "queries", { id: q.employee_query_id }))}
+      empty={{ title: "No Queries", text: "None you can see." }}
+      columns={[
+        { key: "n", label: "Number", render: (q: Query) => q.number },
+        { key: "s", label: "Subject", render: (q: Query) => q.subject },
+        { key: "b", label: "Raised By", desktop: true, render: (q: Query) => q.raised_by_name ?? q.rule_name ?? "Rule" },
+        { key: "d", label: "Raised", render: (q: Query) => formatDate(q.created_at) },
+        { key: "t", label: "Status", render: queryPill },
+      ]}
+    />
+  );
+}
+
+const SANCTION_STATUS = {
+  pending_approval: { tone: "warn", text: "Awaiting Approval" },
+  issued: { tone: "neutral", text: "Issued" },
+  rejected: { tone: "err", text: "Not Approved" },
+  withdrawn: { tone: "neutral", text: "Withdrawn" },
+} as const;
+
+/** The person's sanctions the viewer may see; a row opens the query it follows, which shows it and its letter. */
+function PersonSanctions({ id }: { id: string }) {
+  const { navigate } = useRouter();
+  const list = usePaged("GET /api/v1/sanctions", { filters: { employee_id: id }, sort: "-created_at" });
+  return (
+    <DataView
+      title="Sanctions"
+      list={list}
+      rowKey={(s: Sanction) => s.sanction_id}
+      noun="sanction"
+      onRowClick={(s: Sanction) => navigate(hrefFor("queries", "queries", { id: s.employee_query_id }))}
+      empty={{ title: "No Sanctions", text: "None you can see." }}
+      columns={[
+        { key: "k", label: "Sanction", render: (s: Sanction) => s.step_name },
+        { key: "q", label: "Query", desktop: true, render: (s: Sanction) => s.query_number },
+        { key: "r", label: "Reason", render: (s: Sanction) => <span data-copy="content">{s.reason}</span> },
+        { key: "d", label: "Date", render: (s: Sanction) => formatDate(s.effective_on) },
+        { key: "m", label: "Fine", align: "n", render: (s: Sanction) => (s.fine ? <Money value={s.fine.amount_ngn} /> : "None") },
+        { key: "t", label: "Status", render: (s: Sanction) => <Pill tone={SANCTION_STATUS[s.status].tone}>{SANCTION_STATUS[s.status].text}</Pill> },
       ]}
     />
   );

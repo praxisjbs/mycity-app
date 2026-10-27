@@ -779,7 +779,8 @@ A probation review belongs to no month: choose **Probation** in **Kind** to list
 5. **Input** shows the dotted-line manager's comment and their name.
 6. Under the lines: the month's tasks (**Done This Month**, **Ongoing**, **Next Month**), and
    **Tasks** listing each with **When** and **Due**; the attendance (**This Month**) and
-   **Recognitions**.
+   **Recognitions**. If you may see queries, **Queries This Month** lists the person's queries
+   raised that month with their **Number**, **Subject**, **Raised** and **Outcome**.
 7. Once scored: **Score This Month**, **Score to Date** and **Rating**, and **Conduct** when a note
    is marked. **Corrective Actions** lists each **Action**, its **Owner**, **Due** and **Task**.
 8. Once closed, press **Download PDF** for the letterheaded copy.

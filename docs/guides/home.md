@@ -463,7 +463,7 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   - The alert's subject is the breach (`attendance_rule_breach`, its id) with `subject_employee_id`
     the person, so a second breach raises its own alert while the first is still open; it opens the
     breach's last day on People · Attendance. Its title says the count ("Ada Obi: 3 late arrivals
-    this month"), Query Due first while the query waits on M3; its trigger the days. Its category is
+    this month"); its trigger the days. Its category is
     attendance; it has no Over By.
   - Alert Rules lists the five read only on an Attendance Policy card, as the version in force today
     sets them (`GET /home/alert-rules/policy`, `HomeAlertPolicyRules`): each rule with its figures in
@@ -606,7 +606,7 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
 | `permission.changed`, `field_visibility.changed`, `capability.changed` (access) | a role's grants, masks or capabilities change | outbox `dashboard.prune-role-kpis`: takes the cards the role can no longer see out of `role_kpi`; idempotent |
 | `home.alert_rule_created`, `home.alert_rule_updated` | a rule is created or changed | audit; switching off also dismisses its open alerts in the same transaction (`home.alert_cleared` per alert) |
 | `home-alert-sweeps` (scheduler, daily 06:00 Lagos; and its queue, to re-run a morning by hand) | every morning | `alerts.sweeps.js`: reads each switched-on rule's metric, a batch at a time, and raises, refreshes or leaves an alert per subject, each in its own transaction; a rule it cannot read is logged and the others still run |
-| `attendance.rule_breached` (Attendance) | a policy rule is breached, in the transaction that crossed it (attendance.md §6.16) | Attendance's outbox handler `attendance.raise_breach_alert` raises its alert through `alerts.service.raisePolicyBreach` when Alert is on, or Query Due while Raise Query waits on M3; `home.alert_raised` follows as for any alert. Home no longer handles `attendance.punched` or `attendance.day_closed` |
+| `attendance.rule_breached` (Attendance) | a policy rule is breached, in the transaction that crossed it (attendance.md §6.16) | Attendance's outbox handler `attendance.raise_breach_alert` raises its alert through `alerts.service.raisePolicyBreach` when Alert is on (the query, with Raise Query on, is Queries & Sanctions', queries.md §6.2); `home.alert_raised` follows as for any alert. Home no longer handles `attendance.punched` or `attendance.day_closed` |
 | `home.alert_raised` | an alert is raised | notifies the holders of the rule's `permission_key` whose scope reaches the person it is about, never that person (a notification, separate from the alert) |
 | `home.alert_cleared` | an alert is cleared or dismissed | the audit entry (who, when, outcome) |
 | `alert-ageing` (scheduler, hourly at ten past, M0) | a High alert has been open 14 days | `home.alert_escalated`: notifies the CEO, once per alert |
@@ -845,6 +845,8 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 27/10/2026 · AJ · A policy breach's alert no longer reads Query Due and is raised only with Alert
+  on: Queries & Sanctions raises the query itself (attendance.md §6.16, queries.md §6.2).
 - 27/10/2026 · AJ · A second personal export through the engine (workspace.md §6, TB at the internal meeting of 26/10/2026): source `workspace_analytics`, never offered on the form, is My Workspace · Analytics' Export, run as the Overview's is on the reader's own hidden report, its filters the period pressed for, and needing the `workspace` export grant as well as the view (`scopeOn` reads a source's `action`); a snapshot source now receives its report's filters. What the Overview alone was in the repo and the service (never listed, its name giving way, its runs read by the screen that pressed, no `home.reports` needed) is now every personal source's (`PERSONAL`, `exportPersonal`, `getPersonalRun`); Reports' screens name the source Workspace Analytics (§4, §6, §7). The same day, after a refresh mid-export showed "still being made": each run keeps its own filters (`home_report_run.filters`, migration 2530), Run Now and Export answer a waiting run only when its filters match too, and the refusal is gone, so a run waiting on the worker never holds up another press (§4, §6).
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Home · Alerts' Category chips carry the unread notices about open alerts in each category, by the rule's metric (`alerts.views.js`, `alerts.repo.js` `placesOf`); a dismissed alert's notice counts on the tab, its list being behind View Dismissed.
 - 26/10/2026 · JP · QA DEF-01 finished: Need You leaves out, on the server, a request about a record whose screen has not shipped (an expense before Milestone 8), so its page and count hold only what opens; ⌘K's KPI Cards group leaves out a card whose module has not shipped, on the server as in the app (`shared/delivery-plan.js`, foundation.md §6.7).

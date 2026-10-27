@@ -1,0 +1,17 @@
+---
+title: "Suspension: {{ query_number }}"
+---
+<style>
+  .sw p { margin: 0 0 10px 0; }
+  .sw .sw-ref { font-size: 9pt; color: #71717A; }
+  .sw h2 { font-size: 12pt; margin: 16px 0 8px 0; }
+</style>
+<div class="sw">
+  <p class="sw-ref">{{ query_number }} · {{ longdate effective_on }}</p>
+  <p>{{ employee.display_name }}<br>{{#if employee.job_title}}{{ employee.job_title }}{{/if}}{{#if employee.department}}, {{ employee.department }}{{/if}}</p>
+  <h2>Suspension</h2>
+  <p>Dear {{ employee.first_name }},</p>
+  <p>Management has reviewed your response to query {{ query_number }} ({{ subject }}) and finds it unacceptable. {{ reason }}</p>
+  <p>You are therefore suspended from duty without pay{{#if days}} for {{ days }} days{{/if}} in accordance with company policy, beginning from {{ longdate effective_on }}.{{#if ends_on}} Your suspension ends on {{ longdate ends_on }}, and you will resume duty on your next working day.{{/if}}</p>
+  <p>You are warned to desist from such acts, as a repeat of this will earn you stiffer disciplinary action.</p>
+</div>

@@ -30,7 +30,7 @@ describe("job registry", () => {
     }
   });
 
-  test("the queue list is the README §5.15 list: M0, and the M1 and M2 jobs built so far", () => {
+  test("the queue list is the README §5.15 list: M0, and the M1, M2 and M3 jobs built so far", () => {
     expect(registry.JOBS.map((j) => j.queue).sort()).toEqual([
       "ai-find-prices",
       "announcement-publish",
@@ -49,6 +49,7 @@ describe("job registry", () => {
       "notification-deliver",
       "notification-push",
       "pdf-render",
+      "query-rule-evaluate",
       "reminders",
       "review-cycle-open",
       "scheduled-report",
@@ -71,6 +72,7 @@ describe("job registry", () => {
       "media-reconcile",
       "outbox-dispatch",
       "places-name",
+      "query-rule-sweep",
       "reminders",
       "review-cycles",
       "scheduled-reports",

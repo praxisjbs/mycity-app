@@ -147,7 +147,8 @@ On a phone the record's buttons sit full width under the name, and the tabs scro
 ### Open and correct a record {#people-record}
 
 A record's tabs are **Profile**, **Job**, **Work Schedule**, **Reporting Line**, **Login** and
-**History**.
+**History**. If you may see queries, it also has **Queries** and **Sanctions**:
+[Someone's queries and sanctions](#queries-person).
 
 ![A person's record](shot:people-record)
 

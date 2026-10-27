@@ -1,4 +1,4 @@
-import type { Department, EmployeeListQuery, Project, Worksite } from "@mycity/contract/contract.gen.ts";
+import type { CitablePolicy, Department, EmployeeListQuery, Project, Worksite } from "@mycity/contract/contract.gen.ts";
 import { usePhotos } from "@/api/download";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
@@ -124,6 +124,25 @@ export function DepartmentPicker({ value, onChange, multiple }: { value: Departm
       title={(d) => d.name}
       multiple={multiple}
       placeholder="Search departments"
+    />
+  );
+}
+
+/** The Knowledge Hub's policies with a version in force, searched on the server (one): what a query cites. */
+/** A policy as a picker holds it: a rule's saved policy names no version, a fresh pick does. */
+export type PolicyChoice = Pick<CitablePolicy, "policy_id" | "number" | "title"> & { version?: number };
+
+export function PolicyPicker({ value, onChange }: { value: PolicyChoice[]; onChange: (value: PolicyChoice[]) => void }) {
+  const list = usePaged("GET /api/v1/queries/policies");
+  return (
+    <RecordPicker<PolicyChoice>
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value}
+      onChange={onChange}
+      id={(p) => p.policy_id}
+      title={(p) => p.title}
+      sub={(p) => (p.version ? `${p.number} · Version ${p.version}` : p.number)}
+      placeholder="Search policies"
     />
   );
 }
