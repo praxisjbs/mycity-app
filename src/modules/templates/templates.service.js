@@ -26,7 +26,7 @@ const { render } = require("../../shared/documents/render");
 const md = require("../../shared/documents/markdown");
 const { markdownToHtml } = md;
 const repo = require("./templates.repo");
-const { EVENTS, SHIPPED, declare } = require("./templates.events");
+const { EVENTS, SHIPPED, FINE_LETTER_KEY, declare } = require("./templates.events");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -80,6 +80,25 @@ async function wordingOf(db, key) {
 
 const publicRow = ({ stored_status: _s, ...row }) => row;
 
+/** The letters every manual query and every fine send, whatever names them (guide §6.7). */
+const DEFAULT_FOR = Object.freeze({ "query-letter": "every manual query", [FINE_LETTER_KEY]: "every fine" });
+
+/** What sends a letter, in words, or null: a step or rule on it, or its being a default. */
+function senderOf(row) {
+  if (row.used_by.length) return row.used_by.join(", ");
+  return DEFAULT_FOR[row.key] || null;
+}
+
+/**
+ * The wording as the editor opens it. Markdown as saved; a shipped HTML file through the one
+ * Markdown whitelist, so the editor shows MyCity's wording with its names, and the first save
+ * keeps it as version 1.
+ */
+function editorHtmlOf(t) {
+  if (!t) return null;
+  return md.markdownToHtml(t.format === "markdown" ? t.body : md.htmlToMarkdown(t.body));
+}
+
 async function get(id) {
   const row = await repo.get(pool, id, shippedWithWording());
   if (!row) throw notFound();
@@ -89,9 +108,10 @@ async function get(id) {
     ...publicRow(row),
     title: t ? t.title || null : null,
     body: t ? t.body : null,
-    body_html: t && t.format === "markdown" ? md.markdownToHtml(t.body) : null,
+    body_html: editorHtmlOf(t),
     format: t ? t.format : null,
     variables: [...VARIABLE_NAMES],
+    in_use: senderOf(row) !== null,
   };
 }
 
@@ -200,6 +220,7 @@ async function create(actor, body) {
       key,
       name: body.name,
       purpose: body.purpose,
+      status: body.status || "draft",
       created_by: actor.user_id,
     });
     declare(key);
@@ -212,9 +233,19 @@ async function create(actor, body) {
       key: EVENTS.LETTER_TEMPLATE_CREATED,
       entity: { type: "letter_template", id: letterId },
       actor,
-      after: { key, name: body.name, purpose: body.purpose, version: version.version },
+      after: { key, name: body.name, purpose: body.purpose, status: body.status || "draft", version: version.version },
       payload: { letter_template_id: letterId, key },
     });
+    // Save and Activate: ready to be chosen at once.
+    if (body.status === "active")
+      await emit(client, {
+        key: EVENTS.LETTER_TEMPLATE_ACTIVATED,
+        entity: { type: "letter_template", id: letterId },
+        actor,
+        before: { status: "draft" },
+        after: { status: "active" },
+        payload: { letter_template_id: letterId, key },
+      });
     return letterId;
   });
   return get(id);
@@ -265,6 +296,55 @@ async function activate(actor, id) {
   return get(id);
 }
 
+/**
+ * Back to a draft (POST /letter-templates/:id/deactivate), only while nothing sends it: a step or
+ * rule on it must move to another letter first, and the defaults never stop.
+ */
+async function deactivate(actor, id) {
+  await tx(async (client) => {
+    const row = await repo.get(client, id, shippedWithWording());
+    if (!row) throw notFound();
+    if (row.stored_status !== "active") return;
+    const sender = senderOf(row);
+    if (sender)
+      throw new AppError("TEMPLATE_IN_USE", `In use by ${sender}`, 409, { letter_template: [`Used by ${sender}`] });
+    await repo.setStatus(client, id, "draft");
+    await emit(client, {
+      key: EVENTS.LETTER_TEMPLATE_DEACTIVATED,
+      entity: { type: "letter_template", id },
+      actor,
+      before: { status: "active" },
+      after: { status: "draft" },
+      payload: { letter_template_id: id, key: row.key },
+    });
+  });
+  return get(id);
+}
+
+/** PATCH /letter-templates/:id: the name, and what it is used for while nothing sends it. */
+async function update(actor, id, body) {
+  await tx(async (client) => {
+    const row = await repo.get(client, id, shippedWithWording());
+    if (!row) throw notFound();
+    const purpose = body.purpose && body.purpose !== row.purpose ? body.purpose : undefined;
+    if (purpose) {
+      const sender = senderOf(row);
+      if (sender)
+        throw new AppError("TEMPLATE_IN_USE", `In use by ${sender}`, 409, { purpose: [`Used by ${sender}`] });
+    }
+    await repo.update(client, id, { name: body.name, purpose });
+    await emit(client, {
+      key: EVENTS.LETTER_TEMPLATE_UPDATED,
+      entity: { type: "letter_template", id },
+      actor,
+      before: { name: row.name, purpose: row.purpose },
+      after: { name: body.name || row.name, purpose: purpose || row.purpose },
+      payload: { letter_template_id: id, key: row.key },
+    });
+  });
+  return get(id);
+}
+
 /* ------------------------------------------------------------------ *
  * For the queries and sanctions services
  * ------------------------------------------------------------------ */
@@ -300,6 +380,8 @@ module.exports = {
   create,
   saveBody,
   activate,
+  deactivate,
+  update,
   isReady,
   usable,
   VARIABLE_NAMES,

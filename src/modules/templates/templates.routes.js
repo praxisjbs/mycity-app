@@ -55,4 +55,14 @@ route(router, "post", "/:id/activate",
     summary: "Make a letter available to send" },
   requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.activate);
 
+route(router, "post", "/:id/deactivate",
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: t.LetterTemplateDetail,
+    summary: "Take a letter nothing sends back to a draft" },
+  requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.deactivate);
+
+route(router, "patch", "/:id",
+  { params: c.common.IdParams, body: t.LetterTemplateUpdate, response: t.LetterTemplateDetail,
+    summary: "Rename a letter, or change what it is used for while nothing sends it" },
+  requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.update);
+
 module.exports = { basePath: "/letter-templates", surface: "staff", router };

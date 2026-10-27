@@ -7,6 +7,8 @@
  *   letter_template.created    a letter was added on Letter Templates (a draft)
  *   letter_template.saved      new wording saved as the next template_version
  *   letter_template.activated  it may now be chosen by a rung, a rule or a query
+ *   letter_template.deactivated  back to a draft, while nothing sends it
+ *   letter_template.updated    renamed, or what it is used for changed while nothing sends it
  *
  * Both document types take the template their caller names (`templateChoice`): a rung
  * added on Chain Settings sends a letter nobody shipped. Every letter fills from one
@@ -22,6 +24,8 @@ const EVENTS = defineEvents("queries", {
   "letter_template.created": { summary: "A letter template was added" },
   "letter_template.saved": { summary: "A letter template's wording was saved" },
   "letter_template.activated": { summary: "A letter template was made available" },
+  "letter_template.deactivated": { summary: "A letter template went back to a draft" },
+  "letter_template.updated": { summary: "A letter template was renamed or its use changed" },
 });
 
 /** The letters the code ships, one file each in templates/documents/ (seed 3190 lists them). */

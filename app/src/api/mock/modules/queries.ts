@@ -81,6 +81,7 @@ const LETTERS: Array<LetterTemplateDetail> = (
   body: WORDING[key] ?? null,
   format: "markdown",
   body_html: null,
+  in_use: false,
   variables: ["employee", "query_number", "subject", "details", "reason", "step_name", "raised_on", "response_due", "effective_on", "ends_on", "days", "fine_amount", "signer"],
 }));
 
@@ -93,9 +94,16 @@ const wordingOfHtml = (html: string) =>
 LETTERS.forEach((t) => (t.body_html = htmlOfWording(t.body)));
 
 const listed = (t: LetterTemplateDetail): LetterTemplate => ({
-  ...omit(t, ["title", "body", "body_html", "format", "variables"] as const),
-  used_by: STEPS.filter((s) => s.letter_template === t.key).map((s) => s.name),
+  ...omit(t, ["title", "body", "body_html", "format", "variables", "in_use"] as const),
+  used_by: [...STEPS.filter((s) => s.letter_template === t.key).map((s) => s.name), ...RULES.filter((r) => r.letter_template === t.key).map((r) => r.name)],
 });
+/** What sends a letter, as the API words it: a step or rule on it, or its being a default. */
+const senderOf = (t: LetterTemplateDetail) => {
+  const used = listed(t).used_by;
+  if (used.length) return used.join(", ");
+  return t.key === "query-letter" ? "every manual query" : t.key === "salary-deduction-letter" ? "every fine" : null;
+};
+const detailOf = (t: LetterTemplateDetail): LetterTemplateDetail => ({ ...t, used_by: listed(t).used_by, in_use: senderOf(t) !== null });
 
 function preview(t: LetterTemplateDetail): LetterPreview {
   const run = (text: string, filled = false) => ({ text, filled });
@@ -148,7 +156,7 @@ route("POST /api/v1/letter-templates/assist", (req) => {
 });
 route("GET /api/v1/letter-templates/:id", (req) => {
   const t = letterOf(req.params.id);
-  return t ? ok({ ...t, used_by: listed(t).used_by }) : notFound();
+  return t ? ok(detailOf(t)) : notFound();
 });
 route("GET /api/v1/letter-templates/:id/preview", (req) => {
   const t = letterOf(req.params.id);
@@ -159,7 +167,7 @@ const configure = (req: Req) => (FULL.has(req.user!) ? null : fail(403, "CAPABIL
 route("POST /api/v1/letter-templates", (req) => {
   const refused = configure(req);
   if (refused) return refused;
-  const b = req.body as { name?: string; purpose?: "query" | "sanction" | "fine"; title?: string; body?: string; body_html?: string };
+  const b = req.body as { name?: string; purpose?: "query" | "sanction" | "fine"; title?: string; body?: string; body_html?: string; status?: "draft" | "active" };
   const wording = b.body_html !== undefined ? wordingOfHtml(b.body_html) : (b.body ?? "");
   const f: Record<string, string[]> = {};
   if (!b.name?.trim()) f.name = ["Required"];
@@ -167,9 +175,9 @@ route("POST /api/v1/letter-templates", (req) => {
   if (wording.trim().length < 40) f.body_html = ["Write the letter"];
   if (Object.keys(f).length) return invalid(f);
   const key = `${b.name!.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-?letter$/, "")}-letter`;
-  const t: LetterTemplateDetail = { letter_template_id: sid(`ltr:${key}:${LETTERS.length}`), key, name: b.name!.trim(), purpose: b.purpose!, status: "draft", version: 1, used_by: [], updated_at: now(), title: b.title ?? null, body: wording, body_html: htmlOfWording(wording), format: "markdown", variables: LETTERS[0].variables };
+  const t: LetterTemplateDetail = { letter_template_id: sid(`ltr:${key}:${LETTERS.length}`), key, name: b.name!.trim(), purpose: b.purpose!, status: b.status ?? "draft", version: 1, used_by: [], updated_at: now(), title: b.title ?? null, body: wording, body_html: htmlOfWording(wording), format: "markdown", variables: LETTERS[0].variables, in_use: false };
   LETTERS.push(t);
-  return created(t);
+  return created(detailOf(t));
 });
 route("PUT /api/v1/letter-templates/:id/body", (req) => {
   const refused = configure(req);
@@ -180,7 +188,7 @@ route("PUT /api/v1/letter-templates/:id/body", (req) => {
   const wording = b.body_html !== undefined ? wordingOfHtml(b.body_html) : (b.body ?? "");
   if (wording.trim().length < 40) return invalid({ body_html: ["Write the letter"] });
   Object.assign(t, { body: wording, body_html: htmlOfWording(wording), title: b.title ?? t.title, format: "markdown", version: t.version + 1, updated_at: now(), status: t.status === "awaiting_sample" ? "draft" : t.status });
-  return ok(t);
+  return ok(detailOf(t));
 });
 route("POST /api/v1/letter-templates/:id/activate", (req) => {
   const refused = configure(req);
@@ -189,7 +197,32 @@ route("POST /api/v1/letter-templates/:id/activate", (req) => {
   if (!t) return notFound();
   if (!t.body) return fail(409, "TEMPLATE_AWAITING_SAMPLE", "Write the letter before it is used");
   t.status = "active";
-  return ok(t);
+  return ok(detailOf(t));
+});
+route("POST /api/v1/letter-templates/:id/deactivate", (req) => {
+  const refused = configure(req);
+  if (refused) return refused;
+  const t = letterOf(req.params.id);
+  if (!t) return notFound();
+  const sender = senderOf(t);
+  if (t.status === "active" && sender) return fail(409, "TEMPLATE_IN_USE", `In use by ${sender}`, { letter_template: [`Used by ${sender}`] });
+  if (t.status === "active") t.status = "draft";
+  return ok(detailOf(t));
+});
+route("PATCH /api/v1/letter-templates/:id", (req) => {
+  const refused = configure(req);
+  if (refused) return refused;
+  const t = letterOf(req.params.id);
+  if (!t) return notFound();
+  const b = req.body as { name?: string; purpose?: "query" | "sanction" };
+  if (b.purpose && b.purpose !== t.purpose) {
+    const sender = senderOf(t);
+    if (sender) return fail(409, "TEMPLATE_IN_USE", `In use by ${sender}`, { purpose: [`Used by ${sender}`] });
+    t.purpose = b.purpose;
+  }
+  if (b.name?.trim()) t.name = b.name.trim();
+  t.updated_at = now();
+  return ok(detailOf(t));
 });
 
 /* ------------------------------------------------------------------ *

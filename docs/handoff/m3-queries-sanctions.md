@@ -437,7 +437,7 @@ real names and never enter this public repository.
 
 ### 9.3 Checklist
 
-- [ ] S1 Letter editing: shipped wording in the editor (converted to Markdown on first save); Used For
+- [x] S1 Letter editing: shipped wording in the editor (converted to Markdown on first save); Used For
   while unused; Deactivate when unused; New Template's Save Draft and Save and Activate; the rule
   form's Letter
 - [ ] S2 My Signature: migration `3050`, stored through the vault, Edit Signature, Raise a Query and
@@ -450,4 +450,5 @@ real names and never enter this public repository.
 ### 9.4 Log
 
 - 27/10/2026 · GE · Observations read against the code, decisions taken, branch restarted from main.
-
+- 27/10/2026 · GE · S1 built: the editor opens a shipped letter's wording, Name and Used For on Edit
+  Template, Deactivate while unused, Save Draft and Save and Activate, the rule's Letter.

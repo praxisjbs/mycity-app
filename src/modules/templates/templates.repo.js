@@ -86,15 +86,24 @@ async function keyExists(db, key) {
 async function insert(db, row) {
   const { rows } = await db.query(
     `INSERT INTO letter_template (key, name, purpose, status, created_by)
-     VALUES ($1, $2, $3, 'draft', $4)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING letter_template_id`,
-    [row.key, row.name, row.purpose, row.created_by || null],
+    [row.key, row.name, row.purpose, row.status || "draft", row.created_by || null],
   );
   return rows[0].letter_template_id;
 }
 
 async function setStatus(db, id, status) {
   await db.query("UPDATE letter_template SET status = $2 WHERE letter_template_id = $1", [id, status]);
+}
+
+/** A letter's name and what it is used for. */
+async function update(db, id, { name, purpose }) {
+  await db.query(
+    `UPDATE letter_template SET name = COALESCE($2, name), purpose = COALESCE($3, purpose), updated_at = now()
+      WHERE letter_template_id = $1`,
+    [id, name ?? null, purpose ?? null],
+  );
 }
 
 /** Touch the row so its updated_at follows an edit of the wording. */
@@ -117,4 +126,4 @@ async function summary(db, shipped) {
   return rows[0];
 }
 
-module.exports = { list, get, getByKey, keyExists, insert, setStatus, touch, summary };
+module.exports = { list, get, getByKey, keyExists, insert, setStatus, update, touch, summary };

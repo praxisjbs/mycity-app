@@ -151,3 +151,23 @@ describe("Queries & Sanctions · who may raise", () => {
     expect(screen.queryByRole("button", { name: "Raise a Query" })).toBeNull();
   }, 30000);
 });
+
+describe("Queries & Sanctions · Letter Templates", () => {
+  it("opens a letter with its wording, and offers Deactivate on an active one", async () => {
+    await signedInAs("cynthia@mycityapp.io", "letter-templates");
+    expect(await screen.findByRole("button", { name: "Deactivate" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Template" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(((await within(dialog).findByRole("textbox", { name: "Name" })) as HTMLInputElement).value).toBe("Caution Letter");
+    // The wording is there to edit, not an empty box.
+    await waitFor(() => expect(within(dialog).getByText(/Dear/)).toBeTruthy());
+  }, 30000);
+
+  it("saves a new letter as a draft or straight into use", async () => {
+    await signedInAs("cynthia@mycityapp.io", "letter-templates");
+    fireEvent.click(await screen.findByRole("button", { name: "New Template" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Save Draft" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Save and Activate" })).toBeTruthy();
+  }, 30000);
+});

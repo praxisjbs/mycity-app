@@ -43,7 +43,7 @@ describe("the routes", () => {
   const routes = routesOf(require("./templates.routes").router);
 
   test("reads need the queries grant; every write needs queries.configure too", () => {
-    expect(routes.length).toBe(9);
+    expect(routes.length).toBe(11);
     for (const r of routes) {
       expect(r.permission.key).toBe("queries");
       // Write With AI belongs to whoever writes letters: its status is asked with the same grant.

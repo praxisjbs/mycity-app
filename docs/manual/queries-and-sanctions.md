@@ -194,17 +194,19 @@ missing clock-outs are counted by the Attendance policy, which raises their quer
 3. Type a **Name**, such as `Overdue Tasks`.
 4. Under **What Sets It Off**, pick what the rule counts.
 5. Type **How Many Times** and **Within, Days**: three in 14 days is `3` and `14`.
-6. To have its letters quote a policy, pick it under **Policy**.
-7. Once a policy is picked, you may type the line it breaks under **Clause**, up to 300 characters.
+6. Under **Letter**, pick the query letter its queries send. With none picked, they send the Query
+   Letter.
+7. To have its letters quote a policy, pick it under **Policy**.
+8. Once a policy is picked, you may type the line it breaks under **Clause**, up to 300 characters.
    The rule's letters quote it.
-8. Press **Save Rule**. The rule is saved as a draft and does nothing yet.
+9. Press **Save Rule**. The rule is saved as a draft and does nothing yet.
 
 ### Change a rule {#queries-rules-edit needs="queries edit, cap queries.configure"}
 
 1. Open [Queries & Sanctions · Rules](/queries?tab=rules).
 2. On the rule's card, press **Edit Rule**.
-3. Change the **Name**, **How Many Times**, **Within, Days**, **Policy** or **Clause**. Taking the
-   policy off clears the clause.
+3. Change the **Name**, **How Many Times**, **Within, Days**, **Letter**, **Policy** or **Clause**.
+   Taking the policy off clears the clause.
 4. Press **Save Rule**. The change counts from the next event.
 
 Once a rule has raised a query, **What Sets It Off** is shown but cannot change. Make a new rule
@@ -298,12 +300,15 @@ A letter **Awaiting Sample** has no wording yet: MyCity has still to send its sa
 
 1. Open [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates) and press the
    template.
-2. Press **Edit Template** at the top right.
-3. Write the wording under **Letter**. Type `{{ employee.first_name }}`, `{{ query_number }}`,
+2. Press **Edit Template** at the top right. The letter opens with its wording as it is sent.
+3. Change the **Name** if you need to. While no step or rule sends the letter, you can also change
+   **Used For**.
+4. Change the wording under **Letter**. Type `{{ employee.first_name }}`, `{{ query_number }}`,
    `{{ reason }}` or `{{ step_name }}` where the record fills in.
-4. To draft it with AI, press **Write With AI**, say what you want under **What To Say**, then
+5. To draft it with AI, press **Write With AI**, say what you want under **What To Say**, then
    **Write Draft** and **Use Draft**.
-5. Press **Save Letter**. Each save is a new version; a letter keeps the version it used.
+6. Press **Save Letter**. Each change of wording is a new version; a letter keeps the version it
+   used.
 
 ### Add a letter {#queries-letters-add needs="queries create, cap queries.configure"}
 
@@ -312,13 +317,20 @@ A letter **Awaiting Sample** has no wording yet: MyCity has still to send its sa
 3. Type the **Name**, such as `Final Warning`.
 4. Under **Used For**, press **Queries** or **Sanctions**.
 5. Write the wording under **Letter**, as above.
-6. Press **Save Template**. It is saved as a draft.
+6. Press **Save Draft** to keep it out of use for now, or **Save and Activate** to use it at once.
 
-### Switch a letter on {#queries-letters-activate needs="queries edit, cap queries.configure"}
+A step chooses its letter on [Chain Settings](#queries-chain), and a rule under **Letter** on
+[New Rule or Edit Rule](#queries-rules-add). Both then show under **Used By**.
 
-1. Press the draft letter on
-   [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates).
-2. Press **Activate** at the top right. A letter with no wording cannot be switched on.
+### Switch a letter on or off {#queries-letters-activate needs="queries edit, cap queries.configure"}
+
+1. Press the letter on [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates).
+2. Press **Activate** at the top right for a draft. A letter with no wording cannot be switched on.
+3. Press **Deactivate** for an active letter you no longer use. It goes back to a draft.
+
+| The hub says | Why | What to do |
+|---|---|---|
+| *In use by …* | A step or rule sends it, or it is the Query Letter or the Salary Deduction Letter | Give the step or rule another letter first |
 
 Only an active letter is used. A step of the ladder needs its letter active before it is offered.
 

@@ -2,7 +2,7 @@ import queries from "@mycity/contract/schemas/queries.js";
 import query_rules from "@mycity/contract/schemas/query_rules.js";
 import sanctions from "@mycity/contract/schemas/sanctions.js";
 import templates from "@mycity/contract/schemas/templates.js";
-import type { ConsequenceStep, LetterTemplate, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
+import type { ConsequenceStep, LetterTemplate, LetterTemplateDetail, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
@@ -532,12 +532,13 @@ function Rules() {
   );
 }
 
-type RuleValues = { name: string; source_event: string; threshold: string; window_days: string; policy_id: string; policy_clause: string };
+type RuleValues = { name: string; source_event: string; threshold: string; window_days: string; letter_template: string; policy_id: string; policy_clause: string };
 const ruleOf = (v: RuleValues) => ({
   name: v.name,
   source_event: v.source_event as QueryRuleSource,
   threshold: v.threshold === "" ? undefined : Number(v.threshold),
   window_days: v.window_days === "" ? undefined : Number(v.window_days),
+  ...(v.letter_template && { letter_template: v.letter_template }),
   ...(v.policy_id && { policy_id: v.policy_id }),
   ...(v.policy_id && v.policy_clause.trim() && { policy_clause: v.policy_clause.trim() }),
 });
@@ -555,6 +556,7 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
       source_event: rule?.source_event ?? "overdue_task",
       threshold: String(rule?.threshold ?? 3),
       window_days: String(rule?.window_days ?? 14),
+      letter_template: rule?.letter_template ?? "",
       policy_id: rule?.policy?.policy_id ?? "",
       policy_clause: rule?.policy_clause ?? "",
     },
@@ -563,15 +565,17 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
   const [policy, setPolicy] = useState<PolicyChoice[]>(rule?.policy ? [rule.policy] : []);
   const create = useMutation("POST /api/v1/query-rules");
   const update = useMutation("PATCH /api/v1/query-rules/:id");
+  // The query letters a rule may send; none picked sends the Query Letter (guide §6.3).
+  const letters = useApi("GET /api/v1/letter-templates", { query: { purpose: "query", status: "active" } });
   const submit = async () => {
     if (!f.check()) return;
-    const body = ruleOf(f.values) as { name: string; source_event: OfferedSource; threshold: number; window_days: number; policy_id?: string; policy_clause?: string };
+    const body = ruleOf(f.values) as { name: string; source_event: OfferedSource; threshold: number; window_days: number; letter_template?: string; policy_id?: string; policy_clause?: string };
     try {
       if (rule) {
         const { source_event: sourceEvent, ...rest } = body;
         const r = await update.run({
           params: { id: rule.query_rule_id },
-          body: { ...rest, ...(!rule.has_fired && { source_event: sourceEvent }), policy_id: body.policy_id ?? null, policy_clause: body.policy_clause ?? null },
+          body: { ...rest, ...(!rule.has_fired && { source_event: sourceEvent }), letter_template: body.letter_template ?? null, policy_id: body.policy_id ?? null, policy_clause: body.policy_clause ?? null },
         });
         invalidate("/api/v1/query-rules");
         close();
@@ -599,6 +603,9 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
         <Field label="How Many Times" {...f.status("threshold")}><NumberField {...f.field("threshold")} /></Field>
         <Field label="Within, Days" {...f.status("window_days")}><NumberField {...f.field("window_days")} /></Field>
       </Grid>
+      <Field label={<HelpTerm help="The letter this rule's queries send. None picked sends the Query Letter.">Letter</HelpTerm>} optional {...f.status("letter_template")}>
+        <SelectField placeholder="Query Letter" options={(letters.data?.data ?? []).map((l) => [l.key, l.name])} {...f.field("letter_template")} />
+      </Field>
       <Field label={<HelpTerm help="The policy this rule enforces. Its queries' letters quote it.">Policy</HelpTerm>} optional {...f.status("policy_id")}>
         <PolicyPicker value={policy} onChange={(p) => {
           setPolicy(p);
@@ -780,12 +787,16 @@ function Templates() {
   const shown = list.rows.find((t) => t.letter_template_id === sel) ?? (beside ? (list.rows[0] ?? null) : null);
   const preview = useApi("GET /api/v1/letter-templates/:id/preview", { params: { id: shown?.letter_template_id ?? "" }, enabled: !!shown && shown.status !== "awaiting_sample" });
   const activate = useMutation("POST /api/v1/letter-templates/:id/activate");
-  const turnOn = async () => {
+  const deactivate = useMutation("POST /api/v1/letter-templates/:id/deactivate");
+  // Activate a draft; Deactivate an active letter nothing sends (the refusal names what does).
+  const flip = async () => {
     if (!shown) return;
+    const on = shown.status !== "active";
     try {
-      await activate.run({ params: { id: shown.letter_template_id }, body: {} });
+      await (on ? activate : deactivate).run({ params: { id: shown.letter_template_id }, body: {} });
       invalidate("/api/v1/letter-templates");
-      toast(`${shown.name} is active`);
+      invalidate("/api/v1/sanctions/chain");
+      toast(on ? `${shown.name} is active` : `${shown.name} is a draft`);
     } catch (e) {
       toast(e instanceof ApiError ? e.message : "Not saved");
     }
@@ -799,7 +810,7 @@ function Templates() {
           configure && (
             <>
               {shown && <Button icon="edit" onClick={() => modal.open({ title: shown.name, wide: true, body: (close) => <EditTemplate id={shown.letter_template_id} close={close} /> })}>Edit Template</Button>}
-              {shown && shown.status === "draft" && <Button onClick={turnOn}>Activate</Button>}
+              {shown && (shown.status === "draft" || shown.status === "active") && <Button onClick={flip}>{shown.status === "active" ? "Deactivate" : "Activate"}</Button>}
               <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>
             </>
           )
@@ -847,13 +858,14 @@ type TemplateValues = { name: string; purpose: string; body_html: string };
 function TemplateForm({ close }: { close: () => void }) {
   const f = useContractForm<TemplateValues>({ name: "", purpose: "sanction", body_html: "" }, templates.LetterTemplateCreate);
   const save = useMutation("POST /api/v1/letter-templates");
-  const submit = async () => {
+  // Save Draft keeps it out of use; Save and Activate makes it ready to be chosen at once.
+  const submit = (status: "draft" | "active") => async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: { ...f.values, purpose: f.values.purpose as "query" | "sanction" | "fine" } });
+      await save.run({ body: { ...f.values, purpose: f.values.purpose as "query" | "sanction" | "fine", status } });
       invalidate("/api/v1/letter-templates");
       close();
-      toast("Template saved as a draft");
+      toast(status === "active" ? "Template saved and active" : "Template saved as a draft");
     } catch (e) {
       failed(f)(e);
     }
@@ -869,7 +881,8 @@ function TemplateForm({ close }: { close: () => void }) {
       <LetterBody f={f} />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Save Template</Button>
+        <Button busy={save.pending} onClick={submit("draft")}>Save Draft</Button>
+        <Button variant="primary" busy={save.pending} onClick={submit("active")}>Save and Activate</Button>
       </FormFooter>
     </LetterAi>
   );
@@ -924,29 +937,59 @@ function EditTemplate({ id, close }: { id: string; close: () => void }) {
   const t = useApi("GET /api/v1/letter-templates/:id", { params: { id } });
   if (t.error) return <ErrorState error={t.error} onRetry={t.reload} />;
   if (!t.data) return <LoadingRows count={6} />;
-  return <EditTemplateForm id={id} name={t.data.name} purpose={t.data.purpose} body={t.data.body_html ?? ""} close={close} />;
+  return <EditTemplateForm t={t.data} close={close} />;
 }
 
-function EditTemplateForm({ id, name, purpose, body, close }: { id: string; name: string; purpose: LetterPurposeKey; body: string; close: () => void }) {
-  const f = useContractForm<{ body_html: string }>({ body_html: body }, templates.LetterTemplateBodySave);
+type EditValues = { name: string; purpose: string; body_html: string };
+
+/**
+ * Edit Template: the name, what it is used for (while nothing sends it), and the wording, which
+ * opens as saved (a shipped letter's file, converted for the editor). Only what changed is sent:
+ * the wording as its next version, the name and use through PATCH.
+ */
+function EditTemplateForm({ t, close }: { t: LetterTemplateDetail; close: () => void }) {
+  const body = t.body_html ?? "";
+  const f = useContractForm<EditValues>(
+    { name: t.name, purpose: t.purpose, body_html: body },
+    {
+      safeParse: (value: unknown) => {
+        const v = value as EditValues;
+        const named = templates.LetterTemplateUpdate.safeParse({ name: v.name, ...(t.purpose !== "fine" && { purpose: v.purpose }) });
+        if (!named.success) return named;
+        return v.body_html === body ? named : templates.LetterTemplateBodySave.safeParse({ body_html: v.body_html });
+      },
+    },
+  );
+  const rename = useMutation("PATCH /api/v1/letter-templates/:id");
   const save = useMutation("PUT /api/v1/letter-templates/:id/body");
+  const id = t.letter_template_id;
   const submit = async () => {
     if (!f.check()) return;
+    const name = f.values.name.trim();
+    const purpose = f.values.purpose as "query" | "sanction";
     try {
-      const r = await save.run({ params: { id }, body: f.values });
+      if (name !== t.name || (t.purpose !== "fine" && purpose !== t.purpose))
+        await rename.run({ params: { id }, body: { ...(name !== t.name && { name }), ...(t.purpose !== "fine" && purpose !== t.purpose && { purpose }) } });
+      const r = f.values.body_html !== body ? await save.run({ params: { id }, body: { body_html: f.values.body_html } }) : null;
       invalidate("/api/v1/letter-templates");
       close();
-      toast(`Saved as version ${r.version}`);
+      toast(r ? `Saved as version ${r.version}` : `${name} saved`);
     } catch (e) {
       failed(f)(e);
     }
   };
   return (
-    <LetterAi letter={() => ({ name, purpose })} body={() => f.values.body_html} use={(html) => f.set("body_html", html)}>
+    <LetterAi letter={() => ({ name: f.values.name.trim() || t.name, purpose: t.purpose })} body={() => f.values.body_html} use={(html) => f.set("body_html", html)}>
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} /></Field>
+      {t.purpose === "fine" ? null : t.in_use ? (
+        <KeyValue items={[[<HelpTerm key="u" help="A step or rule sends it, or every manual query does. Move them first.">Used For</HelpTerm>, t.purpose === "query" ? "Queries" : "Sanctions"]]} />
+      ) : (
+        <Field label="Used For" {...f.status("purpose")}><ChoiceField {...f.field("purpose")} options={[["query", "Queries"], ["sanction", "Sanctions"]]} /></Field>
+      )}
       <LetterBody f={f} />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Save Letter</Button>
+        <Button variant="primary" busy={save.pending || rename.pending} onClick={submit}>Save Letter</Button>
       </FormFooter>
     </LetterAi>
   );

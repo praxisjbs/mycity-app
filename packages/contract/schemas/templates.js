@@ -47,10 +47,18 @@ const LetterTemplatePage = Paged(LetterTemplate);
 const LetterTemplateDetail = LetterTemplate.extend({
   title: z.string().nullable(),
   body: z.string().nullable(),
-  /** The Markdown wording as the rich text editor opens it; null for a shipped HTML letter. */
+  /**
+   * The wording as the rich text editor opens it. A shipped HTML letter comes converted to the
+   * editor's Markdown, its names kept, so saving it keeps MyCity's wording as its first version.
+   */
   body_html: z.string().nullable(),
   format: z.enum(["html", "markdown"]).nullable(),
   variables: z.array(z.string()).max(50),
+  /**
+   * Something sends it: a step, a rule, every manual query (the Query Letter) or every fine (the
+   * Salary Deduction Letter). While true it cannot be deactivated or change what it is used for.
+   */
+  in_use: z.boolean(),
 }).strict();
 
 /** GET /letter-templates */
@@ -78,9 +86,23 @@ const LetterTemplateCreate = z
     title: text(150).optional(),
     body: body.optional(),
     body_html: bodyHtml.optional(),
+    // Save Draft, or Save and Activate: ready to be chosen at once.
+    status: z.enum(["draft", "active"]).default("draft"),
   })
   .strict()
   .refine(oneBody, ONE_BODY);
+
+/**
+ * PATCH /letter-templates/:id: its name, and what it is used for while nothing sends it. A fine's
+ * letter is the shipped one only, so Used For is Queries or Sanctions.
+ */
+const LetterTemplateUpdate = z
+  .object({
+    name: text(80).optional(),
+    purpose: z.enum(["query", "sanction"]).optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, "Change at least one field");
 
 /** PUT /letter-templates/:id/body: new wording, saved as the next version. */
 const LetterTemplateBodySave = z
@@ -210,6 +232,7 @@ const TABLES = {
       body_html: "body rendered by the one Markdown renderer, for the editor",
       format: "template_version.format",
       variables: "the names ConsequenceLetterVars declares",
+      in_use: "whether a step, a rule, every manual query or every fine sends it",
     },
   },
   LetterTemplateListQuery: { table: null, reason: "list controls and filters for Letter Templates" },
@@ -221,6 +244,7 @@ const TABLES = {
       body_html: "the editor's HTML, written to template_version as Markdown",
     },
   },
+  LetterTemplateUpdate: { table: "letter_template" },
   LetterTemplateBodySave: {
     table: null,
     reason: "the next template_version of the template's key",
@@ -249,6 +273,7 @@ module.exports = {
   LetterTemplateListQuery,
   LetterTemplateCreate,
   LetterTemplateBodySave,
+  LetterTemplateUpdate,
   LetterTemplatesSummary,
   LetterPreview,
   ConsequenceLetterVars,
