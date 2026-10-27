@@ -313,7 +313,7 @@ const Objective = z
     plan_status: PlanStatus,
     score: ScoreValue.nullable(),
     key_results: z.array(KeyResult),
-    /** The reader may edit or delete it and its key results: its plan is draft, returned or unbound, and they set its goals. */
+    /** The reader may edit or delete it and its key results: its plan is draft, returned, unbound or awaiting approval, and they set its goals. */
     can_edit: z.boolean(),
   })
   .strict();
@@ -322,13 +322,15 @@ const ObjectivePage = Paged(Objective);
 
 /**
  * GET /performance/okrs. `department_id` "company" lists the company's objectives. `status` is a plan's
- * state, or `live` for the plans the quarter runs on: binding, unbound and revising (Report Month's).
+ * state, `live` for the plans the quarter runs on (binding, unbound and revising: Report Month's), or
+ * `editable` for the plans whose goals their head may still add to and change (draft, returned,
+ * unbound, submitted and revising: New Key Result's).
  */
 const OkrListQuery = listQuery(
   {
     period_id: uuid.optional(),
     department_id: z.union([uuid, z.literal("company")]).optional(),
-    status: z.union([PlanStatus, z.literal("live")]).optional(),
+    status: z.union([PlanStatus, z.literal("live"), z.literal("editable")]).optional(),
   },
   ["position", "code"],
 );

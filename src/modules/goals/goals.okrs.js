@@ -3,8 +3,9 @@
  * Objectives and key results, Report Month and Confirm Score (docs/guides/performance.md §6.1,
  * §6.3, §6.7, §6.8).
  *
- * The tree is edited while its plan is a draft, returned or unbound (§6.22): codes are given then (G1)
- * and freeze when it binds; an unbound plan adds new ones and changes no code already given. A
+ * The tree is edited while its plan is a draft, returned, unbound or awaiting approval (§6.4, §6.22):
+ * codes are given then (G1) and freeze when it binds; an unbound plan adds new ones and changes no code
+ * already given, and what is added to a plan already sent joins it, its approval carrying on. A
  * binding key result changes only through a target change, except a TBC target before the quarter's
  * lock date, which its owner edits in place. Each month the head reports the
  * function's key results and KPIs in one save; a score under the Watch band needs a recovery owner
@@ -95,7 +96,7 @@ function keyResultView(kr, latest = null, rules) {
 
 /**
  * Objective rows with their key results and latest months, as Objective, banded by their quarter's
- * rules. `can_edit` is the reader's: a draft, returned or unbound plan whose goals they set (none without one).
+ * rules. `can_edit` is the reader's: a draft, returned, unbound or awaiting plan whose goals they set (none without one).
  */
 async function withKeyResults(db, objectives, until = null, actor = null) {
   const krs = await repo.keyResultsOf(db, objectives.map((o) => o.okr_objective_id));
@@ -106,7 +107,7 @@ async function withKeyResults(db, objectives, until = null, actor = null) {
     rulesOf.set(periodId, (await plans.periodOf(db, periodId)).rules);
   const setsFor = new Map();
   if (actor)
-    for (const departmentId of new Set(objectives.filter((o) => plans.isOpen(o.plan_status)).map((o) => o.department_id)))
+    for (const departmentId of new Set(objectives.filter((o) => plans.isEditable(o.plan_status)).map((o) => o.department_id)))
       setsFor.set(departmentId, await authority.maySetGoals(db, actor, departmentId));
   return objectives.map((o) => {
     const rules = rulesOf.get(o.performance_period_id);
@@ -124,7 +125,7 @@ async function withKeyResults(db, objectives, until = null, actor = null) {
       plan_status: o.plan_status,
       score: scoring.formatScore(cascade.objectiveScore(mine)),
       key_results: mine,
-      can_edit: plans.isOpen(o.plan_status) && setsFor.get(o.department_id) === true,
+      can_edit: plans.isEditable(o.plan_status) && setsFor.get(o.department_id) === true,
     };
   });
 }
@@ -170,17 +171,17 @@ async function objectivesOfPlan(db, planId, actor = null) {
 }
 
 /**
- * Refuse a change to a plan that is not open: sent, binding or revising (a draft, returned or unbound
- * plan is open, §6.22). `field` names the form field at fault when there is one (New Objective's
+ * Refuse a change to a plan that is not editable: a binding one (a draft, returned, unbound or awaiting
+ * plan is, §6.4, §6.22). `field` names the form field at fault when there is one (New Objective's
  * Function), so the refusal is marked there, not only said.
  */
 function assertOpen(plan, field = null) {
-  if (!plans.isOpen(plan.status))
+  if (!plans.isEditable(plan.status))
     throw new AppError(
       "PLAN_BINDING",
-      "This plan is sent or binding: change a target instead",
+      "This plan is binding: change a target instead",
       409,
-      field ? { [field]: [["submitted", "revising"].includes(plan.status) ? "Plan awaits approval" : "Plan is binding"] } : undefined,
+      field ? { [field]: ["Plan is binding"] } : undefined,
     );
 }
 
@@ -265,13 +266,16 @@ function refuseHeld(holds, what) {
   if (holds.in_use) throw new AppError("KEY_RESULT_IN_USE", HELD[what].in_use, 409);
 }
 
-/** DELETE /performance/objectives/:id: an open plan's objective, with its key results. */
+/** DELETE /performance/objectives/:id: an editable plan's objective, with its key results. */
 async function deleteObjective(actor, id) {
   const before = await repo.getObjective(pool, id);
   if (!before) throw notFound("That objective");
   await authority.assertSetsGoals(pool, actor, before.department_id);
   assertOpen({ status: before.plan_status });
-  if (before.plan_status === "unbound") refuseHeld(await repo.objectiveHolds(pool, id), "objective");
+  if (plans.isAmended(before.plan_status)) refuseHeld(await repo.objectiveHolds(pool, id), "objective");
+  // A plan awaiting approval was sent with something to approve: it never loses its last objective.
+  if (plans.isAwaiting(before.plan_status) && (await repo.objectivesOfPlan(pool, before.performance_plan_id)).length <= 1)
+    throw new AppError("PLAN_EMPTY", "A plan awaiting approval keeps an objective", 409);
   await tx(async (client) => {
     await repo.deleteObjective(client, id);
     await emit(client, {
@@ -394,9 +398,9 @@ async function assertScoredOnHeld(id, patch) {
 async function updateKeyResult(actor, id, patch) {
   const ctx = await repo.keyResultContext(pool, id);
   if (!ctx) throw notFound();
-  if (plans.isOpen(ctx.plan_status)) {
+  if (plans.isEditable(ctx.plan_status)) {
     await authority.assertSetsGoals(pool, actor, ctx.department_id);
-    if (ctx.plan_status === "unbound") await assertScoredOnHeld(id, patch);
+    if (plans.isAmended(ctx.plan_status)) await assertScoredOnHeld(id, patch);
   } else {
     const open = tbcOpen(ctx);
     const onlyTarget = Object.keys(patch).every((k) => TBC_FIELDS.has(k));
@@ -423,13 +427,13 @@ async function updateKeyResult(actor, id, patch) {
   return getKeyResultView(id);
 }
 
-/** DELETE /performance/key-results/:id: an open plan's key result. */
+/** DELETE /performance/key-results/:id: an editable plan's key result. */
 async function deleteKeyResult(actor, id) {
   const ctx = await repo.keyResultContext(pool, id);
   if (!ctx) throw notFound();
   await authority.assertSetsGoals(pool, actor, ctx.department_id);
   assertOpen({ status: ctx.plan_status });
-  if (ctx.plan_status === "unbound") refuseHeld(await repo.keyResultHolds(pool, id), "key_result");
+  if (plans.isAmended(ctx.plan_status)) refuseHeld(await repo.keyResultHolds(pool, id), "key_result");
   await tx(async (client) => {
     await repo.deleteKeyResult(client, id);
     await emit(client, {
@@ -478,7 +482,7 @@ async function getKeyResultDetail(id, actor = null) {
     target_history: changes.map(changeView),
     trace: path,
     can_change_target: await mayChangeTarget(actor, objective.plan_status, ctx),
-    can_edit: Boolean(actor) && plans.isOpen(objective.plan_status) && (await authority.maySetGoals(pool, actor, objective.department_id)),
+    can_edit: Boolean(actor) && plans.isEditable(objective.plan_status) && (await authority.maySetGoals(pool, actor, objective.department_id)),
     can_set_target: await maySetTarget(actor, ctx),
   };
 }

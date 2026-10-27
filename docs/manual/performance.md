@@ -134,12 +134,13 @@ The CEO records the year's organisational goals.
 
 The CEO and Management set the company's objectives; each function's head sets the function's.
 Operations and People and the CEO may set any function's. They can be added and changed while the
-plan is a draft, after it comes back, or once the CEO has unbound it (see
-[Ask to change a binding plan](#performance-plan-unbind)). A new objective goes into the quarter
-chosen in **Quarter** on Goals.
+plan is a draft, while it awaits approval, after it comes back, or once the CEO has unbound it (see
+[Ask to change a binding plan](#performance-plan-unbind)). What you add to a plan that awaits
+approval joins the plan already sent: you do not send it again. A new objective goes into the
+quarter chosen in **Quarter** on Goals.
 
-**New Goal** shows only if you may set goals for a function or the company. While your function's
-plan is binding, **Request To Unbind** takes its place.
+**New Goal** shows only if you may set goals for a function or the company. Where the plan on the
+page is binding, **Request To Unbind** takes its place.
 
 ![New Goal, an objective](shot:performance-new-goal)
 
@@ -148,15 +149,14 @@ plan is binding, **Request To Unbind** takes its place.
 2. Pick the **Function**, type the **Objective**, and pick the **Organisational Goal** it serves.
    Press **Set Objective**. The hub gives it its code, such as *BM-O3 set*.
    **Function** lists only what you may set; a head finds their own function already picked. One
-   whose plan is already sent or binding says so beside its name, such as
-   *Marketing & Sales · Binding*, and takes no new objective. **None you may set** means your role
-   sets no function's goals.
+   whose plan is binding says so beside its name, such as *Marketing & Sales · Binding*, and takes
+   no new objective. **None you may set** means your role sets no function's goals.
 3. {needs="cap goals.company"} For a company objective, choose **Company** in **Function**.
 4. For a key result, press **New Goal** and choose **Key Result**.
 5. Pick its **Objective**, and type the **Key Result**, such as `Grow monthly active users to
    64,000`. The **Objective** list holds every objective of the quarter whose plan is a draft,
-   returned or unbound and that you may add to, whatever **Function** Goals shows. If the form reads
-   **No Objectives Yet**, set an objective first, or the plan is already sent.
+   awaiting approval, returned or unbound and that you may add to, whatever **Function** Goals
+   shows. If the form reads **No Objectives Yet**, set an objective first, or the plan is binding.
 6. Choose its **Measure**: **Numeric**, **Dated** or **Yes or No**.
 7. Fill in the **Target** as a number, and **Target in Words** as people say it, such as
    `64,000 users`. Tick **Target to be confirmed** if it is not settled yet.
@@ -184,8 +184,7 @@ example, *BM-O1 deleted*.
 | **Finishes before it starts** under **Finish** | **Finish** is before **Start** | Change one of the two dates |
 | **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
 | **Plan is binding** under **Function** | That function's plan for the quarter is approved | Pick another function, ask to unbind its plan, or change a target |
-| **Plan awaits approval** under **Function** | That function's plan is with its approvers | Wait until it is returned or binding |
-| **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, ask to unbind the plan, or change a target |
+| **This plan is binding: change a target instead** | That function's plan for the quarter is approved | Choose a quarter still in **Planning** in **Quarter**, ask to unbind the plan, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
 | **Only the function's head sets its goals** | Your role changed since the page opened | Reload the page and pick again |
 | **Pick a function** under **Function** | No function picked, and your role does not set the company's | Pick your function |
@@ -211,6 +210,11 @@ sent it. The company's plan goes to the CEO alone. Only the CEO's approval makes
 6. If it comes back, the card reads **Returned** with the reason. Change what was asked and press
    **Send Plan** again.
 
+Until the plan is approved you can still add objectives and key results to it, and change them. They
+join the plan already sent, and its approvers read it as it stands. A plan that awaits approval
+always keeps at least one objective, so **A plan awaiting approval keeps an objective** means the
+last one stays.
+
 | The bar reads | What to do |
 |---|---|
 | **Add an objective first** | Set at least one objective |
@@ -225,7 +229,7 @@ card reads **Awaiting Approval**.
 | The plan reads | What it means |
 |---|---|
 | **Draft** | Being prepared |
-| **Awaiting Approval** | Sent, with one of its approvers |
+| **Awaiting Approval** | Sent, with one of its approvers; you can still add to it |
 | **Returned** | An approver asked for changes |
 | **Binding** | Approved by the CEO; the quarter runs on it |
 | **Unbound** | The CEO opened a binding plan for changes; the quarter still runs on it |
@@ -243,7 +247,8 @@ company's. The CEO does not need to ask.
 1. Open [Performance · Goals](/performance?tab=goals). Pick your function in **Function** if the
    page does not show it already.
 2. While the plan reads **Binding**, **Request To Unbind** is at the top right, where **New Goal**
-   would be.
+   would be. With **All Functions** picked, it takes **New Goal**'s place when every function you
+   set is binding, and the form asks for the **Function**.
 3. Press **Request To Unbind**, type the **Reason**, and press **Send Request**. The hub says
    **Request sent to the CEO**.
 4. The plan card shows **Unbind Request** as **Waiting On CEO**. The button is gone until the CEO
@@ -254,7 +259,7 @@ company's. The CEO does not need to ask.
    objectives and key results as in [Set objectives and key results](#performance-goals-set), and
    change the ones you have.
 7. Press **Send Plan** on the plan card. It goes to the CEO alone. The plan reads **Awaiting
-   Approval** and cannot be changed until they decide.
+   Approval**. What you add before they decide joins the plan sent.
 8. When the CEO approves, the plan reads **Binding** again. If they ask for changes, it reads
    **Unbound** with their reason. Change it and press **Send Plan** again.
 

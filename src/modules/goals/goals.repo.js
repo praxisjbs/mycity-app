@@ -346,7 +346,8 @@ function listObjectives(db, query) {
       WHERE ($1::uuid IS NULL OR o.performance_period_id = $1)
         AND ($2::boolean IS FALSE OR o.department_id IS NULL)
         AND ($3::uuid IS NULL OR o.department_id = $3)
-        AND ($4::text IS NULL OR pl.status = $4 OR ($4 = 'live' AND pl.status IN ('binding', 'unbound', 'revising')))
+        AND ($4::text IS NULL OR pl.status = $4 OR ($4 = 'live' AND pl.status IN ('binding', 'unbound', 'revising'))
+             OR ($4 = 'editable' AND pl.status IN ('draft', 'returned', 'unbound', 'submitted', 'revising')))
         AND ($5::text IS NULL OR search_fold(o.code || ' ' || o.title || ' ' || COALESCE((
               SELECT string_agg(kr.code || ' ' || kr.statement, ' ') FROM okr_key_result kr
                WHERE kr.okr_objective_id = o.okr_objective_id), '')) LIKE '%' || search_fold($5) || '%')
