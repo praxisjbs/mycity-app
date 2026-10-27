@@ -22,6 +22,9 @@ import { byId, byKey, DEPARTMENTS, PEOPLE, ref, refKey, teamOf } from "../data/p
 import { me as meOf } from "./identity";
 import { leaveRequests } from "./organisation";
 import { exportFile } from "./shared";
+import { personalExport, personalRun } from "./home";
+import workspaceContract from "@mycity/contract/schemas/workspace.js";
+import reportsContract from "@mycity/contract/schemas/reports.js";
 
 /**
  * My Workspace in the browser, in the contract's shapes (docs/guides/workspace.md §5).
@@ -912,7 +915,43 @@ route("GET /api/v1/workspace/today", (req) => {
     since: { data: since.map((a) => ({ task_id: a.task_id, task_title: a.task_title, actor: a.actor, kind: a.kind, to_status: a.to_status, created_at: a.created_at })), total: since.length },
   });
 });
+/** A refused query or body, its issues on their fields as the API's validator names them. */
+const refusedFields = (issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>, prefix = "") =>
+  invalid(Object.fromEntries(issues.map((i) => [`${prefix}${i.path.join(".")}`, [i.message]])));
+
+/** The days a period covers, as the API reads them (workspace.analytics periodOf). */
+function analyticsDays(q: { period?: string; from?: string; to?: string }) {
+  const today = isoDaysAgo(0);
+  if (q.period === "custom") return { from: q.from!, to: q.to! };
+  if (q.period === "week") {
+    const day = new Date(`${today}T00:00:00Z`).getUTCDay();
+    return { from: isoDaysAgo(day === 0 ? 6 : day - 1), to: today };
+  }
+  if (q.period === "year") return { from: `${today.slice(0, 4)}-01-01`, to: today };
+  return { from: isoDaysAgo((q.period === "90d" ? 90 : 30) - 1), to: today };
+}
+
+const mayExport = (user: string) => meOf(user).is_ceo || (meOf(user).grants.workspace ?? []).includes("export");
+
+route("POST /api/v1/workspace/analytics/export", (req) => {
+  if (!mayExport(req.user!)) return fail(403, "FORBIDDEN", "You cannot export My Workspace");
+  const body = reportsContract.WorkspaceAnalyticsExport.safeParse(req.body);
+  if (!body.success) return refusedFields(body.error.issues);
+  const b = body.data;
+  if (b.period === "custom" && b.to! > isoDaysAgo(0)) return invalid({ to: ["Not after today"] });
+  const custom = b.period === "custom";
+  const filters = { task_scope: b.scope, analytics_period: b.period, ...(custom ? { period_from: b.from, period_to: b.to } : {}) };
+  return personalExport(req.user!, "workspace_analytics", b.format, filters, req.idempotency_key);
+});
+
+route("GET /api/v1/workspace/analytics/export/:id", (req) =>
+  mayExport(req.user!) ? personalRun(req.user!, "workspace_analytics", req.params.id) : fail(403, "FORBIDDEN", "You cannot export My Workspace"),
+);
+
 route("GET /api/v1/workspace/analytics", (req) => {
+  const asked = workspaceContract.AnalyticsQuery.safeParse(req.query);
+  if (!asked.success) return refusedFields(asked.error.issues, "query.");
+  if (asked.data.period === "custom" && asked.data.to! > isoDaysAgo(0)) return invalid({ to: ["Not after today"] });
   // Mine is what the reader leads or shares; a task they set for someone else counts under My Team.
   const own = (t: Task) => t.assignee?.employee_id === me(req.user) || onIt(req.user!, t);
   const l = (req.query.scope === "team" ? scoped(req.user!, "team") : TASKS.filter(own)).map(fresh);
@@ -925,12 +964,11 @@ route("GET /api/v1/workspace/analytics", (req) => {
     e.open += 1;
     by.set(t.assignee.employee_id, e);
   }
-  // The last 30 or 90 days, or the calendar year from 1 January (Africa/Lagos).
-  const today = isoDaysAgo(0);
-  const from = req.query.period === "year" ? `${today.slice(0, 4)}-01-01` : isoDaysAgo((req.query.period === "90d" ? 90 : 30) - 1);
+  // This week, the last 30 or 90 days, the calendar year, or the reader's own days (Africa/Lagos).
+  const { from, to } = analyticsDays(asked.data);
   return ok({
     from,
-    to: today,
+    to,
     completion_rate: done.length + openNow.length ? Math.round((done.length / (done.length + openNow.length)) * 1000) / 10 : null,
     overdue: openNow.filter((t) => t.overdue).length,
     avg_completion_days: 2.4,

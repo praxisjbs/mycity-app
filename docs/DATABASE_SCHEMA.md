@@ -331,7 +331,9 @@ Withdrawn (`withdrawn_at`, `withdrawn_reason`; the status `withdrawn`, `NOT VALI
 missed commitment's Recovery task (Performance PR 4) · `2500` projects get a screen: `project.created_by`,
 its status CHECK (`active`, `completed`) and indexes · `2510` Why Late's reasons (`task_late_reason`,
 switched off rather than deleted; the CHECK on `task.late_reason` gives way to it) · `2520` an event's
-invitation SEQUENCE (`calendar_event.ics_sequence`) · `2590` seed: the six starting late reasons and the
+invitation SEQUENCE (`calendar_event.ics_sequence`) · `2530` a report run keeps the filters it was
+asked with (`home_report_run.filters`, jsonb, null but for My Workspace · Analytics' Export; Home's
+table, 1150, reviewed by TB; docs/guides/workspace.md §6) · `2590` seed: the six starting late reasons and the
 `workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit).
 
 **Owes:**

@@ -681,7 +681,7 @@ device they pressed it on. Nothing pressed is emailed. Only a report schedule's 
   `GET /exports/:id` (the asker alone) and downloads `GET /documents/:id/content`.
 - **Which buttons.** Export Month (My Attendance), Export Register (People · Attendance), the Audit
   Log's Export, Download PDF (Org Chart and Organogram), Download My Data, Download Their Data. A
-  report run somebody pressed for (Run Now, the Overview's Export) is a numbered run, not an
+  report run somebody pressed for (Run Now, the Overview's Export, My Workspace · Analytics' Export) is a numbered run, not an
   export: its screen waits on the run (`GET /home/report-runs/:id`; the Overview's own run on
   `GET /home/overview/export/:id`, which Staff may read without `home.reports`) and downloads its
   file the same way. The screens of later milestones (Payroll, Expenses, Partnerships,

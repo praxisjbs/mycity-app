@@ -10,13 +10,13 @@ import { useWorkSiteSheet } from "@/features/attendance/TemporarySites";
 import { useOpens } from "@/lib/plan";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
-import { Button, DesktopOnly, ErrorState, formatCount, formatDate, Grid, IconButton, LoadingRows, Menu, PageHeader, PhoneOnly, toast, zoneClock } from "@mycity/ui";
+import { Button, DesktopOnly, ErrorState, formatCount, formatDate, FormatButton, Grid, IconButton, LoadingRows, Menu, PageHeader, PhoneOnly, toast, zoneClock } from "@mycity/ui";
 import { CardRow } from "./cards";
+import { formatName } from "./labels";
 import { reloadsFor } from "./refresh";
 import { useCreateActions } from "./createActions";
 import { useKpiDetail } from "./KpiDetail";
 import { useKpiPicker } from "./KpiPickerDialog";
-import { FormatButton } from "./Reports";
 import { ActivityToday, DayStrip, GoalBars, MainChart, NeedYou, Pipeline, SideDonut, UpcomingLeave, weekdayOf, YourWeek } from "./sections";
 
 /**
@@ -108,7 +108,7 @@ function ExportOverview() {
       setWaiting(false);
     }
   };
-  return <FormatButton label="Export" formats={["pdf", "xlsx"]} busy={exporting.pending || waiting} onRun={(format) => void run(format)} item={(format) => `Export ${format}`} size="md" />;
+  return <FormatButton label="Export" formats={["pdf", "xlsx"]} busy={exporting.pending || waiting} onRun={run} item={(format) => `Export ${formatName(format)}`} size="md" />;
 }
 
 /** A section of the Overview, laid out two to a row on desktop. */

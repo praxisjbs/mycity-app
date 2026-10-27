@@ -665,7 +665,8 @@ Analytics shows how work is moving: yours, or your team's.
 
 1. Open [My Workspace · Analytics](/workspace?tab=analytics). On a computer, the dates it covers
    show under the title.
-2. Choose the period: **30 Days**, **90 Days** or **This Year**.
+2. Choose the period: **This Week**, **30 Days**, **90 Days** or **This Year**. To pick your own
+   dates, see [Choose your own dates](#workspace-analytics-custom).
 3. {needs="team"} Choose **My Team** for the people you set work for, or **Mine** for your own work.
    It opens on **My Team**.
 4. The tiles show the **Completion Rate**, how many are **Overdue**, the **Avg Completion** time
@@ -688,6 +689,37 @@ so: **Nothing Overdue**, **Nothing Blocked** or **No open tasks.** A rate with n
 
 The completion rate is the tasks done, out of those done or due in the period. A cancelled task
 counts only under **Cancelled**.
+
+### Choose your own dates {#workspace-analytics-custom}
+
+1. Open [My Workspace · Analytics](/workspace?tab=analytics).
+2. Press **Custom**. **Custom Period** opens.
+   ![Custom Period](shot:workspace-analytics-custom)
+3. Under **Period**, fill in **From** and **To**, or pick each day from its calendar. **To** can be
+   today at the latest, and the period can be at most 366 days.
+4. Press **Show Period**. The figures change to those dates, and on a computer the dates show under
+   the title.
+5. To change the dates, press **Change Dates**. **Cancel** keeps the period you had.
+
+If **To** is before **From**, the field says which day to pick instead, such as *Pick 24/10/2026 or
+later*.
+
+### Export the figures {#workspace-analytics-export needs="workspace export"}
+
+1. Open [My Workspace · Analytics](/workspace?tab=analytics) on a computer. **Export** is not on a
+   phone.
+2. Choose **Mine** or **My Team**, and the period, as you want them in the file.
+3. Press **Export**, then **Export PDF** or **Export XLSX**. XLSX opens in Excel.
+   ![Export, with its two formats](shot:workspace-analytics-export)
+4. Wait while the button turns. The file saves to your computer, and a message names it, such as
+   *RPT-0216 downloaded*.
+
+The file has the figures, then each chart and list, with every person on **Workload by Person**
+and every task on **Blocked Work**. You can download it again from
+[Home · Reports](/home?tab=reports) under Recent Runs, if you can open that tab.
+
+You can export another period, or the other of **Mine** and **My Team**, while a file is still
+being made. Each file has the period it was asked for.
 
 ```shot workspace-today
 open: /workspace?tab=today
@@ -803,6 +835,29 @@ as: operations
 marks:
   1: role radio "My Team" | Whose work
   2: role radio "90 Days" | The period
+  3: role radio "Custom" | Your own dates
+```
+
+```shot workspace-analytics-export
+open: /workspace?tab=analytics
+as: operations
+device: desktop
+do:
+  - click: button "Export"
+marks:
+  1: text "Export PDF" | A PDF
+  2: text "Export XLSX" | For Excel
+```
+
+```shot workspace-analytics-custom
+open: /workspace?tab=analytics
+as: operations
+do:
+  - click: role radio "Custom"
+crop: modal
+marks:
+  1: label "Period" | From and To
+  2: button "Show Period" | Show those dates
 ```
 
 ```shot workspace-share
