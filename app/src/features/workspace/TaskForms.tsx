@@ -673,13 +673,16 @@ export function StepForm({ id, close, onDone }: { id: string; close: () => void;
   );
 }
 
-/** Pick a task this one waits on, from the tasks the reader can see. */
+/**
+ * Pick a task this one waits on, from the tasks the reader can see: never itself, one it already
+ * waits on, or one already waiting on it, which would make a loop.
+ */
 export function WaitingForm({ task, close, onDone }: { task: TaskDetail; close: () => void; onDone: () => void }) {
   const list = usePaged("GET /api/v1/tasks", { filters: { scope: "team" } });
   const [picked, setPicked] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
   const save = useMutation("POST /api/v1/tasks/:id/waiting-on");
-  const taken = new Set([task.task_id, ...task.waiting_on.map((d) => d.task.task_id)]);
+  const taken = new Set([task.task_id, ...task.waiting_on.map((d) => d.task.task_id), ...task.holding_up.map((d) => d.task.task_id)]);
   const submit = async () => {
     if (!picked[0]) return setError("Pick a task");
     try {

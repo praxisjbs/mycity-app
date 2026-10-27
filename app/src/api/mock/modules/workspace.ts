@@ -691,8 +691,12 @@ route("POST /api/v1/tasks/:id/waiting-on", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
   const other = find(req.user!, (req.body as { depends_on_task_id: string }).depends_on_task_id);
-  if (!other || other.task_id === t.task_id) return invalid({ depends_on_task_id: ["Not a task you can see"] });
-  if (reaches(other.task_id, t.task_id)) return invalid({ depends_on_task_id: [`${other.number} already waits on this task`] });
+  // Each refusal under its own rule, as the API says it.
+  const refuse = (code: string, message: string) => fail(422, code, message, { depends_on_task_id: [message] });
+  if (other?.task_id === t.task_id) return refuse("TASK_LINK_SELF", "Pick another task");
+  if (!other) return refuse("TASK_LINK_UNSEEN", "Not a task you can see");
+  if (other.status === "cancelled") return refuse("TASK_LINK_CANCELLED", "That task was cancelled");
+  if (reaches(other.task_id, t.task_id)) return refuse("TASK_LINK_LOOP", `${other.number} already waits on this task`);
   if (!EDGES.some((e) => e.task_id === t.task_id && e.depends_on_task_id === other.task_id))
     EDGES.push({ task_dependency_id: sid(`edge:${Date.now()}`), task_id: t.task_id, depends_on_task_id: other.task_id, overridden_at: null, override_reason: null });
   log(req.user!, t, "waiting_added");

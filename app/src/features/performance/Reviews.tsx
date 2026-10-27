@@ -34,6 +34,7 @@ import {
   Sub,
   TextAreaField,
   toast,
+  todayIso,
   Toolbar,
   useContractForm,
   useModal,
@@ -230,12 +231,23 @@ export function Reviews() {
   );
 }
 
-/** Open Round: a month of the quarter that has ended and has no round yet. */
+/** A month's last day, from its first: "2026-10-01" → "2026-10-31". */
+const monthEnd = (m: string) => new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).toISOString().slice(0, 10);
+
+/**
+ * Open Round: a month of the quarter with no round yet. A month still running is listed with the
+ * day it ends and cannot be picked until then; with none ended, the field says so and nothing is sent.
+ */
 function OpenRoundForm({ periodId, months, taken, close, onOpened }: { periodId: string; months: string[]; taken: string[]; close: () => void; onOpened: (r: Round) => void }) {
   const free = months.filter((m) => !taken.includes(m));
-  const f = useContractForm({ performance_period_id: periodId, month: free[0] ?? "" }, reviewsContract.RoundCreate);
+  const today = todayIso();
+  const ended = free.filter((m) => monthEnd(m) < today);
+  // With none ended the field holds the first, which reads its end, and Open Round marks it.
+  const f = useContractForm({ performance_period_id: periodId, month: ended[0] ?? free[0] ?? "" }, reviewsContract.RoundCreate);
   const save = useMutation("POST /api/v1/performance/rounds");
+  const options = free.map((m) => (ended.includes(m) ? { value: m, label: formatMonth(m) } : { value: m, label: `${formatMonth(m)} · Ends ${formatDate(monthEnd(m))}`, disabled: true }));
   const submit = async () => {
+    if (f.values.month && !ended.includes(f.values.month)) return f.setServerErrors({ month: ["Not ended yet"] });
     if (!f.check()) return;
     try {
       const r = await save.run({ body: f.values });
@@ -250,7 +262,7 @@ function OpenRoundForm({ periodId, months, taken, close, onOpened }: { periodId:
   return (
     <>
       <Field label="Month" {...f.status("month")}>
-        <SelectField options={free.map((m) => [m, formatMonth(m)] as [string, string])} {...f.field("month")} />
+        <SelectField options={options} {...f.field("month")} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

@@ -126,6 +126,17 @@ describe("password policy", () => {
     expect(miss).toEqual({ checked: true, breached: false });
   });
 
+  test("a password found in a breach is refused on its field, and says it is not a fault (fault #6 on staging, 27/10/2026)", async () => {
+    // The breach service's answer holds the rest of the password's hash: it was found.
+    const sha1 = require("node:crypto").createHash("sha1").update("Password1!").digest("hex").toUpperCase();
+    const fetchImpl = async () => ({ ok: true, text: async () => `${sha1.slice(5)}:120415` });
+    const err = await passwordPolicy.assert("Password1!", { fetchImpl }).catch((e) => e);
+    expect([err.code, err.status, err.fields]).toEqual(["WEAK_PASSWORD", 422, { new_password: ["Found in a breach"] }]);
+    expect(err.recorded).toBe(false);
+    // Every other refusal is one a screen can check first, and is recorded as it always was.
+    expect((await passwordPolicy.assert("Short1!").catch((e) => e)).recorded).toBeUndefined();
+  });
+
   test("an unreachable breach service allows the password", async () => {
     const down = async () => {
       throw new Error("offline");

@@ -226,6 +226,21 @@ describe("a month's round (§6.2)", () => {
     expect(await cycle.reviewerFor(null, { effective_manager_id: "m" })).toEqual({ reviewer_employee_id: "m", review_type: "manager" });
     expect(await cycle.reviewerFor(null, {})).toBeNull();
   });
+  test("Open Round refuses a month outside the quarter and one not ended, each under its own rule (fault #8 on staging, 27/10/2026)", async () => {
+    const plans = require("../goals/goals.plans");
+    const lagos = require("../../shared/time/lagos");
+    const period = { performance_period_id: "p", starts_on: "2026-10-01", status: "active" };
+    const asked = jest.spyOn(plans, "periodOf").mockResolvedValue(period);
+    const today = jest.spyOn(lagos, "today").mockReturnValue("2026-10-26");
+    try {
+      const refusal = (month) => cycle.createRound({ user_id: "u" }, { performance_period_id: "p", month }).catch((e) => [e.code, e.status, e.fields]);
+      expect(await refusal("2026-10-01")).toEqual(["ROUND_MONTH_NOT_ENDED", 422, { month: ["Not ended yet"] }]);
+      expect(await refusal("2027-01-01")).toEqual(["ROUND_MONTH_NOT_IN_QUARTER", 422, { month: ["Not this quarter"] }]);
+    } finally {
+      asked.mockRestore();
+      today.mockRestore();
+    }
+  });
 });
 
 describe("Tidy never brings in a figure (§6.17)", () => {

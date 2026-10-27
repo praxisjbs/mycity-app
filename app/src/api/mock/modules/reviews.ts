@@ -223,11 +223,11 @@ route("POST /api/v1/performance/rounds", (req) => {
   if (!isHr(req.user)) return fail(403, "PERMISSION_DENIED", "Operations & People open rounds");
   const b = req.body as { performance_period_id?: string; month?: string };
   if (b.performance_period_id !== PERIOD.performance_period_id) return invalid({ performance_period_id: ["Pick a quarter"] });
-  if (!b.month || !PERIOD.months.includes(b.month)) return invalid({ month: ["Not this quarter's"] });
+  if (!b.month || !PERIOD.months.includes(b.month)) return fail(422, "ROUND_MONTH_NOT_IN_QUARTER", "Pick a month of the quarter", { month: ["Not this quarter"] });
   const next = new Date(`${b.month}T00:00:00Z`);
   next.setUTCMonth(next.getUTCMonth() + 1);
   const after = next.toISOString().slice(0, 10);
-  if (after > now().slice(0, 10)) return invalid({ month: ["Not ended yet"] });
+  if (after > now().slice(0, 10)) return fail(422, "ROUND_MONTH_NOT_ENDED", "The month has not ended", { month: ["Not ended yet"] });
   if (ROUNDS.some((r) => r.month === b.month)) return fail(409, "ROUND_EXISTS", "That month's round is open", { month: ["Already open"] });
   const opens = businessDay(new Date(Date.parse(`${after}T00:00:00Z`) - 86400000).toISOString().slice(0, 10), 1);
   const round: Round = {

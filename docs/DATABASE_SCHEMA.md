@@ -320,6 +320,11 @@ summaries · `2190` seed: the five Performance capabilities and their holders, t
 lists · `2200` the statuses an organisational goal (`active`, `closed`; active by default) and a
 scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance PR 2) · `2290` seed: the
 `goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired) ·
+`2291` seed: the `organisational_goal` numbering scheme, `ORG-2026-01`, starting again each plan year ·
+`2295` an organisational goal's ID is the system's (`docs/guides/performance.md` §6.1, JBS Praxis,
+27/10/2026): `organisational_goal.code_given_at` (when the system gave it; null for one typed before),
+and every goal of the plan without an ID given the next of its year, the counter moved past the IDs
+typed; its DOWN clears only the IDs it or the service gave ·
 `2300` the statuses a round (`open`, `closed`) and a review (`check_in`, `with_reviewer`, `second_level`,
 `with_hr`, `closed`, `returned`) may hold, `NOT VALID` so earlier rows stand, with `open` and `check_in`
 the defaults; a review's second level (`second_level_employee_id`) and each item's corrective action

@@ -12,6 +12,7 @@ const authority = require("./goals.authority");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
+const numbering = require("../../shared/numbering/numbering");
 const { scoring } = require("@mycity/contract");
 const periods = require("./goals.periods");
 const repo = require("./goals.repo");
@@ -204,17 +205,21 @@ async function getGoal(id) {
   };
 }
 
-/** POST /performance/goals: active at once; its year is the plan year, its owner the CEO who records it. */
+/**
+ * POST /performance/goals: active at once; its year is the plan year, its owner the CEO who records it.
+ * Its ID is the next of its plan year from Documents & Numbering (ORG-2026-01, §6.1), never typed.
+ */
 async function createGoal(actor, body, { owner_employee_id: ownerId = null } = {}) {
   const owner = ownerId || (actor && actor.employee_id);
   if (!owner) throw new AppError("VALIDATION_FAILED", "A goal needs an owner with an employee record", 422);
   const year = body.plan_year_starts_on.slice(0, 4);
   const id = await tx(async (client) => {
-    if (body.code && (await repo.goalCodeTaken(client, body.plan_year_starts_on, body.code)))
-      throw new AppError("GOAL_CODE_TAKEN", "Another goal this year has that code", 409, { code: ["Already in use"] });
     const { targets = [], ...fields } = body;
+    const { number: code } = await numbering.allocate(client, "organisational_goal", { date: body.plan_year_starts_on });
     const newId = await repo.insertGoal(client, {
       ...fields,
+      code,
+      code_given_at: new Date(),
       level: "organisation",
       status: "active",
       starts_on: `${year}-01-01`,
@@ -226,8 +231,8 @@ async function createGoal(actor, body, { owner_employee_id: ownerId = null } = {
       key: EVENTS.ORGANISATIONAL_GOAL_SAVED,
       entity: { type: "organisational_goal", id: newId },
       actor,
-      after: { code: body.code || null, title: body.title },
-      payload: { organisational_goal_id: newId, code: body.code || null, title: body.title },
+      after: { code, title: body.title },
+      payload: { organisational_goal_id: newId, code, title: body.title },
     });
     return newId;
   });
@@ -239,8 +244,6 @@ async function updateGoal(actor, id, patch) {
   const before = await repo.getGoal(pool, id);
   if (!before) throw new AppError("NOT_FOUND", "That goal does not exist", 404);
   await tx(async (client) => {
-    if (patch.code && (await repo.goalCodeTaken(client, day(before.plan_year_starts_on), patch.code, id)))
-      throw new AppError("GOAL_CODE_TAKEN", "Another goal this year has that code", 409, { code: ["Already in use"] });
     const { targets, ...fields } = patch;
     await repo.updateGoal(client, id, fields);
     if (targets) await repo.setGoalTargets(client, id, targets);
@@ -250,7 +253,7 @@ async function updateGoal(actor, id, patch) {
       actor,
       before: goalView(before),
       after: { ...goalView(before), ...fields },
-      payload: { organisational_goal_id: id, code: fields.code ?? before.code, title: fields.title || before.title },
+      payload: { organisational_goal_id: id, code: before.code, title: fields.title || before.title },
     });
   });
   return goalView(await repo.getGoal(pool, id));
