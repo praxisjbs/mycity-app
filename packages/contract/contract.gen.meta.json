@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "bf9244e5b286fb6303e8bf2e92e1fcf2cdff9aa46727062577ea014ae7226114",
-  "schemas": 1203,
-  "endpoints": 584,
+  "source_hash": "af09fae91894b74c4649955c60321fef709ad80bcb754b1f758e904730993d97",
+  "schemas": 1204,
+  "endpoints": 586,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -55,7 +55,7 @@
     "packages/contract/schemas/proposals.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/queries.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/query_rules.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/reports.js": "db69fc43acc0164baaec4a000a17f3a6a3cc8dd7749c7cd276543e1fbb13ce99",
+    "packages/contract/schemas/reports.js": "b315112b68580c24839868f429e574c521f0e3a7b3146b3deba61e542898cc21",
     "packages/contract/schemas/requisitions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/reviews.js": "c1682de462c4444729ce94af47ab0357d261fef269cded147331419d1fff1c3f",
     "packages/contract/schemas/salary_structure.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -76,7 +76,7 @@
     "packages/contract/schemas/vacancies.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/workflow.js": "4308fac069f1df42fe9b375b345a05c9cfd29581e70f8a43ea6bf906e9d2aabc",
     "packages/contract/schemas/worksites.js": "3b8451376d5d4500e026779fe9efafbba17f86ac2b50400800ef40214adc4f3a",
-    "packages/contract/schemas/workspace.js": "c14bbef54b6626a263ef13759f3c5d728fd3eb06c5e3ce0ab39a273259151d05",
+    "packages/contract/schemas/workspace.js": "85d46b8095025384afc99f99185149ea69be72ca519022075014e9dd9befa273",
     "src/modules/access/access.routes.js": "b2701c9c63b01069e391675c0d49cd3ab308ecff22e2dbab8e6a77746e2bf4e5",
     "src/modules/ai_governance/ai_governance.routes.js": "0f5817fcbf3f38f809b6763b28cb27224b393932fdffb41d5b0a96871aadd720",
     "src/modules/alerts/alerts.routes.js": "fda8e77d03da77555506c0cc0edfaa884ed720c1a794800bb1fd748a60ff74c7",
@@ -114,6 +114,6 @@
     "src/modules/users/users.routes.js": "7ae43569a5eba7045ba4e0da675f395051f0a576ca2002dd5885cd9c1f1651df",
     "src/modules/workflow/workflow.routes.js": "ff43be65f65f035e02c355eb24668d1f4217b955a8690cf5ced982fa22904af5",
     "src/modules/worksites/worksites.routes.js": "7daf0982081974fffa0b2bca02029fef5d0e35b7f0af723599e5229146bcb7a1",
-    "src/modules/workspace/workspace.routes.js": "11b0c0ff210b8d7faef1c52c09212d3372da310ac5745934e89eb2b1c6ee880b"
+    "src/modules/workspace/workspace.routes.js": "c97d26aa89f2a2349e4d549e03f533b259fbd96e42ab6941cff6e8bf9754dc51"
   }
 }

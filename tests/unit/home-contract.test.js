@@ -190,7 +190,7 @@ describe("alerts", () => {
 });
 
 describe("reports", () => {
-  test("the sources are the ones the reports module gathers, Overview Export last and not offered", () => {
+  test("the sources are the ones the reports module gathers, the two personal exports last and not offered", () => {
     expect(Object.keys(reports.HOME_REPORT_SOURCES)).toEqual([
       "daily_attendance",
       "leave",
@@ -201,10 +201,11 @@ describe("reports", () => {
       "expenses",
       "recruitment",
       "overview",
+      "workspace_analytics",
     ]);
     expect(reports.HomeReportSource.options).toEqual(Object.keys(reports.HOME_REPORT_SOURCES));
     const notOffered = Object.entries(reports.HOME_REPORT_SOURCES).filter(([, s]) => !s.offered);
-    expect(notOffered.map(([k]) => k)).toEqual(["overview"]);
+    expect(notOffered.map(([k]) => k)).toEqual(["overview", "workspace_analytics"]);
   });
 
   test("each source names a catalogued module and only filters a report can hold", () => {

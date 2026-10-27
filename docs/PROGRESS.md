@@ -672,11 +672,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Notes**
 
+- 27/10/2026 · AJ · Reports (#3): a second personal export runs through the engine, My Workspace · Analytics' (`workspace_analytics`, `docs/guides/home.md` §6); what was the Overview's alone (never listed, its name giving way, its runs read by the screen that pressed) is now each personal source's, and a snapshot source receives its filters. Recent Runs names its runs Workspace Analytics. Run Now and the Overview's Export use the shared `FormatButton` from `@mycity/ui`; nothing a person sees changed. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #2 Alerts' Category chips carry the unread notices about the open alerts in each category · nothing left
 - 26/10/2026 · JP · Overview (#1), QA DEF-01 finished: Need You (`/workflow/mine` and its count) never lists a request about a record whose screen has not shipped (an expense before Milestone 8), decided on the server by the plan the app was built with · nothing left
 - 26/10/2026 · JP · Overview (#1), QA DEF-01: Overview cards and Choose Cards leave out a card whose module is Coming Soon in this build (Expenses before M8), for every role; cards and options carry `module`, and a `?kpi=` link to a held-back card opens nothing · Need You can still list an expense approval that opens Coming Soon (its paging is the server's, and the server does not know what is released)
@@ -782,10 +783,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 101 | Projects | `projects` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
-| 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
+| 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
 
+- 27/10/2026 · AJ · Analytics (#7) Export, after a refresh mid-export answered "Your last export is still being made": each report run keeps the period it was pressed for (migration `2530_home_report_run_filters.sql`, `home_report_run.filters`, Home's table, TB to review), the file is built with it, and a waiting run never holds up another press; the refusal is gone, from the API, the mock and the User Guide. The ledger has each file's period on its `home.report_run` line. Custom Period is a `Form` (Enter shows it). Tests: workspace integration (two periods at once, each file with its own; the period on the ledger), the migration round trip. Left: nothing; a stuck run on a laptop means no worker is running (`npm run dev:worker`).
+- 27/10/2026 · AJ · Analytics (#7), asked for by TB at the internal meeting of 26/10/2026: the period is This Week, 30 Days, 90 Days, This Year or Custom (Custom Period: From and To, at most 366 days, ending today at the latest, checked by the contract as filled and by the API; Change Dates reopens it), and Export (desktop, holders of `workspace` export) makes a PDF or an XLSX of the figures through Home's reports engine, as the Overview's Export does: source `workspace_analytics` on the reader's own hidden report, `POST` and `GET /workspace/analytics/export`, a numbered run built in the worker as the reader, Workload by Person and Blocked Work every page. Home's `FormatButton` moved into `packages/ui` (Data) so both screens share it, its press handing back its work (F26). Tests: workspace integration 6 new (periods, refusals, who exports, the file's sheets against the screen's figures, a second period while one waits, a lost grant skipped), reports unit 1, `FormatButton` 4, the screen 3; the User Guide's Analytics section, a new picture, the chapters' stale pictures retaken. Not verified: a click-through on staging. Left: nothing.
 - 27/10/2026 · JP · Tasks (#5), fault #4 of the 27/10 staging brief: Wait On Task left out the task itself and those it waits on, but offered tasks already waiting on it, which the service refuses as a loop; it now leaves those out too. Add Link's four refusals have their own codes (`TASK_LINK_SELF`, `TASK_LINK_UNSEEN`, `TASK_LINK_CANCELLED`, `TASK_LINK_LOOP`), so System Health names the rule met. Tests: `workspace/Workspace.test.tsx`, `tests/integration/workspace.test.js`. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #5 Tasks' Mine and My Team and each board column (a phone's stage) carry the unread notices about the tasks there; the board opens on My Team when only others' tasks hold them, Show Cancelled turns on when a cancelled one does, and a new card has a row's dot · nothing left
 - 26/10/2026 · JP · Tasks (#5), QA OBS-06 finished: a waiting card moved out of To Do (a drag, its menu, a phone's Move To) opens Waiting On before anything is sent, naming each task it waits on with Open Task, and Go Ahead for whoever plans it, which then moves the card where it was put; Close leaves it in To Do; the mock refuses as the API does. QA DEF-06 acceptance tested: an empty Add Comment is marked and sends nothing, a refused one keeps its words, one press (even two) adds exactly one · nothing left
