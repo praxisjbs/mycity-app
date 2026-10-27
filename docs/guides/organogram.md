@@ -5,12 +5,12 @@
 | Owner | TB |
 | Milestone | M1 |
 | Backend modules | `organisation` |
-| Frontend paths | `app/src/features/organogram/`, `app/src/features/people/` (Organogram tab), `app/src/features/ess/` (Org Chart tab), `app/src/features/shared/ReportingForm.tsx` (Change Manager, shared with the employee record) |
-| Permission key(s) | `people` (builder, manage), `org_chart` (viewer, read for all staff) |
-| Capabilities | none; the builder is the `people` grant and the viewer every member of staff |
-| Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
+| Frontend paths | `app/src/features/organogram/`, `app/src/features/people/` (Organogram and Departments tabs), `app/src/features/ess/` (Org Chart tab), `app/src/features/shared/ReportingForm.tsx` (Change Manager, shared with the employee record) |
+| Permission key(s) | `people` (builder, departments, manage), `org_chart` (viewer, read for all staff) |
+| Capabilities | none; the builder and People · Departments are the `people` grant and the viewer every member of staff |
+| Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026), #103 People · Departments (JBS Praxis, 27/10/2026) |
 | Status | Built |
-| Last changed | 26/10/2026 |
+| Last changed | 27/10/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -28,6 +28,14 @@ whom and where they sit. It is not a new structure: it draws the same `line_mana
 tree that already decides who approves whose leave, expenses and tasks, so the picture can never
 drift from how the company actually runs.
 
+The **departments** are MyCity's functions, and nothing about them is fixed in code (JBS Praxis,
+27/10/2026). People keep them on **People · Departments**: add one, rename it, give it a head, move
+people into it, merge it into another, retire it or delete one never used. Every screen reads the
+same rows: the Department on a person's record and card, the department filters, the audiences of
+announcements and policies, and Performance, where each department in use is a function with its own
+quarter plan and its head sets its objectives (`docs/guides/performance.md` §6.3). A head's rights and
+the reporting lines follow the head, so setting a head is one step, not three (§6).
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -35,7 +43,10 @@ drift from how the company actually runs.
 | People · Organogram (`organogram`) | staff app | HR, Operations (People), CEO and management | The whole company tree with HR-rich node cards, solid and dotted reporting lines, and vacant seats | Search, collapse and expand branches, drag a card onto a new manager to reassign (desktop), open a person's sheet and Change Manager from it (both shells), set a dotted-line manager, add or edit a vacant seat, Download PDF (emailed) |
 | ESS · Org Chart (`org-chart`) | staff app | every employee, HR included | The same whole company tree, read only, with the standard node card | Search, collapse and expand, open a person's sheet and Send Message from it, Download PDF (downloaded on the device). No editing, no restricted fields |
 | Recruitment · Vacancies (`vacancies`) | staff app | HR, hiring managers | A "suggested vacancies" list, each built from a vacant seat (role title, department, reporting line) | Turn a suggestion into a real vacancy |
-| People · Employees (`employees`) | staff app | HR, Operations | The employee edit form carries the line manager picker | Changing a line manager here is what moves the chart; the organogram reflects it |
+| People · Employees (`employees`) | staff app | HR, Operations | The employee edit form carries the line manager picker and the Department | Changing a line manager here is what moves the chart; the organogram reflects it. A new Department moves the person as People · Departments does (§6), and Move To Department moves the rows picked |
+| People · Departments (`departments`) | staff app | Whoever opens People · Employees (`people` view with Settings, or the CEO): People, Operations, management, the admins | Every department: its code, head (a person, or an open role and who acts for it), people, open roles and status; a department's people with who each reports to | Add Department, Edit Department, Set Head, Add People, Move To (one person), Merge Department, Retire Department, Restore Department, Delete Department, by grant (§8) |
+| Settings · Users (`users`) | staff app | `settings` view | A head's login holds Head of Department while they head (§6) | Nothing new: Save Roles as before; the role comes back while they still head |
+| Performance (every tab) | staff app | as Performance | The Function filters and New Objective's Function list the departments in use; a function's head is the department's | Nothing new here: a head set on People · Departments acts at once (`docs/guides/performance.md` §6.3) |
 
 ## 3 · How the screens relate
 
@@ -57,6 +68,16 @@ The organogram reads one tree and nobody keeps a second copy.
 - **Download PDF** lays the whole chart out and queues it for the pdf-render job, which draws it
   as a PDF; the screen waits for it and saves it on the device that pressed (§5, §7). Nothing is
   emailed (`docs/guides/foundation.md` §6.12).
+- **People · Departments** keeps the `department` rows every other screen reads by id, so a rename
+  shows everywhere at once and breaks nothing. A department's record lists its people; **Set Head**,
+  **Add People** and **Move To** make the same writes the employee record and the organogram make:
+  the department on the record, and the reporting line through the same reporting write a drag
+  makes (§5), each audited on the person's History. A department found with ⌘K opens here with its
+  record open (`?id=`).
+- **Set Head** decides who sets the function's goals on **Performance**: the head, or whoever acts
+  for an open head role, gets Head of Department on **Settings · Users** while they head (§6), and the
+  reporting lines follow them. **Merge Department**, **Retire Department** and **Delete Department**
+  close one; its goals, KPIs and scorecards stay with it for the quarters they belong to.
 - **People · Employees** also carries each employee's attendance setup (owned by the attendance
   guide, `docs/MyCity-ERP-Documents/attendance-guide.md`). A change of work arrangement applies
   from the employee's next punch; opening a registered home address, changing an arrangement and
@@ -68,7 +89,8 @@ The organogram reads one tree and nobody keeps a second copy.
 | Table | Key columns | Notes |
 |---|---|---|
 | `employee` | `line_manager_id` (self-FK, nullable for the CEO), `dotted_manager_id` (self-FK, nullable), `department_id` | `line_manager_id` already exists in the contract (`organisation.js`). `dotted_manager_id` is the net-new column for the matrix (full matrix in v1) |
-| `department` | `id`, `name`, `code`, `head_employee_id` or `head_seat_id` (2100) | Department name is the node chip. A department's head is a person or a vacant seat, never both; while the seat is vacant the person above it acts (`organisation.headOf()`, `docs/guides/performance.md` §6.20). MyCity's five departments, their codes and heads are kept true by the staff loader (`seeds/staff/nomenclature.json`, `docs/guides/foundation.md` §6.1) |
+| `department` | `id`, `name`, `code`, `active`, `head_employee_id` or `head_seat_id` (2100), `merged_into_department_id` (2600) | Department name is the node chip. A department's head is a person or a vacant seat, never both; while the seat is vacant the person above it acts (`organisation.headOf()`, `docs/guides/performance.md` §6.20). One level: `parent_department_id` (0040) is not used (JBS Praxis, 27/10/2026). Names, codes and heads are set on People · Departments; the staff loader gave MyCity's five theirs once, on a database without them (`seeds/staff/nomenclature.json`, `docs/guides/foundation.md` §6.1). A merged department names the one it went into |
+| `user_role` (0020, altered 2600) | `from_headship` | True on a Head of Department role the system gave because the person heads a department or acts for its open head role (§6); only such a row is taken back when they stop. A role given by hand is false |
 | `org_seat` (vacant seat) | `title`, `department_id`, `line_manager_id` or `line_manager_seat_id`, `status` (vacant, filled, closed), `filled_by_employee_id` | A seat with no employee. A vacant seat can carry reports: an employee whose manager's post is empty points at it through `employee.line_manager_seat_id` (or `dotted_manager_seat_id` for a dotted line), never at both a person and a seat. Modelled so the line never breaks when a role is unfilled |
 
 Migration file: `migrations/0110_employee_profile.sql` (M0) adds `dotted_manager_id`, the two seat
@@ -85,8 +107,8 @@ reports show as roots the builder flags rather than vanishing (§11).
 `head` (a person, the person in a filled head seat, or the vacant seat, as a `ManagerRef`) and its
 `acting_head` (the person who acts: the head, or the first person above a vacant head seat, through
 any vacant seats between). `PATCH /api/v1/departments/:id` sets `head_employee_id` or `head_seat_id`;
-naming one clears the other. There is no department form on screen in M2: the staff loader sets the
-heads, and a later screen may edit them.
+naming one clears the other. People · Departments sets them (JBS Praxis, 27/10/2026), and the
+reporting lines and the head's role follow (§6).
 
 **Who answers for an empty seat** (TB, 19/10/2026). The view `employee_effective_manager`
 (`migrations/1160_employee_effective_manager.sql`) gives every employee the person they answer to:
@@ -102,6 +124,13 @@ scope read it (§6); the chart still draws the seat, because the seat is the tru
 | `PATCH /api/v1/employees/:id/line-manager` | `EmployeeReportingUpdate` | `people` edit · team/all | n/a | Sets `line_manager_id` **or** `line_manager_seat_id`, and the dotted one beside it. A loop (through people or vacant seats), reporting to oneself, and naming both a person and a seat are each refused |
 | `GET /api/v1/org-seats`, `POST /api/v1/org-seats`, `PATCH /api/v1/org-seats/:id` | `OrgSeat*` | `people` view, create, edit | list at 25 | The seats themselves: Add Role on the builder, and the seat a sheet's VACANT row becomes. A seat placed under one of its own reports is refused as a loop |
 | `POST /api/v1/org-chart/exports` | `OrgChartExportRequest` to `ExportFile` (documents) | `ess` view (every member of staff) | n/a | Download PDF: reads and lays out the whole chart, in the view asked for, queues it through `documents.generate` and answers 202 with the file pending. The pdf-render job draws it; the screen waits on `GET /exports/:id` and downloads it (§6, §7). It takes `view`, as the read does, because the file holds nothing the read does not |
+| `GET /api/v1/departments` | `DepartmentListQuery` to `DepartmentPage` | `people` view | yes, 25 | `q` (name or code), `active`; sort `name`, `headcount`, `created_at`. Each department: `code`, `head` and `acting_head`, `headcount` (people working now), `open_roles`, `active`, `merged_into`, and `can_delete` (nothing has ever used it) |
+| `GET /api/v1/departments/:id` | `Department` | `people` view | n/a | One department, for a link (`?id=`) |
+| `POST /api/v1/departments` | `DepartmentCreate` to `Department` | `people` create | n/a | Add Department: `name`, `code` (2 to 10 letters; made from the name when left out) and an optional head, which applies §6 as Set Head does |
+| `PATCH /api/v1/departments/:id` | `DepartmentUpdate` to `Department` | `people` edit | n/a | Edit Department (`name`, `code`); Set Head (`head_employee_id` or `head_seat_id`; naming one clears the other, both null for none), which moves lines and the head's role (§6); Retire (`active: false`, only when empty) and Restore (`active: true`) |
+| `POST /api/v1/departments/:id/people` | `DepartmentPeopleMove` to `Department` | `people` edit | n/a | Add People and Move To: `employee_ids`, 1 to 25 a press, each moved and their line set as §6 says, in one transaction |
+| `POST /api/v1/departments/:id/merge` | `DepartmentMerge` to `Department` | `people` edit | n/a | Merge Department into `into_department_id` (another in use): its people and open roles move as Add People moves them, and it retires, marked merged; answers the department it went into |
+| `DELETE /api/v1/departments/:id` | `no_content` | `people` delete | n/a | Delete Department, only while `can_delete`; otherwise 409 `DEPARTMENT_IN_USE` |
 
 A drag on the chart and Change Manager in a person's sheet call the same employee write a form
 would. Download PDF is drawn on the server, never in the browser: the request queues it through
@@ -124,7 +153,7 @@ stays off the table until MyCity is near that size.
   "Dotted line: <manager>" tag, never as the primary line, and it does not affect permission scope:
   approvals of leave, expenses and tasks follow the solid line only (§1).
 - Departments are data (`department` rows, §4): adding or renaming one is a setting, never a code
-  change.
+  change. The rules for them are §6.1.
 - A **vacant seat** is a node with a role and department but no employee. It may have reports. It
   carries no person data and never shows a card field that implies one. While it is empty, the
   first person above it answers for its reports: their leave, expenses and tasks go to that person
@@ -149,11 +178,85 @@ stays off the table until MyCity is near that size.
   them and the CEO alone, kept in the vault a day and never locked (an export,
   `docs/guides/foundation.md` §6.12); it carries no number.
 
+### 6.1 Departments (JBS Praxis, 27/10/2026)
+
+Decided with JBS Praxis on 27/10/2026 (four answers): a head gets a head's rights with no second
+step; reporting lines always follow the head; departments are one level; a department closes by
+merge, retire or delete.
+
+- **One level.** A department is a function (`docs/guides/performance.md` P4): every department in
+  use is one on Performance, with its own quarter plan. Teams inside a department are its reporting
+  lines, drawn on the Organogram.
+- **Name and code.** A name is used by one department only, case and punctuation aside
+  (`DEPARTMENT_EXISTS` on `name`). A code is 2 to 10 letters, upper case, used once
+  (`DEPARTMENT_CODE` on `code`); Add Department offers the name's initials. The code starts the
+  codes of the function's objectives, key results and KPIs (`BM-O1`, performance.md G1); each keeps
+  the code it was given, so a new code names only what is set after it.
+- **The head** is someone who works here now (`MANAGER_NOT_FOUND` on `head_employee_id` otherwise),
+  or an open role of this department (`SEAT_NOT_FOUND` on `head_seat_id` otherwise), whose acting
+  head is the first person above it. One person may head more than one department. A department may
+  have none; Performance then leaves its goals to the CEO and Operations & People.
+- **Reporting lines follow the head.** When the head of a department changes from one (the old
+  head) to another (the new head), in this order:
+  1. The new head, when they work in another department and head none, moves into this one.
+  2. The new head takes the old head's place: they report to whoever the old head reported to (an
+     open role's own line, for an open head role). When the old head had nobody above them (the CEO),
+     or nobody was head, or the new head heads another department too, the new head keeps their own
+     line.
+  3. Everyone in the department who reported to the old head, people and open roles, reports to the
+     new head.
+  4. The old head, while they still work in the department, reports to the new head.
+
+  Clearing the head (none) moves no line. The CEO's own line never changes.
+- **Moving people in** (Add People, Move To, Move To Department on People · Employees, a new
+  Department on Edit Record): each person joins the department and reports to its head (the person,
+  or the open head role), unless they are its head, it has none, or their manager already works in
+  it or moves in with them. So a team moved together keeps its lines, and one person moved on their
+  own reports to the head. A head who moves keeps heading their department until Set Head changes it.
+  The importer and the deploy loader set lines from their sheet, never by this rule.
+- **Every line change is the reporting write** (`setReportingLine`, §5): audited on the person's
+  History with the reason (*Head of Branding & Marketing changed*, *Moved to Partnership & Growth*),
+  `employee.reporting_line_changed`, approvals and team scope at once. A change that would make a
+  loop is left as it was and the rest is saved.
+- **Rights follow the head.** Whoever heads a department in use, or acts for its open head role,
+  holds Head of Department (`head_of_department`) while they do, unless they are the CEO or a role
+  they hold already lets them set a function's goals (`goals.function`: Management, Operations &
+  People, the Implementation Team). The system gives that role (`user_role.from_headship`) and takes
+  back only a role it gave, once they head nothing; a role given by hand stays. It is worked out
+  again in the same transaction as every write that can move a head (a department's head, active or
+  merge; an open role's line or status; an archive or restore), when a login is made (Invite User)
+  or its roles saved (Settings · Users), and on each deploy. Someone with no login gets it with their
+  login.
+- **A head's reach is their reporting line** (JBS Praxis, 27/10/2026, asked twice to be sure): the
+  role's `team` scope, as every manager's, never "everyone in the department". Someone in a
+  department whose manager works elsewhere is that manager's to see and approve; moves and head
+  changes already put a department's people under its head, so this happens only where People set
+  such a line on purpose.
+- **Merge Department** moves every person still on the books (not archived) and every role not closed
+  into the department picked, as Add People moves them: the old head and anyone whose manager stays
+  behind report to its head, and teams keep their lines. Then the department retires with no head,
+  marked merged into it (`merged_into`). Its plans, objectives, KPIs and scorecards stay with it for
+  their quarters (performance.md §11). Merging into itself or into a retired department is refused
+  (`DEPARTMENT_MERGE`, `DEPARTMENT_NOT_FOUND`).
+- **Retire Department** only when nobody works in it and it has no open roles (409
+  `DEPARTMENT_NOT_EMPTY`, naming how many: Merge Department moves them). It clears the head, and the
+  head's role with it. A retired department leaves every picker and Performance's functions; its
+  history stays. **Restore Department** brings it back with no head.
+- **Delete Department** only for one nothing names: no person (archived ones included), open or
+  closed role, plan, objective, KPI, scorecard, goal, channel, policy, vacancy, offer, expense,
+  announcement or department merged into it, and not merged away itself (`can_delete`, worked out from
+  every foreign key to `department`, so a table added later counts). Otherwise 409
+  `DEPARTMENT_IN_USE`, with Retire as the way.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
 |---|---|---|
-| `employee.reporting_line_changed` | after a line manager or dotted manager change commits | outbox: the chart re-reads; permission scope caches that derive from the tree are refreshed |
+| `employee.reporting_line_changed` | after a line manager or dotted manager change commits, a head's reporting lines and a move's included (§6.1) | outbox: the chart re-reads; permission scope caches that derive from the tree are refreshed |
+| `department.created`, `department.updated` | Add Department; Edit Department, Set Head, Retire and Restore (before and after) | the audit line; the lines a head change moves are each `employee.reporting_line_changed`, which refreshes team scope |
+| `department.people_moved` | Add People, Move To, Move To Department (one per press: who, from where) | the audit line; each person's own `employee.updated` and line change are written too |
+| `department.merged`, `department.deleted` | Merge Department (the department and where it went), Delete Department | the audit line |
+| `access.roles_set` | the Head of Department role given or taken with a head (§6.1) | as for Save Roles: the grants cache of that login is cleared in the same write |
 | `vacancy.suggested_from_seat` | when HR sends a vacant seat to Recruitment | outbox: creates a suggested-vacancy entry on Recruitment · Vacancies |
 | `org_chart.export_requested` | Download PDF | the audit line, written with the PDF's document in the request: the tree read and laid out (§6) and queued through `documents.generate` as doc type `org_chart` (template `templates/documents/org-chart.html`, no number); `document.render_requested` sends it to the pdf-render job |
 | `document.generated`, `document.render_failed`, doc type `org_chart` | the PDF is drawn, or the render job gave up | no handler: the screen waiting on `GET /exports/:id` reads it done and downloads it, or reads it failed and says so; nothing is emailed and nobody is notified |
@@ -166,6 +269,14 @@ stays off the table until MyCity is near that size.
 | Employee (any non-HR) | The whole company tree, read only, standard card | Search, expand, collapse, zoom, export. No edit, no restricted fields |
 | HR / Operations (People) | The whole tree, HR-rich card | Build and correct the tree: drag to reassign, set dotted lines, add and edit vacant seats, send a seat to Recruitment, export |
 | CEO / management | The whole tree | Read. Edit only with the `people` capability |
+
+**People · Departments** shows to whoever opens People · Employees (the tab rule, `shell/access.ts`)
+and follows the `people` grant: `view` reads the departments and their people (each person in the
+reader's record scope; the counts are everyone's); `create` adds a department; `edit` changes one,
+sets its head, moves people, merges, retires and restores; `delete` deletes one never used. A change
+needs the grant over everyone (`all`), since a head change or a merge moves lines beyond any team
+(403 `FORBIDDEN` otherwise). Operations & People, the Implementation Team and the CEO hold all four by
+default; Management all but `delete`.
 
 Restricted fields: never on an organogram card for anyone. Salary, bank and phone live on the
 employee 360 and ESS · My Profile under their own rules, not here.
@@ -196,6 +307,11 @@ every capability and every field until handover, and training runs from it (TB, 
   the last four digits) or the name they go by. An open seat is found by its title or department and
   opens the Organogram focused on it (`?id=` the seat: the phone focuses it, the desktop tree marks it).
   Words people use include "org chart", "organogram", "structure", "who is my manager", "reporting line".
+- **Departments**: a department in use is found by its name or code and opens on People · Departments
+  with its record open (`?id=`); the screen is found as "departments", "functions", "teams", "units",
+  "heads of department". ⌘K's Add Department opens its form for those with `people` create. The AI
+  reads the departments with their heads and counts (`departments.list`), a page at a time, and
+  sends "add a department" or "change a department's head" to People · Departments.
 
 ## 10 · On screen and mobile
 
@@ -212,7 +328,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | People · Organogram (`organogram`) | Organogram; the seat count on desktop (12 seats · 11 filled · 1 open); Search, Expand All, Download PDF, Add Role; a line above the tree when more than one person or role sits at the top; the legend (Reporting Line, Dotted Line, CEO, Vacant Seat); the whole tree. Each node card carries initials, name, title, the department chip, the since and arrangement line, a dotted-line tag where set, and Create Vacancy and Edit Role on a vacant seat (Edit Role is the role's title, department and who it reports to, which is how a seat the sheet left at the top gets its line). Node text is data. A person's card opens their sheet (Profile): initials, name and title; Department, Reports To, Dotted Line and Team; Send Message, Open Record and Change Manager as §8 allows. Download PDF is busy while the PDF is drawn, then saves it on this device: "PDF downloaded" | Help term on the legend's Reporting Line: "Drag a card onto a new manager to change its reporting line." Help term on Dotted Line: "A second manager for matrix work. It does not change who approves leave, expenses or tasks." The sheet's Dotted Line label carries the same help term | That a drag is the same employee write as the form and is audited: §3, §5. That a vacant seat becomes a suggested vacancy in Recruitment: §3. That salary, bank details and phone never show on a card: §6, §8. The subtitle "The live reporting structure … drag a card to reassign" and the footnote paragraph under the tree are removed |
 | ESS · Org Chart (`org-chart`) | Org Chart; the seat count on desktop; Search, Download PDF; the legend; the whole tree with the standard node card (no since and arrangement line; "Open role" on a vacant seat). A person's card opens their sheet (Profile): initials, name and title; Department, Reports To, Dotted Line and Team; Send Message, or My Profile on your own card; Open Record (`people` view with Employees) and Change Manager (`people` edit) for those who hold them, as §8 says | Help term on the legend's Dotted Line, the same text as the builder, and on the sheet's Dotted Line label | "Read only", "Every employee sees the whole company here" and the restricted fields never shown: §6, §8. "On a phone this becomes a focus view": §10.2. That the PDF is drawn on the server and emailed: §5, §7. The subtitle "Who reports to whom across MyCity · read only" and the footnote paragraph are removed |
 | Recruitment · Vacancies (`vacancies`) | Not in the demo yet. The suggested vacancies list: role title, department, reporting line; Create Vacancy | None | That nothing is auto-created from a seat, and the hand-off event: §3, §7 |
-| People · Employees (`employees`) | Employees; the staff and department count on desktop; Import Staff, Add Employee; Headcount, Confirmed, On Probation, Attrition 90 Days; the count per work pattern; All Employees (employee and job title, number, department, Line Manager, Work Pattern, Status, Login, View Record), 25 a page, sorted by the server; Headcount by Department; Needs a Decision (Probation Ending opens the probation reviews on Performance · Reviews, `?kind=probation`, where each is confirmed or extended; Contracts Ending opens the list on Contract, Ending in 30 Days, `?contract=ending`); the Contract filter (Any Contract, Ending in 30 Days). A row opens the record: Profile, Job, Work Schedule, Reporting Line, Login, History, with Edit Record, Archive Record, Send Invite and Change Manager (`docs/guides/foundation.md` §10) | Help term on Invited: what an invited login is. On the record, a masked field shows Restricted behind a help term naming who may see it, and Dotted line carries the matrix help term | "Select a row for details and actions": the rows carry View Record. "A department is a setting, not a code change": §6. Attendance Today, the attendance and location modal and the home-address banner: they return with the attendance routes (attendance guide §1, §3) |
+| People · Employees (`employees`) | Employees; the staff and department count on desktop; Import Staff, Add Employee; Headcount, Confirmed, On Probation, Attrition 90 Days; the count per work pattern; All Employees (employee and job title, number, department, Line Manager, Work Pattern, Status, Login, View Record), 25 a page, sorted by the server; for `people` edit a tick on each row and, once rows are picked, Move To Department (Move People: Department, Move People); Headcount by Department; Needs a Decision (Probation Ending opens the probation reviews on Performance · Reviews, `?kind=probation`, where each is confirmed or extended; Contracts Ending opens the list on Contract, Ending in 30 Days, `?contract=ending`); the Contract filter (Any Contract, Ending in 30 Days). A row opens the record: Profile, Job, Work Schedule, Reporting Line, Login, History, with Edit Record, Archive Record, Send Invite and Change Manager (`docs/guides/foundation.md` §10) | Help term on Invited: what an invited login is. On the record, a masked field shows Restricted behind a help term naming who may see it, and Dotted line carries the matrix help term | "Select a row for details and actions": the rows carry View Record. "A department is a setting, not a code change": §6. That a person moved reports to the new head: §6.1, the manual. Attendance Today, the attendance and location modal and the home-address banner: they return with the attendance routes (attendance guide §1, §3) |
+| People · Departments (`departments`) | Departments; on desktop the count in use and retired (5 in use · 1 retired); Add Department (`people` create); Search (Name or code); the chips In Use, Retired, All; All Departments (Department with its code, Head, People, Open Roles, Status), 25 a page, sorted by the server. A department opens its record: its name and status pill (In Use, Retired, Merged); Code, Head (a person, or the open role marked open), Acting Head (who acts for an open head role), People, Open Roles, Merged Into; its People, 25 a page (Employee and job title, Reports To), a person opening their record, each with Move To on desktop for `people` edit; Set Head, Add People and Edit Department (`people` edit), and behind More Actions Merge Department and Retire Department (`people` edit) and Delete Department (`people` delete, only one nothing names); Restore Department on a retired one. Set Head: Head Is (A Person, An Open Role, Nobody), Head or Open Role, Set Head. Add Department: Name, Code (offered from the name), Head, Add Department. Edit Department: Name, Code, Save Department. Add People: People, Add People. Move To and Move To Department: Department, Move Person or Move People. Merge Department: Into, Merge Department. Retire and Delete confirm by name | Help term on Code: "Starts the codes of its goals and KPIs, such as BM-O1. Codes already set keep theirs." On Head and Head Is: "Sets this function's goals on Performance. Anyone who reported to the last head reports to the new one." On Acting Head: "The head's role is open, so the first person above it acts as head." | The order the lines move in, who is skipped and why: §6.1. That the head's role is given and taken back: §6.1, identity.md. What merge moves and what stays with the department: §6.1, performance.md §11. That the deploy never renames one: foundation.md §6.1 |
 
 ### 10.2 Phone layout
 
@@ -221,7 +338,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | People · Organogram (`organogram`) | Not the tree shrunk: Search, Download PDF and a Focus or Everyone switch (TB, 19/10/2026), opening on Everyone. **Everyone** is the whole company as one indented list, the CEO first: a row per person or open role (initials, name, title and department, its direct count), open to the third level and folding below it; a tap opens Focus on that row. **Focus** is one card and what is around it: the path from the top as chips (a tap moves there); Reports To with the manager's card; the focused card, larger and outlined, with its team ("3 direct · 13 in all", §6); Direct Reports; Dotted Line, the people with a dotted line to them; Same Manager, their colleagues, or at the top Also At The Top, so each card at the top can be reached and given a line. Every card carries title and department, its team and a dotted-line tag where set. A search lists the people and roles that match as cards; a tap focuses one | The drawn tree, the legend and its help terms, the seat count, Expand All, the since and arrangement line, and dragging to reassign (desktop only) | Tap a card to focus it; tap the focused person for their sheet (Send Message, Open Record, Change Manager, full width at the foot); on a focused vacant seat, Create Vacancy and Edit Role full width; Add Role in the floating button; Show Top returns to the top | Bottom bar People; the People tabs along the top |
 | ESS · Org Chart (`org-chart`) | The same two views, opening on Focus at the signed-in employee (their path, their manager, them, their reports and colleagues); at the top, the CEO, for someone who is not on the chart. Everyone opens the path down to them and marks their row You. Search, Also At The Top and Download PDF work as on the builder | The drawn tree, the legend, the seat count, every edit | Tap a card to focus it; tap the focused person for their sheet (Send Message; My Profile on your own); Show Me returns to the employee | Bottom bar; the ESS tabs along the top |
 | Recruitment · Vacancies (`vacancies`) | Not in the demo yet: suggested vacancies as cards (role title, department, a status pill) | The reporting line, shown in the card's sheet | Create Vacancy, full width at the foot of the sheet | Bottom bar; the Recruitment tabs along the top |
-| People · Employees (`employees`) | Import and Add Employee; the four KPI cards two to a row; the count per work arrangement; All Employees as person cards (name and department, Employment Status pill, Department, Line Manager) | The page subtitle; the Arrangement, Attendance Today and View Details columns (they show in the employee sheet) | Tap a person card: the employee modal as a bottom sheet, its buttons full width | Bottom bar People; the People tabs along the top |
+| People · Employees (`employees`) | Import and Add Employee; the four KPI cards two to a row; the count per work arrangement; All Employees as person cards (name and department, Employment Status pill, Department, Line Manager) | The page subtitle; the Arrangement, Attendance Today and View Details columns (they show in the employee sheet) | Tap a person card: the employee modal as a bottom sheet, its buttons full width. Move To Department is desktop only: a phone moves people with Add People on People · Departments | Bottom bar People; the People tabs along the top |
+| People · Departments (`departments`) | Search, the In Use, Retired and All chips, then the departments as cards (name and code, Head, People, a status pill) | The count line, the Open Roles column (in the department's sheet) and each person's Move To (a phone moves people with Add People, or the record's Department) | Tap a card: the department in a bottom sheet, its people as rows and its buttons full width at the foot; Add Department in the floating button | More, People; the People tabs along the top |
 
 ## 11 · Edge cases
 
@@ -253,6 +371,24 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **The person who asked leaves the screen while it is drawn:** it still downloads wherever they are
   in the app; closed, the app gets nothing and the PDF leaves the vault a day later.
 - **A very wide or tall chart:** the page grows with it; past 4,900 mm it is drawn smaller (§6).
+- **A new head who reported to the old head** (promoted from inside): they take the old head's place,
+  so they never end up reporting to someone who now reports to them (§6.1).
+- **The new head heads another department too:** they stay where they work and keep their own line;
+  both departments' people report to them.
+- **The head leaves** (archived): the department still names them until Set Head names another; their
+  login is closed, so their role no longer matters, and Performance leaves the function to the CEO
+  and Operations & People meanwhile.
+- **A move that would make a loop** (a manager moved under someone who reports to them): that one
+  line stays as it was, the rest is saved, and the Organogram shows the result.
+- **Moving the CEO:** their department changes; their line never does.
+- **Retire with people still in it:** refused with how many, and Merge Department is the way.
+- **Delete a department used before:** refused (`DEPARTMENT_IN_USE`); Retire Department keeps its
+  history.
+- **Restore Department:** it comes back with no head; Set Head gives it one.
+- **More than 25 people to move:** Add People takes 25 a press; Move To Department takes the rows
+  picked on the page.
+- **A renamed department after the next deploy:** it stays as named; the loader finds it by its code
+  and never makes the old name again (foundation.md §6.1).
 
 ## 12 · Donor code
 
@@ -324,6 +460,8 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 27/10/2026 · JP · §6.1 records two more answers of JBS Praxis: a head's reach is their reporting line, not the whole department, and Head of Department goes to heads and acting heads who need it, as built.
+- 27/10/2026 · JP · People · Departments (#103), from JBS Praxis's four answers of 27/10/2026: departments are kept on screen, with nothing about them in code (§1 to §11). Add Department, Edit Department, Set Head (a person or an open role), Add People, Move To, Merge Department, Retire Department, Restore Department and Delete Department (only one never used), on new routes (`GET /departments/:id`, `POST /departments/:id/people`, `POST /departments/:id/merge`, `DELETE /departments/:id`) beside the old ones. Reporting lines follow the head: a new head takes the old head's place and their people, and a person moved in reports to the head unless their manager is already there (§6.1). The head, or whoever acts for an open head role, holds Head of Department while they head, given and taken back by the system (`user_role.from_headship`, migration 2600), so they set the function's goals with no second step. People · Employees gains Move To Department on the rows picked, and a new Department on Edit Record moves the person the same way. ⌘K opens a department on its screen (it opened Settings · Organisation, which never listed them). The deploy loader gives departments and heads only to a database that never had them, and never renames one or sets a head after (foundation.md §6.1). One level only: `parent_department_id` stays unused.
 - 26/10/2026 · JP · Nothing on the Organogram or Org Chart changed. People · Leave, whose code this guide's map also covers, now shows on its chips the unread notices about the requests under each status (ess.md, notifications.md §6).
 - 26/10/2026 · JP · Nothing on the Organogram or Org Chart changed. Beside them, from the QA bug register: ESS · My Leave and People · Leave name the real approver and mark a request past the allowance with its days and balance (`docs/guides/ess.md`), and Add Employee refuses a negative Gross Monthly (`docs/guides/foundation.md` §6).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Add Role (and ⌘K's) needs `people` create, as `POST /org-seats` does; a refused drag or open role says the server's reason ("That would make a loop in the reporting line."), not the last call's; the open role's Department is the shared picker of departments in use, searched on the server; Change Reporting Line asks for an open role when An Open Role is chosen ("Pick an open role"). Create Vacancy stays, opening Recruitment's Coming Soon (the owner, 26/10/2026).

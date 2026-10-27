@@ -78,6 +78,12 @@ const ACTIONS = Object.freeze([
     need: ["people", "create"],
     words: ["open role", "vacant seat", "new seat", "vacancy on the organogram"],
   }),
+  a("add_department", "Add Department", {
+    screen: "people.departments",
+    params: { action: "new" },
+    need: ["people", "create"],
+    words: ["new department", "new function", "new team", "create department", "add function"],
+  }),
   a("add_worksite", "Add Worksite", {
     screen: "people.worksites",
     params: { action: "new" },

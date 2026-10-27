@@ -133,6 +133,7 @@ const SCREENS = Object.freeze([
   s("settings", "audit-log", "Audit Log", ["audit", "history", "who changed", "activity log"]),
   s("settings", "imports", "Imports", ["import", "upload", "spreadsheet", "import history"]),
   s("knowledge", "user-guide", "User Guide", ["help", "manual", "how to", "guide", "instructions", "tutorial", "quick start", "getting started"]),
+  s("people", "departments", "Departments", ["department", "function", "functions", "team", "teams", "unit", "head of department", "department head", "move people", "merge department"]),
   // new:screen adds screens above this line
 ]);
 

@@ -70,9 +70,25 @@ route(router, "post", "/departments",
   { body: c.organisation.DepartmentCreate, response: c.organisation.Department, summary: "Add a department" },
   create, controller.createDepartment);
 
+route(router, "get", "/departments/:id",
+  { response: c.organisation.Department, summary: "One department" },
+  view, controller.department);
+
 route(router, "patch", "/departments/:id",
-  { body: c.organisation.DepartmentUpdate, response: c.organisation.Department, summary: "Change a department" },
+  { body: c.organisation.DepartmentUpdate, response: c.organisation.Department, summary: "Change a department, set its head, retire or restore it" },
   edit, controller.updateDepartment);
+
+route(router, "post", "/departments/:id/people",
+  { body: c.organisation.DepartmentPeopleMove, response: c.organisation.Department, summary: "Move people into a department" },
+  edit, controller.moveToDepartment);
+
+route(router, "post", "/departments/:id/merge",
+  { body: c.organisation.DepartmentMerge, response: c.organisation.Department, summary: "Merge a department into another" },
+  edit, controller.mergeDepartment);
+
+route(router, "delete", "/departments/:id",
+  { no_content: true, summary: "Delete a department nobody has used" },
+  archive, controller.deleteDepartment);
 
 route(router, "get", "/org-seats",
   { query: c.organisation.OrgSeatListQuery, response: c.organisation.OrgSeatPage, summary: "Seats in the structure" },

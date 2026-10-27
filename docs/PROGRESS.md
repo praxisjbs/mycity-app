@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 101 screens (95 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 102 screens (96 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 35 items below: 34 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
-| M2 Productivity & Performance | 11 | 0 | 0 | 11 | 0 | 0 |
+| M2 Productivity & Performance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **101** | **40** | **0** | **61** | **0** | **0** |
+| **Total** | **102** | **40** | **0** | **62** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -992,9 +992,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 25/10/2026 |
+| 103 | Departments | `departments` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
 
+- 27/10/2026 · JP · People · Departments (#103), JBS Praxis's four answers of 27/10/2026 (`docs/guides/organogram.md` §6.1, §10): departments are kept on screen, with nothing about them in code. Add Department (the code offered from the name), Edit Department, Set Head (a person, an open role of the department, or nobody), Add People, Move To, Merge Department, Retire Department, Restore Department and Delete Department (only one nothing names), on `GET /departments/:id`, `POST /departments/:id/people`, `POST /departments/:id/merge` and `DELETE /departments/:id` beside the old routes; a change needs `people` over everyone. Reporting lines follow the head: a new head takes the old head's place and their people, and someone moved in reports to the head unless their manager is there or moves with them (Edit Record's Department too). The head, or whoever acts for an open head role, holds Head of Department while they head (`user_role.from_headship`, migration 2600), given and taken back with the head, on Invite User, Save Roles and each deploy, so a head sets their function's goals with no second step. People · Employees gains Move To Department on the rows picked (desktop). ⌘K opens a department here (it opened Settings · Organisation) and offers Add Department. The deploy loader gives departments and heads only to a database that never had them. Tests: `tests/integration/departments.test.js` (14), the loader's screen edits surviving a deploy, `Departments.test.tsx` (5). One level only. Left: a Head mark on the organogram's cards, if wanted.
 - 26/10/2026 · JP · Where it waits, inside a tab (the QA register's Worksites 2): #28 Worksites' Permanent and Temporary, Temporary's Sites, Requests and Field and their chips carry the unread notices about what they hold, and the screen opens there; a link that arrives while Worksites is open picks its side. #25 Attendance's views and chips likewise (Register rows keyed by the day, so a notice about one dots it), #26 Leave's and #27 Devices' chips by status · nothing left
 - 26/10/2026 · JP · Attendance (#25), QA DEF-02 finished: ⌘K's attendance days end with All Days of each person listed, opening People · Attendance's All Days panel (`?person=`): their days by month, newest first, a day opening over it (`GET /attendance/days`, `people` view, in scope) · nothing left
 - 26/10/2026 · JP · QA DEF-04 finished: Attendance (#25) export Period's From and To each carry their own label and error, At most 31 days shows once under both. QA OBS-05: Leave (#26) Waiting On agrees with the request's history on every route, tested against Postgres · nothing left
@@ -1098,6 +1100,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 27/10/2026 · JP · Performance's functions and heads now come from People · Departments (#103, `docs/guides/organogram.md` §6.1): a head set there sets the function's goals at once, holding Head of Department while they head; reporting lines follow the head, so the next month's reviews go to them. No Performance code changed: `organisation.headOf` is read live. `performance.md` P4, §2, §6.3, §6.20 and §11 updated · nothing left
 - 27/10/2026 · JP · Goals (#29): an organisational goal's ID is the system's (JBS Praxis, 27/10/2026): New Goal no longer asks for a Goal ID; the service gives the next of the plan year from the new `organisational_goal` numbering scheme (`ORG-2026-01`, seed 2291, editable on Settings · Documents & Numbering #76), the toast names it, and neither body takes it. Migration 2295 gives each goal of the plan without an ID the next of its year (`code_given_at`) and moves the counter past those typed, which they keep. Tests: `Goals.test.tsx`, `performance-plan.test.js` (and the goal tests that typed `OG1`). Left: nothing.
 - 27/10/2026 · JP · Scorecards (#30) and Reviews (#32), the 27/10 staging faults brief: Edit Lines checks its lines against `ScorecardLinesSave` before Save Lines sends them, so a line added without its Goal reads Required and nothing is sent (fault #1); Open Round lists a month still running with the day it ends, unpickable, and with none ended marks the Month Not ended yet and sends nothing (fault #8: on 26/10 its first choice was October); the round's month rules have their own codes (`ROUND_MONTH_NOT_IN_QUARTER`, `ROUND_MONTH_NOT_ENDED`). Fault #9 (Report Month's Actual) was already fixed by #12. Tests: `Scorecards.test.tsx`, `Reviews.test.tsx`, `reviews.test.js`. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #30 Scorecards' Scorecards and Commitments, #32 Reviews' Reviews and PIPs carry the unread notices about what each holds, and the screen opens where they wait · nothing left
