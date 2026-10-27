@@ -3,9 +3,10 @@
  * Objectives and key results, Report Month and Confirm Score (docs/guides/performance.md §6.1,
  * §6.3, §6.7, §6.8).
  *
- * The tree is edited while its plan is a draft or returned: codes are given then (G1) and freeze
- * when it binds. A binding key result changes only through a target change, except a TBC target
- * before the quarter's lock date, which its owner edits in place. Each month the head reports the
+ * The tree is edited while its plan is a draft, returned or unbound (§6.22): codes are given then (G1)
+ * and freeze when it binds; an unbound plan adds new ones and changes no code already given. A
+ * binding key result changes only through a target change, except a TBC target before the quarter's
+ * lock date, which its owner edits in place. Each month the head reports the
  * function's key results and KPIs in one save; a score under the Watch band needs a recovery owner
  * and date. A company key result Scored From a function key result takes its month, so nothing is
  * entered twice. The CEO confirms each month's score; the confirmed score counts, else the
@@ -92,11 +93,9 @@ function keyResultView(kr, latest = null, rules) {
   };
 }
 
-const isDraft = (planStatus) => planStatus === "draft" || planStatus === "returned";
-
 /**
  * Objective rows with their key results and latest months, as Objective, banded by their quarter's
- * rules. `can_edit` is the reader's: a draft or returned plan whose goals they set (none without one).
+ * rules. `can_edit` is the reader's: a draft, returned or unbound plan whose goals they set (none without one).
  */
 async function withKeyResults(db, objectives, until = null, actor = null) {
   const krs = await repo.keyResultsOf(db, objectives.map((o) => o.okr_objective_id));
@@ -107,7 +106,7 @@ async function withKeyResults(db, objectives, until = null, actor = null) {
     rulesOf.set(periodId, (await plans.periodOf(db, periodId)).rules);
   const setsFor = new Map();
   if (actor)
-    for (const departmentId of new Set(objectives.filter((o) => isDraft(o.plan_status)).map((o) => o.department_id)))
+    for (const departmentId of new Set(objectives.filter((o) => plans.isOpen(o.plan_status)).map((o) => o.department_id)))
       setsFor.set(departmentId, await authority.maySetGoals(db, actor, departmentId));
   return objectives.map((o) => {
     const rules = rulesOf.get(o.performance_period_id);
@@ -125,7 +124,7 @@ async function withKeyResults(db, objectives, until = null, actor = null) {
       plan_status: o.plan_status,
       score: scoring.formatScore(cascade.objectiveScore(mine)),
       key_results: mine,
-      can_edit: isDraft(o.plan_status) && setsFor.get(o.department_id) === true,
+      can_edit: plans.isOpen(o.plan_status) && setsFor.get(o.department_id) === true,
     };
   });
 }
@@ -171,16 +170,17 @@ async function objectivesOfPlan(db, planId, actor = null) {
 }
 
 /**
- * Refuse a change to a plan that is no longer a draft. `field` names the form field at fault when
- * there is one (New Objective's Function), so the refusal is marked there, not only said.
+ * Refuse a change to a plan that is not open: sent, binding or revising (a draft, returned or unbound
+ * plan is open, §6.22). `field` names the form field at fault when there is one (New Objective's
+ * Function), so the refusal is marked there, not only said.
  */
-function assertDraft(plan, field = null) {
-  if (!["draft", "returned"].includes(plan.status))
+function assertOpen(plan, field = null) {
+  if (!plans.isOpen(plan.status))
     throw new AppError(
       "PLAN_BINDING",
       "This plan is sent or binding: change a target instead",
       409,
-      field ? { [field]: [plan.status === "submitted" ? "Plan awaits approval" : "Plan is binding"] } : undefined,
+      field ? { [field]: [["submitted", "revising"].includes(plan.status) ? "Plan awaits approval" : "Plan is binding"] } : undefined,
     );
 }
 
@@ -192,7 +192,7 @@ async function createObjective(actor, body, opts = {}) {
     const period = await plans.periodOf(client, body.performance_period_id);
     if (period.status === "closed") throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409);
     const plan = await plans.ensurePlan(client, period.performance_period_id, departmentId);
-    if (!opts.system) assertDraft(plan, "department_id");
+    if (!opts.system) assertOpen(plan, "department_id");
     let prefix = "CO";
     if (departmentId) {
       const { rows } = await client.query("SELECT code::text AS code FROM department WHERE department_id = $1", [departmentId]);
@@ -233,7 +233,7 @@ async function updateObjective(actor, id, patch) {
   const before = await repo.getObjective(pool, id);
   if (!before) throw notFound("That objective");
   await authority.assertSetsGoals(pool, actor, before.department_id);
-  assertDraft({ status: before.plan_status });
+  assertOpen({ status: before.plan_status });
   await tx(async (client) => {
     await repo.updateObjective(client, id, patch);
     await emit(client, {
@@ -248,12 +248,30 @@ async function updateObjective(actor, id, patch) {
   return getObjective(id, actor);
 }
 
-/** DELETE /performance/objectives/:id: a draft's objective, with its key results. */
+/** What an unbound plan never deletes (§6.22): a key result with a reported month, or one a line, Team result, change, initiative or company key result depends on. */
+const HELD = Object.freeze({
+  key_result: {
+    reported: "This key result has a reported month",
+    in_use: "Something depends on this key result",
+  },
+  objective: {
+    reported: "A key result of this objective has a reported month",
+    in_use: "Something depends on a key result of this objective",
+  },
+});
+
+function refuseHeld(holds, what) {
+  if (holds.reported) throw new AppError("KEY_RESULT_REPORTED", HELD[what].reported, 409);
+  if (holds.in_use) throw new AppError("KEY_RESULT_IN_USE", HELD[what].in_use, 409);
+}
+
+/** DELETE /performance/objectives/:id: an open plan's objective, with its key results. */
 async function deleteObjective(actor, id) {
   const before = await repo.getObjective(pool, id);
   if (!before) throw notFound("That objective");
   await authority.assertSetsGoals(pool, actor, before.department_id);
-  assertDraft({ status: before.plan_status });
+  assertOpen({ status: before.plan_status });
+  if (before.plan_status === "unbound") refuseHeld(await repo.objectiveHolds(pool, id), "objective");
   await tx(async (client) => {
     await repo.deleteObjective(client, id);
     await emit(client, {
@@ -289,7 +307,7 @@ async function createKeyResult(actor, body, opts = {}) {
   if (!objective) throw new AppError("VALIDATION_FAILED", "Pick an objective", 422, { okr_objective_id: ["Not found"] });
   if (!opts.system) {
     await authority.assertSetsGoals(pool, actor, objective.department_id);
-    assertDraft({ status: objective.plan_status });
+    assertOpen({ status: objective.plan_status });
   }
   await checkLinks(pool, objective, body);
   const id = await tx(async (client) => {
@@ -333,18 +351,52 @@ const tbcOpen = (ctx, today = lagos.today()) =>
 
 /** May the actor set this binding key result's TBC target in place: its owner, or whoever sets its function's goals? */
 async function maySetTarget(actor, ctx) {
-  if (!actor || ctx.plan_status !== "binding" || !tbcOpen(ctx)) return false;
+  if (!actor || !plans.isLive(ctx.plan_status) || !tbcOpen(ctx)) return false;
   if (actor.employee_id && actor.employee_id === ctx.accountable_employee_id) return true;
   return (await authority.holds(actor, "goals.function")) && (await authority.maySetGoals(pool, actor, ctx.department_id));
+}
+
+/** What a reported month was scored on: an unbound plan keeps it in place once a month is reported (§6.22). */
+const SCORED_ON = ["target_value", "target_text", "target_provisional", "measure", "direction", "unit", "parts"];
+
+/** A value as text whatever order its keys came in (a jsonb column reads back in its own order). */
+const canonical = (v) =>
+  Array.isArray(v)
+    ? `[${v.map(canonical).join(",")}]`
+    : v && typeof v === "object"
+      ? `{${Object.keys(v).sort().map((k) => `${k}:${canonical(v[k])}`).join(",")}}`
+      : JSON.stringify(v ?? null);
+
+/** A key result's field as an edit would compare it: a number as a number, parts as their text, a blank as null. */
+const comparable = (k, v) => {
+  if (v === undefined || v === null || v === "") return null;
+  if (k === "target_value") return Number(v);
+  return typeof v === "object" ? canonical(v) : String(v);
+};
+
+/**
+ * An unbound plan's key result with a reported month keeps its target, measure, direction, unit and
+ * parts in place: the target changes through Change Target, which keeps the original beside the new one.
+ */
+async function assertScoredOnHeld(id, patch) {
+  const kr = await repo.getKeyResult(pool, id);
+  const touched = SCORED_ON.filter((k) => patch[k] !== undefined && comparable(k, patch[k]) !== comparable(k, kr[k]));
+  if (!touched.length || !(await repo.keyResultHolds(pool, id)).reported) return;
+  throw new AppError(
+    "KEY_RESULT_REPORTED",
+    "This key result has a reported month: change its target instead",
+    409,
+    Object.fromEntries(touched.map((k) => [k, ["Use Change Target"]])),
+  );
 }
 
 /** PATCH /performance/key-results/:id */
 async function updateKeyResult(actor, id, patch) {
   const ctx = await repo.keyResultContext(pool, id);
   if (!ctx) throw notFound();
-  const draft = ["draft", "returned"].includes(ctx.plan_status);
-  if (draft) {
+  if (plans.isOpen(ctx.plan_status)) {
     await authority.assertSetsGoals(pool, actor, ctx.department_id);
+    if (ctx.plan_status === "unbound") await assertScoredOnHeld(id, patch);
   } else {
     const open = tbcOpen(ctx);
     const onlyTarget = Object.keys(patch).every((k) => TBC_FIELDS.has(k));
@@ -371,12 +423,13 @@ async function updateKeyResult(actor, id, patch) {
   return getKeyResultView(id);
 }
 
-/** DELETE /performance/key-results/:id: a draft's key result. */
+/** DELETE /performance/key-results/:id: an open plan's key result. */
 async function deleteKeyResult(actor, id) {
   const ctx = await repo.keyResultContext(pool, id);
   if (!ctx) throw notFound();
   await authority.assertSetsGoals(pool, actor, ctx.department_id);
-  assertDraft({ status: ctx.plan_status });
+  assertOpen({ status: ctx.plan_status });
+  if (ctx.plan_status === "unbound") refuseHeld(await repo.keyResultHolds(pool, id), "key_result");
   await tx(async (client) => {
     await repo.deleteKeyResult(client, id);
     await emit(client, {
@@ -391,7 +444,7 @@ async function deleteKeyResult(actor, id) {
 
 /** May the reader ask to change this key result's target? requestChange's checks, as a yes or no. */
 async function mayChangeTarget(actor, planStatus, ctx) {
-  if (!actor || planStatus !== "binding" || tbcOpen(ctx)) return false;
+  if (!actor || !plans.isLive(planStatus) || tbcOpen(ctx)) return false;
   if (await repo.changePending(pool, { okr_key_result_id: ctx.okr_key_result_id })) return false;
   if (!(await scopeFor(actor, "performance", "edit"))) return false;
   if (actor.employee_id && actor.employee_id === ctx.accountable_employee_id) return true;
@@ -425,7 +478,7 @@ async function getKeyResultDetail(id, actor = null) {
     target_history: changes.map(changeView),
     trace: path,
     can_change_target: await mayChangeTarget(actor, objective.plan_status, ctx),
-    can_edit: Boolean(actor) && isDraft(objective.plan_status) && (await authority.maySetGoals(pool, actor, objective.department_id)),
+    can_edit: Boolean(actor) && plans.isOpen(objective.plan_status) && (await authority.maySetGoals(pool, actor, objective.department_id)),
     can_set_target: await maySetTarget(actor, ctx),
   };
 }
@@ -520,7 +573,7 @@ async function reportMonth(actor, body) {
     const ctx = await repo.keyResultContext(pool, r.okr_key_result_id);
     if (!ctx || ctx.department_id !== departmentId)
       throw new AppError("VALIDATION_FAILED", "A key result is not this function's", 422, { key_results: ["Not this function's"] });
-    if (ctx.plan_status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Report a month once the plan is binding", 409);
+    if (!plans.isLive(ctx.plan_status)) throw new AppError("PLAN_NOT_BINDING", "Report a month once the plan is binding", 409);
     contexts.push(ctx);
   }
   if (departmentId) {

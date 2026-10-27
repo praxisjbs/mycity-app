@@ -56,6 +56,8 @@ module.exports = {
   departments: async (req, res) => sendPaged(res, await service.listDepartments(withActor(req), req.validated.query, scopeOf(req))),
   plan: async (req, res) => ok(res, await service.planDetail(id(req), withActor(req), scopeOf(req))),
   submitPlan: async (req, res) => ok(res, await service.submitPlan(withActor(req), id(req), scopeOf(req))),
+  requestUnbind: async (req, res) => created(res, await service.requestUnbind(withActor(req), id(req), req.validated.body)),
+  unbind: async (req, res) => ok(res, await service.unbindDetail(id(req))),
 
   changes: async (req, res) => sendPaged(res, await service.listChanges(req.validated.query, scopeOf(req))),
   change: async (req, res) => ok(res, await service.changeDetail(id(req), withActor(req), scopeOf(req))),

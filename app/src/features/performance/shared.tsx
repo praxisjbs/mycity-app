@@ -148,6 +148,9 @@ const PLAN: Record<string, [string, Tone]> = {
   submitted: ["Awaiting Approval", "warn"],
   binding: ["Binding", "ok"],
   returned: ["Returned", "err"],
+  // Unbound: live and open for changes; revising: its changes are with the CEO (§6.22).
+  unbound: ["Unbound", "info"],
+  revising: ["Awaiting Approval", "warn"],
 };
 
 /** A plan's status as a pill. */

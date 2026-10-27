@@ -1,7 +1,7 @@
 "use strict";
 /**
- * The four Performance approval flows and the named-person approver
- * (docs/guides/performance.md §6.4, §6.7, §6.11, §6.12, §6.13).
+ * The Performance approval flows and the named-person approver
+ * (docs/guides/performance.md §6.4, §6.7, §6.11, §6.12, §6.13, §6.22).
  */
 const cond = require("../../src/shared/workflow/conditions");
 const definitions = require("../../src/shared/workflow/definitions");
@@ -12,7 +12,7 @@ const stages = (key, context) => cond.applicableStages(D[key], context).map((s) 
 const someone = "7f0c4c53-8c55-4b1a-9a43-6b1b4a3c2d10";
 
 describe("the Performance flows ship valid", () => {
-  test.each(["performance.plan", "performance.target_change", "performance.commitments", "performance.review"])(
+  test.each(["performance.plan", "performance.plan_change", "performance.target_change", "performance.commitments", "performance.review"])(
     "%s passes validateDefinition",
     (key) => {
       expect(definitions.problemsOf(D[key])).toEqual([]);
@@ -35,6 +35,12 @@ describe("performance.plan (§6.4)", () => {
   });
   test("the company plan: the CEO alone", () => {
     expect(stages("performance.plan", ctx({ is_company: true, head_reports_to_ceo: true }))).toEqual(["ceo"]);
+  });
+});
+
+describe("performance.plan_change (§6.22)", () => {
+  test("one stage, the CEO, for an unbind request and for the changes made after it", () => {
+    expect(stages("performance.plan_change", {})).toEqual(["ceo"]);
   });
 });
 
