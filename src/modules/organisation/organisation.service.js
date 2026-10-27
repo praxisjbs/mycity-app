@@ -1098,6 +1098,26 @@ async function summary(client, scope) {
 }
 
 /**
+ * The tree's Head marks by node (docs/guides/organogram.md §6), as People · Departments names
+ * the heads: each department in use on the card of the person heading it (named, or in its filled
+ * head seat) or of its open head role, and, for an open one, on the first person above it, acting.
+ * @param {{query: Function}} db
+ * @returns {Promise<Map<string, Array<{department_id: string, name: string, code: string, acting: boolean}>>>}
+ */
+async function headMarks(db) {
+  const marks = new Map();
+  const add = (nodeId, d, acting) => {
+    if (!nodeId) return;
+    marks.set(nodeId, [...(marks.get(nodeId) || []), { department_id: d.department_id, name: d.name, code: d.code, acting }]);
+  };
+  for (const d of await repo.departmentHeads(db)) {
+    add(d.head_employee_id || d.head_seat_id, d, false);
+    if (d.head_seat_id) add(await repo.headOf(db, d.department_id), d, true);
+  }
+  return marks;
+}
+
+/**
  * The whole reporting tree, for Org Chart and Organogram. A manager who is no longer an
  * active node (archived, or left) is dropped from the line, so their former reports show
  * as roots the builder can flag instead of vanishing (docs/guides/organogram.md §11).
@@ -1105,6 +1125,12 @@ async function summary(client, scope) {
 async function orgChart(client, { view = "viewer" } = {}) {
   const rows = await repo.tree(client);
   const ids = new Set(rows.map((r) => r.node_id));
+  const marks = await headMarks(client);
+  /* Its own department's mark first, then the others' with their code: "Acting Head · PG". */
+  const headsOf = (r) =>
+    (marks.get(r.node_id) || [])
+      .sort((a, b) => Number(b.department_id === r.department_id) - Number(a.department_id === r.department_id))
+      .map((h) => ({ ...h, mark: `${h.acting ? "Acting Head" : "Head"}${h.department_id === r.department_id ? "" : ` · ${h.code}`}` }));
   const PATTERN_LABELS = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" };
   const nodes = rows.map((r) => {
     const meta =
@@ -1128,6 +1154,7 @@ async function orgChart(client, { view = "viewer" } = {}) {
       vacant: r.vacant,
       meta,
       photo_url: r.photo_url,
+      heads: headsOf(r),
     };
   });
   return {

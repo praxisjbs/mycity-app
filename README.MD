@@ -172,7 +172,9 @@ mycity-app/
 │   ├── CODEOWNERS            who must approve each path (checked by check/codeowners.js)
 │   └── pull_request_template.md
 ├── .claude/
-│   ├── settings.json         registers the Stop hook for everyone using Claude Code here
+│   ├── settings.json         registers the SessionStart and Stop hooks for everyone using Claude Code here
+│   ├── hooks/session-start.sh  a cloud session starts as CI: Node 20 first on PATH, PostgreSQL and
+│   │                         Redis running, the integration variables set, the image's Chromium named
 │   └── hooks/stop-check.js   runs the process gates before Claude may finish a task, and the
 │                             screen gates (8, 11, 12, 17) when app/, public-app/ or demo.html changed
 ├── package.json · package-lock.json · .nvmrc (Node 20) · eslint.config.js · jest.config.js
@@ -445,7 +447,7 @@ for this device), tested in `app/src/features/attendance/location.test.ts`.
 | `workspace` | `.today`, `.analytics` (aggregator; its Export is a run of Home's reports engine, `reports.sources` `workspace_analytics`, through `reports.service` `exportPersonal`, each run keeping its period: migration `2530_home_report_run_filters.sql`), `.week` (My Week, Team This Week and Tidy With AI, Performance PR 4), `.events` (`week.summary_saved`); the screens' commitment and week parts in `app/src/features/workspace/` `Commitment.tsx` and `Week.tsx` |
 | `goals` | `.periods` (quarters and their rounds' deadlines in business days), `.authority` (who sets which goals: the CEO, `goals.company`, `goals.function` and the function's head), `.plans` (one plan per function per quarter), `.okrs` (objectives, key results, Report Month, Confirm Score and the workbook import's writes), `.cascade` (codes G1 and the roll-up), `.trace` (key result → company key result → organisational goal), `.approval` (the plan and target change completions: `performance.plan`, `performance.target_change`, and `performance.plan_change` for a request to unbind a binding plan and an unbound plan's changes, §6.22: migration `2320_performance_plan_unbind.sql`, seed `2321_seed_plan_change_flow.sql`, tested by `tests/integration/performance-plan-unbind.test.js`), `.workbook` (MyCity's OKR workbook as it is kept), `.import` (`okr_workbook`), `.analytics` (Performance Analytics, PR 5); set and changed on screen (quarters with their rules, goals, objectives and key results, Set Target) tested by `tests/integration/performance-goals-edit.test.js`; `GET /performance/departments` (the departments a reader's Department and Function filters offer, in their `performance` scope) tested by `tests/integration/performance-departments.test.js`; the Goals screen's parts in `app/src/features/performance/` `Quarter.tsx` (Set Up Quarter and Edit Quarter) and `KeyResultForm.tsx` (New and Edit Key Result, Set Target), tested by `Goals.test.tsx` (which also holds that Staff are offered none of New Goal, Report Month and New KPI, and which functions Report Month lists) |
 | `targets` | `.weights` (sections and the contribution check), `.progress` (automatic lines, PR 3), `.commitments` (commitments and their approval, PR 4), `.import` (`scorecards`); agreement and its reminder in `.service` |
-| `kpis` | `.import` (`okr_kpis`) |
+| `kpis` | `.import` (`okr_kpis`); the units in use `GET /performance/kpis/units`; its rules (the target's wording required, the actual required for Met and Not Met) tested by `kpis.test.js`, and on screen by `app/src/features/performance/Kpis.test.tsx` (New KPI, the Unit field, Record Actual, Edit KPI and a KPI's row on Report Month); the Unit field is `ComboField` in `packages/ui/src/form/` |
 | `reviews` | `.cycle` (monthly rounds, `review-cycle-open`), `.sequence` (self first, A17, and the stages), `.pip` (improvement plans), `.pdf` (`templates/documents/review-summary.html`), `.dictation` (A18); migration `2300_performance_reviews.sql` (status CHECKs, the second level, corrective actions) and `2310_performance_review_withdrawn.sql` (Score Without Check-In's reason, the Withdrawn status); tested by `tests/integration/performance-reviews.test.js`; on the in-browser mock in `app/src/api/mock/{data,modules}/reviews.ts` |
 | `ess` | `.performance` (My Performance and the check-in, PR 3) |
 
@@ -855,7 +857,7 @@ npm run gallery              # every shared component in every state (packages/u
 npm run new:component -- --name X --group Display   # a new shared component, never in a feature
 npm run new:screen -- --module people --tab "Work Patterns" --m M1 --owner LA   # a new staff-app screen, every piece at once
 npm run fe:test              # also fe:typecheck, fe:lint, fe:build: packages/ui and both apps
-npm run ci                   # before every push
+npm run ci                   # before every push; refuses a Node other than .nvmrc's
 ```
 
 The seed command checks `APP_ENV`, the database name and the `system_marker` row, and refuses unless

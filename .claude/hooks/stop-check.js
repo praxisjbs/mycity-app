@@ -18,7 +18,9 @@
  * forms (12), dashes (17), five-second (8), two-shells (11) and native-ui (21)
  * (FRONTEND_GUIDE §5, §7, §8; FRONTEND_FOUNDATION F4, F8, F25). They are the conventions agreed on
  * 8 and 15 October; a session that broke one does not get to stop. The slow
- * ones (a11y, mock-free, the builds) are left to npm run ci.
+ * ones (a11y, mock-free, the builds) are left to npm run ci, and so are these while an
+ * `npm run ci` is running (its pid in node_modules/.cache/mycity/ci-local.pid), since both would
+ * rebuild and read the one demo build.
  *
  * Loop guard. If the checks still fail after Claude has been sent back twice
  * in a row in the same session, the hook lets it stop and prints the problems
@@ -34,9 +36,25 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const MAX_BLOCKS = 2;
+/* A cloud session's image has its own Chromium, not the build the repository's Playwright pins:
+   the screen gates use it when nothing else is set (session-start.sh sets it for the session's
+   own commands). */
+const CLOUD_CHROMIUM = "/opt/pw-browsers/chromium";
+if (process.env.CLAUDE_CODE_REMOTE === "true" && !process.env.MYCITY_CHROMIUM && fs.existsSync(CLOUD_CHROMIUM))
+  process.env.MYCITY_CHROMIUM = CLOUD_CHROMIUM;
 const CHECKS = ["progress", "guides", "readme-map", "user-guide"];
 const SCREEN_CHECKS = ["components", "palette", "forms", "dashes", "five-second", "two-shells", "native-ui"];
 const TOUCHES_SCREENS = /^(packages\/ui|app|public-app)\/|^docs\/MyCity-ERP-Documents\/demo\.html$/;
+
+/* An `npm run ci` in progress runs the screen gates itself, on the demo build these would rebuild under it. */
+function ciRunning() {
+  try {
+    process.kill(Number(fs.readFileSync(path.join(ROOT, "node_modules", ".cache", "mycity", "ci-local.pid"), "utf8")), 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
 
 function screensChanged() {
   try {
@@ -74,7 +92,7 @@ const writeCount = (n) => {
 };
 
 const failures = [];
-for (const id of screensChanged() ? [...CHECKS, ...SCREEN_CHECKS] : CHECKS) {
+for (const id of screensChanged() && !ciRunning() ? [...CHECKS, ...SCREEN_CHECKS] : CHECKS) {
   const script = path.join(ROOT, "scripts", "check", `${id}.js`);
   if (!fs.existsSync(script)) continue;
   const r = spawnSync(process.execPath, [script], { cwd: ROOT, encoding: "utf8" });

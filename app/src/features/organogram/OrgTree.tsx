@@ -276,6 +276,11 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
           </span>
           <b className="block text-sm leading-tight font-strong">{n.display_name}</b>
           <span className="mt-0.5 block text-2xs text-muted-foreground">{`Vacant · ${n.department}`}</span>
+          {n.heads.length > 0 && (
+            <span className="mt-1.5 flex flex-wrap justify-center gap-1">
+              <HeadMarks n={n} />
+            </span>
+          )}
           {shapes ? (
             <span className="mt-2 flex flex-wrap items-center justify-center gap-1">
               <button
@@ -320,7 +325,10 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         <Avatar name={n.display_name} src={photo(n.photo_url)} size="lg" tone={n.is_ceo ? "brand" : "soft"} className="mx-auto mb-2" />
         <b className="block text-sm leading-tight font-strong">{n.display_name}</b>
         <span className="mt-0.5 block text-2xs text-muted-foreground">{n.job_title}</span>
-        <span className="mt-2 inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{n.department}</span>
+        <span className="mt-2 flex flex-wrap items-center justify-center gap-1">
+          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{n.department}</span>
+          <HeadMarks n={n} />
+        </span>
         {n.meta && <span className="mt-1.5 block text-2xs text-subtle-foreground">{n.meta}</span>}
         {n.dotted_line_to && <span className="mt-1.5 inline-block rounded-full border border-dashed border-input px-2 py-px text-2xs text-subtle-foreground">{`Dotted line · ${n.dotted_line_to}`}</span>}
         {toggle(n)}
@@ -451,6 +459,19 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   );
 }
 
+/** A card's Head marks (organogram.md §6): Head, Acting Head, and another department's code after it. */
+function HeadMarks({ n }: { n: OrgNode }) {
+  return (
+    <>
+      {n.heads.map((h) => (
+        <Pill key={h.department_id} tone="info" className="flex-none">
+          {h.mark}
+        </Pill>
+      ))}
+    </>
+  );
+}
+
 /** One card of the phone's views: a tap moves the focus to it, or on the focused person opens their sheet. */
 function NodeTile({
   n,
@@ -485,7 +506,11 @@ function NodeTile({
         <Avatar name={n.display_name} src={photo} size={large ? "xl" : "lg"} tone={n.is_ceo ? "brand" : "soft"} />
       )}
       <span className="min-w-0 flex-1" data-copy="content">
-        <b className={cn("block truncate font-strong", large ? "text-base" : "text-sm")}>{n.display_name}</b>
+        {/* The marks wrap under a name they would crowd: a name is never cut short for them. */}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <b className={cn("truncate font-strong", large ? "text-base" : "text-sm")}>{n.display_name}</b>
+          <HeadMarks n={n} />
+        </span>
         <span className="block truncate text-2xs text-muted-foreground">{n.vacant ? `Vacant · ${n.department}` : `${n.job_title} · ${n.department}`}</span>
         {large && n.meta && <span className="block truncate text-2xs text-subtle-foreground">{n.meta}</span>}
         {team && <span className="block truncate text-2xs text-subtle-foreground">{team}</span>}
@@ -721,6 +746,7 @@ function PersonSheet({
 }) {
   const photo = usePhoto(n.photo_url);
   const items: Array<[ReactNode, ReactNode]> = [["Department", n.department]];
+  if (n.heads.length) items.push(["Head Of", n.heads.map((h) => (h.acting ? `${h.name} (acting)` : h.name)).join(", ")]);
   if (manager) items.push(["Reports To", manager.vacant ? `${manager.display_name} (open role)` : manager.display_name]);
   if (n.dotted_line_to)
     items.push([

@@ -827,6 +827,15 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
       const problem = actualProblem(id, value);
       return { ...e, [id]: problem ? { ...rest, actual_value: problem } : rest };
     });
+  /** A KPI row's actual the contract refuses: none for Met or Not Met, or a figure written wrongly. */
+  const kpiProblem = (id: string, r: KpiRow) =>
+    goalsContract.KpiReport.safeParse({ kpi_definition_id: id, result: r.result, ...(r.actual_value.trim() && r.result !== "na" ? { actual_value: r.actual_value.trim() } : {}) }).error?.issues.find((i) => i.path[0] === "actual_value")?.message;
+  const markKpiActual = (id: string, r: KpiRow) =>
+    setErrors((e) => {
+      const { actual_value: _was, ...rest } = e[id] ?? {};
+      const problem = kpiProblem(id, r);
+      return { ...e, [id]: problem ? { ...rest, actual_value: problem } : rest };
+    });
   const submit = async () => {
     const ids = Object.keys(edits);
     const kpiIds = Object.keys(kpiEdits);
@@ -835,10 +844,12 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
       return;
     }
     const refused = ids.filter((id) => actualProblem(id, edits[id].actual_value));
-    if (refused.length) {
+    const kpiRefused = kpiIds.filter((id) => kpiProblem(id, kpiEdits[id]));
+    if (refused.length || kpiRefused.length) {
       refused.forEach((id) => markActual(id, edits[id].actual_value));
+      kpiRefused.forEach((id) => markKpiActual(id, kpiEdits[id]));
       // A refused row may sit on another page: name it.
-      const named = refused.map((id) => codes[id]).filter(Boolean);
+      const named = [...refused, ...kpiRefused].map((id) => codes[id]).filter(Boolean);
       toast.error(named.length ? `Check ${named.slice(0, 3).join(", ")}` : "Check the marked rows");
       return;
     }
@@ -860,7 +871,7 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
           }),
           kpis: kpiIds.map((id) => {
             const r = kpiEdits[id];
-            return { kpi_definition_id: id, result: r.result, ...(r.actual_value.trim() ? { actual_value: r.actual_value.trim() } : {}), ...(r.comment.trim() ? { comment: r.comment.trim() } : {}) };
+            return { kpi_definition_id: id, result: r.result, ...(r.actual_value.trim() && r.result !== "na" ? { actual_value: r.actual_value.trim() } : {}), ...(r.comment.trim() ? { comment: r.comment.trim() } : {}) };
           }),
         },
       });
@@ -932,8 +943,31 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
             return (
               <Card key={id} className="mb-2">
                 <CardHeader title={<span>{`${k.code} · ${k.name}`}</span>} record />
-                <Field label="Result" {...mark(id, "result", "Pick a result")}><SelectField options={KPI_RESULTS} value={r.result} onChange={(v) => setKpi(k, { result: v as KpiRow["result"] })} /></Field>
-                <Field label="Actual" optional {...mark(id, "actual_value", "Enter a number")}><TextField value={r.actual_value} onChange={(v) => setKpi(k, { actual_value: v })} inputMode="decimal" /></Field>
+                <Field label="Result" {...mark(id, "result", "Pick a result")}>
+                  <SelectField
+                    options={KPI_RESULTS}
+                    value={r.result}
+                    onChange={(v) => {
+                      // A month with no eligible cases has no figure; Met and Not Met need one.
+                      const result = v as KpiRow["result"];
+                      setKpi(k, { result, ...(result === "na" ? { actual_value: "" } : {}) });
+                      if (errors[id]?.actual_value !== undefined) markKpiActual(id, { ...r, result, actual_value: result === "na" ? "" : r.actual_value });
+                    }}
+                  />
+                </Field>
+                {r.result !== "na" && (
+                  <Field label="Actual" {...mark(id, "actual_value", "Enter the actual")}>
+                    <TextField
+                      value={r.actual_value}
+                      onChange={(v) => {
+                        setKpi(k, { actual_value: v });
+                        if (errors[id]?.actual_value !== undefined) markKpiActual(id, { ...r, actual_value: v });
+                      }}
+                      onBlur={() => kpiEdits[id] && markKpiActual(id, r)}
+                      inputMode="decimal"
+                    />
+                  </Field>
+                )}
                 <Field label="Comment" optional {...mark(id, "comment", "Shorten the comment")}><TextField value={r.comment} onChange={(v) => setKpi(k, { comment: v })} /></Field>
               </Card>
             );

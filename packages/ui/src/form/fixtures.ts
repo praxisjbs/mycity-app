@@ -26,6 +26,20 @@ export const SAMPLE_SITES: SampleSite[] = [
   { worksite_id: "w3", name: "Apapa Yard", area: "Lagos Mainland" },
 ];
 
+export interface SampleUnit {
+  unit: string;
+  uses: number;
+}
+
+/** Units in use, most used first, as a KPI's Unit field is offered them. */
+export const SAMPLE_UNITS: SampleUnit[] = [
+  { unit: "%", uses: 31 },
+  { unit: "users", uses: 9 },
+  { unit: "days", uses: 6 },
+  { unit: "₦", uses: 4 },
+  { unit: "partners", uses: 1 },
+];
+
 /** Climbs to 100 over about a second, so the gallery shows a real percentage. */
 export const slowUploader: Uploader = ({ file, onProgress }) =>
   new Promise<DocumentRef>((resolve) => {

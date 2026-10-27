@@ -18,7 +18,7 @@ const { z } = require("zod");
 const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
 const { ScoreValue, Quantity, Direction, KrBand, Rating, ScoringRules } = require("./scoring");
-const { MonthStart, Kpi, KpiMonth, KpiResult } = require("./kpis");
+const { MonthStart, Kpi, KpiMonth, KpiResult, hasActual, ACTUAL_REQUIRED } = require("./kpis");
 const { KeyResultRef, Scorecard, Contribution } = require("./targets");
 
 /* ------------------------------------------------------------------ *
@@ -544,7 +544,7 @@ const KeyResultReport = z
   })
   .strict();
 
-/** One KPI's figure in a month's report. */
+/** One KPI's figure in a month's report; Met and Not Met need it, as on Record Actual. */
 const KpiReport = z
   .object({
     kpi_definition_id: uuid,
@@ -553,7 +553,8 @@ const KpiReport = z
     actual_text: optionalText(500),
     comment: optionalText(2000),
   })
-  .strict();
+  .strict()
+  .refine(hasActual, ACTUAL_REQUIRED);
 
 /** POST /performance/reports: a function's (or the company's) month, in one save. */
 const MonthReport = z

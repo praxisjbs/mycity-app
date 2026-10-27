@@ -879,8 +879,9 @@ Who works at MyCity, and who reports to whom.
 5. On a phone, **Everyone** shows the whole company as a list, with **You** on your row. Tap the
    arrow beside a row to open or fold its team. Typing in **Name or role** lists the matching people
    as cards; **No Match** means nobody matches.
-6. Press a person's card. **Profile** shows their **Department**, who they **Reports To**, any
-   **Dotted Line**, and their **Team**, such as `3 direct · 13 in all`.
+6. Press a person's card. **Profile** shows their **Department**, the departments they head under
+   **Head Of**, who they **Reports To**, any **Dotted Line**, and their **Team**, such as
+   `3 direct · 13 in all`.
 7. Press **Send Message** to write to them in Staff Community. On your own card, **My Profile**
    opens [My Profile](/ess?tab=my-profile) instead.
 8. {needs="people view"} **Open Record** opens their record on People.
@@ -890,7 +891,9 @@ Who works at MyCity, and who reports to whom.
 A solid line is the reporting line. A dashed line is a **Dotted Line**: a second manager for shared
 work, who does not approve leave or expenses. A dashed card reading **Open role** is a post nobody
 holds yet. On a computer the legend names **Reporting Line**, **Dotted Line**, **CEO** and
-**Vacant Seat**. If a banner says people and roles sit at the top, People have not given them a
+**Vacant Seat**. A **Head** mark shows who heads each department: beside the department on a
+computer, beside the name on a phone. **Acting Head** marks whoever acts for a department whose
+head role is open. A mark for another department adds its code, such as `Acting Head · PG`. If a banner says people and roles sit at the top, People have not given them a
 manager yet; there is nothing for you to do.
 
 Press **Download PDF** to save the whole chart as a file. The button spins while it is drawn, then

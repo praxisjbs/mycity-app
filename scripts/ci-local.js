@@ -45,6 +45,7 @@
  * documents, and report the rest as skipped. Unset, or on a laptop, it is full.
  */
 const { spawn } = require("node:child_process");
+const net = require("node:net");
 const os = require("node:os");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -68,6 +69,19 @@ if (has("decide-scope")) {
 }
 if (!["full", "docs", "tested"].includes(SCOPE)) {
   console.error(`CI_SCOPE is "${SCOPE}": it must be full, docs or tested`);
+  process.exit(2);
+}
+
+/*
+ * The Node major CI runs (.nvmrc), or no run: another major passes what CI fails. On Node 22's
+ * larger default heap the backend suite never ran out of memory as it did on Node 20 (27/10/2026).
+ */
+const NODE_WANTED = fs.readFileSync(path.join(ROOT, ".nvmrc"), "utf8").trim().replace(/^v/, "").split(".")[0];
+if (process.versions.node.split(".")[0] !== NODE_WANTED) {
+  console.error(
+    `npm run ci: CI runs Node ${NODE_WANTED} (.nvmrc) and this is Node ${process.versions.node}. ` +
+      "Switch first: nvm use (a cloud session's start does it, .claude/hooks/session-start.sh).",
+  );
   process.exit(2);
 }
 
@@ -239,8 +253,42 @@ async function lane(gates, tag) {
   return out;
 }
 
+/** Whether something answers on a URL's host and port within two seconds. */
+function answers(url, port) {
+  const u = new URL(url);
+  return new Promise((resolve) => {
+    const socket = net.connect({ host: u.hostname, port: Number(u.port) || port });
+    const done = (ok) => (socket.destroy(), resolve(ok));
+    socket.setTimeout(2000, () => done(false));
+    socket.once("connect", () => done(true));
+    socket.once("error", () => done(false));
+  });
+}
+
+/**
+ * Marks a run in progress (its pid), so the Stop hook leaves the screen gates to it: two at once
+ * rebuild and read one demo build, and one took the other's index.html away mid-crawl (27/10/2026).
+ */
+const RUNNING = path.join(ROOT, "node_modules", ".cache", "mycity", "ci-local.pid");
+
 async function main() {
+  fs.mkdirSync(path.dirname(RUNNING), { recursive: true });
+  fs.writeFileSync(RUNNING, String(process.pid));
+  process.on("exit", () => fs.rmSync(RUNNING, { force: true }));
   const chosen = GATES.filter((g) => (!ONLY || ONLY.has(g.id)) && (!GROUP || groupOf(g) === GROUP));
+  /*
+   * With RUN_DB_TESTS=1 the backend group needs PostgreSQL and Redis. One that had stopped cost a
+   * ten-minute run that failed every integration file (27/10/2026): say so before starting.
+   */
+  if (process.env.RUN_DB_TESTS === "1" && chosen.some((g) => groupOf(g) === "backend")) {
+    const down = [];
+    if (process.env.DATABASE_URL && !(await answers(process.env.DATABASE_URL, 5432))) down.push("PostgreSQL");
+    if (process.env.REDIS_URL && !(await answers(process.env.REDIS_URL, 6379))) down.push("Redis");
+    if (down.length) {
+      console.error(`npm run ci: ${down.join(" and ")} not answering. Start ${down.length > 1 ? "them" : "it"} first (a cloud session: bash .claude/hooks/session-start.sh).`);
+      process.exit(2);
+    }
+  }
   const groups = GROUPS.map((g) => chosen.filter((x) => groupOf(x) === g)).filter((l) => l.length);
   const together = !SERIAL && groups.length > 1;
   if (together) console.log(`Running ${groups.length} groups at once: ${groups.map((l) => groupOf(l[0])).join(", ")}. --serial runs one gate at a time.\n`);

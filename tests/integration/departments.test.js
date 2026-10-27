@@ -57,6 +57,7 @@ describeDb("People · Departments against the real migrations", () => {
 
   const auth = (token) => (r) => r.set("Authorization", `Bearer ${token}`);
   const asOps = () => auth(tokens.ops);
+  const asManager = () => auth(tokens.manager);
 
   /** Where someone works and reports now. */
   const where = (employeeId) =>
@@ -212,6 +213,21 @@ describeDb("People · Departments against the real migrations", () => {
     expect(given.n).toBe(1);
   });
 
+  test("the organogram marks each head's card: Head, the open head role, and Acting Head with its code", async () => {
+    const res = await asManager()(request(app).get("/api/v1/org-chart"));
+    expect(res.status).toBe(200);
+    expect(c.organisation.OrgChartTree.safeParse(res.body).success).toBe(true);
+    const marks = (id) => res.body.nodes.find((n) => n.node_id === id).heads.map((h) => h.mark);
+    expect(marks(p.ceo)).toEqual(["Head"]);
+    expect(marks(p.bHead)).toEqual(["Head"]);
+    expect(marks(p.gSeat)).toEqual(["Head"]);
+    // The Program Manager works in General Management and acts for Growth's open head role.
+    expect(marks(p.pm)).toEqual(["Acting Head · PG"]);
+    expect(res.body.nodes.find((n) => n.node_id === p.pm).heads[0]).toMatchObject({ department_id: d.pg, name: "Growth", code: "PG", acting: true });
+    expect(marks(p.b1)).toEqual([]);
+    expect(marks(p.g1)).toEqual([]);
+  });
+
   test("a name or a code another department holds is refused on its field", async () => {
     const name = await asOps()(request(app).patch(`/api/v1/departments/${d.bm}`)).send({ name: "general management" });
     expect(name.status).toBe(409);
@@ -251,6 +267,11 @@ describeDb("People · Departments against the real migrations", () => {
     const res = await asOps()(request(app).patch(`/api/v1/departments/${d.op}`)).send({ head_employee_id: p.b1 });
     expect(res.status).toBe(200);
     expect(await where(p.b1)).toMatchObject({ department_id: d.bm, line_manager_id: p.pm });
+    const chart = await asOps()(request(app).get("/api/v1/org-chart"));
+    const marksOf = (id) => chart.body.nodes.find((n) => n.node_id === id).heads.map((h) => h.mark);
+    // Their own department's mark first, then the other's with its code; the old head has none.
+    expect(marksOf(p.b1)).toEqual(["Head", "Head · OPS"]);
+    expect(marksOf(p.bHead)).toEqual([]);
     const cleared = await asOps()(request(app).patch(`/api/v1/departments/${d.op}`)).send({ head_employee_id: null });
     expect(cleared.body.head).toBeNull();
     expect(await holdsHead(p.b1)).toBe(true);
