@@ -448,7 +448,8 @@ sent. Operations and People may draft one for anyone but themselves.
    line also needs its **Due Date**.
 10. Press **Add Line** for another, or **Remove Line** to take one away.
 11. Press **Save Lines**. The hub says **Lines saved** and the scorecard closes. Press its row to
-    open it again.
+    open it again. If a line is not right, such as a new line with no **Goal**, nothing is saved:
+    the field is marked, and the mark clears as you correct it.
 
 > **Tip:** A line copied from last quarter loses its key results and its milestone date, because
 > those belong to their quarter. Pick its **Key Result** (or tick its **Team Key Results**) and its
@@ -851,13 +852,15 @@ hand when it started late.
 1. Press **Open Round** at the top of [Performance · Reviews](/performance?tab=reviews). On a phone
    it is also in **Quick Actions**. It shows while a month of the quarter has no round yet.
 2. Pick the **Month** and press **Open Round**. The hub says, for example, *November 2026 opened*.
+   A month still running shows the day it ends, such as *November 2026 · Ends 30/11/2026*, and
+   cannot be picked until then.
 3. When the round is done, press **Close Round**. It closes at once and the hub says, for example,
    *October 2026 closed*. Reviews still open carry on to their end.
 
 | The hub says | What it means | What to do |
 |---|---|---|
 | **That month's round is already open** | It was opened already | Choose it in **Month** |
-| **Not ended yet** under **Month** | The month is not over | Wait until it ends |
+| **Not ended yet** under **Month** | The month is not over | Wait until the day it ends, shown beside it |
 | **The quarter is still being planned** | The quarter shown reads **Planning** | Make it **Active** first (see [Change a quarter](#performance-quarter-edit)) |
 
 ## Analytics {#performance-analytics screen=performance/analytics icon=chart}

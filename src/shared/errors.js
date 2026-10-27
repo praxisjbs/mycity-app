@@ -17,6 +17,11 @@
  * stands for an outside service not answering, whose outage a readiness check already carries,
  * says so instead (`err.severity = "warning"`): counted on System Health, never alerting or
  * escalating (docs/guides/system-health.md §6).
+ *
+ * A refused form (a 422 with `fields`) is recorded on System Health under its rule, so a screen
+ * that lets through what it should have caught shows as a count. A refusal no screen can foresee,
+ * where only the server can know and no fix could prevent it (a password found in a breach), is
+ * the rule working, not a fault: it says so (`err.recorded = false`) and is never recorded.
  */
 class AppError extends Error {
   /**

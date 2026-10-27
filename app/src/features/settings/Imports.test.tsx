@@ -143,4 +143,25 @@ describe("Settings · Imports, Map", () => {
     choose("work", "Leave Out");
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("moves a field picked for a second column, so a field mapped twice never reaches the server (fault #2 on staging, 27/10/2026)", async () => {
+    const sheet = batch([
+      { index: 0, header: "name", field: "full_name" },
+      { index: 1, header: "role", field: "job_title" },
+      { index: 2, header: "team", field: "department" },
+      { index: 3, header: "email", field: "work_email" },
+      { index: 4, header: "work", field: null },
+    ]);
+    m.run.mockResolvedValueOnce(sheet).mockResolvedValueOnce({ batch: { ...sheet, status: "previewed" }, stats: {} });
+    open(sheet);
+    choose("work", "Work Email");
+    expect(screen.getByRole("combobox", { name: "work" }).textContent).toContain("Work Email");
+    expect(screen.getByRole("combobox", { name: "email" }).textContent).toContain("Leave Out");
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(m.run).toHaveBeenCalled());
+    const sent = m.run.mock.calls[0]![0] as { body: { fields: Record<string, string | null> } };
+    expect(Object.values(sent.body.fields).filter((f) => f === "work_email")).toHaveLength(1);
+    expect(sent.body.fields).toMatchObject({ "3": null, "4": "work_email" });
+  });
 });

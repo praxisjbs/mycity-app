@@ -232,12 +232,13 @@ async function openDueRounds(today = lagos.today()) {
 async function createRound(actor, body) {
   const period = await require("../goals/goals.plans").periodOf(pool, body.performance_period_id);
   const month = day(body.month);
+  // Each refusal under its own rule, so System Health names the one a person met (system-health.md §6).
   if (!monthsOf(period).includes(month))
-    throw new AppError("VALIDATION_FAILED", "Pick a month of the quarter", 422, { month: ["Not this quarter"] });
+    throw new AppError("ROUND_MONTH_NOT_IN_QUARTER", "Pick a month of the quarter", 422, { month: ["Not this quarter"] });
   if (period.status === "planning")
     throw new AppError("PERIOD_NOT_ACTIVE", "The quarter is still being planned", 409);
   if (lagos.monthBounds(month).last >= lagos.today())
-    throw new AppError("VALIDATION_FAILED", "The month has not ended", 422, { month: ["Not ended yet"] });
+    throw new AppError("ROUND_MONTH_NOT_ENDED", "The month has not ended", 422, { month: ["Not ended yet"] });
   if (await repo.roundOf(pool, period.performance_period_id, month))
     throw new AppError("ROUND_EXISTS", "That month's round is already open", 409);
   const r = await tx((client) => openRound(client, actor, period, month));
