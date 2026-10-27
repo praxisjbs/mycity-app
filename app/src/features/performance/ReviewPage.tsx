@@ -95,7 +95,7 @@ function QueriesOfMonth({ employeeId, month }: { employeeId: string; month: stri
       columns={[
         { key: "n", label: "Number", render: (q: Query) => q.number },
         { key: "s", label: "Subject", render: (q: Query) => q.subject },
-        { key: "d", label: "Raised", render: (q: Query) => formatDate(q.created_at.slice(0, 10)) },
+        { key: "d", label: "Raised", render: (q: Query) => formatDate(q.created_at) },
         { key: "o", label: "Outcome", render: (q: Query) => (q.status !== "resolved" ? "Open" : q.outcome === "sanctioned" ? "Sanctioned" : "Closed, No Action") },
       ]}
     />

@@ -22,31 +22,24 @@ describe("reaching a rule", () => {
     });
   });
 
-  test("a minutes rule sums late minutes; nothing counted is never a breach", () => {
-    const hours = { measure: "minutes", threshold: 300 };
-    expect(reached(hours, [{ date: "2026-10-02", minutes: 200 }]).breached).toBe(false);
-    expect(reached(hours, [{ date: "2026-10-02", minutes: 200 }, { date: "2026-10-09", minutes: 100 }]).breached).toBe(true);
+  test("nothing counted is never a breach", () => {
     expect(reached({ measure: "count", threshold: 0 }, []).breached).toBe(false);
   });
 });
 
 describe("the query a breach raises", () => {
   test("named after the rule, the counted days day-first in its details, one evidence item a day", () => {
-    const rule = { name: "Repeated Lateness", source_event: "lateness", measure: "count", window_days: 30 };
-    const offences = [
-      { date: "2026-10-02", minutes: 12 },
-      { date: "2026-10-15", minutes: 25 },
-      { date: "2026-10-31", minutes: 7 },
-    ];
-    const q = queryOf(rule, offences, 3);
-    expect(q.subject).toBe("Repeated Lateness");
-    expect(q.details).toBe("Late arrival on 02/10/2026, 15/10/2026 and 31/10/2026 (3 in 30 days). Please explain.");
-    expect(q.evidence).toEqual([
-      { label: "Late arrival, 12 minutes", date: "2026-10-02" },
-      { label: "Late arrival, 25 minutes", date: "2026-10-15" },
-      { label: "Late arrival, 7 minutes", date: "2026-10-31" },
+    const rule = { name: "Unknown Phones", source_event: "unenrolled_device", window_days: 30 };
+    const offences = [{ date: "2026-10-02" }, { date: "2026-10-15" }, { date: "2026-10-31" }];
+    const q = queryOf(rule, offences);
+    expect(q.subject).toBe("Unknown Phones");
+    expect(q.details).toBe("Punch from an unregistered device on 02/10/2026, 15/10/2026 and 31/10/2026 (3 in 30 days). Please explain.");
+    expect(q.evidence).toEqual(offences.map((o) => ({ label: "Punch from an unregistered device", date: o.date })));
+    // A module may name each offence itself (a task's number and title).
+    expect(queryOf({ ...rule, source_event: "overdue_task" }, [{ date: "2026-10-02", label: "Task overdue: Stock count" }]).evidence).toEqual([
+      { label: "Task overdue: Stock count", date: "2026-10-02" },
     ]);
-    expect(dayList(["2026-10-02"])).toBe("02/10/2026");
+    expect(dayList(["2026-10-02", "2026-10-02"])).toBe("02/10/2026");
   });
 });
 

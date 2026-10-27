@@ -256,7 +256,7 @@ Also agreed the same day:
   `performance.md`, so no other milestone's chapter changes); the user-guide gate passing without a
   trailer (27/10/2026)
 - [x] 12: `queries.md` §13 cleared of what §4 settles; PROGRESS note (27/10/2026)
-- [ ] 12: `npm run ci` green on the committed merge; #22 ready for review
+- [x] 12: `npm run ci` green on the committed merge; #22 ready for review (27/10/2026)
 - [x] Approve Sanction and Reject on the query's card for whoever `queries.consequence` waits on
   (`POST /sanctions/:id/approve|reject`), Operations & People signing there (27/10/2026)
 - [x] The afternoon decisions (§2): the Attendance policy raises its queries (`3040`), 24 hours,
@@ -317,6 +317,8 @@ Also agreed the same day:
   attendance triggers; §2 to §4 here struck through where superseded and §3 rewritten as built; the
   stale words (48 hours, six rungs, Question, all six letters MyCity's) and the manual's three
   slips corrected. Left: §8.1's public repository (the owner's call) and the nits in §8.3.
+- 27/10/2026 · GE · §8.3 fixed; main merged (#31); #22 rounded up and marked ready once `npm run ci`
+  was green.
 
 ---
 
@@ -388,10 +390,15 @@ checked against the code. Tick it here when fixed, with the commit.
 
 ### 8.3 Nits
 
-- Dead code for the moved attendance triggers (evaluator labels, the `minutes` measure, "Comes with
-  M2" on an old lateness rule). Mock: duplicate sanction id on a re-proposal, one reminder ever, the
-  fine letter lost on approval. Employee 360's status words differ from the Queries screens.
-  Raised dates from `created_at.slice(0, 10)` show the UTC day. Rules has no empty or error state
-  and no pager; Edit Rule offers a fixed trigger. `next_step` hints at sanctions on queries the
-  reader cannot see; scope `team` reads a team member's sanction approval by id. Local databases
-  that ran the earlier 3190 need a rebuild.
+All fixed 27/10/2026 (GE), except the last, which is a note:
+
+- [x] Dead code for the moved attendance triggers: the `minutes` measure, the lateness labels, "Comes
+  with M2" on an old lateness rule.
+- [x] Mock: a re-proposed sanction's id, one reminder a day, a fine's letter and the proposed dates
+  kept on approval, Queries by Reason per rule.
+- [x] Employee 360's status words match the Queries screens; raised dates show the Lagos day.
+- [x] Rules: empty and error states, a pager, Activate only for what is counted, Edit Rule shows a
+  fired rule's trigger fixed (`has_fired`); no made-up policy version.
+- [x] `next_step` counts only the sanctions the reader may see; a team scope never reads a sanction's
+  approval by id.
+- Local databases that ran the earlier 3190 need a rebuild (`migrate.js` refuses the changed file).

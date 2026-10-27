@@ -16,7 +16,7 @@ export interface LetterLike {
   fields_note?: string;
 }
 
-export function Letter({ l, note = "As it is sent. Everything underlined came from the record, not from typing." }: { l: LetterLike; note?: string }) {
+export function Letter({ l, note = "Underlined words come from the record." }: { l: LetterLike; note?: string }) {
   return (
     <Paper note={note}>
       <PaperLogo reference={l.reference} />
@@ -34,8 +34,8 @@ export function Letter({ l, note = "As it is sent. Everything underlined came fr
 /** A letter already sent: the PDF the employee received, from the vault. */
 export function LetterFile({ documentId, name }: { documentId: string | null; name: string }) {
   const href = useFileUrl(documentId ? `/api/v1/documents/${documentId}/content` : null);
-  if (!documentId) return <EmptyState bare icon="doc" title="No Letter Yet" text="It is written once approved." />;
-  if (!href) return <EmptyState bare icon="doc" title="Opening" text="This takes a moment." />;
+  if (!documentId) return <EmptyState bare icon="doc" title="No Letter Yet" />;
+  if (!href) return <EmptyState bare icon="doc" title="Opening Letter" />;
   return <DocumentPreview name={`${name}.pdf`} mime="application/pdf" href={href} />;
 }
 

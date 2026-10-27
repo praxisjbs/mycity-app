@@ -383,6 +383,12 @@ function approvalOf(q: Row, user: string): QueryDetail["approval"] {
   return { stage: ceo ? "ceo" : "operations_people", stage_name: ceo ? "CEO" : "Operations & People", can_decide: mayAct, signs: !ceo };
 }
 
+/** The Lagos day of an instant: UTC+1 all year, no daylight saving. */
+const lagosDay = (iso: string) => new Date(new Date(iso).getTime() + 3_600_000).toISOString().slice(0, 10);
+
+/** Reminded already today, Lagos time (one a day). */
+const remindedToday = (q: Row) => !!q.reminded_at && lagosDay(q.reminded_at) === lagosDay(now());
+
 function view(q: Row, user: string): QueryDetail {
   const rest = omit(q, ["_by"] as const);
   const overdue = new Date(q.response_due_at!).getTime() <= Date.now();
@@ -391,7 +397,8 @@ function view(q: Row, user: string): QueryDetail {
     ...rest,
     next_step: q.status === "resolved" ? null : nextStepOf(q.employee.employee_id),
     can_decide: decides && q.status !== "resolved" && !q.escalated && (!!q.response || overdue) && byKey(user)?.employee_id !== q.employee.employee_id,
-    can_remind: q.status === "awaiting_response" && !q.response && !q.reminded_at,
+    // One reminder a day, as the API allows.
+    can_remind: q.status === "awaiting_response" && !q.response && !remindedToday(q),
     approval: approvalOf(q, user),
   };
 }
@@ -406,10 +413,16 @@ route("GET /api/v1/queries/summary", (req) => {
     awaiting_response: list.filter((q) => q.status === "awaiting_response").length,
     closed_this_month: list.filter((q) => q.status === "resolved" && (q.reviewed_at ?? "").startsWith(month)).length,
     escalated: list.filter((q) => q.escalated).length,
-    by_reason: [
-      { label: RULE_NAME, count: list.filter((q) => q.rule_name).length },
-      { label: "Raised by a Person", count: list.filter((q) => !q.rule_name).length },
-    ].filter((r) => r.count > 0),
+    // One bar per rule (the Attendance Policy among them), then those people raised, as the API counts.
+    by_reason: Object.entries(
+      list.reduce<Record<string, number>>((n, q) => {
+        const label = q.rule_name ?? "Raised by a Person";
+        n[label] = (n[label] ?? 0) + 1;
+        return n;
+      }, {}),
+    )
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
   });
 });
 route("GET /api/v1/queries", (req) => {
@@ -421,8 +434,8 @@ route("GET /api/v1/queries", (req) => {
       employee_id: (q, v) => q.employee.employee_id === v,
       raised: (q, v) => (v === "mine" ? q.raised_by === uid(user) : q.source !== "person"),
       // A review's month (performance.md §6.16): raised on these Lagos days, both inclusive.
-      raised_from: (q, v) => q.created_at.slice(0, 10) >= v,
-      raised_to: (q, v) => q.created_at.slice(0, 10) <= v,
+      raised_from: (q, v) => lagosDay(q.created_at) >= v,
+      raised_to: (q, v) => lagosDay(q.created_at) <= v,
     },
     sort: {
       created_at: (a, b) => b.created_at.localeCompare(a.created_at),
@@ -479,7 +492,7 @@ route("POST /api/v1/queries", (req) => {
 route("POST /api/v1/queries/:id/remind", (req) => {
   const q = findQ(req.user!, req.params.id);
   if (!q) return notFound();
-  if (q.status !== "awaiting_response" || q.reminded_at) return fail(409, "QUERY_NOT_REMINDABLE", "A reminder cannot be sent now");
+  if (q.status !== "awaiting_response" || remindedToday(q)) return fail(409, "QUERY_NOT_REMINDABLE", "A reminder cannot be sent now");
   q.reminded_at = now();
   return ok(view(q, req.user!));
 });
@@ -523,8 +536,10 @@ const RULES: QueryRule[] = (
   policy: i === 0 && ATTENDANCE_CITED() ? { policy_id: ATTENDANCE_CITED()!.policy_id, number: ATTENDANCE_CITED()!.number, title: ATTENDANCE_CITED()!.title } : null,
   policy_clause: i === 0 && ATTENDANCE_CITED() ? DEVICE_CLAUSE : null,
   state, active: state === "active", activated_at: state === "draft" ? null : at(40, "09:00"),
-  fired_this_month: i === 0 ? 2 : 0, created_at: at(41, "09:00"), updated_at: at(40, "09:00"),
+  fired_this_month: i === 0 ? 2 : 0, has_fired: false, created_at: at(41, "09:00"), updated_at: at(40, "09:00"),
 }));
+/** A rule as the API returns it: whether it has raised a query, which fixes its trigger. */
+const withFired = (r: QueryRule): QueryRule => ({ ...r, has_fired: QUERIES.some((q) => q.query_rule_id === r.query_rule_id) });
 const COUNTED = new Set(["unenrolled_device", "overdue_task", "low_performance"]);
 /** Late arrivals, absences and missing clock-outs are the Attendance policy's rules (guide §6.3). */
 const ATTENDANCE_COUNTS = new Set(["lateness", "absence", "missing_clock_out"]);
@@ -538,7 +553,7 @@ route("GET /api/v1/query-rules/summary", () =>
   }),
 );
 route("GET /api/v1/query-rules", (req) =>
-  paged(RULES, req, {
+  paged(RULES.map(withFired), req, {
     search: (r) => [r.name, r.code],
     filters: { state: (r, v) => r.state === v, source_event: (r, v) => r.source_event === v },
     sort: { name: (a, b) => a.name.localeCompare(b.name), created_at: (a, b) => a.created_at.localeCompare(b.created_at) },
@@ -564,9 +579,9 @@ route("POST /api/v1/query-rules", (req) => {
   if (Object.keys(f).length) return invalid(f);
   const r: QueryRule = {
     query_rule_id: sid(`rule:new:${RULES.length}`), code: b.name!.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_"), name: b.name!.trim(), source_event: b.source_event!,
-    measure: b.measure ?? "count", threshold: Number(b.threshold), window_days: Number(b.window_days), letter_template: b.letter_template ?? null,
+    measure: "count", threshold: Number(b.threshold), window_days: Number(b.window_days), letter_template: b.letter_template ?? null,
     policy: ruleNamed(b.policy_id), policy_clause: b.policy_id ? (b.policy_clause?.trim() || null) : null, state: "draft",
-    active: false, activated_at: null, fired_this_month: 0, created_at: now(), updated_at: now(),
+    active: false, activated_at: null, fired_this_month: 0, has_fired: false, created_at: now(), updated_at: now(),
   };
   RULES.push(r);
   return created(r);
@@ -586,11 +601,11 @@ route("PATCH /api/v1/query-rules/:id", (req) => {
   if (clause && clause.length > 300) return invalid({ policy_clause: ["At most 300 characters"] });
   if (rest.source_event && ATTENDANCE_COUNTS.has(rest.source_event)) return invalid({ source_event: ["The Attendance policy counts that"] });
   if (rest.source_event && rest.source_event !== r.source_event && QUERIES.some((q) => q.query_rule_id === r.query_rule_id))
-    return fail(409, "RULE_TRIGGER_FIXED", "This rule has fired; its trigger stays");
+    return fail(409, "RULE_HAS_FIRED", "This rule has raised queries; start a new one instead", { source_event: ["Fixed once it has fired"] });
   Object.assign(r, rest, { updated_at: now() }, policyId !== undefined && { policy: ruleNamed(policyId) });
   if (clause !== undefined) r.policy_clause = clause?.trim() || null;
   if (!r.policy) r.policy_clause = null;
-  return ok(r);
+  return ok(withFired(r));
 });
 route("POST /api/v1/query-rules/:id/activate", (req) => {
   const refused = configure(req);
@@ -599,7 +614,7 @@ route("POST /api/v1/query-rules/:id/activate", (req) => {
   if (!r) return notFound();
   if (!COUNTED.has(r.source_event)) return fail(409, "TRIGGER_NOT_AVAILABLE", "This trigger is not counted yet", { source_event: ["Comes with M2"] });
   Object.assign(r, { state: "active", active: true, activated_at: r.activated_at ?? now() });
-  return ok(r);
+  return ok(withFired(r));
 });
 route("POST /api/v1/query-rules/:id/pause", (req) => {
   const refused = configure(req);
@@ -607,7 +622,7 @@ route("POST /api/v1/query-rules/:id/pause", (req) => {
   const r = ruleOf(req.params.id);
   if (!r) return notFound();
   Object.assign(r, { state: "paused", active: false });
-  return ok(r);
+  return ok(withFired(r));
 });
 
 /* ------------------------------------------------------------------ *
@@ -672,7 +687,15 @@ route("POST /api/v1/sanctions/:id/approve", (req) => {
     return ok(s!);
   }
   const number = `SAN-${String(SANCTIONS.filter((x) => x.number).length + 1).padStart(4, "0")}`;
-  Object.assign(s!, { number, status: "issued", waiting_on: null, letter_document_id: sid(`sanltr:${q!.number}`), effective_on: isoDaysAgo(0) });
+  // The dates proposed stand; a fine sends its Salary Deduction letter beside the rung's.
+  Object.assign(s!, {
+    number,
+    status: "issued",
+    waiting_on: null,
+    letter_document_id: sid(`sanltr:${q!.number}`),
+    fine_letter_document_id: s!.fine ? sid(`sanfine:${q!.number}`) : null,
+    effective_on: s!.effective_on || isoDaysAgo(0),
+  });
   q!.sanction = { sanction_id: s!.sanction_id, number, step_name: s!.step_name, status: "issued" };
   Object.assign(q!, { status: "resolved", outcome: "sanctioned", escalated: false, reviewed_at: now(), reviewed_by_name: s!.decided_by_name });
   return ok(s!);

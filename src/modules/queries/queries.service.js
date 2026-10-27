@@ -102,7 +102,7 @@ async function visibleRow(db, reader, id) {
  * The rung a new offence is offered first (guide §6.5). Required when it is asked: the
  * sanctions service requires this one for its queries' settlement.
  */
-const nextStepFor = (employeeId) => require("../sanctions/sanctions.service").nextStep(pool, employeeId);
+const nextStepFor = (employeeId, reader) => require("../sanctions/sanctions.service").nextStep(pool, employeeId, reader);
 
 /** Whether the reader may decide this query now (guide §6.4). */
 function decidable(row, user, canEdit) {
@@ -124,26 +124,22 @@ const SIGNING_STAGE = "operations_people";
 
 /**
  * A pending sanction's approval as this reader meets it (guide §6.4): the stage it waits on,
- * whether they may decide it, whether deciding signs. Read through the workflow service, which
- * alone says who may act; null when nothing waits or the reader may not read the approval.
+ * whether they may decide it, whether deciding signs. The workflow service alone says who may act;
+ * null when nothing waits.
  */
 async function approvalFor(row, user) {
   if (!row.sanction || row.sanction.status !== "pending_approval" || !row.workflow_instance_id) return null;
-  try {
-    const workflow = require("../workflow/workflow.service");
-    const flow = await workflow.getInstance(user, row.workflow_instance_id);
-    if (flow.state !== "pending" || !flow.current_stage) return null;
-    return {
-      stage: flow.current_stage,
-      stage_name: flow.stage_name || flow.current_stage,
-      // Decided here, on the card: My Approvals' own can_decide is false for a sanction.
-      can_decide: await workflow.mayAct(user, row.workflow_instance_id),
-      signs: flow.current_stage === SIGNING_STAGE,
-    };
-  } catch (err) {
-    if (err && err.status === 404) return null;
-    throw err;
-  }
+  // The caller already sees this query (§6.1), so its sanction's stage is read without the
+  // workflow's own read rule; who may act is still the workflow's to say.
+  const workflow = require("../workflow/workflow.service");
+  const stage = await workflow.pendingStage(row.workflow_instance_id);
+  if (!stage) return null;
+  return {
+    stage: stage.key,
+    stage_name: stage.name,
+    can_decide: await workflow.mayAct(user, row.workflow_instance_id),
+    signs: stage.key === SIGNING_STAGE,
+  };
 }
 
 /** One query as its card shows it, for this reader. */
@@ -157,7 +153,8 @@ async function get(id, user, scope) {
   const { employee_id: employeeId, ...rest } = await readable(pool, row);
   return {
     ...rest,
-    next_step: row.status === "resolved" ? null : await nextStepFor(employeeId),
+    // From the sanctions this reader may see, so it hints at none they cannot (§6.1).
+    next_step: row.status === "resolved" ? null : await nextStepFor(employeeId, reader),
     can_decide: decidable(row, user, Boolean(canEdit)),
     can_remind: remindable(row, Boolean(canCreate)),
     approval: await approvalFor(row, user),

@@ -456,8 +456,14 @@ function History({ id }: { id: string }) {
 const QUERY_STATUS = {
   awaiting_response: { tone: "warn", text: "Awaiting Response" },
   under_review: { tone: "info", text: "Under Review" },
-  resolved: { tone: "neutral", text: "Closed" },
 } as const;
+
+/** A query's status in the words Queries & Sanctions uses: a closed one says how it ended. */
+function queryPill(q: Query) {
+  if (q.status === "resolved") return q.outcome === "sanctioned" ? <Pill tone="neutral">Sanctioned</Pill> : <Pill tone="ok">Closed, No Action</Pill>;
+  if (q.escalated) return <Pill tone="err">Escalated</Pill>;
+  return <Pill tone={QUERY_STATUS[q.status].tone}>{QUERY_STATUS[q.status].text}</Pill>;
+}
 
 /** The person's queries the viewer may see (queries.md §6.1); a row opens it on Queries & Sanctions. */
 function PersonQueries({ id }: { id: string }) {
@@ -476,8 +482,8 @@ function PersonQueries({ id }: { id: string }) {
         { key: "n", label: "Number", render: (q: Query) => q.number },
         { key: "s", label: "Subject", render: (q: Query) => q.subject },
         { key: "b", label: "Raised By", desktop: true, render: (q: Query) => q.raised_by_name ?? q.rule_name ?? "Rule" },
-        { key: "d", label: "Raised", render: (q: Query) => formatDate(q.created_at.slice(0, 10)) },
-        { key: "t", label: "Status", render: (q: Query) => <Pill tone={q.escalated ? "err" : QUERY_STATUS[q.status].tone}>{q.escalated ? "Escalated" : QUERY_STATUS[q.status].text}</Pill> },
+        { key: "d", label: "Raised", render: (q: Query) => formatDate(q.created_at) },
+        { key: "t", label: "Status", render: queryPill },
       ]}
     />
   );
@@ -486,8 +492,8 @@ function PersonQueries({ id }: { id: string }) {
 const SANCTION_STATUS = {
   pending_approval: { tone: "warn", text: "Awaiting Approval" },
   issued: { tone: "neutral", text: "Issued" },
-  rejected: { tone: "ok", text: "Rejected" },
-  withdrawn: { tone: "ok", text: "Withdrawn" },
+  rejected: { tone: "err", text: "Not Approved" },
+  withdrawn: { tone: "neutral", text: "Withdrawn" },
 } as const;
 
 /** The person's sanctions the viewer may see; a row opens the query it follows, which shows it and its letter. */

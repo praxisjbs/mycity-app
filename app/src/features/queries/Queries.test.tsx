@@ -113,6 +113,9 @@ describe("Queries & Sanctions · Rules", () => {
     fireEvent.click(edit[edit.length - 1]);
     const dialog = await screen.findByRole("dialog");
     expect((within(dialog).getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("Unregistered Device");
+    // It has raised queries, so its trigger is shown, not offered.
+    expect(within(dialog).queryByRole("combobox", { name: "What Sets It Off" })).toBeNull();
+    expect(within(dialog).getByText("What Sets It Off")).toBeTruthy();
     const clause = within(dialog).getByRole("textbox", { name: /Clause/ }) as HTMLInputElement;
     expect(clause.value).toBe("Clock in only from a device registered in My Devices.");
     fireEvent.change(clause, { target: { value: "x".repeat(301) } });

@@ -2,7 +2,7 @@ import queries from "@mycity/contract/schemas/queries.js";
 import query_rules from "@mycity/contract/schemas/query_rules.js";
 import sanctions from "@mycity/contract/schemas/sanctions.js";
 import templates from "@mycity/contract/schemas/templates.js";
-import type { CitablePolicy, ConsequenceStep, LetterTemplate, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
+import type { ConsequenceStep, LetterTemplate, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
@@ -11,7 +11,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Letter, LetterFile, PolicyCited } from "@/features/shared/Letter";
 import { withSignature } from "@/features/shared/signature";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { EmployeePicker, PolicyPicker } from "@/features/shared/pickers";
+import { EmployeePicker, PolicyPicker, type PolicyChoice } from "@/features/shared/pickers";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
@@ -20,7 +20,7 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
   ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, DetailPane, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
-  KeyValue, ListDetail, LoadingRows, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
+  KeyValue, ListDetail, LoadingRows, Pager, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
 } from "@mycity/ui";
 
 /**
@@ -197,7 +197,7 @@ type RaiseValues = { subject: string; details: string; policy_id: string; policy
 
 function RaiseQuery({ close }: { close: () => void }) {
   const [who, setWho] = useState<PickedPerson[]>([]);
-  const [policy, setPolicy] = useState<CitablePolicy[]>([]);
+  const [policy, setPolicy] = useState<PolicyChoice[]>([]);
   const [tried, setTried] = useState(false);
   // The policy cited and the clause quoted, only once a policy is picked (guide §6.2).
   const cited = (v: RaiseValues) => {
@@ -457,6 +457,8 @@ const TRIGGER_NAME = Object.fromEntries(TRIGGERS) as Record<QueryRuleSource, str
 /** What a new or edited rule may count: late arrivals, absences and missing clock-outs are the Attendance policy's (guide §6.3). */
 const OFFERED = new Set<QueryRuleSource>(["unenrolled_device", "overdue_task", "low_performance", "missed_target"]);
 const OFFERED_TRIGGERS = TRIGGERS.filter(([key]) => OFFERED.has(key));
+/** What something counts today, so a rule on it can be switched on: Missed Target waits for M2's KPIs. */
+const COUNTED_NOW = new Set<QueryRuleSource>(["unenrolled_device", "overdue_task", "low_performance"]);
 const ruleState = (r: QueryRule) => (r.state === "active" ? pill("ok", "Active") : r.state === "paused" ? pill("neutral", "Paused") : pill("warn", "Draft"));
 const threshold = (r: QueryRule) => (r.measure === "minutes" ? `${r.threshold} min in ${r.window_days} days` : `${r.threshold} in ${r.window_days} days`);
 
@@ -499,7 +501,7 @@ function Rules() {
                 <ActionGroup>
                   <div className="mt-2.5 flex justify-end gap-2">
                     {OFFERED.has(r.source_event) && <Button size="sm" icon="edit" onClick={() => modal.open({ title: "Edit Rule", body: (close) => <RuleForm rule={r} close={close} /> })}>Edit Rule</Button>}
-                    <Button size="sm" onClick={() => flip(r)}>{r.active ? "Pause" : "Activate"}</Button>
+                    {(r.active || COUNTED_NOW.has(r.source_event)) && <Button size="sm" onClick={() => flip(r)}>{r.active ? "Pause" : "Activate"}</Button>}
                   </div>
                 </ActionGroup>
               )}
@@ -507,6 +509,7 @@ function Rules() {
           ))}
         </Grid>
       )}
+      {rules.rows.length > 0 && <Pager page={rules.page} onPage={rules.setPage} noun="rule" label="Rules" />}
       {/* Left off a phone (guide §10.2). */}
       {!phone && (
       <Grid cols={2} className="mt-3">
@@ -557,7 +560,7 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
     },
     { safeParse: (v: RuleValues) => (editing ? query_rules.QueryRuleUpdate : query_rules.QueryRuleCreate).safeParse(ruleOf(v)) },
   );
-  const [policy, setPolicy] = useState<CitablePolicy[]>(rule?.policy ? [{ ...rule.policy, policy_version_id: rule.policy.policy_id, version: 1 }] : []);
+  const [policy, setPolicy] = useState<PolicyChoice[]>(rule?.policy ? [rule.policy] : []);
   const create = useMutation("POST /api/v1/query-rules");
   const update = useMutation("PATCH /api/v1/query-rules/:id");
   const submit = async () => {
@@ -565,7 +568,11 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
     const body = ruleOf(f.values) as { name: string; source_event: OfferedSource; threshold: number; window_days: number; policy_id?: string; policy_clause?: string };
     try {
       if (rule) {
-        const r = await update.run({ params: { id: rule.query_rule_id }, body: { ...body, policy_id: body.policy_id ?? null, policy_clause: body.policy_clause ?? null } });
+        const { source_event: sourceEvent, ...rest } = body;
+        const r = await update.run({
+          params: { id: rule.query_rule_id },
+          body: { ...rest, ...(!rule.has_fired && { source_event: sourceEvent }), policy_id: body.policy_id ?? null, policy_clause: body.policy_clause ?? null },
+        });
         invalidate("/api/v1/query-rules");
         close();
         toast(`${r.name} saved`);
@@ -582,7 +589,12 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
   return (
     <>
       <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Overdue Tasks" /></Field>
-      <Field label="What Sets It Off" {...f.status("source_event")}><SelectField options={OFFERED_TRIGGERS} {...f.field("source_event")} /></Field>
+      {rule?.has_fired ? (
+        // Its queries were counted this way: the trigger stays (guide §6.3).
+        <KeyValue items={[[<HelpTerm key="t" help="Fixed once the rule has raised a query.">What Sets It Off</HelpTerm>, TRIGGER_NAME[rule.source_event]]]} />
+      ) : (
+        <Field label="What Sets It Off" {...f.status("source_event")}><SelectField options={OFFERED_TRIGGERS} {...f.field("source_event")} /></Field>
+      )}
       <Grid cols={2}>
         <Field label="How Many Times" {...f.status("threshold")}><NumberField {...f.field("threshold")} /></Field>
         <Field label="Within, Days" {...f.status("window_days")}><NumberField {...f.field("window_days")} /></Field>

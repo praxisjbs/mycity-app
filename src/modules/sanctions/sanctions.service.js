@@ -64,9 +64,12 @@ async function get(id, reader) {
   return detailOf(row);
 }
 
-/** The rung a new offence is offered first: the one after the highest still in force. */
-async function nextStep(db, employeeId) {
-  const held = await repo.inForce(db, employeeId, lagos.today());
+/**
+ * The rung a new offence is offered first: the one after the highest still in force, of the
+ * sanctions the reader may see (all of them for scope `all`).
+ */
+async function nextStep(db, employeeId, reader = null) {
+  const held = await repo.inForce(db, employeeId, lagos.today(), reader);
   return repo.stepAbove(db, held.length ? held[0].position : 0);
 }
 

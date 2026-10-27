@@ -19,13 +19,14 @@ const ROWS = `
          ${STATE} AS state, r.active, r.activated_at,
          (SELECT count(*)::int FROM employee_query q WHERE q.query_rule_id = r.query_rule_id AND q.created_at >= $1)
            AS fired_this_month,
+         EXISTS (SELECT 1 FROM employee_query q WHERE q.query_rule_id = r.query_rule_id) AS has_fired,
          r.created_at, r.updated_at,
          search_fold(r.name || ' ' || r.code) AS haystack
     FROM query_rule r`;
 
 const OUT = `v.query_rule_id, v.code, v.name, v.source_event, v.measure, v.threshold, v.window_days,
   v.letter_template, v.policy_id, v.policy_clause, v.state, v.active, v.activated_at, v.fired_this_month,
-  v.created_at, v.updated_at`;
+  v.has_fired, v.created_at, v.updated_at`;
 
 const SORTS = { name: "v.name", created_at: "v.created_at" };
 

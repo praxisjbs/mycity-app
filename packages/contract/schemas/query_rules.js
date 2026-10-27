@@ -5,8 +5,9 @@
  *
  * A rule counts one trigger (`source_event`) for one person inside a rolling window
  * of `window_days` Lagos days (shared/rules/window-counter) and raises one query when
- * the count reaches `threshold`. `measure` is `count` (events) or `minutes` (late
- * minutes summed, lateness only), so a threshold in cumulative hours is a setting too.
+ * the count reaches `threshold`. Every rule counts events (`measure` `count`): late minutes
+ * summed were lateness's, which the Attendance policy counts now (guide §6.3); a stored rule may
+ * still read `minutes`.
  *
  * States a person reads, worked out from `active` and `activated_at`:
  *   draft   never activated; nothing fires
@@ -61,6 +62,8 @@ const QueryRule = z
     active: z.boolean(),
     activated_at: isoDateTime.nullable(),
     fired_this_month: z.number().int().min(0),
+    // It has raised a query: its trigger is fixed from then on (PATCH refuses a change).
+    has_fired: z.boolean(),
     created_at: isoDateTime,
     updated_at: isoDateTime,
   })
@@ -74,16 +77,11 @@ const QueryRuleListQuery = listQuery(
   ["name", "created_at"],
 );
 
-const minutesOnlyForLateness = (v) =>
-  !v.measure || v.measure === "count" || !v.source_event || v.source_event === "lateness";
-const MINUTES_ONLY = { message: "Minutes count lateness only", path: ["measure"] };
-
 /** POST /query-rules: saved as a draft. The code is made from the name. */
 const QueryRuleCreate = z
   .object({
     name: text(80),
     source_event: OfferedRuleSource,
-    measure: QueryRuleMeasure.default("count"),
     threshold,
     window_days: windowDays,
     letter_template: letterKey.optional(),
@@ -91,11 +89,10 @@ const QueryRuleCreate = z
     policy_id: uuid.optional(),
     policy_clause: z.string().trim().max(300, "At most 300 characters").optional(),
   })
-  .strict()
-  .refine(minutesOnlyForLateness, MINUTES_ONLY);
+  .strict();
 
 /**
- * PATCH /query-rules/:id. The trigger and measure are fixed once a rule has fired
+ * PATCH /query-rules/:id. The trigger is fixed once a rule has fired
  * (its queries were counted that way); the threshold, window and letter may change
  * and apply from the next event.
  */
@@ -103,7 +100,6 @@ const QueryRuleUpdate = z
   .object({
     name: text(80).optional(),
     source_event: OfferedRuleSource.optional(),
-    measure: QueryRuleMeasure.optional(),
     threshold: threshold.optional(),
     window_days: windowDays.optional(),
     letter_template: letterKey.nullable().optional(),
@@ -111,8 +107,7 @@ const QueryRuleUpdate = z
     policy_clause: z.string().trim().max(300, "At most 300 characters").nullable().optional(),
   })
   .strict()
-  .refine((v) => Object.keys(v).length > 0, "Change at least one field")
-  .refine(minutesOnlyForLateness, MINUTES_ONLY);
+  .refine((v) => Object.keys(v).length > 0, "Change at least one field");
 
 /** GET /query-rules/summary */
 const QueryRulesSummary = z
@@ -149,6 +144,7 @@ const TABLES = {
     virtual: {
       state: "draft, active or paused, from active and activated_at",
       fired_this_month: "queries this rule raised since the 1st, Lagos time",
+      has_fired: "whether this rule has ever raised a query",
       policy: "the policy named by policy_id, from the policies service",
     },
   },

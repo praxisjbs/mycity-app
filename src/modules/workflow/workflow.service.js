@@ -7,7 +7,8 @@
  *    the modules where the caller holds `approve` (the CEO approves everywhere).
  *  - A request is read by whoever opened it, the employee it is about, the people its
  *    current stage names, anyone who decided on it, and a holder of `view` on its
- *    module whose scope covers that employee. Anyone else gets a 404.
+ *    module whose scope covers that employee (for `queries`, scope `all` only). Anyone
+ *    else gets a 404.
  *  - Deciding needs both: the stage names the caller (the engine checks, and nobody
  *    decides their own request, the CEO excepted), and the caller holds `approve` on
  *    the request's module (shared/workflow/approvers.js leaves that to the route).
@@ -307,6 +308,9 @@ async function named(client, snapshot, user) {
   return held.some((code) => wanted.includes(code));
 }
 
+/** Modules whose `view` scope `team` does not reach their people's requests (queries.md §6.1). */
+const NARROW_MODULES = new Set(["queries"]);
+
 /** May the caller read this request? */
 async function mayRead(client, instance, user) {
   if (user.is_ceo === true) return true;
@@ -317,6 +321,9 @@ async function mayRead(client, instance, user) {
   const scope = await rbac().scopeFor(user, instance.module_key, "view");
   if (!scope) return false;
   if (scope.scope === "all") return true;
+  // A module whose records a team scope never widens (a sanction, queries.md §6.1) is read here
+  // only by those above, or with scope all.
+  if (NARROW_MODULES.has(instance.module_key)) return false;
   return Boolean(instance.subject_employee_id && (scope.scope_ids || []).includes(instance.subject_employee_id));
 }
 
@@ -439,9 +446,21 @@ async function decideIn(client, user, id, decision, reason = null) {
  */
 async function mayAct(user, id) {
   const instance = await engine.getInstance(pool, id);
-  if (!instance || instance.state !== "pending" || !(await mayRead(pool, instance, user))) return false;
+  if (!instance || instance.state !== "pending") return false;
   if (!(await approveScope(user, instance.module_key))) return false;
   return approvers.canAct(pool, instance.stage_approvers, user, instance);
+}
+
+/**
+ * The stage a request waits on and its name, for a record that has already checked its reader may
+ * see it (a query's card, queries.md §6.1): no read check of its own. Null once it has completed.
+ */
+async function pendingStage(id) {
+  const instance = await engine.getInstance(pool, id);
+  if (!instance || instance.state !== "pending" || !instance.current_stage) return null;
+  const def = await definitions.findById(pool, instance.workflow_definition_id);
+  const stage = cond.stageByKey(def, instance.current_stage);
+  return { key: instance.current_stage, name: stage ? stage.name : instance.current_stage };
 }
 
 /** The stage a request waits on, under the caller's transaction (null once it has completed). */
@@ -547,6 +566,7 @@ module.exports = {
   decideIn,
   stageOf,
   mayAct,
+  pendingStage,
   withdraw,
   reassign,
 };

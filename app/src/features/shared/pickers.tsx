@@ -129,16 +129,19 @@ export function DepartmentPicker({ value, onChange, multiple }: { value: Departm
 }
 
 /** The Knowledge Hub's policies with a version in force, searched on the server (one): what a query cites. */
-export function PolicyPicker({ value, onChange }: { value: CitablePolicy[]; onChange: (value: CitablePolicy[]) => void }) {
+/** A policy as a picker holds it: a rule's saved policy names no version, a fresh pick does. */
+export type PolicyChoice = Pick<CitablePolicy, "policy_id" | "number" | "title"> & { version?: number };
+
+export function PolicyPicker({ value, onChange }: { value: PolicyChoice[]; onChange: (value: PolicyChoice[]) => void }) {
   const list = usePaged("GET /api/v1/queries/policies");
   return (
-    <RecordPicker
+    <RecordPicker<PolicyChoice>
       list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
       value={value}
       onChange={onChange}
       id={(p) => p.policy_id}
       title={(p) => p.title}
-      sub={(p) => `${p.number} · Version ${p.version}`}
+      sub={(p) => (p.version ? `${p.number} · Version ${p.version}` : p.number)}
       placeholder="Search policies"
     />
   );

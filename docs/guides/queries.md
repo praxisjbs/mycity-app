@@ -135,7 +135,7 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `GET /api/v1/letter-templates/assist` | → `AiAvailability` | `queries` edit, `queries.configure` | no | As above, for the letter editor |
 | `POST /api/v1/letter-templates/assist` | `LetterDraftRequest` → `LetterDraft` | `queries` edit, `queries.configure` | no | The letter's wording as HTML for the editor; nothing is kept (§9) |
 | `GET /api/v1/query-rules/summary` | → `QueryRulesSummary` | `queries` view | no | |
-| `GET /api/v1/query-rules` | `QueryRuleListQuery` (`state`, `source_event`, `q`, `sort`) → `QueryRulePage` | `queries` view | yes, 25 | |
+| `GET /api/v1/query-rules` | `QueryRuleListQuery` (`state`, `source_event`, `q`, `sort`) → `QueryRulePage` | `queries` view | yes, 25 | Each rule with `has_fired` |
 | `POST /api/v1/query-rules` | `QueryRuleCreate` → `QueryRule` | `queries` create, `queries.configure` | | Saved as a draft |
 | `PATCH /api/v1/query-rules/:id` | `QueryRuleUpdate` → `QueryRule` | `queries` edit, `queries.configure` | | |
 | `POST /api/v1/query-rules/:id/activate` | `EmptyBody` → `QueryRule` | `queries` edit, `queries.configure` | | |
@@ -227,7 +227,11 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
   `unenrolled_device` (a punch from a device not on the person's list), `overdue_task` (a Workspace
   task whose due day passed before it was done: still open, or done late, counted on its due day),
   `low_performance` (a month's review closed rated Below, counted on the day it closed),
-  `missed_target` (an M2 KPI closed below its target; not counted yet). `measure` is always `count`.
+  `missed_target` (an M2 KPI closed below its target; not counted yet). `measure` is always `count`:
+  the contract no longer takes it, and a stored `minutes` row (lateness's, before 27/10/2026) never
+  fires. A rule says whether it has fired (`has_fired`), and from then its trigger is fixed (409
+  `RULE_HAS_FIRED`); Edit Rule shows it instead of offering it. Activate is offered only for a
+  trigger something counts.
 - The window is `shared/rules/window-counter`: the `window_days` days ending on the event's date,
   in Lagos dates.
 - Counting starts after the last query the same rule raised for the person, so a threshold of three
@@ -284,7 +288,9 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
   how long it stays in force for escalation (`valid_days`, null for ever) and whether evidence is
   required.
 - **Next rung**: the rung after the highest one still in force for the person (issued, and inside
-  its `valid_days`). With none in force it is the first rung. This is what a second offence offers
+  its `valid_days`), of the sanctions the reader may see (§6.1): a manager's card counts only those
+  on queries they raised, so it never hints at the others; Operations & People, who approve every
+  sanction, see the whole standing. With none in force it is the first rung. This is what a second offence offers
   without code. People may choose a different rung; the choice and reason are recorded.
 - A retired rung keeps its sanctions; it is no longer offered. A rung with sanctions is never deleted.
 - Who decides is the `queries.consequence` approval, edited on Settings · Approvals: Operations &
@@ -376,6 +382,11 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
 | Employee | Their own queries and sanctions, in ESS only | Respond |
 | Line Manager (`manager`, `queries` team, view and create) | Queries they raised | Raise, remind; read the response |
 | Head of Department (`queries` team, view, create, edit, approve) | Queries they raised | Raise, remind, decide their own queries |
+
+A team scope never widens a sanction's approval either: `GET /workflow/instances/:id` reads a
+`queries` request only for scope `all`, the CEO, its opener, its approvers and deciders, and the
+person it is about (`workflow.service` NARROW_MODULES). The query's card shows who a sanction waits
+on to whoever may see the query (`workflow.pendingStage`).
 | Operations & People (`queries` all) | Everything | Everything, including rules, chain and letters (`queries.configure`); first approver of every sanction, who signs its letters |
 | Management (`queries` all, no delete) | Everything | Decide queries |
 | Implementation | Everything | Everything (`queries.configure`) |
@@ -425,7 +436,7 @@ or tier 2.**
 | Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature; Write With AI (What To Say, Write Draft, the draft, Try Again, Use Draft), reading AI Is Off or AI Limit Reached when it cannot answer | Help on Clause: the line of the policy the letter quotes | Where the signature is kept, the version cited: §6.2 |
 | Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by (a person, the rule, or Attendance Policy), raised, response due, counted days, response, sanction, and while a sanction waits: its step and who it waits on); Raise a Query (only with `queries` create; also from ⌘K), Send Reminder, View Letter (the PDF the employee received), Record Decision; Approve Sanction (Your Signature at the Operations & People stage) and Reject (Reason) for whoever it waits on; a refused proposal reads "Not Approved" | Help on Escalated (the KPI) and on Waiting On: a sanction is waiting for approval. Help on Response Due: the 24 hour window. Help on Your Signature when approving: it signs the letters | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
 | Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, Evidence (one item a line) for a step that requires it, fine, reason | Help on the next rung: why it is offered. Help on Evidence: the step needs the facts it rests on | The approval route and its thresholds: Settings · Approvals, §6.5 |
-| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status); Recent Firings; New Rule, Edit Rule, Activate, Pause; the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional); an empty state when there are no rules | Help on Policy and on Clause, as the form reads them | Counting after the last query, the dedup key: §6.3 |
+| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status), a page at a time; Recent Firings; New Rule, Edit Rule, Activate, Pause; the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional); an empty state when there are no rules | Help on Policy and on Clause, as the form reads them | Counting after the last query, the dedup key: §6.3 |
 | Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
 | Letter Templates | Stat strip; the list (template, used by, status); the selected letter's preview on paper, the record's words underlined; New Template, Edit Template, Activate | Help on Letter: the names a letter can use | Versioning, the shipped defaults: §6.7 |
@@ -436,7 +447,7 @@ or tier 2.**
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Queries | Two KPI cards (Open, Awaiting Response), then query cards with a status pill | Queries by Reason; the Number and Raised By columns | Raise a Query, full width; a query opens in a sheet with Record Decision at its foot | Bottom bar More → Queries; the four tabs scroll sideways |
-| Rules | Rule cards, one a row, with Activate on drafts | Recent Firings | New Rule in the header | Tabs scroll sideways |
+| Rules | Rule cards, one a row, with Activate on drafts whose trigger is counted | Recent Firings | New Rule in the header | Tabs scroll sideways |
 | Sanctions | Sanction cards with the step and status | The query and decided-by columns | Issue Sanction | Tabs scroll sideways |
 | Letter Templates | The template list, then the selected letter's preview | The Used By column | New Template | Tabs scroll sideways |
 | ESS · My Queries | The switch at the top as a segmented control, then the chosen list as cards | The Number and Query columns | Respond, full width at the foot of the query's sheet; a sanction opens its letter full screen | Bottom bar Self-Service → My Queries |
@@ -516,6 +527,12 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 27/10/2026 · GE · The audit's small items (handoff §8.3): the `minutes` measure and the attendance
+  triggers' labels gone (§6.3); `has_fired` on a rule, its trigger shown fixed on Edit Rule, Activate
+  only for what is counted, a pager on Rules (§10); the next rung from the sanctions the reader may
+  see (§6.5) and a team scope never reading a sanction's approval (§8); the mock reminds once a day,
+  keeps a fine's letter and the dates proposed, and counts Queries by Reason per rule; Employee
+  360's status words and raised dates match Queries.
 - 27/10/2026 · GE · From the audit, the screens (§10): Record Decision asks for Evidence on a step
   that requires it (the top two could not be proposed); Raise a Query only with `queries` create,
   and on ⌘K; after Approve Sanction the card is read again once the worker has issued it, and the

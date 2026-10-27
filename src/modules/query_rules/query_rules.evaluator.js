@@ -12,7 +12,7 @@
  *      offences behind one query never count towards the next;
  *   2. the module that owns the trigger counts the person's offences in it (attendance,
  *      tasks or reviews, each in its own `<module>.auto-query.js`);
- *   3. at the threshold (offences, or late minutes summed), one query is raised through
+ *   3. at the threshold, one query is raised through
  *      the queries service, the counted days as its evidence, its dedup key the rule, the
  *      person and the breach day. A second delivery of the same event finds the breach
  *      already raised and does nothing.
@@ -34,9 +34,6 @@ const { EVENTS } = require("./query_rules.events");
 
 /** What one offence is called in a query's details and evidence. */
 const OFFENCE = Object.freeze({
-  lateness: "Late arrival",
-  absence: "Absent",
-  missing_clock_out: "No clock-out",
   unenrolled_device: "Punch from an unregistered device",
   overdue_task: "Task overdue",
   low_performance: "Month rated Below",
@@ -69,28 +66,25 @@ function dayList(dates) {
 
 /**
  * Whether the offences reach the rule, and on which day. Pure, for the tests.
- * @param {{measure: string, threshold: number}} rule
- * @param {Array<{date: string, minutes: number}>} offences  inside the window, oldest first
+ * @param {{threshold: number}} rule
+ * @param {Array<{date: string}>} offences  inside the window, oldest first
  * @returns {{breached: boolean, total: number, breach_date: string|null}}
  */
 function reached(rule, offences) {
-  const total = rule.measure === "minutes" ? offences.reduce((n, o) => n + o.minutes, 0) : offences.length;
+  const total = offences.length;
   const breached = offences.length > 0 && total >= rule.threshold;
   return { breached, total, breach_date: breached ? offences[offences.length - 1].date : null };
 }
 
 /** The subject, details and evidence of the query a breach raises. */
-function queryOf(rule, offences, total) {
+function queryOf(rule, offences) {
   const label = OFFENCE[rule.source_event];
-  const counted =
-    rule.measure === "minutes"
-      ? `${total} late minutes in ${rule.window_days} days`
-      : `${offences.length} in ${rule.window_days} days`;
+  const counted = `${offences.length} in ${rule.window_days} days`;
   return {
     subject: rule.name,
     details: `${label} on ${dayList(offences.map((o) => o.date))} (${counted}). Please explain.`,
     evidence: offences.map((o) => ({
-      label: o.label || (rule.source_event === "lateness" ? `${label}, ${o.minutes} minutes` : label),
+      label: o.label || label,
       date: o.date,
     })),
   };
@@ -115,7 +109,7 @@ async function evaluateRule(rule, employeeId, date) {
     const id = await queries.raiseForRule(client, {
       rule,
       employee_id: employeeId,
-      ...queryOf(rule, offences, r.total),
+      ...queryOf(rule, offences),
       dedup_key: `${rule.query_rule_id}:${employeeId}:${r.breach_date}`,
     });
     if (!id) return null;

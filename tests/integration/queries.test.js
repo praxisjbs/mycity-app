@@ -762,6 +762,41 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect((await as("ops").post(`/sanctions/${card.sanction.sanction_id}/reject`, { reason: "I do not accept this at all." })).status).toBe(403);
       expect((await as("ops").get(`/queries/${qid}`)).body.sanction.status).toBe("pending_approval");
     });
+
+    test("the next rung counts only the sanctions the reader may see; a team scope never reads a sanction's approval", async () => {
+      const raised = await as("manager").post("/queries", {
+        employee_id: people.other.employee.employee_id,
+        subject: "Late Field Visit Report",
+        details: "The field visit report for Tuesday reached the team on Friday, after the client asked for it.",
+        signature: SIGNATURE,
+      });
+      expect(raised.status).toBe(201);
+      const qid = raised.body.employee_query_id;
+      expect((await as("other").post(`/ess/queries/${qid}/response`, { body_html: "<p>I accept that it was late and have nothing to add.</p>" })).status).toBe(200);
+      // The manager sees none of the sanctions Zainab holds, on queries others raised.
+      expect((await as("manager").get(`/queries/${qid}`)).body.next_step).toMatchObject({ name: "Caution", position: 1 });
+      // Operations & People see them all, so Zainab's standing moves her past the first rung.
+      expect((await as("ops").get(`/queries/${qid}`)).body.next_step?.name).not.toBe("Caution");
+
+      const res = await as("ops").post(`/queries/${qid}/decision`, {
+        outcome: "sanction",
+        consequence_step_id: steps.Caution,
+        reason: "The explanation does not account for the delay.",
+      });
+      expect(res.status).toBe(200);
+      // The raiser still sees who it waits on, but reads the approval only through the card.
+      const card = (await as("manager").get(`/queries/${qid}`)).body;
+      expect(card.approval).toMatchObject({ stage: "operations_people", stage_name: "Operations & People", can_decide: false });
+      const flow = (await as("ops").get(`/sanctions/${card.sanction.sanction_id}`)).body.workflow_instance_id;
+      expect((await as("manager").get(`/workflow/instances/${flow}`)).status).toBe(404);
+      expect((await as("hod").get(`/workflow/instances/${flow}`)).status).toBe(404);
+      expect((await as("ops").get(`/workflow/instances/${flow}`)).status).toBe(200);
+    });
+
+    test("a rule counts events, never minutes", async () => {
+      const minutes = await as("ops").post("/query-rules", { name: "Phones Minutes", source_event: "unenrolled_device", measure: "minutes", threshold: 2, window_days: 30 });
+      expect(minutes.status).toBe(422);
+    });
   });
 
   /* ---------------------------------------------------------------- *
@@ -865,7 +900,8 @@ describeDb("queries and sanctions against the real migrations", () => {
       const change = await as("ops").patch(`/query-rules/${rules.device}`, { source_event: "overdue_task" });
       expect(change.status).toBe(409);
       const edited = await as("ops").patch(`/query-rules/${rules.device}`, { name: "Unregistered Phones", threshold: 4, window_days: 14 });
-      expect(edited.body).toMatchObject({ name: "Unregistered Phones", threshold: 4, window_days: 14 });
+      // It says it has fired, so Edit Rule shows its trigger fixed.
+      expect(edited.body).toMatchObject({ name: "Unregistered Phones", threshold: 4, window_days: 14, has_fired: true });
       const off = await as("ops").post(`/query-rules/${rules.device}/pause`);
       expect(off.body.state).toBe("paused");
       await strangeDevice("staff", day(-1));

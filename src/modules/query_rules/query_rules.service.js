@@ -87,7 +87,7 @@ async function create(actor, body) {
     let code = codeFrom(body.name);
     for (let n = 2; await repo.codeTaken(client, code); n += 1) code = codeFrom(`${body.name} ${n}`);
     const clause = body.policy_id ? body.policy_clause || null : null;
-    const ruleId = await repo.insert(client, { ...body, policy_clause: clause, code, created_by: actor.user_id });
+    const ruleId = await repo.insert(client, { ...body, measure: "count", policy_clause: clause, code, created_by: actor.user_id });
     await emit(client, {
       key: EVENTS.QUERY_RULE_SAVED,
       entity: { type: "query_rule", id: ruleId },
@@ -104,16 +104,11 @@ async function update(actor, id, body) {
   await tx(async (client) => {
     const before = await repo.get(client, id, monthStart());
     if (!before) throw notFound();
-    const changesHow = (body.source_event && body.source_event !== before.source_event) ||
-      (body.measure && body.measure !== before.measure);
+    const changesHow = body.source_event && body.source_event !== before.source_event;
     if (changesHow && (await repo.hasFired(client, id)))
       throw new AppError("RULE_HAS_FIRED", "This rule has raised queries; start a new one instead", 409, {
         source_event: ["Fixed once it has fired"],
       });
-    const measure = body.measure || before.measure;
-    const source = body.source_event || before.source_event;
-    if (measure === "minutes" && source !== "lateness")
-      throw new AppError("RULE_INVALID", "Minutes count lateness only", 422, { measure: ["Lateness only"] });
     if (body.letter_template) await assertLetter(client, body.letter_template);
     await assertPolicy(client, body.policy_id);
     // The clause is a line of the policy: blank is none, and taking the policy off clears it.

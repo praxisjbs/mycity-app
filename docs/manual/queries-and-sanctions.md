@@ -207,12 +207,14 @@ missing clock-outs are counted by the Attendance policy, which raises their quer
    policy off clears the clause.
 4. Press **Save Rule**. The change counts from the next event.
 
-Once a rule has raised a query, **What Sets It Off** cannot change. Make a new rule instead.
+Once a rule has raised a query, **What Sets It Off** is shown but cannot change. Make a new rule
+instead.
 
 ### Switch a rule on or off {#queries-rules-switch needs="queries edit, cap queries.configure"}
 
 1. Open [Queries & Sanctions · Rules](/queries?tab=rules).
-2. On the rule's card, press **Activate**. It counts from now on, never before.
+2. On the rule's card, press **Activate**. It counts from now on, never before. A **Missed Target**
+   rule has no **Activate** yet: nothing counts missed targets until KPIs do.
 3. To stop it, press **Pause**. A rule that has fired is paused, never deleted.
 
 ## Sanctions {#queries-sanctions screen=queries/sanctions icon=flag}

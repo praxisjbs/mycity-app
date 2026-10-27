@@ -259,7 +259,13 @@ async function insertLetter(db, { sanction_id, document_id, letter_type }) {
  * The rungs in force for a person on `today`: issued sanctions whose rung counts for
  * escalation (no valid_days, or still inside them), highest first.
  */
-async function inForce(db, employeeId, today) {
+/**
+ * One person's sanctions in force. With a reader, only those on queries the reader may see
+ * (queries.visibility): a next rung offered never hints at a sanction they cannot read.
+ */
+async function inForce(db, employeeId, today, reader = null) {
+  const params = [employeeId, today];
+  const v = reader ? visibility.clause(reader, params, "q.raised_by") : { and: "" };
   // pagination:complete one person's standing on the ladder: a handful of rungs, never listed
   const { rows } = await completeQuery(
     db,
@@ -267,10 +273,12 @@ async function inForce(db, employeeId, today) {
             s.position, x.effective_on,
             CASE WHEN s.valid_days IS NULL THEN NULL ELSE x.effective_on + (s.valid_days - 1) END AS in_force_until
        FROM sanction x JOIN consequence_step s ON s.consequence_step_id = x.consequence_step_id
+       JOIN employee_query q ON q.employee_query_id = x.employee_query_id
       WHERE x.employee_id = $1 AND x.status = 'issued'
         AND (s.valid_days IS NULL OR x.effective_on + (s.valid_days - 1) >= $2::date)
+        ${v.and}
       ORDER BY s.position DESC, x.effective_on DESC, x.sanction_id`,
-    [employeeId, today],
+    params,
     { label: "sanctions in force", ceiling: 25 },
   );
   return rows;
