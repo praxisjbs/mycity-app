@@ -212,6 +212,9 @@ either, never lengthen it (`foundation.md` §6.4); the minutes below are the def
   check below stands in for one.)
 - Not in a known breach (the k-anonymity range lookup; only five characters of the hash leave
   the server). The check fails open after 3 seconds. `PASSWORD_BREACH_CHECK=false` turns it off.
+  Only the server can know it, so no screen can say it first: the refusal (Found in a breach) is
+  the rule working, and it is never recorded on System Health (`err.recorded = false`,
+  system-health.md §6). Every other password rule is a screen's to check, and is recorded.
 - Hashed with Argon2id. Argon2 runs outside the transaction.
 
 **Wrong passwords** (`identity.throttle.js`): the first 5 cost nothing; then each attempt waits
@@ -471,6 +474,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 ## 14 · Change log
 
 - 27/10/2026 · JP · §8: Head of Department follows headship (JBS Praxis, 27/10/2026; `docs/guides/organogram.md` §6.1). Whoever heads a department, or acts for its open head role, holds it while they do unless a role of theirs already carries `goals.function`; the system gives it (`user_role.from_headship`, migration 2600) and takes back only what it gave. Invite User and Save Roles keep it on a head (`users.invite.js`, `users.service.setRoles`). Settings · Users shows it as any role.
+- 27/10/2026 · JP · From the 27/10 staging faults brief (fault #6, `WEAK_PASSWORD: new_password` at `POST /api/v1/auth/reset`, three times): the person had chosen a password found in a breach, which the reset page cannot check and no fix prevents. That refusal still marks the field Found in a breach, and is no longer recorded on System Health; the other password rules are (§6 Passwords).
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Settings · Users' Status chips carry the unread notices about the logins under each status, as the list reads it; a login that has left shows under Everyone alone (`users.views.js`, `users.repo.js` `statusesOf`).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Users by Role is desktop only, as §10.2 says; Invite and Save Roles hold to five roles (`UserInvite`, `UserRolesSet`) and say so on Roles as a sixth is picked, and a refusal on Roles reads in four words. Settings · Approvals (the workflow designer): a route's problems name the stage and the rule in words (`workflow.service` `plainly`), on the Needs Fixing banner and on a refused save (`Fix the stages first`); the Person picker lists active logins only; Add Stage stops at ten; the Status column shows on a phone. §10 updated.
 - 25/10/2026 · JP · §6.1 written, from the employee creation audit and JBS Praxis's decisions of 25/10/2026: a login works only while its employee does and closes on archive; an unused login follows a corrected work email, a used one moves with Use Work Email; Invite All Pending, Not Sent and Send Invite for roster logins; per-person link limits and Link Not Checked; one login per employee (0500); no ceiling on roles, written down. §5 corrected: candidates need `settings` create. §6: a new link closes every open link; there is no common-password list.

@@ -145,6 +145,25 @@ describe("Performance · Reviews", () => {
     await expect(api.call("GET /api/v1/performance/reviews/:id", { params: { id: rows.data[0].performance_review_id } })).rejects.toMatchObject({ code: "CHECK_IN_FIRST" });
   }, 30000);
 
+  it("Open Round lists a month still running with the day it ends, and sends nothing until one has ended (fault #8 on staging, 27/10/2026)", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=reviews");
+    // 3 November: October has its round; November and December are still to end.
+    await press(document.body, "Open Round");
+    const form = dialog();
+    fireEvent.click(within(form).getByRole("combobox", { name: "Month" }));
+    const listed = within(screen.getByRole("listbox")).getAllByRole("option");
+    expect(listed.map((o) => [o.textContent, o.getAttribute("aria-disabled")])).toEqual([
+      ["November 2026 · Ends 30/11/2026", "true"],
+      ["December 2026 · Ends 31/12/2026", "true"],
+    ]);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    const opens = () => vi.mocked(dispatch).mock.calls.filter(([r]) => r.method === "POST" && r.path.endsWith("/performance/rounds")).length;
+    const sent = opens();
+    await press(form, "Open Round");
+    expect(opens()).toBe(sent);
+    expect(within(form).getByText("Not ended yet")).toBeTruthy();
+  }, 30000);
+
   it("opens on the newest round, which the API lists first", async () => {
     const real = vi.mocked(dispatch).getMockImplementation()!;
     vi.mocked(dispatch).mockImplementation(async (req) => {

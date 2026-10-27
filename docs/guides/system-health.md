@@ -180,6 +180,11 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
   21/10/2026, faults #1 to #3: three lines titled `VALIDATION_FAILED` at `POST /leave` needed the
   server's log to tell them apart). The route is `req.routePattern`, stamped by `http/route.js`
   before the router's base path is unwound; every fault the error handler records carries it.
+- **A refusal no screen can foresee is not a fault.** Where only the server can know and no fix
+  could prevent it, the error says so (`err.recorded = false`, `shared/errors.js`) and is answered
+  the same, never recorded: a password found in a breach (identity.md §6; fault #6 of the 27/10
+  brief, JBS Praxis). A rule a screen could check first stays recorded, since its count is how a
+  screen that lets it through is found (leave past the allowance stays, JBS Praxis, 27/10/2026).
 - Only `fatal` and `error` are told. A `warning` or `notice` group is grouped, counted and reopened
   when it comes back like any other, but never pushed as new, back again or happening fast, and
   never escalates (TB, 20/10/2026, fault #1). The roll-up reads the reporter's `ALERT_SEVERITIES`,
@@ -454,6 +459,7 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 27/10/2026 · JP · From the 27/10 staging faults brief (JBS Praxis's answers): a refusal no screen can foresee, a password found in a breach, is answered as before and never recorded as a fault (`err.recorded = false`, §6); a person choosing a breached password is the rule working, and three of them cost a fix session to rule out. Waits On's and Open Round's rules, which shared `VALIDATION_FAILED`, each have their own code, so a brief names the rule a person met (workspace.md, performance.md).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Checks reads Show All when every check is up and Show Fewer once all show; Download Brief, the bulk changes and a fault's status buttons say why they failed; more than 25 (a brief) or 50 (a status) ticked asks first, as §11 says; Take It On sends `assigned_to`, so Held By names the reader (§2, §10.1); Add Note saves a note with no status change (`POST /faults/:id/notes`); the fault's labels are Title Case (First Seen, Last Seen, How Often, Held By); Status keeps its title when it cannot load; a reader with view only gets no ticks. §10 updated.
 - 25/10/2026 · JP · Settings · Performance: the p95 column keeps its help term and sorts from the glyph beside it (`DataView` `sortLabel`), since a help term inside the sort button was a control inside a control (the accessibility gate's nested-interactive).
 - 24/10/2026 · GE · The fix and status briefs name the repository `praxisjbs/mycity-app`; it moved from `tomblakeasaah196/mycity-app` (`docs/runbooks/github-settings.md`). No behaviour changes.

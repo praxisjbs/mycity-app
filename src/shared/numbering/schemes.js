@@ -72,6 +72,13 @@ const SCHEMES = Object.freeze({
     reset: "never",
     include_period: false,
   }, // M2 My Workspace: a task, "TSK-0001" (seeded in 2090)
+  organisational_goal: {
+    prefix: "ORG",
+    padding: 2,
+    separator: "-",
+    reset: "yearly",
+    include_period: true,
+  }, // M2 Performance: an organisational goal's ID, "ORG-2026-01", numbered by its plan year (seeded in 2291)
   location_request: {
     prefix: "WLR",
     padding: 4,

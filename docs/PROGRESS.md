@@ -114,6 +114,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 27/10/2026 · JP · Addresses (F27), fault #3 of the 27/10 staging brief: a pin tapped on the map carried Leaflet's fifteen places, which `PinQuery` refuses past ten, so Drop a Pin named nothing; `places.pin` now sends six (`degreesOf`), as `place` keeps them (`addresses.md` §3, §14). Sign-in (identity): a password found in a breach is refused on the reset, welcome and change forms as before and never recorded as a fault (`identity.md` §6). Tests: `app/src/features/shared/places.test.ts`, `identity.test.js`. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab (JBS Praxis, from the QA register's Worksites 2 with neither Permanent nor Temporary marked): `GET /notifications/views` counts a screen's unread notices by the inner view each record sits in, placed by its module as the screen's own filters find it (`<module>.views.js`); `Chips`, `SegmentedControl` and `Kanban` columns show the share in the tab strip's yellow, a board's cards are marked as rows are, and each screen opens on the side and chip holding the news (`marks.tsx`). Wired on every tab with inner views where notices land (notes under People, Employee Self-Service, My Workspace, Performance, Knowledge Hub, Settings, Home) · nothing left
 - 26/10/2026 · JP · QA DEF-02 and DEF-12 finished: a capped ⌘K group may end with `more` rows, declared in the provider's `types` for the coverage gate; the shell's update, install and notifications offers show on Home only (`offersScreen`), on phone and desktop, Back to Guide on every screen · nothing left
 - 26/10/2026 · JP · QA DEF-04 finished, form system: DateRangeField's ends show From and To labels and each says its own problem under its box, tied to it alone; the period's message sits under the empty end, else once under both; `useFieldControl` takes `part`, and `useFieldError` lets a control show its Field's message beside the part at fault · nothing left
@@ -778,13 +779,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 4 | Today | `today` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
-| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 101 | Projects | `projects` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 
 **Notes**
 
+- 27/10/2026 · JP · Tasks (#5), fault #4 of the 27/10 staging brief: Wait On Task left out the task itself and those it waits on, but offered tasks already waiting on it, which the service refuses as a loop; it now leaves those out too. Add Link's four refusals have their own codes (`TASK_LINK_SELF`, `TASK_LINK_UNSEEN`, `TASK_LINK_CANCELLED`, `TASK_LINK_LOOP`), so System Health names the rule met. Tests: `workspace/Workspace.test.tsx`, `tests/integration/workspace.test.js`. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #5 Tasks' Mine and My Team and each board column (a phone's stage) carry the unread notices about the tasks there; the board opens on My Team when only others' tasks hold them, Show Cancelled turns on when a cancelled one does, and a new card has a row's dot · nothing left
 - 26/10/2026 · JP · Tasks (#5), QA OBS-06 finished: a waiting card moved out of To Do (a drag, its menu, a phone's Move To) opens Waiting On before anything is sent, naming each task it waits on with Open Task, and Go Ahead for whoever plans it, which then moves the card where it was put; Close leaves it in To Do; the mock refuses as the API does. QA DEF-06 acceptance tested: an empty Add Comment is marked and sends nothing, a refused one keeps its words, one press (even two) adds exactly one · nothing left
 - 26/10/2026 · JP · Tasks (#5), QA bug register (Milestone 2): the task panel takes the saved title as soon as Edit Task saves, and again on a second edit (DEF-05); Add Comment leaves the emptied box unmarked (DEF-06, the shared form's reset); a refused move, such as a waiting task moved out of To Do, is an error toast naming the task it waits on, never a confirmation (OBS-06) · nothing left
@@ -1079,10 +1081,10 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
+| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 32 | Reviews | `reviews` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 32 | Reviews | `reviews` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 33 | Analytics | `analytics` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Build plan** (`docs/guides/performance.md` §1.2, where each PR's checklist is ticked; PR 1 and PR 2 in
@@ -1099,6 +1101,8 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 **Notes**
 
 - 27/10/2026 · JP · Performance's functions and heads now come from People · Departments (#103, `docs/guides/organogram.md` §6.1): a head set there sets the function's goals at once, holding Head of Department while they head; reporting lines follow the head, so the next month's reviews go to them. No Performance code changed: `organisation.headOf` is read live. `performance.md` P4, §2, §6.3, §6.20 and §11 updated · nothing left
+- 27/10/2026 · JP · Goals (#29): an organisational goal's ID is the system's (JBS Praxis, 27/10/2026): New Goal no longer asks for a Goal ID; the service gives the next of the plan year from the new `organisational_goal` numbering scheme (`ORG-2026-01`, seed 2291, editable on Settings · Documents & Numbering #76), the toast names it, and neither body takes it. Migration 2295 gives each goal of the plan without an ID the next of its year (`code_given_at`) and moves the counter past those typed, which they keep. Tests: `Goals.test.tsx`, `performance-plan.test.js` (and the goal tests that typed `OG1`). Left: nothing.
+- 27/10/2026 · JP · Scorecards (#30) and Reviews (#32), the 27/10 staging faults brief: Edit Lines checks its lines against `ScorecardLinesSave` before Save Lines sends them, so a line added without its Goal reads Required and nothing is sent (fault #1); Open Round lists a month still running with the day it ends, unpickable, and with none ended marks the Month Not ended yet and sends nothing (fault #8: on 26/10 its first choice was October); the round's month rules have their own codes (`ROUND_MONTH_NOT_IN_QUARTER`, `ROUND_MONTH_NOT_ENDED`). Fault #9 (Report Month's Actual) was already fixed by #12. Tests: `Scorecards.test.tsx`, `Reviews.test.tsx`, `reviews.test.js`. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #30 Scorecards' Scorecards and Commitments, #32 Reviews' Reviews and PIPs carry the unread notices about what each holds, and the screen opens where they wait · nothing left
 - 26/10/2026 · JP · Goals (#29) and KPIs (#31): New Goal, Report Month and New KPI show only to a reader who may set something (`GET /performance/functions`, goals.authority alone), and Report Month's Function lists only the company and the functions the reader may set, as New Objective's and New KPI's already do. Before, a reader holding `goals.function` who headed nothing (a Program Manager) was offered every function and all three buttons, and refused on the save. No API or contract change; the guide's §6.3 and §10 and the User Guide's Performance chapter say it, its pictures retaken. Tests: `performance/Goals.test.tsx`. Left: nothing.
 - 26/10/2026 · JP · QA bug register finished (Milestone 2): Goals (#29) New Objective offers only the company and the functions the reader may set (`GET /performance/functions`, goals.authority alone), starting on a head's own function, a sent or binding plan still marked (DEF-10); KPIs (#31) New KPI offers only the functions the reader may set KPIs for, the in-form refusal behind it (DEF-11); Scorecards (#30) Edit Lines totals each section's lines against its share as weights are typed (Accountability 22.5 of 15, red until it adds up, by `scoring.sectionWeightProblems`; OBS-04) · nothing left
@@ -1321,10 +1325,11 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
 
+- 27/10/2026 · JP · Imports (#93), fault #2 of the 27/10 staging brief: the Map step let one field be picked for two columns, which only the server refused (`IMPORT_MAPPING_INVALID`, three times in twelve minutes). A field picked for a second column now moves there, the first reading Leave Out, with the toast *Moved from* and its name. Faults (#97): a refusal no screen can foresee, a password found in a breach (fault #6), is no longer recorded (`err.recorded = false`, `system-health.md` §6). Fault #7 (a refused address) and #5 (leave past the allowance, words improved by #13) need no code. Tests: `settings/Imports.test.tsx`, `tests/unit/foundation/middleware.test.js`, `identity.test.js`. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #70 Users' Status chips and #77 Integrations' Group chips carry the unread notices about what each holds; a notice about a connection now opens it, and its row is dotted · nothing left
 - 26/10/2026 · JP · Audit Log (#79), QA DEF-04 finished: the Dates ends show From and To labels and each says its own problem under its box, tied to it alone · nothing left
 - 26/10/2026 · JP · QA bug register: Audit Log (#79, DEF-04) Dates ends have their own ids and are named From and To, as are their calendar buttons; Imports (#93, OBS-03) Map lists the Required fields and refuses Next in the window, naming the fields still without a column (focused, nothing sent), and shows a server refusal of the mapping the same way until the mapping is put right · nothing left

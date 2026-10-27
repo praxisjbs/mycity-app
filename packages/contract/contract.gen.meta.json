@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "34eb30e693442be8164586d4354d11d6472889bb79da9cb024a8f1f5b17eaddf",
+  "source_hash": "bf9244e5b286fb6303e8bf2e92e1fcf2cdff9aa46727062577ea014ae7226114",
   "schemas": 1203,
   "endpoints": 584,
   "inputs": {
@@ -29,7 +29,7 @@
     "packages/contract/schemas/ess.js": "533956948dbb444b0155578f7de68cd7e672c8485e84b2afb4afc53771aa2924",
     "packages/contract/schemas/expense_categories.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/expenses.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/goals.js": "e18202f53db102034504c9daee30d1d4d067bc50b6294427e3c64a71ecd08f59",
+    "packages/contract/schemas/goals.js": "19999d434b0d82cc72ea39a9a2f17bd149d5d042591a28c6f74a7a8d3de03986",
     "packages/contract/schemas/identity.js": "399d7f571458b79f3fd310debeccb41677efa350da3498d59b1e95497fc9447b",
     "packages/contract/schemas/imports.js": "5e59f54fa0dced55405c09bcb26309d2e42050bcf2f3e0beaffdc0132bdeb61c",
     "packages/contract/schemas/integrations.js": "6c5ddf2df67dd50949cb74754c371deec121c8d8a1c240a1ddb3b60262113d18",
@@ -63,7 +63,7 @@
     "packages/contract/schemas/scoring.js": "dc2ccca24c1d814b04fb784d7d82ac9052ce86dcb64020ff37ed85cc34837eba",
     "packages/contract/schemas/search.js": "d2d2cc6675a7948131bb4b28c313f85997c4391d3641b897c1cc58b2cfb1c3ed",
     "packages/contract/schemas/security.js": "6cf6f6a58006e811045e71036358fd5a74aeccc27f82db0174acc5cfd4c329e0",
-    "packages/contract/schemas/settings.js": "0648300da1bd16607e113255617024ccd20d5ab699250c39df8245c025dbef5a",
+    "packages/contract/schemas/settings.js": "ef94a970cf6540f117e8da490a4c940e17b708ace43bc63564025d4b68e29103",
     "packages/contract/schemas/signatures.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/statutory.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/system_health.js": "8f2636ad9c6666b05b55f91ad31c40d21f08514dca36a76850f06215a649a980",

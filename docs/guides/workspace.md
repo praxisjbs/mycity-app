@@ -95,8 +95,10 @@ project, which anyone may start and everyone may find, with a board of its own (
     the setter and the watchers. Clear Blocker takes an optional note and, unless unticked, moves the
     due time on by the days the hold lasted (at least one), recorded on the hold. Earlier holds stay
     as the task's history (Blocked Before on the History view).
-10. **A task waits on another.** Add Link on the panel picks a task the reader can see; a loop is
-    a 422. While what it waits on is not Done, the task does not leave To Do (409 `TASK_WAITING`)
+10. **A task waits on another.** Add Link on the panel picks a task the reader can see, never the
+    task itself, one it already waits on, or one already waiting on it; a deeper loop is a 422. Each
+    refusal is its own rule on the field `depends_on_task_id`: `TASK_LINK_SELF`, `TASK_LINK_UNSEEN`,
+    `TASK_LINK_CANCELLED`, `TASK_LINK_LOOP`. While what it waits on is not Done, the task does not leave To Do (409 `TASK_WAITING`)
     unless someone with the task presses Go Ahead, which records who, when and why on the link.
     When the prerequisite is done, the people on each task waiting on it are told, about their own
     task.
@@ -552,6 +554,7 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 27/10/2026 · JP · From the 27/10 staging faults brief (fault #4, `VALIDATION_FAILED: depends_on_task_id` at `POST /api/v1/tasks/:id/waiting-on`): Wait On Task offered the tasks already waiting on this one, which the service refuses as a loop; it now leaves them out, as it left out the task itself and those it already waits on. Each of Add Link's four refusals has its own code (`TASK_LINK_SELF`, `TASK_LINK_UNSEEN`, `TASK_LINK_CANCELLED`, `TASK_LINK_LOOP`), so System Health names the rule a person met (§3 step 10).
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Tasks' Mine and My Team, and each board column (a phone's stage), carry the unread notices about the tasks there (`tasks.views.js`: the reader's own under `mine`, the rest under `others`, which My Team adds to them). The board opens on My Team when only others' tasks hold the news, a phone on the stage holding it, and Show Cancelled turns on when a cancelled task does; a card new to the reader has the dot and tint a row has, and opening it reads it.
 - 26/10/2026 · JP · QA OBS-06: a waiting card moved out of To Do, by drag, its menu or a phone's Move To, opens Waiting On before anything is sent: each task it waits on with Open Task, and Go Ahead for whoever plans it, which then moves the card where it was put; Close leaves it in To Do. The API's `TASK_WAITING` refusal stays behind it for a board read before the link was added. The mock refuses as the API does (the task's number and title, marked on `status`) and lets only whoever plans the task go ahead.
 - 26/10/2026 · JP · From the QA bug register (Milestone 2): a task's panel takes the saved title as soon as Edit Task saves, on every screen that opens one (DEF-05, `useTaskPanel` follows the task as read); Add Comment leaves the emptied box unmarked (DEF-06, the shared form's reset, `docs/guides/foundation.md`); a refused move or action says so as an error toast with its warning mark, never as a confirmation, such as "Waiting on TSK-0397: Book the venue" when a waiting task is moved out of To Do (OBS-06).
