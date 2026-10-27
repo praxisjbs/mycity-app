@@ -917,7 +917,7 @@ When People archive someone, their open reviews are withdrawn by themselves, wit
 | **Probation was extended once already** | Only one extension is allowed | Choose **Confirm** or **End Employment** |
 | **This review is already closed** | It closed or was withdrawn while you had it open | Nothing to do |
 
-### Open or close a round {#performance-round needs="performance create, cap performance.manage"}
+### Open, close or reopen a round {#performance-round needs="performance create, cap performance.manage"}
 
 Each month's round opens by itself on the first weekday of the next month. You only open one by
 hand when it started late.
@@ -929,6 +929,9 @@ hand when it started late.
    cannot be picked until then.
 3. When the round is done, press **Close Round**. It closes at once and the hub says, for example,
    *October 2026 closed*. Reviews still open carry on to their end.
+4. Closed it too soon? Pick the month in **Month**, then press **Reopen Round**, which takes the
+   place of **Close Round** while that round is closed. The hub says, for example, *October 2026
+   reopened*, and **Close Round** is back.
 
 | The hub says | What it means | What to do |
 |---|---|---|

@@ -1,7 +1,7 @@
 /**
  * Performance · Reviews (the `reviews` tab; docs/guides/performance.md §2, §3.3, §6.12, §10): the
  * month's round. Its figures, Waiting On You, every review in scope with its stage, and the PIPs;
- * Open Round and Close Round for Operations & People. A review opens in ReviewPage.tsx.
+ * Open Round, Close Round and Reopen Round for Operations & People. A review opens in ReviewPage.tsx.
  */
 import { useEffect, useRef, useState } from "react";
 import reviewsContract from "@mycity/contract/schemas/reviews.js";
@@ -94,6 +94,7 @@ export function Reviews() {
   const waiting = usePaged("GET /api/v1/performance/reviews", { filters: { waiting_on_me: "true" } });
   const pips = usePaged("GET /api/v1/performance/pips", { enabled: view === "pips" });
   const closeRound = useMutation("POST /api/v1/performance/rounds/:id/close");
+  const reopenRound = useMutation("POST /api/v1/performance/rounds/:id/reopen");
 
   const reload = () => {
     invalidate("/api/v1/performance/reviews");
@@ -103,16 +104,19 @@ export function Reviews() {
   const openReview = (id: string) => modal.open({ title: "Review", wide: true, full: true, body: (close) => <ReviewSheet id={id} close={() => (close(), reload())} /> });
   const openPip = (p: Pip) => modal.open({ title: "Improvement Plan", body: (close) => <PipSheet pip={p} manage={manage} close={() => (close(), reload())} /> });
   const openRound = () => modal.open({ title: "Open Round", body: (close) => <OpenRoundForm periodId={quarter.periodId} months={quarter.period?.months ?? []} taken={rounds.rows.map((r) => r.month)} close={close} onOpened={(r) => (setRoundId(r.performance_cycle_id), reload())} /> });
-  const close = async () => {
+  // Close Round and Reopen Round: the round shown changes its status, and the screen reads it again.
+  const changeRound = (word: string, run: (id: string) => Promise<unknown>) => async () => {
     if (!round) return;
     try {
-      await closeRound.run({ params: { id: round.performance_cycle_id }, body: {} });
+      await run(round.performance_cycle_id);
       reload();
-      toast(`${round.name} closed`);
+      toast(`${round.name} ${word}`);
     } catch (e) {
       say(e);
     }
   };
+  const close = changeRound("closed", (id) => closeRound.run({ params: { id }, body: {} }));
+  const reopen = changeRound("reopened", (id) => reopenRound.run({ params: { id }, body: {} }));
   // A month for Open Round: one of the quarter's with no round yet.
   const freeMonth = (quarter.period?.months ?? []).some((m) => !rounds.rows.some((r) => r.month === m));
   useScreenAction(manage && quarter.period && freeMonth ? { label: "Open Round", onSelect: openRound } : null);
@@ -140,6 +144,7 @@ export function Reviews() {
           manage ? (
             <>
               {round?.status === "open" && <Button onClick={close}>Close Round</Button>}
+              {round?.status === "closed" && <Button onClick={reopen}>Reopen Round</Button>}
               {quarter.period && freeMonth && <Button variant="primary" icon="plus" onClick={openRound}>Open Round</Button>}
             </>
           ) : undefined

@@ -41,6 +41,7 @@ const REVIEW_FLOW = "performance.review";
 const EVENTS = defineEvents("performance", {
   "review_round.opened": { summary: "A month's review round opened, with a review for each binding scorecard" },
   "review_round.closed": { summary: "A month's review round was closed" },
+  "review_round.reopened": { summary: "A month's review round was reopened" },
   "review.opened": { summary: "A probation review opened" },
   "review.check_in_due": { summary: "A check-in is due" },
   "review.check_in_saved": { summary: "An employee saved their check-in" },

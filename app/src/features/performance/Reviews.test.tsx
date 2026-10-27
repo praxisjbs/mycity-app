@@ -164,6 +164,23 @@ describe("Performance · Reviews", () => {
     expect(within(form).getByText("Not ended yet")).toBeTruthy();
   }, 30000);
 
+  it("Close Round gives way to Reopen Round on a closed round, and Reopen Round opens it again", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=reviews");
+    const october = async () => ((await api.call("GET /api/v1/performance/rounds", { query: {} })) as { data: Array<{ name: string; status: string }> }).data.find((r) => r.name === "October 2026");
+    expect(screen.queryByRole("button", { name: "Reopen Round" })).toBeNull();
+    expect((await october())?.status).toBe("open");
+
+    await press(document.body, "Close Round");
+    expect((await october())?.status).toBe("closed");
+    expect(screen.queryByRole("button", { name: "Close Round" })).toBeNull();
+    expect(copyProblems()).toEqual([]);
+
+    await press(document.body, "Reopen Round");
+    expect((await october())?.status).toBe("open");
+    expect(screen.queryByRole("button", { name: "Reopen Round" })).toBeNull();
+    screen.getByRole("button", { name: "Close Round" });
+  }, 30000);
+
   /** What the Department filter offers, in order; null when the screen shows no such filter. */
   const departmentChoices = () => {
     const filter = screen.queryByRole("combobox", { name: "Department" });

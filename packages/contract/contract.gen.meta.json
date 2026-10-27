@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "937b97df8c396fd5d42b0da479bd64c17adbbcbfc4a33ea0c7f08c9ce1b74473",
+  "source_hash": "e534ccecc5e0a33c9867a831ed9506b8c335041a3f806f85244514ca0abedf3f",
   "schemas": 1214,
-  "endpoints": 590,
+  "endpoints": 591,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -103,7 +103,7 @@
     "src/modules/policies/policies.routes.js": "fc507d3124b59274a3e08503c3486274689960ead168914538b114bb87640916",
     "src/modules/projects/projects.routes.js": "1c0cdf35062d44cbfa5a4c555893249b1a3c874c92843c83b9a1fbf3057c9bc7",
     "src/modules/reports/reports.routes.js": "7c9e4d8214908d9baf4ed5f1448d190cea08b6b952cf355e0b900f2fbb8a3ebe",
-    "src/modules/reviews/reviews.routes.js": "a1dad9dbe7f969d97387c5ed59bc997203553ccf9fde5af5bba6ec489e59ae16",
+    "src/modules/reviews/reviews.routes.js": "7f82567a01301f1d63761835d6aa5cd8fcfd8b57c09acf94ffcaa2ebb7273b92",
     "src/modules/search/search.routes.js": "0e82222d55484d42635f18d0da8068d4665bb070e4407a57b498ef829a7e44bd",
     "src/modules/security/security.routes.js": "2148273cc406a5725539fcfb75ff74008a69e3bb40a0c939e1eaeb33c74f0f4f",
     "src/modules/settings/settings.routes.js": "24e880ee10c223bc347fa980803a2e1bb28bf02d373c73451a26cbcb2029e802",

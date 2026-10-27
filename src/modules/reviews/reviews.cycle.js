@@ -245,24 +245,30 @@ async function createRound(actor, body) {
   return roundView(await repo.getRound(pool, r.performance_cycle_id));
 }
 
-/** POST /performance/rounds/:id/close. Reviews still open finish as they are. */
-async function closeRound(actor, id) {
+/** A round's status moved by a person: recorded once, and a round already there is returned as it is. */
+async function changeRound(actor, id, status, key) {
   const round = await repo.getRound(pool, id);
   if (!round) throw new AppError("NOT_FOUND", "That round does not exist", 404);
-  if (round.status !== "closed")
+  if (round.status !== status)
     await tx(async (client) => {
-      await repo.setRoundStatus(client, id, "closed");
+      await repo.setRoundStatus(client, id, status);
       await emit(client, {
-        key: EVENTS.REVIEW_ROUND_CLOSED,
+        key,
         entity: { type: "performance_cycle", id },
         actor,
         before: { status: round.status },
-        after: { status: "closed" },
+        after: { status },
         payload: { performance_cycle_id: id, round_name: round.name },
       });
     });
   return roundView(await repo.getRound(pool, id));
 }
+
+/** POST /performance/rounds/:id/close. Reviews still open finish as they are. */
+const closeRound = (actor, id) => changeRound(actor, id, "closed", EVENTS.REVIEW_ROUND_CLOSED);
+
+/** POST /performance/rounds/:id/reopen: a round closed too soon, or by mistake, is the round it was. */
+const reopenRound = (actor, id) => changeRound(actor, id, "open", EVENTS.REVIEW_ROUND_REOPENED);
 
 /** GET /performance/rounds, each with its reviews counted by stage within what the reader may list. */
 async function listRounds(query, actor, scope) {
@@ -409,6 +415,7 @@ module.exports = {
   openDueRounds,
   createRound,
   closeRound,
+  reopenRound,
   listRounds,
   checkInReminder,
   reviewReminder,
