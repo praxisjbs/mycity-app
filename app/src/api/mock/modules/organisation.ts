@@ -47,9 +47,15 @@ type MockDept = {
   merged_into: string | null;
 };
 
+/** A short code as MyCity keeps them (GM, TBO): the initials of two words or more, else three letters. */
+const shortCode = (name: string) => {
+  const words = name.split(/[^A-Za-z]+/).filter(Boolean);
+  return (words.length > 1 ? words.map((w) => w[0]).join("") : (words[0] ?? "").slice(0, 3)).toUpperCase().slice(0, 10);
+};
+
 const DEPTS: MockDept[] = DEPARTMENTS.map((name, i) => ({
   department_id: sid(`dept:${name}`),
-  code: name.toUpperCase().replace(/[^A-Z0-9]+/g, "_"),
+  code: shortCode(name),
   name,
   parent_department_id: null,
   active: true,
@@ -444,13 +450,6 @@ route("PATCH /api/v1/employees/:id/line-manager", (req) => {
 const CEO_KEY = "ifeoma";
 const CODE = /^[A-Za-z]{2,10}$/;
 const deptById = (id: string | null | undefined) => DEPTS.find((d) => d.department_id === id);
-const initials = (name: string) =>
-  name
-    .split(/[^A-Za-z]+/)
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
 
 const headRef = (d: MockDept): ManagerRef | null => {
   const h = byKey(d.head_key);
@@ -551,7 +550,7 @@ route("POST /api/v1/departments", (req) => {
   if (DEPTS.some((d) => d.name.toLowerCase() === name.toLowerCase()))
     return fail(409, "DEPARTMENT_EXISTS", "There is already a department with this name.", { name: ["Already in use"] });
   if (b.code && !CODE.test(b.code)) return invalid({ code: ["Letters only"] });
-  const code = (b.code || initials(name) || "DEPT").toUpperCase();
+  const code = (b.code || shortCode(name) || "DEPT").toUpperCase();
   if (DEPTS.some((d) => d.code === code)) return fail(409, "DEPARTMENT_CODE", "Another department has this code.", { code: ["Already in use"] });
   const head = b.head_employee_id ? byId(b.head_employee_id) : undefined;
   if (b.head_employee_id && (!head || !visible(head)))

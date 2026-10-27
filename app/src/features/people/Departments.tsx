@@ -35,6 +35,7 @@ import {
   Toolbar,
   useConfirm,
   useContractForm,
+  useIsPhone,
   useModal,
   useSideBySide,
   Who,
@@ -168,6 +169,7 @@ export function Departments() {
 /** One department: its head, people and roles, and what the reader may do to it. */
 function DepartmentRecord({ id, onGone }: { id: string; onGone: () => void }) {
   const { can } = useAuth();
+  const phone = useIsPhone();
   const modal = useModal();
   const confirm = useConfirm();
   const { navigate } = useRouter();
@@ -265,7 +267,14 @@ function DepartmentRecord({ id, onGone }: { id: string; onGone: () => void }) {
                   Restore Department
                 </Button>
               )}
-              {more.length > 0 && <Menu label="Department actions" trigger={(p) => <IconButton {...p} icon="dots" label="More Actions" />} items={more} />}
+              {more.length > 0 && (
+                <Menu
+                  label="Department actions"
+                  // A phone stacks the buttons full width, so this one is a full button there too.
+                  trigger={(p) => (phone ? <Button {...p} icon="dots">More Actions</Button> : <IconButton {...p} icon="dots" label="More Actions" />)}
+                  items={more}
+                />
+              )}
             </ActionGroup>
           </div>
         )}
