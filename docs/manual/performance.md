@@ -113,10 +113,11 @@ The CEO records the year's organisational goals.
 
 1. Press **New Goal** at the top right of [Performance · Goals](/performance?tab=goals).
 2. Choose **Organisational Goal** in **What**.
-3. Type the **Goal**. Add the **Goal ID**, **Strategic Theme**, **Success Measure** and
-   **Baseline** if you have them.
-4. Press **Record Goal**. The hub says **Goal recorded**. If **Goal ID** reads **Already in use**,
-   another goal this year has that ID: type another.
+3. Type the **Goal**. Add the **Strategic Theme**, **Success Measure** and **Baseline** if you
+   have them.
+4. Press **Record Goal**. The hub gives the goal the next ID of its year and names it, for example
+   *Goal ORG-2026-05 recorded*. The **Goal ID** shows under **Organisational Goals**; nobody types
+   or changes it.
 5. {needs="performance edit"} To change one, press it under **Organisational Goals**, then
    **Edit Goal**. Change the **Goal** or **Description**, or a quarter's target, such as
    *Q4 2026 Target*. Each quarter set up in the goal's year has one. Press **Save Goal**. The hub
@@ -135,6 +136,8 @@ The CEO and Management set the company's objectives; each function's head sets t
 Operations and People and the CEO may set any function's. They can be added and changed while the
 plan is a draft, or after it comes back. A new objective goes into the quarter chosen in
 **Quarter** on Goals.
+
+**New Goal** shows only if you may set goals for a function or the company.
 
 ![New Goal, an objective](shot:performance-new-goal)
 
@@ -182,7 +185,7 @@ example, *BM-O1 deleted*.
 | **Plan awaits approval** under **Function** | That function's plan is with its approvers | Wait until it is returned or binding |
 | **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
-| **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
+| **Only the function's head sets its goals** | Your role changed since the page opened | Reload the page and pick again |
 | **Pick a function** under **Function** | No function picked, and your role does not set the company's | Pick your function |
 | **You cannot set a function's goals** | Your role sets only the company's objectives | Choose **Company** in **Function** |
 
@@ -259,10 +262,11 @@ What waits for you sits in **Waiting On You** near the top of
 By the third working day of each month (Monday to Friday, not a public holiday), each function's
 head reports how its key results and KPIs did. Management report the company's key results.
 
-1. Press **Report Month** at the top of [Performance · Goals](/performance?tab=goals).
-2. Pick the **Function** (or **Company**, for Management) and the **Month** first. The **Month**
-   starts on the month just ended. Changing it once you have typed asks first: **Change Month**
-   clears what you typed, **Keep It** stays.
+1. Press **Report Month** at the top of [Performance · Goals](/performance?tab=goals). It shows
+   only if you report for a function or the company.
+2. Pick the **Function** (or **Company**, for Management) and the **Month** first. **Function**
+   lists only those you report for. The **Month** starts on the month just ended. Changing it once
+   you have typed asks first: **Change Month** clears what you typed, **Keep It** stays.
 3. For each key result you report, choose its **Status** and fill in the **Actual** and a short
    **Update**. Type the **Actual** as a figure: a comma or a unit stays out, so `64,000` goes in
    as `64000`. A minus is kept, such as `-5`. A figure it cannot take is marked as you leave it.
@@ -445,7 +449,8 @@ sent. Operations and People may draft one for anyone but themselves.
    line also needs its **Due Date**.
 10. Press **Add Line** for another, or **Remove Line** to take one away.
 11. Press **Save Lines**. The hub says **Lines saved** and the scorecard closes. Press its row to
-    open it again.
+    open it again. If a line is not right, such as a new line with no **Goal**, nothing is saved:
+    the field is marked, and the mark clears as you correct it.
 
 > **Tip:** A line copied from last quarter loses its key results and its milestone date, because
 > those belong to their quarter. Pick its **Key Result** (or tick its **Team Key Results**) and its
@@ -608,7 +613,7 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 ### Add a KPI {#performance-kpi-new needs="performance create, cap goals.function"}
 
 1. Press **New KPI** at the top right of [Performance · KPIs](/performance?tab=kpis). On a phone it
-   is in **Quick Actions**.
+   is in **Quick Actions**. It shows only if you set a function's KPIs.
    ![New KPI](shot:performance-kpi-new)
 2. Pick the **Function** and type the **KPI**, such as `Social response within 24 hours`.
    **Function** lists only the functions you may set KPIs for; a head finds their own already
@@ -622,7 +627,7 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 
 | The hub says | What it means | What to do |
 |---|---|---|
-| **Only the function's head sets its KPIs** | You picked another function | Pick your own function in **Function** |
+| **Only the function's head sets its KPIs** | Your role changed since the page opened | Reload the page and pick again |
 | **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or use **Target Wording** |
 
 **Only the function's head sets its KPIs** shows in red above **Set KPI** and stays until you press
@@ -848,13 +853,15 @@ hand when it started late.
 1. Press **Open Round** at the top of [Performance · Reviews](/performance?tab=reviews). On a phone
    it is also in **Quick Actions**. It shows while a month of the quarter has no round yet.
 2. Pick the **Month** and press **Open Round**. The hub says, for example, *November 2026 opened*.
+   A month still running shows the day it ends, such as *November 2026 · Ends 30/11/2026*, and
+   cannot be picked until then.
 3. When the round is done, press **Close Round**. It closes at once and the hub says, for example,
    *October 2026 closed*. Reviews still open carry on to their end.
 
 | The hub says | What it means | What to do |
 |---|---|---|
 | **That month's round is already open** | It was opened already | Choose it in **Month** |
-| **Not ended yet** under **Month** | The month is not over | Wait until it ends |
+| **Not ended yet** under **Month** | The month is not over | Wait until the day it ends, shown beside it |
 | **The quarter is still being planned** | The quarter shown reads **Planning** | Make it **Active** first (see [Change a quarter](#performance-quarter-edit)) |
 
 ## Analytics {#performance-analytics screen=performance/analytics icon=chart}

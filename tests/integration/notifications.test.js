@@ -230,6 +230,29 @@ describeDb("the bell against the real migrations", () => {
       expect((await ceo.post("/notifications/read-record").send({ module: "people", tab: "leave", entity_id: "nope" })).status).toBe(422);
     });
 
+    test("inside a tab, each view counts the notices about the records it holds, and those below it; reading a record leaves them (§6, Where it waits)", async () => {
+      const [card, set, plan] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+      await notify(ceoId, { title: "Scorecard to agree", entity_type: "scorecard", entity_id: card });
+      await notify(ceoId, { title: "Scorecard, a reminder", entity_type: "scorecard", entity_id: card });
+      await notify(ceoId, { title: "Commitments sent", entity_type: "commitment_set", entity_id: set });
+      await notify(ceoId, { title: "Commitments, read", entity_type: "commitment_set", entity_id: set, read: true });
+      const urgent = await notify(ceoId, { title: "Improvement plan started", entity_type: "improvement_plan", entity_id: plan, read: true });
+      await q("UPDATE notification SET urgency = 'urgent', acknowledge_required = true WHERE notification_id = $1", [urgent.notification_id]);
+
+      const targets = await ceo.get("/notifications/views?module=performance&tab=targets");
+      expect(targets.status).toBe(200);
+      expect(targets.body).toEqual({ views: { scorecards: { unread: 2, urgent: false }, commitments: { unread: 1, urgent: false } } });
+      // Read but not yet acknowledged, an urgent notice is still open there: red, with nothing unread.
+      expect((await ceo.get("/notifications/views?module=performance&tab=reviews")).body).toEqual({ views: { pips: { unread: 0, urgent: true } } });
+      // A screen nobody's records wait on, and another person's screen, place nothing.
+      expect((await ceo.get("/notifications/views?module=people&tab=organogram")).body).toEqual({ views: {} });
+      expect((await staff.get("/notifications/views?module=performance&tab=targets")).body).toEqual({ views: {} });
+      expect((await ceo.get("/notifications/views?module=performance&tab=Not%20A%20Tab")).status).toBe(422);
+
+      expect((await ceo.post("/notifications/read-record").send({ module: "performance", tab: "targets", entity_id: card })).status).toBe(204);
+      expect((await ceo.get("/notifications/views?module=performance&tab=targets")).body).toEqual({ views: { commitments: { unread: 1, urgent: false } } });
+    });
+
     test("marking one read: recorded once, other tabs told, and another person's row is a 404", async () => {
       const row = await notify(staffId, { title: "Read me" });
       const others = await notify(ceoId, { title: "Not yours" });

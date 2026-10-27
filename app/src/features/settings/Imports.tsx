@@ -84,6 +84,9 @@ const listOf = (labels: string[]) => (labels.length < 2 ? labels.join("") : `${l
 const missingLine = (labels: string[]) =>
   labels.length > 4 ? `Choose columns for ${labels.length} required fields` : `Choose a column for ${listOf(labels)}`;
 
+/** A sheet's column as the Map step names it: its header, or its place when the header is empty. */
+const columnName = (c: { index: number; header: string }) => c.header || `Column ${c.index + 1}`;
+
 /** The rows a person should look at: errors and duplicates block, warnings save with something missing. */
 const problemsOf = (stats: ImportBatch["stats"]) =>
   Number(stats.error ?? 0) + Number(stats.duplicate ?? 0) + Number(stats.warning ?? 0);
@@ -418,12 +421,15 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
             />
           )}
           {(batch?.mapping.columns ?? []).map((c) => (
-            <Field key={c.index} label={c.header || `Column ${c.index + 1}`}>
+            <Field key={c.index} label={columnName(c)}>
               <SelectField
                 value={fields[String(c.index)] ?? ""}
                 onChange={(v) => {
                   setRefused(null);
-                  setFields((f) => ({ ...f, [String(c.index)]: v || null }));
+                  // A field feeds one column: picked here, it leaves the column that had it.
+                  const had = v ? (batch?.mapping.columns ?? []).find((o) => o.index !== c.index && fields[String(o.index)] === v) : undefined;
+                  setFields((f) => ({ ...f, [String(c.index)]: v || null, ...(had ? { [String(had.index)]: null } : {}) }));
+                  if (had) toast(`Moved from ${columnName(had)}`);
                 }}
                 options={options}
               />

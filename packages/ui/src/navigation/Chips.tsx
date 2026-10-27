@@ -5,7 +5,7 @@
  * @use Narrowing a list by a status or a group (Everyone, Late 4, Remote 2); a board's stage switcher on a phone (F19); picking several departments with `selected`.
  * @avoid Switching between views (use SegmentedControl or Tabs); a choice inside a form (use ChoiceField or CheckboxField); a status shown on a record (use Pill).
  * @phone One row that scrolls sideways inside itself, never the page; each chip is a 44 px target.
- * @a11y A group named by `label`; each chip is a button with aria-pressed, so a screen reader hears which are on. The count is read with the label (Late 4).
+ * @a11y A group named by `label`; each chip is a button with aria-pressed, so a screen reader hears which are on. The count is read with the label (Late 4), and an unread count after it, as a tab reads its own (Late 4 1, Pending 1).
  * @status stable
  * @example <Chips label="Status" value={status} onChange={setStatus} options={[["all", "Everyone"], { value: "late", label: "Late", count: 4 }]} />
  * @example <Chips label="Departments" selected={depts} onSelectedChange={setDepts} options={departments.map((d) => [d.name, d.name])} />
@@ -14,10 +14,11 @@ import { cn } from "../lib/cn";
 import { formatCount } from "../lib/format";
 import { Icon } from "../icons/Icon";
 import { WORD_LIMITS, warnOverLimit } from "../help/words";
-import { toOption, type Choice } from "./options";
+import { CountBadge } from "../display/CountBadge";
+import { toOption, unreadOf, type Choice } from "./options";
 
 export interface ChipsProps<V extends string = string> {
-  /** The merged tuple ["late", "Late"], or { value, label, count, icon, disabled }. Labels Title Case, at most 3 words; counts as numbers. */
+  /** The merged tuple ["late", "Late"], or { value, label, count, unread, urgent, icon, disabled }. Labels Title Case, at most 3 words; counts as numbers; `unread` the reader's unread notifications behind the chip, in yellow. */
   options: ReadonlyArray<Choice<V>>;
   /** Single select: the chip that is on. */
   value?: V;
@@ -69,6 +70,8 @@ export function Chips<V extends string = string>({ options, value, onChange, sel
             {item.count != null && (
               <span className={cn("tabular-nums", on ? "text-secondary-foreground" : "text-foreground")}>{formatCount(item.count)}</span>
             )}
+            {unreadOf(item) > 0 && " "}
+            <CountBadge count={unreadOf(item)} tone={item.urgent ? "err" : "primary"} />
           </button>
         );
       })}

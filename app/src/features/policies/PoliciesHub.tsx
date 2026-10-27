@@ -7,6 +7,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { usePhotos } from "@/api/download";
 import { useAuth } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import { useScreenAction } from "@/shell/screen-action";
 import { Banner, Button, Card, CardHeader, Chips, DataView, ErrorState, ExportButton, Field, formatDate, FormFooter, KeyValue, LoadingRows, PageHeader, Pill, TextField, toast, useContractForm, useModal, Who } from "@mycity/ui";
 import { KIND_LABEL, POLICY_STATE, versionPill } from "./labels";
@@ -41,6 +42,7 @@ function PolicyList() {
   const { navigate } = useRouter();
   const [state, setState] = useState<"" | PolicyRow["state"]>("");
   const list = usePaged("GET /api/v1/policies", { filters: state ? { state } : {} });
+  const news = useViewNews();
   const open = (r: PolicyRow) => navigate(`/knowledge?tab=policies&policy=${r.policy_id}`);
   const create = () => modal.open({ title: "New Policy", body: (close) => <NewPolicyForm close={close} onCreated={(id) => navigate(`/knowledge?tab=policies&policy=${id}`)} /> });
   const mayCreate = can("knowledge", "create");
@@ -58,7 +60,7 @@ function PolicyList() {
           ) : undefined
         }
       />
-      <Chips label="State" value={state} onChange={setState} options={STATE_FILTER} />
+      <Chips label="State" value={state} onChange={setState} options={withNews(news, STATE_FILTER, { all: "" })} />
       <DataView
         title="Policies"
         list={list}

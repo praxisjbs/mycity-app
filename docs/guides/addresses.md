@@ -93,8 +93,9 @@ clock-in line.
    point of its own (a worksite's centre, a field site, a client visit), the pick fills it too.
 4. **Nothing found.** The list says so ("No address found", "Try a nearby landmark or street.").
    **Drop a Pin** sits under the search box throughout: the map opens in the field, at the form's own
-   point where it has one; a tap asks `GET /maps/pin?lat=&lon=&level=`, which names the nearest
-   address and signs it with the tapped point kept as the point (source pin).
+   point where it has one; a tap asks `GET /maps/pin?lat=&lon=&level=` (the point at six places, as
+   `place` keeps it), which names the nearest address and signs it with the tapped point kept as
+   the point (source pin).
 5. **Address search down** (no key, the provider refusing or silent, or the day's credits spent):
    the field says "Address search is unavailable", with Try Again, and shows **Use Current
    Location**. The device's reading (its accuracy shown) becomes the address, saved as waiting to
@@ -339,6 +340,7 @@ None.
 
 ## 14 · Change log
 
+- 27/10/2026 · JP · From the 27/10 staging faults brief (fault #3, `VALIDATION_FAILED: query.lat, query.lon` at `GET /api/v1/maps/pin`): a tap on the map carries Leaflet's full precision (6.452871234567891), and the hub sent it as written, which `PinQuery` refuses past ten places, so a pin named nothing. The hub's `places.pin` now sends six places (`degreesOf`), about 10 cm, what `place.lat` keeps (§3 step 4, §5). The contract is unchanged.
 - 22/10/2026 · TB · My Attendance's Home Location address is asked for only while the Attendance policy's Home Location is on (`attendance.md` §1.3); the residential Home Address on My Profile and the employee record is unchanged.
 - 20/10/2026 · TB · Written from TB's brief and four answers (§1.1): every address across the ERP
   picked, never typed, on hub and go, live and staging, with the inventory (§2), the signed place

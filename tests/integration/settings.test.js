@@ -704,8 +704,8 @@ describeDb("access, settings and audit against the real migrations", () => {
     test("every numbered document type, with the next number it would give", async () => {
       const res = await as("ops").get("/settings/numbering");
       expect(res.status).toBe(200);
-      // 21, and M2 My Workspace's Project and Task (2099, 2090).
-      expect(res.body.page.total).toBe(23);
+      // 21, M2 My Workspace's Project and Task (2099, 2090), and Performance's Organisational Goal (2291).
+      expect(res.body.page.total).toBe(24);
       const expense = res.body.data.find((s) => s.doc_type === "expense");
       expect(expense).toEqual(expect.objectContaining({ label: "Expense Request", prefix: "EXP", next: "EXP-0001", issued: 0 }));
       const staff = res.body.data.find((s) => s.doc_type === "employee");
@@ -714,8 +714,8 @@ describeDb("access, settings and audit against the real migrations", () => {
       const found = await as("ops").get("/settings/numbering?q=payslip");
       expect(found.body.data.map((s) => s.doc_type)).toEqual(["payslip"]);
       const summary = await as("ops").get("/settings/numbering/summary");
-      // Project resets each year (2099); Task never does (2090).
-      expect(summary.body).toEqual(expect.objectContaining({ types: 23, resetting: 3 }));
+      // Project and Organisational Goal reset each year (2099, 2291); Task never does (2090).
+      expect(summary.body).toEqual(expect.objectContaining({ types: 24, resetting: 4 }));
     });
 
     test("a scheme changes the next number, never one issued; a reset needs its period", async () => {

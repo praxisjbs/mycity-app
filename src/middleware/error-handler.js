@@ -19,7 +19,8 @@
  * logged at warn; validation failures are recorded at
  * `notice`, grouped by the rule that refused them (the error's code), its field names and
  * the route as declared, so a form that keeps failing shows up as one rising count per
- * rule rather than noise.
+ * rule rather than noise. A refusal that says it is not a fault (`err.recorded = false`, a
+ * password found in a breach) is answered the same and never recorded.
  *
  * Messages are written without dashes (README §7 rule 11: copy a person reads).
  */
@@ -125,7 +126,7 @@ function errorHandler(err, req, res, _next) {
       });
     } else {
       logger.warn({ code: err.code, status }, err.message);
-      if (status === 422 && err.fields) recordValidation(req, err.fields, err.code);
+      if (status === 422 && err.fields && err.recorded !== false) recordValidation(req, err.fields, err.code);
     }
     return send(
       res,

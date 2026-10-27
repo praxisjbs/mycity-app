@@ -6,7 +6,8 @@
  * and target changes the reader decides (./Approvals); Report Month for the head, Confirm Score for
  * the CEO, Set Target on a TBC target before its lock date and Change Target after it; Set Up
  * Quarter and Edit Quarter (./Quarter) for whoever runs the cycle. ⌘K opens a goal (?goal=), an
- * objective (?objective=) and a key result (?id=). Everyone sees the whole tree.
+ * objective (?objective=) and a key result (?id=). Everyone sees the whole tree; New Goal and Report
+ * Month are offered only to a reader who may act on a function or the company (useSettableFunctions).
  */
 import { useEffect, useRef, useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
@@ -98,7 +99,10 @@ export function Goals() {
   const functions: Array<[string, string]> = (departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string]);
   const chips: Array<[string, string]> = [["", "All Functions"], ["company", "Company"], ...functions];
 
-  const mayGoal = hasCapability(me, "goals.organisation") || hasCapability(me, "goals.company") || hasCapability(me, "goals.function");
+  // What the reader may act on, as the API's goals.authority answers (useSettableFunctions): New Goal and Report
+  // Month are offered only to a reader with something to act on, so everyone else reads and nothing more.
+  const settable = useSettableFunctions(quarter.periodId || null);
+  const mayGoal = hasCapability(me, "goals.organisation") || settable.rows.length > 0;
   const { can } = useAuth();
   // Setting up a quarter is `performance` create, changing one `performance` edit, both with the capability (goals.routes).
   const manage = hasCapability(me, "performance.manage");
@@ -111,10 +115,10 @@ export function Goals() {
   const editQuarter = () =>
     period && modal.open({ title: "Edit Quarter", wide: true, full: true, body: (close) => <QuarterWizard close={close} period={period} /> });
   // Report Month is one function's, or the company's for Management: the one picked, else the reader's own, else the first.
-  const mayReportCompany = hasCapability(me, "goals.company");
-  const mayReport = hasCapability(me, "goals.function") || mayReportCompany;
-  const reportable: Array<[string, string]> = [...(mayReportCompany ? ([["company", "Company"]] as Array<[string, string]>) : []), ...functions];
-  const ownFunction = functions.find(([, name]) => name === me.department)?.[0];
+  // It lists the company and the functions the reader may act for, no others.
+  const reportable: Array<[string, string]> = settable.rows.map((x) => (x.department_id ? [x.department_id, x.name ?? ""] : ["company", "Company"]));
+  const mayReport = reportable.length > 0;
+  const ownFunction = reportable.find(([, name]) => name === me.department)?.[0];
   const report = () =>
     modal.open({
       title: "Report Month",
@@ -123,8 +127,8 @@ export function Goals() {
     });
   // The floating button on a phone (§10.2): Report Month for a function's head, else New Goal.
   const heads = hasCapability(me, "goals.function") && !hasCapability(me, "goals.company");
-  useScreenAction(period ? (heads ? { label: "Report Month", onSelect: report } : mayGoal ? { label: "New Goal", onSelect: newGoal } : null) : null);
-  useUrlAction("report", mayReport && period && departments.data ? report : null);
+  useScreenAction(period ? (heads && mayReport ? { label: "Report Month", onSelect: report } : mayGoal ? { label: "New Goal", onSelect: newGoal } : mayReport ? { label: "Report Month", onSelect: report } : null) : null);
+  useUrlAction("report", mayReport && period ? report : null);
   useUrlAction("quarter", maySetUp && !quarter.loading ? setUpQuarter : null);
   useApprovalLinks();
   const openKrId = (id: string, code = "Key Result") => modal.open({ title: code, wide: true, body: (close) => <KeyResultSheet id={id} close={close} /> });
@@ -910,15 +914,16 @@ function NewKeyResult({ close, period, objectives }: { close: () => void; period
 
 function GoalForm({ close, period }: { close: () => void; period: PerformancePeriod | null }) {
   const year = period ? `${period.starts_on.slice(0, 4)}-01-01` : `${new Date().getUTCFullYear()}-01-01`;
-  const f = useContractForm({ code: "", title: "", strategic_theme: "", success_measure: "", baseline: "", plan_year_starts_on: year }, goalsContract.OrganisationalGoalCreate);
+  const f = useContractForm({ title: "", strategic_theme: "", success_measure: "", baseline: "", plan_year_starts_on: year }, goalsContract.OrganisationalGoalCreate);
   const save = useMutation("POST /api/v1/performance/goals");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: f.values });
+      // The goal's ID is given by the system (ORG-2026-05), never typed: the toast names it.
+      const goal = await save.run({ body: f.values });
       invalidate("/api/v1/performance/goals");
       close();
-      toast("Goal recorded");
+      toast(goal.code ? `Goal ${goal.code} recorded` : "Goal recorded");
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
@@ -926,7 +931,6 @@ function GoalForm({ close, period }: { close: () => void; period: PerformancePer
   };
   return (
     <>
-      <Field label="Goal ID" optional {...f.status("code")}><TextField {...f.field("code")} /></Field>
       <Field label="Goal" {...f.status("title")}><TextField {...f.field("title")} /></Field>
       <Field label="Strategic Theme" optional {...f.status("strategic_theme")}><TextField {...f.field("strategic_theme")} /></Field>
       <Field label="Success Measure" optional {...f.status("success_measure")}><TextField {...f.field("success_measure")} /></Field>

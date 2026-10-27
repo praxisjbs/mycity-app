@@ -4,8 +4,8 @@
  * @summary A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19).
  * @use A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions.
  * @avoid A list that is not staged (use DataView); dragging as the only way to move a card; more than six stages.
- * @phone No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet.
- * @a11y Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26).
+ * @phone No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. The board opens on the first stage holding the reader's unread notifications when the first holds none, until the person picks one.
+ * @a11y Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26). A card new to its reader (RowMarksContext) says Unread before its title, beside its dot and tint, as a list's row does.
  * @status stable
  * @exports KanbanCardBody
  * @example <Kanban columns={stages} onMove={(card, from, to) => move(card, to)} onOpen={openRecord} empty={<EmptyState title="No Tasks Yet" />} />
@@ -20,6 +20,9 @@ import { Skeleton } from "../display/Skeleton";
 import { Button } from "../actions/Button";
 import { isThenable, whenSettled } from "../actions/press";
 import { Chips } from "../navigation/Chips";
+import { unreadOf } from "../navigation/options";
+import { CountBadge } from "../display/CountBadge";
+import { useRowMarks } from "../lib/marks";
 import { Icon } from "../icons/Icon";
 import { Menu, type MenuItem } from "../overlay/Menu";
 import type { Series } from "../charts/lazy";
@@ -45,6 +48,10 @@ export interface KanbanColumn {
   label: string;
   /** How many records are in the stage, from the server; the cards' own count otherwise. */
   count?: number;
+  /** How many of the reader's unread notifications are about the stage's records: the tab strip's yellow count beside its name. */
+  unread?: number;
+  /** An urgent notification is open about one of them: that count reads red, and at least 1. */
+  urgent?: boolean;
   /** Which of the six series marks it. */
   series?: Series;
   /** The stage's cards, in the order the server returned them. */
@@ -133,6 +140,21 @@ const held = (busy: boolean) =>
       }
     : {};
 
+/** A stage's cards new to the reader (RowMarksContext), each stage asking for its own: a hook per stage. */
+function Marked({ cards, children }: { cards: KanbanCard[]; children: (marks: { marked: ReadonlySet<string>; opened: (key: string) => void }) => ReactNode }) {
+  return <>{children(useRowMarks(cards.map((c) => c.key)))}</>;
+}
+
+/** A card's dot while it is new to the reader. */
+const UnreadDot = () => <span aria-hidden="true" data-unread="" className="absolute top-3 left-1 size-2 rounded-full bg-primary" />;
+
+/** The word a screen reader hears first on a card new to the reader: inside its open button, so its name says it. */
+const Unread = () => (
+  <>
+    <span className="sr-only">Unread,</span>{" "}
+  </>
+);
+
 /** Where an empty stage's cards will be, while the board loads. */
 function Placeholder() {
   return (
@@ -154,6 +176,22 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
   useEffect(() => {
     if (columns.length > 0 && !columns.some((c) => c.key === stage)) setStage(columns[0]!.key);
   }, [columns, stage]);
+
+  // The phone opens on the first stage with something unread for the reader, once, when the one
+  // it shows has none and the person has not picked one.
+  const picked = useRef(false);
+  const placed = useRef(false);
+  const news = columns.find((c) => unreadOf(c) > 0)?.key ?? null;
+  const here = unreadOf(columns.find((c) => c.key === stage) ?? {}) > 0;
+  useEffect(() => {
+    if (placed.current || news === null) return;
+    placed.current = true;
+    if (!picked.current && !here) setStage(news);
+  }, [news, here]);
+  const pick = (key: string) => {
+    picked.current = true;
+    setStage(key);
+  };
 
   const bare = !loading && empty !== undefined && columns.every((c) => c.cards.length === 0 && !c.count);
 
@@ -194,38 +232,50 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
         <Chips
           label="Stage"
           value={stage}
-          onChange={setStage}
-          options={columns.map((c) => ({ value: c.key, label: c.label, count: c.count ?? c.cards.length }))}
+          onChange={pick}
+          options={columns.map((c) => ({ value: c.key, label: c.label, count: c.count ?? c.cards.length, unread: c.unread, urgent: c.urgent }))}
         />
         {current && (
-          <ul {...content} aria-label={current.label} className="m-0 flex list-none flex-col gap-2 p-0">
-            {current.cards.map((card) => {
-              const wait = busy.has(card.key);
-              return (
-                <li key={card.key} className="relative rounded-box border border-border bg-card p-2.5">
-                  <button type="button" data-row-open={onOpen ? "" : undefined} onClick={() => onOpen?.(card.key, current.key)} className={cn("w-full text-left", onOpen && "stretch-link")}>
-                    <KanbanCardBody card={card} />
-                  </button>
-                  {onMove && (
-                    <span className="relative z-10 mt-2 flex">
-                      <Menu
-                        label="Move To"
-                        items={moveItems(card.key, current.key)}
-                        trigger={(p) => (
-                          <button {...p} {...held(wait)} onClick={wait ? undefined : p.onClick} type="button" className="flex min-h-tap items-center gap-1.5 text-xs font-semibold text-accent-foreground">
-                            {wait ? <Spin /> : <Icon name="sort" size="s" />}
-                            Move To
-                          </button>
-                        )}
-                      />
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-            {current.cards.length === 0 &&
-              (loading ? <Placeholder /> : <li className="rounded-box border border-dashed border-input px-3 py-6 text-center text-xs text-subtle-foreground">Nothing in this stage</li>)}
-          </ul>
+          <Marked cards={current.cards}>
+            {(marks) => (
+            <ul {...content} aria-label={current.label} className="m-0 flex list-none flex-col gap-2 p-0">
+              {current.cards.map((card) => {
+                const wait = busy.has(card.key);
+                const fresh = marks.marked.has(card.key);
+                return (
+                  <li key={card.key} className={cn("relative rounded-box border border-border p-2.5", fresh ? "bg-warning-soft" : "bg-card")}>
+                    {fresh && <UnreadDot />}
+                    <button
+                      type="button"
+                      data-row-open={onOpen ? "" : undefined}
+                      onClick={() => (fresh && marks.opened(card.key), onOpen?.(card.key, current.key))}
+                      className={cn("w-full text-left", onOpen && "stretch-link")}
+                    >
+                      {fresh && <Unread />}
+                      <KanbanCardBody card={card} />
+                    </button>
+                    {onMove && (
+                      <span className="relative z-10 mt-2 flex">
+                        <Menu
+                          label="Move To"
+                          items={moveItems(card.key, current.key)}
+                          trigger={(p) => (
+                            <button {...p} {...held(wait)} onClick={wait ? undefined : p.onClick} type="button" className="flex min-h-tap items-center gap-1.5 text-xs font-semibold text-accent-foreground">
+                              {wait ? <Spin /> : <Icon name="sort" size="s" />}
+                              Move To
+                            </button>
+                          )}
+                        />
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+              {current.cards.length === 0 &&
+                (loading ? <Placeholder /> : <li className="rounded-box border border-dashed border-input px-3 py-6 text-center text-xs text-subtle-foreground">Nothing in this stage</li>)}
+            </ul>
+            )}
+          </Marked>
         )}
         {current && <More column={current} />}
       </div>
@@ -235,80 +285,97 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
   return (
     <div className={cn("grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4", className)} aria-busy={loading || undefined}>
       {columns.map((column) => (
-        <section
-          key={column.key}
-          aria-label={column.label}
-          className={cn("min-w-0 rounded-card border border-border bg-muted p-2.5 transition-colors", over === column.key && "border-ring bg-accent")}
-          onDragOver={onMove ? (e: DragEvent) => (e.preventDefault(), setOver(column.key)) : undefined}
-          onDragLeave={onMove ? () => setOver((o) => (o === column.key ? null : o)) : undefined}
-          onDrop={
-            onMove
-              ? (e: DragEvent) => {
-                  e.preventDefault();
-                  setOver(null);
-                  const d = dragged(e);
-                  if (d && (reorder || d.from !== column.key)) move(d.card, d.from, column.key, null);
-                }
-              : undefined
-          }
-        >
-          {/* The board sits straight under a screen's own title, so its stages are that screen's second level. */}
-          <h2 className="mb-2.5 flex items-center gap-2 text-2xs tracking-caps text-muted-foreground uppercase">
-            <span aria-hidden="true" className="size-2 flex-none rounded-sm bg-(--stage-ink)" style={{ "--stage-ink": seriesInk(column.series ?? 1) } as CSSProperties} />
-            {column.label}
-            <em className="ml-auto text-2xs text-subtle-foreground not-italic tabular-nums">{column.count ?? column.cards.length}</em>
-          </h2>
-          <ul {...content} className="m-0 flex list-none flex-col gap-2 p-0">
-            {column.cards.map((card) => {
-              const wait = busy.has(card.key);
-              return (
-                <li
-                  key={card.key}
-                  className="relative"
-                  onDrop={
-                    onMove
-                      ? (e: DragEvent) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setOver(null);
-                          const d = dragged(e);
-                          if (!d || d.card === card.key) return;
-                          if (reorder) move(d.card, d.from, column.key, card.key);
-                          else if (d.from !== column.key) move(d.card, d.from, column.key, null);
-                        }
-                      : undefined
+        <Marked key={column.key} cards={column.cards}>
+          {(marks) => (
+          <section
+            aria-label={column.label}
+            className={cn("min-w-0 rounded-card border border-border bg-muted p-2.5 transition-colors", over === column.key && "border-ring bg-accent")}
+            onDragOver={onMove ? (e: DragEvent) => (e.preventDefault(), setOver(column.key)) : undefined}
+            onDragLeave={onMove ? () => setOver((o) => (o === column.key ? null : o)) : undefined}
+            onDrop={
+              onMove
+                ? (e: DragEvent) => {
+                    e.preventDefault();
+                    setOver(null);
+                    const d = dragged(e);
+                    if (d && (reorder || d.from !== column.key)) move(d.card, d.from, column.key, null);
                   }
-                >
-                  <div
-                    draggable={Boolean(onMove) && !wait}
-                    onDragStart={onMove ? (e: DragEvent) => e.dataTransfer.setData("text/plain", `${card.key}|${column.key}`) : undefined}
-                    className={cn("rounded-box border border-border bg-card p-2.5 transition hover:-translate-y-0.5 hover:shadow-2", onMove && !wait && "cursor-grab active:cursor-grabbing")}
+                : undefined
+            }
+          >
+            {/* The board sits straight under a screen's own title, so its stages are that screen's second level. */}
+            <h2 className="mb-2.5 flex items-center gap-2 text-2xs tracking-caps text-muted-foreground uppercase">
+              <span aria-hidden="true" className="size-2 flex-none rounded-sm bg-(--stage-ink)" style={{ "--stage-ink": seriesInk(column.series ?? 1) } as CSSProperties} />
+              {column.label}
+              {unreadOf(column) > 0 && " "}
+              <CountBadge count={unreadOf(column)} tone={column.urgent ? "err" : "primary"} />
+              <em className="ml-auto text-2xs text-subtle-foreground not-italic tabular-nums">{column.count ?? column.cards.length}</em>
+            </h2>
+            <ul {...content} className="m-0 flex list-none flex-col gap-2 p-0">
+              {column.cards.map((card) => {
+                const wait = busy.has(card.key);
+                const fresh = marks.marked.has(card.key);
+                return (
+                  <li
+                    key={card.key}
+                    className="relative"
+                    onDrop={
+                      onMove
+                        ? (e: DragEvent) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setOver(null);
+                            const d = dragged(e);
+                            if (!d || d.card === card.key) return;
+                            if (reorder) move(d.card, d.from, column.key, card.key);
+                            else if (d.from !== column.key) move(d.card, d.from, column.key, null);
+                          }
+                        : undefined
+                    }
                   >
-                    <button type="button" data-row-open={onOpen ? "" : undefined} onClick={() => onOpen?.(card.key, column.key)} className={cn("w-full text-left", onOpen && "stretch-link")}>
+                    <div
+                      draggable={Boolean(onMove) && !wait}
+                      onDragStart={onMove ? (e: DragEvent) => e.dataTransfer.setData("text/plain", `${card.key}|${column.key}`) : undefined}
+                      className={cn(
+                        "relative rounded-box border border-border p-2.5 transition hover:-translate-y-0.5 hover:shadow-2",
+                        fresh ? "bg-warning-soft" : "bg-card",
+                        onMove && !wait && "cursor-grab active:cursor-grabbing",
+                      )}
+                    >
+                      {fresh && <UnreadDot />}
+                      <button
+                        type="button"
+                        data-row-open={onOpen ? "" : undefined}
+                        onClick={() => (fresh && marks.opened(card.key), onOpen?.(card.key, column.key))}
+                        className={cn("w-full text-left", onOpen && "stretch-link")}
+                      >
+                        {fresh && <Unread />}
                       <KanbanCardBody card={card} />
-                    </button>
-                    {onMove && (
-                      <span className="relative z-10 mt-2 flex justify-end">
-                        <Menu
-                          label="Move To"
-                          items={moveItems(card.key, column.key)}
-                          trigger={(p) => (
-                            <button {...p} {...held(wait)} type="button" aria-label={`Move ${card.owner ?? "card"}`} className="text-subtle-foreground hover:text-foreground">
-                              {wait ? <Spin /> : <Icon name="dots" size="s" />}
-                            </button>
-                          )}
-                        />
-                      </span>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-            {column.cards.length === 0 &&
-              (loading ? <Placeholder /> : <li className="rounded-box border border-dashed border-input px-3 py-4 text-center text-2xs text-subtle-foreground">Nothing in this stage</li>)}
-          </ul>
-          <More column={column} />
-        </section>
+                      </button>
+                      {onMove && (
+                        <span className="relative z-10 mt-2 flex justify-end">
+                          <Menu
+                            label="Move To"
+                            items={moveItems(card.key, column.key)}
+                            trigger={(p) => (
+                              <button {...p} {...held(wait)} type="button" aria-label={`Move ${card.owner ?? "card"}`} className="text-subtle-foreground hover:text-foreground">
+                                {wait ? <Spin /> : <Icon name="dots" size="s" />}
+                              </button>
+                            )}
+                          />
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+              {column.cards.length === 0 &&
+                (loading ? <Placeholder /> : <li className="rounded-box border border-dashed border-input px-3 py-4 text-center text-2xs text-subtle-foreground">Nothing in this stage</li>)}
+            </ul>
+            <More column={column} />
+          </section>
+          )}
+        </Marked>
       ))}
     </div>
   );

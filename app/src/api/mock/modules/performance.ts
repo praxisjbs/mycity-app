@@ -212,9 +212,11 @@ route("POST /api/v1/performance/goals", (req) => {
   const b = req.body as Record<string, string | undefined>;
   if (!b.title?.trim()) return invalid({ title: ["Required"] });
   const year = (b.plan_year_starts_on ?? `${new Date().getUTCFullYear()}-01-01`).slice(0, 4);
+  // The ID is the next of its plan year, as Documents & Numbering gives it (ORG-2026-05); never typed.
+  const taken = ORG_GOALS.map((x) => new RegExp(`^ORG-${year}-(\\d+)$`).exec(x.code ?? "")?.[1]).filter(Boolean).map(Number);
   const g: OrganisationalGoal = {
     organisational_goal_id: sid(`perf:goal:new:${fresh()}`),
-    code: b.code || null,
+    code: `ORG-${year}-${String(Math.max(0, ...taken) + 1).padStart(2, "0")}`,
     title: b.title.trim(),
     strategic_theme: b.strategic_theme || null,
     detail: b.detail || null,

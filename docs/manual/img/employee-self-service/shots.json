@@ -1,7 +1,7 @@
 {
   "ess-attendance": {
     "spec": "207947064e7bdf5e",
-    "source": "2a26fedbd332641f",
+    "source": "330217791a7e744f",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "ess-policies": {
     "spec": "3cfe5a1b37968e4d",
-    "source": "8831f8efacca9865",
+    "source": "f899d2ac9146c2d1",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "ess-policy-read": {
     "spec": "cd4c771ae8115e55",
-    "source": "8831f8efacca9865",
+    "source": "f899d2ac9146c2d1",
     "devices": [
       "desktop",
       "phone"
@@ -97,7 +97,7 @@
   },
   "ess-request-leave": {
     "spec": "c8bbd2782de7a52f",
-    "source": "ae42ea5d93db31b2",
+    "source": "5496a2a0d65056c7",
     "devices": [
       "desktop",
       "phone"
@@ -126,7 +126,7 @@
   },
   "ess-site": {
     "spec": "25644583075b344a",
-    "source": "6fd8a5b4faa258a7",
+    "source": "ee1840cdde345770",
     "devices": [
       "desktop",
       "phone"
@@ -134,7 +134,7 @@
   },
   "ess-work-location": {
     "spec": "84a4b6ec1786e07a",
-    "source": "9f08c5aee8d2d318",
+    "source": "84278465230bea68",
     "devices": [
       "desktop",
       "phone"

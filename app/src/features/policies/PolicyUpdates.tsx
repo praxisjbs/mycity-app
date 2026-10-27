@@ -4,6 +4,7 @@ import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import { useSearchParams } from "@/lib/router";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { ActionGroup, Button, Card, CardHeader, DataView, ExportButton, formatDate, FormFooter, KeyValue, PageHeader, Pill, SegmentedControl, toast, useModal } from "@mycity/ui";
 import { KIND_LABEL, versionPill } from "./labels";
 import { ApproveForm, ReasonForm } from "./PolicyForms";
@@ -27,6 +28,9 @@ export function PolicyUpdatesPage() {
   const modal = useModal();
   const [params] = useSearchParams();
   const [view, setView] = useState<View>("to_acknowledge");
+  // Each view carries what waits on the reader in it, and the page opens where it waits.
+  const news = useViewNews();
+  useOpenWhereNews({ value: view, onChange: setView, values: VIEWS.map(([v]) => v), all: "all", skip: Boolean(params.get("version")) });
   const list = usePaged("GET /api/v1/policies/me", { filters: { state: view } });
   const ack = useMutation("POST /api/v1/policies/me/versions/:id/acknowledge");
 
@@ -62,7 +66,7 @@ export function PolicyUpdatesPage() {
   return (
     <>
       <PageHeader title="Policy Updates" sub="The policies that apply to you" />
-      <SegmentedControl className="mb-3" label="Policies" value={view} onChange={setView} options={VIEWS} />
+      <SegmentedControl className="mb-3" label="Policies" value={view} onChange={setView} options={withNews(news, VIEWS, { all: "all" })} />
       <DataView<MyPolicyRow>
         title={VIEWS.find(([v]) => v === view)![1]}
         list={list}

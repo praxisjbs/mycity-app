@@ -17,6 +17,7 @@ const { AppError } = require("../../shared/errors");
 const routeMap = require("../../shared/route-map");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const categories = require("../../shared/notifications/categories");
+const viewsOf = require("../../shared/notifications/views");
 const lagos = require("../../shared/time/lagos");
 const vapid = require("../../services/push/vapid");
 const realtime = require("../../services/realtime/emitter");
@@ -154,6 +155,40 @@ async function badges(user) {
 async function unreadRecords(user, query) {
   const types = await typesShownOn(user, query.module, query.tab);
   return { ids: types.length ? await repo.unreadRecordIds(pool, user.user_id, types, query.ids) : [] };
+}
+
+/**
+ * Where on one screen the caller's unread notices wait (§6, Where it waits): by the inner view each
+ * record sits in, as its module places it (shared/notifications/views.js), each view counting its
+ * own and those below it. A screen whose records would be too many to place counts on its tab
+ * alone rather than fail.
+ */
+async function views(user, query) {
+  const types = await typesShownOn(user, query.module, query.tab);
+  const out = {};
+  if (!types.length) return { views: out };
+  let rows;
+  try {
+    rows = await repo.waitingByRecord(pool, user.user_id, types);
+  } catch (err) {
+    if (err.code !== "RESULT_SET_TOO_LARGE") throw err;
+    logger.warn({ module: query.module, tab: query.tab }, "too many records with unread notices to place on one screen");
+    return { views: out };
+  }
+  for (const type of types) {
+    const mine = rows.filter((r) => r.entity_type === type);
+    if (!mine.length) continue;
+    const where = await viewsOf.placeAll(pool, { module: query.module, tab: query.tab, type, ids: mine.map((r) => r.entity_id), user });
+    for (const r of mine) {
+      if (!where.has(r.entity_id)) continue;
+      for (const p of viewsOf.pathsOf(where.get(r.entity_id))) {
+        const v = (out[p] = out[p] || { unread: 0, urgent: false });
+        v.unread += r.unread;
+        v.urgent = v.urgent || Boolean(r.urgent);
+      }
+    }
+  }
+  return { views: out };
 }
 
 /**
@@ -669,6 +704,7 @@ module.exports = {
   unreadCount,
   badges,
   unreadRecords,
+  views,
   readRecord,
   markRead,
   markAllRead,

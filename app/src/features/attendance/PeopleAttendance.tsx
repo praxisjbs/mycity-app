@@ -8,6 +8,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth, useMe } from "@/auth/AuthProvider";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useSearchParams } from "@/lib/router";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { useScreenAction } from "@/shell/screen-action";
 import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, SelectField, SidePanel, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, locationShown, PATTERN, PUNCH_STATE, REGISTER_STATUS, UNCLEAR_HELP, VERDICT } from "./labels";
@@ -59,6 +60,9 @@ export function PeopleAttendance() {
     ["deductions", "Deductions"],
     ["overtime", "Overtime"],
   ];
+  // Each view carries what waits on the reader in it, and the page opens where it waits, unless a link named a record.
+  const news = useViewNews();
+  useOpenWhereNews({ value: shown, onChange: setView, values: views.map(([v]) => v), skip: Boolean(id || homeId || employeeId || personId) });
   const openDay = useCallback((employeeId: string, name: string, day: string) => modal.open({ title: name, wide: true, body: <DayView employeeId={employeeId} date={day} /> }), [modal]);
   useRecordLink(id, openDay);
   usePersonLink(employeeId, openDay);
@@ -111,7 +115,7 @@ export function PeopleAttendance() {
         />
       </Grid>
       <div className="my-3">
-        <SegmentedControl label="View" value={shown} onChange={setView} options={views} />
+        <SegmentedControl label="View" value={shown} onChange={setView} options={withNews(news, views)} />
       </div>
       {shown === "register" ? (
         <Register date={date} status={status} setStatus={setStatus} openDay={openDay} />
@@ -193,15 +197,17 @@ function Register({ date, status, setStatus, openDay }: { date: string; status: 
   const list = usePaged("GET /api/v1/attendance/register", { filters: { date, ...(status !== "all" && { status }) } });
   const photo = usePhotos(list.rows.map((r) => r.employee.photo_url));
   const open = (r: RegisterRow) => openDay(r.employee.employee_id, r.employee.display_name, r.date);
+  const news = useViewNews();
   return (
     <>
-      <Chips label="Status" value={status} onChange={setStatus} options={STATUS_CHIPS} />
+      <Chips label="Status" value={status} onChange={setStatus} options={withNews(news, STATUS_CHIPS, { at: "register", all: "all" })} />
       <DataView
         title="Register"
         wide
         list={list}
         search="Name or Location"
-        rowKey={(r) => r.employee.employee_id}
+        // A person's day once it has one, so a notice about that day marks its row; else the person.
+        rowKey={(r) => r.attendance_day_id ?? r.employee.employee_id}
         onRowClick={open}
         noun="person"
         nounPlural="people"
@@ -321,13 +327,21 @@ const exceptionColumns = (photo: ((url: string | null) => string | null) | null)
 function Exceptions({ date, start = "open" }: { date: string; start?: "open" | "day" }) {
   const modal = useModal();
   const [status, setStatus] = useState<"open" | "resolved" | "day">(start);
+  const chips: Array<["open" | "resolved" | "day", string]> = [
+    ["open", "Open"],
+    ["resolved", "Decided"],
+    ["day", `Open, ${formatDate(date)}`],
+  ];
+  const news = useViewNews();
+  // Open Exceptions' tile asks for that day: it stays there.
+  useOpenWhereNews({ value: status, onChange: setStatus, values: ["open", "resolved"], at: "exceptions", skip: start === "day" });
   // The day's chip is that day's open exceptions, the ones Open Exceptions counts.
   const list = usePaged("GET /api/v1/attendance/exceptions", { filters: status === "day" ? { date, status: "open" as const } : { status } });
   const photo = usePhotos(list.rows.map((x) => x.employee.photo_url));
   const open = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], wide: true, body: (close) => <ExceptionView x={x} close={close} /> });
   return (
     <>
-      <Chips label="Exceptions" value={status} onChange={setStatus} options={[["open", "Open"], ["resolved", "Decided"], ["day", `Open, ${formatDate(date)}`]]} />
+      <Chips label="Exceptions" value={status} onChange={setStatus} options={withNews(news, chips, { at: "exceptions" })} />
       <DataView
         title="Exceptions"
         list={list}
@@ -485,9 +499,11 @@ const far = (m: number | null) => (m === null ? null : m < 1000 ? `${m} m` : `${
 function Homes({ openHome }: { openHome: (h: HomeRequest) => void }) {
   const [status, setStatus] = useState<HomeStatus | "all">("pending");
   const list = usePaged("GET /api/v1/attendance/homes", { filters: status === "all" ? {} : { status } });
+  const news = useViewNews();
+  useOpenWhereNews({ value: status, onChange: setStatus, values: HOME_CHIPS.map(([v]) => v), at: "homes", all: "all" });
   return (
     <>
-      <Chips label="Homes" value={status} onChange={setStatus} options={HOME_CHIPS} />
+      <Chips label="Homes" value={status} onChange={setStatus} options={withNews(news, HOME_CHIPS, { at: "homes", all: "all" })} />
       <DataView
         title="Homes"
         list={list}

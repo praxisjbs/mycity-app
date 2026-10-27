@@ -6,6 +6,7 @@ import type { UserRow } from "@mycity/contract/contract.gen.ts";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { KpiTiles } from "@/features/shared/KpiTiles";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AuditLog } from "./AuditLog";
@@ -18,7 +19,7 @@ import { FaultsTab, StatusTab } from "./SystemHealth";
 import { PerformanceTab } from "./Performance";
 import { IntegrationsTab } from "./integrations";
 import { AppearanceTab } from "./Appearance";
-import { Banner, Button, Card, Chips, DesktopOnly, Field, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, TextAreaField, toast, useConfirm, useModal, Who } from "@mycity/ui";
+import { Banner, Button, Card, Chips, DesktopOnly, Field, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, TextAreaField, toast, useConfirm, useModal, Who, type ChoiceOption } from "@mycity/ui";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { MAX_ROLES, RolePicker, type RoleRef } from "@/features/shared/pickers";
 import { Imports } from "./Imports";
@@ -101,6 +102,13 @@ function Users() {
   const s = useApi("GET /api/v1/users/summary");
   const list = usePaged("GET /api/v1/users", { filters: status ? { status } : {} });
   const photo = usePhotos(list.rows.map((u) => u.photo_url));
+  const news = useViewNews();
+  const statusChips: Array<ChoiceOption<"" | UserRow["status"]>> = [
+    { value: "", label: "Everyone" },
+    { value: "active", label: "Active", count: s.data?.active },
+    { value: "invited", label: "Invited", count: s.data?.invited },
+    { value: "suspended", label: "Suspended", count: s.data?.suspended },
+  ];
   return (
     <>
       <PageHeader
@@ -128,12 +136,7 @@ function Users() {
         label="Status"
         value={status}
         onChange={setStatus}
-        options={[
-          { value: "", label: "Everyone" },
-          { value: "active", label: "Active", count: s.data?.active },
-          { value: "invited", label: "Invited", count: s.data?.invited },
-          { value: "suspended", label: "Suspended", count: s.data?.suspended },
-        ]}
+        options={withNews(news, statusChips, { all: "" })}
       />
       <PagedTable<UserRow>
         title="Users"

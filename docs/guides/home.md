@@ -838,6 +838,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Home · Alerts' Category chips carry the unread notices about open alerts in each category, by the rule's metric (`alerts.views.js`, `alerts.repo.js` `placesOf`); a dismissed alert's notice counts on the tab, its list being behind View Dismissed.
 - 26/10/2026 · JP · QA DEF-01 finished: Need You leaves out, on the server, a request about a record whose screen has not shipped (an expense before Milestone 8), so its page and count hold only what opens; ⌘K's KPI Cards group leaves out a card whose module has not shipped, on the server as in the app (`shared/delivery-plan.js`, foundation.md §6.7).
 - 26/10/2026 · JP · QA DEF-01, §6: a card and a picker option name their module, and the Overview, Choose Cards and ⌘K leave out a card whose module is Coming Soon in that build (Expenses before Milestone 8), for every role.
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Team's View Attendance opens that person's day on People · Attendance (`?employee=`), not the whole register; Choose Cards' refusals are error toasts and the list reloads as it now is; a Daily Attendance report saved holding a status its day cannot (Absent on Today) opens with it dropped; §6 and §10.1 say Window Days shows for no listed metric today. Clear N Alerts was checked and kept: its count and the Open Alerts list are the same set.

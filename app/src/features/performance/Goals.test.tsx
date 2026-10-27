@@ -6,7 +6,7 @@ import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@myc
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession, sid } from "@/api/mock/core";
-import { deptId, OBJECTIVES } from "@/api/mock/data/performance";
+import { deptId, OBJECTIVES, ORG_GOALS } from "@/api/mock/data/performance";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider, useRouter } from "@/lib/router";
 import { ScreenActionProvider } from "@/shell/screen-action";
@@ -142,6 +142,21 @@ const quarter = sid("perf:period:q4-2026");
 type Period = { performance_period_id: string; name: string; starts_on: string; status: string; rules: { bands: { meets: number }; sections: Record<string, number> } };
 
 describe("Performance · Goals, set and changed on screen", () => {
+  it("New Goal asks for no Goal ID: the CEO's goal is given the next of its year (JBS Praxis, 27/10/2026)", async () => {
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    await settled();
+    const form = dialog();
+    expect(valueOf(form, "What")).toBe("goal");
+    expect(within(form).queryByLabelText(/Goal ID/)).toBeNull();
+    type(form, "Goal", "Open in four more cities");
+    const before = ORG_GOALS.length;
+    await press(form, "Record Goal");
+    expect(ORG_GOALS.length).toBe(before + 1);
+    // The demo's year holds ORG-2026-01 to ORG-2026-03.
+    expect(ORG_GOALS.at(-1)).toMatchObject({ code: "ORG-2026-04", title: "Open in four more cities" });
+  }, 60000);
+
   it("New Objective marks a function whose plan is binding as it is picked, and sends nothing (QA DEF-10)", async () => {
     await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
     fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
@@ -412,5 +427,40 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(within(sheet).getByText("36 stories")).toBeTruthy();
     expect(within(sheet).getByText("27 stories")).toBeTruthy();
     expect(copyProblems()).toEqual([]);
+  }, 60000);
+
+  /** A select's choices, read by opening it. */
+  const choices = (root: HTMLElement, label: string) => optionLabels(within(root).getByRole("combobox", { name: label }));
+
+  it("Staff read only: New Goal, Report Month and New KPI are not offered", async () => {
+    await openAs("chidera@mycityapp.io", "/performance?tab=goals");
+    expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Report Month" })).toBeNull();
+    cleanup();
+
+    await openAs("chidera@mycityapp.io", "/performance?tab=kpis");
+    expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "New KPI" })).toBeNull();
+  }, 60000);
+
+  it("Report Month lists only what the reader may act for: a head their own function, Operations & People every function, the CEO the company too", async () => {
+    await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+    await press(document.body, "Report Month");
+    expect(await choices(dialog(), "Function")).toEqual(["Marketing & Sales"]);
+    cleanup();
+
+    await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+    await press(document.body, "Report Month");
+    const operations = await choices(dialog(), "Function");
+    expect(operations).toEqual(expect.arrayContaining(["Marketing & Sales", "Content", "Engineering"]));
+    expect(operations).not.toContain("Company");
+    cleanup();
+
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    await press(document.body, "Report Month");
+    const ceo = await choices(dialog(), "Function");
+    expect(ceo[0]).toBe("Company");
+    expect(ceo).toContain("Marketing & Sales");
   }, 60000);
 });

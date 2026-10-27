@@ -3,6 +3,7 @@ import type { OvertimeDecision, PayItem, PayItemStatus } from "@mycity/contract/
 import { useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { RESTRICTED_HELP } from "@/features/people/status";
 import { addDaysIso, Button, Chips, DataView, type DataViewColumn, DateField, EmptyValue, Field, type FieldBinding, formatDate, FormFooter, HelpTerm, KeyValue, type KeyValueItem, Money, NumberField, Pill, TextAreaField, toast, todayIso, useContractForm, useIsPhone, useModal, Who } from "@mycity/ui";
 import { hours, lateBy, PAY_AMOUNT_HELP, PAY_KIND, PAY_METHOD, PAY_STATUS } from "./labels";
@@ -95,6 +96,9 @@ export function PayItemsView({ group, waiveRef, onCanWaive }: { group: "deductio
   // The ticked items this reader may waive, kept as they are ticked, so a tick on another page still counts.
   const [decidable, setDecidable] = useState<ReadonlySet<string>>(new Set());
   const list = usePaged("GET /api/v1/attendance/pay-items", { filters: { group, ...(status !== "all" && { status }) } });
+  const chips = deductions ? DEDUCTION_CHIPS : OVERTIME_CHIPS;
+  const news = useViewNews();
+  useOpenWhereNews({ value: status, onChange: setStatus, values: chips.map(([v]) => v), at: group, all: "all" });
   const open = (x: PayItem) => modal.open({ title: PAY_KIND[x.kind], body: (close) => <PayItemView x={x} close={close} /> });
   const pick = (keys: string[]) => {
     setPicked(keys);
@@ -118,7 +122,7 @@ export function PayItemsView({ group, waiveRef, onCanWaive }: { group: "deductio
   const anyDecidable = deductions && list.rows.some((x) => x.can_decide);
   return (
     <>
-      <Chips label={deductions ? "Deductions" : "Overtime"} value={status} onChange={(s) => (setStatus(s), clear())} options={deductions ? DEDUCTION_CHIPS : OVERTIME_CHIPS} />
+      <Chips label={deductions ? "Deductions" : "Overtime"} value={status} onChange={(s) => (setStatus(s), clear())} options={withNews(news, chips, { at: group, all: "all" })} />
       <DataView
         title={deductions ? "Deductions" : "Overtime"}
         help={deductions ? WAIVE_HELP : undefined}

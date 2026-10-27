@@ -5,6 +5,7 @@ import { appearanceApplied } from "../data/appearance";
 import { byKey, grantsFor, PEOPLE, SIGN_INS, teamOf } from "../data/people";
 import { searchResult } from "../data/search";
 import { searchableDays } from "./attendance";
+import { leaveRequests } from "./organisation";
 import { codeGiven, codeOk, markFresh, needsCode, passkeyOwner, waysOf } from "./security";
 
 /**
@@ -336,6 +337,26 @@ const onScreen = (module: unknown, tab: unknown) => notes().filter((n) => n.link
 route("GET /api/v1/notifications/unread-records", (req) => {
   const ids = String(req.query.ids ?? "").split(",");
   return ok({ ids: [...new Set(onScreen(req.query.module, req.query.tab).filter((n) => n.read_at === null && ids.includes(n.entity_id)).map((n) => n.entity_id))] });
+});
+/** Where a notice's record sits on its screen, as the API's `<module>.views.js` place it, for the records the mock holds. */
+const VIEW_OF: Record<string, (entityId: string) => string | null> = {
+  "people/leave/leave_request": (id) => leaveRequests().find((l) => l.leave_request_id === id)?.status ?? null,
+};
+route("GET /api/v1/notifications/views", (req) => {
+  const views: Record<string, { unread: number; urgent: boolean }> = {};
+  for (const n of onScreen(req.query.module, req.query.tab)) {
+    const urgent = n.urgency === "urgent" && (n.acknowledge_required ? n.acknowledged_at === null : n.read_at === null);
+    const where = VIEW_OF[`${n.link.module}/${n.link.tab}/${n.entity_type}`]?.(n.entity_id);
+    if (!where || (n.read_at !== null && !urgent)) continue;
+    // A record counts in its view and in every view above it.
+    const parts = where.split("/");
+    for (let i = 1; i <= parts.length; i += 1) {
+      const v = (views[parts.slice(0, i).join("/")] ??= { unread: 0, urgent: false });
+      if (n.read_at === null) v.unread += 1;
+      v.urgent ||= urgent;
+    }
+  }
+  return ok({ views });
 });
 route("POST /api/v1/notifications/read-record", (req) => {
   for (const n of onScreen(req.body.module, req.body.tab)) if (n.entity_id === req.body.entity_id) READ.add(n.notification_id);

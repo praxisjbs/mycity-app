@@ -37,10 +37,29 @@ function Toggle() {
   );
 }
 
+/** What waits on the reader behind each chip (unread notifications), as the tab strip shows it. */
+function Waiting() {
+  const [state, setState] = useState("all");
+  return (
+    <Chips
+      label="State"
+      value={state}
+      onChange={setState}
+      options={[
+        { value: "all", label: "All", unread: 3 },
+        { value: "submitted", label: "Awaiting Approval", unread: 2 },
+        { value: "in_progress", label: "In Progress" },
+        { value: "cancelled", label: "Cancelled", urgent: true },
+      ]}
+    />
+  );
+}
+
 export default {
   component: "Chips",
   states: {
     "With Counts": () => <Status />,
+    "With Unread": () => <Waiting />,
     "Single Select": () => <Plain />,
     Toggle: () => <Toggle />,
   },

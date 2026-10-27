@@ -770,6 +770,9 @@ work at for a few days.
    **Waiting On**, its **Description**, each address on a map with its **Radius**, its **People**,
    and **Approval**: the route and each decision.
 
+> **Tip:** A yellow number on **Permanent**, **Temporary** or a chip counts what is new for you
+> there, and Worksites opens on the side that holds it.
+
 On a phone each worksite is a card with its **Radius**, **Assigned** and **Status**; tap it for the
 rest. The buttons that add a worksite or a temporary site are also in **Quick Actions**.
 
@@ -977,7 +980,7 @@ as: operations
 sources:
   - packages/ui/src/layout/ListDetail.tsx
 do:
-  - click: button "Pending"
+  - click: button "Pending 1"
   - click: row 1
   - wait: button "Approve"
 marks:

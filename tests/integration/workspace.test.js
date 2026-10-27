@@ -17,6 +17,7 @@ const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
 const { rebuild } = require("./helpers/schema");
+const { noticeAbout, readAll } = require("./helpers/notices");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
@@ -347,7 +348,9 @@ describeDb("my workspace against the real migrations", () => {
 
     const loop = await as("staff").post(`/tasks/${first.body.task_id}/waiting-on`, { depends_on_task_id: then.body.task_id });
     expect(loop.status).toBe(422);
-    expect(loop.body.error.fields.depends_on_task_id).toBeDefined();
+    expect(loop.body.error.code).toBe("TASK_LINK_LOOP");
+    expect(loop.body.error.fields.depends_on_task_id).toEqual([`${then.body.number} already waits on this task`]);
+    expect((await as("staff").post(`/tasks/${first.body.task_id}/waiting-on`, { depends_on_task_id: first.body.task_id })).body.error.code).toBe("TASK_LINK_SELF");
 
     const early = await as("staff").post(`/tasks/${then.body.task_id}/move`, { status: "in_progress" });
     expect(early.status).toBe(409);
@@ -364,6 +367,13 @@ describeDb("my workspace against the real migrations", () => {
     const outsiderTask = await as("outsider").post("/tasks", { title: "Close the books" });
     const hidden = await as("staff").post(`/tasks/${first.body.task_id}/waiting-on`, { depends_on_task_id: outsiderTask.body.task_id });
     expect(hidden.status).toBe(422);
+    expect(hidden.body.error.code).toBe("TASK_LINK_UNSEEN");
+
+    const dropped = await as("staff").post("/tasks", { title: "Book the old venue" });
+    await as("staff").post(`/tasks/${dropped.body.task_id}/cancel`, { cancel_reason: "Venue changed" });
+    const cancelled = await as("staff").post(`/tasks/${then.body.task_id}/waiting-on`, { depends_on_task_id: dropped.body.task_id });
+    expect(cancelled.status).toBe(422);
+    expect(cancelled.body.error.code).toBe("TASK_LINK_CANCELLED");
   });
 
   test("watchers are people who can already see the task; they hear about it, and a ping reaches whoever it names", async () => {
@@ -1073,5 +1083,24 @@ describeDb("my workspace against the real migrations", () => {
     const c = require("@mycity/contract");
     expect(c.calendar.CalendarEventPrefill.parse({ title: "Stand walk", attendee_ids: [emp("staff")] }).attendee_ids).toEqual([emp("staff")]);
     expect(c.projects.ProjectPrefill.parse({ name: "Ikeja Launch" }).name).toBe("Ikeja Launch");
+  });
+  test("My Workspace · Tasks says where its count waits: the reader's own under Mine, the rest beside them under My Team, each in its column (notifications' views)", async () => {
+    const set = (await as("manager").post("/tasks", { title: "Views: set for Musa", primary_assignee_id: emp("staff") })).body;
+    const own = (await as("staff").post("/tasks", { title: "Views: Musa's own" })).body;
+    const told = async (who) => {
+      const user = people[who].user.user_id;
+      await readAll(pool, user);
+      for (const t of [set, own]) await noticeAbout(pool, user, { entity_type: "task", entity_id: t.task_id });
+      return (await as(who).get("/notifications/views?module=workspace&tab=tasks")).body.views;
+    };
+    // The manager set one; the other is their report's own, which only My Team shows them.
+    expect(await told("manager")).toEqual({
+      mine: { unread: 1, urgent: false },
+      "mine/todo": { unread: 1, urgent: false },
+      others: { unread: 1, urgent: false },
+      "others/todo": { unread: 1, urgent: false },
+    });
+    // For the person both are for, both are their own.
+    expect(await told("staff")).toEqual({ mine: { unread: 2, urgent: false }, "mine/todo": { unread: 2, urgent: false } });
   });
 });

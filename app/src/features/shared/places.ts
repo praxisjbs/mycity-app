@@ -25,10 +25,16 @@ export const loadTile: LoadTile = (url) =>
 /** What a token says, or null when it is not one of ours in shape (the contract reads it; the server checks it). */
 const read = (token: string) => maps.readPlaceToken(token) as PlaceSummary | null;
 
+/**
+ * A point's degrees as the pin's query takes them: six places, about 10 cm, as a place keeps them
+ * (`numeric(9,6)`). A tap on the map carries fifteen, which the contract refuses.
+ */
+export const degreesOf = (n: number) => n.toFixed(6);
+
 /** The address search, the pin and the token reader every address field takes. */
 export const places: Places = {
   search: (q, opts) => api.call("GET /api/v1/maps/search", { query: { q, level: opts?.level }, signal: opts?.signal }).then((r) => r.places),
-  pin: (point, opts) => api.call("GET /api/v1/maps/pin", { query: { lat: String(point.lat), lon: String(point.lon), level: opts?.level } }),
+  pin: (point, opts) => api.call("GET /api/v1/maps/pin", { query: { lat: degreesOf(point.lat), lon: degreesOf(point.lon), level: opts?.level } }),
   read,
   loadTile,
 };

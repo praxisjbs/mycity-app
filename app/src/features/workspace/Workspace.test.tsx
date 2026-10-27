@@ -247,6 +247,33 @@ describe("my workspace", () => {
     expect(moves()).toBe(sent + 1);
   }, 40000);
 
+  it("Add Link never offers a task already waiting on this one, which would make a loop (fault #4 on staging, 27/10/2026)", async () => {
+    await board();
+    const order = await arrange({ title: "Order the welcome banners", due_on: isoDaysAhead(3) });
+    const hang = await arrange({ title: "Hang the welcome banners", due_on: isoDaysAhead(6) });
+    await arrange({ title: "Print the welcome cards", due_on: isoDaysAhead(4) });
+    await act(async () => {
+      await api.call("POST /api/v1/tasks/:id/waiting-on", { params: { id: hang }, body: { depends_on_task_id: order } });
+      invalidate("/api/v1/tasks");
+    });
+    const panel = await openCard("Order the welcome banners");
+    fireEvent.click(await within(panel).findByRole("button", { name: "Add Link" }, { timeout: 5000 }));
+    const form = await screen.findByRole("dialog", { name: "Wait On Task" });
+    fireEvent.change(within(form).getByRole("searchbox"), { target: { value: "welcome" } });
+    // The searched page, once it has landed: every row it offers names the word.
+    await waitFor(
+      () => {
+        const offered = within(form).getAllByRole("option").map((o) => o.textContent ?? "");
+        expect(offered.length).toBeGreaterThan(0);
+        expect(offered.every((t) => t.includes("welcome"))).toBe(true);
+      },
+      { timeout: 5000 },
+    );
+    expect(within(form).getByRole("option", { name: /Print the welcome cards/ })).toBeTruthy();
+    expect(within(form).queryByRole("option", { name: /Hang the welcome banners/ })).toBeNull();
+    expect(within(form).queryByRole("option", { name: /Order the welcome banners/ })).toBeNull();
+  }, 30000);
+
   it("Mark Blocked asks what is blocking it, and Clear Blocker clears it", async () => {
     await board();
     await arrange({ title: "Book the Lekki venue", due_on: isoDaysAhead(5) });
@@ -319,7 +346,8 @@ describe("my workspace", () => {
     const form = await newTask();
     fireEvent.click(within(form).getByRole("radio", { name: "Shared" }));
     expect(within(form).queryByText("Assign To")).toBeNull();
-    expect(within(form).getByText("Share With")).toBeTruthy();
+    // Share With waits on whether the reader sets tasks for others (its own read).
+    expect(await within(form).findByText("Share With", undefined, { timeout: 5000 })).toBeTruthy();
     const lead = () => within(form).getByRole("combobox", { name: /Lead/ });
     expect(lead().textContent).toContain("You");
     named(form, "Plan the Ops offsite");

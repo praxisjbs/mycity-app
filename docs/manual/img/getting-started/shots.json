@@ -1,14 +1,14 @@
 {
   "start-desktop": {
     "spec": "ec4b8baceab8df59",
-    "source": "97acfd634e479002",
+    "source": "f681864e006d30af",
     "devices": [
       "desktop"
     ]
   },
   "start-display": {
     "spec": "7cf2f13894e86ffb",
-    "source": "97acfd634e479002",
+    "source": "f681864e006d30af",
     "devices": [
       "desktop",
       "phone"
@@ -16,7 +16,7 @@
   },
   "start-lock": {
     "spec": "d7b4756feb3ea399",
-    "source": "97acfd634e479002",
+    "source": "f681864e006d30af",
     "devices": [
       "desktop",
       "phone"
@@ -24,7 +24,7 @@
   },
   "start-notification-settings": {
     "spec": "d7eb43fe3585760d",
-    "source": "97acfd634e479002",
+    "source": "f681864e006d30af",
     "devices": [
       "desktop",
       "phone"
@@ -32,7 +32,7 @@
   },
   "start-notifications": {
     "spec": "db12270dc85487fd",
-    "source": "97acfd634e479002",
+    "source": "f681864e006d30af",
     "devices": [
       "desktop",
       "phone"
@@ -40,14 +40,14 @@
   },
   "start-phone": {
     "spec": "c148a7d836ed50df",
-    "source": "97acfd634e479002",
+    "source": "f681864e006d30af",
     "devices": [
       "phone"
     ]
   },
   "start-search": {
     "spec": "f1f41035cceab305",
-    "source": "97acfd634e479002",
+    "source": "f681864e006d30af",
     "devices": [
       "desktop",
       "phone"
@@ -87,7 +87,7 @@
   },
   "start-where-it-waits": {
     "spec": "9de24141d123213f",
-    "source": "bc9839f446f4926e",
+    "source": "f26c86571e20f3c0",
     "devices": [
       "desktop",
       "phone"
