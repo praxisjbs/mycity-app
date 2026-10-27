@@ -1086,7 +1086,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
-| 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 32 | Reviews | `reviews` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 33 | Analytics | `analytics` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
@@ -1103,6 +1103,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 27/10/2026 · JP · KPIs (#31) and Goals (#29), from JBS Praxis's review of New KPI on staging: Target Wording is required (`KpiCreate`; `KpiEdit` can change it, never clear it) and the Target figure, Unit, Formula and Data Source stay optional. Unit is a new shared `ComboField` in `packages/ui` that suggests the units in use (`GET /performance/kpis/units`, 25 a page, from KPIs, key results and scorecard lines, narrowed as it is typed) and keeps a unit it does not know as typed; Edit KPI takes it too. Record Actual and a KPI's row on Report Month need the Actual for Met and Not Met and show none for N/A (`KpiActual`, `KpiReport`; the field read Optional while the API refused it empty). The contract, service, mock, tests, `performance.md` §5, §6.5, §10 and §14, the Performance chapter and its pictures are updated. Left: Edit KPI still cannot change the figure, Direction or Frequency; a KPI imported with no wording must be given one when it is edited.
 - 27/10/2026 · JP · Performance's functions and heads now come from People · Departments (#103, `docs/guides/organogram.md` §6.1): a head set there sets the function's goals at once, holding Head of Department while they head; reporting lines follow the head, so the next month's reviews go to them. No Performance code changed: `organisation.headOf` is read live. `performance.md` P4, §2, §6.3, §6.20 and §11 updated · nothing left
 - 27/10/2026 · JP · Goals (#29): an organisational goal's ID is the system's (JBS Praxis, 27/10/2026): New Goal no longer asks for a Goal ID; the service gives the next of the plan year from the new `organisational_goal` numbering scheme (`ORG-2026-01`, seed 2291, editable on Settings · Documents & Numbering #76), the toast names it, and neither body takes it. Migration 2295 gives each goal of the plan without an ID the next of its year (`code_given_at`) and moves the counter past those typed, which they keep. Tests: `Goals.test.tsx`, `performance-plan.test.js` (and the goal tests that typed `OG1`). Left: nothing.
 - 27/10/2026 · JP · Scorecards (#30) and Reviews (#32), the 27/10 staging faults brief: Edit Lines checks its lines against `ScorecardLinesSave` before Save Lines sends them, so a line added without its Goal reads Required and nothing is sent (fault #1); Open Round lists a month still running with the day it ends, unpickable, and with none ended marks the Month Not ended yet and sends nothing (fault #8: on 26/10 its first choice was October); the round's month rules have their own codes (`ROUND_MONTH_NOT_IN_QUARTER`, `ROUND_MONTH_NOT_ENDED`). Fault #9 (Report Month's Actual) was already fixed by #12. Tests: `Scorecards.test.tsx`, `Reviews.test.tsx`, `reviews.test.js`. Left: nothing.

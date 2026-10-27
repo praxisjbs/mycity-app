@@ -4,6 +4,7 @@
  *
  *   GET   /kpis               `performance` view: 25 a page, a function's or all, with the latest month
  *   GET   /kpis/summary       `performance` view: a month's Met, Not Met and awaiting over the active KPIs
+ *   GET   /kpis/units         `performance` view: the units in use, 25 a page, for the Unit field
  *   GET   /kpis/:id           `performance` view: its months and the scorecard lines that use it
  *   POST  /kpis               `performance` create, goals.function: the head of the function (§6.3)
  *   PATCH /kpis/:id           `performance` edit, goals.function
@@ -25,6 +26,10 @@ route(router, "get", "/kpis",
 route(router, "get", "/kpis/summary",
   { query: k.KpiSummaryQuery, response: k.KpiSummary, summary: "The KPIs figures" },
   requirePermission("performance", "view"), controller.summary);
+
+route(router, "get", "/kpis/units",
+  { query: k.KpiUnitListQuery, response: k.KpiUnitPage, summary: "The units in use" },
+  requirePermission("performance", "view"), controller.units);
 
 route(router, "get", "/kpis/:id",
   { params: c.common.IdParams, response: k.KpiDetail, summary: "One KPI" },
