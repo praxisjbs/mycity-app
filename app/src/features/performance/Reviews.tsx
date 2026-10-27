@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import reviewsContract from "@mycity/contract/schemas/reviews.js";
 import type { Pip, Review, Round } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
@@ -40,7 +40,7 @@ import {
   useModal,
 } from "@mycity/ui";
 import { ReviewSheet } from "./ReviewPage";
-import { person, rating, reviewStatus, score, STAGE_OPTIONS, useQuarter } from "./shared";
+import { person, rating, reviewStatus, score, STAGE_OPTIONS, useDepartmentFilter, useQuarter } from "./shared";
 
 const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const KIND_OPTIONS: Array<[string, string]> = [["", "All Kinds"], ["monthly", "Monthly"], ["probation", "Probation"]];
@@ -72,12 +72,13 @@ export function Reviews() {
   const pickQuarter = (id: string) => (quarter.setPeriodId(id), setRoundId(""));
   // The API lists rounds newest month first, so the newest round is the one shown until another is picked.
   const round: Round | undefined = rounds.rows.find((r) => r.performance_cycle_id === roundId) ?? rounds.rows[0];
-  const departments = useApi("GET /api/v1/departments", { query: {} });
   const [view, setView] = useState<"reviews" | "pips">("reviews");
   // Each view carries what waits on the reader in it, and the page opens where it waits, unless a link named a record.
   const news = useViewNews();
   useOpenWhereNews({ value: view, onChange: setView, values: ["reviews", "pips"], skip: Boolean(params.get("id")) });
-  const [dept, setDept] = useState("");
+  const [pickedDept, setDept] = useState("");
+  const departments = useDepartmentFilter("All Departments", pickedDept);
+  const dept = departments.value;
   const [stage, setStage] = useState("");
   // `?kind=probation` (People's Probation Ending) opens on the probation reviews.
   const [kind, setKind] = useState(params.get("kind") === "probation" ? "probation" : "");
@@ -128,7 +129,6 @@ export function Reviews() {
   }, [linked]);
 
   const c = round?.counts;
-  const deptOptions: Array<[string, string]> = [["", "All Departments"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
   const monthOptions: Array<[string, string]> = rounds.rows.map((r) => [r.performance_cycle_id, r.name]);
 
   return (
@@ -187,7 +187,7 @@ export function Reviews() {
             />
           )}
           <Toolbar>
-            <FilterSelect label="Department" value={dept} onChange={setDept} options={deptOptions} />
+            {departments.pick && <FilterSelect label="Department" value={dept} onChange={setDept} options={departments.options} />}
             <FilterSelect label="Stage" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
             <FilterSelect label="Kind" value={kind} onChange={setKind} options={KIND_OPTIONS} />
           </Toolbar>
