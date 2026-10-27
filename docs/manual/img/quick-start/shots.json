@@ -1,7 +1,7 @@
 {
   "qs-add-employee": {
     "spec": "ecaa81f3ffa184d4",
-    "source": "52feef0e747d23f6",
+    "source": "bb08569fbdcb4256",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "qs-agree": {
     "spec": "663deb49e9bb88ca",
-    "source": "e1b08be9065803d2",
+    "source": "5036f9718f5f0384",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "qs-approve-commitments": {
     "spec": "670035074f4610c2",
-    "source": "cc80dd2a01686443",
+    "source": "a635135d65781fdb",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "qs-approve-leave": {
     "spec": "f974e711363d9efc",
-    "source": "5181fe21abd2917c",
+    "source": "44957bc98e5f3ead",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "qs-check-in": {
     "spec": "590035331c4ca0f0",
-    "source": "c6e2ee62b6c34d81",
+    "source": "fa30d4d3ee00d8a3",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "qs-clock-in": {
     "spec": "51edfe0fed8ea055",
-    "source": "a48cbcee2f75f8fb",
+    "source": "837e9ae6e6386254",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "qs-close-review": {
     "spec": "604a2fce10313447",
-    "source": "cc80dd2a01686443",
+    "source": "a635135d65781fdb",
     "devices": [
       "desktop",
       "phone"
@@ -97,7 +97,7 @@
   },
   "qs-department-head": {
     "spec": "068ea5be43f180ff",
-    "source": "52feef0e747d23f6",
+    "source": "bb08569fbdcb4256",
     "devices": [
       "desktop",
       "phone"
@@ -113,7 +113,7 @@
   },
   "qs-import": {
     "spec": "402734ecb1661d71",
-    "source": "52feef0e747d23f6",
+    "source": "bb08569fbdcb4256",
     "devices": [
       "desktop",
       "phone"
@@ -177,7 +177,7 @@
   },
   "qs-quarter": {
     "spec": "f235478418d3f1d1",
-    "source": "cc80dd2a01686443",
+    "source": "a635135d65781fdb",
     "devices": [
       "desktop",
       "phone"
@@ -185,7 +185,7 @@
   },
   "qs-report-month": {
     "spec": "6e78bdb9be20b6f0",
-    "source": "cc80dd2a01686443",
+    "source": "a635135d65781fdb",
     "devices": [
       "desktop",
       "phone"
@@ -193,7 +193,7 @@
   },
   "qs-request-leave": {
     "spec": "0db81a71cb5f5bc5",
-    "source": "bb07060429ec1494",
+    "source": "baa77bb338ac989f",
     "devices": [
       "desktop",
       "phone"
@@ -209,7 +209,7 @@
   },
   "qs-score-review": {
     "spec": "dea01acb415b7670",
-    "source": "cc80dd2a01686443",
+    "source": "a635135d65781fdb",
     "devices": [
       "desktop",
       "phone"
