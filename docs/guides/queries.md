@@ -134,8 +134,8 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `GET /api/v1/letter-templates` | `LetterTemplateListQuery` (`purpose`, `status`, `q`) → `LetterTemplatePage` | `queries` view | yes, 25 | |
 | `GET /api/v1/letter-templates/:id` | → `LetterTemplateDetail` | `queries` view | no | The current wording and its version |
 | `GET /api/v1/letter-templates/:id/preview` | → `LetterPreview` | `queries` view | no | The wording filled with sample values, as paragraphs of runs; `filled` marks the record's words |
-| `POST /api/v1/letter-templates` | `LetterTemplateCreate` → `LetterTemplateDetail` | `queries` create, `queries.configure` | | Saved as a draft |
-| `PUT /api/v1/letter-templates/:id/body` | `LetterTemplateBodySave` → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | A new `template_version` |
+| `POST /api/v1/letter-templates` | `LetterTemplateCreate` (`body_html` from the editor, or `body` in Markdown) → `LetterTemplateDetail` | `queries` create, `queries.configure` | | Saved as a draft |
+| `PUT /api/v1/letter-templates/:id/body` | `LetterTemplateBodySave` (`body_html` or `body`) → `LetterTemplateDetail` (with `body_html` for the editor) | `queries` edit, `queries.configure` | | A new `template_version` |
 | `POST /api/v1/letter-templates/:id/activate` | `EmptyBody` → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | Refused while it has no wording |
 | `GET /api/v1/ess/queries/summary` | → `MyQueriesSummary` | `ess` · own | no | Open, archived, sanctions and the latest one's date |
 | `GET /api/v1/ess/queries` | `EssQueryListQuery` (`status`: `open`, `archived`) → `MyQueryPage` | `ess` · own | yes, 25 | ESS module, through the queries service. Without `status`, every query, open ones first, then newest first |
@@ -258,7 +258,10 @@ here.
 - One variable schema serves every letter (`ConsequenceLetterVars`: the employee, the record's
   number, subject or rung, reason, dates, fine, response due, signer), so a template added on the
   screen fills from the same record.
-- An edit saves a new `template_version`; a letter records the version it used. A template is
+- An edit saves a new `template_version`; a letter records the version it used. The wording is
+  written in the rich text editor (meeting 26/10) and kept as Markdown through the one renderer's
+  whitelist (`htmlToMarkdown`), its `{{ names }}` as written; the detail hands it back as HTML
+  (`body_html`) for the editor. A script may still send Markdown (`body`). A template is
   `awaiting_sample` while it has no wording (the sanction letters' files stay empty until MyCity
   sends the samples; `query-letter` and `salary-deduction-letter` ship with wording and are seeded
   active, so a rule can raise a query and a fine can be sent on a fresh database), `draft` until
@@ -415,6 +418,8 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · The letter editor is rich text (meeting 26/10): `body_html` in, kept as Markdown,
+  `body_html` back for the editor (§5, §6.7).
 - 26/10/2026 · GE · Policies (meeting 26/10): a rule names the policy it enforces and a manual query
   may cite one, with the clause to quote; the query keeps the version in force, and its letter
   quotes it (§6.2, §6.3, migration 3030, `GET /queries/policies` through the policies service).

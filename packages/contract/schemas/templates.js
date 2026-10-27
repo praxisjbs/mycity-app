@@ -19,7 +19,7 @@
  * `queries.configure` capability.
  */
 const { z } = require("zod");
-const { uuid, text, isoDate, isoDateTime, money, listQuery, Paged } = require("./common");
+const { uuid, text, isoDate, isoDateTime, money, listQuery, Paged, textOfHtml } = require("./common");
 
 /** query: a query's letter; sanction: a rung's; fine: the Salary Deduction letter a fine sends (guide §6.6). */
 const LetterPurpose = z.enum(["query", "sanction", "fine"]);
@@ -47,6 +47,8 @@ const LetterTemplatePage = Paged(LetterTemplate);
 const LetterTemplateDetail = LetterTemplate.extend({
   title: z.string().nullable(),
   body: z.string().nullable(),
+  /** The Markdown wording as the rich text editor opens it; null for a shipped HTML letter. */
+  body_html: z.string().nullable(),
   format: z.enum(["html", "markdown"]).nullable(),
   variables: z.array(z.string()).max(50),
 }).strict();
@@ -58,22 +60,37 @@ const LetterTemplateListQuery = listQuery(
 );
 
 /** POST /letter-templates: a new letter, saved as a draft. Its key is made from the name. */
+/**
+ * The wording, as Markdown (`body`, for scripts and imports) or as the rich text editor's HTML
+ * (`body_html`, kept as Markdown by the server): exactly one of them.
+ */
+const bodyHtml = z
+  .string()
+  .max(60_000, "Too long")
+  .refine((v) => textOfHtml(v).length >= 40, "Write the letter");
+const oneBody = (v) => (v.body === undefined) !== (v.body_html === undefined);
+const ONE_BODY = { message: "Write the letter", path: ["body_html"] };
+
 const LetterTemplateCreate = z
   .object({
     name: text(80),
     purpose: LetterPurpose,
     title: text(150).optional(),
-    body,
+    body: body.optional(),
+    body_html: bodyHtml.optional(),
   })
-  .strict();
+  .strict()
+  .refine(oneBody, ONE_BODY);
 
 /** PUT /letter-templates/:id/body: new wording, saved as the next version. */
 const LetterTemplateBodySave = z
   .object({
     title: text(150).optional(),
-    body,
+    body: body.optional(),
+    body_html: bodyHtml.optional(),
   })
-  .strict();
+  .strict()
+  .refine(oneBody, ONE_BODY);
 
 /** GET /letter-templates/summary */
 const LetterTemplatesSummary = z
@@ -165,6 +182,7 @@ const TABLES = {
       used_by: "names of the consequence_step and query_rule rows that send it",
       title: "template_version.title",
       body: "template_version.body, or the shipped file",
+      body_html: "body rendered by the one Markdown renderer, for the editor",
       format: "template_version.format",
       variables: "the names ConsequenceLetterVars declares",
     },
@@ -172,7 +190,11 @@ const TABLES = {
   LetterTemplateListQuery: { table: null, reason: "list controls and filters for Letter Templates" },
   LetterTemplateCreate: {
     table: "letter_template",
-    virtual: { title: "written to template_version", body: "written to template_version" },
+    virtual: {
+      title: "written to template_version",
+      body: "written to template_version",
+      body_html: "the editor's HTML, written to template_version as Markdown",
+    },
   },
   LetterTemplateBodySave: {
     table: null,

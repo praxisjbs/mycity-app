@@ -248,6 +248,23 @@ describeDb("queries and sanctions against the real migrations", () => {
         "letter_template.activated",
       ]);
     });
+
+    test("the editor's rich text is kept as Markdown, its names intact and no markup with it", async () => {
+      const t = await byKey("ops", "final-warning-letter");
+      const res = await as("ops").put(`/letter-templates/${t.letter_template_id}/body`, {
+        body_html:
+          "<p>Dear {{ employee.first_name }},</p><p>Following query <strong>{{ query_number }}</strong>: {{ reason }}.</p><script>alert(1)</script>",
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.body).toBe("Dear {{ employee.first_name }},\n\nFollowing query **{{ query_number }}**: {{ reason }}.");
+      expect(res.body.body_html).toBe("<p>Dear {{ employee.first_name }},</p>\n<p>Following query <strong>{{ query_number }}</strong>: {{ reason }}.</p>");
+      // A name a letter cannot fill is still refused, through the editor too.
+      const bad = await as("ops").put(`/letter-templates/${t.letter_template_id}/body`, {
+        body_html: "<p>Dear {{ employee.first_name }}, your {{ salary }} is cut after query {{ query_number }}.</p>",
+      });
+      expect(bad.status).toBe(422);
+      expect((await as("ops").put(`/letter-templates/${t.letter_template_id}/body`, { body_html: "<p>Too short</p>" })).status).toBe(422);
+    });
   });
 
   /* ---------------------------------------------------------------- *

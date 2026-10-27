@@ -18,7 +18,7 @@ import { hasCapability } from "@/shell/access";
 import type { ModuleScreenProps } from "@/shell/screens";
 import {
   ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, DetailPane, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
-  KeyValue, ListDetail, LoadingRows, RichText, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
+  KeyValue, ListDetail, LoadingRows, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
 } from "@mycity/ui";
 
 /**
@@ -635,15 +635,15 @@ function Templates() {
   );
 }
 
-type TemplateValues = { name: string; purpose: string; body: string };
+type TemplateValues = { name: string; purpose: string; body_html: string };
 
 function TemplateForm({ close }: { close: () => void }) {
-  const f = useContractForm<TemplateValues>({ name: "", purpose: "sanction", body: "" }, templates.LetterTemplateCreate);
+  const f = useContractForm<TemplateValues>({ name: "", purpose: "sanction", body_html: "" }, templates.LetterTemplateCreate);
   const save = useMutation("POST /api/v1/letter-templates");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: { ...f.values, purpose: f.values.purpose as "query" | "sanction" } });
+      await save.run({ body: { ...f.values, purpose: f.values.purpose as "query" | "sanction" | "fine" } });
       invalidate("/api/v1/letter-templates");
       close();
       toast("Template saved as a draft");
@@ -664,10 +664,10 @@ function TemplateForm({ close }: { close: () => void }) {
   );
 }
 
-function LetterBody({ f }: { f: { status: (k: "body") => object; field: (k: "body") => object } }) {
+function LetterBody({ f }: { f: { status: (k: "body_html") => object; field: (k: "body_html") => object } }) {
   return (
-    <Field label={<HelpTerm help="Write {{ employee.first_name }}, {{ query_number }}, {{ reason }} or {{ step_name }} where the record fills in.">Letter</HelpTerm>} {...f.status("body")}>
-      <TextAreaField {...(f.field("body") as Parameters<typeof TextAreaField>[0])} rows={8} placeholder="Dear Ada," />
+    <Field label={<HelpTerm help="Write {{ employee.first_name }}, {{ query_number }}, {{ reason }} or {{ step_name }} where the record fills in.">Letter</HelpTerm>} {...f.status("body_html")}>
+      <RichTextField label="Letter" {...(f.field("body_html") as Omit<Parameters<typeof RichTextField>[0], "label">)} />
     </Field>
   );
 }
@@ -676,11 +676,11 @@ function EditTemplate({ id, close }: { id: string; close: () => void }) {
   const t = useApi("GET /api/v1/letter-templates/:id", { params: { id } });
   if (t.error) return <ErrorState error={t.error} onRetry={t.reload} />;
   if (!t.data) return <LoadingRows count={6} />;
-  return <EditTemplateForm id={id} body={t.data.format === "markdown" ? (t.data.body ?? "") : ""} close={close} />;
+  return <EditTemplateForm id={id} body={t.data.body_html ?? ""} close={close} />;
 }
 
 function EditTemplateForm({ id, body, close }: { id: string; body: string; close: () => void }) {
-  const f = useContractForm<{ body: string }>({ body }, templates.LetterTemplateBodySave);
+  const f = useContractForm<{ body_html: string }>({ body_html: body }, templates.LetterTemplateBodySave);
   const save = useMutation("PUT /api/v1/letter-templates/:id/body");
   const submit = async () => {
     if (!f.check()) return;

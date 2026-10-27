@@ -70,11 +70,20 @@ const LETTERS: Array<LetterTemplateDetail> = (
         ? "Dear {{ employee.first_name }},\n\n{{ details }}\n\nPlease explain this in writing by {{ datetime response_due }}, in My Queries."
         : "Dear {{ employee.first_name }},\n\nFollowing query {{ query_number }}, this is a {{ step_name }}: {{ reason }}",
   format: status === "awaiting_sample" ? null : "markdown",
+  body_html: null,
   variables: ["employee", "query_number", "subject", "details", "reason", "step_name", "raised_on", "response_due", "effective_on", "ends_on", "days", "fine_amount", "signer"],
 }));
 
+/** The mock's wording both ways: Markdown paragraphs as the editor's HTML, and the HTML's text back. */
+const htmlOfWording = (body: string | null) => (body ? body.split(/\n\n+/).map((p) => `<p>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>`).join("") : null);
+const wordingOfHtml = (html: string) =>
+  blocksOf(html)
+    .map((b) => (b.kind === "bullets" || b.kind === "numbered" ? b.items.map((i) => `- ${i.map((x) => x.text).join("")}`).join("\n") : b.spans.map((x) => x.text).join("")))
+    .join("\n\n");
+LETTERS.forEach((t) => (t.body_html = htmlOfWording(t.body)));
+
 const listed = (t: LetterTemplateDetail): LetterTemplate => ({
-  ...omit(t, ["title", "body", "format", "variables"] as const),
+  ...omit(t, ["title", "body", "body_html", "format", "variables"] as const),
   used_by: STEPS.filter((s) => s.letter_template === t.key).map((s) => s.name),
 });
 
@@ -127,14 +136,15 @@ const configure = (req: Req) => (FULL.has(req.user!) ? null : fail(403, "CAPABIL
 route("POST /api/v1/letter-templates", (req) => {
   const refused = configure(req);
   if (refused) return refused;
-  const b = req.body as { name?: string; purpose?: "query" | "sanction"; title?: string; body?: string };
+  const b = req.body as { name?: string; purpose?: "query" | "sanction" | "fine"; title?: string; body?: string; body_html?: string };
+  const wording = b.body_html !== undefined ? wordingOfHtml(b.body_html) : (b.body ?? "");
   const f: Record<string, string[]> = {};
   if (!b.name?.trim()) f.name = ["Required"];
   if (!b.purpose) f.purpose = ["Choose one"];
-  if (!b.body || b.body.trim().length < 40) f.body = ["Write the letter"];
+  if (wording.trim().length < 40) f.body_html = ["Write the letter"];
   if (Object.keys(f).length) return invalid(f);
   const key = `${b.name!.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-?letter$/, "")}-letter`;
-  const t: LetterTemplateDetail = { letter_template_id: sid(`ltr:${key}:${LETTERS.length}`), key, name: b.name!.trim(), purpose: b.purpose!, status: "draft", version: 1, used_by: [], updated_at: now(), title: b.title ?? null, body: b.body!, format: "markdown", variables: LETTERS[0].variables };
+  const t: LetterTemplateDetail = { letter_template_id: sid(`ltr:${key}:${LETTERS.length}`), key, name: b.name!.trim(), purpose: b.purpose!, status: "draft", version: 1, used_by: [], updated_at: now(), title: b.title ?? null, body: wording, body_html: htmlOfWording(wording), format: "markdown", variables: LETTERS[0].variables };
   LETTERS.push(t);
   return created(t);
 });
@@ -143,9 +153,10 @@ route("PUT /api/v1/letter-templates/:id/body", (req) => {
   if (refused) return refused;
   const t = letterOf(req.params.id);
   if (!t) return notFound();
-  const b = req.body as { title?: string; body?: string };
-  if (!b.body || b.body.trim().length < 40) return invalid({ body: ["Write the letter"] });
-  Object.assign(t, { body: b.body, title: b.title ?? t.title, format: "markdown", version: t.version + 1, updated_at: now(), status: t.status === "awaiting_sample" ? "draft" : t.status });
+  const b = req.body as { title?: string; body?: string; body_html?: string };
+  const wording = b.body_html !== undefined ? wordingOfHtml(b.body_html) : (b.body ?? "");
+  if (wording.trim().length < 40) return invalid({ body_html: ["Write the letter"] });
+  Object.assign(t, { body: wording, body_html: htmlOfWording(wording), title: b.title ?? t.title, format: "markdown", version: t.version + 1, updated_at: now(), status: t.status === "awaiting_sample" ? "draft" : t.status });
   return ok(t);
 });
 route("POST /api/v1/letter-templates/:id/activate", (req) => {

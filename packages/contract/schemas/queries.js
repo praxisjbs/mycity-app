@@ -23,6 +23,7 @@ const {
   blank,
   listQuery,
   Paged,
+  textOfHtml,
 } = require("./common");
 const { PersonRef } = require("./organisation");
 const { RichTextBlock, SignaturePng } = require("./policies");
@@ -245,14 +246,7 @@ const MyQueriesSummary = z
   })
   .strict();
 
-/** The words of an editor's HTML: tags dropped, entities read, spaces folded. Counts what was written. */
-const wordsOf = (html) =>
-  String(html)
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;|&#160;/g, " ")
-    .replace(/&[a-z]+;|&#\d+;/gi, "x")
-    .replace(/\s+/g, " ")
-    .trim();
+const wordsOf = textOfHtml;
 
 /**
  * POST /ess/queries/:id/response: the employee's written answer, as the rich text editor's HTML.

@@ -23,7 +23,8 @@ const documents = require("../../shared/documents/generate");
 const lagos = require("../../shared/time/lagos");
 const { formatLongDate } = require("../../shared/time/day-first");
 const { render } = require("../../shared/documents/render");
-const { markdownToHtml } = require("../../shared/documents/markdown");
+const md = require("../../shared/documents/markdown");
+const { markdownToHtml } = md;
 const repo = require("./templates.repo");
 const { EVENTS, SHIPPED, declare } = require("./templates.events");
 
@@ -88,6 +89,7 @@ async function get(id) {
     ...publicRow(row),
     title: t ? t.title || null : null,
     body: t ? t.body : null,
+    body_html: t && t.format === "markdown" ? md.markdownToHtml(t.body) : null,
     format: t ? t.format : null,
     variables: [...VARIABLE_NAMES],
   };
@@ -177,6 +179,19 @@ async function preview(id) {
  * Writing
  * ------------------------------------------------------------------ */
 
+/**
+ * The wording to keep, as Markdown: the editor's HTML through the one renderer's whitelist
+ * (htmlToMarkdown, as Policies and query responses), so no tag survives and the letter's
+ * {{ names }} stay as written; or Markdown as a script sends it.
+ */
+function wordingFrom(body) {
+  if (body.body_html === undefined) return body.body;
+  const kept = md.htmlToMarkdown(body.body_html).trim();
+  if (md.markdownToText(kept).trim().length < 40)
+    throw new AppError("VALIDATION_FAILED", "Write the letter", 422, { body_html: ["Write the letter"] });
+  return kept;
+}
+
 async function create(actor, body) {
   const id = await tx(async (client) => {
     let key = keyFrom(body.name);
@@ -190,7 +205,7 @@ async function create(actor, body) {
     declare(key);
     const version = await store.saveVersion(
       client,
-      { kind: "document", key, title: body.title, body: body.body, format: "markdown" },
+      { kind: "document", key, title: body.title, body: wordingFrom(body), format: "markdown" },
       { created_by: actor.user_id },
     );
     await emit(client, {
@@ -214,7 +229,7 @@ async function saveBody(actor, id, body) {
     declare(row.key);
     const version = await store.saveVersion(
       client,
-      { kind: "document", key: row.key, title: body.title, body: body.body, format: "markdown" },
+      { kind: "document", key: row.key, title: body.title, body: wordingFrom(body), format: "markdown" },
       { created_by: actor.user_id },
     );
     await repo.touch(client, id);
