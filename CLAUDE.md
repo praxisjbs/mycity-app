@@ -35,6 +35,10 @@ State the type in your first message ("This is a full-stack change to My Attenda
 4. The User Guide chapter for the screens you touch, `docs/manual/<chapter>.md` (what a person is
    told to press and see there), and `docs/manual/README.md` before you write one. If your task
    changes what a screen shows or does, the chapter changes with it.
+5. `docs/handoff/`: a handoff for the work, its module or its branch (each names its branch and
+   owner in its header). If one exists, read it in full before you write any code: its decisions
+   are not re-opened, its checklist says where the work stands and what comes next, and you tick
+   it and add to its log as you go.
 
 **Then by type:**
 

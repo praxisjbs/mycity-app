@@ -36,8 +36,10 @@ describe("the routes", () => {
       expect(route.contract.self).toBe(true);
       expect(route.permission).toBeNull();
       expect(route.path).not.toMatch(/:employee_id\b/);
-      // A record id (one of my leave requests) is checked against the session in the service.
-      if (/:id\b/.test(route.path)) expect(route.path).toMatch(/^\/leave\/:id(\/cancel)?$/);
+      // A record id (one of my leave requests, one of my queries) is checked against the session
+      // in the service.
+      if (/:id\b/.test(route.path))
+        expect(route.path).toMatch(/^\/(leave\/:id(\/cancel)?|queries\/:id\/response)$/);
     }
   });
 

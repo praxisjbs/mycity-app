@@ -30,6 +30,8 @@
  * reviewer is the CEO, then Operations & People; the reviewee is excluded from deciding it).
  * A fifth, `performance.plan_change` (§6.22, seeded in 2321), is the CEO's decision on a request to
  * unbind a binding plan and on the changes then made to it.
+ * M3 adds `queries.consequence` (docs/guides/queries.md §6.5, seeded in 3190): a proposed
+ * sanction, Operations & People, then the CEO from the fourth rung.
  *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
@@ -234,6 +236,32 @@ const DEFAULTS = Object.freeze({
       },
     ],
   },
+  // M3, seeded in 3190 (docs/guides/queries.md §6.5): who approves a proposed sanction.
+  // `rank` is the rung's position on the chain when it was proposed; `financial_effect` what the
+  // rung does, which decides whether the CEO is asked, wherever the rung sits.
+  "queries.consequence": {
+    key: "queries.consequence",
+    module: "queries",
+    name: "Sanction",
+    description: "Operations & People, then the CEO from Suspension Without Pay up.",
+    context: { rank: "number", financial_effect: "text", fine_amount: "money" },
+    stages: [
+      {
+        key: "operations_people",
+        name: "Operations & People",
+        approver: { type: "role", value: "operations_people" },
+        sla_hours: 48,
+      },
+      {
+        // MyCity's handbook (§4.7.4): the CEO and the HR Manager decide a suspension.
+        key: "ceo",
+        name: "CEO",
+        approver: { type: "ceo" },
+        condition: { field: "financial_effect", op: "in", value: ["unpaid_days", "ends_employment"] },
+        sla_hours: 48,
+      },
+    ],
+  },
 });
 
 /**
@@ -266,6 +294,15 @@ function assertValid(def) {
 function getDefault(key) {
   return DEFAULTS[key] || null;
 }
+
+/**
+ * Approvals decided only on their own record, never from My Approvals: deciding them keeps
+ * something the engine does not (a sanction's signature, docs/guides/queries.md §6.4), so the
+ * generic routes refuse them and the request links to the record instead.
+ */
+const ON_THE_RECORD = Object.freeze(new Set(["queries.consequence"]));
+
+const decidedOnRecord = (key) => ON_THE_RECORD.has(key);
 
 /** The row shape the engine works with, from a stored row. */
 function fromRow(row) {
@@ -374,6 +411,7 @@ async function ensureActive(client, key) {
 module.exports = {
   DEFAULTS,
   getDefault,
+  decidedOnRecord,
   problemsOf,
   assertValid,
   fromRow,

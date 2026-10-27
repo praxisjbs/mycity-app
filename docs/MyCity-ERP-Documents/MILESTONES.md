@@ -734,6 +734,21 @@ Every outcome records reason, evidence, decision-maker, date.
 **Employee response and review.** The employee responds in ESS; the manager reviews; the full
 history is on the employee 360 and is append-only.
 
+**Ratified 27/10/2026 (GE, with AJ and TB, from MyCity's sample letters and handbook).** Three
+changes to the above, recorded in `docs/guides/queries.md` §6.3, §6.5 and §13:
+
+- **The ladder** is Caution → Warning → Second Warning → Suspension Without Pay → Dismissal or
+  Termination. A disciplinary suspension is always without pay (handbook §4.6.2, §4.7.4); a
+  suspension on full pay is a precaution during an investigation, not a rung, so the ladder has one
+  suspension. Second Warning is the definition of done's own rung. The ladder stays data, entered on
+  Chain Settings at go-live.
+- **Who decides:** Operations & People for every rung, who sign its letters as they approve; then
+  the CEO for a rung that suspends without pay or ends employment (handbook §4.7.4).
+- **Late punches, absences and missing clock-outs** are counted by the Attendance policy's own rules,
+  which raise the query through the same `queries` path; Rules keeps the other triggers. So the
+  definition of done's "three late arrivals in thirty days" is an Attendance policy rule, set on
+  screen, and the response window is 24 hours (handbook §4.7.1).
+
 Reuse: `attendance.query.js` (124) for the one real auto-query that exists; `hr_ops.service.js`'s
 waive/uphold loop as the pattern for financial consequence; `document_vault` and the PDF service for
 letters; the M0 workflow engine for the chain.

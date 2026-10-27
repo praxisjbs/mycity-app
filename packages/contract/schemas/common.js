@@ -265,8 +265,22 @@ const TABLES = {
   IdParams: { table: null, reason: "the :id path parameter" },
 };
 
+/**
+ * The words of a rich text editor's HTML: tags dropped, entities read, spaces folded. A schema
+ * counts what was written with it (a query response, a letter); the server keeps the text as
+ * Markdown through shared/documents/markdown.
+ */
+const textOfHtml = (html) =>
+  String(html)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;|&#160;/g, " ")
+    .replace(/&[a-z]+;|&#\d+;/gi, "x")
+    .replace(/\s+/g, " ")
+    .trim();
+
 module.exports = {
   TABLES,
+  textOfHtml,
   uuid,
   text,
   optionalText,

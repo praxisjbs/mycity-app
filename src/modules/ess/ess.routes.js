@@ -8,8 +8,8 @@
  * nothing a wrong employee id could slip past; the service reads the employee
  * from `req.user` and there is no parameter that names another.
  *
- * My Profile, My Documents (M0, track B), My Leave (M1) and My Performance (M2) are on the
- * real API. The other tabs are added here as their milestones land.
+ * My Profile, My Documents (M0, track B), My Leave (M1), My Performance (M2) and My Queries
+ * (M3) are on the real API. The other tabs are added here as their milestones land.
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -130,5 +130,24 @@ route(router, "get", "/performance/reviews",
   { query: c.ess.MyReviewListQuery, response: c.ess.MyReviewPage, self: true,
     summary: "My reviews" },
   controller.myReviews);
+
+route(router, "get", "/queries/summary",
+  { response: c.queries.MyQueriesSummary, self: true, summary: "The counts above My Queries" },
+  controller.queriesSummary);
+
+route(router, "get", "/queries",
+  { query: c.queries.EssQueryListQuery, response: c.queries.MyQueryPage, self: true,
+    summary: "My queries" },
+  controller.listQueries);
+
+route(router, "post", "/queries/:id/response",
+  { params: c.common.IdParams, body: c.queries.QueryResponseCreate, response: c.queries.MyQuery,
+    self: true, summary: "Respond to one of my queries" },
+  controller.respondToQuery);
+
+route(router, "get", "/sanctions",
+  { query: c.common.PageQuery, response: c.sanctions.MySanctionPage, self: true,
+    summary: "My sanctions" },
+  controller.listSanctions);
 
 module.exports = { basePath: "/ess", surface: "staff", router };

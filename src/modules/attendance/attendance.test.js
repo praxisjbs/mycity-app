@@ -845,12 +845,12 @@ describe("the consequence rules' words", () => {
   const engine = require("./attendance.rules-engine");
   const breach = (over) => ({ rule: "late", period: "month", count: 3, minutes: 41, reached: "count", days: ["2026-10-02", "2026-10-06", "2026-10-09"], raise_query: false, ...over });
 
-  test("an alert counts what was reached, Query Due first while the query waits on M3", () => {
+  test("an alert counts what was reached; the query is Queries & Sanctions' own", () => {
     expect(engine.wordsOf(breach(), "Ada Obi")).toEqual({
       title: "Ada Obi: 3 late arrivals this month",
       trigger: "Late on 02/10/2026, 06/10/2026 and 09/10/2026",
     });
-    expect(engine.wordsOf(breach({ raise_query: true }), "Ada Obi").title).toBe("Query Due: Ada Obi, 3 late arrivals this month");
+    expect(engine.wordsOf(breach({ raise_query: true }), "Ada Obi").title).toBe("Ada Obi: 3 late arrivals this month");
     expect(engine.wordsOf(breach({ reached: "hours", minutes: 300, count: 2 }), "Ada Obi").title).toBe("Ada Obi: 5 hours late this month");
     expect(engine.wordsOf(breach({ rule: "absence", period: "week", count: 1, days: ["2026-10-06"] }), "Ada Obi")).toEqual({
       title: "Ada Obi: 1 absence this week",
@@ -859,6 +859,19 @@ describe("the consequence rules' words", () => {
     expect(engine.wordsOf(breach({ rule: "location_flag", period: "days_30", days: ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"], count: 4 }), "Ada Obi").trigger).toBe(
       "Outside on 4 days, last on 04/10/2026",
     );
+  });
+
+  test("a breach's query says what was reached, names the days, and keeps each as evidence", () => {
+    expect(engine.queryWordsOf(breach())).toEqual({
+      subject: "3 late arrivals this month",
+      details: "Our attendance records show 3 late arrivals this month. Late on 02/10/2026, 06/10/2026 and 09/10/2026.",
+      evidence: [
+        { label: "Late arrival", date: "2026-10-02" },
+        { label: "Late arrival", date: "2026-10-06" },
+        { label: "Late arrival", date: "2026-10-09" },
+      ],
+    });
+    expect(engine.queryWordsOf(breach({ rule: "absence", period: "week", count: 1, days: ["2026-10-06"] })).subject).toBe("1 absence this week");
   });
 
   test("each rule is the policy's", () => {

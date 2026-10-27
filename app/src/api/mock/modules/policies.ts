@@ -6,6 +6,7 @@ import type {
   MyPolicyVersion,
   Policy,
   PolicyAck,
+  PolicyCitation,
   PolicyDraft,
   PolicyKind,
   PolicyRow,
@@ -60,7 +61,8 @@ function spansOf(node: Node, marks: Marks = { bold: false, italic: false, href: 
   return out;
 }
 
-function blocksOf(html: string): RichTextBlock[] {
+/** The editor's HTML as the blocks the API returns, for every mock that keeps rich text. */
+export function blocksOf(html: string): RichTextBlock[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const out: RichTextBlock[] = [];
   for (const el of Array.from(doc.body.children)) {
@@ -769,6 +771,16 @@ function overview(p: Pol, reader?: string | null): Policy {
 }
 
 /** The rules the clock judges a punch by today: the Attendance policy's version in force. */
+/** A policy as a query or rule cites it: its version in force today (queries guide §6.2). */
+export function policyCitation(policyId: string): PolicyCitation | null {
+  const p = polOf(policyId);
+  const v = p && p.status === "active" ? inForce(policyId) : null;
+  return p && v ? { policy_id: p.policy_id, policy_version_id: v.id, number: p.number, title: v.title ?? p.title, version: v.version! } : null;
+}
+/** Every policy with a version in force, by title: the queries' policy picker. */
+export const citablePolicies = (): PolicyCitation[] =>
+  POLICIES.map((p) => policyCitation(p.policy_id)).filter((c): c is PolicyCitation => c !== null).sort((a, b) => a.title.localeCompare(b.title));
+
 export function attendanceRulesInForce(): AttendanceRules {
   return attendanceRulesOn(todayIso());
 }

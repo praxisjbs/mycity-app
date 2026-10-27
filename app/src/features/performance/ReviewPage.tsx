@@ -9,10 +9,12 @@
 import { useState } from "react";
 import reviewsContract from "@mycity/contract/schemas/reviews.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import type { ReviewDetail, ReviewItem } from "@mycity/contract/contract.gen.ts";
+import type { Query, ReviewDetail, ReviewItem } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { saveFile } from "@/api/download";
-import { invalidate, useApi, useMutation } from "@/api/hooks";
+import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useAuth } from "@/auth/AuthProvider";
+import { hrefFor, useRouter } from "@/lib/router";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
 import {
@@ -59,6 +61,46 @@ function evidenceOf(i: ReviewItem) {
 }
 
 const lineTitle = (i: ReviewItem) => i.line?.title ?? (i.criterion ? i.criterion[0].toUpperCase() + i.criterion.slice(1) : "Line");
+
+/** The last day of the month a review is for: `2026-10-01` → `2026-10-31`. */
+const monthEnd = (month: string) => {
+  const [y, m] = month.split("-").map(Number);
+  return `${month.slice(0, 8)}${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+};
+
+/**
+ * Queries This Month (performance.md §6.16): the person's queries raised in the review's month that
+ * the reader may see (queries.md §6.1), each opening on Queries & Sanctions. Not shown without
+ * `queries` view, nor when there are none.
+ */
+function QueriesThisMonth({ employeeId, month }: { employeeId: string; month: string }) {
+  const { me } = useAuth();
+  const sees = Boolean(me?.grants.queries?.includes("view"));
+  return sees ? <QueriesOfMonth employeeId={employeeId} month={month} /> : null;
+}
+
+function QueriesOfMonth({ employeeId, month }: { employeeId: string; month: string }) {
+  const { navigate } = useRouter();
+  const list = usePaged("GET /api/v1/queries", { filters: { employee_id: employeeId, raised_from: month, raised_to: monthEnd(month) }, sort: "-created_at" });
+  if (!list.rows.length) return null;
+  return (
+    <DataView
+      className="mt-3"
+      title="Queries This Month"
+      list={list}
+      rowKey={(q: Query) => q.employee_query_id}
+      noun="query"
+      nounPlural="queries"
+      onRowClick={(q: Query) => navigate(hrefFor("queries", "queries", { id: q.employee_query_id }))}
+      columns={[
+        { key: "n", label: "Number", render: (q: Query) => q.number },
+        { key: "s", label: "Subject", render: (q: Query) => q.subject },
+        { key: "d", label: "Raised", render: (q: Query) => formatDate(q.created_at) },
+        { key: "o", label: "Outcome", render: (q: Query) => (q.status !== "resolved" ? "Open" : q.outcome === "sanctioned" ? "Sanctioned" : "Closed, No Action") },
+      ]}
+    />
+  );
+}
 
 /** One review, as the reader may see it, and what they may do to it now. */
 export function ReviewSheet({ id, close }: { id: string; close: () => void }) {
@@ -142,6 +184,7 @@ export function ReviewSheet({ id, close }: { id: string; close: () => void }) {
         </Card>
       )}
       <MonthCard r={r} />
+      {r.month && <QueriesThisMonth employeeId={r.employee.employee_id} month={r.month} />}
       {(closed || r.score_month) && (
         <KeyValue
           className="mt-3"

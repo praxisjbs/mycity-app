@@ -7,10 +7,13 @@
  *    the modules where the caller holds `approve` (the CEO approves everywhere).
  *  - A request is read by whoever opened it, the employee it is about, the people its
  *    current stage names, anyone who decided on it, and a holder of `view` on its
- *    module whose scope covers that employee. Anyone else gets a 404.
+ *    module whose scope covers that employee (for `queries`, scope `all` only). Anyone
+ *    else gets a 404.
  *  - Deciding needs both: the stage names the caller (the engine checks, and nobody
  *    decides their own request, the CEO excepted), and the caller holds `approve` on
  *    the request's module (shared/workflow/approvers.js leaves that to the route).
+ *  - A request decided on its own record (definitions.decidedOnRecord: a sanction, decided on its
+ *    query's card) is listed and read here, but never decided here: 409, and can_decide false.
  *  - Withdrawing is the requester's (or the CEO's), while it is pending.
  *  - Reassigning a stage whose approver has gone needs `approve` with scope `all` on
  *    the request's module: Operations & People, Management, the CEO (§11).
@@ -305,6 +308,9 @@ async function named(client, snapshot, user) {
   return held.some((code) => wanted.includes(code));
 }
 
+/** Modules whose `view` scope `team` does not reach their people's requests (queries.md §6.1). */
+const NARROW_MODULES = new Set(["queries"]);
+
 /** May the caller read this request? */
 async function mayRead(client, instance, user) {
   if (user.is_ceo === true) return true;
@@ -315,6 +321,9 @@ async function mayRead(client, instance, user) {
   const scope = await rbac().scopeFor(user, instance.module_key, "view");
   if (!scope) return false;
   if (scope.scope === "all") return true;
+  // A module whose records a team scope never widens (a sanction, queries.md §6.1) is read here
+  // only by those above, or with scope all.
+  if (NARROW_MODULES.has(instance.module_key)) return false;
   return Boolean(instance.subject_employee_id && (scope.scope_ids || []).includes(instance.subject_employee_id));
 }
 
@@ -393,7 +402,10 @@ async function detail(client, id, user) {
       };
     }),
     can_decide:
-      pending && Boolean(approves) && (await approvers.canAct(client, instance.stage_approvers, user, instance)),
+      pending &&
+      !definitions.decidedOnRecord(instance.definition_key) &&
+      Boolean(approves) &&
+      (await approvers.canAct(client, instance.stage_approvers, user, instance)),
     can_withdraw: pending && (user.is_ceo === true || instance.opened_by === user.user_id),
     can_reassign: pending && approves === "all",
     link: linkOf(instance, user),
@@ -414,15 +426,56 @@ async function readable(client, id, user) {
   return found;
 }
 
-/** Approve, reject or request changes on the current stage. */
+/**
+ * Approve, reject or request changes on the current stage, on the caller's transaction: a module
+ * that keeps something with the decision (a sanction's signature, queries.md §6.4) writes it and
+ * decides in one transaction. The same checks as decide().
+ */
+async function decideIn(client, user, id, decision, reason = null) {
+  const found = await readable(client, id, user);
+  if (!(await approveScope(user, found.module_key))) {
+    throw new AppError("PERMISSION_DENIED", "You do not approve these requests", 403);
+  }
+  await engine.act(client, { instance_id: id, actor: user, decision, reason });
+  return detail(client, id, user);
+}
+
+/**
+ * Whether the caller may act on the stage a request waits on, wherever it is decided: the record
+ * that decides its own approval (decidedOnRecord) asks this for its card.
+ */
+async function mayAct(user, id) {
+  const instance = await engine.getInstance(pool, id);
+  if (!instance || instance.state !== "pending") return false;
+  if (!(await approveScope(user, instance.module_key))) return false;
+  return approvers.canAct(pool, instance.stage_approvers, user, instance);
+}
+
+/**
+ * The stage a request waits on and its name, for a record that has already checked its reader may
+ * see it (a query's card, queries.md §6.1): no read check of its own. Null once it has completed.
+ */
+async function pendingStage(id) {
+  const instance = await engine.getInstance(pool, id);
+  if (!instance || instance.state !== "pending" || !instance.current_stage) return null;
+  const def = await definitions.findById(pool, instance.workflow_definition_id);
+  const stage = cond.stageByKey(def, instance.current_stage);
+  return { key: instance.current_stage, name: stage ? stage.name : instance.current_stage };
+}
+
+/** The stage a request waits on, under the caller's transaction (null once it has completed). */
+async function stageOf(client, id) {
+  const found = await engine.getInstance(client, id);
+  return found && found.state === "pending" ? found.current_stage : null;
+}
+
+/** Approve, reject or request changes on the current stage, from My Approvals. */
 async function decide(user, id, decision, reason = null) {
   return tx(async (client) => {
     const found = await readable(client, id, user);
-    if (!(await approveScope(user, found.module_key))) {
-      throw new AppError("PERMISSION_DENIED", "You do not approve these requests", 403);
-    }
-    await engine.act(client, { instance_id: id, actor: user, decision, reason });
-    return detail(client, id, user);
+    if (definitions.decidedOnRecord(found.definition_key))
+      throw new AppError("DECIDE_ON_RECORD", "Decide this on its record", 409);
+    return decideIn(client, user, id, decision, reason);
   });
 }
 
@@ -510,6 +563,10 @@ module.exports = {
   mineCount,
   getInstance,
   decide,
+  decideIn,
+  stageOf,
+  mayAct,
+  pendingStage,
   withdraw,
   reassign,
 };

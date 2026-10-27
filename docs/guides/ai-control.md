@@ -437,10 +437,11 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
    whether it goes on AI Control.
 2. **Actions registered later**: JD draft, CV screening, proposal draft, MOU draft and image
    reading are registered by the build that makes each one, asking the person which job
-   (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5).
+   (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5); Queries' two (`query-draft` on Default, `letter-draft` on Deep Reasoning, chosen by GE) on 26/10/2026 (`queries.md` §9).
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · §13: Queries' Write With AI registered, `query-draft` (Default) and `letter-draft` (Deep Reasoning), personal data, chosen by GE (`queries.md` §9).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: refusals on Actions and Models are error toasts and reload the screen (a proposal decided or a search started meanwhile shows as it is); Make First refused for one model names it ("DeepSeek V3: Carries personal data"); `AiActionRow.set_chain` marks an action with the registry's own chain, whose reset reads Restore Chain and "Back on its chosen chain"; Accept All with nothing left says "Nothing left to accept"; Set Cap on a Free provider says "Only a paid provider has a cap" beside the field (§3, §10).
 - 26/10/2026 · JP · §6.5 and §6.6: Guide Search (Embeddings), Guide Answer (Fast) and Guide Voice Search (Transcription) registered for the User Guide's search, chosen by JBS Praxis (`user-guide.md` §6.1); `embed()` beside `complete()` with its `embedding` ledger step (migration 10320), input-only prices, and why the guide's vectors do not lock the chain; `complete()` takes a `timeoutMs` for a screen that waits.
 

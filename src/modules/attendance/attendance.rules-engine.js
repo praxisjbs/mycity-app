@@ -91,25 +91,43 @@ function onDays(lead, dates) {
   return `${lead} ${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
 }
 
+/** What a breach counted, in words: "3 late arrivals this month", "5 hours late in 30 days". Pure. */
+function countedOf(breach) {
+  const r = RULES[breach.rule];
+  const what =
+    breach.reached === "hours" && r.hours
+      ? `${hoursOf(breach.minutes)} ${r.hoursText}`
+      : `${breach.count} ${breach.count === 1 ? r.one : r.many}`;
+  return `${what} ${PERIOD_TEXT[breach.period]}`;
+}
+
 /**
  * What a breach's alert says (§6.16; home.md §6): the title counts what was reached ("Ada Obi: 3 late
- * arrivals this month", or "Ada Obi: 5 hours late this month"), Query Due first while its query waits
- * on Queries & Sanctions (M3); the trigger names the days. Pure.
+ * arrivals this month", or "Ada Obi: 5 hours late this month"); the trigger names the days. The
+ * query, when Raise Query is on, is Queries & Sanctions' own (queries.md §6.2). Pure.
  * @param {{rule: string, period: string, count: number, minutes: number, reached: "count"|"hours",
  *          days: string[], raise_query: boolean}} breach
  * @param {string} name  the person's display name
  * @returns {{title: string, trigger: string}}
  */
 function wordsOf(breach, name) {
+  return { title: `${name}: ${countedOf(breach)}`, trigger: onDays(RULES[breach.rule].on, breach.days) };
+}
+
+/**
+ * What the query a breach raises says (queries.md §6.2), in MyCity's words for it (its QUERY
+ * NOTIFICATION sample): the subject counts what was reached, the details name the days, and each
+ * counted day is evidence. Pure.
+ * @returns {{subject: string, details: string, evidence: Array<{label: string, date: string}>}}
+ */
+function queryWordsOf(breach) {
   const r = RULES[breach.rule];
-  const what =
-    breach.reached === "hours" && r.hours
-      ? `${hoursOf(breach.minutes)} ${r.hoursText}`
-      : `${breach.count} ${breach.count === 1 ? r.one : r.many}`;
-  const counted = `${what} ${PERIOD_TEXT[breach.period]}`;
+  const counted = countedOf(breach);
+  const label = `${r.one[0].toUpperCase()}${r.one.slice(1)}`;
   return {
-    title: breach.raise_query ? `Query Due: ${name}, ${counted}` : `${name}: ${counted}`,
-    trigger: onDays(r.on, breach.days),
+    subject: `${counted[0].toUpperCase()}${counted.slice(1)}`,
+    details: `Our attendance records show ${counted}. ${onDays(r.on, breach.days)}.`,
+    evidence: [...new Set(breach.days)].map((date) => ({ label, date })),
   };
 }
 
@@ -196,4 +214,4 @@ async function countDay(client, person, date) {
   return made;
 }
 
-module.exports = { RULES, BY_POLICY_KEY, PERIOD_TEXT, wordsOf, onDays, countDay };
+module.exports = { RULES, BY_POLICY_KEY, PERIOD_TEXT, wordsOf, queryWordsOf, onDays, countDay };

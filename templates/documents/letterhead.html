@@ -13,10 +13,22 @@
   .lh-body th, .lh-body td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #E4E4E7; vertical-align: top; }
   .lh-body th { font-weight: 600; color: #014339; }
   .lh-body .amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .lh-foot { margin-top: 28px; padding-top: 8px; border-top: 1px solid #E4E4E7; font-size: 8.5pt; color: #71717A; }
+  .lh-foot { margin-top: 20px; padding-top: 8px; border-top: 1px solid #E4E4E7; font-size: 8.5pt; color: #71717A; }
+  /* A table's head and foot repeat on every printed page: past one page, the letterhead and the
+     organisation's line print on each, and the PDF numbers them (services/pdf). */
+  .lh-page { width: 100%; border-collapse: collapse; }
+  .lh-page > thead { display: table-header-group; }
+  .lh-page > tfoot { display: table-footer-group; }
+  .lh-page > * > tr > td { padding: 0; vertical-align: top; }
+  .lh-sign { margin-top: 24px; break-inside: avoid; page-break-inside: avoid; }
+  .lh-sign img { height: 44px; display: block; margin-bottom: 2px; }
+  .lh-sign-role { color: #71717A; }
+  .lh-sign-for { margin-bottom: 6px; }
   .lh-staging { position: fixed; top: 40%; left: 0; right: 0; text-align: center; font-size: 64pt; font-weight: 700; color: rgba(218, 30, 16, 0.12); transform: rotate(-24deg); pointer-events: none; }
 </style>
 {{#if staging}}<div class="lh-staging">STAGING</div>{{/if}}
+<table class="lh-page">
+<thead><tr><td>
 <header class="lh-head">
   <div class="lh-brand">
     {{#if org.logo}}<img src="{{ org.logo }}" alt="{{ org.display_name }}">{{else}}<div class="lh-wordmark">{{ org.display_name }}</div>{{/if}}
@@ -26,10 +38,17 @@
     <div>{{ longdate today }}</div>
   </div>
 </header>
-<main class="lh-body">
-  {{#if doc.title}}<h1 class="lh-title">{{ doc.title }}</h1>{{/if}}
-  {{> body}}
-</main>
+</td></tr></thead>
+<tfoot><tr><td>
 <footer class="lh-foot">
   {{ org.name }}{{#if org.rc}} · {{ org.rc }}{{/if}}{{#if org.address}} · {{ org.address }}{{/if}}{{#if org.phone}} · {{ org.phone }}{{/if}}{{#if org.email}} · {{ org.email }}{{/if}}{{#if org.website}} · {{ org.website }}{{/if}}
 </footer>
+</td></tr></tfoot>
+<tbody><tr><td>
+<main class="lh-body">
+  {{#if doc.title}}<h1 class="lh-title">{{ doc.title }}</h1>{{/if}}
+  {{> body}}
+  {{#if doc.signer}}<div class="lh-sign"><div class="lh-sign-for">For {{ org.name }}</div>{{#if doc.signer.signature}}<img src="{{ doc.signer.signature }}" alt="Signature of {{ doc.signer.name }}">{{/if}}<div>{{ doc.signer.name }}</div><div class="lh-sign-role">{{ doc.signer.role }}</div></div>{{/if}}
+</main>
+</td></tr></tbody>
+</table>

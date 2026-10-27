@@ -1501,7 +1501,7 @@ const locationFlags = (db, employeeId, from, to) =>
 const BREACH = `b.attendance_rule_breach_id, b.employee_id, b.rule, b.policy_version_id, b.period,
   b.period_start::text AS period_start, b.period_end::text AS period_end, b.count, b.minutes, b.reached,
   ARRAY(SELECT d::text FROM unnest(b.days) AS d ORDER BY d) AS days, b.last_day::text AS last_day,
-  b.alert, b.raise_query, b.breached_at, b.home_alert_id`;
+  b.alert, b.raise_query, b.breached_at, b.home_alert_id, b.employee_query_id`;
 
 /** The person's latest breach of a rule whose last day falls on or after `from`, or null. */
 function latestBreach(db, employeeId, rule, from) {
@@ -1543,6 +1543,17 @@ function insertBreach(client, b) {
 }
 
 const getBreach = (db, id) => one(db, `SELECT ${BREACH} FROM attendance_rule_breach b WHERE b.attendance_rule_breach_id = $1`, [id]);
+/** The breach, locked until the caller's transaction ends: one query is raised for it, however many deliveries race. */
+const lockBreach = (db, id) =>
+  one(db, `SELECT ${BREACH} FROM attendance_rule_breach b WHERE b.attendance_rule_breach_id = $1 FOR UPDATE`, [id]);
+
+/** Keep the query Queries & Sanctions raised for a breach (queries.raise_from_breach, its transaction). */
+function setBreachQuery(client, id, queryId) {
+  return client.query(
+    "UPDATE attendance_rule_breach SET employee_query_id = $2 WHERE attendance_rule_breach_id = $1 AND employee_query_id IS NULL",
+    [id, queryId],
+  );
+}
 
 /** Keep the Home alert a breach raised (after commit, attendance.raise_breach_alert). */
 function setBreachAlert(client, id, alertId) {
@@ -1938,7 +1949,9 @@ module.exports = {
   latestBreach,
   insertBreach,
   getBreach,
+  lockBreach,
   setBreachAlert,
+  setBreachQuery,
   payItemsOn,
   getPayItem,
   insertPayItem,

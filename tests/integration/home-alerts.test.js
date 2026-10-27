@@ -418,7 +418,7 @@ describeDb("Home · Alerts against the real migrations", () => {
    * ---------------------------------------------------------------- */
 
   describe("the Attendance policy's breaches (attendance.md §6.16)", () => {
-    test("the day-close's missing clock-out is a forgotten clock-out: its breach raises Query Due after commit", async () => {
+    test("the day-close's missing clock-out is a forgotten clock-out: its breach raises its alert and its query after commit", async () => {
       const yesterday = workingWeek.addWorkingDays(today, -1, await workingWeek.loadCalendar(pool));
       await q(
         `INSERT INTO attendance_event (employee_id, event_type, occurred_at, work_date, worksite_id, source, validation_state)
@@ -445,12 +445,21 @@ describeDb("Home · Alerts against the real migrations", () => {
           subject_type: "attendance_rule_breach",
           subject_id: breach.attendance_rule_breach_id,
           subject_employee_id: ids.remote,
-          title: "Query Due: Zainab Lawal, 1 forgotten clock-out in 30 days",
+          title: "Zainab Lawal: 1 forgotten clock-out in 30 days",
           trigger: `No clock-out on ${formatDate(yesterday)}`,
           severity: "medium",
         },
       ]);
-      expect((await one("SELECT home_alert_id FROM attendance_rule_breach WHERE attendance_rule_breach_id = $1", [breach.attendance_rule_breach_id])).home_alert_id).toBeTruthy();
+      const kept = await one("SELECT home_alert_id, employee_query_id FROM attendance_rule_breach WHERE attendance_rule_breach_id = $1", [
+        breach.attendance_rule_breach_id,
+      ]);
+      expect(kept.home_alert_id).toBeTruthy();
+      // Raise Query is on: Queries & Sanctions raised the query itself (queries.md §6.2).
+      expect(kept.employee_query_id).toBeTruthy();
+      expect(await one("SELECT source, subject FROM employee_query WHERE employee_query_id = $1", [kept.employee_query_id])).toEqual({
+        source: "attendance",
+        subject: "1 forgotten clock-out in 30 days",
+      });
       // Running the handlers again changes nothing.
       await q("UPDATE event_outbox SET status = 'pending', completed_handlers = '{}' WHERE event_key = $1", [
         ATTENDANCE.ATTENDANCE_RULE_BREACHED,
@@ -458,6 +467,7 @@ describeDb("Home · Alerts against the real migrations", () => {
       await drain();
       expect((await one("SELECT count(*)::int AS n FROM home_alert")).n).toBe(1);
       expect(await countEvents("home.alert_raised")).toBe(1);
+      expect((await one("SELECT count(*)::int AS n FROM employee_query")).n).toBe(1);
     });
 
     test("late arrivals: three give one breach and its alert; the fourth waits for the next", async () => {
@@ -624,7 +634,7 @@ describeDb("Home · Alerts against the real migrations", () => {
           subject_type: "attendance_rule_breach",
           subject_id: expect.any(String),
           subject_employee_id: ids.remote,
-          title: "Query Due: Zainab Lawal, 1 forgotten clock-out in 30 days",
+          title: "Zainab Lawal: 1 forgotten clock-out in 30 days",
           trigger: expect.stringMatching(/^No clock-out on /),
           over_by: "0.00",
         },
@@ -720,7 +730,7 @@ describeDb("Home · Alerts against the real migrations", () => {
       expect(subjects(await alertsOf("manager"))).toEqual([
         "Approvals Waiting, Slow: Leave Request for Musa Danjuma: waiting 5 days",
         "Approvals Waiting: Leave Request for Musa Danjuma: waiting 5 days",
-        "Forgotten Clock-Outs: Query Due: Zainab Lawal, 1 forgotten clock-out in 30 days",
+        "Forgotten Clock-Outs: Zainab Lawal: 1 forgotten clock-out in 30 days",
         "Late Arrivals: Musa Danjuma: 3 late arrivals in 30 days",
       ]);
     });
@@ -781,7 +791,7 @@ describeDb("Home · Alerts against the real migrations", () => {
 
     test("the list filters by category, severity, rule and age, and sorts by severity", async () => {
       expect(subjects(await alertsOf("ops", "?category=attendance"))).toEqual([
-        "Forgotten Clock-Outs: Query Due: Zainab Lawal, 1 forgotten clock-out in 30 days",
+        "Forgotten Clock-Outs: Zainab Lawal: 1 forgotten clock-out in 30 days",
         "Late Arrivals: Bisi Ojo: 3 late arrivals in 30 days",
         "Late Arrivals: Musa Danjuma: 3 late arrivals in 30 days",
       ]);

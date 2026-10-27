@@ -1,0 +1,425 @@
+"use strict";
+/**
+ * Queries: raised by a manager or a rule, answered by the employee, decided by
+ * People (docs/guides/queries.md §3, §5, §6).
+ *
+ * Who sees a query is one rule (§6.1): scope `all` and the CEO see every one,
+ * anyone else only the queries they raised; a query a rule raised (`raised_by`
+ * null) is seen by scope `all` and the CEO only. The employee reads their own in
+ * ESS, under /ess/queries, with the My… shapes at the end of this file.
+ *
+ * Statuses:
+ *   awaiting_response  raised; the employee has not answered
+ *   under_review       answered, or a proposed sanction waits for approval
+ *   resolved           closed with an outcome: no_action or sanctioned
+ */
+const { z } = require("zod");
+const {
+  uuid,
+  text,
+  isoDate,
+  isoDateTime,
+  money,
+  blank,
+  listQuery,
+  Paged,
+  textOfHtml,
+} = require("./common");
+const { PersonRef } = require("./organisation");
+const { RichTextBlock, SignaturePng } = require("./policies");
+
+const QueryStatus = z.enum(["awaiting_response", "under_review", "resolved"]);
+/** Who raised it (guide §3 step 1): a person, a rule on Rules, or an Attendance policy breach. */
+const QuerySource = z.enum(["person", "rule", "attendance"]);
+const QueryOutcome = z.enum(["no_action", "sanctioned"]);
+
+/** One piece of evidence: a counted day, a note, or a file from the vault. */
+const EvidenceItem = z
+  .object({
+    label: text(200),
+    date: isoDate.optional(),
+    document_id: uuid.optional(),
+  })
+  .strict();
+
+const evidence = z.array(EvidenceItem).max(50);
+
+/**
+ * The response, once the employee has written it. Never edited. `body` is the Markdown kept from
+ * the editor's HTML (guide §3 step 3); `blocks` is the same text as a screen draws it.
+ */
+const QueryResponse = z
+  .object({
+    body: z.string(),
+    blocks: z.array(RichTextBlock),
+    submitted_at: isoDateTime,
+  })
+  .strict();
+
+/** The sanction a query led to, as the query shows it. */
+const QuerySanctionRef = z
+  .object({
+    sanction_id: uuid,
+    number: z.string().nullable(),
+    step_name: z.string(),
+    status: z.enum(["pending_approval", "issued", "rejected", "withdrawn"]),
+  })
+  .strict();
+
+/** The policy a query cites (guide §6.2): the version in force when it was raised. */
+const PolicyCitation = z
+  .object({
+    policy_id: uuid,
+    policy_version_id: uuid,
+    number: z.string(),
+    title: z.string(),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+/** The line of a policy a query or rule quotes; optional. */
+const policyClause = z.string().trim().max(300, "At most 300 characters");
+
+/** GET /queries/policies: a policy a query or rule may cite, with its version in force. */
+const CitablePolicy = PolicyCitation;
+const CitablePolicyPage = Paged(CitablePolicy);
+const CitablePolicyListQuery = listQuery({});
+
+/** One row of the Queries list. */
+const Query = z
+  .object({
+    employee_query_id: uuid,
+    number: z.string(),
+    employee: PersonRef,
+    subject: z.string(),
+    raised_by: uuid.nullable(),
+    raised_by_name: z.string().nullable(),
+    source: QuerySource,
+    query_rule_id: uuid.nullable(),
+    rule_name: z.string().nullable(),
+    status: QueryStatus,
+    outcome: QueryOutcome.nullable(),
+    escalated: z.boolean(),
+    response_due_at: isoDateTime.nullable(),
+    responded_at: isoDateTime.nullable(),
+    created_at: isoDateTime,
+  })
+  .strict();
+
+const QueryPage = Paged(Query);
+
+/** One query, as its card shows it. */
+const QueryDetail = Query.extend({
+  details: z.string(),
+  evidence,
+  response: QueryResponse.nullable(),
+  letter_document_id: uuid.nullable(),
+  reminded_at: isoDateTime.nullable(),
+  reviewed_by_name: z.string().nullable(),
+  reviewed_at: isoDateTime.nullable(),
+  workflow_instance_id: uuid.nullable(),
+  sanction: QuerySanctionRef.nullable(),
+  policy: PolicyCitation.nullable(),
+  policy_clause: z.string().nullable(),
+  next_step: z
+    .object({ consequence_step_id: uuid, name: z.string(), position: z.number().int().min(1) })
+    .strict()
+    .nullable(),
+  can_decide: z.boolean(),
+  can_remind: z.boolean(),
+  // A proposed sanction's approval as the reader meets it (guide §6.4): the stage it waits on,
+  // whether they may decide it, and whether deciding it signs the letters (Operations & People).
+  approval: z
+    .object({ stage: z.string(), stage_name: z.string(), can_decide: z.boolean(), signs: z.boolean() })
+    .strict()
+    .nullable(),
+}).strict();
+
+/**
+ * GET /queries. `raised`: `mine` keeps the queries the caller raised, `rules` those
+ * a rule raised (scope `all` only; anyone else already sees only their own).
+ */
+const QueryListQuery = listQuery(
+  {
+    status: QueryStatus.optional(),
+    employee_id: uuid.optional(),
+    raised: z.enum(["mine", "rules"]).optional(),
+    // Raised on these Lagos days, both inclusive (a review's month, performance.md §6.16).
+    raised_from: isoDate.optional(),
+    raised_to: isoDate.optional(),
+  },
+  ["created_at", "number", "response_due_at"],
+);
+
+/** POST /queries: a manager or People raise a query. */
+const QueryCreate = z
+  .object({
+    employee_id: uuid,
+    subject: z.string().trim().min(4, "Name the subject").max(150),
+    details: z.string().trim().min(20, "Give the facts").max(4000),
+    letter_template: z.string().trim().max(64).optional(),
+    // The policy it breaches, and the line to quote (guide §6.2); both optional.
+    policy_id: uuid.optional(),
+    policy_clause: policyClause.optional(),
+    // The raiser's drawn signature (guide §6.2), kept in the vault and printed on the letter.
+    signature: SignaturePng,
+  })
+  .strict();
+
+/**
+ * POST /queries/:id/decision. `no_action` closes the query. `sanction` proposes a
+ * rung of the chain: it is written as pending and its approval opens
+ * (queries.consequence); the query resolves when that approval does.
+ */
+const QueryDecision = z
+  .object({
+    outcome: z.enum(["no_action", "sanction"]),
+    reason: z.string().trim().min(10, "Record the reason").max(2000),
+    consequence_step_id: uuid.optional(),
+    effective_on: blank(isoDate),
+    ends_on: blank(isoDate),
+    evidence: evidence.optional(),
+    fine_amount: blank(money),
+  })
+  .strict()
+  .refine((v) => v.outcome !== "sanction" || Boolean(v.consequence_step_id), {
+    message: "Pick the sanction",
+    path: ["consequence_step_id"],
+  })
+  .refine((v) => v.outcome === "sanction" || (!v.consequence_step_id && !v.fine_amount), {
+    message: "Only with a sanction",
+    path: ["consequence_step_id"],
+  })
+  // Above 0.00 without turning money into a number: not negative, and some digit not zero.
+  .refine((v) => !v.fine_amount || (!v.fine_amount.startsWith("-") && /[1-9]/.test(v.fine_amount)), {
+    message: "Enter the fine",
+    path: ["fine_amount"],
+  })
+  .refine((v) => !v.effective_on || !v.ends_on || v.ends_on >= v.effective_on, {
+    message: "Ends before it starts",
+    path: ["ends_on"],
+  });
+
+/** GET /queries/summary: the figures above the list, within the caller's visibility. */
+const QueriesSummary = z
+  .object({
+    open: z.number().int().min(0),
+    awaiting_response: z.number().int().min(0),
+    closed_this_month: z.number().int().min(0),
+    escalated: z.number().int().min(0),
+    by_reason: z
+      .array(z.object({ label: z.string(), count: z.number().int().min(0) }).strict())
+      .max(25),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
+ * ESS · My Queries (the ess module, through the queries service)
+ * ------------------------------------------------------------------ */
+
+/** GET /ess/queries: `open` is not yet resolved, `archived` is resolved. */
+const EssQueryListQuery = listQuery({ status: z.enum(["open", "archived"]).optional() });
+
+/** One of the caller's own queries. */
+const MyQuery = z
+  .object({
+    employee_query_id: uuid,
+    number: z.string(),
+    subject: z.string(),
+    details: z.string(),
+    status: QueryStatus,
+    outcome: QueryOutcome.nullable(),
+    response_due_at: isoDateTime.nullable(),
+    response: QueryResponse.nullable(),
+    letter_document_id: uuid.nullable(),
+    sanction: QuerySanctionRef.nullable(),
+    policy: PolicyCitation.nullable(),
+    policy_clause: z.string().nullable(),
+    can_respond: z.boolean(),
+    created_at: isoDateTime,
+  })
+  .strict();
+
+const MyQueryPage = Paged(MyQuery);
+
+/** GET /ess/queries/summary: the three cards on My Queries, the caller's own. */
+const MyQueriesSummary = z
+  .object({
+    open: z.number().int().min(0),
+    archived: z.number().int().min(0),
+    sanctions: z.number().int().min(0),
+    last_sanction: isoDate.nullable(),
+  })
+  .strict();
+
+const wordsOf = textOfHtml;
+
+/**
+ * POST /ess/queries/:id/response: the employee's written answer, as the rich text editor's HTML.
+ * One a query. The text inside counts (20 to 4,000 characters); the service keeps it as Markdown.
+ */
+const QueryResponseCreate = z
+  .object({
+    body_html: z
+      .string()
+      .max(40_000, "Too long")
+      .refine((v) => wordsOf(v).length >= 20, "Write your response")
+      .refine((v) => wordsOf(v).length <= 4000, "At most 4000 characters"),
+  })
+  .strict();
+
+/** The variables of templates/email/query-raised.html: the letter rides as the attachment. */
+const QueryRaisedEmailVars = z
+  .object({
+    query_number: z.string(),
+    subject: z.string(),
+    response_due: isoDateTime.nullable(),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
+ * Write With AI (guide §9): nothing here is kept
+ * ------------------------------------------------------------------ */
+
+/** Whether Write With AI may answer now; `off` (switched off or no provider) or `limit` (the month's budget). */
+const AiAvailability = z
+  .object({ available: z.boolean(), reason: z.enum(["off", "limit"]).nullable() })
+  .strict();
+
+/** POST /queries/assist: what the form holds, and what happened in the raiser's own words. */
+const QueryDraftRequest = z
+  .object({
+    employee_id: uuid,
+    instruction: z.string().trim().min(10, "Say what happened").max(2000, "At most 2000 characters"),
+    subject: z.string().trim().max(150).default(""),
+    details: z.string().trim().max(4000).default(""),
+    policy_id: uuid.optional(),
+    policy_clause: policyClause.optional(),
+  })
+  .strict();
+
+/** A drafted Subject and What Happened, or why there is none. Nothing changes until Use Draft. */
+const QueryDraft = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    subject: z.string().nullable(),
+    details: z.string().nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** The model's answer, held to the form's own limits and to "no gap left to fill". */
+const QueryDraftOutput = z
+  .object({
+    subject: z.string().trim().min(4).max(150),
+    details: z.string().trim().min(20).max(4000),
+  })
+  .strict();
+
+/** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+const TABLES = {
+  EvidenceItem: { table: null, reason: "one item of employee_query.evidence or sanction.evidence (jsonb)" },
+  QueryResponse: { table: "query_response", virtual: { blocks: "body as RichTextBlock[], from the one Markdown renderer" } },
+  QuerySanctionRef: {
+    table: "sanction",
+    virtual: { step_name: "consequence_step.name, or sanction.sanction_type for a rung since removed" },
+  },
+  Query: {
+    table: "employee_query",
+    virtual: {
+      employee: "the person, from employee and department",
+      raised_by_name: "the raiser's display name, from app_user and employee",
+      rule_name: "query_rule.name, or Attendance Policy for a breach's query",
+      escalated: "a sanction on the query is pending_approval",
+    },
+  },
+  QueryPage: { table: null, reason: "a page of queries" },
+  QueryDetail: {
+    table: "employee_query",
+    virtual: {
+      employee: "the person, from employee and department",
+      raised_by_name: "the raiser's display name, from app_user and employee",
+      rule_name: "query_rule.name",
+      escalated: "a sanction on the query is pending_approval",
+      response: "the query_response row",
+      reviewed_by_name: "the reviewer's display name",
+      sanction: "the latest sanction on the query",
+      policy: "the cited policy_version, from the policies service",
+      next_step: "the rung after the highest one in force for the person (guide §6.5)",
+      can_decide: "the reader may record a decision now (guide §6.4)",
+      can_remind: "awaiting a response, raised by the reader or in scope all, not reminded today",
+      approval: "the pending sanction's workflow_instance stage, from the workflow service",
+    },
+  },
+  QueryListQuery: { table: null, reason: "list controls and filters for the Queries list" },
+  QueryCreate: {
+    table: "employee_query",
+    virtual: {
+      letter_template: "the letter_template key the query letter is generated from",
+      policy_id: "the policy cited; its version in force is kept as policy_version_id",
+      signature: "the drawn PNG, stored through the vault as signature_document_id",
+    },
+  },
+  QueryDecision: {
+    table: null,
+    reason: "a decision: resolves the query, or writes a sanction and opens its approval",
+  },
+  QueriesSummary: { table: null, reason: "counts over employee_query within the reader's visibility" },
+  EssQueryListQuery: { table: null, reason: "list controls for ESS · My Queries" },
+  MyQuery: {
+    table: "employee_query",
+    virtual: {
+      response: "the query_response row",
+      sanction: "the latest sanction on the query",
+      policy: "the cited policy_version, from the policies service",
+      can_respond: "awaiting a response and not yet answered",
+    },
+  },
+  MyQueryPage: { table: null, reason: "a page of the caller's own queries" },
+  MyQueriesSummary: { table: null, reason: "counts over the caller's own queries and issued sanctions" },
+  QueryResponseCreate: {
+    table: "query_response",
+    virtual: { body_html: "the editor's HTML, kept as body (Markdown) by shared/documents/markdown" },
+  },
+  QueryRaisedEmailVars: { table: null, reason: "the variables of templates/email/query-raised.html, not a row" },
+  PolicyCitation: { table: null, reason: "a policy_version as a query cites it, read through the policies service" },
+  CitablePolicy: { table: null, reason: "a policy_version in force, read through the policies service" },
+  AiAvailability: { table: null, reason: "whether Write With AI may answer now; nothing is stored" },
+  QueryDraftRequest: { table: null, reason: "what the Raise a Query form holds; nothing is kept" },
+  QueryDraft: { table: null, reason: "a draft shown before anything changes; nothing is kept" },
+  QueryDraftOutput: { table: null, reason: "the model's answer, checked before anyone sees it" },
+  CitablePolicyPage: { table: null, reason: "a page of citable policies" },
+  CitablePolicyListQuery: { table: null, reason: "list controls for the policy picker" },
+};
+
+module.exports = {
+  TABLES,
+  AiAvailability,
+  QueryDraftRequest,
+  QueryDraft,
+  QueryDraftOutput,
+  PolicyCitation,
+  CitablePolicy,
+  CitablePolicyPage,
+  CitablePolicyListQuery,
+  QueryStatus,
+  QuerySource,
+  QueryOutcome,
+  EvidenceItem,
+  QueryResponse,
+  QuerySanctionRef,
+  Query,
+  QueryPage,
+  QueryDetail,
+  QueryListQuery,
+  QueryCreate,
+  QueryDecision,
+  QueriesSummary,
+  EssQueryListQuery,
+  MyQuery,
+  MyQueryPage,
+  MyQueriesSummary,
+  QueryResponseCreate,
+  QueryRaisedEmailVars,
+};

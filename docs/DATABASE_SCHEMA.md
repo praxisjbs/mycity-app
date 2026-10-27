@@ -228,7 +228,7 @@ table frozen · `1425` a day judged once: on `attendance_day` its `early_minutes
 (`policy_version_id`, `attendance_work_schedule_id`, `shift_working`, `shift_starts_at`,
 `shift_ends_at`, `judged_at`) · `1430` `attendance_rule_breach` (one row per breach of the Attendance
 policy's five consequence rules, unique on the person, the rule and its last counted day; the Home
-alert it raised; `employee_query_id` for M3, no key yet) · `1435` `attendance_pay_item` (one pending
+alert it raised; `employee_query_id`, keyed to the query by M3's `3040`) · `1435` `attendance_pay_item` (one pending
 deduction or overtime per person, day and kind, its amount `numeric(18,2)` masked as the salary is;
 `payroll_run_id` for M6, no key yet) and `attendance_overtime_approval` (overtime approved for a day
 beforehand, one per person and day) · `1440` reminders to clock out: `attendance_clock_reminder`'s
@@ -267,9 +267,9 @@ use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
 - Attendance (attendance.md §4, §13): the redesign's tables above are built (PR 2's in `1380` and
-  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign keys of
-  `attendance_rule_breach.employee_query_id` (M3) and `attendance_pay_item.payroll_run_id` (M6) once
-  their tables exist; dropping `attendance_location_request` and the field assignment tables once no
+  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign key of
+  `attendance_pay_item.payroll_run_id` (M6) once its table exists (the breach's query key is M3's
+  `3040`); dropping `attendance_location_request` and the field assignment tables once no
   request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)
   (MIGRATIONS §8); dropping
   `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
@@ -388,14 +388,29 @@ for a role given by hand).
 
 ### M3 Queries & Consequence Management · 3000 to 3999 · GE
 
-**Built:** `3000` query rules, queries, responses, sanctions, fines, letters · `3099` seed.
+**Built:** `3000` query rules, queries, responses, sanctions, fines, letters · `3099` seed ·
+`3010` the chain (`consequence_step`, one rung a row in position order), `letter_template`, a rule's
+`measure`, letter and drafts, the query's `dedup_key` (three punches raise exactly one query),
+outcome and letter, a sanction's number, rung, evidence and approval; `letter_template.purpose`
+`query`, `sanction` or `fine` · `3020` the drawn signatures, `signature_document_id` on
+`employee_query` and `sanction` (the vault keeps the PNG) · `3030` the policy a rule enforces
+(`query_rule.policy_id`, `policy_clause`) and the version a query cites (`employee_query.policy_version_id`,
+`policy_clause`) · `3190` the `queries.configure`
+capability, the `queries.consequence` approval (replacing `3099`'s invalid `employee_consequence`,
+switched off; Operations & People, then the CEO for a rung that suspends without pay or ends
+employment), the shipped letters' rows, six, each active (five in MyCity's own wording, the Salary
+Deduction letter ours; docs/guides/queries.md §4, §6.7), and `3099`'s `sanction_type` rows switched
+off (read by nothing) · `3040` the key from
+`attendance_rule_breach.employee_query_id` to the query raised for the breach (owed since 1430),
+`employee_query.source` (`person`, `rule`, `attendance`), `sanction.signed_by` (the Operations &
+People approver who signed it; RESTRICT, indexed) and `sanction.letter_template` (the rung's letter
+when it was proposed).
 
 **Owes:**
-- Query rules: the action, and the dedup key so three punches raise exactly one query.
-- Letters for a query, not only for a sanction.
-- Fines as pending deductions for the M6 payroll run (MILESTONES §8).
-- The consequence workflow: `3099`'s `employee_consequence` fails `validateDefinition()` and must
-  be replaced by a valid definition in a new seed.
+- Fines as pending deductions accepted into the M6 payroll run (MILESTONES §8): M6 reads
+  `sanction_fine` through `sanctions.fines`; the deduction table links back to it.
+- `sanction_fine.employee_accepted_at`, `employee_rejected_at`, `rejection_reason` are unused
+  (queries.md §13): dropped in a later release unless M6 needs them.
 
 ### M4 Recruitment · 4000 to 4999 · TB
 
