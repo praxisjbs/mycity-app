@@ -157,7 +157,7 @@ mycity-app/
 │   │                         staff-roster (MyCity's staff onto a server that has none),
 │   │                         push-notifications (web push keys, live mail, a device's health)
 │   ├── handoff/              a build carried across sessions: its decisions, plan and log
-│   │                         (push-notifications)
+│   │                         (push-notifications, m3-queries-sanctions)
 │   └── manual/               the User Guide (Knowledge Hub · User Guide, docs/guides/user-guide.md): one
 │       │                     chapter per module plus getting-started.md and quick-start.md, written as
 │       │                     each milestone is approved; README.md says how to write one; img/<chapter>/
