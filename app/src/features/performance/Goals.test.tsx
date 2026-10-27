@@ -6,7 +6,7 @@ import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@myc
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession, sid } from "@/api/mock/core";
-import { deptId, OBJECTIVES, ORG_GOALS } from "@/api/mock/data/performance";
+import { deptId, OBJECTIVES, ORG_GOALS, PLANS } from "@/api/mock/data/performance";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider, useRouter } from "@/lib/router";
 import { ScreenActionProvider } from "@/shell/screen-action";
@@ -341,6 +341,35 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(screen.getAllByRole("button", { name: "New Goal" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
   }, 60000);
+
+  it("a binding plan the reader does not set hides New Goal and offers no Request To Unbind: the company's, for Operations & People and for a head (JBS Praxis, 27/10/2026)", async () => {
+    // The company's plan, binding: Management and the CEO set it (§6.3), neither of these accounts does. A company objective
+    // made by an earlier test leaves its draft plan behind, so that one is bound when it is there, and put back after.
+    const made = { ...PLANS[0]!, performance_plan_id: sid("perf:plan:company"), department_id: null, department: null, status: "binding" as const };
+    const left = PLANS.find((p) => p.department_id === null && p.performance_period_id === made.performance_period_id);
+    const was = left?.status;
+    if (left) left.status = "binding";
+    else PLANS.push(made);
+    try {
+      await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+      // With All Functions picked there are functions to add to; with Company picked, the company's plan is the one in view.
+      expect(screen.getAllByRole("button", { name: "New Goal" }).length).toBeGreaterThan(0);
+      await chooseOption(screen.getByLabelText("Function"), "Company");
+      await settled();
+      expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
+      cleanup();
+
+      await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+      await chooseOption(screen.getByLabelText("Function"), "Company");
+      await settled();
+      expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
+    } finally {
+      if (left) left.status = was!;
+      else PLANS.splice(PLANS.indexOf(made), 1);
+    }
+  }, 90000);
 
   it("only the CEO is left out of Request To Unbind: the build account, which holds goals.organisation too, is offered it on a binding plan (JBS Praxis, 27/10/2026)", async () => {
     // The Operations demo account, given the one capability the Implementation Team holds that it does not: not the CEO.
