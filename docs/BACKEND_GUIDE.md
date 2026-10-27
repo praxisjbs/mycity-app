@@ -533,6 +533,17 @@ Chromium, ffmpeg's packages and npm's downloads are cached between runs. Four jo
 runner minutes than one (each installs its own packages), so the draft rule below matters more,
 not less.
 
+**Run it as CI does** (JBS Praxis, 27/10/2026). CI runs the Node major `.nvmrc` names, and
+`npm run ci` refuses another (`nvm use`): on Node 22's larger default heap the backend suite never
+ran out of memory as it did on Node 20 in CI, so a laptop passed what GitHub failed. Jest now
+replaces its worker once it has grown past 1 GB after a file (`workerIdleMemoryLimit` in
+`jest.config.js`). Set `RUN_DB_TESTS=1`, `DATABASE_URL` and `REDIS_URL` against a local PostgreSQL
+16 with pgvector and Redis, as CI's backend job does; without them the run skips the integration
+files and gate 4's live round trip, which CI always runs. A Claude Code cloud session does all of
+this as it starts (`.claude/hooks/session-start.sh`) and names the image's Chromium for the screen
+gates; if PostgreSQL or Redis stops during a session, run the hook again by hand. On GitHub the
+backend job's PostgreSQL logs fatal errors only, so a red backend log ends with its failing test.
+
 A run does only what its change needs (`scripts/check/lib/scope.js`; the *scope* job says which
 and why):
 

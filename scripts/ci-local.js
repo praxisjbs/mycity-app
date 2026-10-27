@@ -71,6 +71,19 @@ if (!["full", "docs", "tested"].includes(SCOPE)) {
   process.exit(2);
 }
 
+/*
+ * The Node major CI runs (.nvmrc), or no run: another major passes what CI fails. On Node 22's
+ * larger default heap the backend suite never ran out of memory as it did on Node 20 (27/10/2026).
+ */
+const NODE_WANTED = fs.readFileSync(path.join(ROOT, ".nvmrc"), "utf8").trim().replace(/^v/, "").split(".")[0];
+if (process.versions.node.split(".")[0] !== NODE_WANTED) {
+  console.error(
+    `npm run ci: CI runs Node ${NODE_WANTED} (.nvmrc) and this is Node ${process.versions.node}. ` +
+      "Switch first: nvm use (a cloud session's start does it, .claude/hooks/session-start.sh).",
+  );
+  process.exit(2);
+}
+
 const bin = (pkg, rel) => path.join(ROOT, "node_modules", pkg, rel);
 
 /**

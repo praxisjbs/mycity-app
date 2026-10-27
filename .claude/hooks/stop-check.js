@@ -34,6 +34,12 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const MAX_BLOCKS = 2;
+/* A cloud session's image has its own Chromium, not the build the repository's Playwright pins:
+   the screen gates use it when nothing else is set (session-start.sh sets it for the session's
+   own commands). */
+const CLOUD_CHROMIUM = "/opt/pw-browsers/chromium";
+if (process.env.CLAUDE_CODE_REMOTE === "true" && !process.env.MYCITY_CHROMIUM && fs.existsSync(CLOUD_CHROMIUM))
+  process.env.MYCITY_CHROMIUM = CLOUD_CHROMIUM;
 const CHECKS = ["progress", "guides", "readme-map", "user-guide"];
 const SCREEN_CHECKS = ["components", "palette", "forms", "dashes", "five-second", "two-shells", "native-ui"];
 const TOUCHES_SCREENS = /^(packages\/ui|app|public-app)\/|^docs\/MyCity-ERP-Documents\/demo\.html$/;
