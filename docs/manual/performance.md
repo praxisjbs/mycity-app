@@ -251,7 +251,9 @@ company's. The CEO does not need to ask.
    page does not show it already.
 2. While the plan reads **Binding**, **Request To Unbind** is at the top right, where **New Goal**
    would be. With **All Functions** picked, it takes **New Goal**'s place when every function you
-   set is binding, and the form asks for the **Function**.
+   set is binding, and the form asks for the **Function**. If the function picked is binding and is
+   not one you set, such as the company's for Operations and People, **New Goal** goes and there is
+   no **Request To Unbind**: only whoever sets a plan may ask to unbind it.
 3. Press **Request To Unbind**, type the **Reason**, and press **Send Request**. The hub says
    **Request sent to the CEO**.
 4. The plan card shows **Unbind Request** as **Waiting On CEO**. The button is gone until the CEO

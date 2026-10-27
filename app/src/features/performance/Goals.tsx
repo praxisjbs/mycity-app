@@ -105,14 +105,16 @@ export function Goals() {
   // Month are offered only to a reader with something to act on, so everyone else reads and nothing more.
   const settable = useSettableFunctions(quarter.periodId || null);
   const mayGoal = hasCapability(me, "goals.organisation") || settable.rows.length > 0;
-  // Where there is nothing to add to, Request To Unbind takes New Goal's place (§6.22): every plan in view is binding, the
-  // plan in view being the function the Function select names, else the reader's only one, else all they set. The CEO,
-  // who records organisational goals, keeps New Goal and is not offered it: the person, not whoever holds the capability
-  // (the build account does, and asks like anyone else).
+  // Where there is nothing to add to, Request To Unbind takes New Goal's place (§6.22): every plan in view is binding. The plan
+  // in view is the function the Function select names, the company's included, whether or not the reader sets it, else the
+  // reader's only one, else all they set. So a binding function that is not theirs hides New Goal and offers nothing: only
+  // whoever sets a plan may ask to unbind it. The CEO, who records organisational goals, keeps New Goal and is not offered it:
+  // the person, not whoever holds the capability (the build account does, and asks like anyone else).
   const named = dept ? settable.rows.find((x) => (dept === "company" ? x.department_id === null : x.department_id === dept)) : undefined;
-  const aimed = named ?? (settable.rows.length === 1 ? settable.rows[0] : undefined);
-  const inView = aimed ? [aimed] : settable.rows;
-  const shut = !me.is_ceo && inView.length > 0 && inView.every((x) => x.plan_status === "binding");
+  const aimed = dept ? named : settable.rows.length === 1 ? settable.rows[0] : undefined;
+  const inView = aimed ? [aimed] : dept ? [] : settable.rows;
+  const bound = dept ? (plan?.status ?? named?.plan_status) === "binding" : inView.length > 0 && inView.every((x) => x.plan_status === "binding");
+  const shut = !me.is_ceo && bound;
   // The plans they may ask about: binding, and no request waiting on one.
   const unbindable = shut ? inView.filter((x) => x.can_request_unbind).flatMap((x) => plans.rows.filter((p) => p.department_id === x.department_id)) : [];
   const mayUnbind = unbindable.length > 0;
