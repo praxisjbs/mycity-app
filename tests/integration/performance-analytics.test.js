@@ -219,7 +219,7 @@ describeDb("performance analytics against the real migrations", () => {
     const period = await as("ops").post("/performance/periods", { starts_on: "2026-10-01", targets_lock_on: "2026-10-31" });
     expect(period.status).toBe(201);
     ids.period = period.body.performance_period_id;
-    const goal = await as("ceo").post("/performance/goals", { code: "OG1", title: "Grow active users", plan_year_starts_on: "2026-01-01" });
+    const goal = await as("ceo").post("/performance/goals", { title: "Grow active users", plan_year_starts_on: "2026-01-01" });
     expect(goal.status).toBe(201);
     ids.goal = goal.body.organisational_goal_id;
 

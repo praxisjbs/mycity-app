@@ -318,7 +318,6 @@ describeDb("performance goals set and changed on screen, against the real migrat
 
   test("organisational goals: the CEO edits a goal's title, description and quarterly targets, and deletes one no company objective serves", async () => {
     const goal = await as("ceo").post("/performance/goals", {
-      code: "OG1",
       title: "Grow active users",
       detail: "Residents first",
       plan_year_starts_on: "2026-01-01",

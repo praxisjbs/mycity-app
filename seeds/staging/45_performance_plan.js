@@ -39,31 +39,27 @@ const PLAN_TABLES = ["employee_target", "organisational_goal"];
 
 const QUARTER = { starts_on: "2026-10-01", targets_lock_on: "2026-11-07", live_from: "2026-10-22" };
 
-/** The year's organisational goals (A16: the CEO records them). */
+/** The year's organisational goals (A16: the CEO records them), given ORG-2026-01 to 04 in this order (§6.1). */
 const GOALS = [
   {
-    code: "ORG-2026-01",
     strategic_theme: "Revenue",
     title: "Earn ₦2 billion plan-year revenue across every stream",
     success_measure: "Revenue earned from Q4 2026 to Q3 2027",
     reference_target: "₦2,000,000,000",
   },
   {
-    code: "ORG-2026-02",
     strategic_theme: "Users",
     title: "Reach 400,000 monthly active users across both apps",
     success_measure: "Verified monthly active users",
     reference_target: "400,000",
   },
   {
-    code: "ORG-2026-03",
     strategic_theme: "Events",
     title: "Sell tickets to 2,000 events through the apps",
     success_measure: "Ticketed events and paid-ticket value",
     reference_target: "2,000 events and ₦500 million",
   },
   {
-    code: "ORG-2026-04",
     strategic_theme: "Delivery",
     title: "Make on-time delivery of commitments the norm",
     success_measure: "Approved monthly commitments delivered by the original date",
@@ -123,7 +119,7 @@ module.exports = async function seed({ pool, log = () => {} }) {
 
   await part(log, "goals", async () => {
     for (const g of GOALS) {
-      const { rows } = await pool.query("SELECT 1 FROM organisational_goal WHERE code = $1", [g.code]);
+      const { rows } = await pool.query("SELECT 1 FROM organisational_goal WHERE title = $1 AND plan_year_starts_on = '2026-01-01'", [g.title]);
       if (!rows.length) await goals.createGoal(actor, { ...g, plan_year_starts_on: "2026-01-01" });
     }
   });

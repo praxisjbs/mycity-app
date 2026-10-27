@@ -136,7 +136,7 @@ async function goalTargets(db, id) {
 }
 
 const GOAL_WRITABLE = [
-  "code", "title", "strategic_theme", "detail", "success_measure", "reference_target", "baseline", "key_decisions",
+  "code", "code_given_at", "title", "strategic_theme", "detail", "success_measure", "reference_target", "baseline", "key_decisions",
   "function_cascade", "plan_year_starts_on", "starts_on", "ends_on", "status", "owner_employee_id", "level", "weight",
 ];
 
@@ -169,16 +169,6 @@ async function setGoalTargets(client, id, targets) {
       [id, t.performance_period_id, t.target_text ?? null, t.target_value ?? null],
     );
 }
-
-const goalCodeTaken = async (db, planYear, code, except = null) =>
-  Boolean(
-    await one(
-      db,
-      `SELECT 1 AS x FROM organisational_goal WHERE plan_year_starts_on = $1 AND code = $2
-          AND organisational_goal_id IS DISTINCT FROM $3`,
-      [planYear, code, except],
-    ),
-  );
 
 /**
  * What keeps a goal from being deleted: the company objectives serving it, and any older row naming
@@ -950,7 +940,6 @@ module.exports = {
   insertGoal,
   updateGoal,
   setGoalTargets,
-  goalCodeTaken,
   companyObjectivesOf,
   effectiveManagerOf,
   isCeoEmployee,

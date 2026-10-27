@@ -113,10 +113,11 @@ The CEO records the year's organisational goals.
 
 1. Press **New Goal** at the top right of [Performance · Goals](/performance?tab=goals).
 2. Choose **Organisational Goal** in **What**.
-3. Type the **Goal**. Add the **Goal ID**, **Strategic Theme**, **Success Measure** and
-   **Baseline** if you have them.
-4. Press **Record Goal**. The hub says **Goal recorded**. If **Goal ID** reads **Already in use**,
-   another goal this year has that ID: type another.
+3. Type the **Goal**. Add the **Strategic Theme**, **Success Measure** and **Baseline** if you
+   have them.
+4. Press **Record Goal**. The hub gives the goal the next ID of its year and names it, for example
+   *Goal ORG-2026-05 recorded*. The **Goal ID** shows under **Organisational Goals**; nobody types
+   or changes it.
 5. {needs="performance edit"} To change one, press it under **Organisational Goals**, then
    **Edit Goal**. Change the **Goal** or **Description**, or a quarter's target, such as
    *Q4 2026 Target*. Each quarter set up in the goal's year has one. Press **Save Goal**. The hub
