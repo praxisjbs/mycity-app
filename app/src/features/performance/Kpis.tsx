@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import kpisContract from "@mycity/contract/schemas/kpis.js";
-import type { Endpoints, Kpi, KpiUnit } from "@mycity/contract/contract.gen.ts";
+import type { Endpoints, Kpi } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -14,8 +14,6 @@ import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Button,
-  ComboField,
-  type ComboFieldProps,
   DataView,
   ErrorState,
   Field,
@@ -29,7 +27,6 @@ import {
   LoadingRows,
   NumberField,
   PageHeader,
-  plural,
   SelectField,
   StatusPill,
   TextField,
@@ -38,7 +35,7 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
-import { bodySchema, figureOf, kpiResult, monthShort, person, reportingMonth, sayRefusal, useQuarter, useSettableFunctions } from "./shared";
+import { bodySchema, figureOf, kpiResult, monthShort, person, reportingMonth, sayRefusal, UnitField, useQuarter, useSettableFunctions } from "./shared";
 
 type KpiCreateBody = Endpoints["POST /api/v1/performance/kpis"]["body"];
 type KpiActualBody = Endpoints["POST /api/v1/performance/kpis/:id/actuals"]["body"];
@@ -47,12 +44,6 @@ const RESULTS: Array<[string, string]> = [["met", "Met"], ["not_met", "Not Met"]
 const DIRECTIONS: Array<[string, string]> = [["higher", "Higher Is Better"], ["lower", "Lower Is Better"]];
 const FREQUENCIES: Array<[string, string]> = [["monthly", "Monthly"], ["weekly", "Weekly"], ["quarterly", "Quarterly"]];
 const naHelp = "No eligible cases this month. It never counts as met.";
-
-/** The Unit field's suggestions: the units already in use, 25 at a time, narrowed as it is typed. */
-function UnitField(binding: Omit<ComboFieldProps<KpiUnit>, "list" | "option" | "sub" | "placeholder">) {
-  const units = usePaged("GET /api/v1/performance/kpis/units", { filters: {} });
-  return <ComboField {...binding} list={units} option={(u) => u.unit} sub={(u) => plural(u.uses, "use")} placeholder="users" />;
-}
 
 export function Kpis() {
   const modal = useModal();

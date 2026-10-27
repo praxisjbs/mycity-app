@@ -157,13 +157,16 @@ page is binding, **Request To Unbind** takes its place.
    64,000`. The **Objective** list holds every objective of the quarter whose plan is a draft,
    awaiting approval, returned or unbound and that you may add to, whatever **Function** Goals
    shows. If the form reads **No Objectives Yet**, set an objective first, or the plan is binding.
-6. Choose its **Measure**: **Numeric**, **Dated** or **Yes or No**.
-7. Fill in the **Target** as a number, and **Target in Words** as people say it, such as
-   `64,000 users`. Tick **Target to be confirmed** if it is not settled yet.
-8. Add the **Unit**, the **Finish** date and the **Owner**. For a function's key result, pick the
-   company key results it **Feeds**.
-9. Press **More** for **Co-Owner**, **Direction** (**Higher Is Better** or **Lower Is Better**),
-   **Baseline**, **Start**, **Type** and **Owner Note**. A company key result also has
+6. Choose its **Measure**: **Numeric**, **Dated** or **Yes or No**. The form shows only what the
+   measure needs.
+7. For **Numeric**, fill in the **Target** as a number. For every measure, fill in **Target in
+   Words** as people say it, such as `64,000 users` or `Launch in Kano`. Tick **Target to be
+   confirmed** if it is not settled yet.
+8. For **Numeric**, pick the **Unit** from the list, or type one the list does not hold and it is
+   offered next time. For every measure, add the **Finish** date and the **Owner**. For a function's
+   key result, pick the company key results it **Feeds**.
+9. Press **More** for **Co-Owner**, **Direction** (**Numeric** only: **Higher Is Better** or **Lower
+   Is Better**), **Baseline**, **Start**, **Type** and **Owner Note**. A company key result also has
    **Scored From** here. The types are explained under [Open a key result](#performance-key-result).
 10. Press **Set Key Result**. The hub gives it its code, such as *BM-KR1.3 set*.
 
