@@ -191,12 +191,28 @@ describeDb("performance plan against the real migrations", () => {
     ids.kr2 = kr2.body.okr_key_result_id;
     // The company key result is wholly delivered by the function's.
     expect((await as("pm").patch(`/performance/key-results/${ids.coKr}`, { scored_from_key_result_id: ids.kr1 })).status).toBe(200);
-    const kpi = await as("head").post("/performance/kpis", { department_id: ids.bm, name: "Assets on time", unit: "%", target_value: "95" });
+    // The target's wording is required; its figure, the unit and the formula are not (§6.5).
+    const noWording = await as("head").post("/performance/kpis", { department_id: ids.bm, name: "Assets on time", unit: "%", target_value: "95" });
+    expect(noWording.status).toBe(422);
+    expect(Object.keys(noWording.body.error.fields)).toEqual(["target_text"]);
+    const kpi = await as("head").post("/performance/kpis", { department_id: ids.bm, name: "Assets on time", unit: "%", target_value: "95", target_text: "≥95%" });
     expect(kpi.status).toBe(201);
     expect(kpi.body.code).toBe("BM-K01");
+    expect(kpi.body).toMatchObject({ target_text: "≥95%", target_value: "95", unit: "%", formula: null });
     ids.kpi = kpi.body.kpi_definition_id;
+    // A KPI's wording can be changed, never cleared.
+    const cleared = await as("head").patch(`/performance/kpis/${ids.kpi}`, { target_text: null });
+    expect(cleared.status).toBe(422);
+    expect(Object.keys(cleared.body.error.fields)).toEqual(["target_text"]);
+    // The units in use are offered from the records that carry them, narrowed as typed.
+    const units = await as("head").get("/performance/kpis/units");
+    expect(units.status).toBe(200);
+    expect(units.body.data).toContainEqual({ unit: "%", uses: expect.any(Number) });
+    expect(units.body.page).toMatchObject({ number: 1, size: 25 });
+    expect((await as("head").get("/performance/kpis/units?q=%25")).body.data.map((u) => u.unit)).toContain("%");
+    expect((await as("head").get("/performance/kpis/units?q=zzzz")).body.data).toEqual([]);
     // Another function's KPI is refused in KPI words, never "goals".
-    const elsewhere = await as("head").post("/performance/kpis", { department_id: ids.tbo, name: "Tickets closed", unit: "%", target_value: "90" });
+    const elsewhere = await as("head").post("/performance/kpis", { department_id: ids.tbo, name: "Tickets closed", unit: "%", target_value: "90", target_text: "≥90%" });
     expect(elsewhere.status).toBe(403);
     expect(elsewhere.body.error.message).toBe("Only the function's head sets its KPIs");
     const trace = await as("ada").get(`/performance/key-results/${ids.kr1}/trace`);
@@ -360,6 +376,13 @@ describeDb("performance plan against the real migrations", () => {
     expect((await as("ada").post("/performance/reports", report({}))).status).toBe(403);
     const figures = async () => (await as("ada").get(`/performance/okrs/summary?period_id=${ids.period}`)).body;
     expect(await figures()).toMatchObject({ key_results: 3, awaiting_report: 3, in_recovery: 0 });
+    // A KPI that was Met or Not Met needs its figure, on its own row, in a report and on Record Actual.
+    const noFigure = await as("head").post("/performance/reports", { ...report({}), kpis: [{ kpi_definition_id: ids.kpi, result: "met" }] });
+    expect(noFigure.status).toBe(422);
+    expect(noFigure.body.error.fields).toEqual({ "kpis.0.actual_value": ["Enter the actual"] });
+    const noActual = await as("head").post(`/performance/kpis/${ids.kpi}/actuals`, { month, result: "not_met" });
+    expect(noActual.status).toBe(422);
+    expect(noActual.body.error.fields).toEqual({ actual_value: ["Enter the actual"] });
     const refused = await as("head").post("/performance/reports", report({ actual_value: "20000" }));
     expect(refused.status).toBe(422);
     expect(refused.body.error.code).toBe("RECOVERY_REQUIRED");

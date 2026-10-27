@@ -322,8 +322,8 @@ head reports how its key results and KPIs did. Management report the company's k
    ![Report Month](shot:performance-report)
 4. If the score falls under 0.4, or the status is **At Risk**, **Off Track** or **Missed**, name
    the **Recovery Owner** and the **Recovery Date**.
-5. Under **KPIs**, for each of the function's KPIs you report, choose its **Result** and fill in the
-   **Actual** and a **Comment**.
+5. Under **KPIs**, for each of the function's KPIs you report, choose its **Result**. For **Met** and
+   **Not Met**, fill in the **Actual**. **N/A** has no **Actual**. Add a **Comment** if it helps.
 6. Press **Report Month**. The hub says **Month reported**. Only the key results and KPIs you
    changed are sent.
 
@@ -338,6 +338,7 @@ its page.
 | **Name owner and date** under **Recovery Owner** | Name the **Recovery Owner** and **Recovery Date** on that key result |
 | **Pick a status** under **Status** | Choose the key result's status |
 | **Like 64000 or 0.95** under **Actual** | Finish the figure, with at most four decimals, such as `0.95`. A key result on another page is named in the message |
+| **Enter the actual** under a KPI's **Actual** | The KPI is **Met** or **Not Met** and has no figure. Fill it in, or choose **N/A** |
 | **Pick a date** under **Recovery Date** | Pick the date the key result should recover by |
 | **Shorten the update** under **Update** | Keep the update shorter |
 | **Only the function's head reports its month** | Ask the head to report it |
@@ -668,17 +669,24 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 2. Pick the **Function** and type the **KPI**, such as `Social response within 24 hours`.
    **Function** lists only the functions you may set KPIs for; a head finds their own already
    picked. **None you may set** means your role sets no function's KPIs.
-3. Add the **Formula** and **Unit** if it has them.
-4. Choose the **Direction**: **Higher Is Better** or **Lower Is Better**. Fill in the **Target** as
-   a figure, or **Target Wording** as people say it. Choose the **Frequency**: **Monthly**,
-   **Weekly** or **Quarterly**.
-5. Name the **Data Source**, where the figure comes from, and press **Set KPI**. The hub gives it
+3. Add the **Formula** if it has one. It is only words, so write how the figure is worked out.
+4. Add the **Unit** if it has one. Type to search the units already in use, then press the one you
+   want. A unit the hub does not know is kept as you typed it: press **Add** beside it.
+5. Choose the **Direction**: **Higher Is Better** or **Lower Is Better**. Fill in **Target Wording**,
+   the target as people say it, such as `95% or more`. Add the **Target** as a figure if it has one.
+   Choose the **Frequency**: **Monthly**, **Weekly** or **Quarterly**.
+6. Name the **Data Source**, where the figure comes from, and press **Set KPI**. The hub gives it
    its ID, such as *BM-K08 set*.
+
+**Function**, **KPI**, **Direction**, **Target Wording** and **Frequency** are needed. **Formula**,
+**Unit**, **Target** and **Data Source** are marked **Optional**. A KPI with no **Target** figure is
+scored from its **Met** or **Not Met** alone.
 
 | The hub says | What it means | What to do |
 |---|---|---|
 | **Only the function's head sets its KPIs** | Your role changed since the page opened | Reload the page and pick again |
-| **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or use **Target Wording** |
+| **Required** under **Target Wording** | The target was left in no words | Say the target in words, such as `0` or `95% or more` |
+| **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or leave it empty |
 
 **Only the function's head sets its KPIs** shows in red above **Set KPI** and stays until you press
 it again. Nothing is saved, and what you typed stays.
@@ -688,17 +696,20 @@ it again. Nothing is saved, and what you typed stays.
 You record your own function's KPIs. Operations and People and the CEO may record any.
 
 1. Open the KPI on [Performance · KPIs](/performance?tab=kpis) and press **Record Actual**.
-2. Pick the **Month**, choose the **Result** (**Met**, **Not Met** or **N/A**), and fill in the
-   **Actual** and a **Comment**.
-3. Press **Record Actual**. The hub says **Actual recorded**.
-4. To change a KPI's words, press **Edit KPI**. Change the **KPI**, **Formula**, **Unit**,
+2. Pick the **Month** and choose the **Result**: **Met**, **Not Met** or **N/A**.
+3. For **Met** and **Not Met**, fill in the **Actual**. **N/A** has no **Actual**, so the field goes.
+   Add a **Comment** if it helps.
+4. Press **Record Actual**. The hub says **Actual recorded**.
+5. To change a KPI's words, press **Edit KPI**. Change the **KPI**, **Formula**, **Unit**,
    **Target Wording** or **Data Source**, and press **Save KPI**. The hub says **KPI saved**.
+   **Target Wording** cannot be left empty.
 
 | The form says | What it means | What to do |
 |---|---|---|
 | **Enter the actual** under **Actual** | **Met** and **Not Met** need the figure | Fill in the **Actual**, or choose **N/A** |
 | **Like 64000 or 0.95** under **Actual** | The figure is unfinished or has more than four decimals | Type the figure only |
 | **Required** under **KPI** | On **Edit KPI**, the **KPI** name is empty | Type it again |
+| **Required** under **Target Wording** | On **Edit KPI**, the wording was emptied | Say the target in words again |
 
 ## Reviews {#performance-reviews screen=performance/reviews icon=ticks}
 
@@ -1308,6 +1319,8 @@ crop: modal
 marks:
   1: label "Function" | Whose KPI
   2: label "KPI" | What it measures
+  3: label "Unit" | Pick or type one
+  4: label "Target Wording" | The target in words
 ```
 
 ```shot performance-pips

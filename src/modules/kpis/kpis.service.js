@@ -106,6 +106,11 @@ async function summary(query) {
   return { kpis: row.kpis, met: row.met, not_met: row.not_met, awaiting: row.awaiting };
 }
 
+/** GET /performance/kpis/units: the units already in use, most used first, narrowed by `q`. */
+function units(query) {
+  return repo.units(pool, query);
+}
+
 /** A function's KPIs, for its plan. */
 async function ofDepartment(db, departmentId) {
   return (await repo.ofDepartment(db, departmentId)).map(kpiView);
@@ -262,4 +267,4 @@ async function removeImported(client, actor, id) {
   });
 }
 
-module.exports = { monthView, kpiView, list, summary, get, ofDepartment, nextCode, create, update, recordIn, recordActual, importKpi, removeImported };
+module.exports = { monthView, kpiView, list, summary, units, get, ofDepartment, nextCode, create, update, recordIn, recordActual, importKpi, removeImported };
