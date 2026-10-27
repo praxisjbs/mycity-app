@@ -227,6 +227,11 @@ merge, retire or delete.
   merge; an open role's line or status; an archive or restore), when a login is made (Invite User)
   or its roles saved (Settings · Users), and on each deploy. Someone with no login gets it with their
   login.
+- **A head's reach is their reporting line** (JBS Praxis, 27/10/2026, asked twice to be sure): the
+  role's `team` scope, as every manager's, never "everyone in the department". Someone in a
+  department whose manager works elsewhere is that manager's to see and approve; moves and head
+  changes already put a department's people under its head, so this happens only where People set
+  such a line on purpose.
 - **Merge Department** moves every person still on the books (not archived) and every role not closed
   into the department picked, as Add People moves them: the old head and anyone whose manager stays
   behind report to its head, and teams keep their lines. Then the department retires with no head,
@@ -455,6 +460,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 27/10/2026 · JP · §6.1 records two more answers of JBS Praxis: a head's reach is their reporting line, not the whole department, and Head of Department goes to heads and acting heads who need it, as built.
 - 27/10/2026 · JP · People · Departments (#103), from JBS Praxis's four answers of 27/10/2026: departments are kept on screen, with nothing about them in code (§1 to §11). Add Department, Edit Department, Set Head (a person or an open role), Add People, Move To, Merge Department, Retire Department, Restore Department and Delete Department (only one never used), on new routes (`GET /departments/:id`, `POST /departments/:id/people`, `POST /departments/:id/merge`, `DELETE /departments/:id`) beside the old ones. Reporting lines follow the head: a new head takes the old head's place and their people, and a person moved in reports to the head unless their manager is already there (§6.1). The head, or whoever acts for an open head role, holds Head of Department while they head, given and taken back by the system (`user_role.from_headship`, migration 2600), so they set the function's goals with no second step. People · Employees gains Move To Department on the rows picked, and a new Department on Edit Record moves the person the same way. ⌘K opens a department on its screen (it opened Settings · Organisation, which never listed them). The deploy loader gives departments and heads only to a database that never had them, and never renames one or sets a head after (foundation.md §6.1). One level only: `parent_department_id` stays unused.
 - 26/10/2026 · JP · Nothing on the Organogram or Org Chart changed. People · Leave, whose code this guide's map also covers, now shows on its chips the unread notices about the requests under each status (ess.md, notifications.md §6).
 - 26/10/2026 · JP · Nothing on the Organogram or Org Chart changed. Beside them, from the QA bug register: ESS · My Leave and People · Leave name the real approver and mark a request past the allowance with its days and balance (`docs/guides/ess.md`), and Add Employee refuses a negative Gross Monthly (`docs/guides/foundation.md` §6).
