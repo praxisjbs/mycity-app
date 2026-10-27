@@ -15,6 +15,7 @@ import { EmployeePicker, PolicyPicker } from "@/features/shared/pickers";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
+import { useScreenAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
@@ -41,13 +42,25 @@ const useConfigure = () => {
   const { me } = useAuth();
   return !!me && hasCapability(me, "queries.configure");
 };
-/** A save that failed: on its fields when the API named them, otherwise in a toast. */
-const failed = (f: { setServerErrors: (x: Record<string, string[]>) => void }) => (e: unknown) => {
-  if (e instanceof ApiError && Object.keys(e.fields ?? {}).length) f.setServerErrors(e.fields);
-  else toast(e instanceof ApiError ? e.message : "Not saved");
+/**
+ * A save that failed: on its fields when the API named fields this form has, otherwise in a toast,
+ * so a refusal about something the form does not show is never silent.
+ */
+const failed = (f: { values: object; setServerErrors: (x: Record<string, string[]>) => void }) => (e: unknown) => {
+  const fields = e instanceof ApiError ? (e.fields ?? {}) : {};
+  const known = Object.keys(fields).filter((k) => k in f.values);
+  if (known.length) f.setServerErrors(fields);
+  if (known.length < Object.keys(fields).length || !known.length) toast(e instanceof ApiError ? e.message : "Not saved");
+};
+/** May this reader raise a query: `queries` create, which the API asks for (guide §8). */
+const useMayRaise = () => {
+  const { me } = useAuth();
+  return !!me?.grants.queries?.includes("create");
 };
 
 /* ───────────── Queries ───────────── */
+
+const ESCALATED_HELP = "A sanction is waiting for approval.";
 
 function queryStatus(q: Pick<Query, "status" | "outcome" | "escalated">) {
   if (q.status === "resolved") return q.outcome === "sanctioned" ? pill("neutral", "Sanctioned") : pill("ok", "Closed, No Action");
@@ -58,6 +71,9 @@ function queryStatus(q: Pick<Query, "status" | "outcome" | "escalated">) {
 function QueriesTab({ id }: { id: string | null }) {
   const modal = useModal();
   const phone = useIsPhone();
+  const mayRaise = useMayRaise();
+  const raise = () => modal.open({ title: "Raise a Query", body: (close) => <RaiseQuery close={close} /> });
+  useScreenAction(mayRaise ? { label: "Raise a Query", onSelect: raise } : null);
   const [raised, setRaised] = useState<"all" | "mine">("all");
   const s = useApi("GET /api/v1/queries/summary");
   const list = usePaged("GET /api/v1/queries", { filters: raised === "mine" ? { raised: "mine" } : {}, sort: "-created_at" });
@@ -71,15 +87,21 @@ function QueriesTab({ id }: { id: string | null }) {
       <PageHeader
         title="Queries"
         sub="Every query and its outcome"
-        actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Raise a Query", body: (close) => <RaiseQuery close={close} /> })}>Raise a Query</Button>}
+        actions={mayRaise ? <Button variant="primary" icon="plus" onClick={raise}>Raise a Query</Button> : undefined}
       />
       {s.data && (
+        // A phone shows the two that ask for action (guide §10.2).
         <KpiTiles
+          mobileCols={2}
           items={[
             { label: "Open", value: String(s.data.open), tone: s.data.open ? "warn" : "ok" },
             { label: "Awaiting Response", value: String(s.data.awaiting_response) },
-            { label: "Closed This Month", value: String(s.data.closed_this_month), tone: "ok" },
-            { label: "Escalated", value: String(s.data.escalated), tone: s.data.escalated ? "err" : undefined },
+            ...(phone
+              ? []
+              : [
+                  { label: "Closed This Month", value: String(s.data.closed_this_month), tone: "ok" as const },
+                  { label: "Escalated", value: String(s.data.escalated), tone: s.data.escalated ? ("err" as const) : undefined, help: ESCALATED_HELP },
+                ]),
           ]}
         />
       )}
@@ -108,10 +130,17 @@ function QueriesTab({ id }: { id: string | null }) {
         <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Query">
           {focus ? <QueryCard id={focus} /> : <Card><EmptyState bare icon="doc" title="No Query Open" text="Pick a query to see it here." /></Card>}
         </DetailPane>
-        {s.data ? <BarsCard title="Queries by Reason" rows={s.data.by_reason.map((r) => ({ label: r.label, pct: Math.round((r.count / top) * 100), value: String(r.count) }))} /> : <Card><LoadingRows /></Card>}
+        {phone ? null : s.data ? <BarsCard title="Queries by Reason" rows={s.data.by_reason.map((r) => ({ label: r.label, pct: Math.round((r.count / top) * 100), value: String(r.count) }))} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );
+}
+
+/** The query's sanction as its card names it: a refused or withdrawn proposal says so. */
+function sanctionLine(s: NonNullable<QueryDetail["sanction"]>) {
+  if (s.status === "rejected") return `${s.step_name}, Not Approved`;
+  if (s.status === "withdrawn") return `${s.step_name}, Withdrawn`;
+  return `${s.step_name}${s.number ? `, ${s.number}` : ""}`;
 }
 
 function QueryCard({ id }: { id: string }) {
@@ -121,6 +150,11 @@ function QueryCard({ id }: { id: string }) {
   if (q.error) return <Card><ErrorState error={q.error} onRetry={q.reload} /></Card>;
   if (!q.data) return <Card><LoadingRows /></Card>;
   const d = q.data;
+  // A sanction settles after the approval commits (the worker issues it): read the card again then.
+  const settled = () => {
+    q.reload();
+    for (const ms of [1500, 4000]) window.setTimeout(() => (invalidate("/api/v1/queries"), invalidate("/api/v1/sanctions"), q.reload()), ms);
+  };
   const sendReminder = async () => {
     await remind.run({ params: { id: d.employee_query_id }, body: {} });
     q.reload();
@@ -138,8 +172,8 @@ function QueryCard({ id }: { id: string }) {
           ...(d.evidence.length ? ([["Counted", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),
           ...(d.policy ? ([["Policy", <PolicyCited key="p" policy={d.policy} clause={d.policy_clause} />]] as Array<[string, React.ReactNode]>) : []),
           ...(d.response ? ([["Response", <RichText key="r" blocks={d.response.blocks} top={4} />]] as Array<[string, React.ReactNode]>) : []),
-          ...(d.sanction ? ([["Sanction", `${d.sanction.step_name}${d.sanction.number ? `, ${d.sanction.number}` : ""}`]] as Array<[string, string]>) : []),
-          ...(d.approval ? ([["Waiting On", d.approval.stage_name]] as Array<[string, string]>) : []),
+          ...(d.sanction ? ([["Sanction", sanctionLine(d.sanction)]] as Array<[string, string]>) : []),
+          ...(d.approval ? ([[<HelpTerm key="w" help={ESCALATED_HELP}>Waiting On</HelpTerm>, d.approval.stage_name]] as Array<[React.ReactNode, string]>) : []),
         ]}
       />
       <ActionGroup>
@@ -149,8 +183,8 @@ function QueryCard({ id }: { id: string }) {
         {d.can_decide && <Button variant="primary" onClick={() => modal.open({ title: `Decision on ${d.number}`, body: (close) => <Decide q={d} close={close} onDone={q.reload} /> })}>Record Decision</Button>}
         {d.approval?.can_decide && d.sanction && (
           <>
-            <Button onClick={() => modal.open({ title: `Reject ${d.sanction!.step_name}`, body: (close) => <RejectSanction id={d.sanction!.sanction_id} close={close} onDone={q.reload} /> })}>Reject</Button>
-            <Button variant="primary" onClick={() => modal.open({ title: `Approve ${d.sanction!.step_name}`, body: (close) => <ApproveSanction id={d.sanction!.sanction_id} signs={d.approval!.signs} close={close} onDone={q.reload} /> })}>Approve Sanction</Button>
+            <Button onClick={() => modal.open({ title: `Reject ${d.sanction!.step_name}`, body: (close) => <RejectSanction id={d.sanction!.sanction_id} close={close} onDone={settled} /> })}>Reject</Button>
+            <Button variant="primary" onClick={() => modal.open({ title: `Approve ${d.sanction!.step_name}`, body: (close) => <ApproveSanction id={d.sanction!.sanction_id} signs={d.approval!.signs} close={close} onDone={settled} /> })}>Approve Sanction</Button>
           </>
         )}
         </div>
@@ -230,8 +264,8 @@ function RaiseQuery({ close }: { close: () => void }) {
       <div className={step.open ? "hidden" : undefined}>
       <WriteWithAiButton status={ai.data} open={() => setStep({ mounted: true, open: true })} />
       <Field label="Employee" state={tried && !employee ? "bad" : undefined} message={tried && !employee ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label="Subject" {...f.status("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out" /></Field>
-      <Field label="What Happened" {...f.status("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
+      <Field label="Subject" {...f.status("subject")}><TextField {...f.field("subject")} placeholder="Late weekly report" /></Field>
+      <Field label="What Happened" {...f.status("details")}><TextAreaField {...f.field("details")} placeholder="Report due 14/10, sent 16/10" /></Field>
       <Field label="Policy" optional {...f.status("policy_id")}>
         <PolicyPicker value={policy} onChange={(p) => (setPolicy(p), f.set("policy_id", p[0]?.policy_id ?? ""))} />
       </Field>
@@ -248,11 +282,24 @@ function RaiseQuery({ close }: { close: () => void }) {
   );
 }
 
-type DecideValues = { outcome: string; consequence_step_id: string; reason: string; fine_amount: string; effective_on: string; ends_on: string };
+type DecideValues = { outcome: string; consequence_step_id: string; reason: string; fine_amount: string; effective_on: string; ends_on: string; evidence: string };
+/** The evidence typed, one item a line (a rung may require it, guide §6.4). */
+const evidenceOf = (v: DecideValues) =>
+  v.evidence
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((label) => ({ label: label.slice(0, 200) }));
 const decisionOf = (v: DecideValues) => ({
   outcome: v.outcome as "no_action" | "sanction",
   reason: v.reason,
-  ...(v.outcome === "sanction" && { consequence_step_id: v.consequence_step_id || undefined, fine_amount: v.fine_amount.replace(/,/g, ""), effective_on: v.effective_on, ends_on: v.ends_on }),
+  ...(v.outcome === "sanction" && {
+    consequence_step_id: v.consequence_step_id || undefined,
+    fine_amount: v.fine_amount.replace(/,/g, ""),
+    effective_on: v.effective_on,
+    ends_on: v.ends_on,
+    ...(evidenceOf(v).length && { evidence: evidenceOf(v) }),
+  }),
 });
 const money = (s: string) => (s && !s.includes(".") ? `${s}.00` : s && /\.\d$/.test(s) ? `${s}0` : s);
 
@@ -260,7 +307,7 @@ function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDon
   const chain = useApi("GET /api/v1/sanctions/chain", { query: { active: "true" } });
   // Nobody signs a proposal: Operations & People sign when they approve it (guide §6.4).
   const f = useContractForm<DecideValues>(
-    { outcome: "no_action", consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "" },
+    { outcome: "no_action", consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "", evidence: "" },
     {
       safeParse: (value: unknown) => {
         const v = value as DecideValues;
@@ -271,8 +318,13 @@ function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDon
   const save = useMutation("POST /api/v1/queries/:id/decision");
   const steps = (chain.data?.data ?? []).filter((s) => s.letter_ready);
   const chosen = steps.find((s) => s.consequence_step_id === f.values.consequence_step_id);
+  const needsEvidence = f.values.outcome === "sanction" && !!chosen?.evidence_required;
   const submit = async () => {
     if (!f.check()) return;
+    if (needsEvidence && !evidenceOf(f.values).length) {
+      f.setServerErrors({ evidence: ["Add the evidence"] });
+      return;
+    }
     try {
       const body = {
         ...decisionOf(f.values),
@@ -302,6 +354,11 @@ function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDon
               <Field label="From" optional {...f.status("effective_on")}><DateField {...f.field("effective_on")} /></Field>
               <Field label="To" optional {...f.status("ends_on")}><DateField {...f.field("ends_on")} /></Field>
             </Grid>
+          )}
+          {needsEvidence && (
+            <Field label={<HelpTerm help="This step needs the facts it rests on. One item a line.">Evidence</HelpTerm>} {...f.status("evidence")}>
+              <TextAreaField {...f.field("evidence")} rows={3} placeholder="Site log, 14/10" />
+            </Field>
           )}
           <Field label={<HelpTerm help="A fine reaches payroll as a pending deduction, accepted there, never automatic.">Fine</HelpTerm>} optional {...f.status("fine_amount")}>
             <MoneyField {...f.field("fine_amount")} />
@@ -336,7 +393,8 @@ function ApproveSanction({ id, signs, close, onDone }: { id: string; signs: bool
       invalidate("/api/v1/sanctions");
       onDone();
       close();
-      toast(r.status === "issued" ? `${r.number} issued, letter sent` : "Approved, sent on to the CEO");
+      // Approving the last stage issues it a moment later; a further stage names who is next.
+      toast(r.status === "issued" ? `${r.number} issued, letter sent` : r.waiting_on ? `Sent on to the ${r.waiting_on}` : "Sanction approved, letter follows");
     } catch (e) {
       failed(f)(e);
     }
@@ -404,6 +462,7 @@ const threshold = (r: QueryRule) => (r.measure === "minutes" ? `${r.threshold} m
 
 function Rules() {
   const modal = useModal();
+  const phone = useIsPhone();
   const configure = useConfigure();
   const s = useApi("GET /api/v1/query-rules/summary");
   const rules = usePaged("GET /api/v1/query-rules", { sort: "name" });
@@ -428,7 +487,9 @@ function Rules() {
         actions={configure && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })}>New Rule</Button>}
       />
       {s.data && <KpiTiles items={[{ label: "Active Rules", value: String(s.data.active) }, { label: "Draft", value: String(s.data.draft) }, { label: "Fired This Month", value: String(s.data.fired_this_month) }, { label: "Queries Raised", value: String(s.data.queries_raised) }]} />}
-      {rules.loading && !rules.rows.length ? <Card><LoadingRows /></Card> : (
+      {rules.error ? <Card><ErrorState error={rules.error} onRetry={() => invalidate("/api/v1/query-rules")} /></Card> : rules.loading && !rules.rows.length ? <Card><LoadingRows /></Card> : !rules.rows.length ? (
+        <Card><EmptyState bare icon="doc" title="No Rules Yet" text="A rule raises a query by itself." /></Card>
+      ) : (
         <Grid cols={3}>
           {rules.rows.map((r: QueryRule) => (
             <Card key={r.query_rule_id}>
@@ -446,6 +507,8 @@ function Rules() {
           ))}
         </Grid>
       )}
+      {/* Left off a phone (guide §10.2). */}
+      {!phone && (
       <Grid cols={2} className="mt-3">
         <PagedTable<QueryRuleFiring>
           title="Recent Firings"
@@ -461,6 +524,7 @@ function Rules() {
           ]}
         />
       </Grid>
+      )}
     </>
   );
 }

@@ -335,7 +335,8 @@ const SANCTIONS: SanctionDetail[] = [];
 function issue(q: Row, stepName: string, daysAgo: number, fine: string | null): SanctionDetail {
   const step = STEPS.find((s) => s.name === stepName)!;
   const s: SanctionDetail = {
-    sanction_id: sid(`san:${q.number}`), number: `SAN-${String(SANCTIONS.length + 1).padStart(4, "0")}`, employee: q.employee,
+    // Seeded by how many came before, so a query proposed again after a refusal gets a new sanction.
+    sanction_id: sid(`san:${q.number}:${SANCTIONS.length}`), number: `SAN-${String(SANCTIONS.length + 1).padStart(4, "0")}`, employee: q.employee,
     employee_query_id: q.employee_query_id, query_number: q.number, consequence_step_id: step.consequence_step_id, sanction_type: step.code,
     step_name: step.name, reason: "The explanation was not accepted.", decided_by: uid("cynthia"), decided_by_name: "Cynthia Osakunih",
     effective_on: isoDaysAgo(daysAgo), ends_on: null, status: "issued",
@@ -487,7 +488,7 @@ route("POST /api/v1/queries/:id/decision", (req) => {
   const q = findQ(user, req.params.id);
   if (!q) return notFound();
   if (!view(q, user).can_decide) return fail(409, "QUERY_NOT_DECIDABLE", "Wait for the response or the deadline");
-  const b = req.body as { outcome?: string; reason?: string; consequence_step_id?: string; fine_amount?: string; effective_on?: string; ends_on?: string };
+  const b = req.body as { outcome?: string; reason?: string; consequence_step_id?: string; fine_amount?: string; effective_on?: string; ends_on?: string; evidence?: Array<{ label: string }> };
   if (!b.reason || b.reason.trim().length < 10) return invalid({ reason: ["Record the reason"] });
   if (b.outcome === "no_action") {
     Object.assign(q, { status: "resolved", outcome: "no_action", reviewed_at: now(), reviewed_by_name: nameOf(user) });
@@ -496,7 +497,9 @@ route("POST /api/v1/queries/:id/decision", (req) => {
   const step = STEPS.find((s) => s.consequence_step_id === b.consequence_step_id && s.active);
   if (!step) return invalid({ consequence_step_id: ["Pick the sanction"] });
   if (!stepView(step).letter_ready) return fail(422, "LETTER_NOT_READY", "This sanction's letter is not ready", { consequence_step_id: ["Letter not ready"] });
+  if (step.evidence_required && !b.evidence?.length) return fail(422, "EVIDENCE_REQUIRED", "This sanction needs evidence", { evidence: ["Add the evidence"] });
   const s = issue(q, step.name, 0, b.fine_amount || null);
+  s.evidence = b.evidence ?? [];
   Object.assign(s, { number: null, status: "pending_approval", reason: b.reason.trim(), decided_by: uid(user), decided_by_name: nameOf(user), letter_document_id: null, fine_letter_document_id: null, waiting_on: "Operations & People", workflow_instance_id: sid(`wf:${s.sanction_id}`) });
   q.sanction = { sanction_id: s.sanction_id, number: null, step_name: s.step_name, status: "pending_approval" };
   Object.assign(q, { status: "under_review", escalated: true, workflow_instance_id: s.workflow_instance_id });

@@ -421,8 +421,8 @@ or tier 2.**
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature; Write With AI (What To Say, Write Draft, the draft, Try Again, Use Draft), reading AI Is Off or AI Limit Reached when it cannot answer | None | Where the signature is kept, the version cited: §6.2 |
-| Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by (a person, the rule, or Attendance Policy), raised, response due, counted days, response, sanction, and while a sanction waits: its step and who it waits on); Raise a Query, Send Reminder, View Letter (the PDF the employee received), Record Decision; Approve Sanction (Your Signature at the Operations & People stage) and Reject (Reason) for whoever it waits on | Help on Escalated: a sanction is waiting for approval. Help on Response Due: the 24 hour window. Help on Your Signature when approving: it signs the letters | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
-| Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, fine, reason | Help on the next rung: why it is offered | The approval route and its thresholds: Settings · Approvals, §6.5 |
+| Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by (a person, the rule, or Attendance Policy), raised, response due, counted days, response, sanction, and while a sanction waits: its step and who it waits on); Raise a Query (only with `queries` create; also from ⌘K), Send Reminder, View Letter (the PDF the employee received), Record Decision; Approve Sanction (Your Signature at the Operations & People stage) and Reject (Reason) for whoever it waits on; a refused proposal reads "Not Approved" | Help on Escalated (the KPI) and on Waiting On: a sanction is waiting for approval. Help on Response Due: the 24 hour window. Help on Your Signature when approving: it signs the letters | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
+| Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, Evidence (one item a line) for a step that requires it, fine, reason | Help on the next rung: why it is offered. Help on Evidence: the step needs the facts it rests on | The approval route and its thresholds: Settings · Approvals, §6.5 |
 | Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status); Recent Firings; New Rule, Edit Rule, Activate, Pause; the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional) | None | Counting after the last query, the dedup key: §6.3 |
 | Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
@@ -512,6 +512,12 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 27/10/2026 · GE · From the audit, the screens (§10): Record Decision asks for Evidence on a step
+  that requires it (the top two could not be proposed); Raise a Query only with `queries` create,
+  and on ⌘K; after Approve Sanction the card is read again once the worker has issued it, and the
+  toast names who is next; a refused proposal reads Not Approved; a phone shows two KPIs and leaves
+  off Queries by Reason and Recent Firings (§10.2); Rules has its empty and error states; My
+  Queries' Respond says why it failed.
 - 27/10/2026 · GE · From the audit (handoff §8): a sanction is decided only on the query's card (the
   generic workflow routes refuse it), never by the person queried, and the approver is checked
   before their signature is kept (§5, §6.4); the CEO is asked by the rung's financial effect, not

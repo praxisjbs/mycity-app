@@ -147,6 +147,12 @@ const ACTIONS = Object.freeze([
     capability: "policies.manage",
     words: ["policy", "write a policy", "company policy", "handbook", "attendance policy"],
   }),
+  a("raise_query", "Raise a Query", {
+    screen: "queries.queries",
+    params: { action: "new" },
+    need: ["queries", "create"],
+    words: ["query", "issue a query", "query letter", "discipline", "misconduct", "explain in writing"],
+  }),
   a("clock_in", "Clock In", {
     screen: "ess.my-attendance",
     run: "clock",

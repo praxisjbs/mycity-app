@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import queries from "@mycity/contract/schemas/queries.js";
 import type { MyQuery, MySanction } from "@mycity/contract/contract.gen.ts";
@@ -138,8 +139,10 @@ function Respond({ q, close }: { q: MyQuery; close: () => void }) {
       invalidate("/api/v1/ess/queries");
       close();
       toast("Response sent");
-    } catch {
-      f.setServerErrors(send.fields);
+    } catch (e) {
+      // On the box when the API named it; anything else (already answered, offline) in a toast.
+      if (e instanceof ApiError && e.fields?.body_html) f.setServerErrors(e.fields);
+      else toast(e instanceof ApiError ? e.message : "Not sent");
     }
   };
   return (

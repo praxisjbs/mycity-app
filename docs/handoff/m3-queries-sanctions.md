@@ -303,6 +303,9 @@ Also agreed the same day:
   approver checked before the signature is kept, the CEO by the rung's effect, the letter kept at
   proposal, `signed_by` RESTRICT and indexed, the breach locked, the letterhead's For line, 3099's
   types retired, the staging seed on the Implementation department's accounts (TB).
+- 27/10/2026 · GE · §8 screens fixed: Evidence on Record Decision, Raise a Query gated and on ⌘K, the
+  card read again after Approve Sanction with the right toast, Not Approved, ESS Respond's errors,
+  the phone layout and Escalated's help, Rules' empty and error states; 35 pictures retaken.
 
 ---
 
@@ -325,7 +328,7 @@ checked against the code. Tick it here when fixed, with the commit.
   10 character reason. Refuse `queries.consequence` on the generic workflow routes (decided on the
   query's card only), and have `settle()` refuse to issue without `signed_by`. Guide §5's closing
   note still names the generic routes.
-- [ ] **Rungs that require evidence cannot be proposed.** Record Decision has no Evidence field, the
+- [x] **Rungs that require evidence cannot be proposed.** Record Decision has no Evidence field, the
   service answers 422 `EVIDENCE_REQUIRED` on `evidence`, and the form shows nothing. The staging seed
   sets it on Suspension Without Pay and Dismissal or Termination. Add the field (or drop the flag),
   show field errors without a field as a toast, and fix the manual's "Add it" row.
@@ -346,16 +349,16 @@ checked against the code. Tick it here when fixed, with the commit.
 - [x] **A sanction can stick in Pending Approval.** If Chain Settings points the rung at a draft
   letter after the proposal, `settle()` throws `LETTER_NOT_READY` in the outbox for ever. Keep the
   letter's key on the sanction at proposal.
-- [ ] **After Approve Sanction the card is stale and the toast wrong.** The sanction settles in the
+- [x] **After Approve Sanction the card is stale and the toast wrong.** The sanction settles in the
   outbox, so the response is still pending: "Approved, sent on to the CEO" shows for a Caution, and
   the card stays Escalated until a reload. Choose the toast from `waiting_on`, refresh again after
   the worker, and have the mock settle late so a test sees it.
-- [ ] **A rejected sanction still reads as the query's Sanction** on the card.
-- [ ] **Raise a Query is shown to people the API refuses** (the employee role's `queries` view, own
+- [x] **A rejected sanction still reads as the query's Sanction** on the card.
+- [x] **Raise a Query is shown to people the API refuses** (the employee role's `queries` view, own
   scope). Gate it on `queries create`; add `raise_query` to ⌘K (it is not findable).
-- [ ] **A failed ESS response says nothing** (`ess/Queries.tsx`: the catch reads the old render's
+- [x] **A failed ESS response says nothing** (`ess/Queries.tsx`: the catch reads the old render's
   fields). Use the `failed(f)` pattern.
-- [ ] **Phone layout against guide §10.2:** four KPIs stacked (two asked for), Queries by Reason and
+- [x] **Phone layout against guide §10.2:** four KPIs stacked (two asked for), Queries by Reason and
   Recent Firings shown (left off). Escalated has no help term (§10.1).
 - [x] **`sanction.signed_by`** (3040) has no ON DELETE and no index.
 - [x] **The signature is stored before the approver is checked**, leaving an orphan file on a 403.

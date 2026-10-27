@@ -27,6 +27,9 @@ if (!("ResizeObserver" in window)) {
   };
 }
 
+// The select menu scrolls its picked option into view; jsdom has no layout.
+Element.prototype.scrollIntoView ??= () => undefined;
+
 beforeEach(() => setViewport(1440));
 afterEach(() => {
   cleanup();
@@ -115,5 +118,33 @@ describe("Queries & Sanctions · Rules", () => {
     fireEvent.change(clause, { target: { value: "x".repeat(301) } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save Rule" }));
     await waitFor(() => expect(within(dialog).getByText("At most 300 characters")).toBeTruthy());
+  }, 30000);
+});
+
+describe("Queries & Sanctions · recording a decision", () => {
+  it("asks for the evidence a step requires before anything is sent", async () => {
+    await signedInAs("cynthia@mycityapp.io", "queries", sid("qry:13"));
+    fireEvent.click(await screen.findByRole("button", { name: "Record Decision" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Sanction" }));
+    // Caution, the step offered first, asks for no evidence.
+    expect(within(dialog).queryByText("Evidence")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("combobox", { name: /Sanction/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "Suspension Without Pay" }));
+    expect(await within(dialog).findByText("Evidence")).toBeTruthy();
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Reason" }), { target: { value: "The explanation does not hold up." } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Record Decision" }));
+    await waitFor(() => expect(within(dialog).getByText("Add the evidence")).toBeTruthy());
+  }, 30000);
+});
+
+describe("Queries & Sanctions · who may raise", () => {
+  it("offers Raise a Query only to those who may raise one", async () => {
+    await signedInAs("cynthia@mycityapp.io", "queries");
+    expect(await screen.findByRole("button", { name: "Raise a Query" })).toBeTruthy();
+    cleanup();
+    await signedInAs("chidera@mycityapp.io", "queries");
+    await screen.findByRole("heading", { name: "Queries" });
+    expect(screen.queryByRole("button", { name: "Raise a Query" })).toBeNull();
   }, 30000);
 });

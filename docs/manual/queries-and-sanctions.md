@@ -30,7 +30,7 @@ Queries lists each query you may see, newest first, with its outcome.
 
 1. Open [Queries & Sanctions · Queries](/queries?tab=queries).
 2. The tiles count the queries that are **Open**, **Awaiting Response**, **Closed This Month** and
-   **Escalated**.
+   **Escalated**. A phone shows the first two.
 3. Press **All Queries** to see every query you may see, or **Raised by Me** for your own.
 4. Type in the search box to find a query by name, number or subject.
 5. Press a query. On a computer it opens beside the list; on a phone it opens over it.
@@ -50,7 +50,8 @@ Queries lists each query you may see, newest first, with its outcome.
 | **Closed, No Action** | It was closed without a sanction |
 | **Sanctioned** | It ended in a sanction |
 
-**Queries by Reason** shows how many queries each rule raised, and how many people raised.
+On a computer, **Queries by Reason** shows how many queries each rule raised, and how many people
+raised.
 
 ### Raise a query {#queries-raise needs="queries create"}
 
@@ -109,13 +110,16 @@ query about themselves.
 5. For **Sanction**, pick the step under **Sanction**. The step marked **Next** is the one after the
    highest still in force for this person.
 6. For a suspension without pay, check the dates under **From** and **To**.
-7. To add a fine, type the amount under **Fine**. Payroll accepts it before anything is deducted.
-8. Type the **Reason**.
-9. Press **Record Decision**. The hub says **Sanction sent for approval**, and the query shows
+7. For a step that needs evidence, such as Suspension Without Pay or Dismissal or Termination,
+   list it under **Evidence**, one item a line.
+8. To add a fine, type the amount under **Fine**. Payroll accepts it before anything is deducted.
+9. Type the **Reason**.
+10. Press **Record Decision**. The hub says **Sanction sent for approval**, and the query shows
    **Escalated**.
 
 Operations & People approve every sanction, and sign it as they do. From Suspension Without Pay up,
-the CEO approves it after them. Whoever proposed it cannot approve it. Once it is approved, its
+the CEO approves it after them. Whoever proposed it cannot approve it, and nobody approves a
+sanction about themselves. Once it is approved, its
 letter is made, filed to the employee's documents and emailed to them. With a fine, a Salary
 Deduction Letter goes with it.
 
@@ -130,7 +134,7 @@ Deduction Letter goes with it.
 | *This query is already closed* | Someone decided it first | Read its status |
 | *A sanction already waits for approval* | A sanction was already proposed | Wait for the approval |
 | *This sanction's letter is not ready* | The step has no active letter | Ask whoever keeps the letters to finish it |
-| *This sanction needs evidence* | That step asks for evidence | Add it, then try again |
+| *Add the evidence* | That step asks for evidence | Fill in **Evidence**, one item a line, then try again |
 
 ### Approve or reject a sanction {#queries-approve needs="queries approve"}
 
@@ -142,15 +146,20 @@ A proposed sanction waits on the query's card for whoever must approve it.
    ![Approve Sanction](shot:queries-approve)
 3. At **Operations & People**, sign in **Your Signature**. It is printed on the sanction's letters,
    with your name and job title.
-4. Press **Approve Sanction**. The hub says the sanction was issued and its letter sent, or that it
-   went on to the CEO.
+4. Press **Approve Sanction**. The hub says it was sent on to the CEO, or that the sanction was
+   approved and its letter follows. The card shows the sanction's number once it is issued.
 5. To refuse it, press **Reject**, type the **Reason** and press **Reject**. The hub says
-   **Sanction rejected**, and the query is back **Under Review**.
+   **Sanction rejected**, the query is back **Under Review**, and its sanction reads **Not
+   Approved**.
 
 | The hub says | Why | What to do |
 |---|---|---|
 | *Sign in the box* | Operations & People sign when they approve | Sign, then press **Approve Sanction** |
 | *This sanction was already decided* | Someone decided it first | Read its status |
+| *You cannot decide your own sanction* | The sanction is about you | Someone else in Operations & People decides it |
+
+> **Tip:** A sanction is approved only here, on the query's card, though it also shows in My
+> Approvals.
 
 ## Rules {#queries-rules screen=queries/rules icon=flag}
 
@@ -167,8 +176,8 @@ missing clock-outs are counted by the Attendance policy, which raises their quer
    **Queries Raised**.
 3. Each rule is a card: what it **Counts**, its **Threshold** such as *3 in 30 days*, the **Policy**
    it enforces, and **Active**, **Draft** or **Paused**.
-4. **Recent Firings** lists the queries the rules raised, with the **Rule**, when it **Fired**, the
-   **Employee** and the **Query**'s status.
+4. On a computer, **Recent Firings** lists the queries the rules raised, with the **Rule**, when it
+   **Fired**, the **Employee** and the **Query**'s status.
 
 | What a rule counts | What it means |
 |---|---|
