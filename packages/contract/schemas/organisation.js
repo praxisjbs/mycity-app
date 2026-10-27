@@ -615,6 +615,21 @@ const OrgSeatUpdate = z
  */
 const OrgChartQuery = z.object({ view: z.enum(["builder", "viewer"]).default("viewer") }).strict();
 
+/**
+ * A department a node heads, or acts for while its head role is open, and the words of the Head
+ * mark its card carries: Head, Acting Head, and the department's code when it is not the card's
+ * own (Acting Head · PG). docs/guides/organogram.md §6.
+ */
+const OrgNodeHead = z
+  .object({
+    department_id: uuid,
+    name: z.string(),
+    code: z.string(),
+    acting: z.boolean(),
+    mark: z.string(),
+  })
+  .strict();
+
 const OrgNode = z
   .object({
     node_id: uuid,
@@ -633,6 +648,8 @@ const OrgNode = z
     meta: z.string().nullable(),
     /** The person's photo at the list size; null for a vacant seat or someone with none. */
     photo_url: z.string().nullable(),
+    /** The departments it heads or acts for, its own first; empty for most cards. */
+    heads: z.array(OrgNodeHead),
   })
   .strict();
 
@@ -678,6 +695,8 @@ const OrgChartDocumentVars = z
           dotted: z.string().nullable(),
           vacant: z.boolean(),
           ceo: z.boolean(),
+          /** The Head marks, as the screen's card says them. */
+          heads: z.array(z.object({ mark: z.string() }).strict()),
         })
         .strict(),
     ),
@@ -891,7 +910,7 @@ const TABLES = {
   OrgChartQuery: { table: null, reason: "which view of the tree is asked for" },
   OrgNode: {
     table: null,
-    reason: "one node of the reporting tree: an employee or a vacant seat, flattened for the chart, with the employee's photo_url",
+    reason: "one node of the reporting tree: an employee or a vacant seat, flattened for the chart, with the employee's photo_url and the departments it heads",
   },
   OrgChartTree: { table: null, reason: "the whole bounded tree and its counts" },
   OrgChartExportRequest: { table: null, reason: "which view of the tree Download PDF draws" },

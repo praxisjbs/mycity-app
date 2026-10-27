@@ -23,6 +23,7 @@
   .oc-title { margin-top: 0.5mm; font-size: 6.5pt; line-height: 1.25; max-height: 2.5em; overflow: hidden; color: #71717A; }
   .oc-dept { display: inline-block; margin-top: 1mm; padding: 0.2mm 2mm; font-size: 6pt; font-weight: 600; color: #6A6A72; background: #F8FAFA; border: 0.25mm solid #E4E4E7; border-radius: 999px; }
   .oc-sub { margin-top: 0.6mm; font-size: 6pt; color: #6A6A72; }
+  .oc-head { display: inline-block; margin: 1mm 0.5mm 0 0.5mm; padding: 0.2mm 2mm; font-size: 6pt; font-weight: 600; color: #1D4ED8; background: #F7F8FE; border: 0.25mm solid #1D4ED8; border-radius: 999px; }
   .oc-dotted { display: inline-block; margin-top: 0.8mm; padding: 0 1.5mm; font-size: 5.8pt; color: #6A6A72; border: 0.25mm dashed #71717A; border-radius: 999px; }
 </style>
 <p class="oc-meta"><strong>{{ seats }} seats</strong> · {{ filled }} filled · {{ open }} open</p>
@@ -33,7 +34,7 @@
     <div class="oc-av">{{#if vacant}}+{{else}}{{ initials }}{{/if}}</div>
     <div class="oc-name">{{ name }}</div>
     <div class="oc-title">{{ title }}</div>
-    {{#if vacant}}{{else}}<span class="oc-dept">{{ department }}</span>{{/if}}
+    {{#if vacant}}{{else}}<span class="oc-dept">{{ department }}</span>{{/if}}{{#each heads}}<span class="oc-head">{{ mark }}</span>{{/each}}
     {{#if meta}}<div class="oc-sub">{{ meta }}</div>{{/if}}
     {{#if dotted}}<div><span class="oc-dotted">Dotted line · {{ dotted }}</span></div>{{/if}}
   </div>{{/each}}

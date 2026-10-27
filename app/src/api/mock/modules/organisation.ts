@@ -704,6 +704,22 @@ route("PATCH /api/v1/org-seats/:id", (req) => {
   return ok(seatRow(seat));
 });
 
+/**
+ * A card's Head marks, as the API works them out (organogram.md §6): Head on a department's head
+ * or its open head role, Acting Head on the person above an open one, another department's code after.
+ */
+const headsOf = (nodeId: string, department: string): OrgNode["heads"] =>
+  DEPTS.filter((d) => d.active)
+    .sort((a, b) => Number(b.name === department) - Number(a.name === department) || a.name.localeCompare(b.name))
+    .flatMap((d) => {
+      const seat = SEATS.find((s) => s.org_seat_id === d.head_seat_id && s.status === "vacant");
+      const heads = byKey(d.head_key)?.employee_id === nodeId || seat?.org_seat_id === nodeId;
+      const acting = !heads && Boolean(seat) && actingOf(d)?.employee_id === nodeId;
+      if (!heads && !acting) return [];
+      const mark = `${acting ? "Acting Head" : "Head"}${d.name === department ? "" : ` · ${d.code}`}`;
+      return [{ department_id: d.department_id, name: d.name, code: d.code, acting, mark }];
+    });
+
 /* The reporting tree. A complete set by design: a tree with a missing branch is wrong. */
 route("GET /api/v1/org-chart", (req) => {
   const builder = req.query.view === "builder" && full(req.user!);
@@ -727,6 +743,7 @@ route("GET /api/v1/org-chart", (req) => {
         vacant: false,
         meta: builder ? [`Since ${p.start_date.slice(0, 4)}`, PATTERNS[p.work_pattern]].join(" · ") : null,
         photo_url: null,
+        heads: headsOf(p.employee_id, p.department),
       };
     }),
     ...SEATS.filter((s) => s.status === "vacant").map((s) => ({
@@ -744,6 +761,7 @@ route("GET /api/v1/org-chart", (req) => {
       vacant: true,
       meta: null,
       photo_url: null,
+      heads: headsOf(s.org_seat_id, s.department),
     })),
   ];
   return ok({

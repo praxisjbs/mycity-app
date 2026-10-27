@@ -154,7 +154,9 @@ describe("People · Organogram on desktop", () => {
     await organogramAsOperations();
     fireEvent.click(screen.getByText("Tolu Adeyemi").closest(".og-card")!);
     await settled();
-    expect(within(sheet()).getByText("Content")).toBeTruthy();
+    /* Tolu heads Content: the sheet names it under Department and Head Of. */
+    expect(within(sheet()).getAllByText("Content")).toHaveLength(2);
+    expect(within(sheet()).getByText("Head Of")).toBeTruthy();
     expect(within(sheet()).getByText("Ifeoma Chukwu")).toBeTruthy();
     expect(within(sheet()).getByText("2 direct")).toBeTruthy();
     for (const name of ["Send Message", "Open Record", "Change Manager"]) expect(within(sheet()).getByRole("button", { name })).toBeTruthy();
@@ -170,6 +172,43 @@ describe("People · Organogram on desktop", () => {
     const asked = vi.mocked(dispatch).mock.calls.map(([req]) => req).filter((req) => req.method === "POST" && req.path === "/api/v1/org-chart/exports");
     expect(asked).toHaveLength(1);
     expect(asked[0].body).toEqual({ view: "builder" });
+  }, 30000);
+});
+
+describe("People · Organogram's Head marks", () => {
+  it("marks each department's head and open head role, and Acting Head with its code above an open one, as the read says", async () => {
+    setViewport(1440);
+    await organogramAsOperations();
+    /* Earlier tests move the mock's open role, so who acts for it is read from the tree as it is now. */
+    const tree = await api.call("GET /api/v1/org-chart", { query: { view: "builder" } });
+    const marksOn = (name: string) =>
+      [...(screen.getByText(name).closest(".og-card") as HTMLElement).querySelectorAll('[data-tone="info"]')].map((el) => el.textContent);
+    const ceo = tree.nodes.find((n) => n.is_ceo)!;
+    expect(marksOn(ceo.display_name)).toEqual(ceo.heads.map((h) => h.mark));
+    expect(marksOn(ceo.display_name)[0]).toBe("Head");
+    const openHead = tree.nodes.find((n) => n.vacant && n.heads.length > 0)!;
+    expect(marksOn(openHead.display_name)).toEqual(["Head"]);
+    const acting = tree.nodes.find((n) => n.heads.some((h) => h.acting))!;
+    const actsFor = acting.heads.find((h) => h.acting)!;
+    expect(actsFor.mark).toBe(`Acting Head · ${actsFor.code}`);
+    expect(marksOn(acting.display_name)).toContain(actsFor.mark);
+    const plain = tree.nodes.find((n) => !n.vacant && !n.heads.length && n.manager_node_id === ceo.node_id);
+    if (plain) expect(marksOn(plain.display_name)).toEqual([]);
+
+    /* The sheet says it in words: the departments they head, "(acting)" after the one they act for. */
+    fireEvent.click(screen.getByText(acting.display_name).closest(".og-card")!);
+    await settled();
+    expect(within(sheet()).getByText("Head Of")).toBeTruthy();
+    expect(within(sheet()).getByText(new RegExp(`${actsFor.name} \\(acting\\)`))).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
+  }, 30000);
+
+  it("on a phone, a head's tile carries the mark beside the name", async () => {
+    setViewport(390);
+    await organogramAsOperations();
+    const ceo = screen.getByRole("button", { name: /^Ifeoma Chukwu/ });
+    expect(within(ceo).getByText("Head").closest('[data-tone="info"]')).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
   }, 30000);
 });
 

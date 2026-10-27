@@ -1141,7 +1141,7 @@ async function tree(db) {
   const { rows } = await completeQuery(
     db,
     `SELECT e.employee_id AS node_id, 'employee' AS node_kind, e.employee_id, NULL::uuid AS org_seat_id,
-            ${DISPLAY_NAME} AS display_name, e.job_title, d.name AS department,
+            ${DISPLAY_NAME} AS display_name, e.job_title, d.name AS department, d.department_id,
             COALESCE(e.line_manager_id, e.line_manager_seat_id) AS manager_node_id,
             COALESCE(e.dotted_manager_id, e.dotted_manager_seat_id) AS dotted_manager_node_id,
             COALESCE(${DOTTED_NAME}, ds.title) AS dotted_line_to,
@@ -1151,7 +1151,7 @@ async function tree(db) {
       WHERE e.status = 'active'
       UNION ALL
      SELECT s.org_seat_id AS node_id, 'seat' AS node_kind, NULL::uuid AS employee_id, s.org_seat_id,
-            s.title AS display_name, s.title AS job_title, d.name AS department,
+            s.title AS display_name, s.title AS job_title, d.name AS department, d.department_id,
             COALESCE(s.line_manager_id, s.line_manager_seat_id) AS manager_node_id,
             NULL::uuid AS dotted_manager_node_id, NULL::text AS dotted_line_to,
             false AS is_ceo, true AS vacant, NULL::text AS since, NULL::text AS work_pattern,
@@ -1162,6 +1162,29 @@ async function tree(db) {
       ORDER BY vacant, display_name`,
     [],
     { label: "the reporting tree", ceiling: TREE_CEILING },
+  );
+  return rows;
+}
+
+/**
+ * Every department in use with a head, for the tree's Head marks (docs/guides/organogram.md §6):
+ * the person heading it, named or in its filled head seat, or else its open head role. Who acts
+ * for an open one is organisation.headOf's to say.
+ */
+async function departmentHeads(db) {
+  // pagination:complete the tree marks every department's head at once, and departments are few
+  const { rows } = await completeQuery(
+    db,
+    `SELECT d.department_id, d.name, d.code::text AS code,
+            COALESCE(d.head_employee_id, CASE WHEN s.status = 'filled' THEN s.filled_by_employee_id END) AS head_employee_id,
+            CASE WHEN s.status = 'vacant' THEN s.org_seat_id END AS head_seat_id
+       FROM department d
+       LEFT JOIN org_seat s ON s.org_seat_id = d.head_seat_id
+      WHERE d.active
+        AND (d.head_employee_id IS NOT NULL OR s.status = 'vacant' OR (s.status = 'filled' AND s.filled_by_employee_id IS NOT NULL))
+      ORDER BY d.name`,
+    [],
+    { label: "the departments' heads", ceiling: TREE_CEILING },
   );
   return rows;
 }
@@ -1251,5 +1274,6 @@ module.exports = {
   insertSeat,
   updateSeat,
   tree,
+  departmentHeads,
   highestStaffNumberSeq,
 };
