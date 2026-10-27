@@ -608,7 +608,7 @@ async function unreportedByFunction(db, month) {
     `SELECT o.department_id, d.name AS department, count(*)::int AS unreported
        FROM okr_key_result kr
        JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
-       JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id AND pl.status = 'binding'
+       JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id AND pl.status IN ('binding', 'unbound', 'revising')
        JOIN performance_period p ON p.performance_period_id = o.performance_period_id AND p.status = 'active'
        JOIN department d ON d.department_id = o.department_id
       WHERE o.department_id IS NOT NULL AND kr.scored_from_key_result_id IS NULL

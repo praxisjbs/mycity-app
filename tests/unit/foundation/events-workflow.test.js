@@ -251,6 +251,7 @@ describe("route map", () => {
     expect(routeMap.linkFor("performance_plan", "pl1").path).toBe("/performance?tab=goals&plan=pl1");
     expect(routeMap.linkFor("performance_plan", "pl1", { self: true })).toMatchObject({ module: "ess", tab: "my-performance" });
     expect(routeMap.linkFor("target_change", "tc1").path).toBe("/performance?tab=goals&change=tc1");
+    expect(routeMap.linkFor("plan_unbind", "pu1").path).toBe("/performance?tab=goals&unbind=pu1");
     expect(routeMap.linkFor("unknown_type", "x")).toBeNull();
     expect(routeMap.linkFor("query", "")).toBeNull();
   });

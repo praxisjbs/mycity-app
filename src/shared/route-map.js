@@ -294,6 +294,8 @@ const ENTITY_ROUTES = Object.freeze({
   performance_plan: { ...screen("performance", "goals"), param: "plan", self: screen("ess", "my-performance") },
   // search:none a target change is opened from its approval and from the key result it changes, which search finds
   target_change: { ...screen("performance", "goals"), param: "change" },
+  // search:none a request to unbind a plan is opened from its approval (the bell, Need You, ⌘K's Waiting on You) and read on Goals
+  plan_unbind: { ...screen("performance", "goals"), param: "unbind" },
   scorecard: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
