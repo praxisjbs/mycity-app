@@ -483,6 +483,9 @@ route("POST /api/v1/performance/reports", (req) => {
   const krs = rows.map((r) => krById(r.okr_key_result_id ?? ""));
   if (krs.some((k) => !k || objectiveOf(k).department_id !== (b.department_id ?? null))) return invalid({ key_results: ["Not this function's"] });
   if (!setsGoalsFor(req, b.department_id ?? null)) return fail(403, "PERMISSION_DENIED", "Only the function's head reports its month");
+  // A KPI that was Met or Not Met needs its figure, on its own row; only N/A has none.
+  const noFigure = Object.fromEntries((b.kpis ?? []).flatMap((r, i) => (r.result !== "na" && !r.actual_value && !r.actual_text ? [[`kpis.${i}.actual_value`, ["Enter the actual"]]] : [])));
+  if (Object.keys(noFigure).length) return invalid(noFigure);
   const missing = Object.fromEntries(
     rows.flatMap((r, i) => {
       const p = proposedOf(krs[i]!, r);
@@ -1127,6 +1130,19 @@ route("GET /api/v1/performance/kpis/summary", (req) => {
     awaiting: active.filter((k) => !of(k)).length,
   });
 });
+/** The units in use on KPIs, key results and scorecard lines, most used first: what the Unit field suggests. */
+route("GET /api/v1/performance/kpis/units", (req) => {
+  const uses = new Map<string, number>();
+  const count = (unit: string | null | undefined) => {
+    const u = unit?.trim();
+    if (u) uses.set(u, (uses.get(u) ?? 0) + 1);
+  };
+  FUNCTION_KPIS.forEach((k) => count(k.unit));
+  OBJECTIVES.forEach((o) => o.key_results.forEach((k) => count(k.unit)));
+  SCORECARDS.forEach((c) => c.lines.forEach((l) => count(l.unit)));
+  const rows = [...uses].map(([unit, n]) => ({ unit, uses: n })).sort((a, b) => b.uses - a.uses || a.unit.localeCompare(b.unit));
+  return paged(rows, req, { search: (u) => [u.unit] });
+});
 route("GET /api/v1/performance/kpis/:id", (req) => {
   const k = FUNCTION_KPIS.find((x) => x.kpi_definition_id === req.params.id);
   if (!k) return notFound();
@@ -1137,6 +1153,7 @@ route("POST /api/v1/performance/kpis", (req) => {
   const b = req.body as Record<string, string | undefined>;
   if (!b.name?.trim()) return invalid({ name: ["Required"] });
   if (!b.department_id) return invalid({ department_id: ["Pick the function"] });
+  if (!b.target_text?.trim()) return invalid({ target_text: ["Required"] });
   const prefix = b.department_id === deptId ? "BM" : "FN";
   const n = FUNCTION_KPIS.filter((k) => k.code.startsWith(`${prefix}-K`)).length + 1;
   const k: Kpi = {
@@ -1149,7 +1166,7 @@ route("POST /api/v1/performance/kpis", (req) => {
     formula: b.formula || null,
     unit: b.unit || null,
     direction: (b.direction ?? "higher") as Kpi["direction"],
-    target_text: b.target_text || null,
+    target_text: b.target_text.trim(),
     target_value: b.target_value || null,
     frequency: (b.frequency ?? "monthly") as Kpi["frequency"],
     data_source: b.data_source || null,
@@ -1165,6 +1182,8 @@ route("POST /api/v1/performance/kpis", (req) => {
 route("PATCH /api/v1/performance/kpis/:id", (req) => {
   const k = FUNCTION_KPIS.find((x) => x.kpi_definition_id === req.params.id);
   if (!k) return notFound();
+  const wording = (req.body as { target_text?: string | null }).target_text;
+  if (wording !== undefined && !wording?.trim()) return invalid({ target_text: ["Required"] });
   Object.assign(k, fieldsOf(req.body, ["name", "description", "formula", "unit", "direction", "target_text", "target_value", "frequency", "data_source", "active"]), { updated_at: now() });
   return ok(k);
 });
@@ -1174,6 +1193,8 @@ route("POST /api/v1/performance/kpis/:id/actuals", (req) => {
   const b = req.body as Record<string, string | undefined>;
   if (!b.month?.endsWith("-01")) return invalid({ month: ["Pick the month"] });
   if (!b.result) return invalid({ result: ["Pick the result"] });
+  // Met and Not Met need the figure; only N/A, no eligible cases, has none.
+  if (b.result !== "na" && !b.actual_value && !b.actual_text) return invalid({ actual_value: ["Enter the actual"] });
   return created(recordKpi(req, k, b));
 });
 

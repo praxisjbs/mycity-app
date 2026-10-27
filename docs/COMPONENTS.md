@@ -94,6 +94,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [ColorField](#colorfield) | `ColorField` | A colour as #RRGGBB, pasted or typed, with a square of it beside the value. | beta |
+| Forms | [ComboField](#combofield) | `ComboField` | A value typed or picked: the server suggests what is already in use as the person types, and what they type that it does not know is kept as it is. | stable |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
@@ -2792,6 +2793,45 @@ A colour as #RRGGBB, pasted or typed, with a square of it beside the value.
 
 ```tsx
 <ColorField {...form.field("background")} />
+```
+
+### ComboField
+
+A value typed or picked: the server suggests what is already in use as the person types, and what they type that it does not know is kept as it is.
+
+| | |
+|---|---|
+| Use | A short text that records tend to share and that new records may extend: a unit, a data source, a team name. The suggestions are a server-paged list, 25 at a time. |
+| Avoid | A value that must be one of a fixed list (SelectField, ChoiceField) or one that points at another record (RecordPicker, PersonPicker); an address (AddressField). |
+| Phone | The suggestions open under the field as 44 px rows inside the sheet's own scroll; Add and the typed text is the first row. |
+| Accessibility | A combobox over a listbox: arrows move, Enter picks, Esc closes; the count found is announced. Takes its label and error links from the Field around it. |
+| Status | stable |
+| Exports | `ComboField` |
+| Import | `import { ComboField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/ComboField.tsx` |
+| Test | `packages/ui/src/form/ComboField.test.tsx` |
+| Gallery | `packages/ui/src/form/ComboField.gallery.tsx` (`npm run gallery`, `#/ComboField`) |
+
+**ComboField** props (`ComboFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The text, from form.field(name): typed, or put there by a pick. |
+| `onChange` | `(value: string) => void` | yes | Called with the new text, on each key and on a pick. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Unused here (the text is always the form's); accepted so {...form.field(name)} spreads cleanly. |
+| `name` | `string` |  | The form field's name, on the input. |
+| `id` | `string` |  | The control's id; the Field around it supplies one otherwise. |
+| `list` | `DataViewList<R>` | yes | The server-paged suggestions (a `usePaged()` result); the field drives its search as the person types. |
+| `option` | `(row: R) => string` | yes | The text a suggestion puts in the field. |
+| `sub` | `(row: R) => ReactNode` |  | The line beside a suggestion (how often it is used). |
+| `placeholder` | `string` |  | A format example of at most 3 words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ComboField list={units} option={(u) => u.unit} {...f.field("unit")} />
 ```
 
 ### DateField

@@ -19,6 +19,13 @@ const KpiFrequency = z.enum(["weekly", "monthly", "quarterly"]);
 /** The first day of a month, the key of every monthly figure ("2026-10-01"). */
 const MonthStart = isoDate.refine((v) => v.endsWith("-01"), "Pick a month");
 
+/**
+ * A month that was Met or Not Met has a figure; only N/A, no eligible cases, has none. Used by
+ * Record Actual and by a KPI's row on Report Month, on the field the person fills.
+ */
+const hasActual = (v) => v.result === "na" || v.actual_value !== undefined || v.actual_text !== undefined;
+const ACTUAL_REQUIRED = { message: "Enter the actual", path: ["actual_value"] };
+
 /** One KPI's actual for one month. */
 const KpiMonth = z
   .object({
@@ -105,7 +112,25 @@ const KpiDetail = Kpi.extend({
   can_edit: z.boolean(),
 }).strict();
 
-/** POST /performance/kpis. The code is the function's next free one (TBO-K04). */
+/**
+ * GET /performance/kpis/units: the units in use, for the Unit field's suggestions. A unit is not a
+ * record: it is the text a KPI, a key result or a scorecard line was saved with.
+ */
+const KpiUnitListQuery = listQuery();
+
+const KpiUnit = z
+  .object({
+    unit: z.string(),
+    uses: z.number().int().min(1),
+  })
+  .strict();
+
+const KpiUnitPage = Paged(KpiUnit);
+
+/**
+ * POST /performance/kpis. The code is the function's next free one (TBO-K04). The wording of the
+ * target is required: it is what every screen shows. The figure, the unit and the formula are not.
+ */
 const KpiCreate = z
   .object({
     department_id: uuid,
@@ -114,7 +139,7 @@ const KpiCreate = z
     formula: optionalText(1000),
     unit: optionalText(40),
     direction: Direction.default("higher"),
-    target_text: optionalText(500),
+    target_text: text(500),
     target_value: blank(Quantity),
     frequency: KpiFrequency.default("monthly"),
     data_source: optionalText(500),
@@ -122,7 +147,7 @@ const KpiCreate = z
   })
   .strict();
 
-/** PATCH /performance/kpis/:id */
+/** PATCH /performance/kpis/:id. The target's wording can be changed, never cleared. */
 const KpiEdit = z
   .object({
     name: text(200),
@@ -130,7 +155,7 @@ const KpiEdit = z
     formula: z.string().trim().max(1000).nullable(),
     unit: z.string().trim().max(40).nullable(),
     direction: Direction,
-    target_text: z.string().trim().max(500).nullable(),
+    target_text: text(500),
     target_value: Quantity.nullable(),
     frequency: KpiFrequency,
     data_source: z.string().trim().max(500).nullable(),
@@ -140,7 +165,7 @@ const KpiEdit = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
 
-/** POST /performance/kpis/:id/actuals: one month's figure. */
+/** POST /performance/kpis/:id/actuals: one month's figure; Met and Not Met need it, N/A does not. */
 const KpiActual = z
   .object({
     month: MonthStart,
@@ -149,7 +174,8 @@ const KpiActual = z
     actual_text: optionalText(500),
     comment: optionalText(2000),
   })
-  .strict();
+  .strict()
+  .refine(hasActual, ACTUAL_REQUIRED);
 
 /** One row of a function sheet's Operational KPIs table, as the okr_kpis importer reads it. */
 const KpiImportRow = z
@@ -185,6 +211,9 @@ const TABLES = {
   },
   KpiPage: { table: null, reason: "a page of KPIs" },
   KpiListQuery: { table: null, reason: "list controls and filters for the KPIs" },
+  KpiUnitListQuery: { table: null, reason: "list controls for the units in use" },
+  KpiUnit: { table: null, reason: "a unit in use on KPIs, key results or scorecard lines, and how many carry it" },
+  KpiUnitPage: { table: null, reason: "a page of the units in use" },
   KpiSummaryQuery: { table: null, reason: "which function and month the KPIs figures count" },
   KpiSummary: { table: null, reason: "the KPIs figures, counted over the active KPIs" },
   KpiLineRef: {
@@ -212,10 +241,15 @@ module.exports = {
   KpiResult,
   KpiFrequency,
   MonthStart,
+  hasActual,
+  ACTUAL_REQUIRED,
   KpiMonth,
   Kpi,
   KpiPage,
   KpiListQuery,
+  KpiUnitListQuery,
+  KpiUnit,
+  KpiUnitPage,
   KpiSummaryQuery,
   KpiSummary,
   KpiLineRef,
