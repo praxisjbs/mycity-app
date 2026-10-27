@@ -172,7 +172,9 @@ mycity-app/
 │   ├── CODEOWNERS            who must approve each path (checked by check/codeowners.js)
 │   └── pull_request_template.md
 ├── .claude/
-│   ├── settings.json         registers the Stop hook for everyone using Claude Code here
+│   ├── settings.json         registers the SessionStart and Stop hooks for everyone using Claude Code here
+│   ├── hooks/session-start.sh  a cloud session starts as CI: Node 20 first on PATH, PostgreSQL and
+│   │                         Redis running, the integration variables set, the image's Chromium named
 │   └── hooks/stop-check.js   runs the process gates before Claude may finish a task, and the
 │                             screen gates (8, 11, 12, 17) when app/, public-app/ or demo.html changed
 ├── package.json · package-lock.json · .nvmrc (Node 20) · eslint.config.js · jest.config.js
@@ -855,7 +857,7 @@ npm run gallery              # every shared component in every state (packages/u
 npm run new:component -- --name X --group Display   # a new shared component, never in a feature
 npm run new:screen -- --module people --tab "Work Patterns" --m M1 --owner LA   # a new staff-app screen, every piece at once
 npm run fe:test              # also fe:typecheck, fe:lint, fe:build: packages/ui and both apps
-npm run ci                   # before every push
+npm run ci                   # before every push; refuses a Node other than .nvmrc's
 ```
 
 The seed command checks `APP_ENV`, the database name and the `system_marker` row, and refuses unless

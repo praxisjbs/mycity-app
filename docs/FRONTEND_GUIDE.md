@@ -995,7 +995,10 @@ its seeded data (`seeds/staging`, A5); production shows only live data. The in-b
 (`app/src/api/mock/`, `public-app/src/api/mock/`) lives only on laptops (`npm run dev`) and in CI
 (tests, the gallery, the crawl), and the `mock-free` gate proves no release build contains it. It
 answers with the backend's exact envelopes, applies search and filters itself and rejects unknown
-query keys with a 422. Each mock response is checked against the contract once that module's schema
+query keys with a 422. An answer takes 90 to 250 ms at random in a browser, so screens are seen
+loading and answers arrive out of order; under the test runner every answer takes the same 90 ms,
+so answers arrive in the order asked and no test depends on the draw (JBS Praxis, 27/10/2026: four
+CI failures came from tests that read one answer before another). Each mock response is checked against the contract once that module's schema
 exists, and a module's mock is deleted when its real routes ship. The identity mock is the exception:
 it stays, in the contract's shapes, because the gallery, the crawl and a laptop all need to sign in. API mode is set in
 `vite.config.ts`: `mock` for `npm run dev` and `npm run build:demo`, `live` for a production build;

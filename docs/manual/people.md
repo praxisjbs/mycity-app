@@ -354,12 +354,15 @@ People and Operations shape it here. Line managers read it here too. Everyone re
    computer, the key above the chart reads **Reporting Line**, **Dotted Line**, **CEO** and
    **Vacant Seat**. Each card shows the job, department, start date and work pattern. An open role
    reads **Open role** if you cannot change the chart.
-5. Press a person's card. **Profile** opens with their **Department**, who they **Reports To**,
-   their **Dotted Line** and their **Team**. **Send Message** writes to them. On your own card,
-   **My Profile** opens your profile instead.
-6. {needs="people view, settings view"} **Open Record** opens their record.
-7. {needs="people edit"} **Change Manager** changes who they report to. The CEO's card has none.
-8. **Download PDF** saves the chart as a file on this device. Wait while it spins; a message says
+5. A **Head** mark beside the department shows who heads it; an open role that heads one carries
+   it too. **Acting Head** marks the person above an open head role, who acts for it. A mark for
+   another department adds its code, such as `Acting Head · PG`.
+6. Press a person's card. **Profile** opens with their **Department**, the departments they head
+   under **Head Of**, who they **Reports To**, their **Dotted Line** and their **Team**. **Send
+   Message** writes to them. On your own card, **My Profile** opens your profile instead.
+7. {needs="people view, settings view"} **Open Record** opens their record.
+8. {needs="people edit"} **Change Manager** changes who they report to. The CEO's card has none.
+9. **Download PDF** saves the chart as a file on this device. Wait while it spins; a message says
    **PDF downloaded**.
 
 If more than one person or role has no manager, a line above the chart says so, such as
@@ -367,7 +370,7 @@ If more than one person or role has no manager, a line above the chart says so, 
 
 On a phone there is no drawn chart, key or seat count. **View** switches between **Everyone** and
 **Focus**, and opens on **Everyone**: the company as one list. Press the arrow beside a row to fold
-its team. Tap a row to see it in **Focus**.
+its team. Tap a row to see it in **Focus**. A head's mark sits beside their name.
 
 **Focus** shows the line from the top as names; tap one to move up. Then **Reports To**, the
 person's own card, and **Direct Reports**, **Dotted Line** and **Same Manager**. At the top of the

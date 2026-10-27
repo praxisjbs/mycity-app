@@ -219,6 +219,7 @@ const rel = (abs) => path.relative(ROOT, abs).split(path.sep).join("/");
 module.exports = {
   ROOT,
   IN_CI,
+  githubEvent,
   git,
   base,
   changedFiles,
