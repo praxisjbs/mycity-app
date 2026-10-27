@@ -57,8 +57,9 @@ The M3 build from TB's branch (`claude/dreamy-bell-6wlskq`, 9 commits) brought o
 
 ## 2 · GE's decisions (26/10/2026, binding)
 
-1. **The Question rung sits after the Warning.** The ladder is Warning, Question, Second Warning,
-   Suspension, Suspension Without Pay, Dismissal or Termination.
+1. ~~**The Question rung sits after the Warning.** The ladder is Warning, Question, Second Warning,
+   Suspension, Suspension Without Pay, Dismissal or Termination.~~ Superseded 27/10/2026: the
+   ladder below, ratified in MILESTONES §8.
 2. **Write With AI's jobs:** `query-draft` on Default, `letter-draft` on Deep Reasoning. Both are
    registered in `src/services/ai/actions.js` with `chosen_by: "GE"`, personal data.
 3. **Nothing is kept until Use Draft.** When AI is off or this month's budget is spent the button
@@ -73,7 +74,7 @@ These replace §2 decision 1 and the §4 answers they name. Each is in `docs/gui
 1. **Attendance owns its rules.** A breach with Raise Query on raises its query
    (`queries.raise_from_breach`, migration 3040's FK). Rules drops Late Arrival, Absence and
    Missing Clock-Out; MILESTONES' "three late arrivals" is the Attendance policy's row.
-2. **Ladder in MILESTONES' order:** Caution, Warning, Second Warning, Suspension Without Pay,
+2. **Ladder as ratified in MILESTONES §8:** Caution, Warning, Second Warning, Suspension Without Pay,
    Dismissal or Termination. "Question" was the transcript mishearing "Caution".
 3. **24 hour response window** (handbook §4.7.1, both query samples). Replaces §4 answer 7.
 4. **Migrations keep their numbers** (MIGRATIONS §3: below the head applies, with a warning).
@@ -82,10 +83,13 @@ These replace §2 decision 1 and the §4 answers they name. Each is in `docs/gui
 6. **One suspension, without pay**; the CEO approves from it up (handbook §4.7.4).
 7. Edit Rule; a review shows its month's queries; Dismissal records the sanction and People archive
    the record; the ladder is entered at go-live; the three unused fine columns stay.
-8. The six letters' wording is MyCity's samples, shipped active; redacted copies in
+8. Five letters' wording is MyCity's samples (the Salary Deduction letter is ours), all six shipped
+   active; redacted copies in
    `docs/MyCity-ERP-Documents/letter-samples/`.
 
 ## 3 · How each screen works (as built)
+
+Brought up to the afternoon decisions and the audit's fixes (§8) on 27/10/2026.
 
 ### 3.1 Raise a Query (Queries · Raise a Query)
 
@@ -101,29 +105,33 @@ Anyone with `queries` create. Partnerships, for example, have no button.
 
 **Write With AI** opens a step in the same window: What To Say, **Write Draft**, then **Try Again**
 or **Use Draft**. It fills Subject and What Happened only. On **Raise Query** the employee is told
-in the app and by email, the query letter is made, and they have 48 hours to respond.
+in the app and by email, the query letter is made, and they have 24 hours to respond. Only people
+with `queries` create see the button (it is on ⌘K too).
 
 ### 3.2 Queries (Queries & Sanctions · Queries)
 
 - Operations & People, Management, Implementation and the CEO see every query. Anyone else sees only
   the queries they raised, even within their own team. A rule's queries are seen by the first group only.
 - KPI strip (Open, Awaiting Response, Closed This Month, Escalated), the **All Queries** and
-  **Raised by Me** chips, the list. A picked row opens beside the list: subject, raised by, raised,
-  response due, the policy cited, the days a rule counted, the response, the sanction.
-- **Send Reminder** once a day while a response is awaited; **View Letter**; **Record Decision**.
+  **Raised by Me** chips, the list. A picked row opens beside the list: subject, raised by (a person,
+  a rule or the Attendance Policy), raised, response due, the policy cited, the days a rule counted,
+  the response, the sanction (a refused one reads Not Approved), and who it waits on.
+- **Send Reminder** once a day while a response is awaited; **View Letter**; **Record Decision**;
+  **Approve Sanction** and **Reject** for whoever the sanction waits on.
 - Phone: two KPI cards, query cards with a status pill, a tapped card in a bottom sheet with
   **Record Decision** at its foot; **Raise a Query** full width.
 
 ### 3.3 Record Decision
 
-- Needs `queries` edit; the person queried never decides their own. Before the 48 hours end it needs
+- Needs `queries` edit; the person queried never decides their own. Before the 24 hours end it needs
   the response; after, it does not.
 - **Close, No Action:** a reason of at least 10 characters; the query is resolved.
 - **Sanction:** the rung (the next one marked Next; only rungs whose letter is ready), dates for an
-  unpaid suspension, an optional fine, the reason and the proposer's signature. It opens the
-  approval, and the query shows Escalated until it is decided.
-- Approval: Operations & People on every rung, Management as well from Suspension up. A refusal
-  sends the query back under review.
+  unpaid suspension, Evidence for a rung that requires it, an optional fine and the reason. Nobody
+  signs a proposal. It opens the approval, and the query shows Escalated until it is decided.
+- Approval, on the query's card only: Operations & People on every rung, signing as they approve;
+  then the CEO for Suspension Without Pay and Dismissal or Termination. The person queried never
+  decides it. A refusal sends the query back under review.
 
 ### 3.4 Sanctions and Chain Settings
 
@@ -138,8 +146,9 @@ in the app and by email, the query letter is made, and they have 48 hours to res
 ### 3.5 The letters
 
 - One page where it fits; longer, the letterhead and footer repeat with "Page n of N".
-- A query letter is signed by its raiser; a rule's query is signed Operations & People. A sanction
-  letter is signed by its proposer (name, job title, drawn signature).
+- A query letter is signed by its raiser; a rule's or the Attendance policy's query is signed
+  Operations & People. A sanction letter is signed by the Operations & People approver (name, job
+  title, drawn signature), "For" the organisation.
 - With a fine, the Salary Deduction Letter goes too, and both leave in one email once both PDFs exist.
 
 ### 3.6 Letter Templates
@@ -154,13 +163,11 @@ in the app and by email, the query letter is made, and they have 48 hours to res
 ### 3.7 Rules
 
 A rule is saved as a draft, counts only from when it is switched on, and is paused rather than
-deleted. "N offences in D days raise one query", the counted days or tasks as its evidence.
+deleted. "N offences in D days raise one query", the counted days or tasks as its evidence. Late
+arrivals, absences and missing clock-outs are the Attendance policy's, which raises their queries.
 
 | Trigger | What counts |
 |---|---|
-| Late Arrival | A late clock-in; may count late minutes instead |
-| Absence | A working day closed as absent |
-| Missing Clock-Out | The day-close found none |
 | Unregistered Device | A punch from a device not on the person's list |
 | Overdue Task | A Workspace task whose due day passed while open, or done on a later day; the primary assignee; counted on the due day, checked each morning at 06:20 Lagos; cancelled and archived never |
 | Low Monthly Score | A monthly review closed rated Below, counted the day it closed; probation reviews never |
@@ -199,28 +206,28 @@ deleted. "N offences in D days raise one query", the counted days or tasks as it
 
 Record each answer here with its date, and change the guide first if an answer changes behaviour.
 
-**Agreed 27/10/2026 (GE and AJ/Victor):**
+**Agreed 27/10/2026 (GE and AJ/Victor), the morning.** Answers 1, 2 and 7 were replaced the same
+afternoon (§2's afternoon decisions): the ladder, who signs and the window are struck through.
 
-1. Ladder order: kept as built. Warning, Question, Second Warning, Suspension, Suspension Without
-   Pay, Dismissal or Termination.
-2. A sanction letter is signed by its proposer, as built.
+1. ~~Ladder order: kept as built. Warning, Question, Second Warning, Suspension, Suspension Without
+   Pay, Dismissal or Termination.~~ Now Caution first, one suspension.
+2. ~~A sanction letter is signed by its proposer, as built.~~ Now Operations & People, approving.
 3. Every manual query is signed, as built. No unsigned Operations & People query.
 4. The Salary Deduction letter keeps our wording; MyCity's HR reads it before go-live.
 5. **Change:** the rule form gains an Optional **Clause** (at most 300 characters), quoted on the
    rule's query letters. The table, contract, repo and evaluator already carry `policy_clause`;
    only the rule form and the mock change. `queries.md` §13 updated first.
 6. Overdue Task and Low Monthly Score count as §3.7 says, as built.
-7. The 48 hour window and one reminder a day, as built.
+7. ~~The 48 hour window~~ 24 hours, and one reminder a day.
 
 Also agreed the same day:
 
 - The User Guide chapter and its sections go in this PR (#22), not a later one; the
   `User-guide-unchanged` line leaves #22's description once they are in.
-- The staging seed carries the six rungs, at least one rule, and demo queries and sanctions.
-  Staging only, never production.
-- Suspension, Suspension Without Pay and Termination stay Needs a Letter until MyCity sends the
-  samples. The demo and the pictures show Warning and Question (and a fine) only; no placeholder
-  wording.
+- The staging seed carries the ~~six~~ five rungs, at least one rule, and demo queries and
+  sanctions. Staging only, never production; on the Implementation department's accounts only (TB).
+- ~~Suspension, Suspension Without Pay and Termination stay Needs a Letter until MyCity sends the
+  samples.~~ The samples came the same afternoon: every letter ships active in MyCity's wording.
 
 ---
 
@@ -306,6 +313,10 @@ Also agreed the same day:
 - 27/10/2026 · GE · §8 screens fixed: Evidence on Record Decision, Raise a Query gated and on ⌘K, the
   card read again after Approve Sanction with the right toast, Not Approved, ESS Respond's errors,
   the phone layout and Escalated's help, Rules' empty and error states; 35 pictures retaken.
+- 27/10/2026 · GE · §8 documents fixed: MILESTONES §8 records the ratified ladder, approvers and
+  attendance triggers; §2 to §4 here struck through where superseded and §3 rewritten as built; the
+  stale words (48 hours, six rungs, Question, all six letters MyCity's) and the manual's three
+  slips corrected. Left: §8.1's public repository (the owner's call) and the nits in §8.3.
 
 ---
 
@@ -338,7 +349,7 @@ checked against the code. Tick it here when fixed, with the commit.
 - [x] **Who approves follows position, not the rung.** `rank: step.position` with `rank >= 4` sends
   the CEO whatever sits fourth; adding or leaving out a rung moves it. Key the condition off the
   rung's `financial_effect` (3190 and `DEFAULTS` together).
-- [ ] **The ladder against MILESTONES §8** (binding). The documents call Caution, Warning, Second
+- [x] **The ladder against MILESTONES §8** (binding). The documents call Caution, Warning, Second
   Warning, Suspension Without Pay, Dismissal or Termination "MILESTONES' order"; §8 has Caution,
   Warning, Suspension, Suspension Without Pay, Dismissal. The attendance triggers moved off Rules
   too. Record the ratification in MILESTONES §8, as §18 did for Departments.
@@ -364,13 +375,13 @@ checked against the code. Tick it here when fixed, with the commit.
 - [x] **The signature is stored before the approver is checked**, leaving an orphan file on a 403.
 - [x] **`raiseFromBreach` does not lock the breach**: two deliveries at once spend a QRY number.
 - [x] **The letterhead's signer block** has no "For" line, as guide §6.4 says it has.
-- [ ] **This handoff's §2 to §4 still describe the superseded design** (48 hours, proposer signs,
+- [x] **This handoff's §2 to §4 still describe the superseded design** (48 hours, proposer signs,
   Management from Suspension, six rungs, the attendance triggers on Rules). Strike them through.
-- [ ] **Stale words elsewhere:** `templates.assist.js` tells the model "Warning, Question"; `ess.md`
+- [x] **Stale words elsewhere:** `templates.assist.js` tells the model "Warning, Question"; `ess.md`
   §10.1 says 48 hours; the demo's knowledge article says 48 hours; guide header and §13 say six
   rungs; guide §4 leaves 3040 off `sanction`; three files say all six letters are MyCity's wording
   (the deduction letter is ours).
-- [ ] **The manual:** rule-raised queries are seen by everyone with scope all, not only Operations &
+- [x] **The manual:** rule-raised queries are seen by everyone with scope all, not only Operations &
   People and the CEO; My Queries' Under Review is not "or the time has passed" (Respond stays open);
   `people.md` lists a record's tabs without Queries and Sanctions.
 - [x] **3099 still seeds a six-rung `sanction_type` list on production** (unused). Set it inactive in 3190.

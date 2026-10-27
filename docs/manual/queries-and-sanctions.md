@@ -18,7 +18,7 @@ bar at the bottom, then **Queries**. Its screens are tabs along the top: **Queri
 
 > **Important:** You see every query only if you work in Operations & People, Management or
 > Implementation, or you are the CEO. Everyone else sees only the queries they raised. A query a
-> rule or the Attendance policy raised is seen by Operations & People and the CEO only.
+> rule or the Attendance policy raised is seen only by those who see every query.
 
 ## Queries {#queries-queries screen=queries/queries icon=flag}
 
@@ -337,8 +337,8 @@ My Queries is your own record of queries and sanctions. It is a tab of Employee 
 
 | Status | What it means |
 |---|---|
-| **Awaiting Your Response** | You can still respond |
-| **Under Review** | Your response is in, or the time has passed; a decision is waiting |
+| **Awaiting Your Response** | You can still respond, even after the 24 hours |
+| **Under Review** | Your response is in; a decision is waiting |
 | **Closed, No Action** | It was closed without a sanction |
 | **Sanctioned** | It ended in a sanction |
 

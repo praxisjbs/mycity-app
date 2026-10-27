@@ -1,6 +1,7 @@
 # MyCity App ERP — document pack
 
-Prepared by [JBS Praxis](https://jbspraxis.com). Six files, 12 October 2026.
+Prepared by [JBS Praxis](https://jbspraxis.com). Six files, 12 October 2026; the files added since are
+listed with them below.
 
 | File | What it is | How to open |
 | --- | --- | --- |

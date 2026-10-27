@@ -523,7 +523,7 @@ describeDb("queries and sanctions against the real migrations", () => {
     });
 
     test("People build the ladder; a rung inserted at a position moves the ones below", async () => {
-      // MyCity's ladder in MILESTONES' order, each letter ready in its own wording.
+      // MyCity's ladder as MILESTONES §8 ratified it, each letter ready in its own wording.
       for (const [name, body] of [
         ["Caution", { letter_template: "caution-letter", valid_days: 365 }],
         ["Warning", { letter_template: "warning-letter", valid_days: 365 }],

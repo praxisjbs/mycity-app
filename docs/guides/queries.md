@@ -15,8 +15,9 @@
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
 milestone's). Four decisions taken with GE on 19/10/2026 before this guide was written are recorded
-in §13 as settled: the chain is a step table over the approval engine, the ladder has six rungs,
-every sanction follows a query, and a query a rule raised is seen by People and the CEO only.
+in §13 as settled: the chain is a step table over the approval engine, the ladder has six rungs
+(five since 27/10/2026, one suspension), every sanction follows a query, and a query a rule raised is
+seen only by those who see every query and the CEO.
 
 ---
 
@@ -188,8 +189,8 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 - Subject 4 to 150 characters, details 20 to 4,000. The employee must be active and must not be the
   person raising it.
 - `response_due_at` is raised-at plus the response window, **24 hours** (MyCity's handbook §4.7.1:
-  "not later than 24 hours after receipt"; AJ, 27/10/2026) unless Settings · Queries (M9) says
-  otherwise. After it passes without a response the query still waits, and a decision may
+  "not later than 24 hours after receipt"; AJ, 27/10/2026), a constant (`RESPONSE_HOURS`) until a
+  setting is asked for. After it passes without a response the query still waits, and a decision may
   be recorded.
 - The query letter is generated in the same transaction (§6.7). A manual query uses the active
   letter template of purpose `query` chosen on the form, or the default `query-letter`.
@@ -272,7 +273,7 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 ### 6.5 The chain
 
 - The rungs, top to bottom, are `consequence_step` rows in `position` order. MyCity's ladder, in
-  MILESTONES §8's order (Cynthia, 10 October): **Caution, Warning, Second Warning, Suspension Without
+  MILESTONES §8 as ratified on 27/10/2026 (Cynthia's of 10 October, with one suspension): **Caution, Warning, Second Warning, Suspension Without
   Pay, Dismissal or Termination**. The Caution is MyCity's own letter (CAUTION, a performance
   caution); "Question" was the meeting transcript mishearing it. A disciplinary suspension is always
   without pay, 3 days the first time and up to 7 for a repeat (handbook §4.6.2, §4.7.4, and the one
@@ -324,7 +325,8 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
   a fine sends, §6.6). Six letters ship, each with wording and seeded active, so every rung is ready
   on a fresh database: Query, Caution, Warning (also the Second Warning's), Suspension Without Pay,
   Termination and Salary Deduction.
-- **The wording is MyCity's** (the samples Cynthia's team sent, 27/10/2026; redacted copies in
+- **The wording is MyCity's** (the samples Cynthia's team sent on 15/10/2026, brought in on
+  27/10/2026; redacted copies in
   `docs/MyCity-ERP-Documents/letter-samples/`): the Query letter follows QUER 2 and QUERY
   NOTIFICATION (respond within the window, "stating why appropriate disciplinary action should not be
   taken"); Caution, Warning, Suspension Without Pay and Termination follow CAUTION, WARNING,
@@ -420,10 +422,10 @@ or tier 2.**
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature; Write With AI (What To Say, Write Draft, the draft, Try Again, Use Draft), reading AI Is Off or AI Limit Reached when it cannot answer | None | Where the signature is kept, the version cited: §6.2 |
+| Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature; Write With AI (What To Say, Write Draft, the draft, Try Again, Use Draft), reading AI Is Off or AI Limit Reached when it cannot answer | Help on Clause: the line of the policy the letter quotes | Where the signature is kept, the version cited: §6.2 |
 | Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by (a person, the rule, or Attendance Policy), raised, response due, counted days, response, sanction, and while a sanction waits: its step and who it waits on); Raise a Query (only with `queries` create; also from ⌘K), Send Reminder, View Letter (the PDF the employee received), Record Decision; Approve Sanction (Your Signature at the Operations & People stage) and Reject (Reason) for whoever it waits on; a refused proposal reads "Not Approved" | Help on Escalated (the KPI) and on Waiting On: a sanction is waiting for approval. Help on Response Due: the 24 hour window. Help on Your Signature when approving: it signs the letters | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
 | Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, Evidence (one item a line) for a step that requires it, fine, reason | Help on the next rung: why it is offered. Help on Evidence: the step needs the facts it rests on | The approval route and its thresholds: Settings · Approvals, §6.5 |
-| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status); Recent Firings; New Rule, Edit Rule, Activate, Pause; the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional) | None | Counting after the last query, the dedup key: §6.3 |
+| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status); Recent Firings; New Rule, Edit Rule, Activate, Pause; the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional); an empty state when there are no rules | Help on Policy and on Clause, as the form reads them | Counting after the last query, the dedup key: §6.3 |
 | Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
 | Letter Templates | Stat strip; the list (template, used by, status); the selected letter's preview on paper, the record's words underlined; New Template, Edit Template, Activate | Help on Letter: the names a letter can use | Versioning, the shipped defaults: §6.7 |
@@ -453,7 +455,7 @@ or tier 2.**
 - **No active letter template for a rung**: the sanction cannot be proposed on that rung; Chain
   Settings shows the rung needs a letter.
 - **The chain is empty** (a fresh production): Record Decision offers Close, No Action only, and
-  Sanctions shows the empty chain with Add Rung.
+  Sanctions shows the empty chain with Add Step.
 - **Huge lists**: every list pages at 25 on the server.
 - **Raising a query on yourself**: refused.
 
@@ -471,8 +473,9 @@ or tier 2.**
   approval engine deciding who approves, not one workflow definition whose stages are rungs.
   MILESTONES §8 says "a workflow definition"; the intent (a rung is data, adding one needs no code,
   A11 decides who approves) is kept.
-- **Settled 19/10/2026 (GE).** The ladder has six rungs, as `3099` lists them, with Second Warning;
-  AJ's screen gains it and "Dismissal" reads "Dismissal or Termination".
+- **Settled 19/10/2026 (GE), superseded 27/10/2026.** ~~The ladder has six rungs, as `3099` lists
+  them~~, with Second Warning; AJ's screen gains it and "Dismissal" reads "Dismissal or Termination".
+  Now five rungs, one suspension (below; MILESTONES §8 ratified); 3099's list is switched off by 3190.
 - **Settled 19/10/2026 (GE).** Every sanction follows a query (`sanction.employee_query_id NOT NULL`);
   Issue Sanction starts from an upheld query.
 - **Settled 19/10/2026 (GE).** A query a rule raised is seen by scope `all` and the CEO only
@@ -482,7 +485,7 @@ or tier 2.**
   - **Lateness and the attendance rules are the Attendance policy's** (§3 step 1, §6.3). The
     threshold is the policy's setting; MyCity's handbook reads 3 late arrivals in a month. Rules no
     longer offers `lateness`, `absence` or `missing_clock_out`.
-  - **The ladder is MILESTONES §8's order:** Caution, Warning, Second Warning, Suspension Without Pay,
+  - **The ladder, ratified in MILESTONES §8 (27/10/2026):** Caution, Warning, Second Warning, Suspension Without Pay,
     Dismissal or Termination (§6.5). The 26/10 "Question Letter" was the transcript mishearing
     "Caution"; the shipped letter is `caution-letter` again.
   - **One suspension, without pay** (handbook §4.7.4); the paid suspension is a precaution, not a rung.
@@ -490,7 +493,8 @@ or tier 2.**
   - **The response window is 24 hours** (handbook §4.7.1, both query samples).
   - **Operations & People sign a sanction's letters when they approve it**, "For" the company, as
     every sample is signed; the proposer no longer signs (§6.4).
-  - **The letters' wording is MyCity's samples** (§6.7); all six ship active.
+  - **The letters' wording is MyCity's samples** (§6.7), the Salary Deduction letter ours; all six
+    ship active.
   - **Dismissal or Termination** records the sanction and tells People; ending the employment stays
     in People · Employees, where the letter's effective date is the Last Day (GE and TB, 27/10/2026).
   - **The ladder on production** is entered on Chain Settings at go-live by Operations & People, on

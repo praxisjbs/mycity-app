@@ -102,7 +102,7 @@ describeDb("Queries & Sanctions' staging seed against the real migrations", () =
     await pool.end();
   });
 
-  test("enters the five rungs in MILESTONES' order and switches the rule on", async () => {
+  test("enters the five rungs MILESTONES §8 ratified and switches the rule on", async () => {
     const { rows } = await q("SELECT name, letter_template FROM consequence_step ORDER BY position");
     expect(rows.map((r) => r.name)).toEqual(["Caution", "Warning", "Second Warning", "Suspension Without Pay", "Dismissal or Termination"]);
     expect(rows[0].letter_template).toBe("caution-letter");

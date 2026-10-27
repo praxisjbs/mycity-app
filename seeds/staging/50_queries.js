@@ -8,7 +8,7 @@
  * query letter reaches the person it is about (TB, 27/10/2026). MyCity's real staff, found by post
  * (lib/staff.js), do what their posts do: raise, propose and approve.
  *
- *   the chain     Chain Settings' five rungs in MILESTONES §8's order (Caution, Warning, Second
+ *   the chain     Chain Settings' five rungs as MILESTONES §8 ratified them (Caution, Warning, Second
  *                 Warning, Suspension Without Pay, Dismissal or Termination), each on its shipped
  *                 letter; only when the chain is empty, so a chain People entered stays theirs
  *   a rule        Unregistered Device on Rules, switched on (the Attendance policy owns lateness)
@@ -38,7 +38,7 @@ const { signatureOf } = require("./lib/signature");
 
 const src = (p) => require(path.join(__dirname, "..", "..", "src", p));
 
-/** Chain Settings' rungs, in MILESTONES §8's order. */
+/** Chain Settings' rungs, as MILESTONES §8 ratified them (27/10/2026). */
 const CHAIN = Object.freeze([
   { name: "Caution", letter_template: "caution-letter", valid_days: 365 },
   { name: "Warning", letter_template: "warning-letter", valid_days: 365 },
