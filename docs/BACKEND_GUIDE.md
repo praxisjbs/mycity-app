@@ -45,6 +45,7 @@ are enforced by review and by the gates.
 | Events | `<module>.events.js` | Event keys emitted; outbox handlers registered | Does work synchronously in the request |
 | AI | `<module>.ai.js` | Read manifest: reads with permission and citation, routes to screens | Declares a write (A23) |
 | Search | `<module>.search.js` | ⌘K provider | Is missing on a module with records (gate 10) |
+| Views | `<module>.views.js` | Where its records wait inside the screens they open on: a fixed view for a type, or each record placed by its state as the screen's filter reads it (`shared/notifications/views.js`, `docs/guides/notifications.md` §6) | Places a record by a rule of its own instead of the list's (export the list's expression and use it) |
 
 **One write path.** A form, a workflow decision, an import row and a script all create a record
 through the same service function. That is how numbering, audit, events and field rules apply

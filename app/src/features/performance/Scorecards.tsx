@@ -9,7 +9,7 @@
  * Scorecards and Commitments switch opens the Commitments view beside it (Commitments.tsx;
  * `?view=commitments`, or `?set=` from an approval's link).
  */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
 import scoring from "@mycity/contract/schemas/scoring.js";
 import targetsContract from "@mycity/contract/schemas/targets.js";
@@ -23,6 +23,7 @@ import { EmployeePicker } from "@/features/shared/pickers";
 import { PagedTable } from "@/features/shared/sections";
 import { ReasonForm } from "@/features/workspace/Commitment";
 import { useSearchParams } from "@/lib/router";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -62,21 +63,31 @@ const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Cou
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
 const AUTO = new Set(["key_result", "team_result", "function_kpi", "commitments", "update_on_time", "team_reviews", "tasks"]);
 
-/** The Scorecards and Commitments switch; the view lives in the address. */
-function ViewSwitch({ view }: { view: "scorecards" | "commitments" }) {
+type View = "scorecards" | "commitments";
+const VIEWS: Array<[View, string]> = [
+  ["scorecards", "Scorecards"],
+  ["commitments", "Commitments"],
+];
+
+/** Shows a view: it lives in the address. */
+function useShowView() {
   const [, setParams] = useSearchParams();
-  return (
-    <SegmentedControl
-      value={view}
-      onChange={(v) => setParams({ view: v === "commitments" ? "commitments" : null, set: null }, { replace: true })}
-      options={[["scorecards", "Scorecards"], ["commitments", "Commitments"]]}
-    />
-  );
+  return useCallback((v: View) => setParams({ view: v === "commitments" ? "commitments" : null, set: null }, { replace: true }), [setParams]);
+}
+
+/** The Scorecards and Commitments switch, each with what waits on the reader there. */
+function ViewSwitch({ view }: { view: View }) {
+  const show = useShowView();
+  const news = useViewNews();
+  return <SegmentedControl value={view} onChange={show} options={withNews(news, VIEWS)} />;
 }
 
 export function Scorecards() {
   const [params] = useSearchParams();
   const commitments = params.get("view") === "commitments" || Boolean(params.get("set"));
+  // Opens where something waits on the reader, unless the address names a view or a record.
+  const show = useShowView();
+  useOpenWhereNews({ value: commitments ? "commitments" : "scorecards", onChange: show, values: ["scorecards", "commitments"], skip: Boolean(params.get("view") || params.get("set") || params.get("id")) });
   if (commitments) return <Commitments switcher={<ViewSwitch view="commitments" />} />;
   return <ScorecardsView />;
 }

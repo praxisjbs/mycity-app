@@ -3,6 +3,7 @@ import type { FieldAssignment, FieldAssignmentState } from "@mycity/contract/con
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import type { PersonRef } from "@/api/types/common";
 import { Button, Card, CardHeader, Chips, DataView, Field, formatDate, formatDateTime, FormFooter, HelpTerm, KeyValue, Pill, TextAreaField, toast, useContractForm, useModal, Who } from "@mycity/ui";
 import { ASSIGNMENT_STATE } from "./labels";
@@ -34,9 +35,10 @@ const STATE_CHIPS: Array<[FieldAssignmentState | "all", string]> = [
 export function FieldView({ openAssignment }: { openAssignment: (a: FieldAssignment) => void }) {
   const [state, setState] = useState<FieldAssignmentState | "all">("all");
   const list = usePaged("GET /api/v1/attendance/field-assignments", { filters: state === "all" ? {} : { state } });
+  const news = useViewNews();
   return (
     <>
-      <Chips label="Field Assignments" value={state} onChange={setState} options={STATE_CHIPS} />
+      <Chips label="Field Assignments" value={state} onChange={setState} options={withNews(news, STATE_CHIPS, { at: "temporary/field", all: "all" })} />
       <DataView
         title="Field Assignments"
         list={list}

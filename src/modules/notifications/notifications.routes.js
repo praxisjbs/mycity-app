@@ -42,6 +42,10 @@ route(router, "get", "/unread-records",
   { query: c.notifications.UnreadRecordsQuery, response: c.notifications.UnreadRecords, self: true, summary: "Which records a list shows have my unread notifications" },
   controller.unreadRecords);
 
+route(router, "get", "/views",
+  { query: c.notifications.ViewNewsQuery, response: c.notifications.ViewNews, self: true, summary: "Where on one screen my unread notifications wait" },
+  controller.views);
+
 route(router, "get", "/read-state",
   { query: c.notifications.NotificationReadStateQuery, response: c.notifications.NotificationReadState, self: true, summary: "Which of my shown notifications are read" },
   controller.readState);

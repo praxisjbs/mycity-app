@@ -23,6 +23,27 @@ function Single({ onChange }: { onChange?: (v: Status) => void }) {
 }
 
 describe("Chips", () => {
+  it("draws the unread notifications behind a chip as a yellow count after its own, red and at least 1 while urgent", () => {
+    render(
+      <Chips
+        label="State"
+        value="all"
+        options={[
+          { value: "all", label: "All", unread: 2 },
+          { value: "late", label: "Late", count: 4, unread: 1 },
+          { value: "cancelled", label: "Cancelled", urgent: true },
+          { value: "done", label: "Done", unread: 0 },
+        ]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "All 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Late 4 1" })).toBeInTheDocument();
+    const urgent = screen.getByRole("button", { name: "Cancelled 1" });
+    expect(urgent.querySelector("[data-count]")).toHaveClass("bg-destructive");
+    expect(screen.getByRole("button", { name: "All 2" }).querySelector("[data-count]")).toHaveClass("bg-primary");
+    expect(screen.getByRole("button", { name: "Done" }).querySelector("[data-count]")).toBeNull();
+  });
+
   it("chooses one, with aria-pressed, a slot on each chip and counts beside the label", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

@@ -43,6 +43,22 @@ function Views() {
   );
 }
 
+/** What waits on the reader behind each view (unread notifications), as the tab strip shows it. */
+function Waiting() {
+  const [side, setSide] = useState("permanent");
+  return (
+    <SegmentedControl
+      label="Worksites"
+      value={side}
+      onChange={setSide}
+      options={[
+        { value: "permanent", label: "Permanent" },
+        { value: "temporary", label: "Temporary", unread: 2 },
+      ]}
+    />
+  );
+}
+
 export default {
   component: "SegmentedControl",
   states: {
@@ -50,5 +66,6 @@ export default {
     "With Disabled": () => <Period />,
     Small: () => <Period small />,
     "Four With Counts": () => <Views />,
+    "With Unread": () => <Waiting />,
   },
 } satisfies GalleryEntry;

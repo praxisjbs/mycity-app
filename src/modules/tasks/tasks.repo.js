@@ -1092,7 +1092,25 @@ async function resolveBlockage(client, taskId, { by, note, shiftDays }) {
   return rows[0] || null;
 }
 
+/**
+ * Each of these tasks' status, and whether it is the reader's own (led, set or shared with them, as
+ * Mine reads it): where it waits on My Workspace · Tasks (tasks.views.js). An archived task is on
+ * no list.
+ */
+async function placesOf(db, ids, employeeId) {
+  const { rows } = await db.query(
+    `SELECT t.task_id AS id, t.status,
+            (t.primary_assignee_id = $2::uuid OR t.set_by_employee_id = $2::uuid
+             OR EXISTS (SELECT 1 FROM task_assignee ta WHERE ta.task_id = t.task_id AND ta.employee_id = $2::uuid)) AS mine
+       FROM task t
+      WHERE t.task_id = ANY($1::uuid[]) AND t.archived_at IS NULL`,
+    [ids, employeeId || null],
+  );
+  return rows;
+}
+
 module.exports = {
+  placesOf,
   PLAN_MAX,
   MEMBERS_MAX,
   people,

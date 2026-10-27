@@ -1068,6 +1068,15 @@ brought forward from M6 by TB, 19/10/2026). In the staff app:
   the tab counts something) and draws a yellow dot and a soft tint on them; opening one, by its row
   or by its address, reads them (`POST .../read-record`) and the dot goes at once. A screen does
   nothing for it: a list keyed by its records' ids is marked by itself.
+- **Where it waits, inside a tab** (JBS Praxis, 26/10/2026): the tab's count splits by the screen's
+  own switches, chips and board columns (`GET .../views`, each record placed by its module). A
+  screen with inner views wires them: `useViewNews()` reads its share by path (the switch's value,
+  then the chip's: `temporary`, `temporary/cancelled`), `withNews(news, options, { at, all })` adds
+  `unread` and `urgent` to a `SegmentedControl`'s or a `Chips`' options (an All option reads the
+  whole of `at`), a `Kanban` column takes `unread` and `urgent` as they are, and
+  `useOpenWhereNews({ value, onChange, values, at, all, skip })` opens the screen on the option
+  holding the news, once, never after the person chose and never over a link that names a record.
+  A Kanban's cards are marked as a `DataView`'s rows are.
 - **⌘K** runs Notification Settings, Turn On Notifications, Send Test Notification and Mark All Read
   in the app itself (`shell/Search.tsx`, `src/shared/search/actions.js`).
 

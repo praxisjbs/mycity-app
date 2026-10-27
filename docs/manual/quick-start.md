@@ -382,7 +382,7 @@ as: operations
 sources:
   - packages/ui/src/layout/ListDetail.tsx
 do:
-  - click: button "Pending"
+  - click: button "Pending 1"
   - click: row 1
   - wait: button "Approve"
 marks:

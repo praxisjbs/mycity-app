@@ -319,7 +319,8 @@ describe("my workspace", () => {
     const form = await newTask();
     fireEvent.click(within(form).getByRole("radio", { name: "Shared" }));
     expect(within(form).queryByText("Assign To")).toBeNull();
-    expect(within(form).getByText("Share With")).toBeTruthy();
+    // Share With waits on whether the reader sets tasks for others (its own read).
+    expect(await within(form).findByText("Share With", undefined, { timeout: 5000 })).toBeTruthy();
     const lead = () => within(form).getByRole("combobox", { name: /Lead/ });
     expect(lead().textContent).toContain("You");
     named(form, "Plan the Ops offsite");

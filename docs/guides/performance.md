@@ -1521,6 +1521,7 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Scorecards' Scorecards and Commitments, and Reviews' Reviews and PIPs, carry the unread notices about the scorecards and commitments, the reviews and improvement plans, each in its view, and each screen opens where they wait unless its address names a view or a record (`targets.views.js`, `reviews.views.js`).
 - 26/10/2026 · JP · New Goal, Report Month and New KPI show only to a reader who may set something,
   and Report Month's Function lists only the company and the functions the reader may set, from the same
   `GET /performance/functions` that New Objective and New KPI already use (§6.3). Before, a reader who

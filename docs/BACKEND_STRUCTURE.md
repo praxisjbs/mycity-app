@@ -563,6 +563,7 @@ src/modules/<name>/
   <name>.events.js        event keys emitted + outbox handlers registered
   <name>.ai.js            read manifest, or `// ai:none <reason>`          (gate 9)
   <name>.search.js        search provider, or `// search:none <reason>`    (gate 10)
+  <name>.views.js         where its records wait inside their screens, only where it has any (notifications.md §6)
   <name>.import.js        importer, when the module's records come from sheets (§9.4)
   <name>.test.js
 ```

@@ -140,6 +140,29 @@ async function unreadRecordIds(db, userId, entityTypes, entityIds) {
   return rows.map((r) => r.entity_id);
 }
 
+/**
+ * The records of these types the caller has an unread bell row about, or an urgent one still
+ * open: how many unread each has, and whether an urgent one is open (`GET /notifications/views`).
+ */
+async function waitingByRecord(db, userId, entityTypes) {
+  // pagination:complete one row per record with something unread on one screen; a person's own, rarely past a few dozen
+  const { rows } = await completeQuery(
+    db,
+    `SELECT n.entity_type, n.entity_id,
+            count(*) FILTER (WHERE n.read_at IS NULL)::int AS unread,
+            bool_or(${OPEN_URGENT}) AS urgent
+       FROM notification n
+      WHERE n.user_id = $1 AND 'in_app' = ANY(n.channels)
+        AND n.entity_type = ANY($2::text[]) AND n.entity_id IS NOT NULL
+        AND (n.read_at IS NULL OR ${OPEN_URGENT})
+      GROUP BY n.entity_type, n.entity_id
+      ORDER BY n.entity_type, n.entity_id`,
+    [userId, entityTypes],
+    { label: "records with unread notifications on one screen" },
+  );
+  return rows;
+}
+
 /** Marks the caller's unread notices about one record read; returns the rows marked. */
 async function markReadForRecord(db, userId, entityType, entityId) {
   const { rows } = await db.query(
@@ -970,6 +993,7 @@ module.exports = {
   markAllRead,
   readIds,
   unreadRecordIds,
+  waitingByRecord,
   markReadForRecord,
   urgentOpen,
   acknowledge,

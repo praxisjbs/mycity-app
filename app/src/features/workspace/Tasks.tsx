@@ -2,11 +2,12 @@
  * My Workspace · Tasks (docs/guides/workspace.md §10.1): the board or the list, Mine or My Team.
  * Each column is its own server list of 25 with Load More, so a column of 200 never loads 200.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Task } from "@mycity/contract/contract.gen.ts";
 import { useApi, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
+import { useOpenWhereNews, useViewNews, withNews, type ViewNews } from "@/features/notifications/marks";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import { Button, CheckboxField, DataView, EmptyState, ErrorState, formatDate, IconButton, PageHeader, Pill, SearchInput, SegmentedControl, Toolbar, useModal, Who } from "@mycity/ui";
 import { duePill, LABEL, PRIORITY, STATUS_TONE, useLiveTasks, useSetsForOthers } from "./shared";
@@ -17,6 +18,14 @@ import { TaskBoard, usePaused } from "./TaskBoard";
 import { LateReasons, useKeepsReasons } from "./LateReasons";
 
 type Scope = "mine" | "team";
+const WHOSE: Array<[Scope, string]> = [
+  ["mine", "Mine"],
+  ["team", "My Team"],
+];
+
+/** Two views' news as one: My Team holds the reader's own tasks and the rest. */
+const both = (a?: ViewNews, b?: ViewNews): ViewNews | undefined =>
+  a || b ? { unread: (a?.unread ?? 0) + (b?.unread ?? 0), urgent: Boolean(a?.urgent || b?.urgent) } : undefined;
 
 export function Tasks({ openId = null }: { openId?: string | null }) {
   const others = useSetsForOthers();
@@ -41,6 +50,19 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
     openPanel(linked, "Task");
     setParams({ id: null }, { replace: true });
   }, [linked, openPanel, setParams]);
+  // What waits on the reader: on Mine and My Team, in each column, and among the cancelled. The
+  // board opens on My Team when only others' tasks hold it, and shows the cancelled when they do.
+  const news = useViewNews();
+  const at = (status: string) => (scope === "mine" ? news(`mine/${status}`) : both(news(`mine/${status}`), news(`others/${status}`)));
+  useOpenWhereNews({ value: scope, onChange: setScope, values: others === undefined ? [] : others ? ["mine", "team"] : ["mine"], all: "team", skip: Boolean(openId) });
+  const cancelledNews = at("cancelled");
+  const cancelledWaits = Boolean(cancelledNews && (cancelledNews.unread > 0 || cancelledNews.urgent));
+  const showedCancelled = useRef(false);
+  useEffect(() => {
+    if (showedCancelled.current || !cancelledWaits) return;
+    showedCancelled.current = true;
+    setCancelled(true);
+  }, [cancelledWaits]);
   const add = () => modal.open({ title: "New Task", body: (close) => <TaskForm close={close} /> });
   const addCommitment = () => modal.open({ title: "New Commitment", body: (close) => <TaskForm close={close} commitment /> });
   const sendMonth = () => modal.open({ title: "Send Commitments", wide: true, body: (close) => <SendCommitmentsForm close={close} /> });
@@ -59,7 +81,7 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
         actions={
           <>
             <SegmentedControl label="Tasks Layout" value={layout} onChange={setLayout} options={[["board", "Board"], ["list", "List"]]} />
-            {others && <SegmentedControl label="Whose Tasks" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
+            {others && <SegmentedControl label="Whose Tasks" value={scope} onChange={setScope} options={withNews(news, WHOSE, { all: "team" })} />}
             {keeps && <IconButton icon="cog" label="Late Reasons" onClick={reasons} />}
             <Button icon="send" onClick={sendMonth}>Send Commitments</Button>
             <Button variant="primary" icon="plus" onClick={add}>New Task</Button>
@@ -90,6 +112,7 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
           filters={{ scope }}
           q={sent}
           onOpen={panel.open}
+          newsOf={at}
           empty={<EmptyState title="No Tasks Yet" action={<Button variant="primary" icon="plus" onClick={add}>New Task</Button>} />}
         />
       ) : (

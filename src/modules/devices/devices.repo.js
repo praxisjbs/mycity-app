@@ -178,7 +178,17 @@ function list(db, query, scope) {
   );
 }
 
+/** Each of these devices' status, as People · Devices' chips read it (devices.views.js). */
+async function statusesOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT ad.attendance_device_id AS id, ad.status FROM attendance_device ad WHERE ad.attendance_device_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
 module.exports = {
+  statusesOf,
   lockEmployee,
   forKnownDevice,
   knownDevice,

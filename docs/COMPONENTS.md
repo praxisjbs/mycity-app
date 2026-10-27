@@ -1947,7 +1947,7 @@ A row of filter chips above a list, each with an optional count: one chosen (sin
 | Use | Narrowing a list by a status or a group (Everyone, Late 4, Remote 2); a board's stage switcher on a phone (F19); picking several departments with `selected`. |
 | Avoid | Switching between views (use SegmentedControl or Tabs); a choice inside a form (use ChoiceField or CheckboxField); a status shown on a record (use Pill). |
 | Phone | One row that scrolls sideways inside itself, never the page; each chip is a 44 px target. |
-| Accessibility | A group named by `label`; each chip is a button with aria-pressed, so a screen reader hears which are on. The count is read with the label (Late 4). |
+| Accessibility | A group named by `label`; each chip is a button with aria-pressed, so a screen reader hears which are on. The count is read with the label (Late 4), and an unread count after it, as a tab reads its own (Late 4 1, Pending 1). |
 | Status | stable |
 | Exports | `Chips` |
 | Import | `import { Chips } from "@mycity/ui";` |
@@ -1959,7 +1959,7 @@ A row of filter chips above a list, each with an optional count: one chosen (sin
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `options` | `ReadonlyArray<Choice<V>>` | yes | The merged tuple ["late", "Late"], or { value, label, count, icon, disabled }. Labels Title Case, at most 3 words; counts as numbers. |
+| `options` | `ReadonlyArray<Choice<V>>` | yes | The merged tuple ["late", "Late"], or { value, label, count, unread, urgent, icon, disabled }. Labels Title Case, at most 3 words; counts as numbers; `unread` the reader's unread notifications behind the chip, in yellow. |
 | `value` | `V` |  | Single select: the chip that is on. |
 | `onChange` | `(value: V) => void` |  | Single select: called with the chip pressed. |
 | `selected` | `readonly V[]` |  | Toggle: the chips that are on (several may be). Using it switches the row to toggle mode. |
@@ -1995,7 +1995,7 @@ Two to five views of the same thing side by side in one pill (Mine, My Team; Wee
 |---|---|---|---|
 | `value` | `V` | yes | The view showing. |
 | `onChange` | `(value: V) => void` | yes | Called with the chosen view. |
-| `options` | `ReadonlyArray<Choice<V>>` | yes | Two to five options: the merged tuple ["team", "My Team"], or { value, label, icon, count, disabled }. |
+| `options` | `ReadonlyArray<Choice<V>>` | yes | Two to five options: the merged tuple ["team", "My Team"], or { value, label, icon, count, unread, urgent, disabled }; `unread` the reader's unread notifications behind a view, in yellow. |
 | `label` | `string` |  | Names the group for assistive technology ("Whose Tasks"); give one unless a visible label sits beside it. |
 | `disabled` | `readonly V[]` |  | Values shown but not choosable (the merged Seg's `disabled`). |
 | `small` | `boolean` |  | The 28 px desktop size for a dense toolbar (still 44 px on a phone). |
@@ -3901,8 +3901,8 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 |---|---|
 | Use | A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions. |
 | Avoid | A list that is not staged (use DataView); dragging as the only way to move a card; more than six stages. |
-| Phone | No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. |
-| Accessibility | Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26). |
+| Phone | No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. The board opens on the first stage holding the reader's unread notifications when the first holds none, until the person picks one. |
+| Accessibility | Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26). A card new to its reader (RowMarksContext) says Unread before its title, beside its dot and tint, as a list's row does. |
 | Status | stable |
 | Exports | `Kanban`, `KanbanCardBody` |
 | Import | `import { Kanban, KanbanCardBody } from "@mycity/ui";` |

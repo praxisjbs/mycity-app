@@ -131,4 +131,16 @@ function candidates(db, query) {
   );
 }
 
-module.exports = { pendingInvites, list, getRow, summary, byRole, candidates };
+/** Each of these logins' status, as Settings · Users' Status chips read it (users.views.js). */
+async function statusesOf(db, ids) {
+  const { rows } = await db.query(
+    `SELECT u.user_id AS id, ${STATUS} AS status
+       FROM app_user u
+       LEFT JOIN employee e ON e.employee_id = u.employee_id
+      WHERE u.user_id = ANY($1::uuid[])`,
+    [ids],
+  );
+  return rows;
+}
+
+module.exports = { pendingInvites, list, getRow, summary, byRole, candidates, statusesOf };

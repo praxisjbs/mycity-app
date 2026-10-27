@@ -110,9 +110,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | User Guide and its gate (JBS Praxis, 25/10/2026): `docs/manual/` chapters cut to each reader on the server, `npm run guide:shots`, gate `check/user-guide.js` with `User-guide-unchanged: <reason>`, the conventions in CLAUDE.md, README, both guides, the PR template and the Stop hook (`docs/guides/user-guide.md`) | JP | ☑ | 25/10/2026 |
 | A record opens in a sheet on a phone (F31; JBS Praxis, 25/10/2026): `ListDetail` and `DetailPane` in `packages/ui` (the list beside the record on desktop, the tapped record in a bottom sheet on a phone, nothing opening unasked), gate 11 tapping each phone screen's first two rows and failing a record that lands in the page, the rule in CLAUDE.md, FRONTEND_GUIDE §7 and `docs/guides/foundation.md` §6.17; thirteen views moved onto it | JP | ☑ | 25/10/2026 |
 | Where it waits (JBS Praxis, 26/10/2026): each module's tabs carry their share of its unread count (yellow, red while urgent), every list marks the records its reader has an unread notice about with a dot and a soft tint, and opening one reads it at once on every device; `GET /notifications/badges` per module and tab, `GET /notifications/unread-records`, `POST /notifications/read-record`, `RowMarksContext` in `packages/ui` (`docs/guides/notifications.md` §3 step 7, §6) | JP | ☑ | 26/10/2026 |
+| Where it waits, inside a tab (JBS Praxis, 26/10/2026): a tab's count splits further by the screen's own switches, chips and board columns, each with the unread notices about the records it holds (the tab strip's yellow, red while urgent), and the screen opens where they wait; `GET /notifications/views`, `shared/notifications/views.js` with each module's `<module>.views.js`, `unread` and `urgent` on `Chips`, `SegmentedControl` and `Kanban` (whose cards are marked as rows are), `useViewNews`, `withNews`, `useOpenWhereNews` (`docs/guides/notifications.md` §6) | JP | ☑ | 26/10/2026 |
 
 **Notes**
 
+- 26/10/2026 · JP · Where it waits, inside a tab (JBS Praxis, from the QA register's Worksites 2 with neither Permanent nor Temporary marked): `GET /notifications/views` counts a screen's unread notices by the inner view each record sits in, placed by its module as the screen's own filters find it (`<module>.views.js`); `Chips`, `SegmentedControl` and `Kanban` columns show the share in the tab strip's yellow, a board's cards are marked as rows are, and each screen opens on the side and chip holding the news (`marks.tsx`). Wired on every tab with inner views where notices land (notes under People, Employee Self-Service, My Workspace, Performance, Knowledge Hub, Settings, Home) · nothing left
 - 26/10/2026 · JP · QA DEF-02 and DEF-12 finished: a capped ⌘K group may end with `more` rows, declared in the provider's `types` for the coverage gate; the shell's update, install and notifications offers show on Home only (`offersScreen`), on phone and desktop, Back to Guide on every screen · nothing left
 - 26/10/2026 · JP · QA DEF-04 finished, form system: DateRangeField's ends show From and To labels and each says its own problem under its box, tied to it alone; the period's message sits under the empty end, else once under both; `useFieldControl` takes `part`, and `useFieldError` lets a control show its Field's message beside the part at fault · nothing left
 - 26/10/2026 · JP · QA DEF-01 finished, F14 on the server: one reader and one rule for the delivery plan (`packages/contract/plan.js`), used by the app's build, the app and the API (`src/shared/delivery-plan.js`, from the `app/dist/delivery-plan.json` the build writes); My Approvals, Need You and ⌘K (record groups, screens, actions, Home cards) leave out on the server what would only open Coming Soon, so their pages of 25 count only what opens · nothing left
@@ -668,12 +670,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Notes**
 
+- 26/10/2026 · JP · Where it waits, inside a tab: #2 Alerts' Category chips carry the unread notices about the open alerts in each category · nothing left
 - 26/10/2026 · JP · Overview (#1), QA DEF-01 finished: Need You (`/workflow/mine` and its count) never lists a request about a record whose screen has not shipped (an expense before Milestone 8), decided on the server by the plan the app was built with · nothing left
 - 26/10/2026 · JP · Overview (#1), QA DEF-01: Overview cards and Choose Cards leave out a card whose module is Coming Soon in this build (Expenses before M8), for every role; cards and options carry `module`, and a `?kpi=` link to a held-back card opens nothing · Need You can still list an expense approval that opens Coming Soon (its paging is the server's, and the server does not know what is released)
 - 26/10/2026 · JP · User Guide audit, screen defects: Team's View Attendance opens that person's day (`?employee=`); Choose Cards' refusals are error toasts and the list reloads; the clock's note failure says what to do; a saved Daily Attendance report holding a status its day cannot opens with it dropped. Checked and kept: Clear N Alerts counts the open alerts the list shows. Left: nothing.
@@ -782,6 +785,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 26/10/2026 · JP · Where it waits, inside a tab: #5 Tasks' Mine and My Team and each board column (a phone's stage) carry the unread notices about the tasks there; the board opens on My Team when only others' tasks hold them, Show Cancelled turns on when a cancelled one does, and a new card has a row's dot · nothing left
 - 26/10/2026 · JP · Tasks (#5), QA OBS-06 finished: a waiting card moved out of To Do (a drag, its menu, a phone's Move To) opens Waiting On before anything is sent, naming each task it waits on with Open Task, and Go Ahead for whoever plans it, which then moves the card where it was put; Close leaves it in To Do; the mock refuses as the API does. QA DEF-06 acceptance tested: an empty Add Comment is marked and sends nothing, a refused one keeps its words, one press (even two) adds exactly one · nothing left
 - 26/10/2026 · JP · Tasks (#5), QA bug register (Milestone 2): the task panel takes the saved title as soon as Edit Task saves, and again on a second edit (DEF-05); Add Comment leaves the emptied box unmarked (DEF-06, the shared form's reset); a refused move, such as a waiting task moved out of To Do, is an error toast naming the task it waits on, never a confirmation (OBS-06) · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects: refusals on Counts Towards and Project say why, and a new assignee drops the last one's scorecard line; Send Nudge with no watchers says so; with every late reason off, Mark Done moves the card; Set Recovery's Owner is the task people picker; Send Commitments shows once there is one; Cancel Task's refusal names who may; one empty-column label on both shells. Left: nothing.
@@ -823,12 +827,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 25/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 26/10/2026 · JP · Where it waits, inside a tab: #89 Policy Updates' To Acknowledge, All Policies and Waiting On You carry the unread notices about the versions in each, and the screen opens where they wait · nothing left
 - 26/10/2026 · JP · My Leave (#12), QA OBS-05 checked against Postgres: Send Request's answer, My Requests' Approver, People's Waiting On and the approval's route and history name the same approver on the line manager's stage, a delegate's and a role's (Admin Override) · nothing left
 - 26/10/2026 · JP · My Leave (#12), QA DEF-08 and OBS-05: a request past the allowance is marked on Last Day with the days asked and the balance ("32 working days, 19 left", was Check this value), and writes nothing; Send Request's message and My Requests' Approver name the real approver (`approver_name`: the line manager, the login the stage was reassigned to or the CEO), else the stage (Sent to Admin Override) · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects: My Attendance shows Real Time Given and reads Not Available for a leaver; after clock-out the clock stays pressable as Done For Today (owner's decision); My Devices, Work Location Request and Download My Data say what to do; Org Chart's banner only for People who may move people, and search opens folded branches; My Documents shows the vault's 15 MB and types; My Leave's Taken and Approved Upcoming open what they count, Cancel Request asks first; My Security says why Change Password failed, Ask for a Code is one request (F26), Passkeys says when the browser cannot add one. Left: nothing.
@@ -982,12 +987,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 25/10/2026 |
 
 **Notes**
 
+- 26/10/2026 · JP · Where it waits, inside a tab (the QA register's Worksites 2): #28 Worksites' Permanent and Temporary, Temporary's Sites, Requests and Field and their chips carry the unread notices about what they hold, and the screen opens there; a link that arrives while Worksites is open picks its side. #25 Attendance's views and chips likewise (Register rows keyed by the day, so a notice about one dots it), #26 Leave's and #27 Devices' chips by status · nothing left
 - 26/10/2026 · JP · Attendance (#25), QA DEF-02 finished: ⌘K's attendance days end with All Days of each person listed, opening People · Attendance's All Days panel (`?person=`): their days by month, newest first, a day opening over it (`GET /attendance/days`, `people` view, in scope) · nothing left
 - 26/10/2026 · JP · QA DEF-04 finished: Attendance (#25) export Period's From and To each carry their own label and error, At most 31 days shows once under both. QA OBS-05: Leave (#26) Waiting On agrees with the request's history on every route, tested against Postgres · nothing left
 - 26/10/2026 · JP · Attendance (#25), QA DEF-02: ⌘K attendance days and exceptions read the person, the status and the day-first date in the label and the accessible name, three at most, newest first, after the person · nothing left
@@ -1074,7 +1080,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 32 | Reviews | `reviews` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 32 | Reviews | `reviews` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 33 | Analytics | `analytics` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Build plan** (`docs/guides/performance.md` §1.2, where each PR's checklist is ticked; PR 1 and PR 2 in
@@ -1090,6 +1096,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 26/10/2026 · JP · Where it waits, inside a tab: #30 Scorecards' Scorecards and Commitments, #32 Reviews' Reviews and PIPs carry the unread notices about what each holds, and the screen opens where they wait · nothing left
 - 26/10/2026 · JP · Goals (#29) and KPIs (#31): New Goal, Report Month and New KPI show only to a reader who may set something (`GET /performance/functions`, goals.authority alone), and Report Month's Function lists only the company and the functions the reader may set, as New Objective's and New KPI's already do. Before, a reader holding `goals.function` who headed nothing (a Program Manager) was offered every function and all three buttons, and refused on the save. No API or contract change; the guide's §6.3 and §10 and the User Guide's Performance chapter say it, its pictures retaken. Tests: `performance/Goals.test.tsx`. Left: nothing.
 - 26/10/2026 · JP · QA bug register finished (Milestone 2): Goals (#29) New Objective offers only the company and the functions the reader may set (`GET /performance/functions`, goals.authority alone), starting on a head's own function, a sent or binding plan still marked (DEF-10); KPIs (#31) New KPI offers only the functions the reader may set KPIs for, the in-form refusal behind it (DEF-11); Scorecards (#30) Edit Lines totals each section's lines against its share as weights are typed (Accountability 22.5 of 15, red until it adds up, by `scoring.sectionWeightProblems`; OBS-04) · nothing left
 - 26/10/2026 · JP · QA bug register (Milestone 2): Goals (#29) New Objective names a function whose plan is sent or binding in its option and marks it on Function as picked, sending nothing, and the API marks `department_id` the same (DEF-10); Goals and KPIs (#31) say a refusal that names no field on the form's error line until the next press ("Only the function's head sets its KPIs", DEF-11); Scorecards (#30) Edit Lines marks a Weight over 100 "At most 100" on its line, where the database refused it unexplained (OBS-04); refusal toasts across Performance are error toasts · nothing left
@@ -1201,7 +1208,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 63 | SOPs | `sops` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
@@ -1210,6 +1217,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 26/10/2026 · JP · Where it waits, inside a tab: #62 Policies' State chips carry the unread notices about the policies under each state · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects (Policies): Archive Policy is refused while a version waits for approval (owner's decision); Recall Submission only for its sender or the CEO; a waiting submission shows what was sent; Publish refuses unsaved changes; Tidy With AI on an empty box says to write first; buttons follow the knowledge grants; a Starts Soon chip. Left: nothing.
 - 26/10/2026 · JP · User Guide (#102), every gap closed: each chapter was checked against its screens string by string (every button, field, column, message, server refusal and schema mark, each given a verdict by a reader of that chapter) and rewritten where it fell short: steps the screens ask for, every message a person can meet with what to do, success messages, what a phone shows differently, and each step's grant. New shared tasks in Getting Started (Confirm It's You, Sign out, saving a download, and a section for screens that cannot open); new needs `team` and `<one> or <another>` (`packages/contract/guide.js`, the API's reader, the mock, the gate; tests `user-guide-parse.test.js`, `user_guide.test.js`); the pictures run on a fixed clock and can pick from a select's list. 201 pictures. No screen changed. Left: the screen defects the audit found (silent failures, misleading messages; listed in the PR) for a follow-up; pictures the demo cannot reach (Set Up Two-Step at sign-in, the home location sheet, a check-in on a site's day, connecting a mailbox, rescoping a commitment); TB to confirm the key result types' meanings in the Performance chapter.
 - 26/10/2026 · JP · User Guide (#102) search (`docs/guides/user-guide.md` §6.1 decisions 9 to 12, §6.8 to §6.10), from JBS Praxis's four answers of 25/10/2026: a search box over the guide on desktop and phone finds sections, tasks and steps by their words (stems, typing slips, half typed words, MyCity's other words for things) and by their meaning (the Embeddings job, OpenAI's small model, kept in `user_guide_passage`, migration 0510, by the `user-guide-index` schedule), cut to the reader's grants down to the step; a result opens the guide at its step. Get Answer writes up to three sentences from the reader's own results on the Fast job, each citing its source; the microphone takes a spoken search (Transcription). ⌘K's Guide group ranks with the same search, and Praxis AI answers how-to questions from it (`guide.search`). Nothing anyone types is kept: the words travel in POST bodies. New: `ai.embed()` beside `complete()` (`docs/guides/ai-control.md` §6.6), `GuideResults` and `GuideAnswerCard` in `packages/ui`. Tests: `user-guide-search.test.js`, `ai-embed.test.js`, `GuideResults.test.tsx`, `UserGuide.test.tsx`, `tests/integration/user-guide.test.js`. Left: the meaning half's thresholds (`MEANING_FLOOR`, `MEANING_BAND`) were set without real vectors (no OpenAI key here) and want checking on staging; no record of searches that found nothing ("not now").
@@ -1300,20 +1308,21 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 95 | Status | `status` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 96 | Performance | `performance` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 97 | Faults | `faults` | M9 | GE | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 25/10/2026 |
+| 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | LA | ☑ | ☑ | ☑ | Dropped | 20/10/2026 |
 | 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 
 **Notes**
 
+- 26/10/2026 · JP · Where it waits, inside a tab: #70 Users' Status chips and #77 Integrations' Group chips carry the unread notices about what each holds; a notice about a connection now opens it, and its row is dotted · nothing left
 - 26/10/2026 · JP · Audit Log (#79), QA DEF-04 finished: the Dates ends show From and To labels and each says its own problem under its box, tied to it alone · nothing left
 - 26/10/2026 · JP · QA bug register: Audit Log (#79, DEF-04) Dates ends have their own ids and are named From and To, as are their calendar buttons; Imports (#93, OBS-03) Map lists the Required fields and refuses Next in the window, naming the fields still without a column (focused, nothing sent), and shows a server refusal of the mapping the same way until the mapping is put right · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects: Status and Faults say why briefs and status changes failed; Organisation's Remove asks first; Users take five roles at most; Approvals name a route's problems in words, ten stages at most; Imports offer Continue on an unfinished import (owner's decision), Download Errors once previewed, Revert for the importer's holders; Security's Two-Step switches stay busy until settled (F26); Audit Log's Export needs its grant; Integrations allow Remove Model on a phone (owner's decision) and keep a failed test's entries. Dropped after checking: Imports' Next already spins. Left: nothing.

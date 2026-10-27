@@ -23,6 +23,23 @@ function Host({ onChange }: { onChange?: (v: Scope) => void }) {
 }
 
 describe("SegmentedControl", () => {
+  it("draws the unread notifications behind a view as a yellow count, nothing for none", () => {
+    render(
+      <SegmentedControl
+        label="Worksites"
+        value="permanent"
+        onChange={() => undefined}
+        options={[
+          { value: "permanent", label: "Permanent" },
+          { value: "temporary", label: "Temporary", unread: 2 },
+        ]}
+      />,
+    );
+    const temporary = screen.getByRole("radio", { name: "Temporary 2" });
+    expect(temporary.querySelector("[data-count]")).toHaveClass("bg-primary");
+    expect(screen.getByRole("radio", { name: "Permanent" }).querySelector("[data-count]")).toBeNull();
+  });
+
   it("is a named radiogroup that takes the merged tuples", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
