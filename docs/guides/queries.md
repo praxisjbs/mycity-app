@@ -438,8 +438,17 @@ or tier 2.**
   used: an employee disputes a fine in their query response. Drop in a later release, or keep for
   M6. LA to say.
 
+- **To agree with Victor before the User Guide pictures (GE, 27/10/2026).** Who signs a sanction
+  letter (built: the proposer); whether a manual query may be raised unsigned by Operations & People
+  (built: always signed); the Salary Deduction letter's wording (ours, for MyCity's HR to read);
+  a Clause on the rule form (built: the policy only); the cut for `overdue_task` and
+  `low_performance` (built: the primary assignee, the due day, rating Below only); the 48 hour
+  window and one reminder a day.
+
 ## 14 · Change log
 
+- 27/10/2026 · GE · Meeting 26/10 items 1 to 10 built; handed to Victor. Left: the staging seed's
+  demo queries and sanctions, the User Guide chapter and its pictures, once §13's last point is agreed.
 - 26/10/2026 · GE · Rules count overdue Workspace tasks and low monthly performance (meeting 26/10;
   §6.3, §7): `overdue_task` from `tasks.auto-query.js` through the daily `query-rule-sweep`, and
   the new trigger `low_performance` (a month closed rated Below) from `reviews.auto-query.js` on

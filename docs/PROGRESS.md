@@ -45,7 +45,7 @@ saying who agreed and when.
 | M0 Foundation | 35 items below: 34 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 11 | 0 | 0 | 11 | 0 | 0 |
-| M3 Queries & Consequence Management | 5 | 0 | 1 | 4 | 0 | 0 |
+| M3 Queries & Consequence Management | 5 | 0 | 0 | 5 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **101** | **35** | **1** | **65** | **0** | **0** |
+| **Total** | **101** | **35** | **0** | **66** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -825,7 +825,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 10 | My Performance | `my-performance` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 13 | My Queries | `my-queries` | M3 | AJ | ☑ | ☐ | ☐ | In progress | 26/10/2026 |
+| 13 | My Queries | `my-queries` | M3 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -1135,10 +1135,10 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 34 | Queries | `queries` | M3 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 35 | Rules | `rules` | M3 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 36 | Sanctions | `sanctions` | M3 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 37 | Letter Templates | `letter-templates` | M3 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 34 | Queries | `queries` | M3 | GE | ☑ | ☑ | ☑ | Built | 27/10/2026 |
+| 35 | Rules | `rules` | M3 | GE | ☑ | ☑ | ☑ | Built | 27/10/2026 |
+| 36 | Sanctions | `sanctions` | M3 | GE | ☑ | ☑ | ☑ | Built | 27/10/2026 |
+| 37 | Letter Templates | `letter-templates` | M3 | GE | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
 
@@ -1158,6 +1158,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 - 26/10/2026 · GE · Letter Templates' editor is rich text (meeting 26/10, item 3): New Template and Edit Template use `RichTextField`; the wording is kept as Markdown (`htmlToMarkdown`, names such as `{{ employee.first_name }}` intact) and the detail returns `body_html` for the editor; Markdown `body` still accepted from scripts. Integration test covers markup removed and an unknown name refused through the editor.
 - 26/10/2026 · GE · Write With AI (meeting 26/10, item 9), built like the mailbox's: Raise a Query (`POST /queries/assist`, prompt `query-draft`, job Default) drafts Subject and What Happened; the letter editor (`POST /letter-templates/assist`, prompt `letter-draft`, job Deep Reasoning, `queries.configure`) drafts the wording with only the letter's own names. Jobs chosen by GE 26/10, registered in `services/ai/actions.js`. Contact details shielded and put back; the mailbox's placeholder guard moved to `services/ai/drafts.js` with the availability read (`GET .../assist`: off or limit), so the button reads AI Is Off or AI Limit Reached and the form works as before. Nothing kept until Use Draft. Integration tests cover off, limit, the shielded number, the guard and the capability. Left: wording reviewed once a real provider is on staging.
 - 26/10/2026 · GE · Rules count overdue tasks and low monthly scores (meeting 26/10, item 10): `overdue_task` switches on, counted by `tasks.auto-query.js` (a task's due day passed while open, or done on a later day; cancelled and archived never) through the daily `query-rule-sweep` (06:20 Lagos); new trigger `low_performance` (Low Monthly Score: a monthly review closed rated Below) counted by `reviews.auto-query.js` on `review.closed`. The evaluator reads each trigger from its owning module; evidence names each task or month. Integration tests cover both. Left: `missed_target` until M2's KPIs count it.
+- 27/10/2026 · GE · Meeting 26/10 items 1 to 10 built (#13, #34 to #37); handed to Victor in the PR. My Queries (#13) UI and Mobile ticked: one tab with the Queries | Sanctions switch, rich text Respond, each sanction opening its letter. Merged main. Left for Victor, after the screens' mechanics are agreed: demo queries and sanctions in the staging seed only (never production); the Queries & Sanctions chapter `docs/manual/queries-and-sanctions.md`, the My Queries section of `employee-self-service.md` and the Employee 360 Queries and Sanctions sections of `people.md`, with their pictures; MyCity's HR to read the Salary Deduction letter's wording; Write With AI's wording checked once a real provider is on staging; `missed_target` with M2's KPIs.
 
 ### Recruitment
 
