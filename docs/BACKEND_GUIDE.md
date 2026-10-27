@@ -594,7 +594,9 @@ capped, before it fails saying the runner's mirror is not answering.
 still apply, and review will hold you to them.
 
 If you use Claude Code, the same progress, guide and README-map checks run before it finishes a
-task (`.claude/hooks/stop-check.js`), so most of these are caught before you push.
+task (`.claude/hooks/stop-check.js`), so most of these are caught before you push. While an
+`npm run ci` is running it leaves the screen gates to that run, since both would rebuild and read
+the one demo build.
 
 ### 8.5 Review and merge
 

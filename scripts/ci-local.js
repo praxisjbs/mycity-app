@@ -265,7 +265,16 @@ function answers(url, port) {
   });
 }
 
+/**
+ * Marks a run in progress (its pid), so the Stop hook leaves the screen gates to it: two at once
+ * rebuild and read one demo build, and one took the other's index.html away mid-crawl (27/10/2026).
+ */
+const RUNNING = path.join(ROOT, "node_modules", ".cache", "mycity", "ci-local.pid");
+
 async function main() {
+  fs.mkdirSync(path.dirname(RUNNING), { recursive: true });
+  fs.writeFileSync(RUNNING, String(process.pid));
+  process.on("exit", () => fs.rmSync(RUNNING, { force: true }));
   const chosen = GATES.filter((g) => (!ONLY || ONLY.has(g.id)) && (!GROUP || groupOf(g) === GROUP));
   /*
    * With RUN_DB_TESTS=1 the backend group needs PostgreSQL and Redis. One that had stopped cost a
