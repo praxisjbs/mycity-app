@@ -53,6 +53,7 @@ module.exports = {
 
   plans: async (req, res) => sendPaged(res, await service.listPlans(req.validated.query)),
   functions: async (req, res) => sendPaged(res, await service.listFunctions(withActor(req), req.validated.query)),
+  departments: async (req, res) => sendPaged(res, await service.listDepartments(withActor(req), req.validated.query, scopeOf(req))),
   plan: async (req, res) => ok(res, await service.planDetail(id(req), withActor(req), scopeOf(req))),
   submitPlan: async (req, res) => ok(res, await service.submitPlan(withActor(req), id(req), scopeOf(req))),
 

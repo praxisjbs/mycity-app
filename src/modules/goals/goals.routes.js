@@ -19,6 +19,7 @@
  *   POST  /key-results/:id/confirm                         `performance` approve, goals.confirm
  *   GET   /plans · /plans/:id                              `performance` view
  *   GET   /functions                                       `performance` view: the company and each function, may the reader set it
+ *   GET   /departments                                     `performance` view · scope: the departments the reader's lists filter by
  *   POST  /plans/:id/submit                                `performance` create, goals.company or goals.function
  *   GET   /target-changes · POST /target-changes           view (a line's within scope) · edit: opens performance.target_change
  *   GET   /target-changes/:id                              `performance` view: one change, named in full
@@ -97,6 +98,9 @@ route(router, "get", "/plans", { query: g.PlanListQuery, response: g.PlanPage, s
 route(router, "get", "/functions",
   { query: g.PerformanceFunctionListQuery, response: g.PerformanceFunctionPage, summary: "The functions the reader may set goals and KPIs for" },
   view, controller.functions);
+route(router, "get", "/departments",
+  { query: g.PerformanceDepartmentListQuery, response: g.PerformanceDepartmentPage, summary: "The departments the reader's Performance lists filter by" },
+  view, controller.departments);
 route(router, "get", "/plans/:id", { params: id, response: g.PlanDetail, summary: "One quarter plan" }, view, controller.plan);
 route(router, "post", "/plans/:id/submit",
   { params: id, body: c.common.EmptyBody, response: g.PlanDetail, summary: "Send a plan for approval" },

@@ -332,6 +332,15 @@ async function listFunctions(actor, query) {
   return { ...page, data };
 }
 
+/**
+ * GET /performance/departments: the departments the reader's Scorecards, Commitments, Reviews and
+ * Analytics can be filtered by, in the reader's `performance` scope (§8). Goals and KPIs are the
+ * company's shared plan and keep offering every function.
+ */
+async function listDepartments(actor, query, scope) {
+  return repo.listDepartments(pool, query, scope, actor || {});
+}
+
 /** What stops a plan being sent, and what only warns (§6.4). */
 async function planProblems(db, plan, { objectives, scorecards, contributions }) {
   const out = [];
@@ -624,6 +633,7 @@ module.exports = {
   planView,
   listPlans,
   listFunctions,
+  listDepartments,
   planDetail,
   submitPlan,
   listChanges,

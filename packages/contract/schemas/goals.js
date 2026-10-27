@@ -625,6 +625,24 @@ const PerformanceFunctionPage = Paged(PerformanceFunction);
 
 const PerformanceFunctionListQuery = listQuery({ period_id: uuid.optional() });
 
+/**
+ * GET /performance/departments: the departments the reader's Performance lists can be filtered by:
+ * every active one for a reader with `all`, else those of the people in their scope, the people
+ * whose reviews and scorecards name them, their own and the ones they head. The Department and
+ * Function filters of Scorecards, Commitments, Reviews and Analytics offer only these.
+ */
+const PerformanceDepartment = z
+  .object({
+    department_id: uuid,
+    code: z.string(),
+    name: z.string(),
+  })
+  .strict();
+
+const PerformanceDepartmentPage = Paged(PerformanceDepartment);
+
+const PerformanceDepartmentListQuery = listQuery({});
+
 /** Why a plan cannot be sent yet (§6.4). */
 const PlanProblem = z
   .object({
@@ -1049,6 +1067,9 @@ const TABLES = {
   },
   PerformanceFunctionPage: { table: null, reason: "a page of the functions a reader may set goals for" },
   PerformanceFunctionListQuery: { table: null, reason: "list controls and the quarter for the functions" },
+  PerformanceDepartment: { table: "department", virtual: {} },
+  PerformanceDepartmentPage: { table: null, reason: "a page of the departments a reader's Performance lists filter by" },
+  PerformanceDepartmentListQuery: { table: null, reason: "list controls for the departments" },
   PlanProblem: { table: null, reason: "a reason the plan cannot be sent, worked out" },
   PlanDetail: {
     table: "performance_plan",
@@ -1162,6 +1183,9 @@ module.exports = {
   PerformanceFunction,
   PerformanceFunctionPage,
   PerformanceFunctionListQuery,
+  PerformanceDepartment,
+  PerformanceDepartmentPage,
+  PerformanceDepartmentListQuery,
   PlanProblem,
   PlanDetail,
   TargetChangeCreate,

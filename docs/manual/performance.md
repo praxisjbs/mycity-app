@@ -382,6 +382,7 @@ of the people you manage.
 2. The tiles count the **Scorecards**, how many are **Agreed**, **Awaiting Agreement**, and
    **Below Meets**.
 3. Narrow the list with **Quarter**, **Department** and **Status**, or type in **Search People**.
+   **Department** lists only the departments of the people you can see. With one, it is left off.
 4. Each row shows the **Employee**, **Department**, **Reviewer**, **Status**, **Score to Date**
    and **Rating**. On a phone, each card shows the **Employee**, **Status**, **Score to Date** and
    **Rating**.
@@ -543,8 +544,8 @@ marked on [My Workspace · Tasks](/workspace?tab=tasks) (see
 ![The Commitments view](shot:performance-commitments)
 
 1. On [Performance · Scorecards](/performance?tab=targets), press **Commitments** at the top.
-2. Choose the **Month**: the last five months, this month or next. Choose a **Department**, and a
-   **State**: **All States**, **Awaiting Approval**, **Not Sent**, **Returned**, **Due**,
+2. Choose the **Month**: the last five months, this month or next. Choose a **Department** of the
+   people you can see, and a **State**: **All States**, **Awaiting Approval**, **Not Sent**, **Returned**, **Due**,
    **On Time**, **Late**, **Missed** or **Rescoped**. Each lists what reads that way. Or type in
    **Search People**.
 3. The tiles count the **Commitments**, those **On Time**, those **Late or Missed**, and those
@@ -672,7 +673,8 @@ those of the people you manage, and any that wait on you.
    or **Close Review** at **With HR**. On a phone, **Next** is left off: each card shows the
    **Employee**, **Stage** and **Due**.
 5. Narrow the list with **Department**, **Stage** and **Kind** (**Monthly** or **Probation**), or
-   type in **Search People**.
+   type in **Search People**. **Department** lists only the departments of the people you can see.
+   With one, it is left off.
 6. Each row shows the **Employee**, **Reviewer**, **Stage**, when it is **Due**, its **Score** and
    **Rating**. On a phone, **Reviewer**, **Score** and **Rating** are left off. Press a row to open
    the review.
@@ -876,7 +878,8 @@ their own team.
 ### Read the figures {#performance-analytics-read}
 
 1. Open [Performance · Analytics](/performance?tab=analytics). Choose the **Quarter** and the
-   **Function**.
+   **Function**. **Function** lists only the functions of the people you can see. With one, it is
+   left off.
 2. The tiles show the **Company Score**, and the share of **Commitments On Time**, **Check-Ins On
    Time** and **Reviews Closed On Time**, each with what it is out of, such as 10 of 13.
 3. **Scores by Month** shows the company's and each function's score for each month.
