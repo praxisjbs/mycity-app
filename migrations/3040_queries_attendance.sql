@@ -9,7 +9,11 @@
 --                     raised_by is set, otherwise a rule
 --   sanction        + signed_by: the Operations & People approver who signed it when they approved
 --                     it (their drawn signature is signature_document_id, from 3020); null for a
---                     sanction signed by its proposer before this
+--                     sanction signed by its proposer before this. RESTRICT: a login that
+--                     signed a letter is suspended, never deleted
+--                   + letter_template: the rung's letter when the sanction was proposed, so a rung
+--                     pointed at another letter afterwards never strands an approved sanction.
+--                     Null for a sanction proposed before this; its rung's letter is used
 -- UP
 ALTER TABLE employee_query ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'person';
 UPDATE employee_query SET source = 'rule' WHERE raised_by IS NULL AND source = 'person';
@@ -21,7 +25,10 @@ BEGIN
 END;
 $$;
 
-ALTER TABLE sanction ADD COLUMN IF NOT EXISTS signed_by uuid REFERENCES app_user(user_id);
+ALTER TABLE sanction ADD COLUMN IF NOT EXISTS signed_by uuid REFERENCES app_user(user_id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS sanction_signed_by_idx ON sanction (signed_by);
+ALTER TABLE sanction ADD COLUMN IF NOT EXISTS letter_template citext REFERENCES letter_template(key) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS sanction_letter_template_idx ON sanction (letter_template);
 
 -- A breach naming a query that is not there (none should) is cleared before the key holds.
 UPDATE attendance_rule_breach b SET employee_query_id = NULL
@@ -41,6 +48,9 @@ CREATE INDEX IF NOT EXISTS attendance_rule_breach_query_idx ON attendance_rule_b
 -- DOWN
 DROP INDEX IF EXISTS attendance_rule_breach_query_idx;
 ALTER TABLE attendance_rule_breach DROP CONSTRAINT IF EXISTS attendance_rule_breach_query_fk;
-ALTER TABLE sanction DROP COLUMN IF EXISTS signed_by;
+DROP INDEX IF EXISTS sanction_letter_template_idx;
+ALTER TABLE sanction DROP COLUMN IF EXISTS letter_template; -- DESTRUCTIVE: rollback only; drops what UP added
+DROP INDEX IF EXISTS sanction_signed_by_idx;
+ALTER TABLE sanction DROP COLUMN IF EXISTS signed_by; -- DESTRUCTIVE: rollback only; drops what UP added
 ALTER TABLE employee_query DROP CONSTRAINT IF EXISTS employee_query_source_check;
 ALTER TABLE employee_query DROP COLUMN IF EXISTS source;

@@ -370,13 +370,15 @@ function nextStepOf(employeeId: string) {
   return next ? { consequence_step_id: next.consequence_step_id, name: next.name, position: next.position } : null;
 }
 
-/** The stage a pending sanction waits on, as the approval says (guide §6.5): Operations & People, then the CEO from rank 4. */
+/** The stage a pending sanction waits on, as the approval says (guide §6.5): Operations & People, then the CEO for a rung that suspends without pay or ends employment. */
 const pendingOf = (q: Row) => (q.sanction?.status === "pending_approval" ? SANCTIONS.find((s) => s.sanction_id === q.sanction!.sanction_id) ?? null : null);
 function approvalOf(q: Row, user: string): QueryDetail["approval"] {
   const s = pendingOf(q);
   if (!s) return null;
   const ceo = s.waiting_on === "CEO";
-  const mayAct = ceo ? user === "ifeoma" : FULL.has(user) && s.decided_by !== uid(user);
+  // Nobody decides a sanction on themselves, nor one they proposed.
+  const own = byKey(user)?.employee_id === s.employee.employee_id;
+  const mayAct = !own && (ceo ? user === "ifeoma" : FULL.has(user) && s.decided_by !== uid(user));
   return { stage: ceo ? "ceo" : "operations_people", stage_name: ceo ? "CEO" : "Operations & People", can_decide: mayAct, signs: !ceo };
 }
 
@@ -661,8 +663,8 @@ route("POST /api/v1/sanctions/:id/approve", (req) => {
   const { s, q, a } = d;
   if (a!.signs && !/^data:image\/png;base64,/.test(String((req.body as { signature?: string }).signature ?? "")))
     return fail(422, "SIGNATURE_REQUIRED", "Sign in the box", { signature: ["Sign in the box"] });
-  const rank = STEPS.find((x) => x.consequence_step_id === s!.consequence_step_id)?.position ?? 1;
-  if (a!.stage === "operations_people" && rank >= 4) {
+  const effect = STEPS.find((x) => x.consequence_step_id === s!.consequence_step_id)?.financial_effect ?? "none";
+  if (a!.stage === "operations_people" && effect !== "none") {
     s!.waiting_on = "CEO";
     return ok(s!);
   }

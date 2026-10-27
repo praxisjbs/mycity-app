@@ -665,7 +665,8 @@ function requestRegisterExport(actor, body) {
  * not there, did not ask for a query, or already has one.
  */
 async function breachForQuery(client, breachId) {
-  const breach = await repo.getBreach(client, breachId);
+  // Locked, so a second delivery waits and then finds the query already linked.
+  const breach = await repo.lockBreach(client, breachId);
   if (!breach || !breach.raise_query || breach.employee_query_id) return null;
   const words = require("./attendance.rules-engine").queryWordsOf(breach);
   return {

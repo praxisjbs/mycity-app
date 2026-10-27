@@ -709,6 +709,59 @@ describeDb("queries and sanctions against the real migrations", () => {
       const standing = await as("hod").get(`/sanctions/standing?employee_id=${people.other.employee.employee_id}`);
       expect(standing.status).toBe(404);
     });
+
+    test("a sanction is decided only on the query's card: My Approvals lists it but never decides it", async () => {
+      const id = await answered("Left the store room open");
+      await propose(id, "Caution");
+      const card = (await as("ops").get(`/queries/${id}`)).body;
+      const flow = (await as("ops").get(`/sanctions/${card.sanction.sanction_id}`)).body.workflow_instance_id;
+      expect((await as("ops").get(`/workflow/instances/${flow}`)).body.can_decide).toBe(false);
+      const generic = await as("ops").post(`/workflow/instances/${flow}/approve`, {});
+      expect(generic.status).toBe(409);
+      expect(generic.body.error.code).toBe("DECIDE_ON_RECORD");
+      expect((await as("ops").post(`/workflow/instances/${flow}/reject`, { reason: "Not through here." })).status).toBe(409);
+      expect((await as("ops").get(`/queries/${id}`)).body.sanction.status).toBe("pending_approval");
+
+      // A non-approver is refused before anything of theirs is kept: no signature file is left.
+      const before = (await q("SELECT count(*)::int AS n FROM document WHERE entity_type = 'sanction' AND entity_id = $1", [card.sanction.sanction_id])).rows[0].n;
+      expect((await as("mgmt").post(`/sanctions/${card.sanction.sanction_id}/approve`, { signature: SIGNATURE })).status).toBe(403);
+      expect((await as("mgmt").post(`/sanctions/${card.sanction.sanction_id}/approve`, {})).status).toBe(403);
+      const after = (await q("SELECT count(*)::int AS n FROM document WHERE entity_type = 'sanction' AND entity_id = $1", [card.sanction.sanction_id])).rows[0].n;
+      expect(after).toBe(before);
+      await approve("ops", id);
+    });
+
+    test("the letter is fixed when the sanction is proposed: a rung pointed at a draft later strands nothing", async () => {
+      const id = await answered("Left the gate unlocked overnight");
+      await propose(id, "Caution");
+      const moved = await as("ops").patch(`/sanctions/chain/${steps.Caution}`, { letter_template: "panel-letter" });
+      expect(moved.status).toBe(200);
+      await approve("ops", id);
+      const card = (await as("hod").get(`/queries/${id}`)).body;
+      expect(card.sanction.status).toBe("issued");
+      const letter = await q("SELECT letter_type FROM sanction_letter WHERE sanction_id = $1", [card.sanction.sanction_id]);
+      expect(letter.rows.map((r) => r.letter_type)).toEqual(["caution-letter"]);
+      expect((await as("ops").patch(`/sanctions/chain/${steps.Caution}`, { letter_template: "caution-letter" })).status).toBe(200);
+    });
+
+    test("the person queried never decides their own sanction, even holding the approving role", async () => {
+      const raised = await as("hod").post("/queries", {
+        employee_id: people.ops.employee.employee_id,
+        subject: "Approved Own Overtime",
+        details: "Overtime for the weekend was approved on your own account without a second signature.",
+        signature: SIGNATURE,
+      });
+      expect(raised.status).toBe(201);
+      const qid = raised.body.employee_query_id;
+      expect((await as("ops").post(`/ess/queries/${qid}/response`, { body_html: "<p>I approved it in a hurry and should have asked.</p>" })).status).toBe(200);
+      expect((await propose(qid, "Caution")).status).toBe(200);
+      const card = (await as("ops").get(`/queries/${qid}`)).body;
+      expect(card.approval).toMatchObject({ stage: "operations_people", can_decide: false });
+      const own = await as("ops").post(`/sanctions/${card.sanction.sanction_id}/approve`, { signature: SIGNATURE });
+      expect(own.status).toBe(403);
+      expect((await as("ops").post(`/sanctions/${card.sanction.sanction_id}/reject`, { reason: "I do not accept this at all." })).status).toBe(403);
+      expect((await as("ops").get(`/queries/${qid}`)).body.sanction.status).toBe("pending_approval");
+    });
   });
 
   /* ---------------------------------------------------------------- *

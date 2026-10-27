@@ -2,15 +2,19 @@
 /**
  * Staging demonstration data: Queries & Sanctions (M3; docs/guides/queries.md §3, §6, F13).
  *
- * Everything goes through the module's own services, as the screens would, hung off MyCity's real
- * staff found by post (lib/staff.js):
+ * Everything goes through the module's own services, as the screens would. The queries and
+ * sanctions are raised on the Implementation Team's own accounts only, the people the organogram
+ * puts in the Implementation department, never on MyCity's staff: staging sends real mail, and a
+ * query letter reaches the person it is about (TB, 27/10/2026). MyCity's real staff, found by post
+ * (lib/staff.js), do what their posts do: raise, propose and approve.
  *
  *   the chain     Chain Settings' five rungs in MILESTONES §8's order (Caution, Warning, Second
  *                 Warning, Suspension Without Pay, Dismissal or Termination), each on its shipped
  *                 letter; only when the chain is empty, so a chain People entered stays theirs
  *   a rule        Unregistered Device on Rules, switched on (the Attendance policy owns lateness)
- *   queries       raised by the Line Manager, then the Head of Department, on the people who report
- *                 to them, each signed on the pad, and walked as the people would:
+ *   queries       raised on the Implementation department's people in turn, each by the person's
+ *                 line manager (Management when they have no login), signed on the pad, and walked
+ *                 as the people would:
  *                   waiting for the response
  *                   answered, waiting for a decision
  *                   answered and closed with no action
@@ -24,7 +28,7 @@
  *
  * Run only by `scripts/db/seed.js --staging` (which refuses production three ways), after
  * 47_performance_commitments.js. Idempotent: each query is found by its person and subject, the
- * rule by its code, and a second run adds nothing. A query whose post nobody holds is left out.
+ * rule by its code, and a second run adds nothing. With nobody in Implementation, no query is added.
  */
 const path = require("node:path");
 const c = require("@mycity/contract");
@@ -67,8 +71,11 @@ const RESPONSE =
   "evening and I did not flag the delay to my manager in time. I have set a reminder two days " +
   "ahead of each deadline and will raise any delay the same day.</p>";
 
+/** The department whose people the queries are raised on: the Implementation Team's accounts. */
+const SUBJECTS = "Implementation";
+
 /**
- * The queries, in the order of the people they go to. `walk` is how far each is taken:
+ * The queries, in turn over the Implementation department's people. `walk` is how far each is taken:
  * open, answered, closed, approved, fined, pending.
  */
 const QUERIES = Object.freeze([
@@ -142,7 +149,7 @@ module.exports = async function seed({ pool, actor, log = () => {} }) {
     log(`queries: rule ${RULE.name} made`);
   }
 
-  /* The queries: each raised by a person's own line manager, Line Manager first, then Head of Department. */
+  /* The queries: on the Implementation department's people only, each raised by their own line manager. */
   const proposerPerson = staff.management[0] || staff.ceo;
   const proposer = await callerOf(pool, proposerPerson);
   const approver = await callerOf(pool, staff.operations);
@@ -150,12 +157,18 @@ module.exports = async function seed({ pool, actor, log = () => {} }) {
     log("queries: no Management or Operations & People login, no queries added");
     return;
   }
-  const busy = new Set([proposerPerson, staff.operations, staff.ceo].filter(Boolean).map((p) => p.employee_id));
+  const subjects = staff.everyone.filter((p) => p.department === SUBJECTS && p.user_id);
+  if (!subjects.length) {
+    log(`queries: nobody in ${SUBJECTS}, no queries added`);
+    return;
+  }
+  const lineOf = (person) => staff.everyone.find((p) => p.employee_id === person.line_manager_id) || null;
   const pairs = [];
-  for (const lead of [staff.manager, staff.head]) {
-    const caller = await callerOf(pool, lead);
-    if (!caller) continue;
-    for (const person of staff.reportsOf(lead)) if (!busy.has(person.employee_id)) pairs.push({ lead, caller, person });
+  for (const [n] of QUERIES.entries()) {
+    const person = subjects[n % subjects.length];
+    const manager = lineOf(person);
+    const managerCaller = manager && manager.employee_id !== person.employee_id ? await callerOf(pool, manager) : null;
+    pairs.push({ lead: managerCaller ? manager : proposerPerson, caller: managerCaller || proposer, person });
   }
   const { rows: chainRows } = await pool.query(
     "SELECT consequence_step_id, name FROM consequence_step WHERE active ORDER BY position",
@@ -165,7 +178,6 @@ module.exports = async function seed({ pool, actor, log = () => {} }) {
 
   let added = 0;
   for (const [n, plan] of QUERIES.entries()) {
-    if (!pairs[n]) break;
     const { lead, caller, person } = pairs[n];
     const { rows: found } = await pool.query(
       "SELECT employee_query_id FROM employee_query WHERE employee_id = $1 AND subject = $2",

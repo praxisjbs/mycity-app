@@ -101,14 +101,14 @@ ESS · My Queries.
 | `employee_query` (3000, 3010, 3020, 3040) | `number`, `employee_id`, `query_rule_id`, `raised_by`, `source` (`person`, `rule` or `attendance`), `subject`, `details`, `evidence`, `status`, `outcome`, `response_due_at`, `reminded_at`, `dedup_key`, `letter_document_id`, `signature_document_id`, `policy_version_id`, `policy_clause`, `workflow_instance_id`, `reviewed_by`, `reviewed_at` | `raised_by` null means a rule raised it. `dedup_key` is unique, so a breach delivered twice raises one query. `status` is `awaiting_response`, `under_review`, `resolved`; `outcome` is `no_action` or `sanctioned` once resolved |
 | `query_response` (3000) | `employee_query_id`, `employee_id`, `body`, `submitted_at` | One per query, never updated |
 | `consequence_step` (3010) | `code`, `name`, `position`, `letter_template`, `financial_effect`, `default_days`, `valid_days`, `evidence_required`, `active` | MyCity's ladder, one rung a row, ordered by `position`. Entered on Chain Settings, not seeded (A26). `financial_effect`: `none`, `unpaid_days`, `ends_employment` |
-| `sanction` (3000, 3010, 3020) | `number`, `employee_query_id`, `employee_id`, `consequence_step_id`, `sanction_type`, `reason`, `evidence`, `decided_by`, `signature_document_id` and `signed_by` (the Operations & People approver who signed it, §6.4), `effective_on`, `ends_on`, `status`, `workflow_instance_id` | Always from a query (NOT NULL). `sanction_type` is the rung's code at the time, kept if the rung is renamed. `status`: `pending_approval`, `issued`, `rejected`, `withdrawn` |
+| `sanction` (3000, 3010, 3020, 3040) | `number`, `employee_query_id`, `employee_id`, `consequence_step_id`, `sanction_type`, `letter_template`, `reason`, `evidence`, `decided_by`, `signature_document_id` and `signed_by` (the Operations & People approver who signed it, §6.4), `effective_on`, `ends_on`, `status`, `workflow_instance_id` | Always from a query (NOT NULL). `sanction_type` is the rung's code at the time, kept if the rung is renamed; `letter_template` its letter at the time, so a rung pointed at another letter later never strands an approved sanction (null before 3040: the rung's). `status`: `pending_approval`, `issued`, `rejected`, `withdrawn` |
 | `sanction_fine` (3000) | `sanction_id`, `amount_ngn`, `settlement_status`, `settled_at` | An attachable outcome on any sanction, never a rung. `pending` until M6 accepts it into a run (`accepted`, then `settled`) or waives it |
 | `sanction_letter` (3000) | `sanction_id`, `document_id`, `letter_type` | The issued letters, from the vault: the rung's, and `salary-deduction-letter` when it carries a fine |
 | `letter_template` (3010) | `key`, `name`, `purpose`, `status` | The letters this module may send. The wording is `template_version` (0080) under the same key; the shipped default is `templates/documents/<key>.html`. `purpose`: `query`, `sanction` or `fine` (§6.6) |
 
 Schema migration file(s): `migrations/3000_queries_sanctions.sql` (merged), `migrations/3010_queries_chain.sql`,
 `migrations/3020_queries_signatures.sql` (the drawn signatures' `signature_document_id`),
-`migrations/3030_queries_policy.sql` (the policy a rule names and a query cites), `migrations/3040_queries_attendance.sql` (the key from `attendance_rule_breach.employee_query_id` to the query it raised, owed since attendance's 1430, and a query's `source`).
+`migrations/3030_queries_policy.sql` (the policy a rule names and a query cites), `migrations/3040_queries_attendance.sql` (the key from `attendance_rule_breach.employee_query_id` to the query it raised, owed since attendance's 1430, a query's `source`, and on `sanction` its signer `signed_by` and its `letter_template` at proposal).
 Reference-data file(s): `seeds/reference/3099_seed_queries_sanctions.sql` (merged),
 `seeds/reference/3190_seed_queries_chain.sql`: the `queries.configure` capability and its holders,
 the `queries.consequence` approval, the shipped letter templates' rows, and `3099`'s invalid
@@ -163,8 +163,10 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 
 Each module mounts its own base path (`/queries`, `/query-rules`, `/sanctions`,
 `/letter-templates`), so no router's `/:id` meets another's word. A proposed sanction is decided
-with the approval's own routes (`POST /workflow/instances/:id/approve`, `reject`), never a route
-here.
+only on the query's card (`POST /sanctions/:id/approve`, `/reject`, §6.4). It is listed in My
+Approvals and read through `GET /workflow/instances/:id` (`can_decide` false there), but the generic
+`/workflow/instances/:id/approve` and `/reject` refuse it (409 `DECIDE_ON_RECORD`): only the card
+keeps the Operations & People signature (`definitions.decidedOnRecord`).
 
 ## 6 · Rules and calculations
 
@@ -206,8 +208,9 @@ here.
   with `raise_query` true. Subject "3 Late Arrivals This Month" (the breach's own words), details
   naming the days, evidence the days, the Attendance policy version in force on the breach's last day
   cited, `source` `attendance`, no `query_rule_id`, dedup `attendance-breach:<breach id>`. The breach
-  is linked to the query through the attendance service (`attachQuery`), in the same transaction. A
-  breach whose person has left raises nothing. Shown as raised by **Attendance Policy**, and seen as
+  is linked to the query through the attendance service (`attachQuery`), in the same transaction,
+  and read under a row lock (`breachForQuery`), so two deliveries at once raise one query and spend
+  one number. A breach whose person has left raises nothing. Shown as raised by **Attendance Policy**, and seen as
   a rule's query is (§6.1).
 
 ### 6.3 Rules
@@ -253,13 +256,16 @@ here.
 - **Close, no action**: a reason of at least 10 characters. Status `resolved`, outcome `no_action`.
 - **Propose a sanction**: a rung (`consequence_step_id`), a reason, evidence when the rung requires
   it, the dates when its financial effect is `unpaid_days`, and an optional fine. Writes the
-  `sanction` as `pending_approval` and opens `queries.consequence` with context
-  `{ rank, fine_amount }`, in one transaction. One open proposal a query. The proposer is
+  `sanction` as `pending_approval`, with the rung's letter kept on it (`letter_template`), and opens
+  `queries.consequence` with context `{ rank, financial_effect, fine_amount }` and the person queried
+  excluded (`exclude_employee_ids`), in one transaction. One open proposal a query. The proposer is
   `decided_by` and does not sign.
-- **Approve or reject** (`POST /sanctions/:id/approve`, `/reject`): only whoever the current stage
-  waits on. At the `operations_people` stage the approver draws their signature (`signature`, 422
-  `SIGNATURE_REQUIRED` without it), stored through the vault as `sanction.signature_document_id`,
-  with `signed_by` the approver. The issued letters (§6.7) carry that signature, name and job title,
+- **Approve or reject** (`POST /sanctions/:id/approve`, `/reject`), on the query's card only (§5):
+  only whoever the current stage waits on, and never the person the sanction is about (403, the
+  CEO included). The approval is decided first, so someone who may not act is refused (403) before
+  anything of theirs is kept. At the `operations_people` stage the approver draws their signature
+  (`signature`, 422 `SIGNATURE_REQUIRED` without it, which undoes the decision), stored through the
+  vault as `sanction.signature_document_id`, with `signed_by` the approver. The issued letters (§6.7) carry that signature, name and job title,
   "For" the company, as every sample MyCity sent is signed by its People & Operations Lead (AJ,
   27/10/2026). A rejection needs a reason of at least 10 characters.
 
@@ -281,9 +287,12 @@ here.
   without code. People may choose a different rung; the choice and reason are recorded.
 - A retired rung keeps its sanctions; it is no longer offered. A rung with sanctions is never deleted.
 - Who decides is the `queries.consequence` approval, edited on Settings · Approvals: Operations &
-  People for every rung (who sign it, §6.4), then the CEO from rank 4 (Suspension Without Pay and
-  above, by position at the time): the handbook has the CEO and the HR Manager decide a suspension
-  (§4.7.4). The rank travels in the approval's context, so a definition change never needs code.
+  People for every rung (who sign it, §6.4), then the CEO for a rung that suspends without pay or
+  ends employment (`financial_effect` `unpaid_days` or `ends_employment`), wherever it sits on the
+  ladder: the handbook has the CEO and the HR Manager decide a suspension (§4.7.4). The rung's
+  financial effect and position travel in the approval's context, so a definition change never
+  needs code, and adding or leaving out a rung never moves the CEO (GE, 27/10/2026; it was
+  position 4 before).
 
 ### 6.6 Fines
 
@@ -496,12 +505,19 @@ or tier 2.**
   300 characters) that the rule's query letters quote (§6.3).
 - **Settled 27/10/2026 (GE).** Staging's seed carries the five rungs, a rule, and demo queries and
   sanctions. Built in `seeds/staging/50_queries.js`: the five rungs when the chain is empty, the
-  Unregistered Device rule switched on, and six queries the people's own line managers raised and
-  signed, one at each stage, two sanctions Management proposed and Operations & People approved and
+  Unregistered Device rule switched on, and six queries on the Implementation department's people
+  only (the JBS Praxis team's accounts, never MyCity's staff: staging sends real mail; TB,
+  27/10/2026), each raised and signed by the person's line manager, one at each stage, two sanctions Management proposed and Operations & People approved and
   signed (one with a fine), one waiting on them.
 
 ## 14 · Change log
 
+- 27/10/2026 · GE · From the audit (handoff §8): a sanction is decided only on the query's card (the
+  generic workflow routes refuse it), never by the person queried, and the approver is checked
+  before their signature is kept (§5, §6.4); the CEO is asked by the rung's financial effect, not
+  its position (§6.5); a sanction keeps its letter from proposal (§4); a breach is locked while its
+  query is raised (§6.2); the letterhead signs "For" the organisation; the staging seed queries the
+  Implementation department's accounts only (TB, §13).
 - 27/10/2026 · AJ · The rule form's Optional Clause built (§6.3): New Rule and Edit Rule, cleared with the policy.
 - 27/10/2026 · AJ · From MyCity's samples and handbook (§13): attendance breaches raise their query
   (`queries.raise_from_breach`, migration 3040's key and `source`); Rules drops the three attendance

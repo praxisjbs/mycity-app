@@ -110,7 +110,7 @@ const ROWS = `
          x.employee_id, x.employee_query_id, q.number::text AS query_number, q.raised_by,
          q.subject AS query_subject, q.details AS query_details, q.created_at AS query_raised_at,
          x.consequence_step_id, x.sanction_type, COALESCE(s.name, x.sanction_type) AS step_name,
-         s.position, s.valid_days, s.letter_template::text AS letter_template, s.financial_effect,
+         s.position, s.valid_days, COALESCE(x.letter_template, s.letter_template)::text AS letter_template, s.financial_effect,
          x.reason, x.decided_by, ${NAME("de")} AS decided_by_name, de.job_title AS decided_by_title,
          x.signature_document_id, x.signed_by, ${NAME("se")} AS signed_by_name, se.job_title AS signed_by_title,
          q.policy_version_id AS query_policy_version_id, q.policy_clause AS query_policy_clause,
@@ -198,8 +198,8 @@ async function insert(db, row) {
   const { rows } = await db.query(
     `INSERT INTO sanction
        (employee_query_id, employee_id, consequence_step_id, sanction_type, reason, evidence, decided_by,
-        effective_on, ends_on, status)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, 'pending_approval')
+        effective_on, ends_on, letter_template, status)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, 'pending_approval')
      RETURNING sanction_id`,
     [
       row.employee_query_id,
@@ -211,6 +211,7 @@ async function insert(db, row) {
       row.decided_by,
       row.effective_on,
       row.ends_on,
+      row.letter_template,
     ],
   );
   return rows[0].sanction_id;

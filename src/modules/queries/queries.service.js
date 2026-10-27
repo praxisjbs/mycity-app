@@ -130,12 +130,14 @@ const SIGNING_STAGE = "operations_people";
 async function approvalFor(row, user) {
   if (!row.sanction || row.sanction.status !== "pending_approval" || !row.workflow_instance_id) return null;
   try {
-    const flow = await require("../workflow/workflow.service").getInstance(user, row.workflow_instance_id);
+    const workflow = require("../workflow/workflow.service");
+    const flow = await workflow.getInstance(user, row.workflow_instance_id);
     if (flow.state !== "pending" || !flow.current_stage) return null;
     return {
       stage: flow.current_stage,
       stage_name: flow.stage_name || flow.current_stage,
-      can_decide: Boolean(flow.can_decide),
+      // Decided here, on the card: My Approvals' own can_decide is false for a sanction.
+      can_decide: await workflow.mayAct(user, row.workflow_instance_id),
       signs: flow.current_stage === SIGNING_STAGE,
     };
   } catch (err) {

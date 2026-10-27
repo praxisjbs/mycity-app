@@ -1,10 +1,11 @@
 "use strict";
 /**
  * Queries & Sanctions' staging seed end to end (seeds/staging/50_queries.js, docs/guides/queries.md
- * §3, §6): the real migrations, MyCity's real staff from 10_staff.js as the runner loads them, then
- * the seed twice. Through the services it enters the chain, switches on a rule and walks six queries
- * from raised to issued; Operations & People approve and sign what Management proposed, the worker
- * issues it, and the second run changes nothing.
+ * §3, §6): the real migrations, the Implementation Team's build account and a second team account,
+ * MyCity's real staff from 10_staff.js as the runner loads them, then the seed twice. Through the
+ * services it enters the chain, switches on a rule and walks six queries from raised to issued, on
+ * the Implementation department's people only, never MyCity's staff; Operations & People approve and
+ * sign what Management proposed, the worker issues it, and the second run changes nothing.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/queries-staging-seed
  *
@@ -22,6 +23,8 @@ const chromium = require("../../src/services/pdf/chromium");
 const staffSeed = require("../../seeds/staging/10_staff");
 const seed = require("../../seeds/staging/50_queries");
 const { realStaff } = require("../../seeds/staging/lib/staff");
+const { atomically } = require("../../src/shared/db/tx");
+const { createAdmin, BUILD_ACCOUNT } = require("../../scripts/db/create-admin");
 
 jest.mock("../../src/jobs/queues", () => ({
   enqueue: jest.fn(async () => ({ id: "1" })),
@@ -66,6 +69,23 @@ describeDb("Queries & Sanctions' staging seed against the real migrations", () =
     await q("INSERT INTO system_marker (environment) VALUES ('test')");
     workingWeek.invalidateCalendar();
     outbox.markReady();
+    // Our own accounts, in the Implementation department, as on staging: the build account and a
+    // teammate's, made before the roster so the loader gives the build account its line to the CTO.
+    const team = [
+      { ...BUILD_ACCOUNT, employee: { ...BUILD_ACCOUNT.employee, work_email: "build@jbspraxis.test" } },
+      {
+        ...BUILD_ACCOUNT,
+        employee: { ...BUILD_ACCOUNT.employee, first_name: "Ada", middle_name: "Grace", last_name: "Builder", preferred_name: "Ada", work_email: "ada@jbspraxis.test" },
+      },
+    ];
+    for (const account of team) {
+      const client = await pool.connect();
+      try {
+        await atomically(client, () => createAdmin(client, account, "A-long-Test-password-1!", { allowAdditional: true }));
+      } finally {
+        client.release();
+      }
+    }
     await runFile(staffSeed);
     await runFile(seed, logs);
     await settle();
@@ -90,14 +110,22 @@ describeDb("Queries & Sanctions' staging seed against the real migrations", () =
     expect(rule).toEqual([{ name: "Unregistered Device", active: true }]);
   });
 
-  test("walks six queries the people's own line managers raised and signed", async () => {
+  test("walks six queries on the Implementation department's people only, raised and signed", async () => {
     expect(logs.filter((m) => m.includes("stopped"))).toEqual([]);
     const { rows } = await q(
-      `SELECT q.subject, q.status, q.outcome, q.source, q.raised_by, q.signature_document_id
-         FROM employee_query q ORDER BY q.number`,
+      `SELECT q.subject, q.status, q.outcome, q.source, q.raised_by, q.signature_document_id, d.name AS department
+         FROM employee_query q JOIN employee e ON e.employee_id = q.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+        ORDER BY q.number`,
     );
     expect(rows).toHaveLength(6);
-    expect([...new Set(rows.map((r) => r.raised_by))].sort()).toEqual([staff.manager.user_id, staff.head.user_id].sort());
+    // Never MyCity's staff: staging mails a query letter to the person it is about.
+    expect([...new Set(rows.map((r) => r.department))]).toEqual(["Implementation"]);
+    const team = staff.everyone.filter((p) => p.department === "Implementation");
+    expect(team).toHaveLength(2);
+    const raisers = new Set(rows.map((r) => r.raised_by));
+    expect(raisers.size).toBeGreaterThan(0);
+    expect(team.some((p) => raisers.has(p.user_id))).toBe(false);
     expect(rows.every((r) => r.source === "person" && r.signature_document_id)).toBe(true);
     const by = Object.fromEntries(rows.map((r) => [r.subject, r]));
     expect(by["Missed Weekly Field Report"].status).toBe("awaiting_response");

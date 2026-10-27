@@ -11,6 +11,8 @@
  *  - Deciding needs both: the stage names the caller (the engine checks, and nobody
  *    decides their own request, the CEO excepted), and the caller holds `approve` on
  *    the request's module (shared/workflow/approvers.js leaves that to the route).
+ *  - A request decided on its own record (definitions.decidedOnRecord: a sanction, decided on its
+ *    query's card) is listed and read here, but never decided here: 409, and can_decide false.
  *  - Withdrawing is the requester's (or the CEO's), while it is pending.
  *  - Reassigning a stage whose approver has gone needs `approve` with scope `all` on
  *    the request's module: Operations & People, Management, the CEO (§11).
@@ -393,7 +395,10 @@ async function detail(client, id, user) {
       };
     }),
     can_decide:
-      pending && Boolean(approves) && (await approvers.canAct(client, instance.stage_approvers, user, instance)),
+      pending &&
+      !definitions.decidedOnRecord(instance.definition_key) &&
+      Boolean(approves) &&
+      (await approvers.canAct(client, instance.stage_approvers, user, instance)),
     can_withdraw: pending && (user.is_ceo === true || instance.opened_by === user.user_id),
     can_reassign: pending && approves === "all",
     link: linkOf(instance, user),
@@ -428,9 +433,31 @@ async function decideIn(client, user, id, decision, reason = null) {
   return detail(client, id, user);
 }
 
-/** Approve, reject or request changes on the current stage. */
+/**
+ * Whether the caller may act on the stage a request waits on, wherever it is decided: the record
+ * that decides its own approval (decidedOnRecord) asks this for its card.
+ */
+async function mayAct(user, id) {
+  const instance = await engine.getInstance(pool, id);
+  if (!instance || instance.state !== "pending" || !(await mayRead(pool, instance, user))) return false;
+  if (!(await approveScope(user, instance.module_key))) return false;
+  return approvers.canAct(pool, instance.stage_approvers, user, instance);
+}
+
+/** The stage a request waits on, under the caller's transaction (null once it has completed). */
+async function stageOf(client, id) {
+  const found = await engine.getInstance(client, id);
+  return found && found.state === "pending" ? found.current_stage : null;
+}
+
+/** Approve, reject or request changes on the current stage, from My Approvals. */
 async function decide(user, id, decision, reason = null) {
-  return tx((client) => decideIn(client, user, id, decision, reason));
+  return tx(async (client) => {
+    const found = await readable(client, id, user);
+    if (definitions.decidedOnRecord(found.definition_key))
+      throw new AppError("DECIDE_ON_RECORD", "Decide this on its record", 409);
+    return decideIn(client, user, id, decision, reason);
+  });
 }
 
 /** The requester takes a pending request back. */
@@ -518,6 +545,8 @@ module.exports = {
   getInstance,
   decide,
   decideIn,
+  stageOf,
+  mayAct,
   withdraw,
   reassign,
 };

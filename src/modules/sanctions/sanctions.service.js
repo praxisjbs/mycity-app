@@ -136,6 +136,8 @@ async function propose(client, actor, query, body) {
     decided_by: actor.user_id,
     effective_on: effectiveOn,
     ends_on: endsOn,
+    // The letter is fixed now: a rung pointed at another letter later never strands this one.
+    letter_template: step.letter_template,
   });
   if (body.fine_amount) await repo.insertFine(client, id, body.fine_amount);
   // Nobody signs a proposal: Operations & People sign when they approve it (guide §6.4).
@@ -159,7 +161,10 @@ async function propose(client, actor, query, body) {
     definition_key: DEFINITION_KEY,
     entity: { type: "sanction", id },
     subject_employee_id: query.employee_id,
-    context: { rank: step.position, fine_amount: body.fine_amount || "0.00" },
+    // Who approves follows what the rung does, not where it sits: the CEO from a suspension up.
+    context: { rank: step.position, financial_effect: step.financial_effect, fine_amount: body.fine_amount || "0.00" },
+    // The person queried never decides their own sanction (guide §6.4).
+    exclude_employee_ids: [query.employee_id],
     actor,
   });
   await repo.setWorkflow(client, id, instance.workflow_instance_id);
@@ -173,12 +178,17 @@ async function propose(client, actor, query, body) {
 /** The stage of queries.consequence whose approver signs the letters. */
 const SIGNING_STAGE = "operations_people";
 
-/** A pending sanction the reader may see, with its approval, locked for the decision. */
-async function pendingFor(client, id, reader) {
+/**
+ * A pending sanction the reader may see, with its approval, locked for the decision. The person it
+ * is about never decides it, the CEO included (guide §6.4).
+ */
+async function pendingFor(client, id, reader, actor) {
   await repo.lock(client, id);
   const row = visibility.assertVisible(reader, await repo.get(client, id), "sanction");
   if (row.status !== "pending_approval" || !row.workflow_instance_id)
     throw new AppError("SANCTION_DECIDED", "This sanction was already decided", 409);
+  if (actor.employee_id && actor.employee_id === row.employee_id)
+    throw new AppError("PERMISSION_DENIED", "You cannot decide your own sanction", 403);
   return row;
 }
 
@@ -190,16 +200,18 @@ async function pendingFor(client, id, reader) {
 async function approve(actor, reader, id, body) {
   const workflow = require("../workflow/workflow.service");
   await tx(async (client) => {
-    const row = await pendingFor(client, id, reader);
-    const flow = await workflow.getInstance(actor, row.workflow_instance_id);
-    if (flow.current_stage === SIGNING_STAGE) {
+    const row = await pendingFor(client, id, reader, actor);
+    // The stage as it stands under the sanction's lock. decideIn says whether this person may act
+    // on it before anything of theirs is kept; a missing signature undoes the decision with the rest.
+    const stage = await workflow.stageOf(client, row.workflow_instance_id);
+    await workflow.decideIn(client, actor, row.workflow_instance_id, "approve");
+    if (stage === SIGNING_STAGE) {
       if (!body.signature)
         throw new AppError("SIGNATURE_REQUIRED", "Sign in the box", 422, { signature: ["Sign in the box"] });
       const queries = require("../queries/queries.service");
       const doc = await queries.storeSignature(client, body.signature, { type: "sanction", id }, actor);
       await repo.setSignature(client, id, doc, actor.user_id);
     }
-    await workflow.decideIn(client, actor, row.workflow_instance_id, "approve");
   });
   return get(id, reader);
 }
@@ -208,7 +220,7 @@ async function approve(actor, reader, id, body) {
 async function reject(actor, reader, id, body) {
   const workflow = require("../workflow/workflow.service");
   await tx(async (client) => {
-    const row = await pendingFor(client, id, reader);
+    const row = await pendingFor(client, id, reader, actor);
     await workflow.decideIn(client, actor, row.workflow_instance_id, "reject", body.reason);
   });
   return get(id, reader);

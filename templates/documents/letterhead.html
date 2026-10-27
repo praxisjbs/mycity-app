@@ -23,6 +23,7 @@
   .lh-sign { margin-top: 24px; break-inside: avoid; page-break-inside: avoid; }
   .lh-sign img { height: 44px; display: block; margin-bottom: 2px; }
   .lh-sign-role { color: #71717A; }
+  .lh-sign-for { margin-bottom: 6px; }
   .lh-staging { position: fixed; top: 40%; left: 0; right: 0; text-align: center; font-size: 64pt; font-weight: 700; color: rgba(218, 30, 16, 0.12); transform: rotate(-24deg); pointer-events: none; }
 </style>
 {{#if staging}}<div class="lh-staging">STAGING</div>{{/if}}
@@ -47,7 +48,7 @@
 <main class="lh-body">
   {{#if doc.title}}<h1 class="lh-title">{{ doc.title }}</h1>{{/if}}
   {{> body}}
-  {{#if doc.signer}}<div class="lh-sign">{{#if doc.signer.signature}}<img src="{{ doc.signer.signature }}" alt="Signature of {{ doc.signer.name }}">{{/if}}<div>{{ doc.signer.name }}</div><div class="lh-sign-role">{{ doc.signer.role }}</div></div>{{/if}}
+  {{#if doc.signer}}<div class="lh-sign"><div class="lh-sign-for">For {{ org.name }}</div>{{#if doc.signer.signature}}<img src="{{ doc.signer.signature }}" alt="Signature of {{ doc.signer.name }}">{{/if}}<div>{{ doc.signer.name }}</div><div class="lh-sign-role">{{ doc.signer.role }}</div></div>{{/if}}
 </main>
 </td></tr></tbody>
 </table>

@@ -397,11 +397,14 @@ outcome and letter, a sanction's number, rung, evidence and approval; `letter_te
 (`query_rule.policy_id`, `policy_clause`) and the version a query cites (`employee_query.policy_version_id`,
 `policy_clause`) · `3190` the `queries.configure`
 capability, the `queries.consequence` approval (replacing `3099`'s invalid `employee_consequence`,
-switched off; Operations & People, then the CEO from rank 4) and the shipped letters' rows, six,
-each active in MyCity's own wording (docs/guides/queries.md §4, §6.7) · `3040` the key from
+switched off; Operations & People, then the CEO for a rung that suspends without pay or ends
+employment), the shipped letters' rows, six, each active (five in MyCity's own wording, the Salary
+Deduction letter ours; docs/guides/queries.md §4, §6.7), and `3099`'s `sanction_type` rows switched
+off (read by nothing) · `3040` the key from
 `attendance_rule_breach.employee_query_id` to the query raised for the breach (owed since 1430),
-`employee_query.source` (`person`, `rule`, `attendance`) and `sanction.signed_by` (the Operations &
-People approver who signed it).
+`employee_query.source` (`person`, `rule`, `attendance`), `sanction.signed_by` (the Operations &
+People approver who signed it; RESTRICT, indexed) and `sanction.letter_template` (the rung's letter
+when it was proposed).
 
 **Owes:**
 - Fines as pending deductions accepted into the M6 payroll run (MILESTONES §8): M6 reads

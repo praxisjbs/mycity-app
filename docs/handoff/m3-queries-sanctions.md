@@ -299,6 +299,10 @@ Also agreed the same day:
 - 27/10/2026 · AJ · The rule form's Clause built (guide §6.3), tested in `queries.test.js` and
   `Queries.test.tsx`; User Guide steps added. Nothing committed.
 - 27/10/2026 · GE · Audit of the branch at 66dc438 (§8): four blockers, the repository's visibility among them.
+- 27/10/2026 · GE · §8 fixed: a sanction decided only on its card and never by the person queried, the
+  approver checked before the signature is kept, the CEO by the rung's effect, the letter kept at
+  proposal, `signed_by` RESTRICT and indexed, the breach locked, the letterhead's For line, 3099's
+  types retired, the staging seed on the Implementation department's accounts (TB).
 
 ---
 
@@ -312,10 +316,10 @@ checked against the code. Tick it here when fixed, with the commit.
 - [ ] **The repository is public** (GitHub reports `visibility: public`), and `seeds/staff/staff-list.xlsx`
   (MyCity's real staff) is on `main`. `README.MD` says private. Make the repository private or move
   the sheet out, then clean its history. Outside M3; the repository's owner decides.
-- [ ] **The queried employee can approve or reject their own sanction.** `sanctions.service.propose()`
+- [x] **The queried employee can approve or reject their own sanction.** `sanctions.service.propose()`
   opens `queries.consequence` without `exclude_employee_ids: [query.employee_id]`, so a queried
   member of Operations & People decides their own. Pass it, and refuse it in `pendingFor`.
-- [ ] **A sanction can be approved unsigned.** It is listed in My Approvals, and
+- [x] **A sanction can be approved unsigned.** It is listed in My Approvals, and
   `POST /workflow/instances/:id/approve` decides it without the Operations & People signature
   (`signed_by` stays null; the letter goes out with no signature). Reject there also skips the
   10 character reason. Refuse `queries.consequence` on the generic workflow routes (decided on the
@@ -328,17 +332,18 @@ checked against the code. Tick it here when fixed, with the commit.
 
 ### 8.2 Should fix
 
-- [ ] **Who approves follows position, not the rung.** `rank: step.position` with `rank >= 4` sends
+- [x] **Who approves follows position, not the rung.** `rank: step.position` with `rank >= 4` sends
   the CEO whatever sits fourth; adding or leaving out a rung moves it. Key the condition off the
   rung's `financial_effect` (3190 and `DEFAULTS` together).
 - [ ] **The ladder against MILESTONES §8** (binding). The documents call Caution, Warning, Second
   Warning, Suspension Without Pay, Dismissal or Termination "MILESTONES' order"; §8 has Caution,
   Warning, Suspension, Suspension Without Pay, Dismissal. The attendance triggers moved off Rules
   too. Record the ratification in MILESTONES §8, as §18 did for Departments.
-- [ ] **The staging seed raises disciplinary records against MyCity's real staff, and staging mails
+- [x] **The staging seed raises disciplinary records against MyCity's real staff, and staging mails
   them** (query letters, sanction notices). Get TB's or MyCity's yes, or seed a demo employee, or
-  hold the mail for seeded records.
-- [ ] **A sanction can stick in Pending Approval.** If Chain Settings points the rung at a draft
+  hold the mail for seeded records. *Fixed: TB chose our accounts (27/10/2026); the seed queries the
+  Implementation department's people only.*
+- [x] **A sanction can stick in Pending Approval.** If Chain Settings points the rung at a draft
   letter after the proposal, `settle()` throws `LETTER_NOT_READY` in the outbox for ever. Keep the
   letter's key on the sanction at proposal.
 - [ ] **After Approve Sanction the card is stale and the toast wrong.** The sanction settles in the
@@ -352,10 +357,10 @@ checked against the code. Tick it here when fixed, with the commit.
   fields). Use the `failed(f)` pattern.
 - [ ] **Phone layout against guide §10.2:** four KPIs stacked (two asked for), Queries by Reason and
   Recent Firings shown (left off). Escalated has no help term (§10.1).
-- [ ] **`sanction.signed_by`** (3040) has no ON DELETE and no index.
-- [ ] **The signature is stored before the approver is checked**, leaving an orphan file on a 403.
-- [ ] **`raiseFromBreach` does not lock the breach**: two deliveries at once spend a QRY number.
-- [ ] **The letterhead's signer block** has no "For" line, as guide §6.4 says it has.
+- [x] **`sanction.signed_by`** (3040) has no ON DELETE and no index.
+- [x] **The signature is stored before the approver is checked**, leaving an orphan file on a 403.
+- [x] **`raiseFromBreach` does not lock the breach**: two deliveries at once spend a QRY number.
+- [x] **The letterhead's signer block** has no "For" line, as guide §6.4 says it has.
 - [ ] **This handoff's §2 to §4 still describe the superseded design** (48 hours, proposer signs,
   Management from Suspension, six rungs, the attendance triggers on Rules). Strike them through.
 - [ ] **Stale words elsewhere:** `templates.assist.js` tells the model "Warning, Question"; `ess.md`
@@ -365,7 +370,7 @@ checked against the code. Tick it here when fixed, with the commit.
 - [ ] **The manual:** rule-raised queries are seen by everyone with scope all, not only Operations &
   People and the CEO; My Queries' Under Review is not "or the time has passed" (Respond stays open);
   `people.md` lists a record's tabs without Queries and Sanctions.
-- [ ] **3099 still seeds a six-rung `sanction_type` list on production** (unused). Set it inactive in 3190.
+- [x] **3099 still seeds a six-rung `sanction_type` list on production** (unused). Set it inactive in 3190.
 
 ### 8.3 Nits
 

@@ -18,12 +18,12 @@ describe("the chain", () => {
     expect(codeFrom("***")).toBe("step");
   });
 
-  test("who approves is a valid shipped definition: Operations & People, then the CEO from rank 4", () => {
+  test("who approves is a valid shipped definition: Operations & People, then the CEO for a suspension or above", () => {
     const def = definitions.DEFAULTS[DEFINITION_KEY];
     expect(definitions.problemsOf(def)).toEqual([]);
     expect(def.stages.map((s) => [s.key, s.approver, s.condition || null])).toEqual([
       ["operations_people", { type: "role", value: "operations_people" }, null],
-      ["ceo", { type: "ceo" }, { field: "rank", op: ">=", value: 4 }],
+      ["ceo", { type: "ceo" }, { field: "financial_effect", op: "in", value: ["unpaid_days", "ends_employment"] }],
     ]);
   });
 });

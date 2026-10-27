@@ -3,8 +3,9 @@
 --   capability        queries.configure (write query rules, the chain and letter templates), held by
 --                     Implementation and Operations & People; the CEO holds every capability.
 --   approval          queries.consequence version 1, as in shared/workflow/definitions.js DEFAULTS
---                     (validateDefinition() passes): Operations & People, then the CEO from rank 4
---                     (Suspension Without Pay up; MyCity's handbook §4.7.4, AJ 27/10/2026).
+--                     (validateDefinition() passes): Operations & People, then the CEO for a rung
+--                     that suspends without pay or ends employment, wherever it sits on the ladder
+--                     (MyCity's handbook §4.7.4, AJ 27/10/2026; keyed off the rung, GE 27/10/2026).
 --   approval, off     3099's employee_consequence fails validateDefinition() (its approvers have no
 --                     type) and is replaced by queries.consequence; it is switched off, not deleted.
 --   letter templates  one row per shipped file in templates/documents/, so the screen lists them and
@@ -14,6 +15,9 @@
 --                     MyCity's own samples (27/10/2026): Query, Caution, Warning (the Second
 --                     Warning's too), Suspension Without Pay and Termination; the Salary Deduction
 --                     letter (purpose fine) is ours. One suspension, without pay (handbook §4.7.4).
+--
+--   sanction types, off  3099's six `sanction_type` reference rows (a paid suspension among them),
+--                     read by nothing; retired, not deleted.
 --
 -- The ladder itself (consequence_step) and every query rule are MyCity's choices, entered on
 -- Sanctions, Chain Settings and on Rules (A26): none are seeded. Rows people edit later are inserted
@@ -35,8 +39,8 @@ INSERT INTO workflow_definition (key, version, module_key, name, description, co
 VALUES (
   'queries.consequence', 1, 'queries', 'Sanction',
   'Operations & People, then the CEO from Suspension Without Pay up.',
-  '{"rank":"number","fine_amount":"money"}'::jsonb,
-  '[{"key":"operations_people","name":"Operations & People","approver":{"type":"role","value":"operations_people"},"sla_hours":48},{"key":"ceo","name":"CEO","approver":{"type":"ceo"},"condition":{"field":"rank","op":">=","value":4},"sla_hours":48}]'::jsonb,
+  '{"rank":"number","financial_effect":"text","fine_amount":"money"}'::jsonb,
+  '[{"key":"operations_people","name":"Operations & People","approver":{"type":"role","value":"operations_people"},"sla_hours":48},{"key":"ceo","name":"CEO","approver":{"type":"ceo"},"condition":{"field":"financial_effect","op":"in","value":["unpaid_days","ends_employment"]},"sla_hours":48}]'::jsonb,
   true
 )
 ON CONFLICT (key, version) DO NOTHING;
@@ -55,7 +59,18 @@ VALUES
   ('salary-deduction-letter', 'Salary Deduction Letter', 'fine', 'active')
 ON CONFLICT (key) DO NOTHING;
 
+-- 3099's sanction types named six rungs, a paid suspension among them. The ladder is People's to
+-- enter on Chain Settings (A26), and nothing reads these rows: they are retired, kept for history.
+UPDATE reference_value
+   SET active = false
+ WHERE domain = 'sanction_type' AND active;
+
 -- DOWN
+UPDATE reference_value
+   SET active = true
+ WHERE domain = 'sanction_type'
+   AND code IN ('caution', 'warning', 'second_warning', 'suspension', 'suspension_without_pay', 'termination')
+   AND NOT active;
 -- Only templates no rung, rule or saved wording uses: a letter someone has edited stays theirs.
 DELETE FROM letter_template t
  WHERE t.key IN ('query-letter', 'caution-letter', 'warning-letter',

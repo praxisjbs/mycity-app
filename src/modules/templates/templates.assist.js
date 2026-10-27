@@ -29,7 +29,7 @@ const NAMES = Object.freeze({
   subject: "what the query is about",
   details: "what happened, as the query says it",
   reason: "why the sanction was decided",
-  step_name: "the sanction's rung: Warning, Question, Suspension and so on",
+  step_name: "the sanction's rung: Caution, Warning, Second Warning, Suspension Without Pay and so on",
   raised_on: "the day the query was raised (a date)",
   response_due: "when the response is due (a date and time)",
   effective_on: "the day the sanction takes effect (a date)",

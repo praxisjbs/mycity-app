@@ -8,6 +8,7 @@
  * A trigger nothing counts yet (missed targets: M2's KPIs) may be drafted but not switched on
  * until its module counts it.
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
@@ -136,10 +137,13 @@ async function setActive(actor, id, on) {
     const before = await repo.get(client, id, monthStart());
     if (!before) throw notFound();
     if (before.active === on) return;
-    if (on && !countable(before.source_event))
+    if (on && !countable(before.source_event)) {
+      // Lateness, absence and missing clock-outs moved to the Attendance policy (guide §6.3).
+      const moved = !c.query_rules.OfferedRuleSource.options.includes(before.source_event);
       throw new AppError("TRIGGER_NOT_AVAILABLE", "This trigger is not counted yet", 409, {
-        source_event: ["Comes with M2"],
+        source_event: [moved ? "The Attendance policy counts it" : "Comes with M2"],
       });
+    }
     await repo.setActive(client, id, on);
     await emit(client, {
       key: on ? EVENTS.QUERY_RULE_ACTIVATED : EVENTS.QUERY_RULE_PAUSED,

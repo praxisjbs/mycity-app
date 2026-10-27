@@ -1543,6 +1543,9 @@ function insertBreach(client, b) {
 }
 
 const getBreach = (db, id) => one(db, `SELECT ${BREACH} FROM attendance_rule_breach b WHERE b.attendance_rule_breach_id = $1`, [id]);
+/** The breach, locked until the caller's transaction ends: one query is raised for it, however many deliveries race. */
+const lockBreach = (db, id) =>
+  one(db, `SELECT ${BREACH} FROM attendance_rule_breach b WHERE b.attendance_rule_breach_id = $1 FOR UPDATE`, [id]);
 
 /** Keep the query Queries & Sanctions raised for a breach (queries.raise_from_breach, its transaction). */
 function setBreachQuery(client, id, queryId) {
@@ -1946,6 +1949,7 @@ module.exports = {
   latestBreach,
   insertBreach,
   getBreach,
+  lockBreach,
   setBreachAlert,
   setBreachQuery,
   payItemsOn,
