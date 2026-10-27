@@ -1335,6 +1335,16 @@ milestone by milestone as each is approved, and a gate holds it to the screens. 
 `src/shared/route-map.js`, `src/shared/search/screens.js` and `docs/PROGRESS.md` (row #102). Its
 engineering shape is in `docs/guides/user-guide.md`.
 
+**Ratified 27/10/2026 (JBS Praxis).** One screen joins the inventory, taking the admin surface to 96
+and the inventory to 102: **People · Departments** (`departments`), a seventh tab in People, after
+Organogram, M2. MyCity's departments are kept there and nowhere in code: add one, rename it, set its
+head (a person, or an open role the person above acts for), move people in, merge, retire, restore,
+and delete one nothing names. Each department in use is a function on Performance, and its head sets
+its goals: the head holds Head of Department while they head, and the reporting lines follow the
+head (JBS Praxis's four answers of 27/10/2026). It reuses the `people` permission key. Applied to the
+table below, `scripts/check/progress.js`, `src/shared/route-map.js`, `src/shared/search/screens.js`
+and `docs/PROGRESS.md` (row #103). Its engineering shape is in `docs/guides/organogram.md` §6.1.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1347,7 +1357,7 @@ staff never navigates to it to do their job.
 | (ungrouped) | **Employee Self-Service** | 12 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · Org Chart · My Security | M1 |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |
-| People | **People** | 6 | Employees · Organogram · Attendance · Leave · Devices · Worksites | M1 |
+| People | **People** | 7 | Employees · Organogram · Departments · Attendance · Leave · Devices · Worksites | M1, M2 (Departments) |
 | People | **Performance** | 5 | Goals · Scorecards · KPIs · Reviews · Analytics | M2 |
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
 | People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |
@@ -1364,7 +1374,7 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | Public | **Public site** | 6 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document | M4, M5 |
 
-Three of the above span a milestone boundary. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs, Training and Announcements in M10. **Recruitment** gets Vacancies through Interviews in M4 and
+Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs, Training and Announcements in M10. **Recruitment** gets Vacancies through Interviews in M4 and
 Offers, Onboarding and Talent Pool in M5. The **public site** gets Careers, Vacancy, Apply and
 Assessment in M4, and Sign Offer and Verify Document in M5. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to

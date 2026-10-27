@@ -4,12 +4,13 @@
  * change something (A23: it reads, it never writes).
  *
  * It answers "who reports to whom", "who reports to X", "how many people are in
- * <department>" and "which roles are vacant" from the same rows the screens read, in
+ * <department>", "who heads <department>" and "which roles are vacant" from the same rows the screens read, in
  * the caller's own scope, 25 at a time (docs/guides/organogram.md §9).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const repo = require("./organisation.repo");
+const service = require("./organisation.service");
 
 module.exports = defineManifest({
   module: "people",
@@ -25,10 +26,10 @@ module.exports = defineManifest({
     },
     {
       key: "departments.list",
-      description: "List departments and how many people are in each of them",
+      description: "List departments with their codes, heads (or who acts for an open head role), how many people and open roles each has, and whether it is in use",
       params: c.organisation.DepartmentListQuery,
       permission: ["people", "view"],
-      run: (client, params) => repo.departments(client, params),
+      run: (client, params) => service.departments(client, params),
       cite: (row) => ({ type: "department", id: row.department_id, label: row.name }),
     },
     {
@@ -45,5 +46,7 @@ module.exports = defineManifest({
     { intent: "import a staff sheet", screen: "people.employees", params: { import: "1" } },
     { intent: "show the org chart", screen: "ess.org-chart" },
     { intent: "change who someone reports to", screen: "people.organogram" },
+    { intent: "add a department", screen: "people.departments", params: { new: "1" } },
+    { intent: "change a department's head, or move people between departments", screen: "people.departments" },
   ],
 });

@@ -262,7 +262,8 @@ see it may tick a step.
 5. To make the task wait for another one, choose **Details**, then press **Add Link** beside
    **Waiting On**.
 6. In **Wait On Task**, search **Waits On** for the other task, pick it and press **Add Link**. The
-   hub says *Waiting on TSK-0397*.
+   hub says *Waiting on TSK-0397*. A task already waiting on this one is not offered, since each
+   would wait for the other.
 7. A waiting task cannot leave **To Do** until the other is done. To start it anyway, press **Go
    Ahead** on the link, give a **Reason** if you like, and press **Go Ahead**. The hub says
    **Going ahead**.
@@ -838,6 +839,18 @@ marks:
   3: role radio "Custom" | Your own dates
 ```
 
+```shot workspace-analytics-custom
+open: /workspace?tab=analytics
+as: operations
+do:
+  - wait: text "Open Tasks"
+  - click: role radio "Custom"
+crop: modal
+marks:
+  1: label "Period" | From and To
+  2: button "Show Period" | Show those dates
+```
+
 ```shot workspace-analytics-export
 open: /workspace?tab=analytics
 as: operations
@@ -847,17 +860,6 @@ do:
 marks:
   1: text "Export PDF" | A PDF
   2: text "Export XLSX" | For Excel
-```
-
-```shot workspace-analytics-custom
-open: /workspace?tab=analytics
-as: operations
-do:
-  - click: role radio "Custom"
-crop: modal
-marks:
-  1: label "Period" | From and To
-  2: button "Show Period" | Show those dates
 ```
 
 ```shot workspace-share

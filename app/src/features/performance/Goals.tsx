@@ -914,15 +914,16 @@ function NewKeyResult({ close, period, objectives }: { close: () => void; period
 
 function GoalForm({ close, period }: { close: () => void; period: PerformancePeriod | null }) {
   const year = period ? `${period.starts_on.slice(0, 4)}-01-01` : `${new Date().getUTCFullYear()}-01-01`;
-  const f = useContractForm({ code: "", title: "", strategic_theme: "", success_measure: "", baseline: "", plan_year_starts_on: year }, goalsContract.OrganisationalGoalCreate);
+  const f = useContractForm({ title: "", strategic_theme: "", success_measure: "", baseline: "", plan_year_starts_on: year }, goalsContract.OrganisationalGoalCreate);
   const save = useMutation("POST /api/v1/performance/goals");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: f.values });
+      // The goal's ID is given by the system (ORG-2026-05), never typed: the toast names it.
+      const goal = await save.run({ body: f.values });
       invalidate("/api/v1/performance/goals");
       close();
-      toast("Goal recorded");
+      toast(goal.code ? `Goal ${goal.code} recorded` : "Goal recorded");
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
@@ -930,7 +931,6 @@ function GoalForm({ close, period }: { close: () => void; period: PerformancePer
   };
   return (
     <>
-      <Field label="Goal ID" optional {...f.status("code")}><TextField {...f.field("code")} /></Field>
       <Field label="Goal" {...f.status("title")}><TextField {...f.field("title")} /></Field>
       <Field label="Strategic Theme" optional {...f.status("strategic_theme")}><TextField {...f.field("strategic_theme")} /></Field>
       <Field label="Success Measure" optional {...f.status("success_measure")}><TextField {...f.field("success_measure")} /></Field>

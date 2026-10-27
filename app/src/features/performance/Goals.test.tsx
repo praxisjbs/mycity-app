@@ -6,7 +6,7 @@ import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@myc
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession, sid } from "@/api/mock/core";
-import { deptId, OBJECTIVES } from "@/api/mock/data/performance";
+import { deptId, OBJECTIVES, ORG_GOALS } from "@/api/mock/data/performance";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider, useRouter } from "@/lib/router";
 import { ScreenActionProvider } from "@/shell/screen-action";
@@ -142,6 +142,21 @@ const quarter = sid("perf:period:q4-2026");
 type Period = { performance_period_id: string; name: string; starts_on: string; status: string; rules: { bands: { meets: number }; sections: Record<string, number> } };
 
 describe("Performance · Goals, set and changed on screen", () => {
+  it("New Goal asks for no Goal ID: the CEO's goal is given the next of its year (JBS Praxis, 27/10/2026)", async () => {
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    await settled();
+    const form = dialog();
+    expect(valueOf(form, "What")).toBe("goal");
+    expect(within(form).queryByLabelText(/Goal ID/)).toBeNull();
+    type(form, "Goal", "Open in four more cities");
+    const before = ORG_GOALS.length;
+    await press(form, "Record Goal");
+    expect(ORG_GOALS.length).toBe(before + 1);
+    // The demo's year holds ORG-2026-01 to ORG-2026-03.
+    expect(ORG_GOALS.at(-1)).toMatchObject({ code: "ORG-2026-04", title: "Open in four more cities" });
+  }, 60000);
+
   it("New Objective marks a function whose plan is binding as it is picked, and sends nothing (QA DEF-10)", async () => {
     await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
     fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);

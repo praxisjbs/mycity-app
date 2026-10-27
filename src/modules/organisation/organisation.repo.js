@@ -364,9 +364,19 @@ function findDepartmentById(db, departmentId) {
   return one(
     db,
     `SELECT department_id, code::text AS code, name, parent_department_id, description, active,
-            head_employee_id, head_seat_id
+            head_employee_id, head_seat_id, merged_into_department_id
        FROM department WHERE department_id = $1`,
     [departmentId],
+  );
+}
+
+/** The department holding this code, any case (a department renamed on screen keeps its code). */
+function findDepartmentByCode(db, code) {
+  return one(
+    db,
+    `SELECT department_id, code::text AS code, name, active, head_employee_id, head_seat_id
+       FROM department WHERE code = $1::citext`,
+    [code],
   );
 }
 
@@ -389,12 +399,16 @@ function insertDepartment(
 }
 
 /**
- * A department as the contract gives it: its headcount, and its head as a ManagerRef (a person,
- * the person in a filled head seat, or the vacant seat). `acting_head` is added by the service.
+ * A department as the contract gives it: its headcount and open roles, its head as a ManagerRef
+ * (a person, the person in a filled head seat, or the vacant seat), and where it went if merged.
+ * `acting_head` and `can_delete` are added by the service.
  */
 const DEPARTMENT_ROW = `
   d.department_id, d.code::text AS code, d.name, d.parent_department_id, d.active,
   (SELECT count(*)::int FROM employee e WHERE e.department_id = d.department_id AND e.status = 'active') AS headcount,
+  (SELECT count(*)::int FROM org_seat os WHERE os.department_id = d.department_id AND os.status = 'vacant') AS open_roles,
+  CASE WHEN mi.department_id IS NOT NULL
+       THEN json_build_object('department_id', mi.department_id, 'name', mi.name) END AS merged_into,
   d.head_employee_id, d.head_seat_id,
   CASE
     WHEN he.employee_id IS NOT NULL THEN json_build_object(
@@ -410,7 +424,8 @@ const DEPARTMENT_ROW = `
 const DEPARTMENT_JOINS = `
   LEFT JOIN employee he ON he.employee_id = d.head_employee_id
   LEFT JOIN org_seat hs ON hs.org_seat_id = d.head_seat_id
-  LEFT JOIN employee hf ON hf.employee_id = hs.filled_by_employee_id AND hs.status = 'filled'`;
+  LEFT JOIN employee hf ON hf.employee_id = hs.filled_by_employee_id AND hs.status = 'filled'
+  LEFT JOIN department mi ON mi.department_id = d.merged_into_department_id`;
 
 /** One department in the shape the contract gives a list row, headcount included. */
 function departmentRow(db, departmentId) {
@@ -462,7 +477,7 @@ function personRef(db, employeeId) {
   ).then((r) => (r ? r.person : null));
 }
 
-const DEPARTMENT_SORTS = { name: "d.name", created_at: "d.created_at" };
+const DEPARTMENT_SORTS = { name: "d.name", headcount: "headcount", created_at: "d.created_at" };
 
 /** One page of departments, each with its headcount. */
 function departments(db, query) {
@@ -479,17 +494,143 @@ function departments(db, query) {
 }
 
 function updateDepartment(db, departmentId, patch) {
-  const keys = ["name", "code", "parent_department_id", "description", "active", "head_employee_id", "head_seat_id"].filter((k) =>
-    Object.prototype.hasOwnProperty.call(patch, k),
-  );
+  const keys = [
+    "name",
+    "code",
+    "parent_department_id",
+    "description",
+    "active",
+    "head_employee_id",
+    "head_seat_id",
+    "merged_into_department_id",
+  ].filter((k) => Object.prototype.hasOwnProperty.call(patch, k));
   const sets = keys.map((k, i) => `${k} = $${i + 2}`);
   return one(
     db,
     `UPDATE department SET ${sets.join(", ")}, updated_at = now()
       WHERE department_id = $1
       RETURNING department_id, code::text AS code, name, parent_department_id, description, active,
-                head_employee_id, head_seat_id, created_at`,
+                head_employee_id, head_seat_id, merged_into_department_id, created_at`,
     [departmentId, ...keys.map((k) => patch[k])],
+  );
+}
+
+/**
+ * The people on a department's books (everyone not archived) and where each reports: what a
+ * head change and a merge move (docs/guides/organogram.md §6.1). A set for one write, never a
+ * list anyone pages through.
+ */
+async function departmentMembers(db, departmentId) {
+  const { rows } = await db.query(
+    `SELECT employee_id, status, department_id, line_manager_id, line_manager_seat_id
+       FROM employee WHERE department_id = $1 AND status <> 'archived'
+      ORDER BY created_at, employee_id`,
+    [departmentId],
+  );
+  return rows;
+}
+
+/** A department's seats that are not closed, with their lines: a head change and a merge move them too. */
+async function departmentSeats(db, departmentId) {
+  const { rows } = await db.query(
+    `SELECT org_seat_id, status, department_id, filled_by_employee_id, line_manager_id, line_manager_seat_id
+       FROM org_seat WHERE department_id = $1 AND status <> 'closed'
+      ORDER BY created_at, org_seat_id`,
+    [departmentId],
+  );
+  return rows;
+}
+
+/** These people as a move reads them, in the order given; an id that names nobody is left out. */
+async function employeesByIds(db, employeeIds) {
+  const { rows } = await db.query(
+    `SELECT e.employee_id, e.status, e.department_id, e.line_manager_id, e.line_manager_seat_id,
+            ${DISPLAY_NAME} AS display_name
+       FROM unnest($1::uuid[]) WITH ORDINALITY AS ids(employee_id, n)
+       JOIN employee e ON e.employee_id = ids.employee_id
+      ORDER BY ids.n`,
+    [employeeIds],
+  );
+  return rows;
+}
+
+/** How many work in a department now (active or suspended) and how many of its roles are open. */
+async function departmentLoad(db, departmentId) {
+  return one(
+    db,
+    `SELECT (SELECT count(*)::int FROM employee WHERE department_id = $1 AND status IN ('active', 'suspended')) AS people,
+            (SELECT count(*)::int FROM org_seat WHERE department_id = $1 AND status = 'vacant') AS open_roles`,
+    [departmentId],
+  );
+}
+
+/** The departments in use this person heads, in person or in the head seat they fill. */
+async function departmentsHeadedBy(db, employeeId) {
+  const { rows } = await db.query(
+    `SELECT d.department_id
+       FROM department d
+       LEFT JOIN org_seat s ON s.org_seat_id = d.head_seat_id
+      WHERE d.active AND (d.head_employee_id = $1 OR (s.status = 'filled' AND s.filled_by_employee_id = $1))`,
+    [employeeId],
+  );
+  return rows.map((r) => r.department_id);
+}
+
+/** Every department in use, for the heads' roles (organisation.syncHeadRoles). */
+async function activeDepartmentIds(db) {
+  const { rows } = await db.query("SELECT department_id FROM department WHERE active ORDER BY department_id");
+  return rows.map((r) => r.department_id);
+}
+
+/** A name from the catalogue, quoted as an identifier. */
+const ident = (name) => `"${String(name).replace(/"/g, '""')}"`;
+
+/**
+ * Every column that names a department: the foreign keys the catalogue holds, so a table added
+ * later counts by itself. Read once per process; the schema does not change while it runs.
+ */
+let departmentReferences = null;
+async function departmentColumns(db) {
+  if (!departmentReferences) {
+    const { rows } = await db.query(
+      `SELECT n.nspname AS schema, t.relname AS tbl, a.attname AS col
+         FROM pg_constraint c
+         JOIN pg_class t ON t.oid = c.conrelid
+         JOIN pg_namespace n ON n.oid = t.relnamespace
+         JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+        WHERE c.contype = 'f' AND c.confrelid = 'department'::regclass
+        ORDER BY 1, 2, 3`,
+    );
+    departmentReferences = rows;
+  }
+  return departmentReferences;
+}
+
+/**
+ * Which of these departments something names: a row behind any foreign key (people archived or
+ * not, seats, plans, goals, KPIs, scorecards, channels, policies, vacancies, offers, expenses,
+ * another department merged into it) or an announcement's audience. Those are never deleted.
+ */
+async function usedDepartmentIds(db, departmentIds) {
+  if (!departmentIds.length) return new Set();
+  const parts = (await departmentColumns(db)).map(
+    (r) => `SELECT ${ident(r.col)} AS id FROM ${ident(r.schema)}.${ident(r.tbl)} WHERE ${ident(r.col)} = ANY ($1::uuid[])`,
+  );
+  parts.push(
+    `SELECT x.id::uuid FROM announcement a, jsonb_array_elements_text(a.audience -> 'department_ids') AS x(id)
+      WHERE jsonb_typeof(a.audience -> 'department_ids') = 'array' AND x.id = ANY (CAST($1::uuid[] AS text[]))`,
+  );
+  const { rows } = await db.query(`SELECT DISTINCT id FROM (${parts.join(" UNION ALL ")}) used`, [departmentIds]);
+  return new Set(rows.map((r) => r.id));
+}
+
+/** Delete a department nothing names (the caller checked usedDepartmentIds first). */
+function deleteDepartment(db, departmentId) {
+  return one(
+    db,
+    `DELETE FROM department WHERE department_id = $1
+     RETURNING department_id, code::text AS code, name, active, head_employee_id, head_seat_id`,
+    [departmentId],
   );
 }
 
@@ -906,8 +1047,9 @@ async function seats(db, query) {
        ${SEAT_JOINS}
       WHERE ($1::text IS NULL OR search_fold(s.title) LIKE '%' || search_fold($1) || '%')
         AND ($2::text IS NULL OR s.status = $2)
+        AND ($3::uuid IS NULL OR s.department_id = $3)
       ORDER BY ${orderBy(query, SEAT_SORTS, "s.org_seat_id")}`,
-    [query.q ?? null, query.status ?? null],
+    [query.q ?? null, query.status ?? null, query.department_id ?? null],
     query,
   );
   return { ...page, data: page.data.map(toSeat) };
@@ -967,11 +1109,16 @@ async function updateSeat(db, seatId, patch) {
   return findSeatById(db, seatId);
 }
 
-/** Whether MyCity's names at this checksum were applied (organisation.service.recordNamesApplied). */
-async function namesApplied(db, sha256) {
+/**
+ * Whether MyCity's names at this checksum were applied (organisation.service.recordNamesApplied);
+ * with no checksum, whether any version ever was.
+ */
+async function namesApplied(db, sha256 = null) {
   const row = await one(
     db,
-    "SELECT 1 AS x FROM event_log WHERE event_key = 'department.names_applied' AND entity_id = $1 LIMIT 1",
+    `SELECT 1 AS x FROM event_log
+      WHERE event_key = 'department.names_applied' AND ($1::text IS NULL OR entity_id = $1)
+      LIMIT 1`,
     [sha256],
   );
   return Boolean(row);
@@ -1058,6 +1205,7 @@ module.exports = {
   historyOf,
   findDepartmentByName,
   findDepartmentById,
+  findDepartmentByCode,
   departmentRow,
   headOf,
   personRef,
@@ -1065,6 +1213,14 @@ module.exports = {
   insertDepartment,
   departments,
   updateDepartment,
+  departmentMembers,
+  departmentSeats,
+  employeesByIds,
+  departmentLoad,
+  departmentsHeadedBy,
+  activeDepartmentIds,
+  usedDepartmentIds,
+  deleteDepartment,
   findEmployeeByWorkEmail,
   findEmployeeByStaffNumber,
   findEmployeeById,

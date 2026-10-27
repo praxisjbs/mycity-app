@@ -477,6 +477,11 @@ const EmployeeHistoryPage = Paged(EmployeeHistoryEntry);
 /**
  * A function's head: a person, or a vacant seat (the person above it acts). `head` names who
  * is set; `acting_head` is who acts while the seat is vacant (docs/guides/performance.md §6.20).
+ *
+ * People keep departments on People · Departments (docs/guides/organogram.md §6.1, JBS Praxis
+ * 27/10/2026): one level, so `parent_department_id` is always null and no body takes it.
+ * `open_roles` counts its vacant seats; `merged_into` names where a merged one went;
+ * `can_delete` says nothing has ever named it, so Delete Department is offered.
  */
 const Department = z
   .object({
@@ -486,26 +491,37 @@ const Department = z
     parent_department_id: uuid.nullable(),
     active: z.boolean(),
     headcount: z.number().int(),
+    open_roles: z.number().int(),
     head_employee_id: uuid.nullable(),
     head_seat_id: uuid.nullable(),
     head: ManagerRef.nullable(),
     acting_head: PersonRef.nullable(),
+    merged_into: z.object({ department_id: uuid, name: z.string() }).strict().nullable(),
+    can_delete: z.boolean(),
   })
   .strict();
 
 const DepartmentListQuery = listQuery({ active: z.enum(["true", "false"]).optional() }, [
   "name",
+  "headcount",
   "created_at",
 ]);
 const DepartmentPage = Paged(Department);
 
 const ONE_HEAD = { message: "A person or a vacant seat, not both", path: ["head_seat_id"] };
 
+/** 2 to 10 letters, stored upper case: the prefix of the function's goal and KPI codes (BM-O1). */
+const departmentCode = z
+  .string()
+  .trim()
+  .min(2, "At least 2 letters")
+  .max(10, "At most 10 letters")
+  .regex(/^[A-Za-z]+$/, "Letters only");
+
 const DepartmentCreate = z
   .object({
     name: text(100),
-    code: z.string().trim().min(2).max(10).regex(/^[A-Za-z]+$/, "Letters only").optional(),
-    parent_department_id: uuid.optional(),
+    code: departmentCode.optional(),
     description: optionalText(300),
     head_employee_id: blank(uuid),
     head_seat_id: blank(uuid),
@@ -516,8 +532,7 @@ const DepartmentCreate = z
 const DepartmentUpdate = z
   .object({
     name: text(100),
-    code: z.string().trim().min(2).max(10).regex(/^[A-Za-z]+$/, "Letters only"),
-    parent_department_id: uuid.nullable(),
+    code: departmentCode,
     description: optionalText(300),
     active: z.boolean(),
     head_employee_id: uuid.nullable(),
@@ -527,6 +542,19 @@ const DepartmentUpdate = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, { message: "change at least one field" })
   .refine((v) => !(v.head_employee_id && v.head_seat_id), ONE_HEAD);
+
+/**
+ * Add People and Move To: the people to move into the department, at most a page a press.
+ * Each one's line follows the head (docs/guides/organogram.md §6.1).
+ */
+const DepartmentPeopleMove = z
+  .object({
+    employee_ids: z.array(uuid).min(1, "Pick someone").max(25, "At most 25 people"),
+  })
+  .strict();
+
+/** Merge Department: the department in use its people and open roles go into. */
+const DepartmentMerge = z.object({ into_department_id: uuid }).strict();
 
 /* ------------------------------------------------------------------ *
  * Vacant seats and the reporting tree
@@ -550,7 +578,7 @@ const OrgSeat = z
   })
   .strict();
 
-const OrgSeatListQuery = listQuery({ status: SeatStatus.optional() }, ["title", "created_at"]);
+const OrgSeatListQuery = listQuery({ status: SeatStatus.optional(), department_id: uuid.optional() }, ["title", "created_at"]);
 const OrgSeatPage = Paged(OrgSeat);
 
 const OrgSeatCreate = z
@@ -820,8 +848,11 @@ const TABLES = {
     table: "department",
     virtual: {
       headcount: "how many active people are in it, counted",
+      open_roles: "how many of its seats are vacant, counted",
       head: "the person in department.head_employee_id, or the seat in department.head_seat_id",
       acting_head: "organisation.headOf(): the head, or the person above a vacant head seat",
+      merged_into: "the department in department.merged_into_department_id, with its name",
+      can_delete: "no row anywhere names the department, worked out from its references",
     },
   },
   DepartmentListQuery: { table: null, reason: "list controls and the active filter, not a row" },
@@ -831,6 +862,11 @@ const TABLES = {
     virtual: {},
   },
   DepartmentUpdate: { table: "department" },
+  DepartmentPeopleMove: { table: null, reason: "the people a move names: each one's employee.department_id changes" },
+  DepartmentMerge: {
+    table: "department",
+    virtual: { into_department_id: "kept as department.merged_into_department_id once merged" },
+  },
   PersonRef: {
     table: null,
     reason: "a person as a list or a card names them, from employee, with the list size of photo_document_id as photo_url",
@@ -922,6 +958,8 @@ module.exports = {
   DepartmentPage,
   DepartmentCreate,
   DepartmentUpdate,
+  DepartmentPeopleMove,
+  DepartmentMerge,
   OrgSeat,
   OrgSeatListQuery,
   OrgSeatPage,

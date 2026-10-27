@@ -165,6 +165,7 @@ const DOC_TYPES = [
   "field_assignment",
   "project",
   "task",
+  "organisational_goal",
   "temporary_site",
   "policy",
   "query",

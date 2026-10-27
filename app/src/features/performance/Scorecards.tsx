@@ -611,6 +611,26 @@ function lineOf(r: LineRow) {
   };
 }
 
+/** What the contract refuses in the lines as typed, keyed as the API names them (`lines.3.title`). */
+function linesProblems(rows: LineRow[]): Record<string, string[]> {
+  const r = targetsContract.ScorecardLinesSave.safeParse({ lines: rows.map(lineOf) });
+  const out: Record<string, string[]> = {};
+  for (const issue of r.success ? [] : r.error.issues) (out[issue.path.join(".")] ??= []).push(issue.message);
+  return out;
+}
+
+/** The API's keys each field of Edit Lines feeds, so changing a field checks its marks again. */
+const FEEDS: Partial<Record<keyof LineRow, string[]>> = {
+  title: ["title"],
+  measure: ["measure"],
+  target: ["target_value", "target_text"],
+  due_on: ["milestone_due_on", "due_on"],
+  weight: ["weight"],
+  okr_key_result_id: ["okr_key_result_id", "share_value"],
+  kpi_definition_id: ["kpi_definition_id"],
+  team_key_result_ids: ["team_key_result_ids"],
+};
+
 /** Every line of a draft scorecard in one save: a line left out is removed. */
 function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }) {
   const okrs = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: card.performance_period_id, ...(card.department_id ? { department_id: card.department_id } : {}) } });
@@ -618,23 +638,38 @@ function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }
   const [rows, setRows] = useState<LineRow[]>(card.lines.map(rowOf));
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const save = useMutation("PUT /api/v1/performance/scorecards/:id/lines");
-  const set = (i: number, patch: Partial<LineRow>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const set = (i: number, patch: Partial<LineRow>) => {
+    const next = rows.map((x, j) => (j === i ? { ...x, ...patch } : x));
+    setRows(next);
+    // A marked field is checked again as it changes, so its mark clears the moment it is right.
+    const keys = Object.keys(patch).flatMap((k) => FEEDS[k as keyof LineRow] ?? []).map((k) => `lines.${i}.${k}`);
+    if (keys.some((k) => errors[k])) {
+      const now = linesProblems(next);
+      setErrors((e) => Object.fromEntries([...Object.entries(e).filter(([k]) => !keys.includes(k)), ...keys.filter((k) => now[k]).map((k) => [k, now[k]] as const)]));
+    }
+  };
   const krOptions: Array<[string, string]> = [["", "None"], ...okrs.rows.flatMap((o) => o.key_results.map((k: KeyResult) => [k.okr_key_result_id, `${k.code} · ${k.statement}`] as [string, string]))];
   const kpiOptions: Array<[string, string]> = [["", "None"], ...kpis.rows.map((k) => [k.kpi_definition_id, `${k.code} · ${k.name}`] as [string, string])];
+  /** A refusal on its fields; what no field shows is said in a toast, naming its line. */
+  const refuse = (fields: Record<string, string[]>, message: string) => {
+    setErrors(fields);
+    const unshown = Object.entries(fields).find(([k]) => !/^lines\.\d+\./.test(k) || !SHOWN.has(k.split(".").slice(2).join(".")));
+    if (unshown) {
+      const at = /^lines\.(\d+)\./.exec(unshown[0]);
+      toast(at ? `Line ${Number(at[1]) + 1}: ${unshown[1][0]}` : message);
+    }
+  };
   const submit = async () => {
+    // What the contract refuses (a line added and left without its Goal) is marked here and never sent.
+    const problems = linesProblems(rows);
+    if (Object.keys(problems).length) return refuse(problems, "Check the highlighted lines");
     try {
       await save.run({ params: { id: card.scorecard_id }, body: { lines: rows.map(lineOf) } });
       close();
       toast("Lines saved");
     } catch (e) {
       if (!(e instanceof ApiError) || !Object.keys(e.fields).length) return say(e);
-      setErrors(e.fields);
-      // What no field shows is said in a toast, naming its line.
-      const unshown = Object.entries(e.fields).find(([k]) => !/^lines\.\d+\./.test(k) || !SHOWN.has(k.split(".").slice(2).join(".")));
-      if (unshown) {
-        const at = /^lines\.(\d+)\./.exec(unshown[0]);
-        toast(at ? `Line ${Number(at[1]) + 1}: ${unshown[1][0]}` : e.message);
-      }
+      refuse(e.fields, e.message);
     }
   };
   // Each section's lines against its share as typed, by the rule the scorecard is held to (scoring.sectionWeightProblems).

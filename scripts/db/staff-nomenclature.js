@@ -17,12 +17,14 @@
  *   5. lines         a post still reporting to the named seat reports to the named post instead
  *   6. heads         a department with no head is given its post's holder, or its seat
  *
- * Each step looks before it writes and changes only what still holds the old value. The
- * changes to people and seats (merges, titles, seats, moves, lines) are applied once per
- * version of nomenclature.json (`once`, from the loader): after that a title, a department or
- * a line People change on screen stays, even when it happens to match an old name. The
- * departments' names, codes and heads only fill what is missing, so they run every time.
- * People are matched by their post, never by name.
+ * Each step looks before it writes and changes only what still holds the old value. The changes
+ * to posts, seats and lines (2 to 5) are applied once per version of nomenclature.json (`once`,
+ * from the loader), so a title or a line People change on screen afterwards stays, even when it
+ * happens to match an old name. The departments and their heads (1 and 6) are given only to a
+ * database that has never had MyCity's names (`first`): after that they are People's, kept on
+ * People · Departments (docs/guides/organogram.md §6.1, JBS Praxis 27/10/2026), and no deploy
+ * renames one, makes one again or sets a head. A department is found by its name, then by MyCity's
+ * code (one renamed on screen keeps it). People are matched by their post, never by name.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -93,11 +95,12 @@ function readNomenclature(file = FILE) {
  *          file?: string, teams?: string[]}} opts
  *   teams: the department names the sheet being loaded uses; a department is created only when
  *   the sheet names it, so a sheet that is not MyCity's creates nothing here
- *   once: this version was applied before; only the departments' names, codes and heads run
+ *   once: this version was applied before, so the changes to posts, seats and lines are left
+ *   first: no version was ever applied, so the departments and their heads are given (default: !once)
  * @returns {Promise<{renamed: number, created: number, codes: number, merged: number, titles: number,
  *                    seats: number, moved: number, lines: number, heads: number}>}
  */
-async function applyNomenclature({ pool, atomically, log = () => {}, actor, file = FILE, teams = [], once = false }) {
+async function applyNomenclature({ pool, atomically, log = () => {}, actor, file = FILE, teams = [], once = false, first = !once }) {
   const out = { renamed: 0, created: 0, codes: 0, merged: 0, titles: 0, seats: 0, moved: 0, lines: 0, heads: 0 };
   const plan = readNomenclature(file);
   if (!plan) return out;
@@ -119,6 +122,8 @@ async function applyNomenclature({ pool, atomically, log = () => {}, actor, file
         [name],
       )
     ).rows[0] || null;
+  /* MyCity's department under its name, or under the name People gave it on screen (its code). */
+  const deptOf = async (d) => (await deptByName(d.name)) || (d.code ? await organisation.findDepartmentByCode(pool, d.code) : null);
   const holders = async (post) =>
     (
       await pool.query(
@@ -127,9 +132,9 @@ async function applyNomenclature({ pool, atomically, log = () => {}, actor, file
       )
     ).rows;
 
-  /* 1. Departments. */
-  for (const d of plan.departments) {
-    let dept = await deptByName(d.name);
+  /* 1. Departments, on a database that has never had MyCity's names: after that they are People's. */
+  for (const d of first ? plan.departments : []) {
+    let dept = await deptOf(d);
     if (!dept) {
       for (const old of d.was || []) {
         const former = await deptByName(old);
@@ -158,7 +163,7 @@ async function applyNomenclature({ pool, atomically, log = () => {}, actor, file
         out.codes += 1;
       }
     }
-    for (const other of once ? [] : d.merge || []) {
+    for (const other of d.merge || []) {
       const from = await deptByName(other);
       if (!from || from.department_id === dept.department_id || !from.active) continue;
       const { rows: people } = await pool.query(
@@ -182,7 +187,7 @@ async function applyNomenclature({ pool, atomically, log = () => {}, actor, file
   }
 
   if (!once) await applyChanges();
-  await applyHeads();
+  if (first) await applyHeads();
   return out;
 
   /* 2 to 5: the changes to people and seats, once per version. */
@@ -213,7 +218,7 @@ async function applyNomenclature({ pool, atomically, log = () => {}, actor, file
 
     /* 4. Moves. */
     for (const m of plan.moves) {
-      const to = await deptByName(m.department);
+      const to = await deptOf(plan.departments.find((d) => d.name === m.department) || { name: m.department });
       if (!to) continue;
       const from = (await Promise.all((m.from || []).map(deptByName))).filter(Boolean).map((x) => x.department_id);
       if (!from.length) continue;
@@ -269,7 +274,7 @@ async function applyNomenclature({ pool, atomically, log = () => {}, actor, file
   async function applyHeads() {
     for (const d of plan.departments) {
       if (!d.head) continue;
-      const dept = await deptByName(d.name);
+      const dept = await deptOf(d);
       if (!dept || dept.head_employee_id || dept.head_seat_id) continue;
       let patch = null;
       if (d.head.post) {

@@ -320,6 +320,11 @@ summaries · `2190` seed: the five Performance capabilities and their holders, t
 lists · `2200` the statuses an organisational goal (`active`, `closed`; active by default) and a
 scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance PR 2) · `2290` seed: the
 `goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired) ·
+`2291` seed: the `organisational_goal` numbering scheme, `ORG-2026-01`, starting again each plan year ·
+`2295` an organisational goal's ID is the system's (`docs/guides/performance.md` §6.1, JBS Praxis,
+27/10/2026): `organisational_goal.code_given_at` (when the system gave it; null for one typed before),
+and every goal of the plan without an ID given the next of its year, the counter moved past the IDs
+typed; its DOWN clears only the IDs it or the service gave ·
 `2300` the statuses a round (`open`, `closed`) and a review (`check_in`, `with_reviewer`, `second_level`,
 `with_hr`, `closed`, `returned`) may hold, `NOT VALID` so earlier rows stand, with `open` and `check_in`
 the defaults; a review's second level (`second_level_employee_id`) and each item's corrective action
@@ -334,7 +339,11 @@ switched off rather than deleted; the CHECK on `task.late_reason` gives way to i
 invitation SEQUENCE (`calendar_event.ics_sequence`) · `2530` a report run keeps the filters it was
 asked with (`home_report_run.filters`, jsonb, null but for My Workspace · Analytics' Export; Home's
 table, 1150, reviewed by TB; docs/guides/workspace.md §6) · `2590` seed: the six starting late reasons and the
-`workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit).
+`workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit) ·
+`2600` departments kept on People · Departments (`docs/guides/organogram.md` §6.1, JBS Praxis
+27/10/2026): where a merged department went (`department.merged_into_department_id`, indexed) and
+which Head of Department roles the system gave with a headship (`user_role.from_headship`, false
+for a role given by hand).
 
 **Owes:**
 - PRs 3 and 5 of `docs/guides/performance.md` use 2300 to 2399 and 2500 to 2599 only for a gap. The numbers 2020, 2030 and

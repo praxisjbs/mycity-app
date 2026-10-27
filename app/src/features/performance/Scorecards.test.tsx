@@ -248,4 +248,38 @@ describe("Performance · a mid-quarter scorecard, a scorecard's link and a line'
     fireEvent.change(within(form).getAllByLabelText("Weight")[0]!, { target: { value: "12.5" } });
     expect(tone("Accountability 17.5 of 15")).toBe("err");
   }, 30000);
+
+  it("Edit Lines marks a line added without its Goal and sends nothing until it has one (fault #1 on staging, 27/10/2026)", async () => {
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=targets");
+    const someone = PEOPLE.find(
+      (p) => p.user_key !== "ifeoma" && p.department !== "Content" && !SCORECARDS.some((c) => c.employee.employee_id === p.employee_id && c.performance_period_id === PERIOD.performance_period_id),
+    )!;
+    let id = "";
+    await act(async () => {
+      const made = await api.call("POST /api/v1/performance/scorecards", { body: { employee_id: someone.employee_id, performance_period_id: PERIOD.performance_period_id } as never });
+      id = (made as { scorecard_id: string }).scorecard_id;
+    });
+    window.history.pushState(null, "", `/performance?tab=targets&id=${id}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    await settled();
+    await press(top(), "Edit Lines");
+    const saves = () => vi.mocked(dispatch).mock.calls.filter(([r]) => r.method === "PUT" && r.path.endsWith(`/scorecards/${id}/lines`)).length;
+    // Two lines added after Accountability's two, and Save Lines pressed with their Goals empty.
+    await press(top(), "Add Line");
+    await press(top(), "Add Line");
+    const sent = saves();
+    await press(top(), "Save Lines");
+    expect(saves()).toBe(sent);
+    const goals = within(top()).getAllByLabelText("Goal");
+    expect(goals).toHaveLength(4);
+    // A field's mark: marked bad, with its message linked to it.
+    const markOf = (input: HTMLElement) =>
+      input.getAttribute("aria-invalid") === "true" ? (input.getAttribute("aria-describedby") ?? "").split(" ").map((d) => document.getElementById(d)?.textContent ?? "").join(" ") : "";
+    expect(markOf(goals[2]!)).toContain("Required");
+    expect(markOf(goals[3]!)).toContain("Required");
+    // The mark clears as the Goal is typed; the other line keeps its own.
+    fireEvent.change(goals[2]!, { target: { value: "Partner launch events held" } });
+    expect(markOf(within(top()).getAllByLabelText("Goal")[2]!)).not.toContain("Required");
+    expect(markOf(within(top()).getAllByLabelText("Goal")[3]!)).toContain("Required");
+  }, 30000);
 });

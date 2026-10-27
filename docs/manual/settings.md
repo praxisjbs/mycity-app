@@ -826,11 +826,13 @@ its error file.
 5. **Blank Sheet** downloads a sheet with the right columns and notes.
 6. Drop your file on **Drop files here, or browse**, or press it to pick one. Excel up to 10 MB, or
    CSV up to 5 MB. Press **Next** once its name shows; before that it says *Upload a sheet first*.
-7. On **Map**, check which field each column fills. **Leave Out** skips a column. The hub finds the
-   row with the column names among the first 20 rows. If it is wrong, or reads **Choose Row**,
-   pick the right row in **Column Names Row**. The columns are matched again. **Required** names
-   the fields that need a column, each marked once one fills it. Press **Next**. If one still has
-   no column, **Map** stays open and says which, such as *Choose a column for Designation*.
+7. On **Map**, check which field each column fills. **Leave Out** skips a column. A field fills one
+   column: picked for another, it moves there, and the hub says, for example, *Moved from Email*.
+   The hub finds the row with the column names among the first 20 rows. If it is wrong, or reads
+   **Choose Row**, pick the right row in **Column Names Row**. The columns are matched again.
+   **Required** names the fields that need a column, each marked once one fills it. Press
+   **Next**. If one still has no column, **Map** stays open and says which, such as *Choose a
+   column for Designation*.
 8. **Preview** shows what would happen: how many rows **To Create**, **To Update**, **Unchanged**
    and with **Problems**. On a computer, choose **Problems** or **Changes** under **Show** to read
    the rows. On a phone, press **Download Errors** to read them in the sheet. Nothing is saved yet.
@@ -861,7 +863,6 @@ run it. Pressed before the list of imports has loaded, the window waits for it.
 | *This file is too large to import: more than 100,000 rows.* | Over a limit it names | Split the file |
 | **Choose the row that holds the column names** | The row picked is past the sheet's end | Pick a row that has the names |
 | *Choose a column for Designation* | A required field has no column | Choose that field for one column |
-| *"Email" and "Work Email" are both mapped to Work Email* | Two columns fill one field | Set one of them to **Leave Out** |
 | *3 rows have problems. Fix them in the file, or commit the valid rows only.* | Some rows cannot be saved | Fix them and import again, or switch on **Commit Valid Rows** |
 
 ### When a performance workbook is refused {#settings-imports-performance needs="performance create"}

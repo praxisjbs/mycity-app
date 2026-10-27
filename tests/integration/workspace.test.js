@@ -351,7 +351,9 @@ describeDb("my workspace against the real migrations", () => {
 
     const loop = await as("staff").post(`/tasks/${first.body.task_id}/waiting-on`, { depends_on_task_id: then.body.task_id });
     expect(loop.status).toBe(422);
-    expect(loop.body.error.fields.depends_on_task_id).toBeDefined();
+    expect(loop.body.error.code).toBe("TASK_LINK_LOOP");
+    expect(loop.body.error.fields.depends_on_task_id).toEqual([`${then.body.number} already waits on this task`]);
+    expect((await as("staff").post(`/tasks/${first.body.task_id}/waiting-on`, { depends_on_task_id: first.body.task_id })).body.error.code).toBe("TASK_LINK_SELF");
 
     const early = await as("staff").post(`/tasks/${then.body.task_id}/move`, { status: "in_progress" });
     expect(early.status).toBe(409);
@@ -368,6 +370,13 @@ describeDb("my workspace against the real migrations", () => {
     const outsiderTask = await as("outsider").post("/tasks", { title: "Close the books" });
     const hidden = await as("staff").post(`/tasks/${first.body.task_id}/waiting-on`, { depends_on_task_id: outsiderTask.body.task_id });
     expect(hidden.status).toBe(422);
+    expect(hidden.body.error.code).toBe("TASK_LINK_UNSEEN");
+
+    const dropped = await as("staff").post("/tasks", { title: "Book the old venue" });
+    await as("staff").post(`/tasks/${dropped.body.task_id}/cancel`, { cancel_reason: "Venue changed" });
+    const cancelled = await as("staff").post(`/tasks/${then.body.task_id}/waiting-on`, { depends_on_task_id: dropped.body.task_id });
+    expect(cancelled.status).toBe(422);
+    expect(cancelled.body.error.code).toBe("TASK_LINK_CANCELLED");
   });
 
   test("watchers are people who can already see the task; they hear about it, and a ping reaches whoever it names", async () => {

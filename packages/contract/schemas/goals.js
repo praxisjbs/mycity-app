@@ -106,6 +106,7 @@ const OrganisationalGoalStatus = z.enum(["active", "closed"]);
 const OrganisationalGoal = z
   .object({
     organisational_goal_id: uuid,
+    /** Its ID, ORG-2026-01, given by the service from Documents & Numbering (§6.1); null only for an old row outside the plan. */
     code: z.string().nullable(),
     title: z.string(),
     strategic_theme: z.string().nullable(),
@@ -171,8 +172,8 @@ const OrganisationalGoalDetail = OrganisationalGoal.extend({
   progress: ScoreValue.nullable(),
 }).strict();
 
+/** What a person writes of a goal. Never its ID: the service gives it (§6.1, JBS Praxis, 27/10/2026). */
 const GOAL_FIELDS = {
-  code: optionalText(20),
   strategic_theme: optionalText(200),
   detail: optionalText(4000),
   success_measure: optionalText(1000),
@@ -196,7 +197,6 @@ const OrganisationalGoalCreate = z
 const OrganisationalGoalEdit = z
   .object({
     title: text(300),
-    code: clearableText(20),
     strategic_theme: clearableText(200),
     detail: clearableText(4000),
     success_measure: clearableText(1000),
