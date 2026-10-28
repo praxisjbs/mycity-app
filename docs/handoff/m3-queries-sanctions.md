@@ -458,3 +458,9 @@ real names and never enter this public repository.
   with Download PDF, signed with the reader's saved signature.
 - 28/10/2026 · GE · S4 built: Issue Sanction picks the query in place. `app/tsconfig.json` checks no
   files (it only references the others): typecheck with `npx tsc -p app/tsconfig.app.json`, as CI does.
+- 28/10/2026 · GE · PR #33 opened. GE's staging walk: the preview drew nothing (the PDF's bytes were
+  never handed to PdfViewer, `useFileBlob` now, with `failed` and Try Again), the paper wording
+  flashed before it (only the demo build fetches it now; the PDF waits for the signature's answer so
+  it renders once), and a browser forcing dark mode darkened the signature pad under its dark ink
+  (`SignatureField` paints its paper into the bitmap; no `color-scheme` opts a page out, checked in
+  Chromium with forced dark on).

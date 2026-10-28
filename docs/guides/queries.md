@@ -371,8 +371,10 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 - **The preview is the PDF** (GE, 27/10/2026): `GET /letter-templates/:id/preview.pdf` renders the
   letter through the same engine and letterhead (`documents.previewPdf`), filled with sample values
   and signed with the reader's saved signature (§6.9), nothing stored, numbered or sent; Letter
-  Templates shows it with Download PDF. The demo build, which has no PDF renderer, shows the wording
-  on paper (`GET /:id/preview`). The deduction letter's sample carries an amount.
+  Templates shows it with Download PDF, the PDF's frame waiting while it is drawn (never the wording
+  first), Try Again if it fails. The demo build, which has no PDF renderer, shows the wording on paper
+  (`GET /:id/preview`), which the API build never fetches. The deduction letter's sample carries an
+  amount.
 - Letter templates added on the screen take a key `<slug>-letter`; generate() is given the template
   key with the shared doc types `query_letter` and `sanction_letter` (a small extension to
   `shared/documents/generate.js`: an explicit `template` for a doc type that allows it).
@@ -573,6 +575,10 @@ or tier 2.**
   Download PDF; the deduction letter's sample names its amount.
 - 28/10/2026 · GE · Issue Sanction picks the query in place (handoff §9, S4; §10): a picker of the
   queries under review, then Record Decision on it at Sanction; only with `queries` edit.
+- 28/10/2026 · GE · Staging walk (handoff §9.4): the preview drew nothing (PdfViewer was handed the
+  link, not the bytes) and the paper wording flashed first; it now opens in the PDF's frame. A
+  browser that darkens every site darkened the signature pad under its dark ink: `SignatureField`
+  now paints its paper into the bitmap, which no browser repaints.
 - 27/10/2026 · GE · My Signature (handoff §9, S2; §6.9): drawn once on Letter Templates' Edit
   Signature, kept through the vault (`letter_signature`, migration `3050`); Raise a Query's and
   Approve Sanction's pads open with it.

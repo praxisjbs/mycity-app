@@ -19,6 +19,8 @@ beforeAll(() => {
     save: vi.fn(),
     restore: vi.fn(),
     clearRect: vi.fn(),
+    fillRect: vi.fn(),
+    fillStyle: "",
     beginPath: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),

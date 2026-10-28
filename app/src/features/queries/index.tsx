@@ -5,7 +5,7 @@ import templates from "@mycity/contract/schemas/templates.js";
 import type { ConsequenceStep, LetterTemplate, LetterTemplateDetail, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
-import { saveFile, useFileUrl } from "@/api/download";
+import { saveBlob, useFileBlob } from "@/api/download";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
@@ -20,7 +20,7 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
   ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, DetailPane, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
-  DocumentPreview, KeyValue, ListDetail, LoadingRows, Pager, RecordPicker, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
+  DocumentPreview, KeyValue, PdfViewer, ListDetail, LoadingRows, Pager, RecordPicker, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
 } from "@mycity/ui";
 
 /**
@@ -818,6 +818,9 @@ function StepForm({ count, close }: { count: number; close: () => void }) {
 const letterStatus = (t: LetterTemplate) =>
   t.status === "active" ? pill("ok", "Active") : t.status === "awaiting_sample" ? pill("warn", "Awaiting Sample") : t.status === "retired" ? pill("neutral", "Retired") : pill("info", "Draft");
 
+/** The demo build holds no PDFs: its letter previews are the wording on paper. */
+const MOCK = import.meta.env.VITE_API_MODE === "mock";
+
 function Templates() {
   const modal = useModal();
   const configure = useConfigure();
@@ -827,14 +830,17 @@ function Templates() {
   const beside = useSideBySide();
   // Beside the list the first template shows unasked; elsewhere one opens when it is pressed (F31).
   const shown = list.rows.find((t) => t.letter_template_id === sel) ?? (beside ? (list.rows[0] ?? null) : null);
-  const preview = useApi("GET /api/v1/letter-templates/:id/preview", { params: { id: shown?.letter_template_id ?? "" }, enabled: !!shown && shown.status !== "awaiting_sample" });
-  // The PDF as sent; the demo build, which has no PDFs, shows the wording on paper instead.
-  // It signs with the reader's saved signature: a new one shows at once.
+  const written = !!shown && shown.status !== "awaiting_sample";
+  const [redraw, setRedraw] = useState(0);
+  // The PDF as sent; only the demo build, which has no PDFs, shows the wording on paper instead.
+  const preview = useApi("GET /api/v1/letter-templates/:id/preview", { params: { id: shown?.letter_template_id ?? "" }, enabled: MOCK && written });
+  // It signs with the reader's saved signature: a new one shows at once. The PDF waits for the
+  // signature's answer, so it is rendered once, not again when that answer lands.
   const mine = useApi("GET /api/v1/queries/my-signature");
-  const pdfUrl = shown && shown.status !== "awaiting_sample"
-    ? `/api/v1/letter-templates/${shown.letter_template_id}/preview.pdf?v=${encodeURIComponent(`${shown.version}-${shown.updated_at}-${mine.data?.updated_at ?? ""}`)}`
+  const pdfUrl = shown && written && !mine.loading
+    ? `/api/v1/letter-templates/${shown.letter_template_id}/preview.pdf?v=${encodeURIComponent(`${shown.version}-${shown.updated_at}-${mine.data?.updated_at ?? ""}`)}${redraw ? `&r=${redraw}` : ""}`
     : null;
-  const pdf = useFileUrl(pdfUrl);
+  const pdf = useFileBlob(pdfUrl);
   const activate = useMutation("POST /api/v1/letter-templates/:id/activate");
   const deactivate = useMutation("POST /api/v1/letter-templates/:id/deactivate");
   // Activate a draft; Deactivate an active letter nothing sends (the refusal names what does).
@@ -892,21 +898,23 @@ function Templates() {
         detail={
           !shown ? null : shown.status === "awaiting_sample" ? (
             <Card><EmptyState bare icon="doc" title="Awaiting Sample" text="Write the letter to preview it." /></Card>
-          ) : pdf ? (
+          ) : MOCK ? (
+            preview.data ? <Letter l={preview.data} /> : preview.error ? <Card><ErrorState error={preview.error} onRetry={preview.reload} /></Card> : <Card><LoadingRows count={6} /></Card>
+          ) : pdf.blob && pdf.href ? (
             // The real PDF the employee would receive, signed with the reader's saved signature.
             <DocumentPreview
               name={`${shown.name}.pdf`}
               mime="application/pdf"
-              href={pdf}
+              href={pdf.href}
+              file={pdf.blob}
               height="lg"
-              actions={<Button size="sm" icon="download" onClick={() => saveFile(pdfUrl!, `${shown.name}.pdf`)}>Download PDF</Button>}
+              actions={<Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, `${shown.name}.pdf`)}>Download PDF</Button>}
             />
-          ) : preview.data ? (
-            <Letter l={preview.data} />
-          ) : preview.error ? (
-            <Card><ErrorState error={preview.error} onRetry={preview.reload} /></Card>
+          ) : pdf.failed ? (
+            <Card><EmptyState bare icon="doc" title="Preview Not Ready" text="The letter could not be drawn." action={<Button icon="refresh" onClick={() => setRedraw((n) => n + 1)}>Try Again</Button>} /></Card>
           ) : (
-            <Card><LoadingRows count={6} /></Card>
+            // The letter's own frame while it is drawn, never the wording first.
+            <Card pad={false}><PdfViewer data={null} name={`${shown.name}.pdf`} height="lg" /></Card>
           )
         }
       />
