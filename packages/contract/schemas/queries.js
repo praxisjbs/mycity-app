@@ -290,7 +290,7 @@ const AiAvailability = z
  * GET /queries/my-signature: the reader's saved signature (guide §6.9), as the pad opens it, or
  * null before they save one.
  */
-const MySignature = z
+const LetterSignature = z
   .object({
     signature: z.string().nullable(),
     updated_at: isoDateTime.nullable(),
@@ -298,7 +298,7 @@ const MySignature = z
   .strict();
 
 /** PUT /queries/my-signature: the signature drawn on Edit Signature, kept through the vault. */
-const MySignatureSave = z.object({ signature: SignaturePng }).strict();
+const LetterSignatureSave = z.object({ signature: SignaturePng }).strict();
 
 /** POST /queries/assist: what the form holds, and what happened in the raiser's own words. */
 const QueryDraftRequest = z
@@ -333,8 +333,8 @@ const QueryDraftOutput = z
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
-  MySignature: { table: "letter_signature", virtual: { signature: "the vault document's PNG, as a data URL" } },
-  MySignatureSave: { table: "letter_signature", virtual: { signature: "stored through the vault as document_id" } },
+  LetterSignature: { table: "letter_signature", virtual: { signature: "the vault document's PNG, as a data URL" } },
+  LetterSignatureSave: { table: "letter_signature", virtual: { signature: "stored through the vault as document_id" } },
   EvidenceItem: { table: null, reason: "one item of employee_query.evidence or sanction.evidence (jsonb)" },
   QueryResponse: { table: "query_response", virtual: { blocks: "body as RichTextBlock[], from the one Markdown renderer" } },
   QuerySanctionRef: {
@@ -410,8 +410,8 @@ const TABLES = {
 };
 
 module.exports = {
-  MySignature,
-  MySignatureSave,
+  LetterSignature,
+  LetterSignatureSave,
   TABLES,
   AiAvailability,
   QueryDraftRequest,

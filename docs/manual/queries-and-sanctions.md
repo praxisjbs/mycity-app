@@ -246,9 +246,14 @@ Sanctions lists each sanction, and holds MyCity's ladder of steps.
 
 Every sanction follows a query.
 
-1. Press **Issue Sanction** at the top right. It opens
-   [Queries & Sanctions · Queries](/queries?tab=queries).
-2. Open the query, then follow [Record a decision](#queries-decide).
+1. Press **Issue Sanction** at the top right.
+2. Under **Query**, search for the query by its number, the person's name or its subject, and pick
+   it. Only queries under review are offered.
+3. **Record Decision** opens on it at **Sanction**: follow [Record a decision](#queries-decide) from
+   step 5.
+
+A query still waiting for its response, or with a sanction already waiting for approval, shows
+**Not Ready**.
 
 ### Set the ladder {#queries-chain needs="cap queries.configure"}
 

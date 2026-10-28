@@ -444,7 +444,7 @@ real names and never enter this public repository.
   Approve Sanction start from it, the preview shows it
 - [x] S3 The samples' layout in every M3 letter; the preview is the rendered PDF with Download; the
   deduction letter's sample amount
-- [ ] S4 Issue Sanction picks the query on Sanctions; guide, chapter, pictures, PROGRESS, `npm run
+- [x] S4 Issue Sanction picks the query on Sanctions; guide, chapter, pictures, PROGRESS, `npm run
   ci`, the PR
 
 ### 9.4 Log
@@ -456,3 +456,5 @@ real names and never enter this public repository.
   preview signing with it comes with S3.
 - 28/10/2026 · GE · S3 built: the samples' layout in every query and sanction letter, the PDF preview
   with Download PDF, signed with the reader's saved signature.
+- 28/10/2026 · GE · S4 built: Issue Sanction picks the query in place. `app/tsconfig.json` checks no
+  files (it only references the others): typecheck with `npx tsc -p app/tsconfig.app.json`, as CI does.

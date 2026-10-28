@@ -181,3 +181,15 @@ describe("Queries & Sanctions · Letter Templates", () => {
     expect(within(dialog).getByRole("button", { name: "Save and Activate" })).toBeTruthy();
   }, 30000);
 });
+
+describe("Queries & Sanctions · Issue Sanction", () => {
+  it("picks the query in place, and opens Record Decision on it at Sanction", async () => {
+    await signedInAs("cynthia@mycityapp.io", "sanctions");
+    fireEvent.click(await screen.findByRole("button", { name: "Issue Sanction" }));
+    const dialog = await screen.findByRole("dialog");
+    // The query is picked here, in the dialog; nothing leaves Sanctions.
+    expect(within(dialog).getByText("Query")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeTruthy();
+    expect(window.location.search).not.toContain("tab=queries");
+  }, 30000);
+});

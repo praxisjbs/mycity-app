@@ -14,14 +14,13 @@ import { withSignature } from "@/features/shared/signature";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker, PolicyPicker, type PolicyChoice } from "@/features/shared/pickers";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
-import { useRouter } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
   ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, DetailPane, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
-  DocumentPreview, KeyValue, ListDetail, LoadingRows, Pager, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
+  DocumentPreview, KeyValue, ListDetail, LoadingRows, Pager, RecordPicker, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
 } from "@mycity/ui";
 
 /**
@@ -306,11 +305,11 @@ const decisionOf = (v: DecideValues) => ({
 });
 const money = (s: string) => (s && !s.includes(".") ? `${s}.00` : s && /\.\d$/.test(s) ? `${s}0` : s);
 
-function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDone: () => void }) {
+function Decide({ q, close, onDone, start = "no_action" }: { q: QueryDetail; close: () => void; onDone: () => void; start?: "no_action" | "sanction" }) {
   const chain = useApi("GET /api/v1/sanctions/chain", { query: { active: "true" } });
   // Nobody signs a proposal: Operations & People sign when they approve it (guide §6.4).
   const f = useContractForm<DecideValues>(
-    { outcome: "no_action", consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "", evidence: "" },
+    { outcome: start, consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "", evidence: "" },
     {
       safeParse: (value: unknown) => {
         const v = value as DecideValues;
@@ -631,10 +630,49 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
 const sanctionStatus = (s: Sanction) =>
   s.status === "issued" ? pill("neutral", "Issued") : s.status === "pending_approval" ? pill("warn", "Awaiting Approval") : s.status === "rejected" ? pill("err", "Not Approved") : pill("neutral", "Withdrawn");
 
+/**
+ * Issue Sanction (guide §10): pick the query it follows, then Record Decision opens on it at
+ * Sanction. Only queries under review are offered; one that cannot be decided yet says why.
+ */
+function IssueSanction({ close }: { close: () => void }) {
+  const list = usePaged("GET /api/v1/queries", { filters: { status: "under_review" }, sort: "-created_at" });
+  const [picked, setPicked] = useState<Query[]>([]);
+  const chosen = picked[0] ?? null;
+  const q = useApi("GET /api/v1/queries/:id", { params: { id: chosen?.employee_query_id ?? "" }, enabled: !!chosen });
+  return (
+    <>
+      <Field label="Query">
+        <RecordPicker<Query>
+          list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+          value={picked}
+          onChange={(rows) => setPicked(rows.slice(-1))}
+          id={(r) => r.employee_query_id}
+          title={(r) => `${r.number} · ${r.employee.display_name}`}
+          sub={(r) => r.subject}
+          placeholder="Search queries"
+        />
+      </Field>
+      {chosen && !q.data && !q.error && <LoadingRows count={3} />}
+      {q.error && <ErrorState error={q.error} onRetry={q.reload} />}
+      {q.data && !q.data.can_decide && (
+        <EmptyState bare icon="doc" title="Not Ready" text={q.data.escalated ? "A sanction already waits for approval." : "It waits for the response."} />
+      )}
+      {q.data?.can_decide ? (
+        <Decide q={q.data} start="sanction" close={close} onDone={() => invalidate("/api/v1/sanctions")} />
+      ) : (
+        <FormFooter>
+          <Button onClick={close}>Cancel</Button>
+        </FormFooter>
+      )}
+    </>
+  );
+}
+
 function Sanctions() {
   const modal = useModal();
-  const { navigate } = useRouter();
   const configure = useConfigure();
+  const { me } = useAuth();
+  const decides = !!me?.grants.queries?.includes("edit");
   const s = useApi("GET /api/v1/sanctions/summary");
   const list = usePaged("GET /api/v1/sanctions", { sort: "-created_at" });
   return (
@@ -645,7 +683,7 @@ function Sanctions() {
         actions={
           <>
             <Button icon="cog" onClick={() => modal.open({ title: "Chain Settings", wide: true, body: <ChainSettings configure={configure} /> })}>Chain Settings</Button>
-            <Button variant="primary" icon="plus" onClick={() => navigate("/queries?tab=queries")}>Issue Sanction</Button>
+            {decides && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Issue Sanction", body: (close) => <IssueSanction close={close} /> })}>Issue Sanction</Button>}
           </>
         }
       />
@@ -883,7 +921,7 @@ function Templates() {
 function EditSignature({ close }: { close: () => void }) {
   const pad = useRef<SignatureFieldHandle>(null);
   const mine = useApi("GET /api/v1/queries/my-signature");
-  const f = useContractForm<{ signature: string }>({ signature: "" }, withSignature(queries.MySignatureSave, pad));
+  const f = useContractForm<{ signature: string }>({ signature: "" }, withSignature(queries.LetterSignatureSave, pad));
   const save = useMutation("PUT /api/v1/queries/my-signature");
   const submit = async () => {
     if (!f.check()) return;

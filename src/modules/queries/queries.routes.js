@@ -43,11 +43,11 @@ route(router, "get", "/policies",
   requirePermission("queries", "view"), controller.policies);
 
 route(router, "get", "/my-signature",
-  { response: qs.MySignature, summary: "The signature my letters start from" },
+  { response: qs.LetterSignature, summary: "The signature my letters start from" },
   requirePermission("queries", "view"), controller.mySignature);
 
 route(router, "put", "/my-signature",
-  { body: qs.MySignatureSave, response: qs.MySignature, summary: "Save the signature my letters start from" },
+  { body: qs.LetterSignatureSave, response: qs.LetterSignature, summary: "Save the signature my letters start from" },
   requirePermission("queries", "view"), controller.saveMySignature);
 
 route(router, "get", "/:id",
