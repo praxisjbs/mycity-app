@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { ApiError } from "@/api/client";
-import { invalidate, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useInfinite, useMutation } from "@/api/hooks";
 import type { ManagerRef } from "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { paging } from "@/features/shared/wire";
 import { Button, Field, FormFooter, SelectField, TextField, toast } from "@mycity/ui";
 
 /** Whose line it is and who is above them now, as the employee 360 and the org chart both hold it. */
@@ -31,7 +32,7 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
       ? [{ employee_id: e.dotted_manager.employee_id, display_name: e.dotted_manager.display_name, job_title: e.dotted_manager.job_title, department: null }]
       : [],
   );
-  const seats = usePaged("GET /api/v1/org-seats", { filters: { status: "vacant" } });
+  const seats = useInfinite("GET /api/v1/org-seats", { filters: { status: "vacant" } });
   const [seat, setSeat] = useState<string>(e.line_manager?.org_seat_id ?? "");
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
@@ -81,6 +82,8 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
             onChange={setSeat}
             placeholder="Open role"
             options={seats.rows.map((s) => [s.org_seat_id, `${s.title} · ${s.department}`] as [string, string])}
+            valueLabel={e.line_manager?.vacant ? e.line_manager.display_name : undefined}
+            {...paging(seats)}
           />
         </Field>
       )}

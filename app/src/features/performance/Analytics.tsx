@@ -88,8 +88,8 @@ export function Analytics() {
     <>
       <PageHeader title="Analytics" sub={period ? `${period.name} · ${formatDate(period.starts_on)} to ${formatDate(period.ends_on)}` : undefined} />
       <Toolbar>
-        <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} />
-        {departments.pick && <FilterSelect label="Function" value={dept} onChange={setDept} options={departments.options} />}
+        <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} {...quarter.paging} />
+        {departments.pick && <FilterSelect label="Function" value={dept} onChange={setDept} options={departments.options} {...departments.paging} />}
       </Toolbar>
     </>
   );

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { HomeRosterStatus, HomeTeamAttendanceRow, HomeTeamQuery, HomeTeamRow, HomeTeamSummary } from "@mycity/contract/contract.gen.ts";
 import { usePhotos } from "@/api/download";
-import { useApi, usePaged } from "@/api/hooks";
+import { useApi, useInfinite, usePaged } from "@/api/hooks";
+import { paging, type Paging } from "@/features/shared/wire";
 import type { Me } from "@/api/types/identity";
 import { useAuth, useMe } from "@/auth/AuthProvider";
 import { useScreenState } from "@/lib/plan";
@@ -99,10 +100,10 @@ const kpiOf = (percent: number | null) => (percent === null ? null : `${formatCo
 const timeOf = (at: string | null) => (at ? formatTime(at) : null);
 const countOf = (n: number | null) => (n === null ? null : formatCount(n));
 
-/** Department options from the organisation's own list, for a reader who may read it (People's grant). */
-function useDepartments(enabled: boolean): Array<[string, string]> {
-  const read = useApi("GET /api/v1/departments", { query: { active: "true" }, enabled });
-  return [["", "All Departments"], ...(read.data?.data ?? []).map((d): [string, string] => [d.department_id, d.name])];
+/** Department options from the organisation's own list, 25 at a time, for a reader who may read it (People's grant). */
+function useDepartments(enabled: boolean): { options: Array<[string, string]> } & Paging {
+  const read = useInfinite("GET /api/v1/departments", { filters: { active: "true" }, enabled });
+  return { options: [["", "All Departments"], ...read.rows.map((d): [string, string] => [d.department_id, d.name])], ...paging(read) };
 }
 
 export function Team() {
@@ -116,7 +117,7 @@ export function Team() {
   const [chip, setChip] = useState<RosterChip>("everyone");
   /* The Department filter is desktop's (§10.2): on a phone it is not drawn, so it does not apply. */
   const departmentFilter = can("people") && !phone;
-  const departments = useDepartments(departmentFilter);
+  const { options: departments, ...departmentPaging } = useDepartments(departmentFilter);
   const [picked, setPicked] = useState("");
   const department = departmentFilter ? picked : "";
 
@@ -153,7 +154,7 @@ export function Team() {
       )}
       {departmentFilter && (
         <Toolbar label="Team Filters">
-          <FilterSelect label="Department" value={picked} onChange={setPicked} options={departments} />
+          <FilterSelect label="Department" value={picked} onChange={setPicked} options={departments} {...departmentPaging} />
         </Toolbar>
       )}
       <Chips label="Status" value={chip} onChange={setChip} options={CHIPS} />

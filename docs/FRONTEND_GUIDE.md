@@ -6,7 +6,7 @@ React apps: the staff app (`app/`, `hub.mycityapp.io`) and the public site (`pub
 
 Status: **the rules here are settled. The foundation (§9) is one design system for both apps,
 `packages/ui` (`@mycity/ui`), owned by AJ (Adole Jerome), backup TB.** It is built in three PRs
-planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F31 are binding: where this guide
+planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F32 are binding: where this guide
 and that file differ, that file wins and this one is fixed. Started 13 October 2026 from
 MILESTONES §1.1, §3 and §17 and the 12 October internal meeting; §5, §7 and §8 rewritten 14 October
 2026 into the screen content, two shells and form conventions; §1 to §3, §6, §9, §10 and §11
@@ -15,7 +15,8 @@ rewritten 15 October 2026 for `packages/ui` (PR 1, Ground), and §5, §7 and §8
 (nothing the browser styles itself, F25) added 18 October 2026, and one press, one request (F26:
 §8.4, §9.4, the `no-void-press` lint) the same day; refresh (F28) and back and forward (F29) in the
 hub added 20 October 2026 (§7, §9.2, §9.5, §9.7); a record opens in a sheet on a phone, never below
-its list (F31, `ListDetail`, gate 11) added 25 October 2026 (§7, §10).
+its list (F31, `ListDetail`, gate 11) added 25 October 2026 (§7, §10); a select whose options come
+from a server list loads its next 25 as its menu nears its end (F32, §4) added 28 October 2026.
 If something here is wrong or missing, fix the guide in the same PR as the code.
 
 **Feature guides are full-stack guides.** A guide in `docs/guides/` covers the backend modules,
@@ -37,7 +38,7 @@ the client has already accepted.
 Guides lead, gates confirm (F9). Every builder, person or AI, starts here, so the gates in §10
 confirm work that was built right instead of rejecting it at the end.
 
-1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F31 and where each foundation PR
+1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F32 and where each foundation PR
    stands. Then **read `docs/COMPONENTS.md`**, the catalogue of every shared component: what it is
    for, when not to use it, its props and how it behaves on a phone. It is generated from the code
    (`npm run gen:components`), so it is never out of date.
@@ -133,8 +134,11 @@ The rule from the 12 October meeting, for every table, list, card grid, picker a
   sends it for you: a sortable column's header cycles ascending, descending, none, and changing it
   goes back to page 1.
 - Infinite scroll on mobile is the same API: fetch `page + 1` when `has_next`.
-- Never fetch "all" of anything to build a dropdown. Pickers search the server and show the first
-  page.
+- Never fetch "all" of anything to build a dropdown, and never cut one to its first page (F32). A
+  select whose options come from a server list reads them with `useInfinite` and spreads
+  `paging(list)` (`features/shared/wire.ts`) on `SelectField`, `FilterSelect` or `InlineSelect`: the
+  next 25 load as its menu nears its end, and `valueLabel` names a saved value whose page is not
+  loaded yet. Pickers search the server and show the first page.
 
 ---
 
@@ -965,7 +969,7 @@ retries (one tab at a time, through the Web Locks API, because the refresh token
 rotated one ends the session; `session.onEnded` receives the server's reason); the public site's calls `/api/public/v1` with no session. Errors arrive as one `ApiError`
 with `code`, `message` and `fields`. Writes that must not repeat pass `idempotencyKey` (sent as
 `Idempotency-Key`). The hooks: `useApi` (one read), `usePaged` (server pages: `page`, `q` debounced
-250 ms, filters; changing either goes to page 1), `useInfinite` (phones), `useMutation` (with
+250 ms, filters; changing either goes to page 1), `useInfinite` (phones, and a select's server list, F32; an optional `sort`), `useMutation` (with
 `fields` after a 422) and `invalidate(prefix)`, which reloads every mounted read under that path.
 `refresh(prefix)` (F28) asks every mounted read under that path again, quietly: data stays on
 screen, `loading` stays false, and the promise it returns settles when the last read has landed
@@ -1175,6 +1179,8 @@ The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-ap
 - [ ] Built against the real API through the contract; no mock data left in components; the mock
   never in a release build (F12)
 - [ ] Every list uses the shared pager, sends `page` only, shows the true total
+- [ ] Every select filled from a server list loads it 25 at a time as its menu nears its end
+  (`useInfinite`, `paging`), never one page cut short (F32, §4)
 - [ ] The feature guide's §10 lists what is open (tier 1), what is collapsed (tier 2) and the phone
   layout of every screen you touched, and the screen matches it
 - [ ] No tier 3 text on the screen; word limits met; Title Case; no dashes (gates 8, 17)

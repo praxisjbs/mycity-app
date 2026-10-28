@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/partnerships";
 import type { Contract, Lead, PartnerRow, Proposal, ProposalDoc, Renewal } from "@/api/types/partnerships";
 import type { PersonRef } from "@/api/types/common";
@@ -11,6 +11,7 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { AddressField, AreaChart, BackButton, Button, Card, CardHeader, Chain, Chips, DataView, DateField, ErrorState, Field, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, FormFooter, Grid, KeyValue, ListDetail, LoadingRows, Meter, Money, MoneyField, PageHeader, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, Pill, ProfileHeader, rules, SelectField, StatStrip, StatusPill, PlacesField, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, useSideBySide, Who, Wizard, type PlaceValue } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { places } from "@/features/shared/places";
+import { paging } from "@/features/shared/wire";
 
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
   if (id && (tab === "partners" || tab === "pipeline")) return <Partner360View id={id} back={tab} />;
@@ -479,7 +480,9 @@ function Proposals() {
 }
 
 function ProposalForm({ close, partner }: { close: () => void; partner: string }) {
-  const partners = usePaged("GET /api/v1/partnerships/partners");
+  const partners = useInfinite("GET /api/v1/partnerships/partners");
+  // The partner a 360 opened this for, by name while its page of the list is not loaded yet.
+  const preset = useApi("GET /api/v1/partnerships/partners/:id", { params: { id: partner }, enabled: Boolean(partner) });
   const f = useContractForm({ partner_id: partner, what: "", why_now: "", cities: [] as PlaceValue[], weeks: "12", value: "", terms: "Half on signature, half on the first activation" }, {
     partner_id: (v) => (!v ? "Pick the partner" : null),
     what: (v) => (v.trim().length < 20 ? "Describe the proposal" : null),
@@ -512,7 +515,7 @@ function ProposalForm({ close, partner }: { close: () => void; partner: string }
           check: () => f.check(["partner_id", "what", "why_now"]),
           body: (
             <>
-              <Field label="Who It Is For" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
+              <Field label="Who It Is For" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} valueLabel={f.values.partner_id === partner ? preset.data?.name : undefined} {...paging(partners)} {...f.field("partner_id")} /></Field>
               <Field label="What We Propose" {...f.field("what")}><TextAreaField {...f.field("what")} placeholder="Four-city health activation" /></Field>
               <Field label="Why Now" {...f.field("why_now")}><TextField {...f.field("why_now")} placeholder="Fits campaign window" /></Field>
             </>
@@ -589,7 +592,7 @@ function Contracts() {
 }
 
 function ContractForm({ close }: { close: () => void }) {
-  const partners = usePaged("GET /api/v1/partnerships/partners");
+  const partners = useInfinite("GET /api/v1/partnerships/partners");
   const f = useContractForm({ partner_id: "", title: "", kind: "Contract", value: "" }, { partner_id: (v) => (!v ? "Pick the partner" : null), title: (v) => (!v.trim() ? "Name the document" : null), value: (v) => (!(Number(v) > 0) ? "Enter the value" : null) });
   const save = useMutation("POST /api/v1/partnerships/contracts");
   const submit = async () => {
@@ -605,7 +608,7 @@ function ContractForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Partner" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
+      <Field label="Partner" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...paging(partners)} {...f.field("partner_id")} /></Field>
       <Field label="Document" {...f.field("title")}><TextField {...f.field("title")} placeholder="e.g. Activation agreement" /></Field>
       <Field label="Type"><SelectField options={[["Contract", "Contract"], ["MOU", "MOU"]]} {...f.field("kind")} /></Field>
       <Field label="Value" {...f.field("value")}><MoneyField {...f.field("value")} /></Field>

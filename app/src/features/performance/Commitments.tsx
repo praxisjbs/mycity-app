@@ -100,7 +100,7 @@ export function Commitments({ switcher }: { switcher: ReactNode }) {
       <PageHeader title="Commitments" sub={formatMonth(`${month}-01`)} actions={switcher} />
       <Toolbar>
         <FilterSelect label="Month" value={month} onChange={set("month")} options={monthOptions()} />
-        {departments.pick && <FilterSelect label="Department" value={dept} onChange={set("department_id")} options={departments.options} />}
+        {departments.pick && <FilterSelect label="Department" value={dept} onChange={set("department_id")} options={departments.options} {...departments.paging} />}
         <FilterSelect label="State" value={state} onChange={set("state")} options={STATE_OPTIONS} />
         {mayExport && <ExportButton onExport={exportReport} message="Report saved">Export Report</ExportButton>}
       </Toolbar>

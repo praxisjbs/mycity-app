@@ -16,11 +16,12 @@ import goalsContract from "@mycity/contract/schemas/goals.js";
 import scoring from "@mycity/contract/schemas/scoring.js";
 import type { KeyResult, KeyResultDetail, KeyResultMonth, Kpi, KpiMonth, Objective, OrganisationalGoalDetail, PerformanceFunction, PerformancePeriod, Plan } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth, useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { paging, type Paging } from "@/features/shared/wire";
 import { PagedTable } from "@/features/shared/sections";
 import { useSearchParams } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
@@ -65,8 +66,9 @@ import { band, bodySchema, fieldMessage, figureOf, krStatus, KR_STATUS_OPTIONS, 
 
 type KrMonthStatus = KeyResultMonth["status"];
 
-/** The help on the score figures (§10.1). */
-const SCORE_HELP = "Scores run from 0 to 1. Green is 0.7 or above; amber 0.4 to 0.7; red below 0.4 needs a recovery plan.";
+/** The help on the score figures (§10.1), in the quarter's own Good and Watch bands (§6.8). */
+const scoreHelp = ({ band_good: good, band_watch: watch }: PerformancePeriod["rules"]["key_results"]) =>
+  `Scores run from 0 to 1. Good is ${good} or above; Watch ${watch} to ${good}; Recovery below ${watch} needs a recovery plan.`;
 /** The help on a TBC target (§10.1). */
 export const TBC_HELP = "A provisional target, locked on the quarter's lock date.";
 const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
@@ -76,7 +78,7 @@ export function Goals() {
   const modal = useModal();
   const quarter = useQuarter();
   const period = quarter.period;
-  const departments = useApi("GET /api/v1/departments", { query: {} });
+  const departments = useInfinite("GET /api/v1/departments", { filters: { active: "true" } });
   const [dept, setDept] = useState("");
   const okrs = usePaged("GET /api/v1/performance/okrs", {
     filters: { ...(quarter.periodId ? { period_id: quarter.periodId } : {}), ...(dept ? { department_id: dept } : {}) },
@@ -91,14 +93,15 @@ export function Goals() {
     enabled: Boolean(quarter.periodId),
   });
   const counted = (n: number | undefined) => (n === undefined ? "–" : String(n));
+  const help = scoreHelp(period?.rules.key_results ?? scoring.DEFAULT_RULES.key_results);
   const tiles = [
-    { label: "Company Score", value: score(summary.data?.company_score), help: SCORE_HELP },
+    { label: "Company Score", value: score(summary.data?.company_score), help },
     // Key results scoring Good this quarter: a reported status of On Track is another thing (the pills).
-    { label: "Scoring Good", value: counted(summary.data?.on_track), tone: "ok" as const, help: SCORE_HELP },
+    { label: "Scoring Good", value: counted(summary.data?.on_track), tone: "ok" as const, help },
     { label: "In Recovery", value: counted(summary.data?.in_recovery), tone: "err" as const },
     { label: "Awaiting Report", value: counted(summary.data?.awaiting_report) },
   ];
-  const functions: Array<[string, string]> = (departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string]);
+  const functions: Array<[string, string]> = departments.rows.map((d) => [d.department_id, d.name] as [string, string]);
   const chips: Array<[string, string]> = [["", "All Functions"], ["company", "Company"], ...functions];
 
   // What the reader may act on, as the API's goals.authority answers (useSettableFunctions): New Goal and Report
@@ -140,7 +143,7 @@ export function Goals() {
     modal.open({
       title: "Report Month",
       wide: true,
-      body: (close) => <ReportMonthForm close={close} period={period} functions={reportable} initial={(reportable.some(([v]) => v === dept) && dept) || ownFunction || reportable[0]?.[0] || ""} />,
+      body: (close) => <ReportMonthForm close={close} period={period} functions={reportable} paging={settable.paging} initial={(reportable.some(([v]) => v === dept) && dept) || ownFunction || reportable[0]?.[0] || ""} />,
     });
   // The floating button on a phone (§10.2): Report Month for a function's head, else New Goal (or Request To Unbind in its place).
   const heads = hasCapability(me, "goals.function") && !hasCapability(me, "goals.company");
@@ -159,7 +162,7 @@ export function Goals() {
       : null,
   );
   useUrlAction("report", mayReport && period ? report : null);
-  useUrlAction("quarter", maySetUp && !quarter.loading ? setUpQuarter : null);
+  useUrlAction("quarter", maySetUp && quarter.listed ? setUpQuarter : null);
   useApprovalLinks();
   const openKrId = (id: string, code = "Key Result") => modal.open({ title: code, wide: true, body: (close) => <KeyResultSheet id={id} close={close} /> });
   const openKr = (kr: KeyResult) => openKrId(kr.okr_key_result_id, kr.code);
@@ -189,8 +192,8 @@ export function Goals() {
         }
       />
       <Toolbar>
-        <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} />
-        <FilterSelect label="Function" value={dept} onChange={setDept} options={chips} />
+        <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} {...quarter.paging} />
+        <FilterSelect label="Function" value={dept} onChange={setDept} options={chips} {...paging(departments)} />
       </Toolbar>
       <KpiTiles items={tiles} mobileCols={2} />
       <WaitingOnYou />
@@ -725,7 +728,7 @@ function ChangeTargetFields({ keyResultId, months, close }: { keyResultId: strin
 }
 
 /** Report Month: one function's month, the function picked at the top. */
-function ReportMonthForm({ close, period, functions, initial }: { close: () => void; period: PerformancePeriod | null; functions: Array<[string, string]>; initial: string }) {
+function ReportMonthForm({ close, period, functions, paging: more, initial }: { close: () => void; period: PerformancePeriod | null; functions: Array<[string, string]>; paging: Paging; initial: string }) {
   const [fn, setFn] = useState(initial);
   if (!period || !functions.length)
     return (
@@ -736,7 +739,7 @@ function ReportMonthForm({ close, period, functions, initial }: { close: () => v
     );
   return (
     <>
-      <Field label="Function"><SelectField options={functions} value={fn} onChange={setFn} /></Field>
+      <Field label="Function"><SelectField options={functions} value={fn} onChange={setFn} {...more} /></Field>
       <ReportFunction key={fn} close={close} period={period} departmentId={fn} />
     </>
   );
@@ -1058,10 +1061,10 @@ function ObjectiveForm({ close, period, objective, onSaved }: { close: () => voi
 /** What a binding plan says on Function: it takes no new objective (§6.4); one awaiting approval takes it into the plan sent. */
 const SHUT: Record<string, string> = { binding: "Plan is binding" };
 
-/** The organisational goals an objective may serve: its quarter's plan year when it is known. */
-function useGoalOptions(period: PerformancePeriod | null): Array<[string, string]> {
-  const goals = usePaged("GET /api/v1/performance/goals", { filters: period ? { plan_year: Number(period.starts_on.slice(0, 4)) } : {} });
-  return [["", "None"], ...goals.rows.map((g) => [g.organisational_goal_id, `${g.code ?? ""} ${g.title}`.trim()] as [string, string])];
+/** The organisational goals an objective may serve: its quarter's plan year when it is known, 25 at a time. */
+function useGoalOptions(period: PerformancePeriod | null): { options: Array<[string, string]> } & Paging {
+  const goals = useInfinite("GET /api/v1/performance/goals", { filters: period ? { plan_year: Number(period.starts_on.slice(0, 4)) } : {} });
+  return { options: [["", "None"], ...goals.rows.map((g) => [g.organisational_goal_id, `${g.code ?? ""} ${g.title}`.trim()] as [string, string])], ...paging(goals) };
 }
 
 /**
@@ -1073,11 +1076,11 @@ function ObjectiveNewForm({ close, period }: { close: () => void; period: Perfor
   const settable = useSettableFunctions(period?.performance_period_id ?? null);
   if (settable.error) return <ErrorState error={settable.error} onRetry={settable.reload} />;
   if (settable.loading) return <LoadingRows count={3} />;
-  return <ObjectiveNewFields close={close} period={period} functions={settable.rows} />;
+  return <ObjectiveNewFields close={close} period={period} functions={settable.rows} paging={settable.paging} />;
 }
 
-function ObjectiveNewFields({ close, period, functions }: { close: () => void; period: PerformancePeriod | null; functions: PerformanceFunction[] }) {
-  const goalOptions = useGoalOptions(period);
+function ObjectiveNewFields({ close, period, functions, paging: more }: { close: () => void; period: PerformancePeriod | null; functions: PerformanceFunction[]; paging: Paging }) {
+  const { options: goalOptions, ...goalPaging } = useGoalOptions(period);
   const company = functions.some((x) => x.department_id === null);
   // A function (or the company, "") whose plan this quarter is binding: named so in its option, and marked as picked.
   const statusOf = (departmentId: string) => functions.find((x) => (x.department_id ?? "") === departmentId)?.plan_status ?? null;
@@ -1119,11 +1122,11 @@ function ObjectiveNewFields({ close, period, functions }: { close: () => void; p
   return (
     <>
       <Field label="Function" {...mark}>
-        <SelectField options={options} placeholder="Pick a function" {...f.field("department_id")} />
+        <SelectField options={options} placeholder="Pick a function" {...more} {...f.field("department_id")} />
       </Field>
       <Field label="Objective" {...f.status("title")}><TextField {...f.field("title")} /></Field>
       <Field label="Organisational Goal" optional {...f.status("organisational_goal_id")}>
-        <SelectField placeholder="None" options={goalOptions} {...f.field("organisational_goal_id")} />
+        <SelectField placeholder="None" options={goalOptions} {...goalPaging} {...f.field("organisational_goal_id")} />
       </Field>
       <FormError>{problem}</FormError>
       <FormFooter>
@@ -1136,7 +1139,7 @@ function ObjectiveNewFields({ close, period, functions }: { close: () => void; p
 
 function ObjectiveEditForm({ close, objective, onSaved }: { close: () => void; objective: Objective; onSaved?: () => void }) {
   const quarter = useApi("GET /api/v1/performance/periods/:id", { params: { id: objective.performance_period_id } });
-  const goalOptions = useGoalOptions(quarter.data ?? null);
+  const { options: goalOptions, ...goalPaging } = useGoalOptions(quarter.data ?? null);
   const f = useContractForm({ title: objective.title, organisational_goal_id: objective.organisational_goal_id ?? "" }, goalsContract.ObjectiveEdit);
   const save = useMutation("PATCH /api/v1/performance/objectives/:id");
   const submit = async () => {
@@ -1157,7 +1160,7 @@ function ObjectiveEditForm({ close, objective, onSaved }: { close: () => void; o
     <>
       <Field label="Objective" {...f.status("title")}><TextField {...f.field("title")} /></Field>
       <Field label="Organisational Goal" optional {...f.status("organisational_goal_id")}>
-        <SelectField placeholder="None" options={goalOptions} {...f.field("organisational_goal_id")} />
+        <SelectField placeholder="None" options={goalOptions} {...goalPaging} {...f.field("organisational_goal_id")} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

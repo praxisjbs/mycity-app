@@ -10,7 +10,7 @@
 | Capabilities | none; the builder and People · Departments are the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026), #103 People · Departments (JBS Praxis, 27/10/2026) |
 | Status | Built |
-| Last changed | 27/10/2026 |
+| Last changed | 28/10/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -470,6 +470,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 28/10/2026 · JP · People · Employees' Department filter, Set Head's Open Role and the reporting form's Open Role read their lists 25 at a time and load the next page as the menu nears its end; a vacant seat already chosen reads as its role until its page loads (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18). They look as before.
 - 27/10/2026 · JP · The Head mark (JBS Praxis, 27/10/2026; §4, §6, §10): each department in use marks its head's card, Head on the person or the open head role and Acting Head on the first person above an open one, its code added when the department is not the card's own (*Acting Head · PG*). `OrgNode.heads` carries them from the read (`repo.departmentHeads`, `organisation.headOf`), so the desktop cards, the phone's tiles and the PDF say the same words; a person's sheet gains Head Of.
 - 27/10/2026 · JP · §6.1 records two more answers of JBS Praxis: a head's reach is their reporting line, not the whole department, and Head of Department goes to heads and acting heads who need it, as built.
 - 27/10/2026 · JP · People · Departments (#103), from JBS Praxis's four answers of 27/10/2026: departments are kept on screen, with nothing about them in code (§1 to §11). Add Department, Edit Department, Set Head (a person or an open role), Add People, Move To, Merge Department, Retire Department, Restore Department and Delete Department (only one never used), on new routes (`GET /departments/:id`, `POST /departments/:id/people`, `POST /departments/:id/merge`, `DELETE /departments/:id`) beside the old ones. Reporting lines follow the head: a new head takes the old head's place and their people, and a person moved in reports to the head unless their manager is already there (§6.1). The head, or whoever acts for an open head role, holds Head of Department while they head, given and taken back by the system (`user_role.from_headship`, migration 2600), so they set the function's goals with no second step. People · Employees gains Move To Department on the rows picked, and a new Department on Edit Record moves the person the same way. ⌘K opens a department on its screen (it opened Settings · Organisation, which never listed them). The deploy loader gives departments and heads only to a database that never had them, and never renames one or sets a head after (foundation.md §6.1). One level only: `parent_department_id` stays unused.

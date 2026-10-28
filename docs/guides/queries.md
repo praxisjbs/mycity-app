@@ -10,7 +10,7 @@
 | Capabilities | `queries.configure` (write query rules, the consequence chain and letter templates: the writes on Rules, Sanctions · Chain Settings and Letter Templates) |
 | Screens (PROGRESS.md rows) | #34 Queries, #35 Rules, #36 Sanctions, #37 Letter Templates; reads shared with #13 ESS · My Queries (AJ) and the employee 360 |
 | Status | Draft |
-| Last changed | 27/10/2026 |
+| Last changed | 28/10/2026 |
 
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
@@ -570,6 +570,7 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 28/10/2026 · JP · A rule's Letter and a consequence step's Letter read the letters 25 at a time and load the next page as the menu nears its end (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18); they look as before.
 - 27/10/2026 · GE · Letters as MyCity's own (handoff §9, S3; §6.7): the date and addressee open
   them, "Yours faithfully" and FOR: the organisation close them; the preview is the real PDF with
   Download PDF; the deduction letter's sample names its amount.

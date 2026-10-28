@@ -3,10 +3,11 @@ import organisation from "@mycity/contract/schemas/organisation.js";
 import type { Department, EmployeeRow } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { usePhotos } from "@/api/download";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { DepartmentPicker, EmployeePicker } from "@/features/shared/pickers";
+import { paging } from "@/features/shared/wire";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
@@ -440,7 +441,7 @@ export function SetHeadForm({ department: d, close, onDone }: { department: Depa
       ? [{ employee_id: d.head.employee_id, display_name: d.head.display_name, job_title: d.head.job_title, department: d.name }]
       : [],
   );
-  const seats = usePaged("GET /api/v1/org-seats", { filters: { status: "vacant", department_id: d.department_id } });
+  const seats = useInfinite("GET /api/v1/org-seats", { filters: { status: "vacant", department_id: d.department_id } });
   const [seat, setSeat] = useState<string>(d.head?.vacant ? (d.head.org_seat_id ?? "") : "");
   const [mark, setMark] = useState<{ person?: string; seat?: string }>({});
   const [error, setError] = useState<string | null>(null);
@@ -494,6 +495,8 @@ export function SetHeadForm({ department: d, close, onDone }: { department: Depa
             onChange={(v) => (setSeat(v), setMark({}))}
             placeholder={seats.rows.length ? "Open role" : "No open roles"}
             options={seats.rows.map((s) => [s.org_seat_id, s.title] as [string, string])}
+            valueLabel={d.head?.vacant ? d.head.display_name : undefined}
+            {...paging(seats)}
           />
         </Field>
       )}
