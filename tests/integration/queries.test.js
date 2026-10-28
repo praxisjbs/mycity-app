@@ -19,6 +19,9 @@ const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const documents = require("../../src/shared/documents/generate");
 const chromium = require("../../src/services/pdf/chromium");
+// The PDF itself stands in: what these tests check is the letter's HTML and the email that follows
+// once a PDF exists. Chromium's real rendering is walked by queries-done.test.js.
+const fakePdf = async () => Buffer.from("%PDF-1.4\n% a letter\n");
 const realtime = require("../../src/services/realtime/emitter");
 
 // The queues would hold Redis connections open past the run: the jobs a handler queues are
@@ -420,7 +423,7 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(html).toContain('alt="Signature of Kemi Alade"');
       const kept = (await q("SELECT signature_document_id FROM employee_query WHERE employee_query_id = $1", [ids.first])).rows[0];
       expect(kept.signature_document_id).toBeTruthy();
-      const doc = await documents.renderPending(docId, { db: pool });
+      const doc = await documents.renderPending(docId, { db: pool, renderPdf: fakePdf });
       expect(doc.locked_at).toBeTruthy();
 
       sent.length = 0;
@@ -691,7 +694,7 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(html).toMatch(/lh-letter-to"><div>Zainab Lawal<\/div><div>Field Officer<\/div>/);
       expect(html).toContain("Yours faithfully,");
       expect(html).toMatch(/lh-sign-for">For: /);
-      await documents.renderPending(docId, { db: pool });
+      await documents.renderPending(docId, { db: pool, renderPdf: fakePdf });
       sent.length = 0;
       await drain();
       expect(sent.find((j) => j.name === "sanction-issued").data).toMatchObject({
@@ -716,10 +719,10 @@ describeDb("queries and sanctions against the real migrations", () => {
       const deduction = (await q("SELECT render_html FROM document WHERE document_id = $1", [issued.fine_letter_document_id])).rows[0];
       expect(deduction.render_html).toContain("₦15,000.00 will be deducted from your salary");
       sent.length = 0;
-      await documents.renderPending(issued.letter_document_id, { db: pool });
+      await documents.renderPending(issued.letter_document_id, { db: pool, renderPdf: fakePdf });
       await drain();
       expect(sent.filter((j) => j.name === "sanction-issued")).toEqual([]);
-      await documents.renderPending(issued.fine_letter_document_id, { db: pool });
+      await documents.renderPending(issued.fine_letter_document_id, { db: pool, renderPdf: fakePdf });
       await drain();
       const mail = sent.filter((j) => j.name === "sanction-issued");
       expect(mail).toHaveLength(1);
