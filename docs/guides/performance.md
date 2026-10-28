@@ -458,12 +458,13 @@ and Home rows of §2 and §10.
    (Edit Objective, Delete Objective) and a key result from its panel (Edit Key Result, Delete Key
    Result); a delete is a confirmation naming
    the item. New Key Result and Edit Key Result are one form that follows its measure. Always:
-   objective, key result, measure, target in words, TBC, finish, owner and, for a function's key
-   result, Feeds (the company key results it feeds, picked 25 at a time); behind More, Scored From (a
-   company key result's function key result), co-owner, baseline, start, type and owner note. A
-   **Numeric** key result also has target and unit open and direction behind More; **Dated** and **Yes
-   or No** have no number to reach, so those three are not offered (§6.8 scores them on done, not a
-   figure).
+   objective, key result, measure, target in words, TBC, start, finish, type, owner and, for a
+   function's key result, Feeds (the company key results it feeds, picked 25 at a time); behind More,
+   Scored From (a company key result's function key result), co-owner, baseline and owner note. A
+   **Numeric** key result also has target and unit open (unit directly under target) and direction
+   behind More; **Dated** and **Yes or No** have no number to reach, so those three are not offered
+   (§6.8 scores them on done, not a figure). The order on the form: objective, key result, measure,
+   target, unit, target in words, TBC, start, finish, type, owner, Feeds (JBS Praxis, 28/10/2026).
 3. **Managers draft their people's scorecards** (Scorecards, New Scorecard; Copy Last Quarter or
    Copy From Colleague): Results, KPIs and Accountability lines, each linked to a key result or KPI,
    with its target, how it is measured, due or frequency, weight and source (§6.5). Accountability
@@ -1758,8 +1759,9 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
   part of a draft plan is an edit of it (`performance` edit, which heads hold; they hold no delete);
   each delete is a ConfirmDialog naming the item; an edit's empty field clears it. **The key result
   form carries every field**: New Key Result and Edit Key Result are one form (`KeyResultForm.tsx`),
-  Feeds picked from `GET /key-results` (25 a page), TBC and target in words open, the rest behind
-  More (`MoreFields`, new in `@mycity/ui`); `KeyResultDetail` names its quarter. **The form follows
+  Feeds picked from `GET /key-results` (25 a page), TBC, target in words, start, finish and type open
+  (unit sits directly under target, type directly above owner), scored from, co-owner, direction,
+  baseline and owner note behind More (`MoreFields`, new in `@mycity/ui`); `KeyResultDetail` names its quarter. **The form follows
   its measure**: only a Numeric key result (and a multi-part one, whose measure is not edited) shows
   Target, Unit and Direction; choosing Dated or Yes or No removes them, and what was typed stays in the
   form for the way back but is not sent. A key result changed to Dated or Yes or No clears its stored
