@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { usePhotos } from "@/api/download";
-import { invalidate, useApi, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, usePaged } from "@/api/hooks";
 import type { EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { toBars } from "@/features/shared/wire";
+import { paging, toBars } from "@/features/shared/wire";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
@@ -44,7 +44,7 @@ export function Employees() {
   const modal = useModal();
   const { navigate } = useRouter();
   const summary = useApi("GET /api/v1/employees/summary");
-  const departments = usePaged("GET /api/v1/departments");
+  const departments = useInfinite("GET /api/v1/departments");
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
   const [pattern, setPattern] = useState("");
@@ -114,6 +114,7 @@ export function Employees() {
           value={department}
           onChange={setDepartment}
           options={[["", "All Departments"], ...departments.rows.map((d) => [d.department_id, d.name] as [string, string])]}
+          {...paging(departments)}
         />
         <FilterSelect
           label="Status"

@@ -45,7 +45,7 @@ State the type in your first message ("This is a full-stack change to My Attenda
 | Type | Read |
 |---|---|
 | Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/DATABASE_SCHEMA.md` (what exists and what your milestone owes) and `docs/MIGRATIONS.md` in full |
-| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F31, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
+| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F32, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
 | Ops | `docs/SYSTEM_ARCHITECTURE.md` §1, §2, §9, §10, §11, and `docs/runbooks/` |
@@ -60,7 +60,7 @@ says what the code does and why. `scripts/check/provenance.js` fails the build o
 1. `MILESTONES.md` is binding for scope and decisions A1 to A26.
 2. `REUSE_MAP.md` wins over `MILESTONES.md` where they disagree.
 3. For the frontend foundation (`packages/ui`, tokens, shared components, the app shells and the
-   frontend gates), decisions F1 to F31 in `docs/FRONTEND_FOUNDATION.md` §3 win over
+   frontend gates), decisions F1 to F32 in `docs/FRONTEND_FOUNDATION.md` §3 win over
    `MILESTONES.md`, `FRONTEND_GUIDE.md` and `demo.html` (decided with TB, 15/10/2026).
 4. `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`, then the backend and frontend guides.
 5. `README.MD` is the map of every file.
@@ -73,7 +73,9 @@ silently.
 
 - **Pagination: 25 per page, server side, everywhere.** Lists go through
   `src/shared/http/paged.js` (`pageQuery`, `sendPaged`). No `LIMIT`/`OFFSET` in a repo, no
-  page-size parameter in the contract or the frontend. The AI reads in pages of 25 too.
+  page-size parameter in the contract or the frontend. The AI reads in pages of 25 too. A select
+  filled from a server list loads its next 25 as its menu nears its end (`useInfinite` with
+  `paging`, F32), never one page cut short.
 - **AI reads, never writes** (A23). Manifests declare reads and screen routes only.
 - **Every AI feature names its job** (`docs/guides/ai-control.md` §6.2: Default, Fast, Deep
   Reasoning, Image Reading, Transcription, Embeddings, Top Tier). Before building one, ask the person

@@ -16,20 +16,22 @@ const ids = {
   seat: "44444444-4444-4444-8444-444444444444",
 };
 const m = vi.hoisted(() => ({ run: vi.fn(async (): Promise<unknown> => ({})) }));
-vi.mock("@/api/hooks", () => ({
-  invalidate: vi.fn(),
-  useApi: () => ({ data: undefined, error: null, loading: false, reload: () => undefined }),
-  useMutation: () => ({ run: m.run, pending: false }),
-  usePaged: () => ({
+vi.mock("@/api/hooks", () => {
+  const seats = {
     rows: [{ org_seat_id: "44444444-4444-4444-8444-444444444444", title: "Head, Growth" }],
     page: { number: 1, size: 25, total: 1, pages: 1, has_next: false },
     loading: false,
     error: null,
-    q: "",
-    setQ: () => undefined,
-    setPage: () => undefined,
-  }),
-}));
+  };
+  return {
+    invalidate: vi.fn(),
+    useApi: () => ({ data: undefined, error: null, loading: false, reload: () => undefined }),
+    useMutation: () => ({ run: m.run, pending: false }),
+    usePaged: () => ({ ...seats, q: "", setQ: () => undefined, setPage: () => undefined }),
+    // Open Role's options, 25 at a time as its menu nears its end.
+    useInfinite: () => ({ ...seats, more: () => undefined, reload: () => undefined }),
+  };
+});
 vi.mock("@/api/download", () => ({ usePhotos: () => () => null }));
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ can: () => true }) }));
 vi.mock("@/features/shared/pickers", () => ({

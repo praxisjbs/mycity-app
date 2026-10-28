@@ -2,7 +2,8 @@
 import { useState } from "react";
 import type { KpiUnit, PerformancePeriod } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { useApi, usePaged } from "@/api/hooks";
+import { useApi, useInfinite, usePaged } from "@/api/hooks";
+import { paging } from "@/features/shared/wire";
 import type { PersonRef } from "@/api/types/common";
 import { ComboField, formatMonth, formatNumber, plural, shortMessage, todayIso, Who, type ComboFieldProps, type ContractSchema, type ServerFields } from "@mycity/ui";
 
@@ -26,8 +27,10 @@ export const person = (p: PersonRef) => <Who name={p.display_name} sub={p.depart
  * in the quarter when one is given. New Objective and New KPI offer only these (§6.4).
  */
 export function useSettableFunctions(periodId: string | null) {
-  const list = usePaged("GET /api/v1/performance/functions", { filters: periodId ? { period_id: periodId } : {} });
-  return { rows: list.rows.filter((f) => f.may_set), loading: list.loading, error: list.error, reload: list.reload };
+  const list = useInfinite("GET /api/v1/performance/functions", { filters: periodId ? { period_id: periodId } : {} });
+  // `paging` loads the next 25 as a Function select's menu nears its end (FRONTEND_GUIDE §4); `loading` is the
+  // first page's alone, so a form open on these never turns back into a skeleton while the next one comes.
+  return { rows: list.rows.filter((f) => f.may_set), loading: list.loading && !list.page, error: list.error, reload: list.reload, paging: paging(list) };
 }
 
 /**
@@ -38,10 +41,12 @@ export function useSettableFunctions(periodId: string | null) {
  * off; `value` is the picked department while it is still one of the choices, else none.
  */
 export function useDepartmentFilter(all: string, picked: string) {
-  const list = usePaged("GET /api/v1/performance/departments");
+  const list = useInfinite("GET /api/v1/performance/departments");
+  const more = Boolean(list.page?.has_next);
   const options: Array<[string, string]> = [["", all], ...list.rows.map((d) => [d.department_id, d.name] as [string, string])];
-  const known = list.loading || list.rows.some((d) => d.department_id === picked);
-  return { options, pick: list.rows.length > 1, value: known ? picked : "" };
+  // A department on a page not loaded yet may still be one of the choices.
+  const known = list.loading || more || list.rows.some((d) => d.department_id === picked);
+  return { options, paging: paging(list), pick: list.rows.length > 1 || more, value: known ? picked : "" };
 }
 
 /** The quarter the screen shows: the current one until another is picked. */
@@ -50,11 +55,15 @@ export function useQuarter(): {
   /** The quarters set up, newest first: the latest is the one a new quarter copies. */
   periods: PerformancePeriod[];
   options: Array<[string, string]>;
+  /** The Quarter select's next 25 as its menu nears its end, and the quarter in view's name meanwhile. */
+  paging: { more: boolean; onMore: () => void; valueLabel?: string };
   periodId: string;
   setPeriodId: (id: string) => void;
   loading: boolean;
+  /** The quarters' first page is in, so `periods[0]` is the latest (what Set Up Quarter copies). */
+  listed: boolean;
 } {
-  const list = usePaged("GET /api/v1/performance/periods");
+  const list = useInfinite("GET /api/v1/performance/periods");
   const current = useApi("GET /api/v1/performance/periods/current");
   const [picked, setPicked] = useState("");
   const period = list.rows.find((p) => p.performance_period_id === picked) ?? current.data ?? list.rows[0] ?? null;
@@ -62,9 +71,11 @@ export function useQuarter(): {
     period,
     periods: [...list.rows].sort((a, b) => b.starts_on.localeCompare(a.starts_on)),
     options: list.rows.map((p) => [p.performance_period_id, p.name] as [string, string]),
+    paging: { ...paging(list), valueLabel: period?.name },
     periodId: period?.performance_period_id ?? "",
     setPeriodId: setPicked,
     loading: current.loading && list.loading,
+    listed: Boolean(list.page),
   };
 }
 

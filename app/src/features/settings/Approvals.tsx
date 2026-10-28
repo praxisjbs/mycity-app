@@ -2,9 +2,10 @@ import { useState } from "react";
 import workflow from "@mycity/contract/schemas/workflow.js";
 import type { ApprovalFlow, ApprovalStage, ApprovalStageInput, StageCondition, UserRow } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
+import { paging } from "@/features/shared/wire";
 import {
   Banner,
   Button,
@@ -344,7 +345,7 @@ function StageForm({ flow, stage, label, taken, onCancel, onDone }: {
   onCancel: () => void;
   onDone: (stage: ApprovalStageInput, label: string) => void;
 }) {
-  const roles = usePaged("GET /api/v1/access/roles");
+  const roles = useInfinite("GET /api/v1/access/roles");
   // Only people who may still sign in and decide: never a Suspended or Left login.
   const users = usePaged("GET /api/v1/users", { filters: { status: "active" } });
   const first = stage?.approvers[0];
@@ -392,7 +393,7 @@ function StageForm({ flow, stage, label, taken, onCancel, onDone }: {
       )}
       {v.approver === "role" && (
         <Field label="Role" {...f.status("role")}>
-          <SelectField placeholder="Choose One" options={roles.rows.map((r) => [r.code, r.name] as [string, string])} {...f.field("role")} />
+          <SelectField placeholder="Choose One" options={roles.rows.map((r) => [r.code, r.name] as [string, string])} valueLabel={first?.type === "role" ? label : undefined} {...paging(roles)} {...f.field("role")} />
         </Field>
       )}
       {v.approver === "user" && (

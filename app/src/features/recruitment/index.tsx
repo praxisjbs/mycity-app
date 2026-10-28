@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/recruitment";
 import type { Assessment, Candidate, InterviewRow, OfferRow, OnboardingRow, PoolRow, Stage, Vacancy } from "@/api/types/recruitment";
 import type { PersonRef } from "@/api/types/common";
@@ -12,7 +12,7 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { AddressField, Button, Card, CardHeader, ChoiceField, cn, DataView, DateField, DesktopOnly, DetailPane, ErrorState, Field, FilterSelect, formatDate, formatDateTime, FormFooter, Grid, Kanban, KeyValue, ListDetail, LoadingRows, Meter, Money, MoneyField, PageHeader, Pill, Quote, SelectField, StatusPill, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useIsPhone, useModal, useSideBySide, Who, Wizard, type PlaceValue } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { places } from "@/features/shared/places";
-import { toTrail } from "@/features/shared/wire";
+import { paging, toTrail } from "@/features/shared/wire";
 
 export default function Recruitment({ tab, id }: ModuleScreenProps) {
   if (tab === "candidates") return <Candidates id={id} />;
@@ -112,7 +112,7 @@ function VacancyDetail({ v, close }: { v: Vacancy; close: () => void }) {
 }
 
 function VacancyForm({ close }: { close: () => void }) {
-  const depts = useDepartmentOptions("Pick the department");
+  const { options: depts, ...deptPaging } = useDepartmentOptions();
   const f = useContractForm({ title: "", department: "", openings: "1", location: null as PlaceValue | null, arrangement: "hybrid", closes_on: "", description: "" }, {
     title: (v) => (v.trim().length < 3 ? "Name the role" : null),
     department: (v) => (!v ? "Pick the department" : null),
@@ -147,7 +147,7 @@ function VacancyForm({ close }: { close: () => void }) {
           body: (
             <>
               <Field label="Role" {...f.field("title")}><TextField {...f.field("title")} placeholder="e.g. Content Producer" /></Field>
-              <Field label="Department" {...f.field("department")}><SelectField options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
+              <Field label="Department" {...f.field("department")}><SelectField options={depts} placeholder="Pick the department" {...deptPaging} {...f.field("department")} /></Field>
               <Field label="Location" {...f.field("location")}><AddressField {...f.field("location")} places={places} level="area" placeholder="Lekki Phase 1" /></Field>
               <Field label="Arrangement"><ChoiceField value={f.values.arrangement} onChange={(v) => f.set("arrangement", v)} options={[["on_site", "On Site"], ["hybrid", "Hybrid"], ["remote", "Remote"]]} /></Field>
             </>
@@ -178,7 +178,7 @@ function Candidates({ id }: { id: string | null }) {
   const modal = useModal();
   const { location } = useRouter();
   const vacancy = location.params.get("vacancy") ?? "";
-  const vacs = usePaged("GET /api/v1/recruitment/vacancies");
+  const vacs = useInfinite("GET /api/v1/recruitment/vacancies");
   const [vac, setVac] = useState(vacancy);
   const s = useApi("GET /api/v1/recruitment/candidates/summary");
   const filters = (stage: Stage) => ({ stage, ...(vac ? { vacancy_id: vac } : {}) });
@@ -208,13 +208,13 @@ function Candidates({ id }: { id: string | null }) {
         sub="Drag through the pipeline"
         actions={
           <>
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Candidate", body: (close) => <AddCandidate close={close} vacancies={vacs.rows} /> })}>Add Candidate</Button>
+            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Candidate", body: (close) => <AddCandidate close={close} /> })}>Add Candidate</Button>
           </>
         }
       />
       {s.data && <KpiTiles items={[{ label: "Candidates", value: String(s.data.candidates) }, { label: "In the Kanban", value: String(s.data.in_board) }, { label: "Awaiting a Human", value: String(s.data.awaiting_human), tone: s.data.awaiting_human ? "warn" : "ok" }, { label: "Average Score", value: String(s.data.average_score) }]} />}
       <Toolbar>
-        <FilterSelect label="Role" value={vac} onChange={setVac} options={[["", "All Roles"], ...vacs.rows.map((v) => [v.vacancy_id, v.title] as [string, string])]} />
+        <FilterSelect label="Role" value={vac} onChange={setVac} options={[["", "All Roles"], ...vacs.rows.map((v) => [v.vacancy_id, v.title] as [string, string])]} {...paging(vacs)} />
       </Toolbar>
       <Kanban
         onMove={onMove}
@@ -312,7 +312,8 @@ function CandidateDetail({ id, close }: { id: string; close: () => void }) {
   );
 }
 
-function AddCandidate({ close, vacancies }: { close: () => void; vacancies: Vacancy[] }) {
+function AddCandidate({ close }: { close: () => void }) {
+  const vacancies = useInfinite("GET /api/v1/recruitment/vacancies");
   const f = useContractForm({ name: "", email: "", vacancy_id: "" }, { name: (v) => (v.trim().length < 3 ? "Enter the full name" : null), email: (v) => (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? "Enter a valid email" : null), vacancy_id: (v) => (!v ? "Pick the vacancy" : null) });
   const save = useMutation("POST /api/v1/recruitment/candidates");
   const submit = async () => {
@@ -330,7 +331,7 @@ function AddCandidate({ close, vacancies }: { close: () => void; vacancies: Vaca
     <>
       <Field label="Full Name" {...f.field("name")}><TextField {...f.field("name")} /></Field>
       <Field label="Email" {...f.field("email")}><TextField {...f.field("email")} type="email" /></Field>
-      <Field label="Vacancy" {...f.field("vacancy_id")}><SelectField placeholder="Pick the vacancy" options={vacancies.filter((v) => !v.paused).map((v) => [v.vacancy_id, v.title])} {...f.field("vacancy_id")} /></Field>
+      <Field label="Vacancy" {...f.field("vacancy_id")}><SelectField placeholder="Pick the vacancy" options={vacancies.rows.filter((v) => !v.paused).map((v) => [v.vacancy_id, v.title])} {...paging(vacancies)} {...f.field("vacancy_id")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Add Candidate</Button>
@@ -493,7 +494,7 @@ function Interviews({ id }: { id: string | null }) {
 }
 
 function ScheduleInterview({ close }: { close: () => void }) {
-  const cands = usePaged("GET /api/v1/recruitment/candidates", { filters: { stage: "shortlisted" } });
+  const cands = useInfinite("GET /api/v1/recruitment/candidates", { filters: { stage: "shortlisted" } });
   const [panel, setPanel] = useState<PersonRef[]>([]);
   const [tried, setTried] = useState(false);
   const f = useContractForm({ candidate_id: "", date: "", time: "10:00" }, { candidate_id: (v) => (!v ? "Pick the candidate" : null), date: (v) => (!v ? "Pick the day" : null), time: (v) => (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? "HH:MM, 24 hour" : null) });
@@ -512,7 +513,7 @@ function ScheduleInterview({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Candidate" {...f.field("candidate_id")}><SelectField placeholder="Shortlisted candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
+      <Field label="Candidate" {...f.field("candidate_id")}><SelectField placeholder="Shortlisted candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...paging(cands)} {...f.field("candidate_id")} /></Field>
       <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>
       <Field label="Time (24 Hour)" {...f.field("time")}><TextField {...f.field("time")} inputMode="numeric" placeholder="10:00" /></Field>
       <Field label="Panel" state={tried && !panel.length ? "bad" : undefined} message={tried && !panel.length ? "Add at least one panellist" : undefined}><EmployeePicker multiple value={panel} onChange={setPanel} /></Field>
@@ -576,7 +577,7 @@ function Offers() {
 }
 
 function OfferForm({ close }: { close: () => void }) {
-  const cands = usePaged("GET /api/v1/recruitment/candidates", { filters: { stage: "interview" } });
+  const cands = useInfinite("GET /api/v1/recruitment/candidates", { filters: { stage: "interview" } });
   const f = useContractForm({ candidate_id: "", salary: "", start_date: "", expires_on: "" }, { candidate_id: (v) => (!v ? "Pick the candidate" : null), salary: (v) => (!(Number(v) > 0) ? "Enter the salary" : null), start_date: (v) => (!v ? "Pick the start date" : null), expires_on: (v) => (!v ? "Pick when it expires" : null) });
   const save = useMutation("POST /api/v1/recruitment/offers");
   const submit = async () => {
@@ -592,7 +593,7 @@ function OfferForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Candidate" {...f.field("candidate_id")}><SelectField placeholder="Interviewed candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
+      <Field label="Candidate" {...f.field("candidate_id")}><SelectField placeholder="Interviewed candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...paging(cands)} {...f.field("candidate_id")} /></Field>
       <Field label="Gross Monthly Salary" {...f.field("salary")}><MoneyField {...f.field("salary")} /></Field>
       <Field label="Start Date" {...f.field("start_date")}><DateField {...f.field("start_date")} min={todayIso()} /></Field>
       <Field label="Offer Expires" {...f.field("expires_on")}><DateField {...f.field("expires_on")} min={todayIso()} /></Field>
@@ -702,13 +703,13 @@ function Pool() {
 }
 
 function Invite({ p, close }: { p: PoolRow; close: () => void }) {
-  const vacs = usePaged("GET /api/v1/recruitment/vacancies", { filters: { status: "open" } });
+  const vacs = useInfinite("GET /api/v1/recruitment/vacancies", { filters: { status: "open" } });
   const [vac, setVac] = useState("");
   const [tried, setTried] = useState(false);
   const invite = useMutation("POST /api/v1/recruitment/pool/:id/invite");
   return (
     <>
-      <Field label="Vacancy" state={tried && !vac ? "bad" : undefined} message="Pick a vacancy"><SelectField value={vac} onChange={setVac} placeholder="Open vacancy" options={vacs.rows.map((v) => [v.vacancy_id, v.title])} /></Field>
+      <Field label="Vacancy" state={tried && !vac ? "bad" : undefined} message="Pick a vacancy"><SelectField value={vac} onChange={setVac} placeholder="Open vacancy" options={vacs.rows.map((v) => [v.vacancy_id, v.title])} {...paging(vacs)} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="send" busy={invite.pending} onClick={async () => { if (!vac) return setTried(true); try { await invite.run({ params: { id: p.pool_id }, body: { vacancy_id: vac } }); invalidate("/api/v1/recruitment/pool"); close(); toast(`Invitation sent to ${p.name}`); } catch (e) { fail(e); } }}>Send Invitation</Button>

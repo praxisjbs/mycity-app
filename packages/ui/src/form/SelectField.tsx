@@ -2,18 +2,19 @@
  * @component SelectField
  * @group Forms
  * @summary Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField).
- * @use SelectField for more than five options, `searchable` once a fixed list is long enough to scroll (a purpose, a country); ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect).
- * @avoid Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown).
- * @phone SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker, and a searchable one a search box above them; ChoiceField segments are 44 px tall and wrap rather than scroll.
- * @a11y Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field; a searchable one a search box that owns the listbox (arrow keys move through what matches, Enter chooses). Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement.
+ * @use SelectField for more than five options, `searchable` once a fixed list is long enough to scroll (a purpose, a country); options from a server list with `more` and `onMore`, so its next 25 load as the menu nears its end; ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect).
+ * @avoid People and records a person searches for (use the server-searching picker); options cut to one page of a server list (pass `more` and `onMore`); a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown).
+ * @phone SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker, and a searchable one a search box above them; a server list's next 25 load as the sheet nears its end; ChoiceField segments are 44 px tall and wrap rather than scroll.
+ * @a11y Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field; a searchable one a search box that owns the listbox (arrow keys move through what matches, Enter chooses). Phone: a sheet named by the field's label holding a listbox. Moving through a server list with the keys loads its next 25 as the end nears; the spinner that ends it is hidden from assistive technology. ChoiceField is a radio group with arrow-key movement.
  * @status stable
  * @exports ChoiceField, SelectMenu
  * @example <SelectField placeholder="Choose One" options={[["ops", "Operations"], ["hr", "People"]]} {...form.field("department")} />
  */
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import * as Pop from "@radix-ui/react-popover";
 import * as RadioGroup from "@radix-ui/react-radio-group";
 import * as Radix from "@radix-ui/react-select";
+import { Spinner } from "../display/Skeleton";
 import { cn } from "../lib/cn";
 import { useIsPhone } from "../lib/media";
 import { Icon } from "../icons/Icon";
@@ -78,15 +79,82 @@ export interface SelectMenuProps {
   container?: HTMLElement | null;
   /** A search box above the options, narrowing them as the person types: for a fixed list long enough to scroll. */
   searchable?: boolean;
+  /** The options are a server list with more pages to load (FRONTEND_GUIDE §4). */
+  more?: boolean;
+  /** Loads the server list's next 25; called as the menu nears its end, or as it opens too short to scroll. */
+  onMore?: () => unknown;
+  /** The chosen value's label while it is on a page not loaded yet (a saved record's own name). */
+  valueLabel?: ReactNode;
 }
+
+/** How near the end of the list, in pixels, the next page is asked for: about three rows. */
+const NEAR_END_PX = 120;
+
+/** The nearest box around `el` that scrolls: the listbox, the panel or the sheet's body. */
+function scrollerOf(el: HTMLElement): HTMLElement | null {
+  for (let at = el.parentElement; at && at !== document.body; at = at.parentElement) {
+    const { overflowY } = getComputedStyle(at);
+    if (overflowY === "auto" || overflowY === "scroll") return at;
+  }
+  return null;
+}
+
+/**
+ * A server list's next page while the menu is open: asked once per length of the list, when
+ * whatever scrolls it nears the end (a scroll, a key that moves past the rows in view) and when
+ * it opens or grows still too short to scroll. Hands back the ref of the row that ends the list.
+ */
+function useNearEnd(open: boolean, count: number, more: boolean | undefined, onMore: (() => unknown) | undefined) {
+  const [end, setEnd] = useState<HTMLElement | null>(null);
+  const asked = useRef(-1);
+  const check = useCallback(
+    (box: Element) => {
+      if (!more || !onMore || asked.current === count) return;
+      if (box.scrollTop + box.clientHeight >= box.scrollHeight - NEAR_END_PX) {
+        asked.current = count;
+        // A touch scroll leaves focus on an option far above. When the next rows arrive, the desktop
+        // list's scroll button brings the focused option back into view, and the list would jump to
+        // its top: the list itself takes focus, as when the pointer leaves an option.
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement && focused.getAttribute("role") === "option" && box.contains(focused)) {
+          const at = focused.getBoundingClientRect();
+          const shown = box.getBoundingClientRect();
+          if (at.bottom <= shown.top || at.top >= shown.bottom) (focused.closest<HTMLElement>("[role=listbox]") ?? box).focus({ preventScroll: true });
+        }
+        void onMore();
+      }
+    },
+    [more, onMore, count],
+  );
+  useEffect(() => {
+    if (!open || !end || !more) return;
+    // A scroll does not bubble: the document hears it on the way down, from whichever box holds the end.
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Element && e.target.contains(end)) check(e.target);
+    };
+    document.addEventListener("scroll", onScroll, true);
+    const box = scrollerOf(end);
+    if (box) check(box);
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, [open, end, more, check]);
+  return setEnd;
+}
+
+/** The row that ends a server list with more to load, its spinner turning while the next page comes. */
+const MoreRow = ({ end }: { end: (el: HTMLElement | null) => void }) => (
+  <div ref={end} aria-hidden="true" className="flex h-row items-center justify-center">
+    <Spinner />
+  </div>
+);
 
 /**
  * The one select in the product. Desktop: a Radix listbox drawn in our tokens,
  * anchored under the button, or for a searchable one a search box over the list.
  * Phone: a bottom sheet of 44 px rows, a searchable one with the search box on top.
+ * Options from a server list load 25 at a time as the list nears its end (`more`).
  * The browser's own picker never shows (gate 21).
  */
-export function SelectMenu({ value, onChange, onBlur, options, placeholder, label, className, id, disabled, name, container, searchable, ...aria }: SelectMenuProps) {
+export function SelectMenu({ value, onChange, onBlur, options, placeholder, label, className, id, disabled, name, container, searchable, more, onMore, valueLabel, ...aria }: SelectMenuProps) {
   const phone = useIsPhone();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -94,13 +162,16 @@ export function SelectMenu({ value, onChange, onBlur, options, placeholder, labe
   const labelId = useFieldLabelId();
   const list = options.map(optionOf);
   const shownList = searchable ? matching(list, q) : list;
+  const end = useNearEnd(open, list.length, more, onMore);
   // The list is named by the field's label as a person reads it.
   const title = () => label || (labelId && document.getElementById(labelId)?.textContent?.trim()) || aria["aria-label"] || placeholder || "Choose One";
   const chosen = list.find((o) => o.value === (value ?? ""));
-  const shown = chosen ? chosen.label : placeholder;
+  // A value from a page not loaded yet still reads as itself.
+  const named = chosen ? chosen.label : value && valueLabel ? valueLabel : undefined;
+  const shown = named ?? placeholder;
   const chevron = <Icon name="down" size="s" className="flex-none text-subtle-foreground" />;
   const text = (
-    <span className={cn("min-w-0 flex-1 truncate", !chosen && "text-subtle-foreground")} data-copy={chosen ? "content" : undefined}>
+    <span className={cn("min-w-0 flex-1 truncate", named === undefined && "text-subtle-foreground")} data-copy={named === undefined ? undefined : "content"}>
       {shown}
     </span>
   );
@@ -168,6 +239,7 @@ export function SelectMenu({ value, onChange, onBlur, options, placeholder, labe
               );
             })}
           </div>
+          {more && <MoreRow end={end} />}
         </Sheet>
       </>
     );
@@ -191,6 +263,7 @@ export function SelectMenu({ value, onChange, onBlur, options, placeholder, labe
         onChange={onChange}
         label={open ? title() : label}
         container={container}
+        end={more ? end : undefined}
         trigger={
           <button ref={button} type="button" id={id} name={name} value={value ?? ""} disabled={disabled} role="combobox" aria-haspopup="listbox" aria-expanded={open} {...aria} className={cn(TRIGGER, className)}>
             {text}
@@ -246,6 +319,7 @@ export function SelectMenu({ value, onChange, onBlur, options, placeholder, labe
                 </Radix.ItemIndicator>
               </Radix.Item>
             ))}
+            {more && <MoreRow end={end} />}
           </Radix.Viewport>
           <Radix.ScrollDownButton className="flex h-6 items-center justify-center text-subtle-foreground">
             <Icon name="down" size="s" />
@@ -278,6 +352,7 @@ function SearchMenu({
   onChange,
   label,
   container,
+  end,
   trigger,
 }: {
   list: Array<{ value: string; label: ReactNode; disabled?: boolean }>;
@@ -289,6 +364,8 @@ function SearchMenu({
   onChange: (value: string) => void;
   label?: string;
   container?: HTMLElement | null;
+  /** The ref of the row that ends a server list with more to load. */
+  end?: (el: HTMLElement | null) => void;
   trigger: ReactNode;
 }) {
   const base = useId();
@@ -370,6 +447,7 @@ function SearchMenu({
                 </button>
               );
             })}
+            {end && <MoreRow end={end} />}
           </div>
         </Pop.Content>
       </Pop.Portal>
@@ -406,6 +484,12 @@ export interface SelectFieldProps {
   container?: HTMLElement | null;
   /** A search box above the options (SelectMenu's `searchable`). */
   searchable?: boolean;
+  /** The options are a server list with more pages to load (SelectMenu's `more`). */
+  more?: boolean;
+  /** Loads the server list's next 25 as the menu nears its end (SelectMenu's `onMore`). */
+  onMore?: () => unknown;
+  /** The chosen value's label while it is on a page not loaded yet (SelectMenu's `valueLabel`). */
+  valueLabel?: ReactNode;
 }
 
 export function SelectField({ value, onChange, onBlur, options, placeholder, state, message: _message, className, id, ...rest }: SelectFieldProps) {

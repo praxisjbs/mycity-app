@@ -7,13 +7,14 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { saveFile, useFileUrl } from "@/api/download";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { Letter, LetterFile, PolicyCited } from "@/features/shared/Letter";
 import { withSignature } from "@/features/shared/signature";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker, PolicyPicker, type PolicyChoice } from "@/features/shared/pickers";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
+import { paging } from "@/features/shared/wire";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
@@ -569,7 +570,7 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
   const create = useMutation("POST /api/v1/query-rules");
   const update = useMutation("PATCH /api/v1/query-rules/:id");
   // The query letters a rule may send; none picked sends the Query Letter (guide §6.3).
-  const letters = useApi("GET /api/v1/letter-templates", { query: { purpose: "query", status: "active" } });
+  const letters = useInfinite("GET /api/v1/letter-templates", { filters: { purpose: "query", status: "active" } });
   const submit = async () => {
     if (!f.check()) return;
     const body = ruleOf(f.values) as { name: string; source_event: OfferedSource; threshold: number; window_days: number; letter_template?: string; policy_id?: string; policy_clause?: string };
@@ -607,7 +608,7 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
         <Field label="Within, Days" {...f.status("window_days")}><NumberField {...f.field("window_days")} /></Field>
       </Grid>
       <Field label={<HelpTerm help="The letter this rule's queries send. None picked sends the Query Letter.">Letter</HelpTerm>} optional {...f.status("letter_template")}>
-        <SelectField placeholder="Query Letter" options={(letters.data?.data ?? []).map((l) => [l.key, l.name])} {...f.field("letter_template")} />
+        <SelectField placeholder="Query Letter" options={letters.rows.map((l) => [l.key, l.name])} {...paging(letters)} {...f.field("letter_template")} />
       </Field>
       <Field label={<HelpTerm help="The policy this rule enforces. Its queries' letters quote it.">Policy</HelpTerm>} optional {...f.status("policy_id")}>
         <PolicyPicker value={policy} onChange={(p) => {
@@ -775,7 +776,7 @@ const stepOf = (v: StepValues) => ({
 });
 
 function StepForm({ count, close }: { count: number; close: () => void }) {
-  const letters = usePaged("GET /api/v1/letter-templates", { filters: { purpose: "sanction" }, sort: "name" });
+  const letters = useInfinite("GET /api/v1/letter-templates", { filters: { purpose: "sanction" }, sort: "name" });
   const f = useContractForm<StepValues>(
     { name: "", position: String(count + 1), letter_template: "", financial_effect: "none", default_days: "", valid_days: "365" },
     { safeParse: (v: StepValues) => sanctions.ConsequenceStepCreate.safeParse(stepOf(v)) },
@@ -799,7 +800,7 @@ function StepForm({ count, close }: { count: number; close: () => void }) {
         <Field label="In Force, Days" optional {...f.status("valid_days")}><NumberField {...f.field("valid_days")} /></Field>
       </Grid>
       <Field label="Letter" optional {...f.status("letter_template")}>
-        <SelectField placeholder="Pick a letter" options={letters.rows.map((t: LetterTemplate) => [t.key, t.name])} {...f.field("letter_template")} />
+        <SelectField placeholder="Pick a letter" options={letters.rows.map((t: LetterTemplate) => [t.key, t.name])} {...paging(letters)} {...f.field("letter_template")} />
       </Field>
       <Field label="Financial Effect" {...f.status("financial_effect")}>
         <ChoiceField {...f.field("financial_effect")} options={[["none", "None"], ["unpaid_days", "Unpaid Days"], ["ends_employment", "Ends Employment"]]} />

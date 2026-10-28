@@ -6,7 +6,7 @@ interface Row {
   employee_id: string;
 }
 interface Endpoints {
-  "GET /api/v1/employees": { query: { page?: number; q?: string; status?: string }; body: never; params: never; response: { data: Row[]; page: { number: number; size: number; total: number; pages: number; has_next: boolean } } };
+  "GET /api/v1/employees": { query: { page?: number; q?: string; status?: string; sort?: "name" | "-name" }; body: never; params: never; response: { data: Row[]; page: { number: number; size: number; total: number; pages: number; has_next: boolean } } };
   "POST /api/v1/employees": { query: never; body: { first_name: string }; params: never; response: Row };
   "GET /api/v1/employees/:id": { query: never; body: never; params: { id: string }; response: Row };
 }
@@ -224,6 +224,19 @@ describe("createApi", () => {
     expect(result.current.page?.total).toBe(61);
     expect(result.current.rows).toHaveLength(1);
     expect(seen.at(-1)!.query.page).toBe(1);
+  });
+
+  it("a select's list sends its one order, and a new order starts again from the first page", async () => {
+    const { transport, seen } = fake((req) => ({ status: 200, body: page(Number(req.query.page), 60) }));
+    const core = createApi<Endpoints>({ credentials: "omit", transport });
+    const { result, rerender } = renderHook(({ sort }: { sort: "name" | "-name" }) => core.useInfinite("GET /api/v1/employees", { sort }), { initialProps: { sort: "name" } });
+    await waitFor(() => expect(result.current.rows).toHaveLength(1));
+    act(() => result.current.more());
+    await waitFor(() => expect(result.current.rows).toHaveLength(2));
+    expect(seen.map((r) => [r.query.page, r.query.sort])).toEqual([[1, "name"], [2, "name"]]);
+    rerender({ sort: "-name" });
+    await waitFor(() => expect(seen.at(-1)!.query).toMatchObject({ page: 1, sort: "-name" }));
+    await waitFor(() => expect(result.current.rows).toHaveLength(1));
   });
 
   it("clear forgets kept answers, and a read still on its way at clear never fills the next session", async () => {

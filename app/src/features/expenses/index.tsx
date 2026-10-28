@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/expenses";
 import type { Category, Disbursement, ExpenseRow, Requisition } from "@/api/types/expenses";
 import type { DocumentRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ExportAction, PagedTable, TrailCard } from "@/features/shared/sections";
+import { paging } from "@/features/shared/wire";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AreaChart, Button, Card, CardHeader, Chain, cn, DataView, DateField, DetailPane, ErrorState, Field, formatBytes, formatDate, formatDateTime, formatMoneyShort, FormFooter, Grid, Icon, KeyValue, LoadingRows, Money, MoneyField, PageHeader, rules, SelectField, StatusPill, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useIsPhone, useModal, Who, Wizard } from "@mycity/ui";
 import { upload } from "@/api/upload";
@@ -89,7 +90,7 @@ function History({ id }: { id: string }) {
 }
 
 function RequestForm({ close }: { close: () => void }) {
-  const cats = usePaged("GET /api/v1/expenses/categories");
+  const cats = useInfinite("GET /api/v1/expenses/categories");
   const { me } = useAuth();
   const [invoice, setInvoice] = useState<DocumentRef | null>(null);
   const [tried, setTried] = useState(false);
@@ -127,7 +128,7 @@ function RequestForm({ close }: { close: () => void }) {
           body: (
             <>
               <Field label="Description" {...f.field("title")}><TextField {...f.field("title")} placeholder="Courier to Enugu" /></Field>
-              <Field label="Category" {...f.field("category_id")}><SelectField placeholder="Pick one" options={cats.rows.map((c) => [c.category_id, c.name])} {...f.field("category_id")} /></Field>
+              <Field label="Category" {...f.field("category_id")}><SelectField placeholder="Pick one" options={cats.rows.map((c) => [c.category_id, c.name])} {...paging(cats)} {...f.field("category_id")} /></Field>
               <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>
               <Field label="Project" optional><TextField {...f.field("project")} placeholder="Campaign or city" /></Field>
             </>
@@ -396,7 +397,7 @@ function Disbursements() {
 }
 
 function LogDisbursement({ close }: { close: () => void }) {
-  const ready = usePaged("GET /api/v1/expenses/requests", { filters: { scope: "all", stage: "approved" } });
+  const ready = useInfinite("GET /api/v1/expenses/requests", { filters: { scope: "all", stage: "approved" } });
   const f = useContractForm({ request_id: "", bank_reference: "", paid_on: todayIso() }, { request_id: (v) => (!v ? "Pick the approved request" : null), bank_reference: (v) => (!/^[A-Z0-9]{8,24}$/.test(v) ? "The bank's transfer reference" : null), paid_on: (v) => (!v ? "Pick the bank date" : null) });
   const save = useMutation("POST /api/v1/expenses/disbursements");
   const submit = async () => {
@@ -412,7 +413,7 @@ function LogDisbursement({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Request" {...f.field("request_id")}><SelectField placeholder={ready.rows.length ? "Pick an approved request" : "Nothing awaiting disbursement"} options={ready.rows.map((r) => [r.request_id, `${r.number} · ${r.title} · ₦${Number(r.amount).toLocaleString("en-NG")}`])} {...f.field("request_id")} /></Field>
+      <Field label="Request" {...f.field("request_id")}><SelectField placeholder={ready.rows.length ? "Pick an approved request" : "Nothing awaiting disbursement"} options={ready.rows.map((r) => [r.request_id, `${r.number} · ${r.title} · ₦${Number(r.amount).toLocaleString("en-NG")}`])} {...paging(ready)} {...f.field("request_id")} /></Field>
       <Field label="Bank Reference" {...f.field("bank_reference")}><TextField {...f.field("bank_reference")} onChange={(v) => f.set("bank_reference", v.toUpperCase().replace(/\s/g, ""))} placeholder="FT26092812445" /></Field>
       <Field label="Paid On" {...f.field("paid_on")}><DateField {...f.field("paid_on")} max={todayIso()} /></Field>
       <FormFooter>

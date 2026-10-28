@@ -10,7 +10,7 @@
 | Capabilities | `home.team` (open the Team tab and its figures), `home.reports` (build, schedule, run and receive reports), `alerts.manage` (create, change and switch off alert rules), `alerts.clear` (clear or dismiss an alert, together with the rule's own grant) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 27/10/2026 |
+| Last changed | 28/10/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -845,6 +845,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 28/10/2026 · JP · Team's Department filter and a report's Department and Leave Type read their lists 25 at a time and load the next page as the menu nears its end (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18); they look as before.
 - 27/10/2026 · AJ · A policy breach's alert no longer reads Query Due and is raised only with Alert
   on: Queries & Sanctions raises the query itself (attendance.md §6.16, queries.md §6.2).
 - 27/10/2026 · AJ · A second personal export through the engine (workspace.md §6, TB at the internal meeting of 26/10/2026): source `workspace_analytics`, never offered on the form, is My Workspace · Analytics' Export, run as the Overview's is on the reader's own hidden report, its filters the period pressed for, and needing the `workspace` export grant as well as the view (`scopeOn` reads a source's `action`); a snapshot source now receives its report's filters. What the Overview alone was in the repo and the service (never listed, its name giving way, its runs read by the screen that pressed, no `home.reports` needed) is now every personal source's (`PERSONAL`, `exportPersonal`, `getPersonalRun`); Reports' screens name the source Workspace Analytics (§4, §6, §7). The same day, after a refresh mid-export showed "still being made": each run keeps its own filters (`home_report_run.filters`, migration 2530), Run Now and Export answer a waiting run only when its filters match too, and the refusal is gone, so a run waiting on the worker never holds up another press (§4, §6).
