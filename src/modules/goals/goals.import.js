@@ -15,7 +15,6 @@
  *    owner note.
  *  - **The type in words.** "Diagnostic gate — retires on sign-off" is a diagnostic gate; gates,
  *    enabling and output key results are scored as dated, the rest as numeric.
- *  - **[TBC]** in the key result or its baseline marks a provisional target.
  *  - **Initiatives** are bullet lines ending in a date ("— 15 Oct", "— CEO, 31 Oct"); each dated
  *    one becomes a task for the owner, linked to the key result.
  *  - **The latest report.** Status, Actual and Update are the latest scored month's (the month
@@ -57,7 +56,6 @@ const STATUSES = [
   [/^(done|complete|achieved|met)\b/i, "done"],
   [/^missed/i, "missed"],
 ];
-const TBC = /\[TBC\]/i;
 
 /** The quarter imports write into, with its three months. */
 async function importPeriod(db) {
@@ -262,7 +260,6 @@ defineImporter({
         kr_type: type,
         measure: DATED.has(type) ? "dated" : "numeric",
         baseline_text: values.baseline || null,
-        target_provisional: TBC.test(values.statement) || TBC.test(values.baseline || ""),
         starts_on: values.starts_on || null,
         finishes_on: values.finishes_on || null,
         ...(await ownersOf(client, values.accountable)),

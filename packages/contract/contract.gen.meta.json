@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "00a3137b07e80a0c103631f3e1e5579daa6e71aa948c3637c158fad945f341be",
+  "source_hash": "3a7356d4cd261b8760170bd4311fd26ae930fe5b7cc19831ba7b3dbf652f79a3",
   "schemas": 1295,
   "endpoints": 638,
   "inputs": {
@@ -29,7 +29,7 @@
     "packages/contract/schemas/ess.js": "533956948dbb444b0155578f7de68cd7e672c8485e84b2afb4afc53771aa2924",
     "packages/contract/schemas/expense_categories.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/expenses.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/goals.js": "63b85d1f815c6b4f68b4e8ffe54c99e1bba06799afaee3c22caf1ec5b64f0ae5",
+    "packages/contract/schemas/goals.js": "bdb39f542daf64bc0c5f13d96ffd3c0d73514f9a0fa6be79086d278102962022",
     "packages/contract/schemas/identity.js": "399d7f571458b79f3fd310debeccb41677efa350da3498d59b1e95497fc9447b",
     "packages/contract/schemas/imports.js": "5e59f54fa0dced55405c09bcb26309d2e42050bcf2f3e0beaffdc0132bdeb61c",
     "packages/contract/schemas/integrations.js": "6c5ddf2df67dd50949cb74754c371deec121c8d8a1c240a1ddb3b60262113d18",
@@ -90,7 +90,7 @@
     "src/modules/devices/devices.routes.js": "66275823baca42614b175e59a41f62ff7bf7c2816e65a6a795f2cbbb0d01459f",
     "src/modules/documents/documents.routes.js": "a3a4c005466e2693981dd795e91484498748f8d17731193c93b9c44f85f451ad",
     "src/modules/ess/ess.routes.js": "fbac0d06f1ae7bdde400d42fff6d1ee3f94244d761dbff6ef6fc3254d7138917",
-    "src/modules/goals/goals.routes.js": "ced39eb21501fa1c4d7b31c09a9538aae554a86d17ce49172cfc5c266b3a4be0",
+    "src/modules/goals/goals.routes.js": "f07da460fd6f4e82b2f097a8266a61ee2aa2547a780cc8ba414309585c4971e0",
     "src/modules/identity/identity.routes.js": "23cb9436cc6f28eb5c84695423e21806571dd3807be442a0766046757505704e",
     "src/modules/imports/imports.routes.js": "581a544f9a5a30e45bdbc8ce6e13c91a360e031362d543e690c5e29561127fb0",
     "src/modules/integrations/integrations.routes.js": "d13aa6c299f16075063a20f8bda557a1e3c69dcec6e8b0712149d9b75b7516c6",

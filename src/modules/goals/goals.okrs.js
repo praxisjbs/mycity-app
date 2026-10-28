@@ -6,8 +6,7 @@
  * The tree is edited while its plan is a draft, returned, unbound or awaiting approval (§6.4, §6.22):
  * codes are given then (G1) and freeze when it binds; an unbound plan adds new ones and changes no code
  * already given, and what is added to a plan already sent joins it, its approval carrying on. A
- * binding key result changes only through a target change, except a TBC target before the quarter's
- * lock date, which its owner edits in place. Each month the head reports the
+ * binding key result changes only through a target change. Each month the head reports the
  * function's key results and KPIs in one save; a score under the Watch band needs a recovery owner
  * and date. A company key result Scored From a function key result takes its month, so nothing is
  * entered twice. The CEO confirms each month's score; the confirmed score counts, else the
@@ -81,8 +80,6 @@ function keyResultView(kr, latest = null, rules) {
     baseline_text: kr.baseline_text,
     target_value: kr.target_value,
     target_text: kr.target_text,
-    target_provisional: kr.target_provisional,
-    target_locked_at: iso(kr.target_locked_at),
     parts: kr.parts || null,
     starts_on: day(kr.starts_on),
     finishes_on: day(kr.finishes_on),
@@ -353,12 +350,7 @@ async function createKeyResult(actor, body, opts = {}) {
       throw new AppError("OBJECTIVE_TOO_MANY", "An objective holds at most four key results", 409);
     const code = opts.code || cascade.nextKeyResultCode(objective.code, used);
     const { linked_company_key_result_ids: links = [], ...fields } = body;
-    const newId = await repo.insertKeyResult(client, {
-      ...fields,
-      code,
-      position: body.position ?? used.length,
-      target_locked_at: opts.locked ? new Date() : undefined,
-    });
+    const newId = await repo.insertKeyResult(client, { ...fields, code, position: body.position ?? used.length });
     await repo.setLinks(client, newId, links);
     await emit(client, {
       key: EVENTS.KEY_RESULT_SAVED,
@@ -379,22 +371,8 @@ async function getKeyResultView(id) {
   return keyResultView(kr, months[0] || null);
 }
 
-/** Fields a TBC key result's owner may change before the lock date, on a binding plan. */
-const TBC_FIELDS = new Set(["target_value", "target_text", "target_provisional"]);
-
-/** A binding key result's TBC target still open: provisional, not locked, its quarter's lock date not come (§6.7). */
-const tbcOpen = (ctx, today = lagos.today()) =>
-  ctx.target_provisional === true && !ctx.target_locked_at && (!ctx.targets_lock_on || day(ctx.targets_lock_on) > today);
-
-/** May the actor set this binding key result's TBC target in place: its owner, or whoever sets its function's goals? */
-async function maySetTarget(actor, ctx) {
-  if (!actor || !plans.isLive(ctx.plan_status) || !tbcOpen(ctx)) return false;
-  if (actor.employee_id && actor.employee_id === ctx.accountable_employee_id) return true;
-  return (await authority.holds(actor, "goals.function")) && (await authority.maySetGoals(pool, actor, ctx.department_id));
-}
-
 /** What a reported month was scored on: an unbound plan keeps it in place once a month is reported (§6.22). */
-const SCORED_ON = ["target_value", "target_text", "target_provisional", "measure", "direction", "unit", "parts"];
+const SCORED_ON = ["target_value", "target_text", "measure", "direction", "unit", "parts"];
 
 /** A value as text whatever order its keys came in (a jsonb column reads back in its own order). */
 const canonical = (v) =>
@@ -431,17 +409,10 @@ async function assertScoredOnHeld(id, patch) {
 async function updateKeyResult(actor, id, patch) {
   const ctx = await repo.keyResultContext(pool, id);
   if (!ctx) throw notFound();
-  if (plans.isEditable(ctx.plan_status)) {
-    await authority.assertSetsGoals(pool, actor, ctx.department_id);
-    if (plans.isAmended(ctx.plan_status)) await assertScoredOnHeld(id, patch);
-  } else {
-    const open = tbcOpen(ctx);
-    const onlyTarget = Object.keys(patch).every((k) => TBC_FIELDS.has(k));
-    const owner = actor && actor.employee_id && actor.employee_id === ctx.accountable_employee_id;
-    if (!(open && onlyTarget && (owner || (await authority.holds(actor, "goals.function")))))
-      throw new AppError("KEY_RESULT_BINDING", "This key result is binding: change its target instead", 409);
-    if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
-  }
+  if (!plans.isEditable(ctx.plan_status))
+    throw new AppError("KEY_RESULT_BINDING", "This key result is binding: change its target instead", 409);
+  await authority.assertSetsGoals(pool, actor, ctx.department_id);
+  if (plans.isAmended(ctx.plan_status)) await assertScoredOnHeld(id, patch);
   const objective = await repo.getObjective(pool, ctx.okr_objective_id);
   await checkLinks(pool, objective, patch);
   await tx(async (client) => {
@@ -481,7 +452,7 @@ async function deleteKeyResult(actor, id) {
 
 /** May the reader ask to change this key result's target? requestChange's checks, as a yes or no. */
 async function mayChangeTarget(actor, planStatus, ctx) {
-  if (!actor || !plans.isLive(planStatus) || tbcOpen(ctx)) return false;
+  if (!actor || !plans.isLive(planStatus)) return false;
   if (await repo.changePending(pool, { okr_key_result_id: ctx.okr_key_result_id })) return false;
   if (!(await scopeFor(actor, "performance", "edit"))) return false;
   if (actor.employee_id && actor.employee_id === ctx.accountable_employee_id) return true;
@@ -518,7 +489,6 @@ async function getKeyResultDetail(id, actor = null) {
     trace: path,
     can_change_target: await mayChangeTarget(actor, objective.plan_status, ctx),
     can_edit: Boolean(actor) && plans.isEditable(objective.plan_status) && (await authority.maySetGoals(pool, actor, objective.department_id)),
-    can_set_target: await maySetTarget(actor, ctx),
   };
 }
 
@@ -563,11 +533,10 @@ function reportedParts(ctx, r) {
 /**
  * The score a report proposes when the head gives none (§6.8): a number against the target in
  * force that month (`target`), a multi-part key result's parts against their stored targets, Done
- * or Missed. A TBC key result is scored only once its target is locked.
+ * or Missed.
  */
 function proposed(ctx, r, { target = ctx.target_value, parts = null } = {}) {
   if (r.proposed_score !== undefined && r.proposed_score !== null) return r.proposed_score;
-  if (ctx.target_provisional && !ctx.target_locked_at) return null;
   if (ctx.measure === "numeric") return scoring.formatScore(scoring.numericScore({ actual: r.actual_value, target, direction: ctx.direction }));
   if (ctx.measure === "multi_part" && parts) {
     const today = lagos.today();
@@ -587,7 +556,7 @@ function proposed(ctx, r, { target = ctx.target_value, parts = null } = {}) {
 
 /**
  * The months of a key result from `fromMonth` (all when null), not yet confirmed, scored again on its
- * target as it now stands: after a target change, or once a TBC target locks. A numeric month needs
+ * target as it now stands: after a target change. A numeric month needs
  * its actual; a dated month's score rests on its status, so only one left unscored is scored.
  */
 async function rescoreFrom(client, keyResultId, fromMonth = null) {
@@ -744,7 +713,7 @@ async function readableTrace(db, reach, id) {
 
 /** The key result fields a workbook row sets. */
 const IMPORTED = [
-  "statement", "kr_type", "measure", "baseline_text", "target_provisional", "starts_on", "finishes_on",
+  "statement", "kr_type", "measure", "baseline_text", "starts_on", "finishes_on",
   "accountable_employee_id", "co_accountable_employee_id", "accountable_note",
 ];
 
@@ -948,7 +917,6 @@ module.exports = {
   changeView,
   withKeyResults,
   listKeyResults,
-  tbcOpen,
   listOkrs,
   objectivesOfPlan,
   createObjective,

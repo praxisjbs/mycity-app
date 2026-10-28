@@ -111,7 +111,7 @@ describeDb("performance plans unbound for changes, against the real migrations",
       tokens[key] = res.body.access_token;
     }
     ids.q4 = (
-      await as("ops").post("/performance/periods", { starts_on: "2026-10-01", targets_lock_on: "2026-11-07", status: "active" })
+      await as("ops").post("/performance/periods", { starts_on: "2026-10-01", status: "active" })
     ).body.performance_period_id;
     // Branding & Marketing's plan: one objective, one key result with October reported, binding.
     const objective = await as("head").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.bm, title: "Be the first app residents open" });

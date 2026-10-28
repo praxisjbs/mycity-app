@@ -80,11 +80,10 @@ code and words, and nothing more of it.
 | **Done** | Delivered |
 | **Missed** | Not delivered by its date |
 | **Not Started** | Work has not begun |
-| **Awaiting Report** | Nothing has been reported for it yet |
-| **TBC** | Its target is not confirmed yet; it is set before the quarter's lock date |
+| **Awaiting Report** | No month has been reported for it yet |
 
-A key result shows its latest reported month. It keeps that month's status until the head reports
-the next one.
+A key result reads **Awaiting Report** until its first month is reported. After that it shows its
+latest reported month, and keeps that month's status until the head reports the next one.
 
 On a phone, the buttons at the top sit under the title. **Quick Actions** offers a function's head
 Report Month, and others New Goal. The tiles sit two to a row. **Organisational Goals**
@@ -96,7 +95,7 @@ list from the bottom, and the larger forms fill the screen.
 |---|---|---|
 | **This was not found** | The goal, objective or key result has been deleted | Close it. Goals shows what remains |
 | **That goal does not exist** or **That key result does not exist** | Someone deleted it while you had it open | Close it and open Goals again |
-| **This key result is binding: change its target instead** | Its plan was sent, or its lock date came, while it was open | Close it, open it again and use **Change Target** |
+| **This key result is binding: change its target instead** | Its plan was sent while it was open | Close it, open it again and use **Change Target** |
 
 ### Open a key result {#performance-key-result}
 
@@ -217,8 +216,7 @@ page is binding, **Request To Unbind** takes its place.
 6. Choose its **Measure**: **Numeric**, **Dated** or **Yes or No**. The form shows only what the
    measure needs.
 7. For **Numeric**, fill in the **Target** as a number. For every measure, fill in **Target in
-   Words** as people say it, such as `64,000 users` or `Launch in Kano`. Tick **Target to be
-   confirmed** if it is not settled yet.
+   Words** as people say it, such as `64,000 users` or `Launch in Kano`.
 8. For **Numeric**, pick the **Unit** from the list, or type one the list does not hold and it is
    offered next time. For every measure, add the **Finish** date and the **Owner**. For a function's
    key result, pick the company key results it **Feeds**.
@@ -420,17 +418,14 @@ The CEO confirms each month's key result scores at the monthly review.
 ### Change a target {#performance-target needs="performance edit"}
 
 A binding target changes only with the CEO's approval. The old target stays beside the new one,
-and scores already given do not change.
+and scores already given do not change. A key result with no target yet is given one the same way.
 
 1. Open the key result on [Performance · Goals](/performance?tab=goals). Its owner and the
-   function's head see the buttons.
-2. Before the quarter's lock date, a **TBC** target is set in place: press **Set Target**, fill
-   in **Target** and **Target in Words**, and press **Set Target**. The hub says **Target set**. It
-   still reads **TBC** until the lock date, so you may set it again until then.
-3. After it, press **Change Target**. Type the **New Target** as a figure only, such as `70000`,
+   function's head see **Change Target**.
+2. Press **Change Target**. Type the **New Target** as a figure only, such as `70000`,
    and the **Target in Words** if it has them. Choose the **From Month**, a month of its quarter.
    Type the **Reason**.
-4. Press **Send Change**. The hub says **Sent to the CEO**, and the key result shows **Change
+3. Press **Send Change**. The hub says **Sent to the CEO**, and the key result shows **Change
    Waiting** until the CEO decides.
 
 | The form says | What it means | What to do |
@@ -447,7 +442,7 @@ starts with a copy of the last quarter's rules.
 1. On [Performance · Goals](/performance?tab=goals), press **Manage Quarters**, then **Set Up
    Quarter**. You can also search for **Set Up Quarter**.
 2. On **Quarter**, check **Starts**: 1 January, 1 April, 1 July or 1 October. **Ends** follows by
-   itself. Add the **Name** (Q1 2027 unless you type another), the **Lock Date** for TBC targets,
+   itself. Add the **Name** (Q1 2027 unless you type another),
    and the **Status**: **Planning** or **Active**. Only one quarter is **Active** at a time. Press
    **Next**.
    ![Set Up Quarter, its first step](shot:performance-quarter)
@@ -469,7 +464,6 @@ says why, such as **That quarter is already set up**.
 | **Pick a quarter start** under **Starts** | It is not a quarter's first day | Pick 1 January, 1 April, 1 July or 1 October |
 | **Already set up** under **Starts** | That quarter exists | Pick the next quarter, or change this one |
 | **Another is active** under **Status** | Another quarter is **Active** | Choose **Planning**, or close the active quarter first |
-| **Outside the quarter** under **Lock Date** | The lock date is not in the quarter | Pick a day between **Starts** and **Ends** |
 | **Must exceed Watch** under **Good From** | Good must start above Watch | Raise **Good From**, or lower **Watch From** |
 | **Must exceed Meets** under **Exceeds From** | Exceeds must start above Meets | Raise **Exceeds From**, or lower **Meets From** |
 | **Must exceed Partly Meets** under **Meets From** | Meets must start above Partly Meets | Raise **Meets From**, or lower **Partly Meets From** |
@@ -1376,11 +1370,11 @@ sources:
 do:
   - click: button "Manage Quarters"
   - click: text "Set Up Quarter"
-  - wait: label "Lock Date"
+  - wait: label "Starts"
 crop: modal
 marks:
   1: label "Starts" | The quarter's first day
-  2: label "Lock Date" | When TBC targets lock
+  2: label "Name" | What the quarter is called
   3: button "Next" | The next step
 ```
 

@@ -9,7 +9,7 @@
  * not fill; the plan goes to the Program Manager, Operations & People and the CEO, and a refusal
  * returns it; once binding the scorecards are agreed or disagreed; the head reports the month,
  * Recovery needs an owner, the company key result scored from the function's takes its month; the
- * CEO confirms; a target change applies on the CEO's approval; TBC targets lock on the lock date.
+ * CEO confirms; a target change applies on the CEO's approval.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/performance-plan
  */
@@ -21,7 +21,6 @@ const { rebuild } = require("./helpers/schema");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
-const goals = require("../../src/modules/goals/goals.service");
 const homeGoals = require("../../src/modules/dashboard/sources/goals.source");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -112,7 +111,7 @@ describeDb("performance plan against the real migrations", () => {
       expect(res.status).toBe(200);
       tokens[key] = res.body.access_token;
     }
-    const period = await as("ops").post("/performance/periods", { starts_on: "2026-10-01", targets_lock_on: "2026-10-31" });
+    const period = await as("ops").post("/performance/periods", { starts_on: "2026-10-01" });
     expect(period.status).toBe(201);
     ids.period = period.body.performance_period_id;
     expect((await as("ops").patch(`/performance/periods/${ids.period}`, { status: "active" })).status).toBe(200);
@@ -187,7 +186,6 @@ describeDb("performance plan against the real migrations", () => {
       okr_objective_id: ids.objective,
       statement: "Publish 36 city stories",
       target_value: "36",
-      target_provisional: true,
       accountable_employee_id: emp("head"),
     });
     expect(kr2.body.code).toBe("BM-KR1.2");
@@ -369,14 +367,14 @@ describeDb("performance plan against the real migrations", () => {
     expect(late.body).toMatchObject({ status: "draft", can_edit: true, can_send: false, amendment_instance_id: null });
   });
 
-  test("Report Month: one save; Recovery needs an owner and date; a TBC target waits; Scored From takes the month; the CEO confirms", async () => {
+  test("Report Month: one save; Recovery needs an owner and date; Scored From takes the month; the CEO confirms", async () => {
     const month = "2026-10-01";
     const report = (kr1) => ({
       month,
       department_id: ids.bm,
       key_results: [
         { okr_key_result_id: ids.kr1, status: "at_risk", actual_value: "38400", update_text: "Two cities slipped", ...kr1 },
-        { okr_key_result_id: ids.kr2, status: "off_track", actual_value: "8" },
+        { okr_key_result_id: ids.kr2, status: "on_track", actual_value: "38" },
       ],
       kpis: [{ kpi_definition_id: ids.kpi, result: "met", actual_value: "96" }],
     });
@@ -401,13 +399,12 @@ describeDb("performance plan against the real migrations", () => {
     );
     expect(recovering.status).toBe(200);
     expect(recovering.body.key_results[0]).toMatchObject({ proposed_score: "0.3125", band: "recovery" });
-    // BM-KR1.1 and the company key result Scored From it are in Recovery; nothing awaits a report.
-    expect(await figures()).toMatchObject({ in_recovery: 2, on_track: 0, awaiting_report: 0 });
+    // BM-KR1.1 and the company key result Scored From it are in Recovery, BM-KR1.2 is Good; nothing awaits a report.
+    expect(await figures()).toMatchObject({ in_recovery: 2, on_track: 1, awaiting_report: 0 });
     const ok = await as("head").post("/performance/reports", report({}));
     expect(ok.status).toBe(200);
     expect(ok.body.key_results[0]).toMatchObject({ proposed_score: "0.6", band: "watch", confirmed: false });
-    // BM-KR1.2's target is TBC until the lock date: its month is kept, unscored.
-    expect(ok.body.key_results[1]).toMatchObject({ status: "off_track", actual_value: "8", proposed_score: null });
+    expect(ok.body.key_results[1]).toMatchObject({ status: "on_track", actual_value: "38", proposed_score: "0.95", band: "good" });
     expect(ok.body.kpis[0]).toMatchObject({ result: "met", actual_value: "96" });
     const company = await as("pm").get(`/performance/key-results/${ids.coKr}`);
     expect(company.body.latest).toMatchObject({ month, actual_value: "38400", proposed_score: "0.6" });
@@ -423,15 +420,15 @@ describeDb("performance plan against the real migrations", () => {
     expect(again.status).toBe(200);
     expect(again.body.key_results[0]).toMatchObject({ status: "on_track", actual_value: "38400", recovery_employee_id: emp("ada"), proposed_score: "0.6", confirmed_score: "0.65" });
     const tree = await as("ada").get(`/performance/okrs?period_id=${ids.period}&department_id=${ids.bm}`);
-    expect(tree.body.data[0].key_results.map((k) => k.latest.score)).toEqual(["0.65", null]);
-    expect(tree.body.data[0]).toMatchObject({ code: "BM-O1", score: "0.65" });
+    expect(tree.body.data[0].key_results.map((k) => k.latest.score)).toEqual(["0.65", "0.95"]);
+    expect(tree.body.data[0]).toMatchObject({ code: "BM-O1", score: "0.8" });
 
     // The figures count what the reader reads of the quarter, or one function, on the server (§6.23): the
     // whole plan for the CEO, the function's own for a member of it.
     const all = await as("ceo").get(`/performance/okrs/summary?period_id=${ids.period}`);
-    expect(all.body).toEqual({ company_score: "0.65", function_score: "0.65", key_results: 3, on_track: 0, in_recovery: 0, awaiting_report: 0 });
+    expect(all.body).toEqual({ company_score: "0.65", function_score: "0.8", key_results: 3, on_track: 1, in_recovery: 0, awaiting_report: 0 });
     const own = await as("ada").get(`/performance/okrs/summary?period_id=${ids.period}`);
-    expect(own.body).toEqual({ company_score: null, function_score: "0.65", key_results: 2, on_track: 0, in_recovery: 0, awaiting_report: 0 });
+    expect(own.body).toEqual({ company_score: null, function_score: "0.8", key_results: 2, on_track: 1, in_recovery: 0, awaiting_report: 0 });
     const bm = await as("ceo").get(`/performance/okrs/summary?period_id=${ids.period}&department_id=${ids.bm}`);
     expect(bm.body).toMatchObject({ company_score: "0.65", key_results: 2 });
     const kpis = await as("ada").get(`/performance/kpis/summary?month=${month}`);
@@ -450,14 +447,6 @@ describeDb("performance plan against the real migrations", () => {
     await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr1, emp("other")]);
     expect(await mayChange("other", ids.kr1)).toBe(true);
     await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr1, owner1]);
-    // A TBC target before its lock date is set in place by its owner or the head, never asked for (§6.7).
-    await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr2, emp("other")]);
-    const tbc = async (who) => {
-      const body = (await as(who).get(`/performance/key-results/${ids.kr2}`)).body;
-      return [body.can_set_target, body.can_change_target];
-    };
-    expect([await tbc("other"), await tbc("head"), await tbc("ada")]).toEqual([[true, false], [true, false], [false, false]]);
-    await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr2, emp("head")]);
     const mayEdit = async (who) => {
       const res = await as(who).get(`/performance/kpis/${ids.kpi}`);
       return res.status === 200 ? res.body.can_edit : null;
@@ -550,17 +539,5 @@ describeDb("performance plan against the real migrations", () => {
     await drain();
     expect((await as("ceo").get(`/performance/target-changes/${id}`)).body.status).toBe("rejected");
     expect((await as("ceo").get("/performance/approvals")).body.data).toEqual([]);
-  });
-
-  test("TBC targets lock on the quarter's lock date, once", async () => {
-    expect(await goals.lockTargets("2026-10-30")).toEqual({ locked: 0 });
-    expect(await goals.lockTargets("2026-11-01")).toEqual({ locked: 1 });
-    expect(await goals.lockTargets("2026-11-02")).toEqual({ locked: 0 });
-    const kr = await one("SELECT target_provisional, target_locked_at FROM okr_key_result WHERE okr_key_result_id = $1", [ids.kr2]);
-    expect(kr.target_provisional).toBe(false);
-    expect(kr.target_locked_at).not.toBeNull();
-    // October was reported while the target was TBC (8 against 40): it is scored now it is firm.
-    const october = await one("SELECT trim_scale(proposed_score)::text AS proposed FROM okr_key_result_month WHERE okr_key_result_id = $1 AND month = '2026-10-01'", [ids.kr2]);
-    expect(october.proposed).toBe("0.2");
   });
 });

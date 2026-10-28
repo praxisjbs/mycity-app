@@ -16,7 +16,7 @@ const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || 
 
 /** A quarter as the service turns it into PerformancePeriod. */
 const PERIOD = `p.performance_period_id, p.name, p.starts_on, p.ends_on, p.plan_year_starts_on,
-  p.targets_lock_on, p.live_from, p.status, p.rules, p.created_at, p.updated_at`;
+  p.live_from, p.status, p.rules, p.created_at, p.updated_at`;
 
 const PERIOD_SORTS = { starts_on: "p.starts_on" };
 
@@ -73,14 +73,14 @@ function insertPeriod(client, p) {
   return one(
     client,
     `INSERT INTO performance_period
-       (name, starts_on, ends_on, plan_year_starts_on, targets_lock_on, live_from, status, rules)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+       (name, starts_on, ends_on, plan_year_starts_on, live_from, status, rules)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
      RETURNING performance_period_id`,
-    [p.name, p.starts_on, p.ends_on, p.plan_year_starts_on, p.targets_lock_on, p.live_from, p.status || "planning", JSON.stringify(p.rules)],
+    [p.name, p.starts_on, p.ends_on, p.plan_year_starts_on, p.live_from, p.status || "planning", JSON.stringify(p.rules)],
   );
 }
 
-const PERIOD_WRITABLE = ["name", "targets_lock_on", "live_from", "status", "rules"];
+const PERIOD_WRITABLE = ["name", "live_from", "status", "rules"];
 
 async function updatePeriod(client, id, patch) {
   const keys = PERIOD_WRITABLE.filter((k) => patch[k] !== undefined);
@@ -433,8 +433,8 @@ async function objectivesOfPeriod(db, periodId, reach = visibility.EVERYTHING) {
 }
 
 const KEY_RESULT = `kr.okr_key_result_id, kr.okr_objective_id, kr.code::text AS code, kr.statement, kr.kr_type, kr.measure,
-  kr.direction, kr.unit, kr.baseline_text, trim_scale(kr.target_value)::text AS target_value, kr.target_text, kr.target_provisional,
-  kr.target_locked_at, kr.parts, kr.starts_on, kr.finishes_on, kr.accountable_employee_id,
+  kr.direction, kr.unit, kr.baseline_text, trim_scale(kr.target_value)::text AS target_value, kr.target_text,
+  kr.parts, kr.starts_on, kr.finishes_on, kr.accountable_employee_id,
   ${personJson("ae", "ad")} AS accountable, kr.co_accountable_employee_id, ${personJson("ce", "cd")} AS co_accountable,
   kr.accountable_note, kr.scored_from_key_result_id, kr.position,
   COALESCE((SELECT json_agg(json_build_object('okr_key_result_id', c.okr_key_result_id, 'code', c.code::text,
@@ -468,10 +468,10 @@ const keyResultContext = (db, id) =>
   one(
     db,
     `SELECT kr.okr_key_result_id, kr.code::text AS code, kr.statement, kr.measure, kr.direction,
-            trim_scale(kr.target_value)::text AS target_value, kr.target_text, kr.target_provisional, kr.target_locked_at,
+            trim_scale(kr.target_value)::text AS target_value, kr.target_text,
             kr.accountable_employee_id, kr.scored_from_key_result_id, kr.parts,
             o.okr_objective_id, o.code::text AS objective_code, o.department_id, o.performance_period_id,
-            pl.performance_plan_id, pl.status AS plan_status, p.targets_lock_on, p.rules, p.status AS period_status
+            pl.performance_plan_id, pl.status AS plan_status, p.rules, p.status AS period_status
        FROM okr_key_result kr
        JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
        JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id
@@ -658,7 +658,7 @@ const deleteObjective = (client, id) => client.query("DELETE FROM okr_objective 
 
 const KR_WRITABLE = [
   "okr_objective_id", "code", "statement", "kr_type", "measure", "direction", "unit", "baseline_text", "target_value",
-  "target_text", "target_provisional", "target_locked_at", "parts", "starts_on", "finishes_on", "accountable_employee_id",
+  "target_text", "parts", "starts_on", "finishes_on", "accountable_employee_id",
   "co_accountable_employee_id", "accountable_note", "scored_from_key_result_id", "position",
 ];
 
@@ -707,24 +707,6 @@ async function objectiveCodes(db, periodId, prefix) {
 async function keyResultCodes(db, objectiveId) {
   const { rows } = await db.query("SELECT code::text AS code FROM okr_key_result WHERE okr_objective_id = $1", [objectiveId]);
   return rows.map((r) => r.code);
-}
-
-/** Key results whose TBC target locks on or before a day. */
-async function provisionalDue(db, today) {
-  // pagination:complete the lock sweeps every provisional target due, once a day
-  const { rows } = await completeQuery(
-    db,
-    `SELECT kr.okr_key_result_id, kr.code::text AS code, o.department_id, o.performance_period_id
-       FROM okr_key_result kr
-       JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
-       JOIN performance_period p ON p.performance_period_id = o.performance_period_id
-      WHERE kr.target_provisional AND kr.target_locked_at IS NULL
-        AND p.targets_lock_on IS NOT NULL AND p.targets_lock_on <= $1::date
-      ORDER BY kr.okr_key_result_id`,
-    [today],
-    { label: "provisional targets due to lock", ceiling: 2000 },
-  );
-  return rows;
 }
 
 /** A key result found by its code or a former one, in a quarter (the importers). */
@@ -1139,7 +1121,6 @@ module.exports = {
   setLinks,
   objectiveCodes,
   keyResultCodes,
-  provisionalDue,
   keyResultByCode,
   addAlias,
   listChanges,

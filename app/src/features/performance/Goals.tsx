@@ -4,13 +4,13 @@
  * company's and each function's objectives with their key results, added, edited and deleted while their
  * plan is draft, returned, unbound or awaiting approval (what is added joins the plan sent); the function's
  * plan and its approval; Waiting On You, the plan stages and target changes the reader decides
- * (./Approvals); Report Month for the head, Confirm Score for the CEO, Set Target on a TBC target before
- * its lock date and Change Target after it; Set Up Quarter and Edit Quarter (./Quarter) for whoever runs
- * the cycle. ⌘K opens a goal (?goal=), an objective (?objective=) and a key result (?id=). Each person
- * reads their own department's tree and what is shared with them; the CEO and Management the whole of it
- * (§6.23), and the CEO shares a goal and Management an objective (./Share, §6.24). New Goal and Report Month
- * are offered only to a reader who may act on a function or the company (useSettableFunctions), and Request
- * To Unbind takes New Goal's place where every plan in view is binding (not for the CEO).
+ * (./Approvals); Report Month for the head, Confirm Score for the CEO and Change Target on a binding key
+ * result; Set Up Quarter and Edit Quarter (./Quarter) for whoever runs the cycle. ⌘K opens a goal (?goal=),
+ * an objective (?objective=) and a key result (?id=). Each person reads their own department's tree and what
+ * is shared with them; the CEO and Management the whole of it (§6.23), and the CEO shares a goal and
+ * Management an objective (./Share, §6.24). New Goal and Report Month are offered only to a reader who may
+ * act on a function or the company (useSettableFunctions), and Request To Unbind takes New Goal's place where
+ * every plan in view is binding (not for the CEO).
  */
 import { useEffect, useRef, useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
@@ -42,7 +42,6 @@ import {
   formatMonth,
   FormError,
   FormFooter,
-  HelpTerm,
   IconButton,
   KeyValue,
   LoadingRows,
@@ -61,7 +60,7 @@ import {
   useModal,
 } from "@mycity/ui";
 import { useApprovalLinks, WaitingOnYou } from "./Approvals";
-import { KeyResultForm, KR_TYPES, SetTargetForm } from "./KeyResultForm";
+import { KeyResultForm, KR_TYPES } from "./KeyResultForm";
 import { QuarterWizard } from "./Quarter";
 import { ShareForm, shareLabel } from "./Share";
 import { band, bodySchema, fieldMessage, figureOf, krStatus, KR_STATUS_OPTIONS, monthChoices, planStatus, reportingMonth, sayRefusal, score, startMonth, useQuarter, useSettableFunctions } from "./shared";
@@ -72,8 +71,6 @@ type OrganisationalGoalRow = OrganisationalGoal;
 /** The help on the score figures (§10.1), in the quarter's own Good and Watch bands (§6.8). */
 const scoreHelp = ({ band_good: good, band_watch: watch }: PerformancePeriod["rules"]["key_results"]) =>
   `Scores run from 0 to 1. Good is ${good} or above; Watch ${watch} to ${good}; Recovery below ${watch} needs a recovery plan.`;
-/** The help on a TBC target (§10.1). */
-export const TBC_HELP = "A provisional target, locked on the quarter's lock date.";
 const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 
 export function Goals() {
@@ -315,14 +312,7 @@ function ObjectiveCard({ objective, onOpen }: { objective: Objective; onOpen: (k
           {
             key: "status",
             label: "Status",
-            render: (k) =>
-              k.target_provisional ? (
-                <HelpTerm help={TBC_HELP}>
-                  <StatusPill s={{ tone: "info", text: "TBC" }} />
-                </HelpTerm>
-              ) : (
-                <StatusPill s={krStatus(k.latest?.status)} />
-              ),
+            render: (k) => <StatusPill s={krStatus(k.latest?.status)} />,
           },
           { key: "score", label: "Score", align: "n", render: (k) => score(k.latest?.score) },
         ]}
@@ -640,12 +630,6 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
             "Target",
             <span key="t">
               {figure(k.target_value, k.target_text) ?? "–"}
-              {k.target_provisional && (
-                <>
-                  {" · "}
-                  <HelpTerm help={TBC_HELP}>TBC</HelpTerm>
-                </>
-              )}
               {was ? ` · Was ${figure(was.from_value, was.from_text) ?? "not set"}` : ""}
             </span>,
           ],
@@ -699,9 +683,6 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
       <FormFooter>
         <Button onClick={close}>Close</Button>
         {k.can_edit && <Button variant="danger" onClick={remove}>Delete Key Result</Button>}
-        {k.can_set_target && (
-          <Button onClick={() => modal.open({ title: "Set Target", body: () => <SetTargetForm keyResult={k} close={back} onSaved={reload} /> })}>Set Target</Button>
-        )}
         {k.can_change_target && (
           <Button onClick={() => modal.open({ title: "Change Target", body: () => <ChangeTargetForm keyResult={k} close={back} /> })}>Change Target</Button>
         )}
@@ -787,17 +768,15 @@ const prefill = (k: KeyResult, month: string): ReportRow => {
 
 /** Does this row ask for a recovery owner and date: by its status, or because its score falls under Watch (which the API refuses without them)? */
 function recoveryOf(k: KeyResult, r: ReportRow, watch: number): { shown: boolean; required: boolean } {
-  // The score the API proposes: none for a TBC target not yet locked; the actual against the target; else Done 1 and Missed 0.
+  // The score the API proposes: the actual against the target; else Done 1 and Missed 0.
   const proposed =
-    k.target_provisional && !k.target_locked_at
-      ? null
-      : k.measure === "numeric"
-        ? scoring.numericScore({ actual: r.actual_value || null, target: k.target_value, direction: k.direction ?? "higher" })
-        : r.status === "done"
-          ? 1
-          : r.status === "missed"
-            ? 0
-            : null;
+    k.measure === "numeric"
+      ? scoring.numericScore({ actual: r.actual_value || null, target: k.target_value, direction: k.direction ?? "higher" })
+      : r.status === "done"
+        ? 1
+        : r.status === "missed"
+          ? 0
+          : null;
   const required = proposed !== null && proposed < watch;
   return { shown: required || RECOVERY_STATUSES.has(r.status), required };
 }

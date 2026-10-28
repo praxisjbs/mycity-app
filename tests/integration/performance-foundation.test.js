@@ -147,14 +147,13 @@ describeDb("performance foundation against the real migrations", () => {
     });
 
     test("Q4 2026: named, ended and planned from its first day, carrying the code's rules", async () => {
-      const res = await as("ops").post("/performance/periods", { starts_on: "2026-10-01", targets_lock_on: "2026-10-31" });
+      const res = await as("ops").post("/performance/periods", { starts_on: "2026-10-01" });
       expect(res.status).toBe(201);
       expect(res.body).toMatchObject({
         name: "Q4 2026",
         starts_on: "2026-10-01",
         ends_on: "2026-12-31",
         plan_year_starts_on: "2026-01-01",
-        targets_lock_on: "2026-10-31",
         status: "planning",
         months: ["2026-10-01", "2026-11-01", "2026-12-01"],
       });
@@ -167,9 +166,9 @@ describeDb("performance foundation against the real migrations", () => {
 
     test("a day outside the quarter and a start that is not a quarter's are refused", async () => {
       expect((await as("ops").post("/performance/periods", { starts_on: "2026-11-01" })).status).toBe(422);
-      const res = await as("ops").patch(`/performance/periods/${ids.q4}`, { targets_lock_on: "2027-01-05" });
+      const res = await as("ops").patch(`/performance/periods/${ids.q4}`, { live_from: "2027-01-05" });
       expect(res.status).toBe(422);
-      expect(res.body.error.fields.targets_lock_on).toBeDefined();
+      expect(res.body.error.fields.live_from).toBeDefined();
     });
 
     test("rules that do not hold together are refused; a change to this quarter's rules is kept", async () => {

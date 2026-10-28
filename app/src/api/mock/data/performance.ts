@@ -29,7 +29,6 @@ export const PERIOD: PerformancePeriod = {
   starts_on: "2026-10-01",
   ends_on: "2026-12-31",
   plan_year_starts_on: "2026-01-01",
-  targets_lock_on: "2026-10-31",
   live_from: "2026-10-22",
   status: "active",
   rules: {
@@ -89,8 +88,6 @@ const kr = (
   baseline_text: null,
   target_value: target,
   target_text: null,
-  target_provisional: false,
-  target_locked_at: at(1, "00:15"),
   parts: null,
   starts_on: "2026-10-01",
   finishes_on: "2026-12-31",
