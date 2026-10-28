@@ -5,7 +5,7 @@
  * MyCity's own Q4 2026 plan, from the workbooks the client keeps (performance/), loaded the way a
  * person would load it, as the CEO:
  *
- *   quarter      Q4 2026 set up and made active, with the workbook's lock date (7 November)
+ *   quarter      Q4 2026 set up and made active
  *   goals        the year's organisational goals: the 2026 references the workbook phases
  *                (Read Me & Decisions: ₦2 billion plan-year revenue, 400,000 monthly active users,
  *                2,000 ticketed events) and on-time delivery, the company's sixth objective
@@ -37,7 +37,7 @@ const BOOKS = path.join(__dirname, "performance");
 /** The tables Home's forward rows filled that Performance's plan now owns. */
 const PLAN_TABLES = ["employee_target", "organisational_goal"];
 
-const QUARTER = { starts_on: "2026-10-01", targets_lock_on: "2026-11-07", live_from: "2026-10-22" };
+const QUARTER = { starts_on: "2026-10-01", live_from: "2026-10-22" };
 
 /** The year's organisational goals (A16: the CEO records them), given ORG-2026-01 to 04 in this order (§6.1). */
 const GOALS = [

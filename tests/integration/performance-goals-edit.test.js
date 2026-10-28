@@ -5,9 +5,9 @@
  *
  * Operations & People set up the next quarter while this one runs, with its own rules, each rule
  * checked on its field; the objectives and key results of a draft plan are edited and deleted by
- * whoever sets them, and nobody else, and not once the plan binds; a TBC target is set in place by
- * its owner or the head before its lock date, and only asked of the CEO after it; the CEO edits an
- * organisational goal and deletes one no company objective serves.
+ * whoever sets them, and nobody else, and not once the plan binds; a binding key result with no
+ * target yet is given one by asking the CEO, never in place; the CEO edits an organisational goal
+ * and deletes one no company objective serves.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/performance-goals-edit
  */
@@ -119,14 +119,14 @@ describeDb("performance goals set and changed on screen, against the real migrat
 
   test("Set Up Quarter: Q1 2027 is set up planning while Q4 2026 runs, with its own rules, each checked on its field", async () => {
     expect((await as("head").post("/performance/periods", { starts_on: "2026-10-01" })).status).toBe(403);
-    const q4 = await as("ops").post("/performance/periods", { starts_on: "2026-10-01", targets_lock_on: "2026-11-07", status: "active" });
+    const q4 = await as("ops").post("/performance/periods", { starts_on: "2026-10-01", status: "active" });
     expect(q4.status).toBe(201);
     expect(q4.body).toMatchObject({ name: "Q4 2026", ends_on: "2026-12-31", status: "active", rules: scoring.DEFAULT_RULES });
     ids.q4 = q4.body.performance_period_id;
 
     // The next quarter, set up in October with rules of its own.
     const rules = rulesWith({ bands: { exceeds: 0.85 }, sections: { results: 50, kpis: 30, accountability: 20 }, key_results: { band_watch: 0.45 } });
-    const q1 = await as("ops").post("/performance/periods", { starts_on: "2027-01-01", targets_lock_on: "2027-02-07", rules });
+    const q1 = await as("ops").post("/performance/periods", { starts_on: "2027-01-01", rules });
     expect(q1.status).toBe(201);
     expect(q1.body).toMatchObject({ name: "Q1 2027", status: "planning", plan_year_starts_on: "2027-01-01", months: ["2027-01-01", "2027-02-01", "2027-03-01"] });
     expect(q1.body.rules).toEqual(rules);
@@ -154,13 +154,13 @@ describeDb("performance goals set and changed on screen, against the real migrat
     const year = await as("ada").get("/performance/periods?plan_year=2027");
     expect(year.body.data.map((p) => p.name)).toEqual(["Q1 2027"]);
 
-    // Edit Quarter: its name, lock date and rules; the lock date stays inside the quarter.
+    // Edit Quarter: its name, first live day and rules; the first live day stays inside the quarter.
     const edited = await as("ops").patch(`/performance/periods/${ids.q1}`, { name: "Q1 2027 Plan", rules: rulesWith({ sections: { results: 70, kpis: 20, accountability: 10 } }) });
     expect(edited.status).toBe(200);
     expect(edited.body).toMatchObject({ name: "Q1 2027 Plan", rules: { sections: { results: 70, kpis: 20, accountability: 10 } } });
-    const outside = await as("ops").patch(`/performance/periods/${ids.q1}`, { targets_lock_on: "2026-12-01" });
+    const outside = await as("ops").patch(`/performance/periods/${ids.q1}`, { live_from: "2026-12-01" });
     expect(outside.status).toBe(422);
-    expect(outside.body.error.fields).toEqual({ targets_lock_on: ["Outside the quarter"] });
+    expect(outside.body.error.fields).toEqual({ live_from: ["Outside the quarter"] });
     // A quarter opened in October takes objectives at once.
     const early = await as("pm").post("/performance/objectives", { performance_period_id: ids.q1, title: "Plan the year's second half" });
     expect(early.status).toBe(201);
@@ -187,7 +187,6 @@ describeDb("performance goals set and changed on screen, against the real migrat
       baseline_text: "38,000 in Q3",
       target_value: "64000",
       target_text: "64,000 downloads",
-      target_provisional: true,
       starts_on: "2026-10-01",
       finishes_on: "2026-12-31",
       accountable_employee_id: emp("ada"),
@@ -196,7 +195,7 @@ describeDb("performance goals set and changed on screen, against the real migrat
       linked_company_key_result_ids: [ids.coKr],
     });
     expect(kr.status).toBe(201);
-    expect(kr.body).toMatchObject({ code: "BM-KR1.1", target_provisional: true, baseline_text: "38,000 in Q3", linked_company_key_results: [{ code: "CO-KR1.1" }] });
+    expect(kr.body).toMatchObject({ code: "BM-KR1.1", baseline_text: "38,000 in Q3", linked_company_key_results: [{ code: "CO-KR1.1" }] });
     ids.kr = kr.body.okr_key_result_id;
     const extra = await as("head").post("/performance/key-results", { okr_objective_id: ids.objective, statement: "Launch in two cities", measure: "dated" });
     ids.extra = extra.body.okr_key_result_id;
@@ -210,9 +209,9 @@ describeDb("performance goals set and changed on screen, against the real migrat
     expect((await as("other").get(`/performance/objectives/${ids.objective}`)).body).toMatchObject({ code: "BM-O1", can_edit: false });
     const detail = async (who) => {
       const body = (await as(who).get(`/performance/key-results/${ids.kr}`)).body;
-      return [body.can_edit, body.can_set_target, body.can_change_target];
+      return [body.can_edit, body.can_change_target];
     };
-    expect([await detail("head"), await detail("ada"), await detail("other")]).toEqual([[true, false, false], [false, false, false], [false, false, false]]);
+    expect([await detail("head"), await detail("ada"), await detail("other")]).toEqual([[true, false], [false, false], [false, false]]);
 
     // The pickers: the company's key results (Feeds) and the functions' (Scored From), 25 a page.
     const company = await as("head").get(`/performance/key-results?period_id=${ids.q4}&level=company`);
@@ -228,11 +227,10 @@ describeDb("performance goals set and changed on screen, against the real migrat
       baseline_text: "",
       co_accountable_employee_id: "",
       kr_type: "",
-      target_provisional: false,
       linked_company_key_result_ids: [],
     });
     expect(edited.status).toBe(200);
-    expect(edited.body).toMatchObject({ statement: "Grow app downloads to 64,000", unit: null, baseline_text: null, co_accountable: null, kr_type: null, target_provisional: false, linked_company_key_results: [] });
+    expect(edited.body).toMatchObject({ statement: "Grow app downloads to 64,000", unit: null, baseline_text: null, co_accountable: null, kr_type: null, linked_company_key_results: [] });
     const backwards = await as("head").patch(`/performance/key-results/${ids.kr}`, { starts_on: "2026-12-01", finishes_on: "2026-11-01" });
     expect(backwards.status).toBe(422);
     expect(backwards.body.error.fields).toHaveProperty("finishes_on");
@@ -270,50 +268,40 @@ describeDb("performance goals set and changed on screen, against the real migrat
     expect((await as("head").patch(`/performance/key-results/${ids.kr}`, { statement: "Again" })).body.error.code).toBe("KEY_RESULT_BINDING");
   });
 
-  test("Set Target: a TBC target is set in place before its lock date by its owner or the head; after it, the CEO is asked", async () => {
-    // A quarter whose lock date has not come, whatever day the suite runs.
-    const later = await as("ops").post("/performance/periods", { starts_on: "2099-01-01", targets_lock_on: "2099-03-31" });
+  test("a binding key result with no target yet is given one by asking the CEO, never in place", async () => {
+    const later = await as("ops").post("/performance/periods", { starts_on: "2099-01-01" });
     ids.later = later.body.performance_period_id;
     const o = await as("head").post("/performance/objectives", { performance_period_id: ids.later, department_id: ids.bm, title: "Reach every state" });
     const kr = await as("head").post("/performance/key-results", {
       okr_objective_id: o.body.okr_objective_id,
       statement: "Active partners per state",
-      target_provisional: true,
       unit: "partners",
       accountable_employee_id: emp("ada"),
     });
-    ids.tbc = kr.body.okr_key_result_id;
+    ids.untargeted = kr.body.okr_key_result_id;
+    expect(kr.body).toMatchObject({ target_value: null, target_text: null });
     await q("UPDATE performance_plan SET status = 'binding', binding_at = now() WHERE performance_period_id = $1 AND department_id = $2", [ids.later, ids.bm]);
     const flags = async (who) => {
-      const body = (await as(who).get(`/performance/key-results/${ids.tbc}`)).body;
-      return { edit: body.can_edit, set: body.can_set_target, change: body.can_change_target };
+      const body = (await as(who).get(`/performance/key-results/${ids.untargeted}`)).body;
+      return { edit: body.can_edit, change: body.can_change_target };
     };
-    expect(await flags("ada")).toEqual({ edit: false, set: true, change: false });
-    expect(await flags("head")).toEqual({ edit: false, set: true, change: false });
-    expect(await flags("other")).toEqual({ edit: false, set: false, change: false });
+    expect(await flags("ada")).toEqual({ edit: false, change: true });
+    expect(await flags("head")).toEqual({ edit: false, change: true });
+    expect(await flags("other")).toEqual({ edit: false, change: false });
 
-    // The owner sets it, then the head; it stays TBC until the lock date, and no approval opens.
-    const byOwner = await as("ada").patch(`/performance/key-results/${ids.tbc}`, { target_value: "12", target_text: "12 partners" });
-    expect(byOwner.status).toBe(200);
-    expect(byOwner.body).toMatchObject({ target_value: "12", target_text: "12 partners", target_provisional: true });
-    const byHead = await as("head").patch(`/performance/key-results/${ids.tbc}`, { target_value: "15", target_text: "" });
-    expect(byHead.body).toMatchObject({ target_value: "15", target_text: null, target_provisional: true });
-    expect(Number((await one("SELECT count(*) AS n FROM target_change WHERE okr_key_result_id = $1", [ids.tbc])).n)).toBe(0);
-    // Only the target, and only by them.
-    expect((await as("ada").patch(`/performance/key-results/${ids.tbc}`, { statement: "Other" })).body.error.code).toBe("KEY_RESULT_BINDING");
-    expect((await as("other").patch(`/performance/key-results/${ids.tbc}`, { target_value: "20" })).status).toBe(403);
-    // Before the lock date the CEO is not asked.
-    const asked = await as("head").post("/performance/target-changes", { okr_key_result_id: ids.tbc, to_value: "20", from_month: "2099-02-01", reason: "More states" });
-    expect(asked.status).toBe(409);
-    expect(asked.body.error.code).toBe("TARGET_TBC");
+    // Nobody sets the target in place: the plan is binding.
+    for (const who of ["ada", "head"]) {
+      const res = await as(who).patch(`/performance/key-results/${ids.untargeted}`, { target_value: "12", target_text: "12 partners" });
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("KEY_RESULT_BINDING");
+    }
+    expect(await one("SELECT target_value FROM okr_key_result WHERE okr_key_result_id = $1", [ids.untargeted])).toEqual({ target_value: null });
 
-    // Once the lock date has passed, Set Target is gone and Change Target is the way.
-    await q("UPDATE performance_period SET targets_lock_on = '2020-01-01' WHERE performance_period_id = $1", [ids.later]);
-    expect(await flags("ada")).toEqual({ edit: false, set: false, change: true });
-    expect((await as("ada").patch(`/performance/key-results/${ids.tbc}`, { target_value: "16" })).body.error.code).toBe("KEY_RESULT_BINDING");
-    const change = await as("head").post("/performance/target-changes", { okr_key_result_id: ids.tbc, to_value: "20", from_month: "2099-02-01", reason: "More states" });
+    // Change Target is the way: it opens an approval for the CEO, from a target that was not set.
+    const change = await as("head").post("/performance/target-changes", { okr_key_result_id: ids.untargeted, to_value: "20", from_month: "2099-02-01", reason: "First target" });
     expect(change.status).toBe(201);
-    expect(change.body).toMatchObject({ from_value: "15", to_value: "20", status: "pending" });
+    expect(change.body).toMatchObject({ from_value: null, from_text: null, to_value: "20", status: "pending" });
+    expect((await as("ada").post("/performance/target-changes", { okr_key_result_id: ids.untargeted, to_value: "25", from_month: "2099-02-01", reason: "Again" })).body.error.code).toBe("CHANGE_PENDING");
   });
 
   test("organisational goals: the CEO edits a goal's title, description and quarterly targets, and deletes one no company objective serves", async () => {

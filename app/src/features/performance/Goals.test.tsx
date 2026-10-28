@@ -17,9 +17,9 @@ import Performance from "./index";
  * Performance · Goals, set and changed on screen, on the in-browser mock (docs/guides/performance.md
  * §3.1, §3.2, §3.5, §6.7, §10): Operations & People set up Q1 2027 from ⌘K in October, its rules copied
  * and changed, each checked on its field; the CEO edits and deletes a draft objective and key result
- * with every field of the form, each delete confirmed by name; the owner sets a TBC target in place
- * before its lock date and is offered Change Target after it; the CEO edits a goal's quarterly target
- * and deletes a goal; on a phone figures read as people write them.
+ * with every field of the form, each delete confirmed by name; a key result nobody has reported reads
+ * Awaiting Report and a binding one with no target is given it by Change Target; the CEO edits a goal's
+ * quarterly target and deletes a goal; on a phone figures read as people write them.
  */
 
 vi.mock("@/api/mock/core", async (importOriginal) => {
@@ -168,7 +168,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     const form = dialog();
     await chooseOption(within(form).getByLabelText("What"), "Key Result");
     await settled();
-    const target = /^Target(?! in Words| to be)/;
+    const target = /^Target(?! in Words)/;
     const measure = (name: string) => fireEvent.click(within(form).getByRole("radio", { name }));
 
     // Numeric asks for the figure, its unit and, behind More, which way is better.
@@ -178,7 +178,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     type(form, target, "7000");
     type(form, /^Unit/, "users");
 
-    // Yes or No and Dated have no figure to reach: the words, TBC, finish and owner remain.
+    // Yes or No and Dated have no figure to reach: the words, finish and owner remain.
     for (const name of ["Yes or No", "Dated"]) {
       measure(name);
       await settled();
@@ -186,7 +186,7 @@ describe("Performance · Goals, set and changed on screen", () => {
       expect(within(form).queryByLabelText(/^Unit/)).toBeNull();
       expect(within(form).queryByText("Direction")).toBeNull();
       expect(within(form).getByLabelText(/^Target in Words/)).toBeTruthy();
-      expect(within(form).getByRole("checkbox", { name: "Target to be confirmed" })).toBeTruthy();
+      expect(within(form).queryByRole("checkbox")).toBeNull();
       expect(within(form).getByLabelText(/^Finish/)).toBeTruthy();
       expect(within(form).getByLabelText(/^Baseline/)).toBeTruthy();
     }
@@ -484,15 +484,15 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(within(form).queryByLabelText(/^Feeds/)).toBeNull();
     expect(within(form).getByLabelText(/^Baseline/).closest("[hidden]")).not.toBeNull();
     type(form, /^Target in Words/, "64,000 monthly users");
-    fireEvent.click(within(form).getByRole("checkbox", { name: "Target to be confirmed" }));
+    expect(within(form).queryByText("TBC")).toBeNull();
     await press(form, "More");
     expect(within(form).getByText("Scored From")).toBeTruthy();
     type(form, /^Baseline/, "38,000 in Q3");
     type(form, /^Owner Note/, "CEO with interim finance owner");
     expect(copyProblems()).toEqual([]);
     await press(form, "Save Key Result");
-    const saved = (await api.call("GET /api/v1/performance/key-results/:id", { params: { id: made.kr! } })) as { target_text: string; target_provisional: boolean; baseline_text: string; accountable_note: string };
-    expect(saved).toMatchObject({ target_text: "64,000 monthly users", target_provisional: true, baseline_text: "38,000 in Q3", accountable_note: "CEO with interim finance owner" });
+    const saved = (await api.call("GET /api/v1/performance/key-results/:id", { params: { id: made.kr! } })) as { target_text: string; baseline_text: string; accountable_note: string };
+    expect(saved).toMatchObject({ target_text: "64,000 monthly users", baseline_text: "38,000 in Q3", accountable_note: "CEO with interim finance owner" });
 
     // Delete Key Result asks once, naming it; Cancel keeps it.
     panel = dialog();
@@ -537,36 +537,26 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(refs.data.map((r) => r.code)).toContain("CO-KR1.1");
   }, 60000);
 
-  it("the owner sets a TBC target in place before its lock date; after it, Change Target is the way", async () => {
+  it("a key result nobody has reported reads Awaiting Report, never TBC; a binding one with no target is given it by Change Target", async () => {
     const k = OBJECTIVES.flatMap((o) => o.key_results).find((x) => x.code === "BM-KR2.1")!;
-    const was = { provisional: k.target_provisional, locked: k.target_locked_at, value: k.target_value };
-    k.target_provisional = true;
-    k.target_locked_at = null;
+    const was = { latest: k.latest, value: k.target_value, text: k.target_text };
+    Object.assign(k, { latest: null, target_value: null, target_text: null });
     try {
       await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+      const row = screen.getByText("BM-KR2.1").closest("tr")!;
+      expect(within(row).getByText("Awaiting Report")).toBeTruthy();
+      expect(screen.queryByText("TBC")).toBeNull();
       fireEvent.click(screen.getByText("BM-KR2.1"));
       await settled();
-      let panel = dialog();
-      expect(within(panel).queryByRole("button", { name: "Change Target" })).toBeNull();
-      await press(panel, "Set Target");
-      type(dialog(), /^Target$/, "15");
-      await press(dialog(), "Set Target");
-      const after = (await api.call("GET /api/v1/performance/key-results/:id", { params: { id: k.okr_key_result_id } })) as { target_value: string; target_provisional: boolean; can_set_target: boolean };
-      expect(after).toMatchObject({ target_value: "15", target_provisional: true, can_set_target: true });
-      expect(await status(api.call("POST /api/v1/performance/target-changes", { body: { okr_key_result_id: k.okr_key_result_id, to_value: "20", from_month: "2026-11-01", reason: "More" } }))).toBe(409);
-      cleanup();
-
-      // The lock date has passed.
-      vi.setSystemTime(new Date("2026-11-02T08:30:00Z"));
-      await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
-      fireEvent.click(screen.getByText("BM-KR2.1"));
-      await settled();
-      panel = dialog();
+      const panel = dialog();
+      expect(within(panel).queryByText("TBC")).toBeNull();
       expect(within(panel).queryByRole("button", { name: "Set Target" })).toBeNull();
       expect(within(panel).getByRole("button", { name: "Change Target" })).toBeTruthy();
+      // The target is not set in place: the plan is binding.
+      expect(await status(api.call("PATCH /api/v1/performance/key-results/:id", { params: { id: k.okr_key_result_id }, body: { target_value: "15" } }))).toBe(409);
+      expect(k.target_value).toBeNull();
     } finally {
-      vi.setSystemTime(new Date("2026-10-23T08:30:00Z"));
-      Object.assign(k, { target_provisional: was.provisional, target_locked_at: was.locked, target_value: was.value });
+      Object.assign(k, { latest: was.latest, target_value: was.value, target_text: was.text });
     }
   }, 60000);
 

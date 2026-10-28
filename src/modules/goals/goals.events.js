@@ -15,7 +15,6 @@ const { loginsOf } = require("../tasks/tasks.events");
 const EVENTS = defineEvents("performance", {
   "period.created": { summary: "A quarter was set up, with the last quarter's rules" },
   "period.changed": { summary: "A quarter's dates, rules or status were changed" },
-  "period.targets_locked": { summary: "A quarter's provisional targets locked on its lock date" },
   "organisational_goal.saved": { summary: "An organisational goal was recorded or changed" },
   "organisational_goal.deleted": { summary: "An organisational goal no company objective served was removed" },
   "objective.saved": { summary: "An objective was set or changed" },

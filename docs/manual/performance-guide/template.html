@@ -287,7 +287,6 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
             <tr><td class="k">OKR</td><td>Objectives and Key Results: each objective is a goal, and its key results are the measurable outcomes that show it was reached</td></tr>
             <tr><td class="k">KR</td><td>Key Result, for example BM-KR1.3</td></tr>
             <tr><td class="k">KPI</td><td>Key Performance Indicator: a function's routine measure, Met or Not Met each month</td></tr>
-            <tr><td class="k">TBC</td><td>To Be Confirmed: a provisional target, given its figure before the quarter's lock date</td></tr>
             <tr><td class="k">PMS</td><td>Performance Management System: the Performance module as a whole</td></tr>
             <tr><td class="k">PIP</td><td>Performance Improvement Plan: 30 days of agreed improvement after a Below rating</td></tr>
             <tr><td class="k">HR</td><td>Human Resources; here, the Operations &amp; People team</td></tr>
@@ -315,7 +314,6 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
             <tr><td class="k">Quarter Plan</td><td>A function's objectives, key results and scorecards, approved as one; binding once the CEO approves</td></tr>
             <tr><td class="k">Waiting On You</td><td>The requests waiting on your decision: on Goals, on Scorecards › Commitments and on Reviews</td></tr>
             <tr><td class="k">Feeds · Rolls Up To</td><td>The company key result a function key result serves, and its chain up to a company objective</td></tr>
-            <tr><td class="k">Set Target</td><td>Gives a TBC target its figure before the lock date, with no approval</td></tr>
             <tr><td class="k">Change Target</td><td>Asks the CEO to change a binding target; once approved, Was shows the old figure</td></tr>
             <tr><td class="k">Proposed · Confirmed</td><td>The score worked out from the month's report, and the score the CEO confirms, which counts</td></tr>
             <tr><td class="k">Good · Watch · Recovery</td><td>Score bands: 0.70 and above; 0.40 to 0.70; below 0.40, which needs a recovery owner and date</td></tr>
@@ -364,7 +362,6 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
         <tr><td class="k"></td><td>Each function reports its key results and KPIs; the CEO confirms the scores</td><td>Function heads · CEO</td><td>3rd business day</td></tr>
         <tr><td class="k"></td><td>The review: reviewer, then second level, then Operations &amp; People close it</td><td>Reviewer · their manager · HR</td><td>5th · 7th · 10th business day</td></tr>
         <tr><td class="k">Each week</td><td>Tasks; My Week shows done, planned and blocked, with one line of Support Needed</td><td>Everyone</td><td>As the week runs</td></tr>
-        <tr><td class="k">Lock date</td><td>Provisional (TBC) targets lock</td><td>Automatic</td><td>7 November for Q4</td></tr>
       </tbody>
     </table>
     <p class="small" style="margin-top:1.4mm">Business days are Monday to Friday, not public holidays.</p>
@@ -375,7 +372,7 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
         <tr><td class="k">Objective</td><td>What a function or the company sets out to achieve this quarter (BM-O1)</td><td class="k">Line</td><td>One row of a scorecard, with its target, weight and source</td></tr>
         <tr><td class="k">Key result</td><td>A measurable result under an objective (BM-KR1.3)</td><td class="k">Auto</td><td>A line the system scores itself; the reviewer may change it with a reason</td></tr>
         <tr><td class="k">KPI</td><td>A function's operational measure, Met or Not Met each month (BM-K02)</td><td class="k">Commitment</td><td>A task promised for the month, with acceptance criteria and a fixed original date</td></tr>
-        <tr><td class="k">TBC</td><td>A provisional target: Set Target until the quarter's lock date</td><td class="k">Check-in</td><td>Each person's monthly report on their own lines</td></tr>
+        <tr><td class="k">Awaiting Report</td><td>A key result nobody has reported yet: its first month is still to come</td><td class="k">Check-in</td><td>Each person's monthly report on their own lines</td></tr>
         <tr><td class="k">Scored From</td><td>A company key result that takes its figures from one function key result</td><td class="k">Review</td><td>The reviewer's scores, approved by second level and closed by HR</td></tr>
         <tr><td class="k">Binding</td><td>Approved by the CEO: targets change only through Change Target</td><td class="k">Score to date</td><td>The weighted score of the lines scored so far, from 0 to 1</td></tr>
       </tbody>
@@ -392,7 +389,7 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
     <table class="t screens">
       <thead><tr><th style="width:36mm">Screen</th><th style="width:40mm">Where</th><th style="width:38mm">Who</th><th>What happens there</th></tr></thead>
       <tbody>
-        <tr><td class="k">Performance · Goals</td><td class="path">Performance › Goals</td><td>Everyone reads; heads, Management and the CEO set</td><td>The OKR tree and its edits, Manage Quarters, Plan Approval (Send Plan), Waiting On You, Report Month, Confirm Score, Set Target, Change Target</td></tr>
+        <tr><td class="k">Performance · Goals</td><td class="path">Performance › Goals</td><td>Everyone reads; heads, Management and the CEO set</td><td>The OKR tree and its edits, Manage Quarters, Plan Approval (Send Plan), Waiting On You, Report Month, Confirm Score, Change Target</td></tr>
         <tr><td class="k">Performance · Scorecards</td><td class="path">Performance › Scorecards</td><td>Managers, HR, CEO; staff see their own</td><td>Every scorecard, its sections and lines; New Scorecard; Send Scorecard; Agree Scorecard; Change Reviewer; a line's Change Target</td></tr>
         <tr><td class="k">… Commitments view</td><td class="path">Scorecards › Commitments</td><td>Reviewers, heads, CEO</td><td>The month's commitments and their states; Approve Month; Export Report</td></tr>
         <tr><td class="k">Performance · KPIs</td><td class="path">Performance › KPIs</td><td>Everyone reads; heads edit their own</td><td>Each function's KPIs with formula, target and source; Record Actual</td></tr>
@@ -430,7 +427,7 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
       <tbody>
         <tr><td class="k">Employee</td><td>Their own scorecard, check-ins, reviews and commitments; the whole OKR tree and every KPI</td><td>Agree Scorecard, Start Check-In, Send Commitments, Support Needed</td></tr>
         <tr><td class="k">Line manager</td><td>Their reporting line</td><td>Drafts scorecards, scores reviews, asks the dotted-line manager for input, approves their people's commitments, is second level for the reviewers under them</td></tr>
-        <tr><td class="k">Head of department</td><td>Their function</td><td>All a manager does, plus the function's objectives, key results and KPIs, Report Month, Set Target and Send Plan</td></tr>
+        <tr><td class="k">Head of department</td><td>Their function</td><td>All a manager does, plus the function's objectives, key results and KPIs, Report Month and Send Plan</td></tr>
         <tr><td class="k">Management · Program Manager</td><td>Everyone</td><td>The company's objectives and key results; approves the plan first for the heads they manage</td></tr>
         <tr><td class="k">Operations &amp; People</td><td>Everyone</td><td>Approves the plan second; closes reviews; changes a reviewer; Mark Conduct; PIPs; probation outcomes; imports; sets up quarters; opens and closes rounds; withdraws a leaver's review</td></tr>
         <tr><td class="k">CEO</td><td>Everyone</td><td>Organisational goals; approves the plan last and every target change; Confirm Score; the heads' commitments; Analytics</td></tr>
@@ -469,7 +466,7 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
           <li><b>The figures</b>: Company Score (the company's, for the quarter), then On Track, In Recovery and Awaiting Report for the function picked in <span class="ui">Function</span>.</li>
           <li><b>Organisational Goals</b>: the year's goals, recorded by the CEO with <span class="ui">New Goal</span> and changed with <span class="ui">Edit Goal</span>.</li>
           <li><b>Codes</b> follow the workbook: CO for the company, then TBO, BM, PG and PC for the functions. They freeze when the plan binds.</li>
-          <li><span class="pill plan">TBC</span> a provisional target. Until the quarter's lock date its owner or the head sets it with <span class="ui">Set Target</span>, no approval needed; after that, Change Target.</li>
+          <li><span class="pill grey">Awaiting Report</span> a key result whose first month has not been reported. After that it shows the status of the month last reported. A binding target changes only with <span class="ui">Change Target</span>.</li>
           <li><b>Editing</b>: while the plan is draft or returned, an objective has <span class="ui">Edit Objective</span> and <span class="ui">Delete Objective</span>, a key result <span class="ui">Edit Key Result</span> and <span class="ui">Delete Key Result</span>. A key result's <b>Feeds</b> names the company key results it serves.</li>
           <li><b>Scored From</b>: a company key result wholly delivered by one function key result takes its figures, so nothing is entered twice.</li>
         </ul>
@@ -510,9 +507,9 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
       </div>
     </div>
     <div class="g2" style="margin-top:3mm">
-      <div class="note warn"><h4>Targets written in words</h4>Most Q4 key results state their target in words ("At least 64,000 new users"). Until a figure is set, Report Month keeps the actual and the update but cannot score them. On a TBC key result its owner or head sets the figure with <b>Set Target</b> until the lock date, no approval needed. Any other figure goes through <b>Change Target</b>, which the CEO approves on <span class="path">Goals › Waiting On You</span>. Dated key results need no figure: Done by the finish date scores 1.</div>
+      <div class="note warn"><h4>Targets written in words</h4>Most Q4 key results state their target in words ("At least 64,000 new users"). Until a figure is set, Report Month keeps the actual and the update but cannot score them. A figure on a binding key result goes through <b>Change Target</b>, which the CEO approves on <span class="path">Goals › Waiting On You</span>. Dated key results need no figure: Done by the finish date scores 1.</div>
       <div class="try"><div class="hd"><span class="tag">Try it</span><span class="role">Head of department, then the CEO</span></div>
-        <ol><li><span class="ui">Report Month</span>: a dated key result, Status Done, with an update.</li><li>As the CEO, open it › <span class="ui">Confirm Score</span>.</li><li>On a key result with a target in words: <span class="ui">Set Target</span> if it is TBC, otherwise <span class="ui">Change Target</span> (figure, from month, reason).</li><li>As the CEO, <span class="path">Goals › Waiting On You</span> › the change › <span class="ui">Approve Change</span>.</li></ol>
+        <ol><li><span class="ui">Report Month</span>: a dated key result, Status Done, with an update.</li><li>As the CEO, open it › <span class="ui">Confirm Score</span>.</li><li>On a key result with a target in words: <span class="ui">Change Target</span> (figure, from month, reason).</li><li>As the CEO, <span class="path">Goals › Waiting On You</span> › the change › <span class="ui">Approve Change</span>.</li></ol>
         <div class="see"><b>You should see</b> the dated key result scored 1.00, Good, then confirmed; the function's score on Analytics; the new target, with Was showing the old one.</div>
       </div>
     </div>
@@ -565,7 +562,7 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
     <div class="g2 wide-l">
       <div>
         <ol class="steps">
-          <li><b>Operations &amp; People set up the quarter</b>: <span class="path">Goals › Manage Quarters › Set Up Quarter</span>, its dates, lock date and scoring rules, starting from the last quarter's.</li>
+          <li><b>Operations &amp; People set up the quarter</b>: <span class="path">Goals › Manage Quarters › Set Up Quarter</span>, its dates and scoring rules, starting from the last quarter's.</li>
           <li><b>The CEO records the year's goals</b>: <span class="path">Goals › New Goal › Organisational Goal</span>.</li>
           <li><b>Management set the company's objectives and key results; each head sets the function's</b> (<span class="ui">New Goal</span> › Objective or Key Result; Edit and Delete while the plan is draft or returned). A key result's Feeds names the company key results it serves.</li>
           <li><b>Managers draft scorecards</b>: <span class="path">Scorecards › New Scorecard</span>, pick the <span class="ui">Employee</span> and <span class="ui">Lines From</span> (Last Quarter or Start Blank), then <span class="ui">Edit Lines</span>. Never one's own.</li>
@@ -581,7 +578,7 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
       </div>
       <div class="stack">
         <figure class="shot"><img src="{{img:new-scorecard}}" alt="New Scorecard"><figcaption><b>New Scorecard</b>Pick the person and where the lines come from.</figcaption></figure>
-        <figure class="shot"><img src="{{img:quarter-setup}}" alt="Set Up Quarter"><figcaption><b>Set Up Quarter</b>Dates and lock date first, then the scoring rules, copied from the last quarter.</figcaption></figure>
+        <figure class="shot"><img src="{{img:quarter-setup}}" alt="Set Up Quarter"><figcaption><b>Set Up Quarter</b>Dates first, then the scoring rules, copied from the last quarter.</figcaption></figure>
         <figure class="shot"><img src="{{img:plan-sheet}}" alt="A quarter plan waiting for the CEO"><figcaption><b>Quarter Plan</b>Opened from Goals › Waiting On You: who sent it, the stages so far, Request Changes or Approve Plan.</figcaption></figure>
       </div>
     </div>
@@ -795,7 +792,7 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
     <figure class="shot" style="margin-top:3mm"><img src="{{img:my-reviews}}" alt="My Reviews with a closed month"><figcaption><b>My Reviews</b>October closed: score 1.00, Exceeds. Cautions are issued in Queries &amp; Sanctions (Milestone 3).</figcaption></figure>
     <h2 class="sec"><span class="n">13.4</span>Questions people ask</h2>
     <div class="qa">
-      <div><b>"My target is wrong."</b>Its owner or head sends Change Target on the key result (Set Target while it is TBC); a line's reviewer or head sends it on the line. Once approved, Was shows the old figure.</div>
+      <div><b>"My target is wrong."</b>Its owner or head sends Change Target on the key result; a line's reviewer or head sends it on the line. Once approved, Was shows the old figure.</div>
       <div><b>"I do not agree with my scorecard."</b>Press Disagree With Reason on My Performance. It clears both agreements and goes back to your reviewer.</div>
       <div><b>"My commitment's date moved."</b>Rescope Commitment with a reason. The original date stays on record; once approved, it leaves the on-time count.</div>
       <div><b>"Why can my reviewer not see my check-in?"</b>Self first: your reviewer opens it only after you press Submit Check-In.</div>
@@ -845,7 +842,7 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
       <tbody>
         <tr><td>1</td><td class="k">CEO</td><td>Goals › Function: Branding &amp; Marketing</td><td>The figures, Plan Approval Binding, the objectives</td><td class="c"><span class="box"></span></td></tr>
         <tr><td>2</td><td class="k">CEO</td><td>Open BM-KR1.3</td><td>Target, This Month, Initiatives, Rolls Up To</td><td class="c"><span class="box"></span></td></tr>
-        <tr><td>3</td><td class="k">Head</td><td>Change Target on a key result in words, not TBC</td><td>On the CEO's Waiting On You</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>3</td><td class="k">Head</td><td>Change Target on a key result in words</td><td>On the CEO's Waiting On You</td><td class="c"><span class="box"></span></td></tr>
         <tr><td>4</td><td class="k">Head</td><td>Report Month: a dated key result, Status Done, an update</td><td>Score 1.00, band Good</td><td class="c"><span class="box"></span></td></tr>
         <tr><td>5</td><td class="k">CEO</td><td>Open it › Confirm Score</td><td>Confirmed; the function's score on Analytics</td><td class="c"><span class="box"></span></td></tr>
         <tr><td>6</td><td class="k">Head</td><td>KPIs › a KPI › Record Actual: Met</td><td>The month under Months; Met Last Month rises</td><td class="c"><span class="box"></span></td></tr>
@@ -869,7 +866,7 @@ table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
       <tbody>
         <tr><td class="k">Every employee</td><td>My Performance and Agree Scorecard; Start Check-In; commitments on Tasks; My Week and Support Needed</td><td>10 to 13</td></tr>
         <tr><td class="k">Line managers</td><td>Scorecards and New Scorecard; Approve Month; the review: Save Scores, Submit Review; Team This Week</td><td>8 to 11, 14</td></tr>
-        <tr><td class="k">Heads of department</td><td>Goals, Report Month, KPIs and Record Actual, Send Plan, Set Target, Change Target</td><td>6 to 9</td></tr>
+        <tr><td class="k">Heads of department</td><td>Goals, Report Month, KPIs and Record Actual, Send Plan, Change Target</td><td>6 to 9</td></tr>
         <tr><td class="k">Operations &amp; People</td><td>Set Up Quarter, Open and Close Round, Close Review, Withdraw Review, Mark Conduct, PIPs, Change Reviewer, Imports</td><td>9, 14, 15</td></tr>
         <tr><td class="k">CEO and Management</td><td>Organisational goals, Confirm Score, Approve Month for the heads, Analytics and Home</td><td>6, 7, 9, 10, 16</td></tr>
       </tbody>

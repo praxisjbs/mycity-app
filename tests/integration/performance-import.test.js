@@ -73,14 +73,14 @@ describeDb("performance importers on MyCity's workbooks", () => {
       is_ceo: true,
     };
     ceo.is_ceo = true;
-    const period = await goals.createPeriod(ceo, { starts_on: "2026-10-01", targets_lock_on: "2026-11-07", live_from: "2026-10-22" });
+    const period = await goals.createPeriod(ceo, { starts_on: "2026-10-01", live_from: "2026-10-22" });
     periodId = period.performance_period_id;
     await q("UPDATE performance_period SET status = 'active' WHERE performance_period_id = $1", [periodId]);
   }, 180000);
 
   afterAll(() => pool.end());
 
-  test("the OKR workbook: every key result, its function, owner, links, TBC and former IDs; plans binding", async () => {
+  test("the OKR workbook: every key result, its function, owner, links and former IDs; plans binding", async () => {
     const run = await upload("okr_workbook", "q4-2026-okrs.xlsx");
     expect(run.previewed.rows).toBe(51);
     expect(run.problems).toEqual([]);
@@ -104,7 +104,7 @@ describeDb("performance importers on MyCity's workbooks", () => {
         [periodId, code],
       );
     const bm11 = await kr("BM-KR1.1");
-    expect(bm11).toMatchObject({ target_provisional: true, kr_type: "outcome", measure: "numeric", first_name: "Chinyere" });
+    expect(bm11).toMatchObject({ kr_type: "outcome", measure: "numeric", first_name: "Chinyere" });
     const co11 = await kr("CO-KR1.1");
     expect(co11).toMatchObject({ kr_type: "diagnostic_gate", measure: "dated", department_id: null });
     expect(co11.accountable_employee_id).toBe(ceo.employee_id);

@@ -39,7 +39,7 @@ const isAmended = (status) => AMENDED.includes(status);
 async function periodOf(db, periodId) {
   const p = await one(
     db,
-    `SELECT performance_period_id, name, starts_on, ends_on, plan_year_starts_on, targets_lock_on, live_from,
+    `SELECT performance_period_id, name, starts_on, ends_on, plan_year_starts_on, live_from,
             status, rules FROM performance_period WHERE performance_period_id = $1`,
     [periodId],
   );

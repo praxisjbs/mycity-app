@@ -38,7 +38,7 @@ const clearable = (schema) =>
     .transform((v) => (v === "" ? null : v));
 const clearableText = (max) => clearable(z.string().trim().max(max));
 
-/** A quarter: its dates, its lock date, the first day the system ran it, and its rules. */
+/** A quarter: its dates, the first day the system ran it, and its rules. */
 const PerformancePeriod = z
   .object({
     performance_period_id: uuid,
@@ -46,7 +46,6 @@ const PerformancePeriod = z
     starts_on: isoDate,
     ends_on: isoDate,
     plan_year_starts_on: isoDate,
-    targets_lock_on: isoDate.nullable(),
     live_from: isoDate.nullable(),
     status: PeriodStatus,
     rules: ScoringRules,
@@ -78,18 +77,16 @@ const PeriodCreate = z
     starts_on: isoDate.refine((v) => /-(01|04|07|10)-01$/.test(v), "Pick a quarter start"),
     name: optionalText(40),
     plan_year_starts_on: blank(isoDate),
-    targets_lock_on: blank(isoDate),
     live_from: blank(isoDate),
     status: z.enum(["planning", "active"]).optional(),
     rules: ScoringRules.optional(),
   })
   .strict();
 
-/** PATCH /performance/periods/:id: the name, the lock date, the first live day, the rules, the status. */
+/** PATCH /performance/periods/:id: the name, the first live day, the rules, the status. */
 const PeriodEdit = z
   .object({
     name: text(40),
-    targets_lock_on: isoDate.nullable(),
     live_from: isoDate.nullable(),
     rules: ScoringRules,
     status: PeriodStatus,
@@ -283,8 +280,6 @@ const KeyResult = z
     baseline_text: z.string().nullable(),
     target_value: Quantity.nullable(),
     target_text: z.string().nullable(),
-    target_provisional: z.boolean(),
-    target_locked_at: isoDateTime.nullable(),
     parts: z.array(KeyResultPart).nullable(),
     starts_on: isoDate.nullable(),
     finishes_on: isoDate.nullable(),
@@ -384,7 +379,6 @@ const KEY_RESULT_FIELDS = {
   baseline_text: optionalText(1000),
   target_value: blank(Quantity),
   target_text: optionalText(1000),
-  target_provisional: z.boolean().default(false),
   parts: z.array(KeyResultPart).max(10).optional(),
   starts_on: blank(isoDate),
   finishes_on: blank(isoDate),
@@ -408,7 +402,7 @@ const KeyResultCreate = z
 /**
  * PATCH /performance/key-results/:id: every field while the plan is a draft or returned (an empty
  * one clears it), and unbound too, except a reported key result's target, measure, direction, unit
- * and parts (§6.22); once binding, only an open TBC target, by its owner or the function's head (§6.7).
+ * and parts (§6.22); once binding, a key result changes only through a target change (§6.7).
  */
 const KeyResultEdit = z
   .object({
@@ -420,7 +414,6 @@ const KeyResultEdit = z
     baseline_text: clearableText(1000),
     target_value: clearable(Quantity),
     target_text: clearableText(1000),
-    target_provisional: z.boolean(),
     parts: z.array(KeyResultPart).max(10).nullable(),
     starts_on: clearable(isoDate),
     finishes_on: clearable(isoDate),
@@ -520,8 +513,6 @@ const KeyResultDetail = KeyResult.extend({
   can_change_target: z.boolean(),
   /** The reader may edit or delete it: its plan is draft or returned, and they set its goals. */
   can_edit: z.boolean(),
-  /** The reader may set its TBC target in place: before the lock date, its owner or the function's head. */
-  can_set_target: z.boolean(),
 }).strict();
 
 /* ------------------------------------------------------------------ *
@@ -1084,7 +1075,6 @@ const TABLES = {
       trace: "what it rolls up to",
       can_change_target: "the reader may ask to change its target now (goals.authority)",
       can_edit: "the reader may change it now: a draft, returned or unbound plan, and goals.authority",
-      can_set_target: "the reader may set its TBC target in place before the lock date (§6.7)",
     },
   },
   KeyResultReport: {
