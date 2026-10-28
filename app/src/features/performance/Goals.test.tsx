@@ -176,6 +176,11 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(within(form).getByLabelText(target)).toBeTruthy();
     expect(within(form).getByLabelText(/^Unit/)).toBeTruthy();
     expect(within(form).getByText("Direction")).toBeTruthy();
+
+    // The form reads in order: Unit under Target, Start above Finish, Type above Owner, all open (JBS Praxis, 28/10/2026).
+    const order = [target, /^Unit/, /^Target in Words/, /^Start/, /^Finish/, /^Type/, /^Owner(?! Note)/].map((name) => within(form).getAllByLabelText(name)[0]!);
+    order.slice(1).forEach((field, i) => expect(order[i]!.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
+
     type(form, target, "7000");
     type(form, /^Unit/, "users");
 
