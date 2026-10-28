@@ -274,6 +274,73 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(bad.status).toBe(422);
       expect((await as("ops").put(`/letter-templates/${t.letter_template_id}/body`, { body_html: "<p>Too short</p>" })).status).toBe(422);
     });
+
+    test("a shipped letter opens in the editor with MyCity's wording, its names intact, and saving keeps it", async () => {
+      const caution = await byKey("ops", "caution-letter");
+      const opened = (await as("ops").get(`/letter-templates/${caution.letter_template_id}`)).body;
+      expect(opened).toMatchObject({ format: "html", version: 0, in_use: false });
+      expect(opened.body_html).toContain("<p>Dear {{ employee.first_name }},</p>");
+      expect(opened.body_html).toContain("advised to improve immediately");
+      expect(opened.body_html).not.toContain("<style");
+      // Saved as it opened: version 1, the same words, now Markdown.
+      const saved = await as("ops").put(`/letter-templates/${caution.letter_template_id}/body`, { body_html: opened.body_html });
+      expect(saved.status).toBe(200);
+      expect(saved.body).toMatchObject({ version: 1, format: "markdown" });
+      expect(saved.body.body).toContain("Dear {{ employee.first_name }},");
+    });
+
+    test("My Signature is saved once through the vault and read back as the pad opens it", async () => {
+      expect((await as("ops").get("/queries/my-signature")).body).toEqual({ signature: null, updated_at: null });
+      const saved = await as("ops").put("/queries/my-signature", { signature: SIGNATURE });
+      expect(saved.status).toBe(200);
+      expect(saved.body.signature).toMatch(/^data:image\/png;base64,/);
+      const kept = (await q("SELECT document_id FROM letter_signature WHERE user_id = $1", [people.ops.user.user_id])).rows;
+      expect(kept).toHaveLength(1);
+      // Saving again replaces it; anyone else sees only their own.
+      await as("ops").put("/queries/my-signature", { signature: SIGNATURE });
+      expect((await q("SELECT count(*)::int AS n FROM letter_signature")).rows[0].n).toBe(1);
+      expect((await as("manager").get("/queries/my-signature")).body.signature).toBeNull();
+      expect((await as("ops").put("/queries/my-signature", { signature: "not a png" })).status).toBe(422);
+    });
+
+    test("the preview is the real PDF, signed with the reader's saved signature; the deduction letter names its amount", async () => {
+      const caution = await byKey("ops", "caution-letter");
+      const pdf = await as("ops").get(`/letter-templates/${caution.letter_template_id}/preview.pdf?v=0-x`).buffer(true);
+      expect(pdf.status).toBe(200);
+      expect(pdf.headers["content-type"]).toBe("application/pdf");
+      expect(pdf.headers["content-disposition"]).toBe('inline; filename="Caution Letter.pdf"');
+      expect(pdf.body.subarray(0, 5).toString()).toBe("%PDF-");
+      const fine = await byKey("ops", "salary-deduction-letter");
+      const words = (await as("ops").get(`/letter-templates/${fine.letter_template_id}/preview`)).body.paragraphs.flat().map((r) => r.text).join("");
+      expect(words).toContain("₦5,000.00 will be deducted");
+    });
+
+    test("Save and Activate, Deactivate while unused, and Used For while nothing sends it", async () => {
+      const made = await as("ops").post("/letter-templates", {
+        name: "Hearing Notice",
+        purpose: "sanction",
+        status: "active",
+        body: "Dear {{ employee.first_name }}, you are invited to a hearing on query {{ query_number }}: {{ reason }}.",
+      });
+      expect(made.status).toBe(201);
+      expect(made.body).toMatchObject({ status: "active", in_use: false });
+      const id = made.body.letter_template_id;
+      const used = await as("ops").patch(`/letter-templates/${id}`, { name: "Hearing Notice Letter", purpose: "query" });
+      expect(used.body).toMatchObject({ name: "Hearing Notice Letter", purpose: "query" });
+      const off = await as("ops").post(`/letter-templates/${id}/deactivate`);
+      expect(off.body.status).toBe("draft");
+      expect((await as("manager").post(`/letter-templates/${id}/deactivate`)).status).toBe(403);
+
+      // The defaults never stop, and never change what they are for.
+      const ql = await byKey("ops", "query-letter");
+      const refused = await as("ops").post(`/letter-templates/${ql.letter_template_id}/deactivate`);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toMatchObject({ code: "TEMPLATE_IN_USE", message: "In use by every manual query" });
+      expect((await as("ops").patch(`/letter-templates/${ql.letter_template_id}`, { purpose: "sanction" })).status).toBe(409);
+      expect((await as("ops").get(`/letter-templates/${ql.letter_template_id}`)).body.in_use).toBe(true);
+      const audit = await q("SELECT event_key FROM event_log WHERE entity_id = $1 ORDER BY occurred_at", [id]);
+      expect(audit.rows.map((r) => r.event_key)).toEqual(["letter_template.created", "letter_template.activated", "letter_template.updated", "letter_template.deactivated"]);
+    });
   });
 
   /* ---------------------------------------------------------------- *
@@ -610,6 +677,10 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(html).toContain("The explanation does not account for the incident.");
       // Signed by the approver who let it stand (guide §6.4), with the signature they drew.
       expect(html).toContain('alt="Signature of Tunde Bakare"');
+      // Laid out as MyCity's own letters (§6.7): the addressee first, then the sign-off.
+      expect(html).toMatch(/lh-letter-to"><div>Zainab Lawal<\/div><div>Field Officer<\/div>/);
+      expect(html).toContain("Yours faithfully,");
+      expect(html).toMatch(/lh-sign-for">For: /);
       await documents.renderPending(docId, { db: pool });
       sent.length = 0;
       await drain();

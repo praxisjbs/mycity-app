@@ -41,6 +41,11 @@ route(router, "get", "/:id/preview",
   { params: c.common.IdParams, response: t.LetterPreview, summary: "A letter rendered with sample values" },
   requirePermission("queries", "view"), controller.preview);
 
+route(router, "get", "/:id/preview.pdf",
+  { params: c.common.IdParams, no_content: true,
+    summary: "The letter as the employee receives it: the real PDF, sample values, nothing stored" },
+  requirePermission("queries", "view"), controller.previewPdf);
+
 route(router, "post", "/",
   { body: t.LetterTemplateCreate, response: t.LetterTemplateDetail, summary: "Add a letter template" },
   requirePermission("queries", "create"), requireCapability("queries.configure"), controller.create);
@@ -54,5 +59,15 @@ route(router, "post", "/:id/activate",
   { params: c.common.IdParams, body: c.common.EmptyBody, response: t.LetterTemplateDetail,
     summary: "Make a letter available to send" },
   requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.activate);
+
+route(router, "post", "/:id/deactivate",
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: t.LetterTemplateDetail,
+    summary: "Take a letter nothing sends back to a draft" },
+  requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.deactivate);
+
+route(router, "patch", "/:id",
+  { params: c.common.IdParams, body: t.LetterTemplateUpdate, response: t.LetterTemplateDetail,
+    summary: "Rename a letter, or change what it is used for while nothing sends it" },
+  requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.update);
 
 module.exports = { basePath: "/letter-templates", surface: "staff", router };

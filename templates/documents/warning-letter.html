@@ -1,16 +1,9 @@
 ---
 title: "{{ step_name }}: {{ query_number }}"
 ---
-<style>
-  .wl p { margin: 0 0 10px 0; }
-  .wl .wl-ref { font-size: 9pt; color: #71717A; }
-  .wl h2 { font-size: 12pt; margin: 16px 0 8px 0; }
-</style>
-<div class="wl">
-  <p class="wl-ref">{{ query_number }} · {{ longdate effective_on }}</p>
-  <p>{{ employee.display_name }}<br>{{#if employee.job_title}}{{ employee.job_title }}{{/if}}{{#if employee.department}}, {{ employee.department }}{{/if}}</p>
-  <h2>{{ step_name }}</h2>
+<div class="letter">
   <p>Dear {{ employee.first_name }},</p>
+  <h2>{{ step_name }}</h2>
   <p>Following query {{ query_number }} ({{ subject }}): {{ reason }}</p>
   <p>Management frowns at this. You are to ensure that it is not repeated, and that all instructions and enquiries sent to you are attended to immediately, to forestall further disciplinary action.</p>
   <p>A copy of this letter is placed on your file.</p>

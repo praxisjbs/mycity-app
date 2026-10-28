@@ -63,7 +63,8 @@ raised.
 5. Under **What Happened**, say what happened, with the date. Use at least 20 characters.
 6. To cite a policy, pick it under **Policy**. Only policies in force are offered.
 7. Once a policy is picked, you may type the line it breaks under **Clause**. The letter quotes it.
-8. Sign with your finger or mouse in **Your Signature**. It is printed on the letter.
+8. Sign with your finger or mouse in **Your Signature**. It is printed on the letter. If you saved
+   [your signature](#queries-signature), it is there already; press **Clear Signature** to redraw.
 9. Press **Raise Query**. The hub says the query was raised and its letter sent.
 
 The employee is told in the hub and by email, with the letter. They have 24 hours to respond.
@@ -144,8 +145,8 @@ A proposed sanction waits on the query's card for whoever must approve it.
    **Escalated**, and **Waiting On** names who must approve.
 2. If it waits on you, press **Approve Sanction**.
    ![Approve Sanction](shot:queries-approve)
-3. At **Operations & People**, sign in **Your Signature**. It is printed on the sanction's letters,
-   with your name and job title.
+3. At **Operations & People**, sign in **Your Signature**, or keep the one you saved. It is printed
+   on the sanction's letters, with your name and job title.
 4. Press **Approve Sanction**. The hub says it was sent on to the CEO, or that the sanction was
    approved and its letter follows. The card shows the sanction's number once it is issued.
 5. To refuse it, press **Reject**, type the **Reason** and press **Reject**. The hub says
@@ -194,17 +195,19 @@ missing clock-outs are counted by the Attendance policy, which raises their quer
 3. Type a **Name**, such as `Overdue Tasks`.
 4. Under **What Sets It Off**, pick what the rule counts.
 5. Type **How Many Times** and **Within, Days**: three in 14 days is `3` and `14`.
-6. To have its letters quote a policy, pick it under **Policy**.
-7. Once a policy is picked, you may type the line it breaks under **Clause**, up to 300 characters.
+6. Under **Letter**, pick the query letter its queries send. With none picked, they send the Query
+   Letter.
+7. To have its letters quote a policy, pick it under **Policy**.
+8. Once a policy is picked, you may type the line it breaks under **Clause**, up to 300 characters.
    The rule's letters quote it.
-8. Press **Save Rule**. The rule is saved as a draft and does nothing yet.
+9. Press **Save Rule**. The rule is saved as a draft and does nothing yet.
 
 ### Change a rule {#queries-rules-edit needs="queries edit, cap queries.configure"}
 
 1. Open [Queries & Sanctions · Rules](/queries?tab=rules).
 2. On the rule's card, press **Edit Rule**.
-3. Change the **Name**, **How Many Times**, **Within, Days**, **Policy** or **Clause**. Taking the
-   policy off clears the clause.
+3. Change the **Name**, **How Many Times**, **Within, Days**, **Letter**, **Policy** or **Clause**.
+   Taking the policy off clears the clause.
 4. Press **Save Rule**. The change counts from the next event.
 
 Once a rule has raised a query, **What Sets It Off** is shown but cannot change. Make a new rule
@@ -243,9 +246,14 @@ Sanctions lists each sanction, and holds MyCity's ladder of steps.
 
 Every sanction follows a query.
 
-1. Press **Issue Sanction** at the top right. It opens
-   [Queries & Sanctions · Queries](/queries?tab=queries).
-2. Open the query, then follow [Record a decision](#queries-decide).
+1. Press **Issue Sanction** at the top right.
+2. Under **Query**, search for the query by its number, the person's name or its subject, and pick
+   it. Only queries under review are offered.
+3. **Record Decision** opens on it at **Sanction**: follow [Record a decision](#queries-decide) from
+   step 5.
+
+A query still waiting for its response, or with a sanction already waiting for approval, shows
+**Not Ready**.
 
 ### Set the ladder {#queries-chain needs="cap queries.configure"}
 
@@ -290,7 +298,8 @@ reason from the record.
 2. The strip counts the **Templates**, the **Active** ones, those **Awaiting Sample**, and the
    **Letters Sent, 90d**.
 3. The list shows each **Template**, what it is **Used By**, and its **Status**.
-4. Press a template to see it on paper. The words the record fills in are underlined.
+4. Press a template to see it as the employee receives it: the letter's PDF, with sample details
+   and your saved signature. Press **Download PDF** to keep a copy.
 
 A letter **Awaiting Sample** has no wording yet: MyCity has still to send its sample.
 
@@ -298,12 +307,15 @@ A letter **Awaiting Sample** has no wording yet: MyCity has still to send its sa
 
 1. Open [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates) and press the
    template.
-2. Press **Edit Template** at the top right.
-3. Write the wording under **Letter**. Type `{{ employee.first_name }}`, `{{ query_number }}`,
+2. Press **Edit Template** at the top right. The letter opens with its wording as it is sent.
+3. Change the **Name** if you need to. While no step or rule sends the letter, you can also change
+   **Used For**.
+4. Change the wording under **Letter**. Type `{{ employee.first_name }}`, `{{ query_number }}`,
    `{{ reason }}` or `{{ step_name }}` where the record fills in.
-4. To draft it with AI, press **Write With AI**, say what you want under **What To Say**, then
+5. To draft it with AI, press **Write With AI**, say what you want under **What To Say**, then
    **Write Draft** and **Use Draft**.
-5. Press **Save Letter**. Each save is a new version; a letter keeps the version it used.
+6. Press **Save Letter**. Each change of wording is a new version; a letter keeps the version it
+   used.
 
 ### Add a letter {#queries-letters-add needs="queries create, cap queries.configure"}
 
@@ -312,15 +324,33 @@ A letter **Awaiting Sample** has no wording yet: MyCity has still to send its sa
 3. Type the **Name**, such as `Final Warning`.
 4. Under **Used For**, press **Queries** or **Sanctions**.
 5. Write the wording under **Letter**, as above.
-6. Press **Save Template**. It is saved as a draft.
+6. Press **Save Draft** to keep it out of use for now, or **Save and Activate** to use it at once.
 
-### Switch a letter on {#queries-letters-activate needs="queries edit, cap queries.configure"}
+A step chooses its letter on [Chain Settings](#queries-chain), and a rule under **Letter** on
+[New Rule or Edit Rule](#queries-rules-add). Both then show under **Used By**.
 
-1. Press the draft letter on
-   [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates).
-2. Press **Activate** at the top right. A letter with no wording cannot be switched on.
+### Switch a letter on or off {#queries-letters-activate needs="queries edit, cap queries.configure"}
+
+1. Press the letter on [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates).
+2. Press **Activate** at the top right for a draft. A letter with no wording cannot be switched on.
+3. Press **Deactivate** for an active letter you no longer use. It goes back to a draft.
+
+| The hub says | Why | What to do |
+|---|---|---|
+| *In use by …* | A step or rule sends it, or it is the Query Letter or the Salary Deduction Letter | Give the step or rule another letter first |
 
 Only an active letter is used. A step of the ladder needs its letter active before it is offered.
+
+### Save your signature {#queries-signature needs="queries view"}
+
+Draw your signature once, and your query letters and the sanctions you approve start from it.
+
+1. Open [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates).
+2. Press **Edit Signature** at the top right.
+3. Sign with your finger or mouse in **Your Signature**. To start again, press **Clear Signature**.
+4. Press **Save Signature**. The hub says **Signature saved**.
+
+A letter already sent keeps the signature it was signed with.
 
 ## My Queries {#queries-my screen=ess/my-queries icon=user}
 

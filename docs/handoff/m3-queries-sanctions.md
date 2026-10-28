@@ -7,8 +7,8 @@ itself is `docs/guides/queries.md`; this file is the build plan and its log.
 
 | | |
 |---|---|
-| Branch | `m3/queries-sanctions` (push only here; the PR targets `main`) |
-| Pull request | #22, draft |
+| Branch | `m3/queries-sanctions` (push only here; the PR targets `main`; restarted from `main` after #22 merged) |
+| Pull request | #22, merged 27/10/2026; the sequel (§9) is #33 |
 | Owner | GE (Godwin-Okoh Elisha); handed to Victor on 27/10/2026 |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 26/10/2026 |
@@ -402,3 +402,59 @@ All fixed 27/10/2026 (GE), except the last, which is a note:
 - [x] `next_step` counts only the sanctions the reader may see; a team scope never reads a sanction's
   approval by id.
 - Local databases that ran the earlier 3190 need a rebuild (`migrate.js` refuses the changed file).
+
+---
+
+## 9 · Sequel: Letter Templates and Sanctions (GE, 27/10/2026, evening)
+
+#22 merged. GE's observations on staging, and the decisions taken on them (binding; do not ask
+again). MyCity's Ops documents (letters, handbook, staff lists) were read for the layout; they hold
+real names and never enter this public repository.
+
+### 9.1 Observations
+
+1. Editing a shipped letter opened an empty editor: its wording is an HTML file, and the API gave
+   `body_html` only for Markdown wording.
+2. Nowhere to keep a signature: each raise and approval draws one.
+3. Used For cannot be chosen when editing; Used By is set from Chain Settings, and a rule cannot
+   name a letter at all (the API takes `letter_template`; the form had no field).
+4. Activate shows only on a draft; there is no Deactivate.
+5. The preview is drawn on screen, not the PDF sent; the deduction letter's preview had no amount.
+6. The preview cannot be downloaded.
+7. Issue Sanction sent the reader to the Queries tab.
+8. New Template saved a draft with no choice to activate it.
+
+### 9.2 Decisions (GE, 27/10/2026)
+
+- **Saved once, reused.** Each person keeps My Signature (Edit Signature on Letter Templates). Raise
+  a Query and Approve Sanction start from it (redraw allowed); the preview shows it.
+- **Deactivate when unused.** Activate a draft; Deactivate an active letter back to draft only while
+  no step or rule uses it, else the refusal names what does.
+- **The samples' layout, our header.** Body and sign-off as MyCity's samples (date, recipient block,
+  bold capitals title, Yours faithfully, FOR: MYCITYAPP LIMITED, signature, name, role), keeping the
+  logo header and the footer with page numbers. The preview is that PDF, downloadable.
+- Used For may change while nothing uses the letter. Issue Sanction picks the query in place.
+
+### 9.3 Checklist
+
+- [x] S1 Letter editing: shipped wording in the editor (converted to Markdown on first save); Used For
+  while unused; Deactivate when unused; New Template's Save Draft and Save and Activate; the rule
+  form's Letter
+- [x] S2 My Signature: migration `3050`, stored through the vault, Edit Signature, Raise a Query and
+  Approve Sanction start from it, the preview shows it
+- [x] S3 The samples' layout in every M3 letter; the preview is the rendered PDF with Download; the
+  deduction letter's sample amount
+- [x] S4 Issue Sanction picks the query on Sanctions; guide, chapter, pictures, PROGRESS, `npm run
+  ci`, the PR
+
+### 9.4 Log
+
+- 27/10/2026 · GE · Observations read against the code, decisions taken, branch restarted from main.
+- 27/10/2026 · GE · S1 built: the editor opens a shipped letter's wording, Name and Used For on Edit
+  Template, Deactivate while unused, Save Draft and Save and Activate, the rule's Letter.
+- 28/10/2026 · GE · S2 built: Edit Signature, `letter_signature` (3050), the pads open with it. The
+  preview signing with it comes with S3.
+- 28/10/2026 · GE · S3 built: the samples' layout in every query and sanction letter, the PDF preview
+  with Download PDF, signed with the reader's saved signature.
+- 28/10/2026 · GE · S4 built: Issue Sanction picks the query in place. `app/tsconfig.json` checks no
+  files (it only references the others): typecheck with `npx tsc -p app/tsconfig.app.json`, as CI does.

@@ -105,11 +105,12 @@ ESS · My Queries.
 | `sanction` (3000, 3010, 3020, 3040) | `number`, `employee_query_id`, `employee_id`, `consequence_step_id`, `sanction_type`, `letter_template`, `reason`, `evidence`, `decided_by`, `signature_document_id` and `signed_by` (the Operations & People approver who signed it, §6.4), `effective_on`, `ends_on`, `status`, `workflow_instance_id` | Always from a query (NOT NULL). `sanction_type` is the rung's code at the time, kept if the rung is renamed; `letter_template` its letter at the time, so a rung pointed at another letter later never strands an approved sanction (null before 3040: the rung's). `status`: `pending_approval`, `issued`, `rejected`, `withdrawn` |
 | `sanction_fine` (3000) | `sanction_id`, `amount_ngn`, `settlement_status`, `settled_at` | An attachable outcome on any sanction, never a rung. `pending` until M6 accepts it into a run (`accepted`, then `settled`) or waives it |
 | `sanction_letter` (3000) | `sanction_id`, `document_id`, `letter_type` | The issued letters, from the vault: the rung's, and `salary-deduction-letter` when it carries a fine |
+| `letter_signature` (3050) | `user_id`, `document_id` | One a login: the signature they saved on Edit Signature, from the vault (§6.9). Replaced when they draw again; never printed on a letter itself (each letter keeps its own copy) |
 | `letter_template` (3010) | `key`, `name`, `purpose`, `status` | The letters this module may send. The wording is `template_version` (0080) under the same key; the shipped default is `templates/documents/<key>.html`. `purpose`: `query`, `sanction` or `fine` (§6.6) |
 
 Schema migration file(s): `migrations/3000_queries_sanctions.sql` (merged), `migrations/3010_queries_chain.sql`,
 `migrations/3020_queries_signatures.sql` (the drawn signatures' `signature_document_id`),
-`migrations/3030_queries_policy.sql` (the policy a rule names and a query cites), `migrations/3040_queries_attendance.sql` (the key from `attendance_rule_breach.employee_query_id` to the query it raised, owed since attendance's 1430, a query's `source`, and on `sanction` its signer `signed_by` and its `letter_template` at proposal).
+`migrations/3030_queries_policy.sql` (the policy a rule names and a query cites), `migrations/3040_queries_attendance.sql` (the key from `attendance_rule_breach.employee_query_id` to the query it raised, owed since attendance's 1430, a query's `source`, and on `sanction` its signer `signed_by` and its `letter_template` at proposal), `migrations/3050_queries_my_signature.sql` (`letter_signature`, §6.9).
 Reference-data file(s): `seeds/reference/3099_seed_queries_sanctions.sql` (merged),
 `seeds/reference/3190_seed_queries_chain.sql`: the `queries.configure` capability and its holders,
 the `queries.consequence` approval, the shipped letter templates' rows, and `3099`'s invalid
@@ -130,6 +131,8 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `POST /api/v1/queries/:id/remind` | `EmptyBody` → `QueryDetail` | `queries` create · §6.1 | | Once a day, while awaiting a response |
 | `POST /api/v1/queries/:id/decision` | `QueryDecision` → `QueryDetail` | `queries` edit · §6.1 | | §6.4 |
 | `GET /api/v1/queries/policies` | `CitablePolicyListQuery` (`q`) → `CitablePolicyPage` | `queries` view | yes, 25 | The policies a query or rule may cite: each with a published version in force, through `policies.service.citable()` |
+| `GET /api/v1/queries/my-signature` | → `LetterSignature` | `queries` view | no | The reader's saved signature as a PNG data URL, or null (§6.9) |
+| `PUT /api/v1/queries/my-signature` | `LetterSignatureSave` → `LetterSignature` | `queries` view | | Kept through the vault, replacing the last (§6.9) |
 | `GET /api/v1/queries/assist` | → `AiAvailability` | `queries` create | no | Whether Write With AI may answer now: `off` or `limit` otherwise |
 | `POST /api/v1/queries/assist` | `QueryDraftRequest` → `QueryDraft` | `queries` create | no | A Subject and What Happened; nothing is kept (§9) |
 | `GET /api/v1/letter-templates/assist` | → `AiAvailability` | `queries` edit, `queries.configure` | no | As above, for the letter editor |
@@ -153,10 +156,13 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `GET /api/v1/letter-templates/summary` | → `LetterTemplatesSummary` | `queries` view | no | |
 | `GET /api/v1/letter-templates` | `LetterTemplateListQuery` (`purpose`, `status`, `q`) → `LetterTemplatePage` | `queries` view | yes, 25 | |
 | `GET /api/v1/letter-templates/:id` | → `LetterTemplateDetail` | `queries` view | no | The current wording and its version |
-| `GET /api/v1/letter-templates/:id/preview` | → `LetterPreview` | `queries` view | no | The wording filled with sample values, as paragraphs of runs; `filled` marks the record's words |
-| `POST /api/v1/letter-templates` | `LetterTemplateCreate` (`body_html` from the editor, or `body` in Markdown) → `LetterTemplateDetail` | `queries` create, `queries.configure` | | Saved as a draft |
+| `GET /api/v1/letter-templates/:id/preview` | → `LetterPreview` | `queries` view | no | The wording filled with sample values, as paragraphs of runs; `filled` marks the record's words (the demo build's preview) |
+| `GET /api/v1/letter-templates/:id/preview.pdf` | → the PDF (`no_content`) | `queries` view | no | The letter as sent: sample values, the reader's saved signature, nothing stored (§6.7) |
+| `POST /api/v1/letter-templates` | `LetterTemplateCreate` (`body_html` from the editor, or `body` in Markdown; `status` `draft` or `active`) → `LetterTemplateDetail` | `queries` create, `queries.configure` | | Save Draft or Save and Activate |
 | `PUT /api/v1/letter-templates/:id/body` | `LetterTemplateBodySave` (`body_html` or `body`) → `LetterTemplateDetail` (with `body_html` for the editor) | `queries` edit, `queries.configure` | | A new `template_version` |
 | `POST /api/v1/letter-templates/:id/activate` | `EmptyBody` → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | Refused while it has no wording |
+| `POST /api/v1/letter-templates/:id/deactivate` | `EmptyBody` → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | Back to a draft; 409 `TEMPLATE_IN_USE` while something sends it (§6.7) |
+| `PATCH /api/v1/letter-templates/:id` | `LetterTemplateUpdate` (`name`, `purpose`) → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | Used For changes only while nothing sends it |
 | `GET /api/v1/ess/queries/summary` | → `MyQueriesSummary` | `ess` · own | no | Open, archived, sanctions and the latest one's date |
 | `GET /api/v1/ess/queries` | `EssQueryListQuery` (`status`: `open`, `archived`) → `MyQueryPage` | `ess` · own | yes, 25 | ESS module, through the queries service. Without `status`, every query, open ones first, then newest first |
 | `POST /api/v1/ess/queries/:id/response` | `QueryResponseCreate` (`body_html`) → `MyQuery` | `ess` · own | | Through `queries.response`; 20 to 4,000 characters of text once the markup is taken out |
@@ -324,9 +330,19 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 - An edit saves a new `template_version`; a letter records the version it used. The wording is
   written in the rich text editor (meeting 26/10) and kept as Markdown through the one renderer's
   whitelist (`htmlToMarkdown`), its `{{ names }}` as written; the detail hands it back as HTML
-  (`body_html`) for the editor. A script may still send Markdown (`body`). A template is
-  `awaiting_sample` while it has no wording, `draft` until activated, `active`, or `retired`. Only
-  an active template can be chosen.
+  (`body_html`) for the editor; a shipped letter's HTML file comes through the same whitelist
+  (`htmlToMarkdown`, then `markdownToHtml`), so Edit Template opens with MyCity's wording and its
+  first save keeps it as version 1 (GE, 27/10/2026). A script may still send Markdown (`body`). A
+  template is `awaiting_sample` while it has no wording, `draft` until activated, `active`, or
+  `retired`. Only an active template can be chosen.
+- **New, activate, deactivate** (GE, 27/10/2026): New Template saves a draft or, with `status`
+  `active`, Save and Activate. Deactivate (`POST /:id/deactivate`) takes an active letter back to a
+  draft only while nothing sends it; `in_use` says when something does: a step or rule on it
+  (`used_by`), or its being the Query Letter (every manual query) or the Salary Deduction Letter
+  (every fine), and the 409 `TEMPLATE_IN_USE` names it. `PATCH /:id` renames a letter, and changes
+  what it is used for (Queries or Sanctions) on the same condition.
+- **What sends it**: a rung names its letter on Chain Settings, a rule on New Rule or Edit Rule
+  (`query_rule.letter_template`; none sends the Query Letter), and both show under Used By.
 - Purposes: `query` (a query's letter), `sanction` (a rung's letter), `fine` (the deduction letter
   a fine sends, §6.6). Six letters ship, each with wording and seeded active, so every rung is ready
   on a fresh database: Query, Caution, Warning (also the Second Warning's), Suspension Without Pay,
@@ -344,6 +360,19 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
   RC number, address, phone, email, website) repeat on every page, and every page is numbered
   "Page 2 of 3". The letterhead is the shared one (`templates/documents/letterhead.html`), so every
   generated document gains the repeat.
+- **As MyCity's own letters** (GE, 27/10/2026, from the samples CAUTION, WARNING, SUSPENSION,
+  DISMISSAL): `query_letter` and `sanction_letter` declare `letter` (the date and the addressee:
+  name, job title, department), so the letterhead opens the body with the date (the query raised, or
+  the sanction effective) and the addressee, prints no page title, and closes with "Yours
+  faithfully," and **FOR: MYCITY APP LTD** (the organisation's name in capitals) above the signer's
+  signature, name in bold and job title, leaving room to sign when there is no drawn signature. The
+  wording starts at "Dear", its heading in bold capitals after it; the logo header (number) and the
+  footer stay. A document that is not a letter keeps the plain "For" line.
+- **The preview is the PDF** (GE, 27/10/2026): `GET /letter-templates/:id/preview.pdf` renders the
+  letter through the same engine and letterhead (`documents.previewPdf`), filled with sample values
+  and signed with the reader's saved signature (§6.9), nothing stored, numbered or sent; Letter
+  Templates shows it with Download PDF. The demo build, which has no PDF renderer, shows the wording
+  on paper (`GET /:id/preview`). The deduction letter's sample carries an amount.
 - Letter templates added on the screen take a key `<slug>-letter`; generate() is given the template
   key with the shared doc types `query_letter` and `sanction_letter` (a small extension to
   `shared/documents/generate.js`: an explicit `template` for a doc type that allows it).
@@ -353,6 +382,18 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 Each decision keeps reason, evidence, decision-maker and date (`reviewed_by`, `decided_by`, the
 approval's decisions). Queries, responses, sanctions and letters are never deleted or edited after
 the fact; a mistake is a withdrawn sanction or a further note, both audited.
+
+### 6.9 My Signature
+
+- A person draws their signature once, on Letter Templates (**Edit Signature**, anyone with
+  `queries` view), and it is kept through the vault (doc type `query_signature`, entity the login)
+  as `letter_signature.document_id`, one row a login (migration `3050`). Drawing again replaces it;
+  `letter_signature.saved` records it.
+- Raise a Query and Approve Sanction open their pad with it (`GET /queries/my-signature`, the PNG as
+  a data URL), so nobody draws each time; they may clear it and redraw. What is sent is still the
+  pad's image, stored with the query or sanction as before (§6.2, §6.4), so a letter already sent
+  never changes when the saved signature does.
+- The letter preview on Letter Templates signs with the reader's saved signature (§6.7).
 
 ## 7 · Events, jobs and notifications
 
@@ -437,9 +478,9 @@ or tier 2.**
 | Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by (a person, the rule, or Attendance Policy), raised, response due, counted days, response, sanction, and while a sanction waits: its step and who it waits on); Raise a Query (only with `queries` create; also from ⌘K), Send Reminder, View Letter (the PDF the employee received), Record Decision; Approve Sanction (Your Signature at the Operations & People stage) and Reject (Reason) for whoever it waits on; a refused proposal reads "Not Approved" | Help on Escalated (the KPI) and on Waiting On: a sanction is waiting for approval. Help on Response Due: the 24 hour window. Help on Your Signature when approving: it signs the letters | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
 | Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, Evidence (one item a line) for a step that requires it, fine, reason | Help on the next rung: why it is offered. Help on Evidence: the step needs the facts it rests on | The approval route and its thresholds: Settings · Approvals, §6.5 |
 | Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status), a page at a time; Recent Firings; New Rule, Edit Rule, Activate, Pause; the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional); an empty state when there are no rules | Help on Policy and on Clause, as the form reads them | Counting after the last query, the dedup key: §6.3 |
-| Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
+| Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction (with `queries` edit: Query, a picker of those under review, then Record Decision at Sanction), Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
-| Letter Templates | Stat strip; the list (template, used by, status); the selected letter's preview on paper, the record's words underlined; New Template, Edit Template, Activate | Help on Letter: the names a letter can use | Versioning, the shipped defaults: §6.7 |
+| Letter Templates | Stat strip; the list (template, used by, status); the selected letter as its PDF, with Download PDF (on paper, the record's words underlined, in the demo build); Edit Signature; New Template (Name, Used For, Letter; Save Draft, Save and Activate), Edit Template (Name, Used For while nothing sends it, Letter, opening with its wording), Activate on a draft, Deactivate on an active letter | Help on Letter: the names a letter can use. Help on Used For when it is fixed | Versioning, the shipped defaults: §6.7 |
 | ESS · My Queries | The Queries and Sanctions switch with each one's count; Queries: the list (number, subject, raised, status), the picked query (subject, raised, respond by, what happened, your response, outcome, sanction), View Letter, Respond; Sanctions: the list (sanction, query, reason, date, fine), each opening its letter | Help on Respond By: the 24 hour window | The sanitising, the Markdown kept: §3 step 3 |
 
 ### 10.2 Phone layout
@@ -527,6 +568,17 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 27/10/2026 · GE · Letters as MyCity's own (handoff §9, S3; §6.7): the date and addressee open
+  them, "Yours faithfully" and FOR: the organisation close them; the preview is the real PDF with
+  Download PDF; the deduction letter's sample names its amount.
+- 28/10/2026 · GE · Issue Sanction picks the query in place (handoff §9, S4; §10): a picker of the
+  queries under review, then Record Decision on it at Sanction; only with `queries` edit.
+- 27/10/2026 · GE · My Signature (handoff §9, S2; §6.9): drawn once on Letter Templates' Edit
+  Signature, kept through the vault (`letter_signature`, migration `3050`); Raise a Query's and
+  Approve Sanction's pads open with it.
+- 27/10/2026 · GE · Letter Templates (handoff §9, S1; §5, §6.7, §10): Edit Template opens a shipped
+  letter with its wording and edits its Name and Used For (while nothing sends it); Deactivate while
+  unused; Save Draft or Save and Activate; a rule picks its Letter.
 - 27/10/2026 · GE · The audit's small items (handoff §8.3): the `minutes` measure and the attendance
   triggers' labels gone (§6.3); `has_fired` on a rule, its trigger shown fixed on Edit Rule, Activate
   only for what is counted, a pager on Rules (§10); the next rung from the sanctions the reader may

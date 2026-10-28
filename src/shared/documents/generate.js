@@ -52,6 +52,12 @@
  * data URL drawn on a SignatureField, or null), whatever the template, so a letter written on a
  * screen in Markdown is signed like a shipped one.
  *
+ * A doc type that is a letter to one person declares `letter: (data) => ({ date, to })`, `to`
+ * the addressee's lines (name, job title, department). The letterhead then opens the body as a
+ * letter (the date, then the addressee) and closes it with "Yours faithfully" and "For" the
+ * organisation above the signer, as MyCity's own letters are laid out; it prints no title, the
+ * wording carrying its own heading.
+ *
  * Brand: the Logo uploaded on Settings · Organisation (else assets/brand/logo.png when
  * present, else the company's name in the letterhead's type) and the Geist fonts
  * (assets/fonts/*.woff2) are embedded as data URLs, because the PDF renderer fetches nothing.
@@ -104,6 +110,8 @@ function defineDocType(docType, spec) {
     throw new Error(`defineDocType(${docType}): title is (data) => string`);
   if (spec.signedBy !== undefined && typeof spec.signedBy !== "function")
     throw new Error(`defineDocType(${docType}): signedBy is (data) => the signer`);
+  if (spec.letter !== undefined && typeof spec.letter !== "function")
+    throw new Error(`defineDocType(${docType}): letter is (data) => ({ date, to })`);
   if (DOC_TYPES.has(docType) && DOC_TYPES.get(docType) !== spec)
     throw new Error(`defineDocType: ${docType} is already defined`);
   DOC_TYPES.set(
@@ -233,6 +241,40 @@ function renderDocumentHtml(template, data, context) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${brand().fontCss}</style></head><body>${page}</body></html>`;
 }
 
+/** What the letterhead is told about the document: its title, its signer, and whether it is a letter. */
+function docOf(spec, data, title) {
+  const letter = spec.letter ? spec.letter(data) || null : null;
+  return {
+    title,
+    signer: spec.signedBy ? spec.signedBy(data) || null : null,
+    letter: letter ? { date: letter.date, to: (letter.to || []).filter(Boolean).map((line) => ({ line })) } : null,
+  };
+}
+
+/**
+ * A document's PDF exactly as it would be generated, from a template key and data, and nothing
+ * stored, numbered or emailed: Letter Templates' preview (docs/guides/queries.md §6.7). The number
+ * printed is the one given.
+ * @param {{query: Function}} db
+ * @param {{doc_type: string, template?: string, data: object, number?: string}} opts
+ * @returns {Promise<{pdf: Buffer, title: string}>}
+ */
+async function previewPdf(db, { doc_type: docType, template: chosen, data, number = null }, { renderPdf } = {}) {
+  const spec = specOf(docType);
+  const templateKey = templateKeyOf(docType, spec, chosen);
+  const checked = variables.parseData("document", templateKey, data);
+  const template = await templates.current(db, "document", templateKey);
+  const title = String(spec.title(checked) || "").trim().slice(0, 200) || docType;
+  const html = renderDocumentHtml(template, checked, {
+    org: await orgProfile(db),
+    number,
+    today: lagos.today(),
+    doc: docOf(spec, checked, title),
+  });
+  const toPdf = renderPdf || require("../../services/pdf/pdf.service").render;
+  return { pdf: await toPdf(html, { footer: number, landscape: spec.landscape }), title };
+}
+
 /* ------------------------------------------------------------------ *
  * Generate (in the request) and render (in the worker)
  * ------------------------------------------------------------------ */
@@ -279,7 +321,7 @@ async function generate(
     org,
     number,
     today: day,
-    doc: { title, signer: spec.signedBy ? spec.signedBy(checked) || null : null },
+    doc: docOf(spec, checked, title),
   });
 
   const id = crypto.randomUUID();
@@ -430,6 +472,7 @@ module.exports = {
   renderPending,
   failRender,
   renderDocumentHtml,
+  previewPdf,
   orgProfile,
   brand,
   __reset,

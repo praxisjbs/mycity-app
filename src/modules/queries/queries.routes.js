@@ -8,8 +8,10 @@
  *   POST /:id/remind            `queries` create: Send Reminder
  *   POST /:id/decision          `queries` edit: close with no action, or propose a sanction
  *
- * A proposed sanction is approved or rejected in its approval (/workflow/instances/:id),
- * never here. The employee's own queries are under /ess/queries.
+ *   GET, PUT /my-signature      `queries` view: the reader's saved signature (queries.signature.js)
+ *
+ * A proposed sanction is approved or rejected on the query's card (/sanctions/:id/approve,
+ * /reject), never here. The employee's own queries are under /ess/queries.
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -39,6 +41,14 @@ route(router, "post", "/assist",
 route(router, "get", "/policies",
   { query: qs.CitablePolicyListQuery, response: qs.CitablePolicyPage, summary: "Policies a query or rule may cite" },
   requirePermission("queries", "view"), controller.policies);
+
+route(router, "get", "/my-signature",
+  { response: qs.LetterSignature, summary: "The signature my letters start from" },
+  requirePermission("queries", "view"), controller.mySignature);
+
+route(router, "put", "/my-signature",
+  { body: qs.LetterSignatureSave, response: qs.LetterSignature, summary: "Save the signature my letters start from" },
+  requirePermission("queries", "view"), controller.saveMySignature);
 
 route(router, "get", "/:id",
   { params: c.common.IdParams, response: qs.QueryDetail, summary: "One query" },

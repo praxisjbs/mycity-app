@@ -151,3 +151,45 @@ describe("Queries & Sanctions · who may raise", () => {
     expect(screen.queryByRole("button", { name: "Raise a Query" })).toBeNull();
   }, 30000);
 });
+
+describe("Queries & Sanctions · Letter Templates", () => {
+  it("opens a letter with its wording, and offers Deactivate on an active one", async () => {
+    await signedInAs("cynthia@mycityapp.io", "letter-templates");
+    expect(await screen.findByRole("button", { name: "Deactivate" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Template" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(((await within(dialog).findByRole("textbox", { name: "Name" })) as HTMLInputElement).value).toBe("Caution Letter");
+    // The wording is there to edit, not an empty box.
+    await waitFor(() => expect(within(dialog).getByText(/Dear/)).toBeTruthy());
+  }, 30000);
+
+  it("keeps the reader's signature behind Edit Signature", async () => {
+    await signedInAs("cynthia@mycityapp.io", "letter-templates");
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Signature" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByRole("img", { name: "Your Signature" })).toBeTruthy();
+    // Nothing drawn: refused on the pad, before anything is sent.
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save Signature" }));
+    await waitFor(() => expect(within(dialog).getByText("Sign in the box")).toBeTruthy());
+  }, 30000);
+
+  it("saves a new letter as a draft or straight into use", async () => {
+    await signedInAs("cynthia@mycityapp.io", "letter-templates");
+    fireEvent.click(await screen.findByRole("button", { name: "New Template" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Save Draft" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Save and Activate" })).toBeTruthy();
+  }, 30000);
+});
+
+describe("Queries & Sanctions · Issue Sanction", () => {
+  it("picks the query in place, and opens Record Decision on it at Sanction", async () => {
+    await signedInAs("cynthia@mycityapp.io", "sanctions");
+    fireEvent.click(await screen.findByRole("button", { name: "Issue Sanction" }));
+    const dialog = await screen.findByRole("dialog");
+    // The query is picked here, in the dialog; nothing leaves Sanctions.
+    expect(within(dialog).getByText("Query")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeTruthy();
+    expect(window.location.search).not.toContain("tab=queries");
+  }, 30000);
+});
