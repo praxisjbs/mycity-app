@@ -65,8 +65,9 @@ import { band, bodySchema, fieldMessage, figureOf, krStatus, KR_STATUS_OPTIONS, 
 
 type KrMonthStatus = KeyResultMonth["status"];
 
-/** The help on the score figures (§10.1). */
-const SCORE_HELP = "Scores run from 0 to 1. Green is 0.7 or above; amber 0.4 to 0.7; red below 0.4 needs a recovery plan.";
+/** The help on the score figures (§10.1), in the quarter's own Good and Watch bands (§6.8). */
+const scoreHelp = ({ band_good: good, band_watch: watch }: PerformancePeriod["rules"]["key_results"]) =>
+  `Scores run from 0 to 1. Good is ${good} or above; Watch ${watch} to ${good}; Recovery below ${watch} needs a recovery plan.`;
 /** The help on a TBC target (§10.1). */
 export const TBC_HELP = "A provisional target, locked on the quarter's lock date.";
 const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
@@ -91,10 +92,11 @@ export function Goals() {
     enabled: Boolean(quarter.periodId),
   });
   const counted = (n: number | undefined) => (n === undefined ? "–" : String(n));
+  const help = scoreHelp(period?.rules.key_results ?? scoring.DEFAULT_RULES.key_results);
   const tiles = [
-    { label: "Company Score", value: score(summary.data?.company_score), help: SCORE_HELP },
+    { label: "Company Score", value: score(summary.data?.company_score), help },
     // Key results scoring Good this quarter: a reported status of On Track is another thing (the pills).
-    { label: "Scoring Good", value: counted(summary.data?.on_track), tone: "ok" as const, help: SCORE_HELP },
+    { label: "Scoring Good", value: counted(summary.data?.on_track), tone: "ok" as const, help },
     { label: "In Recovery", value: counted(summary.data?.in_recovery), tone: "err" as const },
     { label: "Awaiting Report", value: counted(summary.data?.awaiting_report) },
   ];

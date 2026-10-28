@@ -212,6 +212,20 @@ describeDb("performance foundation against the real migrations", () => {
       );
       expect(audit.rows.length).toBeGreaterThanOrEqual(2);
     });
+
+    test("a closed quarter changes no more: its rules, name and status stay as it ran (§3.2)", async () => {
+      const closed = await as("ops").patch(`/performance/periods/${ids.q1}`, { status: "closed" });
+      expect(closed.status).toBe(200);
+      const rules = JSON.parse(JSON.stringify(closed.body.rules));
+      rules.key_results.band_good = 0.8;
+      for (const body of [{ rules }, { name: "Q1 2027 Renamed" }, { status: "closed" }]) {
+        const res = await as("ops").patch(`/performance/periods/${ids.q1}`, body);
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("PERIOD_CLOSED");
+      }
+      const after = await as("staff").get(`/performance/periods/${ids.q1}`);
+      expect(after.body).toMatchObject({ name: "Q1 2027", status: "closed", rules: closed.body.rules });
+    });
   });
 
   describe("the review flow's second level (§6.12, §6.13)", () => {
