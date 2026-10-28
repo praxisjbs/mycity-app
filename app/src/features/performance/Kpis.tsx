@@ -7,10 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import kpisContract from "@mycity/contract/schemas/kpis.js";
 import type { Endpoints, Kpi } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
-import { paging, type Paging } from "@/features/shared/wire";
+import { type Paging } from "@/features/shared/wire";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -50,8 +50,12 @@ export function Kpis() {
   const modal = useModal();
   const quarter = useQuarter();
   const period = quarter.period;
-  const departments = useInfinite("GET /api/v1/departments", { filters: { active: "true" } });
-  const [dept, setDept] = useState("");
+  // The functions the reader reads (§6.23): a member of one is shown its KPIs without choosing, and the select is left off.
+  const settable = useSettableFunctions(null);
+  const functions: Array<[string, string]> = settable.all.filter((f) => f.department_id).map((f) => [f.department_id as string, f.name ?? ""]);
+  const pickFunction = functions.length > 1 || Boolean(settable.paging.more);
+  const [picked, setPicked] = useState("");
+  const dept = picked || (!pickFunction && functions.length === 1 ? functions[0]![0] : "");
   const list = usePaged("GET /api/v1/performance/kpis", { filters: { active: "true", ...(dept ? { department_id: dept } : {}) } });
   const months = period?.months ?? [];
   // The month just ended, which the heads and the workbook import record.
@@ -64,9 +68,9 @@ export function Kpis() {
     { label: "Not Met", value: counted(summary.data?.not_met), tone: "err" as const },
     { label: "Awaiting Actual", value: counted(summary.data?.awaiting) },
   ];
-  const deptOptions: Array<[string, string]> = [["", "All Functions"], ...departments.rows.map((d) => [d.department_id, d.name] as [string, string])];
+  const deptOptions: Array<[string, string]> = [["", "All Functions"], ...functions];
   // New KPI is offered only to a reader who may set some function's KPIs, as the API's goals.authority answers.
-  const mayAdd = useSettableFunctions(null).rows.some((x) => x.department_id !== null);
+  const mayAdd = settable.rows.some((x) => x.department_id !== null);
   const newKpi = () => modal.open({ title: "New KPI", body: (close) => <KpiForm close={close} periodId={quarter.periodId} departmentId={dept} /> });
   const openKpiId = (id: string, code = "KPI") => modal.open({ title: code, wide: true, body: (close) => <KpiSheet id={id} months={months} close={close} /> });
   const openKpi = (k: Kpi) => openKpiId(k.kpi_definition_id, k.code);
@@ -90,9 +94,11 @@ export function Kpis() {
         sub={period ? `${period.name} · ${formatDate(period.starts_on)} to ${formatDate(period.ends_on)}` : undefined}
         actions={mayAdd ? <Button variant="primary" icon="plus" onClick={newKpi}>New KPI</Button> : undefined}
       />
-      <Toolbar>
-        <FilterSelect label="Function" value={dept} onChange={setDept} options={deptOptions} {...paging(departments)} />
-      </Toolbar>
+      {pickFunction && (
+        <Toolbar>
+          <FilterSelect label="Function" value={picked} onChange={setPicked} options={deptOptions} {...settable.paging} />
+        </Toolbar>
+      )}
       <KpiTiles items={tiles} mobileCols={2} />
       <PagedTable
         title="KPIs"

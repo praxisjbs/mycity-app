@@ -5,15 +5,17 @@
  * plan is draft, returned, unbound or awaiting approval (what is added joins the plan sent); the function's
  * plan and its approval; Waiting On You, the plan stages and target changes the reader decides
  * (./Approvals); Report Month for the head, Confirm Score for the CEO and Change Target on a binding key
- * result; Set Up Quarter and Edit Quarter (./Quarter) for whoever runs the cycle. ⌘K opens a goal (?goal=), an objective (?objective=) and a key result (?id=). Everyone sees
- * the whole tree; New Goal and Report Month are offered only to a reader who may act on a function or the
- * company (useSettableFunctions), and Request To Unbind takes New Goal's place where every plan in view is
- * binding (not for the CEO).
+ * result; Set Up Quarter and Edit Quarter (./Quarter) for whoever runs the cycle. ⌘K opens a goal (?goal=),
+ * an objective (?objective=) and a key result (?id=). Each person reads their own department's tree and what
+ * is shared with them; the CEO and Management the whole of it (§6.23), and the CEO shares a goal and
+ * Management an objective (./Share, §6.24). New Goal and Report Month are offered only to a reader who may
+ * act on a function or the company (useSettableFunctions), and Request To Unbind takes New Goal's place where
+ * every plan in view is binding (not for the CEO).
  */
 import { useEffect, useRef, useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
 import scoring from "@mycity/contract/schemas/scoring.js";
-import type { KeyResult, KeyResultDetail, KeyResultMonth, Kpi, KpiMonth, Objective, OrganisationalGoalDetail, PerformanceFunction, PerformancePeriod, Plan } from "@mycity/contract/contract.gen.ts";
+import type { KeyResult, KeyResultDetail, KeyResultMonth, Kpi, KpiMonth, Objective, OrganisationalGoal, OrganisationalGoalDetail, PerformanceFunction, PerformancePeriod, Plan } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
@@ -60,9 +62,11 @@ import {
 import { useApprovalLinks, WaitingOnYou } from "./Approvals";
 import { KeyResultForm, KR_TYPES } from "./KeyResultForm";
 import { QuarterWizard } from "./Quarter";
+import { ShareForm, shareLabel } from "./Share";
 import { band, bodySchema, fieldMessage, figureOf, krStatus, KR_STATUS_OPTIONS, monthChoices, planStatus, reportingMonth, sayRefusal, score, startMonth, useQuarter, useSettableFunctions } from "./shared";
 
 type KrMonthStatus = KeyResultMonth["status"];
+type OrganisationalGoalRow = OrganisationalGoal;
 
 /** The help on the score figures (§10.1), in the quarter's own Good and Watch bands (§6.8). */
 const scoreHelp = ({ band_good: good, band_watch: watch }: PerformancePeriod["rules"]["key_results"]) =>
@@ -74,8 +78,17 @@ export function Goals() {
   const modal = useModal();
   const quarter = useQuarter();
   const period = quarter.period;
-  const departments = useInfinite("GET /api/v1/departments", { filters: { active: "true" } });
-  const [dept, setDept] = useState("");
+  // What the reader may act on, as the API's goals.authority answers (useSettableFunctions): New Goal and Report
+  // Month are offered only to a reader with something to act on, so everyone else reads and nothing more.
+  const settable = useSettableFunctions(quarter.periodId || null);
+  // The Function select offers what the reader reads: the company for whoever reads its plan, then their functions.
+  // A reader of one function alone (a member of it, its head) is shown that function without choosing it, and the
+  // select is left off, as the people lists leave off a Department of one (§6.23).
+  const functions: Array<[string, string]> = settable.all.filter((f) => f.department_id).map((f) => [f.department_id as string, f.name ?? ""]);
+  const chips: Array<[string, string]> = [["", "All Functions"], ...(settable.all.some((f) => !f.department_id) ? ([["company", "Company"]] as Array<[string, string]>) : []), ...functions];
+  const pickFunction = chips.length > 2 || Boolean(settable.paging.more);
+  const [picked, setPicked] = useState("");
+  const dept = picked || (!pickFunction && functions.length === 1 ? functions[0]![0] : "");
   const okrs = usePaged("GET /api/v1/performance/okrs", {
     filters: { ...(quarter.periodId ? { period_id: quarter.periodId } : {}), ...(dept ? { department_id: dept } : {}) },
     enabled: Boolean(quarter.periodId),
@@ -90,19 +103,16 @@ export function Goals() {
   });
   const counted = (n: number | undefined) => (n === undefined ? "–" : String(n));
   const help = scoreHelp(period?.rules.key_results ?? scoring.DEFAULT_RULES.key_results);
+  // The whole plan's reader is given the company's score; everyone else the score of the functions they read (§6.23).
+  const readsCompany = hasCapability(me, "goals.view_all") || hasCapability(me, "goals.company") || hasCapability(me, "goals.organisation");
   const tiles = [
-    { label: "Company Score", value: score(summary.data?.company_score), help },
+    readsCompany ? { label: "Company Score", value: score(summary.data?.company_score), help } : { label: "Function Score", value: score(summary.data?.function_score), help },
     // Key results scoring Good this quarter: a reported status of On Track is another thing (the pills).
     { label: "Scoring Good", value: counted(summary.data?.on_track), tone: "ok" as const, help },
     { label: "In Recovery", value: counted(summary.data?.in_recovery), tone: "err" as const },
     { label: "Awaiting Report", value: counted(summary.data?.awaiting_report) },
   ];
-  const functions: Array<[string, string]> = departments.rows.map((d) => [d.department_id, d.name] as [string, string]);
-  const chips: Array<[string, string]> = [["", "All Functions"], ["company", "Company"], ...functions];
 
-  // What the reader may act on, as the API's goals.authority answers (useSettableFunctions): New Goal and Report
-  // Month are offered only to a reader with something to act on, so everyone else reads and nothing more.
-  const settable = useSettableFunctions(quarter.periodId || null);
   const mayGoal = hasCapability(me, "goals.organisation") || settable.rows.length > 0;
   // Where there is nothing to add to, Request To Unbind takes New Goal's place (§6.22): every plan in view is binding. The plan
   // in view is the function the Function select names, the company's included, whether or not the reader sets it, else the
@@ -189,24 +199,27 @@ export function Goals() {
       />
       <Toolbar>
         <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} {...quarter.paging} />
-        <FilterSelect label="Function" value={dept} onChange={setDept} options={chips} {...paging(departments)} />
+        {pickFunction && <FilterSelect label="Function" value={picked} onChange={setPicked} options={chips} {...settable.paging} />}
       </Toolbar>
       <KpiTiles items={tiles} mobileCols={2} />
       <WaitingOnYou />
       {plan && <PlanCard id={plan.performance_plan_id} />}
-      <PagedTable
-        title="Organisational Goals"
-        list={goals}
-        rowKey={(g) => g.organisational_goal_id}
-        onRowClick={(g) => openGoal(g.organisational_goal_id)}
-        noun="goal"
-        columns={[
-          { key: "code", label: "Goal ID", render: (g) => <span className="font-semibold">{g.code ?? "–"}</span> },
-          { key: "theme", label: "Strategic Theme", render: (g) => g.strategic_theme ?? "–", desktop: true },
-          { key: "goal", label: "Goal", render: (g) => g.title },
-          { key: "measure", label: "Success Measure", render: (g) => g.success_measure ?? "–", desktop: true },
-        ]}
-      />
+      {(readsCompany || goals.loading || goals.rows.length > 0) && (
+        <PagedTable
+          title="Organisational Goals"
+          list={goals}
+          rowKey={(g) => g.organisational_goal_id}
+          onRowClick={(g) => openGoal(g.organisational_goal_id)}
+          noun="goal"
+          columns={[
+            { key: "code", label: "Goal ID", render: (g) => <span className="font-semibold">{g.code ?? "–"}</span> },
+            { key: "theme", label: "Strategic Theme", render: (g) => g.strategic_theme ?? "–", desktop: true },
+            { key: "goal", label: "Goal", render: (g) => g.title },
+            { key: "measure", label: "Success Measure", render: (g) => g.success_measure ?? "–", desktop: true },
+            ...(hasCapability(me, "goals.organisation") ? [{ key: "shared", label: "Shared", render: (g: OrganisationalGoalRow) => shareLabel(g.share), desktop: true }] : []),
+          ]}
+        />
+      )}
       {okrs.rows.map((o) => (
         <ObjectiveCard key={o.okr_objective_id} objective={o} onOpen={openKr} />
       ))}
@@ -244,6 +257,8 @@ function useObjectiveActions(objective: Objective, done?: () => void) {
   const confirm = useConfirm();
   const del = useMutation("DELETE /api/v1/performance/objectives/:id");
   const edit = () => modal.open({ title: "Edit Objective", body: (close) => <ObjectiveForm close={close} objective={objective} onSaved={done} /> });
+  // Share Objective and Stop Sharing: Management share a company objective, with all staff or chosen departments (§6.24).
+  const share = () => modal.open({ title: "Share Objective", body: (close) => <ShareForm kind="objective" id={objective.okr_objective_id} share={objective.share} close={close} /> });
   const remove = async () => {
     if (!(await confirm({ title: "Delete Objective", body: `${objective.code} · ${objective.title}`, confirmLabel: "Delete Objective", destructive: true }))) return;
     try {
@@ -256,11 +271,11 @@ function useObjectiveActions(objective: Objective, done?: () => void) {
       say(e);
     }
   };
-  return { edit, remove };
+  return { edit, remove, share };
 }
 
 function ObjectiveCard({ objective, onOpen }: { objective: Objective; onOpen: (kr: KeyResult) => void }) {
-  const { edit, remove } = useObjectiveActions(objective);
+  const { edit, remove, share } = useObjectiveActions(objective);
   return (
     <Card className="mt-3">
       <CardHeader
@@ -268,15 +283,15 @@ function ObjectiveCard({ objective, onOpen }: { objective: Objective; onOpen: (k
         record
         actions={
           <span className="flex items-center gap-2">
+            {objective.share && <StatusPill s={{ tone: "info", text: "Shared" }} />}
             <span className="text-xs font-semibold">{score(objective.score)}</span>
-            {objective.can_edit && (
+            {(objective.can_edit || objective.can_share) && (
               <Menu
                 label="Objective Actions"
                 trigger={(p) => <IconButton {...p} icon="dots" label={`${objective.code} Actions`} size="sm" />}
                 items={[
-                  { label: "Edit Objective", icon: "edit", onSelect: edit },
-                  "sep",
-                  { label: "Delete Objective", icon: "trash", danger: true, onSelect: remove },
+                  ...(objective.can_share ? [{ label: "Share Objective", icon: "share" as const, onSelect: share }] : []),
+                  ...(objective.can_edit ? [{ label: "Edit Objective", icon: "edit" as const, onSelect: edit }, "sep" as const, { label: "Delete Objective", icon: "trash" as const, danger: true, onSelect: remove }] : []),
                 ]}
               />
             )}
@@ -317,6 +332,13 @@ function ObjectiveSheet({ id, close, onOpen }: { id: string; close: () => void; 
 
 function ObjectiveDetail({ objective: o, close, onOpen }: { objective: Objective; close: () => void; onOpen: (kr: KeyResult) => void }) {
   const { edit, remove } = useObjectiveActions(o, close);
+  const modal = useModal();
+  // Back to this sheet once it is shared or no longer shared.
+  const share = () =>
+    modal.open({
+      title: "Share Objective",
+      body: () => <ShareForm kind="objective" id={o.okr_objective_id} share={o.share} close={() => modal.open({ title: "Objective", wide: true, body: (x) => <ObjectiveSheet id={o.okr_objective_id} close={x} onOpen={onOpen} /> })} />,
+    });
   return (
     <>
       <KeyValue
@@ -325,6 +347,7 @@ function ObjectiveDetail({ objective: o, close, onOpen }: { objective: Objective
           ["Function", o.department ?? "Company"],
           ["Plan", planStatus(o.plan_status).text],
           ["Score", score(o.score)],
+          ...(o.can_share ? ([["Shared With", shareLabel(o.share)]] as Array<[string, string]>) : []),
         ]}
       />
       <DataView
@@ -346,6 +369,7 @@ function ObjectiveDetail({ objective: o, close, onOpen }: { objective: Objective
       <FormFooter>
         <Button onClick={close}>Close</Button>
         {o.can_edit && <Button variant="danger" onClick={remove}>Delete Objective</Button>}
+        {o.can_share && <Button onClick={share}>Share Objective</Button>}
         {o.can_edit && <Button variant="primary" onClick={edit}>Edit Objective</Button>}
       </FormFooter>
     </>
@@ -366,6 +390,12 @@ function GoalSheet({ id, close }: { id: string; close: () => void }) {
   const mine = hasCapability(me, "goals.organisation");
   const mayEdit = mine && can("performance", "edit");
   const mayDelete = mine && can("performance", "delete");
+  // Share Goal and Stop Sharing: the CEO shares an organisational goal, with all staff or chosen departments (§6.24).
+  const share = () =>
+    modal.open({
+      title: "Share Goal",
+      body: () => <ShareForm kind="goal" id={id} share={g.share} close={() => modal.open({ title: "Organisational Goal", wide: true, body: (c) => <GoalSheet id={id} close={c} /> })} />,
+    });
   const remove = async () => {
     if (!(await confirm({ title: "Delete Goal", body: `${g.code ? `${g.code} · ` : ""}${g.title}`, confirmLabel: "Delete Goal", destructive: true }))) return;
     try {
@@ -389,11 +419,13 @@ function GoalSheet({ id, close }: { id: string; close: () => void }) {
           ...g.targets.map((t) => [`${t.period_name} Target`, figureOf(t.target_value, t.target_text) ?? "–"] as [string, string]),
           ["Objectives", g.objectives.map((o) => o.code).join(", ") || "–"],
           ["Progress", score(g.progress)],
+          ...(g.can_share ? ([["Shared With", shareLabel(g.share)]] as Array<[string, string]>) : []),
         ]}
       />
       <FormFooter>
         <Button onClick={close}>Close</Button>
         {mayDelete && <Button variant="danger" onClick={remove}>Delete Goal</Button>}
+        {g.can_share && <Button onClick={share}>Share Goal</Button>}
         {mayEdit && (
           <Button variant="primary" onClick={() => modal.open({ title: "Edit Goal", body: () => <GoalEditForm goal={g} close={() => modal.open({ title: "Organisational Goal", wide: true, body: (c) => <GoalSheet id={id} close={c} /> })} /> })}>
             Edit Goal

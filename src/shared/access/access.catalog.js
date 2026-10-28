@@ -280,6 +280,12 @@ const CAPABILITY_CATALOG = [
     description: "Confirm the month's key result scores the heads propose.",
   },
   {
+    code: "goals.view_all",
+    module: "performance",
+    label: "View All Goals",
+    description: "Read the whole organisational and company plan: every organisational goal, company objective and key result.",
+  },
+  {
     code: "performance.manage",
     module: "performance",
     label: "Run Performance",

@@ -286,8 +286,8 @@ describeDb("performance analytics against the real migrations", () => {
     await commitment("dev", "2026-10-01", "2026-10-05T16:00:00Z", "2026-10-05T17:00:00Z");
   });
 
-  test("the OKR figures read the whole tree: scores by month, the company score, key results by status", async () => {
-    const res = await as("ada").get(`/performance/analytics?period_id=${ids.period}`);
+  test("the OKR figures read the tree as the reader may (§6.23): scores by month, the company score, key results by status", async () => {
+    const res = await as("pm").get(`/performance/analytics?period_id=${ids.period}`);
     expect(res.status).toBe(200);
     const a = c.goals.PerformanceAnalytics.parse(res.body);
     expect(a.period).toEqual({ performance_period_id: ids.period, name: "Q4 2026", starts_on: "2026-10-01", ends_on: "2026-12-31" });
@@ -312,10 +312,19 @@ describeDb("performance analytics against the real migrations", () => {
       recovery: 1,
     });
 
+    // Operations & People read every function's figures, never the company's: no company score or row.
     const tbo = c.goals.PerformanceAnalytics.parse((await as("ops").get(`/performance/analytics?department_id=${ids.tbo}`)).body);
-    expect(tbo.scores.map((s) => s.department)).toEqual([null, "Technology & Back-office Ops"]);
-    expect(tbo.company_score).toBe("0.58");
+    expect(tbo.scores.map((s) => s.department)).toEqual(["Technology & Back-office Ops"]);
+    expect(tbo.company_score).toBeNull();
     expect(tbo.key_results).toMatchObject({ key_results: 2, off_track: 1, at_risk: 1, recovery: 1, awaiting_report: 0 });
+    const ops = c.goals.PerformanceAnalytics.parse((await as("ops").get(`/performance/analytics?period_id=${ids.period}`)).body);
+    expect(ops.scores.map((s) => s.department)).toEqual(["Branding & Marketing", "Technology & Back-office Ops"]);
+    expect(ops.key_results.key_results).toBe(4);
+    // A member of a function reads that function's alone.
+    const own = c.goals.PerformanceAnalytics.parse((await as("ada").get(`/performance/analytics?period_id=${ids.period}`)).body);
+    expect(own.company_score).toBeNull();
+    expect(own.scores.map((s) => s.department)).toEqual(["Branding & Marketing"]);
+    expect(own.key_results.key_results).toBe(2);
   });
 
   test("ratings at the latest closed round and Self Against Final, in the reader's scope", async () => {
@@ -339,11 +348,11 @@ describeDb("performance analytics against the real migrations", () => {
     const mine = c.goals.PerformanceAnalytics.parse((await as("head").get("/performance/analytics")).body);
     expect(mine.ratings.counts.map((r) => r.count)).toEqual([1, 1, 0, 1]);
     expect(mine.self_against_final.map((r) => r.department)).toEqual(["Branding & Marketing"]);
-    // Their own alone, for a member of staff; the OKR figures are everyone's.
+    // Their own alone, for a member of staff, with no company score.
     const own = c.goals.PerformanceAnalytics.parse((await as("ada").get("/performance/analytics")).body);
     expect(own.ratings.counts.map((r) => r.count)).toEqual([0, 1, 0, 0]);
     expect(own.self_against_final).toEqual([{ department_id: ids.bm, department: "Branding & Marketing", gap: "0.03", lines: 3 }]);
-    expect(own.company_score).toBe("0.58");
+    expect(own.company_score).toBeNull();
   });
 
   test("check-ins, reviews closed and commitments on time, against their deadlines in Lagos", async () => {

@@ -121,6 +121,8 @@ export const ORG_GOALS: OrganisationalGoal[] = [
   ends_on: "2026-12-31",
   status: "active" as const,
   owner: refKey("ifeoma"),
+  can_share: false,
+  share: null,
   created_at: at(60, "09:00"),
   updated_at: at(60, "09:00"),
 }));
@@ -140,6 +142,8 @@ export const OBJECTIVES: Objective[] = [
     plan_status: "binding",
     score: "0.68",
     can_edit: false,
+    can_share: false,
+    share: null,
     key_results: [
       kr("BM-KR1.1", "BM-O1", "Grow monthly active users to 64,000", "64000", "users", month("BM-KR1.1", "0.6", "at_risk", "38400", "Campaign in two cities slipped a week."), 0),
       kr("BM-KR1.2", "BM-O1", "Publish 36 city stories across channels", "36", "stories", month("BM-KR1.2", "0.75", "on_track", "27", "On plan."), 1),
@@ -157,6 +161,8 @@ export const OBJECTIVES: Objective[] = [
     position: 1,
     plan_status: "binding",
     can_edit: false,
+    can_share: false,
+    share: null,
     score: "0.9",
     key_results: [kr("BM-KR2.1", "BM-O2", "Secure 12 earned media features", "12", "features", month("BM-KR2.1", "0.9", "on_track", "11", "Two pending."), 0)],
   },

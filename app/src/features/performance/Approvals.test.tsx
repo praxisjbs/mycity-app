@@ -2,7 +2,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ModalProvider } from "@mycity/ui";
-import { chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession, sid } from "@/api/mock/core";
@@ -235,7 +235,8 @@ describe("Performance · Goals, Waiting On You", () => {
     // The head reads why on the plan, and may ask again.
     setViewport(1440);
     await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
-    await chooseOption(screen.getByLabelText("Function"), "Marketing & Sales");
+    // A head reads their own function alone: no Function to choose, and its plan is the one in view (§6.23).
+    expect(screen.queryByLabelText("Function")).toBeNull();
     await settled();
     expect(screen.getByText("Not this quarter")).toBeTruthy();
     expect(header("Request To Unbind")).toBeTruthy();
@@ -261,7 +262,6 @@ describe("Performance · Goals, Waiting On You", () => {
     await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
     expect(header("Request To Unbind")).toBeUndefined();
     expect(header("New Goal")).toBeTruthy();
-    await chooseOption(screen.getByLabelText("Function"), "Marketing & Sales");
     await settled();
     expect(screen.getAllByText("Unbound").length).toBeGreaterThan(0);
     await press(document.body, "Send Plan");
