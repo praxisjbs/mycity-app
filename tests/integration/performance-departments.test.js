@@ -138,7 +138,7 @@ describeDb("performance department filters against the real migrations", () => {
     const quarter = await request(app)
       .post("/api/v1/performance/periods")
       .set("Authorization", `Bearer ${tokens.ops}`)
-      .send({ starts_on: "2026-10-01", targets_lock_on: "2026-10-31" });
+      .send({ starts_on: "2026-10-01" });
     expect(quarter.status).toBe(201);
     ids.period = quarter.body.performance_period_id;
     const card = await one(

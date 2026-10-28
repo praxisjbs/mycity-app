@@ -43,7 +43,6 @@ const monthKey = today.slice(0, 7);
 const lastMonth = lagos.addMonths(thisMonth, -1);
 const lastKey = lastMonth.slice(0, 7);
 const quarterStart = `${today.slice(0, 4)}-${String(Math.floor((Number(today.slice(5, 7)) - 1) / 3) * 3 + 1).padStart(2, "0")}-01`;
-const quarterEnd = lagos.addDays(lagos.addMonths(quarterStart, 3), -1);
 /** A day in this month after today when there is one, else today. */
 const laterThisMonth = lagos.monthBounds(today).last > today ? lagos.monthBounds(today).last : today;
 
@@ -136,7 +135,7 @@ describeDb("performance commitments, the week and the calendar against the real 
     }
     // The quarter, a binding plan with one key result the head owns, and Ada's binding scorecard
     // with a line measured in tasks (PR 2 builds these through its screens; here they are rows).
-    const period = await as("ops").post("/performance/periods", { starts_on: quarterStart, targets_lock_on: quarterEnd });
+    const period = await as("ops").post("/performance/periods", { starts_on: quarterStart });
     expect(period.status).toBe(201);
     ids.period = period.body.performance_period_id;
     ids.plan = (

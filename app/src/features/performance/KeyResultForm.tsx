@@ -1,10 +1,9 @@
 /**
  * Performance · Goals, New Key Result and Edit Key Result (docs/guides/performance.md §3.2, §6.3, §10):
  * one form, checked by the goals contract (KeyResultCreate, or KeyResultEdit for a draft's key result).
- * Open: objective, key result, measure, target, target in words, TBC, unit, finish, owner, and Feeds for
+ * Open: objective, key result, measure, target, target in words, unit, finish, owner, and Feeds for
  * a function's key result (the company key results it feeds, 25 a page from the server). Behind More:
  * Scored From for a company key result, co-owner, direction, baseline, start, type and owner note.
- * Set Target: a TBC target set in place before its lock date (§6.7).
  */
 import { useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
@@ -13,7 +12,7 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { Button, CheckboxField, ChoiceField, DateField, EmptyState, Field, FormFooter, MoreFields, NumberField, RecordPicker, SelectField, TextField, toast, useContractForm } from "@mycity/ui";
+import { Button, ChoiceField, DateField, EmptyState, Field, FormFooter, MoreFields, NumberField, RecordPicker, SelectField, TextField, toast, useContractForm } from "@mycity/ui";
 import { bodySchema, UnitField } from "./shared";
 
 export const KR_TYPES: Record<string, string> = {
@@ -38,7 +37,6 @@ type Values = {
   measure: string;
   target_value: string;
   target_text: string;
-  target_provisional: boolean;
   unit: string;
   finishes_on: string;
   accountable_employee_id: string;
@@ -85,7 +83,6 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
       measure: k?.measure ?? "numeric",
       target_value: k?.target_value ?? "",
       target_text: k?.target_text ?? "",
-      target_provisional: k?.target_provisional ?? false,
       unit: k?.unit ?? "",
       finishes_on: k?.finishes_on ?? "",
       accountable_employee_id: k?.accountable?.employee_id ?? "",
@@ -151,9 +148,6 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
       )}
       {numbers && <Field label="Target" optional {...f.status("target_value")}><NumberField decimal signed {...f.field("target_value")} placeholder="64000" /></Field>}
       <Field label="Target in Words" optional {...f.status("target_text")}><TextField {...f.field("target_text")} placeholder={numbers ? "64,000 users" : "Launch in Kano"} /></Field>
-      <Field label="TBC" {...f.status("target_provisional")}>
-        <CheckboxField label="Target to be confirmed" value={v.target_provisional} onChange={(x) => f.field("target_provisional").onChange(x)} />
-      </Field>
       {numbers && <Field label="Unit" optional {...f.status("unit")}><UnitField {...f.field("unit")} /></Field>}
       <Field label="Finish" optional {...f.status("finishes_on")}><DateField {...f.field("finishes_on")} /></Field>
       <Field label="Owner" optional {...f.status("accountable_employee_id")}>
@@ -251,35 +245,4 @@ function editBody(v: Values, k: KeyResultDetail) {
     linked_company_key_result_ids: company ? [] : v.linked_company_key_result_ids,
     scored_from_key_result_id: company ? v.scored_from_key_result_id : "",
   };
-}
-
-/** Set Target: a TBC target set in place by its owner or the function's head before the lock date; it stays TBC until then. */
-export function SetTargetForm({ keyResult, close, onSaved }: { keyResult: KeyResultDetail; close: () => void; onSaved?: () => void }) {
-  type Target = { target_value: string; target_text: string };
-  const numbers = !NUMBERLESS.has(keyResult.measure);
-  const f = useContractForm<Target>({ target_value: keyResult.target_value ?? "", target_text: keyResult.target_text ?? "" }, goalsContract.KeyResultEdit);
-  const save = useMutation("PATCH /api/v1/performance/key-results/:id");
-  const submit = async () => {
-    if (!f.check()) return;
-    try {
-      await save.run({ params: { id: keyResult.okr_key_result_id }, body: f.values as Endpoints["PATCH /api/v1/performance/key-results/:id"]["body"] });
-      invalidate("/api/v1/performance/okrs");
-      close();
-      toast("Target set");
-      onSaved?.();
-    } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else say(e);
-    }
-  };
-  return (
-    <>
-      {numbers && <Field label="Target" optional {...f.status("target_value")}><NumberField decimal signed {...f.field("target_value")} placeholder="64000" /></Field>}
-      <Field label="Target in Words" optional {...f.status("target_text")}><TextField {...f.field("target_text")} placeholder={numbers ? "64,000 users" : "Launch in Kano"} /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={submit}>Set Target</Button>
-      </FormFooter>
-    </>
-  );
 }

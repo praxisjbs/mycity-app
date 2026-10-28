@@ -101,7 +101,7 @@ async function settleChange(changeId, { state }) {
     if (approved) {
       const target = { target_value: change.to_value ?? null, target_text: change.to_text ?? null };
       if (change.okr_key_result_id) {
-        await repo.updateKeyResult(client, change.okr_key_result_id, { ...target, target_provisional: false });
+        await repo.updateKeyResult(client, change.okr_key_result_id, target);
         await require("./goals.okrs").rescoreFrom(client, change.okr_key_result_id, change.from_month);
       } else {
         await require("../targets/targets.service").applyTargetChange(client, { ...change, ...target });

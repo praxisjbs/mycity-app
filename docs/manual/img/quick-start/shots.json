@@ -41,7 +41,7 @@
   },
   "qs-approve-commitments": {
     "spec": "670035074f4610c2",
-    "source": "ff6447c77b382545",
+    "source": "1de2297095640706",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "qs-close-review": {
     "spec": "604a2fce10313447",
-    "source": "ff6447c77b382545",
+    "source": "1de2297095640706",
     "devices": [
       "desktop",
       "phone"
@@ -176,8 +176,8 @@
     ]
   },
   "qs-quarter": {
-    "spec": "f235478418d3f1d1",
-    "source": "ff6447c77b382545",
+    "spec": "38fab6013ca027ea",
+    "source": "1de2297095640706",
     "devices": [
       "desktop",
       "phone"
@@ -185,7 +185,7 @@
   },
   "qs-report-month": {
     "spec": "6e78bdb9be20b6f0",
-    "source": "ff6447c77b382545",
+    "source": "1de2297095640706",
     "devices": [
       "desktop",
       "phone"
@@ -209,7 +209,7 @@
   },
   "qs-score-review": {
     "spec": "dea01acb415b7670",
-    "source": "ff6447c77b382545",
+    "source": "1de2297095640706",
     "devices": [
       "desktop",
       "phone"

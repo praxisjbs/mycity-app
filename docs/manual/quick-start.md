@@ -294,7 +294,7 @@ icon: spark
 ![Set Up Quarter](shot:qs-quarter)
 
 1. Open [Performance · Goals](/performance?tab=goals) and press **Manage Quarters**.
-2. Choose **Set Up Quarter**. Check its **Starts** date and **Lock Date**.
+2. Choose **Set Up Quarter**. Check its **Starts** date and **Status**.
 3. Press **Next** through **Bands**, **Key Result Scoring**, **Line Scoring** and **Section
    Weights**.
 4. Press **Set Up Quarter**. Read [Set up a quarter](#performance-quarter).
@@ -554,10 +554,10 @@ as: operations
 do:
   - click: button "Manage Quarters"
   - click: text "Set Up Quarter"
-  - wait: text "Lock Date"
+  - wait: label "Starts"
 crop: modal
 marks:
-  1: text "Lock Date" | When TBC targets lock
+  1: label "Starts" | The quarter's first day
   2: button "Next" | The next step
 ```
 
