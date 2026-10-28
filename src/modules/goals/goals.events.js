@@ -10,15 +10,19 @@
  */
 const { defineEvents } = require("../../shared/events/catalogue");
 const { defineNotification } = require("../../shared/notifications/fanout");
+const { completeQuery } = require("../../shared/http/paged");
 const { loginsOf } = require("../tasks/tasks.events");
 
 const EVENTS = defineEvents("performance", {
   "period.created": { summary: "A quarter was set up, with the last quarter's rules" },
   "period.changed": { summary: "A quarter's dates, rules or status were changed" },
-  "period.targets_locked": { summary: "A quarter's provisional targets locked on its lock date" },
   "organisational_goal.saved": { summary: "An organisational goal was recorded or changed" },
   "organisational_goal.deleted": { summary: "An organisational goal no company objective served was removed" },
+  "organisational_goal.shared": { summary: "An organisational goal was shared with all staff or chosen departments" },
+  "organisational_goal.unshared": { summary: "An organisational goal was no longer shared" },
   "objective.saved": { summary: "An objective was set or changed" },
+  "objective.shared": { summary: "A company objective was shared with all staff or chosen departments" },
+  "objective.unshared": { summary: "A company objective was no longer shared" },
   "objective.deleted": { summary: "A draft objective was removed" },
   "key_result.saved": { summary: "A key result was set or changed" },
   "key_result.deleted": { summary: "A draft key result was removed" },
@@ -79,6 +83,51 @@ defineNotification(EVENTS.TARGET_CHANGE_DECIDED, {
   title: (e) => (e.payload.status === "approved" ? "Target change approved" : "Target change refused"),
   body: (e) => e.payload.label || "",
   include_actor: true,
+});
+
+/**
+ * The logins a share newly reaches (§6.24): every active holder of `performance` view, or those in the
+ * departments added, less the departments it already reached; not the CEO or whoever reads the whole plan,
+ * who read it already.
+ */
+async function newlyReachedLogins(e, client) {
+  const n = e.payload.notify || {};
+  if (!n.all && !(n.department_ids || []).length) return [];
+  // pagination:complete the people a share newly reaches, told once when it is saved
+  const { rows } = await completeQuery(
+    client,
+    `SELECT u.user_id
+       FROM app_user u JOIN employee em ON em.employee_id = u.employee_id
+      WHERE u.status = 'active' AND em.status = 'active' AND NOT u.is_ceo
+        AND ($1::boolean OR em.department_id = ANY($2::uuid[]))
+        AND NOT COALESCE(em.department_id = ANY($3::uuid[]), false)
+        AND EXISTS (SELECT 1 FROM user_role ur JOIN permission pm ON pm.role_id = ur.role_id
+                     WHERE ur.user_id = u.user_id AND pm.module_key = 'performance' AND pm.can_view
+                       AND ur.effective_from <= CURRENT_DATE AND (ur.effective_to IS NULL OR ur.effective_to >= CURRENT_DATE))
+        AND NOT EXISTS (SELECT 1 FROM capability c
+                         WHERE c.code = 'goals.view_all'
+                           AND (EXISTS (SELECT 1 FROM user_capability uc
+                                         WHERE uc.capability_id = c.capability_id AND uc.user_id = u.user_id
+                                           AND (uc.expires_at IS NULL OR uc.expires_at > now()))
+                                OR EXISTS (SELECT 1 FROM role_capability rc JOIN user_role vr ON vr.role_id = rc.role_id
+                                            WHERE rc.capability_id = c.capability_id AND vr.user_id = u.user_id)))
+      ORDER BY u.user_id`,
+    [n.all === true, n.department_ids || [], n.except_department_ids || []],
+    { label: "the people a share reaches", ceiling: 5000 },
+  );
+  return rows.map((r) => r.user_id);
+}
+
+defineNotification(EVENTS.ORGANISATIONAL_GOAL_SHARED, {
+  to: [{ users: newlyReachedLogins }],
+  title: () => "A goal was shared with you",
+  body: (e) => `${e.payload.code || ""} ${e.payload.title || ""}`.trim(),
+});
+
+defineNotification(EVENTS.OBJECTIVE_SHARED, {
+  to: [{ users: newlyReachedLogins }],
+  title: () => "An objective was shared with you",
+  body: (e) => `${e.payload.code || ""} ${e.payload.title || ""}`.trim(),
 });
 
 module.exports = { EVENTS };

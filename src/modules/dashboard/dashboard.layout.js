@@ -44,6 +44,7 @@ const leave = require("../leave/leave.service");
 const organisation = require("../organisation/organisation.service");
 const calendar = require("./sources/calendar.source");
 const goals = require("./sources/goals.source");
+const visibility = require("../goals/goals.visibility");
 const partners = require("./sources/partners.source");
 const tasks = require("./sources/tasks.source");
 const { leadBalance } = require("./kpi-catalog/tiles/people");
@@ -172,10 +173,10 @@ async function attendance(client, { today, scopes }) {
  * The organisation's goals live this quarter, soonest ending first, at most a page, each with its
  * progress: the mean score of the company objectives serving it, as a percentage (goals.source.js).
  */
-async function quarterGoals(client, { today }) {
-  const page = await goals.organisationGoals(client, quarterOf(today), {
-    page: 1,
-  });
+async function quarterGoals(client, { today, user }) {
+  // Only the goals the reader may read (performance.md §6.23): all of them for the CEO and Management, else those
+  // shared with them, and a section drawn with none is empty, as every section is.
+  const page = await goals.organisationGoals(client, quarterOf(today), { page: 1 }, await visibility.readerOf(client, user));
   return page.data.map((g) => ({
     title: g.title,
     progress: g.progress ?? null,
@@ -189,20 +190,24 @@ async function quarterGoals(client, { today }) {
  * beside it, as percentages (goals.source.js orgScores: the score Goals shows), null for one with
  * nothing scored; the departments are the organisation's own, the first page of them by name.
  */
-async function orgKpi(client, { today }) {
+async function orgKpi(client, { today, user }) {
+  const reach = await visibility.readerOf(client, user);
   const [page, scores] = await Promise.all([
     organisation.departments(client, { page: 1, active: "true" }),
-    goals.orgScores(client, { today }),
+    goals.orgScores(client, { today }, reach),
   ]);
   const percentOf = new Map(scores.map((r) => [r.department_id, r.percent]));
   return {
     kind: "org_kpi",
+    // The company's score is the whole plan's; a function's, those the reader reads (performance.md §6.23).
     percent: percentOf.get(null) ?? null,
-    departments: page.data.map((d) => ({
-      department_id: d.department_id,
-      department: d.name,
-      percent: percentOf.get(d.department_id) ?? null,
-    })),
+    departments: page.data
+      .filter((d) => visibility.readsFunction(reach, d.department_id))
+      .map((d) => ({
+        department_id: d.department_id,
+        department: d.name,
+        percent: percentOf.get(d.department_id) ?? null,
+      })),
   };
 }
 

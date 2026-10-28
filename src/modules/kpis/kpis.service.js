@@ -14,6 +14,7 @@ const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { scopeFor } = require("../../middleware/rbac");
 const authority = require("../goals/goals.authority");
+const visibility = require("../goals/goals.visibility");
 const repo = require("./kpis.repo");
 const { EVENTS } = require("./kpis.events");
 
@@ -77,14 +78,16 @@ async function untilOf(periodId) {
   return rows[0] ? day(rows[0].ends_on) : null;
 }
 
-async function list(query) {
-  const page = await repo.list(pool, query, await untilOf(query.period_id));
+/** GET /performance/kpis: the KPIs of the functions the reader reads (§6.23). */
+async function list(query, actor = null) {
+  const page = await repo.list(pool, query, await untilOf(query.period_id), await visibility.readerOf(pool, actor));
   return { ...page, data: page.data.map(kpiView) };
 }
 
 async function get(id, { period_id: periodId = null } = {}, actor = null) {
   const row = await repo.get(pool, id, await untilOf(periodId));
   if (!row) throw notFound();
+  if (!visibility.readsFunction(await visibility.readerOf(pool, actor), row.department_id)) throw notFound();
   return {
     ...kpiView(row),
     months: (await repo.months(pool, id)).map(monthView),
@@ -101,8 +104,8 @@ async function mayEdit(actor, departmentId) {
 }
 
 /** GET /performance/kpis/summary: the month's figures over every active KPI, or one function's. */
-async function summary(query) {
-  const row = await repo.summary(pool, { department_id: query.department_id || null, month: query.month });
+async function summary(query, actor = null) {
+  const row = await repo.summary(pool, { department_id: query.department_id || null, month: query.month }, await visibility.readerOf(pool, actor));
   return { kpis: row.kpis, met: row.met, not_met: row.not_met, awaiting: row.awaiting };
 }
 

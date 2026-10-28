@@ -11,7 +11,7 @@ system: the goals are planned each quarter, each person has a scorecard, and the
 every month.
 
 - **Goals** holds the organisational goals, and the company's and each function's objectives with
-  their key results.
+  their key results. You read your own department's, and what has been shared with you.
 - **Scorecards** holds each person's scorecard for the quarter, and the month's **Commitments**.
 - **KPIs** holds each function's operational measures and their monthly results.
 - **Reviews** holds each month's review of every scorecard.
@@ -26,13 +26,14 @@ Scores run from 0 to 1. A key result scoring 0.7 or more is **Good**, 0.4 to 0.7
 and under 0.4 is **Recovery**, which needs a recovery plan. A scorecard's rating is **Exceeds**
 (0.90 or more), **Meets** (0.75 or more), **Partly Meets** (0.50 or more) or **Below**.
 These are the starting numbers. Operations and People can change them for each quarter (see
-[Set up a quarter](#performance-quarter)). Point at **Company Score** on Goals, or tap it, to see
-the quarter's own.
+[Set up a quarter](#performance-quarter)). Point at **Company Score** or **Function Score** on
+Goals, or tap it, to see the quarter's own.
 
 ## Goals {#performance-goals screen=performance/goals icon=target}
 
 Goals is the quarter's plan, from the year's organisational goals down to each function's key
-results. Everyone can read all of it.
+results. You read your own department's part of it, and anything the CEO or Management has shared
+with you. The CEO and Management read all of it.
 
 ![Performance, Goals](shot:performance-goals)
 
@@ -41,13 +42,15 @@ results. Everyone can read all of it.
 1. Open [Performance · Goals](/performance?tab=goals). The quarter and its dates show under the
    title on a computer.
 2. Choose the **Quarter**, and the **Function**: **All Functions**, **Company** or one function.
-3. The tiles show the **Company Score**. **Scoring Good** counts key results scoring **Good** in
-   their latest month. **In Recovery** counts those scoring **Recovery**. **Awaiting Report** counts those
-   never reported.
-4. **Organisational Goals** lists the year's goals: **Goal ID**, **Strategic Theme**, **Goal** and
-   **Success Measure**. Press one to open it: its **Strategic Theme**, **Success Measure**,
-   **Baseline**, **Description**, a target for each quarter, the **Objectives** serving it and its
-   **Progress**.
+   **Function** lists what you may read, and is left off when that is one function.
+3. The first tile is the **Company Score** for the CEO and Management, and the **Function Score**
+   for everyone else. **Scoring Good** counts key results scoring **Good** in their latest month.
+   **In Recovery** counts those scoring **Recovery**. **Awaiting Report** counts those never
+   reported. All of them count what you read.
+4. **Organisational Goals** lists the year's goals you may read: **Goal ID**, **Strategic Theme**,
+   **Goal** and **Success Measure**. It shows only when there is one for you. Press one to open it:
+   its **Strategic Theme**, **Success Measure**, **Baseline**, **Description**, a target for each
+   quarter, the **Objectives** of it you may read and its **Progress**.
 5. Under it, each objective is a card with its code, its title and its score. Its table lists each
    key result's **Code**, **Key Result**, **Owner**, **Finish**, **Status** and **Score**.
 6. Press a key result to open its panel (see [Open a key result](#performance-key-result)).
@@ -58,6 +61,17 @@ results. Everyone can read all of it.
 Before any objective is set for the quarter, Goals reads **No Objectives Yet**. Before the first
 quarter is set up, only **Manage Quarters** is offered.
 
+| You are | You read on Goals |
+|---|---|
+| A member of a department | Your department's objectives and key results, any key result you own wherever it sits, and what has been shared with you |
+| A department's head | The same for the department you head |
+| In Operations and People | Every function's objectives and key results, and the company's only when it is shared with you |
+| In Management, or the CEO | Everything: the organisational goals, the company's objectives and every function's |
+
+A company objective you read only because you own one of its key results shows that key result
+alone, with no score. A key result of your department names the company key result it feeds by its
+code and words, and nothing more of it.
+
 | A key result's status | What it means |
 |---|---|
 | **On Track** | Going to plan |
@@ -66,11 +80,10 @@ quarter is set up, only **Manage Quarters** is offered.
 | **Done** | Delivered |
 | **Missed** | Not delivered by its date |
 | **Not Started** | Work has not begun |
-| **Awaiting Report** | Nothing has been reported for it yet |
-| **TBC** | Its target is not confirmed yet; it is set before the quarter's lock date |
+| **Awaiting Report** | No month has been reported for it yet |
 
-A key result shows its latest reported month. It keeps that month's status until the head reports
-the next one.
+A key result reads **Awaiting Report** until its first month is reported. After that it shows its
+latest reported month, and keeps that month's status until the head reports the next one.
 
 On a phone, the buttons at the top sit under the title. **Quick Actions** offers a function's head
 Report Month, and others New Goal. The tiles sit two to a row. **Organisational Goals**
@@ -82,7 +95,7 @@ list from the bottom, and the larger forms fill the screen.
 |---|---|---|
 | **This was not found** | The goal, objective or key result has been deleted | Close it. Goals shows what remains |
 | **That goal does not exist** or **That key result does not exist** | Someone deleted it while you had it open | Close it and open Goals again |
-| **This key result is binding: change its target instead** | Its plan was sent, or its lock date came, while it was open | Close it, open it again and use **Change Target** |
+| **This key result is binding: change its target instead** | Its plan was sent while it was open | Close it, open it again and use **Change Target** |
 
 ### Open a key result {#performance-key-result}
 
@@ -93,8 +106,8 @@ The panel shows what the key result is and how its latest month went:
 - **Key Result**, **Type**, **Owner**, **Start**, **Finish** and **Baseline**.
 - **Target**, with *Was* and the old target after a change. **Change Waiting** shows a new target
   the CEO has not decided yet.
-- **Feeds** names the company key results it feeds, **Fed By** the ones that feed it, and **Rolls
-  Up To** the objective and goal above it.
+- **Feeds** names the company key results it feeds, by code and words, **Fed By** the ones that feed
+  it that you may read, and **Rolls Up To** the objective and goal above it where you may read them.
 - The month last reported, named such as *October 2026* (**Not Reported** before any), with its
   pill (**Good**, **Watch**, **Recovery** or **Not Scored**): **Status**, **Actual**, **Source**,
   **Update**, the **Proposed** score and the **Confirmed** score.
@@ -133,6 +146,46 @@ The CEO records the year's organisational goals.
 | **A company objective serves this goal** | A company objective names it | Point that objective at another goal first, then delete |
 | **Another record names this goal** | An older scorecard line or goal names it | Keep the goal; ask Operations and People if it must go |
 
+### Share an organisational goal {#performance-goals-share needs="performance edit, cap goals.organisation"}
+
+The CEO decides who reads an organisational goal. A shared goal is read only: nobody it is shared
+with can change, delete or share it.
+
+1. Open [Performance · Goals](/performance?tab=goals) and press the goal under **Organisational
+   Goals**.
+   ![Sharing a goal](shot:performance-goal-share)
+2. Press **Share Goal**.
+3. Choose **Share With**: **All Staff** or **Chosen Departments**. For the second, pick each
+   department under **Departments**.
+4. Press **Share Goal**. The people it newly reaches get a notice that opens the goal. The goal's
+   sheet shows **Shared With**, and **Organisational Goals** shows **Shared** beside it.
+5. To take it back, press **Share Goal** again, then **Stop Sharing**. Nobody is told.
+
+Sharing a goal shares nothing else: not the objectives that serve it, and not any plan.
+
+| The hub says | What it means | What to do |
+|---|---|---|
+| **Pick a department** | **Chosen Departments** is chosen and none is picked | Pick at least one, or choose **All Staff** |
+| **Not a department** | One of the departments is retired | Pick active departments |
+
+### Share a company objective {#performance-objective-share needs="performance edit, cap goals.company"}
+
+Management decide who reads a company objective. It is shared with its key results, read only.
+
+1. On [Performance · Goals](/performance?tab=goals), press the three dots on the company objective's
+   card, then **Share Objective**. Or open the objective and press **Share Objective**.
+2. Choose **Share With**, and the **Departments** for **Chosen Departments**.
+3. Press **Share Objective**. The people it newly reaches get a notice that opens it. The card
+   shows **Shared** while it is shared.
+4. To take it back, open **Share Objective** again and press **Stop Sharing**.
+
+A function's own objective is never shared: its department already reads it. Each quarter has its
+own company objectives, so share them again each quarter.
+
+| The hub says | What it means | What to do |
+|---|---|---|
+| **Only a company objective is shared** | The objective belongs to a function | Nothing to do: its department reads it |
+
 ### Set objectives and key results {#performance-goals-set needs="performance create, cap goals.function"}
 
 The CEO and Management set the company's objectives; each function's head sets the function's.
@@ -162,15 +215,15 @@ page is binding, **Request To Unbind** takes its place.
    shows. If the form reads **No Objectives Yet**, set an objective first, or the plan is binding.
 6. Choose its **Measure**: **Numeric**, **Dated** or **Yes or No**. The form shows only what the
    measure needs.
-7. For **Numeric**, fill in the **Target** as a number. For every measure, fill in **Target in
-   Words** as people say it, such as `64,000 users` or `Launch in Kano`. Tick **Target to be
-   confirmed** if it is not settled yet.
-8. For **Numeric**, pick the **Unit** from the list, or type one the list does not hold and it is
-   offered next time. For every measure, add the **Finish** date and the **Owner**. For a function's
-   key result, pick the company key results it **Feeds**.
+7. For **Numeric**, fill in the **Target** as a number, then pick the **Unit** from the list, or
+   type one the list does not hold and it is offered next time. For every measure, fill in **Target
+   in Words** as people say it, such as `64,000 users` or `Launch in Kano`.
+8. For every measure, add the **Start** and **Finish** dates, the **Type** and the **Owner**. For a
+   function's key result, pick the company key results it **Feeds**. The types are explained under
+   [Open a key result](#performance-key-result).
 9. Press **More** for **Co-Owner**, **Direction** (**Numeric** only: **Higher Is Better** or **Lower
-   Is Better**), **Baseline**, **Start**, **Type** and **Owner Note**. A company key result also has
-   **Scored From** here. The types are explained under [Open a key result](#performance-key-result).
+   Is Better**), **Baseline** and **Owner Note**. A company key result also has **Scored From**
+   here.
 10. Press **Set Key Result**. The hub gives it its code, such as *BM-KR1.3 set*.
 
 To change an objective, press the three dots on its card and choose **Edit Objective**. Change the
@@ -366,17 +419,14 @@ The CEO confirms each month's key result scores at the monthly review.
 ### Change a target {#performance-target needs="performance edit"}
 
 A binding target changes only with the CEO's approval. The old target stays beside the new one,
-and scores already given do not change.
+and scores already given do not change. A key result with no target yet is given one the same way.
 
 1. Open the key result on [Performance · Goals](/performance?tab=goals). Its owner and the
-   function's head see the buttons.
-2. Before the quarter's lock date, a **TBC** target is set in place: press **Set Target**, fill
-   in **Target** and **Target in Words**, and press **Set Target**. The hub says **Target set**. It
-   still reads **TBC** until the lock date, so you may set it again until then.
-3. After it, press **Change Target**. Type the **New Target** as a figure only, such as `70000`,
+   function's head see **Change Target**.
+2. Press **Change Target**. Type the **New Target** as a figure only, such as `70000`,
    and the **Target in Words** if it has them. Choose the **From Month**, a month of its quarter.
    Type the **Reason**.
-4. Press **Send Change**. The hub says **Sent to the CEO**, and the key result shows **Change
+3. Press **Send Change**. The hub says **Sent to the CEO**, and the key result shows **Change
    Waiting** until the CEO decides.
 
 | The form says | What it means | What to do |
@@ -393,7 +443,7 @@ starts with a copy of the last quarter's rules.
 1. On [Performance · Goals](/performance?tab=goals), press **Manage Quarters**, then **Set Up
    Quarter**. You can also search for **Set Up Quarter**.
 2. On **Quarter**, check **Starts**: 1 January, 1 April, 1 July or 1 October. **Ends** follows by
-   itself. Add the **Name** (Q1 2027 unless you type another), the **Lock Date** for TBC targets,
+   itself. Add the **Name** (Q1 2027 unless you type another),
    and the **Status**: **Planning** or **Active**. Only one quarter is **Active** at a time. Press
    **Next**.
    ![Set Up Quarter, its first step](shot:performance-quarter)
@@ -415,7 +465,6 @@ says why, such as **That quarter is already set up**.
 | **Pick a quarter start** under **Starts** | It is not a quarter's first day | Pick 1 January, 1 April, 1 July or 1 October |
 | **Already set up** under **Starts** | That quarter exists | Pick the next quarter, or change this one |
 | **Another is active** under **Status** | Another quarter is **Active** | Choose **Planning**, or close the active quarter first |
-| **Outside the quarter** under **Lock Date** | The lock date is not in the quarter | Pick a day between **Starts** and **Ends** |
 | **Must exceed Watch** under **Good From** | Good must start above Watch | Raise **Good From**, or lower **Watch From** |
 | **Must exceed Meets** under **Exceeds From** | Exceeds must start above Meets | Raise **Exceeds From**, or lower **Meets From** |
 | **Must exceed Partly Meets** under **Meets From** | Meets must start above Partly Meets | Raise **Meets From**, or lower **Partly Meets From** |
@@ -657,13 +706,15 @@ Commitments view.
 ## KPIs {#performance-kpis screen=performance/kpis icon=chart}
 
 KPIs are each function's standing operational measures, such as *Brand assets delivered on time*.
-Each has a result every month: **Met**, **Not Met** or **N/A**.
+Each has a result every month: **Met**, **Not Met** or **N/A**. You read your own function's. The CEO,
+Management and Operations and People read every function's.
 
 ![Performance, KPIs](shot:performance-kpis)
 
 ### Read the KPIs {#performance-kpis-read}
 
-1. Open [Performance · KPIs](/performance?tab=kpis) and choose the **Function**.
+1. Open [Performance · KPIs](/performance?tab=kpis) and choose the **Function**. It is left off
+   when you read one function's KPIs.
 2. Type in **Search KPIs** to find one by its ID or name. Only KPIs in use are listed.
 3. The tiles count the **KPIs**, those **Met Last Month**, those **Not Met**, and those
    **Awaiting Actual**.
@@ -951,9 +1002,9 @@ hand when it started late.
 ## Analytics {#performance-analytics screen=performance/analytics icon=chart}
 
 Analytics shows the quarter's figures for the company, or one function. It is open to people who
-manage others, Operations and People, and the CEO. The key result figures cover the whole company.
-Scorecards, check-ins, reviews and commitments count only the people you may see: a manager sees
-their own team.
+manage others, Operations and People, and the CEO. The key result figures count what you read on
+Goals. The **Company Score** is for the CEO and Management alone. Scorecards, check-ins, reviews
+and commitments count only the people you may see: a manager sees their own team.
 
 ![Performance, Analytics](shot:performance-analytics)
 
@@ -962,8 +1013,9 @@ their own team.
 1. Open [Performance · Analytics](/performance?tab=analytics). Choose the **Quarter** and the
    **Function**. **Function** lists only the functions of the people you can see. With one, it is
    left off.
-2. The tiles show the **Company Score**, and the share of **Commitments On Time**, **Check-Ins On
-   Time** and **Reviews Closed On Time**, each with what it is out of, such as 10 of 13.
+2. The tiles show the **Company Score** (the CEO and Management only), and the share of
+   **Commitments On Time**, **Check-Ins On Time** and **Reviews Closed On Time**, each with what it
+   is out of, such as 10 of 13.
 3. **Scores by Month** shows the company's and each function's score for each month.
 4. **Key Results by Status** counts the key results by their status, with those **In Recovery**.
 5. **Rating Spread** counts the ratings of the latest closed round. Before one closes it reads
@@ -1128,11 +1180,24 @@ submit again.
 
 ```shot performance-goals
 open: /performance?tab=goals
-as: operations
+as: ceo
 marks:
   1: label "Quarter" | Pick the quarter
   2: label "Function" | One function or all
   3: text "Company Score" | The company's score
+```
+
+```shot performance-goal-share
+open: /performance?tab=goals&goal=b070313a-aabe-4450-aace-c56a1f06aa20
+as: ceo
+do:
+  - wait: button "Share Goal"
+  - click: button "Share Goal"
+  - wait: role radio "Chosen Departments"
+crop: modal
+marks:
+  1: label "Share With" | All staff or departments
+  2: button "Share Goal" | Share it
 ```
 
 ```shot performance-key-result
@@ -1306,11 +1371,11 @@ sources:
 do:
   - click: button "Manage Quarters"
   - click: text "Set Up Quarter"
-  - wait: label "Lock Date"
+  - wait: label "Starts"
 crop: modal
 marks:
   1: label "Starts" | The quarter's first day
-  2: label "Lock Date" | When TBC targets lock
+  2: label "Name" | What the quarter is called
   3: button "Next" | The next step
 ```
 

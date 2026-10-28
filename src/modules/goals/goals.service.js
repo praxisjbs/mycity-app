@@ -15,6 +15,8 @@ const { emit } = require("../../shared/events/emit");
 const numbering = require("../../shared/numbering/numbering");
 const { scoring } = require("@mycity/contract");
 const periods = require("./goals.periods");
+const share = require("./goals.share");
+const visibility = require("./goals.visibility");
 const repo = require("./goals.repo");
 const { EVENTS } = require("./goals.events");
 
@@ -42,7 +44,6 @@ function periodView(row) {
     starts_on: startsOn,
     ends_on: day(row.ends_on),
     plan_year_starts_on: day(row.plan_year_starts_on),
-    targets_lock_on: day(row.targets_lock_on),
     live_from: day(row.live_from),
     status: row.status,
     rules: row.rules,
@@ -52,7 +53,7 @@ function periodView(row) {
   };
 }
 
-/** A date the quarter's own days must hold (the lock date, the first live day). */
+/** A date the quarter's own days must hold (the first live day). */
 function assertInQuarter(field, value, startsOn, endsOn) {
   if (value && (value < startsOn || value > endsOn))
     throw new AppError("VALIDATION_FAILED", "Pick a day inside the quarter", 422, { [field]: ["Outside the quarter"] });
@@ -88,7 +89,6 @@ async function currentPeriod(db = pool) {
 async function createPeriod(actor, body) {
   const startsOn = body.starts_on;
   const endsOn = periods.quarterEnd(startsOn);
-  assertInQuarter("targets_lock_on", body.targets_lock_on, startsOn, endsOn);
   assertInQuarter("live_from", body.live_from, startsOn, endsOn);
   const id = await tx(async (client) => {
     if (await repo.periodStarting(client, startsOn))
@@ -103,7 +103,6 @@ async function createPeriod(actor, body) {
       starts_on: startsOn,
       ends_on: endsOn,
       plan_year_starts_on: body.plan_year_starts_on || periods.planYearOf(startsOn),
-      targets_lock_on: body.targets_lock_on || null,
       live_from: body.live_from || null,
       status,
       rules,
@@ -126,7 +125,7 @@ async function createPeriod(actor, body) {
   return getPeriod(id);
 }
 
-/** Change a quarter's name, lock date, first live day, rules or status, until it is closed (§3.2). */
+/** Change a quarter's name, first live day, rules or status, until it is closed (§3.2). */
 async function updatePeriod(actor, id, patch) {
   const id2 = await tx(async (client) => {
     const before = await repo.getPeriod(client, id);
@@ -135,7 +134,6 @@ async function updatePeriod(actor, id, patch) {
     if (before.status === "closed") throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409);
     const startsOn = day(before.starts_on);
     const endsOn = day(before.ends_on);
-    assertInQuarter("targets_lock_on", patch.targets_lock_on, startsOn, endsOn);
     assertInQuarter("live_from", patch.live_from, startsOn, endsOn);
     if (patch.status && patch.status !== before.status) {
       if (ORDER[patch.status] < ORDER[before.status])
@@ -164,9 +162,10 @@ async function updatePeriod(actor, id, patch) {
  * Organisational goals (§3.1, §6.3): the CEO's, active at once (A16)
  * ------------------------------------------------------------------ */
 
-/** An organisational_goal row as OrganisationalGoal. */
-function goalView(g) {
+/** An organisational_goal row as OrganisationalGoal, with how the reader may share it (§6.24). */
+function goalView(g, sharing = { can_share: false, share: null }) {
   return {
+    ...sharing,
     organisational_goal_id: g.organisational_goal_id,
     code: g.code,
     title: g.title,
@@ -187,22 +186,42 @@ function goalView(g) {
   };
 }
 
-async function listGoals(query) {
-  const page = await repo.listGoals(pool, query);
-  return { ...page, data: page.data.map(goalView) };
+/** A goal as the reader may read it: with whether they may share it and, if so, how it is shared. */
+async function goalFor(actor, row) {
+  const sharing = await share.sharingOf(actor, "goal", [row]);
+  return goalView(row, sharing.get(row.organisational_goal_id));
 }
 
-async function getGoal(id) {
+/** GET /performance/goals: every goal for the whole plan, else those shared with the reader (§6.23). */
+async function listGoals(query, actor = null) {
+  const page = await repo.listGoals(pool, query, await visibility.readerOf(pool, actor));
+  const sharing = await share.sharingOf(actor, "goal", page.data);
+  return { ...page, data: page.data.map((g) => goalView(g, sharing.get(g.organisational_goal_id))) };
+}
+
+/**
+ * GET /performance/goals/:id. Its progress is the mean of every company objective serving it, whoever reads
+ * it; the objectives it lists are those the reader may read (a goal shared alone shows none).
+ */
+async function getGoal(id, actor = null) {
   const g = await repo.getGoal(pool, id);
   if (!g) throw new AppError("NOT_FOUND", "That goal does not exist", 404);
+  const reach = await visibility.readerOf(pool, actor);
+  await visibility.assertGoal(pool, reach, id);
   const okrs = require("./goals.okrs");
   const objectives = [];
-  for (const objectiveId of await repo.companyObjectivesOf(pool, id)) objectives.push(await okrs.getObjective(objectiveId));
+  const mine = [];
+  for (const objectiveId of await repo.companyObjectivesOf(pool, id)) {
+    const objective = await okrs.getObjective(objectiveId);
+    objectives.push(objective);
+    const access = await visibility.objectiveAccess(pool, reach, objectiveId);
+    if (access && access.readable) mine.push(objective);
+  }
   const { scoring: sc } = require("@mycity/contract");
   return {
-    ...goalView(g),
+    ...(await goalFor(actor, g)),
     targets: (await repo.goalTargets(pool, id)).map((t) => ({ ...t })),
-    objectives: objectives.map((o) => ({ okr_objective_id: o.okr_objective_id, code: o.code, title: o.title })),
+    objectives: mine.map((o) => ({ okr_objective_id: o.okr_objective_id, code: o.code, title: o.title })),
     progress: sc.formatScore(sc.meanScore(objectives.map((o) => o.score))),
   };
 }
@@ -238,7 +257,7 @@ async function createGoal(actor, body, { owner_employee_id: ownerId = null } = {
     });
     return newId;
   });
-  return goalView(await repo.getGoal(pool, id));
+  return goalFor(actor, await repo.getGoal(pool, id));
 }
 
 /** PATCH /performance/goals/:id */
@@ -258,7 +277,7 @@ async function updateGoal(actor, id, patch) {
       payload: { organisational_goal_id: id, code: before.code, title: fields.title || before.title },
     });
   });
-  return goalView(await repo.getGoal(pool, id));
+  return goalFor(actor, await repo.getGoal(pool, id));
 }
 
 /**
@@ -311,8 +330,8 @@ function planView(p) {
   };
 }
 
-async function listPlans(query) {
-  const page = await repo.listPlans(pool, query);
+async function listPlans(query, actor = null) {
+  const page = await repo.listPlans(pool, query, await visibility.readerOf(pool, actor));
   return { ...page, data: page.data.map(planView) };
 }
 
@@ -325,7 +344,7 @@ async function listPlans(query) {
  * New Objective and New KPI offer only those the reader may set (§6.4).
  */
 async function listFunctions(actor, query) {
-  const page = await repo.listFunctions(pool, query);
+  const page = await repo.listFunctions(pool, query, await visibility.readerOf(pool, actor));
   const asksToUnbind = !(actor && actor.is_ceo === true);
   const data = [];
   for (const f of page.data) {
@@ -343,8 +362,8 @@ async function listFunctions(actor, query) {
 
 /**
  * GET /performance/departments: the departments the reader's Scorecards, Commitments, Reviews and
- * Analytics can be filtered by, in the reader's `performance` scope (§8). Goals and KPIs are the
- * company's shared plan and keep offering every function.
+ * Analytics can be filtered by, in the reader's `performance` scope (§8). Goals and KPIs read
+ * GET /performance/functions instead: the functions the reader reads (§6.23).
  */
 async function listDepartments(actor, query, scope) {
   return repo.listDepartments(pool, query, scope, actor || {});
@@ -380,6 +399,7 @@ async function planProblems(db, plan, { objectives, scorecards, contributions })
 async function planDetail(id, actor, scope = null) {
   const plan = await repo.getPlan(pool, id);
   if (!plan) throw new AppError("NOT_FOUND", "That plan does not exist", 404);
+  await visibility.assertPlan(pool, await visibility.readerOf(pool, actor), actor, plan);
   const okrs = require("./goals.okrs");
   const kpis = require("../kpis/kpis.service");
   const targets = require("../targets/targets.service");
@@ -541,9 +561,13 @@ async function requestUnbind(actor, id, body) {
 }
 
 /** GET /performance/unbinds/:id: one request, named in full, for its sheet. */
-async function unbindDetail(id) {
+async function unbindDetail(id, actor = null) {
   const row = await repo.getUnbindDetail(pool, id);
   if (!row) throw new AppError("NOT_FOUND", "That unbind request does not exist", 404);
+  await visibility.assertPlan(pool, await visibility.readerOf(pool, actor), actor, {
+    department_id: row.department_id,
+    workflow_instance_id: row.workflow_instance_id,
+  });
   return { ...unbindView(row), department_id: row.department_id, department: row.department, period_name: row.period_name };
 }
 
@@ -551,21 +575,24 @@ async function unbindDetail(id) {
  * Target changes (§6.7)
  * ------------------------------------------------------------------ */
 
-async function listChanges(query, scope) {
+async function listChanges(query, scope, actor = null) {
   const okrs = require("./goals.okrs");
-  const page = await repo.listChanges(pool, query, scope);
+  const page = await repo.listChanges(pool, query, scope, await visibility.readerOf(pool, actor));
   return { ...page, data: page.data.map(okrs.changeView) };
 }
 
 /**
- * GET /performance/target-changes/:id: one change for its sheet. A key result's is anyone's to read
- * (the OKR tree is shared); a line's is for whoever may read its scorecard (in scope, its person, its
+ * GET /performance/target-changes/:id: one change for its sheet. A key result's is for whoever may read
+ * the key result (§6.23), or decides the change; a line's is for whoever may read its scorecard (in scope, its person, its
  * reviewer or dotted manager), its requester, or whoever runs the cycle (the CEO decides it).
  */
 async function changeDetail(id, actor, scope) {
   const okrs = require("./goals.okrs");
   const row = await repo.getChangeDetail(pool, id);
   if (!row) throw new AppError("NOT_FOUND", "That target change does not exist", 404);
+  // A key result's change is read where its key result is, or by whoever decides it (§6.23).
+  if (row.key_result && !(await visibility.waitsOn(pool, actor, row.workflow_instance_id)))
+    await visibility.assertKeyResult(pool, await visibility.readerOf(pool, actor), row.key_result.okr_key_result_id);
   const asked = Boolean(actor && row.requested_by && row.requested_by.employee_id === actor.employee_id);
   if (row.line_employee_id && !asked && !(await authority.runsTheCycle(actor))) {
     const targets = require("../targets/targets.service");
@@ -631,8 +658,6 @@ async function requestChange(actor, scope, body) {
     const ctx = await repo.keyResultContext(pool, body.okr_key_result_id);
     if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404);
     if (!plansLib.isLive(ctx.plan_status)) throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
-    if (okrs.tbcOpen(ctx))
-      throw new AppError("TARGET_TBC", "Set this TBC target directly", 409);
     const owner = actor && actor.employee_id === ctx.accountable_employee_id;
     if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
     from = { value: ctx.target_value, text: ctx.target_text };
@@ -677,33 +702,6 @@ async function requestChange(actor, scope, body) {
   return okrs.changeView(await repo.getChange(pool, id));
 }
 
-/**
- * The `targets-lock` job: every TBC target whose quarter's lock date has come locks, once.
- * @param {string} today  YYYY-MM-DD in Lagos
- */
-async function lockTargets(today) {
-  const due = await repo.provisionalDue(pool, today);
-  if (!due.length) return { locked: 0 };
-  const byPeriod = new Map();
-  for (const kr of due) byPeriod.set(kr.performance_period_id, [...(byPeriod.get(kr.performance_period_id) || []), kr]);
-  await tx(async (client) => {
-    for (const [periodId, krs] of byPeriod) {
-      for (const kr of krs) {
-        await repo.updateKeyResult(client, kr.okr_key_result_id, { target_provisional: false, target_locked_at: new Date() });
-        // The months reported while the target was TBC are scored now it is firm.
-        await require("./goals.okrs").rescoreFrom(client, kr.okr_key_result_id);
-      }
-      await emit(client, {
-        key: EVENTS.PERIOD_TARGETS_LOCKED,
-        entity: { type: "performance_period", id: periodId },
-        actor: null,
-        payload: { performance_period_id: periodId, locked: krs.map((k) => k.code) },
-      });
-    }
-  });
-  return { locked: due.length };
-}
-
 module.exports = {
   periodView,
   listPeriods,
@@ -729,5 +727,4 @@ module.exports = {
   changeDetail,
   approvals,
   requestChange,
-  lockTargets,
 };

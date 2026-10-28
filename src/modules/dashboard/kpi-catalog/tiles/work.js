@@ -18,6 +18,7 @@ const workflow = require("../../../workflow/workflow.service");
 const alerts = require("../../../alerts/alerts.service");
 const tasks = require("../../sources/tasks.source");
 const goals = require("../../sources/goals.source");
+const visibility = require("../../../goals/goals.visibility");
 const { cell, linkTo, record, records } = require("../shared");
 
 const PRIORITY = Object.freeze({ low: "Low", normal: "Normal", high: "High", urgent: "Urgent" });
@@ -212,7 +213,8 @@ const ENTRIES = [
     pickable: true,
     tone: null,
     source: "goals",
-    value: (client, g, ctx) => g.ratio(() => goals.keyResultsOnTrack(client, { today: ctx.today })),
+    value: (client, g, ctx) =>
+      g.ratio(async () => goals.keyResultsOnTrack(client, { today: ctx.today }, await visibility.readerOf(client, ctx.user))),
     detail: {
       title: "Goals On Track",
       summary: (f) => `${f.value} of ${f.denominator} key results on track or done`,
@@ -224,7 +226,7 @@ const ENTRIES = [
       ],
       groups: KR_GROUPS,
       list: async (client, query, ctx) =>
-        records(await goals.keyResultsPage(client, { today: ctx.today, group: query.group }, query), (r) => {
+        records(await goals.keyResultsPage(client, { today: ctx.today, group: query.group }, query, await visibility.readerOf(client, ctx.user)), (r) => {
           const [tone, text] = KR_STATUS[r.status || "awaiting_report"];
           return record(
             r.okr_key_result_id,

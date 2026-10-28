@@ -126,7 +126,7 @@ describeDb("performance reviews against the real migrations", () => {
     }
 
     // Q3 2026: planned, bound and agreed, as PR 2 leaves a quarter.
-    const period = await as("ops").post("/performance/periods", { starts_on: "2026-07-01", targets_lock_on: "2026-07-31" });
+    const period = await as("ops").post("/performance/periods", { starts_on: "2026-07-01" });
     expect(period.status).toBe(201);
     ids.period = period.body.performance_period_id;
     expect((await as("ops").patch(`/performance/periods/${ids.period}`, { status: "active" })).status).toBe(200);

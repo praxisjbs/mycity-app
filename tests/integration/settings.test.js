@@ -176,6 +176,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "goals.confirm",
         "goals.function",
         "goals.organisation",
+        "goals.view_all",
         "home.reports",
         "home.team",
         "mailbox.signature",

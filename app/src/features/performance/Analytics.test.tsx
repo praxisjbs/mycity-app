@@ -72,8 +72,14 @@ async function analyticsAs(email: string) {
 const headings = () => screen.getAllByRole("heading").map((h) => h.textContent?.trim());
 
 describe("Performance · Analytics", () => {
-  it("draws the four figures and every section on desktop, with Export of the people", async () => {
+  it("Operations & People read no company: three figures, no Company Score (JBS Praxis, 28/10/2026)", async () => {
     await analyticsAs("cynthia@mycityapp.io");
+    expect(screen.queryByText("Company Score")).toBeNull();
+    for (const tile of ["Commitments On Time", "Check-Ins On Time", "Reviews Closed On Time"]) expect(screen.getAllByText(tile).length).toBeGreaterThan(0);
+  }, 30000);
+
+  it("draws the four figures and every section on desktop, with Export of the people", async () => {
+    await analyticsAs("ifeoma@mycityapp.io");
     const h = headings();
     for (const title of ["Analytics", "Scores by Month", "Key Results by Status", "Rating Spread", "Commitments On Time", "People"]) expect(h).toContain(title);
     expect(screen.getAllByText("Self Against Final").length).toBeGreaterThan(0);

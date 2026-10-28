@@ -12,6 +12,7 @@ export const CAPABILITIES = [
   { code: "goals.confirm", name: "Confirm Scores", description: "Confirm the month's key result scores the heads propose." },
   { code: "goals.function", name: "Set Function OKRs", description: "Set a function's objectives, key results and KPIs, report its month and send its plan, as its head or acting head." },
   { code: "goals.organisation", name: "Set Organisational Goals", description: "Record and edit the organisational goals and their quarterly targets." },
+  { code: "goals.view_all", name: "View All Goals", description: "Read the whole organisational and company plan: every organisational goal, company objective and key result." },
   { code: "home.reports", name: "Run Reports", description: "Build, schedule and run reports on Home, and receive them." },
   { code: "home.team", name: "View Team", description: "Open the Team tab on Home: who is in today and the team's figures." },
   { code: "mailbox.signature", name: "Configure Signature", description: "Set the company's signature links and what shows on everyone's email signature." },
@@ -29,7 +30,7 @@ const MANAGES = ["alerts.clear", "home.reports", "home.team"];
 export const ROLE_CAPABILITIES: Record<string, string[]> = {
   implementation: EVERY,
   operations_people: [...HOME, "goals.function", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"],
-  management: [...HOME, "goals.company", "goals.function", "workspace.late_reasons"],
+  management: [...HOME, "goals.company", "goals.function", "goals.view_all", "workspace.late_reasons"],
   head_of_department: [...MANAGES, "goals.function"],
   manager: MANAGES,
   administrator: ["mailbox.signature"],

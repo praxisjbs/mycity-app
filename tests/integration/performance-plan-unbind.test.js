@@ -111,7 +111,7 @@ describeDb("performance plans unbound for changes, against the real migrations",
       tokens[key] = res.body.access_token;
     }
     ids.q4 = (
-      await as("ops").post("/performance/periods", { starts_on: "2026-10-01", targets_lock_on: "2026-11-07", status: "active" })
+      await as("ops").post("/performance/periods", { starts_on: "2026-10-01", status: "active" })
     ).body.performance_period_id;
     // Branding & Marketing's plan: one objective, one key result with October reported, binding.
     const objective = await as("head").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.bm, title: "Be the first app residents open" });
@@ -143,8 +143,9 @@ describeDb("performance plans unbound for changes, against the real migrations",
 
   test("Request To Unbind is offered to whoever sets a binding plan, and to nobody else", async () => {
     expect(await bmRow("head")).toMatchObject({ may_set: true, plan_status: "binding", can_request_unbind: true });
-    // Another function's head does not set this plan; staff and the CEO (who keeps New Goal) are not offered it.
-    expect(await bmRow("other")).toMatchObject({ may_set: false, can_request_unbind: false });
+    // Another function's head does not read this plan at all (§6.23), so is not offered it; staff and the CEO
+    // (who keeps New Goal) are not offered it either.
+    expect(await bmRow("other")).toBeUndefined();
     expect(await bmRow("ada")).toMatchObject({ may_set: false, can_request_unbind: false });
     expect(await bmRow("ceo")).toMatchObject({ may_set: true, can_request_unbind: false });
     // The company's plan has no row of its own yet: Management's would be offered only once it binds.
