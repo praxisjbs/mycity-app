@@ -126,11 +126,13 @@ async function createPeriod(actor, body) {
   return getPeriod(id);
 }
 
-/** Change a quarter's name, lock date, first live day, rules or status. */
+/** Change a quarter's name, lock date, first live day, rules or status, until it is closed (§3.2). */
 async function updatePeriod(actor, id, patch) {
   const id2 = await tx(async (client) => {
     const before = await repo.getPeriod(client, id);
     if (!before) throw notFound();
+    // A closed quarter keeps the rules it ran on, or its bands would be read again on new ones.
+    if (before.status === "closed") throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409);
     const startsOn = day(before.starts_on);
     const endsOn = day(before.ends_on);
     assertInQuarter("targets_lock_on", patch.targets_lock_on, startsOn, endsOn);

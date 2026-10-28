@@ -425,6 +425,35 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(screen.getByText(/Q1 2027 · 01\/01\/2027 to 31\/03\/2027/)).toBeTruthy();
   }, 60000);
 
+  it("the score figures' help names the quarter's own Good and Watch bands, and follows Edit Quarter (JBS Praxis, 28/10/2026)", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+    const before = (await api.call("GET /api/v1/performance/periods/:id", { params: { id: quarter } })) as { rules: Record<string, unknown> };
+    const helpOf = (name: string) => {
+      const term = screen.getAllByRole("button", { name }).find((b) => b.hasAttribute("aria-describedby"))!;
+      return document.getElementById(term.getAttribute("aria-describedby")!)?.textContent;
+    };
+    expect(helpOf("Company Score")).toBe("Scores run from 0 to 1. Good is 0.7 or above; Watch 0.4 to 0.7; Recovery below 0.4 needs a recovery plan.");
+    try {
+      fireEvent.pointerDown(screen.getByRole("button", { name: "Manage Quarters" }), { button: 0, pointerType: "mouse" });
+      await settled();
+      fireEvent.click(screen.getByRole("menuitem", { name: "Edit Quarter" }));
+      await settled();
+      await press(dialog(), "Next");
+      type(dialog(), "Good From", "0.8");
+      type(dialog(), "Watch From", "0.5");
+      await press(dialog(), "Next");
+      await press(dialog(), "Next");
+      await press(dialog(), "Next");
+      await press(dialog(), "Save Quarter");
+      const help = "Scores run from 0 to 1. Good is 0.8 or above; Watch 0.5 to 0.8; Recovery below 0.5 needs a recovery plan.";
+      expect(helpOf("Company Score")).toBe(help);
+      expect(helpOf("Scoring Good")).toBe(help);
+      expect(copy.wordCount(help)).toBeLessThanOrEqual(copy.LIMITS.help);
+    } finally {
+      await api.call("PATCH /api/v1/performance/periods/:id", { params: { id: quarter }, body: { rules: before.rules } as never });
+    }
+  }, 60000);
+
   it("the CEO edits a draft objective and key result with every field, and deletes each after a confirmation naming it", async () => {
     const made: { objective?: string; kr?: string } = {};
     await openAs("ifeoma@mycityapp.io", "/performance?tab=goals", async () => {

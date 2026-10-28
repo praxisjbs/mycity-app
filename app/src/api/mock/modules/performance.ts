@@ -86,6 +86,7 @@ route("POST /api/v1/performance/periods", (req) => {
 route("PATCH /api/v1/performance/periods/:id", (req) => {
   const p = PERIODS.find((x) => x.performance_period_id === req.params.id);
   if (!p) return notFound();
+  if (p.status === "closed") return fail(409, "PERIOD_CLOSED", "That quarter is closed");
   const b = req.body as Partial<PerformancePeriod>;
   if (b.status === "active" && PERIODS.some((x) => x !== p && x.status === "active")) return fail(409, "PERIOD_ACTIVE_EXISTS", "Close the active quarter first", { status: ["Another is active"] });
   Object.assign(p, b, { updated_at: new Date().toISOString() });
