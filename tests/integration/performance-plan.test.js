@@ -145,8 +145,11 @@ describeDb("performance plan against the real migrations", () => {
     expect((await as("ceo").del(`/performance/goals/${second.body.organisational_goal_id}`)).status).toBe(204);
     expect((await as("ceo").del(`/performance/goals/${next.body.organisational_goal_id}`)).status).toBe(204);
     ids.goal = res.body.organisational_goal_id;
-    const detail = await as("ada").get(`/performance/goals/${ids.goal}`);
+    const detail = await as("ceo").get(`/performance/goals/${ids.goal}`);
     expect(detail.body.targets).toEqual([expect.objectContaining({ period_name: "Q4 2026", target_value: "64000" })]);
+    // A goal is the whole plan's until it is shared (§6.23): staff do not find it, Management do.
+    expect((await as("ada").get(`/performance/goals/${ids.goal}`)).status).toBe(404);
+    expect((await as("pm").get(`/performance/goals/${ids.goal}`)).status).toBe(200);
     const home = await homeGoals.organisationGoals(pool, { from: "2026-10-01", to: "2026-12-31" }, {});
     expect(home.data.map((g) => g.title)).toContain("Grow active users");
   });
@@ -215,8 +218,12 @@ describeDb("performance plan against the real migrations", () => {
     const elsewhere = await as("head").post("/performance/kpis", { department_id: ids.tbo, name: "Tickets closed", unit: "%", target_value: "90", target_text: "≥90%" });
     expect(elsewhere.status).toBe(403);
     expect(elsewhere.body.error.message).toBe("Only the function's head sets its KPIs");
-    const trace = await as("ada").get(`/performance/key-results/${ids.kr1}/trace`);
+    const trace = await as("ceo").get(`/performance/key-results/${ids.kr1}/trace`);
     expect(trace.body.steps.map((s) => s.kind)).toEqual(["key_result", "company_key_result", "objective", "organisational_goal"]);
+    // A member of the function reads the company key result it feeds by code and statement, and no further (§6.23).
+    const staffTrace = await as("ada").get(`/performance/key-results/${ids.kr1}/trace`);
+    expect(staffTrace.body.steps.map((s) => s.kind)).toEqual(["key_result", "company_key_result"]);
+    expect(staffTrace.body.steps[1]).toMatchObject({ code: "CO-KR1.1" });
   });
 
   test("the head drafts two scorecards, never their own; Send Plan refuses what would be wrong", async () => {
@@ -374,8 +381,10 @@ describeDb("performance plan against the real migrations", () => {
       kpis: [{ kpi_definition_id: ids.kpi, result: "met", actual_value: "96" }],
     });
     expect((await as("ada").post("/performance/reports", report({}))).status).toBe(403);
-    const figures = async () => (await as("ada").get(`/performance/okrs/summary?period_id=${ids.period}`)).body;
+    const figures = async (who = "ceo") => (await as(who).get(`/performance/okrs/summary?period_id=${ids.period}`)).body;
     expect(await figures()).toMatchObject({ key_results: 3, awaiting_report: 3, in_recovery: 0 });
+    // A member of the function counts its own key results only, and is given no company score (§6.23).
+    expect(await figures("ada")).toMatchObject({ company_score: null, key_results: 2, awaiting_report: 2, in_recovery: 0 });
     // A KPI that was Met or Not Met needs its figure, on its own row, in a report and on Record Actual.
     const noFigure = await as("head").post("/performance/reports", { ...report({}), kpis: [{ kpi_definition_id: ids.kpi, result: "met" }] });
     expect(noFigure.status).toBe(422);
@@ -417,18 +426,25 @@ describeDb("performance plan against the real migrations", () => {
     expect(tree.body.data[0].key_results.map((k) => k.latest.score)).toEqual(["0.65", null]);
     expect(tree.body.data[0]).toMatchObject({ code: "BM-O1", score: "0.65" });
 
-    // The figures count the whole quarter, or one function, on the server.
-    const all = await as("ada").get(`/performance/okrs/summary?period_id=${ids.period}`);
-    expect(all.body).toEqual({ company_score: "0.65", key_results: 3, on_track: 0, in_recovery: 0, awaiting_report: 0 });
-    const bm = await as("ada").get(`/performance/okrs/summary?period_id=${ids.period}&department_id=${ids.bm}`);
+    // The figures count what the reader reads of the quarter, or one function, on the server (§6.23): the
+    // whole plan for the CEO, the function's own for a member of it.
+    const all = await as("ceo").get(`/performance/okrs/summary?period_id=${ids.period}`);
+    expect(all.body).toEqual({ company_score: "0.65", function_score: "0.65", key_results: 3, on_track: 0, in_recovery: 0, awaiting_report: 0 });
+    const own = await as("ada").get(`/performance/okrs/summary?period_id=${ids.period}`);
+    expect(own.body).toEqual({ company_score: null, function_score: "0.65", key_results: 2, on_track: 0, in_recovery: 0, awaiting_report: 0 });
+    const bm = await as("ceo").get(`/performance/okrs/summary?period_id=${ids.period}&department_id=${ids.bm}`);
     expect(bm.body).toMatchObject({ company_score: "0.65", key_results: 2 });
     const kpis = await as("ada").get(`/performance/kpis/summary?month=${month}`);
     expect(kpis.body).toEqual({ kpis: 1, met: 1, not_met: 0, awaiting: 0 });
     expect((await as("ada").get("/performance/kpis/summary?month=2026-11-01")).body).toMatchObject({ met: 0, awaiting: 1 });
 
     // What each reader is offered is what the API would let them do.
-    const mayChange = async (who, kr = ids.kr1) => (await as(who).get(`/performance/key-results/${kr}`)).body.can_change_target;
-    expect([await mayChange("head"), await mayChange("ceo"), await mayChange("ada"), await mayChange("other")]).toEqual([true, true, false, false]);
+    const mayChange = async (who, kr = ids.kr1) => {
+      const res = await as(who).get(`/performance/key-results/${kr}`);
+      return res.status === 200 ? res.body.can_change_target : null;
+    };
+    // Another function's head does not read this key result at all (null), so is offered nothing.
+    expect([await mayChange("head"), await mayChange("ceo"), await mayChange("ada"), await mayChange("other")]).toEqual([true, true, false, null]);
     // The accountable person may ask, though they set no goals for the function.
     const owner1 = (await one("SELECT accountable_employee_id FROM okr_key_result WHERE okr_key_result_id = $1", [ids.kr1])).accountable_employee_id;
     await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr1, emp("other")]);
@@ -442,8 +458,12 @@ describeDb("performance plan against the real migrations", () => {
     };
     expect([await tbc("other"), await tbc("head"), await tbc("ada")]).toEqual([[true, false], [true, false], [false, false]]);
     await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr2, emp("head")]);
-    const mayEdit = async (who) => (await as(who).get(`/performance/kpis/${ids.kpi}`)).body.can_edit;
-    expect([await mayEdit("head"), await mayEdit("ops"), await mayEdit("ada"), await mayEdit("other")]).toEqual([true, true, false, false]);
+    const mayEdit = async (who) => {
+      const res = await as(who).get(`/performance/kpis/${ids.kpi}`);
+      return res.status === 200 ? res.body.can_edit : null;
+    };
+    // Another function's head does not read this function's KPIs at all (null, §6.23).
+    expect([await mayEdit("head"), await mayEdit("ops"), await mayEdit("ada"), await mayEdit("other")]).toEqual([true, true, false, null]);
   });
 
   test("a target change applies on the CEO's approval and keeps the original beside it", async () => {

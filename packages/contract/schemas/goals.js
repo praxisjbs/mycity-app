@@ -102,6 +102,57 @@ const PeriodEdit = z
  * Organisational goals
  * ------------------------------------------------------------------ */
 
+/**
+ * GET /performance/departments: the departments the reader's Performance lists can be filtered by:
+ * every active one for a reader with `all`, else those of the people in their scope, the people
+ * whose reviews and scorecards name them, their own and the ones they head. The Department and
+ * Function filters of Scorecards, Commitments, Reviews and Analytics offer only these.
+ */
+const PerformanceDepartment = z
+  .object({
+    department_id: uuid,
+    code: z.string(),
+    name: z.string(),
+  })
+  .strict();
+
+/**
+ * Who a share reaches (§6.24): `all` is every holder of `performance` view; `departments` the people of the
+ * departments named. A share is read only.
+ */
+const ShareAudience = z.enum(["all", "departments"]);
+
+/** A shared organisational goal or company objective, as its sharer reads it. */
+const GoalShare = z
+  .object({
+    goal_share_id: uuid,
+    organisational_goal_id: uuid.nullable(),
+    okr_objective_id: uuid.nullable(),
+    audience: ShareAudience,
+    departments: z.array(PerformanceDepartment),
+    shared_by: PersonRef.nullable(),
+    created_at: isoDateTime,
+    updated_at: isoDateTime,
+  })
+  .strict();
+
+/**
+ * PUT /performance/goals/:id/share and /objectives/:id/share. `department_ids` are the departments a
+ * `departments` share reaches (at least one, active); an `all` share names none.
+ */
+const GoalShareSave = z
+  .object({
+    audience: ShareAudience,
+    department_ids: z.array(uuid).max(50).default([]),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.audience === "departments" && v.department_ids.length === 0)
+      ctx.addIssue({ code: "custom", path: ["department_ids"], message: "Pick a department" });
+    if (v.audience === "all" && v.department_ids.length > 0)
+      ctx.addIssue({ code: "custom", path: ["department_ids"], message: "All staff names none" });
+  });
+
 const OrganisationalGoalStatus = z.enum(["active", "closed"]);
 
 const OrganisationalGoal = z
@@ -122,6 +173,10 @@ const OrganisationalGoal = z
     ends_on: isoDate,
     status: OrganisationalGoalStatus,
     owner: PersonRef.nullable(),
+    /** The reader may share it (`goals.organisation`). */
+    can_share: z.boolean(),
+    /** How it is shared, given only to a reader who may share it; null when it is not shared. */
+    share: GoalShare.nullable(),
     created_at: isoDateTime,
     updated_at: isoDateTime,
   })
@@ -315,6 +370,10 @@ const Objective = z
     key_results: z.array(KeyResult),
     /** The reader may edit or delete it and its key results: its plan is draft, returned, unbound or awaiting approval, and they set its goals. */
     can_edit: z.boolean(),
+    /** The reader may share it: a company objective and `goals.company`. */
+    can_share: z.boolean(),
+    /** How it is shared, given only to a reader who may share it; null when it is not shared. */
+    share: GoalShare.nullable(),
   })
   .strict();
 
@@ -345,7 +404,10 @@ const OkrSummaryQuery = z
 
 const OkrSummary = z
   .object({
+    /** The company's score: given only to a reader of the whole plan (§6.23), null for everyone else. */
     company_score: ScoreValue.nullable(),
+    /** The mean of the functions' objectives the reader reads (the one function picked, or all they read); null with none scored. */
+    function_score: ScoreValue.nullable(),
     key_results: z.number().int().min(0),
     on_track: z.number().int().min(0),
     in_recovery: z.number().int().min(0),
@@ -639,20 +701,6 @@ const PerformanceFunctionPage = Paged(PerformanceFunction);
 
 const PerformanceFunctionListQuery = listQuery({ period_id: uuid.optional() });
 
-/**
- * GET /performance/departments: the departments the reader's Performance lists can be filtered by:
- * every active one for a reader with `all`, else those of the people in their scope, the people
- * whose reviews and scorecards name them, their own and the ones they head. The Department and
- * Function filters of Scorecards, Commitments, Reviews and Analytics offer only these.
- */
-const PerformanceDepartment = z
-  .object({
-    department_id: uuid,
-    code: z.string(),
-    name: z.string(),
-  })
-  .strict();
-
 const PerformanceDepartmentPage = Paged(PerformanceDepartment);
 
 const PerformanceDepartmentListQuery = listQuery({});
@@ -911,8 +959,9 @@ const SelfAgainstFinal = z
   .strict();
 
 /**
- * Performance Analytics (§6.21) for a quarter, within the reader's scope. The OKR figures are the
- * company's shared plan, read whole; scorecards, reviews and commitments are the reader's scope's.
+ * Performance Analytics (§6.21) for a quarter, within the reader's scope. The OKR figures count what the
+ * reader may read of the tree (§6.23: the company's, `company_score` included, only for the whole plan's
+ * reader); scorecards, reviews and commitments are the reader's scope's.
  */
 const PerformanceAnalytics = z
   .object({
@@ -977,7 +1026,11 @@ const KR_VIRTUAL = {
   linked_company_key_results: "the company key results in okr_key_result_link",
   latest: "the key result's latest okr_key_result_month",
 };
-const GOAL_VIRTUAL = { owner: "the person in organisational_goal.owner_employee_id" };
+const GOAL_VIRTUAL = {
+  owner: "the person in organisational_goal.owner_employee_id",
+  can_share: "the reader holds goals.organisation",
+  share: "the goal_share row, for a reader who may share it",
+};
 const PLAN_VIRTUAL = {
   submitted_by: "the employee of performance_plan.submitted_by",
   period_name: "performance_period.name",
@@ -1039,6 +1092,8 @@ const TABLES = {
       score: "the mean of its key results' latest scores (§6.8)",
       key_results: "its okr_key_result rows",
       can_edit: "the reader may change it now: a draft, returned or unbound plan, and goals.authority",
+      can_share: "a company objective, and the reader holds goals.company",
+      share: "the goal_share row, for a reader who may share it",
     },
   },
   ObjectivePage: { table: null, reason: "a page of objectives with their key results" },
@@ -1116,6 +1171,18 @@ const TABLES = {
   PerformanceFunctionPage: { table: null, reason: "a page of the functions a reader may set goals for" },
   PerformanceFunctionListQuery: { table: null, reason: "list controls and the quarter for the functions" },
   PerformanceDepartment: { table: "department", virtual: {} },
+  ShareAudience: { table: null, reason: "the audience of a share, a CHECK of goal_share.audience" },
+  GoalShare: {
+    table: "goal_share",
+    virtual: {
+      departments: "the departments in goal_share_department",
+      shared_by: "the person behind goal_share.shared_by",
+    },
+  },
+  GoalShareSave: {
+    table: "goal_share",
+    virtual: { department_ids: "written as goal_share_department rows" },
+  },
   PerformanceDepartmentPage: { table: null, reason: "a page of the departments a reader's Performance lists filter by" },
   PerformanceDepartmentListQuery: { table: null, reason: "list controls for the departments" },
   PlanProblem: { table: null, reason: "a reason the plan cannot be sent, worked out" },
@@ -1247,6 +1314,9 @@ module.exports = {
   PerformanceFunctionPage,
   PerformanceFunctionListQuery,
   PerformanceDepartment,
+  ShareAudience,
+  GoalShare,
+  GoalShareSave,
   PerformanceDepartmentPage,
   PerformanceDepartmentListQuery,
   PlanProblem,

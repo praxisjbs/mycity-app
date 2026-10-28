@@ -5,6 +5,7 @@
  */
 const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
+const visibility = require("../goals/goals.visibility");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -34,7 +35,9 @@ const SORTS = { code: "k.code", name: "k.name" };
  * One page of KPIs.
  * @param {object} query  KpiListQuery; `until` the last month the reader looks at (a quarter's end)
  */
-function list(db, query, until = null) {
+function list(db, query, until = null, reach = visibility.EVERYTHING) {
+  const params = [until, query.department_id || null, query.active === undefined ? null : query.active === "true", query.q || null];
+  const readable = visibility.departmentReadable(reach, "k.department_id", params);
   return pageQuery(
     db,
     `SELECT ${ROW}, ${TOTAL_COL} ${FROM}
@@ -42,15 +45,18 @@ function list(db, query, until = null) {
         AND ($2::uuid IS NULL OR k.department_id = $2)
         AND ($3::boolean IS NULL OR k.active = $3)
         AND ($4::text IS NULL OR search_fold(k.code || ' ' || k.name) LIKE '%' || search_fold($4) || '%')
+        AND ${readable}
       ORDER BY ${orderBy(query, SORTS, "k.kpi_definition_id")}`,
-    [until, query.department_id || null, query.active === undefined ? null : query.active === "true", query.q || null],
+    params,
     query,
   );
 }
 
 /** The KPIs figures: active KPIs, and how many met, did not meet or await `month`. One row. */
-const summary = (db, { department_id: departmentId, month }) =>
-  one(
+const summary = (db, { department_id: departmentId, month }, reach = visibility.EVERYTHING) => {
+  const params = [departmentId, month];
+  const readable = visibility.departmentReadable(reach, "k.department_id", params);
+  return one(
     db,
     `SELECT count(*)::int AS kpis,
             count(*) FILTER (WHERE m.result = 'met')::int AS met,
@@ -58,9 +64,10 @@ const summary = (db, { department_id: departmentId, month }) =>
             count(*) FILTER (WHERE m.kpi_month_id IS NULL)::int AS awaiting
        FROM kpi_definition k
        LEFT JOIN kpi_month m ON m.kpi_definition_id = k.kpi_definition_id AND m.month = $2::date
-      WHERE k.department_id IS NOT NULL AND k.active AND ($1::uuid IS NULL OR k.department_id = $1)`,
-    [departmentId, month],
+      WHERE k.department_id IS NOT NULL AND k.active AND ($1::uuid IS NULL OR k.department_id = $1) AND ${readable}`,
+    params,
   );
+};
 
 /**
  * One page of the units in use on KPIs, key results and scorecard lines, most used first, for the

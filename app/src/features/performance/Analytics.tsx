@@ -11,6 +11,7 @@ import { api } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { useApi, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
+import { hasCapability } from "@/shell/access";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import {
   BarChart,
@@ -114,8 +115,10 @@ export function Analytics() {
   const commitments = share(a.commitments);
   const checkIns = share(a.check_ins);
   const reviews = share(a.reviews_closed);
+  // The company's score is the whole plan's alone (§6.23): everyone else is shown the three measures of their people.
+  const readsCompany = hasCapability(me, "goals.view_all") || hasCapability(me, "goals.company") || hasCapability(me, "goals.organisation");
   const tiles = [
-    { label: "Company Score", value: a.company_score === null ? <EmptyValue /> : score(a.company_score) },
+    ...(readsCompany ? [{ label: "Company Score", value: a.company_score === null ? <EmptyValue /> : score(a.company_score) }] : []),
     { label: "Commitments On Time", ...commitments },
     { label: "Check-Ins On Time", ...checkIns },
     { label: "Reviews Closed On Time", ...reviews },

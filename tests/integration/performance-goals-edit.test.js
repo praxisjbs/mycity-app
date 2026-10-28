@@ -201,18 +201,22 @@ describeDb("performance goals set and changed on screen, against the real migrat
     const extra = await as("head").post("/performance/key-results", { okr_objective_id: ids.objective, statement: "Launch in two cities", measure: "dated" });
     ids.extra = extra.body.okr_key_result_id;
 
-    // Who may edit: the head for the function, Management for the company; nobody else.
+    // Who may edit: the head for the function, Management for the company; nobody else. And who reads what
+    // (§6.23): the function's people its own objective, Management and the CEO the whole tree, Operations &
+    // People every function's but not the company's.
     const tree = async (who) => (await as(who).get(`/performance/okrs?period_id=${ids.q4}`)).body.data.map((x) => [x.code, x.can_edit]);
-    expect(await tree("head")).toEqual([["CO-O1", false], ["BM-O1", true]]);
+    expect(await tree("head")).toEqual([["BM-O1", true]]);
     expect(await tree("pm")).toEqual([["CO-O1", true], ["BM-O1", false]]);
-    expect(await tree("ada")).toEqual([["CO-O1", false], ["BM-O1", false]]);
-    expect(await tree("ops")).toEqual([["CO-O1", false], ["BM-O1", true]]);
-    expect((await as("other").get(`/performance/objectives/${ids.objective}`)).body).toMatchObject({ code: "BM-O1", can_edit: false });
+    expect(await tree("ada")).toEqual([["BM-O1", false]]);
+    expect(await tree("ops")).toEqual([["BM-O1", true]]);
+    expect(await tree("ceo")).toEqual([["CO-O1", true], ["BM-O1", true]]);
+    expect((await as("other").get(`/performance/objectives/${ids.objective}`)).status).toBe(404);
+    expect((await as("ops").get(`/performance/objectives/${ids.objective}`)).body).toMatchObject({ code: "BM-O1", can_edit: true });
     const detail = async (who) => {
-      const body = (await as(who).get(`/performance/key-results/${ids.kr}`)).body;
-      return [body.can_edit, body.can_set_target, body.can_change_target];
+      const res = await as(who).get(`/performance/key-results/${ids.kr}`);
+      return res.status === 200 ? [res.body.can_edit, res.body.can_set_target, res.body.can_change_target] : null;
     };
-    expect([await detail("head"), await detail("ada"), await detail("other")]).toEqual([[true, false, false], [false, false, false], [false, false, false]]);
+    expect([await detail("head"), await detail("ada"), await detail("other")]).toEqual([[true, false, false], [false, false, false], null]);
 
     // The pickers: the company's key results (Feeds) and the functions' (Scored From), 25 a page.
     const company = await as("head").get(`/performance/key-results?period_id=${ids.q4}&level=company`);
@@ -257,7 +261,7 @@ describeDb("performance goals set and changed on screen, against the real migrat
 
     // Once the plan binds, nothing is edited or deleted, and nobody is offered it.
     await q("UPDATE performance_plan SET status = 'binding', binding_at = now() WHERE department_id = $1", [ids.bm]);
-    expect(await tree("head")).toEqual([["CO-O1", false], ["BM-O1", false]]);
+    expect(await tree("head")).toEqual([["BM-O1", false]]);
     expect((await as("head").get(`/performance/key-results/${ids.kr}`)).body.can_edit).toBe(false);
     const late = await as("head").patch(`/performance/objectives/${ids.objective}`, { title: "Again" });
     expect(late.status).toBe(409);
@@ -285,12 +289,13 @@ describeDb("performance goals set and changed on screen, against the real migrat
     ids.tbc = kr.body.okr_key_result_id;
     await q("UPDATE performance_plan SET status = 'binding', binding_at = now() WHERE performance_period_id = $1 AND department_id = $2", [ids.later, ids.bm]);
     const flags = async (who) => {
-      const body = (await as(who).get(`/performance/key-results/${ids.tbc}`)).body;
-      return { edit: body.can_edit, set: body.can_set_target, change: body.can_change_target };
+      const res = await as(who).get(`/performance/key-results/${ids.tbc}`);
+      return res.status === 200 ? { edit: res.body.can_edit, set: res.body.can_set_target, change: res.body.can_change_target } : null;
     };
     expect(await flags("ada")).toEqual({ edit: false, set: true, change: false });
     expect(await flags("head")).toEqual({ edit: false, set: true, change: false });
-    expect(await flags("other")).toEqual({ edit: false, set: false, change: false });
+    // Another function's head does not read this function's key results (§6.23).
+    expect(await flags("other")).toBeNull();
 
     // The owner sets it, then the head; it stays TBC until the lock date, and no approval opens.
     const byOwner = await as("ada").patch(`/performance/key-results/${ids.tbc}`, { target_value: "12", target_text: "12 partners" });
@@ -332,7 +337,7 @@ describeDb("performance goals set and changed on screen, against the real migrat
     });
     expect(edited.status).toBe(200);
     expect(edited.body).toMatchObject({ title: "Grow monthly active users", detail: null });
-    expect((await as("ada").get(`/performance/goals/${ids.goal}`)).body.targets).toEqual([
+    expect((await as("ceo").get(`/performance/goals/${ids.goal}`)).body.targets).toEqual([
       expect.objectContaining({ period_name: "Q4 2026", target_text: "64,000 users", target_value: "64000" }),
     ]);
 
@@ -362,15 +367,19 @@ describeDb("performance goals set and changed on screen, against the real migrat
     // a head their own function's; someone with no goals grant nothing.
     expect(await offered("ceo")).toMatchObject({ Company: true, "Branding & Marketing": true, "Technology & Back-office Ops": true });
     expect(await offered("pm")).toMatchObject({ Company: true, "Branding & Marketing": false, "Technology & Back-office Ops": false });
-    expect(await offered("ops")).toMatchObject({ Company: false, "Branding & Marketing": true, "Technology & Back-office Ops": true });
-    expect(await offered("head")).toMatchObject({ Company: false, "Branding & Marketing": true, "Technology & Back-office Ops": false });
-    expect(await offered("other")).toMatchObject({ Company: false, "Branding & Marketing": false, "Technology & Back-office Ops": true });
-    expect(Object.values(await offered("ada")).every((may) => may === false)).toBe(true);
+    // Each reader is told of the functions they read (§6.23): Operations & People every function and not the
+    // company, a head or a member their own function alone.
+    expect(await offered("ops")).toMatchObject({ "Branding & Marketing": true, "Technology & Back-office Ops": true });
+    expect((await offered("ops")).Company).toBeUndefined();
+    expect(await offered("head")).toEqual({ "Branding & Marketing": true });
+    expect(await offered("other")).toEqual({ "Technology & Back-office Ops": true });
+    expect(await offered("ada")).toEqual({ "Branding & Marketing": false });
     // The company first, then the functions by name, each with its plan in the quarter, in pages of 25.
-    const page = (await as("head").get(`/performance/functions?period_id=${ids.q4}`)).body;
+    const page = (await as("ceo").get(`/performance/functions?period_id=${ids.q4}`)).body;
     expect(page.data[0]).toMatchObject({ department_id: null, name: null });
     expect(page.data.find((f) => f.department_id === ids.bm).plan_status).toBe("binding");
     expect(page.page).toMatchObject({ number: 1, size: 25 });
+    expect((await as("head").get(`/performance/functions?period_id=${ids.q4}`)).body.data.map((f) => f.name)).toEqual(["Branding & Marketing"]);
     // Asked without a quarter, no plan is named.
     expect((await as("head").get("/performance/functions")).body.data.every((f) => f.plan_status === null)).toBe(true);
   });

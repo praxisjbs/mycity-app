@@ -143,8 +143,9 @@ describeDb("performance plans unbound for changes, against the real migrations",
 
   test("Request To Unbind is offered to whoever sets a binding plan, and to nobody else", async () => {
     expect(await bmRow("head")).toMatchObject({ may_set: true, plan_status: "binding", can_request_unbind: true });
-    // Another function's head does not set this plan; staff and the CEO (who keeps New Goal) are not offered it.
-    expect(await bmRow("other")).toMatchObject({ may_set: false, can_request_unbind: false });
+    // Another function's head does not read this plan at all (§6.23), so is not offered it; staff and the CEO
+    // (who keeps New Goal) are not offered it either.
+    expect(await bmRow("other")).toBeUndefined();
     expect(await bmRow("ada")).toMatchObject({ may_set: false, can_request_unbind: false });
     expect(await bmRow("ceo")).toMatchObject({ may_set: true, can_request_unbind: false });
     // The company's plan has no row of its own yet: Management's would be offered only once it binds.

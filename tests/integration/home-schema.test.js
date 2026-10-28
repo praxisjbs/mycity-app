@@ -422,12 +422,12 @@ describeDb("Home schema and reference data against the real migrations", () => {
       // goals and performance capabilities (performance.md §8); 2590 (My Workspace) Manage Late Reasons
       // to Management, Operations & People and Implementation (workspace.md §8); 3190 (Queries)
       // Configure Queries to Implementation and Operations & People.
-      const goals = ["goals.company", "goals.confirm", "goals.function", "goals.organisation"];
+      const goals = ["goals.company", "goals.confirm", "goals.function", "goals.organisation", "goals.view_all"];
       const sorted = (codes) => [...codes].sort();
       expect(Object.fromEntries(rows.map((r) => [r.role, r.codes]))).toEqual({
         implementation: sorted([...all, ...goals, "mailbox.signature", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]),
         operations_people: sorted([...all, "goals.function", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]),
-        management: sorted([...all, "goals.company", "goals.function", "workspace.late_reasons"]),
+        management: sorted([...all, "goals.company", "goals.function", "goals.view_all", "workspace.late_reasons"]),
         head_of_department: sorted([...managers, "goals.function"]),
         manager: managers,
         administrator: ["mailbox.signature"],
@@ -506,6 +506,7 @@ describeDb("Home schema and reference data against the real migrations", () => {
           "goals.confirm",
           "goals.function",
           "goals.organisation",
+          "goals.view_all",
           "home.team",
           "mailbox.signature",
           "performance.manage",

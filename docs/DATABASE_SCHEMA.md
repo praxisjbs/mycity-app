@@ -344,6 +344,7 @@ invitation SEQUENCE (`calendar_event.ics_sequence`) · `2530` a report run keeps
 asked with (`home_report_run.filters`, jsonb, null but for My Workspace · Analytics' Export; Home's
 table, 1150, reviewed by TB; docs/guides/workspace.md §6) · `2590` seed: the six starting late reasons and the
 `workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit) ·
+`2540` sharing a company goal (`goal_share`: one per organisational goal or company objective, the audience `all` or `departments`, who shared it; `goal_share_department`: the departments a `departments` share reaches; a goal, objective or department deleted takes its row) and `2541` seed: the capability `goals.view_all` with its holders, Management and Implementation (`docs/guides/performance.md` §4, §6.23, §6.24, JBS Praxis, 28/10/2026) ·
 `2600` departments kept on People · Departments (`docs/guides/organogram.md` §6.1, JBS Praxis
 27/10/2026): where a merged department went (`department.merged_into_department_id`, indexed) and
 which Head of Department roles the system gave with a headship (`user_role.from_headship`, false
