@@ -404,8 +404,21 @@ async function planDetail(id, actor, scope = null) {
     contributions,
     problems,
     can_submit: mayAct && plansLib.isOpen(plan.status) && !problems.some((p) => p.blocking),
+    approval: await approvalOf(plan),
     unbind: await repo.latestUnbind(pool, id).then((u) => (u ? unbindView(u) : null)),
   };
+}
+
+/**
+ * Who a plan awaiting approval is with (§6.4): the stage its pending approval is at, named as its approvers were
+ * told it. Null for a plan not sent, returned, unbound or binding, which has no approval pending.
+ */
+async function approvalOf(plan) {
+  if (!plansLib.isAwaiting(plan.status)) return null;
+  const row = await repo.pendingStage(pool, plan.workflow_instance_id);
+  if (!row || !row.stage_key) return null;
+  const stage = require("../../shared/workflow/conditions").stageByKey({ stages: row.stages }, row.stage_key);
+  return { stage_key: row.stage_key, stage_name: stage ? stage.name : row.stage_key };
 }
 
 /** The items a reader may see, in order. */

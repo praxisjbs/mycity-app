@@ -688,6 +688,14 @@ const PlanUnbindDetail = PlanUnbind.extend({
   period_name: z.string(),
 }).strict();
 
+/** The stage a plan awaiting approval is with (§6.4): the one whose approvers the engine told and whose Waiting On You lists it. */
+const PlanApproval = z
+  .object({
+    stage_key: z.string(),
+    stage_name: z.string(),
+  })
+  .strict();
+
 /** GET /performance/plans/:id: everything the plan binds, and what stops it being sent. */
 const PlanDetail = Plan.extend({
   objectives: z.array(Objective),
@@ -696,6 +704,8 @@ const PlanDetail = Plan.extend({
   contributions: z.array(Contribution),
   problems: z.array(PlanProblem),
   can_submit: z.boolean(),
+  /** Who it is with while it is sent or its changes are (Line Manager, Operations & People or CEO); null otherwise. */
+  approval: PlanApproval.nullable(),
   /** The latest request to unbind it, pending or decided (null when none was made). */
   unbind: PlanUnbind.nullable(),
 }).strict();
@@ -1119,9 +1129,11 @@ const TABLES = {
       contributions: "its split key results",
       problems: "what stops it being sent",
       can_submit: "the reader may send it now",
+      approval: "the current stage of its pending workflow_instance, null when none is pending",
       unbind: "its latest plan_unbind row, null when none was made",
     },
   },
+  PlanApproval: { table: null, reason: "the stage a plan awaiting approval is with, read from its pending workflow_instance" },
   PlanUnbind: {
     table: "plan_unbind",
     virtual: { requested_by: "the employee of plan_unbind.requested_by" },
@@ -1244,6 +1256,7 @@ module.exports = {
   PlanUnbind,
   PlanUnbindCreate,
   PlanUnbindDetail,
+  PlanApproval,
   PlanDetail,
   TargetChangeCreate,
   TargetChangePage,

@@ -249,6 +249,21 @@ function listPlans(db, query) {
 const getPlan = (db, id) => one(db, `SELECT ${PLAN} ${PLAN_FROM} WHERE pl.performance_plan_id = $1`, [id]);
 
 /**
+ * The stage a plan's approval is at: its key and the stages of the definition version it started on (so its
+ * name is the one its approvers were told), or null when that approval is not pending.
+ */
+const pendingStage = (db, instanceId) =>
+  instanceId
+    ? one(
+        db,
+        `SELECT wi.current_stage AS stage_key, wd.stages
+           FROM workflow_instance wi JOIN workflow_definition wd ON wd.workflow_definition_id = wi.workflow_definition_id
+          WHERE wi.workflow_instance_id = $1 AND wi.state = 'pending'`,
+        [instanceId],
+      )
+    : null;
+
+/**
  * GET /performance/functions: the company first (no department), then each active function by
  * name, with its plan's status in the quarter `period_id` (none without one) and whether a request to
  * unbind it waits. Whether the reader may set each is the service's question for goals.authority,
@@ -1055,6 +1070,7 @@ module.exports = {
   listFunctions,
   listDepartments,
   getPlan,
+  pendingStage,
   getChangeDetail,
   approvalsWaiting,
   updatePlan,

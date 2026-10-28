@@ -127,6 +127,17 @@ const seededChange = sid("perf:change:seed");
 type Waiting = { data: Array<{ kind: string; record_id: string; stage_name: string }> };
 
 describe("Performance · Goals, Waiting On You", () => {
+  it("the plan card says which stage a plan awaiting approval is with, so one at Operations & People is not missing from the CEO's list", async () => {
+    // Content's plan was sent by its head and waits on Operations & People; the CEO's stage comes after.
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    await chooseOption(screen.getByLabelText("Function"), "Content");
+    await settled();
+    expect(screen.getByText("With Operations & People")).toBeTruthy();
+    expect(screen.queryByText("With CEO")).toBeNull();
+    expect(((await api.call("GET /api/v1/performance/approvals")) as Waiting).data.map((r) => r.record_id)).not.toContain(contentPlan);
+    expect(copyProblems()).toEqual([]);
+  }, 30000);
+
   it("Operations & People: the plan stage waiting on them opens its sheet; Approve Plan sends it on to the CEO", async () => {
     await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
     const waiting = screen.getByRole("table", { name: "Waiting On You" });
@@ -265,7 +276,9 @@ describe("Performance · Goals, Waiting On You", () => {
     await settled();
     expect(screen.getAllByText("Unbound").length).toBeGreaterThan(0);
     await press(document.body, "Send Plan");
-    expect(await planNow()).toMatchObject({ status: "revising" });
+    expect(await planNow()).toMatchObject({ status: "revising", approval: { stage_key: "ceo", stage_name: "CEO" } });
+    // The card names who it went to.
+    expect(screen.getByText("With CEO")).toBeTruthy();
     // It is with the CEO alone, and the head can neither add nor send it again.
     expect(((await api.call("GET /api/v1/performance/approvals")) as Waiting).data).toEqual([]);
     cleanup();

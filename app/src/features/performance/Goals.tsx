@@ -465,10 +465,10 @@ function PlanCard({ id }: { id: string }) {
   if (!p) return null;
   const submit = async () => {
     try {
-      await send.run({ params: { id }, body: {} });
+      const sent = await send.run({ params: { id }, body: {} });
       invalidate("/api/v1/performance/plans");
       plan.reload();
-      toast("Plan sent for approval");
+      toast(sent.approval ? `Plan sent to ${sent.approval.stage_name}` : "Plan sent for approval");
     } catch (e) {
       say(e);
     }
@@ -480,6 +480,8 @@ function PlanCard({ id }: { id: string }) {
         items={[
           ["Objectives", String(p.objective_count)],
           ["Scorecards", String(p.scorecard_count)],
+          // The stage a plan awaiting approval is with: only its approvers are told, so a plan at Operations & People is not the CEO's yet.
+          ...(p.approval ? ([["Approval", `With ${p.approval.stage_name}`]] as Array<[string, string]>) : []),
           ...(p.returned_reason ? ([["Returned", p.returned_reason]] as Array<[string, string]>) : []),
           // The latest request to unbind it: waiting on the CEO, or refused while the plan stays binding.
           ...(p.unbind?.status === "pending" ? ([["Unbind Request", "Waiting On CEO"]] as Array<[string, string]>) : []),

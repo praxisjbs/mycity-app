@@ -210,8 +210,11 @@ sent it. The company's plan goes to the CEO alone. Only the CEO's approval makes
    anything that stops it.
 4. Fix each problem in a red bar. An amber bar only warns. **Send Plan** shows once no red bar is
    left.
-5. Press **Send Plan**. The hub says **Plan sent for approval**.
-6. If it comes back, the card reads **Returned** with the reason. Change what was asked and press
+5. Press **Send Plan**. The hub says which stage it went to, such as *Plan sent to Operations & People*.
+6. The card reads **Awaiting Approval**, and its **Approval** row reads *With Operations & People*, or
+   whichever stage has it now. Only that stage's approvers are told and have the plan in **Waiting On
+   You**. The next stage is told when this one approves, so the CEO does not see a plan before then.
+7. If it comes back, the card reads **Returned** with the reason. Change what was asked and press
    **Send Plan** again.
 
 Until the plan is approved you can still add objectives and key results to it, and change them. They
@@ -265,7 +268,8 @@ company's. The CEO does not need to ask.
    objectives and key results as in [Set objectives and key results](#performance-goals-set), and
    change the ones you have.
 7. Press **Send Plan** on the plan card. It goes to the CEO alone. The plan reads **Awaiting
-   Approval**. What you add before they decide joins the plan sent.
+   Approval**, and its **Approval** row reads *With CEO*. What you add before they decide joins the
+   plan sent.
 8. When the CEO approves, the plan reads **Binding** again. If they ask for changes, it reads
    **Unbound** with their reason. Change it and press **Send Plan** again.
 
