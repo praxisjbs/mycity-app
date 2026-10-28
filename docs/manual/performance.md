@@ -25,6 +25,9 @@ Your own scorecard, check-in and reviews are on
 Scores run from 0 to 1. A key result scoring 0.7 or more is **Good**, 0.4 to 0.7 is **Watch**,
 and under 0.4 is **Recovery**, which needs a recovery plan. A scorecard's rating is **Exceeds**
 (0.90 or more), **Meets** (0.75 or more), **Partly Meets** (0.50 or more) or **Below**.
+These are the starting numbers. Operations and People can change them for each quarter (see
+[Set up a quarter](#performance-quarter)). Point at **Company Score** on Goals, or tap it, to see
+the quarter's own.
 
 ## Goals {#performance-goals screen=performance/goals icon=target}
 
@@ -330,8 +333,8 @@ head reports how its key results and KPIs did. Management report the company's k
    **Update**. Type the **Actual** as a figure: a comma or a unit stays out, so `64,000` goes in
    as `64000`. A minus is kept, such as `-5`. A figure it cannot take is marked as you leave it.
    ![Report Month](shot:performance-report)
-4. If the score falls under 0.4, or the status is **At Risk**, **Off Track** or **Missed**, name
-   the **Recovery Owner** and the **Recovery Date**.
+4. If the score falls in **Recovery** (under 0.4 unless the quarter sets another), or the status is
+   **At Risk**, **Off Track** or **Missed**, name the **Recovery Owner** and the **Recovery Date**.
 5. Under **KPIs**, for each of the function's KPIs you report, choose its **Result**. For **Met** and
    **Not Met**, fill in the **Actual**. **N/A** has no **Actual**. Add a **Comment** if it helps.
 6. Press **Report Month**. The hub says **Month reported**. Only the key results and KPIs you
@@ -426,7 +429,12 @@ says why, such as **That quarter is already set up**.
 3. Change what you need on each step. **Starts** cannot change.
 4. Press **Save Quarter**. The hub says **Quarter saved**.
 
-A quarter only moves forward, from **Planning** to **Active** to **Closed**.
+A quarter only moves forward, from **Planning** to **Active** to **Closed**. A **Closed** quarter
+cannot be changed. If it was closed while you had it open, the hub says **That quarter is closed**.
+
+New **Bands** show at once on every score of the quarter, including months already reported. New
+scoring rules and weights count only from then on: a score or rating already given keeps its number.
+To score a whole quarter on new rules, change them before the quarter starts.
 
 ## Scorecards {#performance-scorecards screen=performance/targets icon=sheet}
 
