@@ -17,6 +17,15 @@ module.exports = {
   summary: async (_req, res) => ok(res, await service.summary()),
   get: async (req, res) => ok(res, await service.get(id(req))),
   preview: async (req, res) => ok(res, await service.preview(id(req))),
+  previewPdf: async (req, res) => {
+    const { pdf, filename } = await service.previewPdf(id(req), req.user);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${filename.replace(/[^\w .-]/g, "")}"`,
+      "Cache-Control": "no-store",
+    });
+    res.send(pdf);
+  },
   create: async (req, res) => created(res, await service.create(withActor(req), req.validated.body)),
   saveBody: async (req, res) => ok(res, await service.saveBody(withActor(req), id(req), req.validated.body)),
   activate: async (req, res) => ok(res, await service.activate(withActor(req), id(req))),

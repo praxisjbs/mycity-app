@@ -48,6 +48,9 @@ function declare(key) {
 
 SHIPPED.forEach(declare);
 
+/** The addressee's lines a letter opens with, as MyCity's letters do: name, post, department. */
+const addressee = (d) => [d.employee.display_name, d.employee.job_title, d.employee.department];
+
 const QUERY_LETTER = "query_letter";
 const SANCTION_LETTER = "sanction_letter";
 
@@ -60,6 +63,7 @@ defineDocType(QUERY_LETTER, {
   sensitivity: "personal",
   title: (d) => `Query ${d.query_number}: ${d.subject}`,
   signedBy: (d) => d.signer,
+  letter: (d) => ({ date: d.raised_on, to: addressee(d) }),
 });
 
 defineDocType(SANCTION_LETTER, {
@@ -71,6 +75,7 @@ defineDocType(SANCTION_LETTER, {
   sensitivity: "personal",
   title: (d) => `${d.step_name || "Sanction"}: ${d.query_number}`,
   signedBy: (d) => d.signer,
+  letter: (d) => ({ date: d.effective_on || d.raised_on, to: addressee(d) }),
 });
 
 module.exports = { EVENTS, SHIPPED, FINE_LETTER_KEY, declare, QUERY_LETTER, SANCTION_LETTER };

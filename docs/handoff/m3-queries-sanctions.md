@@ -442,7 +442,7 @@ real names and never enter this public repository.
   form's Letter
 - [x] S2 My Signature: migration `3050`, stored through the vault, Edit Signature, Raise a Query and
   Approve Sanction start from it, the preview shows it
-- [ ] S3 The samples' layout in every M3 letter; the preview is the rendered PDF with Download; the
+- [x] S3 The samples' layout in every M3 letter; the preview is the rendered PDF with Download; the
   deduction letter's sample amount
 - [ ] S4 Issue Sanction picks the query on Sanctions; guide, chapter, pictures, PROGRESS, `npm run
   ci`, the PR
@@ -454,3 +454,5 @@ real names and never enter this public repository.
   Template, Deactivate while unused, Save Draft and Save and Activate, the rule's Letter.
 - 28/10/2026 · GE · S2 built: Edit Signature, `letter_signature` (3050), the pads open with it. The
   preview signing with it comes with S3.
+- 28/10/2026 · GE · S3 built: the samples' layout in every query and sanction letter, the PDF preview
+  with Download PDF, signed with the reader's saved signature.

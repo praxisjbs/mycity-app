@@ -5,6 +5,7 @@ import templates from "@mycity/contract/schemas/templates.js";
 import type { ConsequenceStep, LetterTemplate, LetterTemplateDetail, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
+import { saveFile, useFileUrl } from "@/api/download";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
@@ -20,7 +21,7 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
   ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, DetailPane, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
-  KeyValue, ListDetail, LoadingRows, Pager, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
+  DocumentPreview, KeyValue, ListDetail, LoadingRows, Pager, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
 } from "@mycity/ui";
 
 /**
@@ -789,6 +790,13 @@ function Templates() {
   // Beside the list the first template shows unasked; elsewhere one opens when it is pressed (F31).
   const shown = list.rows.find((t) => t.letter_template_id === sel) ?? (beside ? (list.rows[0] ?? null) : null);
   const preview = useApi("GET /api/v1/letter-templates/:id/preview", { params: { id: shown?.letter_template_id ?? "" }, enabled: !!shown && shown.status !== "awaiting_sample" });
+  // The PDF as sent; the demo build, which has no PDFs, shows the wording on paper instead.
+  // It signs with the reader's saved signature: a new one shows at once.
+  const mine = useApi("GET /api/v1/queries/my-signature");
+  const pdfUrl = shown && shown.status !== "awaiting_sample"
+    ? `/api/v1/letter-templates/${shown.letter_template_id}/preview.pdf?v=${encodeURIComponent(`${shown.version}-${shown.updated_at}-${mine.data?.updated_at ?? ""}`)}`
+    : null;
+  const pdf = useFileUrl(pdfUrl);
   const activate = useMutation("POST /api/v1/letter-templates/:id/activate");
   const deactivate = useMutation("POST /api/v1/letter-templates/:id/deactivate");
   // Activate a draft; Deactivate an active letter nothing sends (the refusal names what does).
@@ -846,6 +854,15 @@ function Templates() {
         detail={
           !shown ? null : shown.status === "awaiting_sample" ? (
             <Card><EmptyState bare icon="doc" title="Awaiting Sample" text="Write the letter to preview it." /></Card>
+          ) : pdf ? (
+            // The real PDF the employee would receive, signed with the reader's saved signature.
+            <DocumentPreview
+              name={`${shown.name}.pdf`}
+              mime="application/pdf"
+              href={pdf}
+              height="lg"
+              actions={<Button size="sm" icon="download" onClick={() => saveFile(pdfUrl!, `${shown.name}.pdf`)}>Download PDF</Button>}
+            />
           ) : preview.data ? (
             <Letter l={preview.data} />
           ) : preview.error ? (

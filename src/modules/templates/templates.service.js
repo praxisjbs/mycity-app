@@ -26,7 +26,7 @@ const { render } = require("../../shared/documents/render");
 const md = require("../../shared/documents/markdown");
 const { markdownToHtml } = md;
 const repo = require("./templates.repo");
-const { EVENTS, SHIPPED, FINE_LETTER_KEY, declare } = require("./templates.events");
+const { EVENTS, SHIPPED, FINE_LETTER_KEY, declare, QUERY_LETTER, SANCTION_LETTER } = require("./templates.events");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -127,10 +127,11 @@ function sampleData(purpose) {
     step_name: purpose === "sanction" ? "Warning" : null,
     raised_on: today,
     response_due: purpose === "query" ? `${lagos.addDays(today, 2)}T17:00:00.000Z` : null,
-    effective_on: purpose === "sanction" ? today : null,
+    effective_on: purpose === "query" ? null : today,
     ends_on: null,
     days: null,
-    fine_amount: null,
+    // The deduction letter's own sentence names the amount (guide §6.6).
+    fine_amount: purpose === "fine" ? "5000.00" : null,
     signer: { name: "Operations & People", role: "Operations & People" },
   };
 }
@@ -193,6 +194,37 @@ async function preview(id) {
     date_line: formatLongDate(today),
     paragraphs: paragraphsOf(html).slice(0, 200),
   };
+}
+
+/**
+ * GET /letter-templates/:id/preview.pdf: the letter as the employee would receive it, the real PDF
+ * from the same letterhead and engine, filled with sample values and signed with the reader's
+ * saved signature (guide §6.7, §6.9). Nothing is stored, numbered or sent.
+ * @returns {Promise<{pdf: Buffer, filename: string}>}
+ */
+async function previewPdf(id, user) {
+  const row = await repo.get(pool, id, shippedWithWording());
+  if (!row) throw notFound();
+  declare(row.key);
+  if (!(await wordingOf(pool, row.key)))
+    throw new AppError("TEMPLATE_AWAITING_SAMPLE", "This letter has no wording yet", 409);
+  const me = user.employee_id ? await require("../queries/queries.repo").employeeOf(pool, user.employee_id) : null;
+  const saved = await require("../queries/queries.signature").dataUrlOf(pool, user.user_id);
+  const data = {
+    ...sampleData(row.purpose),
+    signer: {
+      name: me ? me.display_name : "Operations & People",
+      role: (me && me.job_title) || "Operations & People",
+      signature: saved ? saved.signature : null,
+    },
+  };
+  const { pdf } = await documents.previewPdf(pool, {
+    doc_type: row.purpose === "query" ? QUERY_LETTER : SANCTION_LETTER,
+    template: row.key,
+    data,
+    number: "LTR-0000",
+  });
+  return { pdf, filename: `${row.name}.pdf` };
 }
 
 /* ------------------------------------------------------------------ *
@@ -377,6 +409,7 @@ module.exports = {
   summary,
   get,
   preview,
+  previewPdf,
   create,
   saveBody,
   activate,

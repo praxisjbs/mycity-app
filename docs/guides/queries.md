@@ -156,7 +156,8 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `GET /api/v1/letter-templates/summary` | → `LetterTemplatesSummary` | `queries` view | no | |
 | `GET /api/v1/letter-templates` | `LetterTemplateListQuery` (`purpose`, `status`, `q`) → `LetterTemplatePage` | `queries` view | yes, 25 | |
 | `GET /api/v1/letter-templates/:id` | → `LetterTemplateDetail` | `queries` view | no | The current wording and its version |
-| `GET /api/v1/letter-templates/:id/preview` | → `LetterPreview` | `queries` view | no | The wording filled with sample values, as paragraphs of runs; `filled` marks the record's words |
+| `GET /api/v1/letter-templates/:id/preview` | → `LetterPreview` | `queries` view | no | The wording filled with sample values, as paragraphs of runs; `filled` marks the record's words (the demo build's preview) |
+| `GET /api/v1/letter-templates/:id/preview.pdf` | → the PDF (`no_content`) | `queries` view | no | The letter as sent: sample values, the reader's saved signature, nothing stored (§6.7) |
 | `POST /api/v1/letter-templates` | `LetterTemplateCreate` (`body_html` from the editor, or `body` in Markdown; `status` `draft` or `active`) → `LetterTemplateDetail` | `queries` create, `queries.configure` | | Save Draft or Save and Activate |
 | `PUT /api/v1/letter-templates/:id/body` | `LetterTemplateBodySave` (`body_html` or `body`) → `LetterTemplateDetail` (with `body_html` for the editor) | `queries` edit, `queries.configure` | | A new `template_version` |
 | `POST /api/v1/letter-templates/:id/activate` | `EmptyBody` → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | Refused while it has no wording |
@@ -359,6 +360,19 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
   RC number, address, phone, email, website) repeat on every page, and every page is numbered
   "Page 2 of 3". The letterhead is the shared one (`templates/documents/letterhead.html`), so every
   generated document gains the repeat.
+- **As MyCity's own letters** (GE, 27/10/2026, from the samples CAUTION, WARNING, SUSPENSION,
+  DISMISSAL): `query_letter` and `sanction_letter` declare `letter` (the date and the addressee:
+  name, job title, department), so the letterhead opens the body with the date (the query raised, or
+  the sanction effective) and the addressee, prints no page title, and closes with "Yours
+  faithfully," and **FOR: MYCITY APP LTD** (the organisation's name in capitals) above the signer's
+  signature, name in bold and job title, leaving room to sign when there is no drawn signature. The
+  wording starts at "Dear", its heading in bold capitals after it; the logo header (number) and the
+  footer stay. A document that is not a letter keeps the plain "For" line.
+- **The preview is the PDF** (GE, 27/10/2026): `GET /letter-templates/:id/preview.pdf` renders the
+  letter through the same engine and letterhead (`documents.previewPdf`), filled with sample values
+  and signed with the reader's saved signature (§6.9), nothing stored, numbered or sent; Letter
+  Templates shows it with Download PDF. The demo build, which has no PDF renderer, shows the wording
+  on paper (`GET /:id/preview`). The deduction letter's sample carries an amount.
 - Letter templates added on the screen take a key `<slug>-letter`; generate() is given the template
   key with the shared doc types `query_letter` and `sanction_letter` (a small extension to
   `shared/documents/generate.js`: an explicit `template` for a doc type that allows it).
@@ -466,7 +480,7 @@ or tier 2.**
 | Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status), a page at a time; Recent Firings; New Rule, Edit Rule, Activate, Pause; the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional); an empty state when there are no rules | Help on Policy and on Clause, as the form reads them | Counting after the last query, the dedup key: §6.3 |
 | Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
-| Letter Templates | Stat strip; the list (template, used by, status); the selected letter's preview on paper, the record's words underlined; New Template (Name, Used For, Letter; Save Draft, Save and Activate), Edit Template (Name, Used For while nothing sends it, Letter, opening with its wording), Activate on a draft, Deactivate on an active letter | Help on Letter: the names a letter can use. Help on Used For when it is fixed | Versioning, the shipped defaults: §6.7 |
+| Letter Templates | Stat strip; the list (template, used by, status); the selected letter as its PDF, with Download PDF (on paper, the record's words underlined, in the demo build); Edit Signature; New Template (Name, Used For, Letter; Save Draft, Save and Activate), Edit Template (Name, Used For while nothing sends it, Letter, opening with its wording), Activate on a draft, Deactivate on an active letter | Help on Letter: the names a letter can use. Help on Used For when it is fixed | Versioning, the shipped defaults: §6.7 |
 | ESS · My Queries | The Queries and Sanctions switch with each one's count; Queries: the list (number, subject, raised, status), the picked query (subject, raised, respond by, what happened, your response, outcome, sanction), View Letter, Respond; Sanctions: the list (sanction, query, reason, date, fine), each opening its letter | Help on Respond By: the 24 hour window | The sanitising, the Markdown kept: §3 step 3 |
 
 ### 10.2 Phone layout
@@ -554,6 +568,9 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 27/10/2026 · GE · Letters as MyCity's own (handoff §9, S3; §6.7): the date and addressee open
+  them, "Yours faithfully" and FOR: the organisation close them; the preview is the real PDF with
+  Download PDF; the deduction letter's sample names its amount.
 - 27/10/2026 · GE · My Signature (handoff §9, S2; §6.9): drawn once on Letter Templates' Edit
   Signature, kept through the vault (`letter_signature`, migration `3050`); Raise a Query's and
   Approve Sanction's pads open with it.

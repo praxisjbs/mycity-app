@@ -293,7 +293,8 @@ reason from the record.
 2. The strip counts the **Templates**, the **Active** ones, those **Awaiting Sample**, and the
    **Letters Sent, 90d**.
 3. The list shows each **Template**, what it is **Used By**, and its **Status**.
-4. Press a template to see it on paper. The words the record fills in are underlined.
+4. Press a template to see it as the employee receives it: the letter's PDF, with sample details
+   and your saved signature. Press **Download PDF** to keep a copy.
 
 A letter **Awaiting Sample** has no wording yet: MyCity has still to send its sample.
 

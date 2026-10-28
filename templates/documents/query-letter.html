@@ -1,16 +1,9 @@
 ---
 title: "Query {{ query_number }}"
 ---
-<style>
-  .ql p { margin: 0 0 10px 0; }
-  .ql .ql-ref { font-size: 9pt; color: #71717A; }
-  .ql h2 { font-size: 12pt; margin: 16px 0 8px 0; }
-</style>
-<div class="ql">
-  <p class="ql-ref">{{ query_number }} · {{ longdate raised_on }}</p>
-  <p>{{ employee.display_name }}<br>{{#if employee.job_title}}{{ employee.job_title }}{{/if}}{{#if employee.department}}, {{ employee.department }}{{/if}}</p>
-  <h2>Query: {{ subject }}</h2>
+<div class="letter">
   <p>Dear {{ employee.first_name }},</p>
+  <h2>Query {{ query_number }}: {{ subject }}</h2>
   <p>This is to formally query you on the following.</p>
   <p>{{ details }}</p>
   {{#if policy}}<p>This is against our {{ policy.title }} ({{ policy.number }}, version {{ policy.version }}){{#if policy.clause}}: "{{ policy.clause }}"{{else}}.{{/if}}</p>{{/if}}

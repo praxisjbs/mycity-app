@@ -303,6 +303,18 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect((await as("ops").put("/queries/my-signature", { signature: "not a png" })).status).toBe(422);
     });
 
+    test("the preview is the real PDF, signed with the reader's saved signature; the deduction letter names its amount", async () => {
+      const caution = await byKey("ops", "caution-letter");
+      const pdf = await as("ops").get(`/letter-templates/${caution.letter_template_id}/preview.pdf?v=0-x`).buffer(true);
+      expect(pdf.status).toBe(200);
+      expect(pdf.headers["content-type"]).toBe("application/pdf");
+      expect(pdf.headers["content-disposition"]).toBe('inline; filename="Caution Letter.pdf"');
+      expect(pdf.body.subarray(0, 5).toString()).toBe("%PDF-");
+      const fine = await byKey("ops", "salary-deduction-letter");
+      const words = (await as("ops").get(`/letter-templates/${fine.letter_template_id}/preview`)).body.paragraphs.flat().map((r) => r.text).join("");
+      expect(words).toContain("₦5,000.00 will be deducted");
+    });
+
     test("Save and Activate, Deactivate while unused, and Used For while nothing sends it", async () => {
       const made = await as("ops").post("/letter-templates", {
         name: "Hearing Notice",
@@ -665,6 +677,10 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(html).toContain("The explanation does not account for the incident.");
       // Signed by the approver who let it stand (guide §6.4), with the signature they drew.
       expect(html).toContain('alt="Signature of Tunde Bakare"');
+      // Laid out as MyCity's own letters (§6.7): the addressee first, then the sign-off.
+      expect(html).toMatch(/lh-letter-to"><div>Zainab Lawal<\/div><div>Field Officer<\/div>/);
+      expect(html).toContain("Yours faithfully,");
+      expect(html).toMatch(/lh-sign-for">For: /);
       await documents.renderPending(docId, { db: pool });
       sent.length = 0;
       await drain();

@@ -1,16 +1,9 @@
 ---
 title: "Caution: {{ query_number }}"
 ---
-<style>
-  .cl p { margin: 0 0 10px 0; }
-  .cl .cl-ref { font-size: 9pt; color: #71717A; }
-  .cl h2 { font-size: 12pt; margin: 16px 0 8px 0; }
-</style>
-<div class="cl">
-  <p class="cl-ref">{{ query_number }} · {{ longdate effective_on }}</p>
-  <p>{{ employee.display_name }}<br>{{#if employee.job_title}}{{ employee.job_title }}{{/if}}{{#if employee.department}}, {{ employee.department }}{{/if}}</p>
-  <h2>{{ subject }}: Caution</h2>
+<div class="letter">
   <p>Dear {{ employee.first_name }},</p>
+  <h2>{{ subject }}: Caution</h2>
   <p>A review of query {{ query_number }} ({{ subject }}) finds the following.</p>
   <p>{{ reason }}</p>
   <p>To this effect, you are hereby advised to improve immediately. Also note that a review will be done to ascertain the results of this improvement.</p>

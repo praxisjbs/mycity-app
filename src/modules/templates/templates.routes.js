@@ -41,6 +41,11 @@ route(router, "get", "/:id/preview",
   { params: c.common.IdParams, response: t.LetterPreview, summary: "A letter rendered with sample values" },
   requirePermission("queries", "view"), controller.preview);
 
+route(router, "get", "/:id/preview.pdf",
+  { params: c.common.IdParams, no_content: true,
+    summary: "The letter as the employee receives it: the real PDF, sample values, nothing stored" },
+  requirePermission("queries", "view"), controller.previewPdf);
+
 route(router, "post", "/",
   { body: t.LetterTemplateCreate, response: t.LetterTemplateDetail, summary: "Add a letter template" },
   requirePermission("queries", "create"), requireCapability("queries.configure"), controller.create);
