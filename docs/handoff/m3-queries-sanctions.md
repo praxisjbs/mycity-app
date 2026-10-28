@@ -8,7 +8,7 @@ itself is `docs/guides/queries.md`; this file is the build plan and its log.
 | | |
 |---|---|
 | Branch | `m3/queries-sanctions` (push only here; the PR targets `main`; restarted from `main` after #22 merged) |
-| Pull request | #22, merged 27/10/2026; the sequel (§9) is a new PR |
+| Pull request | #22, merged 27/10/2026; the sequel (§9) is #33 |
 | Owner | GE (Godwin-Okoh Elisha); handed to Victor on 27/10/2026 |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 26/10/2026 |
