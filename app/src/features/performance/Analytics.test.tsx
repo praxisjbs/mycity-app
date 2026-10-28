@@ -72,10 +72,9 @@ async function analyticsAs(email: string) {
 const headings = () => screen.getAllByRole("heading").map((h) => h.textContent?.trim());
 
 describe("Performance · Analytics", () => {
-  it("Operations & People read no company: three figures, no Company Score (JBS Praxis, 28/10/2026)", async () => {
+  it("Operations & People read the whole plan: the Company Score with the three figures (JBS Praxis, 28/10/2026, P27)", async () => {
     await analyticsAs("cynthia@mycityapp.io");
-    expect(screen.queryByText("Company Score")).toBeNull();
-    for (const tile of ["Commitments On Time", "Check-Ins On Time", "Reviews Closed On Time"]) expect(screen.getAllByText(tile).length).toBeGreaterThan(0);
+    for (const tile of ["Company Score", "Commitments On Time", "Check-Ins On Time", "Reviews Closed On Time"]) expect(screen.getAllByText(tile).length).toBeGreaterThan(0);
   }, 30000);
 
   it("draws the four figures and every section on desktop, with Export of the people", async () => {

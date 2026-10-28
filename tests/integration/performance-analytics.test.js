@@ -312,14 +312,14 @@ describeDb("performance analytics against the real migrations", () => {
       recovery: 1,
     });
 
-    // Operations & People read every function's figures, never the company's: no company score or row.
+    // Operations & People read the whole plan (P27): the company's score and row with every function's.
     const tbo = c.goals.PerformanceAnalytics.parse((await as("ops").get(`/performance/analytics?department_id=${ids.tbo}`)).body);
-    expect(tbo.scores.map((s) => s.department)).toEqual(["Technology & Back-office Ops"]);
-    expect(tbo.company_score).toBeNull();
+    expect(tbo.scores.map((s) => s.department)).toEqual([null, "Technology & Back-office Ops"]);
+    expect(tbo.company_score).toBe("0.58");
     expect(tbo.key_results).toMatchObject({ key_results: 2, off_track: 1, at_risk: 1, recovery: 1, awaiting_report: 0 });
     const ops = c.goals.PerformanceAnalytics.parse((await as("ops").get(`/performance/analytics?period_id=${ids.period}`)).body);
-    expect(ops.scores.map((s) => s.department)).toEqual(["Branding & Marketing", "Technology & Back-office Ops"]);
-    expect(ops.key_results.key_results).toBe(4);
+    expect(ops.scores.map((s) => s.department)).toEqual([null, "Branding & Marketing", "Technology & Back-office Ops"]);
+    expect(ops.key_results.key_results).toBe(6);
     // A member of a function reads that function's alone.
     const own = c.goals.PerformanceAnalytics.parse((await as("ada").get(`/performance/analytics?period_id=${ids.period}`)).body);
     expect(own.company_score).toBeNull();

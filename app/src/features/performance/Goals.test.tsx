@@ -267,7 +267,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(valueOf(dialog(), "Objective")).toBe("QA objective on a binding plan");
   }, 60000);
 
-  it("New Objective offers Operations & People every function and never the company: what the server says they may set (QA DEF-10)", async () => {
+  it("New Objective offers Operations & People the company and every function: what the server says they may set (QA DEF-10, P27)", async () => {
     await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
     fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
     await settled();
@@ -275,8 +275,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     await chooseOption(within(form).getByLabelText("What"), "Objective");
     await settled();
     const offered = await optionLabels(within(form).getByLabelText("Function"));
-    expect(offered).not.toContain("Company");
-    expect(offered).toEqual(expect.arrayContaining(["Engineering", "Finance", "Marketing & Sales · Binding"]));
+    expect(offered).toEqual(expect.arrayContaining(["Company", "Engineering", "Finance", "Marketing & Sales · Binding"]));
   }, 60000);
 
   it("a head whose plan is binding is offered Request To Unbind in place of New Goal; New KPI offers their own function alone (QA DEF-11, JBS Praxis 27/10/2026)", async () => {
@@ -348,11 +347,11 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
   }, 60000);
 
-  it("a binding plan the reader reads but does not set hides New Goal and offers no Request To Unbind: the company's, for a reader of the whole plan; Operations & People read no company (JBS Praxis, 27/10/2026, 28/10/2026)", async () => {
-    // The company's plan, binding: Management and the CEO set it (§6.3). A reader of the whole plan who does not (here the
-    // head, given goals.view_all) reads it and is offered nothing; Operations & People read every function's, never the
-    // company's (§6.23). A company objective made by an earlier test leaves its draft plan behind, so that one is bound when
-    // it is there, and put back after.
+  it("a binding plan the reader reads but does not set hides New Goal and offers no Request To Unbind: the company's, for a reader of the whole plan who does not set it; Operations & People set it and are offered Request To Unbind (JBS Praxis, 27/10/2026, 28/10/2026)", async () => {
+    // The company's plan, binding: Management, Operations & People and the CEO set it (§6.3, P27). A reader of the whole
+    // plan who does not (here the head, given goals.view_all) reads it and is offered nothing; Operations & People set it,
+    // so are offered Request To Unbind. A company objective made by an earlier test leaves its draft plan behind, so that
+    // one is bound when it is there, and put back after.
     const made = { ...PLANS[0]!, performance_plan_id: sid("perf:plan:company"), department_id: null, department: null, status: "binding" as const };
     const left = PLANS.find((p) => p.department_id === null && p.performance_period_id === made.performance_period_id);
     const was = left?.status;
@@ -360,11 +359,12 @@ describe("Performance · Goals, set and changed on screen", () => {
     else PLANS.push(made);
     try {
       await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
-      // With All Functions picked there are functions to add to; the company is not among her choices.
+      // With All Functions picked there are functions to add to; on the binding company she may ask to unbind it.
       expect(screen.getAllByRole("button", { name: "New Goal" }).length).toBeGreaterThan(0);
-      await chooseOption(screen.getByLabelText("Function"), "Marketing & Sales");
+      await chooseOption(screen.getByLabelText("Function"), "Company");
       await settled();
-      expect(screen.queryByRole("option", { name: "Company" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+      expect(screen.getAllByRole("button", { name: "Request To Unbind" }).length).toBeGreaterThan(0);
       cleanup();
 
       // The Head of Department role, given the one capability that reads the whole plan.
@@ -446,8 +446,8 @@ describe("Performance · Goals, set and changed on screen", () => {
       const term = screen.getAllByRole("button", { name }).find((b) => b.hasAttribute("aria-describedby"))!;
       return document.getElementById(term.getAttribute("aria-describedby")!)?.textContent;
     };
-    // Operations & People read every function, not the company: their first figure is the functions' score (§6.23).
-    expect(helpOf("Function Score")).toBe("Scores run from 0 to 1. Good is 0.7 or above; Watch 0.4 to 0.7; Recovery below 0.4 needs a recovery plan.");
+    // Operations & People read the whole plan (P27): their first figure is the company's score.
+    expect(helpOf("Company Score")).toBe("Scores run from 0 to 1. Good is 0.7 or above; Watch 0.4 to 0.7; Recovery below 0.4 needs a recovery plan.");
     try {
       fireEvent.pointerDown(screen.getByRole("button", { name: "Manage Quarters" }), { button: 0, pointerType: "mouse" });
       await settled();
@@ -461,7 +461,7 @@ describe("Performance · Goals, set and changed on screen", () => {
       await press(dialog(), "Next");
       await press(dialog(), "Save Quarter");
       const help = "Scores run from 0 to 1. Good is 0.8 or above; Watch 0.5 to 0.8; Recovery below 0.5 needs a recovery plan.";
-      expect(helpOf("Function Score")).toBe(help);
+      expect(helpOf("Company Score")).toBe(help);
       expect(helpOf("Scoring Good")).toBe(help);
       expect(copy.wordCount(help)).toBeLessThanOrEqual(copy.LIMITS.help);
     } finally {
@@ -768,7 +768,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(screen.queryByRole("button", { name: "New KPI" })).toBeNull();
   }, 60000);
 
-  it("Report Month lists only what the reader may act for: a head their own function, Operations & People every function, the CEO the company too", async () => {
+  it("Report Month lists only what the reader may act for: a head their own function, Operations & People the company and every function, the CEO the same (P27)", async () => {
     await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
     await press(document.body, "Report Month");
     expect(await choices(dialog(), "Function")).toEqual(["Marketing & Sales"]);
@@ -777,8 +777,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
     await press(document.body, "Report Month");
     const operations = await choices(dialog(), "Function");
-    expect(operations).toEqual(expect.arrayContaining(["Marketing & Sales", "Content", "Engineering"]));
-    expect(operations).not.toContain("Company");
+    expect(operations).toEqual(expect.arrayContaining(["Company", "Marketing & Sales", "Content", "Engineering"]));
     cleanup();
 
     await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");

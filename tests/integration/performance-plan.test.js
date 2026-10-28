@@ -123,7 +123,8 @@ describeDb("performance plan against the real migrations", () => {
   });
 
   test("the CEO records an organisational goal, active at once, with a target per quarter; Home reads it", async () => {
-    expect((await as("pm").post("/performance/goals", { title: "x", plan_year_starts_on: "2026-01-01" })).status).toBe(403);
+    // Only whoever holds goals.organisation records one; a head does not (General Management do, P27).
+    expect((await as("head").post("/performance/goals", { title: "x", plan_year_starts_on: "2026-01-01" })).status).toBe(403);
     // Its ID is the system's, never typed (§6.1, JBS Praxis, 27/10/2026).
     const typed = await as("ceo").post("/performance/goals", { code: "OG1", title: "x", plan_year_starts_on: "2026-01-01" });
     expect([typed.status, typed.body.error.fields]).toEqual([422, { code: ["is not allowed"] }]);

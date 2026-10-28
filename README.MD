@@ -465,7 +465,8 @@ Shared first filled: `shared/time/recurrence`, `services/calendar/ics`, `service
 (`llm.service`, `transcription`, prompts `review-cleanup.md`, `review-dictation.md` and `week-summary.md`).
 
 Migration `2540_goal_share.sql` (sharing a company goal: `goal_share`, `goal_share_department`) and the
-reference seed `2541_seed_goal_view_all.sql` (the capability `goals.view_all`); integration test
+reference seeds `2541_seed_goal_view_all.sql` (the capability `goals.view_all`) and
+`2542_seed_goal_plan_operations.sql` (the plan's three capabilities for Operations & People); integration test
 `tests/integration/performance-goal-scope.test.js`.
 
 Migration `2400_performance_commitments.sql` (Performance PR 4: a rescope's reason on the task, a task
