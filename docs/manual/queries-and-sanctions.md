@@ -185,7 +185,7 @@ missing clock-outs are counted by the Attendance policy, which raises their quer
 | **Unregistered Device** | A clock-in from a device not on the person's list |
 | **Overdue Task** | A task in My Workspace done after its due day, or still open after it |
 | **Low Monthly Score** | A monthly review closed rated **Below** |
-| **Missed Target** | Not counted yet |
+| **Missed Target** | Not counted yet, so its rule stays a draft with no **Activate** until KPI targets are in use |
 
 ### Add a rule {#queries-rules-add needs="queries create, cap queries.configure"}
 

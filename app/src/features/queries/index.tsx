@@ -500,7 +500,7 @@ function Rules() {
           {rules.rows.map((r: QueryRule) => (
             <Card key={r.query_rule_id}>
               <CardHeader record title={r.name} right={<StatusPill s={ruleState(r)} />} />
-              <KeyValue items={[["Counts", TRIGGER_NAME[r.source_event]], ["Threshold", threshold(r)], ...(r.policy ? ([["Policy", r.policy.title]] as Array<[string, string]>) : [])]} />
+              <KeyValue items={[["Counts", !r.active && OFFERED.has(r.source_event) && !COUNTED_NOW.has(r.source_event) ? <HelpTerm key="c" help="Nothing counts this yet. The rule can be switched on once KPI targets are in use.">{TRIGGER_NAME[r.source_event]}</HelpTerm> : TRIGGER_NAME[r.source_event]], ["Threshold", threshold(r)], ...(r.policy ? ([["Policy", r.policy.title]] as Array<[string, string]>) : [])]} />
               {configure && (
                 <ActionGroup>
                   <div className="mt-2.5 flex justify-end gap-2">
@@ -601,7 +601,7 @@ function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
         // Its queries were counted this way: the trigger stays (guide §6.3).
         <KeyValue items={[[<HelpTerm key="t" help="Fixed once the rule has raised a query.">What Sets It Off</HelpTerm>, TRIGGER_NAME[rule.source_event]]]} />
       ) : (
-        <Field label="What Sets It Off" {...f.status("source_event")}><SelectField options={OFFERED_TRIGGERS} {...f.field("source_event")} /></Field>
+        <Field label={<HelpTerm help="Late arrivals, absences and missing clock-outs are set on the Attendance Policy, which raises their queries.">What Sets It Off</HelpTerm>} {...f.status("source_event")}><SelectField options={OFFERED_TRIGGERS} {...f.field("source_event")} /></Field>
       )}
       <Grid cols={2}>
         <Field label="How Many Times" {...f.status("threshold")}><NumberField {...f.field("threshold")} /></Field>
@@ -908,14 +908,14 @@ function Templates() {
               mime="application/pdf"
               href={pdf.href}
               file={pdf.blob}
-              height="lg"
+              height="page"
               actions={<Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, `${shown.name}.pdf`)}>Download PDF</Button>}
             />
           ) : pdf.failed ? (
             <Card><EmptyState bare icon="doc" title="Preview Not Ready" text="The letter could not be drawn." action={<Button icon="refresh" onClick={() => setRedraw((n) => n + 1)}>Try Again</Button>} /></Card>
           ) : (
             // The letter's own frame while it is drawn, never the wording first.
-            <Card pad={false}><PdfViewer data={null} name={`${shown.name}.pdf`} height="lg" /></Card>
+            <Card pad={false}><PdfViewer data={null} name={`${shown.name}.pdf`} height="page" /></Card>
           )
         }
       />

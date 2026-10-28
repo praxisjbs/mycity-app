@@ -55,6 +55,43 @@ function paper(pad: HTMLCanvasElement, ink: CanvasRenderingContext2D) {
   ink.restore();
 }
 
+/**
+ * The signature cut to its ink, with a little paper around it: the document sets the image to a
+ * signature's height, so the whole wide pad would shrink the strokes to a mark. A pad whose pixels
+ * cannot be read (a test's canvas) is kept whole.
+ */
+function cropped(pad: HTMLCanvasElement): string {
+  const ink = pad.getContext("2d");
+  if (!ink || typeof ink.getImageData !== "function" || !pad.width || !pad.height) return pad.toDataURL("image/png");
+  const { data, width, height } = ink.getImageData(0, 0, pad.width, pad.height);
+  let left = width, right = -1, top = height, bottom = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      // Ink is anything clearly darker than the paper.
+      if (data[i + 3]! > 0 && data[i]! + data[i + 1]! + data[i + 2]! < 600) {
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+    }
+  }
+  if (right < 0) return pad.toDataURL("image/png");
+  const margin = Math.round(6 * (window.devicePixelRatio || 1));
+  const x = Math.max(0, left - margin);
+  const y = Math.max(0, top - margin);
+  const w = Math.min(width, right + margin + 1) - x;
+  const h = Math.min(height, bottom + margin + 1) - y;
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const copy = out.getContext("2d");
+  if (!copy) return pad.toDataURL("image/png");
+  copy.drawImage(pad, x, y, w, h, 0, 0, w, h);
+  return out.toDataURL("image/png");
+}
+
 export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldProps>(function SignatureField({ label, onChange, disabled, noClear, initial, className }, ref) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -165,7 +202,7 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
 
   useImperativeHandle(ref, () => ({
     clear: wipe,
-    toPng: () => (inked.current ? (canvas.current?.toDataURL("image/png") ?? null) : null),
+    toPng: () => (inked.current && canvas.current ? cropped(canvas.current) : null),
   }));
 
   return (

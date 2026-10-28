@@ -7,6 +7,7 @@ export default {
   component: "DocumentPreview",
   states: {
     "A PDF": () => <DocumentPreview name="Receipt.pdf" mime="application/pdf" href={SAMPLE_PDF} sizeBytes={48213} height="sm" />,
+    "A Letter, Grown To Its Pages": () => <DocumentPreview name="Caution Letter.pdf" mime="application/pdf" href={SAMPLE_PDF} height="page" />,
     "A Picture": () => <DocumentPreview name="Receipt.jpg" mime="image/jpeg" href={SAMPLE_IMAGE} sizeBytes={184320} height="sm" />,
     "Something Else": () => (
       <DocumentPreview name="Staff Import.xlsx" mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" href={SAMPLE_PDF} sizeBytes={920104} />
