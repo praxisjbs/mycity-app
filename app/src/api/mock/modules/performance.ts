@@ -60,7 +60,7 @@ route("GET /api/v1/performance/periods/:id", (req) => {
   return p ? ok(p) : notFound();
 });
 route("POST /api/v1/performance/periods", (req) => {
-  const b = req.body as { starts_on?: string; name?: string; targets_lock_on?: string; live_from?: string; status?: "planning" | "active"; rules?: PerformancePeriod["rules"] };
+  const b = req.body as { starts_on?: string; name?: string; live_from?: string; status?: "planning" | "active"; rules?: PerformancePeriod["rules"] };
   if (!b.starts_on || !/-(01|04|07|10)-01$/.test(b.starts_on)) return invalid({ starts_on: ["Pick a quarter start"] });
   if (PERIODS.some((p) => p.starts_on === b.starts_on)) return fail(409, "PERIOD_EXISTS", "That quarter is already set up", { starts_on: ["Already set up"] });
   if (b.status === "active" && PERIODS.some((p) => p.status === "active")) return fail(409, "PERIOD_ACTIVE_EXISTS", "Close the active quarter first", { status: ["Another is active"] });
@@ -72,7 +72,6 @@ route("POST /api/v1/performance/periods", (req) => {
     starts_on: b.starts_on,
     ends_on: new Date(Date.parse(`${addMonths(b.starts_on, 3)}T00:00:00Z`) - 86400000).toISOString().slice(0, 10),
     plan_year_starts_on: `${b.starts_on.slice(0, 4)}-01-01`,
-    targets_lock_on: b.targets_lock_on || null,
     live_from: b.live_from || null,
     status: b.status ?? "planning",
     rules: b.rules ?? last.rules,
@@ -138,7 +137,7 @@ const allKrs = () => OBJECTIVES.flatMap((o) => o.key_results);
 const krById = (id: string) => allKrs().find((k) => k.okr_key_result_id === id);
 const objectiveOf = (kr: KeyResult) => OBJECTIVES.find((o) => o.okr_objective_id === kr.okr_objective_id)!;
 const fieldsOf = (b: Record<string, unknown>, keys: string[]) => Object.fromEntries(keys.filter((k) => k in b).map((k) => [k, b[k] === "" ? null : b[k]]));
-const KR_KEYS = ["statement", "kr_type", "measure", "direction", "unit", "baseline_text", "target_value", "target_text", "target_provisional", "parts", "starts_on", "finishes_on", "accountable_note", "scored_from_key_result_id", "position"];
+const KR_KEYS = ["statement", "kr_type", "measure", "direction", "unit", "baseline_text", "target_value", "target_text", "parts", "starts_on", "finishes_on", "accountable_note", "scored_from_key_result_id", "position"];
 const objectiveScore = (o: Objective) => {
   const s = o.key_results.map((k) => k.latest?.score).filter((x): x is string => x !== null && x !== undefined).map(Number);
   return s.length ? String(Math.round((s.reduce((x, y) => x + y, 0) / s.length) * 100) / 100) : null;
@@ -159,11 +158,6 @@ const traceOf = (kr: KeyResult) => {
 const setsGoalsFor = (req: Req, departmentId: string | null) => isCeo(req) || (departmentId === deptId && meOf(req)?.user_key === "ngozi");
 /** An objective as the reader gets it: may they edit it now (a plan not yet binding, or unbound, whose goals they set)? */
 const withCan = (o: Objective, req: Req): Objective => ({ ...o, score: objectiveScore(o), can_edit: editable(o.plan_status) && setsGoalsFor(req, o.department_id) });
-/** A TBC target still open: provisional, not locked, its quarter's lock date not come (§6.7). */
-const tbcOpen = (kr: KeyResult) => {
-  const lock = (PERIODS.find((p) => p.performance_period_id === objectiveOf(kr).performance_period_id) ?? PERIOD).targets_lock_on;
-  return kr.target_provisional && !kr.target_locked_at && (!lock || lock > new Date().toISOString().slice(0, 10));
-};
 const isOwner = (kr: KeyResult, req: Req) => Boolean(kr.accountable && kr.accountable.employee_id === meOf(req)?.employee_id);
 /** The form's people and links, as a key result carries them. */
 const krPeopleAndLinks = (b: Record<string, unknown>): Partial<KeyResult> => {
@@ -194,11 +188,9 @@ const krDetail = (kr: KeyResult, req: Req): KeyResultDetail => {
     performance_period_id: o.performance_period_id,
     can_change_target:
       o.plan_status === "binding" &&
-      !tbcOpen(kr) &&
       !TARGET_CHANGES.some((c) => c.okr_key_result_id === kr.okr_key_result_id && c.status === "pending") &&
       (isOwner(kr, req) || setsGoalsFor(req, o.department_id)),
     can_edit: editable(o.plan_status) && setsGoalsFor(req, o.department_id),
-    can_set_target: o.plan_status === "binding" && tbcOpen(kr) && (isOwner(kr, req) || setsGoalsFor(req, o.department_id)),
   };
 };
 
@@ -393,8 +385,6 @@ route("POST /api/v1/performance/key-results", (req) => {
     baseline_text: null,
     target_value: null,
     target_text: null,
-    target_provisional: false,
-    target_locked_at: null,
     parts: null,
     starts_on: null,
     finishes_on: null,
@@ -435,18 +425,14 @@ route("PATCH /api/v1/performance/key-results/:id", (req) => {
   if (!k) return notFound();
   const o = objectiveOf(k);
   const b = req.body as Record<string, unknown>;
-  if (editable(o.plan_status)) {
-    if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
-    // An unbound plan keeps what a reported month was scored on in place: the target changes through Change Target (§6.22).
-    const scored = ["target_value", "target_text", "target_provisional", "measure", "direction", "unit", "parts"].filter(
-      (x) => x in b && JSON.stringify(b[x] === "" ? null : b[x]) !== JSON.stringify((k as unknown as Record<string, unknown>)[x] ?? null),
-    );
-    if (amended(o.plan_status) && k.latest && scored.length)
-      return fail(409, "KEY_RESULT_REPORTED", "This key result has a reported month: change its target instead", Object.fromEntries(scored.map((x) => [x, ["Use Change Target"]])));
-  } else {
-    const onlyTarget = Object.keys(b).every((x) => ["target_value", "target_text", "target_provisional"].includes(x));
-    if (!(tbcOpen(k) && onlyTarget && (isOwner(k, req) || setsGoalsFor(req, o.department_id)))) return fail(409, "KEY_RESULT_BINDING", "This key result is binding: change its target instead");
-  }
+  if (!editable(o.plan_status)) return fail(409, "KEY_RESULT_BINDING", "This key result is binding: change its target instead");
+  if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
+  // An unbound plan keeps what a reported month was scored on in place: the target changes through Change Target (§6.22).
+  const scored = ["target_value", "target_text", "measure", "direction", "unit", "parts"].filter(
+    (x) => x in b && JSON.stringify(b[x] === "" ? null : b[x]) !== JSON.stringify((k as unknown as Record<string, unknown>)[x] ?? null),
+  );
+  if (amended(o.plan_status) && k.latest && scored.length)
+    return fail(409, "KEY_RESULT_REPORTED", "This key result has a reported month: change its target instead", Object.fromEntries(scored.map((x) => [x, ["Use Change Target"]])));
   Object.assign(k, fieldsOf(b, KR_KEYS), krPeopleAndLinks(b));
   return ok(k);
 });
@@ -471,9 +457,8 @@ route("POST /api/v1/performance/key-results/:id/confirm", (req) => {
 });
 
 /* Report Month */
-/** The score a report proposes, as the API works it out: none for a TBC target not yet locked. */
+/** The score a report proposes, as the API works it out. */
 const proposedOf = (k: KeyResult, r: Record<string, string | undefined>) => {
-  if (k.target_provisional && !k.target_locked_at) return null;
   if (k.measure === "numeric") {
     const target = Number(k.target_value);
     const actual = Number(r.actual_value);
@@ -688,7 +673,6 @@ route("POST /api/v1/performance/target-changes", (req) => {
   const b = req.body as Record<string, string | undefined>;
   const k = b.okr_key_result_id ? krById(b.okr_key_result_id) : undefined;
   if (b.okr_key_result_id && !k) return invalid({ okr_key_result_id: ["Pick a key result"] });
-  if (k && tbcOpen(k)) return fail(409, "TARGET_TBC", "Set this TBC target directly");
   const found = b.employee_target_id ? lineById(b.employee_target_id) : null;
   if (b.employee_target_id && !found) return notFound();
   // A line's target is changed by its scorecard's reviewer or the function's head, never its employee (§3.5).
@@ -985,7 +969,7 @@ export function decideTargetChange(user: string, wid: string, approve: boolean, 
   CHANGE_MOVES[wid] = { stage: "ceo", decision: approve ? "approve" : "reject", by: user, reason: why || null, at: now() };
   Object.assign(c, { status: approve ? "approved" : "rejected", decided_at: now() });
   const k = approve && c.okr_key_result_id ? krById(c.okr_key_result_id) : undefined;
-  if (k) Object.assign(k, { target_value: c.to_value, target_text: c.to_text, target_provisional: false });
+  if (k) Object.assign(k, { target_value: c.to_value, target_text: c.to_text });
   const found = approve ? lineById(c.employee_target_id) : null;
   if (found) Object.assign(found.line, { target_value: c.to_value, target_text: c.to_text });
   return ok(changeInstance(user, c));

@@ -42,7 +42,6 @@ function periodView(row) {
     starts_on: startsOn,
     ends_on: day(row.ends_on),
     plan_year_starts_on: day(row.plan_year_starts_on),
-    targets_lock_on: day(row.targets_lock_on),
     live_from: day(row.live_from),
     status: row.status,
     rules: row.rules,
@@ -52,7 +51,7 @@ function periodView(row) {
   };
 }
 
-/** A date the quarter's own days must hold (the lock date, the first live day). */
+/** A date the quarter's own days must hold (the first live day). */
 function assertInQuarter(field, value, startsOn, endsOn) {
   if (value && (value < startsOn || value > endsOn))
     throw new AppError("VALIDATION_FAILED", "Pick a day inside the quarter", 422, { [field]: ["Outside the quarter"] });
@@ -88,7 +87,6 @@ async function currentPeriod(db = pool) {
 async function createPeriod(actor, body) {
   const startsOn = body.starts_on;
   const endsOn = periods.quarterEnd(startsOn);
-  assertInQuarter("targets_lock_on", body.targets_lock_on, startsOn, endsOn);
   assertInQuarter("live_from", body.live_from, startsOn, endsOn);
   const id = await tx(async (client) => {
     if (await repo.periodStarting(client, startsOn))
@@ -103,7 +101,6 @@ async function createPeriod(actor, body) {
       starts_on: startsOn,
       ends_on: endsOn,
       plan_year_starts_on: body.plan_year_starts_on || periods.planYearOf(startsOn),
-      targets_lock_on: body.targets_lock_on || null,
       live_from: body.live_from || null,
       status,
       rules,
@@ -126,7 +123,7 @@ async function createPeriod(actor, body) {
   return getPeriod(id);
 }
 
-/** Change a quarter's name, lock date, first live day, rules or status, until it is closed (§3.2). */
+/** Change a quarter's name, first live day, rules or status, until it is closed (§3.2). */
 async function updatePeriod(actor, id, patch) {
   const id2 = await tx(async (client) => {
     const before = await repo.getPeriod(client, id);
@@ -135,7 +132,6 @@ async function updatePeriod(actor, id, patch) {
     if (before.status === "closed") throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409);
     const startsOn = day(before.starts_on);
     const endsOn = day(before.ends_on);
-    assertInQuarter("targets_lock_on", patch.targets_lock_on, startsOn, endsOn);
     assertInQuarter("live_from", patch.live_from, startsOn, endsOn);
     if (patch.status && patch.status !== before.status) {
       if (ORDER[patch.status] < ORDER[before.status])
@@ -631,8 +627,6 @@ async function requestChange(actor, scope, body) {
     const ctx = await repo.keyResultContext(pool, body.okr_key_result_id);
     if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404);
     if (!plansLib.isLive(ctx.plan_status)) throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
-    if (okrs.tbcOpen(ctx))
-      throw new AppError("TARGET_TBC", "Set this TBC target directly", 409);
     const owner = actor && actor.employee_id === ctx.accountable_employee_id;
     if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
     from = { value: ctx.target_value, text: ctx.target_text };
@@ -677,33 +671,6 @@ async function requestChange(actor, scope, body) {
   return okrs.changeView(await repo.getChange(pool, id));
 }
 
-/**
- * The `targets-lock` job: every TBC target whose quarter's lock date has come locks, once.
- * @param {string} today  YYYY-MM-DD in Lagos
- */
-async function lockTargets(today) {
-  const due = await repo.provisionalDue(pool, today);
-  if (!due.length) return { locked: 0 };
-  const byPeriod = new Map();
-  for (const kr of due) byPeriod.set(kr.performance_period_id, [...(byPeriod.get(kr.performance_period_id) || []), kr]);
-  await tx(async (client) => {
-    for (const [periodId, krs] of byPeriod) {
-      for (const kr of krs) {
-        await repo.updateKeyResult(client, kr.okr_key_result_id, { target_provisional: false, target_locked_at: new Date() });
-        // The months reported while the target was TBC are scored now it is firm.
-        await require("./goals.okrs").rescoreFrom(client, kr.okr_key_result_id);
-      }
-      await emit(client, {
-        key: EVENTS.PERIOD_TARGETS_LOCKED,
-        entity: { type: "performance_period", id: periodId },
-        actor: null,
-        payload: { performance_period_id: periodId, locked: krs.map((k) => k.code) },
-      });
-    }
-  });
-  return { locked: due.length };
-}
-
 module.exports = {
   periodView,
   listPeriods,
@@ -729,5 +696,4 @@ module.exports = {
   changeDetail,
   approvals,
   requestChange,
-  lockTargets,
 };

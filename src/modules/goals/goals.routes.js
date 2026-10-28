@@ -13,7 +13,7 @@
  *   GET   /objectives/:id                                  `performance` view: one objective, with its key results
  *   POST  /objectives · PATCH · DELETE /objectives/:id     goals.company or goals.function: a draft plan only
  *   GET   /key-results                                     `performance` view: a quarter's key results for a picker
- *   POST  /key-results · PATCH · DELETE /key-results/:id   as objectives; a binding TBC target by its owner or head
+ *   POST  /key-results · PATCH · DELETE /key-results/:id   as objectives; a binding key result changes by a target change
  *   GET   /key-results/:id · /key-results/:id/trace        `performance` view
  *   POST  /reports                                         `performance` edit: the head, or the accountable person
  *   POST  /key-results/:id/confirm                         `performance` approve, goals.confirm

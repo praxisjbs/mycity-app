@@ -1,6 +1,6 @@
 /**
  * Performance · Goals, Set Up Quarter and Edit Quarter (docs/guides/performance.md §3.2, §5, §10): the
- * quarter (name, start, the end that follows it, lock date, status), then its scoring rules, which
+ * quarter (name, start, the end that follows it, status), then its scoring rules, which
  * start as a copy of the last quarter's: the bands, the key results' and the lines' scoring thresholds
  * and the section weights. The contract's PeriodCreate or PeriodEdit, ScoringRules inside, checks every
  * field, and each problem lands on its field. A quarter is set up before it starts (Q1 2027 in October).
@@ -39,7 +39,7 @@ const RULES: Rule[] = [
   { step: "Section Weights", group: "sections", key: "accountability", label: "Accountability", decimal: false },
 ];
 const STEPS = ["Bands", "Key Result Scoring", "Line Scoring", "Section Weights"];
-const QUARTER_FIELDS = ["name", "starts_on", "targets_lock_on", "status"];
+const QUARTER_FIELDS = ["name", "starts_on", "status"];
 
 type Values = Record<string, string>;
 const ruleField = (r: Rule) => `${r.group}/${r.key}`;
@@ -101,14 +101,13 @@ export function QuarterWizard({ close, period, latest, onSaved }: { close: () =>
   const initial: Values = {
     name: period?.name ?? "",
     starts_on: period?.starts_on ?? nextStart(latest),
-    targets_lock_on: period?.targets_lock_on ?? "",
     status: period?.status ?? "planning",
     ...Object.fromEntries(RULES.map((r) => [ruleField(r), String((base[r.group] as Record<string, number>)[r.key] ?? "")])),
   };
   const toBody = (v: Values) =>
     editing
-      ? { name: v.name, targets_lock_on: v.targets_lock_on || null, status: v.status, rules: rulesOf(v, base) }
-      : { starts_on: v.starts_on, name: v.name, targets_lock_on: v.targets_lock_on, status: v.status, rules: rulesOf(v, base) };
+      ? { name: v.name, status: v.status, rules: rulesOf(v, base) }
+      : { starts_on: v.starts_on, name: v.name, status: v.status, rules: rulesOf(v, base) };
   const f = useContractForm(initial, bodySchema<Values>(editing ? goalsContract.PeriodEdit : goalsContract.PeriodCreate, toBody, fieldOf));
   const create = useMutation("POST /api/v1/performance/periods");
   const change = useMutation("PATCH /api/v1/performance/periods/:id");
@@ -163,9 +162,6 @@ export function QuarterWizard({ close, period, latest, onSaved }: { close: () =>
               </Field>
               <Field label="Ends">
                 <TextField value={formatDate(ends)} onChange={() => undefined} disabled />
-              </Field>
-              <Field label="Lock Date" optional {...f.status("targets_lock_on")}>
-                <DateField {...f.field("targets_lock_on")} min={v.starts_on || undefined} max={ends || undefined} />
               </Field>
               <Field label="Status" {...f.status("status")}>
                 <ChoiceField label="Status" options={statuses} disabled={behind} value={v.status} onChange={(x) => f.field("status").onChange(x)} />
