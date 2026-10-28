@@ -63,7 +63,8 @@ raised.
 5. Under **What Happened**, say what happened, with the date. Use at least 20 characters.
 6. To cite a policy, pick it under **Policy**. Only policies in force are offered.
 7. Once a policy is picked, you may type the line it breaks under **Clause**. The letter quotes it.
-8. Sign with your finger or mouse in **Your Signature**. It is printed on the letter.
+8. Sign with your finger or mouse in **Your Signature**. It is printed on the letter. If you saved
+   [your signature](#queries-signature), it is there already; press **Clear Signature** to redraw.
 9. Press **Raise Query**. The hub says the query was raised and its letter sent.
 
 The employee is told in the hub and by email, with the letter. They have 24 hours to respond.
@@ -144,8 +145,8 @@ A proposed sanction waits on the query's card for whoever must approve it.
    **Escalated**, and **Waiting On** names who must approve.
 2. If it waits on you, press **Approve Sanction**.
    ![Approve Sanction](shot:queries-approve)
-3. At **Operations & People**, sign in **Your Signature**. It is printed on the sanction's letters,
-   with your name and job title.
+3. At **Operations & People**, sign in **Your Signature**, or keep the one you saved. It is printed
+   on the sanction's letters, with your name and job title.
 4. Press **Approve Sanction**. The hub says it was sent on to the CEO, or that the sanction was
    approved and its letter follows. The card shows the sanction's number once it is issued.
 5. To refuse it, press **Reject**, type the **Reason** and press **Reject**. The hub says
@@ -333,6 +334,17 @@ A step chooses its letter on [Chain Settings](#queries-chain), and a rule under 
 | *In use by …* | A step or rule sends it, or it is the Query Letter or the Salary Deduction Letter | Give the step or rule another letter first |
 
 Only an active letter is used. A step of the ladder needs its letter active before it is offered.
+
+### Save your signature {#queries-signature needs="queries view"}
+
+Draw your signature once, and your query letters and the sanctions you approve start from it.
+
+1. Open [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates).
+2. Press **Edit Signature** at the top right.
+3. Sign with your finger or mouse in **Your Signature**. To start again, press **Clear Signature**.
+4. Press **Save Signature**. The hub says **Signature saved**.
+
+A letter already sent keeps the signature it was signed with.
 
 ## My Queries {#queries-my screen=ess/my-queries icon=user}
 

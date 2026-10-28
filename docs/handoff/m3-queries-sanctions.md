@@ -440,7 +440,7 @@ real names and never enter this public repository.
 - [x] S1 Letter editing: shipped wording in the editor (converted to Markdown on first save); Used For
   while unused; Deactivate when unused; New Template's Save Draft and Save and Activate; the rule
   form's Letter
-- [ ] S2 My Signature: migration `3050`, stored through the vault, Edit Signature, Raise a Query and
+- [x] S2 My Signature: migration `3050`, stored through the vault, Edit Signature, Raise a Query and
   Approve Sanction start from it, the preview shows it
 - [ ] S3 The samples' layout in every M3 letter; the preview is the rendered PDF with Download; the
   deduction letter's sample amount
@@ -452,3 +452,5 @@ real names and never enter this public repository.
 - 27/10/2026 · GE · Observations read against the code, decisions taken, branch restarted from main.
 - 27/10/2026 · GE · S1 built: the editor opens a shipped letter's wording, Name and Used For on Edit
   Template, Deactivate while unused, Save Draft and Save and Activate, the rule's Letter.
+- 28/10/2026 · GE · S2 built: Edit Signature, `letter_signature` (3050), the pads open with it. The
+  preview signing with it comes with S3.

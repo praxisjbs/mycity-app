@@ -472,7 +472,7 @@ and `performance-commitments-seed.test.js` (the staging seed).
 
 | Module | Files beyond the template |
 |---|---|
-| `queries` | `.visibility` (a manager sees only queries they raised), `.response`, `.escalate`, `.assist` (Write With AI on Raise a Query, prompt `services/ai/prompts/query-draft.md`; on screen `app/src/features/queries/WriteWithAi.tsx`, shared with the letter editor) |
+| `queries` | `.visibility` (a manager sees only queries they raised), `.response`, `.escalate`, `.assist` (Write With AI on Raise a Query, prompt `services/ai/prompts/query-draft.md`; on screen `app/src/features/queries/WriteWithAi.tsx`, shared with the letter editor), `.signature` (My Signature: drawn once on Letter Templates, kept through the vault in `letter_signature`, migration `3050`) |
 | `query_rules` | `.evaluator` (outbox subscriber: N events in a window) |
 | `sanctions` | `.chain` (workflow definition), `.fines` (pending deduction for M6), `.letters` |
 | `templates` | Editable letter templates (M3), mail templates (M5); `.assist` (Write With AI on the letter editor, prompt `services/ai/prompts/letter-draft.md`) |

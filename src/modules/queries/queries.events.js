@@ -27,6 +27,7 @@ const EVENTS = defineEvents("queries", {
   "query.reminded": { summary: "An employee was reminded to answer a query" },
   "query.responded": { summary: "An employee answered a query" },
   "query.closed": { summary: "A query was closed with no action" },
+  "letter_signature.saved": { summary: "A person saved the signature their letters start from" },
 });
 
 defineVariables("email", "query-raised", c.queries.QueryRaisedEmailVars);

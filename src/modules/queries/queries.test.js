@@ -86,6 +86,9 @@ describe("the routes", () => {
       "GET /assist": "create",
       "POST /assist": "create",
       "GET /policies": "view",
+      // The reader's own saved signature (guide §6.9).
+      "GET /my-signature": "view",
+      "PUT /my-signature": "view",
       "POST /": "create",
       "POST /:id/remind": "create",
       "POST /:id/decision": "edit",

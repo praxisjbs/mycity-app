@@ -3523,10 +3523,11 @@ A signature drawn with a finger or a mouse, which leaves as a PNG for the docume
 | `onChange` | `(hasInk: boolean) => void` | yes | Called true the moment the first stroke lands, and false when it is cleared. |
 | `disabled` | `boolean` |  | Nothing can be drawn (the document is already signed, or the link has been used). |
 | `noClear` | `boolean` |  | Hide the Clear button, where the screen offers its own. |
+| `initial` | `string \| null` |  | A signature the person saved before, as a PNG data URL: drawn on the pad as its ink when it opens, so they need not draw again. Clear Signature wipes it; drawing adds to it. |
 | `className` | `string` |  | Layout classes only (spacing, height). |
 
 ```tsx
-<SignatureField label="Your Signature" onChange={setInk} ref={pad} />
+<SignatureField label="Your Signature" onChange={setInk} ref={pad} initial={saved} />
 ```
 
 ### StepBar

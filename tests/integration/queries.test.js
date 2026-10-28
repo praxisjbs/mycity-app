@@ -289,6 +289,20 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(saved.body.body).toContain("Dear {{ employee.first_name }},");
     });
 
+    test("My Signature is saved once through the vault and read back as the pad opens it", async () => {
+      expect((await as("ops").get("/queries/my-signature")).body).toEqual({ signature: null, updated_at: null });
+      const saved = await as("ops").put("/queries/my-signature", { signature: SIGNATURE });
+      expect(saved.status).toBe(200);
+      expect(saved.body.signature).toMatch(/^data:image\/png;base64,/);
+      const kept = (await q("SELECT document_id FROM letter_signature WHERE user_id = $1", [people.ops.user.user_id])).rows;
+      expect(kept).toHaveLength(1);
+      // Saving again replaces it; anyone else sees only their own.
+      await as("ops").put("/queries/my-signature", { signature: SIGNATURE });
+      expect((await q("SELECT count(*)::int AS n FROM letter_signature")).rows[0].n).toBe(1);
+      expect((await as("manager").get("/queries/my-signature")).body.signature).toBeNull();
+      expect((await as("ops").put("/queries/my-signature", { signature: "not a png" })).status).toBe(422);
+    });
+
     test("Save and Activate, Deactivate while unused, and Used For while nothing sends it", async () => {
       const made = await as("ops").post("/letter-templates", {
         name: "Hearing Notice",

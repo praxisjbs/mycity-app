@@ -7,7 +7,7 @@
  * @phone This is where it is used most: the pad is full width and drawn with a finger, and Clear is a 44 px target.
  * @a11y The pad is named, and Clear says whether anything has been drawn, so the state is never only visual; a typed-name fallback stays the screen's choice.
  * @status stable
- * @example <SignatureField label="Your Signature" onChange={setInk} ref={pad} />
+ * @example <SignatureField label="Your Signature" onChange={setInk} ref={pad} initial={saved} />
  */
 import { forwardRef, useEffect, useImperativeHandle, useRef, type PointerEvent } from "react";
 import { cn } from "../lib/cn";
@@ -30,6 +30,11 @@ export interface SignatureFieldProps {
   disabled?: boolean;
   /** Hide the Clear button, where the screen offers its own. */
   noClear?: boolean;
+  /**
+   * A signature the person saved before, as a PNG data URL: drawn on the pad as its ink when it
+   * opens, so they need not draw again. Clear Signature wipes it; drawing adds to it.
+   */
+  initial?: string | null;
   /** Layout classes only (spacing, height). */
   className?: string;
 }
@@ -37,7 +42,7 @@ export interface SignatureFieldProps {
 /** The ink's width, in CSS pixels, before the screen's own density is applied. */
 const STROKE = 2.2;
 
-export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldProps>(function SignatureField({ label, onChange, disabled, noClear, className }, ref) {
+export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldProps>(function SignatureField({ label, onChange, disabled, noClear, initial, className }, ref) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const inked = useRef(false);
@@ -80,6 +85,27 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
     watch.observe(pad);
     return () => watch.disconnect();
   }, []);
+
+  /* The saved signature, fitted inside the pad and centred, as ink. Once per image. */
+  const drawn = useRef<string | null>(null);
+  useEffect(() => {
+    const pad = canvas.current;
+    if (!pad || !initial || drawn.current === initial) return;
+    drawn.current = initial;
+    const image = new Image();
+    image.onload = () => {
+      const ink = pad.getContext("2d");
+      if (!ink || !image.width || !image.height) return;
+      const box = pad.getBoundingClientRect();
+      const scale = Math.min(box.width / image.width, box.height / image.height, 1);
+      const w = image.width * scale;
+      const h = image.height * scale;
+      ink.drawImage(image, (box.width - w) / 2, (box.height - h) / 2, w, h);
+      inked.current = true;
+      onChange(true);
+    };
+    image.src = initial;
+  }, [initial, onChange]);
 
   const at = (e: PointerEvent<HTMLCanvasElement>) => {
     const box = canvas.current!.getBoundingClientRect();

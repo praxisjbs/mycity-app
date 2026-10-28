@@ -404,7 +404,8 @@ off (read by nothing) · `3040` the key from
 `attendance_rule_breach.employee_query_id` to the query raised for the breach (owed since 1430),
 `employee_query.source` (`person`, `rule`, `attendance`), `sanction.signed_by` (the Operations &
 People approver who signed it; RESTRICT, indexed) and `sanction.letter_template` (the rung's letter
-when it was proposed).
+when it was proposed). · `3050` `letter_signature` (one a login: the signature they saved on Edit Signature, from
+the vault; docs/guides/queries.md §6.9).
 
 **Owes:**
 - Fines as pending deductions accepted into the M6 payroll run (MILESTONES §8): M6 reads

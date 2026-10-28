@@ -212,6 +212,8 @@ function RaiseQuery({ close }: { close: () => void }) {
   );
   const save = useMutation("POST /api/v1/queries");
   const ai = useApi("GET /api/v1/queries/assist");
+  // The pad starts from the signature saved on Letter Templates (guide §6.9).
+  const mine = useApi("GET /api/v1/queries/my-signature");
   // Write With AI: mounted from its first opening, so Back keeps what was typed in it (mailbox §10).
   const [step, setStep] = useState<{ mounted: boolean; open: boolean }>({ mounted: false, open: false });
   const draft = async (instruction: string) => {
@@ -271,7 +273,7 @@ function RaiseQuery({ close }: { close: () => void }) {
       </Field>
       {policy.length > 0 && <Field label={<HelpTerm help="The line of the policy the letter quotes.">Clause</HelpTerm>} optional {...f.status("policy_clause")}><TextField {...f.field("policy_clause")} /></Field>}
       <Field label="Your Signature" {...f.status("signature")}>
-        <SignatureField ref={pad} label="Your Signature" onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
+        <SignatureField ref={pad} label="Your Signature" initial={mine.data?.signature} onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -385,6 +387,7 @@ function ApproveSanction({ id, signs, close, onDone }: { id: string; signs: bool
     withSignature(sanctions.SanctionApprove, pad, () => signs),
   );
   const save = useMutation("POST /api/v1/sanctions/:id/approve");
+  const mine = useApi("GET /api/v1/queries/my-signature", { enabled: signs });
   const submit = async () => {
     if (!f.check()) return;
     try {
@@ -403,7 +406,7 @@ function ApproveSanction({ id, signs, close, onDone }: { id: string; signs: bool
     <>
       {signs && (
         <Field label={<HelpTerm help="Your signature is printed on this sanction's letters.">Your Signature</HelpTerm>} {...f.status("signature")}>
-          <SignatureField ref={pad} label="Your Signature" onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
+          <SignatureField ref={pad} label="Your Signature" initial={mine.data?.signature} onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
         </Field>
       )}
       <FormFooter>
@@ -807,13 +810,16 @@ function Templates() {
         title="Letter Templates"
         sub="The system fills name, date and reason"
         actions={
-          configure && (
+          <>
+            <Button icon="signature" onClick={() => modal.open({ title: "My Signature", body: (close) => <EditSignature close={close} /> })}>Edit Signature</Button>
+            {configure && (
             <>
               {shown && <Button icon="edit" onClick={() => modal.open({ title: shown.name, wide: true, body: (close) => <EditTemplate id={shown.letter_template_id} close={close} /> })}>Edit Template</Button>}
               {shown && (shown.status === "draft" || shown.status === "active") && <Button onClick={flip}>{shown.status === "active" ? "Deactivate" : "Activate"}</Button>}
               <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>
             </>
-          )
+            )}
+          </>
         }
       />
       {s.data && <StatStrip items={[{ label: "Templates", value: s.data.templates }, { label: "Active", value: s.data.active, tone: "ok" }, { label: "Awaiting Sample", value: s.data.awaiting_sample, tone: "warn" }, { label: "Letters Sent, 90d", value: s.data.sent_90d }]} />}
@@ -849,6 +855,41 @@ function Templates() {
           )
         }
       />
+    </>
+  );
+}
+
+/**
+ * Edit Signature (guide §6.9): the reader's own signature, drawn once and kept through the vault.
+ * Raise a Query and Approve Sanction start from it; a letter already sent keeps its own copy.
+ */
+function EditSignature({ close }: { close: () => void }) {
+  const pad = useRef<SignatureFieldHandle>(null);
+  const mine = useApi("GET /api/v1/queries/my-signature");
+  const f = useContractForm<{ signature: string }>({ signature: "" }, withSignature(queries.MySignatureSave, pad));
+  const save = useMutation("PUT /api/v1/queries/my-signature");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ body: { signature: pad.current?.toPng() ?? "" } });
+      invalidate("/api/v1/queries/my-signature");
+      invalidate("/api/v1/letter-templates");
+      close();
+      toast("Signature saved");
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
+  if (mine.loading && !mine.data) return <LoadingRows count={2} />;
+  return (
+    <>
+      <Field label={<HelpTerm help="Your letters start from it. You can still redraw it on each one.">Your Signature</HelpTerm>} {...f.status("signature")}>
+        <SignatureField ref={pad} label="Your Signature" initial={mine.data?.signature} onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" icon="ok" busy={save.pending} onClick={submit}>Save Signature</Button>
+      </FormFooter>
     </>
   );
 }

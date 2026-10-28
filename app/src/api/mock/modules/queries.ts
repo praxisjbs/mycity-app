@@ -478,6 +478,15 @@ route("GET /api/v1/queries", (req) => {
   });
 });
 /* Write With AI (guide §9): the demo drafts from what was asked; nothing is kept. */
+/* My Signature (guide §6.9): one saved signature a person, kept for the session. */
+const SIGNATURES = new Map<string, { signature: string; updated_at: string }>();
+route("GET /api/v1/queries/my-signature", (req) => ok(SIGNATURES.get(req.user!) ?? { signature: null, updated_at: null }));
+route("PUT /api/v1/queries/my-signature", (req) => {
+  const signature = String((req.body as { signature?: string }).signature ?? "");
+  if (!/^data:image\/png;base64,/.test(signature)) return invalid({ signature: ["Sign in the box"] });
+  SIGNATURES.set(req.user!, { signature, updated_at: now() });
+  return ok(SIGNATURES.get(req.user!)!);
+});
 route("GET /api/v1/queries/assist", () => ok({ available: true, reason: null }));
 route("POST /api/v1/queries/assist", (req) => {
   const b = req.body as { employee_id?: string; instruction?: string; policy_id?: string };

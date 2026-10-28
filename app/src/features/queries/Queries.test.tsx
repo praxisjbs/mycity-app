@@ -163,6 +163,16 @@ describe("Queries & Sanctions · Letter Templates", () => {
     await waitFor(() => expect(within(dialog).getByText(/Dear/)).toBeTruthy());
   }, 30000);
 
+  it("keeps the reader's signature behind Edit Signature", async () => {
+    await signedInAs("cynthia@mycityapp.io", "letter-templates");
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Signature" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByRole("img", { name: "Your Signature" })).toBeTruthy();
+    // Nothing drawn: refused on the pad, before anything is sent.
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save Signature" }));
+    await waitFor(() => expect(within(dialog).getByText("Sign in the box")).toBeTruthy());
+  }, 30000);
+
   it("saves a new letter as a draft or straight into use", async () => {
     await signedInAs("cynthia@mycityapp.io", "letter-templates");
     fireEvent.click(await screen.findByRole("button", { name: "New Template" }));

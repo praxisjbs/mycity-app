@@ -96,3 +96,27 @@ describe("SignatureField", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe("SignatureField · a saved signature", () => {
+  it("opens with the saved signature as its ink, so it can be sent without drawing", async () => {
+    // jsdom loads no images: one that loads as soon as its source is set.
+    const Real = globalThis.Image;
+    globalThis.Image = class {
+      width = 240;
+      height = 80;
+      onload: (() => void) | null = null;
+      set src(_v: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    } as never;
+    try {
+      const ref = createRef<SignatureFieldHandle>();
+      const onChange = vi.fn();
+      render(<SignatureField ref={ref} label="Your Signature" onChange={onChange} initial="data:image/png;base64,saved" />);
+      await vi.waitFor(() => expect(onChange).toHaveBeenCalledWith(true));
+      expect(ref.current!.toPng()).toBe("data:image/png;base64,ink");
+    } finally {
+      globalThis.Image = Real;
+    }
+  });
+});
