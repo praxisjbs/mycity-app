@@ -42,6 +42,19 @@ export interface SignatureFieldProps {
 /** The ink's width, in CSS pixels, before the screen's own density is applied. */
 const STROKE = 2.2;
 
+/**
+ * Lay the paper into the bitmap itself, across the whole pad. A browser that darkens every site
+ * repaints the canvas's CSS background but never its pixels, so paper drawn there stays white
+ * under the dark ink; the PNG carries it, white on the white page it is stamped into.
+ */
+function paper(pad: HTMLCanvasElement, ink: CanvasRenderingContext2D) {
+  ink.save();
+  ink.setTransform(1, 0, 0, 1, 0, 0);
+  ink.fillStyle = getComputedStyle(pad).backgroundColor;
+  ink.fillRect(0, 0, pad.width, pad.height);
+  ink.restore();
+}
+
 export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldProps>(function SignatureField({ label, onChange, disabled, noClear, initial, className }, ref) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -73,6 +86,7 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
       pad.height = height;
       const ink = pad.getContext("2d");
       if (!ink) return;
+      paper(pad, ink);
       if (keep) ink.drawImage(keep, 0, 0, keep.width, keep.height, 0, 0, width, height);
       ink.setTransform(ratio, 0, 0, ratio, 0, 0);
       ink.lineCap = "round";
@@ -144,10 +158,7 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
     const pad = canvas.current;
     const ink = pad?.getContext("2d");
     if (!pad || !ink) return;
-    ink.save();
-    ink.setTransform(1, 0, 0, 1, 0, 0);
-    ink.clearRect(0, 0, pad.width, pad.height);
-    ink.restore();
+    paper(pad, ink);
     inked.current = false;
     onChange(false);
   };
@@ -166,7 +177,7 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
         /*
          * Paper in both themes with dark ink: the image is stamped into the
          * execution block of a white PDF, so it is never drawn in the theme's
-         * own foreground colour.
+         * own foreground colour. The bitmap carries the paper too (paper()).
          */
         className={cn(
           "block h-24 w-full touch-none rounded-box border border-dashed border-paper-dash bg-paper text-paper-heading",

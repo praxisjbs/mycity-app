@@ -304,12 +304,22 @@ describeDb("queries and sanctions against the real migrations", () => {
     });
 
     test("the preview is the real PDF, signed with the reader's saved signature; the deduction letter names its amount", async () => {
+      // The renderer stands in, as CI has no Chromium: what is checked is the letter handed to it.
+      const pdfService = require("../../src/services/pdf/pdf.service");
+      const render = jest.spyOn(pdfService, "render").mockResolvedValue(Buffer.from("%PDF-1.7 sample"));
+      await as("ops").put("/queries/my-signature", { signature: SIGNATURE });
       const caution = await byKey("ops", "caution-letter");
       const pdf = await as("ops").get(`/letter-templates/${caution.letter_template_id}/preview.pdf?v=0-x`).buffer(true);
+      const [html, opts] = render.mock.calls[0];
+      render.mockRestore();
       expect(pdf.status).toBe(200);
       expect(pdf.headers["content-type"]).toBe("application/pdf");
       expect(pdf.headers["content-disposition"]).toBe('inline; filename="Caution Letter.pdf"');
       expect(pdf.body.subarray(0, 5).toString()).toBe("%PDF-");
+      expect(opts).toMatchObject({ footer: "LTR-0000" });
+      expect(html).toContain("Yours faithfully,");
+      expect(html).toMatch(/<img src="data:image\/png;base64,[^"]+" alt="Signature of /);
+      expect(html).toContain("LTR-0000");
       const fine = await byKey("ops", "salary-deduction-letter");
       const words = (await as("ops").get(`/letter-templates/${fine.letter_template_id}/preview`)).body.paragraphs.flat().map((r) => r.text).join("");
       expect(words).toContain("₦5,000.00 will be deducted");

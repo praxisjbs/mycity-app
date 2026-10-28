@@ -146,11 +146,14 @@ export function useFileUrl(url: string | null): string | null {
 /**
  * A gated file's bytes and a blob URL for them, for a preview that draws the bytes and
  * links the URL (DocumentPreview: PdfViewer draws a PDF from its bytes, Open in Tab opens
- * the URL). Both null while it is fetched, in mock mode, or when there is nothing to show.
+ * the URL). Both null while it is fetched, in mock mode, or when there is nothing to show;
+ * `failed` once the fetch was refused, so the screen can say so rather than wait.
  */
-export function useFileBlob(url: string | null): { blob: Blob | null; href: string | null } {
+export function useFileBlob(url: string | null): { blob: Blob | null; href: string | null; failed: boolean } {
   const [got, setGot] = useState<{ blob: Blob; href: string } | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
+    setFailed(false);
     if (!url || MOCK) {
       setGot(null);
       return;
@@ -163,14 +166,16 @@ export function useFileBlob(url: string | null): { blob: Blob | null; href: stri
         made = URL.createObjectURL(blob);
         setGot({ blob, href: made });
       })
-      .catch(() => live && setGot(null));
+      .catch(() => {
+        if (live) setFailed(true);
+      });
     return () => {
       live = false;
       if (made) URL.revokeObjectURL(made);
       setGot(null);
     };
   }, [url]);
-  return { blob: got?.blob ?? null, href: got?.href ?? null };
+  return { blob: got?.blob ?? null, href: got?.href ?? null, failed };
 }
 
 /**
