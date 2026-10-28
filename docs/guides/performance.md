@@ -458,12 +458,13 @@ and Home rows of §2 and §10.
    (Edit Objective, Delete Objective) and a key result from its panel (Edit Key Result, Delete Key
    Result); a delete is a confirmation naming
    the item. New Key Result and Edit Key Result are one form that follows its measure. Always:
-   objective, key result, measure, target in words, finish, owner and, for a function's key
-   result, Feeds (the company key results it feeds, picked 25 at a time); behind More, Scored From (a
-   company key result's function key result), co-owner, baseline, start, type and owner note. A
-   **Numeric** key result also has target and unit open and direction behind More; **Dated** and **Yes
-   or No** have no number to reach, so those three are not offered (§6.8 scores them on done, not a
-   figure).
+   objective, key result, measure, target in words, start, finish, type, owner and, for a
+   function's key result, Feeds (the company key results it feeds, picked 25 at a time); behind More,
+   Scored From (a company key result's function key result), co-owner, baseline and owner note. A
+   **Numeric** key result also has target and unit open (unit directly under target) and direction
+   behind More; **Dated** and **Yes or No** have no number to reach, so those three are not offered
+   (§6.8 scores them on done, not a figure). The order on the form: objective, key result, measure,
+   target, unit, target in words, start, finish, type, owner, Feeds (JBS Praxis, 28/10/2026).
 3. **Managers draft their people's scorecards** (Scorecards, New Scorecard; Copy Last Quarter or
    Copy From Colleague): Results, KPIs and Accountability lines, each linked to a key result or KPI,
    with its target, how it is measured, due or frequency, weight and source (§6.5). Accountability
@@ -1693,6 +1694,7 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 28/10/2026 · JP · New Key Result and Edit Key Result read in a new order (JBS Praxis, 28/10/2026; §3.2, §10, §11): Unit directly under Target, Start above Finish, Type above Owner. Start and Type come out from behind More, which now holds Scored From, Co-Owner, Direction, Baseline and Owner Note. The User Guide chapter's steps 7 to 9 and its pictures follow. No contract or API change.
 - 28/10/2026 · JP · TBC leaves key results (JBS Praxis, 28/10/2026, asked on staging: TBC is the state of a plan awaiting approval, never of a key result or an objective; §1.1 P9, §3.2, §3.5, §4, §5, §6.7, §6.8, §6.19, §10, §11), guide first. A key result no longer carries a provisional target: New Key Result and Edit Key Result lose the TBC checkbox, a key result's status reads **Awaiting Report** until its first month is reported and then the status of the month last reported (never TBC, whatever it was imported as), and a month is scored on the target as soon as it is reported. Set Target, the quarter's Lock Date (`targets_lock_on`), the `targets-lock` job, its `period.targets_locked` event and the 409 `TARGET_TBC` are gone; a binding key result with no target yet is given one by Change Target to the CEO (from "not set"), like any binding target, and a binding key result is never changed in place (409 `KEY_RESULT_BINDING`). The OKR workbook's `[TBC]` marker no longer sets anything: the words stay in the key result's text. Contract: `target_provisional`, `target_locked_at`, `can_set_target` and the periods' `targets_lock_on` removed from `goals.js`. Migrations: none yet. `okr_key_result.target_provisional`, `okr_key_result.target_locked_at` and `performance_period.targets_lock_on` stay in the schema, unread and unwritten, and one migration drops all three one release after this code ships (MIGRATIONS §8, DESTRUCTIVE). Left: that migration; a key result still flagged on staging or production reads as any other until then. `goals.{okrs,service,repo,import,events,plans,approval,routes}.js`, `jobs/schedulers/targets-lock.js` (deleted), `Goals.tsx`, `KeyResultForm.tsx`, `Quarter.tsx`, the mock, `performance-{plan,goals-edit,foundation,import}` integration tests, `Goals.test.tsx`.
 - 28/10/2026 · JP · Every Performance select fed by a server list loads it 25 at a time, the next page as the menu nears its end (JBS Praxis, 28/10/2026, from Goals' Function select, which stopped at the first 25 departments; FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18): the Quarter switcher, the Function and Department filters, Report Month's, New Objective's and New KPI's Function, Organisational Goal, and a scorecard line's Key Result and KPI (a saved one reads as itself until its page loads). Goals' and KPIs' Function filters ask the server for active departments instead of dropping retired ones from one page. While the reader's departments run past a page, one named in the address keeps filtering until its page is loaded (§8). Set Up Quarter from ⌘K waits for the quarters' first page, so it copies the latest. Left: `GET /performance/functions` still says `may_set` row by row, so a reader whose only function sits on a later page sees None you may set until that page loads; the server filtering it is a backend change not made here.
 - 28/10/2026 · JP · The scoring rules are the quarter's, everywhere (JBS Praxis, 28/10/2026, asked whether the score bands are configurable; §3.2, §5, §6.8, §10.1, §11), guide first. The help on Goals' score figures named 0.7 and 0.4 in the code, so a quarter whose Good or Watch band was changed showed the old numbers; it now reads the quarter's `band_good` and `band_watch` (the defaults before a quarter exists) and names the bands as the pills do (Good, Watch, Recovery, not green, amber and red). `PATCH /performance/periods/:id` refused nothing on a closed quarter, which only the screen hid; it now answers 409 `PERIOD_CLOSED`, so a finished quarter's bands cannot be changed under it. §11 says what a change while the quarter runs reaches and what it leaves (decided: saved scores are not worked out again). No migration, no contract change. `goals.service.js`, `Goals.tsx`, the mock; `tests/integration/performance-foundation.test.js`, `Goals.test.tsx`; the Performance chapter.
@@ -1748,8 +1750,9 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
   part of a draft plan is an edit of it (`performance` edit, which heads hold; they hold no delete);
   each delete is a ConfirmDialog naming the item; an edit's empty field clears it. **The key result
   form carries every field**: New Key Result and Edit Key Result are one form (`KeyResultForm.tsx`),
-  Feeds picked from `GET /key-results` (25 a page), TBC and target in words open, the rest behind
-  More (`MoreFields`, new in `@mycity/ui`); `KeyResultDetail` names its quarter. **The form follows
+  Feeds picked from `GET /key-results` (25 a page), target in words, start, finish and type open
+  (unit sits directly under target, type directly above owner), scored from, co-owner, direction,
+  baseline and owner note behind More (`MoreFields`, new in `@mycity/ui`); `KeyResultDetail` names its quarter. **The form follows
   its measure**: only a Numeric key result (and a multi-part one, whose measure is not edited) shows
   Target, Unit and Direction; choosing Dated or Yes or No removes them, and what was typed stays in the
   form for the way back but is not sent. A key result changed to Dated or Yes or No clears its stored

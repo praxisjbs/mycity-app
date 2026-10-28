@@ -161,14 +161,15 @@ page is binding, **Request To Unbind** takes its place.
    shows. If the form reads **No Objectives Yet**, set an objective first, or the plan is binding.
 6. Choose its **Measure**: **Numeric**, **Dated** or **Yes or No**. The form shows only what the
    measure needs.
-7. For **Numeric**, fill in the **Target** as a number. For every measure, fill in **Target in
-   Words** as people say it, such as `64,000 users` or `Launch in Kano`.
-8. For **Numeric**, pick the **Unit** from the list, or type one the list does not hold and it is
-   offered next time. For every measure, add the **Finish** date and the **Owner**. For a function's
-   key result, pick the company key results it **Feeds**.
+7. For **Numeric**, fill in the **Target** as a number, then pick the **Unit** from the list, or
+   type one the list does not hold and it is offered next time. For every measure, fill in **Target
+   in Words** as people say it, such as `64,000 users` or `Launch in Kano`.
+8. For every measure, add the **Start** and **Finish** dates, the **Type** and the **Owner**. For a
+   function's key result, pick the company key results it **Feeds**. The types are explained under
+   [Open a key result](#performance-key-result).
 9. Press **More** for **Co-Owner**, **Direction** (**Numeric** only: **Higher Is Better** or **Lower
-   Is Better**), **Baseline**, **Start**, **Type** and **Owner Note**. A company key result also has
-   **Scored From** here. The types are explained under [Open a key result](#performance-key-result).
+   Is Better**), **Baseline** and **Owner Note**. A company key result also has **Scored From**
+   here.
 10. Press **Set Key Result**. The hub gives it its code, such as *BM-KR1.3 set*.
 
 To change an objective, press the three dots on its card and choose **Edit Objective**. Change the
