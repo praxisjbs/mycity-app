@@ -15,12 +15,13 @@ import scoring from "@mycity/contract/schemas/scoring.js";
 import targetsContract from "@mycity/contract/schemas/targets.js";
 import type { KeyResult, ScorecardDetail, ScorecardLine } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { PagedTable } from "@/features/shared/sections";
+import { paging } from "@/features/shared/wire";
 import { ReasonForm } from "@/features/workspace/Commitment";
 import { useSearchParams } from "@/lib/router";
 import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
@@ -159,8 +160,8 @@ function ScorecardsView() {
         }
       />
       <Toolbar>
-        <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} />
-        {departments.pick && <FilterSelect label="Department" value={dept} onChange={setDept} options={departments.options} />}
+        <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} {...quarter.paging} />
+        {departments.pick && <FilterSelect label="Department" value={dept} onChange={setDept} options={departments.options} {...departments.paging} />}
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
       </Toolbar>
       <KpiTiles
@@ -633,8 +634,8 @@ const FEEDS: Partial<Record<keyof LineRow, string[]>> = {
 
 /** Every line of a draft scorecard in one save: a line left out is removed. */
 function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }) {
-  const okrs = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: card.performance_period_id, ...(card.department_id ? { department_id: card.department_id } : {}) } });
-  const kpis = usePaged("GET /api/v1/performance/kpis", { filters: card.department_id ? { department_id: card.department_id } : {} });
+  const okrs = useInfinite("GET /api/v1/performance/okrs", { filters: { period_id: card.performance_period_id, ...(card.department_id ? { department_id: card.department_id } : {}) } });
+  const kpis = useInfinite("GET /api/v1/performance/kpis", { filters: card.department_id ? { department_id: card.department_id } : {} });
   const [rows, setRows] = useState<LineRow[]>(card.lines.map(rowOf));
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const save = useMutation("PUT /api/v1/performance/scorecards/:id/lines");
@@ -650,6 +651,13 @@ function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }
   };
   const krOptions: Array<[string, string]> = [["", "None"], ...okrs.rows.flatMap((o) => o.key_results.map((k: KeyResult) => [k.okr_key_result_id, `${k.code} · ${k.statement}`] as [string, string]))];
   const kpiOptions: Array<[string, string]> = [["", "None"], ...kpis.rows.map((k) => [k.kpi_definition_id, `${k.code} · ${k.name}`] as [string, string])];
+  // A saved line names its key result and KPI, so a link on a page not loaded yet still reads as itself.
+  const saved = new Map(
+    card.lines.flatMap((l) => [
+      ...(l.key_result ? [[l.key_result.okr_key_result_id, `${l.key_result.code} · ${l.key_result.statement}`] as const] : []),
+      ...(l.kpi ? [[l.kpi.kpi_definition_id, `${l.kpi.code} · ${l.kpi.name}`] as const] : []),
+    ]),
+  );
   /** A refusal on its fields; what no field shows is said in a toast, naming its line. */
   const refuse = (fields: Record<string, string[]>, message: string) => {
     setErrors(fields);
@@ -732,7 +740,7 @@ function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }
           )}
           <Field label="Weight" {...mark(i, "Check the weight", "weight")}><TextField value={r.weight} onChange={(v) => set(i, { weight: v.replace(/[^\d.]/g, "") })} inputMode="decimal" /></Field>
           {r.section === "kpis" ? (
-            <Field label="KPI" optional {...mark(i, "Link a KPI", "kpi_definition_id")}><SelectField options={kpiOptions} value={r.kpi_definition_id} onChange={(v) => set(i, { kpi_definition_id: v })} /></Field>
+            <Field label="KPI" optional {...mark(i, "Link a KPI", "kpi_definition_id")}><SelectField options={kpiOptions} value={r.kpi_definition_id} onChange={(v) => set(i, { kpi_definition_id: v })} valueLabel={saved.get(r.kpi_definition_id)} {...paging(kpis)} /></Field>
           ) : r.source === "team_result" ? (
             <Field label="Team Key Results" {...mark(i, "Pick the key results", "team_key_result_ids")}>
               <ul className="m-0 flex list-none flex-col p-0" aria-label={`Line ${i + 1} Team Key Results`}>
@@ -750,7 +758,7 @@ function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }
             </Field>
           ) : (
             <Field label="Key Result" optional {...mark(i, "Link a key result", "okr_key_result_id", "team_key_result_ids", "share_value")}>
-              <SelectField options={krOptions} value={r.okr_key_result_id} onChange={(v) => set(i, { okr_key_result_id: v })} />
+              <SelectField options={krOptions} value={r.okr_key_result_id} onChange={(v) => set(i, { okr_key_result_id: v })} valueLabel={saved.get(r.okr_key_result_id)} {...paging(okrs)} />
             </Field>
           )}
         </Card>

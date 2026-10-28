@@ -3349,7 +3349,7 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 
 | | |
 |---|---|
-| Use | Above every list that searches; FilterSelect for one of a list's server filters. |
+| Use | Above every list that searches; FilterSelect for one of a list's server filters, with `more` and `onMore` when its options are a server list. |
 | Avoid | Filtering the 25 rows on screen in the browser (FRONTEND_GUIDE §4); a second search box design. |
 | Phone | Full width, 44 px tall; the keyboard's search key; FilterSelect opens a branded bottom sheet, never the phone's own picker. |
 | Accessibility | The box is a searchbox named by its label (or its placeholder), or by its Field's label when it is a picker's box; FilterSelect's label is visible and linked. |
@@ -3382,6 +3382,9 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | `value` | `string` | yes | The chosen value; "" for all. |
 | `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
 | `options` | `ReadonlyArray<Option>` | yes | The filter's options. |
+| `more` | `boolean` |  | The options are a server list with more pages to load (SelectMenu's `more`). |
+| `onMore` | `() => unknown` |  | Loads the server list's next 25 as the menu nears its end (SelectMenu's `onMore`). |
+| `valueLabel` | `ReactNode` |  | The chosen value's label while it is on a page not loaded yet (SelectMenu's `valueLabel`). |
 
 ```tsx
 <SearchInput label="Search Employees" placeholder="Name or Email" value={q} onChange={setQ} />
@@ -3429,10 +3432,10 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 
 | | |
 |---|---|
-| Use | SelectField for more than five options, `searchable` once a fixed list is long enough to scroll (a purpose, a country); ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
-| Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown). |
-| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker, and a searchable one a search box above them; ChoiceField segments are 44 px tall and wrap rather than scroll. |
-| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field; a searchable one a search box that owns the listbox (arrow keys move through what matches, Enter chooses). Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
+| Use | SelectField for more than five options, `searchable` once a fixed list is long enough to scroll (a purpose, a country); options from a server list with `more` and `onMore`, so its next 25 load as the menu nears its end; ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
+| Avoid | People and records a person searches for (use the server-searching picker); options cut to one page of a server list (pass `more` and `onMore`); a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown). |
+| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker, and a searchable one a search box above them; a server list's next 25 load as the sheet nears its end; ChoiceField segments are 44 px tall and wrap rather than scroll. |
+| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field; a searchable one a search box that owns the listbox (arrow keys move through what matches, Enter chooses). Phone: a sheet named by the field's label holding a listbox. Moving through a server list with the keys loads its next 25 as the end nears; the spinner that ends it is hidden from assistive technology. ChoiceField is a radio group with arrow-key movement. |
 | Status | stable |
 | Exports | `SelectField`, `ChoiceField`, `SelectMenu` |
 | Import | `import { SelectField, ChoiceField, SelectMenu } from "@mycity/ui";` |
@@ -3458,6 +3461,9 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default. |
 | `searchable` | `boolean` |  | A search box above the options (SelectMenu's `searchable`). |
+| `more` | `boolean` |  | The options are a server list with more pages to load (SelectMenu's `more`). |
+| `onMore` | `() => unknown` |  | Loads the server list's next 25 as the menu nears its end (SelectMenu's `onMore`). |
+| `valueLabel` | `ReactNode` |  | The chosen value's label while it is on a page not loaded yet (SelectMenu's `valueLabel`). |
 
 **ChoiceField** props (`ChoiceFieldProps`)
 
@@ -3493,6 +3499,9 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `name` | `string` |  | Its name in a submitted form. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default (the gallery passes its themed frame). |
 | `searchable` | `boolean` |  | A search box above the options, narrowing them as the person types: for a fixed list long enough to scroll. |
+| `more` | `boolean` |  | The options are a server list with more pages to load (FRONTEND_GUIDE §4). |
+| `onMore` | `() => unknown` |  | Loads the server list's next 25; called as the menu nears its end, or as it opens too short to scroll. |
+| `valueLabel` | `ReactNode` |  | The chosen value's label while it is on a page not loaded yet (a saved record's own name). |
 
 ```tsx
 <SelectField placeholder="Choose One" options={[["ops", "Operations"], ["hr", "People"]]} {...form.field("department")} />

@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 import { api } from "@/api/client";
 import { saveExport } from "@/api/exports";
-import { useApi, type PagedResult } from "@/api/hooks";
+import { useInfinite, type PagedResult } from "@/api/hooks";
 import "@/api/types/organisation";
 import "@/api/types/shared";
 import { Bars, Card, CardHeader, Chain, DataView, ExportButton, KeyValue, Pager, SearchInput, Timeline, type DataViewColumn } from "@mycity/ui";
-import { toBars, toTrail, type WireBar, type WireTrailItem } from "./wire";
+import { paging, toBars, toTrail, type Paging, type WireBar, type WireTrailItem } from "./wire";
 
 /**
  * The building blocks the module screens share: the explanation card, the
@@ -106,8 +106,8 @@ export function PagedTable<R>({
   );
 }
 
-/** Department options from the organisation's own list (never typed into a screen). */
-export function useDepartmentOptions(all = "All Departments"): Array<[string, string]> {
-  const d = useApi("GET /api/v1/departments", { query: {} });
-  return [["", all], ...(d.data?.data ?? []).map((x) => [x.name, x.name] as [string, string])];
+/** Department options from the organisation's own list (never typed into a screen), 25 at a time as the menu nears its end. */
+export function useDepartmentOptions(): { options: Array<[string, string]> } & Paging {
+  const d = useInfinite("GET /api/v1/departments");
+  return { options: d.rows.map((x) => [x.name, x.name] as [string, string]), ...paging(d) };
 }

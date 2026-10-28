@@ -45,6 +45,19 @@ function Searchable() {
   );
 }
 
+/** A server list: its next 25 load as the menu nears its end, three pages in all. */
+function ServerList() {
+  const [v, setV] = useState("");
+  const [pages, setPages] = useState(1);
+  const options = Array.from({ length: pages * 25 }, (_, i) => [`d${i + 1}`, `Department ${i + 1}`] as const);
+  const more = () => new Promise<void>((done) => setTimeout(done, 600)).then(() => setPages((n) => Math.min(n + 1, 3)));
+  return (
+    <Field label="Department">
+      <SelectField value={v} onChange={setV} placeholder="Choose One" options={options} more={pages < 3} onMore={more} />
+    </Field>
+  );
+}
+
 function Choice() {
   const [v, setV] = useState("on_site");
   return (
@@ -59,6 +72,7 @@ export default {
   states: {
     Select: () => <Select />,
     Searchable: () => <Searchable />,
+    "Server List": () => <ServerList />,
     Choice: () => <Choice />,
   },
 } satisfies GalleryEntry;

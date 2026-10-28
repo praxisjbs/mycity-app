@@ -1,4 +1,4 @@
-import type { BarsRow, KpiTrend, Series, TimelineItem } from "@mycity/ui";
+import type { BarsRow, KpiTrend, PageMeta, Series, TimelineItem } from "@mycity/ui";
 
 /**
  * What the API sends, turned into what the shared components take. The wire's
@@ -51,3 +51,12 @@ export type WireTrendDir = "up" | "dn" | "fl";
 /** `KpiCard`'s trend from the wire's direction; nothing when the read sent none. */
 export const toTrend = (dir?: WireTrendDir | null): KpiTrend | undefined =>
   dir === "up" ? "up" : dir === "dn" ? "down" : dir === "fl" ? "flat" : undefined;
+
+/**
+ * A select's paging from a server list read with useInfinite: whether another page of 25 waits,
+ * and how to load it as the menu nears its end (FRONTEND_GUIDE §4). Spread it on the select.
+ */
+export const paging = (list: { page?: PageMeta; more: () => void }) => ({ more: Boolean(list.page?.has_next), onMore: list.more });
+
+/** What `paging` hands a select. */
+export type Paging = ReturnType<typeof paging>;

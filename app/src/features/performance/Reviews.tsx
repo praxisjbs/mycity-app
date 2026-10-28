@@ -151,7 +151,7 @@ export function Reviews() {
         }
       />
       <Toolbar>
-        <FilterSelect label="Quarter" value={quarter.periodId} onChange={pickQuarter} options={quarter.options} />
+        <FilterSelect label="Quarter" value={quarter.periodId} onChange={pickQuarter} options={quarter.options} {...quarter.paging} />
         <FilterSelect label="Month" value={round?.performance_cycle_id ?? ""} onChange={setRoundId} options={monthOptions} />
         <SegmentedControl label="Reviews or PIPs" value={view} onChange={setView} options={withNews(news, REVIEW_VIEWS)} />
       </Toolbar>
@@ -192,7 +192,7 @@ export function Reviews() {
             />
           )}
           <Toolbar>
-            {departments.pick && <FilterSelect label="Department" value={dept} onChange={setDept} options={departments.options} />}
+            {departments.pick && <FilterSelect label="Department" value={dept} onChange={setDept} options={departments.options} {...departments.paging} />}
             <FilterSelect label="Stage" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
             <FilterSelect label="Kind" value={kind} onChange={setKind} options={KIND_OPTIONS} />
           </Toolbar>

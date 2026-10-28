@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 26/10/2026 |
+| Last changed | 28/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -925,6 +925,30 @@ Praxis's four answers that day (FRONTEND_FOUNDATION §5) made it a rule for ever
 - **Not affected**: a record with its own screen (an employee's record, a partner's 360) and a reader
   that fills the screen (`SplitPanes`: the mailbox, chat, Settings · Roles).
 
+### 6.18 A select's server list loads as it scrolls (JBS Praxis, 28/10/2026; FRONTEND_FOUNDATION F32)
+
+Asked from Performance · Goals, whose Function select is fed by People · Departments: it read one page
+of departments, active and retired together, so a 26th department would never have been offered.
+About thirty selects across the hub read their options that way. JBS Praxis's answers that day:
+
+- **Every select whose options come from a server list loads them 25 at a time**: the first page as it
+  opens, the next as the menu nears its end (a scroll, or the arrow keys moving past the rows in view),
+  and at once when it opens too short to scroll. On a phone the same happens in its bottom sheet. A
+  spinner row ends the list while more wait; assistive technology reads the rows alone.
+- **It looks as it did**: the same select, with no search box and no new control. Loading every page
+  before the menu opens was turned down (FRONTEND_GUIDE §4 forbids it).
+- **A saved value on a page not loaded yet still reads as itself** where the record names it
+  (`valueLabel`: a line's key result and KPI, a vacant head or line-manager seat, an approval stage's
+  role, a 360's partner, the quarter in view).
+- **One way to build it**: the list read with `useInfinite` (now with an optional `sort`), and
+  `paging(list)` from `app/src/features/shared/wire.ts` spread on `SelectField`, `FilterSelect` or
+  `InlineSelect`, which pass `more` and `onMore` to `SelectMenu`. Goals and KPIs ask for active
+  departments on the server instead of dropping retired ones from the page they had.
+- **Not changed**: the pickers (`PersonPicker`, `RecordPicker`) keep their search and first 25 matches;
+  lists a rule bounds need nothing (a quarter's review rounds, at most three; Why Late's reasons, at
+  most `LATE_REASONS_MAX`); chips are not selects (Staff Community's and Policies' department chips
+  still show one page).
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -1093,6 +1117,7 @@ screen.
 
 ## 14 · Change log
 
+- 28/10/2026 · JP · §6.18, a select's server list loads as it scrolls (JBS Praxis, from Goals' Function select, fed by People · Departments, which stopped at 25): every select filled from a server list reads it 25 at a time (`useInfinite`, `paging`) and loads the next page as its menu nears its end, on both shells; it looks as before. In the folders this guide maps: People · Employees' Department filter, Departments' Open Role (Set Head) and the reporting form's Open Role. FRONTEND_FOUNDATION F32.
 - 27/10/2026 · JP · Nothing in this guide changed. In the `organisation` module it maps, the reporting tree's read carries each node's department and the Head marks (`OrgNode.heads`, `repo.departmentHeads`), and Download PDF's cards carry them too (`docs/guides/organogram.md` §6).
 - 27/10/2026 · JP · §6.1: the deploy loader gives the departments, their codes and heads only to a database that has never had MyCity's names, and then leaves them to People · Departments (#103, `docs/guides/organogram.md` §6.1, JBS Praxis 27/10/2026), even when `nomenclature.json` changes; it finds a department renamed on screen by MyCity's code, the roster never makes its old name again, and each deploy gives every department head their Head of Department role. §10: People · Employees gains Move To Department on the rows picked (desktop).
 - 27/10/2026 · JP · Documents & Numbering (#76) gains Organisational Goal (`organisational_goal`, ORG-2026-01, starting again each plan year, seeded by `2291`): a goal's ID is the system's now (`performance.md` §6.1). `DOC_TYPES` in the contract and the screen's labels carry it.

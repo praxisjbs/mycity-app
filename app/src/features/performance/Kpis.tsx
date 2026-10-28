@@ -7,9 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import kpisContract from "@mycity/contract/schemas/kpis.js";
 import type { Endpoints, Kpi } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
+import { paging, type Paging } from "@/features/shared/wire";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -49,7 +50,7 @@ export function Kpis() {
   const modal = useModal();
   const quarter = useQuarter();
   const period = quarter.period;
-  const departments = useApi("GET /api/v1/departments", { query: {} });
+  const departments = useInfinite("GET /api/v1/departments", { filters: { active: "true" } });
   const [dept, setDept] = useState("");
   const list = usePaged("GET /api/v1/performance/kpis", { filters: { active: "true", ...(dept ? { department_id: dept } : {}) } });
   const months = period?.months ?? [];
@@ -63,7 +64,7 @@ export function Kpis() {
     { label: "Not Met", value: counted(summary.data?.not_met), tone: "err" as const },
     { label: "Awaiting Actual", value: counted(summary.data?.awaiting) },
   ];
-  const deptOptions: Array<[string, string]> = [["", "All Functions"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
+  const deptOptions: Array<[string, string]> = [["", "All Functions"], ...departments.rows.map((d) => [d.department_id, d.name] as [string, string])];
   // New KPI is offered only to a reader who may set some function's KPIs, as the API's goals.authority answers.
   const mayAdd = useSettableFunctions(null).rows.some((x) => x.department_id !== null);
   const newKpi = () => modal.open({ title: "New KPI", body: (close) => <KpiForm close={close} periodId={quarter.periodId} departmentId={dept} /> });
@@ -90,7 +91,7 @@ export function Kpis() {
         actions={mayAdd ? <Button variant="primary" icon="plus" onClick={newKpi}>New KPI</Button> : undefined}
       />
       <Toolbar>
-        <FilterSelect label="Function" value={dept} onChange={setDept} options={deptOptions} />
+        <FilterSelect label="Function" value={dept} onChange={setDept} options={deptOptions} {...paging(departments)} />
       </Toolbar>
       <KpiTiles items={tiles} mobileCols={2} />
       <PagedTable
@@ -199,10 +200,10 @@ function KpiForm({ close, periodId, departmentId }: { close: () => void; periodI
   if (settable.loading) return <LoadingRows count={4} />;
   const options = settable.rows.flatMap((x) => (x.department_id ? [[x.department_id, x.name ?? ""] as [string, string]] : []));
   const first = options.some(([id]) => id === departmentId) ? departmentId : options.length === 1 ? options[0]![0] : "";
-  return <KpiFields close={close} periodId={periodId} departmentId={first} options={options} />;
+  return <KpiFields close={close} periodId={periodId} departmentId={first} options={options} paging={settable.paging} />;
 }
 
-function KpiFields({ close, periodId, departmentId, options }: { close: () => void; periodId: string; departmentId: string; options: Array<[string, string]> }) {
+function KpiFields({ close, periodId, departmentId, options, paging: more }: { close: () => void; periodId: string; departmentId: string; options: Array<[string, string]>; paging: Paging }) {
   const f = useContractForm(
     { department_id: departmentId, name: "", formula: "", unit: "", direction: "higher", target_text: "", target_value: "", frequency: "monthly", data_source: "", starts_period_id: periodId },
     kpisContract.KpiCreate,
@@ -225,7 +226,7 @@ function KpiFields({ close, periodId, departmentId, options }: { close: () => vo
   return (
     <>
       <Field label="Function" {...(none ? { state: "bad" as const, message: "None you may set" } : f.status("department_id"))}>
-        <SelectField options={options} placeholder="Pick a function" {...f.field("department_id")} />
+        <SelectField options={options} placeholder="Pick a function" {...more} {...f.field("department_id")} />
       </Field>
       <Field label="KPI" {...f.status("name")}><TextField {...f.field("name")} /></Field>
       <Field label="Formula" optional {...f.status("formula")}><TextField {...f.field("formula")} /></Field>

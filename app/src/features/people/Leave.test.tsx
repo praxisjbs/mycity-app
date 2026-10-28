@@ -15,6 +15,15 @@ const m = vi.hoisted(() => ({ run: vi.fn(async (): Promise<unknown> => ({})), ye
 vi.mock("@/api/hooks", () => {
   const annual = "11111111-1111-4111-8111-111111111111";
   const unpaid = "22222222-2222-4222-8222-222222222222";
+  const types = {
+    rows: [
+      { leave_type_id: annual, code: "annual", name: "Annual", days_per_year: 20, active: true },
+      { leave_type_id: unpaid, code: "unpaid", name: "Unpaid", days_per_year: null, active: true },
+    ],
+    page: { number: 1, size: 25, total: 2, pages: 1, has_next: false },
+    loading: false,
+    error: null,
+  };
   return {
     invalidate: vi.fn(),
     useApi: (_key: string, opts: { query?: { year?: number }; enabled?: boolean } = {}) => {
@@ -27,18 +36,9 @@ vi.mock("@/api/hooks", () => {
       return { data: { year: opts.query?.year, balances }, error: null, loading: false, reload: () => undefined };
     },
     useMutation: () => ({ run: m.run, pending: false }),
-    usePaged: () => ({
-      rows: [
-        { leave_type_id: annual, code: "annual", name: "Annual", days_per_year: 20, active: true },
-        { leave_type_id: unpaid, code: "unpaid", name: "Unpaid", days_per_year: null, active: true },
-      ],
-      page: { number: 1, size: 25, total: 2, pages: 1, has_next: false },
-      loading: false,
-      error: null,
-      q: "",
-      setQ: () => undefined,
-      setPage: () => undefined,
-    }),
+    usePaged: () => ({ ...types, q: "", setQ: () => undefined, setPage: () => undefined }),
+    // Leave Type's options, 25 at a time as its menu nears its end.
+    useInfinite: () => ({ ...types, more: () => undefined, reload: () => undefined }),
   };
 });
 vi.mock("@/api/download", () => ({ usePhotos: () => ({}) }));

@@ -4,7 +4,7 @@ import workflow from "@mycity/contract/schemas/workflow.js";
 import type { LeaveRequest, LeaveStatus } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { usePhotos } from "@/api/download";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
@@ -12,6 +12,7 @@ import { useViewNews, withNews } from "@/features/notifications/marks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { paging } from "@/features/shared/wire";
 import { useAddressPrefill } from "@/shell/screen-action";
 import { LeaveAllowances, LeaveTypes } from "./LeaveSettings";
 import {
@@ -345,7 +346,7 @@ function LeaveCalendar() {
 export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: boolean }) {
   const [who, setWho] = useState<PersonRef[]>([]);
   const [whoError, setWhoError] = useState<string | null>(null);
-  const types = usePaged("GET /api/v1/leave/types", { filters: { active: "true" } });
+  const types = useInfinite("GET /api/v1/leave/types", { filters: { active: "true" } });
   // My Leave opened by Praxis AI's Request Leave button carries the type, the days and the note.
   const filled = useAddressPrefill(leave.LeaveRequestPrefill, !onBehalf);
   const f = useContractForm({ leave_type_id: "", starts_on: "", ends_on: "", reason: "", ...filled }, leave.LeaveRequestCreate);
@@ -409,6 +410,7 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
         <SelectField
           placeholder={types.loading ? "Loading" : "Pick a type"}
           options={types.rows.map((t) => [t.leave_type_id, typeLabel(t)])}
+          {...paging(types)}
           {...f.field("leave_type_id")}
         />
       </Field>

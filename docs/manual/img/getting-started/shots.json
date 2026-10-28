@@ -1,14 +1,14 @@
 {
   "start-desktop": {
     "spec": "ec4b8baceab8df59",
-    "source": "66cc22158e774c63",
+    "source": "eb227c20d7d58d74",
     "devices": [
       "desktop"
     ]
   },
   "start-display": {
     "spec": "7cf2f13894e86ffb",
-    "source": "66cc22158e774c63",
+    "source": "eb227c20d7d58d74",
     "devices": [
       "desktop",
       "phone"
@@ -16,7 +16,7 @@
   },
   "start-lock": {
     "spec": "d7b4756feb3ea399",
-    "source": "66cc22158e774c63",
+    "source": "eb227c20d7d58d74",
     "devices": [
       "desktop",
       "phone"
@@ -24,7 +24,7 @@
   },
   "start-notification-settings": {
     "spec": "d7eb43fe3585760d",
-    "source": "66cc22158e774c63",
+    "source": "eb227c20d7d58d74",
     "devices": [
       "desktop",
       "phone"
@@ -32,7 +32,7 @@
   },
   "start-notifications": {
     "spec": "db12270dc85487fd",
-    "source": "66cc22158e774c63",
+    "source": "eb227c20d7d58d74",
     "devices": [
       "desktop",
       "phone"
@@ -40,14 +40,14 @@
   },
   "start-phone": {
     "spec": "c148a7d836ed50df",
-    "source": "66cc22158e774c63",
+    "source": "eb227c20d7d58d74",
     "devices": [
       "phone"
     ]
   },
   "start-search": {
     "spec": "f1f41035cceab305",
-    "source": "66cc22158e774c63",
+    "source": "eb227c20d7d58d74",
     "devices": [
       "desktop",
       "phone"
@@ -63,7 +63,7 @@
   },
   "start-user-guide": {
     "spec": "5fd6ad7b76e1470e",
-    "source": "715a842ef7d71256",
+    "source": "e7671542fa2d8612",
     "devices": [
       "desktop",
       "phone"
@@ -71,7 +71,7 @@
   },
   "start-user-guide-answer": {
     "spec": "38adf96f9c38bdd9",
-    "source": "715a842ef7d71256",
+    "source": "e7671542fa2d8612",
     "devices": [
       "desktop",
       "phone"
@@ -79,7 +79,7 @@
   },
   "start-user-guide-search": {
     "spec": "e9bd99b40042515d",
-    "source": "715a842ef7d71256",
+    "source": "e7671542fa2d8612",
     "devices": [
       "desktop",
       "phone"
@@ -87,7 +87,7 @@
   },
   "start-where-it-waits": {
     "spec": "9de24141d123213f",
-    "source": "b836801c84d70b52",
+    "source": "c5cd14c89c516436",
     "devices": [
       "desktop",
       "phone"

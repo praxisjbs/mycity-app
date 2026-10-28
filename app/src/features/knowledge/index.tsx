@@ -241,7 +241,7 @@ function Training() {
 }
 
 function ResourceForm({ close }: { close: () => void }) {
-  const depts = useDepartmentOptions("Pick the department");
+  const { options: depts, ...deptPaging } = useDepartmentOptions();
   const [aud, setAud] = useState<"everyone" | "department">("everyone");
   const f = useContractForm({ title: "", description: "", kind: "Document", due: "", department: "" }, { title: (v) => (!v.trim() ? "Name the resource" : null), description: (v) => (v.trim().length < 10 ? "Say what it covers" : null) });
   const save = useMutation("POST /api/v1/knowledge/training");
@@ -263,7 +263,7 @@ function ResourceForm({ close }: { close: () => void }) {
       <Field label="Kind"><SelectField options={[["Document", "Document"], ["Video", "Video"], ["Course", "Course"]]} {...f.field("kind")} /></Field>
       <Field label="Due (Optional)"><DateField {...f.field("due")} min={todayIso()} /></Field>
       <Field label="Assign To"><ChoiceField value={aud} onChange={setAud} options={[["everyone", "Everyone"], ["department", "A Department"]]} /></Field>
-      {aud === "department" && <Field label="Department" {...f.field("department")}><SelectField placeholder="Pick the department" options={depts.slice(1)} {...f.field("department")} /></Field>}
+      {aud === "department" && <Field label="Department" {...f.field("department")}><SelectField placeholder="Pick the department" options={depts} {...deptPaging} {...f.field("department")} /></Field>}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Assign</Button>
