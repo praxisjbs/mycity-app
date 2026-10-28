@@ -122,6 +122,10 @@ module.exports = async function seed({ pool, log = () => {} }) {
       const { rows } = await pool.query("SELECT 1 FROM organisational_goal WHERE title = $1 AND plan_year_starts_on = '2026-01-01'", [g.title]);
       if (!rows.length) await goals.createGoal(actor, { ...g, plan_year_starts_on: "2026-01-01" });
     }
+    // The first goal is shared with all staff, so staging shows what a shared goal is to everyone who reads it
+    // (performance.md §6.24). Saved again it changes nothing, and tells nobody twice.
+    const first = await pool.query("SELECT organisational_goal_id FROM organisational_goal WHERE title = $1 AND plan_year_starts_on = '2026-01-01'", [GOALS[0].title]);
+    if (first.rows[0]) await src("modules/goals/goals.share").saveGoal(actor, first.rows[0].organisational_goal_id, { audience: "all", department_ids: [] });
   });
 
   // The workbooks are Q4 2026's: they go in only while that is the quarter imports write into.

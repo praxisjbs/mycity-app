@@ -1171,7 +1171,6 @@ const TABLES = {
   PerformanceFunctionPage: { table: null, reason: "a page of the functions a reader may set goals for" },
   PerformanceFunctionListQuery: { table: null, reason: "list controls and the quarter for the functions" },
   PerformanceDepartment: { table: "department", virtual: {} },
-  ShareAudience: { table: null, reason: "the audience of a share, a CHECK of goal_share.audience" },
   GoalShare: {
     table: "goal_share",
     virtual: {

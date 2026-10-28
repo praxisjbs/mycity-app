@@ -174,12 +174,9 @@ async function attendance(client, { today, scopes }) {
  * progress: the mean score of the company objectives serving it, as a percentage (goals.source.js).
  */
 async function quarterGoals(client, { today, user }) {
-  const page = await goals.organisationGoals(
-    client,
-    quarterOf(today),
-    { page: 1 },
-    await visibility.readerOf(client, user),
-  );
+  // Only the goals the reader may read (performance.md §6.23): all of them for the CEO and Management, else those
+  // shared with them, and a section drawn with none is empty, as every section is.
+  const page = await goals.organisationGoals(client, quarterOf(today), { page: 1 }, await visibility.readerOf(client, user));
   return page.data.map((g) => ({
     title: g.title,
     progress: g.progress ?? null,
