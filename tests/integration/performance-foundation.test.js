@@ -122,12 +122,14 @@ describeDb("performance foundation against the real migrations", () => {
   describe("capabilities (§8)", () => {
     test("each role holds its defaults; the CEO holds every one", async () => {
       const caps = async (who) => (await as(who).get("/auth/me")).body.capabilities;
-      expect(await caps("ops")).toEqual(expect.arrayContaining(["goals.function", "performance.manage"]));
-      expect(await caps("ops")).not.toContain("goals.company");
-      expect(await caps("pm")).toEqual(expect.arrayContaining(["goals.company", "goals.function"]));
+      // Operations & People read, share and edit the whole plan by role (P27, seed 2542).
+      expect(await caps("ops")).toEqual(expect.arrayContaining(["goals.function", "performance.manage", "goals.view_all", "goals.company", "goals.organisation"]));
+      // The Program Manager is in General Management, whose people hold the same three through the department.
+      expect(await caps("pm")).toEqual(expect.arrayContaining(["goals.company", "goals.function", "goals.view_all", "goals.organisation"]));
       expect(await caps("pm")).not.toContain("performance.manage");
       expect(await caps("head")).toEqual(expect.arrayContaining(["goals.function"]));
       expect(await caps("staff")).not.toContain("goals.function");
+      expect(await caps("staff")).not.toContain("goals.view_all");
       expect(await caps("ceo")).toEqual(expect.arrayContaining(["goals.organisation", "goals.confirm", "performance.manage"]));
     });
   });

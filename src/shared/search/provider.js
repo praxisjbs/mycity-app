@@ -30,6 +30,12 @@
  * search service runs the provider only for a reader holding that capability (the CEO holds every
  * one), as the route behind the screen checks it.
  *
+ * `reach: async (client, user) => any` with `readable: (reach, params) => sql` is for records whose
+ * visibility is the module's own rule, beyond a person's scope (Performance's goals and KPIs, docs/guides/
+ * performance.md §6.23): `reach` works out what the reader may read once per search, and `readable` is
+ * the condition added to the query, pushing its own parameters on `params` as the SQL builders of
+ * goals.visibility.js do. A provider with neither is visible to every holder of `view`.
+ *
  * `available: async (client) => boolean` is for records a feature can switch off (the Attendance
  * policy's Home Location, docs/guides/attendance.md §1.3): asked before the query, false leaves
  * the group out for everyone, as the routes behind it refuse while it is off.
@@ -126,6 +132,10 @@ function recordProvider(spec) {
     throw new Error(`search provider ${spec.type}: "${spec.capability}" is not a catalogued capability`);
   if (spec.phones !== undefined && (!Array.isArray(spec.phones) || spec.phones.some((col) => !col)))
     throw new Error(`search provider ${spec.type}: phones is a list of columns`);
+  if ((spec.reach === undefined) !== (spec.readable === undefined))
+    throw new Error(`search provider ${spec.type}: reach and readable go together`);
+  if (spec.reach !== undefined && (typeof spec.reach !== "function" || typeof spec.readable !== "function"))
+    throw new Error(`search provider ${spec.type}: reach is (client, user) => reach, readable is (reach, params) => sql`);
   if (spec.available !== undefined && typeof spec.available !== "function")
     throw new Error(`search provider ${spec.type}: available is (client) => boolean`);
   if (spec.cap !== undefined && !(Number.isInteger(spec.cap) && spec.cap >= 1 && spec.cap < PAGE_SIZE))
@@ -195,9 +205,10 @@ function recordProvider(spec) {
       params.push(user.user_id);
       owned = `AND ${spec.owner.column} = $${params.length}`;
     }
+    const seen = spec.reach ? `AND ${spec.readable(await spec.reach(c, user), params)}` : "";
     const sql = `SELECT ${spec.select}, GREATEST(${rank.join(", ")}) AS search_rank, ${TOTAL_COL}
                    FROM ${spec.from}
-                  WHERE (${like.join(" OR ")})${spec.where ? ` AND (${spec.where})` : ""} ${s.and} ${owned}
+                  WHERE (${like.join(" OR ")})${spec.where ? ` AND (${spec.where})` : ""} ${s.and} ${owned} ${seen}
                   ORDER BY search_rank DESC${spec.order ? `, ${spec.order}` : ""}, ${spec.key}`;
     const result = await pageQuery(c, sql, params, { page });
     const rows = spec.cap ? result.data.slice(0, spec.cap) : result.data;

@@ -15,7 +15,7 @@ module.exports = defineManifest({
       description: "List the functions' KPIs with their target and latest monthly result (Met, Not Met or N/A)",
       params: c.kpis.KpiListQuery,
       permission: ["performance", "view"],
-      run: (_client, params) => service.list(params),
+      run: (_client, params, actor) => service.list(params, actor),
       cite: (row) => ({ type: "kpi", id: row.kpi_definition_id, label: `${row.code} ${row.name}` }),
     },
   ],

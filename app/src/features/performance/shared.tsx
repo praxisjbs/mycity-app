@@ -30,7 +30,9 @@ export function useSettableFunctions(periodId: string | null) {
   const list = useInfinite("GET /api/v1/performance/functions", { filters: periodId ? { period_id: periodId } : {} });
   // `paging` loads the next 25 as a Function select's menu nears its end (FRONTEND_GUIDE §4); `loading` is the
   // first page's alone, so a form open on these never turns back into a skeleton while the next one comes.
-  return { rows: list.rows.filter((f) => f.may_set), loading: list.loading && !list.page, error: list.error, reload: list.reload, paging: paging(list) };
+  // `all` is every row the reader reads (the company for whoever reads its plan, then their functions): what
+  // the Function select of Goals offers, and nothing the reader may not open (§6.23).
+  return { rows: list.rows.filter((f) => f.may_set), all: list.rows, loading: list.loading && !list.page, error: list.error, reload: list.reload, paging: paging(list) };
 }
 
 /**

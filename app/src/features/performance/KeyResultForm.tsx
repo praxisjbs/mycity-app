@@ -1,9 +1,9 @@
 /**
  * Performance · Goals, New Key Result and Edit Key Result (docs/guides/performance.md §3.2, §6.3, §10):
  * one form, checked by the goals contract (KeyResultCreate, or KeyResultEdit for a draft's key result).
- * Open: objective, key result, measure, target, target in words, unit, finish, owner, and Feeds for
- * a function's key result (the company key results it feeds, 25 a page from the server). Behind More:
- * Scored From for a company key result, co-owner, direction, baseline, start, type and owner note.
+ * Open: objective, key result, measure, target, unit, target in words, start, finish, type, owner, and
+ * Feeds for a function's key result (the company key results it feeds, 25 a page from the server). Behind
+ * More: Scored From for a company key result, co-owner, direction, baseline and owner note.
  */
 import { useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
@@ -29,7 +29,7 @@ const MEASURES: Array<[string, string]> = [["numeric", "Numeric"], ["dated", "Da
 const NUMBERLESS = new Set(["dated", "yes_no"]);
 const NO_NUMBERS = { target_value: "", unit: "", direction: "higher" };
 /** The fields behind More: it opens itself while one of them is marked. */
-const MORE = ["scored_from_key_result_id", "co_accountable_employee_id", "direction", "baseline_text", "starts_on", "kr_type", "accountable_note"];
+const MORE = ["scored_from_key_result_id", "co_accountable_employee_id", "direction", "baseline_text", "accountable_note"];
 
 type Values = {
   okr_objective_id: string;
@@ -147,9 +147,13 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
         </Field>
       )}
       {numbers && <Field label="Target" optional {...f.status("target_value")}><NumberField decimal signed {...f.field("target_value")} placeholder="64000" /></Field>}
-      <Field label="Target in Words" optional {...f.status("target_text")}><TextField {...f.field("target_text")} placeholder={numbers ? "64,000 users" : "Launch in Kano"} /></Field>
       {numbers && <Field label="Unit" optional {...f.status("unit")}><UnitField {...f.field("unit")} /></Field>}
+      <Field label="Target in Words" optional {...f.status("target_text")}><TextField {...f.field("target_text")} placeholder={numbers ? "64,000 users" : "Launch in Kano"} /></Field>
+      <Field label="Start" optional {...f.status("starts_on")}><DateField {...f.field("starts_on")} /></Field>
       <Field label="Finish" optional {...f.status("finishes_on")}><DateField {...f.field("finishes_on")} /></Field>
+      <Field label="Type" optional {...f.status("kr_type")}>
+        <SelectField placeholder="None" options={[["", "None"], ...Object.entries(KR_TYPES)]} {...f.field("kr_type")} />
+      </Field>
       <Field label="Owner" optional {...f.status("accountable_employee_id")}>
         <EmployeePicker
           value={owner}
@@ -203,10 +207,6 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
           </Field>
         )}
         <Field label="Baseline" optional {...f.status("baseline_text")}><TextField {...f.field("baseline_text")} /></Field>
-        <Field label="Start" optional {...f.status("starts_on")}><DateField {...f.field("starts_on")} /></Field>
-        <Field label="Type" optional {...f.status("kr_type")}>
-          <SelectField placeholder="None" options={[["", "None"], ...Object.entries(KR_TYPES)]} {...f.field("kr_type")} />
-        </Field>
         <Field label="Owner Note" optional {...f.status("accountable_note")}><TextField {...f.field("accountable_note")} /></Field>
       </MoreFields>
       <FormFooter>

@@ -20,6 +20,8 @@ const lagos = require("../../shared/time/lagos");
 const { scoring } = require("@mycity/contract");
 const { scopeFor } = require("../../middleware/rbac");
 const authority = require("./goals.authority");
+const share = require("./goals.share");
+const visibility = require("./goals.visibility");
 const cascade = require("./goals.cascade");
 const plans = require("./goals.plans");
 const { traceOf } = require("./goals.trace");
@@ -97,6 +99,7 @@ function keyResultView(kr, latest = null, rules) {
  */
 async function withKeyResults(db, objectives, until = null, actor = null) {
   const krs = await repo.keyResultsOf(db, objectives.map((o) => o.okr_objective_id));
+  const sharing = actor ? await share.sharingOf(actor, "objective", objectives) : new Map();
   const months = await repo.latestMonths(db, krs.map((k) => k.okr_key_result_id), until);
   const latestOf = new Map(months.map((m) => [m.okr_key_result_id, m]));
   const rulesOf = new Map();
@@ -108,7 +111,12 @@ async function withKeyResults(db, objectives, until = null, actor = null) {
       setsFor.set(departmentId, await authority.maySetGoals(db, actor, departmentId));
   return objectives.map((o) => {
     const rules = rulesOf.get(o.performance_period_id);
-    const mine = krs.filter((k) => k.okr_objective_id === o.okr_objective_id).map((k) => keyResultView(k, latestOf.get(k.okr_key_result_id), rules));
+    // An objective the reader reaches only through a key result they own is shown with that key result alone (§6.23).
+    const partial = o.reader_open === false;
+    const owns = (k) => Boolean(actor && actor.employee_id) && [k.accountable_employee_id, k.co_accountable_employee_id].includes(actor.employee_id);
+    const mine = krs
+      .filter((k) => k.okr_objective_id === o.okr_objective_id && (!partial || owns(k)))
+      .map((k) => keyResultView(k, latestOf.get(k.okr_key_result_id), rules));
     return {
       okr_objective_id: o.okr_objective_id,
       performance_period_id: o.performance_period_id,
@@ -120,22 +128,33 @@ async function withKeyResults(db, objectives, until = null, actor = null) {
       organisational_goal_id: o.organisational_goal_id,
       position: o.position,
       plan_status: o.plan_status,
-      score: scoring.formatScore(cascade.objectiveScore(mine)),
+      score: partial ? null : scoring.formatScore(cascade.objectiveScore(mine)),
       key_results: mine,
       can_edit: plans.isEditable(o.plan_status) && setsFor.get(o.department_id) === true,
+      ...(sharing.get(o.okr_objective_id) || { can_share: false, share: null }),
     };
   });
 }
 
 /** GET /performance/okrs */
 async function listOkrs(query, actor = null) {
-  const page = await repo.listObjectives(pool, query);
+  const page = await repo.listObjectives(pool, query, await visibility.readerOf(pool, actor));
   return { ...page, data: await withKeyResults(pool, page.data, null, actor) };
 }
 
-/** GET /performance/key-results: a quarter's key results for a picker, 25 a page. */
-async function listKeyResults(query) {
-  return repo.listKeyResultRefs(pool, query);
+/**
+ * GET /performance/key-results: a quarter's key results for a picker, 25 a page. A function's within the
+ * reader's reach; the company's, by code and statement alone, for whoever sets goals, so a head can say
+ * which company key result theirs feeds (§6.23).
+ */
+async function listKeyResults(query, actor = null) {
+  const reach = await visibility.readerOf(pool, actor);
+  const pickCompany =
+    reach.full ||
+    (await authority.holds(actor, "goals.function")) ||
+    (await authority.holds(actor, "goals.company")) ||
+    (await authority.runsTheCycle(actor));
+  return repo.listKeyResultRefs(pool, query, reach, pickCompany);
 }
 
 /**
@@ -143,9 +162,14 @@ async function listKeyResults(query) {
  * company score is the mean of the company objectives' scores whatever the function; the counts
  * are the function's key results (or every key result) by their latest month.
  */
-async function okrSummary(query) {
-  const objectives = await withKeyResults(pool, await repo.objectivesOfPeriod(pool, query.period_id));
-  const company = objectives.filter((o) => o.department_id === null && o.score !== null).map((o) => Number(o.score));
+async function okrSummary(query, actor = null) {
+  const reach = await visibility.readerOf(pool, actor);
+  const objectives = await withKeyResults(pool, await repo.objectivesOfPeriod(pool, query.period_id, reach), null, actor);
+  // The company's score is the whole plan's alone; the functions' mean is whatever functions the reader reads.
+  const company = reach.full ? objectives.filter((o) => o.department_id === null && o.score !== null).map((o) => Number(o.score)) : [];
+  const functionScores = objectives
+    .filter((o) => o.department_id !== null && o.score !== null && (!query.department_id || query.department_id === o.department_id))
+    .map((o) => Number(o.score));
   const wanted =
     query.department_id === "company"
       ? objectives.filter((o) => o.department_id === null)
@@ -155,6 +179,7 @@ async function okrSummary(query) {
   const krs = wanted.flatMap((o) => o.key_results);
   return {
     company_score: company.length ? scoring.formatScore(company.reduce((a, b) => a + b, 0) / company.length) : null,
+    function_score: functionScores.length ? scoring.formatScore(functionScores.reduce((a, b) => a + b, 0) / functionScores.length) : null,
     key_results: krs.length,
     on_track: krs.filter((k) => k.latest && k.latest.band === "good").length,
     in_recovery: krs.filter((k) => k.latest && k.latest.band === "recovery").length,
@@ -220,9 +245,17 @@ async function createObjective(actor, body, opts = {}) {
   return getObjective(id, actor);
 }
 
+/**
+ * One objective with its key results. With an actor the reader's reach decides (404 outside it, and only the
+ * key results they own when that is all they reach, §6.23); without, it is the system's own read.
+ */
 async function getObjective(id, actor = null) {
   const row = await repo.getObjective(pool, id);
   if (!row) throw notFound("That objective");
+  if (actor) {
+    const access = await visibility.assertObjective(pool, await visibility.readerOf(pool, actor), id);
+    row.reader_open = access.open;
+  }
   return (await withKeyResults(pool, [row], null, actor))[0];
 }
 
@@ -430,14 +463,16 @@ async function mayChangeTarget(actor, planStatus, ctx) {
 async function getKeyResultDetail(id, actor = null) {
   const kr = await repo.getKeyResult(pool, id);
   if (!kr) throw notFound();
+  const reach = await visibility.readerOf(pool, actor);
+  await visibility.assertKeyResult(pool, reach, id);
   const ctx = await repo.keyResultContext(pool, id);
   const objective = await repo.getObjective(pool, kr.okr_objective_id);
   const [months, contributing, initiatives, changes, path] = await Promise.all([
     repo.monthsOf(pool, id),
-    repo.contributing(pool, id),
+    repo.contributing(pool, id, reach),
     repo.initiatives(pool, id),
     repo.changesOf(pool, id),
-    traceOf(pool, id),
+    readableTrace(pool, reach, id),
   ]);
   const latest = months.length ? months[months.length - 1] : null;
   return {
@@ -641,9 +676,35 @@ async function confirmScore(actor, id, body) {
 }
 
 /** GET /performance/key-results/:id/trace */
-async function trace(id) {
+async function trace(id, actor = null) {
   if (!(await repo.getKeyResult(pool, id))) throw notFound();
-  return traceOf(pool, id);
+  const reach = await visibility.readerOf(pool, actor);
+  await visibility.assertKeyResult(pool, reach, id);
+  return readableTrace(pool, reach, id);
+}
+
+/**
+ * What a key result rolls up to, as far as the reader may read it (§6.23): the company key result it feeds
+ * by code and statement, then its objective and the organisational goal only where they are the reader's.
+ */
+async function readableTrace(db, reach, id) {
+  const { steps } = await traceOf(db, id);
+  const kept = [];
+  for (const step of steps) {
+    if (step.kind === "objective") {
+      const access = await visibility.objectiveAccess(db, reach, step.id);
+      if (!access || !access.readable) continue;
+    } else if (step.kind === "organisational_goal") {
+      try {
+        await visibility.assertGoal(db, reach, step.id);
+      } catch (err) {
+        if (err.code === "NOT_FOUND") continue;
+        throw err;
+      }
+    }
+    kept.push(step);
+  }
+  return { steps: kept };
 }
 
 /* ------------------------------------------------------------------ *

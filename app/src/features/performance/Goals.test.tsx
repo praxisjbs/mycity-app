@@ -6,6 +6,7 @@ import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@myc
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession, sid } from "@/api/mock/core";
+import { ROLE_CAPABILITIES } from "@/api/mock/data/access";
 import { deptId, OBJECTIVES, ORG_GOALS, PLANS } from "@/api/mock/data/performance";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider, useRouter } from "@/lib/router";
@@ -175,6 +176,11 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(within(form).getByLabelText(target)).toBeTruthy();
     expect(within(form).getByLabelText(/^Unit/)).toBeTruthy();
     expect(within(form).getByText("Direction")).toBeTruthy();
+
+    // The form reads in order: Unit under Target, Start above Finish, Type above Owner, all open (JBS Praxis, 28/10/2026).
+    const order = [target, /^Unit/, /^Target in Words/, /^Start/, /^Finish/, /^Type/, /^Owner(?! Note)/].map((name) => within(form).getAllByLabelText(name)[0]!);
+    order.slice(1).forEach((field, i) => expect(order[i]!.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
+
     type(form, target, "7000");
     type(form, /^Unit/, "users");
 
@@ -261,7 +267,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(valueOf(dialog(), "Objective")).toBe("QA objective on a binding plan");
   }, 60000);
 
-  it("New Objective offers Operations & People every function and never the company: what the server says they may set (QA DEF-10)", async () => {
+  it("New Objective offers Operations & People the company and every function: what the server says they may set (QA DEF-10, P27)", async () => {
     await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
     fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
     await settled();
@@ -269,8 +275,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     await chooseOption(within(form).getByLabelText("What"), "Objective");
     await settled();
     const offered = await optionLabels(within(form).getByLabelText("Function"));
-    expect(offered).not.toContain("Company");
-    expect(offered).toEqual(expect.arrayContaining(["Engineering", "Finance", "Marketing & Sales · Binding"]));
+    expect(offered).toEqual(expect.arrayContaining(["Company", "Engineering", "Finance", "Marketing & Sales · Binding"]));
   }, 60000);
 
   it("a head whose plan is binding is offered Request To Unbind in place of New Goal; New KPI offers their own function alone (QA DEF-11, JBS Praxis 27/10/2026)", async () => {
@@ -342,9 +347,11 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
   }, 60000);
 
-  it("a binding plan the reader does not set hides New Goal and offers no Request To Unbind: the company's, for Operations & People and for a head (JBS Praxis, 27/10/2026)", async () => {
-    // The company's plan, binding: Management and the CEO set it (§6.3), neither of these accounts does. A company objective
-    // made by an earlier test leaves its draft plan behind, so that one is bound when it is there, and put back after.
+  it("a binding plan the reader reads but does not set hides New Goal and offers no Request To Unbind: the company's, for a reader of the whole plan who does not set it; Operations & People set it and are offered Request To Unbind (JBS Praxis, 27/10/2026, 28/10/2026)", async () => {
+    // The company's plan, binding: Management, Operations & People and the CEO set it (§6.3, P27). A reader of the whole
+    // plan who does not (here the head, given goals.view_all) reads it and is offered nothing; Operations & People set it,
+    // so are offered Request To Unbind. A company objective made by an earlier test leaves its draft plan behind, so that
+    // one is bound when it is there, and put back after.
     const made = { ...PLANS[0]!, performance_plan_id: sid("perf:plan:company"), department_id: null, department: null, status: "binding" as const };
     const left = PLANS.find((p) => p.department_id === null && p.performance_period_id === made.performance_period_id);
     const was = left?.status;
@@ -352,19 +359,26 @@ describe("Performance · Goals, set and changed on screen", () => {
     else PLANS.push(made);
     try {
       await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
-      // With All Functions picked there are functions to add to; with Company picked, the company's plan is the one in view.
+      // With All Functions picked there are functions to add to; on the binding company she may ask to unbind it.
       expect(screen.getAllByRole("button", { name: "New Goal" }).length).toBeGreaterThan(0);
       await chooseOption(screen.getByLabelText("Function"), "Company");
       await settled();
       expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
+      expect(screen.getAllByRole("button", { name: "Request To Unbind" }).length).toBeGreaterThan(0);
       cleanup();
 
-      await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
-      await chooseOption(screen.getByLabelText("Function"), "Company");
-      await settled();
-      expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
+      // The Head of Department role, given the one capability that reads the whole plan.
+      const heads = ROLE_CAPABILITIES.head_of_department!;
+      heads.push("goals.view_all");
+      try {
+        await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+        await chooseOption(screen.getByLabelText("Function"), "Company");
+        await settled();
+        expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Request To Unbind" })).toBeNull();
+      } finally {
+        heads.splice(heads.indexOf("goals.view_all"), 1);
+      }
     } finally {
       if (left) left.status = was!;
       else PLANS.splice(PLANS.indexOf(made), 1);
@@ -432,6 +446,7 @@ describe("Performance · Goals, set and changed on screen", () => {
       const term = screen.getAllByRole("button", { name }).find((b) => b.hasAttribute("aria-describedby"))!;
       return document.getElementById(term.getAttribute("aria-describedby")!)?.textContent;
     };
+    // Operations & People read the whole plan (P27): their first figure is the company's score.
     expect(helpOf("Company Score")).toBe("Scores run from 0 to 1. Good is 0.7 or above; Watch 0.4 to 0.7; Recovery below 0.4 needs a recovery plan.");
     try {
       fireEvent.pointerDown(screen.getByRole("button", { name: "Manage Quarters" }), { button: 0, pointerType: "mouse" });
@@ -560,6 +575,113 @@ describe("Performance · Goals, set and changed on screen", () => {
     }
   }, 60000);
 
+  it("each person reads their own department's goals: staff of another department read no tree and no organisational goals, a head reads theirs (JBS Praxis, 28/10/2026)", async () => {
+    // Content's people read Content's own tree (an earlier test may have given it objectives), not Marketing & Sales' and not the company's.
+    await openAs("chidera@mycityapp.io", "/performance?tab=goals");
+    expect(screen.queryByRole("table", { name: "Organisational Goals" })).toBeNull();
+    expect(screen.queryByLabelText("Function")).toBeNull();
+    expect(screen.queryByText("BM-O1")).toBeNull();
+    expect(screen.getByText("Function Score")).toBeTruthy();
+    expect(screen.queryByText("Company Score")).toBeNull();
+    expect(copyProblems()).toEqual([]);
+    cleanup();
+
+    // The head of Marketing & Sales reads their function's two objectives, and no company.
+    await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+    expect(screen.getByText(/^BM-O1 · /)).toBeTruthy();
+    expect(screen.queryByLabelText("Function")).toBeNull();
+    expect(screen.queryByText("Company Score")).toBeNull();
+    cleanup();
+
+    // The CEO reads the whole tree, with the company's score and every function to choose from.
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    expect(screen.getByText("Company Score")).toBeTruthy();
+    expect(screen.getByLabelText("Function")).toBeTruthy();
+    expect(screen.getByRole("table", { name: "Organisational Goals" })).toBeTruthy();
+  }, 60000);
+
+  it("the CEO shares a goal with a department: its people read it, the others do not; Stop Sharing takes it back (JBS Praxis, 28/10/2026)", async () => {
+    const goal = sid("perf:goal:ORG-2026-01");
+    const readsAs = async (user: string) => {
+      mockSession.set(user);
+      return status(api.call("GET /api/v1/performance/goals/:id", { params: { id: goal } }));
+    };
+    await openAs("ifeoma@mycityapp.io", `/performance?tab=goals&goal=${goal}`);
+    let sheet = dialog();
+    expect(within(sheet).getByText("Not Shared")).toBeTruthy();
+    await press(sheet, "Share Goal");
+    let form = dialog();
+    // Chosen Departments asks which; nothing is shared until one is picked.
+    fireEvent.click(within(form).getByRole("radio", { name: "Chosen Departments" }));
+    await settled();
+    await press(form, "Share Goal");
+    expect(within(form).getByText("Pick a department")).toBeTruthy();
+    fireEvent.click(await within(form).findByRole("option", { name: /Marketing & Sales/ }));
+    expect(copyProblems()).toEqual([]);
+    await press(form, "Share Goal");
+    // Back on the goal's sheet, which says with whom.
+    sheet = dialog();
+    expect(await within(sheet).findByText("Marketing & Sales")).toBeTruthy();
+    expect([await readsAs("ngozi"), await readsAs("chidera")]).toEqual([200, 404]);
+    mockSession.set("ifeoma");
+
+    // All Staff reaches Content too.
+    await press(sheet, "Share Goal");
+    form = dialog();
+    fireEvent.click(within(form).getByRole("radio", { name: "All Staff" }));
+    await press(form, "Share Goal");
+    sheet = dialog();
+    expect(await within(sheet).findByText("All Staff")).toBeTruthy();
+    expect(await readsAs("chidera")).toBe(200);
+    // Read only for the reader: no Share Goal for them, and the API refuses it.
+    expect(await status(api.call("PUT /api/v1/performance/goals/:id/share", { params: { id: goal }, body: { audience: "all", department_ids: [] } }))).toBe(403);
+    mockSession.set("ifeoma");
+
+    await press(sheet, "Share Goal");
+    await press(dialog(), "Stop Sharing");
+    sheet = dialog();
+    expect(await within(sheet).findByText("Not Shared")).toBeTruthy();
+    expect([await readsAs("ngozi"), await readsAs("chidera")]).toEqual([404, 404]);
+    mockSession.set("ifeoma");
+  }, 90000);
+
+  it("Management share a company objective: a function's is refused, and the department it is shared with reads it with its key results (JBS Praxis, 28/10/2026)", async () => {
+    let made = "";
+    let code = "";
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals", async () => {
+      const o = (await api.call("POST /api/v1/performance/objectives", { body: { performance_period_id: quarter, title: "One shared view" } })) as { okr_objective_id: string; code: string };
+      made = o.okr_objective_id;
+      code = o.code;
+      await api.call("POST /api/v1/performance/key-results", { body: { okr_objective_id: made, statement: "Sign off the baseline", measure: "dated" } });
+    });
+    // The company's objective opens its menu to Share Objective; a function's does not.
+    fireEvent.pointerDown(screen.getByRole("button", { name: `${code} Actions` }), { button: 0, pointerType: "mouse" });
+    await settled();
+    expect(screen.getByRole("menuitem", { name: "Share Objective" })).toBeTruthy();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    expect(await status(api.call("PUT /api/v1/performance/objectives/:id/share", { params: { id: sid("perf:obj:BM-O1") }, body: { audience: "all", department_ids: [] } }))).toBe(409);
+    await act(async () => {
+      await api.call("PUT /api/v1/performance/objectives/:id/share", { params: { id: made }, body: { audience: "departments", department_ids: [sid("dept:Content")] } });
+    });
+    const readsAs = async (user: string) => {
+      mockSession.set(user);
+      const res = (await api.call("GET /api/v1/performance/okrs", { query: { period_id: quarter } })) as { data: Array<{ okr_objective_id: string; code: string; key_results: unknown[]; can_edit: boolean; can_share: boolean }> };
+      return res.data.filter((o) => o.okr_objective_id === made);
+    };
+    // Content reads it, whole and read only; Marketing & Sales do not.
+    expect(await readsAs("chidera")).toEqual([expect.objectContaining({ code, can_edit: false, can_share: false, key_results: [expect.anything()] })]);
+    expect(await readsAs("ngozi")).toEqual([]);
+    mockSession.set("ifeoma");
+    await act(async () => {
+      await api.call("DELETE /api/v1/performance/objectives/:id/share", { params: { id: made } });
+    });
+    expect(await readsAs("chidera")).toEqual([]);
+    mockSession.set("ifeoma");
+    await act(async () => {
+      await api.call("DELETE /api/v1/performance/objectives/:id", { params: { id: made } });
+    });
+  }, 60000);
+
   it("the CEO opens a goal from ⌘K, edits its quarter's target, and deletes it; one a company objective serves stays", async () => {
     const goal = sid("perf:goal:ORG-2026-03");
     await openAs("ifeoma@mycityapp.io", `/performance?tab=goals&goal=${goal}`);
@@ -646,7 +768,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(screen.queryByRole("button", { name: "New KPI" })).toBeNull();
   }, 60000);
 
-  it("Report Month lists only what the reader may act for: a head their own function, Operations & People every function, the CEO the company too", async () => {
+  it("Report Month lists only what the reader may act for: a head their own function, Operations & People the company and every function, the CEO the same (P27)", async () => {
     await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
     await press(document.body, "Report Month");
     expect(await choices(dialog(), "Function")).toEqual(["Marketing & Sales"]);
@@ -655,8 +777,7 @@ describe("Performance · Goals, set and changed on screen", () => {
     await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
     await press(document.body, "Report Month");
     const operations = await choices(dialog(), "Function");
-    expect(operations).toEqual(expect.arrayContaining(["Marketing & Sales", "Content", "Engineering"]));
-    expect(operations).not.toContain("Company");
+    expect(operations).toEqual(expect.arrayContaining(["Company", "Marketing & Sales", "Content", "Engineering"]));
     cleanup();
 
     await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
