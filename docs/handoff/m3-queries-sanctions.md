@@ -8,7 +8,7 @@ itself is `docs/guides/queries.md`; this file is the build plan and its log.
 | | |
 |---|---|
 | Branch | `m3/queries-sanctions` (push only here; the PR targets `main`; restarted from `main` after #22 merged) |
-| Pull request | #22, merged 27/10/2026; the sequel (§9) is #33 |
+| Pull request | #22, merged 27/10/2026; the sequel (§9) #33, merged 28/10/2026; its staging fixes #35 |
 | Owner | GE (Godwin-Okoh Elisha); handed to Victor on 27/10/2026 |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 26/10/2026 |
@@ -458,7 +458,7 @@ real names and never enter this public repository.
   with Download PDF, signed with the reader's saved signature.
 - 28/10/2026 · GE · S4 built: Issue Sanction picks the query in place. `app/tsconfig.json` checks no
   files (it only references the others): typecheck with `npx tsc -p app/tsconfig.app.json`, as CI does.
-- 28/10/2026 · GE · PR #33 opened. GE's staging walk: the preview drew nothing (the PDF's bytes were
+- 28/10/2026 · GE · #33 merged. GE's staging walk, fixed in #35: the preview drew nothing (the PDF's bytes were
   never handed to PdfViewer, `useFileBlob` now, with `failed` and Try Again), the paper wording
   flashed before it (only the demo build fetches it now; the PDF waits for the signature's answer so
   it renders once), and a browser forcing dark mode darkened the signature pad under its dark ink
