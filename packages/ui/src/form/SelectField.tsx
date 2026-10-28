@@ -119,7 +119,7 @@ function useNearEnd(open: boolean, count: number, more: boolean | undefined, onM
         if (focused instanceof HTMLElement && focused.getAttribute("role") === "option" && box.contains(focused)) {
           const at = focused.getBoundingClientRect();
           const shown = box.getBoundingClientRect();
-          if (at.bottom <= shown.top || at.top >= shown.bottom) (focused.closest<HTMLElement>("[role=listbox]") ?? box).focus({ preventScroll: true });
+          if (at.bottom <= shown.top || at.top >= shown.bottom) focused.closest<HTMLElement>("[role=listbox]")?.focus({ preventScroll: true });
         }
         void onMore();
       }
