@@ -29,7 +29,7 @@ const MANAGES = ["alerts.clear", "home.reports", "home.team"];
 /** Role code → the capabilities it holds by default. */
 export const ROLE_CAPABILITIES: Record<string, string[]> = {
   implementation: EVERY,
-  operations_people: [...HOME, "goals.function", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"],
+  operations_people: [...HOME, "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"],
   management: [...HOME, "goals.company", "goals.function", "goals.view_all", "workspace.late_reasons"],
   head_of_department: [...MANAGES, "goals.function"],
   manager: MANAGES,
@@ -37,8 +37,14 @@ export const ROLE_CAPABILITIES: Record<string, string[]> = {
   employee: [],
 };
 
-/** What a person holds: every capability for the CEO, else the union of their roles'. */
-export function capabilitiesOf(roleCodes: string[], isCeo: boolean): string[] {
+/** What everyone in General Management, the CEO's department, holds without a role (the API's GENERAL_MANAGEMENT_CAPABILITIES). */
+export const GENERAL_MANAGEMENT_CAPABILITIES = ["goals.company", "goals.organisation", "goals.view_all"];
+
+/**
+ * What a person holds: every capability for the CEO, else the union of their roles' and, for whoever sits in
+ * General Management, the plan's three.
+ */
+export function capabilitiesOf(roleCodes: string[], isCeo: boolean, inGeneralManagement = false): string[] {
   if (isCeo) return [...EVERY];
-  return EVERY.filter((code) => roleCodes.some((r) => ROLE_CAPABILITIES[r]?.includes(code)));
+  return EVERY.filter((code) => (inGeneralManagement && GENERAL_MANAGEMENT_CAPABILITIES.includes(code)) || roleCodes.some((r) => ROLE_CAPABILITIES[r]?.includes(code)));
 }

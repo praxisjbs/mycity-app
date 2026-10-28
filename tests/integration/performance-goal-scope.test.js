@@ -4,11 +4,11 @@
  * the real migrations, the whole app through HTTP, every response parsed with its contract.
  *
  * Each person reads their own department's goals, OKRs and KPIs; the organisational goals and the company's
- * objectives only the CEO and Management (Operations & People read every function's, not the company's); a
- * key result a person owns is theirs to read wherever it sits; the company key result a function feeds is
- * named by code and statement alone. The CEO shares an organisational goal and Management a company
- * objective with all staff or chosen departments, read only, and may stop; the people newly reached are told.
- * ⌘K, the assistant and Home read the same rule.
+ * objectives only the CEO, Management, Operations & People, the Implementation Team and everyone in General
+ * Management (P27: they also share and edit them); a key result a person owns is theirs to read wherever it
+ * sits; the company key result a function feeds is named by code and statement alone. Whoever holds the
+ * authority shares an organisational goal or a company objective with all staff or chosen departments, read
+ * only, and may stop; the people newly reached are told. ⌘K, the assistant and Home read the same rule.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/performance-goal-scope
  */
@@ -100,9 +100,16 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
           { allowAdditional: true },
         );
       });
+    // A role that reads every function across Performance and holds none of the plan's capabilities: what
+    // Operations & People were before P27, kept so the "every function, not the company" reach stays covered.
+    const auditor = await one("INSERT INTO role (code, name, description, is_system, home_view, rank) VALUES ('auditor', 'Auditor', 'Reads every function.', false, 'staff', 30) RETURNING role_id");
+    await q("INSERT INTO permission (role_id, module_key, can_view, scope) VALUES ($1, 'performance', true, 'all')", [auditor.role_id]);
     await make("ceo", "Amaka", "Obi", "management", "Chief Executive Officer", "General Management", true);
     await make("pm", "Kunle", "Bello", "management", "Program Manager", "General Management");
     await make("ops", "Ngozi", "Eze", "operations_people", "Operations & People Lead", "People & Culture");
+    await make("audit", "Chidi", "Okoro", "auditor", "Performance Auditor", "People & Culture");
+    await make("mgr", "Bode", "Ibe", "management", "Chief Technology Officer", "Technology & Back-office Ops");
+    await make("tech", "Yemi", "Cole", "employee", "Technical Assistant", "General Management");
     await make("head", "Tolu", "Ade", "head_of_department", "Head, Brand", "Branding & Marketing");
     await make("ada", "Ada", "Nwosu", "employee", "Social Media Manager", "Branding & Marketing");
     await make("other", "Bisi", "Lawal", "head_of_department", "Head, Tech", "Technology & Back-office Ops");
@@ -156,20 +163,23 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     await pool.end();
   });
 
-  test("a person reads their own department's objectives; Operations & People every function's; Management and the CEO everything", async () => {
+  test("a person reads their own department's objectives; a wider grant every function's; Management, Operations & People and the CEO everything", async () => {
     expect(await codes("ada")).toEqual(["BM-O1"]);
     expect(await codes("head")).toEqual(["BM-O1"]);
     expect(await codes("dev")).toEqual(["TBO-O1"]);
     expect(await codes("other")).toEqual(["TBO-O1"]);
-    // Operations & People run the cycle: every function's, never the company's.
-    expect(await codes("ops")).toEqual(["BM-O1", "TBO-O1"]);
+    // A grant whose scope is all, with none of the plan's capabilities: every function's, never the company's.
+    expect(await codes("audit")).toEqual(["BM-O1", "TBO-O1"]);
+    // Operations & People hold the plan's capabilities (P27): the whole of it.
+    expect(await codes("ops")).toEqual(["BM-O1", "CO-O1", "TBO-O1"]);
+    expect(await codes("mgr")).toEqual(["BM-O1", "CO-O1", "TBO-O1"]);
     expect(await codes("pm")).toEqual(["BM-O1", "CO-O1", "TBO-O1"]);
     expect(await codes("ceo")).toEqual(["BM-O1", "CO-O1", "TBO-O1"]);
     // One objective by its id: 404 outside the reach, not 403.
     expect((await as("ada").get(`/performance/objectives/${ids.bmO}`)).status).toBe(200);
     expect((await as("ada").get(`/performance/objectives/${ids.tboO}`)).status).toBe(404);
     expect((await as("ada").get(`/performance/objectives/${ids.co}`)).status).toBe(404);
-    expect((await as("ops").get(`/performance/objectives/${ids.co}`)).status).toBe(404);
+    expect((await as("audit").get(`/performance/objectives/${ids.co}`)).status).toBe(404);
     expect((await as("pm").get(`/performance/objectives/${ids.co}`)).status).toBe(200);
     // The company is asked for by name and a reader outside it gets nothing, not a refusal.
     expect((await as("ada").get(`/performance/okrs?period_id=${ids.q4}&department_id=company`)).body.data).toEqual([]);
@@ -183,17 +193,17 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     const listed = async (who) => (await as(who).get("/performance/goals")).body.data.map((g) => g.title).sort();
     expect(await listed("ceo")).toEqual(["Earn two billion in revenue", "Grow monthly active users"]);
     expect(await listed("pm")).toHaveLength(2);
-    expect(await listed("ops")).toEqual([]);
+    expect(await listed("audit")).toEqual([]);
     expect(await listed("ada")).toEqual([]);
     expect((await as("ada").get(`/performance/goals/${ids.goalA}`)).status).toBe(404);
-    expect((await as("ops").get(`/performance/goals/${ids.goalA}`)).status).toBe(404);
+    expect((await as("audit").get(`/performance/goals/${ids.goalA}`)).status).toBe(404);
     expect((await as("pm").get(`/performance/goals/${ids.goalA}`)).status).toBe(200);
     // The same key results: a function's own, and not another's or the company's.
     expect((await as("ada").get(`/performance/key-results/${ids.bmKr}`)).status).toBe(200);
     expect((await as("ada").get(`/performance/key-results/${ids.tboKr}`)).status).toBe(404);
     expect((await as("ada").get(`/performance/key-results/${ids.coKr1}`)).status).toBe(404);
-    expect((await as("ops").get(`/performance/key-results/${ids.tboKr}`)).status).toBe(200);
-    expect((await as("ops").get(`/performance/key-results/${ids.coKr1}`)).status).toBe(404);
+    expect((await as("audit").get(`/performance/key-results/${ids.tboKr}`)).status).toBe(200);
+    expect((await as("audit").get(`/performance/key-results/${ids.coKr1}`)).status).toBe(404);
     // The summary counts what the reader reads, and gives the company score to the whole plan alone.
     const own = c.goals.OkrSummary.parse((await as("ada").get(`/performance/okrs/summary?period_id=${ids.q4}`)).body);
     expect(own).toMatchObject({ company_score: null, key_results: 1 });
@@ -204,8 +214,8 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     expect(await functions("ada")).toEqual(["Branding & Marketing"]);
     expect(await functions("other")).toEqual(["Technology & Back-office Ops"]);
     expect(await functions("pm")).toEqual(expect.arrayContaining(["Company", "Branding & Marketing", "Technology & Back-office Ops"]));
-    expect(await functions("ops")).not.toContain("Company");
-    expect(await functions("ops")).toEqual(expect.arrayContaining(["Branding & Marketing", "Technology & Back-office Ops"]));
+    expect(await functions("audit")).not.toContain("Company");
+    expect(await functions("audit")).toEqual(expect.arrayContaining(["Branding & Marketing", "Technology & Back-office Ops"]));
     // Plans: a function's reads its own plan; the company's plan is the whole plan's.
     const plans = async (who) => (await as(who).get(`/performance/plans?period_id=${ids.q4}`)).body.data.map((p) => p.department ?? "Company");
     expect(await plans("ada")).toEqual(["Branding & Marketing"]);
@@ -214,7 +224,7 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     expect((await as("ada").get(`/performance/plans/${bmPlan.performance_plan_id}`)).status).toBe(200);
     expect((await as("dev").get(`/performance/plans/${bmPlan.performance_plan_id}`)).status).toBe(404);
     const coPlan = (await as("pm").get(`/performance/plans?period_id=${ids.q4}&department_id=company`)).body.data[0];
-    expect((await as("ops").get(`/performance/plans/${coPlan.performance_plan_id}`)).status).toBe(404);
+    expect((await as("audit").get(`/performance/plans/${coPlan.performance_plan_id}`)).status).toBe(404);
     expect((await as("pm").get(`/performance/plans/${coPlan.performance_plan_id}`)).status).toBe(200);
   });
 
@@ -264,7 +274,7 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     const names = async (who) => (await as(who).get(`/performance/kpis?period_id=${ids.q4}`)).body.data.map((k) => k.code);
     expect(await names("ada")).toEqual(["BM-K01"]);
     expect(await names("dev")).toEqual(["TBO-K01"]);
-    expect(await names("ops")).toEqual(["BM-K01", "TBO-K01"]);
+    expect(await names("audit")).toEqual(["BM-K01", "TBO-K01"]);
     expect(await names("pm")).toEqual(["BM-K01", "TBO-K01"]);
     expect((await as("ada").get(`/performance/kpis/${ids.tboKpi}`)).status).toBe(404);
     expect((await as("ada").get(`/performance/kpis/${ids.bmKpi}`)).status).toBe(200);
@@ -273,10 +283,11 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     expect((await as("pm").get(`/performance/kpis/summary?month=${month}`)).body.kpis).toBe(2);
   });
 
-  test("Share Goal: the CEO's alone; all staff or chosen departments; a department's people read it, the others do not", async () => {
+  test("Share Goal: whoever holds goals.organisation; all staff or chosen departments; a department's people read it, the others do not", async () => {
     const body = { audience: "departments", department_ids: [ids.bm] };
-    // The capability decides: Management set the company's objectives, not the organisational goals.
-    expect((await as("pm").put(`/performance/goals/${ids.goalA}/share`, body)).status).toBe(403);
+    // The capability decides: Management set the company's objectives, not the organisational goals (those in
+    // General Management hold it through the department, P27).
+    expect((await as("mgr").put(`/performance/goals/${ids.goalA}/share`, body)).status).toBe(403);
     expect((await as("ada").put(`/performance/goals/${ids.goalA}/share`, body)).status).toBe(403);
     // A department chosen must be an active one, and an all-staff share names none.
     expect((await as("ceo").put(`/performance/goals/${ids.goalA}/share`, { audience: "departments", department_ids: [] })).status).toBe(422);
@@ -300,7 +311,7 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     expect((await as("ada").get("/performance/goals")).body.data.map((g) => g.title)).toEqual(["Grow monthly active users"]);
     expect((await as("ada").get(`/performance/goals/${ids.goalB}`)).status).toBe(404);
     expect((await as("dev").get(`/performance/goals/${ids.goalA}`)).status).toBe(404);
-    expect((await as("ops").get(`/performance/goals/${ids.goalA}`)).status).toBe(404);
+    expect((await as("audit").get(`/performance/goals/${ids.goalA}`)).status).toBe(404);
     // The sharer sees how it is shared; read only for the reader.
     const mine = (await as("ceo").get("/performance/goals")).body.data.find((g) => g.organisational_goal_id === ids.goalA);
     expect(mine).toMatchObject({ can_share: true, share: { audience: "departments" } });
@@ -334,16 +345,18 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     expect(wider.body).toMatchObject({ audience: "all", departments: [] });
     await drain();
     expect(await told("dev", "organisational_goal.shared")).toHaveLength(1);
-    expect(await told("ops", "organisational_goal.shared")).toHaveLength(1);
+    expect(await told("audit", "organisational_goal.shared")).toHaveLength(1);
+    // Whoever reads the whole plan reads it already: Operations & People, Management, General Management.
+    for (const who of ["ops", "mgr", "tech", "pm"]) expect(await told(who, "organisational_goal.shared")).toEqual([]);
     // Branding & Marketing already had it: still one notice each.
     expect(await told("ada", "organisational_goal.shared")).toHaveLength(1);
     expect((await as("dev").get(`/performance/goals/${ids.goalA}`)).status).toBe(200);
-    expect((await as("ops").get(`/performance/goals/${ids.goalA}`)).status).toBe(200);
+    expect((await as("audit").get(`/performance/goals/${ids.goalA}`)).status).toBe(200);
     // One share per goal: saving again replaced it.
     expect(Number((await one("SELECT count(*) AS n FROM goal_share WHERE organisational_goal_id = $1", [ids.goalA])).n)).toBe(1);
     expect(Number((await one("SELECT count(*) AS n FROM goal_share_department")).n)).toBe(0);
 
-    expect((await as("pm").del(`/performance/goals/${ids.goalA}/share`)).status).toBe(403);
+    expect((await as("mgr").del(`/performance/goals/${ids.goalA}/share`)).status).toBe(403);
     expect((await as("ceo").del(`/performance/goals/${ids.goalA}/share`)).status).toBe(204);
     expect((await as("ceo").del(`/performance/goals/${ids.goalA}/share`)).status).toBe(204);
     expect((await as("ada").get(`/performance/goals/${ids.goalA}`)).status).toBe(404);
@@ -414,7 +427,7 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
       return (await read(kpisAi, "kpis.list").run(pool, {}, actor)).data.map((k) => k.code);
     };
     expect(await kpis("dev")).toEqual(["TBO-K01"]);
-    expect(await kpis("ops")).toEqual(["BM-K01", "TBO-K01"]);
+    expect(await kpis("audit")).toEqual(["BM-K01", "TBO-K01"]);
   });
 
   test("a reviewer reads the function of the scorecards they review: a manager of someone in another function links that scorecard's lines to its key results", async () => {
@@ -433,12 +446,73 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     expect(await codes("dev")).toEqual(["TBO-O1"]);
   });
 
+  test("Operations & People read the whole plan, and share and edit it (P27)", async () => {
+    expect(await codes("ops")).toEqual(["BM-O1", "CO-O1", "TBO-O1"]);
+    expect((await as("ops").get(`/performance/objectives/${ids.co}`)).status).toBe(200);
+    expect((await as("ops").get(`/performance/key-results/${ids.coKr1}`)).status).toBe(200);
+    expect((await as("ops").get("/performance/goals")).body.data.length).toBeGreaterThanOrEqual(1);
+    // They record an organisational goal, share it, change it and stop sharing it.
+    const made = await as("ops").post("/performance/goals", { title: "Open three new cities", strategic_theme: "Growth", plan_year_starts_on: "2026-01-01" });
+    expect(made.status).toBe(201);
+    const goal = made.body.organisational_goal_id;
+    expect(c.goals.OrganisationalGoalDetail.parse((await as("ops").get(`/performance/goals/${goal}`)).body)).toMatchObject({ can_share: true });
+    expect((await as("ops").put(`/performance/goals/${goal}/share`, { audience: "all", department_ids: [] })).status).toBe(200);
+    expect((await as("ops").patch(`/performance/goals/${goal}`, { title: "Open four new cities" })).status).toBe(200);
+    expect((await as("ada").get(`/performance/goals/${goal}`)).status).toBe(200);
+    expect((await as("ops").del(`/performance/goals/${goal}/share`)).status).toBe(204);
+    expect((await as("ada").get(`/performance/goals/${goal}`)).status).toBe(404);
+    // They set the company's objectives and share one with its key results.
+    expect((await as("ops").patch(`/performance/objectives/${ids.co}`, { title: "One trusted view of MyCity" })).status).toBe(200);
+    expect((await as("ops").patch(`/performance/objectives/${ids.co}`, { title: "One trusted view" })).status).toBe(200);
+    expect((await as("ops").put(`/performance/objectives/${ids.co}/share`, { audience: "departments", department_ids: [ids.tbo] })).status).toBe(200);
+    expect((await as("dev").get(`/performance/objectives/${ids.co}`)).status).toBe(200);
+    expect((await as("ops").del(`/performance/objectives/${ids.co}/share`)).status).toBe(204);
+    expect((await as("ops").del(`/performance/goals/${goal}`)).status).toBe(204);
+  });
+
+  test("everyone in General Management holds the plan through the department, not a role (P27)", async () => {
+    const grantsCache = require("../../src/shared/rbac/grants-cache");
+    const held = (who) => grantsCache.getCapabilities(pool, people[who].user.user_id);
+    const GM = ["goals.company", "goals.organisation", "goals.view_all"];
+    // A Technical Assistant with only the staff role, in the CEO's department.
+    expect(await held("tech")).toEqual(GM);
+    expect(await held("ada")).toEqual([]);
+    expect(await codes("tech")).toEqual(["BM-O1", "CO-O1", "TBO-O1"]);
+    expect((await visibility.readerOf(pool, await actorOf("tech"))).full).toBe(true);
+    // They record, share, change and delete an organisational goal, and set the company's objectives.
+    const made = await as("tech").post("/performance/goals", { title: "Reach every state capital", strategic_theme: "Growth", plan_year_starts_on: "2026-01-01" });
+    expect(made.status).toBe(201);
+    const goal = made.body.organisational_goal_id;
+    expect((await as("tech").put(`/performance/goals/${goal}/share`, { audience: "departments", department_ids: [ids.bm] })).status).toBe(200);
+    expect((await as("ada").get(`/performance/goals/${goal}`)).status).toBe(200);
+    expect((await as("dev").get(`/performance/goals/${goal}`)).status).toBe(404);
+    expect((await as("tech").patch(`/performance/goals/${goal}`, { title: "Reach every capital" })).status).toBe(200);
+    expect((await as("tech").patch(`/performance/objectives/${ids.co}`, { title: "One trusted view" })).status).toBe(200);
+    // A function's own goals stay its head's: General Management do not set Branding & Marketing's.
+    expect((await as("tech").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.bm, title: "Not theirs" })).status).toBe(403);
+
+    // The rule is the CEO's department, however it is named or coded.
+    await q("UPDATE department SET name = 'Executive Office', code = 'EXEC' WHERE department_id = $1", [(await one("SELECT department_id FROM employee WHERE employee_id = $1", [emp("ceo")])).department_id]);
+    await grantsCache.invalidateUser(people.tech.user.user_id);
+    expect(await held("tech")).toEqual(GM);
+
+    // A person moved out of it loses the three, and with them the plan.
+    await q("UPDATE employee SET department_id = $2 WHERE employee_id = $1", [emp("tech"), ids.tbo]);
+    await grantsCache.invalidateUser(people.tech.user.user_id);
+    expect(await held("tech")).toEqual([]);
+    expect(await codes("tech")).toEqual(["TBO-O1"]);
+    expect((await as("tech").put(`/performance/goals/${goal}/share`, { audience: "all", department_ids: [] })).status).toBe(403);
+    expect((await as("tech").get(`/performance/goals/${goal}`)).status).toBe(404);
+    expect((await as("ceo").del(`/performance/goals/${goal}`)).status).toBe(204);
+  });
+
   test("a person with no login, or no grant, reads nothing", async () => {
     expect((await visibility.readerOf(pool, null)).none).toBe(true);
     expect((await visibility.readerOf(pool, { user_id: people.ada.user.user_id, role_ids: [] })).none).toBe(true);
     const reach = await visibility.readerOf(pool, await actorOf("ada"));
     expect(reach).toMatchObject({ none: false, full: false, all_functions: false, department_ids: [ids.bm] });
-    expect((await visibility.readerOf(pool, await actorOf("ops"))).all_functions).toBe(true);
+    expect(await visibility.readerOf(pool, await actorOf("audit"))).toMatchObject({ all_functions: true, full: false });
+    expect((await visibility.readerOf(pool, await actorOf("ops"))).full).toBe(true);
     expect((await visibility.readerOf(pool, await actorOf("pm"))).full).toBe(true);
     expect((await visibility.readerOf(pool, await actorOf("ceo"))).full).toBe(true);
     // A head's reach includes the department they head, whatever their own record says.
