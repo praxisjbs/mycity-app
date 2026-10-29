@@ -131,12 +131,17 @@ module.exports = async function seed({ pool, actor, log = () => {} }) {
   const staff = await realStaff(pool);
   const all = { scope: "all", scope_ids: null };
 
-  /* The chain, only when nobody has entered one. */
-  const { rows: steps } = await pool.query("SELECT count(*)::int AS n FROM consequence_step");
-  if (steps[0].n === 0) {
+  /*
+   * The chain: each rung added, at the end and in order, while no rung of its name exists. One
+   * entered by hand stays as it is, and a retired one is not brought back.
+   */
+  const { rows: steps } = await pool.query("SELECT name FROM consequence_step");
+  const have = new Set(steps.map((s) => s.name.toLowerCase()));
+  const missing = CHAIN.filter((step) => !have.has(step.name.toLowerCase()));
+  if (missing.length) {
     const by = (await callerOf(pool, staff.operations)) || actor;
-    for (const step of CHAIN) await chain.create(by, c.sanctions.ConsequenceStepCreate.parse(step));
-    log(`queries: the chain's ${CHAIN.length} rungs entered`);
+    for (const step of missing) await chain.create(by, c.sanctions.ConsequenceStepCreate.parse(step));
+    log(`queries: ${missing.length} of the chain's ${CHAIN.length} rungs entered (${missing.map((s) => s.name).join(", ")})`);
   }
 
   /* The rule. */

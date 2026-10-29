@@ -3,7 +3,7 @@ import query_rules from "@mycity/contract/schemas/query_rules.js";
 import sanctions from "@mycity/contract/schemas/sanctions.js";
 import templates from "@mycity/contract/schemas/templates.js";
 import type { ConsequenceStep, LetterTemplate, LetterTemplateDetail, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { saveBlob, useFileBlob } from "@/api/download";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
@@ -636,7 +636,8 @@ const sanctionStatus = (s: Sanction) =>
  * Sanction. Only queries under review are offered; one that cannot be decided yet says why.
  */
 function IssueSanction({ close }: { close: () => void }) {
-  const list = usePaged("GET /api/v1/queries", { filters: { status: "under_review" }, sort: "-created_at" });
+  // Answered, or past the deadline unanswered: the queries a decision may be recorded on now.
+  const list = usePaged("GET /api/v1/queries", { filters: { ready: "true" }, sort: "-created_at" });
   const [picked, setPicked] = useState<Query[]>([]);
   const chosen = picked[0] ?? null;
   const q = useApi("GET /api/v1/queries/:id", { params: { id: chosen?.employee_query_id ?? "" }, enabled: !!chosen });
@@ -857,6 +858,20 @@ function Templates() {
       toast(e instanceof ApiError ? e.message : "Not saved");
     }
   };
+  // The letter's own actions sit on its preview, beside Download PDF.
+  const edit = () => shown && modal.open({ title: shown.name, wide: true, body: (close) => <EditTemplate id={shown.letter_template_id} close={close} /> });
+  const manage = configure && shown ? (
+    <>
+      <Button size="sm" icon="edit" onClick={edit}>Edit Template</Button>
+      {(shown.status === "draft" || shown.status === "active") && <Button size="sm" onClick={flip}>{shown.status === "active" ? "Deactivate" : "Activate"}</Button>}
+    </>
+  ) : null;
+  const above = (body: ReactNode) => (
+    <>
+      {manage && <ActionGroup><div className="mb-2.5 flex flex-wrap justify-end gap-2">{manage}</div></ActionGroup>}
+      {body}
+    </>
+  );
   return (
     <>
       <PageHeader
@@ -865,13 +880,7 @@ function Templates() {
         actions={
           <>
             <Button icon="signature" onClick={() => modal.open({ title: "My Signature", body: (close) => <EditSignature close={close} /> })}>Edit Signature</Button>
-            {configure && (
-            <>
-              {shown && <Button icon="edit" onClick={() => modal.open({ title: shown.name, wide: true, body: (close) => <EditTemplate id={shown.letter_template_id} close={close} /> })}>Edit Template</Button>}
-              {shown && (shown.status === "draft" || shown.status === "active") && <Button onClick={flip}>{shown.status === "active" ? "Deactivate" : "Activate"}</Button>}
-              <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>
-            </>
-            )}
+            {configure && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>}
           </>
         }
       />
@@ -898,9 +907,9 @@ function Templates() {
         }
         detail={
           !shown ? null : shown.status === "awaiting_sample" ? (
-            <Card><EmptyState bare icon="doc" title="Awaiting Sample" text="Write the letter to preview it." /></Card>
+            <Card><EmptyState bare icon="doc" title="Awaiting Sample" text="Write the letter to preview it." action={configure ? <Button icon="edit" onClick={edit}>Edit Template</Button> : undefined} /></Card>
           ) : MOCK ? (
-            preview.data ? <Letter l={preview.data} /> : preview.error ? <Card><ErrorState error={preview.error} onRetry={preview.reload} /></Card> : <Card><LoadingRows count={6} /></Card>
+            above(preview.data ? <Letter l={preview.data} /> : preview.error ? <Card><ErrorState error={preview.error} onRetry={preview.reload} /></Card> : <Card><LoadingRows count={6} /></Card>)
           ) : pdf.blob && pdf.href ? (
             // The real PDF the employee would receive, signed with the reader's saved signature.
             <DocumentPreview
@@ -909,12 +918,18 @@ function Templates() {
               href={pdf.href}
               file={pdf.blob}
               height="page"
-              actions={<Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, `${shown.name}.pdf`)}>Download PDF</Button>}
+              actions={
+                <ActionGroup>
+                  {manage}
+                  <Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, `${shown.name}.pdf`)}>Download PDF</Button>
+                </ActionGroup>
+              }
             />
           ) : pdf.failed ? (
-            <Card><EmptyState bare icon="doc" title="Preview Not Ready" text="The letter could not be drawn." action={<Button icon="refresh" onClick={() => setRedraw((n) => n + 1)}>Try Again</Button>} /></Card>
+            above(<Card><EmptyState bare icon="doc" title="Preview Not Ready" text="The letter could not be drawn." action={<Button icon="refresh" onClick={() => setRedraw((n) => n + 1)}>Try Again</Button>} /></Card>)
           ) : (
             // The letter's own frame while it is drawn, never the wording first.
+            // The actions arrive with the PDF's bar, so they never jump from above it into it.
             <Card pad={false}><PdfViewer data={null} name={`${shown.name}.pdf`} height="page" /></Card>
           )
         }

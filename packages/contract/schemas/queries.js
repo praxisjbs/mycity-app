@@ -144,6 +144,9 @@ const QueryListQuery = listQuery(
     status: QueryStatus.optional(),
     employee_id: uuid.optional(),
     raised: z.enum(["mine", "rules"]).optional(),
+    // Ready for a decision (guide §6.4): open, no sanction waiting, answered or past its deadline,
+    // and not about the reader. Issue Sanction's picker lists these.
+    ready: z.enum(["true", "false"]).optional(),
     // Raised on these Lagos days, both inclusive (a review's month, performance.md §6.16).
     raised_from: isoDate.optional(),
     raised_to: isoDate.optional(),

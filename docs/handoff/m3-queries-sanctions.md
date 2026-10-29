@@ -469,3 +469,7 @@ real names and never enter this public repository.
   questions (no Late Arrival trigger, no Activate on Missed Target) answered by help terms: both are
   decided (§6.3: Attendance owns lateness; Missed Target waits for M2's KPIs). The signature
   printed as a speck: the pad now keeps it cut to its ink.
+- 29/10/2026 · GE · Third staging walk: Issue Sanction offered only answered queries (now `ready=true`,
+  as `decidable` reads it); Edit Template and Activate or Deactivate moved onto the letter's bar;
+  the staging chain had two rungs entered by hand, so the seed (all or nothing) entered none: it now
+  adds each missing rung by name.

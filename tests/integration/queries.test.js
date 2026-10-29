@@ -443,6 +443,20 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(self.body.error.code).toBe("QUERY_SELF");
     });
 
+    test("ready lists what a decision may be recorded on now: answered, or past the deadline unanswered", async () => {
+      const ready = async () => (await as("ops").get("/queries?ready=true&sort=number")).body.data.map((r) => r.number);
+      // QRY-0001 waits for Musa's answer, within its 24 hours.
+      expect(await ready()).toEqual([]);
+      const { response_due_at: due } = (await q("SELECT response_due_at FROM employee_query WHERE employee_query_id = $1", [ids.first])).rows[0];
+      await q("UPDATE employee_query SET response_due_at = now() - interval '1 hour' WHERE employee_query_id = $1", [ids.first]);
+      try {
+        expect(await ready()).toEqual(["QRY-0001"]);
+        expect((await as("ops").get(`/queries/${ids.first}`)).body.can_decide).toBe(true);
+      } finally {
+        await q("UPDATE employee_query SET response_due_at = $2 WHERE employee_query_id = $1", [ids.first, due]);
+      }
+    });
+
     test("a manager sees only the queries they raised; People and Management see all (§6.1)", async () => {
       const hod = await raise("hod", "other", "Late arrival on Monday");
       expect(hod.status).toBe(201);

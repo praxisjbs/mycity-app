@@ -248,7 +248,7 @@ Every sanction follows a query.
 
 1. Press **Issue Sanction** at the top right.
 2. Under **Query**, search for the query by its number, the person's name or its subject, and pick
-   it. Only queries under review are offered.
+   it. Only queries ready for a decision are offered: answered, or past the 24 hours unanswered.
 3. **Record Decision** opens on it at **Sanction**: follow [Record a decision](#queries-decide) from
    step 5.
 
@@ -307,7 +307,8 @@ A letter **Awaiting Sample** has no wording yet: MyCity has still to send its sa
 
 1. Open [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates) and press the
    template.
-2. Press **Edit Template** at the top right. The letter opens with its wording as it is sent.
+2. Press **Edit Template** on the letter's bar, beside **Download PDF**. The letter opens with its
+   wording as it is sent.
 3. Change the **Name** if you need to. While no step or rule sends the letter, you can also change
    **Used For**.
 4. Change the wording under **Letter**. Type `{{ employee.first_name }}`, `{{ query_number }}`,
@@ -332,7 +333,7 @@ A step chooses its letter on [Chain Settings](#queries-chain), and a rule under 
 ### Switch a letter on or off {#queries-letters-activate needs="queries edit, cap queries.configure"}
 
 1. Press the letter on [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates).
-2. Press **Activate** at the top right for a draft. A letter with no wording cannot be switched on.
+2. Press **Activate** on the letter's bar for a draft. A letter with no wording cannot be switched on.
 3. Press **Deactivate** for an active letter you no longer use. It goes back to a draft.
 
 | The hub says | Why | What to do |
