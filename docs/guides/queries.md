@@ -604,7 +604,9 @@ or tier 2.**
   Templates, Edit Template and Activate or Deactivate sit in a ⋯ menu beside Open in Tab. A letter's
   frame scrolls sideways only once zoomed in.
 - 29/10/2026 · GE · The Queries list drops Response (the query's sheet holds it, with Responded, its date and time); the letter's ⋯ sits after
-  Open in Tab (`DocumentPreview` gains `trailing`). Issue Sanction offered only answered
+  Open in Tab (`DocumentPreview` gains `trailing`).
+- 29/10/2026 · GE · Queries and Sanction History drop `wide` (a 1,080 px minimum): with five columns they fit
+  a laptop or a zoomed window instead of scrolling sideways. Issue Sanction offered only answered
   queries, so one past its 24 hours unanswered (decidable all the same) never showed: its picker
   lists `ready=true` now. The staging seed adds each missing rung of the chain by name, so a chain
   entered in part on staging is filled in; a retired rung is not brought back. Staging's seed gains

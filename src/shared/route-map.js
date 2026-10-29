@@ -93,7 +93,7 @@ const SCREENS = Object.freeze({
     "budgets",
     "categories",
   ],
-  knowledge: ["policies", "sops", "faqs", "training", "announcements", "user-guide"],
+  knowledge: ["policies", "sops", "faqs", "training", "user-guide"],
   praxis_ai: ["ask", "history"],
   ai_control: ["actions", "models", "spend"],
   settings: [
@@ -386,7 +386,6 @@ const ENTITY_ROUTES = Object.freeze({
   sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge)
   faq: screen("knowledge", "faqs"), // search:none not built yet (src/modules/knowledge)
   training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/knowledge)
-  knowledge_announcement: screen("knowledge", "announcements"), // search:none not built yet (src/modules/knowledge)
 
   // Praxis AI
   // A conversation opens on Ask, where it can be read and continued (docs/guides/praxis-ai.md §9).

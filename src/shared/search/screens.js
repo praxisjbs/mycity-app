@@ -103,7 +103,6 @@ const SCREENS = Object.freeze([
   s("knowledge", "sops", "SOPs", ["sop", "procedures", "processes", "how to"]),
   s("knowledge", "faqs", "FAQs", ["faq", "questions", "help"]),
   s("knowledge", "training", "Training", ["courses", "learning", "lessons"]),
-  s("knowledge", "announcements", "Announcements", ["company news", "notices"]),
 
   s("praxis_ai", "ask", "Ask", ["ai", "assistant", "chat", "question"]),
   s("praxis_ai", "history", "History", ["ai history", "past questions", "conversations"]),

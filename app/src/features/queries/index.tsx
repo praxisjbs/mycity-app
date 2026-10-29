@@ -117,7 +117,6 @@ function QueriesTab({ id }: { id: string | null }) {
         noun="query"
         nounPlural="queries"
         onRowClick={(q) => openQuery(q.employee_query_id)}
-        wide
         empty={{ title: "No Queries", text: "Queries you raise appear here." }}
         columns={[
           { key: "e", label: "Employee", render: (q) => person(q.employee) },
@@ -726,7 +725,6 @@ function Sanctions() {
         search="Search people or reasons"
         rowKey={(x) => x.sanction_id}
         noun="sanction"
-        wide
         empty={{ title: "No Sanctions", text: "Sanctions follow a query's decision." }}
         // The reason, who decided, the fine and the letters are on the sanction's sheet.
         onRowClick={(x) => modal.open({ title: "Sanction", wide: true, body: <SanctionSheet id={x.sanction_id} /> })}

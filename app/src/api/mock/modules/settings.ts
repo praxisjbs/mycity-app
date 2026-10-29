@@ -297,7 +297,7 @@ const MODULE_LIST: Array<[string, string, string, string]> = [
   ["community", "Staff Community", "work", "Channels, direct messages and announcements"], ["mailbox", "Mailbox", "work", "Your work email"], ["people", "People", "people", "Employees, attendance, leave, devices and worksites"],
   ["performance", "Performance", "people", "Goals, targets, KPIs and reviews"], ["queries", "Queries & Sanctions", "people", "Queries, rules, sanctions and letter templates"], ["recruitment", "Recruitment", "people", "Vacancies through to onboarding"],
   ["payroll", "Payroll", "people", "Payroll runs, payslips, salary structure and statutory"], ["partnerships", "Partnerships", "business", "Pipeline, partners, leads, proposals and contracts"], ["expenses", "Expenses", "business", "Requests, approvals, requisitions, disbursements and budgets"],
-  ["knowledge", "Knowledge Hub", "system", "Policies, SOPs, FAQs, training and announcements"], ["praxis_ai", "Praxis AI", "system", "The assistant, and AI controls"], ["settings", "Settings", "system", "Organisation, users, roles, approvals and system settings"],
+  ["knowledge", "Knowledge Hub", "system", "Policies, SOPs, FAQs and training"], ["praxis_ai", "Praxis AI", "system", "The assistant, and AI controls"], ["settings", "Settings", "system", "Organisation, users, roles, approvals and system settings"],
 ];
 const FIELDS = [["employee.salary", "Salary and pay"], ["employee.bank", "Bank details"], ["employee.personal", "Personal details"], ["employee.statutory", "Tax and pension numbers"]] as const;
 const CATALOGUE: AccessCatalogue = {

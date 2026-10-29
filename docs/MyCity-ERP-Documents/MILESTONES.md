@@ -1379,7 +1379,7 @@ staff never navigates to it to do their job.
 | People | **Payroll** | 5 | Payroll Runs · Payslips · Salary Structure · Deductions · Statutory | M6 |
 | Business | **Partnerships** | 6 | Pipeline · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 |
 | Business | **Expenses** | 6 | My Requests · Approvals · Requisitions · Disbursements · Budgets · Categories | M8 |
-| System | **Knowledge Hub** | 6 | Policies · SOPs · FAQs · Training · Announcements · User Guide | M1 (Policies), M10, M0 (User Guide) |
+| System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · User Guide | M1 (Policies), M10, M0 (User Guide) |
 | System | **Praxis AI** | 2 | Ask · History | M10 |
 | System | **Settings** | 13 | Organisation · Status · Performance · Faults · Users · Roles & Permissions · Approvals · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |
 
@@ -1389,7 +1389,7 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | Public | **Public site** | 6 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document | M4, M5 |
 
-Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs, Training and Announcements in M10. **Recruitment** gets Vacancies through Interviews in M4 and
+Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews in M4 and
 Offers, Onboarding and Talent Pool in M5. The **public site** gets Careers, Vacancy, Apply and
 Assessment in M4, and Sign Offer and Verify Document in M5. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to

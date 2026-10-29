@@ -63,7 +63,7 @@
   },
   "start-user-guide": {
     "spec": "5fd6ad7b76e1470e",
-    "source": "e7671542fa2d8612",
+    "source": "fca181284aea991b",
     "devices": [
       "desktop",
       "phone"
@@ -71,7 +71,7 @@
   },
   "start-user-guide-answer": {
     "spec": "38adf96f9c38bdd9",
-    "source": "e7671542fa2d8612",
+    "source": "fca181284aea991b",
     "devices": [
       "desktop",
       "phone"
@@ -79,7 +79,7 @@
   },
   "start-user-guide-search": {
     "spec": "e9bd99b40042515d",
-    "source": "e7671542fa2d8612",
+    "source": "fca181284aea991b",
     "devices": [
       "desktop",
       "phone"
