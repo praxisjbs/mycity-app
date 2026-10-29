@@ -69,7 +69,8 @@ const SORTS = {
  * @param {{status?: string, employee_id?: string, raised?: "mine"|"rules", q?: string,
  *          raised_since?: string, raised_before?: string, page?: number, sort?: object}} query
  *   raised_since and raised_before are instants (the service turns a Lagos day into one)
- * @param {{all: boolean, user_id: string}} reader
+ *   ready: only queries the reader could decide now (queries.service decidable, less the edit grant)
+ * @param {{all: boolean, user_id: string, employee_id?: string|null}} reader
  */
 function list(db, query, reader) {
   const params = [
@@ -80,6 +81,8 @@ function list(db, query, reader) {
     query.q || null,
     query.raised_since || null,
     query.raised_before || null,
+    query.ready === "true",
+    reader.employee_id || null,
   ];
   const v = visibility.clause(reader, params, "v.raised_by");
   return pageQuery(
@@ -93,6 +96,9 @@ function list(db, query, reader) {
         AND ($5::text IS NULL OR v.haystack LIKE '%' || search_fold($5) || '%')
         AND ($6::timestamptz IS NULL OR v.created_at >= $6)
         AND ($7::timestamptz IS NULL OR v.created_at < $7)
+        AND (NOT $8::boolean OR (v.status <> 'resolved' AND NOT v.escalated
+             AND (v.responded_at IS NOT NULL OR v.response_due_at <= now())
+             AND ($9::uuid IS NULL OR v.employee_id <> $9)))
         ${v.and}
       ORDER BY ${orderBy(query, SORTS, "v.employee_query_id")}`,
     params,

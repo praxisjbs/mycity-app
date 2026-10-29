@@ -36,7 +36,7 @@ export function LetterFile({ documentId, name }: { documentId: string | null; na
   const href = useFileUrl(documentId ? `/api/v1/documents/${documentId}/content` : null);
   if (!documentId) return <EmptyState bare icon="doc" title="No Letter Yet" />;
   if (!href) return <EmptyState bare icon="doc" title="Opening Letter" />;
-  return <DocumentPreview name={`${name}.pdf`} mime="application/pdf" href={href} />;
+  return <DocumentPreview name={`${name}.pdf`} mime="application/pdf" href={href} height="page" />;
 }
 
 /** The policy a query cites: its title, number and version, and the clause quoted. */

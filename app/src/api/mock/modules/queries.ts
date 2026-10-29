@@ -466,6 +466,11 @@ route("GET /api/v1/queries", (req) => {
       status: (q, v) => q.status === v,
       employee_id: (q, v) => q.employee.employee_id === v,
       raised: (q, v) => (v === "mine" ? q.raised_by === uid(user) : q.source !== "person"),
+      // Ready for a decision, as can_decide reads it less the edit grant: Issue Sanction's picker.
+      ready: (q, v) =>
+        v !== "true" ||
+        (q.status !== "resolved" && !q.escalated && (!!q.responded_at || (!!q.response_due_at && new Date(q.response_due_at) <= new Date())) &&
+          byKey(user)?.employee_id !== q.employee.employee_id),
       // A review's month (performance.md §6.16): raised on these Lagos days, both inclusive.
       raised_from: (q, v) => lagosDay(q.created_at) >= v,
       raised_to: (q, v) => lagosDay(q.created_at) <= v,

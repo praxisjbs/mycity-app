@@ -9,7 +9,7 @@
  * @status stable
  * @example <DocumentPreview name="Receipt.pdf" mime="application/pdf" href={href} file={blob} />
  */
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { formatBytes } from "../lib/format";
 import { Button } from "../actions/Button";
@@ -32,21 +32,39 @@ export interface DocumentPreviewProps {
   mime: string;
   /** The file, ready for the browser (a blob URL the app fetched with the session): what Open in Tab and Download open. */
   href: string;
-  /** A PDF's bytes, for PdfViewer to draw; null while they arrive. */
+  /** A PDF's bytes, for PdfViewer to draw; null while they arrive. Left out, they are read from `href`. */
   file?: Blob | null;
   /** Its size, for the line under the name. */
   sizeBytes?: number;
-  /** How tall the frame is; `md` unless a sheet wants it shorter or a page taller. */
-  height?: "sm" | "md" | "lg";
+  /** How tall the frame is; `md` unless a sheet wants it shorter or a page taller; `page` grows a PDF to its pages (a letter). */
+  height?: "sm" | "md" | "lg" | "page";
   /** What sits beside Open in Tab (Replace, Remove). */
   actions?: ReactNode;
   /** Layout classes only (spacing). */
   className?: string;
 }
 
+/** A PDF's bytes read back from the blob URL the screen already holds, when it passed no `file`. */
+function useHrefBytes(href: string | null): Blob | null {
+  const [got, setGot] = useState<{ href: string; blob: Blob } | null>(null);
+  useEffect(() => {
+    if (!href) return;
+    let live = true;
+    void fetch(href)
+      .then((res) => res.blob())
+      .then((blob) => live && setGot({ href, blob }))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [href]);
+  return got && got.href === href ? got.blob : null;
+}
+
 export function DocumentPreview({ name, mime, href, file, sizeBytes, height = "md", actions, className }: DocumentPreviewProps) {
   const isPdf = mime === "application/pdf";
   const isImage = mime.startsWith("image/");
+  const read = useHrefBytes(isPdf && file === undefined ? href : null);
 
   const bar = (
     <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted px-3 py-2">
@@ -86,11 +104,11 @@ export function DocumentPreview({ name, mime, href, file, sizeBytes, height = "m
 
   let body: ReactNode;
   if (isImage) {
-    body = <ImageViewer src={href} alt={name} height={height} noOpen />;
+    body = <ImageViewer src={href} alt={name} height={height === "page" ? "lg" : height} noOpen />;
   } else if (isPdf) {
     // Drawn by PDF.js, not the browser: Android's browser draws no PDF in a page, and the
     // security policy lets no <object> load (FRONTEND_FOUNDATION §5, PR 3 question 4).
-    body = <PdfViewer data={file ?? null} name={name} height={height} />;
+    body = <PdfViewer data={file === undefined ? read : file} name={name} height={height} />;
   } else {
     body = download("Download To Read", "This file opens in its own app.");
   }

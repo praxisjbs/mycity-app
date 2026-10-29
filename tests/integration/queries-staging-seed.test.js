@@ -161,4 +161,20 @@ describeDb("Queries & Sanctions' staging seed against the real migrations", () =
   test("a second run adds nothing", () => {
     expect(second).toEqual(first);
   });
+
+  // Staging had Caution and Warning entered by hand before the seed ran, so it entered none.
+  test("a chain entered in part gets its missing rungs, in order; a retired rung stays retired", async () => {
+    await q("UPDATE consequence_step SET active = false WHERE name = 'Second Warning'");
+    await q("DELETE FROM consequence_step WHERE name IN ('Suspension Without Pay', 'Dismissal or Termination')");
+    await runFile(seed, logs);
+    await settle();
+    const { rows } = await q("SELECT name, active FROM consequence_step ORDER BY position");
+    expect(rows).toEqual([
+      { name: "Caution", active: true },
+      { name: "Warning", active: true },
+      { name: "Second Warning", active: false },
+      { name: "Suspension Without Pay", active: true },
+      { name: "Dismissal or Termination", active: true },
+    ]);
+  });
 });

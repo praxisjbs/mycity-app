@@ -21,6 +21,7 @@ function readerOf(scope, user) {
   return {
     all: Boolean(user && user.is_ceo === true) || Boolean(scope && scope.scope === "all"),
     user_id: user ? user.user_id : null,
+    employee_id: (user && user.employee_id) || null,
   };
 }
 

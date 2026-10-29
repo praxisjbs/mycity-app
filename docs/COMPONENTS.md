@@ -4353,9 +4353,9 @@ A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a 
 | `name` | `string` | yes | The file's name, as the person uploaded it. |
 | `mime` | `string` | yes | Its type, as the SERVER decided, not as the browser guessed. |
 | `href` | `string` | yes | The file, ready for the browser (a blob URL the app fetched with the session): what Open in Tab and Download open. |
-| `file` | `Blob \| null` |  | A PDF's bytes, for PdfViewer to draw; null while they arrive. |
+| `file` | `Blob \| null` |  | A PDF's bytes, for PdfViewer to draw; null while they arrive. Left out, they are read from `href`. |
 | `sizeBytes` | `number` |  | Its size, for the line under the name. |
-| `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller. |
+| `height` | `"sm" \| "md" \| "lg" \| "page"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller; `page` grows a PDF to its pages (a letter). |
 | `actions` | `ReactNode` |  | What sits beside Open in Tab (Replace, Remove). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -4639,7 +4639,7 @@ A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and des
 |---|---|
 | Use | Reading a PDF someone uploaded or sent: a chat file in the file viewer, a document's preview on My Documents, a mail attachment. |
 | Avoid | A document the product generated and prints (Paper); a photo (ImageViewer); editing or signing a PDF (it only shows one). |
-| Phone | Fills its frame; pages fit the width and scroll, Zoom In and Zoom Out sit at the foot with the page number, each a 44 px target. |
+| Phone | Fills its frame (or, as `page`, grows to its pages so only the screen scrolls); pages fit the width and scroll, Zoom In and Zoom Out sit at the foot with the page number, each a 44 px target. |
 | Accessibility | The pages are one focusable document named by the file and the page in view, scrolled by the keyboard; zoom buttons are named and the page number is announced; a PDF that cannot be opened says so in words. |
 | Status | beta |
 | Exports | `PdfViewer` |
@@ -4654,7 +4654,7 @@ A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and des
 |---|---|---|---|
 | `data` | `Blob \| ArrayBuffer \| Uint8Array \| null` | yes | The PDF's bytes, fetched with the session; null while they arrive. |
 | `name` | `string` | yes | The file's name: the document's accessible name. |
-| `height` | `"sm" \| "md" \| "lg" \| "fill"` |  | A frame of fixed height (`sm`, `md`, `lg`, as DocumentPreview's), or `fill` its parent (the full-screen viewer). |
+| `height` | `"sm" \| "md" \| "lg" \| "fill" \| "page"` |  | A frame of fixed height (`sm`, `md`, `lg`, as DocumentPreview's), `fill` its parent (the full-screen viewer), or `page`: as tall as its pages, for a letter beside a list or in a sheet, so the screen scrolls once rather than a frame scrolling inside it. |
 | `tone` | `"card" \| "deep"` |  | The page area's backdrop: the muted card (`card`), or the viewer's deep green (`deep`). |
 | `onError` | `(reason: "password" \| "invalid") => void` |  | Called when the file cannot be drawn: locked with a password, or damaged. |
 | `className` | `string` |  | Layout classes only (spacing). |
