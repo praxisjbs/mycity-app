@@ -4356,7 +4356,8 @@ A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a 
 | `file` | `Blob \| null` |  | A PDF's bytes, for PdfViewer to draw; null while they arrive. Left out, they are read from `href`. |
 | `sizeBytes` | `number` |  | Its size, for the line under the name. |
 | `height` | `"sm" \| "md" \| "lg" \| "page"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller; `page` grows a PDF to its pages (a letter). |
-| `actions` | `ReactNode` |  | What sits beside Open in Tab (Replace, Remove). |
+| `actions` | `ReactNode` |  | What sits beside Open in Tab, before it (Replace, Remove). |
+| `trailing` | `ReactNode` |  | What closes the bar, after Open in Tab: a record's ⋯ menu. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx

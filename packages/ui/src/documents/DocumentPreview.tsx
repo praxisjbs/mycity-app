@@ -38,8 +38,10 @@ export interface DocumentPreviewProps {
   sizeBytes?: number;
   /** How tall the frame is; `md` unless a sheet wants it shorter or a page taller; `page` grows a PDF to its pages (a letter). */
   height?: "sm" | "md" | "lg" | "page";
-  /** What sits beside Open in Tab (Replace, Remove). */
+  /** What sits beside Open in Tab, before it (Replace, Remove). */
   actions?: ReactNode;
+  /** What closes the bar, after Open in Tab: a record's ⋯ menu. */
+  trailing?: ReactNode;
   /** Layout classes only (spacing). */
   className?: string;
 }
@@ -61,7 +63,7 @@ function useHrefBytes(href: string | null): Blob | null {
   return got && got.href === href ? got.blob : null;
 }
 
-export function DocumentPreview({ name, mime, href, file, sizeBytes, height = "md", actions, className }: DocumentPreviewProps) {
+export function DocumentPreview({ name, mime, href, file, sizeBytes, height = "md", actions, trailing, className }: DocumentPreviewProps) {
   const isPdf = mime === "application/pdf";
   const isImage = mime.startsWith("image/");
   const read = useHrefBytes(isPdf && file === undefined ? href : null);
@@ -83,6 +85,7 @@ export function DocumentPreview({ name, mime, href, file, sizeBytes, height = "m
           Open in Tab
         </a>
       </Button>
+      {trailing}
     </div>
   );
 
