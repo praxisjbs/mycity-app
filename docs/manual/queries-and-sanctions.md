@@ -35,7 +35,8 @@ Queries lists each query you may see, newest first, with its outcome.
 4. Type in the search box to find a query by name, number or subject.
 5. Press a query. It opens over the list, with its status at the top.
 6. The query shows its **Subject**, who raised it (**Raised By**), when (**Raised**), the
-   **Response Due** time, the **Policy** it cites and the employee's **Response**.
+   **Response Due** time, the **Policy** it cites, the employee's **Response** and when they sent it
+   (**Responded**).
 7. A query a rule raised also shows **Counted**: the days or tasks the rule counted. One the
    Attendance policy raised shows **Attendance Policy** under **Raised By**, and the late days it
    counted.

@@ -179,6 +179,7 @@ function QueryCard({ id }: { id: string }) {
           ...(d.evidence.length ? ([["Counted", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),
           ...(d.policy ? ([["Policy", <PolicyCited key="p" policy={d.policy} clause={d.policy_clause} />]] as Array<[string, React.ReactNode]>) : []),
           ...(d.response ? ([["Response", <RichText key="r" blocks={d.response.blocks} top={4} />]] as Array<[string, React.ReactNode]>) : []),
+          ...(d.responded_at ? ([["Responded", formatDateTime(d.responded_at)]] as Array<[string, string]>) : []),
           ...(d.sanction ? ([["Sanction", sanctionLine(d.sanction)]] as Array<[string, string]>) : []),
           ...(d.approval ? ([[<HelpTerm key="w" help={ESCALATED_HELP}>Waiting On</HelpTerm>, d.approval.stage_name]] as Array<[React.ReactNode, string]>) : []),
         ]}
