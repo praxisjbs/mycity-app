@@ -206,7 +206,7 @@ export default function PdfDraw({ data, name, tone, onError, flow }: PdfDrawProp
         aria-label={doc ? `${name}, page ${current} of ${doc.numPages}` : name}
         aria-busy={!doc || undefined}
         onScroll={onScroll}
-        className={cn(flow ? "w-full overflow-x-auto" : "size-full overflow-auto overscroll-contain", "px-3 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring", deep ? "bg-deep" : "bg-muted")}
+        className={cn(flow ? (zoom > 1 ? "w-full overflow-x-auto" : "w-full overflow-x-hidden") : "size-full overflow-auto overscroll-contain", "px-3 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring", deep ? "bg-deep" : "bg-muted")}
       >
         {doc && fit > 0 ? (
           <div className="flex w-max min-w-full flex-col items-center gap-3 pb-14">
