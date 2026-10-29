@@ -473,3 +473,7 @@ real names and never enter this public repository.
   as `decidable` reads it); Edit Template and Activate or Deactivate moved onto the letter's bar;
   the staging chain had two rungs entered by hand, so the seed (all or nothing) entered none: it now
   adds each missing rung by name.
+- 29/10/2026 · GE · Staging's demonstration data is loaded by hand on the server, not by a deploy
+  (`docs/runbooks/deploy.md`): the queries seed had never run there. `48_policies.js` added (two
+  policies for Implementation only) and every seeded query and the rule cite one. To do: run
+  `scripts/db/seed.js --staging` on staging after this merges.

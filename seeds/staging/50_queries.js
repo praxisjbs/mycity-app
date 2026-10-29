@@ -35,6 +35,7 @@ const c = require("@mycity/contract");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
 const { realStaff } = require("./lib/staff");
 const { signatureOf } = require("./lib/signature");
+const { CLAUSES } = require("./48_policies");
 
 const src = (p) => require(path.join(__dirname, "..", "..", "src", p));
 
@@ -63,7 +64,8 @@ const RULE = Object.freeze({
   source_event: "unenrolled_device",
   threshold: 3,
   window_days: 30,
-  policy_clause: "Clock in only from a device registered in My Devices.",
+  policy: "Use of Company Devices",
+  policy_clause: CLAUSES.clockIn,
 });
 
 const RESPONSE =
@@ -82,31 +84,43 @@ const QUERIES = Object.freeze([
   {
     walk: "open",
     subject: "Missed Weekly Field Report",
+    policy: "Code of Conduct",
+    clause: CLAUSES.reports,
     details: "The weekly field report for the week ending last Friday was not submitted, and no reason was given to your manager.",
   },
   {
     walk: "answered",
     subject: "Late Vendor Report",
+    policy: "Code of Conduct",
+    clause: CLAUSES.reports,
     details: "The vendor reconciliation report was due on Monday at 12:00 and reached the team on Wednesday, holding up the month's figures.",
   },
   {
     walk: "closed",
     subject: "Absent From Team Meeting",
+    policy: "Code of Conduct",
+    clause: CLAUSES.meetings,
     details: "You did not attend Tuesday's team meeting at 10:00 and no apology or reason was sent to your manager before or after it.",
   },
   {
     walk: "approved",
     subject: "Unapproved Schedule Change",
+    policy: "Code of Conduct",
+    clause: CLAUSES.plans,
     details: "You changed the agents' visit schedule for the week without your manager's approval, and two partner visits were missed.",
   },
   {
     walk: "fined",
     subject: "Company Phone Misuse",
+    policy: "Use of Company Devices",
+    clause: CLAUSES.devices,
     details: "The company phone assigned to you ran up data charges well above the monthly allowance on downloads unrelated to work.",
   },
   {
     walk: "pending",
     subject: "Unanswered Partner Complaint",
+    policy: "Code of Conduct",
+    clause: CLAUSES.partners,
     details: "A partner's complaint sent to you on Monday was not answered or passed on for three working days, and they escalated it to the CEO.",
   },
 ]);
@@ -119,6 +133,13 @@ async function callerOf(db, person) {
 }
 
 const nameOf = (p) => `${p.first_name} ${p.last_name}`;
+
+/** A policy 48_policies.js published, by its title; null when it is not there (or not in force). */
+async function policyNamed(db, title) {
+  if (!title) return null;
+  const { rows } = await db.query("SELECT policy_id FROM policy WHERE title = $1 AND status = 'active'", [title]);
+  return rows[0] ? rows[0].policy_id : null;
+}
 
 module.exports = async function seed({ pool, actor, log = () => {} }) {
   const queries = src("modules/queries/queries.service");
@@ -149,7 +170,9 @@ module.exports = async function seed({ pool, actor, log = () => {} }) {
   const { rows: had } = await pool.query("SELECT query_rule_id FROM query_rule WHERE code = $1", [code]);
   if (!had.length) {
     const by = (await callerOf(pool, staff.operations)) || actor;
-    const made = await rules.create(by, c.query_rules.QueryRuleCreate.parse(RULE));
+    const { policy, ...rule } = RULE;
+    const policyId = await policyNamed(pool, policy);
+    const made = await rules.create(by, c.query_rules.QueryRuleCreate.parse(policyId ? { ...rule, policy_id: policyId } : { ...rule, policy_clause: undefined }));
     if (rules.countable(RULE.source_event)) await rules.activate(by, made.query_rule_id);
     log(`queries: rule ${RULE.name} made`);
   }
@@ -182,6 +205,9 @@ module.exports = async function seed({ pool, actor, log = () => {} }) {
   const reader = visibility.readerOf(all, approver);
 
   let added = 0;
+  // The policy each query breaks, published by 48_policies.js: its letter quotes the clause.
+  const cited = {};
+  for (const title of new Set(QUERIES.map((qp) => qp.policy))) cited[title] = await policyNamed(pool, title);
   for (const [n, plan] of QUERIES.entries()) {
     const { lead, caller, person } = pairs[n];
     const { rows: found } = await pool.query(
@@ -197,6 +223,7 @@ module.exports = async function seed({ pool, actor, log = () => {} }) {
           employee_id: person.employee_id,
           subject: plan.subject,
           details: plan.details,
+          ...(cited[plan.policy] ? { policy_id: cited[plan.policy], policy_clause: plan.clause } : {}),
           signature: signatureOf(nameOf(lead)),
         }),
       );
