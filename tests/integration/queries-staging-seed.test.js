@@ -21,6 +21,7 @@ const workingWeek = require("../../src/shared/time/working-week");
 const realtime = require("../../src/services/realtime/emitter");
 const chromium = require("../../src/services/pdf/chromium");
 const staffSeed = require("../../seeds/staging/10_staff");
+const policiesSeed = require("../../seeds/staging/48_policies");
 const seed = require("../../seeds/staging/50_queries");
 const { realStaff } = require("../../seeds/staging/lib/staff");
 const { atomically } = require("../../src/shared/db/tx");
@@ -50,7 +51,7 @@ async function settle() {
   }
 }
 
-const TABLES = ["consequence_step", "query_rule", "employee_query", "query_response", "sanction", "sanction_fine"];
+const TABLES = ["policy", "policy_version", "consequence_step", "query_rule", "employee_query", "query_response", "sanction", "sanction_fine"];
 async function counts() {
   const out = {};
   for (const table of TABLES) out[table] = (await q(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n;
@@ -87,9 +88,11 @@ describeDb("Queries & Sanctions' staging seed against the real migrations", () =
       }
     }
     await runFile(staffSeed);
+    await runFile(policiesSeed, logs);
     await runFile(seed, logs);
     await settle();
     first = await counts();
+    await runFile(policiesSeed, logs);
     await runFile(seed, logs);
     await settle();
     second = await counts();
@@ -156,6 +159,35 @@ describeDb("Queries & Sanctions' staging seed against the real migrations", () =
     }
     expect(rows[1].amount).toBe("5000.00");
     expect(rows[2].signed_by).toBeNull();
+  });
+
+  test("two policies in force for Implementation only; every query and the rule cite one, and the letter quotes it", async () => {
+    expect(logs.filter((m) => m.startsWith("policies:") && m.includes("stopped"))).toEqual([]);
+    const { rows: pols } = await q(
+      `SELECT p.title, v.version, v.effective_from, v.applies_to_everyone,
+              (SELECT array_agg(d.name) FROM policy_audience pa JOIN department d ON d.department_id = pa.department_id
+                WHERE pa.policy_version_id = v.policy_version_id) AS departments
+         FROM policy p JOIN policy_version v ON v.policy_id = p.policy_id AND v.status = 'published'
+        ORDER BY p.title`,
+    );
+    expect(pols.map((p) => [p.title, Number(p.version), p.applies_to_everyone, p.departments])).toEqual([
+      ["Code of Conduct", 1, false, ["Implementation"]],
+      ["Use of Company Devices", 1, false, ["Implementation"]],
+    ]);
+    const { rows: cites } = await q(
+      `SELECT q.subject, p.title, q.policy_clause FROM employee_query q
+         JOIN policy_version v ON v.policy_version_id = q.policy_version_id JOIN policy p ON p.policy_id = v.policy_id`,
+    );
+    expect(cites).toHaveLength(6);
+    expect(Object.fromEntries(cites.map((r) => [r.subject, r.title]))["Company Phone Misuse"]).toBe("Use of Company Devices");
+    expect(cites.every((r) => policiesSeed.POLICIES.some((p) => p.body_html.includes(r.policy_clause)))).toBe(true);
+    const rule = (await q("SELECT p.title, r.policy_clause FROM query_rule r JOIN policy p ON p.policy_id = r.policy_id")).rows;
+    expect(rule).toEqual([{ title: "Use of Company Devices", policy_clause: policiesSeed.CLAUSES.clockIn }]);
+    const { rows: letter } = await q(
+      `SELECT d.render_html FROM employee_query q JOIN document d ON d.document_id = q.letter_document_id
+        WHERE q.subject = 'Missed Weekly Field Report'`,
+    );
+    if (letter[0] && letter[0].render_html) expect(letter[0].render_html).toContain(`This is against our Code of Conduct`);
   });
 
   test("a second run adds nothing", () => {

@@ -563,10 +563,14 @@ or tier 2.**
   300 characters) that the rule's query letters quote (§6.3).
 - **Settled 27/10/2026 (GE).** Staging's seed carries the five rungs, a rule, and demo queries and
   sanctions. Built in `seeds/staging/50_queries.js`: the five rungs when the chain is empty, the
-  Unregistered Device rule switched on, and six queries on the Implementation department's people
+  Unregistered Device rule switched on (citing Use of Company Devices), and six queries on the
+  Implementation department's people
   only (the JBS Praxis team's accounts, never MyCity's staff: staging sends real mail; TB,
   27/10/2026), each raised and signed by the person's line manager, one at each stage, two sanctions Management proposed and Operations & People approved and
-  signed (one with a fine), one waiting on them.
+  signed (one with a fine), one waiting on them. Each query cites a clause of a policy that
+  `seeds/staging/48_policies.js` publishes first (Code of Conduct, Use of Company Devices; in force
+  from the day it runs, for the Implementation department only, so MyCity's staff are never told), so
+  its letter quotes it. The missing rungs are added by name (29/10/2026).
 
 ## 14 · Change log
 
@@ -589,7 +593,9 @@ or tier 2.**
   onto the letter's bar, beside Download PDF (GE, 29/10/2026). Issue Sanction offered only answered
   queries, so one past its 24 hours unanswered (decidable all the same) never showed: its picker
   lists `ready=true` now. The staging seed adds each missing rung of the chain by name, so a chain
-  entered in part on staging is filled in; a retired rung is not brought back.
+  entered in part on staging is filled in; a retired rung is not brought back. Staging's seed gains
+  two policies (`48_policies.js`) that its queries and rule cite. It is run by hand on the server
+  (`docs/runbooks/deploy.md`), not by a deploy.
 - 27/10/2026 · GE · My Signature (handoff §9, S2; §6.9): drawn once on Letter Templates' Edit
   Signature, kept through the vault (`letter_signature`, migration `3050`); Raise a Query's and
   Approve Sanction's pads open with it.
