@@ -126,6 +126,12 @@ const ACTIONS = Object.freeze([
     need: ["settings", "create"],
     words: ["public holiday", "add holiday", "holiday", "day off for everyone"],
   }),
+  a("new_flow", "New Flow", {
+    screen: "settings.approvals",
+    params: { action: "new" },
+    need: ["settings", "create"],
+    words: ["approval flow", "add flow", "create flow", "new approval", "approval route", "who approves", "approval stages"],
+  }),
   a("new_rule", "New Rule", {
     screen: "home.alerts",
     params: { action: "new" },

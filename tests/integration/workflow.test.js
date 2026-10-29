@@ -308,6 +308,125 @@ describeDb("approvals against the real migrations", () => {
     expect(rows[0].payload).toMatchObject({ key: "leave.approval", from_version: 1, version: 2 });
   });
 
+  describe("making a flow on screen", () => {
+    const ceoStage = { key: "ceo", name: "CEO", approvers: [{ type: "ceo" }], condition: [], sla_hours: 72, on_timeout: "escalate", on_approve: "next", on_reject: "reject" };
+    const body = (patch = {}) => ({
+      name: "Petty Cash",
+      module_key: "people",
+      description: "The CEO decides every top-up.",
+      context_types: { amount: "money" },
+      stages: [ceoStage],
+      ...patch,
+    });
+
+    test("saves version 1 under its module and name, listed as not used yet", async () => {
+      expect((await as("staff").post("/settings/approvals", body())).status).toBe(403);
+      expect((await as("manager").post("/settings/approvals", body())).status).toBe(403);
+
+      const res = await as("ops").post("/settings/approvals", body());
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({
+        key: "people.petty_cash",
+        version: 1,
+        module_key: "people",
+        name: "Petty Cash",
+        context_types: { amount: "money" },
+        open_requests: 0,
+        problems: [],
+        used: false,
+      });
+      expect(res.body.stages[0]).toMatchObject({ key: "ceo", approvers: [{ type: "ceo", label: "CEO" }] });
+
+      const listed = (await flowsOf("ops")).find((f) => f.key === "people.petty_cash");
+      expect(listed).toMatchObject({ used: false, version: 1 });
+      expect((await flowsOf("ops")).find((f) => f.key === "leave.approval").used).toBe(true);
+      expect((await as("ops").get("/settings/approvals/summary")).body.needs_fixing).toBe(
+        (await flowsOf("ops")).filter((f) => f.problems.length).length,
+      );
+
+      const { rows } = await q(
+        "SELECT payload FROM event_log WHERE event_key = 'workflow.definition_created' ORDER BY created_at DESC LIMIT 1",
+      );
+      expect(rows[0].payload).toMatchObject({ key: "people.petty_cash", version: 1, module_key: "people" });
+    });
+
+    test("is used once a module opens it, with the values it declares", async () => {
+      await as("ops").post("/settings/approvals", body({ name: "Site Hire" }));
+      const open = (context) =>
+        tx((client) =>
+          engine.openInstance(client, {
+            definition_key: "people.site_hire",
+            entity: { type: "site_hire", id: crypto.randomUUID() },
+            subject_employee_id: people.staff.employee.employee_id,
+            context,
+            actor: people.staff.user,
+          }),
+        );
+      await expect(open({})).rejects.toThrow(/amount/);
+      const instance = await open({ amount: "250000.00" });
+      expect(instance).toMatchObject({ definition_key: "people.site_hire", state: "pending", current_stage: "ceo" });
+      const flow = (await flowsOf("ops")).find((f) => f.key === "people.site_hire");
+      expect(flow).toMatchObject({ open_requests: 1, used: true });
+    });
+
+    test("a name already a flow, shipped or made, is refused on the name", async () => {
+      expect((await as("ops").post("/settings/approvals", body())).status).toBe(422);
+      const again = await as("ops").post("/settings/approvals", body({ name: "petty  cash" }));
+      expect(again.status).toBe(422);
+      expect(again.body.error.fields.name).toEqual(["Name already used"]);
+      const sym = await as("ops").post("/settings/approvals", body({ name: "???" }));
+      expect(sym.body.error.fields.name).toEqual(["Use letters"]);
+    });
+
+    test("two made at once leave one flow, version 1", async () => {
+      const [a, b] = await Promise.all([
+        as("ops").post("/settings/approvals", body({ name: "Race Flow" })),
+        as("admin").post("/settings/approvals", body({ name: "Race Flow" })),
+      ]);
+      expect([a.status, b.status].sort()).toEqual([201, 422]);
+      const { rows } = await q("SELECT version FROM workflow_definition WHERE key = 'people.race_flow'");
+      expect(rows).toEqual([{ version: 1 }]);
+    });
+
+    test("a route the engine would refuse is refused in the words of its stages", async () => {
+      const noRole = await as("ops").post(
+        "/settings/approvals",
+        body({ name: "Bad Role", stages: [{ ...ceoStage, name: "Finance", approvers: [{ type: "role", value: "no_such_role" }] }] }),
+      );
+      expect(noRole.status).toBe(422);
+      expect(noRole.body.error.fields.stages).toEqual(["Finance: a role it names no longer exists"]);
+
+      const undeclared = await as("ops").post(
+        "/settings/approvals",
+        body({ name: "Bad Rule", stages: [{ ...ceoStage, name: "Finance", condition: [{ field: "days", op: ">", value: 5 }] }] }),
+      );
+      expect(undeclared.body.error.fields.stages).toEqual(["Finance: its condition does not fit these requests"]);
+
+      const named = await as("ops").post(
+        "/settings/approvals",
+        body({ name: "Bad Named", stages: [{ ...ceoStage, name: "Reviewer", approvers: [{ type: "employee_in_context", value: "reviewer_id" }] }] }),
+      );
+      expect(named.body.error.fields.stages).toEqual(["Reviewer: pick who decides"]);
+
+      const auto = await as("ops").post(
+        "/settings/approvals",
+        body({ name: "Bad Money", stages: [{ ...ceoStage, name: "Finance", on_timeout: "auto_approve" }] }),
+      );
+      expect(auto.status).toBe(422);
+      const none = await as("ops").post("/settings/approvals", body({ name: "No Module", module_key: "no_such_module" }));
+      expect(none.body.error.fields.module_key).toEqual(["Pick a module"]);
+      expect((await flowsOf("ops")).some((f) => /bad_|no_module/.test(f.key))).toBe(false);
+    });
+
+    test("its stages are edited like any other flow's, as the next version", async () => {
+      const made = (await as("ops").post("/settings/approvals", body({ name: "Edit Me" }))).body;
+      const stages = [{ ...ceoStage, approvers: [{ type: "manager_of_subject" }] }, ceoStage].map((s, i) => ({ ...s, key: i ? "ceo" : "manager", name: i ? "CEO" : "Line Manager" }));
+      const saved = await as("ops").put(`/settings/approvals/${made.workflow_definition_id}/steps`, { stages });
+      expect(saved.status).toBe(200);
+      expect(saved.body).toMatchObject({ key: "people.edit_me", version: 2, used: false });
+    });
+  });
+
   test("Operations & People reassign a waiting stage to someone who approves these", async () => {
     const { workflow_instance_id: id } = await openLeave("staff", 3);
     const to = (who) => ({ user_id: people[who].user.user_id, reason: "Kemi is on leave this week" });

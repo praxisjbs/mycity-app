@@ -33,6 +33,9 @@
  * M3 adds `queries.consequence` (docs/guides/queries.md §6.5, seeded in 3190): a proposed
  * sanction, Operations & People, then the CEO from the fourth rung.
  *
+ * A person may also make a flow on screen (Settings, Approvals, New Flow; keyFor, keyTaken). It is
+ * stored like any other and opens only once a module's service calls openInstance with its key.
+ *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
  *                        context_types jsonb, stages jsonb, active, created_by, created_at;
@@ -296,6 +299,38 @@ function getDefault(key) {
 }
 
 /**
+ * The key of a flow made on screen: its module and its name in snake_case
+ * (`expenses.petty_cash`). Null when the name has no letter or digit to make one from.
+ */
+function keyFor(module, name) {
+  const slug = String(name || "")
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40)
+    .replace(/_+$/, "");
+  if (!slug) return null;
+  return `${module}.${/^[a-z]/.test(slug) ? slug : `flow_${slug}`}`;
+}
+
+/**
+ * Is the key already a flow: shipped in DEFAULTS, or stored in any version? Takes the key's lock
+ * first (the one saveVersion takes), so two people making the same flow at once cannot both pass.
+ * @param {import("pg").PoolClient} client  inside atomically()
+ */
+async function keyTaken(client, key) {
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtext('workflow_definition:' || $1))",
+    [key],
+  );
+  if (getDefault(key)) return true;
+  const { rows } = await client.query("SELECT 1 FROM workflow_definition WHERE key = $1 LIMIT 1", [key]);
+  return rows.length > 0;
+}
+
+/**
  * Approvals decided only on their own record, never from My Approvals: deciding them keeps
  * something the engine does not (a sanction's signature, docs/guides/queries.md §6.4), so the
  * generic routes refuse them and the request links to the record instead.
@@ -411,6 +446,8 @@ async function ensureActive(client, key) {
 module.exports = {
   DEFAULTS,
   getDefault,
+  keyFor,
+  keyTaken,
   decidedOnRecord,
   problemsOf,
   assertValid,

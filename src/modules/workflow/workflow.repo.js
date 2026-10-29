@@ -29,6 +29,7 @@ function listFlows(client, query) {
             d.context_types, d.stages, d.created_at, ${NAME("ce")} AS created_by_name,
             (SELECT count(*)::int FROM workflow_instance i
               WHERE i.definition_key = d.key::text AND i.state = 'pending') AS open_requests,
+            EXISTS (SELECT 1 FROM workflow_instance i WHERE i.definition_key = d.key::text) AS ever_opened,
             ${TOTAL_COL}
        FROM workflow_definition d
        LEFT JOIN app_user cu ON cu.user_id = d.created_by
@@ -49,7 +50,8 @@ async function flowById(client, id) {
     `SELECT d.workflow_definition_id, d.key::text AS key, d.version, d.module_key, d.name, d.description,
             d.context_types, d.stages, d.active, d.created_at, ${NAME("ce")} AS created_by_name,
             (SELECT count(*)::int FROM workflow_instance i
-              WHERE i.definition_key = d.key::text AND i.state = 'pending') AS open_requests
+              WHERE i.definition_key = d.key::text AND i.state = 'pending') AS open_requests,
+            EXISTS (SELECT 1 FROM workflow_instance i WHERE i.definition_key = d.key::text) AS ever_opened
        FROM workflow_definition d
        LEFT JOIN app_user cu ON cu.user_id = d.created_by
        LEFT JOIN employee ce ON ce.employee_id = cu.employee_id
