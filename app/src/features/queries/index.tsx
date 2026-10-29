@@ -20,7 +20,7 @@ import { useScreenAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
-  ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, DetailPane, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
+  ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
   DocumentPreview, KeyValue, PdfViewer, ListDetail, LoadingRows, Pager, RecordPicker, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
 } from "@mycity/ui";
 
@@ -78,10 +78,12 @@ function QueriesTab({ id }: { id: string | null }) {
   const [raised, setRaised] = useState<"all" | "mine">("all");
   const s = useApi("GET /api/v1/queries/summary");
   const list = usePaged("GET /api/v1/queries", { filters: raised === "mine" ? { raised: "mine" } : {}, sort: "-created_at" });
-  // A query the address names opens at once; on desktop the newest shows unasked, on a phone nothing does (F31).
-  const [sel, setSel] = useState<string | null>(id);
-  useEffect(() => setSel(id), [id]);
-  const focus = sel ?? (phone ? null : (list.rows[0]?.employee_query_id ?? null));
+  // A query opens in its sheet when its row is pressed, or at once when the address names it.
+  const openQuery = useQuerySheet();
+  useEffect(() => {
+    if (id) openQuery(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
   const top = Math.max(1, ...(s.data?.by_reason ?? []).map((r) => r.count));
   return (
     <>
@@ -114,7 +116,7 @@ function QueriesTab({ id }: { id: string | null }) {
         rowKey={(q) => q.employee_query_id}
         noun="query"
         nounPlural="queries"
-        onRowClick={(q) => setSel(q.employee_query_id)}
+        onRowClick={(q) => openQuery(q.employee_query_id)}
         wide
         empty={{ title: "No Queries", text: "Queries you raise appear here." }}
         columns={[
@@ -124,15 +126,14 @@ function QueriesTab({ id }: { id: string | null }) {
           { key: "b", label: "Raised By", render: (q) => q.raised_by_name ?? q.rule_name ?? "Rule", desktop: true },
           { key: "d", label: "Raised", render: (q) => formatDate(q.created_at) },
           { key: "r", label: "Response", render: (q) => (q.responded_at ? formatDate(q.responded_at) : "Not yet"), desktop: true },
-          { key: "st", label: "Status", render: (q) => <StatusPill s={queryStatus(q)} /> },
         ]}
       />
-      <Grid cols={2} className="mt-3">
-        <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Query">
-          {focus ? <QueryCard id={focus} /> : <Card><EmptyState bare icon="doc" title="No Query Open" text="Pick a query to see it here." /></Card>}
-        </DetailPane>
-        {phone ? null : s.data ? <BarsCard title="Queries by Reason" rows={s.data.by_reason.map((r) => ({ label: r.label, pct: Math.round((r.count / top) * 100), value: String(r.count) }))} /> : <Card><LoadingRows /></Card>}
-      </Grid>
+      {/* Below the list on a computer; a phone leaves it off (guide §10.2). */}
+      {!phone && s.data && (
+        <div className="mt-3">
+          <BarsCard title="Queries by Reason" rows={s.data.by_reason.map((r) => ({ label: r.label, pct: Math.round((r.count / top) * 100), value: String(r.count) }))} />
+        </div>
+      )}
     </>
   );
 }
@@ -144,12 +145,18 @@ function sanctionLine(s: NonNullable<QueryDetail["sanction"]>) {
   return `${s.step_name}${s.number ? `, ${s.number}` : ""}`;
 }
 
+/** Opens a query in its sheet, replacing whatever sheet is open (Sanctions' Open Query too). */
+function useQuerySheet() {
+  const modal = useModal();
+  return (id: string) => modal.open({ title: "Query", wide: true, body: <QueryCard id={id} /> });
+}
+
 function QueryCard({ id }: { id: string }) {
   const modal = useModal();
   const q = useApi("GET /api/v1/queries/:id", { params: { id } });
   const remind = useMutation("POST /api/v1/queries/:id/remind");
-  if (q.error) return <Card><ErrorState error={q.error} onRetry={q.reload} /></Card>;
-  if (!q.data) return <Card><LoadingRows /></Card>;
+  if (q.error) return <ErrorState error={q.error} onRetry={q.reload} />;
+  if (!q.data) return <LoadingRows />;
   const d = q.data;
   // A sanction settles after the approval commits (the worker issues it): read the card again then.
   const settled = () => {
@@ -162,7 +169,7 @@ function QueryCard({ id }: { id: string }) {
     toast(`Reminder sent to ${d.employee.display_name}`);
   };
   return (
-    <Card>
+    <>
       <CardHeader record title={`${d.number} · ${d.employee.display_name}`} right={<StatusPill s={queryStatus(d)} />} />
       <KeyValue
         items={[
@@ -190,7 +197,7 @@ function QueryCard({ id }: { id: string }) {
         )}
         </div>
       </ActionGroup>
-    </Card>
+    </>
   );
 }
 
@@ -707,17 +714,56 @@ function Sanctions() {
         noun="sanction"
         wide
         empty={{ title: "No Sanctions", text: "Sanctions follow a query's decision." }}
+        // The reason, who decided, the fine and the letters are on the sanction's sheet.
+        onRowClick={(x) => modal.open({ title: "Sanction", wide: true, body: <SanctionSheet id={x.sanction_id} /> })}
         columns={[
           { key: "e", label: "Employee", render: (x) => person(x.employee) },
           { key: "k", label: "Sanction", render: (x) => x.step_name },
           { key: "q", label: "Query", render: (x) => x.query_number, desktop: true },
-          { key: "r", label: "Reason", render: (x) => x.reason },
-          { key: "b", label: "Decided By", render: (x) => x.decided_by_name ?? "", desktop: true },
-          { key: "d", label: "Date", render: (x) => formatDate(x.effective_on) },
-          { key: "m", label: "Fine", align: "n", render: (x) => (x.fine ? <Money value={x.fine.amount_ngn} /> : "None") },
+          { key: "d", label: "Date", render: (x) => formatDate(x.effective_on), desktop: true },
           { key: "s", label: "Status", render: (x) => <StatusPill s={sanctionStatus(x)} /> },
         ]}
       />
+    </>
+  );
+}
+
+const FINE_STATUS: Record<NonNullable<Sanction["fine"]>["settlement_status"], string> = {
+  pending: "Waiting for Payroll", accepted: "Accepted by Payroll", rejected: "Refused by Payroll", settled: "Deducted", waived: "Waived",
+};
+
+/** One sanction in full: what, why, who decided, the fine and its letters. */
+function SanctionSheet({ id }: { id: string }) {
+  const modal = useModal();
+  const openQuery = useQuerySheet();
+  const s = useApi("GET /api/v1/sanctions/:id", { params: { id } });
+  if (s.error) return <ErrorState error={s.error} onRetry={s.reload} />;
+  if (!s.data) return <LoadingRows />;
+  const d = s.data;
+  const letter = (docId: string, name: string) => modal.open({ title: name, wide: true, body: <LetterFile documentId={docId} name={name} /> });
+  return (
+    <>
+      <CardHeader record title={`${d.step_name} · ${d.employee.display_name}`} right={<StatusPill s={sanctionStatus(d)} />} />
+      <KeyValue
+        items={[
+          ["Number", d.number ?? "Not yet"],
+          ["Query", d.query_number],
+          ["Reason", d.reason],
+          ["Decided By", d.decided_by_name ?? ""],
+          ...(d.waiting_on ? ([[<HelpTerm key="w" help={ESCALATED_HELP}>Waiting On</HelpTerm>, d.waiting_on]] as Array<[React.ReactNode, string]>) : []),
+          ["From", formatDate(d.effective_on)],
+          ...(d.ends_on ? ([["Until", formatDate(d.ends_on)]] as Array<[string, string]>) : []),
+          ["Fine", d.fine ? <span key="f"><Money value={d.fine.amount_ngn} />, {FINE_STATUS[d.fine.settlement_status]}</span> : "None"],
+          ...(d.evidence.length ? ([["Evidence", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),
+        ]}
+      />
+      <ActionGroup>
+        <div className="mt-3.5 flex flex-wrap gap-2">
+          {d.letter_document_id && <Button icon="doc" onClick={() => letter(d.letter_document_id!, d.number ?? d.step_name)}>View Letter</Button>}
+          {d.fine_letter_document_id && <Button icon="doc" onClick={() => letter(d.fine_letter_document_id!, `${d.number ?? d.step_name} Deduction`)}>Deduction Letter</Button>}
+          <Button onClick={() => openQuery(d.employee_query_id)}>Open Query</Button>
+        </div>
+      </ActionGroup>
     </>
   );
 }

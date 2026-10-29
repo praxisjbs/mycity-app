@@ -33,7 +33,7 @@ Queries lists each query you may see, newest first, with its outcome.
    **Escalated**. A phone shows the first two.
 3. Press **All Queries** to see every query you may see, or **Raised by Me** for your own.
 4. Type in the search box to find a query by name, number or subject.
-5. Press a query. On a computer it opens beside the list; on a phone it opens over it.
+5. Press a query. It opens over the list, with its status at the top.
 6. The query shows its **Subject**, who raised it (**Raised By**), when (**Raised**), the
    **Response Due** time, the **Policy** it cites and the employee's **Response**.
 7. A query a rule raised also shows **Counted**: the days or tasks the rule counted. One the
@@ -50,8 +50,8 @@ Queries lists each query you may see, newest first, with its outcome.
 | **Closed, No Action** | It was closed without a sanction |
 | **Sanctioned** | It ended in a sanction |
 
-On a computer, **Queries by Reason** shows how many queries each rule raised, and how many people
-raised.
+On a computer, **Queries by Reason**, under the list, shows how many queries each rule raised, and
+how many people raised.
 
 ### Raise a query {#queries-raise needs="queries create"}
 
@@ -231,9 +231,14 @@ Sanctions lists each sanction, and holds MyCity's ladder of steps.
 1. Open [Queries & Sanctions · Sanctions](/queries?tab=sanctions).
 2. The tiles show the **Active Sanctions**, those **Awaiting Approval**, the **Fines, This Year**
    and the **Fines Recovered**.
-3. **Sanction History** lists each one: **Employee**, **Sanction**, **Query**, **Reason**,
-   **Decided By**, **Date**, **Fine** and **Status**.
+3. **Sanction History** lists each one: **Employee**, **Sanction**, **Query**, **Date** and
+   **Status**.
 4. Type in the search box to find a person or a reason.
+5. Press a sanction to open it: its **Number**, the **Query**, the **Reason**, who **Decided By**,
+   the dates it runs **From** and **Until**, any **Fine** and where Payroll stands with it, and any
+   **Evidence**.
+6. Press **View Letter** for its letter, **Deduction Letter** for a fine's, or **Open Query** for the
+   query it follows.
 
 | Status | What it means |
 |---|---|

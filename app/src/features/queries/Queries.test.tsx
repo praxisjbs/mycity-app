@@ -192,4 +192,16 @@ describe("Queries & Sanctions · Issue Sanction", () => {
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeTruthy();
     expect(window.location.search).not.toContain("tab=queries");
   }, 30000);
+
+  it("opens a sanction's details in a sheet: why, who decided, the fine and the query", async () => {
+    await signedInAs("cynthia@mycityapp.io", "sanctions");
+    const table = await screen.findByRole("table");
+    // The list keeps its few columns; the reason waits on the sheet.
+    expect(within(table).queryByText("Reason")).toBeNull();
+    fireEvent.click(within(table).getAllByRole("row")[1]!);
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("Reason")).toBeTruthy();
+    expect(within(dialog).getByText("Decided By")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Open Query" })).toBeTruthy();
+  }, 30000);
 });
