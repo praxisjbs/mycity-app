@@ -105,19 +105,20 @@ describeDb("access, settings and audit against the real migrations", () => {
     rules.reset();
     ({ app } = buildApp({ strict: true, accessLog: false }));
 
-    const sample = (first, last, email, job) => ({
+    // The CEO sits in General Management, whose people hold the plan's capabilities (performance.md P27).
+    const sample = (first, last, email, job, department = "HR & Operations") => ({
       first_name: first,
       last_name: last,
       work_email: email,
       phone: "08031234567",
       job_title: job,
-      department_name: "HR & Operations",
+      department_name: department,
       start_date: "2026-01-05",
       employment_type: "full_time",
       work_pattern: "remote",
     });
     const make = (client, who, first, last, email, job, role_code, is_ceo = false) =>
-      createAdmin(client, { employee: sample(first, last, email, job), role_code, is_ceo }, PASSWORD[who], {
+      createAdmin(client, { employee: sample(first, last, email, job, is_ceo ? "General Management" : undefined), role_code, is_ceo }, PASSWORD[who], {
         allowAdditional: true,
       });
     await tx(async (client) => {
@@ -244,7 +245,10 @@ describeDb("access, settings and audit against the real migrations", () => {
         "alerts.clear",
         "alerts.manage",
         "announcements.post",
+        "goals.company",
         "goals.function",
+        "goals.organisation",
+        "goals.view_all",
         "home.reports",
         "home.team",
         "performance.manage",
@@ -267,7 +271,10 @@ describeDb("access, settings and audit against the real migrations", () => {
         "alerts.clear",
         "alerts.manage",
         "announcements.post",
+        "goals.company",
         "goals.function",
+        "goals.organisation",
+        "goals.view_all",
         "home.reports",
         "home.team",
         "performance.manage",

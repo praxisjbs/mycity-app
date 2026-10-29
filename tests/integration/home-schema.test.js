@@ -426,7 +426,7 @@ describeDb("Home schema and reference data against the real migrations", () => {
       const sorted = (codes) => [...codes].sort();
       expect(Object.fromEntries(rows.map((r) => [r.role, r.codes]))).toEqual({
         implementation: sorted([...all, ...goals, "mailbox.signature", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]),
-        operations_people: sorted([...all, "goals.function", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]),
+        operations_people: sorted([...all, "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]),
         management: sorted([...all, "goals.company", "goals.function", "goals.view_all", "workspace.late_reasons"]),
         head_of_department: sorted([...managers, "goals.function"]),
         manager: managers,
@@ -523,7 +523,7 @@ describeDb("Home schema and reference data against the real migrations", () => {
               [role],
             )
           ).rows.map((r) => r.code);
-        expect(await heldBy("operations_people")).toEqual(["alerts.clear", "announcements.post", "goals.function", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]);
+        expect(await heldBy("operations_people")).toEqual(["alerts.clear", "announcements.post", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]);
         expect(await heldBy("manager")).toEqual([]);
         expect(await heldBy("studio_lead")).toEqual(["home.team"]);
         expect(await seededKeysLeft(c)).toEqual([...SEEDED_KEYS].sort());

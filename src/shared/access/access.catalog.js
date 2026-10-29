@@ -294,6 +294,13 @@ const CAPABILITY_CATALOG = [
   },
 ];
 
+/**
+ * What everyone in General Management holds without a role (docs/guides/performance.md P27, §6.25): they read
+ * the whole OKR plan and may share and edit it. General Management is the CEO's department, so the answer
+ * follows the people in it (shared/rbac/grants-cache.js getCapabilities).
+ */
+const GENERAL_MANAGEMENT_CAPABILITIES = Object.freeze(["goals.company", "goals.organisation", "goals.view_all"]);
+
 const CAPABILITIES = CAPABILITY_CATALOG.map((c) => c.code);
 const CAPABILITY_SET = new Set(CAPABILITIES);
 
@@ -310,6 +317,7 @@ module.exports = {
   CAPABILITY_CODE,
   CAPABILITY_CATALOG,
   CAPABILITIES,
+  GENERAL_MANAGEMENT_CAPABILITIES,
   isModule,
   isAction,
   isScope,

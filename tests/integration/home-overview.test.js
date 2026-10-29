@@ -446,23 +446,16 @@ describeDb("Home · Overview against the real migrations", () => {
       ]);
     });
 
-    test("Operations' Goals This Quarter are the goals shared with them, with when each ends (performance.md §6.23)", async () => {
-      // Operations & People read every function's goals, never the organisational goals until the CEO shares them.
-      expect((await at14("ops")).goals).toEqual([]);
-      const goal = await one("SELECT organisational_goal_id FROM organisational_goal WHERE title = 'Reach Three New States'");
-      await q("INSERT INTO goal_share (organisational_goal_id, audience, shared_by) VALUES ($1, 'all', $2)", [goal.organisational_goal_id, users.ceo.user_id]);
-      try {
-        expect((await at14("ops")).goals).toEqual([
-          {
-            title: "Reach Three New States",
-            progress: null,
-            due_on: "2026-12-31",
-            link: expect.stringMatching(/^\/performance\?tab=goals&id=/),
-          },
-        ]);
-      } finally {
-        await q("DELETE FROM goal_share WHERE organisational_goal_id = $1", [goal.organisational_goal_id]);
-      }
+    test("Operations' Goals This Quarter are the organisational goals, with when each ends (performance.md §6.23, P27)", async () => {
+      // Operations & People read the whole plan, so the goals are theirs without the CEO sharing them.
+      expect((await at14("ops")).goals).toEqual([
+        {
+          title: "Reach Three New States",
+          progress: null,
+          due_on: "2026-12-31",
+          link: expect.stringMatching(/^\/performance\?tab=goals&id=/),
+        },
+      ]);
     });
 
     test("Partnerships: the Naira signed each month this year, the agreements the Signed Value card counts", async () => {

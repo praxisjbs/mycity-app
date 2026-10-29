@@ -31,6 +31,7 @@
  *   role_capability role_id, capability_id (migration 0400)
  */
 const { tryClient, rkey } = require("../../config/redis");
+const { GENERAL_MANAGEMENT_CAPABILITIES } = require("../access/access.catalog");
 
 const TTL_S = 30;
 const TEAM_TTL_S = 60;
@@ -168,7 +169,9 @@ function getMaskedFieldKeys(client, userId) {
 
 /**
  * Capability codes the user holds (README §5.2): given to them directly (user_capability,
- * until an optional date), or held by one of their roles ("announcements.post").
+ * until an optional date), held by one of their roles ("announcements.post"), or held by
+ * everyone in General Management, the CEO's department (GENERAL_MANAGEMENT_CAPABILITIES, found
+ * from the CEO's employee record so a rename or a new code of the department changes nothing).
  */
 function getCapabilities(client, userId) {
   if (!userId) return Promise.resolve([]);
@@ -185,8 +188,18 @@ function getCapabilities(client, userId) {
          JOIN capability c ON c.capability_id = rc.capability_id
         WHERE ur.user_id = $1
           AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE)
+       UNION
+       SELECT c.code::text
+         FROM capability c
+        WHERE c.code::text = ANY($2::text[])
+          AND EXISTS (SELECT 1
+                        FROM app_user u
+                        JOIN employee mine ON mine.employee_id = u.employee_id
+                        JOIN app_user boss ON boss.is_ceo
+                        JOIN employee ceo ON ceo.employee_id = boss.employee_id
+                       WHERE u.user_id = $1 AND mine.department_id = ceo.department_id)
         ORDER BY 1`,
-      [userId],
+      [userId, GENERAL_MANAGEMENT_CAPABILITIES],
     );
     return rows.map((r) => r.code);
   });

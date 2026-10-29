@@ -54,7 +54,7 @@ export function me(key: string): Me {
     photo_url: null,
     is_ceo: isCeo,
     grants: grantsFor(key) as Me["grants"],
-    capabilities: capabilitiesOf([role.code], isCeo),
+    capabilities: capabilitiesOf([role.code], isCeo, p.department === byKey("ifeoma")?.department),
     roles: [role],
     home_view: SIGN_INS[key]?.view ?? "staff",
     manages_people: teamOf(key).length > 0,

@@ -32,8 +32,9 @@ Goals, or tap it, to see the quarter's own.
 ## Goals {#performance-goals screen=performance/goals icon=target}
 
 Goals is the quarter's plan, from the year's organisational goals down to each function's key
-results. You read your own department's part of it, and anything the CEO or Management has shared
-with you. The CEO and Management read all of it.
+results. You read your own department's part of it, and anything shared with you. The CEO,
+Management, Operations and People, the Implementation Team and everyone in General Management read
+all of it.
 
 ![Performance, Goals](shot:performance-goals)
 
@@ -43,7 +44,7 @@ with you. The CEO and Management read all of it.
    title on a computer.
 2. Choose the **Quarter**, and the **Function**: **All Functions**, **Company** or one function.
    **Function** lists what you may read, and is left off when that is one function.
-3. The first tile is the **Company Score** for the CEO and Management, and the **Function Score**
+3. The first tile is the **Company Score** for whoever reads the whole plan, and the **Function Score**
    for everyone else. **Scoring Good** counts key results scoring **Good** in their latest month.
    **In Recovery** counts those scoring **Recovery**. **Awaiting Report** counts those never
    reported. All of them count what you read.
@@ -125,7 +126,8 @@ The panel shows what the key result is and how its latest month went:
 
 ### Record an organisational goal {#performance-goals-org needs="performance create, cap goals.organisation"}
 
-The CEO records the year's organisational goals.
+The CEO, Operations and People, and everyone in General Management record the year's organisational
+goals.
 
 1. Press **New Goal** at the top right of [Performance · Goals](/performance?tab=goals).
 2. Choose **Organisational Goal** in **What**.
@@ -148,8 +150,8 @@ The CEO records the year's organisational goals.
 
 ### Share an organisational goal {#performance-goals-share needs="performance edit, cap goals.organisation"}
 
-The CEO decides who reads an organisational goal. A shared goal is read only: nobody it is shared
-with can change, delete or share it.
+The CEO, Operations and People, and everyone in General Management decide who reads an organisational
+goal. A shared goal is read only: nobody it is shared with can change, delete or share it.
 
 1. Open [Performance · Goals](/performance?tab=goals) and press the goal under **Organisational
    Goals**.
@@ -170,7 +172,8 @@ Sharing a goal shares nothing else: not the objectives that serve it, and not an
 
 ### Share a company objective {#performance-objective-share needs="performance edit, cap goals.company"}
 
-Management decide who reads a company objective. It is shared with its key results, read only.
+Management, Operations and People, and everyone in General Management decide who reads a company
+objective. It is shared with its key results, read only.
 
 1. On [Performance · Goals](/performance?tab=goals), press the three dots on the company objective's
    card, then **Share Objective**. Or open the objective and press **Share Objective**.
@@ -188,7 +191,8 @@ own company objectives, so share them again each quarter.
 
 ### Set objectives and key results {#performance-goals-set needs="performance create, cap goals.function"}
 
-The CEO and Management set the company's objectives; each function's head sets the function's.
+The CEO, Management, Operations and People, and everyone in General Management set the company's
+objectives; each function's head sets the function's.
 Operations and People and the CEO may set any function's. They can be added and changed while the
 plan is a draft, while it awaits approval, after it comes back, or once the CEO has unbound it (see
 [Ask to change a binding plan](#performance-plan-unbind)). What you add to a plan that awaits
@@ -265,8 +269,11 @@ sent it. The company's plan goes to the CEO alone. Only the CEO's approval makes
    anything that stops it.
 4. Fix each problem in a red bar. An amber bar only warns. **Send Plan** shows once no red bar is
    left.
-5. Press **Send Plan**. The hub says **Plan sent for approval**.
-6. If it comes back, the card reads **Returned** with the reason. Change what was asked and press
+5. Press **Send Plan**. The hub says which stage it went to, such as *Plan sent to Operations & People*.
+6. The card reads **Awaiting Approval**, and its **Approval** row reads *With Operations & People*, or
+   whichever stage has it now. Only that stage's approvers are told and have the plan in **Waiting On
+   You**. The next stage is told when this one approves, so the CEO does not see a plan before then.
+7. If it comes back, the card reads **Returned** with the reason. Change what was asked and press
    **Send Plan** again.
 
 Until the plan is approved you can still add objectives and key results to it, and change them. They
@@ -320,7 +327,8 @@ company's. The CEO does not need to ask.
    objectives and key results as in [Set objectives and key results](#performance-goals-set), and
    change the ones you have.
 7. Press **Send Plan** on the plan card. It goes to the CEO alone. The plan reads **Awaiting
-   Approval**. What you add before they decide joins the plan sent.
+   Approval**, and its **Approval** row reads *With CEO*. What you add before they decide joins the
+   plan sent.
 8. When the CEO approves, the plan reads **Binding** again. If they ask for changes, it reads
    **Unbound** with their reason. Change it and press **Send Plan** again.
 
@@ -1003,7 +1011,7 @@ hand when it started late.
 
 Analytics shows the quarter's figures for the company, or one function. It is open to people who
 manage others, Operations and People, and the CEO. The key result figures count what you read on
-Goals. The **Company Score** is for the CEO and Management alone. Scorecards, check-ins, reviews
+Goals. The **Company Score** is for whoever reads the whole plan. Scorecards, check-ins, reviews
 and commitments count only the people you may see: a manager sees their own team.
 
 ![Performance, Analytics](shot:performance-analytics)
@@ -1013,7 +1021,7 @@ and commitments count only the people you may see: a manager sees their own team
 1. Open [Performance · Analytics](/performance?tab=analytics). Choose the **Quarter** and the
    **Function**. **Function** lists only the functions of the people you can see. With one, it is
    left off.
-2. The tiles show the **Company Score** (the CEO and Management only), and the share of
+2. The tiles show the **Company Score** (for whoever reads the whole plan), and the share of
    **Commitments On Time**, **Check-Ins On Time** and **Reviews Closed On Time**, each with what it
    is out of, such as 10 of 13.
 3. **Scores by Month** shows the company's and each function's score for each month.
@@ -1329,6 +1337,9 @@ as: operations
 do:
   - click: button "New Goal"
   - wait: label "What"
+  - click: label "What"
+  - click: role option "Objective"
+  - wait: label "Function"
 crop: modal
 marks:
   1: label "What" | Objective or key result

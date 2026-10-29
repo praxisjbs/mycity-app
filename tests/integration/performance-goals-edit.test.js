@@ -201,13 +201,13 @@ describeDb("performance goals set and changed on screen, against the real migrat
     ids.extra = extra.body.okr_key_result_id;
 
     // Who may edit: the head for the function, Management for the company; nobody else. And who reads what
-    // (§6.23): the function's people its own objective, Management and the CEO the whole tree, Operations &
-    // People every function's but not the company's.
+    // (§6.23): the function's people its own objective; Management, Operations & People and the CEO the whole
+    // tree, and Operations & People set the company's as Management do (P27).
     const tree = async (who) => (await as(who).get(`/performance/okrs?period_id=${ids.q4}`)).body.data.map((x) => [x.code, x.can_edit]);
     expect(await tree("head")).toEqual([["BM-O1", true]]);
     expect(await tree("pm")).toEqual([["CO-O1", true], ["BM-O1", false]]);
     expect(await tree("ada")).toEqual([["BM-O1", false]]);
-    expect(await tree("ops")).toEqual([["BM-O1", true]]);
+    expect(await tree("ops")).toEqual([["CO-O1", true], ["BM-O1", true]]);
     expect(await tree("ceo")).toEqual([["CO-O1", true], ["BM-O1", true]]);
     expect((await as("other").get(`/performance/objectives/${ids.objective}`)).status).toBe(404);
     expect((await as("ops").get(`/performance/objectives/${ids.objective}`)).body).toMatchObject({ code: "BM-O1", can_edit: true });
@@ -317,7 +317,8 @@ describeDb("performance goals set and changed on screen, against the real migrat
       targets: [{ performance_period_id: ids.q4, target_text: "40,000 users", target_value: "40000" }],
     });
     ids.goal = goal.body.organisational_goal_id;
-    expect((await as("pm").patch(`/performance/goals/${ids.goal}`, { title: "x" })).status).toBe(403);
+    // Whoever holds goals.organisation edits it, which General Management do through the department (P27).
+    expect((await as("other").patch(`/performance/goals/${ids.goal}`, { title: "x" })).status).toBe(403);
     const edited = await as("ceo").patch(`/performance/goals/${ids.goal}`, {
       title: "Grow monthly active users",
       detail: "",
@@ -351,14 +352,13 @@ describeDb("performance goals set and changed on screen, against the real migrat
       expect(r.status).toBe(200);
       return Object.fromEntries(r.body.data.map((f) => [f.name ?? "Company", f.may_set]));
     };
-    // The CEO sets everything; Management the company's; Operations & People every function's;
+    // The CEO sets everything; Management the company's; Operations & People the company's and every function's;
     // a head their own function's; someone with no goals grant nothing.
     expect(await offered("ceo")).toMatchObject({ Company: true, "Branding & Marketing": true, "Technology & Back-office Ops": true });
     expect(await offered("pm")).toMatchObject({ Company: true, "Branding & Marketing": false, "Technology & Back-office Ops": false });
-    // Each reader is told of the functions they read (§6.23): Operations & People every function and not the
-    // company, a head or a member their own function alone.
-    expect(await offered("ops")).toMatchObject({ "Branding & Marketing": true, "Technology & Back-office Ops": true });
-    expect((await offered("ops")).Company).toBeUndefined();
+    // Each reader is told of the functions they read (§6.23): Operations & People the company and every
+    // function, a head or a member their own function alone.
+    expect(await offered("ops")).toMatchObject({ Company: true, "Branding & Marketing": true, "Technology & Back-office Ops": true });
     expect(await offered("head")).toEqual({ "Branding & Marketing": true });
     expect(await offered("other")).toEqual({ "Technology & Back-office Ops": true });
     expect(await offered("ada")).toEqual({ "Branding & Marketing": false });

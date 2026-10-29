@@ -111,6 +111,9 @@ async function newlyReachedLogins(e, client) {
                                            AND (uc.expires_at IS NULL OR uc.expires_at > now()))
                                 OR EXISTS (SELECT 1 FROM role_capability rc JOIN user_role vr ON vr.role_id = rc.role_id
                                             WHERE rc.capability_id = c.capability_id AND vr.user_id = u.user_id)))
+        -- General Management holds the plan through its department (§6.25), the CEO's own.
+        AND NOT EXISTS (SELECT 1 FROM app_user boss JOIN employee ceo ON ceo.employee_id = boss.employee_id
+                         WHERE boss.is_ceo AND ceo.department_id = em.department_id)
       ORDER BY u.user_id`,
     [n.all === true, n.department_ids || [], n.except_department_ids || []],
     { label: "the people a share reaches", ceiling: 5000 },
