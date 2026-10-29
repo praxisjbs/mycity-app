@@ -220,6 +220,15 @@ instead.
    rule has no **Activate** yet: nothing counts missed targets until KPIs do.
 3. To stop it, press **Pause**. A rule that has fired is paused, never deleted.
 
+### Delete a rule {#queries-rules-delete needs="queries edit, cap queries.configure"}
+
+1. Open [Queries & Sanctions · Rules](/queries?tab=rules).
+2. On the card of a rule that has never raised a query, press **Delete Rule**.
+3. Press **Delete Rule** again to confirm. The rule is gone for good.
+
+A rule that has raised a query has no **Delete Rule**: press **Pause** instead, so its queries keep
+their history.
+
 ## Sanctions {#queries-sanctions screen=queries/sanctions icon=flag}
 
 Sanctions lists each sanction, and holds MyCity's ladder of steps.
@@ -312,7 +321,7 @@ A letter **Awaiting Sample** has no wording yet: MyCity has still to send its sa
 
 1. Open [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates) and press the
    template.
-2. Press **Edit Template** on the letter's bar, beside **Download PDF**. The letter opens with its
+2. Press the **⋯** on the letter's bar, beside **Open in Tab**, then **Edit Template**. The letter opens with its
    wording as it is sent.
 3. Change the **Name** if you need to. While no step or rule sends the letter, you can also change
    **Used For**.
@@ -338,8 +347,9 @@ A step chooses its letter on [Chain Settings](#queries-chain), and a rule under 
 ### Switch a letter on or off {#queries-letters-activate needs="queries edit, cap queries.configure"}
 
 1. Press the letter on [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates).
-2. Press **Activate** on the letter's bar for a draft. A letter with no wording cannot be switched on.
-3. Press **Deactivate** for an active letter you no longer use. It goes back to a draft.
+2. Press the **⋯** on the letter's bar, then **Activate** for a draft. A letter with no wording cannot
+   be switched on.
+3. Press the **⋯**, then **Deactivate** for an active letter you no longer use. It goes back to a draft.
 
 | The hub says | Why | What to do |
 |---|---|---|

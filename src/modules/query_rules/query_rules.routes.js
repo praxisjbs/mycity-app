@@ -7,6 +7,7 @@
  *   POST  /                    `queries` create + queries.configure: a draft
  *   PATCH /:id                 `queries` edit + queries.configure
  *   POST  /:id/activate, pause `queries` edit + queries.configure
+ *   DELETE /:id                 `queries` edit + queries.configure; only a rule that never fired
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -44,5 +45,9 @@ route(router, "post", "/:id/activate",
 route(router, "post", "/:id/pause",
   { params: c.common.IdParams, body: c.common.EmptyBody, response: r.QueryRule, summary: "Pause a rule" },
   requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.pause);
+
+route(router, "delete", "/:id",
+  { params: c.common.IdParams, no_content: true, summary: "Delete a rule that never raised a query" },
+  requirePermission("queries", "edit"), requireCapability("queries.configure"), controller.remove);
 
 module.exports = { basePath: "/query-rules", surface: "staff", router };

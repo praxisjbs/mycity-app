@@ -24,4 +24,8 @@ module.exports = {
   update: async (req, res) => ok(res, await service.update(withActor(req), id(req), req.validated.body)),
   activate: async (req, res) => ok(res, await service.activate(withActor(req), id(req))),
   pause: async (req, res) => ok(res, await service.pause(withActor(req), id(req))),
+  remove: async (req, res) => {
+    await service.remove(withActor(req), id(req));
+    res.status(204).end();
+  },
 };

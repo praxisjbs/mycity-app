@@ -11,7 +11,7 @@ import type {
   QueryRuleFiring,
   SanctionDetail,
 } from "@mycity/contract/contract.gen.ts";
-import { at, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid, type Req } from "../core";
+import { at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, refKey } from "../data/people";
 import { blocksOf, citablePolicies, policyCitation } from "./policies";
 
@@ -663,6 +663,17 @@ route("POST /api/v1/query-rules/:id/activate", (req) => {
   Object.assign(r, { state: "active", active: true, activated_at: r.activated_at ?? now() });
   return ok(withFired(r));
 });
+// Only a rule that never raised a query (guide §6.3); one that has is paused instead.
+route("DELETE /api/v1/query-rules/:id", (req) => {
+  const refused = configure(req);
+  if (refused) return refused;
+  const r = ruleOf(req.params.id);
+  if (!r) return notFound();
+  if (withFired(r).has_fired) return fail(409, "RULE_HAS_FIRED", "This rule has raised queries; pause it instead");
+  RULES.splice(RULES.indexOf(r), 1);
+  return noContent();
+});
+
 route("POST /api/v1/query-rules/:id/pause", (req) => {
   const refused = configure(req);
   if (refused) return refused;

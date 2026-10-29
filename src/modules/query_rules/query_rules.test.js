@@ -69,6 +69,6 @@ describe("a rule", () => {
       if (r.method === "GET") expect([r.permission.action, r.capability]).toEqual(["view", null]);
       else expect(r.capability).toBe("queries.configure");
     }
-    expect(routes).toHaveLength(7);
+    expect(routes).toHaveLength(8);
   });
 });

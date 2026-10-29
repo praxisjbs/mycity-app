@@ -26,6 +26,7 @@ const EVENTS = defineEvents("queries", {
   "query_rule.saved": { summary: "A query rule was saved" },
   "query_rule.activated": { summary: "A query rule was switched on" },
   "query_rule.paused": { summary: "A query rule was paused" },
+  "query_rule.deleted": { summary: "A query rule that never fired was deleted" },
   "query_rule.fired": { summary: "A query rule raised a query" },
 });
 

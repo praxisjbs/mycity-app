@@ -143,6 +143,7 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `PATCH /api/v1/query-rules/:id` | `QueryRuleUpdate` → `QueryRule` | `queries` edit, `queries.configure` | | |
 | `POST /api/v1/query-rules/:id/activate` | `EmptyBody` → `QueryRule` | `queries` edit, `queries.configure` | | |
 | `POST /api/v1/query-rules/:id/pause` | `EmptyBody` → `QueryRule` | `queries` edit, `queries.configure` | | |
+| `DELETE /api/v1/query-rules/:id` | → 204 (`no_content`) | `queries` edit, `queries.configure` | | Only a rule that never raised a query; one that has is 409 `RULE_HAS_FIRED` (pause it). Emits `query_rule.deleted` |
 | `GET /api/v1/query-rules/firings` | `QueryRuleFiringListQuery` (`query_rule_id`) → `QueryRuleFiringPage` | `queries` view · scope `all` sees all; else firings whose query the reader may see | yes, 25 | A firing is a rule-raised query |
 | `GET /api/v1/sanctions/summary` | → `SanctionsSummary` | `queries` view · §6.1 | no | |
 | `GET /api/v1/sanctions` | `SanctionListQuery` (`status`, `employee_id`, `consequence_step_id`, `q`, `sort`) → `SanctionPage` | `queries` view · §6.1 | yes, 25 | |
@@ -258,7 +259,8 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 - A draft or paused rule never fires. Activating a rule does not reach back: it counts events from
   its activation onwards. **Edit Rule** changes a rule's name, threshold, window, letter, policy and clause;
   its trigger is fixed once it has fired.
-- A rule may not be deleted once it has fired; it is paused.
+- A rule may not be deleted once it has fired; it is paused. One that never raised a query may be
+  deleted (Delete Rule, after a confirm), and its history goes with it.
 
 ### 6.4 Deciding a query
 
@@ -479,10 +481,10 @@ or tier 2.**
 | Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature; Write With AI (What To Say, Write Draft, the draft, Try Again, Use Draft), reading AI Is Off or AI Limit Reached when it cannot answer | Help on Clause: the line of the policy the letter quotes | Where the signature is kept, the version cited: §6.2 |
 | Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response); Queries by Reason under it; a pressed row opens the query in a sheet (its status pill, subject, raised by (a person, the rule, or Attendance Policy), raised, response due, counted days, response, sanction, and while a sanction waits: its step and who it waits on); Raise a Query (only with `queries` create; also from ⌘K), Send Reminder, View Letter (the PDF the employee received), Record Decision; Approve Sanction (Your Signature at the Operations & People stage) and Reject (Reason) for whoever it waits on; a refused proposal reads "Not Approved" | Help on Escalated (the KPI) and on Waiting On: a sanction is waiting for approval. Help on Response Due: the 24 hour window. Help on Your Signature when approving: it signs the letters | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
 | Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, Evidence (one item a line) for a step that requires it, fine, reason | Help on the next rung: why it is offered. Help on Evidence: the step needs the facts it rests on | The approval route and its thresholds: Settings · Approvals, §6.5 |
-| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status), a page at a time; Recent Firings; New Rule, Edit Rule, Activate, Pause; the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional); an empty state when there are no rules | Help on Policy and on Clause, as the form reads them. Help on What Sets It Off: late arrivals, absences and missing clock-outs are the Attendance Policy's. Help on a draft's trigger nothing counts yet (Missed Target), in place of Activate | Counting after the last query, the dedup key: §6.3 |
+| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status), a page at a time; Recent Firings; New Rule, Edit Rule, Activate, Pause, Delete Rule (only on a rule that never fired, after a confirm); the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional); an empty state when there are no rules | Help on Policy and on Clause, as the form reads them. Help on What Sets It Off: late arrivals, absences and missing clock-outs are the Attendance Policy's. Help on a draft's trigger nothing counts yet (Missed Target), in place of Activate | Counting after the last query, the dedup key: §6.3 |
 | Sanctions | KPI strip; the history (employee, sanction, query, date, status); a pressed row opens the sanction in a sheet (number, query, reason, decided by, waiting on, from, until, fine and its Payroll state, evidence; View Letter, Deduction Letter, Open Query); Issue Sanction (with `queries` edit: Query, a picker of those ready for a decision (`ready=true`), then Record Decision at Sanction), Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
-| Letter Templates | Stat strip; the list (template, used by, status); the selected letter as its PDF, its bar holding Edit Template, Activate or Deactivate, Download PDF and Open in Tab (on paper, the record's words underlined, in the demo build, the actions above it); Edit Signature and New Template in the header; New Template (Name, Used For, Letter; Save Draft, Save and Activate), Edit Template (Name, Used For while nothing sends it, Letter, opening with its wording), Activate on a draft, Deactivate on an active letter | Help on Letter: the names a letter can use. Help on Used For when it is fixed | Versioning, the shipped defaults: §6.7 |
+| Letter Templates | Stat strip; the list (template, used by, status); the selected letter as its PDF, its bar holding Download PDF, a ⋯ menu (Edit Template, Activate or Deactivate) and Open in Tab (on paper, the record's words underlined, in the demo build, the actions above it); Edit Signature and New Template in the header; New Template (Name, Used For, Letter; Save Draft, Save and Activate), Edit Template (Name, Used For while nothing sends it, Letter, opening with its wording), Activate on a draft, Deactivate on an active letter | Help on Letter: the names a letter can use. Help on Used For when it is fixed | Versioning, the shipped defaults: §6.7 |
 | ESS · My Queries | The Queries and Sanctions switch with each one's count; Queries: the list (number, subject, raised, status), the picked query (subject, raised, respond by, what happened, your response, outcome, sanction), View Letter, Respond; Sanctions: the list (sanction, query, reason, date, fine), each opening its letter | Help on Respond By: the 24 hour window | The sanitising, the Markdown kept: §3 step 3 |
 
 ### 10.2 Phone layout
@@ -596,7 +598,11 @@ or tier 2.**
   the list unasked, Queries by Reason sits under the list, the Queries list drops Status (its sheet
   shows it) and Sanction History drops Reason, Decided By and Fine (the sheet holds them). View Letter
   hands the PDF's bytes to the viewer: the security policy (`connect-src 'self'`) refuses a page
-  reading a blob URL back, so the letter drew nothing on staging. Issue Sanction offered only answered
+  reading a blob URL back, so the letter drew nothing on staging.
+- 29/10/2026 · GE · Rules gain Delete Rule for a rule that never raised a query (`DELETE
+  /query-rules/:id`, `query_rule.deleted`); one that has fired is still only paused. On Letter
+  Templates, Edit Template and Activate or Deactivate sit in a ⋯ menu beside Open in Tab. A letter's
+  frame scrolls sideways only once zoomed in. Issue Sanction offered only answered
   queries, so one past its 24 hours unanswered (decidable all the same) never showed: its picker
   lists `ready=true` now. The staging seed adds each missing rung of the chain by name, so a chain
   entered in part on staging is filled in; a retired rung is not brought back. Staging's seed gains

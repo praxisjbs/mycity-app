@@ -20,8 +20,8 @@ import { useScreenAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
-  ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
-  DocumentPreview, KeyValue, PdfViewer, ListDetail, LoadingRows, Pager, RecordPicker, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
+  ActionGroup, Button, Card, IconButton, Menu, CardHeader, ChoiceField, Chips, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
+  DocumentPreview, KeyValue, PdfViewer, ListDetail, LoadingRows, Pager, RecordPicker, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useConfirm, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
 } from "@mycity/ui";
 
 /**
@@ -482,6 +482,19 @@ function Rules() {
   const firings = usePaged("GET /api/v1/query-rules/firings", { sort: "created_at" });
   const activate = useMutation("POST /api/v1/query-rules/:id/activate");
   const pause = useMutation("POST /api/v1/query-rules/:id/pause");
+  const drop = useMutation("DELETE /api/v1/query-rules/:id");
+  const confirm = useConfirm();
+  // Only a rule that never raised a query; one that has keeps its history and is paused (guide §6.3).
+  const remove = async (r: QueryRule) => {
+    if (!(await confirm({ title: "Delete Rule", body: `${r.name} goes for good.`, confirmLabel: "Delete Rule", destructive: true }))) return;
+    try {
+      await drop.run({ params: { id: r.query_rule_id } });
+      invalidate("/api/v1/query-rules");
+      toast(`${r.name} deleted`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not deleted");
+    }
+  };
   const flip = async (r: QueryRule) => {
     try {
       if (r.active) await pause.run({ params: { id: r.query_rule_id }, body: {} });
@@ -513,6 +526,7 @@ function Rules() {
                   <div className="mt-2.5 flex justify-end gap-2">
                     {OFFERED.has(r.source_event) && <Button size="sm" icon="edit" onClick={() => modal.open({ title: "Edit Rule", body: (close) => <RuleForm rule={r} close={close} /> })}>Edit Rule</Button>}
                     {(r.active || COUNTED_NOW.has(r.source_event)) && <Button size="sm" onClick={() => flip(r)}>{r.active ? "Pause" : "Activate"}</Button>}
+                    {!r.has_fired && <Button size="sm" icon="trash" onClick={() => remove(r)}>Delete Rule</Button>}
                   </div>
                 </ActionGroup>
               )}
@@ -907,10 +921,14 @@ function Templates() {
   // The letter's own actions sit on its preview, beside Download PDF.
   const edit = () => shown && modal.open({ title: shown.name, wide: true, body: (close) => <EditTemplate id={shown.letter_template_id} close={close} /> });
   const manage = configure && shown ? (
-    <>
-      <Button size="sm" icon="edit" onClick={edit}>Edit Template</Button>
-      {(shown.status === "draft" || shown.status === "active") && <Button size="sm" onClick={flip}>{shown.status === "active" ? "Deactivate" : "Activate"}</Button>}
-    </>
+    <Menu
+      label="Letter Actions"
+      trigger={(p) => <IconButton {...p} icon="dots" label={`${shown.name} Actions`} size="sm" />}
+      items={[
+        { label: "Edit Template", icon: "edit" as const, onSelect: edit },
+        ...(shown.status === "draft" || shown.status === "active" ? [{ label: shown.status === "active" ? "Deactivate" : "Activate", onSelect: flip }] : []),
+      ]}
+    />
   ) : null;
   const above = (body: ReactNode) => (
     <>
@@ -966,8 +984,8 @@ function Templates() {
               height="page"
               actions={
                 <ActionGroup>
-                  {manage}
                   <Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, `${shown.name}.pdf`)}>Download PDF</Button>
+                  {manage}
                 </ActionGroup>
               }
             />

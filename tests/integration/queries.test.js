@@ -75,6 +75,7 @@ describeDb("queries and sanctions against the real migrations", () => {
       post: (path, body = {}) => auth(request(app).post(`/api/v1${path}`)).send(body),
       put: (path, body = {}) => auth(request(app).put(`/api/v1${path}`)).send(body),
       patch: (path, body = {}) => auth(request(app).patch(`/api/v1${path}`)).send(body),
+      delete: (path) => auth(request(app).delete(`/api/v1${path}`)),
     };
   };
 
@@ -1004,6 +1005,19 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(off.body.state).toBe("paused");
       await strangeDevice("staff", day(-1));
       expect((await evaluate("staff", day(-1))).raised).toEqual([]);
+    });
+
+    test("a rule that never raised a query can be deleted; one that has is paused, never deleted", async () => {
+      expect((await as("ops").delete(`/query-rules/${rules.device}`)).status).toBe(409);
+      const made = await as("ops").post("/query-rules", { name: "Spare Draft", source_event: "overdue_task", threshold: 2, window_days: 7 });
+      expect(made.status).toBe(201);
+      const id = made.body.query_rule_id;
+      expect((await as("manager").delete(`/query-rules/${id}`)).status).toBe(403);
+      expect((await as("ops").delete(`/query-rules/${id}`)).status).toBe(204);
+      expect((await q("SELECT 1 FROM query_rule WHERE query_rule_id = $1", [id])).rows).toHaveLength(0);
+      expect((await as("ops").delete(`/query-rules/${id}`)).status).toBe(404);
+      const audit = (await q("SELECT event_key FROM event_log WHERE entity_id = $1 ORDER BY occurred_at", [id])).rows.map((r) => r.event_key);
+      expect(audit).toContain("query_rule.deleted");
     });
 
     test("an attendance event becomes the evaluation job only for what Rules counts", async () => {
