@@ -1,12 +1,13 @@
-import type { ApprovalFlow, ApprovalStageInput } from "@mycity/contract/contract.gen.ts";
-import { at, fail, invalid, notFound, ok, paged, route, sid } from "../core";
+import type { ApprovalFlow, ApprovalFlowCreate, ApprovalStageInput } from "@mycity/contract/contract.gen.ts";
+import { at, created, fail, invalid, notFound, ok, paged, route, sid } from "../core";
 import { SIGN_INS } from "../data/people";
 
 /**
  * Settings · Approvals on the in-browser mock (laptops and CI only, F12 to F14),
  * in the contract's shapes. The flows are the ones every database holds from the
  * reference seeds: the leave flow (0499) and the consequence review an earlier
- * seed stored before the rules, which the screen lists as needing fixing.
+ * seed stored before the rules, which the screen lists as needing fixing. New Flow
+ * adds one, under its module and name as the API keys it, and it lists as not used yet.
  */
 const editor = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
 
@@ -38,6 +39,7 @@ const FLOWS: ApprovalFlow[] = [
     ],
     open_requests: 2,
     problems: [],
+    used: true,
     created_by_name: null,
     created_at: at(3, "08:00"),
   },
@@ -55,6 +57,7 @@ const FLOWS: ApprovalFlow[] = [
     ],
     open_requests: 0,
     problems: ['key is dotted snake_case, e.g. "expense.approval"', "stage 1 (manager_review): approver type must be one of role, user, manager_of_subject, ceo"],
+    used: false,
     created_by_name: null,
     created_at: at(3, "08:00"),
   },
@@ -68,6 +71,39 @@ route("GET /api/v1/settings/approvals", (req) => {
   const { sort, ...rest } = req.query;
   const rows = sort === "-name" ? [...FLOWS].reverse() : FLOWS;
   return paged(rows, { ...req, query: rest }, { search: (f) => [f.name, f.key, f.description], filters: { module_key: (f, v) => f.module_key === v } });
+});
+
+/** The key the API gives a flow made on screen: its module and its name in snake_case. */
+function keyFor(module: string, name: string): string | null {
+  const slug = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40).replace(/_+$/, "");
+  return slug ? `${module}.${/^[a-z]/.test(slug) ? slug : `flow_${slug}`}` : null;
+}
+
+route("POST /api/v1/settings/approvals", (req) => {
+  if (!editor(req.user!)) return fail(403, "PERMISSION_DENIED", "You need settings create to make approval flows.");
+  const body = req.body as ApprovalFlowCreate;
+  if (!body.module_key) return invalid({ module_key: ["Pick a module"] });
+  const key = keyFor(body.module_key, String(body.name ?? ""));
+  if (!key) return invalid({ name: ["Use letters"] });
+  if (FLOWS.some((f) => f.key === key)) return invalid({ name: ["Name already used"] });
+  if (!body.stages?.length) return invalid({ stages: ["Add a stage"] });
+  const flow: ApprovalFlow = {
+    workflow_definition_id: sid(`flow:${key}:1`),
+    key,
+    version: 1,
+    module_key: body.module_key,
+    name: body.name.trim(),
+    description: body.description ?? null,
+    context_types: body.context_types,
+    stages: body.stages.map((s) => ({ ...s, approvers: s.approvers.map((a) => ({ type: a.type, value: a.value ?? null, label: label(a) })) })),
+    open_requests: 0,
+    problems: [],
+    used: false,
+    created_by_name: "You",
+    created_at: new Date().toISOString(),
+  };
+  FLOWS.push(flow);
+  return created(flow);
 });
 
 route("PUT /api/v1/settings/approvals/:id/steps", (req) => {

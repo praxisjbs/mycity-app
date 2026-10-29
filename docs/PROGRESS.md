@@ -1366,7 +1366,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 97 | Faults | `faults` | M9 | GE | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
-| 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 29/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | LA | ☑ | ☑ | ☑ | Dropped | 20/10/2026 |
 | 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
@@ -1378,6 +1378,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 29/10/2026 · JP · Approvals (#72) gains New Flow (`POST /settings/approvals`, `settings` create, owner's decision): a wizard of Flow (name, module, description), Values (at most 5, each a name and a type) and Stages (built as Edit Stages builds them), saved as version 1 under `<module>.<name>` and listed as Not Used Yet until a module opens it; a flow's detail shows its Key. Edit Stages and New Flow share `features/settings/Stages.tsx`; a Yes or No value is compared with Yes or No, and a stage's comparison starts again when its value changes. ⌘K's New Flow, the mock's route, tests (`workflow.test.js`, `tests/integration/workflow.test.js`, `Approvals.test.tsx`), the guide (`docs/guides/foundation.md` §5, §6.5, §10, §11) and the User Guide's Add a Flow. Left: a developer wires a module to a flow made on screen with `openInstance`; its values cannot be changed after it is made.
 - 27/10/2026 · JP · Imports (#93), fault #2 of the 27/10 staging brief: the Map step let one field be picked for two columns, which only the server refused (`IMPORT_MAPPING_INVALID`, three times in twelve minutes). A field picked for a second column now moves there, the first reading Leave Out, with the toast *Moved from* and its name. Faults (#97): a refusal no screen can foresee, a password found in a breach (fault #6), is no longer recorded (`err.recorded = false`, `system-health.md` §6). Fault #7 (a refused address) and #5 (leave past the allowance, words improved by #13) need no code. Tests: `settings/Imports.test.tsx`, `tests/unit/foundation/middleware.test.js`, `identity.test.js`. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #70 Users' Status chips and #77 Integrations' Group chips carry the unread notices about what each holds; a notice about a connection now opens it, and its row is dotted · nothing left
 - 26/10/2026 · JP · Audit Log (#79), QA DEF-04 finished: the Dates ends show From and To labels and each says its own problem under its box, tied to it alone · nothing left

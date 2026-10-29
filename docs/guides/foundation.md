@@ -228,6 +228,7 @@ Users keeps `GET /access/roles`.
 | `POST /workflow/instances/:id/withdraw` | the requester, or the CEO |
 | `POST /workflow/instances/:id/reassign` (one login and a reason) | `approve` with scope `all` on the request's module (§11) |
 | `GET /settings/approvals` (the active version of each flow, 25 a page), `/approvals/summary` | `settings` view |
+| `POST /settings/approvals` (a name, a module, its values and its stages; saves version 1, 201; a name whose key exists is refused) | `settings` create |
 | `PUT /settings/approvals/:id/steps` (`:id` is the version on screen; saves the next version) | `settings` edit |
 | `GET /search` (`q`, `page`, `type` to page one group) | everyone signed in; each group by the reader's own grants |
 
@@ -474,8 +475,23 @@ As built (17/10/2026):
   named person), when
   it applies (Always, or one comparison on a number the flow carries: Over, At Least, Under, At Most,
   Exactly) and its time limit in hours; stages are added, removed and moved up or down. Save Stages
-  writes the whole list as the next version. The flow's key, name, values and the timeout, approve and
-  reject behaviour of each stage are the code's and are kept as they are.
+  writes the whole list as the next version. The flow's key, name, module, values and the timeout,
+  approve and reject behaviour of each stage are kept as they are: the code's for a flow it ships, and
+  what was set when it was made for a flow made on screen.
+- **A flow made on screen** (New Flow, JP, 29/10/2026, owner's decision): `POST /settings/approvals`
+  saves a flow nobody has coded yet, as version 1 (`definitions.saveVersion`, event
+  `workflow.definition_created`). It takes a name, a module, an optional description, up to 5 values
+  (each a name and a type: Money, Number, Date, Text, Yes or No, Person) and one to 10 stages, written
+  by the same rules as Edit Stages (`problemsOf`, `assertApproversExist`). The key is
+  `<module>.<name in snake_case>` (Petty Cash on `expenses` is `expenses.petty_cash`), never typed
+  and never changed; a value's key is its name in snake_case, shown title-cased. A key that already
+  exists, stored in any version or shipped in `DEFAULTS`, is refused with `Name already used` on the
+  name. Nothing opens a flow made on screen until a module's service calls `openInstance` with its key,
+  so the list shows it as **Not Used Yet** (`used` false: the key is not in `DEFAULTS` and no request
+  was ever opened on it) beside Active and Needs Fixing; its detail shows its Module and Key for the
+  developer who wires it. Its values are fixed at creation (a stage's condition reads them); Edit
+  Stages still changes the stages. Who decides is unchanged: the people a stage names, holding
+  `approve` on the flow's module.
 - A save is refused when the version on screen is no longer the active one (409: someone saved first),
   when a stage names a role or a login that does not exist, or when the engine's rules refuse the
   route (422 naming the problem). Each save is the event `workflow.definition_saved`, so the Audit Log
@@ -518,7 +534,7 @@ As built (17/10/2026):
 
 - `GET /search` answers in groups, each the first page of 25: **Screens** (every tab of the staff app by
   its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
-  Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
+  Start Import, Invite User, New Role, New Holiday, New Flow, Add Role, Clock In, Request Leave, Change Password,
   Set PIN, Mark All Read, Notification Settings, Turn On Notifications, Send Test Notification, Use
   Dark Theme, Use Light Theme, Change Density, Install App, Refresh Screen, Reload App, Sign Out, Add
   Work Site, Add Temporary Site), then
@@ -965,6 +981,7 @@ About thirty selects across the hub read their options that way. JBS Praxis's an
 | `export-cleanup` (scheduler, every hour at twenty past) | B | Removes every export file 24 hours after it was made (`vault.remove`, `document.removed`; §6.12) |
 | The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
 | `workflow.definition_saved` | D | Audit only (the stages before and after) |
+| `workflow.definition_created` | D | Audit only (a flow made on screen: its key, module and stages) |
 | `workflow.reassigned` | D | The new approver is told; the stage's time limit starts again |
 
 ## 8 · Permissions and visibility by role
@@ -1022,7 +1039,7 @@ screen.
 | Text Size (account menu, More, ⌘K) | Title "Text Size"; Small, Default, Large, Largest; toast "Text size: Large" | None | That it is kept per device and what it scales: §6.15 |
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up (a switch busy while its change saves, F26); who is signed in where; the failed sign-ins of the last 7 days with the outcome, as the figure counts; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
 | Settings · Audit Log | Today, This Week, This Month, Sensitive; who, what, record, module, when; Module and Dates filters, search; an entry opens its fields before and after with Open Record; Entries by Module; Export | Restricted values masked with a help term | How `emit()` writes the ledger: BACKEND_STRUCTURE |
-| Settings · Approvals | Flows, Open Requests, Overdue, Needs Fixing; the flows (Flow, Stages, Version, Open Requests, Status); a flow's route and each stage's Approver, Applies When, Time Limit; Needs Fixing names each stage's problem in words; Edit Stages, then per stage Move Up, Move Down, Edit, Remove, Add Stage (at most 10 stages), Save Stages; a stage's Stage Name, Approver, Role or Person (active logins only), Applies When, Comparison and value, Time Limit, Hours | Help term on Applies When | Versioning of open requests, who decides: §6.5 |
+| Settings · Approvals | Flows, Open Requests, Overdue, Needs Fixing; the flows (Flow, Stages, Version, Open Requests, Status: Active, Not Used Yet or Needs Fixing); a flow's route and each stage's Approver, Applies When, Time Limit; its Module and Key when made on screen; Needs Fixing names each stage's problem in words; New Flow, a wizard of Flow (Flow Name, Module, Description), Values (Add Value, Value Name, Type, at most 5) and Stages, then Create Flow, toast "Flow created"; Edit Stages, then per stage Move Up, Move Down, Edit, Remove, Add Stage (at most 10 stages), Save Stages; a stage's Stage Name, Approver, Role or Person (active logins only), Applies When, Comparison and value, Time Limit, Hours | Help terms on Applies When, Module and Values | Versioning of open requests, who decides, how a flow made on screen gets its key: §6.5 |
 | ⌘K Search | Results grouped Waiting on You (first, when anything waits), Screens, Actions, then each kind of record (Employees, Departments, Open Seats, Users, Roles, Numbering, Holidays, Approval Flows, Imports) | None | The coverage gate: §6.7 |
 
 ### 10.2 Phone layout
@@ -1040,7 +1057,7 @@ screen.
 | Text Size | A bottom sheet with the four sizes as one segmented row | None | A tap applies it | More's row (the text size button), ⌘K |
 | Settings · Security | Counts as cards, the three rules, two-step by role as switches | Method and address of a session, the person and address of a failed sign-in | Save Rules, full width | More, Settings |
 | Settings · Audit Log | Entry cards: who, what, when | Export, Entries by Module, the Module column | Filter in a sheet | More, Settings |
-| Settings · Approvals | KPI cards two to a row, then flow cards (name, stages, version, open requests, status) | None | Edit Stages in the flow's full sheet; Save Stages full width | More, Settings |
+| Settings · Approvals | KPI cards two to a row, then flow cards (name, stages, version, open requests, status) | None | New Flow in the floating button, a full sheet in three steps with Next and Create Flow full width; Edit Stages in the flow's full sheet; Save Stages full width | More, Settings |
 | ⌘K Search | Full-screen search with grouped results | None | Tap a result | The search bar in More and the top bar |
 
 ## 11 · Edge cases
@@ -1065,6 +1082,12 @@ screen.
   login who holds `approve` on the module (never the requester), writes a `reassign` decision with the
   reason (`0450`), starts the time limit again and tells them.
 - Two people editing one flow: the second save is refused (409) and they open it again.
+- Two people making a flow with the same name at once: the key's lock (`pg_advisory_xact_lock`, the one
+  `saveVersion` takes) makes the second see the first, and it is refused as `Name already used`.
+- A flow made on screen that no module opens: it stays Not Used Yet and no request ever waits on it;
+  it is the developer's to wire (`openInstance` with its key and a context holding every value it
+  declares), and an approval that carries a Money value never approves itself on time out.
+- A name with no letters or digits ("???"): refused on the name, `Use letters`.
 - A security rule set looser than the floor: refused with the floor named. An idle lock longer than
   the session: refused, "Within the session length".
 - A role change that would leave the person saving it without Settings: refused (`LOCKOUT`).
@@ -1326,3 +1349,4 @@ screen.
 - 26/10/2026 · JP · From the User Guide audit's screen defects: More's settings icon reads My Security (a padlock) for a person without Settings, where it goes. Praxis AI's tile stays Assistant: a tile is one word (F17) and "Praxis" alone is not a name of this product (`check/provenance.js`).
 - 26/10/2026 · JP · From the User Guide audit's screen defects and the owner's decision of 26/10/2026: Archive Record asks for a Last Day (`EmployeeArchive.left_on`, today unless given, never after today nor before the start), kept as `employee.left_on` so Attrition, 90 Days counts the leaver, and Restore clears it; the record carries `is_ceo` and the CEO's offers no Archive Record; the Reason is on the form system with the contract's 200 limit.
 - 26/10/2026 · GE · The employee record gains Queries and Sanctions tabs for a viewer holding `queries` view (meeting 26/10/2026: TB saw them mixed with no distinction); each lists that person's records within the viewer's query visibility, and a row opens its query on Queries & Sanctions (§10.1).
+- 29/10/2026 · JP · §5, §6.5, §7, §10 and §11: Settings · Approvals gains New Flow (`POST /settings/approvals`, `settings` create): a name, a module, up to 5 values and the stages, saved as version 1 with the key `<module>.<name>`. The flow lists as Not Used Yet until a module opens it; the guide's earlier "the flow's key, name and values are the code's" now holds for the flows the code ships.

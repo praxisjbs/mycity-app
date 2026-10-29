@@ -4,7 +4,7 @@
  * (`self`): the service decides from the request who may read or move it. Settings,
  * Approvals is the `settings` grant's.
  */
-const { ok } = require("../../shared/http/respond");
+const { ok, created } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { withActor } = require("../../shared/events/emit");
 const service = require("./workflow.service");
@@ -25,5 +25,6 @@ module.exports = {
 
   flows: async (req, res) => sendPaged(res, await service.listFlows(req.validated.query)),
   flowsSummary: async (_req, res) => ok(res, await service.summary()),
+  createFlow: async (req, res) => created(res, await service.createFlow(withActor(req), req.validated.body)),
   saveSteps: async (req, res) => ok(res, await service.saveSteps(withActor(req), id(req), req.validated.body)),
 };

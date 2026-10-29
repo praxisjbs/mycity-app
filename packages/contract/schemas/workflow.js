@@ -75,6 +75,26 @@ const ApprovalStageInput = z
 /** PUT /settings/approvals/:id/steps: the stages of the version open on screen. */
 const ApprovalStepsUpdate = z.object({ stages: z.array(ApprovalStageInput).min(1).max(10) }).strict();
 
+/** The most values a flow made on screen carries. */
+const MAX_VALUES = 5;
+
+/**
+ * POST /settings/approvals: a flow nobody has coded yet, saved as version 1. Its key is made from the
+ * module and the name (`expenses.petty_cash`), never sent. `context_types` names the values a stage's
+ * condition may read, each by its snake_case name.
+ */
+const ApprovalFlowCreate = z
+  .object({
+    name: text(60),
+    module_key: ModuleKey,
+    description: optionalText(200),
+    context_types: z
+      .record(z.string().regex(KEY, "Use lower case and underscores").max(40), ContextType)
+      .refine((v) => Object.keys(v).length <= MAX_VALUES, `At most ${MAX_VALUES} values`),
+    stages: z.array(ApprovalStageInput).min(1).max(10),
+  })
+  .strict();
+
 /**
  * An approver as a person reads it. `type` stays a plain string here because a stored
  * flow may predate the rules (the flow then lists its `problems`).
@@ -116,6 +136,8 @@ const ApprovalFlow = z
     open_requests: z.number().int().min(0),
     /** Why this flow would be refused if saved as it is (a flow stored before the rules). */
     problems: z.array(z.string()),
+    /** The code ships this flow, or a request was opened on it: false for one made on screen that nothing opens yet. */
+    used: z.boolean(),
     created_by_name: z.string().nullable(),
     created_at: isoDateTime,
   })
@@ -253,6 +275,7 @@ const TABLES = {
   StageApprover: { table: null, reason: "one approver inside workflow_definition.stages" },
   ApprovalStageInput: { table: null, reason: "one stage inside workflow_definition.stages" },
   ApprovalStepsUpdate: { table: "workflow_definition" },
+  ApprovalFlowCreate: { table: "workflow_definition" },
   ApproverView: { table: null, reason: "an approver inside a stage, with the name a person reads" },
   ApprovalStage: { table: null, reason: "one stage inside workflow_definition.stages" },
   ApprovalFlow: {
@@ -260,6 +283,7 @@ const TABLES = {
     virtual: {
       open_requests: "counted from workflow_instance rows still pending on the flow's key",
       problems: "shared/workflow/definitions.problemsOf() on the stored flow",
+      used: "the key is shipped in definitions.DEFAULTS, or a workflow_instance row was opened on it",
       created_by_name: "the name of the login in created_by",
     },
   },
@@ -324,6 +348,7 @@ module.exports = {
   StageApprover,
   ApprovalStageInput,
   ApprovalStepsUpdate,
+  ApprovalFlowCreate,
   ApproverView,
   ApprovalStage,
   ApprovalFlow,
