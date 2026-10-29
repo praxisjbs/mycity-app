@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/community/` |
 | Permission key(s) | `community` |
 | Capabilities | `announcements.post` (post to the announcements channel and track who has read a post: the Announcements tab's routes) |
-| Screens (PROGRESS.md rows) | #15 Channels, #16 Direct Messages, #17 Announcements; reads shared with #66 Knowledge Hub · Announcements (M10) |
+| Screens (PROGRESS.md rows) | #15 Channels, #16 Direct Messages, #17 Announcements (#66 Knowledge Hub · Announcements was dropped, 29/10/2026) |
 | Status | Built |
 | Last changed | 26/10/2026 |
 
@@ -39,7 +39,6 @@ track who has read them.
 | Forward To (sheet, over either tab and over Mailbox) | Staff app | Members of the conversation; a mailbox's owner for its attachments | The channels they may post in, their conversations and every colleague, searchable; the chats picked | Pick up to 5 chats, Forward |
 | Staff Community · Announcements (`announcements`) | Staff app | People and the CEO | The configuration and tracking side: KPI strip, every announcement with read counts and its level | Publish or schedule an announcement as Normal, Important or Urgent, see who has and has not read or acknowledged it |
 | #announcements channel | Staff app, inside Channels | Every employee, read only | Published announcements, newest last, Urgent ones red and Important ones amber | Read; acknowledge an Urgent one; only People and the CEO post |
-| Knowledge Hub · Announcements (M10) | Staff app | Every employee | The same announcement records, as an archive | Read. No second copy of the data |
 | Notification bell and web push | Staff app, phone | Recipients | New announcement, direct message, mention | Open the message |
 | People · Employees (employee record) | Staff app | People | `date_of_birth`, `start_date`, avatar | Source of the birthday and anniversary posts. Nothing is entered in Community for them |
 | Settings · Notifications (M6) | Staff app | Every employee | "Community messages" category | Choose in-app, push or email |
@@ -618,6 +617,7 @@ fields, never in a toast.
 
 ## 14 · Change log
 
+- 29/10/2026 · GE · Knowledge Hub's Announcements tab (#66, M10) is dropped (GE, 29/10/2026): announcements are published and kept on Staff Community · Announcements and read in #announcements. Its interim page, ⌘K screen and the `knowledge_announcement` record type are gone. Nothing on these screens changes.
 - 26/10/2026 · JP · From the QA bug register (M1): a poll's options must differ, their case and spaces ignored; a repeat reads "Already an option" on its own field as it is typed, and the contract (`PollChoices`), the service and the mock refuse it on Start a Poll and Edit Poll (§5, §6, §10.1). A refused option's mark lands on the field it came from when an optional one was left empty. The shell's update, install and notifications offers no longer float over the composer: they wait off every Staff Community tab (FRONTEND_GUIDE, PWA). Left: nothing.
 
 - 26/10/2026 · JP · From the User Guide audit's screen defects: every refusal is said (Remove, Add People, Unpin, Celebrate and the thumbs up, a vote, Start a Poll, Send Files, Acknowledge, Channel Details and New Channel without a field, an announcement's save); Remove asks first; Start a Poll closes only once posted; a channel's Purpose takes the API's `description` marks; a message deleted meanwhile reads "That message is no longer here" (the service's `messageGone`), and Edit Message and Send Wishes toast it rather than marking the field; a message over 4,000 characters and a recognition note over 500 are said before sending; a headline, message or question of one to three characters reads At least 4 characters; Who Can Post reads Every Member and Admins Only everywhere; LAST_ADMIN shows the server's words; the Announcements tab follows `announcements.post`, as its routes do (shell and search); Read and Not Read page; the recorder's refusal says to type instead; the desktop profile's Message focuses the message box; the phone profile's Mute Notifications follows its own change; Average Read carries its help (StatStrip `help`); Edit opens as Edit Announcement. §3 step 13 no longer says the divider resets on a double click, §10.1's subtitle is the channel count, and §10.2's channel list is a bottom sheet, as the code does.

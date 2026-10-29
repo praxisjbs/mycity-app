@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 102 screens (96 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 101 screens (95 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -52,8 +52,8 @@ saying who agreed and when.
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
-| M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **102** | **35** | **0** | **67** | **0** | **0** |
+| M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
+| **Total** | **101** | **34** | **0** | **67** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -1197,6 +1197,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 - 29/10/2026 · GE · Sanctions (#36) and Letter Templates (#37) from staging: Issue Sanction found no query, as it offered only answered ones; a query past its 24 hours unanswered can be decided too, and the picker now lists every query ready for a decision (`GET /queries?ready=true`). Edit Template and Activate or Deactivate sit on the letter's bar beside Download PDF. The staging seed adds the chain's missing rungs by name (staging had Caution and Warning entered by hand, so it had entered none); a retired rung stays retired. Left: walk it on staging after the next deploy.
 - 29/10/2026 · GE · Staging seed for the whole flow (GE asked to see Policies through to Queries): `seeds/staging/48_policies.js` publishes Code of Conduct and Use of Company Devices for the Implementation department (needs acknowledging in 7 days; MyCity's staff never told), and `50_queries.js` cites a clause on each of its six queries and its rule, so every letter quotes it. Left: run `scripts/db/seed.js --staging` on the staging server (by hand, `docs/runbooks/deploy.md`); it has not been run since M3.
 - 29/10/2026 · GE · From the seeded staging walk, Queries (#34) and Sanctions (#36): View Letter drew nothing on staging (the page fetched the PDF back from its blob URL, which `connect-src 'self'` refuses; it now hands the viewer the bytes it fetched). A query and a sanction open in a sheet when their row is pressed, as Performance's do: nothing shows under the Queries list unasked, Queries by Reason sits under the list, Queries drops its Status column and Sanction History drops Reason, Decided By and Fine, all on the new sanction sheet (with View Letter, Deduction Letter and Open Query). A letter's frame scrolls sideways only once zoomed in (`PdfViewer`). The letterhead takes the logo uploaded on Settings · Organisation; staging has none yet, so it shows the wordmark. Rules gain Delete Rule for a rule that never raised a query (one that has fired is paused, as before); Letter Templates' Edit Template and Activate or Deactivate move into a ⋯ menu beside Open in Tab. The Queries list drops Response (in the query's sheet) and the letter's ⋯ moves after Open in Tab (`DocumentPreview` gains `trailing`). Left: walk it on staging; upload MyCity's logo there.
+- 29/10/2026 · GE · Queries (#34) and Sanctions (#36): their lists no longer set a 1,080 px minimum width (`wide`), which made them scroll sideways on a laptop or a zoomed window (under about 1,366 px); with five columns each they fit, checked from 1,500 down to 1,200 px. Left: nothing.
 
 ### Recruitment
 
@@ -1270,11 +1271,12 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 63 | SOPs | `sops` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
-| 66 | Announcements | `announcements` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
+| 66 | Announcements | `announcements` | M10 | TB | ☐ | ☐ | ☐ | Dropped | 29/10/2026 |
 | 102 | User Guide | `user-guide` | M0 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 
 **Notes**
 
+- 29/10/2026 · GE · Announcements (#66) dropped by GE, 29/10/2026: Knowledge Hub keeps Policies, SOPs, FAQs, Training and the User Guide. Announcements are published and kept on Staff Community · Announcements (#17) and read in #announcements, so the archive tab only repeated them. Removed: the tab, its interim page, its ⌘K screen and the `knowledge_announcement` record type (route map, notification category); MILESTONES' screen table says five tabs. Counted nowhere now (M10 8 screens). TB to note for M10. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #62 Policies' State chips carry the unread notices about the policies under each state · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects (Policies): Archive Policy is refused while a version waits for approval (owner's decision); Recall Submission only for its sender or the CEO; a waiting submission shows what was sent; Publish refuses unsaved changes; Tidy With AI on an empty box says to write first; buttons follow the knowledge grants; a Starts Soon chip. Left: nothing.
 - 26/10/2026 · JP · User Guide (#102), every gap closed: each chapter was checked against its screens string by string (every button, field, column, message, server refusal and schema mark, each given a verdict by a reader of that chapter) and rewritten where it fell short: steps the screens ask for, every message a person can meet with what to do, success messages, what a phone shows differently, and each step's grant. New shared tasks in Getting Started (Confirm It's You, Sign out, saving a download, and a section for screens that cannot open); new needs `team` and `<one> or <another>` (`packages/contract/guide.js`, the API's reader, the mock, the gate; tests `user-guide-parse.test.js`, `user_guide.test.js`); the pictures run on a fixed clock and can pick from a select's list. 201 pictures. No screen changed. Left: the screen defects the audit found (silent failures, misleading messages; listed in the PR) for a follow-up; pictures the demo cannot reach (Set Up Two-Step at sign-in, the home location sheet, a check-in on a site's day, connecting a mailbox, rescoping a commitment); TB to confirm the key result types' meanings in the Performance chapter.

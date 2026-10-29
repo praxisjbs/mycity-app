@@ -57,7 +57,7 @@ export const MODULES: ModuleDef[] = [
     key: "expenses", label: "Expenses", short: "Expenses", icon: "wallet", area: "Business",
     tabs: [t("My Requests", "my-requests"), t("Approvals", "approvals"), t("Requisitions", "requisitions"), t("Disbursements", "disbursements"), t("Budgets", "budgets"), t("Categories", "categories")],
   },
-  { key: "knowledge", label: "Knowledge Hub", short: "Knowledge", icon: "book", area: "System", tabs: [t("Policies", "policies"), t("SOPs", "sops"), t("FAQs", "faqs"), t("Training", "training"), t("Announcements", "announcements"), t("User Guide", "user-guide")] },
+  { key: "knowledge", label: "Knowledge Hub", short: "Knowledge", icon: "book", area: "System", tabs: [t("Policies", "policies"), t("SOPs", "sops"), t("FAQs", "faqs"), t("Training", "training"), t("User Guide", "user-guide")] },
   { key: "praxis_ai", label: "Praxis AI", short: "Assistant", icon: "spark", area: "System", tabs: [t("Ask", "ask"), t("History", "history")] },
   { key: "ai_control", label: "AI Control", short: "AI Control", icon: "shield", area: "System", tabs: [t("Actions", "actions"), t("Models", "models"), t("Spend", "spend")] },
   {

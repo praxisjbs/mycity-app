@@ -104,7 +104,6 @@ export const COMING: Record<string, string[]> = {
   "knowledge/sops": ["Step-by-step procedures for each department", "Owners keep them current", "Linked from the screens they describe"],
   "knowledge/faqs": ["Answers to the questions staff ask most", "Search in plain words", "Suggest a new question"],
   "knowledge/training": ["Training material and onboarding courses", "Track who has completed what", "Assign training to a person or team"],
-  "knowledge/announcements": ["Company announcements, kept and searchable", "Filter by department or date", "Linked to the policy they change"],
 
   /* Praxis AI */
   "praxis_ai/ask": ["Ask questions about your operations in plain words", "Answers from records you can see, never more", "Every answer says what it read"],
