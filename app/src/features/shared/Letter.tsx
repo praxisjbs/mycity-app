@@ -1,4 +1,4 @@
-import { useFileUrl } from "@/api/download";
+import { useFileBlob } from "@/api/download";
 import { DocumentPreview, EmptyState, Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@mycity/ui";
 
 /**
@@ -31,12 +31,16 @@ export function Letter({ l, note = "Underlined words come from the record." }: {
   );
 }
 
-/** A letter already sent: the PDF the employee received, from the vault. */
+/**
+ * A letter already sent: the PDF the employee received, from the vault. Its bytes go to the viewer
+ * with the link: the security policy lets no page read a blob URL back (connect-src 'self').
+ */
 export function LetterFile({ documentId, name }: { documentId: string | null; name: string }) {
-  const href = useFileUrl(documentId ? `/api/v1/documents/${documentId}/content` : null);
+  const { blob, href, failed } = useFileBlob(documentId ? `/api/v1/documents/${documentId}/content` : null);
   if (!documentId) return <EmptyState bare icon="doc" title="No Letter Yet" />;
-  if (!href) return <EmptyState bare icon="doc" title="Opening Letter" />;
-  return <DocumentPreview name={`${name}.pdf`} mime="application/pdf" href={href} height="page" />;
+  if (failed) return <EmptyState bare icon="doc" title="Letter Not Ready" text="It is still being made. Try again shortly." />;
+  if (!blob || !href) return <EmptyState bare icon="doc" title="Opening Letter" />;
+  return <DocumentPreview name={`${name}.pdf`} mime="application/pdf" href={href} file={blob} height="page" />;
 }
 
 /** The policy a query cites: its title, number and version, and the clause quoted. */

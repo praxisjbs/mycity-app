@@ -54,6 +54,15 @@ async function codeTaken(db, code) {
   return rows.length > 0;
 }
 
+/** Delete a rule (the service has checked it never raised a query). True when a row went. */
+async function remove(db, id) {
+  const { rowCount } = await db.query(
+    "DELETE FROM query_rule r WHERE r.query_rule_id = $1 AND NOT EXISTS (SELECT 1 FROM employee_query q WHERE q.query_rule_id = r.query_rule_id)",
+    [id],
+  );
+  return rowCount > 0;
+}
+
 async function hasFired(db, id) {
   const { rows } = await db.query("SELECT 1 FROM employee_query WHERE query_rule_id = $1", [id]);
   return rows.length > 0;
@@ -176,7 +185,7 @@ module.exports = {
   list,
   get,
   codeTaken,
-  hasFired,
+  hasFired, remove,
   isQueryLetter,
   insert,
   update,

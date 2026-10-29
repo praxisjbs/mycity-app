@@ -155,8 +155,12 @@ describe("Queries & Sanctions · who may raise", () => {
 describe("Queries & Sanctions · Letter Templates", () => {
   it("opens a letter with its wording, and offers Deactivate on an active one", async () => {
     await signedInAs("cynthia@mycityapp.io", "letter-templates");
-    expect(await screen.findByRole("button", { name: "Deactivate" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Edit Template" }));
+    // Edit Template and Deactivate wait behind the letter's ⋯, beside Open in Tab.
+    const more = await screen.findByRole("button", { name: "Caution Letter Actions" });
+    expect(screen.queryByRole("button", { name: "Deactivate" })).toBeNull();
+    fireEvent.pointerDown(more, { button: 0, pointerType: "mouse" });
+    expect(await screen.findByRole("menuitem", { name: "Deactivate" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit Template" }));
     const dialog = await screen.findByRole("dialog");
     expect(((await within(dialog).findByRole("textbox", { name: "Name" })) as HTMLInputElement).value).toBe("Caution Letter");
     // The wording is there to edit, not an empty box.
@@ -191,5 +195,28 @@ describe("Queries & Sanctions · Issue Sanction", () => {
     expect(within(dialog).getByText("Query")).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeTruthy();
     expect(window.location.search).not.toContain("tab=queries");
+  }, 30000);
+
+  it("opens a sanction's details in a sheet: why, who decided, the fine and the query", async () => {
+    await signedInAs("cynthia@mycityapp.io", "sanctions");
+    const table = await screen.findByRole("table");
+    // The list keeps its few columns; the reason waits on the sheet.
+    expect(within(table).queryByText("Reason")).toBeNull();
+    fireEvent.click(within(table).getAllByRole("row")[1]!);
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("Reason")).toBeTruthy();
+    expect(within(dialog).getByText("Decided By")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Open Query" })).toBeTruthy();
+  }, 30000);
+
+  // Last in the file: the demo's rules are shared, and this one is gone afterwards.
+  it("deletes a rule that never raised a query, after asking", async () => {
+    await signedInAs("cynthia@mycityapp.io", "rules");
+    const before = (await screen.findAllByRole("button", { name: "Delete Rule" })).length;
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete Rule" })[0]!);
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText(/goes for good/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete Rule" }));
+    await waitFor(() => expect(screen.queryAllByRole("button", { name: "Delete Rule" }).length).toBe(before - 1));
   }, 30000);
 });

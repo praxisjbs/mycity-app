@@ -155,4 +155,25 @@ async function setActive(actor, id, on) {
 const activate = (actor, id) => setActive(actor, id, true);
 const pause = (actor, id) => setActive(actor, id, false);
 
-module.exports = { codeFrom, countable, list, summary, firings, get, create, update, activate, pause };
+/**
+ * DELETE /query-rules/:id: a rule that never raised a query (guide §6.3). One that has fired
+ * keeps its history behind the queries it raised: it is paused instead.
+ */
+async function remove(actor, id) {
+  await tx(async (client) => {
+    const before = await repo.get(client, id, monthStart());
+    if (!before) throw notFound();
+    if (await repo.hasFired(client, id) || !(await repo.remove(client, id)))
+      throw new AppError("RULE_HAS_FIRED", "This rule has raised queries; pause it instead", 409);
+    await emit(client, {
+      key: EVENTS.QUERY_RULE_DELETED,
+      entity: { type: "query_rule", id },
+      actor,
+      before: { code: before.code, name: before.name, source_event: before.source_event, active: before.active },
+      after: null,
+      payload: { query_rule_id: id, code: before.code },
+    });
+  });
+}
+
+module.exports = { codeFrom, countable, list, summary, firings, get, create, update, activate, pause, remove };
