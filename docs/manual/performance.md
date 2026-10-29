@@ -1337,6 +1337,9 @@ as: operations
 do:
   - click: button "New Goal"
   - wait: label "What"
+  - click: label "What"
+  - click: role option "Objective"
+  - wait: label "Function"
 crop: modal
 marks:
   1: label "What" | Objective or key result
