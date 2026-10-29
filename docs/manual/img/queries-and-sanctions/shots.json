@@ -1,7 +1,7 @@
 {
   "queries-approve": {
     "spec": "a6a1e9a97038acd5",
-    "source": "d2d720fc28e40221",
+    "source": "1bd988a5f3e08eb0",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "queries-chain": {
     "spec": "64db354d586ffe1a",
-    "source": "d2d720fc28e40221",
+    "source": "1bd988a5f3e08eb0",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "queries-decide": {
     "spec": "25f8beec30177681",
-    "source": "d2d720fc28e40221",
+    "source": "1bd988a5f3e08eb0",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "queries-letters": {
     "spec": "fc21dcc4ab6e4680",
-    "source": "d2d720fc28e40221",
+    "source": "1bd988a5f3e08eb0",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "queries-list": {
     "spec": "0604204346946db9",
-    "source": "d2d720fc28e40221",
+    "source": "1bd988a5f3e08eb0",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "queries-raise": {
     "spec": "221f2cbca2d6a8ec",
-    "source": "d2d720fc28e40221",
+    "source": "1bd988a5f3e08eb0",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "queries-rule-new": {
     "spec": "7c9dc9dee87cd8c6",
-    "source": "d2d720fc28e40221",
+    "source": "1bd988a5f3e08eb0",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "queries-rules": {
     "spec": "b735097b66bd505c",
-    "source": "d2d720fc28e40221",
+    "source": "1bd988a5f3e08eb0",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "queries-sanctions": {
     "spec": "03fa61c21d10ea62",
-    "source": "d2d720fc28e40221",
+    "source": "1bd988a5f3e08eb0",
     "devices": [
       "desktop",
       "phone"

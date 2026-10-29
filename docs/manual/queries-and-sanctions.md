@@ -321,7 +321,7 @@ A letter **Awaiting Sample** has no wording yet: MyCity has still to send its sa
 
 1. Open [Queries & Sanctions · Letter Templates](/queries?tab=letter-templates) and press the
    template.
-2. Press the **⋯** on the letter's bar, beside **Open in Tab**, then **Edit Template**. The letter opens with its
+2. Press the **⋯** at the right end of the letter's bar, after **Open in Tab**, then **Edit Template**. The letter opens with its
    wording as it is sent.
 3. Change the **Name** if you need to. While no step or rule sends the letter, you can also change
    **Used For**.

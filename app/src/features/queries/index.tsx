@@ -125,7 +125,6 @@ function QueriesTab({ id }: { id: string | null }) {
           { key: "s", label: "Subject", render: (q) => q.subject },
           { key: "b", label: "Raised By", render: (q) => q.raised_by_name ?? q.rule_name ?? "Rule", desktop: true },
           { key: "d", label: "Raised", render: (q) => formatDate(q.created_at) },
-          { key: "r", label: "Response", render: (q) => (q.responded_at ? formatDate(q.responded_at) : "Not yet"), desktop: true },
         ]}
       />
       {/* Below the list on a computer; a phone leaves it off (guide §10.2). */}
@@ -982,11 +981,9 @@ function Templates() {
               href={pdf.href}
               file={pdf.blob}
               height="page"
+              trailing={manage}
               actions={
-                <ActionGroup>
-                  <Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, `${shown.name}.pdf`)}>Download PDF</Button>
-                  {manage}
-                </ActionGroup>
+                <Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, `${shown.name}.pdf`)}>Download PDF</Button>
               }
             />
           ) : pdf.failed ? (
