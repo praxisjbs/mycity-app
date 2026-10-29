@@ -676,6 +676,8 @@ const planDetail = (req: Req, p: Plan): PlanDetail => {
   const latestUnbind = UNBINDS.filter((u) => u.performance_plan_id === p.performance_plan_id).at(-1);
   const me = meOf(req);
   const head = p.department_id === deptId ? me?.user_key === "ngozi" : isCeo(req);
+  // Who a plan awaiting approval is with: the stage of its own flow, as the engine tells it.
+  const flow = waiting(p.status) ? FLOWS.find((f) => !f.scorecardId && f.wid === p.workflow_instance_id && pending(f)) : undefined;
   return {
     ...p,
     objective_count: OBJECTIVES.filter((o) => o.performance_plan_id === p.performance_plan_id).length,
@@ -685,6 +687,7 @@ const planDetail = (req: Req, p: Plan): PlanDetail => {
     contributions: CONTRIBUTIONS,
     problems,
     can_submit: open(p.status) && (head || isCeo(req)) && !problems.some((x) => x.blocking),
+    approval: flow ? { stage_key: flow.stages[flow.at], stage_name: STAGE_NAMES[flow.stages[flow.at]] } : null,
     unbind: latestUnbind ? unbindRow(latestUnbind) : null,
   };
 };
