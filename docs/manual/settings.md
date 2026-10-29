@@ -413,7 +413,36 @@ Who decides each kind of request, in which order, and how long each has.
 - Each flow lists its **Stages** in order, its **Version** and its **Open Requests**.
 - Search for a flow by name, then press it. Its stages show one by one, with their **Approver**,
   **Applies When** and **Time Limit**.
-- On a phone each flow is a card, with its **Status**: **Active** or **Needs Fixing**.
+- Each flow shows its **Status**: **Active**, **Needs Fixing**, or **Not Used Yet** when no request
+  has ever opened it. On a phone each flow is a card.
+- Open a flow to see its **Key**, the name a developer uses to connect it to a screen.
+
+### Add a flow {#settings-approvals-add needs="settings create"}
+
+1. Open [Settings · Approvals](/settings?tab=approvals) and press **New Flow**.
+   ![New Flow](shot:settings-new-flow)
+2. Type the **Flow Name**, such as *Petty Cash*.
+3. Choose the **Module** the requests are about. The people who decide must hold Approve on it.
+4. Type a **Description** if you like, then press **Next**.
+5. Press **Add Value** for each thing a stage may compare, such as an *Amount* of type **Money** or
+   *Days* of type **Number**. A flow holds at most 5. Skip this step if no stage compares anything.
+6. Type the **Value Name**, choose its **Type**, and press **Add Value**.
+7. Press **Next**. The bin removes a value, unless a stage reads it.
+8. Press **Add Stage** and fill it in as in [Change who approves](#settings-approvals-edit), steps 5 to 10.
+9. Add every stage the request goes through, in order. The up and down arrows move a stage.
+10. Press **Create Flow**. The message says **Flow created**.
+11. Open the flow and give its **Key** to the developer, so a screen can start requests on it.
+
+| The message | What it means | What to do |
+|---|---|---|
+| **Required** | The **Flow Name** or the **Value Name** is empty | Fill it in |
+| **Pick a module** | The **Module** is not chosen | Choose one |
+| **Pick a type** | The value has no **Type** | Choose one |
+| **Add a stage** | **Create Flow** was pressed with no stage | Press **Add Stage** |
+| **Name already used** | Another flow, or value, has this name | Choose another name |
+| **Use letters** | The name has no letters or digits | Type a name with letters |
+
+Values cannot be changed once the flow is made. To add one, make a new flow.
 
 ### Change who approves {#settings-approvals-edit needs="settings edit"}
 
@@ -430,7 +459,8 @@ Who decides each kind of request, in which order, and how long each has.
    a person, **Named Person** also shows; choose which in **Named In**.
 7. For **Role**, pick the role. For **Person**, pick the person: only active logins are listed.
 8. Leave **Applies When** at **Always**, or choose a value. Then choose the **Comparison**
-   (**Over**, **At Least**, **Under**, **At Most** or **Exactly**) and type the value.
+   (**Over**, **At Least**, **Under**, **At Most** or **Exactly**) and type the value. For a
+   **Yes or No** value, choose **Yes** or **No**.
 9. Set the **Time Limit, Hours**, from 1 to 2160.
 10. Press **Add Stage** or **Update Stage**. **Cancel** goes back without it.
 11. The up and down arrows move a stage. The bin removes one. A flow keeps at least one stage.
@@ -1096,11 +1126,28 @@ marks:
   1: text "Editing" | You are changing this role
 ```
 
+```shot settings-new-flow
+open: /settings?tab=approvals
+as: admin
+sources:
+  - app/src/features/settings/NewFlow.tsx
+  - app/src/features/settings/Stages.tsx
+do:
+  - phone click: button "Quick Actions"
+  - click: button "New Flow"
+  - wait: text "Flow Name"
+crop: modal
+marks:
+  1: label "Flow Name" | Name the flow
+  2: button "Next" | Go to the next step
+```
+
 ```shot settings-stages
 open: /settings?tab=approvals
 as: admin
 sources:
   - app/src/features/settings/Approvals.tsx
+  - app/src/features/settings/Stages.tsx
 do:
   - click: row 1
   - click: button "Edit Stages"

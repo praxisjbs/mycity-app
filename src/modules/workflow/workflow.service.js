@@ -133,6 +133,8 @@ function flowView(row, names) {
     stages: cond.stagesOf(def).map((s) => stageView(s, names)),
     open_requests: Number(row.open_requests) || 0,
     problems: definitions.problemsOf(def).map((p) => plainly(p, def.stages)),
+    // A flow the code ships is in use before its first request; one made on screen is not until a module opens it.
+    used: definitions.getDefault(row.key) !== null || row.ever_opened === true,
     created_by_name: row.created_by_name || null,
     created_at: row.created_at,
   };
@@ -219,6 +221,44 @@ async function assertApproversExist(client, stages) {
     if (users.some((id) => !logins.has(id))) problems.push(`${s.name}: a person it names has no login`);
   }
   if (problems.length) throw refuseRoute(problems);
+}
+
+const nameRefused = (message) => new AppError("VALIDATION_FAILED", message, 422, { name: [message] });
+
+/**
+ * Make a flow on screen: version 1, under the key its module and name give. Nothing opens it
+ * until a module's service calls openInstance with that key, so it lists as Not Used Yet.
+ */
+async function createFlow(actor, body) {
+  return tx(async (client) => {
+    if (!catalog.isModule(body.module_key)) {
+      throw new AppError("VALIDATION_FAILED", "Pick a module", 422, { module_key: ["Pick a module"] });
+    }
+    const key = definitions.keyFor(body.module_key, body.name);
+    if (!key) throw nameRefused("Use letters");
+    if (await definitions.keyTaken(client, key)) throw nameRefused("Name already used");
+    const proposed = {
+      key,
+      module: body.module_key,
+      name: body.name,
+      description: body.description ?? null,
+      context: body.context_types,
+      stages: authoredStages(body.stages),
+    };
+    const problems = definitions.problemsOf(proposed);
+    if (problems.length) throw refuseRoute(problems.map((p) => plainly(p, body.stages)));
+    await assertApproversExist(client, body.stages);
+    const saved = await definitions.saveVersion(client, proposed, { created_by: actor.user_id });
+    await emit(client, {
+      key: EVENTS.WORKFLOW_DEFINITION_CREATED,
+      entity: { type: "workflow_definition", id: saved.workflow_definition_id },
+      actor,
+      after: { key: saved.key, version: saved.version, module: saved.module, name: saved.name, stages: saved.stages },
+      payload: { key: saved.key, version: saved.version, module_key: saved.module },
+    });
+    const row = await repo.flowById(client, saved.workflow_definition_id);
+    return (await flowsView(client, [row]))[0];
+  });
 }
 
 /**
@@ -557,6 +597,7 @@ module.exports = {
   authoredStages,
   listFlows,
   summary,
+  createFlow,
   saveSteps,
   plainly,
   mine,
