@@ -17,6 +17,7 @@ import type {
 import { api, ApiError } from "@/api/client";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
+import { hrefFor, useRouter } from "@/lib/router";
 import {
   Banner,
   Button,
@@ -224,10 +225,19 @@ export function PerformanceTab() {
 /* ───────────── The four figures against their targets ───────────── */
 
 function Headline({ s }: { s: PerformanceSeries }) {
+  const { navigate } = useRouter();
   return (
     <>
       {!s.recording && (
-        <Banner tone="warn" className="mb-3">
+        <Banner
+          tone="warn"
+          className="mb-3"
+          action={
+            <Button size="sm" onClick={() => navigate(hrefFor("settings", "status"))}>
+              Open Status
+            </Button>
+          }
+        >
           {s.last_sample_at
             ? `Nothing recorded since ${formatDateTime(s.last_sample_at)}. See Status, Background Jobs.`
             : "Nothing has been recorded yet. See Status, Background Jobs."}
@@ -576,7 +586,7 @@ function Routes({ range }: { range: Range }) {
             </span>
           ),
         },
-        { key: "p95_ms", label: <HelpTerm help={HELP.p95}>p95</HelpTerm>, align: "n", sortable: true, render: (r) => ms(r.p95_ms) },
+        { key: "p95_ms", label: <HelpTerm help={HELP.p95}>p95</HelpTerm>, sortLabel: "p95", align: "n", sortable: true, render: (r) => ms(r.p95_ms) },
         { key: "mean_ms", label: "Mean", align: "n", sortable: true, render: (r) => ms(r.mean_ms) },
         { key: "requests", label: "Calls", align: "n", sortable: true, render: (r) => formatCount(r.requests) },
         { key: "errors", label: "Failed", align: "n", sortable: true, render: (r) => (r.errors ? <span className="text-destructive">{formatCount(r.errors)}</span> : "0") },

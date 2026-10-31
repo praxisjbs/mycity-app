@@ -48,6 +48,7 @@ export default {
     "Slow Move": () => <Moving slow />,
     Loading: () => <Kanban columns={START.map((c) => ({ ...c, cards: [], count: undefined }))} loading onMove={() => undefined} empty={<EmptyState title="No Deals Yet" />} />,
     "Read Only": () => <Kanban columns={START} />,
+    "With Unread": () => <Kanban columns={START.map((c, i) => (i === 1 ? { ...c, unread: 2 } : i === 2 ? { ...c, urgent: true } : c))} onMove={() => undefined} />,
     "Empty Board": () => <Kanban columns={START.map((c) => ({ ...c, cards: [], count: 0 }))} onMove={() => undefined} />,
     "Empty With State": () => (
       <Kanban columns={START.map((c) => ({ ...c, cards: [], count: 0 }))} empty={<EmptyState title="No Deals Yet" text="Add the first partner to start" />} />

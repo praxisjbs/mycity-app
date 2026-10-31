@@ -1,5 +1,5 @@
 "use strict";
-/* global document, window, getComputedStyle, PopStateEvent */
+/* global document, window, location, getComputedStyle, PopStateEvent */
 /**
  * Opens every screen in Chromium at phone and desktop size and records what a
  * person sees: the copy in each slot (page title, card titles, buttons,
@@ -24,7 +24,9 @@
  *            the in-browser mock API, so no server or database). Built here when
  *            it is missing or older than app/src. Signs in, then opens every
  *            module and tab in app/dist/screens.json, the route list the build
- *            writes from the shell's catalogue (FRONTEND_GUIDE §9.2).
+ *            writes from the shell's catalogue (FRONTEND_GUIDE §9.2). On a
+ *            phone it then taps each screen's first two rows that open
+ *            something and records where the record went (`rowOpens`, F31).
  *
  * One crawl serves both gates: the result is cached in the OS temp folder,
  * keyed by the inputs (the gallery's input hash, the demo when it is crawled,
@@ -48,7 +50,13 @@ const gallery = require("./gallery");
 
 const ROOT = path.resolve(__dirname, "..", "..", "..");
 const DEMO = "docs/MyCity-ERP-Documents/demo.html";
-const APP_DIST = "app/dist";
+/*
+ * The screen gates' own demo build of the staff app (the in-browser mock), apart from app/dist,
+ * where `npm run fe:build` writes the release build: `npm run ci` runs the frontend and screens
+ * groups at the same time, and two builds in one folder would overwrite each other. It lives
+ * under node_modules/.cache, which every scanner, ESLint and git already skip, and never ships.
+ */
+const APP_DIST = "node_modules/.cache/mycity/demo-app";
 
 const WIDTHS = {
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
@@ -594,7 +602,10 @@ function ensureAppBuild() {
   if (!fs.existsSync(app)) return false;
   const built = path.join(ROOT, APP_DIST, "screens.json");
   // packages/ui is built into the app, so a change to a shared component makes the build stale too.
-  const source = Math.max(newest(path.join(app, "src")), newest(path.join(ROOT, "packages", "ui", "src")), newest(path.join(app, "index.html")), newest(path.join(app, "vite.config.ts")), newest(path.join(app, "package.json")), newest(path.join(ROOT, "docs", "PROGRESS.md")));
+  // The demo carries the User Guide's chapters (the mock reads docs/manual), so a changed chapter rebuilds it too; its pictures do not.
+  const manual = path.join(ROOT, "docs", "manual");
+  const chapters = fs.existsSync(manual) ? fs.readdirSync(manual).filter((f) => f.endsWith(".md")).map((f) => newest(path.join(manual, f))) : [];
+  const source = Math.max(newest(path.join(app, "src")), newest(path.join(ROOT, "packages", "ui", "src")), newest(path.join(app, "index.html")), newest(path.join(app, "vite.config.ts")), newest(path.join(app, "package.json")), newest(path.join(ROOT, "docs", "PROGRESS.md")), ...chapters);
   const mock = () => {
     try {
       return JSON.parse(fs.readFileSync(built, "utf8")).api_mode === "mock";
@@ -602,13 +613,20 @@ function ensureAppBuild() {
       return false;
     }
   };
-  // A production build in app/dist talks to the real API; the crawl needs the demo build.
+  // A production build talks to the real API; the crawl needs the demo build.
   if (fs.existsSync(built) && fs.statSync(built).mtimeMs >= source && mock()) return true;
-  if (!fs.existsSync(path.join(ROOT, "node_modules", "vite"))) {
+  const vite = path.join(ROOT, "node_modules", "vite", "bin", "vite.js");
+  if (!fs.existsSync(vite)) {
     throw new Error("The workspace has no packages installed. Run `npm ci` at the root (CI does this), then the gate again.");
   }
-  const r = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build:demo"], { cwd: app, encoding: "utf8", shell: process.platform === "win32" });
-  if (r.status !== 0) throw new Error(`app/ did not build (npm run build:demo):\n${String(r.stdout || "").slice(-1500)}${String(r.stderr || "").slice(-800)}`);
+  // Vite alone, as `npm run build:demo` builds after its type check: the type check is the
+  // frontend group's (fe-typecheck), and two `tsc -b` at once would share their build info.
+  const r = spawnSync(process.execPath, [vite, "build", "--mode", "demo", "--outDir", path.join(ROOT, APP_DIST), "--emptyOutDir", "--logLevel", "warn"], {
+    cwd: app,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (r.status !== 0) throw new Error(`app/ did not build (vite build --mode demo):\n${String(r.stdout || "").slice(-1500)}${String(r.stderr || "").slice(-800)}`);
   return true;
 }
 
@@ -636,6 +654,105 @@ async function appSettle(page) {
       if (a.effect && a.effect.getComputedTiming().endTime !== Infinity) a.finish();
     }
   });
+}
+
+/* ───── F31: where a phone row's record opens (two-shells.js) ───── */
+
+/**
+ * How many rows a phone screen's check taps: the first two, so a screen that
+ * shows its first pick in the page unasked still changes on the second.
+ */
+const ROW_TAPS = 2;
+
+/**
+ * Runs in the page, in three steps. "mark": marks the i-th visible row that
+ * opens something (DataView's phone cards, TapList, Kanban: `data-row-open`)
+ * and its list, and reads what the page shows outside that list. "tap": taps
+ * it. "after": says where the record went: "sheet" (a modal or sheet), "cover"
+ * (a pane over the whole screen, as SplitPanes draws one), "screen" (the list
+ * left the page: the record's own screen), "page" (the page beside the list
+ * changed: the record opened in it, which F31 refuses), "address" or "nothing".
+ */
+function rowProbe({ step, i, before, page, modal }) {
+  const visible = (el) =>
+    el.checkVisibility ? el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getClientRects().length > 0 : !!el.getClientRects().length;
+  const root = document.querySelector(page);
+  const pageText = () => {
+    const parts = [];
+    if (!root) return "";
+    const walker = document.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const v = n.nodeValue.replace(/\s+/g, " ").trim();
+      const parent = n.parentElement;
+      if (!v || !parent || parent.closest("[data-gate-list], [data-ui-ignore]") || !visible(parent)) continue;
+      parts.push(v);
+    }
+    return parts.join(" ");
+  };
+  if (step === "mark") {
+    document.querySelectorAll("[data-gate-row]").forEach((el) => el.removeAttribute("data-gate-row"));
+    document.querySelectorAll("[data-gate-list]").forEach((el) => el.removeAttribute("data-gate-list"));
+    if (!root || [...document.querySelectorAll(modal)].some(visible)) return null;
+    const row = [...root.querySelectorAll("[data-row-open]")].filter(visible)[i];
+    if (!row) return null;
+    const list = row.closest("ul, ol, [role=list]") || row.parentElement;
+    row.setAttribute("data-gate-row", "");
+    list.setAttribute("data-gate-list", "");
+    return { label: String(row.innerText || row.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40), href: location.href, text: pageText() };
+  }
+  if (step === "tap") {
+    const row = document.querySelector("[data-gate-row]");
+    if (row) row.click();
+    return null;
+  }
+  if ([...document.querySelectorAll(modal)].some(visible)) return "sheet";
+  const covers = (el) => {
+    if (getComputedStyle(el).position !== "fixed" || !visible(el)) return false;
+    const r = el.getBoundingClientRect();
+    return r.width >= window.innerWidth * 0.9 && r.height >= window.innerHeight * 0.9;
+  };
+  if (root && [...root.querySelectorAll("*")].some(covers)) return "cover";
+  const list = document.querySelector("[data-gate-list]");
+  if (!list || !visible(list)) return "screen";
+  if (pageText() !== before.text) return "page";
+  return location.href === before.href ? "nothing" : "address";
+}
+
+/** Closes whatever a tapped row opened: Esc, then the phone's Back, which every overlay answers (F29). */
+async function closeOpened(page, target) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const open = await page.evaluate((sel) => [...document.querySelectorAll(sel)].some((el) => el.getClientRects().length > 0), target.modal);
+    if (!open) return;
+    if (attempt < 2) await page.keyboard.press("Escape");
+    else await page.evaluate(() => window.history.back());
+    await appSettle(page);
+  }
+}
+
+/** Taps the first rows of a phone screen and records where each record opened (F31). */
+async function rowOpens(page, target, screenPath) {
+  const opens = [];
+  // A list that waits on its summary arrives a reply later than the page settles (the mock answers in 90 to 250 ms).
+  await page.waitForFunction((sel) => !!document.querySelector(`${sel} [data-row-open]`), target.page, { timeout: 800 }).catch(() => null);
+  await appSettle(page);
+  for (let i = 0; i < ROW_TAPS; i += 1) {
+    const before = await page.evaluate(rowProbe, { step: "mark", i, page: target.page, modal: target.modal });
+    if (!before) break;
+    await page.evaluate(rowProbe, { step: "tap", page: target.page, modal: target.modal });
+    await appSettle(page);
+    const outcome = await page.evaluate(rowProbe, { step: "after", before, page: target.page, modal: target.modal });
+    opens.push({ label: before.label, outcome });
+    await closeOpened(page, target);
+    if (outcome !== "sheet" && outcome !== "nothing") {
+      // Back to the screen as the crawl opened it, for the next tap.
+      await page.evaluate((to) => {
+        window.history.pushState(null, "", to);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }, screenPath);
+      await appSettle(page);
+    }
+  }
+  return opens;
 }
 
 async function crawlApp(browser, width, target, origin, list, errors) {
@@ -675,7 +792,10 @@ async function crawlApp(browser, width, target, origin, list, errors) {
       await page.keyboard.press("Escape");
       await appSettle(page);
     }
-    screens.push({ target: target.id, width, screen: where, kind: "screen", checks: target.checks, ...(await page.evaluate(collect, target)) });
+    const view = { target: target.id, width, screen: where, kind: "screen", checks: target.checks, ...(await page.evaluate(collect, target)) };
+    // On a phone, where a tapped row's record opens (F31): read last, so the screen above is read as it loads.
+    if (width === "phone") view.rowOpens = await rowOpens(page, target, s.path);
+    screens.push(view);
   }
   await ctx.close();
   return { screens };
@@ -813,4 +933,4 @@ function run(gate, body) {
   });
 }
 
-module.exports = { crawl, demoWanted, summarise, finish, run, collect, ensureAppBuild, serve, appSettle, hashOf, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, APP_DIST, ROOT };
+module.exports = { crawl, demoWanted, summarise, finish, run, collect, ensureAppBuild, serve, appSettle, launch, hashOf, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, APP_DIST, ROOT };

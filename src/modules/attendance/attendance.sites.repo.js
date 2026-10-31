@@ -561,7 +561,22 @@ function renameAddress(client, owner, key, line) {
   return client.query(ADDRESS_LINE[owner], [key, line]);
 }
 
+/**
+ * Each of these sites' state on `today`, as the list's state filter reads it: where it waits on
+ * People · Worksites (attendance.views.js).
+ */
+async function statesOf(db, ids, today) {
+  const { rows } = await db.query(
+    `SELECT s.temporary_site_id AS id, ${STATE("$2")} AS state
+       FROM attendance_temporary_site s
+      WHERE s.temporary_site_id = ANY($1::uuid[])`,
+    [ids, today],
+  );
+  return rows;
+}
+
 module.exports = {
+  statesOf,
   HOME,
   SITE_HOURS_DAY,
   REGISTER_SITE,

@@ -105,19 +105,20 @@ describeDb("access, settings and audit against the real migrations", () => {
     rules.reset();
     ({ app } = buildApp({ strict: true, accessLog: false }));
 
-    const sample = (first, last, email, job) => ({
+    // The CEO sits in General Management, whose people hold the plan's capabilities (performance.md P27).
+    const sample = (first, last, email, job, department = "HR & Operations") => ({
       first_name: first,
       last_name: last,
       work_email: email,
       phone: "08031234567",
       job_title: job,
-      department_name: "HR & Operations",
+      department_name: department,
       start_date: "2026-01-05",
       employment_type: "full_time",
       work_pattern: "remote",
     });
     const make = (client, who, first, last, email, job, role_code, is_ceo = false) =>
-      createAdmin(client, { employee: sample(first, last, email, job), role_code, is_ceo }, PASSWORD[who], {
+      createAdmin(client, { employee: sample(first, last, email, job, is_ceo ? "General Management" : undefined), role_code, is_ceo }, PASSWORD[who], {
         allowAdditional: true,
       });
     await tx(async (client) => {
@@ -176,11 +177,13 @@ describeDb("access, settings and audit against the real migrations", () => {
         "goals.confirm",
         "goals.function",
         "goals.organisation",
+        "goals.view_all",
         "home.reports",
         "home.team",
         "mailbox.signature",
         "performance.manage",
         "policies.manage",
+        "queries.configure",
         "workspace.late_reasons",
       ]);
 
@@ -242,11 +245,15 @@ describeDb("access, settings and audit against the real migrations", () => {
         "alerts.clear",
         "alerts.manage",
         "announcements.post",
+        "goals.company",
         "goals.function",
+        "goals.organisation",
+        "goals.view_all",
         "home.reports",
         "home.team",
         "performance.manage",
         "policies.manage",
+        "queries.configure",
         "workspace.late_reasons",
       ]);
       const staff = await detail("employee");
@@ -264,11 +271,15 @@ describeDb("access, settings and audit against the real migrations", () => {
         "alerts.clear",
         "alerts.manage",
         "announcements.post",
+        "goals.company",
         "goals.function",
+        "goals.organisation",
+        "goals.view_all",
         "home.reports",
         "home.team",
         "performance.manage",
         "policies.manage",
+        "queries.configure",
         "workspace.late_reasons",
       ]);
       expect(await grantsCache.getCapabilities(pool, people.staff.user.user_id)).toEqual([]);
@@ -701,8 +712,8 @@ describeDb("access, settings and audit against the real migrations", () => {
     test("every numbered document type, with the next number it would give", async () => {
       const res = await as("ops").get("/settings/numbering");
       expect(res.status).toBe(200);
-      // 21, and M2 My Workspace's Project and Task (2099, 2090).
-      expect(res.body.page.total).toBe(23);
+      // 21, M2 My Workspace's Project and Task (2099, 2090), and Performance's Organisational Goal (2291).
+      expect(res.body.page.total).toBe(24);
       const expense = res.body.data.find((s) => s.doc_type === "expense");
       expect(expense).toEqual(expect.objectContaining({ label: "Expense Request", prefix: "EXP", next: "EXP-0001", issued: 0 }));
       const staff = res.body.data.find((s) => s.doc_type === "employee");
@@ -711,8 +722,8 @@ describeDb("access, settings and audit against the real migrations", () => {
       const found = await as("ops").get("/settings/numbering?q=payslip");
       expect(found.body.data.map((s) => s.doc_type)).toEqual(["payslip"]);
       const summary = await as("ops").get("/settings/numbering/summary");
-      // Project resets each year (2099); Task never does (2090).
-      expect(summary.body).toEqual(expect.objectContaining({ types: 23, resetting: 3 }));
+      // Project and Organisational Goal reset each year (2099, 2291); Task never does (2090).
+      expect(summary.body).toEqual(expect.objectContaining({ types: 24, resetting: 4 }));
     });
 
     test("a scheme changes the next number, never one issued; a reset needs its period", async () => {

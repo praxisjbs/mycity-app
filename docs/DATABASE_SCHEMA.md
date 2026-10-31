@@ -121,7 +121,10 @@ quiet hours and digest) and `reminder` (one row per occurrence of a declared rem
 row per address field of a record (`owner`, `owner_key`), picked, pinned, the device's location or
 typed before the rule, with its line, details, point, kind and whether it waits to be named;
 backfilled from every address already saved, as typed and unverified · `0499` the leave flow, `leave.approval` (the line manager, then Operations &
-People over 5 days; §6.5).
+People over 5 days; §6.5) · `0510` `user_guide_passage` (JP, 26/10/2026; `docs/guides/user-guide.md`
+§4, §6.8): the User Guide's meaning index, one `vector(1536)` per distinct passage of `docs/manual`
+on the Guide Search model, keyed by the hash of what was embedded and the model (HNSW cosine index);
+no words, nothing a person typed, rebuilt from the files.
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).
@@ -225,7 +228,7 @@ table frozen · `1425` a day judged once: on `attendance_day` its `early_minutes
 (`policy_version_id`, `attendance_work_schedule_id`, `shift_working`, `shift_starts_at`,
 `shift_ends_at`, `judged_at`) · `1430` `attendance_rule_breach` (one row per breach of the Attendance
 policy's five consequence rules, unique on the person, the rule and its last counted day; the Home
-alert it raised; `employee_query_id` for M3, no key yet) · `1435` `attendance_pay_item` (one pending
+alert it raised; `employee_query_id`, keyed to the query by M3's `3040`) · `1435` `attendance_pay_item` (one pending
 deduction or overtime per person, day and kind, its amount `numeric(18,2)` masked as the salary is;
 `payroll_run_id` for M6, no key yet) and `attendance_overtime_approval` (overtime approved for a day
 beforehand, one per person and day) · `1440` reminders to clock out: `attendance_clock_reminder`'s
@@ -264,9 +267,9 @@ use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
 - Attendance (attendance.md §4, §13): the redesign's tables above are built (PR 2's in `1380` and
-  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign keys of
-  `attendance_rule_breach.employee_query_id` (M3) and `attendance_pay_item.payroll_run_id` (M6) once
-  their tables exist; dropping `attendance_location_request` and the field assignment tables once no
+  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign key of
+  `attendance_pay_item.payroll_run_id` (M6) once its table exists (the breach's query key is M3's
+  `3040`); dropping `attendance_location_request` and the field assignment tables once no
   request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)
   (MIGRATIONS §8); dropping
   `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
@@ -317,6 +320,11 @@ summaries · `2190` seed: the five Performance capabilities and their holders, t
 lists · `2200` the statuses an organisational goal (`active`, `closed`; active by default) and a
 scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance PR 2) · `2290` seed: the
 `goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired) ·
+`2291` seed: the `organisational_goal` numbering scheme, `ORG-2026-01`, starting again each plan year ·
+`2295` an organisational goal's ID is the system's (`docs/guides/performance.md` §6.1, JBS Praxis,
+27/10/2026): `organisational_goal.code_given_at` (when the system gave it; null for one typed before),
+and every goal of the plan without an ID given the next of its year, the counter moved past the IDs
+typed; its DOWN clears only the IDs it or the service gave ·
 `2300` the statuses a round (`open`, `closed`) and a review (`check_in`, `with_reviewer`, `second_level`,
 `with_hr`, `closed`, `returned`) may hold, `NOT VALID` so earlier rows stand, with `open` and `check_in`
 the defaults; a review's second level (`second_level_employee_id`) and each item's corrective action
@@ -324,12 +332,23 @@ the defaults; a review's second level (`second_level_employee_id`) and each item
 `2310` a review scored without its check-in (`no_check_in_at`, `no_check_in_reason`) and closed as
 Withdrawn (`withdrawn_at`, `withdrawn_reason`; the status `withdrawn`, `NOT VALID`) (after PR #130,
 `docs/guides/performance.md` §11) ·
+`2320` a request to unbind a binding plan (`plan_unbind`: reason, status `pending`, `approved` or
+`rejected`, the instance, who asked, the decision and its reason; one pending request per plan) and the
+plan's two states `unbound` and `revising` on the `performance_plan` status check (`docs/guides/performance.md`
+§6.22, JBS Praxis, 27/10/2026) · `2321` seed: the flow `performance.plan_change`, the CEO alone ·
 `2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
 missed commitment's Recovery task (Performance PR 4) · `2500` projects get a screen: `project.created_by`,
 its status CHECK (`active`, `completed`) and indexes · `2510` Why Late's reasons (`task_late_reason`,
 switched off rather than deleted; the CHECK on `task.late_reason` gives way to it) · `2520` an event's
-invitation SEQUENCE (`calendar_event.ics_sequence`) · `2590` seed: the six starting late reasons and the
-`workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit).
+invitation SEQUENCE (`calendar_event.ics_sequence`) · `2530` a report run keeps the filters it was
+asked with (`home_report_run.filters`, jsonb, null but for My Workspace · Analytics' Export; Home's
+table, 1150, reviewed by TB; docs/guides/workspace.md §6) · `2590` seed: the six starting late reasons and the
+`workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit) ·
+`2540` sharing a company goal (`goal_share`: one per organisational goal or company objective, the audience `all` or `departments`, who shared it; `goal_share_department`: the departments a `departments` share reaches; a goal, objective or department deleted takes its row) and `2541` seed: the capability `goals.view_all` with its holders, Management and Implementation (`docs/guides/performance.md` §4, §6.23, §6.24, JBS Praxis, 28/10/2026), and `2542` seed: `goals.view_all`, `goals.company` and `goals.organisation` for Operations & People (P27, §6.25) ·
+`2600` departments kept on People · Departments (`docs/guides/organogram.md` §6.1, JBS Praxis
+27/10/2026): where a merged department went (`department.merged_into_department_id`, indexed) and
+which Head of Department roles the system gave with a headship (`user_role.from_headship`, false
+for a role given by hand).
 
 **Owes:**
 - PRs 3 and 5 of `docs/guides/performance.md` use 2300 to 2399 and 2500 to 2599 only for a gap. The numbers 2020, 2030 and
@@ -370,14 +389,30 @@ invitation SEQUENCE (`calendar_event.ics_sequence`) · `2590` seed: the six star
 
 ### M3 Queries & Consequence Management · 3000 to 3999 · GE
 
-**Built:** `3000` query rules, queries, responses, sanctions, fines, letters · `3099` seed.
+**Built:** `3000` query rules, queries, responses, sanctions, fines, letters · `3099` seed ·
+`3010` the chain (`consequence_step`, one rung a row in position order), `letter_template`, a rule's
+`measure`, letter and drafts, the query's `dedup_key` (three punches raise exactly one query),
+outcome and letter, a sanction's number, rung, evidence and approval; `letter_template.purpose`
+`query`, `sanction` or `fine` · `3020` the drawn signatures, `signature_document_id` on
+`employee_query` and `sanction` (the vault keeps the PNG) · `3030` the policy a rule enforces
+(`query_rule.policy_id`, `policy_clause`) and the version a query cites (`employee_query.policy_version_id`,
+`policy_clause`) · `3190` the `queries.configure`
+capability, the `queries.consequence` approval (replacing `3099`'s invalid `employee_consequence`,
+switched off; Operations & People, then the CEO for a rung that suspends without pay or ends
+employment), the shipped letters' rows, six, each active (five in MyCity's own wording, the Salary
+Deduction letter ours; docs/guides/queries.md §4, §6.7), and `3099`'s `sanction_type` rows switched
+off (read by nothing) · `3040` the key from
+`attendance_rule_breach.employee_query_id` to the query raised for the breach (owed since 1430),
+`employee_query.source` (`person`, `rule`, `attendance`), `sanction.signed_by` (the Operations &
+People approver who signed it; RESTRICT, indexed) and `sanction.letter_template` (the rung's letter
+when it was proposed). · `3050` `letter_signature` (one a login: the signature they saved on Edit Signature, from
+the vault; docs/guides/queries.md §6.9).
 
 **Owes:**
-- Query rules: the action, and the dedup key so three punches raise exactly one query.
-- Letters for a query, not only for a sanction.
-- Fines as pending deductions for the M6 payroll run (MILESTONES §8).
-- The consequence workflow: `3099`'s `employee_consequence` fails `validateDefinition()` and must
-  be replaced by a valid definition in a new seed.
+- Fines as pending deductions accepted into the M6 payroll run (MILESTONES §8): M6 reads
+  `sanction_fine` through `sanctions.fines`; the deduction table links back to it.
+- `sanction_fine.employee_accepted_at`, `employee_rejected_at`, `rejection_reason` are unused
+  (queries.md §13): dropped in a later release unless M6 needs them.
 
 ### M4 Recruitment · 4000 to 4999 · TB
 
@@ -544,7 +579,8 @@ gist, up to five key points and things asked of the owner, the message count and
 covered, its AI run) · `10310` Praxis AI's Ask and History (`docs/guides/praxis-ai.md` §4):
 `ai_conversation` gains `last_asked_at` and `questions`; `ai_message` gains `rows_read`, `module_key`
 and a CHECK on `role`; `ai_message_citation` gains `entity_type`, `entity_id`, `read_key` and
-`position`, so a citation names a database record and keeps the answer's order.
+`position`, so a citation names a database record and keeps the answer's order · `10320` an
+`ai_run_step` may be an `embedding` (the Embeddings job's vectors, `docs/guides/ai-control.md` §6.6).
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

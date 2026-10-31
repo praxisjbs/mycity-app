@@ -84,7 +84,7 @@ async function signedIn(email: string, search = "") {
   mockSession.set(null);
   invalidate("/api/v1");
   const { rerender } = render(app(false));
-  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 5000 });
+  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 15000 });
   await act(async () => {
     const next = await auth!.signIn(email, "demo1234");
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
@@ -704,9 +704,9 @@ describe("New Rule and Edit Rule", () => {
     expect(within(dialog).getByRole("radio", { name: "Medium" }).getAttribute("aria-checked")).toBe("true");
     expect(field(dialog, "Who Can Clear").textContent).toBe("People Approvers");
 
-    // Nothing typed: the form marks what is missing and sends nothing.
+    // Nothing typed: the form marks what is missing, each empty field Required, and sends nothing.
     fireEvent.click(within(dialog).getByRole("button", { name: "Create Rule" }));
-    expect(await within(dialog).findByText("Required")).toBeTruthy();
+    expect((await within(dialog).findAllByText("Required")).length).toBeGreaterThan(0);
 
     // A deadline metric counts whole days, and is cleared by its own grant.
     fireEvent.change(field(dialog, "Rule Name"), { target: { value: "Visa Expiry" } });

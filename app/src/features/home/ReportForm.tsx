@@ -2,10 +2,11 @@ import reports from "@mycity/contract/schemas/reports.js";
 import { useMemo, useRef, useState } from "react";
 import type { HomeReport, HomeReportFilters, HomeReportFormat, HomeReportRecurrence, HomeReportRosterDay, HomeRosterStatus, Me } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation } from "@/api/hooks";
+import { invalidate, useInfinite, useMutation } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth, useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker } from "@/features/shared/pickers";
+import { paging, type Paging } from "@/features/shared/wire";
 import {
   CheckboxField,
   ChoiceField,
@@ -47,13 +48,17 @@ import { ALERT_CATEGORY, isoWeekday, LEAVE_STATUS, REPORT_SOURCE, ROSTER_STATUS,
  * schedule adds, and a refusal names the person, on Recipients.
  */
 
-type FilterKey = keyof HomeReportFilters;
+/** The filters of Workspace Analytics' Export, a personal source the form never offers. */
+const PERSONAL_FILTERS = ["task_scope", "analytics_period", "period_from", "period_to"] as const;
+type FilterKey = Exclude<keyof HomeReportFilters, (typeof PERSONAL_FILTERS)[number]>;
 type Freq = HomeReportRecurrence["freq"];
 export type Repeats = Freq | "on_demand";
 export type FormatChoice = HomeReportFormat | "both";
 
-/** The filters the contract knows, each meaning one thing whichever source takes it. */
-const FILTER_KEYS = Object.keys(reports.HomeReportFilters.shape) as FilterKey[];
+/** The filters the contract knows that a source on the form takes, each meaning one thing whichever source takes it. */
+const FILTER_KEYS = (Object.keys(reports.HomeReportFilters.shape) as Array<keyof HomeReportFilters>).filter(
+  (k): k is FilterKey => !(PERSONAL_FILTERS as readonly string[]).includes(k),
+);
 
 /** Someone a report goes to: their login (what the report is generated as), and the person the picker found, when it did. */
 export interface Recipient {
@@ -155,6 +160,10 @@ export function reportValues(report: HomeReport, me: Pick<Me, "user_id" | "displ
   const s = report.schedule;
   const start = newReportValues(me, report.report_key, today);
   const filters = Object.fromEntries(FILTER_KEYS.map((k) => [k, report.filters[k] ?? NO_FILTERS[k]])) as Pick<ReportValues, FilterKey>;
+  // A report saved before the day held its own statuses may tick one its day cannot (Absent on Today):
+  // the form drops it, as changing Day does, since no box is drawn to untick it.
+  const holds = reports.ROSTER_STATUSES_ON[filters.roster_day] as readonly string[] | undefined;
+  if (holds) filters.roster_statuses = filters.roster_statuses.filter((x) => holds.includes(x));
   if (!s) return { ...start, name: report.name, ...filters, shared: report.shared, repeats: "on_demand" };
   const r = s.recurrence;
   return {
@@ -485,12 +494,14 @@ function RosterFilters({ field, status, values, set }: FieldBindings) {
 
 /** The filters the chosen source takes; the departments and leave types are read only when one is offered. */
 function SourceFilters({ takes, field, status, values, set }: { takes: readonly FilterKey[] } & FieldBindings) {
-  const departments = useApi("GET /api/v1/departments", { query: { active: "true" }, enabled: takes.includes("department_id") });
-  const types = useApi("GET /api/v1/leave/types", { query: { active: "true" }, enabled: takes.includes("leave_type_id") });
+  const departments = useInfinite("GET /api/v1/departments", { filters: { active: "true" }, enabled: takes.includes("department_id") });
+  const types = useInfinite("GET /api/v1/leave/types", { filters: { active: "true" }, enabled: takes.includes("leave_type_id") });
   const read: Partial<Record<FilterKey, Array<[string, string]>>> = {
-    department_id: (departments.data?.data ?? []).map((d): [string, string] => [d.department_id, d.name]),
-    leave_type_id: (types.data?.data ?? []).map((t): [string, string] => [t.leave_type_id, t.name]),
+    department_id: departments.rows.map((d): [string, string] => [d.department_id, d.name]),
+    leave_type_id: types.rows.map((t): [string, string] => [t.leave_type_id, t.name]),
   };
+  // Both lists load 25 at a time as their menu nears its end.
+  const more: Partial<Record<FilterKey, Paging>> = { department_id: paging(departments), leave_type_id: paging(types) };
   return (
     <>
       {takes.includes("roster_day") && <RosterFilters field={field} status={status} values={values} set={set} />}
@@ -499,7 +510,7 @@ function SourceFilters({ takes, field, status, values, set }: { takes: readonly 
         const spec = FILTER_FIELDS[key];
         return (
           <Field key={key} label={spec.label} {...status(key)}>
-            <SelectField options={[["", spec.all], ...(read[key] ?? spec.options)]} {...field(key)} />
+            <SelectField options={[["", spec.all], ...(read[key] ?? spec.options)]} {...more[key]} {...field(key)} />
           </Field>
         );
       })}

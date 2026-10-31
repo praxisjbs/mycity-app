@@ -5,6 +5,7 @@ import { axe } from "../testing/axe";
 import { setViewport } from "../testing/viewport";
 import { installOverlayTestEnv } from "../overlay/test-env";
 import { Kanban, type KanbanColumn } from "./Kanban";
+import { RowMarksContext, type RowMarks } from "../lib/marks";
 
 beforeAll(installOverlayTestEnv);
 beforeEach(() => setViewport(1440));
@@ -144,7 +145,7 @@ describe("Kanban on desktop", () => {
     const empty = COLUMNS.map((c) => ({ ...c, cards: [], count: undefined }));
     const { container, rerender } = render(<Kanban columns={empty} loading empty={<p>No Tasks Yet</p>} />);
     expect(screen.queryByText("No Tasks Yet")).toBeNull();
-    expect(screen.queryByText("Nothing here")).toBeNull();
+    expect(screen.queryByText("Nothing in this stage")).toBeNull();
     expect(container.querySelector("[aria-busy=true]")).not.toBeNull();
     expect(container.querySelectorAll("[data-skeleton]")).toHaveLength(3);
     rerender(<Kanban columns={empty} empty={<p>No Tasks Yet</p>} />);
@@ -153,7 +154,7 @@ describe("Kanban on desktop", () => {
 
   it("marks an empty stage, and shows the empty state when no stage holds a card", () => {
     const { rerender } = render(<Kanban columns={COLUMNS} empty={<p>No Tasks Yet</p>} />);
-    expect(within(screen.getByRole("region", { name: "Signed" })).getByText("Nothing here")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Signed" })).getByText("Nothing in this stage")).toBeInTheDocument();
     expect(screen.queryByText("No Tasks Yet")).toBeNull();
     rerender(<Kanban columns={COLUMNS.map((c) => ({ ...c, cards: [], count: 0 }))} empty={<p>No Tasks Yet</p>} />);
     expect(screen.getByText("No Tasks Yet")).toBeInTheDocument();
@@ -163,6 +164,59 @@ describe("Kanban on desktop", () => {
   it("has no accessibility violations", async () => {
     const { container } = render(<Kanban columns={COLUMNS} onOpen={vi.fn()} onMove={vi.fn()} />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("Kanban: what waits on the reader", () => {
+  /** Cards new to the reader, as the app's RowMarksContext gives them; `opened` records the reads. */
+  const marksOf = (fresh: string[], opened: (key: string) => void): RowMarks => ({
+    useMarked: (keys) => new Set(keys.filter((k) => fresh.includes(k))),
+    opened,
+  });
+  const WAITING: KanbanColumn[] = [
+    { ...COLUMNS[0]! },
+    { ...COLUMNS[1]!, unread: 2 },
+    { ...COLUMNS[2]!, urgent: true },
+  ];
+
+  it("counts each stage's unread notifications beside its name, red and at least 1 while urgent", () => {
+    render(<Kanban columns={WAITING} />);
+    const qualified = within(screen.getByRole("region", { name: "Qualified" })).getByRole("heading");
+    expect(qualified.querySelector("[data-count]")).toHaveTextContent("2");
+    expect(qualified.querySelector("[data-count]")).toHaveClass("bg-primary");
+    expect(within(screen.getByRole("region", { name: "Signed" })).getByRole("heading").querySelector("[data-count]")).toHaveClass("bg-destructive");
+    expect(within(screen.getByRole("region", { name: "Lead" })).getByRole("heading").querySelector("[data-count]")).toBeNull();
+  });
+
+  it("dots and tints a card new to the reader, which opening reads", async () => {
+    const opened = vi.fn();
+    const onOpen = vi.fn();
+    render(
+      <RowMarksContext.Provider value={marksOf(["c2"], opened)}>
+        <Kanban columns={COLUMNS} onOpen={onOpen} />
+      </RowMarksContext.Provider>,
+    );
+    const card = screen.getByRole("button", { name: /Ikeja Mall/ });
+    expect(card).toHaveAccessibleName(/^Unread, Ikeja Mall/);
+    expect(screen.getByRole("region", { name: "Qualified" }).querySelector("[data-unread]")).not.toBeNull();
+    expect(screen.getByRole("region", { name: "Lead" }).querySelector("[data-unread]")).toBeNull();
+    await userEvent.click(card);
+    expect(opened).toHaveBeenCalledWith("c2");
+    expect(onOpen).toHaveBeenCalledWith("c2", "qualified");
+    await userEvent.click(screen.getByRole("button", { name: /Lagos Water Board/ }));
+    expect(opened).toHaveBeenCalledOnce();
+  });
+
+  it("on a phone, opens on the stage holding the news, and stays where the person picks", async () => {
+    setViewport(390);
+    const { rerender } = render(<Kanban columns={COLUMNS} />);
+    expect(screen.getByText("Lagos Water Board")).toBeInTheDocument();
+    rerender(<Kanban columns={WAITING} />);
+    await waitFor(() => expect(screen.getByText("Ikeja Mall")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Qualified 8 2/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: /Lead 12/ }));
+    rerender(<Kanban columns={WAITING.map((c) => ({ ...c, unread: (c.unread ?? 0) + 1 }))} />);
+    expect(screen.getByText("Lagos Water Board")).toBeInTheDocument();
   });
 });
 

@@ -122,12 +122,14 @@ describeDb("performance foundation against the real migrations", () => {
   describe("capabilities (§8)", () => {
     test("each role holds its defaults; the CEO holds every one", async () => {
       const caps = async (who) => (await as(who).get("/auth/me")).body.capabilities;
-      expect(await caps("ops")).toEqual(expect.arrayContaining(["goals.function", "performance.manage"]));
-      expect(await caps("ops")).not.toContain("goals.company");
-      expect(await caps("pm")).toEqual(expect.arrayContaining(["goals.company", "goals.function"]));
+      // Operations & People read, share and edit the whole plan by role (P27, seed 2542).
+      expect(await caps("ops")).toEqual(expect.arrayContaining(["goals.function", "performance.manage", "goals.view_all", "goals.company", "goals.organisation"]));
+      // The Program Manager is in General Management, whose people hold the same three through the department.
+      expect(await caps("pm")).toEqual(expect.arrayContaining(["goals.company", "goals.function", "goals.view_all", "goals.organisation"]));
       expect(await caps("pm")).not.toContain("performance.manage");
       expect(await caps("head")).toEqual(expect.arrayContaining(["goals.function"]));
       expect(await caps("staff")).not.toContain("goals.function");
+      expect(await caps("staff")).not.toContain("goals.view_all");
       expect(await caps("ceo")).toEqual(expect.arrayContaining(["goals.organisation", "goals.confirm", "performance.manage"]));
     });
   });
@@ -147,14 +149,13 @@ describeDb("performance foundation against the real migrations", () => {
     });
 
     test("Q4 2026: named, ended and planned from its first day, carrying the code's rules", async () => {
-      const res = await as("ops").post("/performance/periods", { starts_on: "2026-10-01", targets_lock_on: "2026-10-31" });
+      const res = await as("ops").post("/performance/periods", { starts_on: "2026-10-01" });
       expect(res.status).toBe(201);
       expect(res.body).toMatchObject({
         name: "Q4 2026",
         starts_on: "2026-10-01",
         ends_on: "2026-12-31",
         plan_year_starts_on: "2026-01-01",
-        targets_lock_on: "2026-10-31",
         status: "planning",
         months: ["2026-10-01", "2026-11-01", "2026-12-01"],
       });
@@ -167,9 +168,9 @@ describeDb("performance foundation against the real migrations", () => {
 
     test("a day outside the quarter and a start that is not a quarter's are refused", async () => {
       expect((await as("ops").post("/performance/periods", { starts_on: "2026-11-01" })).status).toBe(422);
-      const res = await as("ops").patch(`/performance/periods/${ids.q4}`, { targets_lock_on: "2027-01-05" });
+      const res = await as("ops").patch(`/performance/periods/${ids.q4}`, { live_from: "2027-01-05" });
       expect(res.status).toBe(422);
-      expect(res.body.error.fields.targets_lock_on).toBeDefined();
+      expect(res.body.error.fields.live_from).toBeDefined();
     });
 
     test("rules that do not hold together are refused; a change to this quarter's rules is kept", async () => {
@@ -211,6 +212,20 @@ describeDb("performance foundation against the real migrations", () => {
         [ids.q4],
       );
       expect(audit.rows.length).toBeGreaterThanOrEqual(2);
+    });
+
+    test("a closed quarter changes no more: its rules, name and status stay as it ran (§3.2)", async () => {
+      const closed = await as("ops").patch(`/performance/periods/${ids.q1}`, { status: "closed" });
+      expect(closed.status).toBe(200);
+      const rules = JSON.parse(JSON.stringify(closed.body.rules));
+      rules.key_results.band_good = 0.8;
+      for (const body of [{ rules }, { name: "Q1 2027 Renamed" }, { status: "closed" }]) {
+        const res = await as("ops").patch(`/performance/periods/${ids.q1}`, body);
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("PERIOD_CLOSED");
+      }
+      const after = await as("staff").get(`/performance/periods/${ids.q1}`);
+      expect(after.body).toMatchObject({ name: "Q1 2027", status: "closed", rules: closed.body.rules });
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { CheckboxField, Switch, ToggleRow } from "./Switch";
@@ -13,6 +13,20 @@ describe("Switch, ToggleRow, CheckboxField", () => {
     sw.focus();
     await user.keyboard(" ");
     expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("a change that hands back its work is busy until it settles, and a second change waits (F26)", async () => {
+    const user = userEvent.setup();
+    let finish: () => void = () => undefined;
+    const onChange = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    render(<Switch checked={false} onChange={onChange} label="Two-Step" />);
+    const sw = screen.getByRole("switch", { name: "Two-Step" });
+    await user.click(sw);
+    expect(sw).toHaveAttribute("aria-busy", "true");
+    await user.click(sw);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+    expect(sw).not.toHaveAttribute("aria-busy");
   });
 
   it("ToggleRow names its switch by its title", () => {

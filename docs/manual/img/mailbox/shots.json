@@ -1,0 +1,122 @@
+{
+  "mailbox-ai": {
+    "spec": "b2a7172f1d1fb27e",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-archive": {
+    "spec": "80dcc6a618bc05ed",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-compose": {
+    "spec": "6612fdd0bcde7dee",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-configure": {
+    "spec": "6c4628ec8557c947",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-configure-shows": {
+    "spec": "0249dedf211dab49",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-configure-social": {
+    "spec": "be99e06e55c1d2b6",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-drafts": {
+    "spec": "d831da63adcf11f5",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-inbox": {
+    "spec": "600cdd97cbf144b9",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-message": {
+    "spec": "81568fd6877e1597",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-schedule": {
+    "spec": "57533a76820bd049",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-sent": {
+    "spec": "79363810291199d6",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-signature": {
+    "spec": "0a8668265397107a",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-spam": {
+    "spec": "70842acd00500c2b",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-summary": {
+    "spec": "98ed22861e835e3c",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-trash": {
+    "spec": "3a9e6f56e4665384",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

@@ -5,6 +5,7 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -219,6 +220,7 @@ export function Alerts({ linked }: { linked: string | null }) {
   }, [ruleLinked, manage, rules, ruleTarget.data, ruleTarget.error]);
 
   const pickCategory = (value: string) => setParams({ category: value === "all" ? null : value }, { replace: true });
+  const news = useViewNews();
   const open = view === "open";
 
   return (
@@ -244,7 +246,7 @@ export function Alerts({ linked }: { linked: string | null }) {
       ) : (
         <LoadingRows count={2} />
       )}
-      {open && summary.data && <Chips label="Category" value={category ?? "all"} onChange={pickCategory} options={categoryChips(summary.data, category)} />}
+      {open && summary.data && <Chips label="Category" value={category ?? "all"} onChange={pickCategory} options={withNews(news, categoryChips(summary.data, category), { at: "open", all: "all" })} />}
       <DataView
         title={open ? "Open Alerts" : "Dismissed Alerts"}
         list={list}

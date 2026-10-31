@@ -34,19 +34,23 @@ function daysOf(startsOn, endsOn, calendar) {
 }
 
 /**
- * Refuse a request the year's allowance cannot hold.
+ * Refuse a request the year's allowance cannot hold. The Last Day's mark gives both figures,
+ * the working days asked for and the days left ("32 working days, 19 left"), in the form's
+ * four words, so the person sees by how much to shorten it. It reads the same whoever asks.
  * @param {{entitled: number|null, remaining: number|null, name: string}|undefined} balance
  * @param {number} days
  */
 function assertWithinAllowance(balance, days) {
   if (!balance || balance.entitled === null || balance.remaining === null) return;
-  if (days > balance.remaining)
+  if (days > balance.remaining) {
+    const left = Math.max(balance.remaining, 0);
     throw new AppError(
       "LEAVE_ALLOWANCE_EXCEEDED",
-      `Only ${Math.max(balance.remaining, 0)} ${balance.name} days are left this year`,
+      `Only ${left} ${balance.name} ${left === 1 ? "day is" : "days are"} left this year`,
       422,
-      { ends_on: ["More than you have left"] },
+      { ends_on: [`${days} working ${days === 1 ? "day" : "days"}, ${left} left`] },
     );
+  }
 }
 
 module.exports = { daysOf, assertWithinAllowance };

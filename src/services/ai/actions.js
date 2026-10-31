@@ -106,6 +106,26 @@ const ACTIONS = Object.freeze({
     built: true,
   }),
   // Mailbox (docs/guides/mailbox.md §1.1, §9): each only when the mailbox's owner presses it.
+  // Write With AI on Raise a Query (docs/guides/queries.md §9): Subject and What Happened.
+  "query-draft": Object.freeze({
+    label: "Write Query",
+    module: "queries",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-10-26",
+    built: true,
+  }),
+  // Write With AI on the letter editor (queries.md §9): a disciplinary letter's wording, with care.
+  "letter-draft": Object.freeze({
+    label: "Write Letter",
+    module: "queries",
+    job: "deep_reasoning",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-10-26",
+    built: true,
+  }),
   "mail-draft": Object.freeze({
     label: "Write Email",
     module: "mailbox",
@@ -140,6 +160,38 @@ const ACTIONS = Object.freeze({
     personal_data: true,
     chosen_by: "TB",
     chosen_at: "2026-10-22",
+    built: true,
+  }),
+  // The User Guide's search (docs/guides/user-guide.md §6.8): its passages and each search, on one
+  // embedding model so the two can be compared. A search can name a person.
+  "guide-search": Object.freeze({
+    label: "Guide Search",
+    module: "knowledge",
+    job: "embeddings",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-10-25",
+    built: true,
+  }),
+  // Its short answer, written only from the passages the reader may read (§6.9), on Fast as
+  // chosen on 25/10/2026 (§6.1 decision 10).
+  "guide-answer": Object.freeze({
+    label: "Guide Answer",
+    module: "knowledge",
+    job: "fast",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-10-25",
+    built: true,
+  }),
+  // A search spoken into the guide's box (§6.10).
+  "guide-voice": Object.freeze({
+    label: "Guide Voice Search",
+    module: "knowledge",
+    job: "transcription",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-10-25",
     built: true,
   }),
   "integration-test": Object.freeze({

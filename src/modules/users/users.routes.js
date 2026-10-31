@@ -32,13 +32,23 @@ route(router, "post", "/",
   { body: c.users.UserInvite, response: c.users.UserRow, summary: "Invite an employee to sign in" },
   create, controller.invite);
 
+/* Every invited login nobody has sent an invitation to yet: the roster makes them with no email. */
+route(router, "post", "/invite-pending",
+  { body: c.common.EmptyBody, response: c.users.InvitesSent, summary: "Send every invitation not sent yet" },
+  edit, limits.adminLinkLimiter, controller.invitePending);
+
 route(router, "get", "/:id",
   { response: c.users.UserRow, summary: "One login" },
   view, controller.get);
 
 route(router, "post", "/:id/invite",
   { body: c.common.EmptyBody, response: c.users.LinkSent, summary: "Send the invitation again" },
-  edit, limits.forgotLimiter, controller.resendInvite);
+  edit, limits.adminLinkLimiter, controller.resendInvite);
+
+/* A login in use moves to its employee's corrected work email only on purpose, after a fresh sign-in. */
+route(router, "post", "/:id/use-work-email",
+  { body: c.common.EmptyBody, response: c.users.UserRow, summary: "Sign in with the employee's work email" },
+  edit, controller.useWorkEmail);
 
 route(router, "post", "/:id/roles",
   { body: c.users.UserRolesSet, response: c.users.UserRow, summary: "Set a login's roles" },
@@ -54,7 +64,7 @@ route(router, "post", "/:id/reactivate",
 
 route(router, "post", "/:id/reset-link",
   { body: c.common.EmptyBody, response: c.users.LinkSent, summary: "Email a reset link" },
-  edit, limits.forgotLimiter, controller.sendResetLink);
+  edit, limits.adminLinkLimiter, controller.sendResetLink);
 
 route(router, "post", "/:id/end-sessions",
   { body: c.common.EmptyBody, response: c.users.UserSessionsEnded, summary: "Sign a login out everywhere" },

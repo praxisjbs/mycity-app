@@ -32,10 +32,10 @@ const { z } = require("zod");
 /** A score from 0 to 1, as a decimal string with up to four places ("0.75"). */
 const ScoreValue = z
   .string()
-  .regex(/^(0(\.\d{1,4})?|1(\.0{1,4})?)$/, "must be a score from 0 to 1, like 0.75");
+  .regex(/^(0(\.\d{1,4})?|1(\.0{1,4})?)$/, "From 0 to 1");
 
 /** A target or actual quantity: numeric(18,4) as a decimal string ("64000", "0.95"). */
-const Quantity = z.string().regex(/^-?\d{1,14}(\.\d{1,4})?$/, "must be a number like 64000 or 0.95");
+const Quantity = z.string().regex(/^-?\d{1,14}(\.\d{1,4})?$/, "Like 64000 or 0.95");
 
 const Direction = z.enum(["higher", "lower"]);
 const KrBand = z.enum(["good", "watch", "recovery"]);
@@ -45,7 +45,7 @@ const Rating = z.enum(["exceeds", "meets", "partly_meets", "below"]);
  * The rules a quarter carries (performance_period.rules)
  * ------------------------------------------------------------------ */
 
-const share = z.number().min(0).max(1);
+const share = z.number().min(0, "From 0 to 1").max(1, "From 0 to 1");
 
 const KeyResultRules = z
   .object({

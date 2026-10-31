@@ -449,7 +449,17 @@ async function hasRates(db, day, base = "USD") {
   return Boolean(await one(db, "SELECT 1 AS yes FROM exchange_rate WHERE day = $1::date AND base = $2 LIMIT 1", [day, base]));
 }
 
+/** Each of these connections' provider code: where it waits on Settings · Integrations (integrations.views.js). */
+async function codesOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT c.integration_connection_id AS id, c.code::text AS code FROM integration_connection c WHERE c.integration_connection_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
 module.exports = {
+  codesOf,
   connections,
   connection,
   connectionForUpdate,

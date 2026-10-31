@@ -31,6 +31,7 @@
     "gen:components": "node scripts/gen/components.js",
     "new:component": "node scripts/new-component.js",
     "new:screen": "node scripts/new-screen.js",
+    "guide:shots": "node scripts/guide/shoot.js",
     "check:pagination": "node scripts/check/pagination.js",
     "check:five-second": "node scripts/check/five-second.js",
     "check:two-shells": "node scripts/check/two-shells.js",

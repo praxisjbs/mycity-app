@@ -101,7 +101,7 @@ export function usePages<R>(list: PagedResult<R>, key: (row: R) => string) {
 }
 
 /** The server's words for a refused write, or a plain fallback. */
-export const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
+export const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
 
 /** Every Workspace read again, after a write. A project's counts follow its tasks. */
 export const refresh = () => {

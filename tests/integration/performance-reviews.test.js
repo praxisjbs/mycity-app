@@ -126,7 +126,7 @@ describeDb("performance reviews against the real migrations", () => {
     }
 
     // Q3 2026: planned, bound and agreed, as PR 2 leaves a quarter.
-    const period = await as("ops").post("/performance/periods", { starts_on: "2026-07-01", targets_lock_on: "2026-07-31" });
+    const period = await as("ops").post("/performance/periods", { starts_on: "2026-07-01" });
     expect(period.status).toBe(201);
     ids.period = period.body.performance_period_id;
     expect((await as("ops").patch(`/performance/periods/${ids.period}`, { status: "active" })).status).toBe(200);
@@ -134,7 +134,7 @@ describeDb("performance reviews against the real migrations", () => {
     expect(o.status).toBe(201);
     const kr = await as("head").post("/performance/key-results", { okr_objective_id: o.body.okr_objective_id, statement: "Publish 36 city stories", target_value: "36", accountable_employee_id: emp("head") });
     expect(kr.status).toBe(201);
-    const kpi = await as("head").post("/performance/kpis", { department_id: ids.bm, name: "Assets on time", unit: "%", target_value: "95" });
+    const kpi = await as("head").post("/performance/kpis", { department_id: ids.bm, name: "Assets on time", unit: "%", target_value: "95", target_text: "≥95%" });
     expect(kpi.status).toBe(201);
     ids.kpi = kpi.body.kpi_definition_id;
     for (const who of ["ada", "musa"]) {
@@ -195,6 +195,40 @@ describeDb("performance reviews against the real migrations", () => {
     const reminders = await q("SELECT occurrence FROM reminder WHERE reminder_key = 'check_in_due' AND entity_id = $1 ORDER BY occurrence", [(await reviewOf("ada")).performance_review_id]);
     // The round's dates have passed in this test's clock, so nothing is scheduled behind them.
     expect(reminders.rows).toEqual([]);
+  });
+
+  test("Close Round and Reopen Round move the round's status and nothing else; a round already there is left as it is", async () => {
+    const path = (verb) => `/performance/rounds/${ids.round}/${verb}`;
+    const status = async () => (await one("SELECT status FROM performance_cycle WHERE performance_cycle_id = $1", [ids.round])).status;
+    const recorded = async (key) =>
+      Number((await one("SELECT count(*) AS n FROM event_log WHERE event_key LIKE $1 AND entity_id = $2", [`%${key}`, ids.round])).n);
+    const counts = async () => (await as("ops").get(`/performance/rounds?period_id=${ids.period}`)).body.data.find((r) => r.performance_cycle_id === ids.round);
+    const open = await counts();
+
+    // Running the cycle is Operations & People's, not a head's.
+    expect((await as("head").post(path("close"), {})).status).toBe(403);
+    expect((await as("head").post(path("reopen"), {})).status).toBe(403);
+    expect(await status()).toBe("open");
+
+    const closed = await as("ops").post(path("close"), {});
+    expect([closed.status, closed.body.status]).toEqual([200, "closed"]);
+    expect(await status()).toBe("closed");
+    // Its reviews stand where they stood.
+    expect(await counts()).toMatchObject({ status: "closed", counts: open.counts });
+    // Again: nothing to do, so nothing is recorded twice.
+    expect((await as("ops").post(path("close"), {})).body.status).toBe("closed");
+    expect(await recorded("review_round.closed")).toBe(1);
+
+    const reopened = await as("ops").post(path("reopen"), {});
+    expect([reopened.status, reopened.body.status]).toEqual([200, "open"]);
+    expect(await status()).toBe("open");
+    // The round as it was: deadlines, counts and all.
+    expect(await counts()).toEqual(open);
+    expect((await as("ops").post(path("reopen"), {})).body.status).toBe("open");
+    expect(await recorded("review_round.reopened")).toBe(1);
+
+    const missing = await as("ops").post(`/performance/rounds/${require("crypto").randomUUID()}/reopen`, {});
+    expect([missing.status, missing.body.error.code]).toEqual([404, "NOT_FOUND"]);
   });
 
   test("self first: the reviewer is refused until the check-in is in (A17)", async () => {

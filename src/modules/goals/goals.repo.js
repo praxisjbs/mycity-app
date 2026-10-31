@@ -10,12 +10,13 @@ const { personJson } = require("../../shared/db/person");
 const { scopeClause } = require("../../shared/rbac/scope");
 const { escapeLike } = require("../../shared/search/provider");
 const approvers = require("../../shared/workflow/approvers");
+const visibility = require("./goals.visibility");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
 /** A quarter as the service turns it into PerformancePeriod. */
 const PERIOD = `p.performance_period_id, p.name, p.starts_on, p.ends_on, p.plan_year_starts_on,
-  p.targets_lock_on, p.live_from, p.status, p.rules, p.created_at, p.updated_at`;
+  p.live_from, p.status, p.rules, p.created_at, p.updated_at`;
 
 const PERIOD_SORTS = { starts_on: "p.starts_on" };
 
@@ -72,14 +73,14 @@ function insertPeriod(client, p) {
   return one(
     client,
     `INSERT INTO performance_period
-       (name, starts_on, ends_on, plan_year_starts_on, targets_lock_on, live_from, status, rules)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+       (name, starts_on, ends_on, plan_year_starts_on, live_from, status, rules)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
      RETURNING performance_period_id`,
-    [p.name, p.starts_on, p.ends_on, p.plan_year_starts_on, p.targets_lock_on, p.live_from, p.status || "planning", JSON.stringify(p.rules)],
+    [p.name, p.starts_on, p.ends_on, p.plan_year_starts_on, p.live_from, p.status || "planning", JSON.stringify(p.rules)],
   );
 }
 
-const PERIOD_WRITABLE = ["name", "targets_lock_on", "live_from", "status", "rules"];
+const PERIOD_WRITABLE = ["name", "live_from", "status", "rules"];
 
 async function updatePeriod(client, id, patch) {
   const keys = PERIOD_WRITABLE.filter((k) => patch[k] !== undefined);
@@ -104,7 +105,10 @@ const GOAL_FROM = `FROM organisational_goal g
   LEFT JOIN department od ON od.department_id = o.department_id`;
 const GOAL_SORTS = { code: "g.code", title: "g.title", ends_on: "g.ends_on" };
 
-function listGoals(db, query) {
+/** One page of organisational goals: all of them for the whole plan, else those shared with the reader (§6.23). */
+function listGoals(db, query, reach = visibility.EVERYTHING) {
+  const params = [query.plan_year ? `${query.plan_year}-01-01` : null, query.status || null, query.q || null];
+  const readable = visibility.goalReadable(reach, "g", params);
   return pageQuery(
     db,
     `SELECT ${GOAL}, ${TOTAL_COL} ${GOAL_FROM}
@@ -113,8 +117,9 @@ function listGoals(db, query) {
         AND ($2::text IS NULL OR g.status = $2)
         AND ($3::text IS NULL OR search_fold(COALESCE(g.code::text, '') || ' ' || g.title || ' ' || COALESCE(g.strategic_theme, ''))
                                  LIKE '%' || search_fold($3) || '%')
+        AND ${readable}
       ORDER BY ${orderBy(query, GOAL_SORTS, "g.organisational_goal_id")}`,
-    [query.plan_year ? `${query.plan_year}-01-01` : null, query.status || null, query.q || null],
+    params,
     query,
   );
 }
@@ -136,7 +141,7 @@ async function goalTargets(db, id) {
 }
 
 const GOAL_WRITABLE = [
-  "code", "title", "strategic_theme", "detail", "success_measure", "reference_target", "baseline", "key_decisions",
+  "code", "code_given_at", "title", "strategic_theme", "detail", "success_measure", "reference_target", "baseline", "key_decisions",
   "function_cascade", "plan_year_starts_on", "starts_on", "ends_on", "status", "owner_employee_id", "level", "weight",
 ];
 
@@ -169,16 +174,6 @@ async function setGoalTargets(client, id, targets) {
       [id, t.performance_period_id, t.target_text ?? null, t.target_value ?? null],
     );
 }
-
-const goalCodeTaken = async (db, planYear, code, except = null) =>
-  Boolean(
-    await one(
-      db,
-      `SELECT 1 AS x FROM organisational_goal WHERE plan_year_starts_on = $1 AND code = $2
-          AND organisational_goal_id IS DISTINCT FROM $3`,
-      [planYear, code, except],
-    ),
-  );
 
 /**
  * What keeps a goal from being deleted: the company objectives serving it, and any older row naming
@@ -241,8 +236,10 @@ const PLAN_FROM = `FROM performance_plan pl
   LEFT JOIN department d ON d.department_id = pl.department_id`;
 const PLAN_SORTS = { department: "d.name", status: "pl.status" };
 
-function listPlans(db, query) {
+function listPlans(db, query, reach = visibility.EVERYTHING) {
   const dept = query.department_id === "company" ? null : query.department_id || null;
+  const params = [query.period_id || null, query.status || null, query.department_id === "company", dept];
+  const readable = visibility.departmentReadable(reach, "pl.department_id", params);
   return pageQuery(
     db,
     `SELECT ${PLAN}, ${TOTAL_COL} ${PLAN_FROM}
@@ -250,13 +247,99 @@ function listPlans(db, query) {
         AND ($2::text IS NULL OR pl.status = $2)
         AND ($3::boolean IS FALSE OR pl.department_id IS NULL)
         AND ($4::uuid IS NULL OR pl.department_id = $4)
+        AND ${readable}
       ORDER BY ${orderBy(query, PLAN_SORTS, "pl.performance_plan_id")}`,
-    [query.period_id || null, query.status || null, query.department_id === "company", dept],
+    params,
     query,
   );
 }
 
 const getPlan = (db, id) => one(db, `SELECT ${PLAN} ${PLAN_FROM} WHERE pl.performance_plan_id = $1`, [id]);
+
+/**
+ * The stage a plan's approval is at: its key and the stages of the definition version it started on (so its
+ * name is the one its approvers were told), or null when that approval is not pending.
+ */
+const pendingStage = (db, instanceId) =>
+  instanceId
+    ? one(
+        db,
+        `SELECT wi.current_stage AS stage_key, wd.stages
+           FROM workflow_instance wi JOIN workflow_definition wd ON wd.workflow_definition_id = wi.workflow_definition_id
+          WHERE wi.workflow_instance_id = $1 AND wi.state = 'pending'`,
+        [instanceId],
+      )
+    : null;
+
+/**
+ * GET /performance/functions: the company first (no department), then each active function by
+ * name, with its plan's status in the quarter `period_id` (none without one) and whether a request to
+ * unbind it waits. Whether the reader may set each is the service's question for goals.authority,
+ * never this query's.
+ */
+function listFunctions(db, query, reach = visibility.EVERYTHING) {
+  const params = [query.period_id || null];
+  const readable = visibility.departmentReadable(reach, "f.department_id", params);
+  return pageQuery(
+    db,
+    `SELECT f.department_id, f.name, pl.status AS plan_status,
+            EXISTS (SELECT 1 FROM plan_unbind u WHERE u.performance_plan_id = pl.performance_plan_id AND u.status = 'pending') AS unbind_pending,
+            ${TOTAL_COL}
+       FROM (SELECT NULL::uuid AS department_id, NULL::text AS name, 0 AS rank
+             UNION ALL
+             SELECT d.department_id, d.name, 1 FROM department d WHERE d.active) f
+       LEFT JOIN performance_plan pl
+         ON pl.performance_period_id = $1::uuid AND pl.department_id IS NOT DISTINCT FROM f.department_id
+      WHERE ${readable}
+      ORDER BY f.rank, f.name, f.department_id`,
+    params,
+    query,
+  );
+}
+
+/**
+ * GET /performance/departments: the departments a reader's Performance lists can be filtered by.
+ * A reader with `all` gets every active one. Anyone else gets the departments of the people they
+ * reach: their scope (the caller first), those whose scorecards or reviews name them (reviewer, a
+ * holder of the reviewing role, dotted manager, second level), and themselves; each as the person's
+ * record and their scorecards give it (a person moved mid-quarter keeps the scorecard's), and the
+ * departments they head.
+ */
+function listDepartments(db, query, scope, reader) {
+  if (scope.scope === "all")
+    return pageQuery(
+      db,
+      `SELECT d.department_id, d.code, d.name, ${TOTAL_COL}
+         FROM department d
+        WHERE d.active
+        ORDER BY d.name, d.department_id`,
+      [],
+      query,
+    );
+  return pageQuery(
+    db,
+    `WITH reach AS (
+       SELECT unnest($1::uuid[]) AS employee_id
+       UNION SELECT $2::uuid
+       UNION SELECT s.employee_id FROM scorecard s
+              WHERE s.reviewer_employee_id = $2 OR s.dotted_employee_id = $2
+                 OR (s.reviewer_role_code IS NOT NULL AND s.employee_id <> $2
+                     AND s.reviewer_role_code::text IN (SELECT r.code::text FROM user_role ur JOIN role r ON r.role_id = ur.role_id WHERE ur.user_id = $3))
+       UNION SELECT pr.employee_id FROM performance_review pr
+              WHERE pr.reviewer_employee_id = $2 OR pr.dotted_employee_id = $2 OR pr.second_level_employee_id = $2
+     ), places AS (
+       SELECT e.department_id FROM employee e JOIN reach USING (employee_id)
+       UNION SELECT s.department_id FROM scorecard s JOIN reach USING (employee_id)
+       UNION SELECT h.department_id FROM department h WHERE h.head_employee_id = $2
+     )
+     SELECT d.department_id, d.code, d.name, ${TOTAL_COL}
+       FROM department d
+      WHERE d.active AND d.department_id IN (SELECT department_id FROM places)
+      ORDER BY d.name, d.department_id`,
+    [Array.isArray(scope.scope_ids) ? scope.scope_ids : [], reader.employee_id || null, reader.user_id || null],
+    query,
+  );
+}
 
 async function updatePlan(client, id, patch) {
   const keys = ["status", "workflow_instance_id", "submitted_by", "submitted_at", "returned_reason", "binding_at"].filter(
@@ -280,21 +363,30 @@ const OBJECTIVE_FROM = `FROM okr_objective o
   LEFT JOIN department d ON d.department_id = o.department_id`;
 const OBJECTIVE_SORTS = { position: "o.department_id NULLS FIRST, o.position, o.code", code: "o.code" };
 
-function listObjectives(db, query) {
+/**
+ * One page of objectives the reader may read (§6.23). `reader_open` says whether the whole of one is theirs,
+ * or only the key results they own (the objective is then shown with those alone).
+ */
+function listObjectives(db, query, reach = visibility.EVERYTHING) {
   const company = query.department_id === "company";
   const dept = company ? null : query.department_id || null;
+  const params = [query.period_id || null, company, dept, query.status || null, query.q || null];
+  const open = visibility.objectiveOpen(reach, "o", params);
+  const readable = visibility.objectiveReadable(reach, "o", params);
   return pageQuery(
     db,
-    `SELECT ${OBJECTIVE}, ${TOTAL_COL} ${OBJECTIVE_FROM}
+    `SELECT ${OBJECTIVE}, ${open} AS reader_open, ${TOTAL_COL} ${OBJECTIVE_FROM}
       WHERE ($1::uuid IS NULL OR o.performance_period_id = $1)
         AND ($2::boolean IS FALSE OR o.department_id IS NULL)
         AND ($3::uuid IS NULL OR o.department_id = $3)
-        AND ($4::text IS NULL OR pl.status = $4)
+        AND ($4::text IS NULL OR pl.status = $4 OR ($4 = 'live' AND pl.status IN ('binding', 'unbound', 'revising'))
+             OR ($4 = 'editable' AND pl.status IN ('draft', 'returned', 'unbound', 'submitted', 'revising')))
         AND ($5::text IS NULL OR search_fold(o.code || ' ' || o.title || ' ' || COALESCE((
               SELECT string_agg(kr.code || ' ' || kr.statement, ' ') FROM okr_key_result kr
                WHERE kr.okr_objective_id = o.okr_objective_id), '')) LIKE '%' || search_fold($5) || '%')
+        AND ${readable}
       ORDER BY ${orderBy(query, OBJECTIVE_SORTS, "o.okr_objective_id")}`,
-    [query.period_id || null, company, dept, query.status || null, query.q || null],
+    params,
     query,
   );
 }
@@ -303,8 +395,14 @@ const getObjective = (db, id) => one(db, `SELECT ${OBJECTIVE} ${OBJECTIVE_FROM} 
 
 const KEY_RESULT_REF_SORTS = { code: "kr.code" };
 
-/** A quarter's key results as a picker names them: the company's, the functions' or one function's. */
-function listKeyResultRefs(db, query) {
+/**
+ * A quarter's key results as a picker names them: the company's, the functions' or one function's. A
+ * function's within the reader's reach; the company's, by code and statement alone, for whoever sets goals
+ * (`pickCompany`), so a head can say which company key result theirs feeds (§6.23).
+ */
+function listKeyResultRefs(db, query, reach = visibility.EVERYTHING, pickCompany = true) {
+  const params = [query.period_id, query.level || null, query.department_id || null, query.q || null, pickCompany === true];
+  const readable = visibility.keyResultReadable(reach, "kr", "o", params);
   return pageQuery(
     db,
     `SELECT kr.okr_key_result_id, kr.code::text AS code, kr.statement, ${TOTAL_COL}
@@ -314,8 +412,9 @@ function listKeyResultRefs(db, query) {
         AND ($2::text IS NULL OR ($2 = 'company') = (o.department_id IS NULL))
         AND ($3::uuid IS NULL OR o.department_id = $3)
         AND ($4::text IS NULL OR search_fold(kr.code || ' ' || kr.statement) LIKE '%' || search_fold($4) || '%')
+        AND (${readable} OR (o.department_id IS NULL AND $5::boolean))
       ORDER BY ${orderBy(query, KEY_RESULT_REF_SORTS, "kr.okr_key_result_id")}`,
-    [query.period_id, query.level || null, query.department_id || null, query.q || null],
+    params,
     query,
   );
 }
@@ -333,21 +432,24 @@ async function objectivesOfPlan(db, planId) {
 }
 
 /** A quarter's objectives, for its figures (a quarter's plans hold a few dozen). */
-async function objectivesOfPeriod(db, periodId) {
+async function objectivesOfPeriod(db, periodId, reach = visibility.EVERYTHING) {
+  const params = [periodId];
+  const open = visibility.objectiveOpen(reach, "o", params);
+  const readable = visibility.objectiveReadable(reach, "o", params);
   // pagination:complete the Goals figures count every key result of the quarter, not a page of them
   const { rows } = await completeQuery(
     db,
-    `SELECT ${OBJECTIVE} ${OBJECTIVE_FROM} WHERE o.performance_period_id = $1
+    `SELECT ${OBJECTIVE}, ${open} AS reader_open ${OBJECTIVE_FROM} WHERE o.performance_period_id = $1 AND ${readable}
       ORDER BY o.department_id NULLS FIRST, o.position, o.code, o.okr_objective_id`,
-    [periodId],
+    params,
     { label: "a quarter's objectives", ceiling: 1000 },
   );
   return rows;
 }
 
 const KEY_RESULT = `kr.okr_key_result_id, kr.okr_objective_id, kr.code::text AS code, kr.statement, kr.kr_type, kr.measure,
-  kr.direction, kr.unit, kr.baseline_text, trim_scale(kr.target_value)::text AS target_value, kr.target_text, kr.target_provisional,
-  kr.target_locked_at, kr.parts, kr.starts_on, kr.finishes_on, kr.accountable_employee_id,
+  kr.direction, kr.unit, kr.baseline_text, trim_scale(kr.target_value)::text AS target_value, kr.target_text,
+  kr.parts, kr.starts_on, kr.finishes_on, kr.accountable_employee_id,
   ${personJson("ae", "ad")} AS accountable, kr.co_accountable_employee_id, ${personJson("ce", "cd")} AS co_accountable,
   kr.accountable_note, kr.scored_from_key_result_id, kr.position,
   COALESCE((SELECT json_agg(json_build_object('okr_key_result_id', c.okr_key_result_id, 'code', c.code::text,
@@ -381,10 +483,10 @@ const keyResultContext = (db, id) =>
   one(
     db,
     `SELECT kr.okr_key_result_id, kr.code::text AS code, kr.statement, kr.measure, kr.direction,
-            trim_scale(kr.target_value)::text AS target_value, kr.target_text, kr.target_provisional, kr.target_locked_at,
+            trim_scale(kr.target_value)::text AS target_value, kr.target_text,
             kr.accountable_employee_id, kr.scored_from_key_result_id, kr.parts,
             o.okr_objective_id, o.code::text AS objective_code, o.department_id, o.performance_period_id,
-            pl.performance_plan_id, pl.status AS plan_status, p.targets_lock_on, p.rules, p.status AS period_status
+            pl.performance_plan_id, pl.status AS plan_status, p.rules, p.status AS period_status
        FROM okr_key_result kr
        JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
        JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id
@@ -501,14 +603,17 @@ const changePending = async (db, { okr_key_result_id: krId = null, employee_targ
   );
 
 /** The function key results that link to a company key result (its Contributing list). */
-async function contributing(db, companyKeyResultId) {
+async function contributing(db, companyKeyResultId, reach = visibility.EVERYTHING) {
+  const params = [companyKeyResultId];
+  const readable = visibility.keyResultReadable(reach, "kr", "o", params);
   // pagination:complete the function key results feeding one company key result
   const { rows } = await completeQuery(
     db,
     `SELECT kr.okr_key_result_id, kr.code::text AS code, kr.statement
        FROM okr_key_result_link l JOIN okr_key_result kr ON kr.okr_key_result_id = l.okr_key_result_id
-      WHERE l.company_key_result_id = $1 ORDER BY kr.code, kr.okr_key_result_id`,
-    [companyKeyResultId],
+       JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
+      WHERE l.company_key_result_id = $1 AND ${readable} ORDER BY kr.code, kr.okr_key_result_id`,
+    params,
     { label: "a company key result's contributors" },
   );
   return rows;
@@ -568,7 +673,7 @@ const deleteObjective = (client, id) => client.query("DELETE FROM okr_objective 
 
 const KR_WRITABLE = [
   "okr_objective_id", "code", "statement", "kr_type", "measure", "direction", "unit", "baseline_text", "target_value",
-  "target_text", "target_provisional", "target_locked_at", "parts", "starts_on", "finishes_on", "accountable_employee_id",
+  "target_text", "parts", "starts_on", "finishes_on", "accountable_employee_id",
   "co_accountable_employee_id", "accountable_note", "scored_from_key_result_id", "position",
 ];
 
@@ -617,24 +722,6 @@ async function objectiveCodes(db, periodId, prefix) {
 async function keyResultCodes(db, objectiveId) {
   const { rows } = await db.query("SELECT code::text AS code FROM okr_key_result WHERE okr_objective_id = $1", [objectiveId]);
   return rows.map((r) => r.code);
-}
-
-/** Key results whose TBC target locks on or before a day. */
-async function provisionalDue(db, today) {
-  // pagination:complete the lock sweeps every provisional target due, once a day
-  const { rows } = await completeQuery(
-    db,
-    `SELECT kr.okr_key_result_id, kr.code::text AS code, o.department_id, o.performance_period_id
-       FROM okr_key_result kr
-       JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
-       JOIN performance_period p ON p.performance_period_id = o.performance_period_id
-      WHERE kr.target_provisional AND kr.target_locked_at IS NULL
-        AND p.targets_lock_on IS NOT NULL AND p.targets_lock_on <= $1::date
-      ORDER BY kr.okr_key_result_id`,
-    [today],
-    { label: "provisional targets due to lock", ceiling: 2000 },
-  );
-  return rows;
 }
 
 /** A key result found by its code or a former one, in a quarter (the importers). */
@@ -772,10 +859,11 @@ const CHANGE = `tc.target_change_id, tc.okr_key_result_id, tc.employee_target_id
      LEFT JOIN department rd ON rd.department_id = re.department_id WHERE ru.user_id = tc.requested_by) AS requested_by,
   tc.decided_at, tc.created_at`;
 
-/** Target changes: a key result's for every reader (the OKR tree is shared), a line's within the reader's scope. */
-function listChanges(db, query, scope = { scope: "all" }) {
+/** Target changes: a key result's where the reader may read the key result (§6.23), a line's within the reader's scope. */
+function listChanges(db, query, scope = { scope: "all" }, reach = visibility.EVERYTHING) {
   const params = [query.status || null, query.okr_key_result_id || null, query.employee_target_id || null];
   const s = scopeClause(scope, { column: "et.employee_id" }, params);
+  const readable = visibility.keyResultReadable(reach, "ckr", "co", params);
   return pageQuery(
     db,
     `SELECT ${CHANGE}, ${TOTAL_COL} FROM target_change tc
@@ -783,6 +871,9 @@ function listChanges(db, query, scope = { scope: "all" }) {
       WHERE ($1::text IS NULL OR tc.status = $1)
         AND ($2::uuid IS NULL OR tc.okr_key_result_id = $2)
         AND ($3::uuid IS NULL OR tc.employee_target_id = $3)
+        AND (tc.okr_key_result_id IS NULL OR EXISTS (
+              SELECT 1 FROM okr_key_result ckr JOIN okr_objective co ON co.okr_objective_id = ckr.okr_objective_id
+               WHERE ckr.okr_key_result_id = tc.okr_key_result_id AND ${readable}))
         ${s.and ? `AND (tc.employee_target_id IS NULL OR ${s.and.slice(4)})` : ""}
       ORDER BY ${orderBy(query, { created_at: "tc.created_at" }, "tc.target_change_id")}`,
     params,
@@ -835,9 +926,9 @@ const getChangeDetail = (db, id) =>
  * ------------------------------------------------------------------ */
 
 /**
- * Goals · Waiting On You: the pending plan stages and target changes whose current stage names the
- * reader (approvers.waitingOnClause), oldest first, 25 a page. `mayDecide` is false for a reader
- * without `performance` approve, whose list is then empty, as the engine would refuse them.
+ * Goals · Waiting On You: the pending plan stages, unbind requests and target changes whose current
+ * stage names the reader (approvers.waitingOnClause), oldest first, 25 a page. `mayDecide` is false
+ * for a reader without `performance` approve, whose list is then empty, as the engine would refuse them.
  */
 function approvalsWaiting(db, reader, roleCodes, mayDecide, query) {
   const params = [];
@@ -845,12 +936,13 @@ function approvalsWaiting(db, reader, roleCodes, mayDecide, query) {
   params.push(mayDecide, query.q ? `%${escapeLike(query.q)}%` : null);
   const may = params.length - 1;
   const q = params.length;
-  // A plan, a target change, or a mid-quarter scorecard sent on its own through the plan's flow (§11).
+  // A plan (or an unbound plan's changes), a request to unbind one, a target change, or a mid-quarter
+  // scorecard sent on its own through the plan's flow (§11).
   return pageQuery(
     db,
     `SELECT v.*, ${TOTAL_COL} FROM (
-       SELECT CASE wi.entity_type WHEN 'performance_plan' THEN 'plan' WHEN 'scorecard' THEN 'scorecard' ELSE 'target_change' END AS kind,
-              coalesce(pl.performance_plan_id, tc.target_change_id, am.scorecard_id) AS record_id,
+       SELECT CASE wi.entity_type WHEN 'performance_plan' THEN 'plan' WHEN 'plan_unbind' THEN 'unbind' WHEN 'scorecard' THEN 'scorecard' ELSE 'target_change' END AS kind,
+              coalesce(pl.performance_plan_id, ub.plan_unbind_id, tc.target_change_id, am.scorecard_id) AS record_id,
               wi.workflow_instance_id, wd.stages, wi.current_stage, wi.stage_entered_at,
               (wi.stage_due_at IS NOT NULL AND wi.stage_due_at < now()) AS overdue,
               p.name AS period_name, d.name AS department, kr.code::text AS key_result_code, et.title AS line_title,
@@ -860,14 +952,16 @@ function approvalsWaiting(db, reader, roleCodes, mayDecide, query) {
          JOIN workflow_definition wd ON wd.workflow_definition_id = wi.workflow_definition_id
          LEFT JOIN performance_plan pl ON wi.entity_type = 'performance_plan' AND pl.performance_plan_id::text = wi.entity_id
          LEFT JOIN scorecard am ON wi.entity_type = 'scorecard' AND am.scorecard_id::text = wi.entity_id
+         LEFT JOIN plan_unbind ub ON wi.entity_type = 'plan_unbind' AND ub.plan_unbind_id::text = wi.entity_id
+         LEFT JOIN performance_plan upl ON upl.performance_plan_id = ub.performance_plan_id
          LEFT JOIN target_change tc ON wi.entity_type = 'target_change' AND tc.target_change_id::text = wi.entity_id
          LEFT JOIN okr_key_result kr ON kr.okr_key_result_id = tc.okr_key_result_id
          LEFT JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
          LEFT JOIN employee_target et ON et.employee_target_id = tc.employee_target_id
          LEFT JOIN scorecard sc ON sc.scorecard_id = et.scorecard_id
-         LEFT JOIN department d ON d.department_id = coalesce(pl.department_id, o.department_id, sc.department_id, am.department_id)
+         LEFT JOIN department d ON d.department_id = coalesce(pl.department_id, upl.department_id, o.department_id, sc.department_id, am.department_id)
          LEFT JOIN performance_period p
-           ON p.performance_period_id = coalesce(pl.performance_period_id, o.performance_period_id, sc.performance_period_id, am.performance_period_id)
+           ON p.performance_period_id = coalesce(pl.performance_period_id, upl.performance_period_id, o.performance_period_id, sc.performance_period_id, am.performance_period_id)
          LEFT JOIN employee pe ON pe.employee_id = coalesce(am.employee_id, sc.employee_id)
          LEFT JOIN department pd ON pd.department_id = pe.department_id
          LEFT JOIN app_user ou ON ou.user_id = wi.opened_by
@@ -875,6 +969,7 @@ function approvalsWaiting(db, reader, roleCodes, mayDecide, query) {
          LEFT JOIN department od ON od.department_id = oe.department_id
         WHERE wi.state = 'pending' AND $${may}::boolean
           AND ((wi.definition_key = 'performance.plan' AND (pl.performance_plan_id IS NOT NULL OR am.scorecard_id IS NOT NULL))
+            OR (wi.definition_key = 'performance.plan_change' AND (pl.performance_plan_id IS NOT NULL OR ub.plan_unbind_id IS NOT NULL))
             OR (wi.definition_key = 'performance.target_change' AND tc.target_change_id IS NOT NULL))
           AND ${named}
      ) v
@@ -910,6 +1005,79 @@ async function updateChange(client, id, patch) {
   );
 }
 
+/* ------------------------------------------------------------------ *
+ * Requests to unbind a plan (§6.22)
+ * ------------------------------------------------------------------ */
+
+const UNBIND = `u.plan_unbind_id, u.performance_plan_id, u.reason, u.status, u.workflow_instance_id, u.decided_at,
+  u.decision_reason, u.created_at,
+  (SELECT ${personJson("re", "rd")} FROM app_user ru JOIN employee re ON re.employee_id = ru.employee_id
+     LEFT JOIN department rd ON rd.department_id = re.department_id WHERE ru.user_id = u.requested_by) AS requested_by`;
+
+const getUnbind = (db, id) => one(db, `SELECT ${UNBIND} FROM plan_unbind u WHERE u.plan_unbind_id = $1`, [id]);
+
+/** The plan's latest request, waiting or decided. */
+const latestUnbind = (db, planId) =>
+  one(db, `SELECT ${UNBIND} FROM plan_unbind u WHERE u.performance_plan_id = $1 ORDER BY u.created_at DESC, u.plan_unbind_id LIMIT 1`, [planId]);
+
+/** One request with the plan it is about, for its sheet. */
+const getUnbindDetail = (db, id) =>
+  one(
+    db,
+    `SELECT ${UNBIND}, pl.department_id, d.name AS department, p.name AS period_name
+       FROM plan_unbind u
+       JOIN performance_plan pl ON pl.performance_plan_id = u.performance_plan_id
+       JOIN performance_period p ON p.performance_period_id = pl.performance_period_id
+       LEFT JOIN department d ON d.department_id = pl.department_id
+      WHERE u.plan_unbind_id = $1`,
+    [id],
+  );
+
+const getUnbindRow = (db, id) => one(db, "SELECT * FROM plan_unbind WHERE plan_unbind_id = $1", [id]);
+
+const unbindPending = async (db, planId) =>
+  Boolean(await one(db, "SELECT 1 AS x FROM plan_unbind WHERE performance_plan_id = $1 AND status = 'pending' LIMIT 1", [planId]));
+
+async function insertUnbind(client, row) {
+  const { rows } = await client.query(
+    "INSERT INTO plan_unbind (performance_plan_id, reason, requested_by) VALUES ($1, $2, $3) RETURNING plan_unbind_id",
+    [row.performance_plan_id, row.reason, row.requested_by],
+  );
+  return rows[0].plan_unbind_id;
+}
+
+async function updateUnbind(client, id, patch) {
+  const keys = ["status", "workflow_instance_id", "decided_at", "decision_reason"].filter((k) => patch[k] !== undefined);
+  if (!keys.length) return;
+  await client.query(
+    `UPDATE plan_unbind SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(", ")} WHERE plan_unbind_id = $1`,
+    [id, ...keys.map((k) => patch[k])],
+  );
+}
+
+/**
+ * What a key result holds that an unbound plan never deletes (§6.22): `reported`, a month has been
+ * reported on it; `in_use`, a scorecard line, a Team result, a target change, an initiative task or a
+ * company key result scored from it names it.
+ */
+const HOLDS = `EXISTS (SELECT 1 FROM okr_key_result_month m WHERE m.okr_key_result_id = kr.okr_key_result_id) AS reported,
+  (EXISTS (SELECT 1 FROM employee_target t WHERE t.okr_key_result_id = kr.okr_key_result_id)
+    OR EXISTS (SELECT 1 FROM employee_target_key_result x WHERE x.okr_key_result_id = kr.okr_key_result_id)
+    OR EXISTS (SELECT 1 FROM target_change c WHERE c.okr_key_result_id = kr.okr_key_result_id)
+    OR EXISTS (SELECT 1 FROM task k WHERE k.entity_type = 'key_result' AND k.entity_id = kr.okr_key_result_id)
+    OR EXISTS (SELECT 1 FROM okr_key_result s WHERE s.scored_from_key_result_id = kr.okr_key_result_id)) AS in_use`;
+
+const keyResultHolds = (db, id) => one(db, `SELECT ${HOLDS} FROM okr_key_result kr WHERE kr.okr_key_result_id = $1`, [id]);
+
+/** The same over an objective's key results: whether any is reported, whether any is in use. */
+const objectiveHolds = (db, id) =>
+  one(
+    db,
+    `SELECT coalesce(bool_or(h.reported), false) AS reported, coalesce(bool_or(h.in_use), false) AS in_use
+       FROM (SELECT ${HOLDS} FROM okr_key_result kr WHERE kr.okr_objective_id = $1) h`,
+    [id],
+  );
+
 module.exports = {
   importPeriodId,
   departmentByName,
@@ -930,13 +1098,15 @@ module.exports = {
   insertGoal,
   updateGoal,
   setGoalTargets,
-  goalCodeTaken,
   companyObjectivesOf,
   effectiveManagerOf,
   isCeoEmployee,
   holdsRoleCode,
   listPlans,
+  listFunctions,
+  listDepartments,
   getPlan,
+  pendingStage,
   getChangeDetail,
   approvalsWaiting,
   updatePlan,
@@ -967,7 +1137,6 @@ module.exports = {
   setLinks,
   objectiveCodes,
   keyResultCodes,
-  provisionalDue,
   keyResultByCode,
   addAlias,
   listChanges,
@@ -976,6 +1145,15 @@ module.exports = {
   getChangeRow,
   insertChange,
   updateChange,
+  getUnbind,
+  latestUnbind,
+  getUnbindDetail,
+  getUnbindRow,
+  unbindPending,
+  insertUnbind,
+  updateUnbind,
+  keyResultHolds,
+  objectiveHolds,
   listPeriods,
   getPeriod,
   currentPeriod,

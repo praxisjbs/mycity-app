@@ -103,6 +103,90 @@ describe("useContractForm", () => {
     expect(shortMessage({ type: "invalid_type", message: "Required" })).toBe("Required");
     expect(shortMessage({ type: "invalid_type", message: "Expected object, received string" })).toBe("Required");
     expect(shortMessage({ type: "invalid_type", message: "Pick an address" })).toBe("Pick an address");
+    // A limit the schema words itself is shown in its words; Zod's own limits keep the short ones.
+    expect(shortMessage({ type: "too_small", message: "At least 150 m" })).toBe("At least 150 m");
+    expect(shortMessage({ type: "too_small", message: "Add a recipient" })).toBe("Add a recipient");
+    expect(shortMessage({ type: "too_big", message: "At most 500 m" })).toBe("At most 500 m");
+    // Zod's own limits say the limit, also when a server 422 carries them raw.
+    expect(shortMessage({ type: "too_small", message: "String must contain at least 3 character(s)" })).toBe("At least 3 characters");
+    expect(shortMessage({ type: "too_big", message: "String must contain at most 500 character(s)" })).toBe("At most 500 characters");
+    expect(shortMessage({ type: "too_big", message: "Number must be less than or equal to 500" })).toBe("At most 500");
+    expect(shortMessage({ type: "too_small", message: "Number must be greater than or equal to 50" })).toBe("At least 50");
+    expect(shortMessage({ type: "custom", message: "Array must contain at most 25 element(s)" })).toBe("At most 25");
+    expect(shortMessage({ type: "too_big", message: "String must contain at most 4000 character(s)" })).toBe("At most 4,000 characters");
+    expect(shortMessage({ type: "too_big", message: "Number must be less than or equal to 2160" })).toBe("At most 2,160");
+    expect(shortMessage({ type: "custom", message: "String must contain at least 1 character(s)" })).toBe("Required");
+    expect(shortMessage({ type: "invalid_type", message: "Expected integer, received float" })).toBe("Whole numbers only");
+    // A pattern's own words when they fit; Zod's own "Invalid" keeps the short one.
+    expect(shortMessage({ type: "invalid_string", message: "Ten digits" })).toBe("Ten digits");
+    expect(shortMessage({ type: "invalid_string", message: "Not a price" })).toBe("Not a price");
+    expect(shortMessage({ type: "invalid_string", message: "Invalid" })).toBe("Check the format");
+    expect(shortMessage({ type: "invalid_string", message: "Invalid email" })).toBe("Check the email");
+  });
+
+  it("never calls a number too long: a limit no schema worded reads by what it limits", () => {
+    const long = "Value is far beyond what this field allows here";
+    expect(shortMessage({ type: "too_big", message: long, kind: "number", maximum: 90 })).toBe("At most 90");
+    expect(shortMessage({ type: "too_small", message: long, kind: "number", minimum: -180 })).toBe("At least -180");
+    expect(shortMessage({ type: "too_big", message: long, kind: "number" })).toBe("Too high");
+    expect(shortMessage({ type: "too_big", message: long, kind: "array" })).toBe("Too many");
+    expect(shortMessage({ type: "too_small", message: long, kind: "date" })).toBe("Too early");
+    expect(shortMessage({ type: "too_big", message: long, kind: "string" })).toBe("Too long");
+    expect(shortMessage({ type: "too_big", message: long })).toBe("Too long");
+  });
+
+  it("marks a worksite's centre outside its range with the whole range, and keeps the ends", async () => {
+    const worksites = (await import("@mycity/contract/schemas/worksites.js")).default;
+    const schema = worksites.WorksiteCreate!;
+    const centre = (latitude: string, longitude: string) => ({ name: "Testbed Office", latitude: Number(latitude), longitude: Number(longitude), radius_m: 100 });
+    function Centre() {
+      const f = useContractForm({ latitude: "91", longitude: "181" }, { safeParse: (v: { latitude: string; longitude: string }) => schema.safeParse(centre(v.latitude, v.longitude)) }, { pauseMs: 10 });
+      return (
+        <>
+          <Field label="Latitude" {...f.status("latitude")}>
+            <TextField {...f.field("latitude")} />
+          </Field>
+          <Field label="Longitude" {...f.status("longitude")}>
+            <TextField {...f.field("longitude")} />
+          </Field>
+          <button type="button" onClick={() => f.check()}>
+            Add Worksite
+          </button>
+          <button type="button" onClick={() => (f.set("latitude", "-90"), f.set("longitude", "180"))}>
+            Set Ends
+          </button>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Centre />);
+    await user.click(screen.getByRole("button", { name: "Add Worksite" }));
+    expect(await screen.findByText("From -90 to 90")).toBeInTheDocument();
+    expect(screen.getByText("From -180 to 180")).toBeInTheDocument();
+    expect(screen.queryByText("Too long")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Set Ends" }));
+    await vi.waitFor(() => expect(screen.queryByText("From -90 to 90")).not.toBeInTheDocument());
+    expect(screen.queryByText("From -180 to 180")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty field the schema's own words for it, else Required", () => {
+    const schema = {
+      safeParse: () => ({
+        success: false,
+        error: {
+          issues: [
+            { path: ["model"], code: "too_small", message: "Pick a model" },
+            { path: ["name"], code: "too_small", message: "String must contain at least 1 character(s)" },
+            { path: ["price"], code: "invalid_string", message: "Not a price" },
+          ],
+        },
+      }),
+    };
+    const { result } = renderHook(() => useContractForm({ model: "", name: "", price: "" }, schema));
+    act(() => {
+      result.current.check();
+    });
+    expect(result.current.errors).toEqual({ model: "Pick a model", name: "Required", price: "Required" });
   });
 });
 
@@ -117,12 +201,44 @@ describe("useContractForm with INTERIM rules", () => {
     expect(result.current.status("name")).toEqual({ state: "bad", message: "Required" });
   });
 
+  it("takes only lists of messages as marks: a refusal's details are not", () => {
+    const { result } = renderHook(() => useContractForm({ email: "ada@mycity.app" }));
+    act(() => result.current.setServerErrors({ email: ["Already in use"], reason: "Connection refused" as never, smtp_code: 421 as never }));
+    expect(result.current.field("email").message).toBe("Already in use");
+  });
+
   it("shows a server error until the field changes", () => {
     const { result } = renderHook(() => useContractForm({ email: "ada@mycity.app" }));
     act(() => result.current.setServerErrors({ email: ["Already in use"] }));
     expect(result.current.field("email").message).toBe("Already in use");
     act(() => result.current.field("email").onChange("ola@mycity.app"));
     expect(result.current.field("email").message).toBeUndefined();
+  });
+
+  it("leaves no mark on a field emptied by reset straight after typing", async () => {
+    const user = userEvent.setup();
+    function CommentBox() {
+      const form = useContractForm({ body: "" }, { body: rules.required() }, { pauseMs: 50 });
+      return (
+        <>
+          <Field label="Comment" {...form.status("body")}>
+            <TextField {...form.field("body")} />
+          </Field>
+          <button type="button" onClick={() => form.check() && form.reset({ body: "" })}>
+            Add Comment
+          </button>
+        </>
+      );
+    }
+    render(<CommentBox />);
+    const box = screen.getByLabelText("Comment");
+    await user.type(box, "Looks good");
+    await user.click(screen.getByRole("button", { name: "Add Comment" }));
+    expect(box).toHaveValue("");
+    // Past the pause the last key started: the emptied box stays unmarked.
+    await new Promise((r) => setTimeout(r, 120));
+    expect(screen.queryByText("Required")).not.toBeInTheDocument();
+    expect(box).not.toHaveAttribute("aria-invalid");
   });
 
   it("keeps every rule message to four words", () => {

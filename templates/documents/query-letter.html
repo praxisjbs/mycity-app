@@ -1,0 +1,12 @@
+---
+title: "Query {{ query_number }}"
+---
+<div class="letter">
+  <p>Dear {{ employee.first_name }},</p>
+  <h2>Query {{ query_number }}: {{ subject }}</h2>
+  <p>This is to formally query you on the following.</p>
+  <p>{{ details }}</p>
+  {{#if policy}}<p>This is against our {{ policy.title }} ({{ policy.number }}, version {{ policy.version }}){{#if policy.clause}}: "{{ policy.clause }}"{{else}}.{{/if}}</p>{{/if}}
+  <p>You are required to respond to this query in writing{{#if response_due}} by {{ datetime response_due }}{{/if}}, in My Queries on the MyCity hub, explaining the circumstances and stating why appropriate disciplinary action should not be taken against you.</p>
+  <p>Please note that continued non-compliance with the company's policies may result in further disciplinary action. Your response will be reviewed accordingly.</p>
+</div>

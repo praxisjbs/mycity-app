@@ -70,6 +70,16 @@ function refuse(field, message) {
 }
 
 /**
+ * Found in a breach: only the breach corpus knows it, so no screen can say it first. The person
+ * picks another; it is the rule working, never a fault on System Health (shared/errors.js).
+ */
+function breachRefusal(field) {
+  const err = refuse(field, "Found in a breach");
+  err.recorded = false;
+  return err;
+}
+
+/**
  * Throws a 422 naming the field when the password fails; resolves otherwise.
  * @param {string} password
  * @param {{email?: string|null, field?: string, fetchImpl?: typeof fetch}} [ctx]
@@ -88,11 +98,11 @@ async function assert(password, ctx = {}) {
   if (local.length >= 3 && String(password).toLowerCase().includes(local))
     throw refuse(field, "Contains your email name");
 
-  // Tests never reach the network; checkBreached is tested with its own fetch.
-  if (!config.PASSWORD_BREACH_CHECK || config.APP_ENV === "test")
+  // Tests never reach the network: a test that checks the breach rule gives its own fetch.
+  if (!config.PASSWORD_BREACH_CHECK || (config.APP_ENV === "test" && !ctx.fetchImpl))
     return { breach_checked: false };
-  const { checked, breached } = await checkBreached(password, ctx);
-  if (breached) throw refuse(field, "Found in a breach");
+  const { checked, breached: found } = await checkBreached(password, ctx);
+  if (found) throw breachRefusal(field);
   if (!checked)
     logger.warn("password breach check skipped: the service was not reached");
   return { breach_checked: checked };

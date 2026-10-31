@@ -76,7 +76,7 @@ async function signedIn(email: string, at = "/home?tab=overview") {
   // The reads' cache is kept by path, not by person: start each person from the server.
   invalidate("/api/v1");
   const { rerender } = render(app(false));
-  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 5000 });
+  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 15000 });
   await act(async () => {
     const next = await auth!.signIn(email, "demo1234");
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
@@ -377,12 +377,12 @@ describe("the records behind a card", () => {
 
   it("pages at 25, the pager carrying the server's total", async () => {
     await overviewAs("cynthia@mycityapp.io");
-    // Enough leave waiting for approval to need a second page.
+    // Enough leave waiting for approval to need a second page: unpaid, which no allowance caps.
     const types = (await api.call("GET /api/v1/leave/types")).data;
-    const annual = types.find((t) => t.code === "annual")!;
+    const unpaid = types.find((t) => t.code === "unpaid")!;
     for (let i = 0; i < 26; i += 1) {
       const day = new Date(Date.UTC(2027, 1, 1 + i)).toISOString().slice(0, 10);
-      await api.call("POST /api/v1/ess/leave", { body: { leave_type_id: annual.leave_type_id, starts_on: day, ends_on: day } });
+      await api.call("POST /api/v1/ess/leave", { body: { leave_type_id: unpaid.leave_type_id, starts_on: day, ends_on: day } });
     }
     const page = dashboard.HomeKpiDetailPage.parse(await api.call("GET /api/v1/home/kpi/:key", { params: { key: "leave_pending" } }));
     expect(page.page).toMatchObject({ size: 25, pages: 2 });

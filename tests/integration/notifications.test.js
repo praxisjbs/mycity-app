@@ -10,6 +10,7 @@
  * Refuses to run unless the database name ends in "_test": it drops and rebuilds the
  * public schema.
  */
+const crypto = require("node:crypto");
 const request = require("supertest");
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
@@ -181,9 +182,75 @@ describeDb("the bell against the real migrations", () => {
       expect((await staff.get("/notifications/unread-count")).body).toEqual({ unread: 2 });
     });
 
-    test("badges count unread rows per module the reader may open", async () => {
-      expect((await staff.get("/notifications/badges")).body).toEqual({ ess: 1 });
-      expect((await ceo.get("/notifications/badges")).body).toEqual({ settings: 1 });
+    test("badges count unread rows per module and tab the reader may open", async () => {
+      expect((await staff.get("/notifications/badges")).body).toEqual({ modules: { ess: 1 }, tabs: { ess: { "my-security": 1 } } });
+      expect((await ceo.get("/notifications/badges")).body).toEqual({ modules: { settings: 1 }, tabs: { settings: { users: 1 } } });
+    });
+
+    test("a module's count splits by the tab its notices open on; a list's rows are marked, and opening one reads it", async () => {
+      const [leaveA, leaveB, person, other] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+      await notify(ceoId, { title: "Leave request", entity_type: "leave_request", entity_id: leaveA });
+      await notify(ceoId, { title: "Leave request, a reminder", entity_type: "leave_request", entity_id: leaveA });
+      await notify(ceoId, { title: "Another leave request", entity_type: "leave_request", entity_id: leaveB });
+      await notify(ceoId, { title: "Probation ending", entity_type: "employee", entity_id: person });
+      const mine = await notify(staffId, { title: "Your leave", entity_type: "leave_request", entity_id: leaveB });
+
+      const before = (await ceo.get("/notifications/badges")).body;
+      expect(before.modules.people).toBe(4);
+      expect(before.tabs.people).toEqual({ leave: 3, employees: 1 });
+      // Staff cannot open People: their own leave counts where it opens for them, Self-Service · My Leave.
+      expect((await staff.get("/notifications/badges")).body).toEqual({
+        modules: { ess: 2 },
+        tabs: { ess: { "my-security": 1, "my-leave": 1 } },
+      });
+
+      const leaveMarks = await ceo.get(`/notifications/unread-records?module=people&tab=leave&ids=${leaveA},${leaveB},${other},${person}`);
+      expect(leaveMarks.status).toBe(200);
+      expect(leaveMarks.body.ids.sort()).toEqual([leaveA, leaveB].sort());
+      expect((await ceo.get(`/notifications/unread-records?module=people&tab=employees&ids=${person},${leaveA}`)).body).toEqual({ ids: [person] });
+      expect((await staff.get(`/notifications/unread-records?module=people&tab=leave&ids=${leaveB}`)).body).toEqual({ ids: [] });
+      expect((await staff.get(`/notifications/unread-records?module=ess&tab=my-leave&ids=${leaveB}`)).body).toEqual({ ids: [leaveB] });
+      expect((await ceo.get("/notifications/unread-records?module=people&tab=leave&ids=not-a-uuid")).status).toBe(422);
+
+      const told = jest.spyOn(realtime, "toUser").mockReturnValue(true);
+      expect((await ceo.post("/notifications/read-record").send({ module: "people", tab: "leave", entity_id: leaveA })).status).toBe(204);
+      const after = (await ceo.get("/notifications/badges")).body;
+      expect(after.modules.people).toBe(2);
+      expect(after.tabs.people).toEqual({ leave: 1, employees: 1 });
+      await drain();
+      expect(told).toHaveBeenCalledWith(ceoId, "notification_read", expect.objectContaining({ notification_id: expect.any(String) }));
+
+      // Opened on a screen its notices do not open on, nothing is read; nor is another person's notice.
+      expect((await ceo.post("/notifications/read-record").send({ module: "people", tab: "employees", entity_id: leaveB })).status).toBe(204);
+      expect((await ceo.get("/notifications/badges")).body.tabs.people).toEqual({ leave: 1, employees: 1 });
+      expect((await one("SELECT read_at FROM notification WHERE notification_id = $1", [mine.notification_id])).read_at).toBeNull();
+      expect((await staff.post("/notifications/read-record").send({ module: "ess", tab: "my-leave", entity_id: leaveB })).status).toBe(204);
+      expect((await one("SELECT read_at FROM notification WHERE notification_id = $1", [mine.notification_id])).read_at).not.toBeNull();
+      expect((await staff.get("/notifications/badges")).body.tabs.ess["my-leave"]).toBeUndefined();
+      expect((await ceo.post("/notifications/read-record").send({ module: "people", tab: "leave", entity_id: "nope" })).status).toBe(422);
+    });
+
+    test("inside a tab, each view counts the notices about the records it holds, and those below it; reading a record leaves them (§6, Where it waits)", async () => {
+      const [card, set, plan] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+      await notify(ceoId, { title: "Scorecard to agree", entity_type: "scorecard", entity_id: card });
+      await notify(ceoId, { title: "Scorecard, a reminder", entity_type: "scorecard", entity_id: card });
+      await notify(ceoId, { title: "Commitments sent", entity_type: "commitment_set", entity_id: set });
+      await notify(ceoId, { title: "Commitments, read", entity_type: "commitment_set", entity_id: set, read: true });
+      const urgent = await notify(ceoId, { title: "Improvement plan started", entity_type: "improvement_plan", entity_id: plan, read: true });
+      await q("UPDATE notification SET urgency = 'urgent', acknowledge_required = true WHERE notification_id = $1", [urgent.notification_id]);
+
+      const targets = await ceo.get("/notifications/views?module=performance&tab=targets");
+      expect(targets.status).toBe(200);
+      expect(targets.body).toEqual({ views: { scorecards: { unread: 2, urgent: false }, commitments: { unread: 1, urgent: false } } });
+      // Read but not yet acknowledged, an urgent notice is still open there: red, with nothing unread.
+      expect((await ceo.get("/notifications/views?module=performance&tab=reviews")).body).toEqual({ views: { pips: { unread: 0, urgent: true } } });
+      // A screen nobody's records wait on, and another person's screen, place nothing.
+      expect((await ceo.get("/notifications/views?module=people&tab=organogram")).body).toEqual({ views: {} });
+      expect((await staff.get("/notifications/views?module=performance&tab=targets")).body).toEqual({ views: {} });
+      expect((await ceo.get("/notifications/views?module=performance&tab=Not%20A%20Tab")).status).toBe(422);
+
+      expect((await ceo.post("/notifications/read-record").send({ module: "performance", tab: "targets", entity_id: card })).status).toBe(204);
+      expect((await ceo.get("/notifications/views?module=performance&tab=targets")).body).toEqual({ views: { commitments: { unread: 1, urgent: false } } });
     });
 
     test("marking one read: recorded once, other tabs told, and another person's row is a 404", async () => {
@@ -226,7 +293,7 @@ describeDb("the bell against the real migrations", () => {
 
       expect((await staff.post("/notifications/read-all").send({})).status).toBe(204);
       expect((await staff.get("/notifications/unread-count")).body).toEqual({ unread: 0 });
-      expect((await staff.get("/notifications/badges")).body).toEqual({});
+      expect((await staff.get("/notifications/badges")).body).toEqual({ modules: {}, tabs: {} });
       expect((await one("SELECT read_at FROM notification WHERE notification_id = $1", [emailOnly.notification_id])).read_at).toBeNull();
       expect((await one("SELECT count(*)::int AS n FROM notification WHERE user_id = $1 AND read_at IS NULL", [ceoId])).n).toBe(ceoUnread.n);
 

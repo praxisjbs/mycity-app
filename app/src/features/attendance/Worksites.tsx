@@ -7,6 +7,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { coordinatesOf, lineOf, loadTile, places, placeValue, pointOf, zoomFor } from "@/features/shared/places";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
@@ -24,17 +25,36 @@ import { PeopleRequestView, RequestsView, useRequestLink } from "./WorkLocationR
  * each. People add, change, retire and restore them; the address is picked from the search or
  * pinned (F27), and the place picked fills the centre, drawn on a map with its fence. Temporary:
  * the temporary sites in the reader's scope (§6.11), Add Temporary Site, each site's approval, and
- * while any made before PR 4 waits or is in force, the old Requests and Field beside them.
+ * while any made before PR 4 waits or is in force, the old Requests and Field beside them. Each
+ * side and view carries what waits on the reader there, and the screen opens where it waits
+ * (docs/guides/notifications.md §6).
  */
 type Side = "permanent" | "temporary";
 type Temporary = "sites" | "requests" | "field";
+const SIDES: Array<[Side, string]> = [
+  ["permanent", "Permanent"],
+  ["temporary", "Temporary"],
+];
+const VIEWS: Array<[Temporary, string]> = [
+  ["sites", "Sites"],
+  ["requests", "Requests"],
+  ["field", "Field"],
+];
 
 export function Worksites() {
   const [params] = useSearchParams();
   const id = params.get("id");
+  const linked = params.get("site") || params.get("request") || params.get("assignment");
   const { can } = useAuth();
-  const [side, setSide] = useState<Side>(params.get("site") || params.get("request") || params.get("assignment") ? "temporary" : "permanent");
+  const [side, setSide] = useState<Side>(linked ? "temporary" : "permanent");
   const toTemporary = useCallback(() => setSide("temporary"), []);
+  // A link that arrives while the screen is open (from the bell, ⌘K) picks its side too.
+  useEffect(() => {
+    if (linked) setSide("temporary");
+    else if (id) setSide("permanent");
+  }, [linked, id]);
+  const news = useViewNews();
+  useOpenWhereNews({ value: side, onChange: setSide, values: ["permanent", "temporary"], skip: Boolean(linked || id) });
   const addSite = useWorkSiteSheet({ direct: true });
   const mayAddSite = can("people", "approve");
   useUrlAction("temporary-site", mayAddSite ? () => (setSide("temporary"), addSite()) : null);
@@ -52,9 +72,9 @@ export function Worksites() {
         }
       />
       <div className="mb-3">
-        <SegmentedControl label="Worksites" value={side} onChange={(v) => setSide(v as Side)} options={[["permanent", "Permanent"], ["temporary", "Temporary"]]} />
+        <SegmentedControl label="Worksites" value={side} onChange={(v) => setSide(v as Side)} options={withNews(news, SIDES)} />
       </div>
-      {side === "permanent" ? <Permanent id={id} /> : <TemporarySide addSite={mayAddSite ? addSite : null} toTemporary={toTemporary} />}
+      {side === "permanent" ? <Permanent id={id} /> : <TemporarySide addSite={mayAddSite ? addSite : null} toTemporary={toTemporary} linked={Boolean(linked)} />}
     </>
   );
 }
@@ -66,16 +86,21 @@ function PermanentAdd() {
 }
 
 /**
- * Temporary: the sites, and while any made before PR 4 is listed, the old requests and field
- * assignments as their own views. A link (`?site=`, `?request=`, `?assignment=`) opens its record.
+ * Temporary: the sites, and while any made before PR 4 is listed or something about one waits on
+ * the reader, the old requests and field assignments as their own views. A link (`?site=`,
+ * `?request=`, `?assignment=`) opens its record in its view.
  */
-function TemporarySide({ addSite, toTemporary }: { addSite: (() => void) | null; toTemporary: () => void }) {
+function TemporarySide({ addSite, toTemporary, linked }: { addSite: (() => void) | null; toTemporary: () => void; linked: boolean }) {
   const [params] = useSearchParams();
   const modal = useModal();
   const [view, setView] = useState<Temporary>("sites");
   useScreenAction(addSite ? { label: "Add Temporary Site", onSelect: addSite } : null);
   const openSite = useSiteView();
-  useSiteLink(params.get("site"), openSite, { before: toTemporary });
+  const toSites = useCallback(() => {
+    toTemporary();
+    setView("sites");
+  }, [toTemporary]);
+  useSiteLink(params.get("site"), openSite, { before: toSites });
   const openRequest = useCallback((r: LocationRequest) => modal.open({ title: `${r.number} · ${r.employee.display_name}`, body: (close) => <PeopleRequestView r={r} close={close} /> }), [modal]);
   const toRequests = useCallback(() => setView("requests"), []);
   useRequestLink(params.get("request"), openRequest, toRequests);
@@ -88,11 +113,14 @@ function TemporarySide({ addSite, toTemporary }: { addSite: (() => void) | null;
   const fieldNow = usePaged("GET /api/v1/attendance/field-assignments", { filters: { state: "in_progress" } });
   const fieldNext = usePaged("GET /api/v1/attendance/field-assignments", { filters: { state: "upcoming" } });
   const live = waiting.rows.length + approved.rows.length + fieldNow.rows.length + fieldNext.rows.length > 0;
+  const news = useViewNews();
+  useOpenWhereNews({ value: view, onChange: setView, values: ["sites", "requests", "field"], at: "temporary", skip: linked });
+  const elsewhere = Boolean(news("temporary/requests") || news("temporary/field"));
   return (
     <>
-      {(live || view !== "sites") && (
+      {(live || elsewhere || view !== "sites") && (
         <div className="mb-3">
-          <SegmentedControl label="Temporary" value={view} onChange={(v) => setView(v as Temporary)} options={[["sites", "Sites"], ["requests", "Requests"], ["field", "Field"]]} />
+          <SegmentedControl label="Temporary" value={view} onChange={(v) => setView(v as Temporary)} options={withNews(news, VIEWS, { at: "temporary" })} />
         </div>
       )}
       {view === "sites" ? <TemporarySitesView openSite={openSite} /> : view === "requests" ? <RequestsView openRequest={openRequest} /> : <FieldView openAssignment={openAssignment} />}

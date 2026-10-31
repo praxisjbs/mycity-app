@@ -30,6 +30,7 @@
  * People, within the `people` grant's scope (all, team, own):
  *   GET   /register, /summary            the day's register and its figures (view)
  *   GET   /register/:employee_id         one person's day (view)
+ *   GET   /days                          one person's days of a month, All Days (view)
  *   GET   /events                        one person's punches on a day (view)
  *   GET   /exceptions                    the exceptions (view)
  *   POST  /exceptions/:id/decision       decide one (approve, scope all; never your own)
@@ -163,6 +164,10 @@ route(router, "get", "/summary",
 route(router, "get", "/register/:employee_id",
   { params: a.DayDetailParams, query: a.DayDetailQuery, response: a.DayDetail, summary: "One person's day" },
   requirePermission("people", "view"), controller.day);
+
+route(router, "get", "/days",
+  { query: a.PersonDayListQuery, response: a.AttendanceDayPage, summary: "One person's days in a month" },
+  requirePermission("people", "view"), controller.personDays);
 
 route(router, "get", "/events",
   { query: a.EventListQuery, response: a.AttendanceEventPage, summary: "One person's punches on a day" },

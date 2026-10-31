@@ -4,6 +4,7 @@ import type { AttendanceEvent, CheckIn, TemporarySite, TemporarySiteCreate, Temp
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker, EmployeePicker } from "@/features/shared/pickers";
@@ -35,6 +36,8 @@ const HOURS: Array<[TemporarySiteHours, string]> = [
   ["site", "Site Hours"],
 ];
 const HOURS_HELP = "Site Hours: every day of the site, weekends too, from its start to its end. Usual Shift: your normal hours.";
+/** Why a site with one person left offers no Take Off. */
+const LAST_ONE_HELP = "The last person stays on it. Cancel Site ends it instead.";
 export const siteDates = (s: Pick<TemporarySite, "starts_on" | "ends_on">) =>
   s.starts_on === s.ends_on ? formatDate(s.starts_on) : `${formatDate(s.starts_on)} to ${formatDate(s.ends_on)}`;
 const peopleOf = (s: TemporarySite) => {
@@ -98,9 +101,10 @@ export function useSiteLink(id: string | null, open: (s: TemporarySite) => void,
 export function TemporarySitesView({ openSite }: { openSite: (s: TemporarySite) => void }) {
   const [state, setState] = useState<TemporarySiteState | "all">("all");
   const list = usePaged("GET /api/v1/attendance/temporary-sites", { filters: state === "all" ? {} : { state } });
+  const news = useViewNews();
   return (
     <>
-      <Chips label="Temporary Sites" value={state} onChange={setState} options={STATE_CHIPS} />
+      <Chips label="Temporary Sites" value={state} onChange={setState} options={withNews(news, STATE_CHIPS, { at: "temporary/sites", all: "all" })} />
       <DataView
         title="Temporary Sites"
         list={list}
@@ -260,13 +264,16 @@ export function SiteView({ s, mine, close }: { s: TemporarySite; mine: boolean; 
         title="People"
         rows={s.members}
         rowKey={(m) => m.employee.employee_id}
-        onRowClick={s.can_change && active.length > 1 ? (m) => !m.removed_at && takeOff(m.employee) : undefined}
+        help={s.can_change && active.length === 1 ? LAST_ONE_HELP : undefined}
         noun="person"
         nounPlural="people"
         columns={[
           { key: "e", label: "Employee", render: (m) => <Who name={m.employee.display_name} sub={m.employee.department} /> },
           { key: "s", label: "On It", render: (m) => (m.removed_at ? <Pill tone="neutral">Taken Off</Pill> : <Pill tone="ok">On It</Pill>) },
           { key: "r", label: "Reason", desktop: true, render: (m) => m.removed_reason },
+          ...(s.can_change && active.length > 1
+            ? [{ key: "x", label: "", render: (m: (typeof s.members)[number]) => (m.removed_at ? null : <Button size="sm" onClick={() => takeOff(m.employee)}>Take Off</Button>) }]
+            : []),
         ]}
       />
       {s.workflow_instance_id && <RequestApproval instanceId={s.workflow_instance_id} />}

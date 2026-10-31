@@ -20,6 +20,12 @@ const lagos = require("../time/lagos");
 
 const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
 
+/**
+ * The serial of 1 January 1910. A smaller number in a date column is a year typed alone
+ * ("1991" would read as 13/06/1905) or a count, never a date anybody here means.
+ */
+const FIRST_SERIAL = 3654;
+
 const pad = (n) => String(n).padStart(2, "0");
 const isoOfUtc = (d) =>
   `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
@@ -55,6 +61,7 @@ function readDate(value) {
     return { date: isoOfUtc(value), error: null };
   }
   if (typeof value === "number") {
+    if (value < FIRST_SERIAL) return { date: null, error: "is a number, not a date" };
     const iso = fromSerial(value);
     return iso
       ? { date: iso, error: null }
@@ -70,6 +77,7 @@ function readDate(value) {
       : { date: null, error: "is not a real date" };
   }
   if (/^\d+(\.\d+)?$/.test(text)) {
+    if (Number(text) < FIRST_SERIAL) return { date: null, error: "is a number, not a date" };
     const iso = fromSerial(Number(text));
     return iso
       ? { date: iso, error: null }

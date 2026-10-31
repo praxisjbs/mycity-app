@@ -329,6 +329,17 @@ describe("a refused form, as System Health counts it", () => {
     ]);
   });
 
+  test("a refusal that says it is not a fault is answered the same and never recorded (fault #6 on staging, 27/10/2026)", async () => {
+    const res = await request(app(() => {
+      const err = new AppError("WEAK_PASSWORD", "Found in a breach", 422, { new_password: ["Found in a breach"] });
+      err.recorded = false;
+      throw err;
+    })).post("/api/v1/ess/leave").send({ leave_type_id: TYPE, starts_on: "2026-11-02", ends_on: "2026-11-04" });
+    expect([res.status, res.body.error.code, res.body.error.fields]).toEqual([422, "WEAK_PASSWORD", { new_password: ["Found in a breach"] }]);
+    await reporter.flush();
+    expect(rows).toEqual([]);
+  });
+
   test("the contract's refusal is VALIDATION_FAILED, at the same full route", async () => {
     const res = await request(app(() => undefined))
       .post("/api/v1/ess/leave").send({ leave_type_id: TYPE, starts_on: "2026-11-04", ends_on: "2026-11-02" });

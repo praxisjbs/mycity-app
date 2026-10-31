@@ -38,6 +38,16 @@ describe("a Name cell", () => {
     });
   });
 
+  test("a title before the name is dropped, and capitals or small letters are put in name case", () => {
+    expect(service.splitName("Engr. Tunde Bakare")).toEqual({ first_name: "Tunde", middle_name: undefined, last_name: "Bakare" });
+    expect(service.cleanName("Mrs  ADA obi")).toBe("Ada Obi");
+    expect(service.cleanName("TOBILOBA IYANUOLUWA DADA")).toBe("Tobiloba Iyanuoluwa Dada");
+    expect(service.cleanName("shola-o'adido")).toBe("Shola-O'Adido");
+    expect(service.cleanName("McCarthy Ojo")).toBe("McCarthy Ojo");
+    /* A title alone is somebody's name, not a title to drop. */
+    expect(service.cleanName("Chief")).toBe("Chief");
+  });
+
   test("VACANT is a post, not a person", () => {
     expect(managerText.isVacantName("VACANT")).toBe(true);
     expect(managerText.isVacantName("vacant ")).toBe(true);
@@ -144,8 +154,13 @@ describe("the roles a post is given", () => {
     });
   });
 
-  test("by the words the post uses, so a typo in the sheet still lands", () => {
-    expect(loader.rolesForTitle(roles, "Head of Delivry").roles).toEqual(["head_of_department"]);
+  test("by the exact title only, case and punctuation aside", () => {
+    expect(loader.rolesForTitle(roles, "head of delivery").roles).toEqual(["head_of_department"]);
+  });
+
+  test("a title that only shares a post's words is staff, so nobody borrows a post's roles", () => {
+    expect(loader.rolesForTitle(roles, "Deputy Head of Delivery").roles).toEqual(["employee"]);
+    expect(loader.rolesForTitle(roles, "Executive Assistant to the Chief Executive Officer")).toEqual({ roles: ["employee"] });
   });
 
   test("anyone else is staff", () => {
@@ -154,6 +169,69 @@ describe("the roles a post is given", () => {
 
   test("a work email is offered for a post whose sheet cell is empty", () => {
     expect(loader.emailsByJobTitle(roles)).toEqual({ "Head of Delivery": "delivery@mycity.test" });
+  });
+});
+
+describe("a staff sheet's cells", () => {
+  const field = (key) => FIELDS.find((f) => f.key === key);
+
+  test("a staff number a spreadsheet read as a number gets its leading zeros back", () => {
+    expect(engine.coerce(field("staff_number"), 19, { pad: 5 })).toEqual({ value: "00019", error: null });
+    expect(engine.coerce(field("staff_number"), "T0019", { pad: 5 })).toEqual({ value: "T0019", error: null });
+  });
+
+  test("a phone number in a number cell, with or without 234, is read", () => {
+    expect(engine.coerce(field("phone"), 8031234567).value).toBe("+2348031234567");
+    expect(engine.coerce(field("phone"), 2348031234567).value).toBe("+2348031234567");
+    expect(engine.coerce(field("phone"), "+234 (0) 803 123 4567").value).toBe("+2348031234567");
+  });
+
+  test("the other ways sheets write a choice are read, and only offered once", () => {
+    expect(engine.coerce(field("work_pattern"), "WFH").value).toBe("remote");
+    expect(engine.coerce(field("work_pattern"), "Onsite").value).toBe("on_site");
+    expect(engine.coerce(field("employment_type"), "Contract").value).toBe("contractor");
+    expect(engine.coerce(field("gender"), "F").value).toBe("female");
+    const registry = require("../../shared/import/registry");
+    expect(registry.optionsOf(field("employment_type")).map((o) => o.label)).toEqual(["Full Time", "Part Time", "Contractor", "Consultant", "Intern"]);
+  });
+
+  test("a year alone in a date column is not a date", () => {
+    expect(engine.coerce(field("start_date"), 1991).error).toBe("is a number, not a date");
+    expect(engine.coerce(field("start_date"), "1991").error).toBe("is a number, not a date");
+  });
+
+  test("a Name cell is tidied before it is compared, and VACANT stays VACANT", () => {
+    expect(engine.coerce(field("full_name"), "Dr. NGOZI umeh").value).toBe("Ngozi Umeh");
+    expect(engine.coerce(field("full_name"), "VACANT").value).toBe("VACANT");
+  });
+
+  test("for the roster, an unreadable optional cell is left out with a note, not the whole row", () => {
+    const importer = require("../../shared/import/registry").get("employees") || { fields: FIELDS, matchKeys: ["staff_number", "work_email"], schema: require("@mycity/contract").organisation.EmployeeImportRow };
+    const grid = [
+      ["Name", "Designation", "Team", "Gender"],
+      ["Ngozi Umeh", "Analyst", "Delivery", "N/A"],
+    ];
+    const columns = { columns: grid[0].map((header, index) => ({ index, header, field: ["full_name", "job_title", "department", "gender"][index] })) };
+    const [byHand] = engine.buildRows(importer, grid, 0, columns);
+    expect(byHand.status).toBe("error");
+    const [roster] = engine.buildRows(importer, grid, 0, columns, { options: { skip_unreadable_optional: true } });
+    expect(roster.status).toBe("ok");
+    expect(roster.values).not.toHaveProperty("gender");
+    expect(roster.problems[0].message).toMatch(/^Gender should be one of: .*; left out$/);
+  });
+});
+
+describe("a sheet's columns, matched", () => {
+  const mapping = require("../../shared/import/mapping");
+
+  test("a column's own name wins over another column's alias, wherever they stand", () => {
+    const { columns } = mapping.autoMap(["Title", "Name", "Designation", "Email", "Work Email", "ID"], FIELDS);
+    expect(columns.map((c) => c.field)).toEqual([null, "full_name", "job_title", null, "work_email", null]);
+  });
+
+  test("an alias still maps a column nothing else claims", () => {
+    const { columns } = mapping.autoMap(["Staff ID", "Full Name", "Position", "Team"], FIELDS);
+    expect(columns.map((c) => c.field)).toEqual(["staff_number", "full_name", "job_title", "department"]);
   });
 });
 
@@ -171,6 +249,8 @@ describe("the staff importer the register offers", () => {
     expect(employees.permission).toEqual(["people", "create"]);
     expect(employees.entity).toBe("employee");
     expect(employees.matchKeys).toEqual(["staff_number", "work_email"]);
+    expect(employees.alsoEntities).toEqual(["org_seat"]);
+    expect(typeof employees.isReferenced).toBe("function");
   });
 
   test("the deploy loads the roster on both environments, after the migrations", () => {
@@ -188,10 +268,20 @@ describe("the staff importer the register offers", () => {
 });
 
 describe("the History tab's line", () => {
-  test("names what was done and which fields changed", () => {
+  test("names what was done and which fields changed, in the record's own words", () => {
     expect(
       employee360.summaryOf({ action: "employee.updated", changed_fields: ["job_title", "phone"] }),
-    ).toBe("Record changed: job_title, phone");
+    ).toBe("Record changed: Job Title, Phone");
+    expect(
+      employee360.summaryOf({ action: "employee.updated", changed_fields: ["account_number", "bank_name"] }),
+    ).toBe("Record changed: Account Number, Bank");
+    // A person or a seat as manager is one Line Manager; a key with no name reads as words, never as a key.
+    expect(
+      employee360.summaryOf({
+        action: "employee.updated",
+        changed_fields: ["line_manager_id", "line_manager_seat_id", "home_address_place_id"],
+      }),
+    ).toBe("Record changed: Line Manager, Home address place");
     expect(employee360.summaryOf({ action: "employee.created", changed_fields: [] })).toBe(
       "Record created",
     );
@@ -285,16 +375,17 @@ describe("Download PDF's drawing", () => {
     expect(layout([node("M", null), ...leaves, node("X", "L5")]).chart.width).toBe(250);
   });
 
-  test("a card says what the screen's does: initials, title, department, dotted line, an open role", () => {
+  test("a card says what the screen's does: initials, title, department, Head marks, dotted line, an open role", () => {
+    const head = (mark, acting = false) => ({ department_id: "d", name: "Finance", code: "FIN", acting, mark });
     const drawing = layout([
-      node("A", null, { display_name: "Ifeoma Mbonu", is_ceo: true, meta: "Since 2023 · Remote" }),
-      node("S", "A", { node_kind: "seat", employee_id: null, display_name: "Head of Finance", department: "Finance", vacant: true }),
-      node("B", "A", { display_name: "Rabi'a Zawiya", dotted_line_to: "Ifeoma Mbonu" }),
+      node("A", null, { display_name: "Ifeoma Mbonu", is_ceo: true, meta: "Since 2023 · Remote", heads: [head("Head"), head("Acting Head · FIN", true)] }),
+      node("S", "A", { node_kind: "seat", employee_id: null, display_name: "Head of Finance", department: "Finance", vacant: true, heads: [head("Head")] }),
+      node("B", "A", { display_name: "Rabi'a Zawiya", dotted_line_to: "Ifeoma Mbonu", heads: [] }),
     ]);
     expect(drawing.cards).toEqual([
-      expect.objectContaining({ initials: "IM", title: "Post A", ceo: true, meta: "Since 2023 · Remote", vacant: false }),
-      expect.objectContaining({ initials: "", name: "Head of Finance", title: "Vacant · Finance", vacant: true, ceo: false }),
-      expect.objectContaining({ initials: "RZ", dotted: "Ifeoma Mbonu", meta: null }),
+      expect.objectContaining({ initials: "IM", title: "Post A", ceo: true, meta: "Since 2023 · Remote", vacant: false, heads: [{ mark: "Head" }, { mark: "Acting Head · FIN" }] }),
+      expect.objectContaining({ initials: "", name: "Head of Finance", title: "Vacant · Finance", vacant: true, ceo: false, heads: [{ mark: "Head" }] }),
+      expect.objectContaining({ initials: "RZ", dotted: "Ifeoma Mbonu", meta: null, heads: [] }),
     ]);
     expect(initialsOf("Sade")).toBe("S");
     expect(initialsOf("  Tobiloba Iyanuoluwa Dada ")).toBe("TD");
@@ -312,9 +403,14 @@ describe("Download PDF's drawing", () => {
   test("the template names only its declared variables and places every card and line", () => {
     const t = store.shipped("document", "org-chart");
     expect(() => variables.assertTemplate("document", "org-chart", t.body)).not.toThrow();
-    const drawing = layout([node("A", null, { is_ceo: true }), node("B", "A", { dotted_line_to: "Ada A" })]);
+    const drawing = layout([
+      node("A", null, { is_ceo: true, heads: [{ department_id: "d", name: "Growth", code: "PG", acting: true, mark: "Acting Head · PG" }] }),
+      node("B", "A", { dotted_line_to: "Ada A" }),
+    ]);
     const data = variables.parseData("document", "org-chart", { ...drawing, seats: 2, filled: 2, open: 0 });
     const html = render(t.body, data);
+    expect(html).toContain('<span class="oc-head">Acting Head · PG</span>');
+    expect(html.match(/class="oc-head"/g)).toHaveLength(1);
     expect(html).toContain("size: 297mm 210mm");
     expect(html).toContain("left: 3mm; top: 0mm;");
     expect(html).toContain("left: 3mm; top: 50mm;");

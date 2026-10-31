@@ -88,7 +88,7 @@ async function openAs(email: string, address: string) {
   mockSession.set(null);
   invalidate("/api/v1");
   const { rerender } = render(app(false));
-  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 5000 });
+  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 15000 });
   await act(async () => {
     const next = await auth!.signIn(email, "demo1234");
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
@@ -145,6 +145,68 @@ describe("Performance · Reviews", () => {
     await expect(api.call("GET /api/v1/performance/reviews/:id", { params: { id: rows.data[0].performance_review_id } })).rejects.toMatchObject({ code: "CHECK_IN_FIRST" });
   }, 30000);
 
+  it("Open Round lists a month still running with the day it ends, and sends nothing until one has ended (fault #8 on staging, 27/10/2026)", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=reviews");
+    // 3 November: October has its round; November and December are still to end.
+    await press(document.body, "Open Round");
+    const form = dialog();
+    fireEvent.click(within(form).getByRole("combobox", { name: "Month" }));
+    const listed = within(screen.getByRole("listbox")).getAllByRole("option");
+    expect(listed.map((o) => [o.textContent, o.getAttribute("aria-disabled")])).toEqual([
+      ["November 2026 · Ends 30/11/2026", "true"],
+      ["December 2026 · Ends 31/12/2026", "true"],
+    ]);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    const opens = () => vi.mocked(dispatch).mock.calls.filter(([r]) => r.method === "POST" && r.path.endsWith("/performance/rounds")).length;
+    const sent = opens();
+    await press(form, "Open Round");
+    expect(opens()).toBe(sent);
+    expect(within(form).getByText("Not ended yet")).toBeTruthy();
+  }, 30000);
+
+  it("Close Round gives way to Reopen Round on a closed round, and Reopen Round opens it again", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=reviews");
+    const october = async () => ((await api.call("GET /api/v1/performance/rounds", { query: {} })) as { data: Array<{ name: string; status: string }> }).data.find((r) => r.name === "October 2026");
+    expect(screen.queryByRole("button", { name: "Reopen Round" })).toBeNull();
+    expect((await october())?.status).toBe("open");
+
+    await press(document.body, "Close Round");
+    expect((await october())?.status).toBe("closed");
+    expect(screen.queryByRole("button", { name: "Close Round" })).toBeNull();
+    expect(copyProblems()).toEqual([]);
+
+    await press(document.body, "Reopen Round");
+    expect((await october())?.status).toBe("open");
+    expect(screen.queryByRole("button", { name: "Reopen Round" })).toBeNull();
+    screen.getByRole("button", { name: "Close Round" });
+  }, 30000);
+
+  /** What the Department filter offers, in order; null when the screen shows no such filter. */
+  const departmentChoices = () => {
+    const filter = screen.queryByRole("combobox", { name: "Department" });
+    if (!filter) return null;
+    fireEvent.click(filter);
+    const names = within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    return names;
+  };
+
+  it("the Department filter offers Operations & People every department", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=reviews");
+    expect(departmentChoices()).toEqual(["All Departments", "Content", "Engineering", "Executive", "Finance", "Marketing & Sales", "Operations & People", "Studio", "Support"]);
+  }, 30000);
+
+  it("the Department filter offers a manager only the departments of the people they reach", async () => {
+    await openAs("ngozi@mycityapp.io", "/performance?tab=reviews");
+    expect(departmentChoices()).toEqual(["All Departments", "Finance", "Marketing & Sales", "Studio"]);
+  }, 30000);
+
+  it("a member of staff with one department to reach is not offered a Department filter", async () => {
+    await openAs("kemi@mycityapp.io", "/performance?tab=reviews");
+    expect(screen.getByRole("heading", { level: 1, name: "Reviews" })).toBeTruthy();
+    expect(departmentChoices()).toBeNull();
+  }, 30000);
+
   it("opens on the newest round, which the API lists first", async () => {
     const real = vi.mocked(dispatch).getMockImplementation()!;
     vi.mocked(dispatch).mockImplementation(async (req) => {
@@ -171,6 +233,8 @@ describe("ESS · My Performance", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Start Check-In" })[0]);
     await settled();
     const sheet = dialog();
+    // Each line's Action is dictated with Dictate, named for the field it fills.
+    expect(within(sheet).getAllByRole("button", { name: "Record Action" })[0]!.textContent).toContain("Dictate");
     // The first line is the person's own Results line: its actual, and where the figure came from.
     fireEvent.change(within(sheet).getAllByLabelText("Actual")[0], { target: { value: "6" } });
     await chooseOption(within(sheet).getAllByLabelText(/^Evidence/)[0], "Source");

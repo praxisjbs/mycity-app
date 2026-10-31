@@ -4,7 +4,7 @@
  * @summary The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each.
  * @use Sibling views of one module or record (Register, Field Assignments, Location Requests). Controlled by value, so the router drives it from ?tab=; give each tab an href so it opens in a new tab and survives a reload.
  * @avoid Two or three views of one list in a toolbar (use SegmentedControl); filtering a list (use Chips); steps of a form (use Wizard); more than one strip on a screen.
- * @phone One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count).
+ * @phone One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). A count's `tone` reads the same on both: yellow for what waits on the reader, red when it is urgent.
  * @a11y A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing.
  * @status stable
  * @exports TabPanel
@@ -29,6 +29,8 @@ export interface TabItem {
   label: ReactNode;
   /** A count beside the label (approvals waiting); nothing is drawn for 0. */
   count?: number;
+  /** The count's colour: `neutral` (the default) for a quiet total, `primary` for what waits on the reader (unread notifications), `err` when something urgent does. */
+  tone?: "neutral" | "primary" | "err";
   /** Where the tab lives, so it can be opened in a new browser tab; a plain click still goes through onValueChange. */
   href?: string;
   /** A glyph before the label. */
@@ -149,7 +151,7 @@ export function Tabs({ items, value, onValueChange, label, children, activation 
       {item.count != null && (
         <>
           {" "}
-          <CountBadge count={item.count} tone="neutral" />
+          <CountBadge count={item.count} tone={item.tone ?? "neutral"} />
         </>
       )}
     </>

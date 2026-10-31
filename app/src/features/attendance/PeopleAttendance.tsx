@@ -6,10 +6,13 @@ import { usePhotos } from "@/api/download";
 import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth, useMe } from "@/auth/AuthProvider";
+import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useSearchParams } from "@/lib/router";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, SelectField, SidePanel, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, locationShown, PATTERN, PUNCH_STATE, REGISTER_STATUS, UNCLEAR_HELP, VERDICT } from "./labels";
+import { DAY_COLUMNS } from "./EssAttendance";
 import { DayRoute } from "./TemporarySites";
 import { ApproveOvertimeForm, PayItemsView } from "./PayItems";
 
@@ -38,6 +41,8 @@ export function PeopleAttendance() {
   const [params] = useSearchParams();
   const id = params.get("id");
   const homeId = params.get("home");
+  const employeeId = params.get("employee");
+  const personId = params.get("person");
   const { can } = useAuth();
   const modal = useModal();
   const [date, setDate] = useState(todayIso());
@@ -55,8 +60,16 @@ export function PeopleAttendance() {
     ["deductions", "Deductions"],
     ["overtime", "Overtime"],
   ];
-  const openDay = (employeeId: string, name: string, day: string) => modal.open({ title: name, wide: true, body: <DayView employeeId={employeeId} date={day} /> });
+  // Each view carries what waits on the reader in it, and the page opens where it waits, unless a link named a record.
+  const news = useViewNews();
+  useOpenWhereNews({ value: shown, onChange: setView, values: views.map(([v]) => v), skip: Boolean(id || homeId || employeeId || personId) });
+  const openDay = useCallback((employeeId: string, name: string, day: string) => modal.open({ title: name, wide: true, body: <DayView employeeId={employeeId} date={day} /> }), [modal]);
   useRecordLink(id, openDay);
+  usePersonLink(employeeId, openDay);
+  // ⌘K's All Days of a person (`?person=`): their days by month in a panel; a day opens over it.
+  const [person, setPerson] = useState<{ employee_id: string; name: string } | null>(null);
+  const openPerson = useCallback((who: string, name: string) => setPerson({ employee_id: who, name }), []);
+  usePersonDaysLink(personId, openPerson);
   const openHome = useCallback((h: HomeRequest) => modal.open({ title: h.employee.display_name, body: (close) => <HomeView h={h} close={close} /> }), [modal]);
   useHomeLink(homesOn ? homeId : null, openHome, () => setView("homes"));
   // Deductions ticked on the Deductions view put Waive Selected in the phone's floating button.
@@ -65,6 +78,8 @@ export function PeopleAttendance() {
   // search:none Waive Selected acts on the deductions ticked on the list, never from search
   useScreenAction(canWaive ? { label: "Waive Selected", icon: "check", onSelect: () => waiveRef.current?.() } : null);
 
+  // Open Exceptions counts the day's open ones: pressing it opens the list on the same.
+  const [exceptionsOn, setExceptionsOn] = useState<"open" | "day">("open");
   const exportRange = () => modal.open({ title: "Export Register", body: (close) => <ExportForm close={close} date={date} status={status} /> });
   const tile = (title: string, value: number | undefined, filter: RegisterStatus | null, tone?: "ok" | "warn" | "err", help?: string) => (
     <KpiCard title={title} value={value === undefined ? "" : String(value)} tone={value ? tone : undefined} help={help} onOpen={filter ? () => (setView("register"), setStatus(filter)) : undefined} />
@@ -96,23 +111,74 @@ export function PeopleAttendance() {
           value={s ? String(s.open_exceptions) : ""}
           tone={s?.open_exceptions ? "warn" : undefined}
           help="Punches recorded for review on this day, waiting on People to accept, reject or correct."
-          onOpen={() => setView("exceptions")}
+          onOpen={() => (setExceptionsOn("day"), setView("exceptions"))}
         />
       </Grid>
       <div className="my-3">
-        <SegmentedControl label="View" value={shown} onChange={setView} options={views} />
+        <SegmentedControl label="View" value={shown} onChange={setView} options={withNews(news, views)} />
       </div>
       {shown === "register" ? (
         <Register date={date} status={status} setStatus={setStatus} openDay={openDay} />
       ) : shown === "exceptions" ? (
-        <Exceptions date={date} />
+        <Exceptions key={exceptionsOn} date={date} start={exceptionsOn} />
       ) : shown === "deductions" || shown === "overtime" ? (
         <PayItemsView key={shown} group={shown} waiveRef={waiveRef} onCanWaive={setCanWaive} />
       ) : (
         <Homes openHome={openHome} />
       )}
+      <SidePanel open={!!person} onClose={() => setPerson(null)} title={person?.name ?? "All Days"} size="wide">
+        {person && <PersonDays key={person.employee_id} employeeId={person.employee_id} name={person.name} openDay={openDay} />}
+      </SidePanel>
     </>
   );
+}
+
+/** All Days: one person's days of a month, newest first, 25 a page; a day opens its own sheet over the panel. */
+function PersonDays({ employeeId, name, openDay }: { employeeId: string; name: string; openDay: (employeeId: string, name: string, date: string) => void }) {
+  const thisMonth = todayIso().slice(0, 7);
+  const [month, setMonth] = useState(thisMonth);
+  const list = usePaged("GET /api/v1/attendance/days", { filters: { employee_id: employeeId, month } });
+  return (
+    <>
+      <MonthPicker value={month} onChange={setMonth} min={`${Number(thisMonth.slice(0, 4)) - 2}-01`} max={thisMonth} className="mb-3" />
+      <DataView
+        title="All Days"
+        list={list}
+        rowKey={(d) => d.attendance_day_id}
+        onRowClick={(d) => openDay(employeeId, name, d.attendance_date)}
+        noun="day"
+        empty={{ icon: "clock", title: "No Days This Month" }}
+        columns={[...DAY_COLUMNS, { key: "r", label: "Review", desktop: true, render: (d) => (d.open_exceptions ? <Pill tone="warn">{`${d.open_exceptions} Open`}</Pill> : null) }]}
+      />
+    </>
+  );
+}
+
+/**
+ * A link to all of a person's days (⌘K's All Days of them, `?person=`) opens them, once. The name
+ * comes from their record, which a person not on today's register (on leave, left) still has.
+ */
+function usePersonDaysLink(employeeId: string | null, open: (employeeId: string, name: string) => void) {
+  const person = useApi("GET /api/v1/employees/:id", { params: { id: employeeId ?? "" }, enabled: !!employeeId });
+  const done = useRef<string | null>(null);
+  useEffect(() => {
+    if (person.data && done.current !== person.data.employee_id) {
+      done.current = person.data.employee_id;
+      open(person.data.employee_id, person.data.display_name);
+    }
+  }, [person.data, open]);
+}
+
+/** A link naming a person (Home's View Attendance) opens their today, once. */
+function usePersonLink(employeeId: string | null, openDay: (employeeId: string, name: string, date: string) => void) {
+  const day = useApi("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: employeeId ?? "" }, query: { date: todayIso() }, enabled: !!employeeId });
+  const done = useRef<string | null>(null);
+  useEffect(() => {
+    if (day.data && done.current !== day.data.employee.employee_id) {
+      done.current = day.data.employee.employee_id;
+      openDay(day.data.employee.employee_id, day.data.employee.display_name, day.data.date);
+    }
+  }, [day.data, openDay]);
 }
 
 /** A link from search or a notice opens the day it names, once. */
@@ -131,15 +197,17 @@ function Register({ date, status, setStatus, openDay }: { date: string; status: 
   const list = usePaged("GET /api/v1/attendance/register", { filters: { date, ...(status !== "all" && { status }) } });
   const photo = usePhotos(list.rows.map((r) => r.employee.photo_url));
   const open = (r: RegisterRow) => openDay(r.employee.employee_id, r.employee.display_name, r.date);
+  const news = useViewNews();
   return (
     <>
-      <Chips label="Status" value={status} onChange={setStatus} options={STATUS_CHIPS} />
+      <Chips label="Status" value={status} onChange={setStatus} options={withNews(news, STATUS_CHIPS, { at: "register", all: "all" })} />
       <DataView
         title="Register"
         wide
         list={list}
         search="Name or Location"
-        rowKey={(r) => r.employee.employee_id}
+        // A person's day once it has one, so a notice about that day marks its row; else the person.
+        rowKey={(r) => r.attendance_day_id ?? r.employee.employee_id}
         onRowClick={open}
         noun="person"
         nounPlural="people"
@@ -173,7 +241,8 @@ function DayView({ employeeId, date }: { employeeId: string; date: string }) {
   if (!d) return <LoadingRows />;
   const decideOne = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], wide: true, body: (close) => <ExceptionView x={x} close={close} /> });
   // Overtime is approved beforehand, for today or a day to come, never for one's own day (§6.17).
-  const mayApprove = can("people", "approve") && d.employee.employee_id !== me.employee_id && d.date >= todayIso();
+  // Only where the policy pays overtime approved beforehand: otherwise nothing reads the approval.
+  const mayApprove = can("people", "approve") && d.policy.pre_approved_overtime && d.employee.employee_id !== me.employee_id && d.date >= todayIso();
   const approveOvertime = () => modal.open({ title: "Approve Overtime", body: (close) => <ApproveOvertimeForm employeeId={d.employee.employee_id} date={d.date} close={close} /> });
   return (
     <>
@@ -231,7 +300,7 @@ function DayView({ employeeId, date }: { employeeId: string; date: string }) {
 const evidenceColumns = [
   { key: "t", label: "Punch", render: (e: AttendanceEvent) => (e.event_type === "clock_in" ? "Clock In" : "Clock Out") },
   { key: "a", label: "Server Time", render: (e: AttendanceEvent) => formatTime(e.occurred_at) },
-  { key: "r", label: "Result", render: (e: AttendanceEvent) => <Pill tone={e.excluded ? "err" : PUNCH_STATE[e.validation_state].tone}>{e.excluded ? "Not Counted" : PUNCH_STATE[e.validation_state].text}</Pill> },
+  { key: "r", label: "Result", render: (e: AttendanceEvent) => <Pill tone={e.excluded ? "err" : PUNCH_STATE[e.validation_state].tone}>{e.excluded ? "Rejected" : PUNCH_STATE[e.validation_state].text}</Pill> },
   { key: "v", label: "Device Time", desktop: true, render: (e: AttendanceEvent) => (e.device_at ? `${formatTime(e.device_at)}${e.skew_seconds && Math.abs(e.skew_seconds) >= 60 ? `, ${Math.round(e.skew_seconds / 60)} min` : ""}` : null) },
   { key: "l", label: "Location", render: (e: AttendanceEvent) => locationShown(e) },
   { key: "c", label: "Accuracy", desktop: true, render: (e: AttendanceEvent) => (e.accuracy_m !== null ? `${Math.round(e.accuracy_m)} m` : null) },
@@ -255,15 +324,24 @@ const exceptionColumns = (photo: ((url: string | null) => string | null) | null)
   },
 ];
 
-function Exceptions({ date }: { date: string }) {
+function Exceptions({ date, start = "open" }: { date: string; start?: "open" | "day" }) {
   const modal = useModal();
-  const [status, setStatus] = useState<"open" | "resolved" | "day">("open");
-  const list = usePaged("GET /api/v1/attendance/exceptions", { filters: status === "day" ? { date } : { status } });
+  const [status, setStatus] = useState<"open" | "resolved" | "day">(start);
+  const chips: Array<["open" | "resolved" | "day", string]> = [
+    ["open", "Open"],
+    ["resolved", "Decided"],
+    ["day", `Open, ${formatDate(date)}`],
+  ];
+  const news = useViewNews();
+  // Open Exceptions' tile asks for that day: it stays there.
+  useOpenWhereNews({ value: status, onChange: setStatus, values: ["open", "resolved"], at: "exceptions", skip: start === "day" });
+  // The day's chip is that day's open exceptions, the ones Open Exceptions counts.
+  const list = usePaged("GET /api/v1/attendance/exceptions", { filters: status === "day" ? { date, status: "open" as const } : { status } });
   const photo = usePhotos(list.rows.map((x) => x.employee.photo_url));
   const open = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], wide: true, body: (close) => <ExceptionView x={x} close={close} /> });
   return (
     <>
-      <Chips label="Exceptions" value={status} onChange={setStatus} options={[["open", "Open"], ["resolved", "Decided"], ["day", formatDate(date)]]} />
+      <Chips label="Exceptions" value={status} onChange={setStatus} options={withNews(news, chips, { at: "exceptions" })} />
       <DataView
         title="Exceptions"
         list={list}
@@ -280,7 +358,6 @@ function Exceptions({ date }: { date: string }) {
 
 /** An exception: what happened, the person's note, the punch's evidence, and the decision. */
 function ExceptionView({ x, close }: { x: AttendanceException; close: () => void }) {
-  const { can } = useAuth();
   const events = usePaged("GET /api/v1/attendance/events", { filters: { employee_id: x.employee.employee_id, date: x.work_date } });
   const checkIns = usePaged("GET /api/v1/attendance/check-ins", { filters: { employee_id: x.employee.employee_id, date: x.work_date } });
   return (
@@ -306,7 +383,7 @@ function ExceptionView({ x, close }: { x: AttendanceException; close: () => void
       </Card>
       <DataView className="mt-3" title="Punches" wide list={events} rowKey={(e) => e.attendance_event_id} noun="punch" nounPlural="punches" columns={evidenceColumns} />
       <DayRoute className="mt-3" punches={events.rows} checkIns={checkIns.rows} />
-      {x.status === "open" && can("people", "approve") ? (
+      {x.can_decide ? (
         <DecisionForm x={x} close={close} />
       ) : (
         <FormFooter>
@@ -320,7 +397,7 @@ function ExceptionView({ x, close }: { x: AttendanceException; close: () => void
 const DECISIONS: Record<ExceptionDecision["decision"], string> = { accept: "Accept", reject: "Reject", add_clock_out: "Add Clock-Out" };
 
 /** What each kind of exception can be decided as, and the words the choice and its help use. */
-function decisionsFor(x: Pick<AttendanceException, "exception_type" | "attendance_check_in_id">): { options: Array<ExceptionDecision["decision"]>; label: (d: ExceptionDecision["decision"]) => string; help: string } {
+function decisionsFor(x: Pick<AttendanceException, "exception_type" | "attendance_check_in_id" | "refused">): { options: Array<ExceptionDecision["decision"]>; label: (d: ExceptionDecision["decision"]) => string; help: string } {
   const type = x.exception_type;
   if (x.attendance_check_in_id)
     return {
@@ -333,6 +410,12 @@ function decisionsFor(x: Pick<AttendanceException, "exception_type" | "attendanc
       options: ["accept", "add_clock_out"],
       label: (d) => (d === "add_clock_out" ? "Correct Time" : DECISIONS[d]),
       help: "Accept keeps the System Clock-Out's time. Correct Time records when the person really left.",
+    };
+  if (x.refused)
+    return {
+      options: ["accept", "reject"],
+      label: (d) => DECISIONS[d],
+      help: "Refused at the clock, so it never counts. Accept agrees with the refusal. Reject notes it was wrong.",
     };
   return {
     options: type === "missing_clock_out" ? ["add_clock_out", "accept"] : ["accept", "reject"],
@@ -416,9 +499,11 @@ const far = (m: number | null) => (m === null ? null : m < 1000 ? `${m} m` : `${
 function Homes({ openHome }: { openHome: (h: HomeRequest) => void }) {
   const [status, setStatus] = useState<HomeStatus | "all">("pending");
   const list = usePaged("GET /api/v1/attendance/homes", { filters: status === "all" ? {} : { status } });
+  const news = useViewNews();
+  useOpenWhereNews({ value: status, onChange: setStatus, values: HOME_CHIPS.map(([v]) => v), at: "homes", all: "all" });
   return (
     <>
-      <Chips label="Homes" value={status} onChange={setStatus} options={HOME_CHIPS} />
+      <Chips label="Homes" value={status} onChange={setStatus} options={withNews(news, HOME_CHIPS, { at: "homes", all: "all" })} />
       <DataView
         title="Homes"
         list={list}
@@ -442,7 +527,6 @@ function Homes({ openHome }: { openHome: (h: HomeRequest) => void }) {
 
 /** One home location: what was sent, how it compares with the home in force, and the decision. */
 function HomeView({ h, close }: { h: HomeRequest; close: () => void }) {
-  const { can } = useAuth();
   return (
     <>
       <Card>
@@ -465,7 +549,7 @@ function HomeView({ h, close }: { h: HomeRequest; close: () => void }) {
           ]}
         />
       </Card>
-      {h.status === "pending" && can("people", "approve") ? (
+      {h.can_decide ? (
         <HomeDecisionForm h={h} close={close} />
       ) : (
         <FormFooter>
@@ -531,10 +615,10 @@ async function downloadRegister(file: ExportFile) {
   }
 }
 
-/** The register between two dates as a workbook, downloaded on this device once it is made. */
+/** The register between two dates as a workbook, downloaded on this device once it is made; the status chip in force is its starting Status. */
 function ExportForm({ close, date, status }: { close: () => void; date: string; status: RegisterStatus | "all" }) {
-  const f = useContractForm({ period: { from: `${date.slice(0, 8)}01`, to: date } }, {
-    safeParse: (v: { period: { from: string; to: string } }) => {
+  const f = useContractForm({ period: { from: `${date.slice(0, 8)}01`, to: date }, status }, {
+    safeParse: (v: { period: { from: string; to: string }; status: RegisterStatus | "all" }) => {
       const r = attendance.RegisterExportRequest.safeParse({ from: v.period.from, to: v.period.to });
       return r.success ? r : { success: false, error: { issues: (r.error?.issues ?? []).map((i) => ({ ...i, path: ["period"] })) } };
     },
@@ -544,7 +628,8 @@ function ExportForm({ close, date, status }: { close: () => void; date: string; 
     if (!f.check()) return;
     setBusy(true);
     try {
-      const file = await api.call("POST /api/v1/attendance/export", { body: { from: f.values.period.from, to: f.values.period.to, ...(status !== "all" && { status }) } });
+      const shown = f.values.status;
+      const file = await api.call("POST /api/v1/attendance/export", { body: { from: f.values.period.from, to: f.values.period.to, ...(shown !== "all" && { status: shown }) } });
       close();
       toast.info("Preparing your export");
       void downloadRegister(file);
@@ -558,6 +643,9 @@ function ExportForm({ close, date, status }: { close: () => void; date: string; 
     <>
       <Field label="Period" {...f.status("period")}>
         <DateRangeField value={f.values.period} onChange={(p) => f.set("period", p)} onProblem={f.field("period").onProblem} max={todayIso()} />
+      </Field>
+      <Field label="Status" {...f.status("status")}>
+        <SelectField value={f.values.status} onChange={(v) => f.set("status", v as RegisterStatus | "all")} options={STATUS_CHIPS} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

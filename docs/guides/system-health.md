@@ -180,6 +180,11 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
   21/10/2026, faults #1 to #3: three lines titled `VALIDATION_FAILED` at `POST /leave` needed the
   server's log to tell them apart). The route is `req.routePattern`, stamped by `http/route.js`
   before the router's base path is unwound; every fault the error handler records carries it.
+- **A refusal no screen can foresee is not a fault.** Where only the server can know and no fix
+  could prevent it, the error says so (`err.recorded = false`, `shared/errors.js`) and is answered
+  the same, never recorded: a password found in a breach (identity.md §6; fault #6 of the 27/10
+  brief, JBS Praxis). A rule a screen could check first stays recorded, since its count is how a
+  screen that lets it through is found (leave past the allowance stays, JBS Praxis, 27/10/2026).
 - Only `fatal` and `error` are told. A `warning` or `notice` group is grouped, counted and reopened
   when it comes back like any other, but never pushed as new, back again or happening fast, and
   never escalates (TB, 20/10/2026, fault #1). The roll-up reads the reporter's `ALERT_SEVERITIES`,
@@ -373,7 +378,7 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 | Check sheet | State pill, since when, what it said; the probe's figures; for Background Jobs every scheduler (Job, Set As, Last Run, Result, Next, State); for Worker every queue (Waiting, Active, Delayed, Failed); the changes over 7 days, 25 a page | Help term on Set As: what the code declared. Help term on Not Due Yet: started, first slot still to come. Help term on Failed: failed jobs still kept, not today's. A job's last error is content, under its name | The read-only commands and the AI instructions: the downloaded brief |
 | Settings · Performance | Four target tiles (Availability, Response Time, Failed Requests, Requests), each with its target; Processor, Memory and Disk cards in real units with a bar split by what uses them; Network and Server cards; Response Time, Requests, Failed Requests, Processor, Memory, Disk Activity and Network over the window; the section switch (Slowest Routes, Database, Background Work, Processes). A banner when nothing is recording | Help terms on Steal, I/O Wait, Cache, Reserved, Full In and p95, one sentence each; the ⓘ on a chart says what it counts | How each figure is worked out, the bucket bounds and the regression: §6 here |
 | Edit Targets | A three-step wizard: Targets (availability, response time, failed requests), Disk and Memory, Processor and Connections; Save Targets | Nothing | Why the defaults are what they are: §6 here |
-| Settings · Faults | The fault table with severity, Today, In All, People, Last Seen, Status and who holds it; Set Status, Assign, Add Note, Download Brief | Help term on Came Back: a fault marked fixed that has happened again. Help term on People: how many different people hit it | The brief's full text: the downloaded file |
+| Settings · Faults | The fault table with severity, Today, In All, People, Last Seen, Status and who holds it; Set Status (Take It On makes the reader its holder: Held By), Add Note on its own, Download Brief; the ticks only for a reader who may brief or change faults, and more ticked than a press takes (25 a brief, 50 a status) asks first | Help term on Came Back: a fault marked fixed that has happened again. Help term on People: how many different people hit it | The brief's full text: the downloaded file |
 | Fault sheet | Title, severity, where, first and last seen with release, the last 5 occurrences with stack, 14 days of bars, notes, history | Help term on Release: the build the fault was last seen on | The brief's full text, the AI instructions: the downloaded file |
 
 ### 10.2 Phone layout
@@ -453,6 +458,11 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
   built; TB decided against it on 20/10/2026 to keep the screen single-audience.
 
 ## 14 · Change log
+
+- 27/10/2026 · JP · From the 27/10 staging faults brief (JBS Praxis's answers): a refusal no screen can foresee, a password found in a breach, is answered as before and never recorded as a fault (`err.recorded = false`, §6); a person choosing a breached password is the rule working, and three of them cost a fix session to rule out. Waits On's and Open Round's rules, which shared `VALIDATION_FAILED`, each have their own code, so a brief names the rule a person met (workspace.md, performance.md).
+- 26/10/2026 · JP · From the User Guide audit's screen defects: Checks reads Show All when every check is up and Show Fewer once all show; Download Brief, the bulk changes and a fault's status buttons say why they failed; more than 25 (a brief) or 50 (a status) ticked asks first, as §11 says; Take It On sends `assigned_to`, so Held By names the reader (§2, §10.1); Add Note saves a note with no status change (`POST /faults/:id/notes`); the fault's labels are Title Case (First Seen, Last Seen, How Often, Held By); Status keeps its title when it cannot load; a reader with view only gets no ticks. §10 updated.
+- 25/10/2026 · JP · Settings · Performance: the p95 column keeps its help term and sorts from the glyph beside it (`DataView` `sortLabel`), since a help term inside the sort button was a control inside a control (the accessibility gate's nested-interactive).
+- 24/10/2026 · GE · The fix and status briefs name the repository `praxisjbs/mycity-app`; it moved from `tomblakeasaah196/mycity-app` (`docs/runbooks/github-settings.md`). No behaviour changes.
 
 - 21/10/2026 · TB · A refused form is recorded under the rule that refused it (`LEAVE_IN_THE_PAST: starts_on`, not `VALIDATION_FAILED: starts_on`) and every fault the API records carries the route as declared (`POST /api/v1/ess/leave`, not `POST /leave`), §6. The three open `VALIDATION_FAILED` lines of the 21/10 brief stop counting; their causes are fixed in the date field, `schemas/leave.js` and `schemas/settings.js`.
 

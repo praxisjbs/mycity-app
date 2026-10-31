@@ -711,6 +711,21 @@ describeDb("attendance against the real migrations", () => {
     expect((await as("manager").get(`/attendance/events?employee_id=${people.outsider.employee.employee_id}&date=${date}`)).status).toBe(404);
   });
 
+  test("All Days: one person's days of a month for People within scope, as the person's own list reads (QA DEF-02)", async () => {
+    const id = people.manager.employee.employee_id;
+    const own = await as("manager").get("/attendance/me?month=2026-10");
+    const theirs = await as("ops").get(`/attendance/days?employee_id=${id}&month=2026-10`);
+    expect(theirs.status).toBe(200);
+    expect(theirs.body.data.map((d) => d.attendance_date)).toEqual(own.body.data.map((d) => d.attendance_date));
+    const late = await as("ops").get(`/attendance/days?employee_id=${id}&month=2026-10&status=late`);
+    expect(late.body.data.length).toBeGreaterThan(0);
+    for (const d of late.body.data) expect(d.status).toBe("late");
+    expect((await as("manager").get(`/attendance/days?employee_id=${people.staff.employee.employee_id}&month=2026-10`)).status).toBe(200);
+    expect((await as("manager").get(`/attendance/days?employee_id=${people.outsider.employee.employee_id}&month=2026-10`)).status).toBe(404);
+    expect((await as("staff").get(`/attendance/days?employee_id=${id}&month=2026-10`)).status).toBe(403);
+    expect((await as("ops").get("/attendance/days?month=2026-10")).status).toBe(422);
+  });
+
   test("the person's own: days, figures, punches and exceptions, never anyone else's, no coordinates", async () => {
     const days = await as("manager").get("/attendance/me?month=2026-10");
     expect(days.status).toBe(200);
@@ -739,7 +754,10 @@ describeDb("attendance against the real migrations", () => {
     const list = await as("ops").get("/attendance/exceptions?status=open&exception_type=outside_worksite");
     expect(list.status).toBe(200);
     const x = list.body.data.find((e) => e.employee.display_name === "Bisi Ade");
-    expect(x).toMatchObject({ status: "open", detail: "340 m from Testbed Office, radius 100 m" });
+    expect(x).toMatchObject({ status: "open", detail: "340 m from Testbed Office, radius 100 m", refused: false, can_decide: true });
+    // A line manager reads it within their team but does not decide it: People with scope all do.
+    const byManager = (await as("manager").get("/attendance/exceptions?status=open&exception_type=outside_worksite")).body.data;
+    expect(byManager.every((e) => e.can_decide === false)).toBe(true);
 
     const mine = await as("outsider").get("/attendance/me/exceptions");
     expect(mine.body.data.map((e) => e.attendance_exception_id)).toContain(x.attendance_exception_id);

@@ -66,6 +66,8 @@ const SearchHit = z
     status: z.string().nullable(),
     link: z.string().nullable(),
     run: SearchRun.nullable(),
+    /** The module whose records it stands for, when that is not the screen it opens (a Home card counting expenses): the app leaves it out while that module is Coming Soon (F14). */
+    module: z.string().regex(/^[a-z][a-z_]*$/).nullable().optional(),
   })
   .strict();
 

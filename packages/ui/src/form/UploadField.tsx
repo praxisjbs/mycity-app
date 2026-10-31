@@ -32,6 +32,9 @@ interface Travelling {
 /** 25 MB: what the vault takes, and what a phone photograph fits inside. */
 const MAX_BYTES = 25 * 1024 * 1024;
 
+/** A limit as a person reads it: 15 MB, not 15.0 MB. */
+const limitOf = (bytes: number) => formatBytes(bytes).replace(/\.0 /, " ");
+
 /** At most ten files at once, so one drop cannot queue a hundred requests. */
 const MAX_FILES = 10;
 
@@ -116,7 +119,7 @@ export function UploadField({
       name: file.name,
       size: file.size,
       percent: 0,
-      error: file.size > maxBytes ? `Larger than ${formatBytes(maxBytes)}` : undefined,
+      error: file.size > maxBytes ? `Larger than ${limitOf(maxBytes)}` : undefined,
       file: file.size > maxBytes ? undefined : file,
     }));
     setFiles((list) => (multiple ? [...list, ...added] : added));
@@ -214,7 +217,7 @@ export function UploadField({
             {label}
           </button>
           <span className="text-2xs text-subtle-foreground">
-            {kinds ? `${kinds}, up to ${formatBytes(maxBytes)}` : `Up to ${formatBytes(maxBytes)} each`}
+            {kinds ? `${kinds}, up to ${limitOf(maxBytes)}` : `Up to ${limitOf(maxBytes)} each`}
           </span>
           {picker}
         </div>

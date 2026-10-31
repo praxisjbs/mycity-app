@@ -9,10 +9,15 @@ import { useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, type ProjectChoice } from "@/features/shared/pickers";
 import { useAddressPrefill } from "@/shell/screen-action";
 import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
-import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, LoadingRows, RecordPicker, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
-import { LABEL, refresh, refreshed, say, useLateOptions, useSetsForOthers, type BoardStatus, type LateReason } from "./shared";
+import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, LoadingRows, Pill, RecordPicker, SelectField, shortMessage, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
+import { LABEL, refresh, refreshed, say, STATUS_TONE, useLateOptions, useSetsForOthers, type BoardStatus, type LateReason, type Status } from "./shared";
 
 /** A 422's field marks on the form; anything else as a toast. */
+/** The most people a shared task takes besides its lead (tasks.service: "At most 25 people"). */
+const MAX_MEMBERS = 25;
+/** Fields a task refusal may name that are pickers outside the form, by the label the form shows. */
+const LOOSE: Record<string, string> = { employee_target_id: "Counts Towards", entity_id: "Counts Towards", project_id: "Project" };
+
 const failed = (f: { setServerErrors: (e: Record<string, string[]>) => void }) => (e: unknown) => {
   if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
   else say(e);
@@ -209,6 +214,8 @@ export function TaskForm({
   };
   /** The people picked; a lead who is no longer among them hands back to the reader. */
   const pickMembers = (p: PersonRef[]) => {
+    // A shared task has at most 25 people besides its lead (tasks.service): the picker stops there.
+    if (p.length > MAX_MEMBERS) return setShareMark(`At most ${MAX_MEMBERS} people`);
     setMembers(p);
     setShareMark(null);
     if (lead !== me.employee_id && !p.some((x) => x.employee_id === lead)) setLead(me.employee_id);
@@ -249,16 +256,27 @@ export function TaskForm({
       refresh();
       close();
     } catch (e) {
-      const mark = e instanceof ApiError ? (e.fields.member_ids ?? e.fields.department_id)?.[0] : undefined;
+      const raw = e instanceof ApiError ? (e.fields.member_ids ?? e.fields.department_id)?.[0] : undefined;
+      const mark = raw ? shortMessage({ type: "custom", message: raw }) : undefined;
       const onLead = e instanceof ApiError ? e.fields.primary_assignee_id?.[0] : undefined;
+      // Counts Towards and Project are pickers outside the form: their refusal is said here.
+      const loose = e instanceof ApiError ? Object.entries(e.fields).find(([k]) => k in LOOSE) : undefined;
       if (mark || onLead) {
         setShareMark(mark ?? null);
         setLeadMark(onLead ?? null);
-      } else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      } else if (loose) toast.error(`${LOOSE[loose[0]]}: ${loose[1][0]}`);
+      else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
     }
   };
   const assigneeId = !shared ? (who[0]?.employee_id ?? (task ? me.employee_id : null)) : by === "department" ? (deptLead[0]?.employee_id ?? null) : lead;
+  // A scorecard line is one person's: a new assignee drops the line picked for the last.
+  const lastAssignee = useRef(assigneeId);
+  useEffect(() => {
+    if (lastAssignee.current === assigneeId) return;
+    lastAssignee.current = assigneeId;
+    setCounts((c) => c.filter((x) => x.kind !== "line"));
+  }, [assigneeId]);
   // You, or one of the people picked the reader may set work for; a shared task's present lead stays offered.
   const leadOptions: Array<[string, string]> = [
     [me.employee_id, "You"],
@@ -388,10 +406,12 @@ export function DoneLateForm({ task, close, onMoved }: { task: Pick<Task, "task_
   const f = useContractForm({ late_reason: (task.late_reason ?? "") as string }, { late_reason: (v: string) => (!v ? "Pick a reason" : null) });
   const reasons = useLateOptions();
   const move = useMutation("POST /api/v1/tasks/:id/move");
+  // With every reason switched off there is nothing to pick: the card moves without one.
+  const none = reasons.ready && reasons.options.length === 0;
   const submit = async () => {
-    if (!f.check()) return;
+    if (!none && !f.check()) return;
     try {
-      await move.run({ params: { id: task.task_id }, body: { status: "done", before_task_id: null, late_reason: f.values.late_reason as LateReason } });
+      await move.run({ params: { id: task.task_id }, body: { status: "done", before_task_id: null, ...(!none && { late_reason: f.values.late_reason as LateReason }) } });
       refresh();
       onMoved?.();
       close();
@@ -402,7 +422,7 @@ export function DoneLateForm({ task, close, onMoved }: { task: Pick<Task, "task_
   };
   return (
     <>
-      {reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
+      {none ? <p className="text-sm text-muted-foreground">No late reasons are switched on</p> : reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Mark Done</Button>
@@ -429,22 +449,103 @@ export function LateReasonForm({ task, close, onSaved }: { task: TaskDetail; clo
   };
   return (
     <>
-      {reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
+      {reasons.ready && reasons.options.length === 0 ? (
+        <>
+          <p className="text-sm text-muted-foreground">No late reasons are switched on</p>
+          <FormFooter>
+            <Button variant="primary" onClick={close}>Close</Button>
+          </FormFooter>
+        </>
+      ) : (
+        <>
+          {reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
+          <FormFooter>
+            <Button onClick={close}>Cancel</Button>
+            <Button variant="primary" onClick={submit}>Save Reason</Button>
+          </FormFooter>
+        </>
+      )}
+    </>
+  );
+}
+
+type OpenSpec = { title: string; body: (close: () => void) => React.ReactNode };
+
+/**
+ * What a waiting card waits on, asked as it leaves To Do (QA OBS-06): each task it waits on, with
+ * Open Task, and Go Ahead for whoever plans it (the panel's own rule). Nothing moves until every
+ * link is done or gone ahead on; then the card goes where it was moved (`proceed`). Close leaves
+ * it in To Do. The API's TASK_WAITING refusal stays behind it, for a board read before a link.
+ */
+function WaitingSheet({ task, close, proceed, onOpenTask, openForm }: { task: TaskDetail; close: () => void; proceed: () => Promise<void>; onOpenTask?: (id: string, title: string) => void; openForm: (spec: OpenSpec) => void }) {
+  const [t, setT] = useState(task);
+  const blockers = t.waiting_on.filter((d) => !d.satisfied);
+  // A link gone ahead on: the task read again; with none left, the move it was asked for.
+  const wentAhead = async () => {
+    try {
+      const fresh = await api.call("GET /api/v1/tasks/:id", { params: { id: t.task_id } });
+      if (fresh.waiting_on.some((d) => !d.satisfied)) return setT(fresh);
+      close();
+      await proceed();
+    } catch (e) {
+      say(e);
+    }
+  };
+  return (
+    <>
+      {blockers.map((d) => (
+        <div key={d.task_dependency_id} className="flex flex-wrap items-center gap-2 border-b border-border py-2 last:border-b-0">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold" data-copy="content">{`${d.task.number} ${d.task.title}`}</span>
+            {d.task.assignee && <span className="text-2xs text-subtle-foreground" data-copy="content">{d.task.assignee.display_name}</span>}
+          </span>
+          <Pill tone={STATUS_TONE[d.task.status as Status]}>{LABEL[d.task.status as Status]}</Pill>
+          {d.task.visible && onOpenTask && (
+            <Button
+              size="sm"
+              onClick={() => {
+                close();
+                onOpenTask(d.task.task_id, d.task.title);
+              }}
+            >
+              Open Task
+            </Button>
+          )}
+          {t.can_plan && (
+            <Button size="sm" onClick={() => openForm({ title: "Go Ahead", body: (done) => <OverrideForm taskId={t.task_id} edgeId={d.task_dependency_id} close={done} onDone={wentAhead} /> })}>
+              Go Ahead
+            </Button>
+          )}
+        </div>
+      ))}
       <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={submit}>Save Reason</Button>
+        <Button onClick={close}>Close</Button>
       </FormFooter>
     </>
   );
 }
 
 /**
- * Move a card (above `before`, or to the foot), asking why first when it reaches Done late. It
- * settles once the board has reloaded, so the board holds the card until it shows where it went.
+ * Move a card (above `before`, or to the foot), asking what it waits on first when it leaves To Do
+ * waiting (WaitingSheet), and why when it reaches Done late. It settles once the board has
+ * reloaded, so the board holds the card until it shows where it went.
  */
-export function useMoveTask(openModal: (spec: { title: string; body: (close: () => void) => React.ReactNode }) => void) {
+export function useMoveTask(openModal: (spec: OpenSpec) => void, onOpenTask?: (id: string, title: string) => void) {
   const move = useMutation("POST /api/v1/tasks/:id/move");
-  return async (t: Pick<Task, "task_id" | "status" | "overdue" | "late_reason">, to: BoardStatus, before: string | null = null) => {
+  const moveTask = async (t: Pick<Task, "task_id" | "status" | "overdue" | "late_reason" | "waiting">, to: BoardStatus, before: string | null = null): Promise<void> => {
+    if (t.waiting && t.status === "todo" && to !== "todo") {
+      let detail: TaskDetail;
+      try {
+        detail = await api.call("GET /api/v1/tasks/:id", { params: { id: t.task_id } });
+      } catch (e) {
+        say(e);
+        return;
+      }
+      if (detail.waiting_on.some((d) => !d.satisfied)) {
+        openModal({ title: "Waiting On", body: (close) => <WaitingSheet task={detail} close={close} proceed={() => moveTask({ ...t, waiting: false }, to, before)} onOpenTask={onOpenTask} openForm={openModal} /> });
+        return;
+      }
+    }
     if (to === "done" && t.status !== "done" && t.overdue) {
       openModal({ title: "Mark Done", body: (close) => <DoneLateForm task={t} close={close} /> });
       return;
@@ -457,6 +558,7 @@ export function useMoveTask(openModal: (spec: { title: string; body: (close: () 
     }
     await refreshed();
   };
+  return moveTask;
 }
 
 /* ───────────── Holds ───────────── */
@@ -571,13 +673,16 @@ export function StepForm({ id, close, onDone }: { id: string; close: () => void;
   );
 }
 
-/** Pick a task this one waits on, from the tasks the reader can see. */
+/**
+ * Pick a task this one waits on, from the tasks the reader can see: never itself, one it already
+ * waits on, or one already waiting on it, which would make a loop.
+ */
 export function WaitingForm({ task, close, onDone }: { task: TaskDetail; close: () => void; onDone: () => void }) {
   const list = usePaged("GET /api/v1/tasks", { filters: { scope: "team" } });
   const [picked, setPicked] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
   const save = useMutation("POST /api/v1/tasks/:id/waiting-on");
-  const taken = new Set([task.task_id, ...task.waiting_on.map((d) => d.task.task_id)]);
+  const taken = new Set([task.task_id, ...task.waiting_on.map((d) => d.task.task_id), ...task.holding_up.map((d) => d.task.task_id)]);
   const submit = async () => {
     if (!picked[0]) return setError("Pick a task");
     try {
@@ -675,7 +780,9 @@ export function PingForm({ id, hasWatchers, close }: { id: string; hasWatchers: 
       close();
       toast("Nudge sent");
     } catch (e) {
-      failed(f)(e);
+      // Without watchers there is no Send To to mark ("Nobody else to tell"): say it here.
+      if (!hasWatchers && e instanceof ApiError && e.fields.to?.length) toast.error(e.fields.to[0]);
+      else failed(f)(e);
     }
   };
   return (

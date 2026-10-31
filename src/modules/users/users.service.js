@@ -12,6 +12,7 @@ const access = require("../access/access.service");
 const identity = require("../identity/identity.service");
 const policy = require("../identity/identity.session-policy");
 const security = require("../security/security.service");
+const organisation = require("../organisation/organisation.service");
 const invites = require("./users.invite");
 const repo = require("./users.repo");
 
@@ -50,6 +51,35 @@ async function resendInvite(userId, actor) {
   return { sent: true, email };
 }
 
+/**
+ * Invite All Pending: every invited login nobody has sent an invitation to yet (the roster
+ * makes logins and emails nobody), each its own link through the outbox, in one transaction.
+ */
+async function invitePending(actor) {
+  const ids = await repo.pendingInvites(pool);
+  await tx(async (client) => {
+    for (const userId of ids) await identity.requestLink(client, userId, "invite", actor);
+  });
+  return { sent: ids.length };
+}
+
+/**
+ * Use Work Email: a login in use moves to its employee's corrected work email (JBS Praxis,
+ * 25/10/2026). A change to a way in, so after a fresh sign-in; the person is signed out and both
+ * addresses are told.
+ */
+async function useWorkEmail(userId, actor) {
+  refuseSelf(userId, actor, "move the email of");
+  const row = await rowOf(userId);
+  if (row.status === "left") throw new AppError("NOT_ACTIVE", "This login is closed.", 422);
+  const moved = await tx(async (client) => {
+    await security.assertFresh(client, actor);
+    return identity.changeLoginEmail(client, userId, row.work_email, actor, { notify: true });
+  });
+  await identity.afterSessionsEnded(userId, moved.ended);
+  return rowOf(userId);
+}
+
 function refuseSelf(userId, actor, what) {
   if (actor && actor.user_id === userId)
     throw new AppError("NOT_ON_YOURSELF", `You cannot ${what} your own login here.`, 422);
@@ -61,6 +91,8 @@ async function setRoles(userId, codes, actor) {
     if (!(await identity.findUserById(client, userId)))
       throw new AppError("NOT_FOUND", "Not found", 404);
     await access.setRoles(client, userId, codes, actor);
+    // A department's head keeps Head of Department while they head (docs/guides/organogram.md §6.1).
+    await organisation.syncHeadRoles(client, actor);
   });
   return rowOf(userId);
 }
@@ -122,6 +154,8 @@ module.exports = {
   candidates,
   invite,
   resendInvite,
+  invitePending,
+  useWorkEmail,
   setRoles,
   suspend,
   reactivate,

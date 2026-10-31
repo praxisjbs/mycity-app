@@ -11,6 +11,7 @@ const { withActor } = require("../../shared/events/emit");
 const service = require("./goals.service");
 const okrs = require("./goals.okrs");
 const analytics = require("./goals.analytics");
+const share = require("./goals.share");
 
 const id = (req) => req.validated.params.id;
 
@@ -21,17 +22,22 @@ module.exports = {
   createPeriod: async (req, res) => created(res, await service.createPeriod(withActor(req), req.validated.body)),
   updatePeriod: async (req, res) => ok(res, await service.updatePeriod(withActor(req), id(req), req.validated.body)),
 
-  goals: async (req, res) => sendPaged(res, await service.listGoals(req.validated.query)),
-  goal: async (req, res) => ok(res, await service.getGoal(id(req))),
+  goals: async (req, res) => sendPaged(res, await service.listGoals(req.validated.query, withActor(req))),
+  goal: async (req, res) => ok(res, await service.getGoal(id(req), withActor(req))),
   createGoal: async (req, res) => created(res, await service.createGoal(withActor(req), req.validated.body)),
   updateGoal: async (req, res) => ok(res, await service.updateGoal(withActor(req), id(req), req.validated.body)),
   deleteGoal: async (req, res) => {
     await service.deleteGoal(withActor(req), id(req));
     return noContent(res);
   },
+  shareGoal: async (req, res) => ok(res, await share.saveGoal(withActor(req), id(req), req.validated.body)),
+  unshareGoal: async (req, res) => {
+    await share.removeGoal(withActor(req), id(req));
+    return noContent(res);
+  },
 
   okrs: async (req, res) => sendPaged(res, await okrs.listOkrs(req.validated.query, withActor(req))),
-  okrSummary: async (req, res) => ok(res, await okrs.okrSummary(req.validated.query)),
+  okrSummary: async (req, res) => ok(res, await okrs.okrSummary(req.validated.query, withActor(req))),
   objective: async (req, res) => ok(res, await okrs.getObjective(id(req), withActor(req))),
   createObjective: async (req, res) => created(res, await okrs.createObjective(withActor(req), req.validated.body)),
   updateObjective: async (req, res) => ok(res, await okrs.updateObjective(withActor(req), id(req), req.validated.body)),
@@ -39,7 +45,12 @@ module.exports = {
     await okrs.deleteObjective(withActor(req), id(req));
     return noContent(res);
   },
-  keyResults: async (req, res) => sendPaged(res, await okrs.listKeyResults(req.validated.query)),
+  shareObjective: async (req, res) => ok(res, await share.saveObjective(withActor(req), id(req), req.validated.body)),
+  unshareObjective: async (req, res) => {
+    await share.removeObjective(withActor(req), id(req));
+    return noContent(res);
+  },
+  keyResults: async (req, res) => sendPaged(res, await okrs.listKeyResults(req.validated.query, withActor(req))),
   createKeyResult: async (req, res) => created(res, await okrs.createKeyResult(withActor(req), req.validated.body)),
   keyResult: async (req, res) => ok(res, await okrs.getKeyResultDetail(id(req), withActor(req))),
   updateKeyResult: async (req, res) => ok(res, await okrs.updateKeyResult(withActor(req), id(req), req.validated.body)),
@@ -47,20 +58,24 @@ module.exports = {
     await okrs.deleteKeyResult(withActor(req), id(req));
     return noContent(res);
   },
-  trace: async (req, res) => ok(res, await okrs.trace(id(req))),
+  trace: async (req, res) => ok(res, await okrs.trace(id(req), withActor(req))),
   report: async (req, res) => ok(res, await okrs.reportMonth(withActor(req), req.validated.body)),
   confirm: async (req, res) => ok(res, await okrs.confirmScore(withActor(req), id(req), req.validated.body)),
 
-  plans: async (req, res) => sendPaged(res, await service.listPlans(req.validated.query)),
+  plans: async (req, res) => sendPaged(res, await service.listPlans(req.validated.query, withActor(req))),
+  functions: async (req, res) => sendPaged(res, await service.listFunctions(withActor(req), req.validated.query)),
+  departments: async (req, res) => sendPaged(res, await service.listDepartments(withActor(req), req.validated.query, scopeOf(req))),
   plan: async (req, res) => ok(res, await service.planDetail(id(req), withActor(req), scopeOf(req))),
   submitPlan: async (req, res) => ok(res, await service.submitPlan(withActor(req), id(req), scopeOf(req))),
+  requestUnbind: async (req, res) => created(res, await service.requestUnbind(withActor(req), id(req), req.validated.body)),
+  unbind: async (req, res) => ok(res, await service.unbindDetail(id(req), withActor(req))),
 
-  changes: async (req, res) => sendPaged(res, await service.listChanges(req.validated.query, scopeOf(req))),
+  changes: async (req, res) => sendPaged(res, await service.listChanges(req.validated.query, scopeOf(req), withActor(req))),
   change: async (req, res) => ok(res, await service.changeDetail(id(req), withActor(req), scopeOf(req))),
   approvals: async (req, res) => sendPaged(res, await service.approvals(req.validated.query, withActor(req))),
   requestChange: async (req, res) => created(res, await service.requestChange(withActor(req), scopeOf(req), req.validated.body)),
 
-  analytics: async (req, res) => ok(res, await analytics.figures(req.validated.query, scopeOf(req))),
+  analytics: async (req, res) => ok(res, await analytics.figures(req.validated.query, scopeOf(req), { actor: withActor(req) })),
   analyticsPeople: async (req, res) => sendPaged(res, await analytics.people(req.validated.query, scopeOf(req))),
   exportAnalyticsPeople: async (req, res) => accepted(res, await analytics.requestExport(withActor(req), req.validated.body)),
 };

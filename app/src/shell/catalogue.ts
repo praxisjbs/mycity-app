@@ -40,7 +40,7 @@ export const MODULES: ModuleDef[] = [
   { key: "mailbox", label: "Mailbox", short: "Mailbox", icon: "mail", area: "Work", tabs: [t("Inbox", "inbox"), t("Sent", "sent"), t("Drafts", "drafts"), t("Archive", "archive"), t("Spam", "spam"), t("Trash", "trash"), t("Signature", "signature")] },
   {
     key: "people", label: "People", short: "People", icon: "users", area: "People",
-    tabs: [t("Employees", "employees"), t("Organogram", "organogram"), t("Attendance", "attendance"), t("Leave", "leave"), t("Devices", "devices"), t("Worksites", "worksites")],
+    tabs: [t("Employees", "employees"), t("Organogram", "organogram"), t("Departments", "departments"), t("Attendance", "attendance"), t("Leave", "leave"), t("Devices", "devices"), t("Worksites", "worksites")],
   },
   { key: "performance", label: "Performance", short: "Performance", icon: "target", area: "People", tabs: [t("Goals", "goals"), t("Scorecards", "targets"), t("KPIs", "kpis"), t("Reviews", "reviews"), t("Analytics", "analytics")] },
   { key: "queries", label: "Queries & Sanctions", short: "Queries", icon: "flag", area: "People", tabs: [t("Queries", "queries"), t("Rules", "rules"), t("Sanctions", "sanctions"), t("Letter Templates", "letter-templates")] },
@@ -57,7 +57,7 @@ export const MODULES: ModuleDef[] = [
     key: "expenses", label: "Expenses", short: "Expenses", icon: "wallet", area: "Business",
     tabs: [t("My Requests", "my-requests"), t("Approvals", "approvals"), t("Requisitions", "requisitions"), t("Disbursements", "disbursements"), t("Budgets", "budgets"), t("Categories", "categories")],
   },
-  { key: "knowledge", label: "Knowledge Hub", short: "Knowledge", icon: "book", area: "System", tabs: [t("Policies", "policies"), t("SOPs", "sops"), t("FAQs", "faqs"), t("Training", "training"), t("Announcements", "announcements")] },
+  { key: "knowledge", label: "Knowledge Hub", short: "Knowledge", icon: "book", area: "System", tabs: [t("Policies", "policies"), t("SOPs", "sops"), t("FAQs", "faqs"), t("Training", "training"), t("User Guide", "user-guide")] },
   { key: "praxis_ai", label: "Praxis AI", short: "Assistant", icon: "spark", area: "System", tabs: [t("Ask", "ask"), t("History", "history")] },
   { key: "ai_control", label: "AI Control", short: "AI Control", icon: "shield", area: "System", tabs: [t("Actions", "actions"), t("Models", "models"), t("Spend", "spend")] },
   {

@@ -1,0 +1,258 @@
+{
+  "qs-add-employee": {
+    "spec": "ecaa81f3ffa184d4",
+    "source": "432db040187ecf21",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-add-task": {
+    "spec": "221d9119480a0a72",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-agree": {
+    "spec": "663deb49e9bb88ca",
+    "source": "e1b08be9065803d2",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-ai-spend": {
+    "spec": "ea7ddac863630f45",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-announcement": {
+    "spec": "db708f827aaf9de8",
+    "source": "b077781b751e4560",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-approve-commitments": {
+    "spec": "670035074f4610c2",
+    "source": "9663b1b799868b06",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-approve-leave": {
+    "spec": "f974e711363d9efc",
+    "source": "ca44817623673ab9",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-channel": {
+    "spec": "344266c761e21850",
+    "source": "b077781b751e4560",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-check-in": {
+    "spec": "590035331c4ca0f0",
+    "source": "c6e2ee62b6c34d81",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-clock-in": {
+    "spec": "51edfe0fed8ea055",
+    "source": "a48cbcee2f75f8fb",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-close-review": {
+    "spec": "604a2fce10313447",
+    "source": "9663b1b799868b06",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-commitments": {
+    "spec": "16ba03ab7983c1b5",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-department-head": {
+    "spec": "068ea5be43f180ff",
+    "source": "432db040187ecf21",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-help": {
+    "spec": "6f0c9af78d68e4fb",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-import": {
+    "spec": "402734ecb1661d71",
+    "source": "432db040187ecf21",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-invite": {
+    "spec": "c132ae2880d47414",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-login-help": {
+    "spec": "a5b16cc1c0b9bd35",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-mail": {
+    "spec": "6412fe26f671c6a8",
+    "source": "59949af49c68566b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-notifications": {
+    "spec": "41982194c80e9106",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-plan-day": {
+    "spec": "0abe755a36a0bce0",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-policy": {
+    "spec": "76af8b46d1d2858d",
+    "source": "fca181284aea991b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-praxis": {
+    "spec": "d6b1d3146dae6a6f",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-quarter": {
+    "spec": "38fab6013ca027ea",
+    "source": "9663b1b799868b06",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-report-month": {
+    "spec": "6e78bdb9be20b6f0",
+    "source": "9663b1b799868b06",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-request-leave": {
+    "spec": "0db81a71cb5f5bc5",
+    "source": "314be84f71fdea5d",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-roles": {
+    "spec": "1e08ac44f16d1790",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-score-review": {
+    "spec": "dea01acb415b7670",
+    "source": "9663b1b799868b06",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-search": {
+    "spec": "eee935c1ee9404c8",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-sign-in": {
+    "spec": "308a044ac4c64c5a",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-status": {
+    "spec": "71c97deb789ceec7",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-team": {
+    "spec": "fb8093ebf06b841e",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-team-tasks": {
+    "spec": "62cb18ba88056ba8",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

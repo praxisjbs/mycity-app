@@ -38,6 +38,26 @@
  *   });
  *   defineVariables("document", "query-letter", c.queries.QueryLetterVars);
  *
+ * A doc type whose letters people write on a screen (M3: a rung added to the chain sends
+ * a letter nobody shipped) declares `templateChoice: true`. A caller then names the
+ * template with `template`; `template` in the spec stays the default. The chosen key's
+ * variables must be declared like any other (defineVariables), and the caller decides
+ * which keys a person may choose:
+ *
+ *   defineDocType("sanction_letter", { template: "warning-letter", templateChoice: true, ... });
+ *   await documents.generate(client, { doc_type: "sanction_letter", template: step.letter_template, ... });
+ *
+ * A doc type whose documents someone signs off declares `signedBy: (data) => data.signer`. The
+ * letterhead then closes the body with that person's block, `{ name, role, signature }` (a PNG
+ * data URL drawn on a SignatureField, or null), whatever the template, so a letter written on a
+ * screen in Markdown is signed like a shipped one.
+ *
+ * A doc type that is a letter to one person declares `letter: (data) => ({ date, to })`, `to`
+ * the addressee's lines (name, job title, department). The letterhead then opens the body as a
+ * letter (the date, then the addressee) and closes it with "Yours faithfully" and "For" the
+ * organisation above the signer, as MyCity's own letters are laid out; it prints no title, the
+ * wording carrying its own heading.
+ *
  * Brand: the Logo uploaded on Settings · Organisation (else assets/brand/logo.png when
  * present, else the company's name in the letterhead's type) and the Geist fonts
  * (assets/fonts/*.woff2) are embedded as data URLs, because the PDF renderer fetches nothing.
@@ -70,7 +90,8 @@ const SENSITIVITIES = new Set(["normal", "personal", "restricted"]);
  * @param {string} docType  snake_case
  * @param {{template: string, numbering?: string|null, sensitivity?: string, title: (data: object) => string,
  *          landscape?: boolean, label?: string, module?: string|null, signable?: boolean, wet?: boolean,
- *          export?: boolean}} spec
+ *          export?: boolean, templateChoice?: boolean,
+ *          signedBy?: (data: object) => ({name: string, role: string, signature?: string|null}|null)}} spec
  */
 function defineDocType(docType, spec) {
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(docType))
@@ -87,6 +108,10 @@ function defineDocType(docType, spec) {
     );
   if (typeof spec.title !== "function")
     throw new Error(`defineDocType(${docType}): title is (data) => string`);
+  if (spec.signedBy !== undefined && typeof spec.signedBy !== "function")
+    throw new Error(`defineDocType(${docType}): signedBy is (data) => the signer`);
+  if (spec.letter !== undefined && typeof spec.letter !== "function")
+    throw new Error(`defineDocType(${docType}): letter is (data) => ({ date, to })`);
   if (DOC_TYPES.has(docType) && DOC_TYPES.get(docType) !== spec)
     throw new Error(`defineDocType: ${docType} is already defined`);
   DOC_TYPES.set(
@@ -95,6 +120,7 @@ function defineDocType(docType, spec) {
       numbering: null,
       sensitivity: "normal",
       landscape: false,
+      templateChoice: false,
       ...spec,
     }),
   );
@@ -110,6 +136,21 @@ function defineDocType(docType, spec) {
     wet: spec.wet === true,
     export: spec.export === true,
   });
+}
+
+const TEMPLATE_KEY_RE = /^[a-z][a-z0-9-]{1,63}$/;
+
+/** The template a document of this type is rendered from: the spec's, or the caller's choice. */
+function templateKeyOf(docType, spec, chosen) {
+  if (chosen === undefined || chosen === null || chosen === spec.template)
+    return spec.template;
+  if (!spec.templateChoice)
+    throw new Error(
+      `documents.generate: ${docType} always uses "${spec.template}"; it does not take a template`,
+    );
+  if (!TEMPLATE_KEY_RE.test(String(chosen)))
+    throw new Error(`documents.generate: "${chosen}" is not a template key`);
+  return String(chosen);
 }
 
 function specOf(docType) {
@@ -200,6 +241,40 @@ function renderDocumentHtml(template, data, context) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${brand().fontCss}</style></head><body>${page}</body></html>`;
 }
 
+/** What the letterhead is told about the document: its title, its signer, and whether it is a letter. */
+function docOf(spec, data, title) {
+  const letter = spec.letter ? spec.letter(data) || null : null;
+  return {
+    title,
+    signer: spec.signedBy ? spec.signedBy(data) || null : null,
+    letter: letter ? { date: letter.date, to: (letter.to || []).filter(Boolean).map((line) => ({ line })) } : null,
+  };
+}
+
+/**
+ * A document's PDF exactly as it would be generated, from a template key and data, and nothing
+ * stored, numbered or emailed: Letter Templates' preview (docs/guides/queries.md §6.7). The number
+ * printed is the one given.
+ * @param {{query: Function}} db
+ * @param {{doc_type: string, template?: string, data: object, number?: string}} opts
+ * @returns {Promise<{pdf: Buffer, title: string}>}
+ */
+async function previewPdf(db, { doc_type: docType, template: chosen, data, number = null }, { renderPdf } = {}) {
+  const spec = specOf(docType);
+  const templateKey = templateKeyOf(docType, spec, chosen);
+  const checked = variables.parseData("document", templateKey, data);
+  const template = await templates.current(db, "document", templateKey);
+  const title = String(spec.title(checked) || "").trim().slice(0, 200) || docType;
+  const html = renderDocumentHtml(template, checked, {
+    org: await orgProfile(db),
+    number,
+    today: lagos.today(),
+    doc: docOf(spec, checked, title),
+  });
+  const toPdf = renderPdf || require("../../services/pdf/pdf.service").render;
+  return { pdf: await toPdf(html, { footer: number, landscape: spec.landscape }), title };
+}
+
 /* ------------------------------------------------------------------ *
  * Generate (in the request) and render (in the worker)
  * ------------------------------------------------------------------ */
@@ -208,8 +283,9 @@ function renderDocumentHtml(template, data, context) {
  * Queue a document for generation, in the caller's transaction.
  * @param {import("pg").PoolClient} client  inside atomically()
  * @param {{doc_type: string, entity: {type: string, id: string}, subject_employee_id?: string|null,
- *          data: object, actor: object|string|null, date?: string}} opts
- *   date  the document's business date (numbering period, the date printed); default today in Lagos
+ *          data: object, actor: object|string|null, date?: string, template?: string}} opts
+ *   date      the document's business date (numbering period, the date printed); default today in Lagos
+ *   template  a template key, for a doc type declared with templateChoice
  * @returns {Promise<object>} the document row, render_status "pending"
  */
 async function generate(
@@ -221,13 +297,15 @@ async function generate(
     data,
     actor,
     date,
+    template: chosen,
   },
 ) {
   if (!inTransaction(client))
     throw new Error("documents.generate must run inside atomically()");
   const spec = specOf(docType);
-  const checked = variables.parseData("document", spec.template, data);
-  const template = await templates.current(client, "document", spec.template);
+  const templateKey = templateKeyOf(docType, spec, chosen);
+  const checked = variables.parseData("document", templateKey, data);
+  const template = await templates.current(client, "document", templateKey);
   const day = date
     ? lagos.assertDate(String(date).slice(0, 10), "date")
     : lagos.today();
@@ -243,7 +321,7 @@ async function generate(
     org,
     number,
     today: day,
-    doc: { title },
+    doc: docOf(spec, checked, title),
   });
 
   const id = crypto.randomUUID();
@@ -264,7 +342,7 @@ async function generate(
     scan_status: "skipped",
     source: "generated",
     number,
-    template_key: spec.template,
+    template_key: templateKey,
     template_version: template.version,
     render_status: "pending",
     render_html: html,
@@ -394,6 +472,7 @@ module.exports = {
   renderPending,
   failRender,
   renderDocumentHtml,
+  previewPdf,
   orgProfile,
   brand,
   __reset,

@@ -1,14 +1,17 @@
-import type { ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
-import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
+import type { ApprovalInstance, ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
+import type { Department, EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
 import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { exportFile } from "./shared";
 import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
 import roster from "../data/roster.json";
 import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
-import { decidePlan, decideTargetChange, performanceInstance, performanceWaitingOn } from "./performance";
+import { decidePlan, decideTargetChange, decideUnbind, performanceInstance, performanceWaitingOn } from "./performance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
 import { decideCommitment } from "./workspace";
+import { assignSite, siteOf, WORKSITES } from "./worksites";
+import { loginOfEmployee } from "./settings";
+import organisation from "@mycity/contract/schemas/organisation.js";
 
 /**
  * The organisation module on the mock, in the contract's own shapes
@@ -25,18 +28,41 @@ const statusOf = (p: MockPerson): EmployeeRow["status"] => (p.status === "suspen
 const probationDue = (p: MockPerson) => (p.status === "probation" ? isoDaysAhead(18) : null);
 const confirmedOn = (p: MockPerson) => (p.status === "probation" ? null : p.start_date);
 
-/** Who has a login on the mock: the four who sign in, and two invited but never signed in. */
-const INVITED = ["damilola", "tolu"];
-const loginOf = (p: MockPerson): EmployeeRow["login"] =>
-  SIGN_INS[p.user_key] ? "active" : INVITED.includes(p.user_key) ? "invited" : p.status === "suspended" ? "suspended" : "none";
+/** Who has a login on the mock: Settings · Users' own list (settings.ts), so both screens agree. */
+const loginOf = (p: MockPerson): EmployeeRow["login"] => {
+  if (ARCHIVED.has(p.employee_id) && loginOfEmployee(p.employee_id)) return "left";
+  return loginOfEmployee(p.employee_id)?.state ?? "none";
+};
 
-const DEPTS = DEPARTMENTS.map((name, i) => ({
+/** A department on the mock: its head is a person (by key) or an open role, as on the API. */
+type MockDept = {
+  department_id: string;
+  code: string;
+  name: string;
+  parent_department_id: null;
+  active: boolean;
+  order: number;
+  head_key: string | null;
+  head_seat_id: string | null;
+  merged_into: string | null;
+};
+
+/** A short code as MyCity keeps them (GM, TBO): the initials of two words or more, else three letters. */
+const shortCode = (name: string) => {
+  const words = name.split(/[^A-Za-z]+/).filter(Boolean);
+  return (words.length > 1 ? words.map((w) => w[0]).join("") : (words[0] ?? "").slice(0, 3)).toUpperCase().slice(0, 10);
+};
+
+const DEPTS: MockDept[] = DEPARTMENTS.map((name, i) => ({
   department_id: sid(`dept:${name}`),
-  code: name.toUpperCase().replace(/[^A-Z0-9]+/g, "_"),
+  code: shortCode(name),
   name,
   parent_department_id: null,
   active: true,
   order: i,
+  head_key: null,
+  head_seat_id: null,
+  merged_into: null,
 }));
 const deptOf = (name: string) => DEPTS.find((d) => d.name === name) ?? DEPTS[0];
 
@@ -71,6 +97,17 @@ const SEATS: Array<OrgSeat & { manager_key: string | null }> = [
     manager_key: "ifeoma",
   },
 ];
+
+/** Each department's head on the mock: Finance's open Head of Finance role, else the person in it whose manager works elsewhere. */
+for (const d of DEPTS) {
+  const seat = SEATS.find((x) => x.department_id === d.department_id);
+  if (seat) {
+    d.head_seat_id = seat.org_seat_id;
+    continue;
+  }
+  const top = PEOPLE.find((p) => p.department === d.name && (!p.manager || byKey(p.manager)?.department !== d.name));
+  d.head_key = top ? top.user_key : null;
+}
 
 const row = (p: MockPerson): EmployeeRow => ({
   employee_id: p.employee_id,
@@ -114,6 +151,8 @@ route("GET /api/v1/employees", (req) => {
       work_pattern: (r, v) => r.work_pattern === v,
       employment_type: (r, v) => r.employment_type === v,
       line_manager_id: (r, v) => r.line_manager?.employee_id === v,
+      // The demo's contracts end 120 days on (record()), so none ends within 30.
+      contract: () => false,
     },
     sort: {
       display_name: (a, b) => text(a.display_name, b.display_name),
@@ -151,9 +190,24 @@ route("GET /api/v1/employees/summary", (req) => {
 });
 
 /** The 360, masked exactly as the API masks it: restricted fields are null for a viewer without the grant. */
+/**
+ * What Add Employee and Edit set that the roster's people do not carry (middle name, gender,
+ * contract and probation dates, next of kin, the account), kept per person on this laptop. A
+ * null clears it, as the API's correction does.
+ */
+const EXTRA = new Map<string, Partial<Employee360>>();
+
 function record(p: MockPerson, viewer: string): Employee360 {
   const canSee = full(viewer) || viewer === p.user_key;
   const [first, ...rest] = p.display_name.split(" ");
+  const extra = EXTRA.get(p.employee_id) ?? {};
+  const restricted = new Set(["date_of_birth", "home_address", "personal_email", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship", "bank_name", "account_number", "gross_monthly"]);
+  const own = Object.fromEntries(Object.entries(extra).filter(([k]) => canSee || !restricted.has(k)));
+  return { ...base(p, viewer, canSee, first, rest), worksite_id: siteOf(p.user_key)?.worksite_id ?? null, ...own };
+}
+
+function base(p: MockPerson, viewer: string, canSee: boolean, first: string, rest: string[]): Employee360 {
+  void viewer;
   return {
     employee_id: p.employee_id,
     staff_number: p.staff_number,
@@ -173,7 +227,8 @@ function record(p: MockPerson, viewer: string): Employee360 {
     contract_ends_on: p.employment_type === "contractor" ? isoDaysAhead(120) : null,
     confirmation_due_on: probationDue(p),
     confirmed_on: confirmedOn(p),
-    left_on: null,
+    left_on: LEFT_ON.get(p.employee_id) ?? null,
+    is_ceo: p.user_key === "ifeoma",
     archived_at: ARCHIVED.has(p.employee_id) ? at(0, "09:00") : null,
     archive_reason: ARCHIVED.has(p.employee_id) ? "Archived on this laptop" : null,
     work_email: p.work_email,
@@ -183,10 +238,10 @@ function record(p: MockPerson, viewer: string): Employee360 {
     dotted_manager: dottedRef(p),
     direct_reports: reportsOf(p.user_key).length,
     login: {
-      user_id: loginOf(p) === "none" ? null : sid(`user:${p.user_key}`),
-      email: loginOf(p) === "none" ? null : p.work_email,
+      user_id: loginOfEmployee(p.employee_id)?.user_id ?? null,
+      email: loginOfEmployee(p.employee_id)?.email ?? null,
       state: loginOf(p),
-      roles: SIGN_INS[p.user_key] ? [{ code: SIGN_INS[p.user_key].view === "ceo" ? "management" : "operations_people", name: SIGN_INS[p.user_key].role }] : loginOf(p) === "none" ? [] : [{ code: "employee", name: "Staff" }],
+      roles: loginOfEmployee(p.employee_id)?.roles ?? [],
       last_sign_in_at: SIGN_INS[p.user_key] ? at(0, "08:40") : null,
     },
     date_of_birth: canSee ? p.date_of_birth : null,
@@ -219,76 +274,133 @@ route("GET /api/v1/employees/:id/history", (req) => {
   const p = mine(req);
   if (!p) return notFound();
   const entries = [
-    { event_id: uuid(), occurred_at: at(2, "11:20"), action: "employee.updated", actor_name: "Cynthia Osakunih", changed_fields: ["job_title"], summary: "Record changed: job_title" },
+    { event_id: uuid(), occurred_at: at(2, "11:20"), action: "employee.updated", actor_name: "Cynthia Osakunih", changed_fields: ["job_title"], summary: "Record changed: Job Title" },
     { event_id: uuid(), occurred_at: at(40, "09:05"), action: "employee.reporting_line_changed", actor_name: "Cynthia Osakunih", changed_fields: ["line_manager_id"], summary: "Reporting line changed" },
     { event_id: uuid(), occurred_at: at(200, "09:00"), action: "employee.created", actor_name: "System", changed_fields: [], summary: "Record created" },
   ];
   return paged(entries, req);
 });
 
-const NG_PHONE = /^(\+?234|0)\d{10}$/;
+/** The contract's refusal, as the API's error handler sends it: every issue on its field. */
+function refusal(issues: Array<{ path: PropertyKey[]; message: string }>) {
+  const f: Record<string, string[]> = {};
+  for (const i of issues) (f[String(i.path[0] ?? "body")] ??= []).push(i.message);
+  return invalid(f);
+}
+
+/** The fields a role that does not see everything may not set (shared/rbac/field-mask.js, seed 0449). */
+const RESTRICTED = ["gross_monthly", "bank_name", "account_number", "date_of_birth", "home_address", "personal_email", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship"];
+const notYours = (user: string, b: Record<string, unknown>, own = false) => {
+  if (own || full(user)) return null;
+  const keys = Object.keys(b).filter((k) => RESTRICTED.includes(k) && b[k] !== undefined);
+  return keys.length ? fail(403, "FIELD_RESTRICTED", "Your role cannot set these details.", Object.fromEntries(keys.map((k) => [k, ["Not yours to set"]]))) : null;
+};
+
+/** The references a record names exist and are in use (organisation.service.js assertReferences). */
+function references(b: { department_id?: string; line_manager_id?: string; worksite_id?: string | null }) {
+  if (b.department_id && !DEPTS.some((d) => d.department_id === b.department_id)) return invalid({ department_id: ["Not a department"] });
+  if (b.line_manager_id) {
+    const m = byId(b.line_manager_id);
+    if (!m || ARCHIVED.has(m.employee_id) || m.status === "suspended") return invalid({ line_manager_id: ["Not an employee"] });
+  }
+  if (b.worksite_id && !WORKSITES.some((w) => w.worksite_id === b.worksite_id && w.active)) return invalid({ worksite_id: ["Not a worksite"] });
+  return null;
+}
 
 route("POST /api/v1/employees", (req) => {
-  const b = req.body as Record<string, string>;
-  const f: Record<string, string[]> = {};
-  const need = ["first_name", "last_name", "work_email", "phone", "job_title", "start_date", "employment_type", "work_pattern", "department_id"];
-  for (const k of need) if (!b[k] || !String(b[k]).trim()) f[k] = ["Required"];
-  if (b.work_email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(b.work_email)) f.work_email = ["Check the spelling"];
-  if (b.work_email && PEOPLE.some((p) => p.work_email === b.work_email.toLowerCase())) f.work_email = ["Already in use"];
-  if (b.phone && !NG_PHONE.test(b.phone.replace(/[\s\-().]/g, ""))) f.phone = ["must be a Nigerian phone number"];
-  if (b.account_number && !/^\d{10}$/.test(b.account_number)) f.account_number = ["must be a 10-digit NUBAN"];
-  if (b.gross_monthly && !/^\d{1,16}\.\d{2}$/.test(b.gross_monthly)) f.gross_monthly = ["must be an amount like 1250000.00"];
-  if (Object.keys(f).length) return invalid(f);
+  const parsed = organisation.EmployeeAdd.safeParse(req.body);
+  if (!parsed.success) return refusal(parsed.error.issues);
+  const b = parsed.data;
+  const refused = notYours(req.user!, req.body as Record<string, unknown>) ?? references(b);
+  if (refused) return refused;
+  if (PEOPLE.some((p) => p.work_email === b.work_email))
+    return fail(409, "EMPLOYEE_EXISTS", "An employee already has this work email.", { work_email: ["Already in use"] });
   const key = b.work_email.split("@")[0];
   const dept = DEPTS.find((d) => d.department_id === b.department_id) ?? deptOf("Operations & People");
   const p: MockPerson = {
     employee_id: sid(`employee:${key}`),
     user_key: key,
-    staff_number: String(PEOPLE.length + 1).padStart(5, "0"),
+    staff_number: b.staff_number ?? String(PEOPLE.length + 1).padStart(5, "0"),
     first_name: b.first_name,
     last_name: b.last_name,
     display_name: `${b.first_name} ${b.last_name}`,
     job_title: b.job_title,
     department: dept.name,
     grade: "G1 · Associate",
-    manager: byId(b.line_manager_id)?.user_key ?? null,
-    work_email: b.work_email.toLowerCase(),
+    manager: b.line_manager_id ? (byId(b.line_manager_id)?.user_key ?? null) : null,
+    work_email: b.work_email,
     phone: b.phone,
     start_date: b.start_date,
-    date_of_birth: b.date_of_birth || "1998-01-01",
+    date_of_birth: b.date_of_birth ?? "1998-01-01",
     employment_type: b.employment_type as MockPerson["employment_type"],
     work_pattern: b.work_pattern as MockPerson["work_pattern"],
     status: b.confirmed_on ? "confirmed" : "probation",
-    worksite: "MTN Head Office, Ikoyi",
-    gross_monthly: b.gross_monthly || "0.00",
-    bank_name: b.bank_name || "",
-    account_last4: (b.account_number || "0000").slice(-4),
-    next_of_kin: b.next_of_kin_name || "",
+    worksite: WORKSITES.find((w) => w.worksite_id === b.worksite_id)?.name ?? "",
+    gross_monthly: b.gross_monthly ?? "0.00",
+    bank_name: b.bank_name ?? "",
+    account_last4: (b.account_number ?? "0000").slice(-4),
+    next_of_kin: b.next_of_kin_name ?? "",
   };
   PEOPLE.push(p);
+  assignSite(key, b.worksite_id ?? null);
+  EXTRA.set(p.employee_id, {
+    middle_name: b.middle_name ?? null,
+    gender: b.gender ?? null,
+    contract_ends_on: b.contract_ends_on ?? null,
+    confirmation_due_on: b.confirmation_due_on ?? null,
+    next_of_kin_phone: b.next_of_kin_phone ?? null,
+    next_of_kin_relationship: b.next_of_kin_relationship ?? null,
+    account_number: b.account_number ?? null,
+  });
   return created(record(p, req.user!));
 });
 
 route("PATCH /api/v1/employees/:id", (req) => {
   const p = mine(req);
   if (!p) return notFound();
-  const b = req.body as Record<string, string>;
-  if (!Object.keys(b).length) return invalid({ first_name: ["Change at least one field"] });
-  if (b.work_email && PEOPLE.some((x) => x !== p && x.work_email === b.work_email.toLowerCase())) return invalid({ work_email: ["Already in use"] });
-  if (b.first_name) p.first_name = b.first_name;
-  if (b.last_name) p.last_name = b.last_name;
-  if (b.first_name || b.last_name) p.display_name = `${p.first_name} ${p.last_name}`;
-  if (b.job_title) p.job_title = b.job_title;
-  if (b.work_email) p.work_email = b.work_email.toLowerCase();
-  if (b.phone) p.phone = b.phone;
-  if (b.work_pattern) p.work_pattern = b.work_pattern as MockPerson["work_pattern"];
-  if (b.employment_type) p.employment_type = b.employment_type as MockPerson["employment_type"];
-  if (b.department_id) p.department = (DEPTS.find((d) => d.department_id === b.department_id) ?? deptOf(p.department)).name;
-  if (b.gross_monthly) p.gross_monthly = b.gross_monthly;
-  if (b.bank_name) p.bank_name = b.bank_name;
-  if (b.confirmed_on) p.status = "confirmed";
+  const parsed = organisation.EmployeeUpdate.safeParse(req.body);
+  if (!parsed.success) return refusal(parsed.error.issues);
+  const b = parsed.data as Record<string, unknown> & Partial<Record<string, string | null>>;
+  const refused = notYours(req.user!, req.body as Record<string, unknown>, req.user === p.user_key) ?? references(b as never);
+  if (refused) return refused;
+  if (typeof b.work_email === "string" && PEOPLE.some((x) => x !== p && x.work_email === b.work_email))
+    return fail(409, "EMPLOYEE_EXISTS", "An employee already has this work email.", { work_email: ["Already in use"] });
+  // As the service: a move to On Site or Hybrid keeps a worksite; a correction elsewhere is never asked.
+  if ("work_pattern" in b || "worksite_id" in b) {
+    const pattern = (b.work_pattern as string | undefined) ?? p.work_pattern;
+    const site = "worksite_id" in b ? b.worksite_id : (siteOf(p.user_key)?.worksite_id ?? null);
+    if (organisation.ON_SITE_PATTERNS.includes(pattern) && !site)
+      return fail(422, "WORKSITE_REQUIRED", "Pick a worksite for someone who works On Site or Hybrid.", { worksite_id: ["Pick a worksite"] });
+  }
+  const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string) : undefined);
+  if (str("first_name")) p.first_name = str("first_name")!;
+  if (str("last_name")) p.last_name = str("last_name")!;
+  if (str("first_name") || str("last_name")) p.display_name = `${p.first_name} ${p.last_name}`;
+  if (str("job_title")) p.job_title = str("job_title")!;
+  if (str("work_email")) p.work_email = str("work_email")!;
+  if (str("phone")) p.phone = str("phone")!;
+  if (str("start_date")) p.start_date = str("start_date")!;
+  if (str("work_pattern")) p.work_pattern = str("work_pattern") as MockPerson["work_pattern"];
+  if (str("employment_type")) p.employment_type = str("employment_type") as MockPerson["employment_type"];
+  // A new department moves the person as People · Departments does: their line follows its head.
+  if (str("department_id")) {
+    const to = DEPTS.find((d) => d.department_id === str("department_id"));
+    if (to && to.name !== p.department) moveIn(to, [p]);
+  }
+  if ("worksite_id" in b && b.worksite_id !== undefined) assignSite(p.user_key, (b.worksite_id as string | null) ?? null);
+  if (b.gross_monthly !== undefined) p.gross_monthly = (b.gross_monthly as string | null) ?? "0.00";
+  if (b.bank_name !== undefined) p.bank_name = (b.bank_name as string | null) ?? "";
+  if (str("date_of_birth")) p.date_of_birth = str("date_of_birth")!;
+  if (str("confirmed_on")) p.status = "confirmed";
+  const extra = { ...(EXTRA.get(p.employee_id) ?? {}) } as Record<string, unknown>;
+  for (const k of ["middle_name", "gender", "contract_ends_on", "confirmation_due_on", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship", "account_number", "personal_email"])
+    if (b[k] !== undefined) extra[k] = b[k];
+  EXTRA.set(p.employee_id, extra as Partial<Employee360>);
   return ok(record(p, req.user!));
 });
+
+/** The last day Archive Record was given, by employee: their left_on until restored. */
+const LEFT_ON = new Map<string, string>();
 
 route("POST /api/v1/employees/:id/archive", (req) => {
   const p = mine(req);
@@ -296,7 +408,10 @@ route("POST /api/v1/employees/:id/archive", (req) => {
   if (!(req.body as { archive_reason?: string }).archive_reason) return invalid({ archive_reason: ["Say why"] });
   if (ARCHIVED.has(p.employee_id)) return fail(422, "ALREADY_ARCHIVED", "This record is already archived.");
   if (p.user_key === "ifeoma") return fail(422, "CEO_PROTECTED", "The CEO's record cannot be archived.");
+  const leftOn = (req.body as { left_on?: string }).left_on ?? isoDaysAgo(0);
+  if (leftOn > isoDaysAgo(0)) return invalid({ left_on: ["Not after today"] });
   ARCHIVED.add(p.employee_id);
+  LEFT_ON.set(p.employee_id, leftOn);
   return ok(record(p, req.user!));
 });
 
@@ -305,6 +420,7 @@ route("POST /api/v1/employees/:id/restore", (req) => {
   if (!p) return notFound();
   if (!ARCHIVED.has(p.employee_id)) return fail(422, "NOT_ARCHIVED", "This record is not archived.");
   ARCHIVED.delete(p.employee_id);
+  LEFT_ON.delete(p.employee_id);
   return ok(record(p, req.user!));
 });
 
@@ -327,42 +443,213 @@ route("PATCH /api/v1/employees/:id/line-manager", (req) => {
   return ok(record(p, req.user!));
 });
 
+/* ------------------------------------------------------------------ *
+ * Departments (docs/guides/organogram.md §6.1): the API's rules, on the mock's people.
+ * ------------------------------------------------------------------ */
+
+const CEO_KEY = "ifeoma";
+const CODE = /^[A-Za-z]{2,10}$/;
+const deptById = (id: string | null | undefined) => DEPTS.find((d) => d.department_id === id);
+
+const headRef = (d: MockDept): ManagerRef | null => {
+  const h = byKey(d.head_key);
+  if (h) return { employee_id: h.employee_id, org_seat_id: null, display_name: h.display_name, job_title: h.job_title, vacant: false };
+  const s = SEATS.find((x) => x.org_seat_id === d.head_seat_id);
+  return s ? { employee_id: null, org_seat_id: s.org_seat_id, display_name: s.title, job_title: s.title, vacant: true } : null;
+};
+
+/** Who acts as head: the head, or the person above an open head role. */
+const actingOf = (d: MockDept) => {
+  if (d.head_key) return byKey(d.head_key) ?? null;
+  const s = SEATS.find((x) => x.org_seat_id === d.head_seat_id);
+  return s && s.manager_key ? (byKey(s.manager_key) ?? null) : null;
+};
+
+const deptOut = (d: MockDept): Department => {
+  const acting = actingOf(d);
+  return {
+    department_id: d.department_id,
+    code: d.code,
+    name: d.name,
+    parent_department_id: null,
+    active: d.active,
+    headcount: PEOPLE.filter((p) => p.department === d.name && visible(p)).length,
+    open_roles: SEATS.filter((s) => s.department_id === d.department_id && s.status === "vacant").length,
+    head_employee_id: byKey(d.head_key)?.employee_id ?? null,
+    head_seat_id: d.head_seat_id,
+    head: headRef(d),
+    acting_head: acting ? personRef(acting) : null,
+    merged_into: d.merged_into ? { department_id: d.merged_into, name: deptById(d.merged_into)?.name ?? "" } : null,
+    can_delete:
+      !PEOPLE.some((p) => p.department === d.name) &&
+      !SEATS.some((s) => s.department_id === d.department_id) &&
+      !d.merged_into &&
+      !DEPTS.some((x) => x.merged_into === d.department_id),
+  };
+};
+
+/** People who join a department report to its head, unless their manager is already there or joins with them. */
+function moveIn(d: MockDept, people: MockPerson[]) {
+  const joining = new Set(people.map((p) => p.user_key));
+  for (const p of people) p.department = d.name;
+  const head = d.head_key;
+  if (!head) return;
+  for (const p of people) {
+    if (p.user_key === head || p.user_key === CEO_KEY) continue;
+    const m = byKey(p.manager);
+    if (m && (joining.has(m.user_key) || m.department === d.name)) continue;
+    if (teamOf(p.user_key).some((x) => x.user_key === head)) continue;
+    p.manager = head;
+  }
+}
+
+/** A new head takes the old head's place, and the old head and their reports follow (organogram.md §6.1). */
+function setHead(d: MockDept, key: string | null, seat: string | null) {
+  const oldKey = d.head_key;
+  if (key && key !== oldKey) {
+    const n = byKey(key)!;
+    if (n.department !== d.name && !DEPTS.some((x) => x.active && x.head_key === n.user_key)) n.department = d.name;
+    const old = byKey(oldKey);
+    if (old && old.manager && n.user_key !== CEO_KEY && old.manager !== n.user_key) n.manager = old.manager;
+    if (old) {
+      for (const p of PEOPLE)
+        if (p.department === d.name && p.manager === old.user_key && p.user_key !== n.user_key && p.user_key !== CEO_KEY) p.manager = n.user_key;
+      if (old.department === d.name && old.user_key !== CEO_KEY) old.manager = n.user_key;
+    }
+  }
+  d.head_key = key;
+  d.head_seat_id = seat;
+}
+
+const stillHere = (people: number, roles: number) => {
+  const parts = [people ? `${people} ${people === 1 ? "person" : "people"}` : "", roles ? `${roles} open ${roles === 1 ? "role" : "roles"}` : ""].filter(Boolean);
+  return `Still has ${parts.join(" and ")}.`;
+};
+
 route("GET /api/v1/departments", (req) =>
-  paged(
-    DEPTS.map((d) => ({
-      department_id: d.department_id,
-      code: d.code,
-      name: d.name,
-      parent_department_id: d.parent_department_id,
-      active: d.active,
-      headcount: PEOPLE.filter((p) => p.department === d.name && visible(p)).length,
-      head_employee_id: null,
-      head_seat_id: null,
-      head: null,
-      acting_head: null,
-    })),
-    req,
-    { search: (r) => [r.name], filters: { active: (r, v) => String(r.active) === v } },
-  ),
+  paged(DEPTS.map(deptOut), req, {
+    search: (r) => [r.name, r.code],
+    filters: { active: (r, v) => String(r.active) === v },
+    sort: {
+      name: (a, b) => a.name.localeCompare(b.name),
+      headcount: (a, b) => a.headcount - b.headcount,
+      created_at: (a, b) => (deptById(a.department_id)?.order ?? 0) - (deptById(b.department_id)?.order ?? 0),
+    },
+  }),
 );
 
+route("GET /api/v1/departments/:id", (req) => {
+  const d = deptById(req.params.id);
+  return d ? ok(deptOut(d)) : notFound();
+});
+
 route("POST /api/v1/departments", (req) => {
-  const name = String((req.body as { name?: string }).name ?? "").trim();
-  if (!name) return invalid({ name: ["Name the department"] });
-  if (DEPTS.some((d) => d.name.toLowerCase() === name.toLowerCase())) return fail(409, "DEPARTMENT_EXISTS", "There is already a department with this name.", { name: ["Already in use"] });
-  const d = { department_id: uuid(), code: name.toUpperCase().replace(/[^A-Z0-9]+/g, "_"), name, parent_department_id: null, active: true, order: DEPTS.length };
+  const b = req.body as { name?: string; code?: string; head_employee_id?: string | null };
+  const name = String(b.name ?? "").trim();
+  if (!name) return invalid({ name: ["Required"] });
+  if (DEPTS.some((d) => d.name.toLowerCase() === name.toLowerCase()))
+    return fail(409, "DEPARTMENT_EXISTS", "There is already a department with this name.", { name: ["Already in use"] });
+  if (b.code && !CODE.test(b.code)) return invalid({ code: ["Letters only"] });
+  const code = (b.code || shortCode(name) || "DEPT").toUpperCase();
+  if (DEPTS.some((d) => d.code === code)) return fail(409, "DEPARTMENT_CODE", "Another department has this code.", { code: ["Already in use"] });
+  const head = b.head_employee_id ? byId(b.head_employee_id) : undefined;
+  if (b.head_employee_id && (!head || !visible(head)))
+    return fail(422, "MANAGER_NOT_FOUND", "Pick someone who works here now.", { head_employee_id: ["Not working here now"] });
+  const d: MockDept = { department_id: uuid(), code, name, parent_department_id: null, active: true, order: DEPTS.length, head_key: null, head_seat_id: null, merged_into: null };
   DEPTS.push(d);
   DEPARTMENTS.push(name);
-  return created({ ...d, headcount: 0, order: undefined, department_id: d.department_id, code: d.code, name, parent_department_id: null, active: true, head_employee_id: null, head_seat_id: null, head: null, acting_head: null });
+  if (head) setHead(d, head.user_key, null);
+  return created(deptOut(d));
 });
 
 route("PATCH /api/v1/departments/:id", (req) => {
-  const d = DEPTS.find((x) => x.department_id === req.params.id);
+  const d = deptById(req.params.id);
   if (!d) return notFound();
-  const b = req.body as { name?: string; active?: boolean };
-  if (b.name) d.name = b.name;
-  if (typeof b.active === "boolean") d.active = b.active;
-  return ok({ department_id: d.department_id, code: d.code, name: d.name, parent_department_id: null, active: d.active, headcount: PEOPLE.filter((p) => p.department === d.name).length, head_employee_id: null, head_seat_id: null, head: null, acting_head: null });
+  const b = req.body as { name?: string; code?: string; active?: boolean; head_employee_id?: string | null; head_seat_id?: string | null };
+  if (b.name !== undefined) {
+    const name = b.name.trim();
+    if (DEPTS.some((x) => x !== d && x.name.toLowerCase() === name.toLowerCase()))
+      return fail(409, "DEPARTMENT_EXISTS", "There is already a department with this name.", { name: ["Already in use"] });
+    for (const p of PEOPLE) if (p.department === d.name) p.department = name;
+    for (const s of SEATS) if (s.department_id === d.department_id) s.department = name;
+    const at_ = DEPARTMENTS.indexOf(d.name);
+    if (at_ >= 0) DEPARTMENTS[at_] = name;
+    d.name = name;
+  }
+  if (b.code !== undefined) {
+    if (!CODE.test(b.code)) return invalid({ code: ["Letters only"] });
+    const code = b.code.toUpperCase();
+    if (DEPTS.some((x) => x !== d && x.code === code)) return fail(409, "DEPARTMENT_CODE", "Another department has this code.", { code: ["Already in use"] });
+    d.code = code;
+  }
+  if (b.active === false && d.active) {
+    const people = PEOPLE.filter((p) => p.department === d.name && visible(p)).length;
+    const roles = SEATS.filter((s) => s.department_id === d.department_id && s.status === "vacant").length;
+    if (people || roles) return fail(409, "DEPARTMENT_NOT_EMPTY", stillHere(people, roles));
+    d.active = false;
+    d.head_key = null;
+    d.head_seat_id = null;
+  } else if (b.active === true && !d.active) {
+    d.active = true;
+    d.merged_into = null;
+  }
+  if ("head_employee_id" in b || "head_seat_id" in b) {
+    if (!d.active) return fail(409, "DEPARTMENT_RETIRED", "Restore this department before giving it a head.");
+    const person = b.head_employee_id ? byId(b.head_employee_id) : undefined;
+    if (b.head_employee_id && (!person || !visible(person)))
+      return fail(422, "MANAGER_NOT_FOUND", "Pick someone who works here now.", { head_employee_id: ["Not working here now"] });
+    if (b.head_seat_id && !SEATS.some((s) => s.org_seat_id === b.head_seat_id && s.department_id === d.department_id && s.status !== "closed"))
+      return fail(422, "SEAT_NOT_FOUND", "Pick an open role in this department.", { head_seat_id: ["Not in this department"] });
+    if (person) setHead(d, person.user_key, null);
+    else if (b.head_seat_id) setHead(d, null, b.head_seat_id);
+    else setHead(d, "head_employee_id" in b ? null : d.head_key, "head_seat_id" in b ? null : d.head_seat_id);
+  }
+  return ok(deptOut(d));
+});
+
+route("POST /api/v1/departments/:id/people", (req) => {
+  const d = deptById(req.params.id);
+  if (!d) return notFound();
+  if (!d.active) return fail(409, "DEPARTMENT_RETIRED", "Restore this department before moving anyone into it.");
+  const ids = (req.body as { employee_ids?: string[] }).employee_ids ?? [];
+  if (!ids.length) return invalid({ employee_ids: ["Pick someone"] });
+  if (ids.length > 25) return invalid({ employee_ids: ["At most 25 people"] });
+  const people = ids.map((id) => byId(id));
+  if (people.some((p) => !p || !visible(p))) return invalid({ employee_ids: ["Not on the staff list"] });
+  moveIn(d, (people as MockPerson[]).filter((p) => p.department !== d.name));
+  return ok(deptOut(d));
+});
+
+route("POST /api/v1/departments/:id/merge", (req) => {
+  const d = deptById(req.params.id);
+  if (!d) return notFound();
+  if (!d.active) return fail(409, "DEPARTMENT_RETIRED", "This department is retired already.");
+  const intoId = (req.body as { into_department_id?: string }).into_department_id;
+  if (intoId === d.department_id)
+    return fail(422, "DEPARTMENT_MERGE", "Pick another department to merge into.", { into_department_id: ["Pick another department"] });
+  const into = deptById(intoId);
+  if (!into || !into.active) return fail(422, "DEPARTMENT_NOT_FOUND", "Pick a department in use.", { into_department_id: ["Not in use"] });
+  for (const s of SEATS)
+    if (s.department_id === d.department_id) {
+      s.department_id = into.department_id;
+      s.department = into.name;
+    }
+  moveIn(into, PEOPLE.filter((p) => p.department === d.name && visible(p)));
+  d.active = false;
+  d.head_key = null;
+  d.head_seat_id = null;
+  d.merged_into = into.department_id;
+  return ok(deptOut(into));
+});
+
+route("DELETE /api/v1/departments/:id", (req) => {
+  const d = deptById(req.params.id);
+  if (!d) return notFound();
+  if (!deptOut(d).can_delete) return fail(409, "DEPARTMENT_IN_USE", "Used before. Retire it instead.");
+  DEPTS.splice(DEPTS.indexOf(d), 1);
+  const at_ = DEPARTMENTS.indexOf(d.name);
+  if (at_ >= 0) DEPARTMENTS.splice(at_, 1);
+  return noContent();
 });
 
 const seatRow = (s: (typeof SEATS)[number]): OrgSeat => {
@@ -381,7 +668,9 @@ const seatRow = (s: (typeof SEATS)[number]): OrgSeat => {
   };
 };
 
-route("GET /api/v1/org-seats", (req) => paged(SEATS.map(seatRow), req, { search: (r) => [r.title], filters: { status: (r, v) => r.status === v } }));
+route("GET /api/v1/org-seats", (req) =>
+  paged(SEATS.map(seatRow), req, { search: (r) => [r.title], filters: { status: (r, v) => r.status === v, department_id: (r, v) => r.department_id === v } }),
+);
 
 route("POST /api/v1/org-seats", (req) => {
   const b = req.body as { title?: string; department_id?: string; line_manager_id?: string };
@@ -415,6 +704,22 @@ route("PATCH /api/v1/org-seats/:id", (req) => {
   return ok(seatRow(seat));
 });
 
+/**
+ * A card's Head marks, as the API works them out (organogram.md §6): Head on a department's head
+ * or its open head role, Acting Head on the person above an open one, another department's code after.
+ */
+const headsOf = (nodeId: string, department: string): OrgNode["heads"] =>
+  DEPTS.filter((d) => d.active)
+    .sort((a, b) => Number(b.name === department) - Number(a.name === department) || a.name.localeCompare(b.name))
+    .flatMap((d) => {
+      const seat = SEATS.find((s) => s.org_seat_id === d.head_seat_id && s.status === "vacant");
+      const heads = byKey(d.head_key)?.employee_id === nodeId || seat?.org_seat_id === nodeId;
+      const acting = !heads && Boolean(seat) && actingOf(d)?.employee_id === nodeId;
+      if (!heads && !acting) return [];
+      const mark = `${acting ? "Acting Head" : "Head"}${d.name === department ? "" : ` · ${d.code}`}`;
+      return [{ department_id: d.department_id, name: d.name, code: d.code, acting, mark }];
+    });
+
 /* The reporting tree. A complete set by design: a tree with a missing branch is wrong. */
 route("GET /api/v1/org-chart", (req) => {
   const builder = req.query.view === "builder" && full(req.user!);
@@ -438,6 +743,7 @@ route("GET /api/v1/org-chart", (req) => {
         vacant: false,
         meta: builder ? [`Since ${p.start_date.slice(0, 4)}`, PATTERNS[p.work_pattern]].join(" · ") : null,
         photo_url: null,
+        heads: headsOf(p.employee_id, p.department),
       };
     }),
     ...SEATS.filter((s) => s.status === "vacant").map((s) => ({
@@ -455,6 +761,7 @@ route("GET /api/v1/org-chart", (req) => {
       vacant: true,
       meta: null,
       photo_url: null,
+      heads: headsOf(s.org_seat_id, s.department),
     })),
   ];
   return ok({
@@ -497,6 +804,11 @@ type L = { key: string; type: LeaveTypeCode; from: number; to: number; days: num
 const L_ROWS = roster.leave as L[];
 const iso = (n: number) => (n >= 0 ? isoDaysAhead(n) : isoDaysAgo(-n));
 type MockLeave = LeaveRequest & { key: string };
+/** The line manager a request waits on, by name, as the API's approver_name reads it. */
+function lineManagerName(key: string): string | null {
+  const p = byKey(key);
+  return (p && managerOf(p)?.display_name) ?? null;
+}
 const LEAVE: MockLeave[] = L_ROWS.map((l, i) => ({
   leave_request_id: sid(`leave:${i}`),
   employee: personRef(byKey(l.key)!),
@@ -510,6 +822,7 @@ const LEAVE: MockLeave[] = L_ROWS.map((l, i) => ({
   status: l.status,
   workflow_instance_id: l.status === "submitted" ? sid(`leave-flow:${i}`) : null,
   waiting_on: l.status === "submitted" ? (l.days > 5 ? "Operations & People" : "Line Manager") : null,
+  approver_name: l.status === "submitted" && l.days <= 5 ? lineManagerName(l.key) : null,
   recorded: false,
   submitted_at: at(5 + i, "10:00"),
   decided_at: l.status === "submitted" ? null : at(4 + i, "12:00"),
@@ -529,6 +842,7 @@ const LIST_FILTERS = {
   employee_id: (r: MockLeave, v: string) => r.employee.employee_id === v,
   from: (r: MockLeave, v: string) => r.ends_on >= v,
   to: (r: MockLeave, v: string) => r.starts_on <= v,
+  live: (r: MockLeave, v: string) => v !== "true" || r.status === "submitted" || r.status === "approved",
 };
 const LIST_SORT = {
   starts_on: (a: MockLeave, b: MockLeave) => a.starts_on.localeCompare(b.starts_on),
@@ -588,6 +902,16 @@ const yearOf = (key: string, year: number) => {
     }),
   };
 };
+/** A request the year's allowance cannot hold, refused as the API refuses it (leave.balance.js); else null. */
+function overAllowance(key: string, t: LeaveType, from: string, to: string) {
+  const left = yearOf(key, Number(from.slice(0, 4))).balances.find((x) => x.leave_type_id === t.leave_type_id)?.remaining;
+  const days = workingDays(from, to);
+  if (left == null || days <= left) return null;
+  const n = Math.max(left, 0);
+  return fail(422, "LEAVE_ALLOWANCE_EXCEEDED", `Only ${n} ${t.name} ${n === 1 ? "day is" : "days are"} left this year`, {
+    ends_on: [`${days} working ${days === 1 ? "day" : "days"}, ${n} left`],
+  });
+}
 route("GET /api/v1/leave/balances", (req) => {
   const who = byId(req.query.employee_id);
   if (!who) return notFound();
@@ -637,9 +961,14 @@ route("POST /api/v1/leave/requests", (req) => {
   const who = byId(b.employee_id);
   const t = LEAVE_TYPES.find((x) => x.leave_type_id === b.leave_type_id);
   if (!who || !t) return invalid({ ...(who ? {} : { employee_id: ["Pick someone"] }), ...(t ? {} : { leave_type_id: ["Pick a type"] }) });
+  if (ARCHIVED.has(who.employee_id) || statusOf(who) !== "active") return fail(422, "EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", { employee_id: ["Not active"] });
+  if (LEAVE.some((x) => x.key === who.user_key && (x.status === "submitted" || x.status === "approved") && x.starts_on <= b.ends_on && x.ends_on >= b.starts_on))
+    return fail(409, "LEAVE_OVERLAP", "They already have leave on some of those days", { starts_on: ["Overlaps other leave"] });
+  const tooMany = overAllowance(who.user_key, t, b.starts_on, b.ends_on);
+  if (tooMany) return tooMany;
   const l: MockLeave = {
     leave_request_id: uuid(), employee: personRef(who), key: who.user_key, leave_type_id: t.leave_type_id, leave_type_name: t.name, starts_on: b.starts_on, ends_on: b.ends_on,
-    days: workingDays(b.starts_on, b.ends_on), reason: b.reason ?? null, status: "approved", workflow_instance_id: null, waiting_on: null, recorded: true,
+    days: workingDays(b.starts_on, b.ends_on), reason: b.reason ?? null, status: "approved", workflow_instance_id: null, waiting_on: null, approver_name: null, recorded: true,
     submitted_at: new Date().toISOString(), decided_at: new Date().toISOString(), created_at: new Date().toISOString(),
   };
   LEAVE.unshift(l);
@@ -664,6 +993,7 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
       decideReview(req.user!, req.params.id, approve, reason) ??
       decideCommitment(req.user!, req.params.id, approve, reason) ??
       decidePlan(req.user!, req.params.id, approve, reason) ??
+      decideUnbind(req.user!, req.params.id, approve, reason) ??
       decideTargetChange(req.user!, req.params.id, approve, reason) ??
       notFound()
     );
@@ -672,15 +1002,48 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
   if (l.key === req.user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
   if (approve && l.days > 5 && l.waiting_on === "Line Manager") {
     l.waiting_on = "Operations & People";
+    l.approver_name = null;
     return ok({ workflow_instance_id: l.workflow_instance_id, state: "pending", stage_name: l.waiting_on });
   }
   l.status = approve ? "approved" : "rejected";
   l.waiting_on = null;
+  l.approver_name = null;
   l.decided_at = new Date().toISOString();
   return ok({ workflow_instance_id: l.workflow_instance_id, state: l.status, stage_name: null });
 };
+/** A leave request's approval as the workflow reads it: its stage, and whether it waits on the reader. */
+function leaveInstance(user: string, wid: string): ApprovalInstance | null {
+  const l = LEAVE.find((x) => x.workflow_instance_id === wid);
+  if (!l) return null;
+  const pending = l.status === "submitted";
+  const now = l.waiting_on === "Operations & People" ? "operations_people" : "line_manager";
+  const entered = l.submitted_at ?? l.created_at;
+  const stages: Array<[string, string]> = [["line_manager", "Line Manager"], ...(l.days > 5 ? ([["operations_people", "Operations & People"]] as Array<[string, string]>) : [])];
+  const state = l.status === "submitted" ? "pending" : l.status === "approved" ? "approved" : l.status === "rejected" ? "rejected" : "cancelled";
+  return {
+    workflow_instance_id: wid, definition_key: "leave.approval", definition_name: "Leave Request", version: 1, module_key: "people",
+    entity_type: "leave_request", entity_id: l.leave_request_id, subject_employee_id: l.employee.employee_id, subject_name: l.employee.display_name,
+    state, current_stage: pending ? now : null, stage_name: pending ? l.waiting_on : null, context: { days: l.days }, stage_entered_at: entered,
+    stage_due_at: pending ? new Date(Date.parse(entered) + STAGE_HOURS * 3600000).toISOString() : null,
+    opened_by: null, opened_by_name: l.employee.display_name, opened_at: entered, completed_at: l.decided_at,
+    route: stages.map(([key, name]) => ({
+      key, name, state: !pending ? (state === "approved" ? "done" : "stopped") : key === now ? "now" : key === "line_manager" ? "done" : "todo",
+      // The stage it waits at names its person, as the API's snapshot does; the others name their kind.
+      approvers: [
+        key === "line_manager"
+          ? pending && key === now && l.approver_name
+            ? { type: "employee", value: null, label: l.approver_name }
+            : { type: "manager_of_subject", value: null, label: "Line Manager" }
+          : { type: "role", value: "operations_people", label: "Operations & People" },
+      ],
+    })),
+    decisions: [],
+    can_decide: pending && l.key !== user && waitingOn(user).some((w) => w.workflow_instance_id === wid),
+    can_withdraw: false, can_reassign: false, link: `/people?tab=leave&id=${l.leave_request_id}`,
+  };
+}
 route("GET /api/v1/workflow/instances/:id", (req) => {
-  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id);
+  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id) ?? leaveInstance(req.user!, req.params.id);
   return found ? ok(found) : notFound();
 });
 route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));
@@ -732,7 +1095,7 @@ route("GET /api/v1/workflow/mine/count", (req) => {
 /* My Leave: the caller's own. */
 const myLeave = (user: string) => LEAVE.filter((l) => l.key === user);
 route("GET /api/v1/ess/leave", (req) =>
-  asPage(paged(myLeave(req.user!), req, { filters: { status: LIST_FILTERS.status, year: (r, v) => r.starts_on.slice(0, 4) === v }, sort: { starts_on: LIST_SORT.starts_on, submitted_at: LIST_SORT.submitted_at } })),
+  asPage(paged(myLeave(req.user!), req, { filters: { status: LIST_FILTERS.status, year: (r, v) => r.starts_on.slice(0, 4) === v, from: (r, v) => r.ends_on >= v, to: (r, v) => r.starts_on <= v }, sort: { starts_on: LIST_SORT.starts_on, submitted_at: LIST_SORT.submitted_at } })),
 );
 /** My Leave's calendar: everyone for Operations & People and the CEO, else mine and everyone under me. */
 route("GET /api/v1/ess/leave/calendar", (req) => {
@@ -761,10 +1124,12 @@ route("POST /api/v1/ess/leave", (req) => {
   const me = byKey(req.user)!;
   if (myLeave(req.user!).some((x) => ["submitted", "approved"].includes(x.status) && x.starts_on <= b.ends_on && x.ends_on >= b.starts_on))
     return fail(409, "LEAVE_OVERLAP", "You already have leave on some of those days", { starts_on: ["Overlaps other leave"] });
+  const tooMany = overAllowance(me.user_key, t!, b.starts_on, b.ends_on);
+  if (tooMany) return tooMany;
   const days = workingDays(b.starts_on, b.ends_on);
   const l: MockLeave = {
     leave_request_id: uuid(), employee: personRef(me), key: me.user_key, leave_type_id: t!.leave_type_id, leave_type_name: t!.name, starts_on: b.starts_on, ends_on: b.ends_on,
-    days, reason: b.reason ?? null, status: "submitted", workflow_instance_id: uuid(), waiting_on: "Line Manager", recorded: false,
+    days, reason: b.reason ?? null, status: "submitted", workflow_instance_id: uuid(), waiting_on: "Line Manager", approver_name: lineManagerName(me.user_key), recorded: false,
     submitted_at: new Date().toISOString(), decided_at: null, created_at: new Date().toISOString(),
   };
   LEAVE.unshift(l);
@@ -776,6 +1141,7 @@ route("POST /api/v1/ess/leave/:id/cancel", (req) => {
   if (!(l.status === "submitted" || (l.status === "approved" && l.starts_on > isoDaysAgo(0)))) return fail(409, "LEAVE_NOT_CANCELLABLE", "This leave can no longer be cancelled");
   l.status = "cancelled";
   l.waiting_on = null;
+  l.approver_name = null;
   return ok(out(l));
 });
 

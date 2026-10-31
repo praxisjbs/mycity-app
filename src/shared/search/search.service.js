@@ -27,9 +27,18 @@
  * either end narrows the search to that type and searches the rest. A term that is
  * only the word is a search for the page, which the app's own registry answers.
  *
+ * Groups come in the registry's order, a provider marked `lead` (the people) before the other
+ * records, so a name typed finds the person before the days and requests about them.
+ *
  * Beyond recordProvider, a provider may answer an empty line (`empty: true`: what waits on
  * the reader), ask to come first (`pinned: true`), and read the reader themselves (`user`
  * is passed to its search), for a list that is the reader's own rather than a table's.
+ *
+ * Work a provider needs from outside the database (the User Guide's search by meaning asks a
+ * model for the term's vector) is its `prepare({ term, user })`, run for every provider that
+ * will search before the transaction opens, so no connection waits on a network call; what it
+ * returns is handed to its search as `prepared`. One that fails or is slow costs only itself:
+ * its search runs with `prepared` null.
  */
 const { logger } = require("../../config/logger");
 const { atomically } = require("../db/tx");
@@ -37,6 +46,7 @@ const { pageOf, envelope, PAGE_SIZE } = require("../http/paged");
 const catalog = require("../access/access.catalog");
 const grantsCache = require("../rbac/grants-cache");
 const routeMap = require("../route-map");
+const deliveryPlan = require("../delivery-plan");
 const registry = require("./registry");
 const { SCREENS, tabVisible } = require("./screens");
 const { ACTIONS, linkOf } = require("./actions");
@@ -109,10 +119,25 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
     candidates.some((p) => p.capability) && !(user && user.is_ceo === true)
       ? await grantsCache.getCapabilities(db, user && user.user_id)
       : [];
-  const run = candidates.filter(
-    (p) => scopes.has(p.module) && (!p.capability || (user && user.is_ceo === true) || caps.includes(p.capability)),
-  );
+  // A record whose screen has not shipped would open Coming Soon (shared/delivery-plan): its group never runs.
+  const run = candidates
+    .filter((p) => scopes.has(p.module) && (!p.capability || (user && user.is_ceo === true) || caps.includes(p.capability)))
+    .filter((p) => deliveryPlan.typeOpens(p.type))
+    .sort((a, b) => Number(b.lead === true) - Number(a.lead === true));
   if (run.length === 0) return out;
+
+  const prepared = new Map();
+  await Promise.all(
+    run
+      .filter((p) => typeof p.prepare === "function")
+      .map(async (p) => {
+        try {
+          prepared.set(p.type, await p.prepare({ term, user }));
+        } catch (err) {
+          logger.warn({ err: err.message, type: p.type }, "search provider could not prepare; it searches without");
+        }
+      }),
+  );
 
   const client = await db.connect();
   try {
@@ -130,6 +155,7 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
             fuzzy,
             scope: scopes.get(p.module),
             user,
+            prepared: prepared.has(p.type) ? prepared.get(p.type) : null,
           });
           await client.query("RELEASE SAVEPOINT search_provider");
           if (r.items.length)
@@ -273,7 +299,7 @@ const tabLabel = (module, tab) => {
 
 /** The screens this reader may open, as catalogue entries carrying their result. */
 function screenEntries(reader) {
-  return SCREENS.filter((x) => tabVisible(x, reader)).map((x) => {
+  return SCREENS.filter((x) => tabVisible(x, reader) && deliveryPlan.screenOpen(x.module, x.tab)).map((x) => {
     const moduleLabel = catalog.MODULE_META[x.module].label;
     return {
       title: x.label,
@@ -303,7 +329,8 @@ function actionEntries(reader) {
     (x) =>
       (!x.need || can(x.need)) &&
       (!x.capability || holds(x.capability)) &&
-      (!x.module || tabVisible({ module: x.module, tab: x.tab }, reader)),
+      (!x.module || tabVisible({ module: x.module, tab: x.tab }, reader)) &&
+      deliveryPlan.linkOpens(linkOf(x)),
   ).map((x) => {
     const where = x.module ? tabLabel(x.module, x.tab) : null;
     return {
@@ -375,4 +402,4 @@ async function everything(db, user, { q = "", type = null, page = 1 } = {}) {
   return { q: records.q, hint: records.hint, groups };
 }
 
-module.exports = { search, everything, readerOf, rankOf, fold, withinOne, nearWord, typeHint, trigramReady, MIN_TERM };
+module.exports = { search, everything, readerOf, screenEntries, actionEntries, rankOf, fold, withinOne, nearWord, typeHint, trigramReady, MIN_TERM };

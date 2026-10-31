@@ -446,9 +446,9 @@ describeDb("Home · Overview against the real migrations", () => {
       ]);
     });
 
-    test("Operations' Goals This Quarter are the same goals, with when each ends", async () => {
-      const o = await at14("ops");
-      expect(o.goals).toEqual([
+    test("Operations' Goals This Quarter are the organisational goals, with when each ends (performance.md §6.23, P27)", async () => {
+      // Operations & People read the whole plan, so the goals are theirs without the CEO sharing them.
+      expect((await at14("ops")).goals).toEqual([
         {
           title: "Reach Three New States",
           progress: null,

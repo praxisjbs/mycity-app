@@ -16,6 +16,7 @@ import {
   ErrorState,
   formatCount,
   formatDateTime,
+  FormatButton,
   Grid,
   Grow,
   IconButton,
@@ -78,42 +79,6 @@ const RELOAD_MS = 10_000;
 /** Is a run on the page still being made, recently enough that its file is worth waiting for? */
 export const awaited = (runs: Array<Pick<HomeReportRun, "status" | "run_at">>, now = Date.now()) => runs.some((r) => r.status === "pending" && now - Date.parse(r.run_at) < WATCH_MS);
 
-interface FormatButtonProps {
-  label: string;
-  formats: HomeReportFormat[];
-  busy: boolean;
-  onRun: (format: HomeReportFormat) => void;
-  /** A choice's words, from the format's name ("Run as PDF"). */
-  item: (format: string) => string;
-  /** Small on a card (the default); the page header's own size beside its other actions. */
-  size?: "sm" | "md";
-}
-
-/**
- * A button that makes one file in a format: the format straight away when there is one, a choice
- * (a menu; an action sheet on a phone) when there are two. Run Now on a report, and the
- * Overview's Export, both use it.
- */
-export function FormatButton({ label, formats, busy, onRun, item, size = "sm" }: FormatButtonProps) {
-  if (formats.length === 1)
-    return (
-      <Button size={size} busy={busy} onClick={() => onRun(formats[0])}>
-        {label}
-      </Button>
-    );
-  return (
-    <Menu
-      label="Choose Format"
-      trigger={(p) => (
-        <Button {...p} size={size} busy={busy}>
-          {label}
-        </Button>
-      )}
-      items={formats.map((format) => ({ label: item(formatName(format)), icon: "doc", onSelect: () => onRun(format) }))}
-    />
-  );
-}
-
 /**
  * Run Now: one file of the report for the reader, waited on and downloaded here, toasted with
  * its number ("RPT-0215 downloaded"). It waits in Recent Runs as Pending meanwhile.
@@ -137,7 +102,7 @@ function RunNow({ report }: { report: HomeReport }) {
       setWaiting(false);
     }
   };
-  return <FormatButton label="Run Now" formats={runFormats(report)} busy={run.pending || waiting} onRun={(format) => void go(format)} item={(format) => `Run as ${format}`} />;
+  return <FormatButton label="Run Now" formats={runFormats(report)} busy={run.pending || waiting} onRun={go} item={(format) => `Run as ${formatName(format)}`} />;
 }
 
 interface ReportActions {

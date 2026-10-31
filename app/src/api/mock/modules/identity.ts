@@ -1,9 +1,11 @@
 import type { Me, SignIn } from "@mycity/contract/contract.gen.ts";
-import { at, fail, invalid, mockSession, ok, noContent, paged, route } from "../core";
+import { at, fail, invalid, mockSession, ok, noContent, paged, route, sid } from "../core";
 import { capabilitiesOf } from "../data/access";
 import { appearanceApplied } from "../data/appearance";
 import { byKey, grantsFor, PEOPLE, SIGN_INS, teamOf } from "../data/people";
 import { searchResult } from "../data/search";
+import { searchableDays } from "./attendance";
+import { leaveRequests } from "./organisation";
 import { codeGiven, codeOk, markFresh, needsCode, passkeyOwner, waysOf } from "./security";
 
 /**
@@ -21,6 +23,21 @@ const ROLE: Record<string, { code: string; name: string }> = {
   Staff: { code: "employee", name: "Staff" },
 };
 
+/**
+ * What a role hides (shared/rbac/field-mask.js, seed 0449): everyone outside Implementation,
+ * Operations & People and Management has salary, bank, personal and statutory fields masked.
+ */
+const HIDDEN = [
+  "salary", "base_salary", "basic_salary", "gross_pay", "net_pay", "monthly_gross", "annual_gross", "gross_monthly", "net_monthly",
+  "total_allowances", "total_deductions", "salary_grade_amount", "pay_amount",
+  "bank_name", "bank_code", "account_number", "bank_account_number", "account_name", "bvn",
+  "date_of_birth", "home_address", "home_latitude", "home_longitude", "residential_address", "personal_email", "personal_phone",
+  "marital_status", "state_of_origin", "lga_of_origin", "nin", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship",
+  "next_of_kin_address", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
+  "tax_id", "tin", "pension_pin", "pension_administrator", "nhf_number", "nsitf_number",
+].sort();
+const SEES_ALL = ["implementation", "operations_people", "management"];
+
 /** The /me answer for a demonstration account; Home's mock reads it to decide which cards each may see. */
 export function me(key: string): Me {
   const p = byKey(key)!;
@@ -37,11 +54,12 @@ export function me(key: string): Me {
     photo_url: null,
     is_ceo: isCeo,
     grants: grantsFor(key) as Me["grants"],
-    capabilities: capabilitiesOf([role.code], isCeo),
+    capabilities: capabilitiesOf([role.code], isCeo, p.department === byKey("ifeoma")?.department),
     roles: [role],
     home_view: SIGN_INS[key]?.view ?? "staff",
     manages_people: teamOf(key).length > 0,
     appearance: appearanceApplied(),
+    hidden_fields: isCeo || SEES_ALL.includes(role.code) ? [] : HIDDEN,
   };
 }
 
@@ -246,20 +264,27 @@ const NOTES = [
   ["queries", "3 late arrivals in 30 days", "A query was raised automatically for Bashir Lawal.", 0, "09:44", "high", "queries", "queries", "query", "normal"],
   ["recruitment", "New application", "Adaeze Okonkwo applied for Content Producer.", 0, "07:20", "normal", "recruitment", "candidates", "candidate", "normal"],
   ["comms", "You were recognised", "Ifeoma Chukwu: \"Kept the Enugu shoot on schedule.\"", 1, "16:12", "normal", "community", "channels", "recognition", "normal"],
-  ["people", "Leave request", "Tobi Ojo requested 5 days from 20/10.", 1, "11:03", "normal", "people", "leave", "leave_request", "normal"],
+  ["people", "Leave request", "Amara Okafor requested 5 days.", 1, "11:03", "normal", "people", "leave", "leave_request", "normal"],
   ["partnerships", "Eko Hotels has gone quiet", "34 days since the last contact.", 2, "09:00", "high", "partnerships", "partners", "partner", "important"],
   ["payroll", "Payroll preview ready", "October run, 25 employees.", 3, "10:30", "normal", "payroll", "payroll-runs", "payroll_run", "normal"],
+  ["people", "Probation ending: Chidera Nwosu", "Confirmation is due in 14 days.", 1, "09:00", "normal", "people", "employees", "employee", "important"],
 ] as const;
 
+/**
+ * The real records some notices are about, so People marks their rows (the leave request
+ * Amara sent, Chidera's record); the rest stand for records the mock does not hold.
+ */
+const RECORDS: Record<number, string> = { 5: sid("leave:1"), 8: sid("employee:chidera") };
+
 const noteId = (i: number) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`;
-/** Read marks, kept for the session: the first four arrive unread. Acknowledgements likewise. */
-const READ = new Set(NOTES.map((_, i) => noteId(i)).slice(4));
+/** Read marks, kept for the session: the first four and People's arrive unread. Acknowledgements likewise. */
+const READ = new Set(NOTES.flatMap((n, i) => (i >= 4 && n[0] !== "people" ? [noteId(i)] : [])));
 const ACKED = new Set<string>();
 
 const notes = () =>
   NOTES.map((n, i) => {
     const id = noteId(i);
-    const entityId = `${n[8]}-${i + 1}`;
+    const entityId = RECORDS[i] ?? `${n[8]}-${i + 1}`;
     const ack = n[9] === "urgent" && n[8] === "announcement";
     return {
       notification_id: id,
@@ -298,9 +323,44 @@ route("POST /api/v1/notifications/:id/acknowledge", (req) => {
 });
 route("GET /api/v1/notifications/unread-count", () => ok({ unread: notes().filter((n) => n.read_at === null).length }));
 route("GET /api/v1/notifications/badges", () => {
-  const out: Record<string, number> = {};
-  for (const n of notes()) if (n.read_at === null) out[n.link.module] = (out[n.link.module] ?? 0) + 1;
-  return ok(out);
+  const modules: Record<string, number> = {};
+  const tabs: Record<string, Record<string, number>> = {};
+  for (const { read_at, link } of notes()) {
+    if (read_at !== null) continue;
+    modules[link.module] = (modules[link.module] ?? 0) + 1;
+    tabs[link.module] = { ...tabs[link.module], [link.tab]: (tabs[link.module]?.[link.tab] ?? 0) + 1 };
+  }
+  return ok({ modules, tabs });
+});
+/** The notices about a record shown on one screen: what marks its row there, and what opening it reads. */
+const onScreen = (module: unknown, tab: unknown) => notes().filter((n) => n.link.module === module && n.link.tab === tab);
+route("GET /api/v1/notifications/unread-records", (req) => {
+  const ids = String(req.query.ids ?? "").split(",");
+  return ok({ ids: [...new Set(onScreen(req.query.module, req.query.tab).filter((n) => n.read_at === null && ids.includes(n.entity_id)).map((n) => n.entity_id))] });
+});
+/** Where a notice's record sits on its screen, as the API's `<module>.views.js` place it, for the records the mock holds. */
+const VIEW_OF: Record<string, (entityId: string) => string | null> = {
+  "people/leave/leave_request": (id) => leaveRequests().find((l) => l.leave_request_id === id)?.status ?? null,
+};
+route("GET /api/v1/notifications/views", (req) => {
+  const views: Record<string, { unread: number; urgent: boolean }> = {};
+  for (const n of onScreen(req.query.module, req.query.tab)) {
+    const urgent = n.urgency === "urgent" && (n.acknowledge_required ? n.acknowledged_at === null : n.read_at === null);
+    const where = VIEW_OF[`${n.link.module}/${n.link.tab}/${n.entity_type}`]?.(n.entity_id);
+    if (!where || (n.read_at !== null && !urgent)) continue;
+    // A record counts in its view and in every view above it.
+    const parts = where.split("/");
+    for (let i = 1; i <= parts.length; i += 1) {
+      const v = (views[parts.slice(0, i).join("/")] ??= { unread: 0, urgent: false });
+      if (n.read_at === null) v.unread += 1;
+      v.urgent ||= urgent;
+    }
+  }
+  return ok({ views });
+});
+route("POST /api/v1/notifications/read-record", (req) => {
+  for (const n of onScreen(req.body.module, req.body.tab)) if (n.entity_id === req.body.entity_id) READ.add(n.notification_id);
+  return noContent();
 });
 route("POST /api/v1/notifications/:id/read", (req) => {
   if (!NOTES.some((_, i) => noteId(i) === req.params.id)) return fail(404, "NOT_FOUND", "There is no such notification.");
@@ -470,5 +530,5 @@ route("POST /api/v1/notifications/push/read", () => noContent(), { anonymous: tr
 route("GET /api/v1/search", (req) => {
   for (const k of Object.keys(req.query)) if (!["q", "page", "type"].includes(k)) return invalid({ [k]: ["is not a filter on this list"] });
   const page = Math.max(1, Number.parseInt(req.query.page ?? "1", 10) || 1);
-  return ok(searchResult(PEOPLE, grantsFor(req.user!), req.query.q ?? "", req.query.type ?? null, page));
+  return ok(searchResult(PEOPLE, grantsFor(req.user!), req.query.q ?? "", req.query.type ?? null, page, searchableDays()));
 });

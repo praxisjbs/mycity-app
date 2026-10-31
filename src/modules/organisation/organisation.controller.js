@@ -10,12 +10,14 @@
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
-const { ok, created, accepted } = require("../../shared/http/respond");
+const { ok, created, accepted, noContent } = require("../../shared/http/respond");
+const { AppError } = require("../../shared/errors");
 const { sendPaged } = require("../../shared/http/paged");
 const { scopeOf, assertInScope } = require("../../shared/rbac/scope");
-const { maskForUser } = require("../../shared/rbac/field-mask");
+const { maskForUser, assertWritable } = require("../../shared/rbac/field-mask");
 const { withActor } = require("../../shared/events/emit");
 const employee360 = require("./employee-360.service");
+const lagos = require("../../shared/time/lagos");
 const service = require("./organisation.service");
 
 const id = (req) => req.validated.params.id;
@@ -28,6 +30,16 @@ async function tx(fn) {
   } finally {
     client.release();
   }
+}
+
+/**
+ * Departments are the company's, so changing one needs the `people` grant over everyone: a head
+ * change or a merge moves lines beyond any one team (docs/guides/organogram.md §6.1, §8).
+ */
+function assertAll(req) {
+  const scope = scopeOf(req);
+  if (!scope || scope.scope !== "all")
+    throw new AppError("FORBIDDEN", "Only People with access to everyone change departments.", 403);
 }
 
 /** Mask what the caller may not see, unless the record is their own. */
@@ -51,6 +63,8 @@ module.exports = {
   get: async (req, res) => ok(res, await maskUnlessOwn(req, await readable(req))),
 
   create: async (req, res) => {
+    // A field the caller's role hides is not theirs to set (shared/rbac/field-mask.js).
+    await assertWritable(pool, req.user, req.validated.body);
     const employee = await tx((client) =>
       service.createEmployee(client, req.validated.body, withActor(req)),
     );
@@ -59,14 +73,22 @@ module.exports = {
 
   update: async (req, res) => {
     await readable(req);
-    await tx((client) => service.updateEmployee(client, id(req), req.validated.body, withActor(req)));
+    await assertWritable(pool, req.user, req.validated.body, { own: req.user && id(req) === req.user.employee_id });
+    // A new Department on Edit Record moves the person as People · Departments does (organogram.md §6.1).
+    await tx((client) => service.updateEmployee(client, id(req), req.validated.body, withActor(req), { followHead: true }));
     return ok(res, await maskUnlessOwn(req, await employee360.get(pool, id(req))));
   },
 
   archive: async (req, res) => {
     await readable(req);
     await tx((client) =>
-      service.archiveEmployee(client, id(req), req.validated.body.archive_reason, withActor(req)),
+      service.archiveEmployee(
+        client,
+        id(req),
+        req.validated.body.archive_reason,
+        withActor(req),
+        req.validated.body.left_on || lagos.today(),
+      ),
     );
     return ok(res, await maskUnlessOwn(req, await employee360.get(pool, id(req))));
   },
@@ -93,11 +115,33 @@ module.exports = {
 
   departments: async (req, res) => sendPaged(res, await service.departments(pool, req.validated.query)),
 
-  createDepartment: async (req, res) =>
-    created(res, await tx((client) => service.createDepartment(client, req.validated.body, withActor(req)))),
+  department: async (req, res) => ok(res, await service.getDepartment(pool, id(req))),
 
-  updateDepartment: async (req, res) =>
-    ok(res, await tx((client) => service.updateDepartment(client, id(req), req.validated.body, withActor(req)))),
+  createDepartment: async (req, res) => {
+    assertAll(req);
+    return created(res, await tx((client) => service.createDepartment(client, req.validated.body, withActor(req))));
+  },
+
+  updateDepartment: async (req, res) => {
+    assertAll(req);
+    return ok(res, await tx((client) => service.updateDepartment(client, id(req), req.validated.body, withActor(req))));
+  },
+
+  moveToDepartment: async (req, res) => {
+    assertAll(req);
+    return ok(res, await tx((client) => service.moveToDepartment(client, id(req), req.validated.body.employee_ids, withActor(req))));
+  },
+
+  mergeDepartment: async (req, res) => {
+    assertAll(req);
+    return ok(res, await tx((client) => service.mergeDepartment(client, id(req), req.validated.body.into_department_id, withActor(req))));
+  },
+
+  deleteDepartment: async (req, res) => {
+    assertAll(req);
+    await tx((client) => service.deleteDepartment(client, id(req), withActor(req)));
+    return noContent(res);
+  },
 
   seats: async (req, res) => sendPaged(res, await service.seats(pool, req.validated.query)),
 

@@ -97,7 +97,7 @@ function Page({ doc, number, size, width, frame }: { doc: Doc; number: number; s
   );
 }
 
-export default function PdfDraw({ data, name, tone, onError }: PdfDrawProps) {
+export default function PdfDraw({ data, name, tone, onError, flow }: PdfDrawProps) {
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const [doc, setDoc] = useState<Doc | null>(null);
   const [sizes, setSizes] = useState<Size[]>([]);
@@ -198,7 +198,7 @@ export default function PdfDraw({ data, name, tone, onError }: PdfDrawProps) {
   }
 
   return (
-    <div className="relative size-full">
+    <div className={flow ? "relative w-full" : "relative size-full"}>
       <div
         ref={setFrame}
         tabIndex={0}
@@ -206,7 +206,7 @@ export default function PdfDraw({ data, name, tone, onError }: PdfDrawProps) {
         aria-label={doc ? `${name}, page ${current} of ${doc.numPages}` : name}
         aria-busy={!doc || undefined}
         onScroll={onScroll}
-        className={cn("size-full overflow-auto overscroll-contain px-3 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring", deep ? "bg-deep" : "bg-muted")}
+        className={cn(flow ? (zoom > 1 ? "w-full overflow-x-auto" : "w-full overflow-x-hidden") : "size-full overflow-auto overscroll-contain", "px-3 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring", deep ? "bg-deep" : "bg-muted")}
       >
         {doc && fit > 0 ? (
           <div className="flex w-max min-w-full flex-col items-center gap-3 pb-14">

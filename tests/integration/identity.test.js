@@ -82,13 +82,13 @@ describeDb("identity against the real migrations", () => {
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));
 
-    const sample = (first, last, email, job) => ({
+    const sample = (first, last, email, job, department = "HR & Operations") => ({
       first_name: first,
       last_name: last,
       work_email: email,
       phone: "08031234567",
       job_title: job,
-      department_name: "HR & Operations",
+      department_name: department,
       start_date: "2026-01-05",
       employment_type: "full_time",
       work_pattern: "remote",
@@ -96,7 +96,7 @@ describeDb("identity against the real migrations", () => {
     await tx(async (client) => {
       people.ceo = await createAdmin(
         client,
-        { employee: sample("Amaka", "Eze", "ceo@mycity.test", "Chief Executive Officer"), role_code: "management", is_ceo: true },
+        { employee: sample("Amaka", "Eze", "ceo@mycity.test", "Chief Executive Officer", "General Management"), role_code: "management", is_ceo: true },
         CEO_PASSWORD,
       );
       people.ops = await createAdmin(

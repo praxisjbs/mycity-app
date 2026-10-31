@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { UrgentBar } from "@mycity/ui";
+import { toast, UrgentBar } from "@mycity/ui";
 import type { Notification } from "@mycity/contract/contract.gen.ts";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { invalidate, useApi } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
 import { markRead } from "./arrivals";
@@ -23,6 +23,11 @@ export function urgentModules(rows: Notification[]): Set<string> {
   return new Set(rows.flatMap((n) => (n.link ? [n.link.module] : [])));
 }
 
+/** The tabs an open urgent notice opens on, as `module/tab`: their counts show red. */
+export function urgentTabs(rows: Notification[]): Set<string> {
+  return new Set(rows.flatMap((n) => (n.link ? [`${n.link.module}/${n.link.tab}`] : [])));
+}
+
 export function UrgentNotices({ rows }: { rows: Notification[] }) {
   const [index, setIndex] = useState(0);
   const { navigate } = useRouter();
@@ -38,7 +43,12 @@ export function UrgentNotices({ rows }: { rows: Notification[] }) {
   const acknowledge = () =>
     api
       .call("POST /api/v1/notifications/:id/acknowledge", { params: { id: n.notification_id }, body: {} })
-      .then(() => invalidate("/api/v1/notifications", "/api/v1/community"));
+      .then(() => invalidate("/api/v1/notifications", "/api/v1/community"))
+      .catch((e) => {
+        // Withdrawn meanwhile, or offline: say why, and show the bar as it is now.
+        toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Not acknowledged. Try again.");
+        invalidate("/api/v1/notifications");
+      });
   return (
     <UrgentBar
       title={n.title}

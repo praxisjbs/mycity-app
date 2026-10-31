@@ -87,7 +87,7 @@ function request(actor, employeeId, own) {
       throw new AppError(
         "DATA_EXPORT_LIMIT",
         own
-          ? "Your copy was already made today. Try tomorrow."
+          ? "A copy of your data was made for People today. Ask again tomorrow."
           : "Their copy was already made today. Try tomorrow.",
         429,
       );

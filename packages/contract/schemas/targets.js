@@ -37,7 +37,18 @@ const LineSource = z.enum([
 ]);
 
 /** A line's weight inside its section: numeric(5,2) as a string ("15", "12.5"). */
-const Weight = z.string().regex(/^\d{1,3}(\.\d{1,2})?$/, "must be a weight like 15 or 12.5");
+const Weight = z.string().regex(/^\d{1,3}(\.\d{1,2})?$/, "Like 15 or 12.5");
+
+/**
+ * A weight as a line is saved: at most 100, the column's own check (numeric(5,2), weight <= 100),
+ * said on the line's Weight rather than left for the database to refuse. Zero or less is the
+ * service's "Above zero" (targets.service lineProblems).
+ */
+const LineWeight = Weight.refine((v) => {
+  const n = Number(v);
+  // Not a number at all: Weight's own words already say so.
+  return Number.isNaN(n) || n <= 100;
+}, "At most 100");
 
 /** A key result as a line or a check names it. */
 const KeyResultRef = z
@@ -232,7 +243,7 @@ const ScorecardLineInput = z
     milestone_due_on: blank(isoDate),
     due_on: blank(isoDate),
     frequency_text: optionalText(100),
-    weight: Weight,
+    weight: LineWeight,
     source: LineSource.default("own"),
     okr_key_result_id: blank(uuid),
     kpi_definition_id: blank(uuid),
@@ -359,13 +370,20 @@ const CommitmentRecovery = z
   })
   .strict();
 
+/**
+ * The State filter: the commitment's own state (`awaiting_approval` is every month not yet approved,
+ * as Send Commitments lists them), or, as the pills read, `sent` (sent and waiting), `not_sent` (not
+ * yet sent, or drafted) and `returned` (sent back).
+ */
+const CommitmentStateFilter = z.enum(["awaiting_approval", "sent", "not_sent", "returned", "due", "on_time", "late", "missed", "rescoped"]);
+
 /** GET /performance/commitments */
 const CommitmentListQuery = listQuery(
   {
     month: MonthKey.optional(),
     department_id: uuid.optional(),
     employee_id: uuid.optional(),
-    state: CommitmentState.optional(),
+    state: CommitmentStateFilter.optional(),
     waiting_on_me: z.enum(["true", "false"]).optional(),
   },
   ["due_at", "employee"],

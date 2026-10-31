@@ -3,26 +3,30 @@
  * operational measures and their monthly actuals, Met, Not Met or N/A. New KPI and Record Actual
  * for the function's head; a KPI opens its definition, its months and the lines that use it.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import kpisContract from "@mycity/contract/schemas/kpis.js";
 import type { Endpoints, Kpi } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
-import { hasCapability } from "@/shell/access";
+import { type Paging } from "@/features/shared/wire";
+import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Button,
   DataView,
+  ErrorState,
   Field,
   FilterSelect,
   formatDate,
   formatMonth,
+  FormError,
   FormFooter,
   HelpTerm,
   KeyValue,
+  LoadingRows,
+  NumberField,
   PageHeader,
   SelectField,
   StatusPill,
@@ -32,23 +36,26 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
-import { figureOf, kpiResult, monthShort, person, reportingMonth, useQuarter } from "./shared";
+import { bodySchema, figureOf, kpiResult, monthShort, person, reportingMonth, sayRefusal, UnitField, useQuarter, useSettableFunctions } from "./shared";
 
 type KpiCreateBody = Endpoints["POST /api/v1/performance/kpis"]["body"];
 type KpiActualBody = Endpoints["POST /api/v1/performance/kpis/:id/actuals"]["body"];
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const RESULTS: Array<[string, string]> = [["met", "Met"], ["not_met", "Not Met"], ["na", "N/A"]];
 const DIRECTIONS: Array<[string, string]> = [["higher", "Higher Is Better"], ["lower", "Lower Is Better"]];
 const FREQUENCIES: Array<[string, string]> = [["monthly", "Monthly"], ["weekly", "Weekly"], ["quarterly", "Quarterly"]];
 const naHelp = "No eligible cases this month. It never counts as met.";
 
 export function Kpis() {
-  const me = useMe();
   const modal = useModal();
   const quarter = useQuarter();
   const period = quarter.period;
-  const departments = useApi("GET /api/v1/departments", { query: {} });
-  const [dept, setDept] = useState("");
+  // The functions the reader reads (§6.23): a member of one is shown its KPIs without choosing, and the select is left off.
+  const settable = useSettableFunctions(null);
+  const functions: Array<[string, string]> = settable.all.filter((f) => f.department_id).map((f) => [f.department_id as string, f.name ?? ""]);
+  const pickFunction = functions.length > 1 || Boolean(settable.paging.more);
+  const [picked, setPicked] = useState("");
+  const dept = picked || (!pickFunction && functions.length === 1 ? functions[0]![0] : "");
   const list = usePaged("GET /api/v1/performance/kpis", { filters: { active: "true", ...(dept ? { department_id: dept } : {}) } });
   const months = period?.months ?? [];
   // The month just ended, which the heads and the workbook import record.
@@ -61,22 +68,37 @@ export function Kpis() {
     { label: "Not Met", value: counted(summary.data?.not_met), tone: "err" as const },
     { label: "Awaiting Actual", value: counted(summary.data?.awaiting) },
   ];
-  const deptOptions: Array<[string, string]> = [["", "All Functions"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
-  const mayEdit = hasCapability(me, "goals.function");
+  const deptOptions: Array<[string, string]> = [["", "All Functions"], ...functions];
+  // New KPI is offered only to a reader who may set some function's KPIs, as the API's goals.authority answers.
+  const mayAdd = settable.rows.some((x) => x.department_id !== null);
   const newKpi = () => modal.open({ title: "New KPI", body: (close) => <KpiForm close={close} periodId={quarter.periodId} departmentId={dept} /> });
-  const openKpi = (k: Kpi) => modal.open({ title: k.code, wide: true, body: (close) => <KpiSheet id={k.kpi_definition_id} months={months} close={close} /> });
-  useScreenAction(mayEdit ? { label: "New KPI", onSelect: newKpi } : null);
+  const openKpiId = (id: string, code = "KPI") => modal.open({ title: code, wide: true, body: (close) => <KpiSheet id={id} months={months} close={close} /> });
+  const openKpi = (k: Kpi) => openKpiId(k.kpi_definition_id, k.code);
+  // A KPI found with ⌘K (or linked from elsewhere, `?id=`) opens its sheet once, then leaves the address.
+  const [params, setParams] = useSearchParams();
+  const linked = params.get("id");
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linked || opened.current === linked) return;
+    opened.current = linked;
+    setParams({ id: null }, { replace: true });
+    openKpiId(linked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked]);
+  useScreenAction(mayAdd ? { label: "New KPI", onSelect: newKpi } : null);
 
   return (
     <>
       <PageHeader
         title="KPIs"
         sub={period ? `${period.name} · ${formatDate(period.starts_on)} to ${formatDate(period.ends_on)}` : undefined}
-        actions={mayEdit ? <Button variant="primary" icon="plus" onClick={newKpi}>New KPI</Button> : undefined}
+        actions={mayAdd ? <Button variant="primary" icon="plus" onClick={newKpi}>New KPI</Button> : undefined}
       />
-      <Toolbar>
-        <FilterSelect label="Function" value={dept} onChange={setDept} options={deptOptions} />
-      </Toolbar>
+      {pickFunction && (
+        <Toolbar>
+          <FilterSelect label="Function" value={picked} onChange={setPicked} options={deptOptions} {...settable.paging} />
+        </Toolbar>
+      )}
       <KpiTiles items={tiles} mobileCols={2} />
       <PagedTable
         title="KPIs"
@@ -113,7 +135,8 @@ function KpiSheet({ id, months, close }: { id: string; months: string[]; close: 
   const modal = useModal();
   const read = useApi("GET /api/v1/performance/kpis/:id", { params: { id } });
   const k = read.data;
-  if (!k) return null;
+  if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
+  if (!k) return <LoadingRows count={4} />;
   const reload = () => {
     read.reload();
     invalidate("/api/v1/performance/kpis");
@@ -172,38 +195,54 @@ function KpiSheet({ id, months, close }: { id: string; months: string[]; close: 
   );
 }
 
+/**
+ * New KPI: the functions the reader may set KPIs for, from the server (useSettableFunctions; a KPI
+ * is always a function's, never the company's). The form opens once they are known, on the page's
+ * Function when the reader sets it, else on their one function.
+ */
 function KpiForm({ close, periodId, departmentId }: { close: () => void; periodId: string; departmentId: string }) {
-  const departments = useApi("GET /api/v1/departments", { query: { active: "true" } });
+  const settable = useSettableFunctions(null);
+  if (settable.error) return <ErrorState error={settable.error} onRetry={settable.reload} />;
+  if (settable.loading) return <LoadingRows count={4} />;
+  const options = settable.rows.flatMap((x) => (x.department_id ? [[x.department_id, x.name ?? ""] as [string, string]] : []));
+  const first = options.some(([id]) => id === departmentId) ? departmentId : options.length === 1 ? options[0]![0] : "";
+  return <KpiFields close={close} periodId={periodId} departmentId={first} options={options} paging={settable.paging} />;
+}
+
+function KpiFields({ close, periodId, departmentId, options, paging: more }: { close: () => void; periodId: string; departmentId: string; options: Array<[string, string]>; paging: Paging }) {
   const f = useContractForm(
     { department_id: departmentId, name: "", formula: "", unit: "", direction: "higher", target_text: "", target_value: "", frequency: "monthly", data_source: "", starts_period_id: periodId },
     kpisContract.KpiCreate,
   );
+  const [problem, setProblem] = useState<string | null>(null);
   const save = useMutation("POST /api/v1/performance/kpis");
+  const none = options.length === 0;
   const submit = async () => {
-    if (!f.check()) return;
+    setProblem(null);
+    if (none || !f.check()) return;
     try {
       const k = await save.run({ body: f.values as KpiCreateBody });
       invalidate("/api/v1/performance/kpis");
       close();
       toast(`${k.code} set`);
     } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else say(e);
+      sayRefusal(e, f, setProblem);
     }
   };
   return (
     <>
-      <Field label="Function" {...f.status("department_id")}>
-        <SelectField options={(departments.data?.data ?? []).map((d) => [d.department_id, d.name] as [string, string])} {...f.field("department_id")} />
+      <Field label="Function" {...(none ? { state: "bad" as const, message: "None you may set" } : f.status("department_id"))}>
+        <SelectField options={options} placeholder="Pick a function" {...more} {...f.field("department_id")} />
       </Field>
       <Field label="KPI" {...f.status("name")}><TextField {...f.field("name")} /></Field>
       <Field label="Formula" optional {...f.status("formula")}><TextField {...f.field("formula")} /></Field>
-      <Field label="Unit" optional {...f.status("unit")}><TextField {...f.field("unit")} /></Field>
+      <Field label="Unit" optional {...f.status("unit")}><UnitField {...f.field("unit")} /></Field>
       <Field label="Direction" {...f.status("direction")}><SelectField options={DIRECTIONS} {...f.field("direction")} /></Field>
-      <Field label="Target" optional {...f.status("target_value")}><TextField {...f.field("target_value")} inputMode="decimal" /></Field>
-      <Field label="Target Wording" optional {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
+      <Field label="Target" optional {...f.status("target_value")}><NumberField decimal signed {...f.field("target_value")} /></Field>
+      <Field label="Target Wording" {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
       <Field label="Frequency" {...f.status("frequency")}><SelectField options={FREQUENCIES} {...f.field("frequency")} /></Field>
       <Field label="Data Source" optional {...f.status("data_source")}><TextField {...f.field("data_source")} /></Field>
+      <FormError>{problem}</FormError>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Set KPI</Button>
@@ -212,29 +251,36 @@ function KpiForm({ close, periodId, departmentId }: { close: () => void; periodI
   );
 }
 
+type KpiEditValues = { name: string; formula: string; unit: string; target_text: string; data_source: string };
+const or = (v: string) => (v.trim() === "" ? null : v.trim());
+// The target's wording is sent as typed: the contract refuses it empty, and a KPI never loses it.
+const kpiEditBody = (v: KpiEditValues) => ({ name: v.name, formula: or(v.formula), unit: or(v.unit), target_text: v.target_text, data_source: or(v.data_source) });
+
+/** Edit KPI: the contract's KpiEdit checks each field as it is filled, and a refusal lands on its field. */
 function KpiEditForm({ kpi, close }: { kpi: Kpi; close: () => void }) {
-  const [values, setValues] = useState({ name: kpi.name, formula: kpi.formula ?? "", unit: kpi.unit ?? "", target_text: kpi.target_text ?? "", data_source: kpi.data_source ?? "" });
+  const f = useContractForm<KpiEditValues>(
+    { name: kpi.name, formula: kpi.formula ?? "", unit: kpi.unit ?? "", target_text: kpi.target_text ?? "", data_source: kpi.data_source ?? "" },
+    bodySchema<KpiEditValues>(kpisContract.KpiEdit, kpiEditBody),
+  );
   const save = useMutation("PATCH /api/v1/performance/kpis/:id");
-  const set = (key: keyof typeof values) => (v: string) => setValues((x) => ({ ...x, [key]: v }));
   const submit = async () => {
+    if (!f.check()) return;
     try {
-      await save.run({
-        params: { id: kpi.kpi_definition_id },
-        body: { name: values.name, formula: values.formula || null, unit: values.unit || null, target_text: values.target_text || null, data_source: values.data_source || null },
-      });
+      await save.run({ params: { id: kpi.kpi_definition_id }, body: kpiEditBody(f.values) });
       close();
       toast("KPI saved");
     } catch (e) {
-      say(e);
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
     }
   };
   return (
     <>
-      <Field label="KPI" state={save.fields.name ? "bad" : undefined} message={save.fields.name?.[0]}><TextField value={values.name} onChange={set("name")} /></Field>
-      <Field label="Formula" optional><TextField value={values.formula} onChange={set("formula")} /></Field>
-      <Field label="Unit" optional><TextField value={values.unit} onChange={set("unit")} /></Field>
-      <Field label="Target Wording" optional><TextField value={values.target_text} onChange={set("target_text")} /></Field>
-      <Field label="Data Source" optional><TextField value={values.data_source} onChange={set("data_source")} /></Field>
+      <Field label="KPI" {...f.status("name")}><TextField {...f.field("name")} /></Field>
+      <Field label="Formula" optional {...f.status("formula")}><TextField {...f.field("formula")} /></Field>
+      <Field label="Unit" optional {...f.status("unit")}><UnitField {...f.field("unit")} /></Field>
+      <Field label="Target Wording" {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
+      <Field label="Data Source" optional {...f.status("data_source")}><TextField {...f.field("data_source")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Save KPI</Button>
@@ -257,11 +303,17 @@ function ActualForm({ id, months, close }: { id: string; months: string[]; close
       else say(e);
     }
   };
+  // A month with no eligible cases has no figure; Met and Not Met need one.
+  const noCases = f.values.result === "na";
+  const chooseResult = (result: string) => {
+    f.set("result", result);
+    if (result === "na") f.set("actual_value", "");
+  };
   return (
     <>
       <Field label="Month" {...f.status("month")}><SelectField options={months.map((m) => [m, formatMonth(m)] as [string, string])} {...f.field("month")} /></Field>
-      <Field label="Result" {...f.status("result")}><SelectField options={RESULTS} {...f.field("result")} /></Field>
-      <Field label="Actual" optional {...f.status("actual_value")}><TextField {...f.field("actual_value")} inputMode="decimal" /></Field>
+      <Field label="Result" {...f.status("result")}><SelectField options={RESULTS} {...f.field("result")} onChange={chooseResult} /></Field>
+      {!noCases && <Field label="Actual" {...f.status("actual_value")}><NumberField decimal signed {...f.field("actual_value")} /></Field>}
       <Field label="Comment" optional {...f.status("comment")}><TextField {...f.field("comment")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

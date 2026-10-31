@@ -31,7 +31,18 @@ import {
 import { useState } from "react";
 import { HELP, JOB, JOB_HELP, NEEDS, PROVIDER, positionOf, SLOT_LABEL, SLOTS, STATE, type Slot } from "./words";
 
-const fail = (e: unknown, fallback: string) => toast(e instanceof ApiError ? e.message : fallback);
+const fail = (e: unknown, fallback: string) => toast.error(e instanceof ApiError ? e.message : fallback);
+
+/** Make First refused for one model ("Carries personal data") names that model: it has no form to mark. */
+function firstFailed(e: unknown, chain: AiChain, position: number) {
+  const at = e instanceof ApiError ? Object.entries(e.fields).find(([k]) => /^links\.\d+\.model$/.test(k)) : undefined;
+  // The refused chain is the reordered one: the model moved first, then the rest in order.
+  const moved = chain.links.find((l) => l.position === position);
+  const reordered = moved ? [moved, ...chain.links.filter((l) => l !== moved)] : chain.links;
+  const named = at && reordered[Number(at[0].split(".")[1])];
+  if (at && named) toast.error(`${named.display_name}: ${at[1][0]}`);
+  else fail(e, "Not moved");
+}
 
 /** A model's state as its pill reads; Skipped says until when. */
 function StatePill({ link }: { link: ChainLink }) {
@@ -110,14 +121,14 @@ function ChainSheet({
       invalidate("/api/v1/ai-control");
       toast("Moved to first");
     } catch (e) {
-      fail(e, "Not moved");
+      firstFailed(e, chain, position);
     }
   };
   const useJob = async () => {
     try {
       await api.call("DELETE /api/v1/ai-control/chains/action/:key", { params: { key } });
       invalidate("/api/v1/ai-control");
-      toast("Back on its job's chain");
+      toast(action?.set_chain ? "Back on its chosen chain" : "Back on its job's chain");
       close();
     } catch (e) {
       fail(e, "Not changed");
@@ -140,7 +151,7 @@ function ChainSheet({
             </HelpTerm>
           )}
           {action.own_chain && (
-            <HelpTerm help={HELP.ownChain}>
+            <HelpTerm help={action.set_chain ? HELP.setChain : HELP.ownChain}>
               <Pill tone="neutral">Own Chain</Pill>
             </HelpTerm>
           )}
@@ -155,7 +166,7 @@ function ChainSheet({
       <ChainList chain={chain} onFirst={edit ? first : undefined} />
       {edit && (
         <FormFooter>
-          {action && chain.scope === "action" && chain.stored && <Button onClick={useJob}>Use Job Chain</Button>}
+          {action && chain.scope === "action" && chain.stored && <Button onClick={useJob}>{action.set_chain ? "Restore Chain" : "Use Job Chain"}</Button>}
           <Button variant="primary" icon="edit" onClick={editChain}>
             Edit Chain
           </Button>
@@ -286,7 +297,7 @@ function JobCard({ row }: { row: AiJobRow }) {
       invalidate("/api/v1/ai-control");
       toast("Moved to first");
     } catch (e) {
-      fail(e, "Not moved");
+      firstFailed(e, row.chain, position);
     }
   };
   const editChain = () =>

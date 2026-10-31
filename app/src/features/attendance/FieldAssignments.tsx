@@ -3,6 +3,7 @@ import type { FieldAssignment, FieldAssignmentState } from "@mycity/contract/con
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import type { PersonRef } from "@/api/types/common";
 import { Button, Card, CardHeader, Chips, DataView, Field, formatDate, formatDateTime, FormFooter, HelpTerm, KeyValue, Pill, TextAreaField, toast, useContractForm, useModal, Who } from "@mycity/ui";
 import { ASSIGNMENT_STATE } from "./labels";
@@ -34,9 +35,10 @@ const STATE_CHIPS: Array<[FieldAssignmentState | "all", string]> = [
 export function FieldView({ openAssignment }: { openAssignment: (a: FieldAssignment) => void }) {
   const [state, setState] = useState<FieldAssignmentState | "all">("all");
   const list = usePaged("GET /api/v1/attendance/field-assignments", { filters: state === "all" ? {} : { state } });
+  const news = useViewNews();
   return (
     <>
-      <Chips label="Field Assignments" value={state} onChange={setState} options={STATE_CHIPS} />
+      <Chips label="Field Assignments" value={state} onChange={setState} options={withNews(news, STATE_CHIPS, { at: "temporary/field", all: "all" })} />
       <DataView
         title="Field Assignments"
         list={list}
@@ -123,13 +125,16 @@ export function AssignmentView({ a, close }: { a: FieldAssignment; close: () => 
         title="People"
         rows={a.members}
         rowKey={(m) => m.employee.employee_id}
-        onRowClick={a.can_change && active.length > 1 ? (m) => !m.removed_at && takeOff(m.employee) : undefined}
+        help={a.can_change && active.length === 1 ? "The last person stays on it. Cancel Assignment ends it instead." : undefined}
         noun="person"
         nounPlural="people"
         columns={[
           { key: "e", label: "Employee", render: (m) => <Who name={m.employee.display_name} sub={m.employee.department} /> },
           { key: "s", label: "On It", render: (m) => (m.removed_at ? <Pill tone="neutral">Taken Off</Pill> : <Pill tone="ok">On It</Pill>) },
           { key: "r", label: "Reason", desktop: true, render: (m) => m.removed_reason },
+          ...(a.can_change && active.length > 1
+            ? [{ key: "x", label: "", render: (m: (typeof a.members)[number]) => (m.removed_at ? null : <Button size="sm" onClick={() => takeOff(m.employee)}>Take Off</Button>) }]
+            : []),
         ]}
       />
       <FormFooter>

@@ -1,7 +1,8 @@
 # Runbook · GitHub settings
 
-The repository is `tomblakeasaah196/mycity-app`. Only the owning account (TB) is an admin, so
-**only TB can apply or change these settings**. Collaborators cannot see or change them; that is
+The repository is `praxisjbs/mycity-app`, JBS Praxis's account (moved from
+`tomblakeasaah196/mycity-app` on 24/10/2026). Only the owning account is an admin, so **only whoever
+signs in as `praxisjbs` can apply or change these settings**. Collaborators cannot see or change them; that is
 what makes them hold. Re-check this page after any change to the repository's plan or visibility.
 
 ## Keep the repository public
@@ -17,16 +18,14 @@ or replace the production approval with a server-side control (SYSTEM_ARCHITECTU
 Settings → Branches → Add branch ruleset (or classic branch protection rule), target `main`:
 
 - [ ] Require a pull request before merging
-  - [ ] Required approvals: **1**
-  - [ ] Dismiss stale pull request approvals when new commits are pushed
-  - [ ] **Require review from Code Owners** (`.github/CODEOWNERS`)
-  - [ ] Require approval of the most recent reviewable push
+  - [ ] Required approvals: **0**. No review is required (JBS Praxis, 24/10/2026); CI is the gate.
+    Code owners are still asked to review automatically, but their approval does not block a merge.
 - [ ] Require status checks to pass: add **`ci`**; require branches to be up to date
 - [ ] Require conversation resolution before merging
 - [ ] Block force pushes
 - [ ] Restrict deletions
-- [ ] **Do not allow bypassing the above settings.** Without it, the admin (TB) is exempt from all
-  of the above.
+- [ ] **Do not allow bypassing the above settings.** Without it, the admin (`praxisjbs`) is exempt
+  from all of the above, CI included.
 
 The `ci` check appears in the status-check picker only after the workflow has run once on a PR.
 

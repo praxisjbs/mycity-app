@@ -151,7 +151,9 @@ With Praxis AI's guide (21/10/2026, `praxis-ai.md` §1.1):
 4. AI Control · Actions builds each job's chain from the models. **Edit Chain** saves a whole
    chain (first choice and up to three fallbacks) and emits `ai_control.chain_changed`;
    **Make First** moves one model to the front in one press. An action given its own chain keeps
-   it until **Use Job Chain** removes it (`ai_control.chain_reset`).
+   it until **Use Job Chain** removes it (`ai_control.chain_reset`). An action the registry gives a
+   chain of its own (Data Answers, `set_chain`) shows **Restore Chain** instead, which goes back to
+   that chain, not the job's.
 5. A feature's call names its action (`ai.complete({ purpose })`, `transcription.transcribe()`).
    The resolver (`services/ai/jobs.js`) walks the action's chain (§6.1); the first model left
    answers; the ledger records the action, the model and the naira prices of that step.
@@ -308,7 +310,10 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
 - Registered since: Review Dictation (Transcription) and Tidy Review (Default), personal data, TB,
   22/10/2026 (`performance.md` §6.17); Week Summary (Default, personal data, TB, 22/10/2026,
   `performance.md` §6.18); the mailbox's Write Email, Tidy Email and Thread Summary (Default) and
-  Mail Dictation (Transcription), all personal data, TB, 22/10/2026 (`mailbox.md` §1.1, §9).
+  Mail Dictation (Transcription), all personal data, TB, 22/10/2026 (`mailbox.md` §1.1, §9); the
+  User Guide's Guide Search (Embeddings), Guide Answer (Fast, JBS Praxis's choice over the
+  recommended Default) and Guide Voice Search (Transcription), all personal data, JP, 25/10/2026
+  (`user-guide.md` §6.1 decisions 9 to 11, §6.8 to §6.10). Guide Answer is the first action on Fast.
 - `redact.js` `shield()` swaps what the external redaction would mask for tokens (`KEPT001`) and
   hands back a `restore()` that puts the real values into the answer, for a feature whose answer
   must carry them (a mail draft) without the model ever seeing them (`mailbox.md` §6).
@@ -325,6 +330,23 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
 Embeddings has one model and no fallback (`ONE_EMBEDDING_MODEL`): vectors from two models cannot
 share an index. Once `knowledge_embedding` holds a row the chain is locked (`EMBEDDINGS_LOCKED`);
 changing it is a support step that rebuilds the index first (`docs/runbooks/`).
+
+- **The call** is `llm.service.embed({ purpose, module, actor, input })`, on the same path as
+  `complete()`: governance first, the action's chain (its one model, from a vendor file with
+  `embed`: OpenAI's today), the run opened before anything leaves, the texts redacted, one step a
+  batch of 96 (kind `embedding`, migration 10320), retried once unless a screen is waiting
+  (`retry: false`). Every vector must be 1,536 long, which the third generation of OpenAI's models is
+  asked for, or nothing is handed back (`AI_BAD_OUTPUT`). With no provider of the chain set up, or the
+  stub switched on, there are **no vectors and no run** (`vectors: null`): a search goes by its words,
+  where a stub run would record one for every search typed. `scripts/check/ai-actions.js` reads
+  `ai.embed(` calls as it reads `complete(`.
+- **Price**: an embedding model is priced on its input tokens alone (`prices.forStep` with
+  `embeddings: true`), so a model whose output price is not set costs nothing for its output rather
+  than falling back to `ai_setting`'s text prices.
+- **The User Guide's vectors do not lock the chain** (`user_guide_passage`, `user-guide.md` §4,
+  §6.8): they are derived from the chapters and kept with the model that made them, so a new model
+  only means the guide rebuilds its index on the next tick, searching by words meanwhile. The lock
+  stays the Knowledge Hub articles' alone.
 
 ## 7 · Events, jobs and notifications
 
@@ -369,8 +391,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| AI Control · Actions (`actions`) | AI Control as the title; each job as a card (desktop) with its chain as First and Fallback 1 to 3, each model's name, provider and state pill (Ready, Not Set Up, Not on Key, Daily Limit, Skipped Until a time, At Cap, Personal Data, Cannot Search); Make First on each fallback; Edit Chain (First Choice, Fallback 1 to 3, each a model picker searching the models that can do the job; Embeddings First Choice only; Save Chain); Locked on Embeddings once indexed; the actions with job, first choice, Personal Data, Own Chain and Not Built Yet pills, Calls Today; an action's sheet with Make First, Edit Chain and Use Job Chain; toasts "Moved to first", "Chain saved", "Back on its job's chain" | Help terms on each job's name (what it is for, from §6.2), on Personal Data (DeepSeek is passed by) and on Own Chain | How the chain is walked and when a provider is skipped: §6.1 |
-| AI Control · Models (`models`) | Models as the title; Find Prices; the New Prices sheet, opened by Find Prices and by Review Prices while proposals wait: the run's progress ("Batch 2 of 4"), each proposed price (model, provider, price, page) with Accept and Dismiss, Accept All, and Find More once the run ends with models still to price; Still to Price and Not Listed counts; a failed run's reason as a pill ("No Search Model"), in the sheet and beside Find Prices once it is closed; the models: name, provider and what it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour"), In Naira, In Chains; Provider and Show (On Key, Not on Key, Any) filters; a model's sheet with its prices, Per 1,000 Searches, In Chains, Edit Price (Input per Million, Output per Million, Audio per Million, Per Audio Hour, Per 1,000 Searches, each Optional) and Open Connection; toasts "Finding prices", "12 prices saved", "Prices saved", "Proposal dismissed" | Help terms on In Naira (the day's rate it used) and Not Listed (models the provider's page does not price; asked again after 7 days) | How Find Prices searches and why IT confirms: §1.1 decision 20, §6.4 |
+| AI Control · Actions (`actions`) | AI Control as the title; each job as a card (desktop) with its chain as First and Fallback 1 to 3, each model's name, provider and state pill (Ready, Not Set Up, Not on Key, Daily Limit, Skipped Until a time, At Cap, Personal Data, Cannot Search); Make First on each fallback; Edit Chain (First Choice, Fallback 1 to 3, each a model picker searching the models that can do the job; Embeddings First Choice only; Save Chain); Locked on Embeddings once indexed; the actions with job, first choice, Personal Data, Own Chain and Not Built Yet pills, Calls Today; an action's sheet with Make First, Edit Chain and Use Job Chain (Restore Chain on Data Answers, "Back on its chosen chain"); toasts "Moved to first", "Chain saved", "Back on its job's chain" | Help terms on each job's name (what it is for, from §6.2), on Personal Data (DeepSeek is passed by) and on Own Chain | How the chain is walked and when a provider is skipped: §6.1 |
+| AI Control · Models (`models`) | Models as the title; Find Prices; the New Prices sheet, opened by Find Prices and by Review Prices while proposals wait: the run's progress ("Batch 2 of 4"), each proposed price (model, provider, price, page) with Accept and Dismiss, Accept All, and Find More once the run ends with models still to price; Still to Price and Not Listed counts; a failed run's reason as a pill ("No Search Model"), in the sheet and beside Find Prices once it is closed; the models: name, provider and what it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour"), In Naira, In Chains; Provider and Show (On Key, Not on Key, Any) filters; a model's sheet with its prices, Per 1,000 Searches, In Chains, Edit Price (Input per Million, Output per Million, Audio per Million, Per Audio Hour, Per 1,000 Searches, each Optional) and Open Connection; toasts "Finding prices", "12 prices saved", "Nothing left to accept", "Prices saved", "Proposal dismissed" | Help terms on In Naira (the day's rate it used) and Not Listed (models the provider's page does not price; asked again after 7 days) | How Find Prices searches and why IT confirms: §1.1 decision 20, §6.4 |
 | AI Control · Spend (`spend`) | Spend as the title; All AI: spent, against its cap (a meter, the percent and "₦19K of ₦100K cap"), Month Of, One Dollar, Rates Of; each provider: Free or Paid, Not Set Up, At Cap, spent, against its cap or "no cap", calls this month; Set Cap on All AI and each paid provider (Monthly Cap, Optional; blank removes it); Spend by Day (desktop): a bar a day, each labelled 14/10, every few days on a narrow screen; By Action: action, job, calls, spent; toasts "Cap set", "Cap removed" | Help terms on All AI and on Monthly Cap (what happens once reached) | How spend is summed: §6.3 |
 
 ### 10.2 Phone layout
@@ -415,9 +437,13 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
    whether it goes on AI Control.
 2. **Actions registered later**: JD draft, CV screening, proposal draft, MOU draft and image
    reading are registered by the build that makes each one, asking the person which job
-   (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5).
+   (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5); Queries' two (`query-draft` on Default, `letter-draft` on Deep Reasoning, chosen by GE) on 26/10/2026 (`queries.md` §9).
 
 ## 14 · Change log
+
+- 26/10/2026 · GE · §13: Queries' Write With AI registered, `query-draft` (Default) and `letter-draft` (Deep Reasoning), personal data, chosen by GE (`queries.md` §9).
+- 26/10/2026 · JP · From the User Guide audit's screen defects: refusals on Actions and Models are error toasts and reload the screen (a proposal decided or a search started meanwhile shows as it is); Make First refused for one model names it ("DeepSeek V3: Carries personal data"); `AiActionRow.set_chain` marks an action with the registry's own chain, whose reset reads Restore Chain and "Back on its chosen chain"; Accept All with nothing left says "Nothing left to accept"; Set Cap on a Free provider says "Only a paid provider has a cap" beside the field (§3, §10).
+- 26/10/2026 · JP · §6.5 and §6.6: Guide Search (Embeddings), Guide Answer (Fast) and Guide Voice Search (Transcription) registered for the User Guide's search, chosen by JBS Praxis (`user-guide.md` §6.1); `embed()` beside `complete()` with its `embedding` ledger step (migration 10320), input-only prices, and why the guide's vectors do not lock the chain; `complete()` takes a `timeoutMs` for a screen that waits.
 
 - 22/10/2026 · GE · Data Answers built (Praxis AI's engine, `praxis-ai.md` §6.1): its Not Built Yet pill goes.
 - 22/10/2026 · GE · Decision 35 built with Praxis AI's API (`praxis-ai.md` §6.6): Voice Question transcribes a spoken question and the recording is removed in the same request; its action is marked built. Praxis AI's audit: a Claude model on Data Answers' chain keeps its tools on a round that may call none (`tool_choice: none`) and gets its own thinking blocks back unchanged, so a Claude fallback no longer fails mid-question; `converse()` takes the question's deadline, so no call starts past 60 seconds.

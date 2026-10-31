@@ -15,6 +15,7 @@ const {
   isDocument,
   scopeOfFiles,
   testedRun,
+  passedRun,
   decide,
 } = require("../../scripts/check/lib/scope");
 
@@ -86,6 +87,35 @@ describe("decide", () => {
   test("a push to main whose tree no run passed runs everything", () => {
     expect(decide({ event: "push", files: files("src/app.js"), repo: "o/r", sha: "abc", tree: "def", tested: never }).scope).toBe("full");
   });
+
+  test("an edit to a description whose tree a full run on that head passed runs the document gates, and says which", () => {
+    const passed = jest.fn(() => "40485988816");
+    const out = decide({ event: "pull_request", action: "edited", files: files("src/app.js"), repo: "o/r", head: "h", tree: "t", passed });
+    expect(out).toEqual({ scope: "tested", reason: "the description changed, and CI run 40485988816 passed this tree" });
+    expect(passed).toHaveBeenCalledWith({ repo: "o/r", head: "h", tree: "t" });
+  });
+
+  test("an edit whose tree no full run passed (still running, red, or main moved) runs everything; a push to it never asks", () => {
+    expect(decide({ event: "pull_request", action: "edited", files: files("src/app.js"), repo: "o/r", head: "h", tree: "t", passed: never }).scope).toBe("full");
+    const passed = jest.fn(() => "1");
+    expect(decide({ event: "pull_request", action: "synchronize", files: files("src/app.js"), repo: "o/r", head: "h", tree: "t", passed }).scope).toBe("full");
+    expect(passed).not.toHaveBeenCalled();
+  });
+});
+
+describe("passedRun", () => {
+  const github = (runs) => (args) => (/actions\/workflows\/ci\.yml\/runs/.test(args[1] || "") ? runs : null);
+
+  test("finds the successful run on this head that left this tree", () => {
+    const treeOf = (repo, runId) => ({ 201: null, 202: "this-tree" })[runId];
+    expect(passedRun({ repo: "o/r", head: "h", tree: "this-tree", call: github("201\n202\n"), treeOf })).toBe("202");
+  });
+
+  test("a run with no tree (one that ran the document gates only) or another tree, or GitHub not answering: null", () => {
+    expect(passedRun({ repo: "o/r", head: "h", tree: "t", call: github("201\n"), treeOf: () => null })).toBeNull();
+    expect(passedRun({ repo: "o/r", head: "h", tree: "t", call: github("201\n"), treeOf: () => "older" })).toBeNull();
+    expect(passedRun({ repo: "o/r", head: "h", tree: "t", call: () => null, treeOf: () => "t" })).toBeNull();
+  });
 });
 
 describe("testedRun", () => {
@@ -117,10 +147,12 @@ describe("testedRun", () => {
 });
 
 describe("names the workflow and the build share with the scope", () => {
-  test("every document the apps' build reads counts as code", () => {
-    const docsTheBuildReads = [...read("packages/ui/vite.shared.js").matchAll(/\bdoc\("([^"]+\.md)"\)/g)].map((m) => m[1]);
-    expect(docsTheBuildReads.length).toBeGreaterThan(0);
-    for (const f of docsTheBuildReads) expect(READ_BY_CODE.has(f)).toBe(true);
+  test("every document the apps' build and the API read the delivery plan from counts as code", () => {
+    // packages/contract/plan.js readPlan is the one reader: vite.shared.js hands it `doc`, the API its own.
+    const docsThePlanReads = [...read("packages/contract/plan.js").matchAll(/\bread\("([^"]+\.md)"\)/g)].map((m) => m[1]);
+    expect(docsThePlanReads.length).toBeGreaterThan(0);
+    for (const f of docsThePlanReads) expect(READ_BY_CODE.has(f)).toBe(true);
+    expect(read("packages/ui/vite.shared.js")).toMatch(/contractPlan\.readPlan\(doc\)/);
   });
 
   test("every document gate is a gate ci-local.js runs", () => {

@@ -166,7 +166,11 @@ function History() {
       invalidate("/api/v1/ai");
       toast(done);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not reach the server");
+      // Already deleted elsewhere: it is gone either way, so the list shows it gone.
+      if (e instanceof ApiError && e.status === 404) {
+        invalidate("/api/v1/ai");
+        toast("That conversation was deleted");
+      } else toast.error(e instanceof ApiError ? e.message : "Could not reach the server");
     }
   };
   const clear = () => removing({ title: "Clear History", body: "Every conversation is removed.", destructive: true }, () => api.call("DELETE /api/v1/ai/history"), "History cleared");

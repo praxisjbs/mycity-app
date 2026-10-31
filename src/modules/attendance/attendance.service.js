@@ -599,12 +599,29 @@ async function dayDetail(employeeId, query, scope) {
       : ctx.approved
         ? { name: ctx.approved.name, radius_m: null }
         : null,
-    policy: { geofence_mode: ctx.policy.geofence_mode, device_mode: ctx.policy.device_mode },
+    policy: {
+      geofence_mode: ctx.policy.geofence_mode,
+      device_mode: ctx.policy.device_mode,
+      pre_approved_overtime: Boolean(ctx.policy.overtime && ctx.policy.overtime.on && ctx.policy.overtime.approval === "pre_approved"),
+    },
     open_exceptions: row.open_exceptions,
     overtime_approval: approval
       ? { minutes: Number(approval.minutes), approved_by_name: approval.approved_by_name || null, reason: approval.reason }
       : null,
   };
+}
+
+/**
+ * One person's days of a month (this month when none is named, in their own zone), within the
+ * caller's scope, newest first: People · Attendance's All Days, as My Attendance lists the
+ * reader's own (myDays).
+ */
+async function personDays(query, scope) {
+  assertInScope(scope, query.employee_id);
+  const person = await repo.person(pool, query.employee_id);
+  if (!person) throw new AppError("NOT_FOUND", "Not found", 404);
+  const { first, last } = monthOf(person, query.month);
+  return repo.listDays(pool, query.employee_id, first, last, query);
 }
 
 /** One person's punches on a date: coordinates only for a reader with scope all. */
@@ -638,7 +655,34 @@ function requestRegisterExport(actor, body) {
   return requestExport(actor, { kind: "register", filters: { from, to, ...filters } });
 }
 
+/* ------------------------------------------------------------------ *
+ * For Queries & Sanctions (queries.md §6.2): a breach's query
+ * ------------------------------------------------------------------ */
+
+/**
+ * What the query for a breach needs, read on the caller's transaction: the breach, its person,
+ * the policy version in force when it was crossed, and the query's words. Null when the breach is
+ * not there, did not ask for a query, or already has one.
+ */
+async function breachForQuery(client, breachId) {
+  // Locked, so a second delivery waits and then finds the query already linked.
+  const breach = await repo.lockBreach(client, breachId);
+  if (!breach || !breach.raise_query || breach.employee_query_id) return null;
+  const words = require("./attendance.rules-engine").queryWordsOf(breach);
+  return {
+    attendance_rule_breach_id: breach.attendance_rule_breach_id,
+    employee_id: breach.employee_id,
+    policy_version_id: breach.policy_version_id,
+    ...words,
+  };
+}
+
+/** Keep the query raised for a breach on it, in the caller's transaction. */
+const attachQuery = (client, breachId, queryId) => repo.setBreachQuery(client, breachId, queryId);
+
 module.exports = {
+  breachForQuery,
+  attachQuery,
   openSession,
   today,
   punch,
@@ -653,6 +697,7 @@ module.exports = {
   register,
   summary,
   dayDetail,
+  personDays,
   events,
   exceptions,
   decide: reconcile.decide,

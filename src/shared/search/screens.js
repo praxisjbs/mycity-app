@@ -103,7 +103,6 @@ const SCREENS = Object.freeze([
   s("knowledge", "sops", "SOPs", ["sop", "procedures", "processes", "how to"]),
   s("knowledge", "faqs", "FAQs", ["faq", "questions", "help"]),
   s("knowledge", "training", "Training", ["courses", "learning", "lessons"]),
-  s("knowledge", "announcements", "Announcements", ["company news", "notices"]),
 
   s("praxis_ai", "ask", "Ask", ["ai", "assistant", "chat", "question"]),
   s("praxis_ai", "history", "History", ["ai history", "past questions", "conversations"]),
@@ -132,6 +131,8 @@ const SCREENS = Object.freeze([
   s("settings", "security", "Security", ["password rules", "sessions", "two step", "failed sign ins"]),
   s("settings", "audit-log", "Audit Log", ["audit", "history", "who changed", "activity log"]),
   s("settings", "imports", "Imports", ["import", "upload", "spreadsheet", "import history"]),
+  s("knowledge", "user-guide", "User Guide", ["help", "manual", "how to", "guide", "instructions", "tutorial", "quick start", "getting started"]),
+  s("people", "departments", "Departments", ["department", "function", "functions", "team", "teams", "unit", "head of department", "department head", "move people", "merge department"]),
   // new:screen adds screens above this line
 ]);
 
@@ -177,8 +178,10 @@ function tabVisible(screen, reader) {
   if (module === "home" && tab === "reports") return hasCapability(reader, "home.reports");
   // Knowledge Hub · Policies is for those who write policies; everyone reads theirs on Policy Updates.
   if (module === "knowledge" && tab === "policies") return hasCapability(reader, "policies.manage");
-  if (module === "people" && !full) return tab === "attendance" || tab === "organogram";
-  if (module === "community" && tab === "announcements") return can("people", "create");
+  // A line manager decides their team's leave on People · Leave (docs/guides/ess.md §2).
+  if (module === "people" && !full) return tab === "attendance" || tab === "organogram" || (tab === "leave" && reader.manages_people);
+  // Announcements is for those who post them (`announcements.post`, as every route asks).
+  if (module === "community" && tab === "announcements") return hasCapability(reader, "announcements.post");
   if (module === "queries" && !full) return tab === "queries";
   if (module === "expenses" && !full)
     return ["my-requests", "approvals", "budgets"].includes(tab) && (tab !== "approvals" || reader.manages_people);

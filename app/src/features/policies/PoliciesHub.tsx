@@ -5,11 +5,13 @@ import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { usePhotos } from "@/api/download";
+import { useAuth } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import { useScreenAction } from "@/shell/screen-action";
 import { Banner, Button, Card, CardHeader, Chips, DataView, ErrorState, ExportButton, Field, formatDate, FormFooter, KeyValue, LoadingRows, PageHeader, Pill, TextField, toast, useContractForm, useModal, Who } from "@mycity/ui";
 import { KIND_LABEL, POLICY_STATE, versionPill } from "./labels";
-import { DraftEditor } from "./PolicyDraft";
+import { DraftEditor, textOf } from "./PolicyDraft";
 import { ReasonForm, SendForm } from "./PolicyForms";
 import { PolicyContent, Signatures, WhatChanged } from "./PolicyText";
 
@@ -29,30 +31,36 @@ const STATE_FILTER: ReadonlyArray<["" | PolicyRow["state"], string]> = [
   ["", "All"],
   ["in_force", "In Force"],
   ["awaiting_approval", "Awaiting Approval"],
+  ["waiting", "Starts Soon"],
   ["draft", "Draft"],
   ["archived", "Archived"],
 ];
 
 function PolicyList() {
+  const { can } = useAuth();
   const modal = useModal();
   const { navigate } = useRouter();
   const [state, setState] = useState<"" | PolicyRow["state"]>("");
   const list = usePaged("GET /api/v1/policies", { filters: state ? { state } : {} });
+  const news = useViewNews();
   const open = (r: PolicyRow) => navigate(`/knowledge?tab=policies&policy=${r.policy_id}`);
   const create = () => modal.open({ title: "New Policy", body: (close) => <NewPolicyForm close={close} onCreated={(id) => navigate(`/knowledge?tab=policies&policy=${id}`)} /> });
-  useScreenAction({ label: "New Policy", onSelect: create });
+  const mayCreate = can("knowledge", "create");
+  useScreenAction(mayCreate ? { label: "New Policy", onSelect: create } : null);
   return (
     <>
       <PageHeader
         title="Policies"
         sub="Every company policy, versioned"
         actions={
-          <Button variant="primary" icon="plus" onClick={create}>
-            New Policy
-          </Button>
+          mayCreate ? (
+            <Button variant="primary" icon="plus" onClick={create}>
+              New Policy
+            </Button>
+          ) : undefined
         }
       />
-      <Chips label="State" value={state} onChange={setState} options={STATE_FILTER} />
+      <Chips label="State" value={state} onChange={setState} options={withNews(news, STATE_FILTER, { all: "" })} />
       <DataView
         title="Policies"
         list={list}
@@ -120,6 +128,8 @@ function PolicyPage({ linked }: { linked: string }) {
   const id = linked === "attendance" ? (byKind.data?.data[0]?.policy_id ?? "") : linked;
   const { data: p, error, reload } = useApi("GET /api/v1/policies/:id", { params: { id }, enabled: !!id });
   const { navigate } = useRouter();
+  // Changes on screen not yet saved: the bar's Publish refuses until Save Draft keeps them.
+  const [dirty, setDirty] = useState(false);
   const back = (
     <Button icon="left" onClick={() => navigate("/knowledge?tab=policies")}>
       All Policies
@@ -138,21 +148,27 @@ function PolicyPage({ linked }: { linked: string }) {
   return (
     <>
       <PageHeader title="Policies" actions={back} />
-      <PolicyOverview p={p} />
-      <DraftEditor key={`${p.policy_id}:${p.draft?.updated_at ?? "none"}:${p.submission?.policy_version_id ?? ""}`} p={p} />
+      <PolicyOverview p={p} dirty={dirty} />
+      <DraftEditor key={`${p.policy_id}:${p.draft?.updated_at ?? "none"}:${p.submission?.policy_version_id ?? ""}`} p={p} onDirty={setDirty} />
       <Versions p={p} />
     </>
   );
 }
 
-function PolicyOverview({ p }: { p: Policy }) {
+function PolicyOverview({ p, dirty }: { p: Policy; dirty: boolean }) {
+  const { can } = useAuth();
+  const edit = p.can_edit && can("knowledge", "edit");
   const modal = useModal();
   const recall = useMutation("POST /api/v1/policies/:id/recall");
   const withdraw = useMutation("POST /api/v1/policies/versions/:id/withdraw");
   const archive = useMutation("POST /api/v1/policies/:id/archive");
   const state = POLICY_STATE[p.state];
   const send = () =>
-    modal.open({ title: p.draft?.needs_approval ? "Submit for Approval" : "Publish Policy", full: true, body: (close) => <SendForm p={p} close={close} /> });
+    dirty
+      ? toast.error("Save the draft first")
+      : modal.open({ title: p.draft?.needs_approval ? "Submit for Approval" : "Publish Policy", full: true, body: (close) => <SendForm p={p} close={close} /> });
+  // A written policy is sent once it has text: an empty new draft offers nothing to publish.
+  const sendable = p.kind !== "document" || textOf(p.draft?.body_html) !== "";
   const reason = (title: string, action: string, placeholder: string, done: string, run: (reason: string) => Promise<unknown>, danger = false) =>
     modal.open({ title, body: (close) => <ReasonForm action={action} placeholder={placeholder} done={done} run={run} danger={danger} close={close} /> });
   const changes = p.draft?.changed.length ?? 0;
@@ -168,7 +184,7 @@ function PolicyOverview({ p }: { p: Policy }) {
             ["In Force", p.in_force ? `Version ${p.in_force.version} since ${formatDate(p.in_force.effective_from)}` : p.kind === "attendance" ? "Default Rules" : null],
           ]}
         />
-        {p.can_archive && (
+        {p.can_archive && can("knowledge", "delete") && (
           <div className="mt-3 flex justify-end">
             <Button
               variant="danger"
@@ -187,7 +203,7 @@ function PolicyOverview({ p }: { p: Policy }) {
           tone="info"
           className="mb-3"
           action={
-            p.can_edit && (
+            edit && (
               <Button
                 size="sm"
                 onClick={() =>
@@ -214,27 +230,32 @@ function PolicyOverview({ p }: { p: Policy }) {
           tone="info"
           className="mb-3"
           action={
-            <Button
-              size="sm"
-              onClick={() =>
-                reason("Recall Submission", "Recall Submission", "Changing the text", "Back to the draft", (r) => recall.run({ params: { id: p.policy_id }, body: { reason: r } }))
-              }
-            >
-              Recall Submission
-            </Button>
+            edit &&
+            p.submission.can_recall && (
+              <Button
+                size="sm"
+                onClick={() =>
+                  reason("Recall Submission", "Recall Submission", "Changing the text", "Back to the draft", (r) => recall.run({ params: { id: p.policy_id }, body: { reason: r } }))
+                }
+              >
+                Recall Submission
+              </Button>
+            )
           }
         >
-          {`Awaiting approval${p.submission.stage_name ? ` by the ${p.submission.stage_name}` : ""}, from ${formatDate(p.submission.effective_from)}.`}
+          {`Awaiting approval${p.submission.stage_name ? ` by the ${p.submission.stage_name}` : ""}, from ${formatDate(p.submission.effective_from)}.${p.submission.submitted_by_name ? ` Sent by ${p.submission.submitted_by_name}.` : ""}`}
         </Banner>
       )}
-      {p.draft && p.can_edit && !p.submission && (
+      {p.draft && edit && !p.submission && (
         <Banner
           tone="warn"
           className="mb-3"
           action={
-            <Button size="sm" variant="primary" onClick={send}>
-              {p.draft.needs_approval ? "Submit for Approval" : "Publish Policy"}
-            </Button>
+            sendable && (
+              <Button size="sm" variant="primary" onClick={send}>
+                {p.draft.needs_approval ? "Submit for Approval" : "Publish Policy"}
+              </Button>
+            )
           }
         >
           {changes ? `Draft with ${changes} change${changes === 1 ? "" : "s"}, not published.` : "Draft saved, not published."}

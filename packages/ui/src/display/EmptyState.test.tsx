@@ -23,6 +23,13 @@ describe("EmptyState", () => {
     expect(container.querySelector("svg")).not.toBeNull();
   });
 
+  it("a bare one is h3 unless its place asks for another level", () => {
+    const { rerender } = render(<EmptyState title="Try Asking" bare />);
+    expect(screen.getByRole("heading", { level: 3, name: "Try Asking" })).toBeInTheDocument();
+    rerender(<EmptyState title="Try Asking" bare level={2} />);
+    expect(screen.getByRole("heading", { level: 2, name: "Try Asking" })).toBeInTheDocument();
+  });
+
   it("offers its one action to the keyboard", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();

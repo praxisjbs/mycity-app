@@ -20,6 +20,11 @@ describe("StatStrip", () => {
     expect(screen.getByText("Submitted")).toHaveAttribute("data-ui", "title");
   });
 
+  it("a figure's help is a help term on its label", () => {
+    render(<StatStrip items={[{ label: "Average Read", value: "64%", help: "Across published announcements, the share of the audience who have opened each one." }]} />);
+    expect(screen.getByRole("button", { name: "Average Read" })).toHaveAttribute("data-help-term");
+  });
+
   it("tones a figure that is good or bad news", () => {
     render(<StatStrip items={ITEMS} />);
     expect(screen.getByText("14").className).toContain("text-success");

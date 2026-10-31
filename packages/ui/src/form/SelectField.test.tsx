@@ -113,6 +113,58 @@ describe("SelectField and ChoiceField", () => {
     expect(onChange).toHaveBeenCalledWith("mkt");
   });
 
+  it("a server list asks for its next page as the menu nears its end, once for each length", async () => {
+    const user = userEvent.setup();
+    const onMore = vi.fn();
+    const pick = (options: ReadonlyArray<readonly [string, string]>, more: boolean) => (
+      <Field label="Department">
+        <SelectField value="" onChange={() => undefined} options={options} placeholder="Choose One" more={more} onMore={onMore} />
+      </Field>
+    );
+    const { rerender } = render(pick(departments.slice(0, 4), true));
+    await user.click(screen.getByRole("combobox", { name: "Department" }));
+    // The row that ends the list turns while the next page comes; assistive technology reads the rows alone.
+    const row = screen.getByRole("status", { hidden: true }).closest("[aria-hidden]") as HTMLElement;
+    const box = row.parentElement as HTMLElement;
+    fireEvent.scroll(box);
+    fireEvent.scroll(box);
+    expect(onMore).toHaveBeenCalledTimes(1);
+
+    rerender(pick(departments, true));
+    fireEvent.scroll(box);
+    expect(onMore).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByRole("option")).toHaveLength(6);
+
+    rerender(pick(departments, false));
+    expect(screen.queryByRole("status", { hidden: true })).toBeNull();
+    expect(onMore).toHaveBeenCalledTimes(2);
+  });
+
+  it("a server list's sheet on a phone loads the next page as it nears its end", async () => {
+    setViewport(390);
+    const user = userEvent.setup();
+    const onMore = vi.fn();
+    render(
+      <Field label="Department">
+        <SelectField value="ops" onChange={() => undefined} options={departments} more onMore={onMore} />
+      </Field>,
+    );
+    await user.click(screen.getByRole("button", { name: "Department" }));
+    await screen.findByRole("dialog", { name: "Department" });
+    const row = screen.getByRole("status", { hidden: true }).closest("[aria-hidden]") as HTMLElement;
+    fireEvent.scroll(row.parentElement as HTMLElement);
+    expect(onMore).toHaveBeenCalledTimes(1);
+  });
+
+  it("a chosen value on a page not loaded yet reads as its own label", () => {
+    render(
+      <Field label="Department">
+        <SelectField value="legal" valueLabel="Legal" onChange={() => undefined} options={departments} placeholder="Choose One" more onMore={() => undefined} />
+      </Field>,
+    );
+    expect(screen.getByRole("combobox", { name: "Department" })).toHaveTextContent("Legal");
+  });
+
   it("ChoiceField is a radio group that moves with the arrow keys", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -131,6 +183,15 @@ describe("SelectField and ChoiceField", () => {
     expect(screen.getByRole("radiogroup", { name: "Work Pattern" })).toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: "Hybrid" }));
     expect(onChange).toHaveBeenCalledWith("hybrid");
+  });
+
+  it("ChoiceField inside a Field is named by the Field's label", () => {
+    render(
+      <Field label="Work Pattern">
+        <ChoiceField value="remote" onChange={() => undefined} options={[["on_site", "On Site"], ["remote", "Remote"]]} />
+      </Field>,
+    );
+    expect(screen.getByRole("radiogroup", { name: "Work Pattern" })).toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {
@@ -154,6 +215,18 @@ describe("SelectField and ChoiceField", () => {
     );
     await user.click(screen.getByRole("combobox", { name: "Department" }));
     await screen.findByRole("searchbox");
+    expect(await axe(document.body)).toHaveNoViolations();
+  });
+
+  it("a server list's menu, open with more to load, has no accessibility violations", async () => {
+    const user = userEvent.setup();
+    render(
+      <Field label="Department">
+        <SelectField value="ops" onChange={() => undefined} options={departments} more onMore={() => undefined} />
+      </Field>,
+    );
+    await user.click(screen.getByRole("combobox", { name: "Department" }));
+    await screen.findByRole("listbox");
     expect(await axe(document.body)).toHaveNoViolations();
   });
 });

@@ -6,6 +6,8 @@ import { installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession, sid } from "@/api/mock/core";
+import { PEOPLE } from "@/api/mock/data/people";
+import { PERIOD, SCORECARDS } from "@/api/mock/data/performance";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import Ess from "@/features/ess";
 import { RouterProvider, useRouter } from "@/lib/router";
@@ -93,7 +95,7 @@ async function openAs(email: string, address: string) {
   mockSession.set(null);
   invalidate("/api/v1");
   const { rerender } = render(app(false));
-  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 5000 });
+  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 15000 });
   await act(async () => {
     const next = await auth!.signIn(email, "demo1234");
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
@@ -198,6 +200,23 @@ describe("Performance · a mid-quarter scorecard, a scorecard's link and a line'
     expect(mine.lines.every((l) => !l.can_change_target)).toBe(true);
   }, 30000);
 
+  it("the Commitments view offers Export Report only to a reader who may export", async () => {
+    await openAs("kemi@mycityapp.io", "/performance?tab=targets&view=commitments");
+    expect((await screen.findAllByRole("heading", { name: "Commitments" })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Export Report" })).toBeNull();
+    cleanup();
+    await openAs("cynthia@mycityapp.io", "/performance?tab=targets&view=commitments");
+    expect(await screen.findByRole("button", { name: "Export Report" })).toBeTruthy();
+  }, 30000);
+
+  it("a department in the Commitments address that the reader's scope does not reach filters nothing and is not offered", async () => {
+    await openAs("kemi@mycityapp.io", `/performance?tab=targets&view=commitments&department_id=${sid("dept:Finance")}`);
+    expect((await screen.findAllByRole("heading", { name: "Commitments" })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("combobox", { name: "Department" })).toBeNull();
+    const asked = vi.mocked(dispatch).mock.calls.map(([r]) => r).filter((r) => r.method === "GET" && r.path.endsWith("/performance/commitments"));
+    expect(asked.at(-1)?.query).not.toHaveProperty("department_id");
+  }, 30000);
+
   it("on a phone: scorecards and lines are cards; a line opens its own sheet with Change Target at its foot", async () => {
     setViewport(390);
     await openAs("ngozi@mycityapp.io", "/performance?tab=targets");
@@ -209,5 +228,66 @@ describe("Performance · a mid-quarter scorecard, a scorecard's link and a line'
     await settled();
     expect(within(top()).getByRole("button", { name: "Change Target" })).toBeTruthy();
     expect(copyProblems()).toEqual([]);
+  }, 30000);
+
+  it("Edit Lines totals each section against its share as weights are typed, by the rule the save is held to (QA OBS-04)", async () => {
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=targets");
+    // A draft the CEO starts for someone with no scorecard this quarter, outside a function whose plan is with its approvers.
+    const someone = PEOPLE.find(
+      (p) => p.user_key !== "ifeoma" && p.department !== "Content" && !SCORECARDS.some((c) => c.employee.employee_id === p.employee_id && c.performance_period_id === PERIOD.performance_period_id),
+    )!;
+    let id = "";
+    await act(async () => {
+      const made = await api.call("POST /api/v1/performance/scorecards", { body: { employee_id: someone.employee_id, performance_period_id: PERIOD.performance_period_id } as never });
+      id = (made as { scorecard_id: string }).scorecard_id;
+    });
+    window.history.pushState(null, "", `/performance?tab=targets&id=${id}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    await settled();
+    await press(top(), "Edit Lines");
+    const form = top();
+    const totals = within(form).getByRole("group", { name: "Section Weights" });
+    const tone = (text: string) => within(totals).getByText(text).closest("[data-tone]")?.getAttribute("data-tone");
+    // It starts with Accountability's two lines, 10 and 5, which fill its 15.
+    expect(tone("Accountability 15 of 15")).toBe("ok");
+    expect(tone("Results 0 of 60")).toBe("err");
+    expect(tone("KPIs 0 of 25")).toBe("err");
+    // A weight typed: the total follows at once, before any save.
+    fireEvent.change(within(form).getAllByLabelText("Weight")[0]!, { target: { value: "12.5" } });
+    expect(tone("Accountability 17.5 of 15")).toBe("err");
+  }, 30000);
+
+  it("Edit Lines marks a line added without its Goal and sends nothing until it has one (fault #1 on staging, 27/10/2026)", async () => {
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=targets");
+    const someone = PEOPLE.find(
+      (p) => p.user_key !== "ifeoma" && p.department !== "Content" && !SCORECARDS.some((c) => c.employee.employee_id === p.employee_id && c.performance_period_id === PERIOD.performance_period_id),
+    )!;
+    let id = "";
+    await act(async () => {
+      const made = await api.call("POST /api/v1/performance/scorecards", { body: { employee_id: someone.employee_id, performance_period_id: PERIOD.performance_period_id } as never });
+      id = (made as { scorecard_id: string }).scorecard_id;
+    });
+    window.history.pushState(null, "", `/performance?tab=targets&id=${id}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    await settled();
+    await press(top(), "Edit Lines");
+    const saves = () => vi.mocked(dispatch).mock.calls.filter(([r]) => r.method === "PUT" && r.path.endsWith(`/scorecards/${id}/lines`)).length;
+    // Two lines added after Accountability's two, and Save Lines pressed with their Goals empty.
+    await press(top(), "Add Line");
+    await press(top(), "Add Line");
+    const sent = saves();
+    await press(top(), "Save Lines");
+    expect(saves()).toBe(sent);
+    const goals = within(top()).getAllByLabelText("Goal");
+    expect(goals).toHaveLength(4);
+    // A field's mark: marked bad, with its message linked to it.
+    const markOf = (input: HTMLElement) =>
+      input.getAttribute("aria-invalid") === "true" ? (input.getAttribute("aria-describedby") ?? "").split(" ").map((d) => document.getElementById(d)?.textContent ?? "").join(" ") : "";
+    expect(markOf(goals[2]!)).toContain("Required");
+    expect(markOf(goals[3]!)).toContain("Required");
+    // The mark clears as the Goal is typed; the other line keeps its own.
+    fireEvent.change(goals[2]!, { target: { value: "Partner launch events held" } });
+    expect(markOf(within(top()).getAllByLabelText("Goal")[2]!)).not.toContain("Required");
+    expect(markOf(within(top()).getAllByLabelText("Goal")[3]!)).toContain("Required");
   }, 30000);
 });

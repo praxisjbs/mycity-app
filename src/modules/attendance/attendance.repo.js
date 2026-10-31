@@ -460,6 +460,9 @@ function listEvents(db, employeeId, date, query, { coordinates }) {
             ${EXCLUDED("ev")} AS excluded,
             ${nameOf("re")} AS recorded_by_name,
             ev.reason,
+            -- One per punch (attendance_exception's unique index on the event and type).
+            (SELECT max(x.evidence ->> 'real_time') FROM attendance_exception x
+              WHERE x.attendance_event_id = ev.attendance_event_id AND x.exception_type = 'automatic_clock_out') AS real_time_given,
             ${TOTAL_COL}
        FROM attendance_event ev
        LEFT JOIN worksite w ON w.worksite_id = ev.worksite_id
@@ -1498,7 +1501,7 @@ const locationFlags = (db, employeeId, from, to) =>
 const BREACH = `b.attendance_rule_breach_id, b.employee_id, b.rule, b.policy_version_id, b.period,
   b.period_start::text AS period_start, b.period_end::text AS period_end, b.count, b.minutes, b.reached,
   ARRAY(SELECT d::text FROM unnest(b.days) AS d ORDER BY d) AS days, b.last_day::text AS last_day,
-  b.alert, b.raise_query, b.breached_at, b.home_alert_id`;
+  b.alert, b.raise_query, b.breached_at, b.home_alert_id, b.employee_query_id`;
 
 /** The person's latest breach of a rule whose last day falls on or after `from`, or null. */
 function latestBreach(db, employeeId, rule, from) {
@@ -1540,6 +1543,17 @@ function insertBreach(client, b) {
 }
 
 const getBreach = (db, id) => one(db, `SELECT ${BREACH} FROM attendance_rule_breach b WHERE b.attendance_rule_breach_id = $1`, [id]);
+/** The breach, locked until the caller's transaction ends: one query is raised for it, however many deliveries race. */
+const lockBreach = (db, id) =>
+  one(db, `SELECT ${BREACH} FROM attendance_rule_breach b WHERE b.attendance_rule_breach_id = $1 FOR UPDATE`, [id]);
+
+/** Keep the query Queries & Sanctions raised for a breach (queries.raise_from_breach, its transaction). */
+function setBreachQuery(client, id, queryId) {
+  return client.query(
+    "UPDATE attendance_rule_breach SET employee_query_id = $2 WHERE attendance_rule_breach_id = $1 AND employee_query_id IS NULL",
+    [id, queryId],
+  );
+}
 
 /** Keep the Home alert a breach raised (after commit, attendance.raise_breach_alert). */
 function setBreachAlert(client, id, alertId) {
@@ -1791,7 +1805,73 @@ function renameAddress(client, owner, key, line) {
   return client.query(ADDRESS_LINE[owner], [key, line]);
 }
 
+/* ------------------------------------------------------------------ *
+ * Where it waits: each record's view and chip, as its list's filter reads it (attendance.views.js)
+ * ------------------------------------------------------------------ */
+
+/** A work location request's status: its chip on Worksites, Temporary, Requests. */
+async function requestStatusesOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT r.location_request_id AS id, r.status FROM attendance_location_request r WHERE r.location_request_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
+/** A field assignment's state on `today`: its chip on Worksites, Temporary, Field. */
+async function assignmentStatesOf(db, ids, today) {
+  const { rows } = await db.query(
+    `SELECT a.field_assignment_id AS id, ${STATE("$2")} AS state
+       FROM attendance_field_assignment a
+      WHERE a.field_assignment_id = ANY($1::uuid[])`,
+    [ids, today],
+  );
+  return rows;
+}
+
+/** An exception's status: Open or Decided on People · Attendance, Exceptions. */
+async function exceptionStatusesOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT x.attendance_exception_id AS id, x.status FROM attendance_exception x WHERE x.attendance_exception_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
+/** A home's status: its chip on People · Attendance, Homes. */
+async function homeStatusesOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT h.attendance_home_id AS id, h.status FROM attendance_home h WHERE h.attendance_home_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
+/** A pay item's kind and status: Overtime or Deductions, and its chip there. */
+async function payItemsOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT pi.attendance_pay_item_id AS id, pi.kind, pi.status FROM attendance_pay_item pi WHERE pi.attendance_pay_item_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
+/** A day's date and status: the Register shows one date's days, each with its status (null before it is judged). */
+async function daysOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT ad.attendance_day_id AS id, ad.attendance_date::text AS date, ad.status FROM attendance_day ad WHERE ad.attendance_day_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
 module.exports = {
+  requestStatusesOf,
+  assignmentStatesOf,
+  exceptionStatusesOf,
+  homeStatusesOf,
+  payItemsOf,
+  daysOf,
   ADDRESS_LINE,
   renameAddress,
   COMPANY_WORKS,
@@ -1869,7 +1949,9 @@ module.exports = {
   latestBreach,
   insertBreach,
   getBreach,
+  lockBreach,
   setBreachAlert,
+  setBreachQuery,
   payItemsOn,
   getPayItem,
   insertPayItem,

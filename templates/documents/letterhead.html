@@ -13,23 +13,56 @@
   .lh-body th, .lh-body td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #E4E4E7; vertical-align: top; }
   .lh-body th { font-weight: 600; color: #014339; }
   .lh-body .amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .lh-foot { margin-top: 28px; padding-top: 8px; border-top: 1px solid #E4E4E7; font-size: 8.5pt; color: #71717A; }
+  .lh-foot { margin-top: 20px; padding-top: 8px; border-top: 1px solid #E4E4E7; font-size: 8.5pt; color: #71717A; }
+  /* A table's head and foot repeat on every printed page: past one page, the letterhead and the
+     organisation's line print on each, and the PDF numbers them (services/pdf). */
+  .lh-page { width: 100%; border-collapse: collapse; }
+  .lh-page > thead { display: table-header-group; }
+  .lh-page > tfoot { display: table-footer-group; }
+  .lh-page > * > tr > td { padding: 0; vertical-align: top; }
+  .lh-sign { margin-top: 24px; break-inside: avoid; page-break-inside: avoid; }
+  .lh-sign img { height: 44px; display: block; margin-bottom: 2px; }
+  .lh-sign-role { color: #71717A; }
+  .lh-sign-for { margin-bottom: 6px; }
+  /* A letter to one person, laid out as MyCity's own (docs/guides/queries.md §6.7): the date and
+     the addressee open it; "Yours faithfully" and FOR: the organisation close it above the signer. */
+  .lh-letter-date { margin: 0 0 14px 0; }
+  .lh-letter-to { margin: 0 0 16px 0; }
+  .lh-letter-to div { margin: 0; }
+  .lh-letter .lh-body h2 { font-size: 11pt; text-transform: uppercase; color: #09090B; margin: 14px 0 10px 0; }
+  .lh-letter .lh-body p { margin: 0 0 10px 0; }
+  .lh-letter .lh-sign-close { margin-bottom: 2px; }
+  .lh-letter .lh-sign-for { font-weight: 700; text-transform: uppercase; }
+  .lh-letter .lh-sign-name { font-weight: 700; }
+  .lh-letter .lh-sign-gap { height: 36px; }
   .lh-staging { position: fixed; top: 40%; left: 0; right: 0; text-align: center; font-size: 64pt; font-weight: 700; color: rgba(218, 30, 16, 0.12); transform: rotate(-24deg); pointer-events: none; }
 </style>
 {{#if staging}}<div class="lh-staging">STAGING</div>{{/if}}
+<table class="lh-page{{#if doc.letter}} lh-letter{{/if}}">
+<thead><tr><td>
 <header class="lh-head">
   <div class="lh-brand">
     {{#if org.logo}}<img src="{{ org.logo }}" alt="{{ org.display_name }}">{{else}}<div class="lh-wordmark">{{ org.display_name }}</div>{{/if}}
   </div>
   <div class="lh-meta">
     {{#if number}}<div><strong>{{ number }}</strong></div>{{/if}}
-    <div>{{ longdate today }}</div>
+    {{#if doc.letter}}{{else}}<div>{{ longdate today }}</div>{{/if}}
   </div>
 </header>
-<main class="lh-body">
-  {{#if doc.title}}<h1 class="lh-title">{{ doc.title }}</h1>{{/if}}
-  {{> body}}
-</main>
+</td></tr></thead>
+<tfoot><tr><td>
 <footer class="lh-foot">
   {{ org.name }}{{#if org.rc}} · {{ org.rc }}{{/if}}{{#if org.address}} · {{ org.address }}{{/if}}{{#if org.phone}} · {{ org.phone }}{{/if}}{{#if org.email}} · {{ org.email }}{{/if}}{{#if org.website}} · {{ org.website }}{{/if}}
 </footer>
+</td></tr></tfoot>
+<tbody><tr><td>
+<main class="lh-body">
+  {{#if doc.letter}}
+  <p class="lh-letter-date">{{ longdate doc.letter.date }}</p>
+  <div class="lh-letter-to">{{#each doc.letter.to}}<div>{{ line }}</div>{{/each}}</div>
+  {{else}}{{#if doc.title}}<h1 class="lh-title">{{ doc.title }}</h1>{{/if}}{{/if}}
+  {{> body}}
+  {{#if doc.signer}}<div class="lh-sign">{{#if doc.letter}}<div class="lh-sign-close">Yours faithfully,</div><div class="lh-sign-for">For: {{ org.name }}</div>{{else}}<div class="lh-sign-for">For {{ org.name }}</div>{{/if}}{{#if doc.signer.signature}}<img src="{{ doc.signer.signature }}" alt="Signature of {{ doc.signer.name }}">{{else}}{{#if doc.letter}}<div class="lh-sign-gap"></div>{{/if}}{{/if}}<div class="lh-sign-name">{{ doc.signer.name }}</div><div class="lh-sign-role">{{ doc.signer.role }}</div></div>{{/if}}
+</main>
+</td></tr></tbody>
+</table>

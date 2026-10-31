@@ -14,6 +14,7 @@ const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { scopeFor } = require("../../middleware/rbac");
 const authority = require("../goals/goals.authority");
+const visibility = require("../goals/goals.visibility");
 const repo = require("./kpis.repo");
 const { EVENTS } = require("./kpis.events");
 
@@ -77,14 +78,16 @@ async function untilOf(periodId) {
   return rows[0] ? day(rows[0].ends_on) : null;
 }
 
-async function list(query) {
-  const page = await repo.list(pool, query, await untilOf(query.period_id));
+/** GET /performance/kpis: the KPIs of the functions the reader reads (§6.23). */
+async function list(query, actor = null) {
+  const page = await repo.list(pool, query, await untilOf(query.period_id), await visibility.readerOf(pool, actor));
   return { ...page, data: page.data.map(kpiView) };
 }
 
 async function get(id, { period_id: periodId = null } = {}, actor = null) {
   const row = await repo.get(pool, id, await untilOf(periodId));
   if (!row) throw notFound();
+  if (!visibility.readsFunction(await visibility.readerOf(pool, actor), row.department_id)) throw notFound();
   return {
     ...kpiView(row),
     months: (await repo.months(pool, id)).map(monthView),
@@ -101,9 +104,14 @@ async function mayEdit(actor, departmentId) {
 }
 
 /** GET /performance/kpis/summary: the month's figures over every active KPI, or one function's. */
-async function summary(query) {
-  const row = await repo.summary(pool, { department_id: query.department_id || null, month: query.month });
+async function summary(query, actor = null) {
+  const row = await repo.summary(pool, { department_id: query.department_id || null, month: query.month }, await visibility.readerOf(pool, actor));
   return { kpis: row.kpis, met: row.met, not_met: row.not_met, awaiting: row.awaiting };
+}
+
+/** GET /performance/kpis/units: the units already in use, most used first, narrowed by `q`. */
+function units(query) {
+  return repo.units(pool, query);
 }
 
 /** A function's KPIs, for its plan. */
@@ -126,7 +134,7 @@ async function nextCode(db, departmentId) {
 
 /** POST /performance/kpis. `code` is accepted from the importer only (imported rows keep their codes). */
 async function create(actor, body, { code = null } = {}) {
-  await authority.assertSetsGoals(pool, actor, body.department_id);
+  await authority.assertSetsGoals(pool, actor, body.department_id, "KPIs");
   const id = await tx(async (client) => {
     const kpiCode = code || (await nextCode(client, body.department_id));
     if (code && (await repo.findByCode(client, code)))
@@ -149,7 +157,7 @@ async function create(actor, body, { code = null } = {}) {
 async function update(actor, id, patch) {
   const before = await repo.get(pool, id);
   if (!before) throw notFound();
-  await authority.assertSetsGoals(pool, actor, before.department_id);
+  await authority.assertSetsGoals(pool, actor, before.department_id, "KPIs");
   await tx(async (client) => {
     await repo.update(client, id, patch);
     const after = await repo.get(client, id);
@@ -188,7 +196,7 @@ async function recordIn(client, actor, kpi, body) {
 async function recordActual(actor, id, body) {
   const kpi = await repo.get(pool, id);
   if (!kpi) throw notFound();
-  await authority.assertSetsGoals(pool, actor, kpi.department_id);
+  await authority.assertSetsGoals(pool, actor, kpi.department_id, "KPIs");
   return tx((client) => recordIn(client, actor, kpi, body));
 }
 
@@ -262,4 +270,4 @@ async function removeImported(client, actor, id) {
   });
 }
 
-module.exports = { monthView, kpiView, list, summary, get, ofDepartment, nextCode, create, update, recordIn, recordActual, importKpi, removeImported };
+module.exports = { monthView, kpiView, list, summary, units, get, ofDepartment, nextCode, create, update, recordIn, recordActual, importKpi, removeImported };

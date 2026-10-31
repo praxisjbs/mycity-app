@@ -566,7 +566,8 @@ function Sent({ email, onBack }: { email: string; onBack: () => void }) {
 }
 
 function LinkForm({ token, onDone, onExpired }: { token: string; onDone: (email: string) => void; onExpired: () => void }) {
-  const [check, setCheck] = useState<LinkCheck | "bad" | null>(null);
+  const [check, setCheck] = useState<LinkCheck | "bad" | "unchecked" | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
   const [touched, setTouched] = useState({ next: false, again: false });
@@ -577,16 +578,33 @@ function LinkForm({ token, onDone, onExpired }: { token: string; onDone: (email:
 
   useEffect(() => {
     let live = true;
+    setCheck(null);
     api
       .call("POST /api/v1/auth/link", { body: { token } })
       .then((c) => live && setCheck(c))
-      .catch(() => live && setCheck("bad"));
+      // Only a link the server calls invalid has expired, or one cut or changed on its way (a mail
+      // program wrapping it fails the token's shape): a busy office or a dropped connection is
+      // asked again, never told to request a new link that would close this one.
+      .catch((e) => live && setCheck(e instanceof ApiError && (e.code === "LINK_INVALID" || e.fields.token) ? "bad" : "unchecked"));
     return () => {
       live = false;
     };
-  }, [token]);
+  }, [token, attempt]);
 
   if (check === null) return <LoadingRows count={3} />;
+  if (check === "unchecked") {
+    return (
+      <div>
+        <h2 className="text-3xl font-strong">Link Not Checked</h2>
+        <Banner tone="warn" icon="alert" className="mt-3">
+          We could not check this link just now. Try again in a minute.
+        </Banner>
+        <BigButton icon="refresh" onClick={() => setAttempt((n) => n + 1)}>
+          Try Again
+        </BigButton>
+      </div>
+    );
+  }
   if (check === "bad") {
     return (
       <div>

@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { invalidate, useMutation, usePaged } from "@/api/hooks";
+import { ApiError } from "@/api/client";
+import { invalidate, useInfinite, useMutation } from "@/api/hooks";
 import type { ManagerRef } from "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { paging } from "@/features/shared/wire";
 import { Button, Field, FormFooter, SelectField, TextField, toast } from "@mycity/ui";
 
 /** Whose line it is and who is above them now, as the employee 360 and the org chart both hold it. */
@@ -30,12 +32,17 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
       ? [{ employee_id: e.dotted_manager.employee_id, display_name: e.dotted_manager.display_name, job_title: e.dotted_manager.job_title, department: null }]
       : [],
   );
-  const seats = usePaged("GET /api/v1/org-seats", { filters: { status: "vacant" } });
+  const seats = useInfinite("GET /api/v1/org-seats", { filters: { status: "vacant" } });
   const [seat, setSeat] = useState<string>(e.line_manager?.org_seat_id ?? "");
   const [reason, setReason] = useState("");
+  const [tried, setTried] = useState(false);
   const save = useMutation("PATCH /api/v1/employees/:id/line-manager");
+  // An open role must be picked: none sent would keep the manager they have, not reassign them.
+  const noSeat = kind === "seat" && !seat;
 
   const submit = async () => {
+    setTried(true);
+    if (noSeat) return;
     const body =
       kind === "seat"
         ? { line_manager_seat_id: seat || null, dotted_manager_id: dotted[0]?.employee_id ?? null, reason: reason.trim() }
@@ -46,8 +53,9 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
       onSaved();
       close();
       toast(`${e.display_name} reassigned`);
-    } catch {
-      toast(save.error?.message ?? "Not changed");
+    } catch (err) {
+      // The refusal itself (REPORTS_TO_SELF, REPORTING_LOOP, an inactive manager): read from the error, not stale state.
+      toast.error(err instanceof ApiError ? err.message : "Not changed. Try again.");
     }
   };
 
@@ -65,20 +73,22 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
       </Field>
       {kind === "person" ? (
         <Field label="Line Manager">
-          <EmployeePicker value={manager} onChange={setManager} placeholder="Manager's name" />
+          <EmployeePicker value={manager} onChange={setManager} filters={{ status: "active" }} placeholder="Manager's name" />
         </Field>
       ) : (
-        <Field label="Open Role">
+        <Field label="Open Role" state={tried && noSeat ? "bad" : undefined} message={tried && noSeat ? "Pick an open role" : undefined}>
           <SelectField
             value={seat}
             onChange={setSeat}
             placeholder="Open role"
             options={seats.rows.map((s) => [s.org_seat_id, `${s.title} · ${s.department}`] as [string, string])}
+            valueLabel={e.line_manager?.vacant ? e.line_manager.display_name : undefined}
+            {...paging(seats)}
           />
         </Field>
       )}
       <Field label="Dotted Line" optional>
-        <EmployeePicker value={dotted} onChange={setDotted} placeholder="Second manager" />
+        <EmployeePicker value={dotted} onChange={setDotted} filters={{ status: "active" }} placeholder="Second manager" />
       </Field>
       <Field label="Reason" optional>
         <TextField value={reason} onChange={setReason} placeholder="New structure" />

@@ -3,9 +3,10 @@ import type { ApprovalDecision, LocationRequest, LocationRequestStatus } from "@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chain, Chips, ChoiceField, DataView, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, KeyValue, LoadingRows, PageHeader, PhoneOnly, Pill, TextAreaField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
+import { Button, Card, CardHeader, Chain, Chips, ChoiceField, DataView, DesktopOnly, ErrorState, Field, formatDate, formatDateTime, FormFooter, KeyValue, LoadingRows, PageHeader, PhoneOnly, Pill, TextAreaField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
 import { REQUEST_STATUS, REQUEST_TYPE } from "./labels";
 import { MySites, useSiteLink, useSiteView, useWorkSiteSheet } from "./TemporarySites";
 
@@ -116,7 +117,7 @@ export function RequestApproval({ instanceId }: { instanceId: string }) {
           )}
         </>
       ) : flow.error ? (
-        <p className="text-2xs text-subtle-foreground">Not available now</p>
+        <ErrorState error={flow.error} onRetry={flow.reload} />
       ) : (
         <LoadingRows count={2} />
       )}
@@ -207,9 +208,11 @@ const REQUEST_CHIPS: Array<[LocationRequestStatus | "all", string]> = [
 export function RequestsView({ openRequest }: { openRequest: (r: LocationRequest) => void }) {
   const [status, setStatus] = useState<LocationRequestStatus | "all">("submitted");
   const list = usePaged("GET /api/v1/attendance/requests", { filters: status === "all" ? {} : { status } });
+  const news = useViewNews();
+  useOpenWhereNews({ value: status, onChange: setStatus, values: REQUEST_CHIPS.map(([v]) => v), at: "temporary/requests", all: "all" });
   return (
     <>
-      <Chips label="Requests" value={status} onChange={setStatus} options={REQUEST_CHIPS} />
+      <Chips label="Requests" value={status} onChange={setStatus} options={withNews(news, REQUEST_CHIPS, { at: "temporary/requests", all: "all" })} />
       <DataView
         title="Requests"
         list={list}

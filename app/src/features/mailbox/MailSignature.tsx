@@ -43,7 +43,7 @@ import {
  * things they change on it, their numbers. Everything else comes from records. Holders of
  * `mailbox.signature` also see Configure: the company's links and what shows for everyone.
  */
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
 
 export function MailSignature() {
   const me = useMe();
@@ -53,6 +53,8 @@ export function MailSignature() {
   const [variant, setVariant] = useState<"full" | "slim">("full");
   const [switching, setSwitching] = useState(false);
   const configure = hasCapability(me, "mailbox.signature");
+  // Changing one's own numbers and switches needs `mailbox` edit (PATCH /mailbox/signature).
+  const edits = Boolean(me.grants.mailbox?.includes("edit"));
 
   const openConfigure = () => modal.open({ title: "Configure Signature", full: true, body: (close) => <ConfigureSignature close={close} /> });
   const editNumbers = (s: MySignature) => modal.open({ title: "Edit Numbers", body: (close) => <EditNumbers sig={s} close={close} /> });
@@ -123,11 +125,11 @@ export function MailSignature() {
   );
   const numbers = (
     <Card details={phone ? <Details title="Details" items={details.map(([k, v]) => [k, v ?? "Not given"])} /> : undefined}>
-      <CardHeader title="Numbers" actions={<Button size="sm" icon="edit" onClick={() => editNumbers(s)}>Edit Numbers</Button>} />
+      <CardHeader title="Numbers" actions={edits ? <Button size="sm" icon="edit" onClick={() => editNumbers(s)}>Edit Numbers</Button> : undefined} />
       <KeyValue items={[["Mobile", s.mobile ? formatPhone(s.mobile) : null], ["Office Line", s.office_line ? formatPhone(s.office_line) : null]]} />
       <div className="mt-2">
-        <ToggleRow title="Show Mobile" checked={s.show_mobile} disabled={switching} onChange={(on) => void flip("show_mobile", on)} />
-        {s.whatsapp_allowed && <ToggleRow title="WhatsApp Link" checked={s.show_whatsapp} disabled={switching} onChange={(on) => void flip("show_whatsapp", on)} />}
+        <ToggleRow title="Show Mobile" checked={s.show_mobile} disabled={switching || !edits} onChange={(on) => void flip("show_mobile", on)} />
+        {s.whatsapp_allowed && <ToggleRow title="WhatsApp Link" checked={s.show_whatsapp} disabled={switching || !edits} onChange={(on) => void flip("show_whatsapp", on)} />}
       </div>
     </Card>
   );

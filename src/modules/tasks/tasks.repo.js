@@ -659,7 +659,7 @@ function countsTowards(db, { assigneeId, month }, query) {
            JOIN performance_period p ON p.performance_period_id = o.performance_period_id
            JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id
           WHERE (kr.accountable_employee_id = $1 OR kr.co_accountable_employee_id = $1)
-            AND pl.status = 'binding' AND $2::date BETWEEN p.starts_on AND p.ends_on
+            AND pl.status IN ('binding', 'unbound', 'revising') AND $2::date BETWEEN p.starts_on AND p.ends_on
        ) v
       WHERE ($3::text IS NULL OR search_fold(v.title) LIKE '%' || search_fold($3) || '%')
       ORDER BY v.grp, v.sec, v.pos, v.title, COALESCE(v.employee_target_id, v.okr_key_result_id)`,
@@ -1092,7 +1092,25 @@ async function resolveBlockage(client, taskId, { by, note, shiftDays }) {
   return rows[0] || null;
 }
 
+/**
+ * Each of these tasks' status, and whether it is the reader's own (led, set or shared with them, as
+ * Mine reads it): where it waits on My Workspace · Tasks (tasks.views.js). An archived task is on
+ * no list.
+ */
+async function placesOf(db, ids, employeeId) {
+  const { rows } = await db.query(
+    `SELECT t.task_id AS id, t.status,
+            (t.primary_assignee_id = $2::uuid OR t.set_by_employee_id = $2::uuid
+             OR EXISTS (SELECT 1 FROM task_assignee ta WHERE ta.task_id = t.task_id AND ta.employee_id = $2::uuid)) AS mine
+       FROM task t
+      WHERE t.task_id = ANY($1::uuid[]) AND t.archived_at IS NULL`,
+    [ids, employeeId || null],
+  );
+  return rows;
+}
+
 module.exports = {
+  placesOf,
   PLAN_MAX,
   MEMBERS_MAX,
   people,

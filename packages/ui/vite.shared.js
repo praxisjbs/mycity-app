@@ -36,9 +36,12 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+/** The contract is CommonJS, as the API require()s it. */
+const contractPlan = createRequire(import.meta.url)("../contract/plan.js");
 
 /** The repository root's Zod, by the file its `import` condition names. */
 export function zodEntry() {
@@ -105,7 +108,7 @@ export function sharedVite() {
       dedupe: ["react", "react-dom"],
     },
     optimizeDeps: {
-      include: ["zod", "@mycity/contract/schemas/*.js"],
+      include: ["zod", "@mycity/contract/schemas/*.js", "@mycity/contract/plan.js"],
     },
     build: {
       commonjsOptions: { include: [/node_modules/, /packages[\\/]contract[\\/]/] },
@@ -138,43 +141,13 @@ export function apiMode(mode) {
   return mode === "production" ? "live" : "mock";
 }
 
-const MONTH = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
-
 /**
- * The delivery plan, read from the docs at build time so there is one source
- * (lib/plan.ts in @mycity/ui decides what opens from it, F14):
- *
- *   docs/PROGRESS.md                          each screen's milestone (M column) and its API, UI
- *                                             and Mobile ticks: API = staging opens it, all three =
- *                                             production opens it
- *   docs/MyCity-ERP-Documents/MILESTONES.md   §4's table: each milestone's name and demo date
- *
- * Screens are keyed "<section>|<slug>": the PROGRESS heading ("Employee
- * Self-Service", "Public site") and the backticked slug or path in the row. A
- * build fails when the plan cannot be read.
+ * The delivery plan, read from the docs at build time so there is one source: each screen's
+ * milestone and ticks from docs/PROGRESS.md, each milestone's name and demo date from
+ * MILESTONES §4 (@mycity/contract/plan readPlan, the reader the API's fallback uses too).
+ * lib/plan.ts in @mycity/ui decides what opens from it (F14). A build fails when the plan
+ * cannot be read.
  */
 export function deliveryPlan() {
-  const ms = doc("docs/MyCity-ERP-Documents/MILESTONES.md");
-  const year = Number((/\b(20\d\d)\b/.exec(ms) ?? [])[1]) || new Date().getFullYear();
-  const head = ms.indexOf("| M | Milestone |");
-  if (head < 0) throw new Error("vite: the milestone table (| M | Milestone |) is missing from MILESTONES.md");
-  const milestones = [];
-  for (const line of ms.slice(head).split("\n").slice(2)) {
-    if (!line.startsWith("|")) break;
-    const c = line.split("|").map((x) => x.replace(/\*/g, "").trim());
-    const n = Number(c[1]);
-    const d = /(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/.exec(c[5]);
-    milestones.push({ key: `M${n}`, n, name: c[2], demo: d ? `${year}-${MONTH[d[2]]}-${d[1].padStart(2, "0")}` : null });
-  }
-  /* "with M1": a milestone demonstrated alongside another takes its date. */
-  for (const m of milestones) if (!m.demo) m.demo = milestones.find((x) => x.n === m.n + 1)?.demo ?? null;
-  const screens = {};
-  let section = "";
-  for (const line of doc("docs/PROGRESS.md").split("\n")) {
-    if (line.startsWith("### ")) section = line.slice(4).split(" · ")[0].trim();
-    const r = /^\|\s*\d+\s*\|[^|]*\|\s*`([^`]+)`\s*\|\s*(M\d+)\s*\|[^|]*\|\s*(\S+)\s*\|\s*(\S+)\s*\|\s*(\S+)\s*\|/.exec(line);
-    if (r) screens[`${section}|${r[1]}`] = { m: r[2], api: r[3] === "☑", delivered: [r[3], r[4], r[5]].every((t) => t === "☑") };
-  }
-  if (Object.keys(screens).length < 50) throw new Error("vite: could not read the screens from docs/PROGRESS.md");
-  return { milestones, screens };
+  return contractPlan.readPlan(doc);
 }

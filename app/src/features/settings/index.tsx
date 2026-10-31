@@ -6,6 +6,7 @@ import type { UserRow } from "@mycity/contract/contract.gen.ts";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { KpiTiles } from "@/features/shared/KpiTiles";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AuditLog } from "./AuditLog";
@@ -18,9 +19,9 @@ import { FaultsTab, StatusTab } from "./SystemHealth";
 import { PerformanceTab } from "./Performance";
 import { IntegrationsTab } from "./integrations";
 import { AppearanceTab } from "./Appearance";
-import { Button, Card, Chips, Field, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, TextAreaField, toast, useConfirm, useModal, Who } from "@mycity/ui";
+import { Banner, Button, Card, Chips, DesktopOnly, Field, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, TextAreaField, toast, useConfirm, useModal, Who, type ChoiceOption } from "@mycity/ui";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
-import { RolePicker, type RoleRef } from "@/features/shared/pickers";
+import { MAX_ROLES, RolePicker, type RoleRef } from "@/features/shared/pickers";
 import { Imports } from "./Imports";
 import { Approvals } from "./Approvals";
 import { useScreenAction } from "@/shell/screen-action";
@@ -51,9 +52,9 @@ const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : "Somethin
 /* ───────────── Users ───────────── */
 
 
-const USER_STATUS: Record<UserRow["status"], { tone: "ok" | "warn" | "err" | "neutral"; text: string }> = {
+const USER_STATUS: Record<UserRow["status"], { tone: "ok" | "warn" | "err" | "neutral" | "info"; text: string }> = {
   active: { tone: "ok", text: "Active" },
-  invited: { tone: "warn", text: "Invited" },
+  invited: { tone: "info", text: "Invited" },
   suspended: { tone: "err", text: "Suspended" },
   left: { tone: "neutral", text: "Left" },
 };
@@ -68,6 +69,17 @@ function Users() {
   const modal = useModal();
   const { can } = useAuth();
   const invite = () => modal.open({ title: "Invite User", body: (close) => <InviteToSignIn close={close} /> });
+  const pending = useMutation("POST /api/v1/users/invite-pending");
+  /* Every Invited login nobody has emailed yet (the staff roster makes them silently), sent at once. */
+  const invitePending = async () => {
+    try {
+      const { sent } = await pending.run({ body: {} });
+      invalidate("/api/v1/users", "/api/v1/employees");
+      toast(sent ? `${sent} ${sent === 1 ? "invitation" : "invitations"} sent` : "Every invitation already sent");
+    } catch (e) {
+      fail(e);
+    }
+  };
   useScreenAction(can("settings", "create") ? { label: "Invite User", onSelect: invite } : null);
   // A login linked by id (a role's People on Roles & Permissions, a search result) opens its sheet.
   const [params, setParams] = useSearchParams();
@@ -90,12 +102,24 @@ function Users() {
   const s = useApi("GET /api/v1/users/summary");
   const list = usePaged("GET /api/v1/users", { filters: status ? { status } : {} });
   const photo = usePhotos(list.rows.map((u) => u.photo_url));
+  const news = useViewNews();
+  const statusChips: Array<ChoiceOption<"" | UserRow["status"]>> = [
+    { value: "", label: "Everyone" },
+    { value: "active", label: "Active", count: s.data?.active },
+    { value: "invited", label: "Invited", count: s.data?.invited },
+    { value: "suspended", label: "Suspended", count: s.data?.suspended },
+  ];
   return (
     <>
       <PageHeader
         title="Users"
         sub={s.data ? `${s.data.users} users · ${s.data.invited} invited` : " "}
-        actions={can("settings", "create") ? <Button variant="primary" icon="plus" onClick={invite}>Invite User</Button> : undefined}
+        actions={
+          <>
+            {can("settings", "edit") && <Button icon="send" onClick={invitePending}>Invite All Pending</Button>}
+            {can("settings", "create") && <Button variant="primary" icon="plus" onClick={invite}>Invite User</Button>}
+          </>
+        }
       />
       {s.data && (
         <KpiTiles
@@ -112,12 +136,7 @@ function Users() {
         label="Status"
         value={status}
         onChange={setStatus}
-        options={[
-          { value: "", label: "Everyone" },
-          { value: "active", label: "Active", count: s.data?.active },
-          { value: "invited", label: "Invited", count: s.data?.invited },
-          { value: "suspended", label: "Suspended", count: s.data?.suspended },
-        ]}
+        options={withNews(news, statusChips, { all: "" })}
       />
       <PagedTable<UserRow>
         title="Users"
@@ -131,27 +150,39 @@ function Users() {
           { key: "r", label: "Roles", render: (u) => (u.is_ceo ? ["CEO", ...u.roles.map((r) => r.name)] : u.roles.map((r) => r.name)).join(", ") },
           { key: "l", label: "Last Seen", render: (u) => (u.last_seen_at ? formatWhen(u.last_seen_at) : "Never"), desktop: true },
           { key: "t", label: "Two-Step", render: (u) => (u.two_step ? "On" : "Off"), desktop: true },
-          { key: "s", label: "Status", render: (u) => <Pill tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].text}</Pill> },
+          {
+            key: "s",
+            label: "Status",
+            render: (u) =>
+              u.status === "invited" && !u.invited_at ? <Pill tone="warn">Not Sent</Pill> : <Pill tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].text}</Pill>,
+          },
         ]}
       />
-      <Grid cols={2} className="mt-3">
-        {s.data ? (
-          <BarsCard
-            title="Users by Role"
-            rows={s.data.by_role.map((r) => ({ label: r.name, value: String(r.users), pct: Math.round((r.users * 100) / Math.max(1, ...s.data!.by_role.map((x) => x.users))) }))}
-          />
-        ) : (
-          <Card><LoadingRows /></Card>
-        )}
-      </Grid>
+      {/* Left off a phone (identity.md §10.2): the tiles above say enough there. */}
+      <DesktopOnly>
+        <Grid cols={2} className="mt-3">
+          {s.data ? (
+            <BarsCard
+              title="Users by Role"
+              rows={s.data.by_role.map((r) => ({ label: r.name, value: String(r.users), pct: Math.round((r.users * 100) / Math.max(1, ...s.data!.by_role.map((x) => x.users))) }))}
+            />
+          ) : (
+            <Card><LoadingRows /></Card>
+          )}
+        </Grid>
+      </DesktopOnly>
     </>
   );
 }
 
 function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
-  const { me } = useAuth();
+  const { me, can } = useAuth();
+  // Someone who may only view Settings sees the login, never buttons the API would refuse.
+  const canEdit = can("settings", "edit");
+  const moveEmail = useMutation("POST /api/v1/users/:id/use-work-email");
   const confirm = useConfirm();
   const [roles, setRoles] = useState<RoleRef[]>(u.roles);
+  const tooMany = roles.length > MAX_ROLES;
   const [reason, setReason] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
   const setR = useMutation("POST /api/v1/users/:id/roles");
@@ -162,7 +193,8 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   const end = useMutation("POST /api/v1/users/:id/end-sessions");
   const resetTwoStep = useMutation("POST /api/v1/users/:id/reset-two-step");
   const fresh = useFreshSignIn();
-  const self = me?.user_id === u.user_id;
+  const self = me?.user_id === u.user_id || !canEdit;
+  const emailMoved = u.email.toLowerCase() !== u.work_email.toLowerCase() && u.status !== "left";
   const reasonBad = reason != null && reason.trim().length < 6;
   const params = { id: u.user_id };
   const run = async (fn: () => Promise<unknown>, msg: string) => {
@@ -177,7 +209,7 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   };
   return (
     <>
-      <Field label="Roles" state={tried && !roles.length ? "bad" : undefined} message="Pick a role">
+      <Field label="Roles" state={(tried && !roles.length) || tooMany ? "bad" : undefined} message={tooMany ? `At most ${MAX_ROLES} roles` : "Pick a role"}>
         {self ? <span className="text-sm">{u.roles.map((r) => r.name).join(", ")}</span> : <RolePicker value={roles} onChange={setRoles} />}
       </Field>
       {reason != null && (
@@ -185,8 +217,35 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
           <TextAreaField value={reason} onChange={setReason} placeholder="Left the company" state={tried && reasonBad ? "bad" : undefined} />
         </Field>
       )}
+      {emailMoved && (
+        <Banner tone="warn" className="mb-3">
+          {`Signs in with ${u.email}, but the record says ${u.work_email}.`}
+        </Banner>
+      )}
       <FormFooter>
-        {!self && u.status === "invited" && <Button busy={resend.pending} onClick={() => run(() => resend.run({ params, body: {} }), "Invitation sent again")}>Resend Invitation</Button>}
+        {!self && emailMoved && (
+          <Button
+            busy={moveEmail.pending}
+            onClick={async () => {
+              if (!(await confirm({ title: "Use Work Email", body: `${u.display_name} signs in with ${u.work_email} from now on, and is signed out now.`, confirmLabel: "Use Work Email" }))) return;
+              try {
+                if (!(await fresh.guard(() => moveEmail.run({ params, body: {} })))) return;
+                invalidate("/api/v1/users", "/api/v1/employees");
+                close();
+                toast(`Signs in with ${u.work_email} now`);
+              } catch (e) {
+                fail(e);
+              }
+            }}
+          >
+            Use Work Email
+          </Button>
+        )}
+        {!self && u.status === "invited" && (
+          <Button busy={resend.pending} onClick={() => run(() => resend.run({ params, body: {} }), u.invited_at ? "Invitation sent again" : "Invitation sent")}>
+            {u.invited_at ? "Resend Invitation" : "Send Invitation"}
+          </Button>
+        )}
         {!self && u.status === "active" && <Button busy={reset.pending} onClick={() => run(() => reset.run({ params, body: {} }), "Reset link sent")}>Send Reset Link</Button>}
         {!self && u.status === "active" && (
           <Button
@@ -216,14 +275,15 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
             Reset Two-Step
           </Button>
         )}
-        {!self && u.status !== "suspended" && !u.is_ceo && (reason == null ? <Button onClick={() => setReason("")}>Suspend</Button> : <Button variant="danger" busy={suspend.pending} onClick={() => (reasonBad ? setTried(true) : run(() => suspend.run({ params, body: { reason: reason.trim() } }), "Login suspended"))}>Confirm Suspend</Button>)}
-        {!self && u.status === "suspended" && <Button busy={reactivate.pending} onClick={() => run(() => reactivate.run({ params, body: {} }), "Login reactivated")}>Reactivate</Button>}
+        {!self && u.status !== "suspended" && u.status !== "left" && !u.is_ceo && (reason == null ? <Button onClick={() => setReason("")}>Suspend</Button> : <Button variant="danger" busy={suspend.pending} onClick={() => (reasonBad ? setTried(true) : run(() => suspend.run({ params, body: { reason: reason.trim() } }), "Login suspended"))}>Confirm Suspend</Button>)}
+        {/* A Left login reopens here once its employee record is restored; the server says so if it is not yet. */}
+        {!self && (u.status === "suspended" || u.status === "left") && <Button busy={reactivate.pending} onClick={() => run(() => reactivate.run({ params, body: {} }), "Login reactivated")}>Reactivate</Button>}
         <Button onClick={close}>Close</Button>
         {!self && (
           <Button
             variant="primary"
             busy={setR.pending}
-            onClick={() => (!roles.length ? setTried(true) : run(() => setR.run({ params, body: { role_codes: roles.map((r) => r.code) } }), "Roles saved"))}
+            onClick={() => (!roles.length || tooMany ? setTried(true) : run(() => setR.run({ params, body: { role_codes: roles.map((r) => r.code) } }), "Roles saved"))}
           >
             Save Roles
           </Button>

@@ -832,7 +832,7 @@ async function cancel(actor, scope, id, { cancel_reason: reason }) {
     if (!(await repo.lock(client, id))) throw notFound();
     const before = await visible(client, id, scope);
     if (!audience.mayManage(scope, before))
-      throw new AppError("FORBIDDEN", "Only the person who set this task can cancel it", 403);
+      throw new AppError("FORBIDDEN", "Only whoever set this task, or the lead's manager, can cancel it", 403);
     if (before.status === "cancelled") return toTask(before);
     if (before.is_commitment && before.original_due_at) throw approvedCommitment();
     await repo.update(client, id, { status: "cancelled", cancelled_at: new Date(), cancel_reason: reason });
@@ -982,20 +982,24 @@ async function removeStep(actor, scope, id, stepId) {
   return getFor(id, scope, actor);
 }
 
-/** This task waits on another the caller can see. No loops, and no more than PLAN_MAX either way. */
+/**
+ * This task waits on another the caller can see. No loops, and no more than PLAN_MAX either way.
+ * Each refusal is its own rule, so System Health names the one a person met (system-health.md §6).
+ */
 async function addWaiting(actor, scope, id, { depends_on_task_id: otherId }) {
-  if (otherId === id) throw invalid("depends_on_task_id", "Pick another task");
+  const refuse = (code, message) => new AppError(code, message, 422, { depends_on_task_id: [message] });
+  if (otherId === id) throw refuse("TASK_LINK_SELF", "Pick another task");
   await tx(async (client) => {
     const row = await planned(client, id, scope);
     const other = await repo.get(client, otherId);
     if (!other || !audience.maySee(scope, other, await repo.sharedWith(client, otherId, scope.employee_id)))
-      throw invalid("depends_on_task_id", "Not a task you can see");
-    if (other.status === "cancelled") throw invalid("depends_on_task_id", "That task was cancelled");
+      throw refuse("TASK_LINK_UNSEEN", "Not a task you can see");
+    if (other.status === "cancelled") throw refuse("TASK_LINK_CANCELLED", "That task was cancelled");
     const counts = await repo.edgeCounts(client, id, otherId);
     if (counts.waits >= repo.PLAN_MAX || counts.held >= repo.PLAN_MAX)
       throw conflict("TOO_MANY_LINKS", `A task waits on, or holds up, at most ${repo.PLAN_MAX} others`);
     if (await repo.wouldCycle(client, id, otherId))
-      throw invalid("depends_on_task_id", `${other.number} already waits on this task`);
+      throw refuse("TASK_LINK_LOOP", `${other.number} already waits on this task`);
     const made = await repo.insertDependency(client, { task_id: id, depends_on_task_id: otherId, created_by: actor.user_id });
     if (made)
       await noted(client, actor, row, {

@@ -24,7 +24,7 @@ export interface ShellNoticeProps {
 
 export function ShellNotice({ icon = "info", children, actions }: ShellNoticeProps) {
   return (
-    <div role="status" data-theme="dark" className="on-dark flex max-w-full animate-rise flex-wrap items-center gap-x-3 gap-y-2 rounded-box bg-sidebar px-4 py-3 text-sm text-sidebar-foreground shadow-3">
+    <div role="status" data-shell-notice="" data-theme="dark" className="on-dark flex max-w-full animate-rise flex-wrap items-center gap-x-3 gap-y-2 rounded-box bg-sidebar px-4 py-3 text-sm text-sidebar-foreground shadow-3">
       <Icon name={icon} className="flex-none text-primary" />
       <span className="min-w-0 flex-1">{children}</span>
       {actions != null && (

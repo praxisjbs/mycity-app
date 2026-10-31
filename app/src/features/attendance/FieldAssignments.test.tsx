@@ -96,7 +96,8 @@ describe("field assignments", () => {
     fireEvent.click(await screen.findByRole("radio", { name: "Field" }, { timeout: 5000 }));
     fireEvent.click(await screen.findByText("FA-0002 · Stand Build"));
     let dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByText("Grace Okon"));
+    // Each person on it has a Take Off of their own.
+    fireEvent.click(within(within(dialog).getByText("Grace Okon").closest("tr")!).getByRole("button", { name: "Take Off" }));
     let form = await screen.findByRole("dialog", { name: "Take Off Grace Okon" });
     fill(form, "Reason", "short");
     pressIn(form, "Take Off");
@@ -108,8 +109,12 @@ describe("field assignments", () => {
     expect(fa).toMatchObject({ people: 1, status: "active" });
     expect(fa.members.find((m: FieldMember) => m.employee.display_name === "Grace Okon")).toMatchObject({ removed_reason: "Needed at the office that day" });
 
+    // The sheet opens from the list's row: the list reads FA-0002 again first, without Grace.
+    await waitFor(() => expect(within(screen.getByText("FA-0002 · Stand Build").closest("tr")!).queryByText(/Grace Okon/)).toBeNull(), { timeout: 5000 });
     fireEvent.click(await screen.findByText("FA-0002 · Stand Build"));
     dialog = await screen.findByRole("dialog");
+    // The last person on it has no Take Off: Cancel Assignment ends it instead.
+    await waitFor(() => expect(within(dialog).queryByRole("button", { name: "Take Off" })).toBeNull());
     pressIn(dialog, "Cancel Assignment");
     form = await screen.findByRole("dialog", { name: "Cancel Assignment" });
     fill(form, "Reason", "The client moved the event");

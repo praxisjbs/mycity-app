@@ -1,4 +1,4 @@
-import type { Department, Project } from "@mycity/contract/contract.gen.ts";
+import type { CitablePolicy, Department, EmployeeListQuery, Project, Worksite } from "@mycity/contract/contract.gen.ts";
 import { usePhotos } from "@/api/download";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
@@ -11,20 +11,23 @@ import { PersonPicker, RecordPicker } from "@mycity/ui";
  * the list and drive its search, so the endpoint stays the app's.
  *
  * Everyone with an employee record, paged at 25 by the server and narrowed by
- * what the person types (FRONTEND_GUIDE §4: never a dropdown of everyone).
+ * what the person types (FRONTEND_GUIDE §4: never a dropdown of everyone). `filters` narrows
+ * it on the server: `{ status: "active" }` for a line manager, who must work here now.
  */
 export function EmployeePicker({
   value,
   onChange,
   multiple,
   placeholder,
+  filters,
 }: {
   value: PersonRef[];
   onChange: (value: PersonRef[]) => void;
   multiple?: boolean;
   placeholder?: string;
+  filters?: Pick<EmployeeListQuery, "status" | "department_id">;
 }) {
-  const list = usePaged("GET /api/v1/employees");
+  const list = usePaged("GET /api/v1/employees", filters ? { filters } : undefined);
   const photos = usePhotos(list.rows.map((row) => row.photo_url));
   return (
     <PersonPicker
@@ -125,6 +128,44 @@ export function DepartmentPicker({ value, onChange, multiple }: { value: Departm
   );
 }
 
+/** The Knowledge Hub's policies with a version in force, searched on the server (one): what a query cites. */
+/** A policy as a picker holds it: a rule's saved policy names no version, a fresh pick does. */
+export type PolicyChoice = Pick<CitablePolicy, "policy_id" | "number" | "title"> & { version?: number };
+
+export function PolicyPicker({ value, onChange }: { value: PolicyChoice[]; onChange: (value: PolicyChoice[]) => void }) {
+  const list = usePaged("GET /api/v1/queries/policies");
+  return (
+    <RecordPicker<PolicyChoice>
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value}
+      onChange={onChange}
+      id={(p) => p.policy_id}
+      title={(p) => p.title}
+      sub={(p) => (p.version ? `${p.number} · Version ${p.version}` : p.number)}
+      placeholder="Search policies"
+    />
+  );
+}
+
+/** A worksite as a picker holds it: enough to show and send. */
+export type WorksiteChoice = Pick<Worksite, "worksite_id" | "name" | "code">;
+
+/** The worksites in use, searched by name on the server (one): where an on-site person clocks in. */
+export function WorksitePicker({ value, onChange }: { value: WorksiteChoice[]; onChange: (value: WorksiteChoice[]) => void }) {
+  const list = usePaged("GET /api/v1/worksites", { filters: { active: "true" } });
+  return (
+    <RecordPicker
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value as Worksite[]}
+      onChange={(rows) => onChange(rows.map((r) => ({ worksite_id: r.worksite_id, name: r.name, code: r.code })))}
+      id={(w) => w.worksite_id}
+      title={(w) => w.name}
+      sub={(w) => w.code}
+      placeholder="Search worksites"
+    />
+  );
+}
+
 export type ProjectChoice = Pick<Project, "project_id" | "number" | "name">;
 
 /** The active projects, searched by number or name on the server (one): a task's Project. */
@@ -146,16 +187,20 @@ export function ProjectPicker({ value, onChange }: { value: ProjectChoice[]; onC
 export type RoleRef = { code: string; name: string };
 
 /** Roles, most senior first, from the server (seeds/reference/0101). Several may be picked. */
+/** The most roles one login holds (the contract's UserInvite and UserRolesSet). */
+export const MAX_ROLES = 5;
+
 export function RolePicker({ value, onChange }: { value: RoleRef[]; onChange: (value: RoleRef[]) => void }) {
   const list = usePaged("GET /api/v1/access/roles");
   return (
     <RecordPicker
       list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
-      value={list.rows.filter((r) => value.some((v) => v.code === r.code))}
+      // The roles chosen, whatever the search shows: a search that hides one must never drop it.
+      value={value as unknown as typeof list.rows}
       onChange={(rows) => onChange(rows.map((r) => ({ code: r.code, name: r.name })))}
       id={(r) => r.code}
       title={(r) => r.name}
-      sub={(r) => r.description ?? ""}
+      sub={(r) => ("description" in r && r.description ? r.description : "")}
       multiple
       placeholder="Search roles"
     />

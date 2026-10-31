@@ -2,26 +2,34 @@
 /**
  * /api/v1/performance: quarters, organisational goals, the OKR tree, Report Month, plans and target
  * changes (docs/guides/performance.md §5). The service checks whose function a write is for
- * (goals.authority.js); a route checks the grant and the capability.
+ * (goals.authority.js); a route checks the grant and the capability. What a reader may read of the tree is
+ * goals.visibility.js (§6.23): a `performance` view reads their own department's, what is shared with them
+ * and the key results they own, the whole plan for the CEO and Management; a record outside is 404.
  *
  *   GET   /periods · /periods/current · /periods/:id      `performance` view
  *   POST  /periods · PATCH /periods/:id                    create · edit, performance.manage
  *   GET   /goals · /goals/:id                              `performance` view
  *   POST  /goals · PATCH · DELETE /goals/:id               create · edit · delete, goals.organisation
+ *   PUT   /goals/:id/share · DELETE                        edit, goals.organisation: Share Goal, Stop Sharing
  *   GET   /okrs                                            `performance` view: 25 objectives a page, with their key results
  *   GET   /okrs/summary                                    `performance` view: the figures over the quarter or a function
  *   GET   /objectives/:id                                  `performance` view: one objective, with its key results
  *   POST  /objectives · PATCH · DELETE /objectives/:id     goals.company or goals.function: a draft plan only
+ *   PUT   /objectives/:id/share · DELETE                   edit, goals.company: Share Objective, Stop Sharing
  *   GET   /key-results                                     `performance` view: a quarter's key results for a picker
- *   POST  /key-results · PATCH · DELETE /key-results/:id   as objectives; a binding TBC target by its owner or head
+ *   POST  /key-results · PATCH · DELETE /key-results/:id   as objectives; a binding key result changes by a target change
  *   GET   /key-results/:id · /key-results/:id/trace        `performance` view
  *   POST  /reports                                         `performance` edit: the head, or the accountable person
  *   POST  /key-results/:id/confirm                         `performance` approve, goals.confirm
  *   GET   /plans · /plans/:id                              `performance` view
+ *   GET   /functions                                       `performance` view: the company and each function, may the reader set it
+ *   GET   /departments                                     `performance` view · scope: the departments the reader's lists filter by
  *   POST  /plans/:id/submit                                `performance` create, goals.company or goals.function
+ *   POST  /plans/:id/unbind                                `performance` create, goals.company or goals.function: opens performance.plan_change
+ *   GET   /unbinds/:id                                     `performance` view: one request to unbind a plan, named in full
  *   GET   /target-changes · POST /target-changes           view (a line's within scope) · edit: opens performance.target_change
  *   GET   /target-changes/:id                              `performance` view: one change, named in full
- *   GET   /approvals                                       `performance` view: plan stages and target changes waiting on the reader
+ *   GET   /approvals                                       `performance` view: plan stages, unbind requests and target changes waiting on the reader
  *   GET   /analytics · /analytics/people                   `performance` view: the quarter's figures and its people, in scope
  *   POST  /analytics/people/export                         `performance` export: the people table as a workbook (202)
  */
@@ -59,6 +67,13 @@ route(router, "delete", "/goals/:id",
   { params: id, no_content: true, summary: "Remove an organisational goal no company objective serves" },
   requirePermission("performance", "delete"), requireCapability("goals.organisation"), controller.deleteGoal);
 
+route(router, "put", "/goals/:id/share",
+  { params: id, body: g.GoalShareSave, response: g.GoalShare, summary: "Share an organisational goal with all staff or departments" },
+  requirePermission("performance", "edit"), requireCapability("goals.organisation"), controller.shareGoal);
+route(router, "delete", "/goals/:id/share",
+  { params: id, no_content: true, summary: "Stop sharing an organisational goal" },
+  requirePermission("performance", "edit"), requireCapability("goals.organisation"), controller.unshareGoal);
+
 route(router, "get", "/okrs", { query: g.OkrListQuery, response: g.ObjectivePage, summary: "The OKR tree" }, view, controller.okrs);
 route(router, "get", "/okrs/summary", { query: g.OkrSummaryQuery, response: g.OkrSummary, summary: "The Goals figures" }, view, controller.okrSummary);
 route(router, "get", "/objectives/:id", { params: id, response: g.Objective, summary: "One objective" }, view, controller.objective);
@@ -71,6 +86,13 @@ route(router, "patch", "/objectives/:id",
 route(router, "delete", "/objectives/:id",
   { params: id, no_content: true, summary: "Remove a draft objective" },
   requirePermission("performance", "edit"), setsGoals, controller.deleteObjective);
+
+route(router, "put", "/objectives/:id/share",
+  { params: id, body: g.GoalShareSave, response: g.GoalShare, summary: "Share a company objective with all staff or departments" },
+  requirePermission("performance", "edit"), requireCapability("goals.company"), controller.shareObjective);
+route(router, "delete", "/objectives/:id/share",
+  { params: id, no_content: true, summary: "Stop sharing a company objective" },
+  requirePermission("performance", "edit"), requireCapability("goals.company"), controller.unshareObjective);
 
 route(router, "get", "/key-results",
   { query: g.KeyResultListQuery, response: g.KeyResultRefPage, summary: "A quarter's key results, for a picker" }, view, controller.keyResults);
@@ -93,10 +115,20 @@ route(router, "post", "/key-results/:id/confirm",
   requirePermission("performance", "approve"), requireCapability("goals.confirm"), controller.confirm);
 
 route(router, "get", "/plans", { query: g.PlanListQuery, response: g.PlanPage, summary: "Quarter plans" }, view, controller.plans);
+route(router, "get", "/functions",
+  { query: g.PerformanceFunctionListQuery, response: g.PerformanceFunctionPage, summary: "The functions the reader may set goals and KPIs for" },
+  view, controller.functions);
+route(router, "get", "/departments",
+  { query: g.PerformanceDepartmentListQuery, response: g.PerformanceDepartmentPage, summary: "The departments the reader's Performance lists filter by" },
+  view, controller.departments);
 route(router, "get", "/plans/:id", { params: id, response: g.PlanDetail, summary: "One quarter plan" }, view, controller.plan);
 route(router, "post", "/plans/:id/submit",
   { params: id, body: c.common.EmptyBody, response: g.PlanDetail, summary: "Send a plan for approval" },
   requirePermission("performance", "create"), setsGoals, controller.submitPlan);
+route(router, "post", "/plans/:id/unbind",
+  { params: id, body: g.PlanUnbindCreate, response: g.PlanUnbind, summary: "Ask the CEO to unbind a binding plan" },
+  requirePermission("performance", "create"), setsGoals, controller.requestUnbind);
+route(router, "get", "/unbinds/:id", { params: id, response: g.PlanUnbindDetail, summary: "One request to unbind a plan" }, view, controller.unbind);
 
 route(router, "get", "/target-changes",
   { query: g.TargetChangeListQuery, response: g.TargetChangePage, summary: "Target changes" }, view, controller.changes);

@@ -545,6 +545,80 @@ describe("search providers", () => {
     expect(withinOne("payslp", "payslips")).toBe(false);
   });
 
+  test("a capped group lists its first few, best and newest first, and never pages past them", async () => {
+    const rows = [1, 2, 3, 4, 5].map((n) => ({ id: `day-${n}`, title: "Ada Obi", sub: `Present · 0${n}/10/2026`, _total: 5 }));
+    const client = { query: async () => ({ rows }) };
+    const days = recordProvider({ ...spec, type: "attendance_record", label: "Attendance Days", cap: 3 });
+    const first = await days.search(client, { term: "ada", page: 1 });
+    expect(first.items.map((i) => i.id)).toEqual(["day-1", "day-2", "day-3"]);
+    expect(first.page).toMatchObject({ number: 1, size: 25, total: 3, pages: 1, has_next: false });
+    expect(await days.search(client, { term: "ada", page: 2 })).toEqual({ page: null, items: [] });
+    expect(() => recordProvider({ ...spec, cap: 25 })).toThrow(/cap is a whole number under 25/);
+    expect(() => recordProvider({ ...spec, cap: 0 })).toThrow(/cap is a whole number/);
+  });
+
+  test("a capped group with more ends with All Days of each person it listed, opening their days (QA DEF-02)", async () => {
+    const rows = [
+      { id: "day-1", title: "Ada Obi", person_id: "p-ada", _total: 6 },
+      { id: "day-2", title: "Ada Bello", person_id: "p-bello", _total: 6 },
+      { id: "day-3", title: "Ada Obi", person_id: "p-ada", _total: 6 },
+      { id: "day-4", title: "Ada Obi", person_id: "p-ada", _total: 6 },
+    ];
+    const client = { query: async () => ({ rows }) };
+    const more = { type: "attendance_days", id: "person_id", title: (r) => `All Days of ${r.title}` };
+    const days = recordProvider({ ...spec, type: "attendance_record", label: "Attendance Days", cap: 3, more });
+    expect(days.types).toEqual(["attendance_record", "attendance_days"]);
+    const r = await days.search(client, { term: "ada", page: 1 });
+    expect(r.items.map((i) => [i.type, i.id, i.title])).toEqual([
+      ["attendance_record", "day-1", "Ada Obi"],
+      ["attendance_record", "day-2", "Ada Bello"],
+      ["attendance_record", "day-3", "Ada Obi"],
+      ["attendance_days", "p-ada", "All Days of Ada Obi"],
+      ["attendance_days", "p-bello", "All Days of Ada Bello"],
+    ]);
+    expect(r.items.at(-1).link).toBe("/people?tab=attendance&person=p-bello");
+    expect(r.page).toMatchObject({ total: 5, pages: 1, has_next: false });
+    expect(() => recordProvider({ ...spec, more })).toThrow(/more ends a capped group/);
+    expect(() => recordProvider({ ...spec, cap: 3, more: { type: "attendance_days", id: "person_id" } })).toThrow(/more is \{ type, id, title\(row\) \}/);
+  });
+
+  test("attendance days and exceptions read as the person, the status and the date, three at most; the people lead", () => {
+    const attendance = require("../../../src/modules/attendance/attendance.search");
+    const organisation = require("../../../src/modules/organisation/organisation.search");
+    for (const type of ["attendance_record", "attendance_exception"]) {
+      const p = attendance.find((x) => x.type === type);
+      expect(p.cap).toBe(3);
+      expect(p.lead).toBe(false);
+    }
+    expect(organisation.find((x) => x.type === "employee").lead).toBe(true);
+    // The days end with All Days of each person listed; the exceptions do not.
+    expect(attendance.find((x) => x.type === "attendance_record").types).toEqual(["attendance_record", "attendance_days"]);
+    expect(attendance.find((x) => x.type === "attendance_exception").types).toEqual(["attendance_exception"]);
+    const declared = fs.readFileSync(path.join(ROOT, "src/modules/attendance/attendance.search.js"), "utf8");
+    expect(declared).toMatch(/WHEN 'leave' THEN 'On Leave'/);
+    expect(declared).toMatch(/WHEN 'missing_clock_out' THEN 'Missing Clock-Out'/);
+    expect(declared).toMatch(/\$\{DAY_STATUS\} \|\| ' · ' \|\| \$\{DAY\} AS sub/);
+    expect(declared).toMatch(/ad\.employee_id AS person_id/);
+  });
+
+  test("a name typed finds the person before the days about them", async () => {
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("../../../src/middleware/rbac", () => ({ scopeFor: async () => ({ scope: "all", scope_ids: null }) }));
+      const reg = require("../../../src/shared/search/registry");
+      const service = require("../../../src/shared/search/search.service");
+      const provider = require("../../../src/shared/search/provider");
+      const days = provider.recordProvider({ ...spec, type: "attendance_record", label: "Attendance Days", cap: 3 });
+      const staff = provider.recordProvider({ ...spec, lead: true });
+      jest.spyOn(reg, "providers").mockReturnValue([days, staff]);
+      const rows = [1, 2, 3, 4].map((n) => ({ id: `r-${n}`, title: "Ada Obi", _total: 4 }));
+      const client = { query: async (sql) => ({ rows: /\bLIMIT\b/.test(sql) ? rows : [] }), release() {} };
+      const r = await service.search({ connect: async () => client }, { user_id: "u-1", is_ceo: false }, { q: "ada" });
+      expect(r.groups.map((g) => g.type)).toEqual(["employee", "attendance_record"]);
+      expect(r.groups[0].items).toHaveLength(4);
+      expect(r.groups[1].items).toHaveLength(3);
+    });
+  });
+
   test("a type word at either end narrows the search", () => {
     const providers = [
       { type: "employee", words: ["staff", "employee"] },

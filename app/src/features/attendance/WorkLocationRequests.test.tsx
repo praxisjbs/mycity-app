@@ -245,7 +245,7 @@ describe("temporary sites", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Temporary" }));
     fireEvent.click(await screen.findByText("TS-0001 · Partner Training Week", undefined, { timeout: 5000 }));
     let dialog = await screen.findByRole("dialog", { name: "TS-0001 · Partner Training Week" });
-    fireEvent.click(within(dialog).getByText("Tolu Adeyemi"));
+    fireEvent.click(within(within(dialog).getByText("Tolu Adeyemi").closest("tr")!).getByRole("button", { name: "Take Off" }));
     let form = await screen.findByRole("dialog", { name: "Take Off Tolu Adeyemi" });
     fill(form, "Reason", "Needed at the office this week");
     pressIn(form, "Take Off");
@@ -253,8 +253,11 @@ describe("temporary sites", () => {
     let site = (await api.call("GET /api/v1/attendance/temporary-sites", { query: { q: "TS-0001" } })).data[0];
     expect(site).toMatchObject({ people: 1, status: "approved" });
 
+    // The list has its new answer before the site opens again from it.
+    await waitFor(() => expect(screen.getByText("TS-0001 · Partner Training Week").closest("tr")!.textContent).not.toContain("Tolu Adeyemi"));
     fireEvent.click(await screen.findByText("TS-0001 · Partner Training Week"));
     dialog = await screen.findByRole("dialog", { name: "TS-0001 · Partner Training Week" });
+    await waitFor(() => expect(within(dialog).queryByRole("button", { name: "Take Off" })).toBeNull());
     pressIn(dialog, "Cancel Site");
     form = await screen.findByRole("dialog", { name: "Cancel Site" });
     fill(form, "Reason", "The partner postponed the training");

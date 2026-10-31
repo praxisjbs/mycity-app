@@ -23,6 +23,8 @@ const engine = require("../../shared/import/engine");
 const report = require("../../shared/import/report");
 const { revert: revertBatch } = require("../../shared/import/revert");
 const { scopeFor } = require("../../middleware/rbac");
+const { maskedKeysFor } = require("../../shared/rbac/field-mask");
+const mapping = require("../../shared/import/mapping");
 const repo = require("./imports.repo");
 
 async function tx(fn) {
@@ -151,11 +153,35 @@ async function revert(batchId, actor) {
   };
 }
 
-/** A page of the sheet's rows, as the Preview step shows them. */
+/**
+ * A page of the sheet's rows, as the Preview step shows them. A restricted column (bank,
+ * personal) is blanked for a reader masked from it, in the cells, the values and the changes,
+ * exactly as the error file blanks it.
+ */
 async function rows(user, batchId, query) {
   const batch = await engine.loadBatch(pool, batchId);
   await assertMayRead(user, batch);
-  return engine.rowsOf(pool, batchId, query);
+  const page = await engine.rowsOf(pool, batchId, query);
+  const imp = registry.get(batch.importer_key);
+  const masked = new Set(await maskedKeysFor(pool, user));
+  const keys = new Set(imp ? imp.fields.filter((f) => f.mask && masked.has(f.mask)).map((f) => f.key) : []);
+  if (keys.size === 0) return page;
+  const headers = new Set(
+    ((batch.mapping && batch.mapping.columns) || [])
+      .filter((c) => keys.has(c.field))
+      .map((c) => mapping.normalise(c.header === "" ? `Column ${c.index + 1}` : c.header)),
+  );
+  const blank = (obj, hidden) =>
+    obj && Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, hidden(k) ? null : v]));
+  return {
+    ...page,
+    data: page.data.map((r) => ({
+      ...r,
+      raw: blank(r.raw, (k) => headers.has(mapping.normalise(k))),
+      values: blank(r.values, (k) => keys.has(k)),
+      diff: r.diff && Object.fromEntries(Object.entries(r.diff).filter(([k]) => !keys.has(k))),
+    })),
+  };
 }
 
 /** The error file: the person's own rows and columns, plus Status and Problem. */

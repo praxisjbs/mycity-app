@@ -429,6 +429,52 @@ describeDb("documents and imports through the API", () => {
       },
       90_000,
     );
+
+    test("a doc type with templateChoice renders the template its caller names, and records it", async () => {
+      const vars = z.object({ employee_name: z.string() });
+      variables.defineVariables("document", "test-chosen-default", vars);
+      variables.defineVariables("document", "test-chosen-other", vars);
+      documents.defineDocType("test_chosen", {
+        template: "test-chosen-default",
+        templateChoice: true,
+        title: (d) => `Chosen for ${d.employee_name}`,
+      });
+      documents.defineDocType("test_fixed", {
+        template: "test-chosen-default",
+        title: (d) => `Fixed for ${d.employee_name}`,
+      });
+      for (const [key, body] of [
+        ["test-chosen-default", "Default wording for {{ employee_name }}."],
+        ["test-chosen-other", "Other wording for {{ employee_name }}."],
+      ]) {
+        await tx((c) => templates.saveVersion(c, { kind: "document", key, body, format: "markdown" }));
+      }
+      const make = (docType, template) =>
+        tx((c) =>
+          documents.generate(c, {
+            doc_type: docType,
+            template,
+            entity: { type: "employee", id: people.staff.employee.employee_id },
+            subject_employee_id: people.staff.employee.employee_id,
+            data: { employee_name: "Temi" },
+            actor: people.ops.user,
+          }),
+        );
+
+      const chosen = await make("test_chosen", "test-chosen-other");
+      expect(chosen.template_key).toBe("test-chosen-other");
+      const htmlOf = async (doc) =>
+        (await one("SELECT render_html FROM document WHERE document_id = $1", [doc.document_id])).render_html;
+      expect(await htmlOf(chosen)).toContain("Other wording for Temi.");
+
+      const fallback = await make("test_chosen", undefined);
+      expect(fallback.template_key).toBe("test-chosen-default");
+      expect(await htmlOf(fallback)).toContain("Default wording for Temi.");
+
+      await expect(make("test_fixed", "test-chosen-other")).rejects.toThrow(/does not take a template/);
+      // A key nobody declared variables for is refused before anything is stored.
+      await expect(make("test_chosen", "test-chosen-nobody")).rejects.toThrow(/no declared variables/);
+    });
   });
 
   /* ---------------------------------------------------------------- */

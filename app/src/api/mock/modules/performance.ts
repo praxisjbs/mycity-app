@@ -1,11 +1,13 @@
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
-import { byId, byKey, managerOf, refKey, teamOf } from "../data/people";
+import { byId, byKey, DEPARTMENTS, managerOf, refKey, SIGN_INS, teamOf } from "../data/people";
+import { me } from "./identity";
 import type {
   AnalyticsPerson,
   ApprovalInstance,
   ApprovalWaiting,
   KeyResult,
   KeyResultDetail,
+  GoalShare,
   KeyResultMonth,
   Kpi,
   KpiMonth,
@@ -14,9 +16,11 @@ import type {
   OrganisationalGoalTarget,
   PerformanceAnalytics,
   PerformanceApproval,
+  PerformanceFunction,
   PerformancePeriod,
   Plan,
   PlanDetail,
+  PlanUnbindDetail,
   Scorecard,
   ScorecardDetail,
   ScorecardLine,
@@ -57,8 +61,8 @@ route("GET /api/v1/performance/periods/:id", (req) => {
   return p ? ok(p) : notFound();
 });
 route("POST /api/v1/performance/periods", (req) => {
-  const b = req.body as { starts_on?: string; name?: string; targets_lock_on?: string; live_from?: string; status?: "planning" | "active"; rules?: PerformancePeriod["rules"] };
-  if (!b.starts_on || !/-(01|04|07|10)-01$/.test(b.starts_on)) return invalid({ starts_on: ["Pick a quarter's first day"] });
+  const b = req.body as { starts_on?: string; name?: string; live_from?: string; status?: "planning" | "active"; rules?: PerformancePeriod["rules"] };
+  if (!b.starts_on || !/-(01|04|07|10)-01$/.test(b.starts_on)) return invalid({ starts_on: ["Pick a quarter start"] });
   if (PERIODS.some((p) => p.starts_on === b.starts_on)) return fail(409, "PERIOD_EXISTS", "That quarter is already set up", { starts_on: ["Already set up"] });
   if (b.status === "active" && PERIODS.some((p) => p.status === "active")) return fail(409, "PERIOD_ACTIVE_EXISTS", "Close the active quarter first", { status: ["Another is active"] });
   const last = [...PERIODS].sort((a, c) => c.starts_on.localeCompare(a.starts_on))[0];
@@ -69,7 +73,6 @@ route("POST /api/v1/performance/periods", (req) => {
     starts_on: b.starts_on,
     ends_on: new Date(Date.parse(`${addMonths(b.starts_on, 3)}T00:00:00Z`) - 86400000).toISOString().slice(0, 10),
     plan_year_starts_on: `${b.starts_on.slice(0, 4)}-01-01`,
-    targets_lock_on: b.targets_lock_on || null,
     live_from: b.live_from || null,
     status: b.status ?? "planning",
     rules: b.rules ?? last.rules,
@@ -83,6 +86,7 @@ route("POST /api/v1/performance/periods", (req) => {
 route("PATCH /api/v1/performance/periods/:id", (req) => {
   const p = PERIODS.find((x) => x.performance_period_id === req.params.id);
   if (!p) return notFound();
+  if (p.status === "closed") return fail(409, "PERIOD_CLOSED", "That quarter is closed");
   const b = req.body as Partial<PerformancePeriod>;
   if (b.status === "active" && PERIODS.some((x) => x !== p && x.status === "active")) return fail(409, "PERIOD_ACTIVE_EXISTS", "Close the active quarter first", { status: ["Another is active"] });
   Object.assign(p, b, { updated_at: new Date().toISOString() });
@@ -120,12 +124,21 @@ const planOf = (periodId: string, departmentId: string | null) => {
   }
   return p;
 };
-const open = (status: string) => status === "draft" || status === "returned";
+/** A plan Send Plan is offered on: before its first approval, or unbound (§6.22). */
+const open = (status: string) => status === "draft" || status === "returned" || status === "unbound";
+/** A plan the quarter runs on: binding, unbound, or revising while the CEO decides the changes. */
+const live = (status: string) => status === "binding" || status === "unbound" || status === "revising";
+/** A plan sent for the CEO's decision. */
+const waiting = (status: string) => status === "submitted" || status === "revising";
+/** A plan its head may add to and change: those above and while it awaits approval, what is added joining the plan sent (§6.4). */
+const editable = (status: string) => open(status) || waiting(status);
+/** A plan that was binding and is being changed: what was reported on it is kept (§6.22). */
+const amended = (status: string) => status === "unbound" || status === "revising";
 const allKrs = () => OBJECTIVES.flatMap((o) => o.key_results);
 const krById = (id: string) => allKrs().find((k) => k.okr_key_result_id === id);
 const objectiveOf = (kr: KeyResult) => OBJECTIVES.find((o) => o.okr_objective_id === kr.okr_objective_id)!;
 const fieldsOf = (b: Record<string, unknown>, keys: string[]) => Object.fromEntries(keys.filter((k) => k in b).map((k) => [k, b[k] === "" ? null : b[k]]));
-const KR_KEYS = ["statement", "kr_type", "measure", "direction", "unit", "baseline_text", "target_value", "target_text", "target_provisional", "parts", "starts_on", "finishes_on", "accountable_note", "scored_from_key_result_id", "position"];
+const KR_KEYS = ["statement", "kr_type", "measure", "direction", "unit", "baseline_text", "target_value", "target_text", "parts", "starts_on", "finishes_on", "accountable_note", "scored_from_key_result_id", "position"];
 const objectiveScore = (o: Objective) => {
   const s = o.key_results.map((k) => k.latest?.score).filter((x): x is string => x !== null && x !== undefined).map(Number);
   return s.length ? String(Math.round((s.reduce((x, y) => x + y, 0) / s.length) * 100) / 100) : null;
@@ -144,13 +157,77 @@ const traceOf = (kr: KeyResult) => {
 };
 /** Who may set a function's goals here: the CEO, or the demonstration function's head. */
 const setsGoalsFor = (req: Req, departmentId: string | null) => isCeo(req) || (departmentId === deptId && meOf(req)?.user_key === "ngozi");
-/** An objective as the reader gets it: may they edit it now (a draft or returned plan whose goals they set)? */
-const withCan = (o: Objective, req: Req): Objective => ({ ...o, score: objectiveScore(o), can_edit: open(o.plan_status) && setsGoalsFor(req, o.department_id) });
-/** A TBC target still open: provisional, not locked, its quarter's lock date not come (§6.7). */
-const tbcOpen = (kr: KeyResult) => {
-  const lock = (PERIODS.find((p) => p.performance_period_id === objectiveOf(kr).performance_period_id) ?? PERIOD).targets_lock_on;
-  return kr.target_provisional && !kr.target_locked_at && (!lock || lock > new Date().toISOString().slice(0, 10));
+/* ------------------------------------------------------------------ *
+ * Who reads the tree, and what is shared (docs/guides/performance.md §6.23, §6.24), as the API's goals.visibility.js and
+ * goals.share.js answer: the whole plan for the CEO and whoever holds goals.view_all, goals.company or goals.organisation;
+ * every function for Operations & People; the reader's own department for everyone else; a key result they own anywhere;
+ * and what the CEO or Management shared with all staff or their department.
+ * ------------------------------------------------------------------ */
+const capsOf = (req: Req) => me(req.user ?? "").capabilities;
+const readsWholePlan = (req: Req) => isCeo(req) || ["goals.view_all", "goals.company", "goals.organisation"].some((c) => capsOf(req).includes(c));
+const readsEveryFunction = (req: Req) => readsWholePlan(req) || SIGN_INS[req.user ?? ""]?.view === "operations";
+/** The departments the reader reads as their own: the one on their record, and the one the demonstration head heads. */
+const ownDepartments = (req: Req) => {
+  const person = meOf(req);
+  const ids = new Set<string>();
+  if (person?.department) ids.add(sid(`dept:${person.department}`));
+  if (person?.user_key === "ngozi") ids.add(deptId);
+  // And the functions of the scorecards they review, whose lines they link to those key results.
+  for (const c of SCORECARDS) if (c.department_id && reviewerOf(c, req)) ids.add(c.department_id);
+  return ids;
 };
+/** May the reader read a function's goals, KPIs and plan (the company's, for no department, is the whole plan's)? */
+const readsFunction = (req: Req, departmentId: string | null) => (departmentId ? readsEveryFunction(req) || ownDepartments(req).has(departmentId) : readsWholePlan(req));
+const SHARES = new Map<string, GoalShare>();
+const shareKey = (kind: "goal" | "objective", id: string) => `${kind}:${id}`;
+const sharedWithReader = (req: Req, kind: "goal" | "objective", id: string) => {
+  const share = SHARES.get(shareKey(kind, id));
+  return Boolean(share && (share.audience === "all" || share.departments.some((d) => ownDepartments(req).has(d.department_id))));
+};
+const ownsKr = (k: KeyResult, req: Req) => [k.accountable, k.co_accountable].some((p) => Boolean(p) && p!.employee_id === meOf(req)?.employee_id);
+/** The whole of an objective: a function's of the reader's, or a company objective shared with them. */
+const objectiveOpen = (o: Objective, req: Req) => (o.department_id ? readsFunction(req, o.department_id) : readsWholePlan(req) || sharedWithReader(req, "objective", o.okr_objective_id));
+const objectiveReadable = (o: Objective, req: Req) => objectiveOpen(o, req) || o.key_results.some((k) => ownsKr(k, req));
+const krReadable = (k: KeyResult, req: Req) => objectiveOpen(objectiveOf(k), req) || ownsKr(k, req);
+const goalReadable = (g: OrganisationalGoal, req: Req) => readsWholePlan(req) || sharedWithReader(req, "goal", g.organisational_goal_id);
+const mayShareGoal = (req: Req) => isCeo(req) || capsOf(req).includes("goals.organisation");
+const mayShareObjective = (o: Objective, req: Req) => o.department_id === null && (isCeo(req) || capsOf(req).includes("goals.company"));
+/** A goal as the reader gets it: whether they may share it and, if so, how it is shared. */
+const withGoalShare = (g: OrganisationalGoal, req: Req): OrganisationalGoal => ({
+  ...g,
+  can_share: mayShareGoal(req),
+  share: mayShareGoal(req) ? (SHARES.get(shareKey("goal", g.organisational_goal_id)) ?? null) : null,
+});
+/**
+ * An objective as the reader gets it: may they edit or share it now, with the key results they read (all of them, or only
+ * those they own) and no score when that is all they read.
+ */
+const withCan = (o: Objective, req: Req): Objective => {
+  const open = objectiveOpen(o, req);
+  const may = mayShareObjective(o, req);
+  return {
+    ...o,
+    key_results: open ? o.key_results : o.key_results.filter((k) => ownsKr(k, req)),
+    score: open ? objectiveScore(o) : null,
+    can_edit: editable(o.plan_status) && setsGoalsFor(req, o.department_id),
+    can_share: may,
+    share: may ? (SHARES.get(shareKey("objective", o.okr_objective_id)) ?? null) : null,
+  };
+};
+/** The trace as far as the reader may read it: the company key result by code and statement, the objective and goal where theirs. */
+const readableTrace = (k: KeyResult, req: Req) => ({
+  steps: traceOf(k).steps.filter((st) => {
+    if (st.kind === "objective") {
+      const o = OBJECTIVES.find((x) => x.okr_objective_id === st.id);
+      return Boolean(o && objectiveReadable(o, req));
+    }
+    if (st.kind === "organisational_goal") {
+      const g = ORG_GOALS.find((x) => x.organisational_goal_id === st.id);
+      return Boolean(g && goalReadable(g, req));
+    }
+    return true;
+  }),
+});
 const isOwner = (kr: KeyResult, req: Req) => Boolean(kr.accountable && kr.accountable.employee_id === meOf(req)?.employee_id);
 /** The form's people and links, as a key result carries them. */
 const krPeopleAndLinks = (b: Record<string, unknown>): Partial<KeyResult> => {
@@ -173,26 +250,26 @@ const krDetail = (kr: KeyResult, req: Req): KeyResultDetail => {
     department_id: o.department_id,
     department: o.department,
     plan_status: o.plan_status,
-    contributing: allKrs().filter((k) => k.linked_company_key_results.some((c) => c.okr_key_result_id === kr.okr_key_result_id)).map((k) => ({ okr_key_result_id: k.okr_key_result_id, code: k.code, statement: k.statement })),
+    contributing: allKrs()
+      .filter((k) => krReadable(k, req) && k.linked_company_key_results.some((c) => c.okr_key_result_id === kr.okr_key_result_id))
+      .map((k) => ({ okr_key_result_id: k.okr_key_result_id, code: k.code, statement: k.statement })),
     initiatives: [],
     months: kr.latest ? [kr.latest] : [],
     target_history: TARGET_CHANGES.filter((c) => c.okr_key_result_id === kr.okr_key_result_id),
-    trace: traceOf(kr),
+    trace: readableTrace(kr, req),
     performance_period_id: o.performance_period_id,
     can_change_target:
       o.plan_status === "binding" &&
-      !tbcOpen(kr) &&
       !TARGET_CHANGES.some((c) => c.okr_key_result_id === kr.okr_key_result_id && c.status === "pending") &&
       (isOwner(kr, req) || setsGoalsFor(req, o.department_id)),
-    can_edit: open(o.plan_status) && setsGoalsFor(req, o.department_id),
-    can_set_target: o.plan_status === "binding" && tbcOpen(kr) && (isOwner(kr, req) || setsGoalsFor(req, o.department_id)),
+    can_edit: editable(o.plan_status) && setsGoalsFor(req, o.department_id),
   };
 };
 
 /* Organisational goals, and what each quarter of their year should reach */
 const GOAL_TARGETS = new Map<string, OrganisationalGoalTarget[]>();
 route("GET /api/v1/performance/goals", (req) =>
-  paged(ORG_GOALS, req, {
+  paged(ORG_GOALS.filter((g) => goalReadable(g, req)).map((g) => withGoalShare(g, req)), req, {
     search: (g) => [g.code, g.title, g.strategic_theme],
     filters: { plan_year: (g, v) => (g.plan_year_starts_on ?? "").startsWith(v), status: (g, v) => g.status === v },
     sort: { code: (a, b) => (a.code ?? "").localeCompare(b.code ?? ""), title: (a, b) => a.title.localeCompare(b.title), ends_on: (a, b) => a.ends_on.localeCompare(b.ends_on) },
@@ -200,19 +277,21 @@ route("GET /api/v1/performance/goals", (req) =>
 );
 route("GET /api/v1/performance/goals/:id", (req) => {
   const g = ORG_GOALS.find((x) => x.organisational_goal_id === req.params.id);
-  if (!g) return notFound();
+  if (!g || !goalReadable(g, req)) return notFound();
   const objectives = OBJECTIVES.filter((o) => o.organisational_goal_id === g.organisational_goal_id);
   const scores = objectives.map((o) => o.score).filter((x): x is string => Boolean(x)).map(Number);
-  return ok({ ...g, targets: GOAL_TARGETS.get(g.organisational_goal_id) ?? [], objectives: objectives.map((o) => ({ okr_objective_id: o.okr_objective_id, code: o.code, title: o.title })), progress: scores.length ? String(Math.round((scores.reduce((x, y) => x + y, 0) / scores.length) * 100) / 100) : null });
+  return ok({ ...withGoalShare(g, req), targets: GOAL_TARGETS.get(g.organisational_goal_id) ?? [], objectives: objectives.filter((o) => objectiveReadable(o, req)).map((o) => ({ okr_objective_id: o.okr_objective_id, code: o.code, title: o.title })), progress: scores.length ? String(Math.round((scores.reduce((x, y) => x + y, 0) / scores.length) * 100) / 100) : null });
 });
 route("POST /api/v1/performance/goals", (req) => {
   if (!isCeo(req)) return fail(403, "PERMISSION_DENIED", "Only the CEO sets organisational goals");
   const b = req.body as Record<string, string | undefined>;
   if (!b.title?.trim()) return invalid({ title: ["Required"] });
   const year = (b.plan_year_starts_on ?? `${new Date().getUTCFullYear()}-01-01`).slice(0, 4);
+  // The ID is the next of its plan year, as Documents & Numbering gives it (ORG-2026-05); never typed.
+  const taken = ORG_GOALS.map((x) => new RegExp(`^ORG-${year}-(\\d+)$`).exec(x.code ?? "")?.[1]).filter(Boolean).map(Number);
   const g: OrganisationalGoal = {
     organisational_goal_id: sid(`perf:goal:new:${fresh()}`),
-    code: b.code || null,
+    code: `ORG-${year}-${String(Math.max(0, ...taken) + 1).padStart(2, "0")}`,
     title: b.title.trim(),
     strategic_theme: b.strategic_theme || null,
     detail: b.detail || null,
@@ -226,11 +305,13 @@ route("POST /api/v1/performance/goals", (req) => {
     ends_on: `${year}-12-31`,
     status: "active",
     owner: refKey("ifeoma"),
+    can_share: false,
+    share: null,
     created_at: now(),
     updated_at: now(),
   };
   ORG_GOALS.push(g);
-  return created(g);
+  return created(withGoalShare(g, req));
 });
 route("PATCH /api/v1/performance/goals/:id", (req) => {
   const g = ORG_GOALS.find((x) => x.organisational_goal_id === req.params.id);
@@ -256,7 +337,7 @@ route("PATCH /api/v1/performance/goals/:id", (req) => {
     }
     GOAL_TARGETS.set(g.organisational_goal_id, held);
   }
-  return ok(g);
+  return ok(withGoalShare(g, req));
 });
 route("DELETE /api/v1/performance/goals/:id", (req) => {
   const at = ORG_GOALS.findIndex((x) => x.organisational_goal_id === req.params.id);
@@ -265,29 +346,92 @@ route("DELETE /api/v1/performance/goals/:id", (req) => {
   if (OBJECTIVES.some((o) => o.department_id === null && o.organisational_goal_id === req.params.id)) return fail(409, "GOAL_IN_USE", "A company objective serves this goal");
   ORG_GOALS.splice(at, 1);
   GOAL_TARGETS.delete(req.params.id);
+  SHARES.delete(shareKey("goal", req.params.id));
+  return noContent();
+});
+
+/** The departments a share names, as the API lists them: active ones, by id. */
+const sharedDepartments = (ids: string[]) => {
+  const known = [...DEPARTMENTS].map((name) => ({ department_id: sid(`dept:${name}`), code: name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase(), name }));
+  const rows = ids.map((id) => known.find((d) => d.department_id === id));
+  return rows.every(Boolean) ? (rows as typeof known) : null;
+};
+/** PUT .../share: Share Goal and Share Objective, the same save (§6.24). */
+const saveShare = (req: Req, kind: "goal" | "objective", itemId: string) => {
+  const b = req.body as { audience?: "all" | "departments"; department_ids?: string[] };
+  const ids = [...new Set(b.department_ids ?? [])];
+  if (b.audience === "departments" && ids.length === 0) return invalid({ department_ids: ["Pick a department"] });
+  if (b.audience === "all" && ids.length > 0) return invalid({ department_ids: ["All staff names none"] });
+  const departments = b.audience === "departments" ? sharedDepartments(ids) : [];
+  if (!departments) return invalid({ department_ids: ["Not a department"] });
+  const held = SHARES.get(shareKey(kind, itemId));
+  const share: GoalShare = {
+    goal_share_id: held?.goal_share_id ?? sid(`perf:share:${kind}:${itemId}`),
+    organisational_goal_id: kind === "goal" ? itemId : null,
+    okr_objective_id: kind === "objective" ? itemId : null,
+    audience: b.audience ?? "all",
+    departments,
+    shared_by: refKey(req.user!),
+    created_at: held?.created_at ?? now(),
+    updated_at: now(),
+  };
+  SHARES.set(shareKey(kind, itemId), share);
+  return ok(share);
+};
+route("PUT /api/v1/performance/goals/:id/share", (req) => {
+  if (!ORG_GOALS.some((g) => g.organisational_goal_id === req.params.id)) return notFound();
+  if (!mayShareGoal(req)) return fail(403, "CAPABILITY_REQUIRED", "Only the CEO shares organisational goals");
+  return saveShare(req, "goal", req.params.id);
+});
+route("DELETE /api/v1/performance/goals/:id/share", (req) => {
+  if (!ORG_GOALS.some((g) => g.organisational_goal_id === req.params.id)) return notFound();
+  if (!mayShareGoal(req)) return fail(403, "CAPABILITY_REQUIRED", "Only the CEO shares organisational goals");
+  SHARES.delete(shareKey("goal", req.params.id));
+  return noContent();
+});
+route("PUT /api/v1/performance/objectives/:id/share", (req) => {
+  const o = OBJECTIVES.find((x) => x.okr_objective_id === req.params.id);
+  if (!o) return notFound();
+  if (!isCeo(req) && !capsOf(req).includes("goals.company")) return fail(403, "CAPABILITY_REQUIRED", "Only Management share company objectives");
+  if (o.department_id) return fail(409, "NOT_A_COMPANY_OBJECTIVE", "Only a company objective is shared");
+  return saveShare(req, "objective", o.okr_objective_id);
+});
+route("DELETE /api/v1/performance/objectives/:id/share", (req) => {
+  const o = OBJECTIVES.find((x) => x.okr_objective_id === req.params.id);
+  if (!o) return notFound();
+  if (!isCeo(req) && !capsOf(req).includes("goals.company")) return fail(403, "CAPABILITY_REQUIRED", "Only Management share company objectives");
+  SHARES.delete(shareKey("objective", o.okr_objective_id));
   return noContent();
 });
 
 /* Objectives and key results */
 route("GET /api/v1/performance/okrs", (req) =>
   paged(
-    OBJECTIVES.map((o) => withCan(o, req)),
+    OBJECTIVES.filter((o) => objectiveReadable(o, req)).map((o) => withCan(o, req)),
     req,
     {
       search: (o) => [o.code, o.title, ...o.key_results.flatMap((k) => [k.code, k.statement])],
-      filters: { period_id: (o, v) => o.performance_period_id === v, department_id: (o, v) => (v === "company" ? o.department_id === null : o.department_id === v), status: (o, v) => o.plan_status === v },
+      filters: {
+        period_id: (o, v) => o.performance_period_id === v,
+        department_id: (o, v) => (v === "company" ? o.department_id === null : o.department_id === v),
+        status: (o, v) => o.plan_status === v || (v === "live" && live(o.plan_status)) || (v === "editable" && editable(o.plan_status)),
+      },
       sort: { position: (a, b) => (a.department ?? "").localeCompare(b.department ?? "") || a.position - b.position, code: (a, b) => a.code.localeCompare(b.code) },
     },
   ),
 );
 route("GET /api/v1/performance/okrs/summary", (req) => {
   const q = req.query as { period_id?: string; department_id?: string };
-  const all = OBJECTIVES.filter((o) => o.performance_period_id === q.period_id);
-  const company = all.filter((o) => o.department_id === null).map(objectiveScore).filter((x): x is string => x !== null).map(Number);
+  // What the reader reads (§6.23): the whole plan's every objective, anyone else's the functions' they read whole.
+  const all = OBJECTIVES.filter((o) => o.performance_period_id === q.period_id && (readsWholePlan(req) || (o.department_id !== null && objectiveOpen(o, req))));
+  const mean = (scores: string[]) => (scores.length ? String(Math.round((scores.reduce((x, y) => x + Number(y), 0) / scores.length) * 100) / 100) : null);
+  const company = readsWholePlan(req) ? all.filter((o) => o.department_id === null).map(objectiveScore).filter((x): x is string => x !== null) : [];
+  const functionScores = all.filter((o) => o.department_id !== null && (!q.department_id || q.department_id === o.department_id)).map(objectiveScore).filter((x): x is string => x !== null);
   const wanted = q.department_id === "company" ? all.filter((o) => o.department_id === null) : q.department_id ? all.filter((o) => o.department_id === q.department_id) : all;
   const krs = wanted.flatMap((o) => o.key_results);
   return ok({
-    company_score: company.length ? String(Math.round((company.reduce((x, y) => x + y, 0) / company.length) * 100) / 100) : null,
+    company_score: mean(company),
+    function_score: mean(functionScores),
     key_results: krs.length,
     on_track: krs.filter((k) => k.latest?.band === "good").length,
     in_recovery: krs.filter((k) => k.latest?.band === "recovery").length,
@@ -300,7 +444,7 @@ route("POST /api/v1/performance/objectives", (req) => {
   const periodId = b.performance_period_id || PERIOD.performance_period_id;
   const dept = b.department_id || null;
   const plan = planOf(periodId, dept);
-  if (!open(plan.status)) return fail(409, "PLAN_NOT_OPEN", "The plan is sent or binding", { department_id: ["Plan is binding"] });
+  if (!editable(plan.status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead", { department_id: ["Plan is binding"] });
   const prefix = dept === null ? "CO" : dept === deptId ? "BM" : "FN";
   const used = new Set(OBJECTIVES.filter((o) => o.code.startsWith(`${prefix}-O`)).map((o) => Number(o.code.split("-O")[1])));
   let n = 1;
@@ -319,6 +463,8 @@ route("POST /api/v1/performance/objectives", (req) => {
     score: null,
     key_results: [],
     can_edit: false,
+    can_share: false,
+    share: null,
   };
   OBJECTIVES.push(o);
   plan.objective_count += 1;
@@ -326,12 +472,12 @@ route("POST /api/v1/performance/objectives", (req) => {
 });
 route("GET /api/v1/performance/objectives/:id", (req) => {
   const o = OBJECTIVES.find((x) => x.okr_objective_id === req.params.id);
-  return o ? ok(withCan(o, req)) : notFound();
+  return o && objectiveReadable(o, req) ? ok(withCan(o, req)) : notFound();
 });
 route("PATCH /api/v1/performance/objectives/:id", (req) => {
   const o = OBJECTIVES.find((x) => x.okr_objective_id === req.params.id);
   if (!o) return notFound();
-  if (!open(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead");
+  if (!editable(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead");
   if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
   Object.assign(o, fieldsOf(req.body, ["title", "organisational_goal_id", "position"]));
   return ok(withCan(o, req));
@@ -339,8 +485,13 @@ route("PATCH /api/v1/performance/objectives/:id", (req) => {
 route("DELETE /api/v1/performance/objectives/:id", (req) => {
   const i = OBJECTIVES.findIndex((x) => x.okr_objective_id === req.params.id);
   if (i < 0) return notFound();
-  if (!open(OBJECTIVES[i].plan_status)) return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead");
+  if (!editable(OBJECTIVES[i].plan_status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead");
   if (!setsGoalsFor(req, OBJECTIVES[i].department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
+  if (amended(OBJECTIVES[i].plan_status) && OBJECTIVES[i].key_results.some((k) => k.latest))
+    return fail(409, "KEY_RESULT_REPORTED", "A key result of this objective has a reported month");
+  // A plan awaiting approval was sent with something to approve: it never loses its last objective.
+  if (waiting(OBJECTIVES[i].plan_status) && OBJECTIVES.filter((x) => x.performance_plan_id === OBJECTIVES[i].performance_plan_id).length <= 1)
+    return fail(409, "PLAN_EMPTY", "A plan awaiting approval keeps an objective");
   const plan = PLANS.find((p) => p.performance_plan_id === OBJECTIVES[i].performance_plan_id);
   if (plan) plan.objective_count = Math.max(0, plan.objective_count - 1);
   OBJECTIVES.splice(i, 1);
@@ -351,7 +502,7 @@ route("POST /api/v1/performance/key-results", (req) => {
   const o = OBJECTIVES.find((x) => x.okr_objective_id === b.okr_objective_id);
   if (!o) return invalid({ okr_objective_id: ["Pick an objective"] });
   if (!String(b.statement ?? "").trim()) return invalid({ statement: ["Required"] });
-  if (!open(o.plan_status)) return fail(409, "PLAN_NOT_OPEN", "The plan is sent or binding");
+  if (!editable(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead");
   if (o.key_results.length >= 4) return fail(422, "OBJECTIVE_TOO_MANY", "An objective holds at most 4 key results", { okr_objective_id: ["Already has 4"] });
   const used = new Set(o.key_results.map((k) => Number(k.code.split(".")[1])));
   let n = 1;
@@ -369,8 +520,6 @@ route("POST /api/v1/performance/key-results", (req) => {
     baseline_text: null,
     target_value: null,
     target_text: null,
-    target_provisional: false,
-    target_locked_at: null,
     parts: null,
     starts_on: null,
     finishes_on: null,
@@ -389,9 +538,12 @@ route("POST /api/v1/performance/key-results", (req) => {
 });
 route("GET /api/v1/performance/key-results", (req) => {
   const q = req.query as { period_id?: string; level?: string; department_id?: string };
+  // A function's key results within the reader's reach; the company's, by code and statement, for whoever sets goals (§6.23).
+  const picksCompany = readsWholePlan(req) || capsOf(req).includes("goals.function") || capsOf(req).includes("goals.company") || capsOf(req).includes("performance.manage");
   const refs = allKrs()
     .filter((k) => {
       const o = objectiveOf(k);
+      if (!(krReadable(k, req) || (o.department_id === null && picksCompany))) return false;
       return (!q.period_id || o.performance_period_id === q.period_id) && (!q.level || (q.level === "company") === (o.department_id === null)) && (!q.department_id || o.department_id === q.department_id);
     })
     .map((k) => ({ okr_key_result_id: k.okr_key_result_id, code: k.code, statement: k.statement }));
@@ -400,23 +552,25 @@ route("GET /api/v1/performance/key-results", (req) => {
 });
 route("GET /api/v1/performance/key-results/:id", (req) => {
   const k = krById(req.params.id);
-  return k ? ok(krDetail(k, req)) : notFound();
+  return k && krReadable(k, req) ? ok(krDetail(k, req)) : notFound();
 });
 route("GET /api/v1/performance/key-results/:id/trace", (req) => {
   const k = krById(req.params.id);
-  return k ? ok(traceOf(k)) : notFound();
+  return k && krReadable(k, req) ? ok(readableTrace(k, req)) : notFound();
 });
 route("PATCH /api/v1/performance/key-results/:id", (req) => {
   const k = krById(req.params.id);
   if (!k) return notFound();
   const o = objectiveOf(k);
   const b = req.body as Record<string, unknown>;
-  if (open(o.plan_status)) {
-    if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
-  } else {
-    const onlyTarget = Object.keys(b).every((x) => ["target_value", "target_text", "target_provisional"].includes(x));
-    if (!(tbcOpen(k) && onlyTarget && (isOwner(k, req) || setsGoalsFor(req, o.department_id)))) return fail(409, "KEY_RESULT_BINDING", "This key result is binding: change its target instead");
-  }
+  if (!editable(o.plan_status)) return fail(409, "KEY_RESULT_BINDING", "This key result is binding: change its target instead");
+  if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
+  // An unbound plan keeps what a reported month was scored on in place: the target changes through Change Target (§6.22).
+  const scored = ["target_value", "target_text", "measure", "direction", "unit", "parts"].filter(
+    (x) => x in b && JSON.stringify(b[x] === "" ? null : b[x]) !== JSON.stringify((k as unknown as Record<string, unknown>)[x] ?? null),
+  );
+  if (amended(o.plan_status) && k.latest && scored.length)
+    return fail(409, "KEY_RESULT_REPORTED", "This key result has a reported month: change its target instead", Object.fromEntries(scored.map((x) => [x, ["Use Change Target"]])));
   Object.assign(k, fieldsOf(b, KR_KEYS), krPeopleAndLinks(b));
   return ok(k);
 });
@@ -424,8 +578,9 @@ route("DELETE /api/v1/performance/key-results/:id", (req) => {
   const k = krById(req.params.id);
   if (!k) return notFound();
   const o = objectiveOf(k);
-  if (!open(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead");
+  if (!editable(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is binding: change a target instead");
   if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
+  if (amended(o.plan_status) && k.latest) return fail(409, "KEY_RESULT_REPORTED", "This key result has a reported month");
   o.key_results = o.key_results.filter((x) => x !== k);
   return noContent();
 });
@@ -440,9 +595,8 @@ route("POST /api/v1/performance/key-results/:id/confirm", (req) => {
 });
 
 /* Report Month */
-/** The score a report proposes, as the API works it out: none for a TBC target not yet locked. */
+/** The score a report proposes, as the API works it out. */
 const proposedOf = (k: KeyResult, r: Record<string, string | undefined>) => {
-  if (k.target_provisional && !k.target_locked_at) return null;
   if (k.measure === "numeric") {
     const target = Number(k.target_value);
     const actual = Number(r.actual_value);
@@ -457,6 +611,9 @@ route("POST /api/v1/performance/reports", (req) => {
   const krs = rows.map((r) => krById(r.okr_key_result_id ?? ""));
   if (krs.some((k) => !k || objectiveOf(k).department_id !== (b.department_id ?? null))) return invalid({ key_results: ["Not this function's"] });
   if (!setsGoalsFor(req, b.department_id ?? null)) return fail(403, "PERMISSION_DENIED", "Only the function's head reports its month");
+  // A KPI that was Met or Not Met needs its figure, on its own row; only N/A has none.
+  const noFigure = Object.fromEntries((b.kpis ?? []).flatMap((r, i) => (r.result !== "na" && !r.actual_value && !r.actual_text ? [[`kpis.${i}.actual_value`, ["Enter the actual"]]] : [])));
+  if (Object.keys(noFigure).length) return invalid(noFigure);
   const missing = Object.fromEntries(
     rows.flatMap((r, i) => {
       const p = proposedOf(krs[i]!, r);
@@ -508,11 +665,19 @@ const planProblems = (p: Plan) => {
     if (weightProblems(c).length) out.push({ code: "WEIGHTS_NOT_100", message: `${c.employee.display_name}'s weights do not total 100`, blocking: true });
   return out;
 };
+/** Requests to unbind a plan this session (§6.22): none are seeded; the CEO's Waiting On You shows them as they are asked. */
+const UNBINDS: PlanUnbindDetail[] = [];
+const unbindPending = (planId: string) => UNBINDS.some((u) => u.performance_plan_id === planId && u.status === "pending");
+/** A request as PlanUnbind: the plan's function and quarter are the detail's alone. */
+const unbindRow = ({ department_id: _d, department: _f, period_name: _q, ...row }: PlanUnbindDetail) => row;
 const planDetail = (req: Req, p: Plan): PlanDetail => {
   // A sent plan was clear when it went; what is left to fix is worked out while it is open.
   const problems = open(p.status) ? planProblems(p) : [];
+  const latestUnbind = UNBINDS.filter((u) => u.performance_plan_id === p.performance_plan_id).at(-1);
   const me = meOf(req);
   const head = p.department_id === deptId ? me?.user_key === "ngozi" : isCeo(req);
+  // Who a plan awaiting approval is with: the stage of its own flow, as the engine tells it.
+  const flow = waiting(p.status) ? FLOWS.find((f) => !f.scorecardId && f.wid === p.workflow_instance_id && pending(f)) : undefined;
   return {
     ...p,
     objective_count: OBJECTIVES.filter((o) => o.performance_plan_id === p.performance_plan_id).length,
@@ -522,17 +687,70 @@ const planDetail = (req: Req, p: Plan): PlanDetail => {
     contributions: CONTRIBUTIONS,
     problems,
     can_submit: open(p.status) && (head || isCeo(req)) && !problems.some((x) => x.blocking),
+    approval: flow ? { stage_key: flow.stages[flow.at], stage_name: STAGE_NAMES[flow.stages[flow.at]] } : null,
+    unbind: latestUnbind ? unbindRow(latestUnbind) : null,
   };
 };
 route("GET /api/v1/performance/plans", (req) =>
-  paged(PLANS, req, {
+  paged(PLANS.filter((p) => readsFunction(req, p.department_id)), req, {
     filters: { period_id: (p, v) => p.performance_period_id === v, status: (p, v) => p.status === v, department_id: (p, v) => (v === "company" ? p.department_id === null : p.department_id === v) },
     sort: { department: (a, b) => (a.department ?? "").localeCompare(b.department ?? ""), status: (a, b) => a.status.localeCompare(b.status) },
   }),
 );
+/**
+ * GET /performance/functions: the company first, then each function by name, whether the reader may
+ * set its goals and KPIs as the API's goals.authority answers (the CEO everything; goals.company the
+ * company's; goals.function with performance.manage, or as the function's head, a function's), and
+ * its plan's status in the quarter asked for.
+ */
+route("GET /api/v1/performance/functions", (req) => {
+  const caps = me(req.user ?? "").capabilities;
+  const periodId = req.query.period_id || null;
+  const maySet = (departmentId: string | null) =>
+    isCeo(req) ||
+    (departmentId === null ? caps.includes("goals.company") : caps.includes("goals.function") && (caps.includes("performance.manage") || setsGoalsFor(req, departmentId)));
+  const planIn = (departmentId: string | null) => (periodId ? PLANS.find((p) => p.performance_period_id === periodId && p.department_id === departmentId) : undefined);
+  const rows: PerformanceFunction[] = [null, ...[...DEPARTMENTS].sort((a, b) => a.localeCompare(b))]
+    .filter((name) => readsFunction(req, name === null ? null : sid(`dept:${name}`)))
+    .map((name) => {
+    const id = name === null ? null : sid(`dept:${name}`);
+    const plan = planIn(id);
+    // Request To Unbind is offered where the plan is binding, the reader sets it and no request waits; the CEO keeps New Goal (§6.22).
+    const canUnbind = !isCeo(req) && maySet(id) && plan?.status === "binding" && !unbindPending(plan.performance_plan_id);
+    return { department_id: id, name, may_set: maySet(id), plan_status: plan?.status ?? null, can_request_unbind: canUnbind };
+  });
+  // The quarter names each plan; it narrows nothing.
+  return paged(rows, req, { filters: { period_id: () => true } });
+});
+/**
+ * GET /performance/departments: the departments the reader's Scorecards, Commitments, Reviews and
+ * Analytics filter by. The CEO and Operations & People reach everyone, so every department; anyone
+ * else the department of themselves, their team and the people whose scorecards they review, and
+ * the ones their scorecards name.
+ */
+route("GET /api/v1/performance/departments", (req) => {
+  const everyone = isCeo(req) || SIGN_INS[req.user ?? ""]?.view === "operations";
+  const person = meOf(req);
+  const reach = new Set<string>();
+  if (person) {
+    reach.add(person.employee_id);
+    for (const p of teamOf(person.user_key)) reach.add(p.employee_id);
+    for (const c of SCORECARDS) if (reviewerOf(c, req)) reach.add(c.employee.employee_id);
+  }
+  const names = new Set<string>();
+  if (!everyone) {
+    for (const key of DEPARTMENTS) if ([...reach].some((id) => byId(id)?.department === key)) names.add(key);
+    for (const c of SCORECARDS) if (reach.has(c.employee.employee_id) && c.department) names.add(c.department);
+  }
+  const rows = [...DEPARTMENTS]
+    .filter((name) => everyone || names.has(name))
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => ({ department_id: sid(`dept:${name}`), code: name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase(), name }));
+  return paged(rows, req, {});
+});
 route("GET /api/v1/performance/plans/:id", (req) => {
   const p = PLANS.find((x) => x.performance_plan_id === req.params.id);
-  return p ? ok(planDetail(req, p)) : notFound();
+  return p && readsFunction(req, p.department_id) ? ok(planDetail(req, p)) : notFound();
 });
 route("POST /api/v1/performance/plans/:id/submit", (req) => {
   const p = PLANS.find((x) => x.performance_plan_id === req.params.id);
@@ -541,10 +759,41 @@ route("POST /api/v1/performance/plans/:id/submit", (req) => {
   if (!d.can_submit) return fail(409, "PLAN_NOT_READY", d.problems.find((x) => x.blocking)?.message ?? "The plan cannot be sent");
   const wid = sid(`perf:wf:plan:${p.performance_plan_id}:${fresh()}`);
   const sentBy = req.user!;
-  FLOWS.push({ wid, planId: p.performance_plan_id, stages: stagesFor(p, sentBy), at: 0, by: sentBy, entered: now(), opened: now(), moves: [] });
-  Object.assign(p, { status: "submitted", workflow_instance_id: wid, submitted_by: refKey(sentBy), submitted_at: now(), returned_reason: null, updated_at: now() });
-  for (const o of OBJECTIVES) if (o.performance_plan_id === p.performance_plan_id) o.plan_status = "submitted";
+  // An unbound plan's changes go to the CEO alone, and the plan is revising meanwhile (§6.22).
+  const revision = p.status === "unbound";
+  FLOWS.push({ wid, planId: p.performance_plan_id, stages: revision ? ["ceo"] : stagesFor(p, sentBy), at: 0, by: sentBy, entered: now(), opened: now(), moves: [], revision });
+  Object.assign(p, { status: revision ? "revising" : "submitted", workflow_instance_id: wid, submitted_by: refKey(sentBy), submitted_at: now(), returned_reason: null, updated_at: now() });
+  for (const o of OBJECTIVES) if (o.performance_plan_id === p.performance_plan_id) o.plan_status = p.status;
   return ok(planDetail(req, p));
+});
+route("POST /api/v1/performance/plans/:id/unbind", (req) => {
+  const p = PLANS.find((x) => x.performance_plan_id === req.params.id);
+  if (!p) return notFound();
+  if (!setsGoalsFor(req, p.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
+  const reason = String((req.body as { reason?: string }).reason ?? "").trim();
+  if (!reason) return invalid({ reason: ["Required"] });
+  if (p.status !== "binding") return fail(409, "PLAN_NOT_BINDING", "Only a binding plan can be unbound");
+  if (unbindPending(p.performance_plan_id)) return fail(409, "UNBIND_PENDING", "An unbind request is already waiting");
+  const u: PlanUnbindDetail = {
+    plan_unbind_id: sid(`perf:unbind:${fresh()}`),
+    performance_plan_id: p.performance_plan_id,
+    reason,
+    status: "pending",
+    workflow_instance_id: sid(`perf:wf:unbind:${fresh()}`),
+    requested_by: refKey(req.user!),
+    decided_at: null,
+    decision_reason: null,
+    created_at: now(),
+    department_id: p.department_id,
+    department: p.department,
+    period_name: p.period_name,
+  };
+  UNBINDS.push(u);
+  return created(unbindRow(u));
+});
+route("GET /api/v1/performance/unbinds/:id", (req) => {
+  const u = UNBINDS.find((x) => x.plan_unbind_id === req.params.id);
+  return u && readsFunction(req, PLANS.find((p) => p.performance_plan_id === u.performance_plan_id)?.department_id ?? null) ? ok(u) : notFound();
 });
 route("GET /api/v1/performance/contributions", (req) => paged(CONTRIBUTIONS, req, { filters: { plan_id: () => true, key_result_id: (c, v) => c.okr_key_result_id === v }, sort: { code: (a, b) => a.code.localeCompare(b.code) } }));
 
@@ -567,7 +816,6 @@ route("POST /api/v1/performance/target-changes", (req) => {
   const b = req.body as Record<string, string | undefined>;
   const k = b.okr_key_result_id ? krById(b.okr_key_result_id) : undefined;
   if (b.okr_key_result_id && !k) return invalid({ okr_key_result_id: ["Pick a key result"] });
-  if (k && tbcOpen(k)) return fail(409, "TARGET_TBC", "Set this TBC target directly");
   const found = b.employee_target_id ? lineById(b.employee_target_id) : null;
   if (b.employee_target_id && !found) return notFound();
   // A line's target is changed by its scorecard's reviewer or the function's head, never its employee (§3.5).
@@ -624,7 +872,7 @@ type PlanStage = "line_manager" | "operations_people" | "ceo";
 const STAGE_NAMES: Record<PlanStage, string> = { line_manager: "Line Manager", operations_people: "Operations & People", ceo: "CEO" };
 const STAGE_HOURS = 72;
 type Move = { stage: PlanStage; decision: "approve" | "reject"; by: string; reason: string | null; at: string };
-type Flow = { wid: string; planId: string; scorecardId?: string; stages: PlanStage[]; at: number; by: string; entered: string; opened: string; moves: Move[] };
+type Flow = { wid: string; planId: string; scorecardId?: string; stages: PlanStage[]; at: number; by: string; entered: string; opened: string; moves: Move[]; revision?: boolean };
 const FLOWS: Flow[] = [
   { wid: sid("perf:wf:plan:content"), planId: sid("perf:plan:content"), stages: ["operations_people", "ceo"], at: 0, by: "tolu", entered: at(1, "11:00"), opened: at(1, "11:00"), moves: [] },
   {
@@ -640,6 +888,7 @@ const FLOWS: Flow[] = [
   },
 ];
 const CHANGE_MOVES: Record<string, Move> = {};
+const UNBIND_MOVES: Record<string, Move> = {};
 const planById = (id: string) => PLANS.find((p) => p.performance_plan_id === id);
 const headKeyOf = (p: Plan) => (p.department_id === deptId ? "ngozi" : p.department === "Content" ? "tolu" : null);
 const keyOf = (ref: { employee_id: string } | null) => (ref ? byId(ref.employee_id)?.user_key ?? null : null);
@@ -659,7 +908,7 @@ const cardOfFlow = (f: Flow) => (f.scorecardId ? SCORECARDS.find((c) => c.scorec
 const pending = (f: Flow) =>
   f.scorecardId
     ? cardOfFlow(f)?.status === "draft" && AMENDMENTS.get(f.scorecardId) === f.wid
-    : planById(f.planId)?.status === "submitted" && planById(f.planId)?.workflow_instance_id === f.wid;
+    : waiting(planById(f.planId)?.status ?? "") && planById(f.planId)?.workflow_instance_id === f.wid;
 const waitsOnPlan = (f: Flow, user: string) => pending(f) && f.by !== user && approverOf(f, f.stages[f.at]) === user;
 const mayDecidePlan = (f: Flow, user: string) => pending(f) && (user === "ifeoma" || (f.by !== user && approverOf(f, f.stages[f.at]) === user));
 const dueOf = (entered: string) => new Date(Date.parse(entered) + STAGE_HOURS * 3600000).toISOString();
@@ -695,8 +944,8 @@ function planInstance(user: string, f: Flow): ApprovalInstance {
   const card = cardOfFlow(f);
   return {
     workflow_instance_id: f.wid,
-    definition_key: "performance.plan",
-    definition_name: "Quarter Plan",
+    definition_key: f.revision ? "performance.plan_change" : "performance.plan",
+    definition_name: f.revision ? "Plan Change" : "Quarter Plan",
     version: 1,
     module_key: "performance",
     entity_type: card ? "scorecard" : "performance_plan",
@@ -706,7 +955,7 @@ function planInstance(user: string, f: Flow): ApprovalInstance {
     state,
     current_stage: open ? f.stages[f.at] : null,
     stage_name: open ? STAGE_NAMES[f.stages[f.at]] : null,
-    context: { head_reports_to_ceo: !f.stages.includes("line_manager"), by_operations_people: f.by === "cynthia", is_company: !p.department_id },
+    context: f.revision ? {} : { head_reports_to_ceo: !f.stages.includes("line_manager"), by_operations_people: f.by === "cynthia", is_company: !p.department_id },
     stage_entered_at: f.entered,
     stage_due_at: open ? dueOf(f.entered) : null,
     opened_by: null,
@@ -755,10 +1004,46 @@ function changeInstance(user: string, c: TargetChange): ApprovalInstance {
   };
 }
 
-/** A plan's or a target change's request, or null when the instance is neither (the workflow mock passes it on). */
+/** A request to unbind a plan, as the CEO decides it: one stage, the CEO. */
+function unbindInstance(user: string, u: PlanUnbindDetail): ApprovalInstance {
+  const asker = byKey(keyOf(u.requested_by) ?? "");
+  const move = UNBIND_MOVES[u.workflow_instance_id ?? ""];
+  const open = u.status === "pending";
+  return {
+    workflow_instance_id: u.workflow_instance_id!,
+    definition_key: "performance.plan_change",
+    definition_name: "Plan Change",
+    version: 1,
+    module_key: "performance",
+    entity_type: "plan_unbind",
+    entity_id: u.plan_unbind_id,
+    subject_employee_id: asker?.employee_id ?? null,
+    subject_name: asker?.display_name ?? null,
+    state: open ? "pending" : u.status === "approved" ? "approved" : "rejected",
+    current_stage: open ? "ceo" : null,
+    stage_name: open ? "CEO" : null,
+    context: {},
+    stage_entered_at: u.created_at,
+    stage_due_at: open ? dueOf(u.created_at) : null,
+    opened_by: null,
+    opened_by_name: asker?.display_name ?? null,
+    opened_at: u.created_at,
+    completed_at: u.decided_at,
+    route: [{ key: "ceo", name: "CEO", state: open ? "now" : move?.decision === "reject" ? "stopped" : "done", approvers: [APPROVER_VIEW.ceo] }],
+    decisions: move ? decisionsOf(u.workflow_instance_id!, [move]) : [],
+    can_decide: open && user === "ifeoma",
+    can_withdraw: false,
+    can_reassign: false,
+    link: `/performance?tab=goals&unbind=${u.plan_unbind_id}`,
+  };
+}
+
+/** A plan's, an unbind request's or a target change's request, or null when the instance is none (the workflow mock passes it on). */
 export function performanceInstance(user: string, wid: string): ApprovalInstance | null {
   const f = FLOWS.find((x) => x.wid === wid);
   if (f) return planInstance(user, f);
+  const u = UNBINDS.find((x) => x.workflow_instance_id === wid);
+  if (u) return unbindInstance(user, u);
   const c = TARGET_CHANGES.find((x) => x.workflow_instance_id === wid);
   return c ? changeInstance(user, c) : null;
 }
@@ -785,16 +1070,35 @@ export function decidePlan(user: string, wid: string, approve: boolean, reason?:
     }
     return ok(planInstance(user, f));
   }
+  // A plan's changes, once unbound, return to unbound with the reason, and bind again on the CEO's approval, its first date kept (§6.22).
   const settle = (status: Plan["status"]) => {
-    Object.assign(p, { status, updated_at: now(), ...(status === "binding" ? { binding_at: now() } : { returned_reason: why }) });
+    Object.assign(p, { status, updated_at: now(), ...(status === "binding" ? (f.revision ? { returned_reason: null } : { binding_at: now() }) : { returned_reason: why }) });
     for (const o of OBJECTIVES) if (o.performance_plan_id === p.performance_plan_id) o.plan_status = status;
   };
-  if (!approve) settle("returned");
+  if (!approve) settle(f.revision ? "unbound" : "returned");
   else if (f.at < f.stages.length - 1) {
     f.at += 1;
     f.entered = now();
   } else settle("binding");
   return ok(planInstance(user, f));
+}
+
+/** Decide a request to unbind a plan, or null when the instance is not one: the CEO's alone. Approved, the plan is unbound. */
+export function decideUnbind(user: string, wid: string, approve: boolean, reason?: string | null) {
+  const u = UNBINDS.find((x) => x.workflow_instance_id === wid);
+  if (!u) return null;
+  if (u.status !== "pending") return fail(409, "WORKFLOW_CLOSED", "This approval is already decided");
+  if (user !== "ifeoma") return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
+  const why = String(reason ?? "").trim();
+  if (!approve && !why) return invalid({ reason: ["is required"] });
+  UNBIND_MOVES[wid] = { stage: "ceo", decision: approve ? "approve" : "reject", by: user, reason: why || null, at: now() };
+  Object.assign(u, { status: approve ? "approved" : "rejected", decided_at: now(), decision_reason: approve ? null : why });
+  const p = planById(u.performance_plan_id);
+  if (approve && p && p.status === "binding") {
+    Object.assign(p, { status: "unbound", updated_at: now() });
+    for (const o of OBJECTIVES) if (o.performance_plan_id === p.performance_plan_id) o.plan_status = "unbound";
+  }
+  return ok(unbindInstance(user, u));
 }
 
 /** Decide a target change, or null when the instance is not one: the CEO's alone. An approved change sets the key result's target. */
@@ -808,7 +1112,7 @@ export function decideTargetChange(user: string, wid: string, approve: boolean, 
   CHANGE_MOVES[wid] = { stage: "ceo", decision: approve ? "approve" : "reject", by: user, reason: why || null, at: now() };
   Object.assign(c, { status: approve ? "approved" : "rejected", decided_at: now() });
   const k = approve && c.okr_key_result_id ? krById(c.okr_key_result_id) : undefined;
-  if (k) Object.assign(k, { target_value: c.to_value, target_text: c.to_text, target_provisional: false });
+  if (k) Object.assign(k, { target_value: c.to_value, target_text: c.to_text });
   const found = approve ? lineById(c.employee_target_id) : null;
   if (found) Object.assign(found.line, { target_value: c.to_value, target_text: c.to_text });
   return ok(changeInstance(user, c));
@@ -854,7 +1158,26 @@ function approvalsFor(user: string): PerformanceApproval[] {
         };
       })
     : [];
-  return [...plans, ...changes].sort((a, b) => a.waiting_since.localeCompare(b.waiting_since));
+  const unbinds =
+    user === "ifeoma"
+      ? UNBINDS.filter((u) => u.status === "pending" && keyOf(u.requested_by) !== user).map(
+          (u): PerformanceApproval => ({
+            kind: "unbind",
+            record_id: u.plan_unbind_id,
+            workflow_instance_id: u.workflow_instance_id!,
+            period_name: u.period_name,
+            department: u.department,
+            key_result_code: null,
+            line_title: null,
+            employee: null,
+            requested_by: u.requested_by,
+            stage_name: "CEO",
+            waiting_since: u.created_at,
+            overdue: Date.parse(dueOf(u.created_at)) < Date.now(),
+          }),
+        )
+      : [];
+  return [...plans, ...unbinds, ...changes].sort((a, b) => a.waiting_since.localeCompare(b.waiting_since));
 }
 route("GET /api/v1/performance/approvals", (req) =>
   paged(approvalsFor(req.user!), req, { search: (r) => [r.department ?? "Company", r.key_result_code, r.line_title, r.employee?.display_name, r.requested_by?.display_name] }),
@@ -863,17 +1186,24 @@ route("GET /api/v1/performance/approvals", (req) =>
 /** The same requests as Home's Need You rows (GET /workflow/mine). */
 export function performanceWaitingOn(user: string): ApprovalWaiting[] {
   return approvalsFor(user).map((r) => {
-    const flow = r.kind !== "target_change" ? FLOWS.find((f) => f.wid === r.workflow_instance_id) : undefined;
+    const flow = r.kind === "plan" || r.kind === "scorecard" ? FLOWS.find((f) => f.wid === r.workflow_instance_id) : undefined;
     const plan = flow ? planById(flow.planId) : undefined;
     const head = plan ? byKey(headKeyOf(plan) ?? "") : undefined;
     const link =
-      r.kind === "plan" ? `/performance?tab=goals&plan=${r.record_id}` : r.kind === "scorecard" ? `/performance?tab=targets&id=${r.record_id}` : `/performance?tab=goals&change=${r.record_id}`;
+      r.kind === "plan"
+        ? `/performance?tab=goals&plan=${r.record_id}`
+        : r.kind === "scorecard"
+          ? `/performance?tab=targets&id=${r.record_id}`
+          : r.kind === "unbind"
+            ? `/performance?tab=goals&unbind=${r.record_id}`
+            : `/performance?tab=goals&change=${r.record_id}`;
+    const planChange = r.kind === "unbind" || flow?.revision;
     return {
       workflow_instance_id: r.workflow_instance_id,
-      definition_key: r.kind === "target_change" ? "performance.target_change" : "performance.plan",
-      definition_name: r.kind === "target_change" ? "Target Change" : "Quarter Plan",
+      definition_key: r.kind === "target_change" ? "performance.target_change" : planChange ? "performance.plan_change" : "performance.plan",
+      definition_name: r.kind === "target_change" ? "Target Change" : planChange ? "Plan Change" : "Quarter Plan",
       module_key: "performance",
-      entity_type: r.kind === "plan" ? "performance_plan" : r.kind === "scorecard" ? "scorecard" : "target_change",
+      entity_type: r.kind === "plan" ? "performance_plan" : r.kind === "scorecard" ? "scorecard" : r.kind === "unbind" ? "plan_unbind" : "target_change",
       entity_id: r.record_id,
       subject_employee_id: plan ? (head?.employee_id ?? null) : (r.requested_by?.employee_id ?? null),
       subject_name: plan ? (head?.display_name ?? null) : (r.requested_by?.display_name ?? null),
@@ -915,7 +1245,7 @@ function recordKpi(req: Req, kpi: Kpi, b: Record<string, string | undefined>): K
 }
 const KPI_MONTHS: Record<string, KpiMonth[]> = {};
 route("GET /api/v1/performance/kpis", (req) =>
-  paged(FUNCTION_KPIS, req, {
+  paged(FUNCTION_KPIS.filter((k) => readsFunction(req, k.department_id)), req, {
     search: (k) => [k.code, k.name],
     filters: { department_id: (k, v) => k.department_id === v, period_id: () => true, active: (k, v) => String(k.active) === v },
     sort: { code: (a, b) => a.code.localeCompare(b.code), name: (a, b) => a.name.localeCompare(b.name) },
@@ -923,7 +1253,7 @@ route("GET /api/v1/performance/kpis", (req) =>
 );
 route("GET /api/v1/performance/kpis/summary", (req) => {
   const q = req.query as { department_id?: string; month?: string };
-  const active = FUNCTION_KPIS.filter((k) => k.active && (!q.department_id || k.department_id === q.department_id));
+  const active = FUNCTION_KPIS.filter((k) => k.active && readsFunction(req, k.department_id) && (!q.department_id || k.department_id === q.department_id));
   const of = (k: Kpi) => (KPI_MONTHS[k.kpi_definition_id] ?? (k.latest ? [k.latest] : [])).find((m) => m.month === q.month);
   return ok({
     kpis: active.length,
@@ -932,9 +1262,22 @@ route("GET /api/v1/performance/kpis/summary", (req) => {
     awaiting: active.filter((k) => !of(k)).length,
   });
 });
+/** The units in use on KPIs, key results and scorecard lines, most used first: what the Unit field suggests. */
+route("GET /api/v1/performance/kpis/units", (req) => {
+  const uses = new Map<string, number>();
+  const count = (unit: string | null | undefined) => {
+    const u = unit?.trim();
+    if (u) uses.set(u, (uses.get(u) ?? 0) + 1);
+  };
+  FUNCTION_KPIS.forEach((k) => count(k.unit));
+  OBJECTIVES.forEach((o) => o.key_results.forEach((k) => count(k.unit)));
+  SCORECARDS.forEach((c) => c.lines.forEach((l) => count(l.unit)));
+  const rows = [...uses].map(([unit, n]) => ({ unit, uses: n })).sort((a, b) => b.uses - a.uses || a.unit.localeCompare(b.unit));
+  return paged(rows, req, { search: (u) => [u.unit] });
+});
 route("GET /api/v1/performance/kpis/:id", (req) => {
   const k = FUNCTION_KPIS.find((x) => x.kpi_definition_id === req.params.id);
-  if (!k) return notFound();
+  if (!k || !readsFunction(req, k.department_id)) return notFound();
   const lines = SCORECARDS.flatMap((c) => c.lines.filter((l) => l.kpi_definition_id === k.kpi_definition_id).map((l) => ({ employee_target_id: l.employee_target_id, scorecard_id: c.scorecard_id, employee: c.employee, title: l.title, weight: l.weight })));
   return ok({ ...k, months: KPI_MONTHS[k.kpi_definition_id] ?? (k.latest ? [k.latest] : []), lines, can_edit: setsGoalsFor(req, k.department_id) });
 });
@@ -942,6 +1285,7 @@ route("POST /api/v1/performance/kpis", (req) => {
   const b = req.body as Record<string, string | undefined>;
   if (!b.name?.trim()) return invalid({ name: ["Required"] });
   if (!b.department_id) return invalid({ department_id: ["Pick the function"] });
+  if (!b.target_text?.trim()) return invalid({ target_text: ["Required"] });
   const prefix = b.department_id === deptId ? "BM" : "FN";
   const n = FUNCTION_KPIS.filter((k) => k.code.startsWith(`${prefix}-K`)).length + 1;
   const k: Kpi = {
@@ -954,7 +1298,7 @@ route("POST /api/v1/performance/kpis", (req) => {
     formula: b.formula || null,
     unit: b.unit || null,
     direction: (b.direction ?? "higher") as Kpi["direction"],
-    target_text: b.target_text || null,
+    target_text: b.target_text.trim(),
     target_value: b.target_value || null,
     frequency: (b.frequency ?? "monthly") as Kpi["frequency"],
     data_source: b.data_source || null,
@@ -970,6 +1314,8 @@ route("POST /api/v1/performance/kpis", (req) => {
 route("PATCH /api/v1/performance/kpis/:id", (req) => {
   const k = FUNCTION_KPIS.find((x) => x.kpi_definition_id === req.params.id);
   if (!k) return notFound();
+  const wording = (req.body as { target_text?: string | null }).target_text;
+  if (wording !== undefined && !wording?.trim()) return invalid({ target_text: ["Required"] });
   Object.assign(k, fieldsOf(req.body, ["name", "description", "formula", "unit", "direction", "target_text", "target_value", "frequency", "data_source", "active"]), { updated_at: now() });
   return ok(k);
 });
@@ -979,6 +1325,8 @@ route("POST /api/v1/performance/kpis/:id/actuals", (req) => {
   const b = req.body as Record<string, string | undefined>;
   if (!b.month?.endsWith("-01")) return invalid({ month: ["Pick the month"] });
   if (!b.result) return invalid({ result: ["Pick the result"] });
+  // Met and Not Met need the figure; only N/A, no eligible cases, has none.
+  if (b.result !== "na" && !b.actual_value && !b.actual_text) return invalid({ actual_value: ["Enter the actual"] });
   return created(recordKpi(req, k, b));
 });
 
@@ -1152,6 +1500,7 @@ route("PUT /api/v1/performance/scorecards/:id/lines", (req) => {
     if (!String(l.title ?? "").trim()) problems[at("title")] = ["Required"];
     if (!MEASURES[String(l.section)]?.includes(String(l.measure))) problems[at("measure")] = [`Pick ${MEASURES[String(l.section)]?.join(" or ") ?? "a measure"}`];
     if (!(Number(l.weight) > 0)) problems[at("weight")] = ["Above zero"];
+    else if (Number(l.weight) > 100) problems[at("weight")] = ["At most 100"];
     if (l.source === "key_result" && !l.okr_key_result_id) problems[at("okr_key_result_id")] = ["Link a key result"];
     if (l.source === "function_kpi" && !l.kpi_definition_id) problems[at("kpi_definition_id")] = ["Link a KPI"];
     if (l.measure === "milestone" && !l.milestone_due_on) problems[at("milestone_due_on")] = ["Pick a date"];
@@ -1241,23 +1590,25 @@ const mean = (scores: Array<string | null>) => {
   return s.length ? String(Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 10000) / 10000) : null;
 };
 
-function analyticsOf(departmentId: string | undefined): PerformanceAnalytics {
+function analyticsOf(departmentId: string | undefined, req: Req): PerformanceAnalytics {
   const months = PERIOD.months;
-  const objectives = OBJECTIVES.filter((o) => !departmentId || o.department_id === null || o.department_id === departmentId);
+  // The OKR figures count what the reader reads (§6.23): the whole plan's the company too, anyone else's the functions' they read whole.
+  const counted = (o: Objective) => readsWholePlan(req) || (o.department_id !== null && objectiveOpen(o, req));
+  const objectives = OBJECTIVES.filter((o) => counted(o) && (!departmentId || o.department_id === null || o.department_id === departmentId));
   const functions = [...new Set(objectives.map((o) => o.department_id))].sort((a, b) => (a === null ? -1 : b === null ? 1 : 0));
   const scores = functions.map((d) => ({
     department_id: d,
     department: d === null ? null : objectives.find((o) => o.department_id === d)?.department ?? null,
     months: months.map((m, i) => ({ month: m, score: i === 0 ? mean(objectives.filter((o) => o.department_id === d).map((o) => o.score)) : null })),
   }));
-  const krs = OBJECTIVES.filter((o) => !departmentId || o.department_id === departmentId).flatMap((o) => o.key_results);
+  const krs = OBJECTIVES.filter((o) => counted(o) && (!departmentId || o.department_id === departmentId)).flatMap((o) => o.key_results);
   const status = (s: string) => krs.filter((k) => k.latest?.status === s).length;
   const company = OBJECTIVES.filter((o) => o.department_id === null).map((o) => o.score);
   const onTime = (due: number, on: number) => ({ due, on_time: on });
   return {
     period: { performance_period_id: PERIOD.performance_period_id, name: PERIOD.name, starts_on: PERIOD.starts_on, ends_on: PERIOD.ends_on },
     months,
-    company_score: company.length ? mean(company) : mean(OBJECTIVES.map((o) => o.score)),
+    company_score: readsWholePlan(req) ? (company.length ? mean(company) : mean(OBJECTIVES.map((o) => o.score))) : null,
     scores,
     key_results: {
       key_results: krs.length,
@@ -1286,7 +1637,7 @@ function analyticsOf(departmentId: string | undefined): PerformanceAnalytics {
 
 route("GET /api/v1/performance/analytics", (req) => {
   if (req.query.period_id && req.query.period_id !== PERIOD.performance_period_id) return notFound();
-  return ok(analyticsOf(req.query.department_id || undefined));
+  return ok(analyticsOf(req.query.department_id || undefined, req));
 });
 
 const analyticsPeople = (): AnalyticsPerson[] =>

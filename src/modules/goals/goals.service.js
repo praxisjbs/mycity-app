@@ -12,8 +12,11 @@ const authority = require("./goals.authority");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
+const numbering = require("../../shared/numbering/numbering");
 const { scoring } = require("@mycity/contract");
 const periods = require("./goals.periods");
+const share = require("./goals.share");
+const visibility = require("./goals.visibility");
 const repo = require("./goals.repo");
 const { EVENTS } = require("./goals.events");
 
@@ -41,7 +44,6 @@ function periodView(row) {
     starts_on: startsOn,
     ends_on: day(row.ends_on),
     plan_year_starts_on: day(row.plan_year_starts_on),
-    targets_lock_on: day(row.targets_lock_on),
     live_from: day(row.live_from),
     status: row.status,
     rules: row.rules,
@@ -51,7 +53,7 @@ function periodView(row) {
   };
 }
 
-/** A date the quarter's own days must hold (the lock date, the first live day). */
+/** A date the quarter's own days must hold (the first live day). */
 function assertInQuarter(field, value, startsOn, endsOn) {
   if (value && (value < startsOn || value > endsOn))
     throw new AppError("VALIDATION_FAILED", "Pick a day inside the quarter", 422, { [field]: ["Outside the quarter"] });
@@ -87,7 +89,6 @@ async function currentPeriod(db = pool) {
 async function createPeriod(actor, body) {
   const startsOn = body.starts_on;
   const endsOn = periods.quarterEnd(startsOn);
-  assertInQuarter("targets_lock_on", body.targets_lock_on, startsOn, endsOn);
   assertInQuarter("live_from", body.live_from, startsOn, endsOn);
   const id = await tx(async (client) => {
     if (await repo.periodStarting(client, startsOn))
@@ -102,7 +103,6 @@ async function createPeriod(actor, body) {
       starts_on: startsOn,
       ends_on: endsOn,
       plan_year_starts_on: body.plan_year_starts_on || periods.planYearOf(startsOn),
-      targets_lock_on: body.targets_lock_on || null,
       live_from: body.live_from || null,
       status,
       rules,
@@ -125,14 +125,15 @@ async function createPeriod(actor, body) {
   return getPeriod(id);
 }
 
-/** Change a quarter's name, lock date, first live day, rules or status. */
+/** Change a quarter's name, first live day, rules or status, until it is closed (§3.2). */
 async function updatePeriod(actor, id, patch) {
   const id2 = await tx(async (client) => {
     const before = await repo.getPeriod(client, id);
     if (!before) throw notFound();
+    // A closed quarter keeps the rules it ran on, or its bands would be read again on new ones.
+    if (before.status === "closed") throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409);
     const startsOn = day(before.starts_on);
     const endsOn = day(before.ends_on);
-    assertInQuarter("targets_lock_on", patch.targets_lock_on, startsOn, endsOn);
     assertInQuarter("live_from", patch.live_from, startsOn, endsOn);
     if (patch.status && patch.status !== before.status) {
       if (ORDER[patch.status] < ORDER[before.status])
@@ -161,9 +162,10 @@ async function updatePeriod(actor, id, patch) {
  * Organisational goals (§3.1, §6.3): the CEO's, active at once (A16)
  * ------------------------------------------------------------------ */
 
-/** An organisational_goal row as OrganisationalGoal. */
-function goalView(g) {
+/** An organisational_goal row as OrganisationalGoal, with how the reader may share it (§6.24). */
+function goalView(g, sharing = { can_share: false, share: null }) {
   return {
+    ...sharing,
     organisational_goal_id: g.organisational_goal_id,
     code: g.code,
     title: g.title,
@@ -184,37 +186,61 @@ function goalView(g) {
   };
 }
 
-async function listGoals(query) {
-  const page = await repo.listGoals(pool, query);
-  return { ...page, data: page.data.map(goalView) };
+/** A goal as the reader may read it: with whether they may share it and, if so, how it is shared. */
+async function goalFor(actor, row) {
+  const sharing = await share.sharingOf(actor, "goal", [row]);
+  return goalView(row, sharing.get(row.organisational_goal_id));
 }
 
-async function getGoal(id) {
+/** GET /performance/goals: every goal for the whole plan, else those shared with the reader (§6.23). */
+async function listGoals(query, actor = null) {
+  const page = await repo.listGoals(pool, query, await visibility.readerOf(pool, actor));
+  const sharing = await share.sharingOf(actor, "goal", page.data);
+  return { ...page, data: page.data.map((g) => goalView(g, sharing.get(g.organisational_goal_id))) };
+}
+
+/**
+ * GET /performance/goals/:id. Its progress is the mean of every company objective serving it, whoever reads
+ * it; the objectives it lists are those the reader may read (a goal shared alone shows none).
+ */
+async function getGoal(id, actor = null) {
   const g = await repo.getGoal(pool, id);
   if (!g) throw new AppError("NOT_FOUND", "That goal does not exist", 404);
+  const reach = await visibility.readerOf(pool, actor);
+  await visibility.assertGoal(pool, reach, id);
   const okrs = require("./goals.okrs");
   const objectives = [];
-  for (const objectiveId of await repo.companyObjectivesOf(pool, id)) objectives.push(await okrs.getObjective(objectiveId));
+  const mine = [];
+  for (const objectiveId of await repo.companyObjectivesOf(pool, id)) {
+    const objective = await okrs.getObjective(objectiveId);
+    objectives.push(objective);
+    const access = await visibility.objectiveAccess(pool, reach, objectiveId);
+    if (access && access.readable) mine.push(objective);
+  }
   const { scoring: sc } = require("@mycity/contract");
   return {
-    ...goalView(g),
+    ...(await goalFor(actor, g)),
     targets: (await repo.goalTargets(pool, id)).map((t) => ({ ...t })),
-    objectives: objectives.map((o) => ({ okr_objective_id: o.okr_objective_id, code: o.code, title: o.title })),
+    objectives: mine.map((o) => ({ okr_objective_id: o.okr_objective_id, code: o.code, title: o.title })),
     progress: sc.formatScore(sc.meanScore(objectives.map((o) => o.score))),
   };
 }
 
-/** POST /performance/goals: active at once; its year is the plan year, its owner the CEO who records it. */
+/**
+ * POST /performance/goals: active at once; its year is the plan year, its owner the CEO who records it.
+ * Its ID is the next of its plan year from Documents & Numbering (ORG-2026-01, §6.1), never typed.
+ */
 async function createGoal(actor, body, { owner_employee_id: ownerId = null } = {}) {
   const owner = ownerId || (actor && actor.employee_id);
   if (!owner) throw new AppError("VALIDATION_FAILED", "A goal needs an owner with an employee record", 422);
   const year = body.plan_year_starts_on.slice(0, 4);
   const id = await tx(async (client) => {
-    if (body.code && (await repo.goalCodeTaken(client, body.plan_year_starts_on, body.code)))
-      throw new AppError("GOAL_CODE_TAKEN", "Another goal this year has that code", 409, { code: ["Already in use"] });
     const { targets = [], ...fields } = body;
+    const { number: code } = await numbering.allocate(client, "organisational_goal", { date: body.plan_year_starts_on });
     const newId = await repo.insertGoal(client, {
       ...fields,
+      code,
+      code_given_at: new Date(),
       level: "organisation",
       status: "active",
       starts_on: `${year}-01-01`,
@@ -226,12 +252,12 @@ async function createGoal(actor, body, { owner_employee_id: ownerId = null } = {
       key: EVENTS.ORGANISATIONAL_GOAL_SAVED,
       entity: { type: "organisational_goal", id: newId },
       actor,
-      after: { code: body.code || null, title: body.title },
-      payload: { organisational_goal_id: newId, code: body.code || null, title: body.title },
+      after: { code, title: body.title },
+      payload: { organisational_goal_id: newId, code, title: body.title },
     });
     return newId;
   });
-  return goalView(await repo.getGoal(pool, id));
+  return goalFor(actor, await repo.getGoal(pool, id));
 }
 
 /** PATCH /performance/goals/:id */
@@ -239,8 +265,6 @@ async function updateGoal(actor, id, patch) {
   const before = await repo.getGoal(pool, id);
   if (!before) throw new AppError("NOT_FOUND", "That goal does not exist", 404);
   await tx(async (client) => {
-    if (patch.code && (await repo.goalCodeTaken(client, day(before.plan_year_starts_on), patch.code, id)))
-      throw new AppError("GOAL_CODE_TAKEN", "Another goal this year has that code", 409, { code: ["Already in use"] });
     const { targets, ...fields } = patch;
     await repo.updateGoal(client, id, fields);
     if (targets) await repo.setGoalTargets(client, id, targets);
@@ -250,10 +274,10 @@ async function updateGoal(actor, id, patch) {
       actor,
       before: goalView(before),
       after: { ...goalView(before), ...fields },
-      payload: { organisational_goal_id: id, code: fields.code ?? before.code, title: fields.title || before.title },
+      payload: { organisational_goal_id: id, code: before.code, title: fields.title || before.title },
     });
   });
-  return goalView(await repo.getGoal(pool, id));
+  return goalFor(actor, await repo.getGoal(pool, id));
 }
 
 /**
@@ -306,9 +330,43 @@ function planView(p) {
   };
 }
 
-async function listPlans(query) {
-  const page = await repo.listPlans(pool, query);
+async function listPlans(query, actor = null) {
+  const page = await repo.listPlans(pool, query, await visibility.readerOf(pool, actor));
   return { ...page, data: page.data.map(planView) };
+}
+
+/**
+ * GET /performance/functions: a page of the company and the functions, each with whether the
+ * reader may set its goals and KPIs (goals.authority, the one rule), its plan's status in the
+ * quarter and whether Request To Unbind is theirs to offer: the plan is binding, they set it, no
+ * request waits, and they are not the CEO (who keeps New Goal, §6.22). It is the person that is
+ * excluded, not a capability: the build account holds `goals.organisation` too and is offered it.
+ * New Objective and New KPI offer only those the reader may set (§6.4).
+ */
+async function listFunctions(actor, query) {
+  const page = await repo.listFunctions(pool, query, await visibility.readerOf(pool, actor));
+  const asksToUnbind = !(actor && actor.is_ceo === true);
+  const data = [];
+  for (const f of page.data) {
+    const maySet = await authority.maySetGoals(pool, actor, f.department_id);
+    data.push({
+      department_id: f.department_id,
+      name: f.name,
+      may_set: maySet,
+      plan_status: f.plan_status,
+      can_request_unbind: asksToUnbind && maySet && f.plan_status === "binding" && !f.unbind_pending,
+    });
+  }
+  return { ...page, data };
+}
+
+/**
+ * GET /performance/departments: the departments the reader's Scorecards, Commitments, Reviews and
+ * Analytics can be filtered by, in the reader's `performance` scope (§8). Goals and KPIs read
+ * GET /performance/functions instead: the functions the reader reads (§6.23).
+ */
+async function listDepartments(actor, query, scope) {
+  return repo.listDepartments(pool, query, scope, actor || {});
 }
 
 /** What stops a plan being sent, and what only warns (§6.4). */
@@ -341,6 +399,7 @@ async function planProblems(db, plan, { objectives, scorecards, contributions })
 async function planDetail(id, actor, scope = null) {
   const plan = await repo.getPlan(pool, id);
   if (!plan) throw new AppError("NOT_FOUND", "That plan does not exist", 404);
+  await visibility.assertPlan(pool, await visibility.readerOf(pool, actor), actor, plan);
   const okrs = require("./goals.okrs");
   const kpis = require("../kpis/kpis.service");
   const targets = require("../targets/targets.service");
@@ -368,8 +427,22 @@ async function planDetail(id, actor, scope = null) {
     ),
     contributions,
     problems,
-    can_submit: mayAct && ["draft", "returned"].includes(plan.status) && !problems.some((p) => p.blocking),
+    can_submit: mayAct && plansLib.isOpen(plan.status) && !problems.some((p) => p.blocking),
+    approval: await approvalOf(plan),
+    unbind: await repo.latestUnbind(pool, id).then((u) => (u ? unbindView(u) : null)),
   };
+}
+
+/**
+ * Who a plan awaiting approval is with (§6.4): the stage its pending approval is at, named as its approvers were
+ * told it. Null for a plan not sent, returned, unbound or binding, which has no approval pending.
+ */
+async function approvalOf(plan) {
+  if (!plansLib.isAwaiting(plan.status)) return null;
+  const row = await repo.pendingStage(pool, plan.workflow_instance_id);
+  if (!row || !row.stage_key) return null;
+  const stage = require("../../shared/workflow/conditions").stageByKey({ stages: row.stages }, row.stage_key);
+  return { stage_key: row.stage_key, stage_name: stage ? stage.name : row.stage_key };
 }
 
 /** The items a reader may see, in order. */
@@ -385,43 +458,51 @@ const isOperationsPeople = (db, actor) =>
 
 /**
  * POST /performance/plans/:id/submit: Send Plan. Refuses while anything blocks; opens
- * `performance.plan` over the head (or acting head), whose line manager is its first stage.
+ * `performance.plan` over the head (or acting head), whose line manager is its first stage. An
+ * unbound plan's changes go to the CEO alone, through `performance.plan_change` (§6.22), and the
+ * plan is revising, locked but live, while they decide.
  */
 async function submitPlan(actor, id, scope = null) {
   const plan = await repo.getPlan(pool, id);
   if (!plan) throw new AppError("NOT_FOUND", "That plan does not exist", 404);
   await authority.assertSetsGoals(pool, actor, plan.department_id);
-  if (!["draft", "returned"].includes(plan.status)) throw new AppError("PLAN_NOT_DRAFT", "This plan is already sent", 409);
+  if (!plansLib.isOpen(plan.status)) throw new AppError("PLAN_NOT_DRAFT", "This plan is already sent", 409);
   const detail = await planDetail(id, actor);
   const blocking = detail.problems.filter((p) => p.blocking);
   if (blocking.length)
     throw new AppError(blocking[0].code, blocking[0].message, 409, { problems: blocking.map((p) => p.message) });
+  const revision = plan.status === "unbound";
   const organisation = require("../organisation/organisation.service");
   const head = plan.department_id ? await organisation.headOf(pool, plan.department_id) : null;
-  const headManager = head ? await repo.effectiveManagerOf(pool, head) : null;
-  const context = {
-    head_reports_to_ceo: !headManager || (await repo.isCeoEmployee(pool, headManager)),
-    by_operations_people: await isOperationsPeople(pool, actor),
-    is_company: !plan.department_id,
-  };
+  let flow = { definition_key: "performance.plan_change", context: {} };
+  if (!revision) {
+    const headManager = head ? await repo.effectiveManagerOf(pool, head) : null;
+    flow = {
+      definition_key: "performance.plan",
+      context: {
+        head_reports_to_ceo: !headManager || (await repo.isCeoEmployee(pool, headManager)),
+        by_operations_people: await isOperationsPeople(pool, actor),
+        is_company: !plan.department_id,
+      },
+    };
+  }
   const workflow = require("../../shared/workflow/engine");
   await tx(async (client) => {
     const instance = await workflow.openInstance(client, {
-      definition_key: "performance.plan",
+      ...flow,
       entity: { type: "performance_plan", id },
       subject_employee_id: head,
-      context,
       actor,
     });
     await repo.updatePlan(client, id, {
-      status: "submitted",
+      status: revision ? "revising" : "submitted",
       workflow_instance_id: instance.workflow_instance_id,
       submitted_by: actor && actor.user_id,
       submitted_at: new Date(),
       returned_reason: null,
     });
     await emit(client, {
-      key: EVENTS.PLAN_SUBMITTED,
+      key: revision ? EVENTS.PLAN_REVISION_SUBMITTED : EVENTS.PLAN_SUBMITTED,
       entity: { type: "performance_plan", id },
       actor,
       payload: { performance_plan_id: id, department: plan.department, period: plan.period_name },
@@ -431,24 +512,100 @@ async function submitPlan(actor, id, scope = null) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Requests to unbind a binding plan (§6.22)
+ * ------------------------------------------------------------------ */
+
+/** A plan_unbind row as PlanUnbind. */
+function unbindView(u) {
+  return {
+    plan_unbind_id: u.plan_unbind_id,
+    performance_plan_id: u.performance_plan_id,
+    reason: u.reason,
+    status: u.status,
+    workflow_instance_id: u.workflow_instance_id,
+    requested_by: u.requested_by || null,
+    decided_at: iso(u.decided_at),
+    decision_reason: u.decision_reason,
+    created_at: iso(u.created_at),
+  };
+}
+
+/**
+ * POST /performance/plans/:id/unbind: Request To Unbind. A binding plan only, by whoever sets its goals,
+ * with a reason, in a quarter still open; one request waits at a time. It goes to the CEO through
+ * `performance.plan_change`; their approval makes the plan unbound (goals.approval.js).
+ */
+async function requestUnbind(actor, id, body) {
+  const plan = await repo.getPlan(pool, id);
+  if (!plan) throw new AppError("NOT_FOUND", "That plan does not exist", 404);
+  await authority.assertSetsGoals(pool, actor, plan.department_id);
+  if ((await plansLib.periodOf(pool, plan.performance_period_id)).status === "closed")
+    throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409);
+  if (plan.status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Only a binding plan can be unbound", 409);
+  const waiting = () => new AppError("UNBIND_PENDING", "An unbind request is already waiting", 409);
+  if (await repo.unbindPending(pool, id)) throw waiting();
+  const workflow = require("../../shared/workflow/engine");
+  let requestId;
+  try {
+    requestId = await tx(async (client) => {
+      const unbindId = await repo.insertUnbind(client, { performance_plan_id: id, reason: body.reason, requested_by: actor && actor.user_id });
+      const instance = await workflow.openInstance(client, {
+        definition_key: "performance.plan_change",
+        entity: { type: "plan_unbind", id: unbindId },
+        subject_employee_id: actor && actor.employee_id,
+        context: {},
+        actor,
+      });
+      await repo.updateUnbind(client, unbindId, { workflow_instance_id: instance.workflow_instance_id });
+      await emit(client, {
+        key: EVENTS.PLAN_UNBIND_REQUESTED,
+        entity: { type: "plan_unbind", id: unbindId },
+        actor,
+        payload: { plan_unbind_id: unbindId, performance_plan_id: id, department: plan.department, period: plan.period_name },
+      });
+      return unbindId;
+    });
+  } catch (err) {
+    // Two presses at once: the second meets the one-pending-per-plan index.
+    if (err.code === "23505") throw waiting();
+    throw err;
+  }
+  return unbindView(await repo.getUnbind(pool, requestId));
+}
+
+/** GET /performance/unbinds/:id: one request, named in full, for its sheet. */
+async function unbindDetail(id, actor = null) {
+  const row = await repo.getUnbindDetail(pool, id);
+  if (!row) throw new AppError("NOT_FOUND", "That unbind request does not exist", 404);
+  await visibility.assertPlan(pool, await visibility.readerOf(pool, actor), actor, {
+    department_id: row.department_id,
+    workflow_instance_id: row.workflow_instance_id,
+  });
+  return { ...unbindView(row), department_id: row.department_id, department: row.department, period_name: row.period_name };
+}
+
+/* ------------------------------------------------------------------ *
  * Target changes (§6.7)
  * ------------------------------------------------------------------ */
 
-async function listChanges(query, scope) {
+async function listChanges(query, scope, actor = null) {
   const okrs = require("./goals.okrs");
-  const page = await repo.listChanges(pool, query, scope);
+  const page = await repo.listChanges(pool, query, scope, await visibility.readerOf(pool, actor));
   return { ...page, data: page.data.map(okrs.changeView) };
 }
 
 /**
- * GET /performance/target-changes/:id: one change for its sheet. A key result's is anyone's to read
- * (the OKR tree is shared); a line's is for whoever may read its scorecard (in scope, its person, its
+ * GET /performance/target-changes/:id: one change for its sheet. A key result's is for whoever may read
+ * the key result (§6.23), or decides the change; a line's is for whoever may read its scorecard (in scope, its person, its
  * reviewer or dotted manager), its requester, or whoever runs the cycle (the CEO decides it).
  */
 async function changeDetail(id, actor, scope) {
   const okrs = require("./goals.okrs");
   const row = await repo.getChangeDetail(pool, id);
   if (!row) throw new AppError("NOT_FOUND", "That target change does not exist", 404);
+  // A key result's change is read where its key result is, or by whoever decides it (§6.23).
+  if (row.key_result && !(await visibility.waitsOn(pool, actor, row.workflow_instance_id)))
+    await visibility.assertKeyResult(pool, await visibility.readerOf(pool, actor), row.key_result.okr_key_result_id);
   const asked = Boolean(actor && row.requested_by && row.requested_by.employee_id === actor.employee_id);
   if (row.line_employee_id && !asked && !(await authority.runsTheCycle(actor))) {
     const targets = require("../targets/targets.service");
@@ -471,10 +628,10 @@ async function changeDetail(id, actor, scope) {
  * ------------------------------------------------------------------ */
 
 /**
- * GET /performance/approvals: the plan stages, target changes and mid-quarter scorecards (sent on
- * their own through the plan's flow, §11) the reader decides, oldest first; a scorecard is named by
- * its person. Deciding stays the engine's (POST /workflow/instances/:id/approve or reject); the
- * outcome is goals.approval.js's.
+ * GET /performance/approvals: the plan stages, unbind requests, target changes and mid-quarter
+ * scorecards (sent on their own through the plan's flow, §11) the reader decides, oldest first; a
+ * scorecard is named by its person. Deciding stays the engine's (POST /workflow/instances/:id/approve
+ * or reject); the outcome is goals.approval.js's.
  */
 async function approvals(query, actor) {
   const approvers = require("../../shared/workflow/approvers");
@@ -513,9 +670,7 @@ async function requestChange(actor, scope, body) {
   if (body.okr_key_result_id) {
     const ctx = await repo.keyResultContext(pool, body.okr_key_result_id);
     if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404);
-    if (ctx.plan_status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
-    if (okrs.tbcOpen(ctx))
-      throw new AppError("TARGET_TBC", "Set this TBC target directly", 409);
+    if (!plansLib.isLive(ctx.plan_status)) throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
     const owner = actor && actor.employee_id === ctx.accountable_employee_id;
     if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
     from = { value: ctx.target_value, text: ctx.target_text };
@@ -560,33 +715,6 @@ async function requestChange(actor, scope, body) {
   return okrs.changeView(await repo.getChange(pool, id));
 }
 
-/**
- * The `targets-lock` job: every TBC target whose quarter's lock date has come locks, once.
- * @param {string} today  YYYY-MM-DD in Lagos
- */
-async function lockTargets(today) {
-  const due = await repo.provisionalDue(pool, today);
-  if (!due.length) return { locked: 0 };
-  const byPeriod = new Map();
-  for (const kr of due) byPeriod.set(kr.performance_period_id, [...(byPeriod.get(kr.performance_period_id) || []), kr]);
-  await tx(async (client) => {
-    for (const [periodId, krs] of byPeriod) {
-      for (const kr of krs) {
-        await repo.updateKeyResult(client, kr.okr_key_result_id, { target_provisional: false, target_locked_at: new Date() });
-        // The months reported while the target was TBC are scored now it is firm.
-        await require("./goals.okrs").rescoreFrom(client, kr.okr_key_result_id);
-      }
-      await emit(client, {
-        key: EVENTS.PERIOD_TARGETS_LOCKED,
-        entity: { type: "performance_period", id: periodId },
-        actor: null,
-        payload: { performance_period_id: periodId, locked: krs.map((k) => k.code) },
-      });
-    }
-  });
-  return { locked: due.length };
-}
-
 module.exports = {
   periodView,
   listPeriods,
@@ -602,11 +730,14 @@ module.exports = {
   deleteGoal,
   planView,
   listPlans,
+  listFunctions,
+  listDepartments,
   planDetail,
   submitPlan,
+  requestUnbind,
+  unbindDetail,
   listChanges,
   changeDetail,
   approvals,
   requestChange,
-  lockTargets,
 };

@@ -13,7 +13,9 @@
  *   both     sideways scrolling of the page; a script error or a native dialog
  *   phone    the desktop sidebar; no bottom bar; a visible table (lists are
  *            cards on a phone); a tap target under 44 × 44 px; more than
- *            LIMITS.phoneFirstScreen words of interface copy on the first screen
+ *            LIMITS.phoneFirstScreen words of interface copy on the first screen;
+ *            a tapped row whose record opens in the page with its list
+ *            instead of a sheet (F31: ListDetail, DetailPane)
  *   desktop  the phone bottom bar; no sidebar
  *
  * Modals are checked by gate 8 for copy; their layout is the shared modal's.
@@ -23,7 +25,6 @@
  *   node scripts/check/two-shells.js --screen=People  only findings on screens starting "People"
  */
 const { LIMITS } = require("./lib/copy");
-const { crawl, finish, run } = require("./lib/screens");
 
 function checkScreen(sc) {
   const out = [];
@@ -45,6 +46,9 @@ function checkScreen(sc) {
     if (checks.firstScreen && sc.firstScreenWords > LIMITS.phoneFirstScreen) {
       out.push(`First phone screen carries ${sc.firstScreenWords} words of interface copy (limit ${LIMITS.phoneFirstScreen}): ${sc.firstScreenText.slice(0, 160)}…`);
     }
+    for (const r of sc.rowOpens || []) {
+      if (r.outcome === "page") out.push(`Tapping "${r.label}" puts its record in the page with the list; on a phone a record opens in a sheet (F31: ListDetail, DetailPane)`);
+    }
   } else if (checks.navigation) {
     if (l.phoneNav) out.push("The phone bottom bar shows on desktop");
     if (!l.desktopNav) out.push("No sidebar on desktop");
@@ -52,12 +56,19 @@ function checkScreen(sc) {
   return out;
 }
 
-run("two-shells", async () => {
-  const result = await crawl();
-  const findings = [];
-  for (const sc of result.screens) {
-    for (const message of checkScreen(sc)) findings.push({ width: sc.width, screen: sc.screen, message });
-  }
-  for (const e of result.errors) findings.push({ width: e.width, screen: e.screen, message: `Script error: ${e.message}` });
-  finish("two-shells", findings, result);
-});
+function main() {
+  const { crawl, finish, run } = require("./lib/screens");
+  run("two-shells", async () => {
+    const result = await crawl();
+    const findings = [];
+    for (const sc of result.screens) {
+      for (const message of checkScreen(sc)) findings.push({ width: sc.width, screen: sc.screen, message });
+    }
+    for (const e of result.errors) findings.push({ width: e.width, screen: e.screen, message: `Script error: ${e.message}` });
+    finish("two-shells", findings, result);
+  });
+}
+
+module.exports = { checkScreen };
+
+if (require.main === module) main();

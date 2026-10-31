@@ -1,0 +1,96 @@
+{
+  "start-desktop": {
+    "spec": "ec4b8baceab8df59",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "start-display": {
+    "spec": "7cf2f13894e86ffb",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-lock": {
+    "spec": "d7b4756feb3ea399",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-notification-settings": {
+    "spec": "d7eb43fe3585760d",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-notifications": {
+    "spec": "db12270dc85487fd",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-phone": {
+    "spec": "c148a7d836ed50df",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "phone"
+    ]
+  },
+  "start-search": {
+    "spec": "f1f41035cceab305",
+    "source": "eb227c20d7d58d74",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-sign-in": {
+    "spec": "f484b5bd9fc72c55",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-user-guide": {
+    "spec": "5fd6ad7b76e1470e",
+    "source": "fca181284aea991b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-user-guide-answer": {
+    "spec": "38adf96f9c38bdd9",
+    "source": "fca181284aea991b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-user-guide-search": {
+    "spec": "e9bd99b40042515d",
+    "source": "fca181284aea991b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-where-it-waits": {
+    "spec": "9de24141d123213f",
+    "source": "c5cd14c89c516436",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

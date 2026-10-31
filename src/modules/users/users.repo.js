@@ -4,16 +4,23 @@
  * list, and the employees who have no login yet. Writes belong to identity (the
  * login) and access (the roles); this file only reads.
  */
-const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { photoUrlSql } = require("../../shared/db/person");
 
-/** invited / active / suspended / left, from the stored status and whether a password was ever chosen. */
-const STATUS = `CASE WHEN u.status = 'active' AND u.password_changed_at IS NULL THEN 'invited' ELSE u.status END`;
+/**
+ * invited / active / suspended / left, from the stored status, whether a password was ever chosen,
+ * and the employee: a login whose employee is archived or has left is Left at once, as signing in
+ * already treats it (identity.repo.js EFFECTIVE_STATUS).
+ */
+const STATUS = `CASE WHEN e.status IN ('archived', 'left') THEN 'left'
+                     WHEN u.status = 'active' AND u.password_changed_at IS NULL THEN 'invited'
+                     ELSE u.status END`;
 
 const ROW = `
   u.user_id, u.employee_id, trim(e.first_name || ' ' || e.last_name) AS display_name,
-  u.email::text AS email, e.job_title, d.name AS department, u.is_ceo,
+  u.email::text AS email, e.work_email::text AS work_email, e.job_title, d.name AS department, u.is_ceo,
   ${STATUS} AS status, (u.mfa_enrolled_at IS NOT NULL) AS two_step,
+  (SELECT max(p.created_at) FROM password_reset p WHERE p.user_id = u.user_id AND p.purpose = 'invite') AS invited_at,
   COALESCE((SELECT json_agg(json_build_object('code', r.code::text, 'name', r.name) ORDER BY r.rank DESC, r.name)
               FROM user_role ur JOIN role r ON r.role_id = ur.role_id
              WHERE ur.user_id = u.user_id
@@ -50,6 +57,24 @@ function list(db, query) {
   );
 }
 
+/**
+ * The invited logins nobody has sent an invitation to yet (the roster makes them with no email),
+ * for Invite All Pending: an active employee, no password chosen, no invitation link ever.
+ */
+async function pendingInvites(db) {
+  // pagination:complete every login waiting for its first invitation, at most the staff list; sent, never shown
+  const { rows } = await completeQuery(
+    db,
+    `SELECT u.user_id ${FROM}
+      WHERE u.status = 'active' AND u.password_changed_at IS NULL AND e.status = 'active'
+        AND NOT EXISTS (SELECT 1 FROM password_reset p WHERE p.user_id = u.user_id AND p.purpose = 'invite')
+      ORDER BY u.created_at, u.user_id`,
+    [],
+    { label: "logins waiting for an invitation" },
+  );
+  return rows.map((r) => r.user_id);
+}
+
 async function getRow(db, userId) {
   const { rows } = await db.query(`SELECT ${ROW} ${FROM} WHERE u.user_id = $1`, [userId]);
   return rows[0] || null;
@@ -64,7 +89,8 @@ async function summary(db, idleSeconds) {
             (SELECT count(DISTINCT s.user_id)::int FROM user_session s
               WHERE s.killed_at IS NULL AND s.expires_at > now()
                 AND s.last_seen_at > now() - make_interval(secs => $1)) AS signed_in_now
-       FROM app_user u`,
+       FROM app_user u
+       JOIN employee e ON e.employee_id = u.employee_id`,
     [idleSeconds],
   );
   return rows[0];
@@ -105,4 +131,16 @@ function candidates(db, query) {
   );
 }
 
-module.exports = { list, getRow, summary, byRole, candidates };
+/** Each of these logins' status, as Settings · Users' Status chips read it (users.views.js). */
+async function statusesOf(db, ids) {
+  const { rows } = await db.query(
+    `SELECT u.user_id AS id, ${STATUS} AS status
+       FROM app_user u
+       LEFT JOIN employee e ON e.employee_id = u.employee_id
+      WHERE u.user_id = ANY($1::uuid[])`,
+    [ids],
+  );
+  return rows;
+}
+
+module.exports = { pendingInvites, list, getRow, summary, byRole, candidates, statusesOf };

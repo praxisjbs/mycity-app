@@ -24,6 +24,7 @@ function person(capabilities: string[], over: Partial<Me> = {}): Me {
     home_view: "staff",
     manages_people: false,
     appearance: { dark: null, fonts: { heading: "geist", body: "geist" }, theme_default: "system", density_default: "compact" },
+    hidden_fields: [],
     ...over,
   };
 }
@@ -60,6 +61,11 @@ describe("shell access", () => {
   it("a capability never opens a module the person cannot view", () => {
     const me = person(["home.team"], { grants: { people: ["view"] } });
     expect(visibleModules(me).map((m) => m.key)).toEqual(["people"]);
+  });
+
+  it("a line manager opens People · Leave to decide their team's leave; anyone else without Settings does not", () => {
+    expect(visibleTabs(person([], { manages_people: true }), people).map((t) => t.slug)).toEqual(["organogram", "attendance", "leave"]);
+    expect(visibleTabs(person([]), people).map((t) => t.slug)).not.toContain("leave");
   });
 
   it("every other module's tabs are gated as before", () => {

@@ -1,0 +1,7 @@
+---
+subject: "Query {{ query_number }}: {{ subject }}"
+title: Query
+---
+<p style="margin:0 0 16px;">{{#if recipient.first_name}}Dear {{ recipient.first_name }},{{else}}Hello,{{/if}}</p>
+<p style="margin:0 0 16px;">A query has been raised with you: {{ subject }}. The letter is attached.</p>
+<p style="margin:0;">{{#if response_due}}Please respond in My Queries on the MyCity hub by {{ datetime response_due }}.{{else}}Please respond in My Queries on the MyCity hub.{{/if}}</p>

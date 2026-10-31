@@ -416,7 +416,8 @@ for (const key of [
  */
 async function raiseBreachAlert(event) {
   const p = event.payload || {};
-  if (!p.attendance_rule_breach_id || !(p.alert || p.raise_query)) return;
+  // The alert only when Alert is on: with Raise Query on, Queries & Sanctions raises the query itself.
+  if (!p.attendance_rule_breach_id || !p.alert) return;
   const { atomically } = require("../../shared/db/tx");
   const repo = require("./attendance.repo");
   const engine = require("./attendance.rules-engine");

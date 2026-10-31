@@ -145,7 +145,8 @@ describe("projects, late reasons and the live board", () => {
     window.history.replaceState(null, "", `/workspace?tab=calendar&new=1&title=Stand%20walk&attendee_ids=${kemi.employee_id}`);
     await signedIn(<Workspace tab="calendar" id={null} />);
     const form = await screen.findByRole("dialog", { name: "New Event" }, { timeout: 8000 });
-    await within(form).findByText(kemi.display_name, undefined, { timeout: 5000 });
+    // The chip of the attendee picked, not her name: once the people list loads it names her too.
+    await within(form).findByRole("button", { name: `Remove ${kemi.display_name}` }, { timeout: 5000 });
   }, 30000);
 });
 

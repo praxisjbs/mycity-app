@@ -21,6 +21,7 @@ const { sentinelOf, filesWith } = require("../../scripts/check/mock-free");
 const { demoWanted } = require("../../scripts/check/lib/screens");
 const { isStale } = require("../../scripts/check/lib/gallery");
 const { merge } = require("../../scripts/check/a11y");
+const { checkScreen } = require("../../scripts/check/two-shells");
 
 /** The linter's own patterns, read from packages/ui/eslint.shared.js (ESM, so not require-able here). */
 function lintPattern(name) {
@@ -157,6 +158,27 @@ describe("native ui (gate 21)", () => {
   test("reads the rendered findings a crawled screen carries", () => {
     expect(renderedMessages({ native: [{ what: "<select>", label: "Department", state: "Select" }] })).toEqual(['<select> "Department" is drawn by the browser (gate 21) in state "Select"']);
     expect(renderedMessages({})).toEqual([]);
+  });
+});
+
+describe("two shells (gate 11): where a phone row's record opens (F31)", () => {
+  const layout = { innerWidth: 390, docScrollWidth: 390, scrollerScrollWidth: 0, scrollerClientWidth: 0, desktopNav: false, phoneNav: true, tables: 0, taps: [], frameOverflow: [] };
+  const phone = (rowOpens) => checkScreen({ width: "phone", kind: "screen", layout, firstScreenWords: 0, firstScreenText: "", rowOpens });
+
+  test("fails a tapped row whose record lands in the page with its list", () => {
+    expect(phone([{ label: "Tolu Adeyemi", outcome: "page" }])).toEqual([
+      'Tapping "Tolu Adeyemi" puts its record in the page with the list; on a phone a record opens in a sheet (F31: ListDetail, DetailPane)',
+    ]);
+  });
+
+  test("passes a sheet, the record's own screen, a full-screen reader, and a row that opens nothing", () => {
+    expect(phone(["sheet", "screen", "cover", "address", "nothing"].map((outcome) => ({ label: "Row", outcome })))).toEqual([]);
+    expect(phone(undefined)).toEqual([]);
+  });
+
+  test("leaves desktop and the gallery's states to the other rules", () => {
+    const desktop = checkScreen({ width: "desktop", kind: "screen", layout: { ...layout, innerWidth: 1440, docScrollWidth: 1440, desktopNav: true, phoneNav: false }, rowOpens: [{ label: "Row", outcome: "page" }] });
+    expect(desktop).toEqual([]);
   });
 });
 

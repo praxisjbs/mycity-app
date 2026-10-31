@@ -13,7 +13,7 @@ import { useTextSizeSheet } from "./TextSize";
  * the search bar, the modules they may open as tiles grouped Work, People,
  * Business and System, Install App while the app is not installed, Sign Out.
  */
-export function More({ open, onClose, modules, badges, current, onSearch }: { open: boolean; onClose: () => void; modules: ModuleDef[]; badges: NavBadges | undefined; current: string | null; onSearch: () => void }) {
+export function More({ open, onClose, modules, badges, current, onSearch }: { open: boolean; onClose: () => void; modules: ModuleDef[]; badges: NavBadges["modules"] | undefined; current: string | null; onSearch: () => void }) {
   const me = useMe();
   const photo = useMyPhoto();
   const { signOut, can } = useAuth();
@@ -40,9 +40,10 @@ export function More({ open, onClose, modules, badges, current, onSearch }: { op
               textSize();
             }}
           />
+          {/* Settings for those who may open it; everyone else's own settings are My Security. */}
           <IconButton
-            icon="cog"
-            label="Settings"
+            icon={can("settings") ? "cog" : "lock"}
+            label={can("settings") ? "Settings" : "My Security"}
             onClick={() => {
               onClose();
               navigate(can("settings") ? hrefFor("settings", "appearance") : hrefFor("ess", "my-security"));

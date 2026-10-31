@@ -21,3 +21,88 @@ export const ARTICLE_GROUPS = [
   { label: "Pay And Leave", items: [{ key: "a3", title: "When you are paid" }, { key: "a4", title: "Booking leave" }] },
   { label: "Policies", items: [{ key: "a5", title: "Expenses policy" }] },
 ];
+
+const plain = (text: string) => ({ text, bold: false, italic: false, code: false, href: null });
+const bold = (text: string) => ({ ...plain(text), bold: true });
+const link = (text: string, href: string) => ({ ...plain(text), bold: true, href });
+
+/** A User Guide task as the API sends it: steps with a screen link and a picture, a tip and a table. */
+export const GUIDE_BLOCKS = [
+  { kind: "paragraph" as const, spans: [plain("Add a person once they have accepted the offer, before their first day.")] },
+  {
+    kind: "steps" as const,
+    items: [
+      { n: 1, spans: [plain("Open "), link("People · Employees", "/people?tab=employees"), plain(".")], figure: null },
+      { n: 2, spans: [plain("Press "), bold("Add Employee"), plain(" at the top right.")], figure: { shot: "people-add", alt: "The Employees list with Add Employee at the top right" } },
+      { n: 3, spans: [plain("Fill in "), bold("Person"), plain(", then press "), bold("Next"), plain(".")], figure: null },
+    ],
+  },
+  { kind: "note" as const, tone: "tip" as const, spans: [plain("A field you cannot see is set by People, not by you.")] },
+  {
+    kind: "table" as const,
+    head: [[plain("Field")], [plain("What to enter")]],
+    rows: [
+      [[bold("Work Email")], [plain("Their address at mycityapp.io")]],
+      [[bold("Start Date")], [plain("Their first working day")]],
+    ],
+  },
+];
+
+/** The picture GUIDE_BLOCKS shows, with its marks. */
+export const GUIDE_PICTURE = {
+  desktop: SAMPLE_IMAGE,
+  phone: SAMPLE_IMAGE,
+  legend: [
+    { n: 1, text: "Add Employee" },
+    { n: 2, text: "The search box" },
+  ],
+};
+
+/** Search results as the User Guide's API ranks them (GuideResults). */
+export const GUIDE_HITS = [
+  {
+    anchor: "start-forgot-password",
+    kind: "task",
+    chapter_title: "Getting Started",
+    section_title: "Signing In",
+    title: "Forgot your password",
+    step: 1,
+    snippet: [
+      { text: "On the sign-in screen, press ", hit: false },
+      { text: "Forgot Password", hit: true },
+      { text: ".", hit: false },
+    ],
+  },
+  {
+    anchor: "ess-change-password",
+    kind: "task",
+    chapter_title: "Employee Self-Service",
+    section_title: "My Security",
+    title: "Change your password",
+    step: null,
+    snippet: [
+      { text: "Type your current ", hit: false },
+      { text: "password", hit: true },
+      { text: ", then the new one twice.", hit: false },
+    ],
+  },
+  {
+    anchor: "start-sign-in",
+    kind: "section",
+    chapter_title: "Getting Started",
+    section_title: "Signing In",
+    title: "Signing In",
+    step: null,
+    snippet: [{ text: "Open the hub and sign in with your work email.", hit: false }],
+  },
+] as const;
+
+/** An answer written from GUIDE_HITS (GuideAnswerCard). */
+export const GUIDE_ANSWER = {
+  found: true,
+  sentences: [
+    { text: "On the sign-in screen, press Forgot Password and type your work email.", sources: [1] },
+    { text: "A link to choose a new password arrives by email.", sources: [1] },
+  ],
+  sources: GUIDE_HITS,
+};

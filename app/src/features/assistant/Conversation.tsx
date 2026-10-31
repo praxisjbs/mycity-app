@@ -32,15 +32,19 @@ const NEXT_PAGE = "Show the next 25.";
 const QUESTION_MAX = 500;
 
 /** The question waiting for its answer, or the one that failed. Try Again sends it with the same key (§11). */
-type Pending = { question: string; key: string; error: string | null };
+type Pending = { question: string; key: string; error: string | null; reference?: string };
+
+/** Refusals asking again cannot help (AI off, the module's AI off, an answer that could not be used): the words go back to the box. */
+const FINAL = new Set(["AI_DISABLED", "AI_MODULE_DISABLED", "AI_BAD_OUTPUT"]);
 
 /** A spoken question to words: one request through the upload engine; the recording is not kept (§6.6). */
 async function transcribe(audio: Blob): Promise<string> {
   const type = audio.type || "audio/webm";
   const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
   const reply = (await upload({ endpoint: "/api/v1/ai/transcribe", file: new File([audio], `question.${ext}`, { type }), fields: { purpose: "voice_note" } })) as unknown as AiTranscript;
-  // A draft is a placeholder, not the person's words (no provider answered): nothing lands in the box.
-  if (reply.draft || !reply.text.trim()) throw new Error("No words heard");
+  // A draft is a placeholder, not the person's words (no voice model is set up): nothing lands in the box.
+  if (reply.draft) throw new ApiError(422, { error: { code: "NOT_SET_UP", message: "Transcription is not set up" } } as never);
+  if (!reply.text.trim()) throw new ApiError(422, { error: { code: "NO_WORDS", message: "No words heard" } } as never);
   return reply.text.trim();
 }
 
@@ -59,6 +63,8 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
   const [text, setText] = useState("");
   const [feedback, setFeedback] = useState<Record<string, AiFeedbackValue | null>>({});
   const asking = useRef(false);
+  /* The question being answered: Send pressed meanwhile waits on it, spinning, with the words kept in the box. */
+  const inflight = useRef<Promise<void> | null>(null);
   /* The conversation this screen is showing: an answer that opens one moves the address here, without starting over. */
   const showing = useRef(id);
   /* Counts the times the person moved to another conversation: an answer asked before the last move is not shown. */
@@ -105,9 +111,16 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
     end.current?.scrollIntoView({ block: "end" });
   }, [newest, pending]);
 
-  const ask = async (words: string, key: string = crypto.randomUUID()) => {
+  const ask = (words: string, key: string = crypto.randomUUID()): Promise<void> | undefined => {
+    if (asking.current) return inflight.current ?? undefined;
+    const work = asked(words, key);
+    inflight.current = work;
+    return work;
+  };
+
+  const asked = async (words: string, key: string) => {
     const question = words.trim();
-    if (!question || asking.current) return;
+    if (!question) return;
     const from = showing.current;
     const move = moves.current;
     /** Still where this question was asked: the screen open and no other conversation picked since (an answer opening its own conversation is not a move). */
@@ -135,22 +148,23 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
         setText(question);
         calls.current.onGone();
         toast("That conversation was deleted");
-      } else if (err.status >= 400 && err.status < 500 && err.status !== 409) {
+      } else if ((err.status >= 400 && err.status < 500 && err.status !== 409) || FINAL.has(err.code)) {
         // Asking again would be refused the same way: the words go back to the box to change.
         setPending(null);
         setText(question);
         toast.error(err.fields?.question?.[0] ?? err.message);
       } else {
-        setPending({ question, key, error: err.message || "Could not reach the server" });
+        setPending({ question, key, error: err.message || "Could not reach the server", reference: err.reference });
       }
     } finally {
       if (here()) asking.current = false;
     }
   };
 
-  /** Send what is in the box: it empties only when the question goes. */
+  /** Send what is in the box: it empties only when the question goes. While an answer is coming it waits on it. */
   const send = () => {
-    if (asking.current || !text.trim()) return;
+    if (asking.current) return inflight.current ?? undefined;
+    if (!text.trim()) return;
     const words = text;
     setText("");
     return ask(words);
@@ -162,7 +176,11 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
       setFeedback((f) => ({ ...f, [a.ai_message_id]: value }));
       if (value) toast("Thanks for the feedback");
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not reach the server");
+      if (e instanceof ApiError && e.status === 404) {
+        // Its conversation was deleted in another tab: a new one, as on any other refusal of a deleted conversation.
+        toast("That conversation was deleted");
+        calls.current.onGone();
+      } else toast.error(e instanceof ApiError ? e.message : "Could not reach the server");
     }
   };
 
@@ -174,7 +192,8 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
       <div role="log" aria-label="Conversation" className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-4 max-md:p-3">
         {empty ? (
           <div className="m-auto flex w-full max-w-120 flex-col gap-3">
-            <EmptyState bare illustration="FirstRun" title={offered.length ? "Try Asking" : "Ask a Question"} />
+            {/* A section of the page beside Recent, and on a phone straight under its title: a second-level heading. */}
+            <EmptyState bare level={2} illustration="FirstRun" title={offered.length ? "Try Asking" : "Ask a Question"} />
             {suggestions.loading && <LoadingRows count={3} />}
             {offered.length > 0 && (
               <div data-copy="content">
@@ -209,6 +228,7 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
                   <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive">
                     <Icon name="alert" size="s" />
                     {pending.error}
+                    {pending.reference && <span data-copy="content">Reference {pending.reference}</span>}
                     <Button size="sm" onClick={() => ask(pending.question, pending.key)}>
                       Try Again
                     </Button>
@@ -252,7 +272,7 @@ function Question({ words }: { words: string }) {
   );
 }
 
-function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: AiFeedbackValue | null; onFeedback: (value: AiFeedbackValue | null) => Promise<void>; onNext?: () => Promise<void> }) {
+function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: AiFeedbackValue | null; onFeedback: (value: AiFeedbackValue | null) => Promise<void>; onNext?: () => Promise<void> | undefined }) {
   const { navigate } = useRouter();
   /* The read the table was drawn from, when it had more rows than the page it returned. */
   const paged = a.table?.rows.length ? a.reads.find((r) => r.rows === a.table!.rows.length && r.total != null && r.total > r.rows) : undefined;

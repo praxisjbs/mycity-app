@@ -32,6 +32,7 @@ section exists to stop.
 | `identity.md` | Sign-in, sessions and the lock screen, credential links, My Security (password and sessions), Settings · Users | TB | M0 | ☑ |
 | `foundation.md` | Foundation completion: People · Employees and the staff roster, imports, documents, roles and permissions, settings, audit, approvals, ⌘K search, in four tracks | TB | M0 | ☑ |
 | `organogram.md` | Organogram: People · Organogram (HR builder) and ESS · Org Chart (read-only viewer) over the live reporting tree | TB | M1 | ☐ |
+| `queries.md` | Queries & Sanctions: Queries, Rules, Sanctions and the consequence chain, Letter Templates; the employee's side in ESS · My Queries | GE | M3 | ☐ |
 | `notifications.md` | Notifications: the bell's pane on both shells, the in-app banner, web push to phones and computers, Notification Settings (brought forward from M6) | TB | M0 | ☐ |
 | `workspace.md` | My Workspace: Today, Tasks (the board, manager-set weekly and daily tasks, A24), Calendar, Analytics | AJ | M2 | ☑ |
 | `performance.md` | Performance Management: the OKR cascade from MyCity's Q4 workbooks, KPIs, scorecards, commitments, the monthly check-in and review chain, PIPs and probation, Analytics, ESS · My Performance; the five-PR build plan with its prompts | TB | M2 | ☑ |
@@ -40,6 +41,7 @@ section exists to stop.
 | `addresses.md` | Addresses: every address across both apps picked from the address search, pinned on the map or, in an outage, taken from the device; never typed (F27, gate 22) | TB | M0 | ☑ |
 | `integrations.md` | Integrations: Settings tab for the system sender, the staff mail server, Geoapify, the AI providers (Gemini, Groq, OpenAI, Anthropic, DeepSeek) with their model lists, Exchange Rates and web push, their keys encrypted, tested before save and watched (brought forward from M9) | TB | M9 | ☑ |
 | `ai-control.md` | AI Control: which model answers each AI feature, its fallbacks, model prices and the monthly spend per provider (brought forward from M10, built in PR2) | TB | M10 | ☑ |
+| `user-guide.md` | User Guide: the Knowledge Hub tab that teaches the whole hub, Quick Start and Full Guide, cut on the server to each reader's grants down to the step, pictures of the real screens, Back to Guide, and the gate that keeps it true (brought forward from M11) | TB | M0 | ☑ |
 | `praxis-ai.md` | Praxis AI: Ask and History, questions answered from the modules' reads with the person's own permissions, up to 5 reads a question, routes for changes, voice in (brought forward from M10) | TB, GE | M10 | ☐ |
 
 Tick **Written** when the guide exists and has been read by the owner of every screen in its §2.

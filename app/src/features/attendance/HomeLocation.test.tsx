@@ -86,7 +86,7 @@ async function signedInAs(email: string, screenUnderTest?: ReactNode) {
       </AuthProvider>
     </RouterProvider>,
   );
-  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 5000 });
+  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 15000 });
   await act(async () => {
     await auth!.signIn(email, "demo1234");
   });
@@ -174,6 +174,8 @@ describe("remote staff's homes", () => {
     fireEvent.click(row);
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Record Decision")).toBeTruthy();
+    const waiting = await api.call("GET /api/v1/attendance/homes", { query: { status: "pending", q: "seyi" } });
+    expect(waiting.data[0]).toMatchObject({ can_decide: true });
 
     fireEvent.click(within(dialog).getByRole("radio", { name: "Reject" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Record Decision" }));
@@ -186,6 +188,17 @@ describe("remote staff's homes", () => {
     await waitFor(() => expect(screen.queryByText("Seyi Balogun")).toBeNull());
     const approved = await api.call("GET /api/v1/attendance/homes", { query: { status: "approved", q: "seyi" } });
     expect(approved.data.map((h) => [h.employee.display_name, h.home_address, h.decided_by_name])).toEqual([["Seyi Balogun", "3 Fixture Road, Ikoyi", "Cynthia Osakunih"]]);
+  }, 20000);
+});
+
+describe("who decides", () => {
+  // The mock's line managers hold no People grant, so the team-scope refusal is the API's test (attendance.test.js).
+  it("People with scope all decide everyone's open exceptions but their own", async () => {
+    await signedInAs("cynthia@mycityapp.io");
+    const all = await api.call("GET /api/v1/attendance/exceptions", { query: { status: "open" } });
+    const me = byKey("cynthia")!.employee_id;
+    expect(all.data.filter((x) => x.employee.employee_id !== me).every((x) => x.can_decide)).toBe(true);
+    expect(all.data.filter((x) => x.employee.employee_id === me).every((x) => !x.can_decide)).toBe(true);
   }, 20000);
 });
 

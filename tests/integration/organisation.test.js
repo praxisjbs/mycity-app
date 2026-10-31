@@ -419,37 +419,137 @@ describeDb("the organisation module against the real migrations", () => {
       expect(res.body.error.fields.work_email).toEqual(["Already in use"]);
     });
 
+    describe("every refusal names its field, so a form shows it where it is (foundation.md §6.16)", () => {
+      const body = (over = {}) => ({
+        first_name: "Kemi",
+        last_name: "Ade",
+        work_email: `kemi.${Math.random().toString(36).slice(2, 8)}@mycity.test`,
+        phone: "803 123 4573",
+        job_title: "Delivery Analyst",
+        start_date: "2026-04-01",
+        employment_type: "full_time",
+        work_pattern: "remote",
+        department_id: people.delivery.department_id,
+        ...over,
+      });
+      const add = (over) => asOps()(request(app).post("/api/v1/employees")).send(body(over));
+
+      test("a department no longer in use", async () => {
+        const retired = await tx((client) => organisation.createDepartment(client, { name: `Retired ${Date.now()}` }, null));
+        await q("UPDATE department SET active = false WHERE department_id = $1", [retired.department_id]);
+        const res = await add({ department_id: retired.department_id });
+        expect(res.status).toBe(422);
+        expect(res.body.error.fields).toEqual({ department_id: ["Not a department"] });
+      });
+
+      test("a line manager who no longer works here", async () => {
+        const gone = await tx((client) =>
+          organisation.createEmployee(client, { ...body(), first_name: "Gone", phone: "+2348031234574" }, null),
+        );
+        // Suspended rather than archived, so the archive test below still finds one archived record.
+        await q("UPDATE employee SET status = 'suspended' WHERE employee_id = $1", [gone.employee_id]);
+        const res = await add({ line_manager_id: gone.employee_id });
+        expect(res.status).toBe(422);
+        expect(res.body.error.fields).toEqual({ line_manager_id: ["Not an employee"] });
+      });
+
+      test("dates out of order, on the field they belong to", async () => {
+        const res = await add({ contract_ends_on: "2026-03-01", confirmation_due_on: "2026-03-31", date_of_birth: "2026-05-01" });
+        expect(res.status).toBe(422);
+        expect(res.body.error.fields).toEqual({
+          contract_ends_on: ["Not before the start"],
+          confirmation_due_on: ["Not before the start"],
+          date_of_birth: ["Before the start date"],
+        });
+      });
+
+      test("On Site without a worksite; a worksite that does not exist", async () => {
+        const none = await add({ work_pattern: "on_site" });
+        expect(none.status).toBe(422);
+        expect(none.body.error.fields).toEqual({ worksite_id: ["Pick a worksite"] });
+        const unknown = await add({ work_pattern: "on_site", worksite_id: "7d1b0b9e-1d2b-4b8e-9b1e-1a2b3c4d5e6f" });
+        expect(unknown.status).toBe(422);
+        expect(unknown.body.error.fields).toEqual({ worksite_id: ["Not a worksite"] });
+      });
+
+      test("an empty optional field is not given; a negative salary is refused", async () => {
+        const ok = await add({ line_manager_id: "", worksite_id: "", staff_number: "", gross_monthly: "" });
+        expect(ok.status).toBe(201);
+        const negative = await add({ gross_monthly: "-5.00" });
+        expect(negative.status).toBe(422);
+        expect(negative.body.error.fields).toEqual({ gross_monthly: ["Not below zero"] });
+      });
+
+      test("a work email another person's login still signs in with", async () => {
+        const res = await add({ work_email: "ops@mycity.test" });
+        expect(res.status).toBe(409);
+        expect(res.body.error.fields).toEqual({ work_email: ["Already in use"] });
+        // The ops lead's record moves to a new address; their active login keeps the old one until Use Work Email.
+        await q("UPDATE employee SET work_email = 'ops.lead@mycity.test' WHERE employee_id = $1", [people.ops.employee.employee_id]);
+        try {
+          const taken = await add({ work_email: "ops@mycity.test" });
+          expect(taken.status).toBe(409);
+          expect(taken.body.error.fields).toEqual({ work_email: ["Used by a login"] });
+        } finally {
+          await q("UPDATE employee SET work_email = 'ops@mycity.test' WHERE employee_id = $1", [people.ops.employee.employee_id]);
+        }
+      });
+
+      test("a phone number typed as a staff number never moves the counter", async () => {
+        const odd = await add({ staff_number: "08031234567" });
+        expect(odd.status).toBe(201);
+        expect(odd.body.staff_number).toBe("08031234567");
+        const next = await add();
+        expect(next.status).toBe(201);
+        expect(next.body.staff_number).toMatch(/^\d{5}$/);
+      });
+    });
+
     test("Edit changes only what it was given", async () => {
       const res = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({
         job_title: "Senior Delivery Analyst",
-        work_pattern: "hybrid",
+        employment_type: "full_time",
       });
       expect(res.status).toBe(200);
       expect(res.body.job_title).toBe("Senior Delivery Analyst");
-      expect(res.body.work_pattern).toBe("hybrid");
-      expect(res.body.employment_type).toBe("contractor");
+      expect(res.body.employment_type).toBe("full_time");
+      expect(res.body.work_pattern).toBe("remote");
       const audit = await one(
         "SELECT changed_fields FROM audit_ledger WHERE entity_id = $1 AND action = 'employee.updated' ORDER BY occurred_at DESC",
         [addedId],
       );
-      expect(audit.changed_fields.sort()).toEqual(["job_title", "work_pattern"]);
+      expect(audit.changed_fields.sort()).toEqual(["employment_type", "job_title"]);
     });
 
-    test("an edit leaves every field it was not given alone, masked ones included", async () => {
+    test("Edit to On Site or Hybrid asks for a worksite; a correction elsewhere never does", async () => {
+      const moved = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ work_pattern: "hybrid" });
+      expect(moved.status).toBe(422);
+      expect(moved.body.error.fields).toEqual({ worksite_id: ["Pick a worksite"] });
+      const emptied = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ work_pattern: "on_site", worksite_id: null });
+      expect(emptied.status).toBe(422);
+      expect(emptied.body.error.fields).toEqual({ worksite_id: ["Pick a worksite"] });
+      expect((await one("SELECT work_pattern FROM employee WHERE employee_id = $1", [addedId])).work_pattern).toBe("remote");
+      // A roster record made On Site before any worksite existed is still corrected elsewhere.
+      await q("UPDATE employee SET work_pattern = 'on_site', worksite_id = NULL WHERE employee_id = $1", [addedId]);
+      try {
+        const named = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ job_title: "Delivery Lead" });
+        expect(named.status).toBe(200);
+        const remote = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ work_pattern: "remote" });
+        expect(remote.status).toBe(200);
+      } finally {
+        await q("UPDATE employee SET work_pattern = 'remote' WHERE employee_id = $1", [addedId]);
+      }
+    });
+
+    test("an edit leaves every field it was not given alone", async () => {
       const before = await one(
         "SELECT gross_monthly, bank_name, account_number, date_of_birth, home_address FROM employee WHERE employee_id = $1",
         [people.staff.employee_id],
       );
       expect(before.gross_monthly).not.toBeNull();
-      /* What a viewer without the field grant sees: those fields come back null, and a
-         form that sent them back as they look (empty, or null for a typed field) would
-         blank them. */
+      // Edit sends only what the person changed (EmployeeForm.tsx), so a field it leaves out is never touched.
       const res = await asOps()(request(app).patch(`/api/v1/employees/${people.staff.employee_id}`)).send({
         job_title: "Senior Analyst",
-        gross_monthly: null,
-        bank_name: "",
-        account_number: null,
-        date_of_birth: "",
       });
       expect(res.status).toBe(200);
       expect(res.body.job_title).toBe("Senior Analyst");
@@ -465,6 +565,35 @@ describeDb("the organisation module against the real migrations", () => {
       expect(audit.changed_fields).toEqual(["job_title"]);
     });
 
+    test("a field emptied on Edit is cleared, and the audit names it", async () => {
+      const res = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ contract_ends_on: "" });
+      expect(res.status).toBe(200);
+      expect(res.body.contract_ends_on).toBeNull();
+      const audit = await one(
+        "SELECT changed_fields FROM audit_ledger WHERE entity_id = $1 AND action = 'employee.updated' ORDER BY occurred_at DESC",
+        [addedId],
+      );
+      expect(audit.changed_fields).toEqual(["contract_ends_on"]);
+    });
+
+    test("a field the caller's role hides is not theirs to set or clear (JBS Praxis, 25/10/2026)", async () => {
+      const ops = await one("SELECT role_id FROM role WHERE code = 'operations_people'");
+      await pool.query("UPDATE field_visibility SET visibility = 'masked' WHERE role_id = $1 AND field_key = 'employee.salary'", [ops.role_id]);
+      await grantsCache.invalidateGrants();
+      try {
+        const before = await one("SELECT gross_monthly FROM employee WHERE employee_id = $1", [people.staff.employee_id]);
+        const res = await asOps()(request(app).patch(`/api/v1/employees/${people.staff.employee_id}`)).send({ gross_monthly: null });
+        expect(res.status).toBe(403);
+        expect(res.body.error.fields).toEqual({ gross_monthly: ["Not yours to set"] });
+        expect(await one("SELECT gross_monthly FROM employee WHERE employee_id = $1", [people.staff.employee_id])).toEqual(before);
+        const me = await asOps()(request(app).get("/api/v1/auth/me"));
+        expect(me.body.hidden_fields).toContain("gross_monthly");
+      } finally {
+        await pool.query("UPDATE field_visibility SET visibility = 'visible' WHERE role_id = $1 AND field_key = 'employee.salary'", [ops.role_id]);
+        await grantsCache.invalidateGrants();
+      }
+    });
+
     test("an empty edit is refused by the contract", async () => {
       const res = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({});
       expect(res.status).toBe(422);
@@ -477,6 +606,9 @@ describeDb("the organisation module against the real migrations", () => {
       expect(archived.status).toBe(200);
       expect(archived.body.status).toBe("archived");
       expect(archived.body.archive_reason).toBe("Contract ended early");
+      // Their last day, today unless given (the owner, 26/10/2026), is what Attrition counts.
+      expect(archived.body.left_on).toBe(lagos.today());
+      expect(archived.body.is_ceo).toBe(false);
 
       const list = await asOps()(request(app).get("/api/v1/employees"));
       expect(list.body.data.map((r) => r.employee_id)).not.toContain(addedId);
@@ -487,6 +619,17 @@ describeDb("the organisation module against the real migrations", () => {
       expect(restored.status).toBe(200);
       expect(restored.body.status).toBe("active");
       expect(restored.body.archived_at).toBeNull();
+      expect(restored.body.left_on).toBeNull();
+    });
+
+    test("Archive takes a last day, never after today", async () => {
+      const ahead = await asOps()(request(app).post(`/api/v1/employees/${addedId}/archive`)).send({ archive_reason: "Leaving soon", left_on: "2999-01-01" });
+      expect(ahead.status).toBe(422);
+      expect(ahead.body.error.fields).toEqual({ left_on: ["Not after today"] });
+      const day = lagos.today();
+      const given = await asOps()(request(app).post(`/api/v1/employees/${addedId}/archive`)).send({ archive_reason: "Left last week", left_on: day });
+      expect(given.body.left_on).toBe(day);
+      await asOps()(request(app).post(`/api/v1/employees/${addedId}/restore`)).send({});
     });
 
     test("archiving twice is refused, and so is archiving the CEO", async () => {
@@ -646,6 +789,14 @@ describeDb("the organisation module against the real migrations", () => {
       const ngozi = after.body.nodes.find((n) => n.display_name === "Ngozi Umeh");
       expect(ngozi.dotted_line_to).toBeNull();
       await asOps()(request(app).post(`/api/v1/employees/${people.manager.employee.employee_id}/restore`)).send({});
+      /* Archiving closed their login (identity.md §6.1) and Restore does not reopen it: an
+         administrator reactivates it, and the manager signs in again for the tests below. */
+      await drain();
+      const reopened = await asOps()(request(app).post(`/api/v1/users/${people.manager.user.user_id}/reactivate`)).send({});
+      expect(reopened.status).toBe(200);
+      const again = await request(app).post("/api/v1/auth/login").set("X-Forwarded-For", "10.30.0.9").send({ email: "manager@mycity.test", password: MANAGER_PASSWORD });
+      expect(again.status).toBe(200);
+      tokens.manager = again.body.access_token;
     });
   });
 
@@ -756,6 +907,13 @@ describeDb("the organisation module against the real migrations", () => {
 
     let sheetFile;
 
+    /** The invented company's own names: the one department the sheet may bring. */
+    const namesFile = () => {
+      const file = path.join(temp, "nomenclature.json");
+      fs.writeFileSync(file, JSON.stringify({ departments: [{ name: "Trading Desk", code: "TRD" }] }));
+      return file;
+    };
+
     beforeAll(async () => {
       sheetFile = path.join(temp, "staff-list.xlsx");
       fs.writeFileSync(sheetFile, await sheet(rows()));
@@ -768,6 +926,7 @@ describeDb("the organisation module against the real migrations", () => {
         log: (m) => log.push(m),
         sheet: sheetFile,
         rolesFile: rolesFile(),
+        nomenclatureFile: namesFile(),
       });
       expect(result.status).toBe("loaded");
       expect(result.stats.create).toBe(5);
@@ -785,7 +944,7 @@ describeDb("the organisation module against the real migrations", () => {
         phone: null,
       });
 
-      /* The DOB column's day and month are kept for the celebrations, matched by email, else staff number. */
+      /* The DOB column's day and month are kept for the celebrations, matched by work email (the post's, from roles.json, when the cell is empty). */
       expect(result.birthdays).toEqual({ set: 4, unmatched: 0 });
       expect(await one("SELECT birth_day, birth_month FROM employee WHERE staff_number = 'T0001'")).toEqual({ birth_day: 12, birth_month: 12 });
       expect(await one("SELECT birth_day, birth_month FROM employee WHERE staff_number = 'T0002'")).toEqual({ birth_day: 26, birth_month: 9 });
@@ -1190,6 +1349,194 @@ describeDb("the organisation module against the real migrations", () => {
       expect(res.body.data.map((r) => r.status)).toContain("warning");
       const errors = await asOps()(request(app).get(`/api/v1/imports/${batch.import_batch_id}/rows?status=error`));
       expect(errors.body.data.every((r) => r.status === "error")).toBe(true);
+    });
+
+    test("a roster person whose name and email both change keeps their number and their one record", async () => {
+      const before = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0003'");
+      const changed = rows().map((r) => (r[0] === "T0003" ? Object.assign([...r], { 1: "Emeka Nwankwo", 8: "emeka.new@mycity.test" }) : r));
+      const file = path.join(temp, "renamed.xlsx");
+      fs.writeFileSync(file, await sheet(changed));
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile(), log: (m) => log.push(m) });
+      expect(result.stats).toMatchObject({ create: 0, error: 1 });
+      expect(log.join("\n")).toMatch(/Staff Number: Staff number T0003 belongs to .*, loaded from the roster before/);
+      expect((await one("SELECT employee_id FROM employee WHERE staff_number = 'T0003'")).employee_id).toBe(before.employee_id);
+      expect(await one("SELECT 1 AS x FROM employee WHERE work_email = 'emeka.new@mycity.test'")).toBeUndefined();
+    });
+
+    test("a row with no staff number whose name is already on the register is held back, not added twice", async () => {
+      const file = path.join(temp, "namesake.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([["", "Sade Akin", "Trading Officer", "Trading Desk", "Female", "", "", "", "sade.other@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""]]),
+      );
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile(), log: (m) => log.push(m) });
+      expect(result.stats).toMatchObject({ create: 0, error: 1 });
+      expect(log.join("\n")).toMatch(/Name: Sade Akin may already be staff number T0004; add their Staff ID to the row/);
+      expect(await one("SELECT count(*)::int AS n FROM employee WHERE first_name = 'Sade' AND last_name = 'Akin'")).toEqual({ n: 1 });
+    });
+
+    test("a second person in a post roles.json gives an email to must bring their own", async () => {
+      const file = path.join(temp, "second-head.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([["T0801", "Musa Bello", "Head of Trading", "Trading Desk", "Male", "", "", "", "", "", "FTE", "Remote", "Mon - Fri", ""]]),
+      );
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile(), log: (m) => log.push(m) });
+      expect(result.stats).toMatchObject({ create: 0, unchanged: 0, error: 1 });
+      expect(log.join("\n")).toMatch(/trading@mycity\.test belongs to staff number T0002; give this person their own email/);
+    });
+
+    test("somebody added on screen gets no login from the roster, whatever their title", async () => {
+      const res = await asOps()(request(app).post("/api/v1/employees")).send({
+        first_name: "Deputy",
+        last_name: "Chief",
+        work_email: "deputy.chief@mycity.test",
+        phone: "08031234576",
+        job_title: "Deputy Chief Executive Officer",
+        start_date: "2026-05-06",
+        employment_type: "full_time",
+        work_pattern: "remote",
+        department_id: people.delivery.department_id,
+      });
+      expect(res.status).toBe(201);
+      const again = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: rolesFile() });
+      expect(again.status).toBe("already_loaded");
+      expect(await one("SELECT 1 AS x FROM app_user WHERE employee_id = $1", [res.body.employee_id])).toBeUndefined();
+    });
+
+    test("a manager written by first and last name is found when their record has a middle name", async () => {
+      const file = path.join(temp, "middle-name.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([
+          ["T0601", "Tobi Ife Dada", "Settlement Lead", "Trading Desk", "Male", "", "", "Zuri Danladi", "tobi.dada@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+          ["T0602", "Ada Eze", "Settlement Officer", "trading-desk", "Female", "", "", "Tobi Dada", "ada.eze@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+        ]),
+      );
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(result.stats).toMatchObject({ create: 2, warning: 0, error: 0 });
+      const ada = await one(
+        `SELECT btrim(m.first_name || ' ' || m.last_name) AS manager, d.name AS department
+           FROM employee e JOIN employee m ON m.employee_id = e.line_manager_id JOIN department d ON d.department_id = e.department_id
+          WHERE e.staff_number = 'T0602'`,
+      );
+      /* "trading-desk" is the Trading Desk, punctuation and case aside. */
+      expect(ada).toEqual({ manager: "Tobi Dada", department: "Trading Desk" });
+    });
+
+    test("a department MyCity does not name is not made by the roster; its rows wait for People", async () => {
+      const file = path.join(temp, "unknown-department.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([["T0701", "Bola Ige", "Analyst", "Treasury Unit", "Male", "", "", "", "bola.ige@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""]]),
+      );
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile(), log: (m) => log.push(m) });
+      expect(result.stats).toMatchObject({ create: 0, error: 1 });
+      expect(log.join("\n")).toMatch(/department "Treasury Unit" is not one of MyCity's/);
+      expect(await one("SELECT 1 AS x FROM department WHERE name = 'Treasury Unit'")).toBeUndefined();
+    });
+
+    test("a seat People closed stays closed when the sheet still lists it", async () => {
+      const audit = [["", "VACANT", "Head of Audit", "Trading Desk", "", "", "", "Zuri Danladi", "", "", "FTE", "Hybrid", "Mon - Fri", ""]];
+      const file = path.join(temp, "closed-seat.xlsx");
+      fs.writeFileSync(file, await sheet(audit));
+      expect((await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() })).stats).toMatchObject({ create: 1 });
+      const seat = await one("SELECT org_seat_id FROM org_seat WHERE title = 'Head of Audit'");
+      await tx((client) => organisation.updateSeat(client, seat.org_seat_id, { status: "closed" }, null));
+      audit[0][13] = "Changed";
+      fs.writeFileSync(file, await sheet(audit));
+      const again = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(again.stats).toMatchObject({ create: 0, unchanged: 1 });
+      expect((await q("SELECT status FROM org_seat WHERE title = 'Head of Audit'")).rows).toEqual([{ status: "closed" }]);
+    });
+
+    test("names applied once stay as People change them on screen", async () => {
+      const file = path.join(temp, "names-once.json");
+      fs.writeFileSync(file, JSON.stringify({ departments: [], job_titles: { "Risk Analyst": "Risk Officer" } }));
+      const first = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: rolesFile(), nomenclatureFile: file });
+      expect(first.names.titles).toBe(1);
+      expect((await one("SELECT job_title FROM employee WHERE staff_number = 'T0401'")).job_title).toBe("Risk Officer");
+      /* People give him back the old title on screen; the next deploy leaves it. */
+      const femi = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0401'");
+      await tx((client) => organisation.updateEmployee(client, femi.employee_id, { job_title: "Risk Analyst" }, null));
+      const next = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: rolesFile(), nomenclatureFile: file });
+      expect(next.names.titles).toBe(0);
+      expect((await one("SELECT job_title FROM employee WHERE staff_number = 'T0401'")).job_title).toBe("Risk Analyst");
+    });
+
+    test("an import by hand is reverted whole: its lines and the fields it filled go back", async () => {
+      const engine = require("../../src/shared/import/engine");
+      const { revert } = require("../../src/shared/import/revert");
+      const yusuf = await one("SELECT employee_id, phone, line_manager_id FROM employee WHERE staff_number = 'T0102'");
+      expect(yusuf).toMatchObject({ phone: null, line_manager_id: null });
+      const buffer = await sheet([
+        ["T0102", "Yusuf Garba", "Trading Officer", "Trading Desk", "Male", "", "", "Zuri Danladi", "yusuf@mycity.test", "08031234599", "FTE", "Remote", "Mon - Fri", ""],
+        ["T0901", "Halima Musa", "Trading Officer", "Trading Desk", "Female", "", "", "Nobody At All", "halima@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+      ]);
+      const batch = await tx((client) =>
+        engine.createBatch(client, {
+          importer_key: "employees",
+          file: { buffer, originalname: "by-hand.xlsx", mimetype: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: buffer.length },
+          actor: loader.SYSTEM,
+        }),
+      );
+      await engine.preview(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      const done = await engine.commit(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      /* Halima is written without the manager nobody holds: a warning, counted as created. */
+      expect(done.stats).toMatchObject({ create: 1, update: 1, error: 0, warning: 1 });
+      const changed = await asOps()(request(app).get(`/api/v1/imports/${batch.import_batch_id}/rows?status=change`));
+      expect(changed.status).toBe(200);
+      expect(changed.body.data.map((r) => r.row_number)).toEqual([2]);
+      expect(Object.keys(changed.body.data[0].diff)).toEqual(["phone"]);
+
+      const out = await revert(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      expect(out).toMatchObject({ archived: 1, restored: 1 });
+      /* The phone the import filled is cleared, and the line it set is taken away. */
+      expect(await one("SELECT phone, line_manager_id FROM employee WHERE staff_number = 'T0102'")).toEqual({ phone: null, line_manager_id: null });
+      expect((await one("SELECT status FROM employee WHERE staff_number = 'T0901'")).status).toBe("archived");
+    });
+
+    test("a person the import made who now has a login is not archived by a revert", async () => {
+      const engine = require("../../src/shared/import/engine");
+      const { revert } = require("../../src/shared/import/revert");
+      const buffer = await sheet([["T0902", "Ngozi Eke", "Trading Officer", "Trading Desk", "Female", "", "", "", "ngozi.eke@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""]]);
+      const batch = await tx((client) =>
+        engine.createBatch(client, {
+          importer_key: "employees",
+          file: { buffer, originalname: "in-use.xlsx", mimetype: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: buffer.length },
+          actor: loader.SYSTEM,
+        }),
+      );
+      await engine.preview(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      await engine.commit(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      const ngozi = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0902'");
+      const invited = await asOps()(request(app).post("/api/v1/users")).send({ employee_id: ngozi.employee_id, role_codes: ["employee"] });
+      expect(invited.status).toBe(201);
+      await expect(revert(batch.import_batch_id, { actor: loader.SYSTEM, db: pool })).rejects.toMatchObject({ code: "IMPORT_REVERT_BLOCKED" });
+      expect((await one("SELECT status FROM employee WHERE staff_number = 'T0902'")).status).toBe("active");
+    });
+
+    test("an import whose header row was not found is mapped from the row the person names", async () => {
+      const engine = require("../../src/shared/import/engine");
+      const buffer = await sheet([["T0999", "Kunle Afolabi", "Trading Officer", "Trading Desk", "Male", "", "", "", "kunle@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""]], {
+        headers: ["Ref", "Who", "Post", "Unit"],
+      });
+      const batch = await tx((client) =>
+        engine.createBatch(client, {
+          importer_key: "employees",
+          file: { buffer, originalname: "no-header.xlsx", mimetype: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: buffer.length },
+          actor: loader.SYSTEM,
+        }),
+      );
+      expect(batch.header_row).toBeNull();
+      const res = await asOps()(request(app).put(`/api/v1/imports/${batch.import_batch_id}/mapping`)).send({ header_row: 0 });
+      expect(res.status).toBe(200);
+      expect(res.body.header_row).toBe(0);
+      expect(res.body.mapping.columns.map((col) => col.header).slice(0, 4)).toEqual(["Ref", "Who", "Post", "Unit"]);
     });
 
     test("no sheet in the build means nothing happens at all", async () => {

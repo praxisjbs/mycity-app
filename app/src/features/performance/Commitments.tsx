@@ -6,10 +6,11 @@
  * same filtered list (F29).
  */
 import { useEffect, type ReactNode } from "react";
-import type { Commitment, CommitmentSetRow } from "@mycity/contract/contract.gen.ts";
+import type { CommitmentListQuery, CommitmentSetRow } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { useApi, useMutation, usePaged, type PagedResult } from "@/api/hooks";
+import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { commitmentMonths, commitmentPill, ORIGINAL_HELP, ReasonForm, refreshCommitments } from "@/features/workspace/Commitment";
@@ -33,13 +34,15 @@ import {
   Toolbar,
   useModal,
 } from "@mycity/ui";
-import { person } from "./shared";
+import { person, useDepartmentFilter } from "./shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 
 const STATE_OPTIONS: Array<[string, string]> = [
   ["", "All States"],
-  ["awaiting_approval", "Awaiting Approval"],
+  ["sent", "Awaiting Approval"],
+  ["not_sent", "Not Sent"],
+  ["returned", "Returned"],
   ["due", "Due"],
   ["on_time", "On Time"],
   ["late", "Late"],
@@ -62,14 +65,16 @@ function monthOptions(today = todayIso()): Array<[string, string]> {
 /** The Commitments view; `switcher` is the Scorecards and Commitments switch above it. */
 export function Commitments({ switcher }: { switcher: ReactNode }) {
   const { navigate } = useRouter();
+  // The month-end report is `performance` export (targets.routes.js): offered only to a reader who holds it.
+  const mayExport = useAuth().can("performance", "export");
   const [params, setParams] = useSearchParams();
   const month = params.get("month") ?? commitmentMonths()[0][0].slice(0, 7);
-  const dept = params.get("department_id") ?? "";
   const state = params.get("state") ?? "";
   const q = params.get("q") ?? "";
-  const departments = useApi("GET /api/v1/departments", { query: {} });
-  const deptOptions: Array<[string, string]> = [["", "All Departments"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
-  const filters = { month, ...(dept ? { department_id: dept } : {}), ...(state ? { state: state as Commitment["state"] } : {}) };
+  // A department in the address that is not one the reader's scope reaches is no filter.
+  const departments = useDepartmentFilter("All Departments", params.get("department_id") ?? "");
+  const dept = departments.value;
+  const filters = { month, ...(dept ? { department_id: dept } : {}), ...(state ? { state: state as CommitmentListQuery["state"] } : {}) };
   const list = usePaged("GET /api/v1/performance/commitments", { filters, sort: "due_at" });
   const summary = useApi("GET /api/v1/performance/commitments/summary", { query: { month, ...(dept ? { department_id: dept } : {}) } });
   const waiting = usePaged("GET /api/v1/performance/commitments/sets", { filters: { waiting_on_me: "true" }, sort: "submitted_at" });
@@ -95,9 +100,9 @@ export function Commitments({ switcher }: { switcher: ReactNode }) {
       <PageHeader title="Commitments" sub={formatMonth(`${month}-01`)} actions={switcher} />
       <Toolbar>
         <FilterSelect label="Month" value={month} onChange={set("month")} options={monthOptions()} />
-        <FilterSelect label="Department" value={dept} onChange={set("department_id")} options={deptOptions} />
+        {departments.pick && <FilterSelect label="Department" value={dept} onChange={set("department_id")} options={departments.options} {...departments.paging} />}
         <FilterSelect label="State" value={state} onChange={set("state")} options={STATE_OPTIONS} />
-        <ExportButton onExport={exportReport} message="Report saved">Export Report</ExportButton>
+        {mayExport && <ExportButton onExport={exportReport} message="Report saved">Export Report</ExportButton>}
       </Toolbar>
       <DesktopOnly>
         <KpiTiles

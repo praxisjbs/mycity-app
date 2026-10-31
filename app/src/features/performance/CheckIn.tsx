@@ -34,8 +34,10 @@ import {
 } from "@mycity/ui";
 import { fieldMessage, figureOf, reviewStatus, score, SECTION_NAMES, targetOf } from "./shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const BUCKET: Record<string, string> = { done: "Done This Month", ongoing: "Ongoing", next_month: "Next Month" };
+/** Dictation's limit: three minutes, as the server takes (reviews.dictation MAX_SECONDS, §6.17). */
+const DICTATION_SECONDS = 180;
 const EVIDENCE: Array<[string, string]> = [["", "None Yet"], ["note", "Source"], ["record", "Task"], ["link", "Link"], ["document", "File"]];
 
 /** A line as the employee fills it. */
@@ -185,6 +187,8 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
     const message = fieldMessage(errors[`${id}.${key}`]?.[0], short);
     return message ? { state: "bad" as const, message } : {};
   };
+  // The API says "Pick a record" for any linked record; this field offers tasks, so it says so.
+  const taskMark = (id: string) => (errors[`${id}.evidence_entity_id`] ? { state: "bad" as const, message: "Pick a task" } : {});
   const taskOptions: Array<[string, string]> = c.tasks.map((t) => [t.task_id, `${t.number} · ${t.title}`]);
 
   return (
@@ -215,7 +219,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
             />
             {i.line && measure === "milestone" && (
               <Field label="Delivered On" optional {...mark(id, "achieved_on", "Pick a date")}>
-                <DateField value={r.achieved_on} onChange={(v) => set(id, { achieved_on: v })} />
+                <DateField value={r.achieved_on} onChange={(v) => set(id, { achieved_on: v })} disabled={!open} />
               </Field>
             )}
             {i.line && measure === "binary" && (
@@ -225,7 +229,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
             )}
             {i.line && (measure === "numeric" || measure === "standard") && (
               <Field label="Actual" optional {...mark(id, "actual_value", "Enter a number")}>
-                <NumberField decimal value={r.actual} onChange={(v) => set(id, { actual: v })} disabled={!open} />
+                <NumberField decimal signed value={r.actual} onChange={(v) => set(id, { actual: v })} disabled={!open} />
               </Field>
             )}
             {i.line && (
@@ -244,7 +248,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
               </Field>
             )}
             {r.evidence_kind === "record" && (
-              <Field label="Task" {...mark(id, "evidence_entity_id", "Pick a task")}>
+              <Field label="Task" {...taskMark(id)}>
                 <SelectField options={taskOptions} value={r.evidence_entity_id} onChange={(v) => set(id, { evidence_entity_id: v })} disabled={!open} />
               </Field>
             )}
@@ -267,7 +271,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
             </Field>
             {open && (
               <div className="flex flex-wrap items-center gap-2">
-                <VoiceField label="Dictate" transcribe={dictate(id)} onTranscript={(text) => set(id, { action_text: text })} />
+                <VoiceField label="Action" action="Dictate" maxSeconds={DICTATION_SECONDS} transcribe={dictate(id)} onTranscript={(text) => set(id, { action_text: text })} />
                 {r.action_text.trim() && !r.tidied && <Button size="sm" icon="spark" onClick={() => tidyText(id)}>Tidy With AI</Button>}
               </div>
             )}

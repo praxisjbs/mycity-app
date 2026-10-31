@@ -32,13 +32,20 @@ State the type in your first message ("This is a full-stack change to My Attenda
    it, whatever the task type. If your task changes behaviour the guide describes, **update the
    guide first** and say so.
 3. The milestone's section of `docs/MyCity-ERP-Documents/MILESTONES.md`.
+4. The User Guide chapter for the screens you touch, `docs/manual/<chapter>.md` (what a person is
+   told to press and see there), and `docs/manual/README.md` before you write one. If your task
+   changes what a screen shows or does, the chapter changes with it.
+5. `docs/handoff/`: a handoff for the work, its module or its branch (each names its branch and
+   owner in its header). If one exists, read it in full before you write any code: its decisions
+   are not re-opened, its checklist says where the work stands and what comes next, and you tick
+   it and add to its log as you go.
 
 **Then by type:**
 
 | Type | Read |
 |---|---|
 | Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/DATABASE_SCHEMA.md` (what exists and what your milestone owes) and `docs/MIGRATIONS.md` in full |
-| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F27, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
+| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F32, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
 | Ops | `docs/SYSTEM_ARCHITECTURE.md` §1, §2, §9, §10, §11, and `docs/runbooks/` |
@@ -53,7 +60,7 @@ says what the code does and why. `scripts/check/provenance.js` fails the build o
 1. `MILESTONES.md` is binding for scope and decisions A1 to A26.
 2. `REUSE_MAP.md` wins over `MILESTONES.md` where they disagree.
 3. For the frontend foundation (`packages/ui`, tokens, shared components, the app shells and the
-   frontend gates), decisions F1 to F27 in `docs/FRONTEND_FOUNDATION.md` §3 win over
+   frontend gates), decisions F1 to F32 in `docs/FRONTEND_FOUNDATION.md` §3 win over
    `MILESTONES.md`, `FRONTEND_GUIDE.md` and `demo.html` (decided with TB, 15/10/2026).
 4. `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`, then the backend and frontend guides.
 5. `README.MD` is the map of every file.
@@ -66,7 +73,9 @@ silently.
 
 - **Pagination: 25 per page, server side, everywhere.** Lists go through
   `src/shared/http/paged.js` (`pageQuery`, `sendPaged`). No `LIMIT`/`OFFSET` in a repo, no
-  page-size parameter in the contract or the frontend. The AI reads in pages of 25 too.
+  page-size parameter in the contract or the frontend. The AI reads in pages of 25 too. A select
+  filled from a server list loads its next 25 as its menu nears its end (`useInfinite` with
+  `paging`, F32), never one page cut short.
 - **AI reads, never writes** (A23). Manifests declare reads and screen routes only.
 - **Every AI feature names its job** (`docs/guides/ai-control.md` §6.2: Default, Fast, Deep
   Reasoning, Image Reading, Transcription, Embeddings, Top Tier). Before building one, ask the person
@@ -90,6 +99,13 @@ silently.
 - **Search reaches everything.** Every new screen, action and record type is findable from ⌘K
   (its module's `.search.js`, the route map, the screen's New action), or carries
   `search:none <reason>`; the search coverage gate fails it otherwise (`docs/guides/foundation.md` §6.7).
+- **The User Guide follows the screens** (JBS Praxis, 25/10/2026; `docs/guides/user-guide.md`). A
+  change to a screen a chapter of `docs/manual/` covers changes the chapter in the same PR, and its
+  pictures are retaken (`npm run guide:shots -- --stale`); a new screen of a delivered milestone
+  gets its section. Steps name buttons in bold exactly as the screen reads them and link the screen;
+  a step needing a grant says so (`needs`), so a reader without it never receives it.
+  `check/user-guide.js` fails it otherwise; `User-guide-unchanged: <reason>` only when nothing a
+  person sees changed. A stale picture has no exemption.
 - **Addresses are picked, never typed** (F27, gate 22; TB, 20/10/2026). Every address or location a
   person enters, on hub and go, live and staging, is an `AddressField` (a `PlacesField` for a list
   of cities) bound to the contract's `PlaceInput` and saved with `places.save()` in the owning
@@ -106,6 +122,11 @@ silently.
   40. Title Case chrome, Verb Noun buttons, Lucide icons, no em dashes in copy a person reads.
 - **Two shells** (gate 11): mobile is a native-feeling app (bottom bar, cards not tables, sheets,
   44 px targets, less text), desktop is desktop software. Never one layout scaled.
+- **A record opens in a sheet, never below its list** (F31, gate 11; JBS Praxis, 25/10/2026). On a
+  phone a tapped row opens its record in a bottom sheet and nothing opens until a row is tapped; on
+  desktop the list and the record sit side by side. A list and the record it opens are always
+  `ListDetail` from `@mycity/ui` (`DetailPane` where desktop puts the record elsewhere). The gate
+  taps each phone screen's rows and has no exemption.
 - **Components only from `@mycity/ui`** (`packages/ui`, listed in `docs/COMPONENTS.md`). A missing
   one is added in `packages/ui` with `npm run new:component` (header, test and gallery page), never
   inside a feature; nothing new goes in `app/src/components/` or `public-app/src/components/`.
@@ -130,11 +151,12 @@ silently.
 
 ## Step 5 · Finish
 
-A Stop hook (`.claude/hooks/stop-check.js`) runs `check/progress.js`, `check/guides.js` and
-`check/readme-map.js` when you try to finish. If they fail you are sent back with the reasons;
-fix them rather than arguing with them. If one genuinely does not apply (a refactor that moves no
-screen, a test-only change), say so to the user and give the PR line to use:
-`Progress-unchanged: <reason>` or `Guide-unchanged: <reason>`. CI runs the same checks on every PR.
+A Stop hook (`.claude/hooks/stop-check.js`) runs `check/progress.js`, `check/guides.js`,
+`check/readme-map.js` and `check/user-guide.js` when you try to finish. If they fail you are sent
+back with the reasons; fix them rather than arguing with them. If one genuinely does not apply (a
+refactor that moves no screen, a test-only change), say so to the user and give the PR line to use:
+`Progress-unchanged: <reason>`, `Guide-unchanged: <reason>` or `User-guide-unchanged: <reason>`.
+CI runs the same checks on every PR.
 When your change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`, the hook also runs
 the screen gates (`components`, `palette`, `forms`, `dashes`, `five-second`, `two-shells`, `native-ui`); they have
 no exemption line. Fix the screen.
@@ -146,7 +168,8 @@ A task is not finished until:
    Status and Updated (day-first date), update the summary counts if a Status changed, and add a
    note under the module: date · initials · what was done · what is left. For foundation work,
    tick the M0 item and add a note there.
-3. The feature guide matches what you built.
+3. The feature guide matches what you built, and so does the User Guide chapter (`docs/manual/`),
+   its pictures retaken.
 4. `README.MD` lists any new file you created (README §11).
 5. A finished module keeps no empty files: delete its stubs that stayed empty and take them off
    `README.MD` and the guide (README §11.5). Stubs a later milestone fills stay.
@@ -156,8 +179,9 @@ A task is not finished until:
 
 ## Working conventions
 
-- Branch `m<N>/<short-name>`. PR titles in Conventional Commits form. One approving review, not
-  the author. Merges to `main` deploy to staging; production waits for a person's approval.
+- Branch `m<N>/<short-name>`. PR titles in Conventional Commits form. No approving review is
+  required (JBS Praxis, 24/10/2026): a PR merges once CI is green, and its author merges it.
+  Merges to `main` deploy to staging; production waits for a person's approval.
 - Do not commit, push or open a PR unless asked.
 - Open a PR as a draft while the work goes on: a draft runs no CI on GitHub, so `npm run ci` runs
   locally; mark it ready for review once that is green (BACKEND_GUIDE §8.4).

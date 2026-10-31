@@ -35,6 +35,7 @@ const { completeQuery, pageQuery, TOTAL_COL } = require("../../../shared/http/pa
 const { personJson } = require("../../../shared/db/person");
 const { scopeClause } = require("../../../shared/rbac/scope");
 const { objectiveScores } = require("../../goals/goals.cascade");
+const visibility = require("../../goals/goals.visibility");
 
 /** The forward tables and the columns these queries read. */
 const TABLES = Object.freeze({
@@ -108,8 +109,12 @@ const MEETS = "COALESCE((pq.rules -> 'bands' ->> 'meets')::numeric, $3)";
  * @param {{query: Function}} client
  * @param {{from: string, to: string}} period  YYYY-MM-DD
  * @param {{page?: number}} query
+ * @param {object} [reach]  what the reader may read of the tree (goals.visibility.js, §6.23): the goals the
+ *   whole plan reads, else those shared with them
  */
-function organisationGoals(client, { from, to }, query) {
+function organisationGoals(client, { from, to }, query, reach = visibility.EVERYTHING) {
+  const params = [from, to];
+  const readable = visibility.goalReadable(reach, "g", params);
   return pageQuery(
     client,
     `WITH objective_score AS (${objectiveScores(QUARTERS_OVERLAPPING)})
@@ -120,8 +125,9 @@ function organisationGoals(client, { from, to }, query) {
        FROM organisational_goal g
       WHERE g.level = 'organisation' AND g.status IN ('active', 'closed')
         AND g.starts_on <= $2::date AND g.ends_on >= $1::date
+        AND ${readable}
       ORDER BY g.ends_on, g.organisational_goal_id`,
-    [from, to],
+    params,
     query,
   );
 }
@@ -155,18 +161,22 @@ function targetsOf(client, { employee_id: employeeId, from, to }, query) {
  * percentages, over the quarter `today` falls in. Functions with no objectives are not listed.
  * @param {{query: Function}} client
  * @param {{today: string}} at
+ * @param {object} [reach]  the company's score is the whole plan's alone; a function's, those the reader reads
  * @returns {Promise<Array<{department_id: string|null, percent: number|null}>>}
  */
-async function orgScores(client, { today }) {
+async function orgScores(client, { today }, reach = visibility.EVERYTHING) {
+  const params = [today];
+  const readable = visibility.departmentReadable(reach, "os.department_id", params);
   // pagination:complete the company and the functions with objectives this quarter, a handful
   const { rows } = await completeQuery(
     client,
     `WITH objective_score AS (${objectiveScores(QUARTER_OF_TODAY)})
      SELECT os.department_id, round(avg(os.score) * 100)::int AS percent
        FROM objective_score os
+      WHERE ${readable}
       GROUP BY os.department_id
       ORDER BY os.department_id NULLS FIRST`,
-    [today],
+    params,
     { label: "the Org KPI's scores", ceiling: 100 },
   );
   return rows;
@@ -178,7 +188,9 @@ async function orgScores(client, { today }) {
  * @param {{query: Function}} client
  * @param {{today: string}} at
  */
-async function keyResultsOnTrack(client, { today }) {
+async function keyResultsOnTrack(client, { today }, reach = visibility.EVERYTHING) {
+  const params = [today];
+  const readable = visibility.keyResultReadable(reach, "k", "o", params);
   const { rows } = await client.query(
     `SELECT count(*) FILTER (WHERE km.status IN ('on_track', 'done'))::int AS value,
             count(*)::int AS denominator,
@@ -192,8 +204,8 @@ async function keyResultsOnTrack(client, { today }) {
        FROM okr_objective o
        JOIN okr_key_result k ON k.okr_objective_id = o.okr_objective_id
        ${LATEST_MONTH}
-      WHERE o.performance_period_id IN (${QUARTER_OF_TODAY})`,
-    [today],
+      WHERE o.performance_period_id IN (${QUARTER_OF_TODAY}) AND ${readable}`,
+    params,
   );
   const r = rows[0] || {};
   return {
@@ -209,8 +221,11 @@ async function keyResultsOnTrack(client, { today }) {
  * @param {{query: Function}} client
  * @param {{today: string, group?: string|null}} at
  * @param {{page?: number, q?: string}} query
+ * @param {object} [reach]  the key results the reader may read (§6.23)
  */
-function keyResultsPage(client, { today, group = null }, query) {
+function keyResultsPage(client, { today, group = null }, query, reach = visibility.EVERYTHING) {
+  const params = [today, group || null, query.q || null];
+  const readable = visibility.keyResultReadable(reach, "k", "o", params);
   return pageQuery(
     client,
     `SELECT k.okr_key_result_id, k.code::text AS code, k.statement, km.status,
@@ -224,8 +239,9 @@ function keyResultsPage(client, { today, group = null }, query) {
       WHERE o.performance_period_id IN (${QUARTER_OF_TODAY})
         AND ($2::text IS NULL OR km.status = $2 OR ($2 = 'awaiting_report' AND km.okr_key_result_month_id IS NULL))
         AND ($3::text IS NULL OR search_fold(k.code::text || ' ' || k.statement) LIKE '%' || search_fold($3) || '%')
+        AND ${readable}
       ORDER BY k.code, k.okr_key_result_id`,
-    [today, group || null, query.q || null],
+    params,
     query,
   );
 }

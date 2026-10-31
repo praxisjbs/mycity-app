@@ -41,9 +41,11 @@ type View = "details" | "steps" | "comments" | "history";
 /** The panel's state for a screen: open(id) and the element to render once. */
 export function useTaskPanel() {
   const [open, setOpen] = useState<{ id: string; title: string } | null>(null);
+  // The heading starts as the row's title and then follows the task as saved, so an edit retitles it.
+  const retitle = useCallback((id: string, title: string) => setOpen((o) => (o && o.id === id && o.title !== title ? { ...o, title } : o)), []);
   const panel = (
     <SidePanel open={!!open} onClose={() => setOpen(null)} title={open?.title ?? "Task"} size="wide">
-      {open && <TaskPanel key={open.id} id={open.id} onOpenTask={(id, title) => setOpen({ id, title })} close={() => setOpen(null)} />}
+      {open && <TaskPanel key={open.id} id={open.id} onOpenTask={(id, title) => setOpen({ id, title })} onTitle={retitle} close={() => setOpen(null)} />}
     </SidePanel>
   );
   const show = useCallback((id: string, title: string) => setOpen({ id, title }), []);
@@ -71,7 +73,7 @@ const minutes = (m: number | null) => {
   return `${m / 1440} day${m === 1440 ? "" : "s"} before`;
 };
 
-export function TaskPanel({ id, close, onOpenTask }: { id: string; close: () => void; onOpenTask: (id: string, title: string) => void }) {
+export function TaskPanel({ id, close, onOpenTask, onTitle }: { id: string; close: () => void; onOpenTask: (id: string, title: string) => void; onTitle?: (id: string, title: string) => void }) {
   const { data: t, error, reload } = useApi("GET /api/v1/tasks/:id", { params: { id } });
   const [view, setView] = useState<View>("details");
   const modal = useModal();
@@ -80,6 +82,10 @@ export function TaskPanel({ id, close, onOpenTask }: { id: string; close: () => 
   useEffect(() => {
     if (gone) close();
   }, [gone, close]);
+  const title = t?.title;
+  useEffect(() => {
+    if (title) onTitle?.(id, title);
+  }, [id, title, onTitle]);
   if (gone) return null;
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!t) return <LoadingRows count={6} />;

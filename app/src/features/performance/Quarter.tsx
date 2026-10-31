@@ -1,10 +1,11 @@
 /**
  * Performance · Goals, Set Up Quarter and Edit Quarter (docs/guides/performance.md §3.2, §5, §10): the
- * quarter (name, start, the end that follows it, lock date, status), then its scoring rules, which
+ * quarter (name, start, the end that follows it, status), then its scoring rules, which
  * start as a copy of the last quarter's: the bands, the key results' and the lines' scoring thresholds
  * and the section weights. The contract's PeriodCreate or PeriodEdit, ScoringRules inside, checks every
  * field, and each problem lands on its field. A quarter is set up before it starts (Q1 2027 in October).
  */
+import { useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
 import scoring from "@mycity/contract/schemas/scoring.js";
 import type { Endpoints, PerformancePeriod, ScoringRules } from "@mycity/contract/contract.gen.ts";
@@ -38,10 +39,17 @@ const RULES: Rule[] = [
   { step: "Section Weights", group: "sections", key: "accountability", label: "Accountability", decimal: false },
 ];
 const STEPS = ["Bands", "Key Result Scoring", "Line Scoring", "Section Weights"];
-const QUARTER_FIELDS = ["name", "starts_on", "targets_lock_on", "status"];
+const QUARTER_FIELDS = ["name", "starts_on", "status"];
 
 type Values = Record<string, string>;
 const ruleField = (r: Rule) => `${r.group}/${r.key}`;
+
+/** The wizard step a field sits on: the Quarter step (0), else its rule's step. */
+export const stepOfField = (field: string) => {
+  if (QUARTER_FIELDS.includes(field)) return 0;
+  const rule = RULES.find((r) => ruleField(r) === field);
+  return rule ? STEPS.indexOf(rule.step) + 1 : -1;
+};
 
 /** A day some months on: "2026-10-01" and 3 → "2027-01-01". */
 function addMonths(day: string, n: number) {
@@ -93,18 +101,19 @@ export function QuarterWizard({ close, period, latest, onSaved }: { close: () =>
   const initial: Values = {
     name: period?.name ?? "",
     starts_on: period?.starts_on ?? nextStart(latest),
-    targets_lock_on: period?.targets_lock_on ?? "",
     status: period?.status ?? "planning",
     ...Object.fromEntries(RULES.map((r) => [ruleField(r), String((base[r.group] as Record<string, number>)[r.key] ?? "")])),
   };
   const toBody = (v: Values) =>
     editing
-      ? { name: v.name, targets_lock_on: v.targets_lock_on || null, status: v.status, rules: rulesOf(v, base) }
-      : { starts_on: v.starts_on, name: v.name, targets_lock_on: v.targets_lock_on, status: v.status, rules: rulesOf(v, base) };
+      ? { name: v.name, status: v.status, rules: rulesOf(v, base) }
+      : { starts_on: v.starts_on, name: v.name, status: v.status, rules: rulesOf(v, base) };
   const f = useContractForm(initial, bodySchema<Values>(editing ? goalsContract.PeriodEdit : goalsContract.PeriodCreate, toBody, fieldOf));
   const create = useMutation("POST /api/v1/performance/periods");
   const change = useMutation("PATCH /api/v1/performance/periods/:id");
   const v = f.values as Values;
+  // The step in view: a refusal on a field takes the person back to that field's step.
+  const [at, setAt] = useState(0);
   const ends = editing ? (period?.ends_on ?? "") : quarterEnd(v.starts_on);
 
   const save = async () => {
@@ -117,9 +126,13 @@ export function QuarterWizard({ close, period, latest, onSaved }: { close: () =>
       toast(editing ? "Quarter saved" : `${saved.name} set up`);
       onSaved?.(saved);
     } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length)
-        f.setServerErrors(Object.fromEntries(Object.entries(e.fields).map(([k, m]) => [k.startsWith("rules.") ? k.slice(6).replace(".", "/") : k, m])));
-      else toast(e instanceof ApiError ? e.message : "Could not save");
+      if (e instanceof ApiError && Object.keys(e.fields).length) {
+        const marks = Object.fromEntries(Object.entries(e.fields).map(([k, m]) => [k.startsWith("rules.") ? k.slice(6).replace(".", "/") : k, m]));
+        f.setServerErrors(marks);
+        const steps = Object.keys(marks).map(stepOfField).filter((i) => i >= 0);
+        if (steps.length) setAt(Math.min(...steps));
+        toast.error(e.message);
+      } else toast.error(e instanceof ApiError ? e.message : "Could not save");
     }
   };
 
@@ -130,6 +143,8 @@ export function QuarterWizard({ close, period, latest, onSaved }: { close: () =>
   return (
     <Wizard
       finish={editing ? "Save Quarter" : "Set Up Quarter"}
+      step={at}
+      onStepChange={setAt}
       busy={create.pending || change.pending}
       onFinish={save}
       onCancel={close}
@@ -147,9 +162,6 @@ export function QuarterWizard({ close, period, latest, onSaved }: { close: () =>
               </Field>
               <Field label="Ends">
                 <TextField value={formatDate(ends)} onChange={() => undefined} disabled />
-              </Field>
-              <Field label="Lock Date" optional {...f.status("targets_lock_on")}>
-                <DateField {...f.field("targets_lock_on")} min={v.starts_on || undefined} max={ends || undefined} />
               </Field>
               <Field label="Status" {...f.status("status")}>
                 <ChoiceField label="Status" options={statuses} disabled={behind} value={v.status} onChange={(x) => f.field("status").onChange(x)} />

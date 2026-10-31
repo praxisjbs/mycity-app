@@ -43,7 +43,9 @@ describe("release manifest", () => {
     const files = manifest.releaseFiles(fakeRepo());
     expect(files).toContain("src/index.js");
     expect(files).toContain("app/dist/index.js");
-    expect(files.some((f) => /test\.js$|\.env$|node_modules|^docs\//.test(f))).toBe(false);
+    // The User Guide's chapters are the one part of docs/ the API serves (docs/guides/user-guide.md §4).
+    expect(files).toContain("docs/manual/index.js");
+    expect(files.some((f) => /test\.js$|\.env$|node_modules|^docs\/(?!manual\/)/.test(f))).toBe(false);
   });
 
   test("a missing frontend build is an error that says how to build it", () => {

@@ -605,6 +605,7 @@ describe("schedules and heartbeat", () => {
       "mail-sync",
       "media-reconcile",
       "places-name",
+      "query-rule-sweep",
       "reminders",
       "review-cycles",
       "scheduled-reports",
@@ -612,9 +613,9 @@ describe("schedules and heartbeat", () => {
       "system-health-digest",
       "system-health-purge",
       "system-health-sample",
-      "targets-lock",
       "task-recurrence",
       "urgent-repeats",
+      "user-guide-index",
       "workflow-timeout",
     ]);
   });

@@ -563,6 +563,7 @@ src/modules/<name>/
   <name>.events.js        event keys emitted + outbox handlers registered
   <name>.ai.js            read manifest, or `// ai:none <reason>`          (gate 9)
   <name>.search.js        search provider, or `// search:none <reason>`    (gate 10)
+  <name>.views.js         where its records wait inside their screens, only where it has any (notifications.md §6)
   <name>.import.js        importer, when the module's records come from sheets (§9.4)
   <name>.test.js
 ```
@@ -842,7 +843,7 @@ milestone shown, so nothing is retrofitted.
 | AI read manifests, registry, catalogue, caller-grant check, citations | M1 onward | `shared/ai` (§14) | Built |
 | Assistant orchestrator (retrieve, read, answer, cite) | M10 | `services/ai/assistant/` | Seam |
 | ⌘K search providers | M1 onward | `shared/search` | Built |
-| Embeddings (pgvector) | M10 | extension in 0001 | Seam |
+| Embeddings (pgvector) | M10 | extension in 0001; `ai.embed()` (`services/ai/llm.service.js`); the User Guide's index (`user_guide_passage`, 0510) | Built for the User Guide; the Knowledge Hub's articles a seam |
 | Scheduled reports, generated as recipient | M1 Home → Reports | `modules/reports` (sources, schedule, files, generate), `jobs` (`scheduled-reports`, `scheduled-report`), `shared/documents`, `shared/spreadsheet` | Built |
 | Backups, restore drill, monitoring | M11 | `scripts/db`, `ops` | Built |
 

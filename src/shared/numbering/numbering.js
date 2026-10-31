@@ -49,6 +49,42 @@ function format(scheme, period, seq) {
   return parts.join(scheme.separator);
 }
 
+/**
+ * A regular expression, read alike by Postgres and JavaScript, that matches a number this
+ * scheme issues in `period`, with the sequence as its one captured group; null when the scheme
+ * carries no sequence. A number of another shape (a phone number typed as a staff number, a
+ * legacy code, a prefix with digits in it) does not match, so it never moves the counter. The
+ * sequence may be at most two digits longer than the padding, the room a counter grows into.
+ * @param {{prefix: string, padding: number, separator: string, include_period: boolean}} scheme
+ * @param {string} period  "all", "2026" or "2026-10"
+ */
+function sequencePattern(scheme, period) {
+  if (!(scheme.padding > 0)) return null;
+  const esc = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = [esc(scheme.prefix)];
+  if (scheme.include_period && period !== "all")
+    parts.push(esc(period.replace("-", scheme.separator || "-")));
+  parts.push(`([0-9]{${scheme.padding},${scheme.padding + 2}})`);
+  return `^${parts.join(esc(scheme.separator || ""))}$`;
+}
+
+/**
+ * The period a number for `docType` on `date` falls in, and the pattern of its sequence
+ * (sequencePattern), so a caller can move the counter past numbers issued elsewhere.
+ * @returns {Promise<{period: string, pattern: string|null}>}
+ */
+async function sequenceOf(client, docType, { date } = {}) {
+  const day = date ? lagos.assertDate(String(date).slice(0, 10), "date") : lagos.today();
+  const scheme = await schemeOf(client, docType);
+  const period = periodOf(scheme, day);
+  return { period, pattern: sequencePattern(scheme, period) };
+}
+
+/** The digits a number for `docType` is padded to (0 for none): what an import pads a bare sequence to. */
+async function paddingOf(client, docType) {
+  return (await schemeOf(client, docType)).padding;
+}
+
 async function schemeOf(client, docType) {
   const { rows } = await client.query(
     "SELECT prefix, padding, separator, reset, include_period FROM numbering_scheme WHERE doc_type = $1",
@@ -177,4 +213,4 @@ async function checkSchemes(client) {
   }
 }
 
-module.exports = { allocate, advanceTo, preview, format, periodOf, checkSchemes };
+module.exports = { allocate, advanceTo, preview, format, periodOf, sequencePattern, sequenceOf, paddingOf, checkSchemes };

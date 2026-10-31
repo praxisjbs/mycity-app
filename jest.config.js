@@ -42,11 +42,17 @@ module.exports = {
   testMatch: ["<rootDir>/src/**/*.test.js", "<rootDir>/tests/**/*.test.js", "<rootDir>/scripts/**/*.test.js"],
   testPathIgnorePatterns: ignored,
   passWithNoTests: true,
-  testTimeout: 15000,
+  // The integration files rebuild the test database's schema in beforeAll (every migration), which
+  // took longer than 15 s on a loaded machine (npm run ci's four groups at once on four CPUs).
+  testTimeout: process.env.RUN_DB_TESTS === "1" ? 60000 : 15000,
   // APP_ENV=test: responses are checked against their contract and a mismatch fails the test.
   setupFiles: ["<rootDir>/tests/setup-env.js"],
   // The error reporter's batch timer never outlives the file that started it.
   setupFilesAfterEnv: ["<rootDir>/tests/settle-reporter.js"],
   // The integration files share one test database and rebuild its schema: one at a time.
   maxWorkers: process.env.RUN_DB_TESTS === "1" ? 1 : 2,
+  // A worker that has grown past 1 GB by the end of a file is replaced before the next. Run in one
+  // process, the whole suite outgrew Node 20's heap of about 2 GB and died with "JavaScript heap
+  // out of memory" on GitHub, while Node 22's larger default heap hid it locally (27/10/2026).
+  workerIdleMemoryLimit: "1GB",
 };

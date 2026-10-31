@@ -13,14 +13,15 @@ import { useRef, type KeyboardEvent } from "react";
 import { cn } from "../lib/cn";
 import { Icon } from "../icons/Icon";
 import { WORD_LIMITS, warnOverLimit } from "../help/words";
-import { toOption, type Choice } from "./options";
+import { CountBadge } from "../display/CountBadge";
+import { toOption, unreadOf, type Choice } from "./options";
 
 export interface SegmentedControlProps<V extends string = string> {
   /** The view showing. */
   value: V;
   /** Called with the chosen view. */
   onChange: (value: V) => void;
-  /** Two to five options: the merged tuple ["team", "My Team"], or { value, label, icon, count, disabled }. */
+  /** Two to five options: the merged tuple ["team", "My Team"], or { value, label, icon, count, unread, urgent, disabled }; `unread` the reader's unread notifications behind a view, in yellow. */
   options: ReadonlyArray<Choice<V>>;
   /** Names the group for assistive technology ("Whose Tasks"); give one unless a visible label sits beside it. */
   label?: string;
@@ -103,6 +104,8 @@ export function SegmentedControl<V extends string = string>({ value, onChange, o
             {item.label}
             {item.count != null && " "}
             {item.count != null && <span className="text-xs tabular-nums">{item.count}</span>}
+            {unreadOf(item) > 0 && " "}
+            <CountBadge count={unreadOf(item)} tone={item.urgent ? "err" : "primary"} />
           </button>
         );
       })}

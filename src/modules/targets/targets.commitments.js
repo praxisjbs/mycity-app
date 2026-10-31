@@ -149,7 +149,11 @@ async function filtersOf(db, query, scope, actor, params) {
   if (query.month) add(monthStart(query.month), (p) => `v.commitment_month = ${p}::date`);
   if (query.department_id) add(query.department_id, (p) => `v.department_id = ${p}::uuid`);
   if (query.employee_id) add(query.employee_id, (p) => `v.primary_assignee_id = ${p}::uuid`);
-  if (query.state) add(query.state, (p) => `v.state = ${p}`);
+  // An unapproved month as its pill reads: sent and waiting, not sent, or returned.
+  if (query.state === "sent") where.push(`v.state = 'awaiting_approval' AND v.set_status = 'submitted'`);
+  else if (query.state === "returned") where.push(`v.state = 'awaiting_approval' AND v.set_status = 'returned'`);
+  else if (query.state === "not_sent") where.push(`v.state = 'awaiting_approval' AND (v.set_status IS NULL OR v.set_status = 'draft')`);
+  else if (query.state) add(query.state, (p) => `v.state = ${p}`);
   if (query.q) add(query.q, (p) => `v.haystack LIKE '%' || search_fold(${p}) || '%'`);
   if (query.waiting_on_me === "true" && actor) {
     where.push(await waitingClause(db, actor, params, { set: "v.commitment_set_id", task: "v.task_id" }));

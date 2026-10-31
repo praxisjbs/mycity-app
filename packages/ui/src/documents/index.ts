@@ -14,6 +14,8 @@ export { Paper, PaperLogo, PaperTitle, PaperTable, PaperFoot, Signature, type Pa
 export { Reader, ArticleBody, type ReaderProps, type ReaderGroup, type ArticleBodyProps } from "./Reader";
 export * from "./EmailFrame";
 export * from "./FileCard";
+export * from "./GuideBody";
+export * from "./GuideResults";
 export * from "./MediaViewer";
 export * from "./PdfViewer";
 export * from "./RichText";

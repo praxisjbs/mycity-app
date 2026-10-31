@@ -40,6 +40,7 @@ const { mapSmtpError, mapImapError, retryPlan, stepCodeOf } = require("../../ser
 const integrations = require("../../shared/integrations/settings");
 const usage = require("../../shared/integrations/usage");
 const { cleanHtml, textToHtml } = require("./visible");
+const realtime = require("../../services/realtime/emitter");
 const { outgoingHtml, textOf } = require("./compose");
 const signatures = require("./signature/signature.service");
 const { place } = require("./signature/signature.place");
@@ -198,6 +199,9 @@ async function disconnect(user) {
 /** Refresh: ask the worker for a sync now. */
 async function requestSync(user) {
   const a = await account(user);
+  // A mailbox waiting to be reconnected is not synced: say so, rather than seem to refresh.
+  if (a.status === "needs_reconnect")
+    throw new AppError("MAILBOX_NEEDS_RECONNECT", "Your mailbox needs reconnecting. Press Reconnect.", 409);
   await tx((client) =>
     emit(client, {
       key: EVENTS.MAIL_ACCOUNT_SYNC_REQUESTED,
@@ -605,8 +609,19 @@ async function move(threadId, to, user) {
   });
   later(async () => {
     const p = await providerFor(pool, a);
-    for (const m of moved)
+    let refilled = 0;
+    for (const m of moved) {
       await p.move(m.from_key, dest.remote_key, m.internet_message_id);
+      // Spam's body was never kept: out of Spam, the message is read again from the server (the owner, 26/10/2026).
+      if (m.from_kind === "spam" && to !== "spam" && to !== "trash") {
+        const full = await p.fetchOne(dest.remote_key, m.internet_message_id);
+        if (full) {
+          await repo.setBody(pool, m.mail_message_id, cleanHtml(full.html) || textToHtml(full.text));
+          refilled += 1;
+        }
+      }
+    }
+    if (refilled) realtime.toUser(user.user_id, "mailbox.updated", { mail_thread_id: threadId });
   }, "move");
   const rows = await listThreads(user, { folder: to, page: 1 });
   return rows.data.find((r) => r.mail_thread_id === threadId) || null;
@@ -983,7 +998,8 @@ async function deliver(q) {
             mail_send_queue_id: q.mail_send_queue_id,
             user_id: q.user_id,
             subject: p.subject || "(no subject)",
-            reason: mapped.message,
+            // Out of tries, a deferral is final: nothing will try it again.
+            reason: mapped.code === "MAIL_DEFERRED" ? "The mail server kept deferring it. Send it again later." : mapped.message,
           },
         }),
       );

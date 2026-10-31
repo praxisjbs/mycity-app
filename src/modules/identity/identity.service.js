@@ -38,6 +38,7 @@ const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
 const catalog = require("../../shared/access/access.catalog");
 const grantsCache = require("../../shared/rbac/grants-cache");
+const fieldMask = require("../../shared/rbac/field-mask");
 const sessions = require("../../shared/rbac/sessions");
 const policy = require("./identity.session-policy");
 const passwordPolicy = require("./identity.password-policy");
@@ -182,6 +183,7 @@ async function me(db, userId) {
     manages_people: row.manages_people === true,
     // Required here, not at the top: settings.appearance reads security, which reads this file.
     appearance: await require("../settings/settings.appearance").applied(db),
+    hidden_fields: await fieldMask.hiddenFieldsFor(db, { user_id: row.user_id, is_ceo: row.is_ceo === true }),
   };
 }
 
@@ -981,10 +983,13 @@ const findCeo = (client) => repo.findCeo(client);
  * @returns {Promise<{user_id: string, email: string}>}
  */
 async function createUserForEmployee(client, { employee_id, email, password = null, is_ceo = false }, actor) {
-  if (await repo.findLoginByEmail(client, email))
-    throw new AppError("LOGIN_EXISTS", "This email already has a login.", 409, { email: ["Already has a login"] });
+  // Named on employee_id, the field Invite User shows, so the person sees why on the form.
   if (await repo.findLoginByEmployeeId(client, employee_id))
-    throw new AppError("LOGIN_EXISTS", "This employee already has a login.", 409);
+    throw new AppError("LOGIN_EXISTS", "This employee already has a login.", 409, { employee_id: ["Already has a login"] });
+  if (await repo.findLoginByEmail(client, email))
+    throw new AppError("LOGIN_EXISTS", "Another login signs in with this person's work email.", 409, {
+      employee_id: ["Email used by a login"],
+    });
   let hash = null;
   if (password !== null && password !== undefined) {
     // The pool, not the caller's transaction: a failed read must not abort their work.
@@ -992,12 +997,20 @@ async function createUserForEmployee(client, { employee_id, email, password = nu
     await passwordPolicy.assert(password, { email, field: "password" });
     hash = await hashPassword(password);
   }
-  const row = await repo.insertLogin(client, {
-    employeeId: employee_id,
-    email,
-    passwordHash: hash,
-    isCeo: is_ceo,
-  });
+  let row;
+  try {
+    row = await repo.insertLogin(client, {
+      employeeId: employee_id,
+      email,
+      passwordHash: hash,
+      isCeo: is_ceo,
+    });
+  } catch (err) {
+    // Two invitations for one person at once: the second meets the unique index (migration 0500).
+    if (err && err.code === "23505")
+      throw new AppError("LOGIN_EXISTS", "This employee already has a login.", 409, { employee_id: ["Already has a login"] });
+    throw err;
+  }
   await emit(client, {
     key: EVENTS.APP_USER_CREATED,
     entity: { type: "app_user", id: row.user_id },
@@ -1042,6 +1055,8 @@ async function suspendUser(client, userId, reason, actor) {
 async function reactivateUser(client, userId, actor) {
   const before = await repo.findLoginById(client, userId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
+  if (before.employee_status !== "active")
+    throw new AppError("EMPLOYEE_NOT_ACTIVE", "Restore their employee record before reactivating this login.", 422);
   await repo.setStatus(client, userId, "active");
   await emit(client, {
     key: EVENTS.APP_USER_REACTIVATED,
@@ -1050,6 +1065,106 @@ async function reactivateUser(client, userId, actor) {
     before: { status: before.status },
     after: { status: "active" },
   });
+}
+
+/**
+ * The outbox handler for employee.archived: the person's login closes (status left), every
+ * session ends and every open link is spent, so nobody keeps access after leaving. Restoring the
+ * record does not reopen it; Reactivate on Settings · Users does (docs/guides/identity.md §6.1).
+ * @param {{entity: {id: string}}} event
+ */
+async function closeLoginOf(event) {
+  const employeeId = event.entity && event.entity.id;
+  if (!employeeId) return;
+  const closed = await tx(async (client) => {
+    const held = await repo.findLoginByEmployeeId(client, employeeId);
+    if (!held || held.login_status === "left") return null;
+    await repo.setStatus(client, held.user_id, "left");
+    const ended = await repo.endUserSessions(client, held.user_id, { reason: "account_suspended" });
+    await repo.closeOpenLinks(client, held.user_id);
+    await emit(client, {
+      key: EVENTS.APP_USER_LEFT,
+      entity: { type: "app_user", id: held.user_id },
+      actor: null,
+      before: { status: held.login_status },
+      after: { status: "left" },
+      payload: { employee_id: employeeId, sessions_ended: ended.length },
+    });
+    return { userId: held.user_id, ended };
+  });
+  if (!closed) return;
+  await afterSessionsEnded(closed.userId, closed.ended);
+  await grantsCache.invalidateUser(closed.userId);
+}
+
+/**
+ * Move a login to another address: refused when another login signs in with it. Its sessions
+ * end and its open links are spent, so the person signs in afresh with the new address. With
+ * `notify`, both addresses are told (a login in use: Use Work Email on Settings · Users).
+ * @returns {Promise<{user_id: string, from: string, to: string, ended: string[]}>}
+ */
+async function changeLoginEmail(client, userId, email, actor, { notify = false } = {}) {
+  const held = await repo.findLoginById(client, userId);
+  if (!held) throw new AppError("NOT_FOUND", "Not found", 404);
+  const to = String(email).trim().toLowerCase();
+  if (held.email.toLowerCase() === to) return { user_id: userId, from: held.email, to, ended: [] };
+  const holder = await repo.findLoginByEmail(client, to);
+  if (holder && holder.user_id !== userId)
+    throw new AppError("LOGIN_EXISTS", "Another login signs in with this email.", 409, { email: ["Already has a login"] });
+  await repo.setEmail(client, userId, to);
+  const ended = await repo.endUserSessions(client, userId, { reason: "ended_by_admin", by: actor && actor.user_id ? actor.user_id : null });
+  await repo.closeOpenLinks(client, userId);
+  await emit(client, {
+    key: EVENTS.APP_USER_EMAIL_CHANGED,
+    entity: { type: "app_user", id: userId },
+    actor,
+    before: { email: held.email },
+    after: { email: to },
+    payload: { from: held.email, to, notify, first_name: held.first_name },
+  });
+  return { user_id: userId, from: held.email, to, ended };
+}
+
+/**
+ * The outbox handler for employee.updated: when People correct a work email, a login nobody has
+ * used yet (no password chosen) follows it, and its invitation is spent, since it went to the old
+ * address; Send Invite sends a new one. A login in use stays where it is until Use Work Email
+ * (JBS Praxis, 25/10/2026). A new address another login already uses is left for People to see on
+ * Settings · Users.
+ * @param {{entity: {id: string}, payload?: {work_email?: {from: string, to: string}}}} event
+ */
+async function followWorkEmail(event) {
+  const change = event.payload && event.payload.work_email;
+  if (!change || !change.to) return;
+  await tx(async (client) => {
+    const held = await repo.findLoginByEmployeeId(client, event.entity.id);
+    if (!held || held.password_changed_at || held.login_status !== "active") return;
+    const holder = await repo.findLoginByEmail(client, change.to);
+    if (holder && holder.user_id !== held.user_id) return;
+    await changeLoginEmail(client, held.user_id, change.to, null);
+  });
+}
+
+/**
+ * The outbox handler for app_user.email_changed with `notify`: the old and the new address are
+ * both told, so a move nobody expected is noticed whichever inbox the person reads.
+ */
+async function tellEmailChanged(event) {
+  const p = event.payload || {};
+  if (!p.notify || !p.from || !p.to) return;
+  const queues = require("../../jobs/queues");
+  for (const address of [p.from, p.to]) {
+    await queues.enqueue("email-send", "notification", {
+      to: { email: address },
+      recipient: { first_name: p.first_name || "", email: address },
+      template: "notification",
+      data: {
+        title: "Your MyCity sign-in email changed",
+        body: `You now sign in with ${p.to}. If you did not expect this, tell People now.`,
+        link_url: null,
+      },
+    });
+  }
 }
 
 /** An administrator signs a person out everywhere. Returns the session ids ended. */
@@ -1140,6 +1255,10 @@ module.exports = {
   requestLink,
   suspendUser,
   reactivateUser,
+  closeLoginOf,
+  changeLoginEmail,
+  followWorkEmail,
+  tellEmailChanged,
   endAllSessions,
   afterSessionsEnded,
   liveSessions,

@@ -1,9 +1,10 @@
 import policies from "@mycity/contract/schemas/policies.js";
 import type { Policy } from "@mycity/contract/contract.gen.ts";
-import { useRef, type RefObject } from "react";
+import { useRef } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useMutation } from "@/api/hooks";
-import { Button, DateField, Field, FormFooter, SignatureField, TextAreaField, toast, todayIso, useContractForm, type ContractSchema, type SignatureFieldHandle } from "@mycity/ui";
+import { Button, DateField, Field, FormFooter, SignatureField, TextAreaField, toast, todayIso, useContractForm, type SignatureFieldHandle } from "@mycity/ui";
+import { withSignature } from "@/features/shared/signature";
 import { WhatChanged } from "./PolicyText";
 
 /**
@@ -13,23 +14,15 @@ import { WhatChanged } from "./PolicyText";
  * schema; the signature is the pad's PNG, read when the form is checked.
  */
 
-/** The contract's schema with the pad's PNG put in for `signature`, and a plain mark when it is empty. */
-function withSignature(schema: ContractSchema, pad: RefObject<SignatureFieldHandle | null>): ContractSchema {
-  return {
-    safeParse: (value: unknown) => {
-      const v = value as Record<string, unknown>;
-      const png = v.signature ? (pad.current?.toPng() ?? null) : null;
-      const r = schema.safeParse({ ...v, signature: png ?? "" });
-      if (r.success || png) return r;
-      const others = (r.error?.issues ?? []).filter((i) => i.path[0] !== "signature");
-      return { success: false, error: { issues: [...others, { path: ["signature"], message: "Sign in the box", code: "custom" }] } };
-    },
-  };
-}
-
-const failed = (e: unknown, fallback: string, setFields: (f: Record<string, string[]>) => void) => {
-  if (e instanceof ApiError && Object.keys(e.fields).length) setFields(e.fields);
-  else toast(e instanceof ApiError ? e.message : fallback);
+/**
+ * A refusal on the sheet: its fields' marks, and the reason as a toast when no field on the sheet
+ * holds it (an empty policy text is the editor's, not this sheet's).
+ */
+const failed = (e: unknown, fallback: string, setFields: (f: Record<string, string[]>) => void, bound: readonly string[]) => {
+  if (e instanceof ApiError && Object.keys(e.fields).length) {
+    setFields(e.fields);
+    if (Object.keys(e.fields).some((k) => !bound.includes(k))) toast.error(e.message);
+  } else toast.error(e instanceof ApiError ? e.message : fallback);
 };
 
 /** The day after an ISO date. */
@@ -60,7 +53,7 @@ export function SendForm({ p, close }: { p: Policy; close: () => void }) {
       const v = out.waiting ?? out.in_force;
       toast(approval ? "Sent for approval" : v ? `Version ${v.version} published` : "Policy published");
     } catch (e) {
-      failed(e, approval ? "Not sent, try again" : "Not published, try again", f.setServerErrors);
+      failed(e, approval ? "Not sent, try again" : "Not published, try again", f.setServerErrors, ["effective_from", "note", "signature"]);
     }
   };
   return (
@@ -99,7 +92,7 @@ export function ApproveForm({ versionId, close, onDone }: { versionId: string; c
       onDone();
       toast("Policy approved");
     } catch (e) {
-      failed(e, "Not approved, try again", f.setServerErrors);
+      failed(e, "Not approved, try again", f.setServerErrors, ["signature"]);
     }
   };
   return (
@@ -142,7 +135,7 @@ export function ReasonForm({
       close();
       toast(done);
     } catch (e) {
-      failed(e, "Not done, try again", f.setServerErrors);
+      failed(e, "Not done, try again", f.setServerErrors, ["reason"]);
     }
   };
   return (

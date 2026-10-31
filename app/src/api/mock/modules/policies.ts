@@ -6,6 +6,7 @@ import type {
   MyPolicyVersion,
   Policy,
   PolicyAck,
+  PolicyCitation,
   PolicyDraft,
   PolicyKind,
   PolicyRow,
@@ -60,7 +61,8 @@ function spansOf(node: Node, marks: Marks = { bold: false, italic: false, href: 
   return out;
 }
 
-function blocksOf(html: string): RichTextBlock[] {
+/** The editor's HTML as the blocks the API returns, for every mock that keeps rich text. */
+export function blocksOf(html: string): RichTextBlock[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const out: RichTextBlock[] = [];
   for (const el of Array.from(doc.body.children)) {
@@ -701,6 +703,7 @@ function asVersion(v: Ver): PolicyVersion {
   const today = todayIso();
   return {
     ...content(v),
+    needs_approval: v.needs_approval,
     published_by_name: v.published_by ? byKey(v.published_by)!.display_name : null,
     withdrawn_at: v.withdrawn_at,
     withdraw_reason: v.withdraw_reason,
@@ -715,29 +718,28 @@ const canManage = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.vie
 const isCeo = (u: string) => SIGN_INS[u]?.view === "ceo";
 const forbidden = () => fail(403, "FORBIDDEN", "You do not have access to this.");
 
-function overview(p: Pol): Policy {
+function overview(p: Pol, reader?: string | null): Policy {
   const today = todayIso();
   const top = newest(p.policy_id);
   const now = inForce(p.policy_id, today);
   const waiting = top && top.effective_from! > today ? top : null;
   const d = working(p.policy_id, "draft");
   const s = working(p.policy_id, "submitted");
-  const draft: PolicyDraft | null = d
-    ? {
-        policy_version_id: d.id,
-        title: d.title,
-        applies_to: d.applies_to,
-        applies_to_people: d.applies_to.employee_ids.map((id) => ref(PEOPLE.find((x) => x.employee_id === id))!).filter(Boolean),
-        needs_acknowledgement: d.needs_acknowledgement,
-        acknowledge_within_days: d.acknowledge_within_days,
-        needs_approval: d.needs_approval,
-        body_html: p.kind === "document" ? htmlOf(d.blocks ?? []) : null,
-        rules: p.kind === "attendance" ? attendanceContract.AttendanceRules.parse(d.rules ?? {}) : null,
-        ...changesOf(p.kind, top, d),
-        updated_at: d.updated_at,
-        updated_by_name: d.updated_by ? byKey(d.updated_by)!.display_name : null,
-      }
-    : null;
+  const editorOf = (d: Ver): PolicyDraft => ({
+    policy_version_id: d.id,
+    title: d.title,
+    applies_to: d.applies_to,
+    applies_to_people: d.applies_to.employee_ids.map((id) => ref(PEOPLE.find((x) => x.employee_id === id))!).filter(Boolean),
+    needs_acknowledgement: d.needs_acknowledgement,
+    acknowledge_within_days: d.acknowledge_within_days,
+    needs_approval: d.needs_approval,
+    body_html: p.kind === "document" ? htmlOf(d.blocks ?? []) : null,
+    rules: p.kind === "attendance" ? attendanceContract.AttendanceRules.parse(d.rules ?? {}) : null,
+    ...changesOf(p.kind, top, d),
+    updated_at: d.updated_at,
+    updated_by_name: d.updated_by ? byKey(d.updated_by)!.display_name : null,
+  });
+  const draft: PolicyDraft | null = d ? editorOf(d) : null;
   return {
     policy_id: p.policy_id,
     number: p.number,
@@ -759,6 +761,8 @@ function overview(p: Pol): Policy {
           submitted_by_name: s.submitted_by ? byKey(s.submitted_by)!.display_name : null,
           stage_name: "CEO",
           workflow_instance_id: sid(`${s.id}-approval`),
+          content: editorOf(s),
+          can_recall: p.status === "active" && !!reader && (isCeo(reader) || s.submitted_by === reader),
         }
       : null,
     can_edit: p.status === "active",
@@ -767,6 +771,16 @@ function overview(p: Pol): Policy {
 }
 
 /** The rules the clock judges a punch by today: the Attendance policy's version in force. */
+/** A policy as a query or rule cites it: its version in force today (queries guide §6.2). */
+export function policyCitation(policyId: string): PolicyCitation | null {
+  const p = polOf(policyId);
+  const v = p && p.status === "active" ? inForce(policyId) : null;
+  return p && v ? { policy_id: p.policy_id, policy_version_id: v.id, number: p.number, title: v.title ?? p.title, version: v.version! } : null;
+}
+/** Every policy with a version in force, by title: the queries' policy picker. */
+export const citablePolicies = (): PolicyCitation[] =>
+  POLICIES.map((p) => policyCitation(p.policy_id)).filter((c): c is PolicyCitation => c !== null).sort((a, b) => a.title.localeCompare(b.title));
+
 export function attendanceRulesInForce(): AttendanceRules {
   return attendanceRulesOn(todayIso());
 }
@@ -785,6 +799,14 @@ export function setMockHomeLocation(on: boolean) {
   const v = inForce(ATTENDANCE.policy_id);
   if (!v || !v.rules) return;
   v.rules = { ...v.rules, home_location: { on } };
+  READ_RULES.delete(v);
+}
+/** Tests: how the version in force approves overtime (Approve Overtime shows under pre_approved). */
+export function setMockOvertimeApproval(approval: AttendanceRules["overtime"]["approval"]) {
+  const v = inForce(ATTENDANCE.policy_id);
+  if (!v || !v.rules) return;
+  const now = attendanceRulesOn(todayIso());
+  v.rules = { ...v.rules, overtime: { ...now.overtime, approval } };
   READ_RULES.delete(v);
 }
 const NO_VERSION: AttendanceRules = attendanceContract.AttendanceRules.parse({});
@@ -857,7 +879,7 @@ route("POST /api/v1/policies", (req) => {
   });
   VERSIONS.splice(VERSIONS.findIndex((v) => v.policy_id === p.policy_id && v.status === "published"), 1);
   audit(byKey(req.user)!.display_name, "Policy created", p.title, null, p.number, null, "Knowledge Hub");
-  return created(overview(p));
+  return created(overview(p, req.user));
 });
 
 route("POST /api/v1/policies/tidy", (req) => {
@@ -892,7 +914,7 @@ route("POST /api/v1/policies/versions/:id/withdraw", (req) => {
   if (!working(v.policy_id, "draft") && !working(v.policy_id, "submitted"))
     VERSIONS.push({ ...v, id: sid(`${v.policy_id}-draft-${Date.now()}`), status: "draft", version: null, effective_from: null, note: null, published_at: null, published_by: null, withdrawn_at: null, withdraw_reason: null, signatures: [] });
   touch(polOf(v.policy_id)!);
-  return ok(overview(polOf(v.policy_id)!));
+  return ok(overview(polOf(v.policy_id)!, req.user));
 });
 
 route("GET /api/v1/policies/versions/:id/acknowledgements", (req) => {
@@ -930,7 +952,7 @@ route("POST /api/v1/policies/versions/:id/pdf", (req) => {
 route("GET /api/v1/policies/:id", (req) => {
   if (!canManage(req.user!)) return forbidden();
   const p = polOf(req.params.id);
-  return p ? ok(overview(p)) : notFound();
+  return p ? ok(overview(p, req.user)) : notFound();
 });
 
 route("PUT /api/v1/policies/:id/draft", (req) => {
@@ -964,7 +986,7 @@ route("PUT /api/v1/policies/:id/draft", (req) => {
   const stray = VERSIONS.findIndex((v) => v.policy_id === p.policy_id && v.version === 0);
   if (stray >= 0) VERSIONS.splice(stray, 1);
   touch(p);
-  return ok(overview(p));
+  return ok(overview(p, req.user));
 });
 
 route("POST /api/v1/policies/:id/draft/discard", (req) => {
@@ -974,7 +996,7 @@ route("POST /api/v1/policies/:id/draft/discard", (req) => {
   const d = working(p.policy_id, "draft");
   if (!d) return fail(409, "NO_DRAFT", "There is no draft");
   VERSIONS.splice(VERSIONS.indexOf(d), 1);
-  return ok(overview(p));
+  return ok(overview(p, req.user));
 });
 
 /** The first day's checks and a ready draft, as the API makes them (guide §6.3). */
@@ -1015,7 +1037,7 @@ route("POST /api/v1/policies/:id/publish", (req) => {
   p.title = ready.d.title;
   touch(p);
   audit(byKey(req.user)!.display_name, "Policy published", p.title, null, `Version ${n}`, body.data.note, "Knowledge Hub");
-  return ok(overview(p));
+  return ok(overview(p, req.user));
 });
 
 route("POST /api/v1/policies/:id/submit", (req) => {
@@ -1037,7 +1059,7 @@ route("POST /api/v1/policies/:id/submit", (req) => {
     signatures: [{ ...signed(req.user!, 0), signed_at: new Date().toISOString() }],
   });
   touch(p);
-  return ok(overview(p));
+  return ok(overview(p, req.user));
 });
 
 route("POST /api/v1/policies/:id/recall", (req) => {
@@ -1048,8 +1070,9 @@ route("POST /api/v1/policies/:id/recall", (req) => {
   if (!body.success) return refused(body.error.issues);
   const s = working(p.policy_id, "submitted");
   if (!s) return fail(409, "NOT_SUBMITTED", "Nothing is waiting for approval");
+  if (!isCeo(req.user!) && s.submitted_by !== req.user) return fail(403, "NOT_YOURS", "Only the person who sent it, or the CEO, can recall it");
   Object.assign(s, { status: "draft", submitted_at: null, submitted_by: null, signatures: [] });
-  return ok(overview(p));
+  return ok(overview(p, req.user));
 });
 
 route("POST /api/v1/policies/:id/archive", (req) => {
@@ -1060,9 +1083,10 @@ route("POST /api/v1/policies/:id/archive", (req) => {
   if (!body.success) return refused(body.error.issues);
   if (p.kind !== "document") return fail(422, "CANNOT_ARCHIVE", "A rules policy always applies; change its rules instead");
   if (p.status === "archived") return fail(409, "POLICY_ARCHIVED", "This policy is already archived");
+  if (working(p.policy_id, "submitted")) return fail(409, "SUBMISSION_WAITING", "A version waits for approval. Recall it first.");
   p.status = "archived";
   touch(p);
-  return ok(overview(p));
+  return ok(overview(p, req.user));
 });
 
 route("GET /api/v1/policies/:id/versions", (req) => {

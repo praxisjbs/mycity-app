@@ -43,6 +43,9 @@ const FILES = [
   { path: "seeds" },
   { path: "templates" },
   { path: "assets" },
+  /* The User Guide's chapters and pictures, which the API serves (docs/guides/user-guide.md §4).
+     The printed performance guide beside them is built on a laptop and never served. */
+  { path: "docs/manual", skip: /^docs\/manual\/performance-guide\// },
   { path: "app/dist", built: true },
   { path: "public-app/dist", built: true },
 ];

@@ -11,6 +11,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../actions/Button";
+import { FormError } from "./Field";
 import { FormFooter } from "./Form";
 import { StepBar } from "./StepBar";
 
@@ -39,26 +40,36 @@ export interface WizardProps {
   initialStep?: number;
   /** Called with the step index each time it changes, so a draft can remember it. */
   onStepChange?: (index: number) => void;
+  /**
+   * The step in view, when the form decides it (a refusal on a field of step 1 takes the person
+   * back there). Set it with `onStepChange`; left unset, the wizard keeps its own step.
+   */
+  step?: number;
+  /** The one general error, above the footer: a refusal that names no field (FRONTEND_GUIDE §8.3). */
+  error?: ReactNode;
 }
 
-export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 0, onStepChange }: WizardProps) {
-  const [at, setAt] = useState(Math.min(Math.max(initialStep, 0), steps.length - 1));
+export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 0, onStepChange, step: controlled, error }: WizardProps) {
+  const clamp = (i: number) => Math.min(Math.max(i, 0), steps.length - 1);
+  const [own, setOwn] = useState(clamp(initialStep));
+  const at = controlled === undefined ? own : clamp(controlled);
   const heading = useRef<HTMLHeadingElement>(null);
-  const first = useRef(true);
+  const shown = useRef(at);
   const step = steps[at];
   const last = at === steps.length - 1;
 
+  // Focus moves to the heading only when the step itself changes: a parent re-rendering (a new
+  // onStepChange on every render) must never pull focus out of the field being typed in.
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    if (shown.current === at) return;
+    shown.current = at;
     heading.current?.focus();
-    onStepChange?.(at);
-  }, [at, onStepChange]);
+    if (controlled === undefined) onStepChange?.(at);
+  }, [at, onStepChange, controlled]);
 
   if (!step) return null;
 
+  const setAt = (i: number) => (controlled === undefined ? setOwn(i) : onStepChange?.(i));
   const next = async () => {
     if (step.check && !(await step.check())) return;
     if (last) return onFinish();
@@ -72,6 +83,7 @@ export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 
         {step.title}
       </h3>
       <div>{step.body}</div>
+      {error ? <div className="mt-3"><FormError>{error}</FormError></div> : null}
       <FormFooter>
         {at > 0 ? (
           <Button onClick={() => setAt(at - 1)}>Back</Button>

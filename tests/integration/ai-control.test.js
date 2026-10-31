@@ -217,7 +217,7 @@ describeDb("AI Control against the real migrations", () => {
       ]);
       expect(by.embeddings.chain.links.map((l) => [l.model, l.state])).toEqual([["text-embedding-3-small", "not_set_up"]]);
       expect(by.top_tier.chain.links.map((l) => l.model)).toEqual(["gemini-2.5-pro", "claude-sonnet-5-5"]);
-      expect(by.default.actions).toBe(6); // Tidy Policy, Review Cleanup, Week Summary and the mailbox's three; Data Answers has its own chain
+      expect(by.default.actions).toBe(7); // Tidy Policy, Review Cleanup, Week Summary, Raise a Query's draft and the mailbox's three; Data Answers has its own chain
     });
 
     test("the registered actions: their job, personal data, own chain and today's calls", async () => {
@@ -231,10 +231,15 @@ describeDb("AI Control against the real migrations", () => {
         "review-dictation",
         "review-cleanup",
         "week-summary",
+        "query-draft",
+        "letter-draft",
         "mail-draft",
         "mail-tidy",
         "mail-summary",
         "mail-dictation",
+        "guide-search",
+        "guide-answer",
+        "guide-voice",
       ]);
       const by = Object.fromEntries(res.body.data.map((a) => [a.key, a]));
       expect(by["data-answers"]).toMatchObject({ job: "default", built: true, own_chain: true, personal_data: true, chosen_by: "TB" });
@@ -246,11 +251,18 @@ describeDb("AI Control against the real migrations", () => {
       // The mailbox's (mailbox.md §9): Default for writing, tidying and summaries, Transcription for Dictate.
       expect(by["mail-draft"]).toMatchObject({ job: "default", personal_data: true, own_chain: false, chosen_by: "TB" });
       expect(by["mail-dictation"]).toMatchObject({ job: "transcription", personal_data: true });
+      // Queries' (queries.md §9), chosen by GE: Raise a Query's draft on Default, letters on Deep Reasoning.
+      expect(by["query-draft"]).toMatchObject({ job: "default", personal_data: true, own_chain: false, chosen_by: "GE" });
+      expect(by["letter-draft"]).toMatchObject({ job: "deep_reasoning", personal_data: true, own_chain: false, chosen_by: "GE" });
+      // The User Guide's (user-guide.md §6.8 to §6.10), each chosen by JBS Praxis: the answer on Fast.
+      expect(by["guide-search"]).toMatchObject({ job: "embeddings", personal_data: true, own_chain: false, chosen_by: "JP" });
+      expect(by["guide-answer"]).toMatchObject({ job: "fast", personal_data: true, own_chain: false, chosen_by: "JP" });
       expect((await as("admin").get("/ai-control/actions?job=transcription")).body.data.map((a) => a.key)).toEqual([
         "voice-note-transcription",
         "praxis-ai-voice",
         "review-dictation",
         "mail-dictation",
+        "guide-voice",
       ]);
     });
   });

@@ -10,6 +10,11 @@
  * them side by side changes no result, only the wall clock: the gallery's 800 component tests no
  * longer wait for the app's, or the other way round.
  *
+ * MYCITY_TEST_WORKERS=<n> caps the machine's share: the workspaces run one after another, each on
+ * at most n workers. `npm run ci` sets it while its other groups run beside this one (the backend's
+ * tests, the browser of the screens group), since the screens' tests wait on a clock and fail
+ * when three workspaces' workers starve them of the processor.
+ *
  *   node scripts/fe-test.js            all three
  *   node scripts/fe-test.js app        just the named ones (ui, app, public-app)
  */
@@ -26,12 +31,14 @@ for (const w of wanted)
     process.exit(2);
   }
 const names = wanted.length ? wanted : Object.keys(WORKSPACES);
+const cap = Number.parseInt(process.env.MYCITY_TEST_WORKERS || "", 10);
+const WORKERS = Number.isInteger(cap) && cap > 0 ? cap : null;
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
 function run(name) {
   return new Promise((resolve) => {
     const started = Date.now();
-    const child = spawn(npm, ["run", "test", "-w", WORKSPACES[name]], {
+    const child = spawn(npm, ["run", "test", "-w", WORKSPACES[name], ...(WORKERS ? ["--", `--maxWorkers=${WORKERS}`] : [])], {
       cwd: ROOT,
       env: { ...process.env, FORCE_COLOR: "0" },
       shell: process.platform === "win32",
@@ -44,7 +51,9 @@ function run(name) {
 }
 
 (async () => {
-  const results = await Promise.all(names.map(run));
+  const results = [];
+  if (WORKERS) for (const n of names) results.push(await run(n));
+  else results.push(...(await Promise.all(names.map(run))));
   for (const r of results) {
     console.log(`\n──── ${WORKSPACES[r.name]}: ${r.code === 0 ? "ok" : "FAILED"} (${r.secs}s) ────`);
     console.log(r.out.trim());

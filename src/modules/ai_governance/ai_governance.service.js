@@ -123,6 +123,7 @@ async function actionList(query = {}) {
       chosen_at: a.chosen_at,
       built: a.built !== false,
       own_chain: ch.scope === "action",
+      set_chain: Boolean(a.chain),
       chain: chainView(ch),
       calls_today: calls[a.key] || 0,
     });

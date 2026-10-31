@@ -45,6 +45,7 @@ are enforced by review and by the gates.
 | Events | `<module>.events.js` | Event keys emitted; outbox handlers registered | Does work synchronously in the request |
 | AI | `<module>.ai.js` | Read manifest: reads with permission and citation, routes to screens | Declares a write (A23) |
 | Search | `<module>.search.js` | ⌘K provider | Is missing on a module with records (gate 10) |
+| Views | `<module>.views.js` | Where its records wait inside the screens they open on: a fixed view for a type, or each record placed by its state as the screen's filter reads it (`shared/notifications/views.js`, `docs/guides/notifications.md` §6) | Places a record by a rule of its own instead of the list's (export the list's expression and use it) |
 
 **One write path.** A form, a workflow decision, an import row and a script all create a record
 through the same service function. That is how numbering, audit, events and field rules apply
@@ -292,6 +293,11 @@ request, never inside a transaction, and what it returns is provisional until a 
   `RUN_DB_TESTS=1`. Every response is parsed with its contract schema in integration tests.
 - Tick the screen's **API** column in `docs/PROGRESS.md` and leave a note.
 - If behaviour changed, the feature guide in `docs/guides/` changed with it.
+- If what a person sees or must do changed (a refusal's words, a rule a form now enforces, a new
+  step), the User Guide chapter for that screen changed with it (`docs/manual/`,
+  `docs/manual/README.md`), and its pictures were retaken (`npm run guide:shots -- --stale`).
+  `check/user-guide.js` holds every bold name in a chapter to the hub's source, the API's messages
+  included, so a renamed button or a reworded refusal fails the chapter that still names the old one.
 
 ---
 
@@ -516,19 +522,42 @@ On GitHub the gates run as four jobs side by side, so a run takes as long as its
 the gates that open every screen) and **checks** (the fast static and process gates). The check
 called **ci** waits for all four, and it is the one branch protection requires. To run one job's
 gates yourself, `npm run ci -- --group=<name>`; `node scripts/ci-local.js --groups` lists them.
+Locally `npm run ci` runs the four groups at the same time too (JBS Praxis, 25/10/2026), each
+gate's line printed as it ends with its group, so a full run takes about as long as the backend's
+tests rather than the sum of all four; `-- --serial` runs one gate after another, and `-- --fast`
+stops at the first failure (serially). Beside the other groups the frontend's tests run on the
+machine's CPUs less two (`MYCITY_TEST_WORKERS`, read by `scripts/fe-test.js`), one workspace after
+another, since tests that wait on a clock fail when starved. While you work, run the group you touched, or
+`-- --only=<ids>`; run the whole thing once before marking the PR ready.
 Chromium, ffmpeg's packages and npm's downloads are cached between runs. Four jobs bill more
 runner minutes than one (each installs its own packages), so the draft rule below matters more,
 not less.
+
+**Run it as CI does** (JBS Praxis, 27/10/2026). CI runs the Node major `.nvmrc` names, and
+`npm run ci` refuses another (`nvm use`): on Node 22's larger default heap the backend suite never
+ran out of memory as it did on Node 20 in CI, so a laptop passed what GitHub failed. Jest now
+replaces its worker once it has grown past 1 GB after a file (`workerIdleMemoryLimit` in
+`jest.config.js`). Set `RUN_DB_TESTS=1`, `DATABASE_URL` and `REDIS_URL` against a local PostgreSQL
+16 with pgvector and Redis, as CI's backend job does; without them the run skips the integration
+files and gate 4's live round trip, which CI always runs; with them set, `npm run ci` says at once
+when PostgreSQL or Redis is not answering. A Claude Code cloud session does all of
+this as it starts (`.claude/hooks/session-start.sh`) and names the image's Chromium for the screen
+gates; if PostgreSQL or Redis stops during a session, run the hook again by hand. On GitHub the
+backend job's PostgreSQL logs fatal errors only, so a red backend log ends with its failing test.
 
 A run does only what its change needs (`scripts/check/lib/scope.js`; the *scope* job says which
 and why):
 
 - **A change to documents only** (Markdown at the root, under `docs/` or in `.github/`, other than
   `docs/PROGRESS.md` and `MILESTONES.md`, which the apps' build reads) runs the gates that read
-  documents: progress, guides, README map, CODEOWNERS, dashes and the component catalogue.
+  documents: progress, guides, README map, CODEOWNERS, dashes, the component catalogue and the
+  User Guide.
 - **After a merge**, `main` runs the whole suite again only when its tree is not the one the PR's
   last run passed. When nothing reached `main` in between, it is the same tree, and the document
   gates are enough; Release then deploys it as before.
+- **An edit to the PR description** re-runs the document gates alone once a full run on the PR's
+  head has passed this tree; before that (still running, red, or `main` moved), the whole run
+  (27/10/2026).
 
 In both cases only the **checks** job runs; backend, frontend and screens are skipped and start no
 runner.
@@ -555,22 +584,27 @@ Guide-unchanged: tests only, behaviour as the guide describes
 ```
 
 A line with no reason does not count. Editing the PR description re-runs CI (not on a draft, and
-not for a new title alone).
+not for a new title alone): the document gates alone when a full run has passed this tree. A run
+that does no work (a draft, a new title) never cancels one that does, and a run cancelled by a
+newer one reports **ci** as cancelled, not failed. The screens job's Chromium install tries twice,
+capped, before it fails saying the runner's mirror is not answering.
 
 `npm run ci` also lists gates as **NOT BUILT**. Those are rules whose check is not written yet
 (money, dates, migrations and others during M0). They do not fail your PR today, but the rules
 still apply, and review will hold you to them.
 
 If you use Claude Code, the same progress, guide and README-map checks run before it finishes a
-task (`.claude/hooks/stop-check.js`), so most of these are caught before you push.
+task (`.claude/hooks/stop-check.js`), so most of these are caught before you push. While an
+`npm run ci` is running it leaves the screen gates to that run, since both would rebuild and read
+the one demo build.
 
 ### 8.5 Review and merge
 
-- One approval, **not yours**, and from a code owner of every path you touched
-  (`.github/CODEOWNERS`): change attendance and LA or her backup must approve.
-- A new push after approval dismisses the approval; ask again.
+- No approval is required (JBS Praxis, 24/10/2026); CI is the gate. The code owners of the paths
+  you touched (`.github/CODEOWNERS`) are still asked automatically: when a change needs a second
+  pair of eyes, wait for one of them.
 - Resolve every review conversation.
-- When CI is green and the PR is approved, the author merges, with **Squash and merge**.
+- When CI is green, the author merges, with **Squash and merge**.
 - Afterwards:
 
   ```
@@ -592,5 +626,7 @@ task (`.claude/hooks/stop-check.js`), so most of these are caught before you pus
 - [ ] Pushed as a branch, PR opened with the template filled in; CI green on the PR
 - [ ] `docs/PROGRESS.md` row ticked and a note left
 - [ ] The feature guide in `docs/guides/` matches what was built
+- [ ] The User Guide chapter in `docs/manual/` matches what a person now sees, its pictures current
+  (`check/user-guide.js`; `User-guide-unchanged: <reason>` only when nothing a person sees changed)
 
 Engineered by JBS Praxis.

@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `/auth/me` lists the ones the person holds (§5) |
 | Screens (PROGRESS.md rows) | #70 Users, #90 My Security, and the M0 sign-in item |
 | Status | Built |
-| Last changed | 21/10/2026 |
+| Last changed | 25/10/2026 |
 
 Sources: MILESTONES §5.3 (brand on the sign-in screen), §14 (roles) and A2; BACKEND_STRUCTURE §11
 and §17; the session rules of the donor product (REUSE_MAP), chosen by TB on 16/10/2026. Two-step
@@ -170,7 +170,9 @@ Schema migrations: `migrations/0200_identity_sessions.sql`, `migrations/0220_sig
 | `POST /api/v1/security/pin`, `/pin/remove` | `PinSet` → `SignInMethods`; `EmptyBody` → `SignInMethods` | own account, fresh | | 422 `WEAK_PIN` (the birthday is the server's check) |
 | `GET /api/v1/users` | `UserListQuery` → `UserPage` | `settings` view | yes, 25 | Filters `status`, `role`; sort `display_name`, `last_seen_at`, `created_at` |
 | `GET /api/v1/users/summary` | → `UsersSummary` | `settings` view | | |
-| `GET /api/v1/users/candidates` | `CandidateListQuery` → `CandidatePage` | `settings` view | yes, 25 | Employees with no login |
+| `GET /api/v1/users/candidates` | `CandidateListQuery` → `CandidatePage` | `settings` create | yes, 25 | Employees with no login |
+| `POST /api/v1/users/invite-pending` | `EmptyBody` → `InvitesSent` | `settings` edit, the per-person link limit | | Every Invited login nobody has emailed yet (§6.1) |
+| `POST /api/v1/users/:id/use-work-email` | `EmptyBody` → `UserRow` | `settings` edit, a fresh sign-in | | The login moves to its employee's work email; sessions end; both addresses are told (§6.1) |
 | `POST /api/v1/users` | `UserInvite` → `UserRow` | `settings` create | | |
 | `GET /api/v1/users/:id` | → `UserRow` | `settings` view | | |
 | `POST /api/v1/users/:id/invite`, `/reset-link` | `EmptyBody` → `LinkSent` | `settings` edit | | |
@@ -206,9 +208,13 @@ either, never lengthen it (`foundation.md` §6.4); the minutes below are the def
 - At least 8 characters, with a lowercase letter, an uppercase letter, a number and a symbol. Settings ·
   Security can ask for more characters (`security.password_min_length`, never below
   `PASSWORD_MIN_LENGTH`); it applies to the next password each person chooses.
-- Not one of the common passwords, not the name part of the person's email.
+- Not the name part of the person's email. (There is no list of common passwords; the breach
+  check below stands in for one.)
 - Not in a known breach (the k-anonymity range lookup; only five characters of the hash leave
   the server). The check fails open after 3 seconds. `PASSWORD_BREACH_CHECK=false` turns it off.
+  Only the server can know it, so no screen can say it first: the refusal (Found in a breach) is
+  the rule working, and it is never recorded on System Health (`err.recorded = false`,
+  system-health.md §6). Every other password rule is a screen's to check, and is recorded.
 - Hashed with Argon2id. Argon2 runs outside the transaction.
 
 **Wrong passwords** (`identity.throttle.js`): the first 5 cost nothing; then each attempt waits
@@ -216,14 +222,16 @@ either, never lengthen it (`foundation.md` §6.4); the minutes below are the def
 unknown email and a wrong password get the same message and take the same time. A suspended
 account is told so only after the right password.
 
-**Links:** a reset link lasts 30 minutes, an invitation 72 hours. A new link closes the open ones of
-the same kind. Setting a password spends every open link and ends every session. A link's email
+**Links:** a reset link lasts 30 minutes, an invitation 72 hours. A new link closes every open link
+of the person, of either kind. Setting a password spends every open link and ends every session. A link's email
 that waited in the mail queue goes out only while its link still works (`linkStillOpen`): one a
 newer link replaced, or that expired meanwhile, is dropped (`docs/guides/integrations.md` §6.15).
 Invitations and resets are the system mail that still goes while IT has paused it.
 
-**Logins:** no login without an employee; a person cannot suspend, reactivate or change the roles of
-their own login.
+**Logins:** no login without an employee who works here (§6.1); a person cannot suspend, change the
+roles of or move the email of their own login. Anyone with `settings` edit may give any role to anyone
+else: there is no ceiling by rank (JBS Praxis, 25/10/2026, after the audit showed a System
+Administrator can make a colleague Implementation Team). Who holds `settings` edit is the control.
 
 **Two-step sign-in** (`security.mfa.js`, `security.signin.js`):
 
@@ -279,6 +287,41 @@ Renaming a passkey changes no way in and needs no window.
 the key, the recovery codes and every browser's trust and ends every session; the person sets
 two-step up again.
 
+### 6.1 Logins, after the employee creation audit (JBS Praxis, 25/10/2026)
+
+The audit of 25/10/2026 (`docs/guides/foundation.md` §6.16) found that a login outlived its employee
+and could be stranded on a mistyped address. These are the rules now, each held by
+`tests/integration/logins.test.js`.
+
+- **A login works only while its employee does.** Every way in reads the login's status through its
+  employee (`identity.repo.js` `EFFECTIVE_STATUS`, `grants-cache.getAuthUser`): an archived or departed
+  employee's login is closed (Left) and a suspended employee's is suspended, at once, before any job
+  runs. Sign-in, the PIN, a passkey, a session's refresh, an open link and Forgot Password all refuse
+  it. The outbox handler `identity.close_login` on `employee.archived` then writes `left`, ends every
+  session and spends every link (`app_user.left`). Restore does not reopen the login; Reactivate on
+  Settings · Users does, and waits until the record is restored (`EMPLOYEE_NOT_ACTIVE`).
+- **The login email and the work email.** A login nobody has used yet (no password chosen) follows
+  its employee's corrected work email (`identity.follow_work_email` on `employee.updated`), and its
+  invitation is spent, since it went to the old address. A login in use stays where it is: Settings ·
+  Users shows "Signs in with ... but the record says ...", and **Use Work Email** moves it after a
+  fresh sign-in, ends its sessions and tells both addresses (`app_user.email_changed`). A record may
+  not take an address another person's login still signs in with ("Used by a login").
+- **Invitations.** The staff roster makes logins and emails nobody: Settings · Users marks them **Not
+  Sent** (`UserRow.invited_at` is null) and **Invite All Pending** sends every one; a record whose
+  login is Invited offers **Send Invite**, which sends the first invitation or a fresh one. The
+  register's Not Yet Invited counts both. Administrators' invitations and reset links are limited per
+  person (60 in 15 minutes, `adminLinkLimiter`), no longer per address with everyone's Forgot
+  Password. Checking a link counts only failures (`linkCheckLimiter`), and a check that fails for any
+  reason but an invalid link shows **Link Not Checked** with Try Again, never Link Expired. A token
+  that fails `LinkToken`'s shape (a link cut or changed in a mail program) is an invalid link too:
+  Link Expired, with Request New Link (26/10/2026).
+- **One login per employee**, in the database too (`app_user_employee_uq`, migration 0500); a second
+  invitation is refused on the Employee field.
+- **View only.** Someone with `settings` view but not edit sees a login's details and no button the
+  API would refuse.
+- **create-admin** refuses to give a login to an employee who is not active, and shows the existing
+  record before the confirmation when the email is already on the register.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -291,6 +334,8 @@ two-step up again.
 | `auth.link_requested` | Forgot, invite, resend, reset link | Outbox `identity.send_link`: mint the token, store its hash, queue the email (no token in the event, the ledger or a notification) |
 | `auth.password_set` | A password chosen from a link | Notice after a reset |
 | `app_user.created`, `app_user.suspended`, `app_user.reactivated` | Users actions | Audit (sensitive); suspension turns push off on every device of the person |
+| `app_user.left` | An employee archived (`identity.close_login` on `employee.archived`) | Audit (sensitive); the login closed, its sessions ended, its links spent (§6.1) |
+| `app_user.email_changed` | Use Work Email; a login nobody has used following a corrected work email | Audit (sensitive); Use Work Email tells the old and the new address (`identity.tell_email_changed`) |
 | `access.roles_set` | Roles changed | Audit (sensitive); the grants cache is dropped |
 | `auth.two_step_started` | A set-up began | Audit |
 | `auth.two_step_on`, `auth.two_step_changed`, `auth.two_step_off` | Two-step turned on, moved to a new app, turned off | Notice to the person |
@@ -314,10 +359,14 @@ or the audit.
 | Implementation Team (`implementation`) | Everything | Everything: every module and action over everything, every capability, every field. For the build team, and training runs from it (TB, 19/10/2026); removed (soft) after handover |
 | Operations & People (`operations_people`) | Everything in operations | Users: invite, roles, suspend, reset links |
 | Management (`management`) | Everything | Read across modules |
-| Head of Department (`head_of_department`) | Their department | Partnerships home |
+| Head of Department (`head_of_department`) | Their department | Partnerships home; set their function's goals and KPIs (`goals.function`). Given by the system to whoever heads a department, or acts for its open head role, while they do, unless a role of theirs already sets a function's goals; taken back when they head nothing, unless it was given by hand (`user_role.from_headship`, `docs/guides/organogram.md` §6.1) |
 | System Administrator (`administrator`) | Settings | Users and settings |
 | Line Manager (`manager`) | Their team | Approvals for their team |
 | Staff (`employee`) | Their own records | Self-service |
+
+A head keeps Head of Department while they head: Save Roles without it, or an invitation without
+it, gives it back in the same save, unless another role they hold sets a function's goals (JBS
+Praxis, 27/10/2026).
 
 The build account (`create-admin --build-account`) holds the Implementation Team role. Until
 handover that role is complete: a module, action, capability or masked field added later is given
@@ -352,9 +401,9 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 | Set-up step | The email; Set Up Two-Step with "Your role needs a code from an authenticator app."; the QR code and the key; Code From App; Turn On, Back; then Recovery Codes with one line to keep them, the ten codes, Copy Codes, Continue | None | Which roles require it and why: `foundation.md` §6.4 |
 | Forgot Password | Reset Password, "We will email you a link.", Email, Send Link, Back; then Check Your Email with the address | None | How long a link lasts and that only an active login gets one: §6 |
 | Reset and Welcome | The email (reset) or "Welcome, first name" (invitation); New Password, Confirm Password, Save Password or Set Password; an expired link says so with Request New Link | None | The password rules beyond the field's own mark: §6 |
-| Lock screen | Session Locked, Session Ended or Signed Out (Enter Code at the code step); why in one line; the person's photo or initials, name and email; PIN or Password, or Sign-In Code; Sign Out, Use Passkey, Use Password or Use PIN, Use Recovery Code, Unlock | None | The idle and time limits and the server-side end: §3 step 5, §6 |
+| Lock screen | Session Locked, Session Ended or Signed Out (Enter Code at the code step, with "From your authenticator app" or "One of your recovery codes"); why in one line; the person's photo or initials, name and email; PIN or Password, or Sign-In Code; Sign Out, Use Passkey, Use Password or Use PIN, Use Recovery Code or Use App Code, Back (the code step), Unlock; an expired code returns to the first step with the refusal | None | The idle and time limits and the server-side end: §3 step 5, §6 |
 | ESS · My Security | Password with when it was changed; Two-Step Sign-In with On or Off, Ask for a Code (Every Sign-In, Once a Day, Once a Month), the recovery codes left, Set Up Two-Step, New Codes, Change App, Turn Off; PIN with On or Off and when changed, Set PIN, Change PIN, Remove PIN; Passkeys (Name with This Device, Added, Last Used; Add Passkey; a passkey's sheet with Name, Save Name, Remove Passkey); Signed In (device, address, when; Sign Out per device; Sign Out Others); Recent Sign-Ins (When, Device, Method, Address, Status); Clock-In Devices: each registered or new device (name and platform, status, last clock-in, This Device; removed ones left out) and Manage My Devices. In the set-up: the QR code, the key, one line to scan it, Code From App, Turn On; then the ten codes, one line to keep them, Copy Codes. Confirm It's You: Confirm With, Password or PIN, Confirm or Use Passkey | Two-Step Sign-In and PIN: what each is, behind the card title | Why other sessions end on a password change, the reuse rule, the window, how codes and passkeys are checked: §6 |
-| Settings · Users | Users, Active, Invited, Suspended, Signed In Now; the status chips; the list (person, roles, last seen, two-step, status); Users by Role; a login's detail with its actions, Reset Two-Step among them, and its confirmation in one sentence | None | What each role grants: Settings · Roles & Permissions, §8; what a reset removes: §6 |
+| Settings · Users | Users, Active, Invited, Suspended, Signed In Now; the status chips; the list (person, roles, last seen, two-step, status); Users by Role (desktop); Invite and Save Roles mark a sixth role "At most 5 roles" as it is picked; a login's detail with its actions, Reset Two-Step among them, and its confirmation in one sentence | None | What each role grants: Settings · Roles & Permissions, §8; what a reset removes: §6 |
 
 ### 10.2 Phone layout
 
@@ -424,6 +473,14 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 
 ## 14 · Change log
 
+- 27/10/2026 · JP · §8: Head of Department follows headship (JBS Praxis, 27/10/2026; `docs/guides/organogram.md` §6.1). Whoever heads a department, or acts for its open head role, holds it while they do unless a role of theirs already carries `goals.function`; the system gives it (`user_role.from_headship`, migration 2600) and takes back only what it gave. Invite User and Save Roles keep it on a head (`users.invite.js`, `users.service.setRoles`). Settings · Users shows it as any role.
+- 27/10/2026 · JP · From the 27/10 staging faults brief (fault #6, `WEAK_PASSWORD: new_password` at `POST /api/v1/auth/reset`, three times): the person had chosen a password found in a breach, which the reset page cannot check and no fix prevents. That refusal still marks the field Found in a breach, and is no longer recorded on System Health; the other password rules are (§6 Passwords).
+- 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Settings · Users' Status chips carry the unread notices about the logins under each status, as the list reads it; a login that has left shows under Everyone alone (`users.views.js`, `users.repo.js` `statusesOf`).
+- 26/10/2026 · JP · From the User Guide audit's screen defects: Users by Role is desktop only, as §10.2 says; Invite and Save Roles hold to five roles (`UserInvite`, `UserRolesSet`) and say so on Roles as a sixth is picked, and a refusal on Roles reads in four words. Settings · Approvals (the workflow designer): a route's problems name the stage and the rule in words (`workflow.service` `plainly`), on the Needs Fixing banner and on a refused save (`Fix the stages first`); the Person picker lists active logins only; Add Stage stops at ten; the Status column shows on a phone. §10 updated.
+- 25/10/2026 · JP · §6.1 written, from the employee creation audit and JBS Praxis's decisions of 25/10/2026: a login works only while its employee does and closes on archive; an unused login follows a corrected work email, a used one moves with Use Work Email; Invite All Pending, Not Sent and Send Invite for roster logins; per-person link limits and Link Not Checked; one login per employee (0500); no ceiling on roles, written down. §5 corrected: candidates need `settings` create. §6: a new link closes every open link; there is no common-password list.
+
+- 25/10/2026 · JP · `/auth/me` (and the sign-in answer's `user`) carries `hidden_fields`: the record fields the person's role masks (`shared/rbac/field-mask.js`), so Add Employee and Edit leave them out; the API refuses a write to one (`docs/guides/foundation.md` §6.16, JBS Praxis's decision of 25/10/2026).
+
 - 23/10/2026 · JP · §11: Sign Out and a sign-in as someone else forget every answer the data client kept, and drop one still on its way (`createApi` `clear`, called by `AuthProvider`), so a read left in flight at Sign Out never fills the next person's screens (the 23/10 My Workspace audit, `docs/guides/workspace.md` §11).
 
 - 21/10/2026 · TB · `/auth/me` (and the sign-in answer's `user`) carries `appearance`: Settings · Appearance as every screen of the hub applies it, the dark tokens when the palette is not MyCity's own, the two fonts and the starting theme and density (`docs/guides/foundation.md` §6.15).
@@ -471,3 +528,4 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   copies.
 - 19/10/2026 · AJ · My Security's Clock-In Devices card lists the person's registered and new devices (`GET /devices/mine`) above Manage My Devices, in place of the link alone (the team lead, 19/10/2026). §10 updated.
 - 20/10/2026 · TB · Sign Out also wipes this device's trail of places (`app/src/lib/trail.ts`, FRONTEND_FOUNDATION F29), so the next person on a shared device never sees where the last one went; a session that ends or locks keeps it for the same person's next sign-in.
+- 26/10/2026 · JP · From the User Guide audit's screen defects: the lock screen's code step has Back and says where a recovery code comes from, and an expired code returns it to the first step (it offered only Sign Out); a link whose token fails its shape reads Link Expired with Request New Link, not Link Not Checked (§6, §10).

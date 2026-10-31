@@ -75,8 +75,14 @@ const ACTIONS = Object.freeze([
   a("add_role", "Add Role", {
     screen: "people.organogram",
     params: { action: "new" },
-    need: ["people", "edit"],
+    need: ["people", "create"],
     words: ["open role", "vacant seat", "new seat", "vacancy on the organogram"],
+  }),
+  a("add_department", "Add Department", {
+    screen: "people.departments",
+    params: { action: "new" },
+    need: ["people", "create"],
+    words: ["new department", "new function", "new team", "create department", "add function"],
   }),
   a("add_worksite", "Add Worksite", {
     screen: "people.worksites",
@@ -120,6 +126,12 @@ const ACTIONS = Object.freeze([
     need: ["settings", "create"],
     words: ["public holiday", "add holiday", "holiday", "day off for everyone"],
   }),
+  a("new_flow", "New Flow", {
+    screen: "settings.approvals",
+    params: { action: "new" },
+    need: ["settings", "create"],
+    words: ["approval flow", "add flow", "create flow", "new approval", "approval route", "who approves", "approval stages"],
+  }),
   a("new_rule", "New Rule", {
     screen: "home.alerts",
     params: { action: "new" },
@@ -140,6 +152,12 @@ const ACTIONS = Object.freeze([
     need: ["knowledge", "create"],
     capability: "policies.manage",
     words: ["policy", "write a policy", "company policy", "handbook", "attendance policy"],
+  }),
+  a("raise_query", "Raise a Query", {
+    screen: "queries.queries",
+    params: { action: "new" },
+    need: ["queries", "create"],
+    words: ["query", "issue a query", "query letter", "discipline", "misconduct", "explain in writing"],
   }),
   a("clock_in", "Clock In", {
     screen: "ess.my-attendance",
@@ -182,7 +200,7 @@ const ACTIONS = Object.freeze([
     params: { action: "quarter" },
     need: ["performance", "create"],
     capability: "performance.manage",
-    words: ["quarter", "new quarter", "next quarter", "open the quarter", "scoring rules", "rating bands", "section weights", "lock date"],
+    words: ["quarter", "new quarter", "next quarter", "open the quarter", "scoring rules", "rating bands", "section weights"],
   }),
   a("report_month", "Report Month", {
     screen: "performance.goals",

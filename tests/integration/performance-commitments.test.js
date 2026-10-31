@@ -43,7 +43,6 @@ const monthKey = today.slice(0, 7);
 const lastMonth = lagos.addMonths(thisMonth, -1);
 const lastKey = lastMonth.slice(0, 7);
 const quarterStart = `${today.slice(0, 4)}-${String(Math.floor((Number(today.slice(5, 7)) - 1) / 3) * 3 + 1).padStart(2, "0")}-01`;
-const quarterEnd = lagos.addDays(lagos.addMonths(quarterStart, 3), -1);
 /** A day in this month after today when there is one, else today. */
 const laterThisMonth = lagos.monthBounds(today).last > today ? lagos.monthBounds(today).last : today;
 
@@ -136,7 +135,7 @@ describeDb("performance commitments, the week and the calendar against the real 
     }
     // The quarter, a binding plan with one key result the head owns, and Ada's binding scorecard
     // with a line measured in tasks (PR 2 builds these through its screens; here they are rows).
-    const period = await as("ops").post("/performance/periods", { starts_on: quarterStart, targets_lock_on: quarterEnd });
+    const period = await as("ops").post("/performance/periods", { starts_on: quarterStart });
     expect(period.status).toBe(201);
     ids.period = period.body.performance_period_id;
     ids.plan = (
@@ -224,6 +223,12 @@ describeDb("performance commitments, the week and the calendar against the real 
     expect((await as("ada").get("/performance/commitments/sets?waiting_on_me=true")).body.data).toEqual([]);
     const rows = await as("head").get(`/performance/commitments?month=${monthKey}&waiting_on_me=true`);
     expect(rows.body.page.total).toBe(3);
+    // The State filter reads as the pills: sent and waiting, not sent, returned; awaiting_approval is every unapproved one.
+    const byState = async (state) => (await as("head").get(`/performance/commitments?month=${monthKey}&state=${state}`)).body.page.total;
+    expect(await byState("sent")).toBe(3);
+    expect(await byState("not_sent")).toBe(0);
+    expect(await byState("returned")).toBe(0);
+    expect(await byState("awaiting_approval")).toBe(3);
     expect((await as("ada").post(`/workflow/instances/${ids.setInstance}/approve`, {})).status).toBe(403);
   });
 
@@ -291,6 +296,9 @@ describeDb("performance commitments, the week and the calendar against the real 
     expect(mine.body.data[0]).toMatchObject({ status: "returned", returned_reason: "Add the Abuja launch" });
     const back = await as("ada").get(`/tasks/${ids.past}`);
     expect(back.body).toMatchObject({ commitment_state: "awaiting_approval", set_status: "returned" });
+    const returned = await as("head").get(`/performance/commitments?month=${lastKey}&state=returned`);
+    expect(returned.body.data.map((row) => row.task_id)).toContain(ids.past);
+    expect((await as("head").get(`/performance/commitments?month=${lastKey}&state=sent`)).body.data.map((row) => row.task_id)).not.toContain(ids.past);
     const again = await as("ada").post(`/performance/commitments/sets/${emp("ada")}/${lastKey}/submit`);
     expect(again.status).toBe(200);
     expect(again.body.workflow_instance_id).not.toBe(sent.body.workflow_instance_id);

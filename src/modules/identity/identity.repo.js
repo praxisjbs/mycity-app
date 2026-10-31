@@ -15,8 +15,20 @@ const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || 
  * Logins
  * ------------------------------------------------------------------ */
 
+/**
+ * A login's status as signing in reads it: its own, unless its employee no longer works here.
+ * An archived or departed employee's login is closed (left) and a suspended employee's is
+ * suspended, at once, before the follow-on job writes it (docs/guides/identity.md §6.1): no
+ * login works for someone who is not on the active staff list. `login_status` is the row's own.
+ */
+const EFFECTIVE_STATUS = `
+  CASE WHEN e.status IN ('archived', 'left') THEN 'left'
+       WHEN e.status = 'suspended' AND u.status = 'active' THEN 'suspended'
+       ELSE u.status END`;
+
 const LOGIN_COLUMNS = `
-  u.user_id, u.employee_id, u.email::text AS email, u.password_hash, u.status, u.is_ceo,
+  u.user_id, u.employee_id, u.email::text AS email, u.password_hash, ${EFFECTIVE_STATUS} AS status,
+  u.status AS login_status, e.status AS employee_status, u.is_ceo,
   u.failed_login_count, u.last_failed_login_at, u.password_changed_at, u.last_login_at,
   e.first_name, e.last_name, e.job_title, trim(e.first_name || ' ' || e.last_name) AS display_name`;
 
@@ -104,6 +116,16 @@ function setPasswordHash(db, userId, hash) {
   );
 }
 
+/** Move a login to another address (citext UNIQUE: two logins never share one). */
+function setEmail(db, userId, email) {
+  return one(
+    db,
+    `UPDATE app_user SET email = $2, updated_at = now() WHERE user_id = $1
+     RETURNING user_id, email::text AS email`,
+    [userId, email],
+  );
+}
+
 function setStatus(db, userId, status) {
   return one(
     db,
@@ -120,7 +142,7 @@ function setStatus(db, userId, status) {
 function meOf(db, userId) {
   return one(
     db,
-    `SELECT u.user_id, u.employee_id, u.email::text AS email, u.is_ceo, u.status,
+    `SELECT u.user_id, u.employee_id, u.email::text AS email, u.is_ceo, ${EFFECTIVE_STATUS} AS status,
             e.first_name, trim(e.first_name || ' ' || e.last_name) AS display_name,
             e.job_title, d.name AS department, e.photo_document_id,
             EXISTS (SELECT 1 FROM employee_effective_manager m
@@ -207,8 +229,9 @@ function lockSession(db, sessionId) {
     `SELECT s.session_id, s.user_id, s.refresh_token_hash, s.killed_at, s.expires_at,
             EXTRACT(EPOCH FROM (now() - s.issued_at)) AS age_seconds,
             EXTRACT(EPOCH FROM (now() - s.last_seen_at)) AS idle_seconds,
-            u.status
+            ${EFFECTIVE_STATUS} AS status
        FROM user_session s JOIN app_user u ON u.user_id = s.user_id
+       JOIN employee e ON e.employee_id = u.employee_id
       WHERE s.session_id = $1
       FOR UPDATE OF s`,
     [sessionId],
@@ -378,7 +401,7 @@ function deviceAccount(db, hash) {
        FROM known_device k
        JOIN app_user u ON u.user_id = k.user_id
        JOIN employee e ON e.employee_id = u.employee_id
-      WHERE k.fingerprint_hash = $1 AND k.revoked_at IS NULL AND u.status = 'active'
+      WHERE k.fingerprint_hash = $1 AND k.revoked_at IS NULL AND u.status = 'active' AND e.status = 'active'
       ORDER BY k.last_seen_at DESC NULLS LAST
       LIMIT 1`,
     [hash],
@@ -502,7 +525,7 @@ function upsertLink(db, { userId, hash, purpose, seconds, requestedBy, ip, event
   );
 }
 
-/** A link that is still good: unused, unexpired, for an active login. */
+/** A link that is still good: unused, unexpired, for an active login whose employee works here. */
 function findOpenLink(db, hash, { lock = false } = {}) {
   return one(
     db,
@@ -512,7 +535,7 @@ function findOpenLink(db, hash, { lock = false } = {}) {
        JOIN app_user u ON u.user_id = p.user_id
        JOIN employee e ON e.employee_id = u.employee_id
       WHERE p.token_hash = $1 AND p.used_at IS NULL AND p.expires_at > now()
-        AND u.status = 'active'
+        AND u.status = 'active' AND e.status = 'active'
       ${lock ? "FOR UPDATE OF p" : ""}`,
     [hash],
   );
@@ -526,6 +549,8 @@ function spendLink(db, linkId) {
 }
 
 module.exports = {
+  EFFECTIVE_STATUS,
+  setEmail,
   findLoginByEmail,
   findLoginById,
   findLoginByEmployeeId,

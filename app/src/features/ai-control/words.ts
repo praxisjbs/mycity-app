@@ -64,6 +64,7 @@ export const HELP = {
   cap: "Once reached, this provider is skipped for the rest of the month and the next model in each chain answers.",
   overall: "Once reached, no AI call is made until the month ends, whatever the chains say.",
   ownChain: "This action has a chain of its own; Use Job Chain puts it back on its job's.",
+  setChain: "This action's chain was chosen for it, not its job's. Restore Chain puts that choice back after an edit.",
   notListed: "Models the provider's pricing page did not price. Find Prices asks about them again after 7 days.",
 };
 

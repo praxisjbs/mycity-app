@@ -17,9 +17,14 @@
  *   5. lines         a post still reporting to the named seat reports to the named post instead
  *   6. heads         a department with no head is given its post's holder, or its seat
  *
- * Each step looks before it writes and changes only what still holds the old value, so an
- * edit made on screen stays and a second deploy changes nothing. People are matched by their
- * post, never by name.
+ * Each step looks before it writes and changes only what still holds the old value. The changes
+ * to posts, seats and lines (2 to 5) are applied once per version of nomenclature.json (`once`,
+ * from the loader), so a title or a line People change on screen afterwards stays, even when it
+ * happens to match an old name. The departments and their heads (1 and 6) are given only to a
+ * database that has never had MyCity's names (`first`): after that they are People's, kept on
+ * People · Departments (docs/guides/organogram.md §6.1, JBS Praxis 27/10/2026), and no deploy
+ * renames one, makes one again or sets a head. A department is found by its name, then by MyCity's
+ * code (one renamed on screen keeps it). People are matched by their post, never by name.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -90,10 +95,12 @@ function readNomenclature(file = FILE) {
  *          file?: string, teams?: string[]}} opts
  *   teams: the department names the sheet being loaded uses; a department is created only when
  *   the sheet names it, so a sheet that is not MyCity's creates nothing here
+ *   once: this version was applied before, so the changes to posts, seats and lines are left
+ *   first: no version was ever applied, so the departments and their heads are given (default: !once)
  * @returns {Promise<{renamed: number, created: number, codes: number, merged: number, titles: number,
  *                    seats: number, moved: number, lines: number, heads: number}>}
  */
-async function applyNomenclature({ pool, atomically, log = () => {}, actor, file = FILE, teams = [] }) {
+async function applyNomenclature({ pool, atomically, log = () => {}, actor, file = FILE, teams = [], once = false, first = !once }) {
   const out = { renamed: 0, created: 0, codes: 0, merged: 0, titles: 0, seats: 0, moved: 0, lines: 0, heads: 0 };
   const plan = readNomenclature(file);
   if (!plan) return out;
@@ -115,6 +122,8 @@ async function applyNomenclature({ pool, atomically, log = () => {}, actor, file
         [name],
       )
     ).rows[0] || null;
+  /* MyCity's department under its name, or under the name People gave it on screen (its code). */
+  const deptOf = async (d) => (await deptByName(d.name)) || (d.code ? await organisation.findDepartmentByCode(pool, d.code) : null);
   const holders = async (post) =>
     (
       await pool.query(
@@ -123,9 +132,9 @@ async function applyNomenclature({ pool, atomically, log = () => {}, actor, file
       )
     ).rows;
 
-  /* 1. Departments. */
-  for (const d of plan.departments) {
-    let dept = await deptByName(d.name);
+  /* 1. Departments, on a database that has never had MyCity's names: after that they are People's. */
+  for (const d of first ? plan.departments : []) {
+    let dept = await deptOf(d);
     if (!dept) {
       for (const old of d.was || []) {
         const former = await deptByName(old);
@@ -177,107 +186,115 @@ async function applyNomenclature({ pool, atomically, log = () => {}, actor, file
     }
   }
 
-  /* 2. Job titles, of people and of open seats. */
-  const { rows: titled } = await pool.query(
-    "SELECT employee_id, job_title FROM employee WHERE status <> 'archived' AND job_title IS NOT NULL ORDER BY created_at",
-  );
-  for (const p of titled) {
-    const next = retitle(plan.job_titles, p.job_title);
-    if (!next) continue;
-    await tx((client) => organisation.updateEmployee(client, p.employee_id, { job_title: next }, actor));
-    log(`post "${p.job_title}" is now "${next}"`);
-    out.titles += 1;
-  }
+  if (!once) await applyChanges();
+  if (first) await applyHeads();
+  return out;
 
-  /* 3. Seats: the seat map, then the job title map for open seats. */
-  const { rows: seats } = await pool.query(
-    "SELECT org_seat_id, title FROM org_seat WHERE status <> 'closed' ORDER BY created_at",
-  );
-  for (const s of seats) {
-    const next = retitle(plan.seats, s.title) || retitle(plan.job_titles, s.title);
-    if (!next) continue;
-    await tx((client) => organisation.updateSeat(client, s.org_seat_id, { title: next }, actor));
-    log(`seat "${s.title}" is now "${next}"`);
-    out.seats += 1;
-  }
+  /* 2 to 5: the changes to people and seats, once per version. */
+  async function applyChanges() {
+    /* 2. Job titles, of people and of open seats. */
+    const { rows: titled } = await pool.query(
+      "SELECT employee_id, job_title FROM employee WHERE status <> 'archived' AND job_title IS NOT NULL ORDER BY created_at",
+    );
+    for (const p of titled) {
+      const next = retitle(plan.job_titles, p.job_title);
+      if (!next) continue;
+      await tx((client) => organisation.updateEmployee(client, p.employee_id, { job_title: next }, actor));
+      log(`post "${p.job_title}" is now "${next}"`);
+      out.titles += 1;
+    }
 
-  /* 4. Moves. */
-  for (const m of plan.moves) {
-    const to = await deptByName(m.department);
-    if (!to) continue;
-    const from = (await Promise.all((m.from || []).map(deptByName))).filter(Boolean).map((x) => x.department_id);
-    if (!from.length) continue;
-    const posts = (m.posts || []).map(matcher);
-    const fits = (title) => posts.some((f) => f(title) !== null);
-    const { rows: people } = await pool.query(
-      "SELECT employee_id, job_title FROM employee WHERE status <> 'archived' AND department_id = ANY($1::uuid[])",
-      [from],
+    /* 3. Seats: the seat map, then the job title map for open seats. */
+    const { rows: seats } = await pool.query(
+      "SELECT org_seat_id, title FROM org_seat WHERE status <> 'closed' ORDER BY created_at",
     );
-    const { rows: open } = await pool.query(
-      "SELECT org_seat_id, title FROM org_seat WHERE status <> 'closed' AND department_id = ANY($1::uuid[])",
-      [from],
-    );
-    const going = people.filter((p) => fits(p.job_title));
-    const seatsGoing = open.filter((s) => fits(s.title));
-    if (!going.length && !seatsGoing.length) continue;
-    await tx(async (client) => {
-      for (const p of going)
-        await organisation.updateEmployee(client, p.employee_id, { department_id: to.department_id }, actor);
-      for (const s of seatsGoing)
-        await organisation.updateSeat(client, s.org_seat_id, { department_id: to.department_id }, actor);
-    });
-    log(`${going.length} people and ${seatsGoing.length} seats moved to "${m.department}"`);
-    out.moved += going.length + seatsGoing.length;
-  }
+    for (const s of seats) {
+      const next = retitle(plan.seats, s.title) || retitle(plan.job_titles, s.title);
+      if (!next) continue;
+      await tx((client) => organisation.updateSeat(client, s.org_seat_id, { title: next }, actor));
+      log(`seat "${s.title}" is now "${next}"`);
+      out.seats += 1;
+    }
 
-  /* 5. Lines. */
-  for (const l of plan.lines) {
-    const seat = (
-      await pool.query(
-        "SELECT org_seat_id FROM org_seat WHERE status <> 'closed' AND lower(btrim(title)) = lower(btrim($1)) LIMIT 1",
-        [l.from_seat],
-      )
-    ).rows[0];
-    const to = await holders(l.to_post);
-    if (!seat || to.length !== 1) continue;
-    const { rows: people } = await pool.query(
-      `SELECT employee_id, dotted_manager_id FROM employee
-        WHERE status <> 'archived' AND lower(btrim(job_title)) = lower(btrim($1)) AND line_manager_seat_id = $2`,
-      [l.post, seat.org_seat_id],
-    );
-    for (const p of people) {
-      const change = { line_manager_id: to[0].employee_id, reason: `Org chart: ${l.post} reports to ${l.to_post}` };
-      if (p.dotted_manager_id === to[0].employee_id) change.dotted_manager_id = null;
-      await tx((client) => organisation.setReportingLine(client, p.employee_id, change, actor));
-      log(`${l.post} now reports to the ${l.to_post}`);
-      out.lines += 1;
+    /* 4. Moves. */
+    for (const m of plan.moves) {
+      const to = await deptOf(plan.departments.find((d) => d.name === m.department) || { name: m.department });
+      if (!to) continue;
+      const from = (await Promise.all((m.from || []).map(deptByName))).filter(Boolean).map((x) => x.department_id);
+      if (!from.length) continue;
+      const posts = (m.posts || []).map(matcher);
+      const fits = (title) => posts.some((f) => f(title) !== null);
+      const { rows: people } = await pool.query(
+        "SELECT employee_id, job_title FROM employee WHERE status <> 'archived' AND department_id = ANY($1::uuid[])",
+        [from],
+      );
+      const { rows: open } = await pool.query(
+        "SELECT org_seat_id, title FROM org_seat WHERE status <> 'closed' AND department_id = ANY($1::uuid[])",
+        [from],
+      );
+      const going = people.filter((p) => fits(p.job_title));
+      const seatsGoing = open.filter((s) => fits(s.title));
+      if (!going.length && !seatsGoing.length) continue;
+      await tx(async (client) => {
+        for (const p of going)
+          await organisation.updateEmployee(client, p.employee_id, { department_id: to.department_id }, actor);
+        for (const s of seatsGoing)
+          await organisation.updateSeat(client, s.org_seat_id, { department_id: to.department_id }, actor);
+      });
+      log(`${going.length} people and ${seatsGoing.length} seats moved to "${m.department}"`);
+      out.moved += going.length + seatsGoing.length;
+    }
+
+    /* 5. Lines. */
+    for (const l of plan.lines) {
+      const seat = (
+        await pool.query(
+          "SELECT org_seat_id FROM org_seat WHERE status <> 'closed' AND lower(btrim(title)) = lower(btrim($1)) LIMIT 1",
+          [l.from_seat],
+        )
+      ).rows[0];
+      const to = await holders(l.to_post);
+      if (!seat || to.length !== 1) continue;
+      const { rows: people } = await pool.query(
+        `SELECT employee_id, dotted_manager_id FROM employee
+          WHERE status <> 'archived' AND lower(btrim(job_title)) = lower(btrim($1)) AND line_manager_seat_id = $2`,
+        [l.post, seat.org_seat_id],
+      );
+      for (const p of people) {
+        const change = { line_manager_id: to[0].employee_id, reason: `Org chart: ${l.post} reports to ${l.to_post}` };
+        if (p.dotted_manager_id === to[0].employee_id) change.dotted_manager_id = null;
+        await tx((client) => organisation.setReportingLine(client, p.employee_id, change, actor));
+        log(`${l.post} now reports to the ${l.to_post}`);
+        out.lines += 1;
+      }
     }
   }
 
   /* 6. Heads. */
-  for (const d of plan.departments) {
-    if (!d.head) continue;
-    const dept = await deptByName(d.name);
-    if (!dept || dept.head_employee_id || dept.head_seat_id) continue;
-    let patch = null;
-    if (d.head.post) {
-      const who = await holders(d.head.post);
-      if (who.length === 1) patch = { head_employee_id: who[0].employee_id };
-    } else if (d.head.seat) {
-      const seat = (
-        await pool.query(
-          "SELECT org_seat_id FROM org_seat WHERE status <> 'closed' AND lower(btrim(title)) = lower(btrim($1)) LIMIT 1",
-          [d.head.seat],
-        )
-      ).rows[0];
-      if (seat) patch = { head_seat_id: seat.org_seat_id };
+  async function applyHeads() {
+    for (const d of plan.departments) {
+      if (!d.head) continue;
+      const dept = await deptOf(d);
+      if (!dept || dept.head_employee_id || dept.head_seat_id) continue;
+      let patch = null;
+      if (d.head.post) {
+        const who = await holders(d.head.post);
+        if (who.length === 1) patch = { head_employee_id: who[0].employee_id };
+      } else if (d.head.seat) {
+        const seat = (
+          await pool.query(
+            "SELECT org_seat_id FROM org_seat WHERE status <> 'closed' AND lower(btrim(title)) = lower(btrim($1)) LIMIT 1",
+            [d.head.seat],
+          )
+        ).rows[0];
+        if (seat) patch = { head_seat_id: seat.org_seat_id };
+      }
+      if (!patch) continue;
+      await tx((client) => organisation.updateDepartment(client, dept.department_id, patch, actor));
+      log(`"${d.name}" is headed by the ${d.head.post || d.head.seat}`);
+      out.heads += 1;
     }
-    if (!patch) continue;
-    await tx((client) => organisation.updateDepartment(client, dept.department_id, patch, actor));
-    log(`"${d.name}" is headed by the ${d.head.post || d.head.seat}`);
-    out.heads += 1;
   }
-  return out;
 }
 
 module.exports = { FILE, fold, matcher, retitle, autoCode, readNomenclature, applyNomenclature };

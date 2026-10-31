@@ -31,7 +31,11 @@ import {
 import { useEffect, useState } from "react";
 import { HELP, JOB, PROVIDER, SHOW, positionOf, reasonOf, usd } from "./words";
 
-const fail = (e: unknown, fallback: string) => toast(e instanceof ApiError ? e.message : fallback);
+/** A refusal says why, and the screen reloads: a proposal decided or a search started meanwhile shows as it now is. */
+const fail = (e: unknown, fallback: string) => {
+  toast.error(e instanceof ApiError ? e.message : fallback);
+  invalidate("/api/v1/ai-control");
+};
 
 type Priced = Pick<AiControlModel, "input_usd_per_million" | "output_usd_per_million" | "usd_per_audio_hour">;
 
@@ -231,7 +235,8 @@ function NewPrices() {
     try {
       const r = await api.call("POST /api/v1/ai-control/prices/accept-all", { body: {} });
       invalidate("/api/v1/ai-control");
-      toast(`${r.accepted} ${r.accepted === 1 ? "price" : "prices"} saved`);
+      if (r.accepted === 0) toast.info("Nothing left to accept");
+      else toast(`${r.accepted} ${r.accepted === 1 ? "price" : "prices"} saved`);
     } catch (e) {
       fail(e, "Not saved");
     }

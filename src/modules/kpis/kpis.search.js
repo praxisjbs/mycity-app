@@ -1,10 +1,11 @@
 "use strict";
 /**
  * ⌘K for KPIs: a KPI by its code or name, or a former code from the workbook's change map
- * (docs/guides/performance.md §9). Shared, not scoped, as the KPIs screen is. A result opens on
- * Performance · KPIs.
+ * (docs/guides/performance.md §9). A reader finds the KPIs of the functions they read, as the KPIs screen
+ * lists them (§6.23). A result opens on Performance · KPIs.
  */
 const { recordProvider } = require("../../shared/search/provider");
+const visibility = require("../goals/goals.visibility");
 
 module.exports = recordProvider({
   type: "kpi",
@@ -22,4 +23,6 @@ module.exports = recordProvider({
   select: "k.kpi_definition_id AS id, k.code::text AS ref, k.name AS title, d.name AS sub, CASE WHEN k.active THEN 'active' ELSE 'retired' END AS status",
   where: "k.department_id IS NOT NULL",
   order: "k.code",
+  reach: (client, user) => visibility.readerOf(client, user),
+  readable: (reach, params) => visibility.departmentReadable(reach, "k.department_id", params),
 });

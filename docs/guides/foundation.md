@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 22/10/2026 |
+| Last changed | 28/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -125,7 +125,7 @@ own migration block (§1.1), to every rule in `docs/MIGRATIONS.md`.
 | `document_request` | 0350 | B | What People asked an employee for; a Missing row until it is given (§6.9) |
 | `role`, `permission`, `field_visibility`, `capability`, `user_capability` | 0020, 0290 | C | Defaults for field visibility and capabilities in `0449` (§6.3). `0400` adds `role.two_step_required` (§6.4) |
 | `role_capability` | 0400 | C | A capability given to everyone holding a role; `user_capability` still gives one to a single person, and a person has the union |
-| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows, the three brand files among them as `organisation.logo_document_id`, `organisation.logo_white_document_id` and `organisation.icon_document_id` (§6.11), read by everything that prints the company through one reader, `shared/organisation/profile.js` (until 19/10/2026 documents and system mail read a single `organisation.profile` row that nothing wrote, so they always printed the defaults); security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026). The Report Run scheme (`report_run`, RPT-0001, never reset) is seeded by `1199` (TB, 17/10/2026); the Work Location Request scheme (`location_request`, WLR-0001, never reset) by `1392` and the Field Assignment scheme (`field_assignment`, FA-0001, never reset) by `1393` (LA, 19/10/2026) |
+| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows, the three brand files among them as `organisation.logo_document_id`, `organisation.logo_white_document_id` and `organisation.icon_document_id` (§6.11), read by everything that prints the company through one reader, `shared/organisation/profile.js` (until 19/10/2026 documents and system mail read a single `organisation.profile` row that nothing wrote, so they always printed the defaults); security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026). The Report Run scheme (`report_run`, RPT-0001, never reset) is seeded by `1199` (TB, 17/10/2026); the Work Location Request scheme (`location_request`, WLR-0001, never reset) by `1392` and the Field Assignment scheme (`field_assignment`, FA-0001, never reset) by `1393` (LA, 19/10/2026); the Organisational Goal scheme (`organisational_goal`, ORG-2026-01, each plan year) by `2291` (JBS Praxis, 27/10/2026; `performance.md` §6.1) |
 | `audit_ledger`, `event_log` | 0030 | C | Read only. `0400` adds the indexes the Audit Log filters on (when, module, action, record) and one on live sessions |
 | `spent_challenge` | 0230 | C | `0400` widens its purpose check with `two_step_setup`, the ticket of the set-up step at sign-in (§6.4) |
 | `workflow_definition`, `workflow_instance`, `workflow_decision` | 0070 | D | The leave definition in `0499` |
@@ -222,12 +222,13 @@ Users keeps `GET /access/roles`.
 
 | Route | Permission |
 |---|---|
-| `GET /workflow/mine` (waiting on me; `module_key` filter), `/workflow/mine/count` (`waiting`, `overdue`) | the caller's own: the requests whose current stage names them, in modules where they hold `approve` |
+| `GET /workflow/mine` (waiting on me; `module_key` filter), `/workflow/mine/count` (`waiting`, `overdue`) | the caller's own: the requests whose current stage names them, in modules where they hold `approve`, never one about a record whose screen has not shipped (`shared/delivery-plan.js` `closedTypes`) |
 | `GET /workflow/instances/:id` (the route, the decisions, `can_decide`, `can_withdraw`, `can_reassign`) | whoever opened it, the employee it is about, the people its stage names, anyone who decided on it, or `view` on its module within scope; anyone else a 404 |
 | `POST /workflow/instances/:id/approve` (optional note), `/reject`, `/request-changes` (a reason, required) | named on the current stage, and `approve` on the request's module (§8) |
 | `POST /workflow/instances/:id/withdraw` | the requester, or the CEO |
 | `POST /workflow/instances/:id/reassign` (one login and a reason) | `approve` with scope `all` on the request's module (§11) |
 | `GET /settings/approvals` (the active version of each flow, 25 a page), `/approvals/summary` | `settings` view |
+| `POST /settings/approvals` (a name, a module, its values and its stages; saves version 1, 201; a name whose key exists is refused) | `settings` create |
 | `PUT /settings/approvals/:id/steps` (`:id` is the version on screen; saves the next version) | `settings` edit |
 | `GET /search` (`q`, `page`, `type` to page one group) | everyone signed in; each group by the reader's own grants |
 
@@ -267,12 +268,15 @@ longer than 4.5 seconds.
   in the deploy log and the batch in Imports history, and does not stop the deploy.
 - **This overrules "production is never seeded" for the real staff only** (TB, 16/10/2026).
   Demonstration data still never reaches production. CLAUDE.md says so.
-- Each person gets a complete employee record, a login in the invited state and their roles. **No
-  email is sent**: Send Invite (one or all) does that, later.
+- Each person the roster brought gets a complete employee record, a login in the invited state and
+  their roles. **No email is sent**: Send Invite (one or all) does that, later. Somebody People add
+  on screen is theirs to invite or not: the roster never gives them a login (25/10/2026).
 - Roles (`roles.json`): the CEO flag and Management for the CEO; Management for the Program Manager
   and the CTO, who is also System Administrator; Operations & People for the Operations & People
   Lead; Head of Department for the Head of PR, Marketing and Brand Strategy; Line Manager for the
-  Back-end Manager; Staff for everyone else.
+  Back-end Manager; Staff for everyone else. A post is matched by its exact title, case and
+  punctuation aside, never by the words it shares with one: "Deputy Chief Technology Officer" is
+  Staff, not System Administrator (25/10/2026).
 - **A post the sheet does not hold** can be given its line manager in `roles.json`, in the same
   words as the sheet's Line Manager column: the Implementation Partner (the build account, which
   `create-admin` makes before any roster) reports to the CTO (TB, 19/10/2026). The loader gives that
@@ -294,9 +298,19 @@ longer than 4.5 seconds.
   (GM, TBO, BM, PG, PC) where the system made one from the name, retires a department merged into
   another once empty (Technology into Technology & Back-office Ops), gives posts and open seats the
   chart's titles, moves the Partnership & Growth posts out of Branding & Marketing, moves David's line to
-  Chinyere, and fills an empty department head. Each step changes only what still holds the old value,
-  so an edit made on screen stays and a second deploy changes nothing; the deploy log lists what it
-  changed. The sheet and `roles.json` carry the same names, so a fresh database ends the same way.
+  Chinyere, and fills an empty department head. Each step changes only what still holds the old value;
+  the deploy log lists what it changed. The changes to people and seats (merges, titles, seats, moves,
+  lines) are applied **once per version of `nomenclature.json`** (the event `department.names_applied`
+  carries its checksum), so a title, a department or a line People change on screen afterwards stays,
+  even one that matches an old name. The departments, their codes and heads are given only to a
+  database that has never had MyCity's names, its first deploy (JBS Praxis, 27/10/2026): after that
+  they are People's, kept on People · Departments (`docs/guides/organogram.md` §6.1), and no deploy
+  renames a department, makes one again, changes a code or sets a head, even with a new version of
+  `nomenclature.json`. A department is found by its name or MyCity's code, so one renamed on screen
+  is still the same one for the moves. The sheet and `roles.json` carry the same names, so
+  a fresh database ends the same way. Each deploy then gives every department head their role
+  (organogram.md §6.1: Head of Department while they head, unless a role of theirs already sets a
+  function's goals).
 - **The sheet was corrected on 19/10/2026 (TB).** Aaron Agama's team is Sales & Marketing (the
   sheet said Marketing, a department of one); Markerting is Marketing in three titles; Operations&
   People Lead is Operations & People Lead, and its `roles.json` key with it; two work emails had a
@@ -305,18 +319,24 @@ longer than 4.5 seconds.
 - FTE is `full_time`; Remote and Hybrid are `remote` and `hybrid`. The working hours column (Monday
   to Friday 09:00 to 17:00, Saturday 09:00 to 15:00) is the organisation's working week (A22), set by
   track C, not per person.
-- A person with no staff ID gets one from `numbering.allocate()`, and the counter is moved past
-  every number the sheet brought (`numbering.advanceTo()`), so the next person added on screen
-  cannot be given one that is taken.
+- A person with no staff ID gets one from `numbering.allocate()`. The counter is moved past every
+  number the sheet claims **before any row is written**, so a row with no Staff ID is never given a
+  number a later row claims, and a holder moved off a number lands above them all, once; it is moved
+  again after the load, so the next person added on screen cannot be given one that is taken. A
+  Staff ID a spreadsheet read as a number (19) gets its leading zeros back (00019).
 - **A column the whole sheet gets wrong is not imported**, and the deploy log says why. MyCity's own
   sheet holds a day and month with no year under DOB, and the same placeholder under Phone, in every
   row: mapping either would fail every row instead of loading the person. A column with one good
   cell among bad ones is imported, and its bad cells are row problems as usual. Work Hours and S/N
-  are not fields of a person at all (the working week is one organisation setting, A22).
+  are not fields of a person at all (the working week is one organisation setting, A22). In any
+  other optional column, a cell that does not read ("N/A" under Gender) is left out of that person
+  with a note on the row, never the whole row (`skip_unreadable_optional`, 25/10/2026): one stray
+  cell no longer keeps people off the register on a fresh database.
 - **A birthday given as a day and month is kept anyway** (GE, 20/10/2026): on every deploy, loaded
   sheet or not, each DOB cell like `03/07` (day first) is written to `employee.birth_day` and
   `birth_month` (migration `1180`) through `organisation.setBirthday`, for the person it names by
-  work email, else staff number, only when they have no date of birth and no birthday yet. The
+  work email (the cell's own, or the one `roles.json` gives the post), never by staff number, which
+  may have moved to somebody else, only when they have no date of birth and no birthday yet. The
   Staff Community celebrations read it (community guide §3 step 3). The log gives counts only.
 - The loader asks the import engine for things no person asks for, as batch options: **keep what
   the app already has** (an existing person is left exactly as People hold them, and the reporting
@@ -332,13 +352,28 @@ longer than 4.5 seconds.
   row is reported), and a person already here under another number. A holder with the row's own
   first and last name is not somebody else: it is the same person, whose work email the sheet now
   spells differently (a corrected domain), and the row is theirs, so nobody moves and no second
-  record is made (TB, 19/10/2026). Importing a sheet by hand moves
+  record is made (TB, 19/10/2026). Nor is anybody an earlier roster brought: a row that changes such
+  a person's name and email together is reported, never a stranger to renumber (the person keeps
+  their number, record and login, and People correct them on screen). A row with no staff number
+  whose email matches nobody, while somebody of the same first and last name is on the register, is
+  held back as a possible duplicate until it names its Staff ID; and the email `roles.json` gives a
+  post is never read as a second person's in that post (25/10/2026). Importing a sheet by hand moves
   nobody: a taken staff number is a problem on the row, as it is on the Add Employee form. Reverting
   such a batch archives the people it created but leaves the holder on the number they moved to; a
   number is given back on screen, not by a revert.
 - **A deploy that changes no file changes no record.** The loader keeps the sheet's checksum on its
   batch; a later deploy with the same sheet checks the logins and stops. A corrected sheet loads
   again, adding what is new and leaving the rest alone.
+- **The roster makes no department by itself** but the ones `nomenclature.json` names (25/10/2026):
+  a Team cell naming any other ("Partnership & Growh") leaves its rows for People, with a warning in
+  the deploy log, so a typo never becomes a production department. Nor does it make one of those
+  again once its code is held under another name, a department renamed on People · Departments
+  (27/10/2026): its rows are left for People the same way. A department is found with case,
+  accents and punctuation set aside ("Technology & Back Office Ops" is the TBO). A build with no
+  `nomenclature.json` creates every one, as before.
+- **A seat People closed stays closed** when the sheet still lists its VACANT row, and a VACANT row
+  matches a seat in its own department (or one made before the load and moved since), so one title
+  in two departments is two seats (25/10/2026).
 
 ### 6.2 Staging demonstration data
 
@@ -440,8 +475,23 @@ As built (17/10/2026):
   named person), when
   it applies (Always, or one comparison on a number the flow carries: Over, At Least, Under, At Most,
   Exactly) and its time limit in hours; stages are added, removed and moved up or down. Save Stages
-  writes the whole list as the next version. The flow's key, name, values and the timeout, approve and
-  reject behaviour of each stage are the code's and are kept as they are.
+  writes the whole list as the next version. The flow's key, name, module, values and the timeout,
+  approve and reject behaviour of each stage are kept as they are: the code's for a flow it ships, and
+  what was set when it was made for a flow made on screen.
+- **A flow made on screen** (New Flow, JP, 29/10/2026, owner's decision): `POST /settings/approvals`
+  saves a flow nobody has coded yet, as version 1 (`definitions.saveVersion`, event
+  `workflow.definition_created`). It takes a name, a module, an optional description, up to 5 values
+  (each a name and a type: Money, Number, Date, Text, Yes or No, Person) and one to 10 stages, written
+  by the same rules as Edit Stages (`problemsOf`, `assertApproversExist`). The key is
+  `<module>.<name in snake_case>` (Petty Cash on `expenses` is `expenses.petty_cash`), never typed
+  and never changed; a value's key is its name in snake_case, shown title-cased. A key that already
+  exists, stored in any version or shipped in `DEFAULTS`, is refused with `Name already used` on the
+  name. Nothing opens a flow made on screen until a module's service calls `openInstance` with its key,
+  so the list shows it as **Not Used Yet** (`used` false: the key is not in `DEFAULTS` and no request
+  was ever opened on it) beside Active and Needs Fixing; its detail shows its Module and Key for the
+  developer who wires it. Its values are fixed at creation (a stage's condition reads them); Edit
+  Stages still changes the stages. Who decides is unchanged: the people a stage names, holding
+  `approve` on the flow's module.
 - A save is refused when the version on screen is no longer the active one (409: someone saved first),
   when a stage names a role or a login that does not exist, or when the engine's rules refuse the
   route (422 naming the problem). Each save is the event `workflow.definition_saved`, so the Audit Log
@@ -484,7 +534,7 @@ As built (17/10/2026):
 
 - `GET /search` answers in groups, each the first page of 25: **Screens** (every tab of the staff app by
   its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
-  Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
+  Start Import, Invite User, New Role, New Holiday, New Flow, Add Role, Clock In, Request Leave, Change Password,
   Set PIN, Mark All Read, Notification Settings, Turn On Notifications, Send Test Notification, Use
   Dark Theme, Use Light Theme, Change Density, Install App, Refresh Screen, Reload App, Sign Out, Add
   Work Site, Add Temporary Site), then
@@ -505,9 +555,29 @@ As built (17/10/2026):
   (`shared/search/screens.js` mirrors `app/src/shell/access.ts`; a Home tab the shell shows locked,
   ⌘K hides) and they hold the grant it needs. A
   record group runs only for a reader with `view` on its module, within their scope.
+- The people lead the records: the Employees provider is marked `lead`, so a name typed finds the
+  person before the days, leave and requests about them. A record a person has one of every day is
+  capped (`cap` in `shared/search/provider.js`): Attendance Days and Attendance Exceptions list at most
+  three, best and newest first, and never page past them; People · Attendance holds the rest. Each
+  reads as the person, then the status or exception and the full date ("Present · 26/10/2026",
+  "Missing Clock-Out · 26/10/2026"), in the result's visible words and so its accessible name. A capped
+  group may end with the way to the rest (`more: { type, id, title }`): Attendance Days end with All
+  Days of each person they listed, a row of the route map's `attendance_days` opening that person's
+  days on People · Attendance (`?person=`). A provider declares its `more` type beside its own
+  (`types`), and the search coverage gate reads both.
+- Nothing that would open Coming Soon is offered (F14). The API leaves out a record group whose type
+  opens on a screen that has not shipped, a screen and an action that would land on one, and a Home
+  card counting a module that has not (`shared/delivery-plan.js`), so a group's page of 25 counts only
+  what opens. The app checks the same hits by the same rule (`useOpens` in `app/src/lib/plan.ts`;
+  `app/src/shell/Search.tsx`), which covers the in-browser mock. Before Milestone 8, ⌘K finds no
+  Expenses screen, request or card.
 - A record group also stands down while its feature is switched off: a provider's `available(client)`
   (`shared/search/provider.js`) is asked before its query, and false leaves the group out for
   everyone (Home Locations while the Attendance policy's Home Location is off, `attendance.md` §1.3).
+- Work a provider needs from outside the database is its `prepare({ term, user })`, run for every
+  provider that will search before the transaction opens, so no connection waits on a network
+  call; what it returns reaches its search as `prepared`, and one that fails costs only itself. The
+  User Guide's group asks for a term's vector there, for three words or more (`user-guide.md` §6.8).
 - A type word at either end of the line ("login halima", "staff ada") narrows the records to that
   type; the screens and actions are still matched on the whole line.
 - An action opens its screen asked to start it: `?action=new` runs the screen's New action
@@ -635,7 +705,7 @@ device they pressed it on. Nothing pressed is emailed. Only a report schedule's 
   `GET /exports/:id` (the asker alone) and downloads `GET /documents/:id/content`.
 - **Which buttons.** Export Month (My Attendance), Export Register (People · Attendance), the Audit
   Log's Export, Download PDF (Org Chart and Organogram), Download My Data, Download Their Data. A
-  report run somebody pressed for (Run Now, the Overview's Export) is a numbered run, not an
+  report run somebody pressed for (Run Now, the Overview's Export, My Workspace · Analytics' Export) is a numbered run, not an
   export: its screen waits on the run (`GET /home/report-runs/:id`; the Overview's own run on
   `GET /home/overview/export/:id`, which Staff may read without `home.reports`) and downloads its
   file the same way. The screens of later milestones (Payroll, Expenses, Partnerships,
@@ -754,6 +824,147 @@ MILESTONES §5.1.
   paints it before the bundle loads. Someone else's hub picks up a new palette at their next sign-in
   or reload.
 
+### 6.16 Employee creation, audited (JBS Praxis, 25/10/2026)
+
+Every path that makes an employee or their login was audited on 25/10/2026: People · Employees'
+Add Employee and Edit, `POST` and `PATCH /employees`, the service and repo, the staff importer and
+the roster loader, create-admin, and the logins that follow (`docs/guides/identity.md` §6). Add
+Employee could not save at all: its form held `home_address: ""`, which the contract (a picked place
+since F27) refuses, so the last step's whole-form check failed on a field no step shows and nothing
+happened. Edit failed the same way. These are the rules now, each held by a test.
+
+**Nothing is refused only at the end.**
+
+- A form holds only the fields it shows; each wizard step (Person, Job, Pay and Bank, Next of Kin)
+  checks every field it shows before Next. An empty required field reads Required (it read "Check
+  the format"), on every form (`useContractForm`).
+- Every rule a form can know is the contract's, so it is marked as the field is filled: a contract,
+  probation or confirmation never ends before the start date and a birthday comes before it
+  (`employeeDateProblems`, also on create-admin's `AdminBootstrap`); gross pay is never below zero,
+  and a minus typed or pasted into it (or any `MoneyField`) stays on the field and reads Not below
+  zero, never dropped (-100 once became 100); an empty optional reference (line manager, worksite,
+  staff number) is not given.
+- Someone who works On Site or Hybrid names their worksite (`EmployeeAdd`, the route's body; JBS
+  Praxis, 25/10/2026), so they can clock in on day one. A roster load and create-admin use
+  `EmployeeCreate`, which does not ask: people arrive before any worksite exists. Edit asks only
+  when it moves the pattern or the worksite (`EmployeeUpdate` when both are sent, the service
+  against the stored worksite otherwise, `WORKSITE_REQUIRED` on `worksite_id`), so a roster record
+  made before its worksite existed is still corrected elsewhere. Edit's toast names the person as
+  saved.
+- A refusal from the server names its field, and the wizard goes back to the step that holds it;
+  one with no field (a lost connection, a server fault) is one line above the footer. The service
+  checks what the database used to refuse without a field: a department or worksite not in use, a
+  line manager who is not active (archived, left or suspended; also on Change Reporting Line), dates
+  out of order (a correction answers for the dates it touches), a work email another person's login
+  still signs in with ("Used by a login"), an archived holder of the email ("Archived record:
+  restore it instead"), and two saves racing for one email or staff number.
+- Someone who may only view the register is told so on the first step ("You can view employees but
+  not add them"), when Praxis AI's Add Employee link opens the form for them, or when the server
+  refuses mid-save because their role changed.
+
+**Fields a role hides** (JBS Praxis, 25/10/2026). `/auth/me` carries `hidden_fields`, the record
+fields the person's role masks; Add Employee and Edit leave them out, and the API refuses a write to
+one (403 `FIELD_RESTRICTED`, the field marked Not yours to set; `field-mask.assertWritable`). A
+person's own record and the CEO are never refused, as they are never masked.
+
+**Edit sends only what changed.** A field emptied on Edit is cleared (the contract's `clearable`
+fields send null; the repo writes it), and a field left alone is never sent, so a stored value from
+an old import never blocks a correction elsewhere. Start Date, Middle Name, Gender, Date of Birth,
+Worksite and Next of Kin are editable there now.
+
+**The staff-number counter reads only its own numbers.** A staff number counts towards the counter
+only in the scheme's shape, at most two digits past its padding (`numbering.sequencePattern`): a
+phone number typed as a staff number used to push every later number past eight billion. A given
+number moves the counter before the record is written, in the same order allocate takes it.
+
+**Bulk: the staff importer and the roster.** The same audit read every path a sheet takes (Settings
+· Imports, the engine, the employees importer, the roster loader, the names step). Beside §6.1's
+rules for the roster:
+
+- Columns are matched in two passes, a column's own name before any alias, so "Designation" takes
+  the job title when a "Title" (Mr, Mrs) column stands before it, and "Work Email" beats a personal
+  "Email". "ID" and "Number" are no longer staff-number aliases (a NIN column took them).
+- A Name cell is tidied before anything compares it: a title before the name goes ("Engr.", "Mrs",
+  "Dr" and the rest), and a word in capitals or small letters is put in name case. A manager is
+  found written in full or by first and last name (a middle name on record no longer hides them),
+  hyphens and apostrophes aside, and only among active staff; a first name alone counts only when
+  nobody else has it and the post beside it is theirs.
+- Cells: a phone in a number cell is read (it was given a leading 0 and refused), a year alone in a
+  date column is refused (1991 read as 13/06/1905), and the ways sheets write a choice (FT,
+  Contract, Onsite, WFH, F, M) are read without being offered as choices.
+- Revert undoes what it did: a person written in the first pass whose line could not be set is a
+  warning (it was an error the revert skipped, leaving them live); a revert puts back the reporting
+  lines and clears what the import filled into empty fields; a person the import made who has since
+  got a login, a leave request or a clock-in is not archived (the revert is refused, naming the row);
+  a seat changed since blocks it too. A re-org that swaps two managers is tried again after the
+  other rows, so the order of the sheet no longer makes a false loop.
+- The Imports screen: the preview lists Problems or Changes (each changed row names its fields),
+  the row's status reads in words, a refusal reads with its column's label and the service's own
+  sentence ("Staff Number: Staff number 00012 belongs to ..."), a commit refused for problems reads
+  the counts again and offers Commit Valid Rows, a new value to tick is named by its field ("New
+  Department"), and a sheet whose row of column names was not found can name it (Column Names Row).
+  A restricted column (bank, personal) is blanked in the preview's rows for a reader masked from
+  it, as the error file blanks it.
+- Left, each named: the staging seed still writes vacancy, budget, expense and partner rows with
+  raw SQL (`seeds/staging/lib/forward-rows.js`; those modules now have services, staging only); a
+  date column that mixes month-first dates is still read day-first where it can be; two VACANT rows
+  with one title in one department are one seat; a dry run still stores the sheet; the roster's
+  new rows after a names version is applied keep the sheet's titles.
+
+**Smaller.** The audit row of a create and a correction holds every field the write touched (salary,
+bank and dates included; the Audit Log masks them per reader), so History names a confirmed
+probation. History (and My Profile's Record History) names each field as the record's screens do,
+"Record changed: Bank, Account Number", never a column's key: one map in the contract
+(`EMPLOYEE_FIELD_LABELS`, `employeeFieldNames`), read by the API and the mock; a key with no name
+there reads as words. Phone accepts the ten digits the field invites after +234 and shows a stored number
+without repeating the code. Account Number keeps digits only. The Wizard keeps focus in the field
+being typed in (a parent re-rendering pulled it to the step's heading after each key).
+
+### 6.17 A record opens in a sheet on a phone (JBS Praxis, 25/10/2026; FRONTEND_FOUNDATION F31)
+
+On a phone, People · Leave put a tapped request's card under the list, where nobody saw it open. JBS
+Praxis's four answers that day (FRONTEND_FOUNDATION §5) made it a rule for every screen of both apps:
+
+- **On a phone a tapped row opens its record in a bottom sheet** (the shared `Modal`; a full sheet for a
+  payslip, a letter or a document). The list stays where it was underneath, Back and a drag down close
+  it, and nothing opens until a row is tapped: a screen's first pick (the first waiting request, the
+  summary's focus) is a desktop convenience only.
+- **On desktop the list and the record stay side by side** from 1181 px; between 761 and 1180 px, where
+  two columns do not fit, the record opens in the centred dialog. A record the desktop layout places
+  elsewhere (under the list beside a chart, above it) stays there.
+- **One way to build it**: `ListDetail` from `@mycity/ui` for a list beside its record, `DetailPane` for a
+  record placed elsewhere, and `useSideBySide()` before showing a first pick. A screen never stacks a
+  list and a record card in a `Grid` itself.
+- **Held by gate 11**: at phone size `check/two-shells.js` taps each screen's first two rows that open
+  something (DataView's cards, TapList's rows and Kanban's cards mark theirs) and fails a screen whose
+  record lands in the page. There is no exemption line.
+- **Not affected**: a record with its own screen (an employee's record, a partner's 360) and a reader
+  that fills the screen (`SplitPanes`: the mailbox, chat, Settings · Roles).
+
+### 6.18 A select's server list loads as it scrolls (JBS Praxis, 28/10/2026; FRONTEND_FOUNDATION F32)
+
+Asked from Performance · Goals, whose Function select is fed by People · Departments: it read one page
+of departments, active and retired together, so a 26th department would never have been offered.
+About thirty selects across the hub read their options that way. JBS Praxis's answers that day:
+
+- **Every select whose options come from a server list loads them 25 at a time**: the first page as it
+  opens, the next as the menu nears its end (a scroll, or the arrow keys moving past the rows in view),
+  and at once when it opens too short to scroll. On a phone the same happens in its bottom sheet. A
+  spinner row ends the list while more wait; assistive technology reads the rows alone.
+- **It looks as it did**: the same select, with no search box and no new control. Loading every page
+  before the menu opens was turned down (FRONTEND_GUIDE §4 forbids it).
+- **A saved value on a page not loaded yet still reads as itself** where the record names it
+  (`valueLabel`: a line's key result and KPI, a vacant head or line-manager seat, an approval stage's
+  role, a 360's partner, the quarter in view).
+- **One way to build it**: the list read with `useInfinite` (now with an optional `sort`), and
+  `paging(list)` from `app/src/features/shared/wire.ts` spread on `SelectField`, `FilterSelect` or
+  `InlineSelect`, which pass `more` and `onMore` to `SelectMenu`. Goals and KPIs ask for active
+  departments on the server instead of dropping retired ones from the page they had.
+- **Not changed**: the pickers (`PersonPicker`, `RecordPicker`) keep their search and first 25 matches;
+  lists a rule bounds need nothing (a quarter's review rounds, at most three; Why Late's reasons, at
+  most `LATE_REASONS_MAX`); chips are not selects (Staff Community's and Policies' department chips
+  still show one page).
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -770,6 +981,7 @@ MILESTONES §5.1.
 | `export-cleanup` (scheduler, every hour at twenty past) | B | Removes every export file 24 hours after it was made (`vault.remove`, `document.removed`; §6.12) |
 | The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
 | `workflow.definition_saved` | D | Audit only (the stages before and after) |
+| `workflow.definition_created` | D | Audit only (a flow made on screen: its key, module and stages) |
 | `workflow.reassigned` | D | The new approver is told; the stage's time limit starts again |
 
 ## 8 · Permissions and visibility by role
@@ -816,25 +1028,25 @@ screen.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
-| Employee record | Profile, Job, Work Schedule (attendance.md §10, LA), Reporting Line, Login and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "Their data downloaded", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
-| Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
-| Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
+| People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; for `people` edit, a tick on each row and Move To Department on the rows picked (organogram.md §6.1); Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. That the people moved report to the department's head: organogram.md §6.1. Attendance Today, which returns to the list with the attendance API (LA, M1) |
+| Employee record | Profile, Job, Work Schedule (attendance.md §10, LA), Reporting Line, Login and History as tabs, then Queries and Sanctions for a viewer holding `queries` view (the person's queries and sanctions that viewer may see, `docs/guides/queries.md` §6.1; a row opens its query on Queries & Sanctions); the status, work pattern, manager and since chips; Edit Record, Archive Record (Reason and Last Day, today by default and never later, kept as `left_on`, which Attrition counts; not on the CEO's record, `is_ceo`) or Restore Record (which clears `left_on`), Send Invite, Change Manager; Download Their Data for the CEO alone (toast "Their data downloaded", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
+| Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors (once previewed), Continue on an unfinished one (Uploaded, Mapped, Previewed: the wizard opens at Map, or Preview) and Revert, both for a reader who may run that importer | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
+| Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; the drop zone's "Excel or CSV, up to 10 MB" (a workbook's limit in `shared/spreadsheet/parse.js`); on Map, Required (the fields a mapping needs, each marked once a column fills it); a field picked for one column leaves the column that had it, which goes back to Leave Out with the toast "Moved from" and its name, so no field is mapped twice; after a refused Next, one error banner naming the fields still without a column or the server's refusal, until it is put right; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
 | Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address (suggestions as it is typed, §6.13), phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
 | Settings · Roles & Permissions | Roles and Matrix; the roles (name, people, modules, record scope); a role's name, Built-In or Custom, people, modules and Home; Access (each module's level with Approve and Export, records), Details (purpose, Home, Sensitive Fields, Capabilities), People (who holds it, 25 a page); the matrix of every role by module with a level meter, its short level and letters; the letter key; Edit Role, Save Role, Create Role, Delete Role, New Role, Next, Back, Keep Editing, Discard Changes; the review: Gains, Loses, Changes and how many people it reaches | ⓘ Role Summary beside the role's name; help terms on Record Scope and on each letter T, O, A, X; Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8; how levels map to actions: §6.10 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give, Period ticked once it starts again, each rule's mark as the scheme is filled; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
 | Settings · Appearance (#75) | Dark Theme: the presets (Deep Green, Charcoal, Black, Dark Grey, and Custom while the colours are none of them), Background, Card, Brand Green, Primary Yellow, Undo Changes, Save Palette, Restore Previous when there is one; errors "Use #RRGGBB", "Too light for dark", "Too dark for buttons"; Preview, the hub drawn in the colours and fonts as they are typed; Contrast: Lowest Contrast (the ratio, and the text colour it is), Pairs Checked, Adjusted; Fonts: Heading Font, Body Font, Undo Changes, Save Fonts; Defaults: Theme for Everyone (Follow the Device, Light, Dark), Density for Everyone (Compact, Comfortable), each saved as picked; toasts "Dark palette saved", "Previous palette restored", "Fonts saved", "Default theme saved", "Default density saved"; Confirm It's You before a change when the session needs it | Help terms on the Dark Theme title ("The hub's dark theme, for everyone. The light theme stays MyCity's own."), on Brand Green, Primary Yellow, Contrast and Defaults; a Details row on Contrast listing each adjusted colour, from and to | How the palette is worked out, why a pair is 4.5:1, where it is stored and how it reaches each hub: §6.15 |
 | Text Size (account menu, More, ⌘K) | Title "Text Size"; Small, Default, Large, Largest; toast "Text size: Large" | None | That it is kept per device and what it scales: §6.15 |
-| Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
+| Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up (a switch busy while its change saves, F26); who is signed in where; the failed sign-ins of the last 7 days with the outcome, as the figure counts; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
 | Settings · Audit Log | Today, This Week, This Month, Sensitive; who, what, record, module, when; Module and Dates filters, search; an entry opens its fields before and after with Open Record; Entries by Module; Export | Restricted values masked with a help term | How `emit()` writes the ledger: BACKEND_STRUCTURE |
-| Settings · Approvals | Flows, Open Requests, Overdue, Needs Fixing; the flows (Flow, Stages, Version, Open Requests, Status); a flow's route and each stage's Approver, Applies When, Time Limit; Edit Stages, then per stage Move Up, Move Down, Edit, Remove, Add Stage, Save Stages; a stage's Stage Name, Approver, Role or Person, Applies When, Comparison and value, Time Limit, Hours | Help term on Applies When | Versioning of open requests, who decides: §6.5 |
+| Settings · Approvals | Flows, Open Requests, Overdue, Needs Fixing; the flows (Flow, Stages, Version, Open Requests, Status: Active, Not Used Yet or Needs Fixing); a flow's route and each stage's Approver, Applies When, Time Limit; its Module and Key when made on screen; Needs Fixing names each stage's problem in words; New Flow, a wizard of Flow (Flow Name, Module, Description), Values (Add Value, Value Name, Type, at most 5) and Stages, then Create Flow, toast "Flow created"; Edit Stages, then per stage Move Up, Move Down, Edit, Remove, Add Stage (at most 10 stages), Save Stages; a stage's Stage Name, Approver, Role or Person (active logins only), Applies When, Comparison and value, Time Limit, Hours | Help terms on Applies When, Module and Values | Versioning of open requests, who decides, how a flow made on screen gets its key: §6.5 |
 | ⌘K Search | Results grouped Waiting on You (first, when anything waits), Screens, Actions, then each kind of record (Employees, Departments, Open Seats, Users, Roles, Numbering, Holidays, Approval Flows, Imports) | None | The coverage gate: §6.7 |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| People · Employees | Search, then employee cards (name, title, department, status pill) | Bulk actions, column choice | Add Employee in the floating button | More, People |
+| People · Employees | Search, then employee cards (name, title, department, status pill) | Bulk actions (Move To Department: a phone moves people from People · Departments' Add People), column choice | Add Employee in the floating button | More, People |
 | Employee record | Profile card, then sections as tabs that scroll sideways | History detail | Send Invite or Edit, full width in a sheet | Back to the list |
 | Settings · Imports (#93) | Import cards: reference, file, status pill | File, Who, Updated, Problems | Start Import in the floating button | More, Settings |
 | Settings · Imports, the wizard | One step per sheet, counts as cards | The rows with problems (Download Errors instead) | Commit Import, full width | From Employees or Settings |
@@ -845,7 +1057,7 @@ screen.
 | Text Size | A bottom sheet with the four sizes as one segmented row | None | A tap applies it | More's row (the text size button), ⌘K |
 | Settings · Security | Counts as cards, the three rules, two-step by role as switches | Method and address of a session, the person and address of a failed sign-in | Save Rules, full width | More, Settings |
 | Settings · Audit Log | Entry cards: who, what, when | Export, Entries by Module, the Module column | Filter in a sheet | More, Settings |
-| Settings · Approvals | KPI cards two to a row, then flow cards (name, stages, version, open requests) | The Status column | Edit Stages in the flow's full sheet; Save Stages full width | More, Settings |
+| Settings · Approvals | KPI cards two to a row, then flow cards (name, stages, version, open requests, status) | None | New Flow in the floating button, a full sheet in three steps with Next and Create Flow full width; Edit Stages in the flow's full sheet; Save Stages full width | More, Settings |
 | ⌘K Search | Full-screen search with grouped results | None | Tap a result | The search bar in More and the top bar |
 
 ## 11 · Edge cases
@@ -870,6 +1082,12 @@ screen.
   login who holds `approve` on the module (never the requester), writes a `reassign` decision with the
   reason (`0450`), starts the time limit again and tells them.
 - Two people editing one flow: the second save is refused (409) and they open it again.
+- Two people making a flow with the same name at once: the key's lock (`pg_advisory_xact_lock`, the one
+  `saveVersion` takes) makes the second see the first, and it is refused as `Name already used`.
+- A flow made on screen that no module opens: it stays Not Used Yet and no request ever waits on it;
+  it is the developer's to wire (`openInstance` with its key and a context holding every value it
+  declares), and an approval that carries a Money value never approves itself on time out.
+- A name with no letters or digits ("???"): refused on the name, `Use letters`.
 - A security rule set looser than the floor: refused with the floor named. An idle lock longer than
   the session: refused, "Within the session length".
 - A role change that would leave the person saving it without Settings: refused (`LOCKOUT`).
@@ -922,6 +1140,30 @@ screen.
 
 ## 14 · Change log
 
+- 28/10/2026 · JP · §6.18, a select's server list loads as it scrolls (JBS Praxis, from Goals' Function select, fed by People · Departments, which stopped at 25): every select filled from a server list reads it 25 at a time (`useInfinite`, `paging`) and loads the next page as its menu nears its end, on both shells; it looks as before. In the folders this guide maps: People · Employees' Department filter, Departments' Open Role (Set Head) and the reporting form's Open Role. FRONTEND_FOUNDATION F32.
+- 27/10/2026 · JP · Nothing in this guide changed. In the `organisation` module it maps, the reporting tree's read carries each node's department and the Head marks (`OrgNode.heads`, `repo.departmentHeads`), and Download PDF's cards carry them too (`docs/guides/organogram.md` §6).
+- 27/10/2026 · JP · §6.1: the deploy loader gives the departments, their codes and heads only to a database that has never had MyCity's names, and then leaves them to People · Departments (#103, `docs/guides/organogram.md` §6.1, JBS Praxis 27/10/2026), even when `nomenclature.json` changes; it finds a department renamed on screen by MyCity's code, the roster never makes its old name again, and each deploy gives every department head their Head of Department role. §10: People · Employees gains Move To Department on the rows picked (desktop).
+- 27/10/2026 · JP · Documents & Numbering (#76) gains Organisational Goal (`organisational_goal`, ORG-2026-01, starting again each plan year, seeded by `2291`): a goal's ID is the system's now (`performance.md` §6.1). `DOC_TYPES` in the contract and the screen's labels carry it.
+- 27/10/2026 · JP · From the 27/10 staging faults brief (fault #2, `IMPORT_MAPPING_INVALID: mapping` at `PUT /api/v1/imports/:id/mapping`, three times in twelve minutes): the Map step let one field be picked for two columns, which only the server refused. A field now feeds one column: picked for another, it leaves the first, which reads Leave Out, and a toast names it (*Moved from Staff Name*). The server's own check stays for a mapping it is sent any other way (the import script). §10 updated.
+- 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): a switch's and a row of chips' options take `unread` and `urgent` (`ChoiceOption`, drawn as the tab strip's yellow count, red while urgent, apart from an option's own count), and so do Kanban's columns, whose cards are marked as a list's rows are; the app's `useViewNews`, `withNews` and `useOpenWhereNews` (`features/notifications/marks.tsx`) give each screen its share and open it where the news is; `GET /notifications/views` and `shared/notifications/views.js` place each record by its module (`<module>.views.js`). People · Leave, Settings · Users and Settings · Integrations use them.
+- 26/10/2026 · JP · QA DEF-02 and DEF-12, §6.7 and the shell: a capped search group may end with `more` rows (Attendance Days end with All Days of each person listed, `attendance_days`), declared in the provider's `types` for the coverage gate; the shell's update, install and notifications offers show on Home only (`offersScreen`, FRONTEND_GUIDE's PWA section).
+- 26/10/2026 · JP · QA DEF-04 finished, the shared `DateRangeField` (Settings · Audit Log's Dates, People · Attendance's export Period): each end shows a small **From** or **To** label above its box and says its own problem under it, tied to that end alone (`aria-describedby`, `aria-invalid`): a half-typed From marks From once the person pauses or leaves it, a To before From marks To at once, and the other end stays unmarked. The Field's message about the period is shown by the range in place of the Field's own line (`useFieldError`): under the end still empty when only one is, else once under both, tied to both; a problem the form marks on Save is said under its end though the person never left it. `useFieldControl` takes `part` for one end of a field: only its own mark and messages.
+- 26/10/2026 · JP · QA DEF-01 finished, F14 on the server: the delivery plan has one reader and one rule (`packages/contract/plan.js`), which the app's build reads the docs with (`packages/ui/vite.shared.js`), the app opens screens by (`packages/ui/src/lib/plan.ts`, `app/src/lib/plan.ts`) and the API decides by (`src/shared/delivery-plan.js`), from the plan the app was built with (`app/dist/delivery-plan.json`, which a release carries; the docs where there is no build). My Approvals and Need You (`/workflow/mine` and its count) and ⌘K (record groups, screens, actions) leave out what would only open Coming Soon on the server, so their pages of 25 count only what opens. By APP_ENV: production by API, UI and Mobile, staging and development by API, a test everything unless it sets a plan (`use`).
+- 26/10/2026 · JP · From the QA bug register (Milestone 2): the form system's `reset()` drops a pause check still waiting from the last key, so a field emptied after a quick save (a task comment) is never marked Required (DEF-06).
+- 26/10/2026 · JP · QA DEF-03, DEF-04 and DEF-07, the shared form fields: a limit no schema worded reads by what it limits (`shortMessage`): a number At most or At least its bound, a list Too many, a date Too late, never Too long on a number (a latitude of 91 read so). `MoneyField` keeps a minus typed or pasted ("-100", "₦-100", "(100)") and reads Not below zero, never dropping it; zero is an amount; a second point or a comma out of place reads Check the amount and a third decimal Two decimals at most, never cut. `DateRangeField` gives each end its own id (the Field's label points at From) and names the ends and their calendar buttons From and To (Pick From Date, Pick To Date), where both were the Field's label twice under one id.
+
+- 26/10/2026 · JP · QA OBS-03, the Import wizard's Map step: **Required** lists the fields a mapping needs, each marked once a column fills it, and Next with one still unfilled stays on Map with an error banner naming them (*Choose a column for Designation and Department*; past four, *Choose columns for 5 required fields*), focus on it, sending nothing, until each has a column. The server's refusal of a mapping (`IMPORT_MAPPING_INVALID`, every problem in `fields.mapping`; a field mapped twice) shows in the same banner and clears when the mapping changes, so a mapping problem is no longer an error toast after the window moved on. §10 updated.
+- 26/10/2026 · JP · From the User Guide audit's screen defects: Settings · Organisation's Remove asks first and Delete Holiday shows only with `settings` delete; Imports offers Download Errors only once an import was previewed, Continue on an unfinished import (decision of 26/10/2026: the wizard opens at its step) and Revert only to a reader who may run that importer, the wizard waits for the importers before it opens and Next on Upload says *Upload a sheet first*, and refusals are error toasts; Security's Two-Step switches hand back their work (Switch is busy until it settles, F26) and Failed Sign-Ins lists the last 7 days as its figure counts; Audit Log offers Export only with `settings` export and says No Access, with no Retry, to a narrower scope; Numbering's and Security's other failures are error toasts. The audit's Map step (Next with no spinner) does not hold: Next hands back its async check, so it is busy and refuses a second press (press.ts). §10 updated.
+- 26/10/2026 · JP · §6.7: a search provider's `prepare`, run before ⌘K's transaction, for the User Guide's search by meaning (`user-guide.md` §6.8).
+- 26/10/2026 · JP · QA DEF-02 and DEF-01, §6.7: Employees lead the record groups (`lead`); Attendance Days and Attendance Exceptions read as the person, the status or exception and the full date, three at most, newest first (`cap`), the mock's search the same; ⌘K leaves out whatever would open Coming Soon in that build (a screen, an action, a record, a Home card counting a module not open; `useOpens`, `SearchHit.module`).
+
+- 25/10/2026 · JP · §6.17 written: a record opens in a sheet on a phone, never below its list (FRONTEND_FOUNDATION F31, `ListDetail`, gate 11). People · Leave moved onto it, with ESS · My Payslips (`docs/guides/ess.md`) and the M3 to M6 screens that paired a list with a record (Payroll · Payslips, Partnerships · Proposals, Queries and Letter Templates, Recruitment · Candidates, Interviews, Offers and Onboarding, Expenses · My Requests, Approvals and Requisitions).
+- 25/10/2026 · JP · §6.1 and §6.16, the bulk audit: roles by exact title only and logins only for people the roster brought; names once per version of `nomenclature.json` (`department.names_applied`); the counter reserved before a load and numeric Staff IDs padded; a roster person never renumbered and a same-name row with no Staff ID held back; unreadable optional cells left out with a note; departments made only from `nomenclature.json`, found punctuation aside; closed seats kept closed and seats matched by department; birthdays by email; two-pass column mapping, tidied names, phone, year and choice spellings; revert puts lines and emptied fields back, refuses a person now in use and a seat changed since; the Imports screen's Changes view, labelled problems, header-row choice and masked rows. What is left is named in §6.16.
+- 25/10/2026 · JP · §10: the Imports drop zone takes and says 10 MB, the server's limit for a
+  workbook, where it said 25.
+- 25/10/2026 · JP · §6.16: Edit asks for a worksite when it moves someone to On Site or Hybrid, and
+  its toast names the person as saved.
+- 25/10/2026 · JP · §6.16 written: the employee creation audit's rules (fields checked as they are filled, every refusal on its field, EmployeeAdd with the worksite, hidden fields refused, Edit clearing, the staff-number counter by the scheme's shape), from JBS Praxis's audit and decisions of 25/10/2026.
 - 22/10/2026 · GE · §6.7: an address that opens a form may fill it with the contract's prefill fields (`useAddressPrefill`); People · Employees' Add Employee and ESS · My Leave's Request Leave read them for Praxis AI's screen buttons (`praxis-ai.md` §6.4).
 - 22/10/2026 · TB · Performance PR 3: upload purpose `performance_evidence` (`documents.js` `UploadPurpose`, 15 MB in `body-limits.js`, PDF, images and Office files in `mime-policy.js`) for a check-in line's evidence file (`docs/guides/performance.md` §6.14). A route whose multipart body is strict accepts the `purpose` field the upload engine sends beside the file, as `EssDocumentUpload` does.
 - 22/10/2026 · TB · Search (§6.7): a record provider may name `available(client)`, asked before its query; false leaves its group out for everyone. Home Locations uses it while the Attendance policy's Home Location is off (`attendance.md` §1.3).
@@ -1103,3 +1345,8 @@ screen.
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) is dropped: policies live on Knowledge Hub · Policies (`docs/guides/policies.md`), brought forward from M10; §2 and §6.8 say so, and Settings · Approvals gains the Policy Approval route (and the Temporary Site route with attendance's PR 4).
 - 20/10/2026 · TB · §6.5: an approval may exclude people from deciding it (`exclude_employee_ids` on `openInstance`, `workflow_instance.excluded_employee_ids`, `1455`), read by `canAct`, `waitingOnClause` and the stage's notice; attendance's temporary sites exclude everyone on them (attendance.md §6.11). §6.7: ⌘K's Add Work Site and Add Temporary Site; a screen may register a second action for the floating button (`useScreenAction(action, { second: true })`, Home's Add Work Site beside New). §6.8's Temporary Site route is built as it says.
 - 22/10/2026 · TB · Performance PR 1: §6.5 adds the named-person approver (`employee_in_context`) and Settings · Approvals shows it; §6.1 adds MyCity's names (`seeds/staff/nomenclature.json`, applied by the loader before and after the sheet), the sheet and `roles.json` renamed to the October chart (five departments, the chart's titles, seven vacant seats, David under Chinyere).
+- 25/10/2026 · JP · §6.16: History names the fields a change touched in the record's own words, not its column keys (`EMPLOYEE_FIELD_LABELS` in the contract), found while writing the M1 User Guide.
+- 26/10/2026 · JP · From the User Guide audit's screen defects: More's settings icon reads My Security (a padlock) for a person without Settings, where it goes. Praxis AI's tile stays Assistant: a tile is one word (F17) and "Praxis" alone is not a name of this product (`check/provenance.js`).
+- 26/10/2026 · JP · From the User Guide audit's screen defects and the owner's decision of 26/10/2026: Archive Record asks for a Last Day (`EmployeeArchive.left_on`, today unless given, never after today nor before the start), kept as `employee.left_on` so Attrition, 90 Days counts the leaver, and Restore clears it; the record carries `is_ceo` and the CEO's offers no Archive Record; the Reason is on the form system with the contract's 200 limit.
+- 26/10/2026 · GE · The employee record gains Queries and Sanctions tabs for a viewer holding `queries` view (meeting 26/10/2026: TB saw them mixed with no distinction); each lists that person's records within the viewer's query visibility, and a row opens its query on Queries & Sanctions (§10.1).
+- 29/10/2026 · JP · §5, §6.5, §7, §10 and §11: Settings · Approvals gains New Flow (`POST /settings/approvals`, `settings` create): a name, a module, up to 5 values and the stages, saved as version 1 with the key `<module>.<name>`. The flow lists as Not Used Yet until a module opens it; the guide's earlier "the flow's key, name and values are the code's" now holds for the flows the code ships.

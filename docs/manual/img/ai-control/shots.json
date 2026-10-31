@@ -1,0 +1,72 @@
+{
+  "ai-control-action-sheet": {
+    "spec": "8b486684fb1deb00",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ai-control-actions": {
+    "spec": "3bdda4ce876ea384",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ai-control-chain-phone": {
+    "spec": "7eb5412228ec52fb",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "phone"
+    ]
+  },
+  "ai-control-edit-chain": {
+    "spec": "c48a2c73d6bef253",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "ai-control-edit-price": {
+    "spec": "298f2cea702a8470",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ai-control-model-sheet": {
+    "spec": "4999d07431f4f1cc",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ai-control-models": {
+    "spec": "0a6f533915eb802e",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ai-control-new-prices": {
+    "spec": "0cf247cef85a315f",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ai-control-spend": {
+    "spec": "187d453e27f4e938",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

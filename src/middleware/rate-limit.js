@@ -20,6 +20,8 @@
  *   confirmLimiter      confirming it is you, per signed-in person, 10 per 15 minutes
  *   linkPreviewLimiter  a link's card for the composer, per signed-in person, 30 per minute
  *   forwardLimiter      forwarding in Staff Community, per signed-in person, 20 per minute
+ *   guideSearchLimiter  the User Guide's search, per signed-in person, 120 per minute
+ *   guideAnswerLimiter  the User Guide's answers, per signed-in person, 20 per minute
  *
  * Limiters are built when this file loads, but Redis connects later at boot, so
  * each limiter asks for its store on every call and uses Redis once it exists.
@@ -199,6 +201,29 @@ const resetLimiter = makeLimiter({
 });
 
 /**
+ * Checking a link before its page shows: only failures count. A 256-bit token cannot be
+ * guessed, and a whole office opening its invitations from one address must not be told its
+ * links have expired (docs/guides/identity.md §6.1).
+ */
+const linkCheckLimiter = makeLimiter({
+  name: "link-check",
+  max: 10,
+  windowMs: 15 * 60_000,
+  failuresOnly: true,
+});
+
+/**
+ * An administrator sending invitations and reset links from Settings · Users: per person, not
+ * per address, so one office's Forgot Password never uses up Operations' invitations.
+ */
+const adminLinkLimiter = makeLimiter({
+  name: "admin-links",
+  max: 60,
+  windowMs: 15 * 60_000,
+  key: (req) => (req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`),
+});
+
+/**
  * Changing a password while signed in: per person, after auth has established who.
  * A stolen access token must not be a licence to guess the current password.
  */
@@ -274,6 +299,27 @@ const forwardLimiter = makeLimiter({
     req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
 });
 
+/**
+ * The User Guide's search (docs/guides/user-guide.md §6.8): each search is embedded on the Guide
+ * Search action, so typing as fast as anyone can still leaves room. Per person, after auth.
+ */
+const guideSearchLimiter = makeLimiter({
+  name: "guide-search",
+  max: 120,
+  windowMs: 60_000,
+  key: (req) =>
+    req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
+});
+
+/** The User Guide's answers (§6.9): each one is a call to a model. Per person, after auth. */
+const guideAnswerLimiter = makeLimiter({
+  name: "guide-answer",
+  max: 20,
+  windowMs: 60_000,
+  key: (req) =>
+    req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
+});
+
 /** Confirming it is you before a sign-in method changes: per person, after auth. */
 const confirmLimiter = makeLimiter({
   name: "confirm",
@@ -295,6 +341,8 @@ module.exports = {
   refreshLimiter,
   forgotLimiter,
   resetLimiter,
+  linkCheckLimiter,
+  adminLinkLimiter,
   changePasswordLimiter,
   deviceLimiter,
   twoStepLimiter,
@@ -304,5 +352,7 @@ module.exports = {
   confirmLimiter,
   linkPreviewLimiter,
   forwardLimiter,
+  guideSearchLimiter,
+  guideAnswerLimiter,
   TOO_MANY,
 };

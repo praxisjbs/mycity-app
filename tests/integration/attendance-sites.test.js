@@ -22,6 +22,7 @@ const { atomically } = require("../../src/shared/db/tx");
 const { rebuild } = require("./helpers/schema");
 const { attendanceVersion } = require("./helpers/policies");
 const { legacyAssignment } = require("./helpers/legacy-places");
+const { noticeAbout, readAll } = require("./helpers/notices");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
@@ -685,5 +686,33 @@ describeDb("temporary sites and check-ins against the real migrations", () => {
     for (const secret of ["Sample Road", "Hidden Close", "Main Mall", "6.6", "6.62", "6.44", "-24.65", "out-of-station letter"]) expect(text).not.toContain(secret);
     const failed = await q("SELECT count(*)::int AS n FROM event_outbox WHERE status = 'failed'", []);
     expect(failed.rows[0].n).toBe(0);
+  });
+
+  test("People · Worksites says where its count waits: each site under Temporary, Sites and its state, as the State chips read it (notifications' views)", async () => {
+    const sent = await as("staff").post("/attendance/me/temporary-sites", body({ name: "Views Waiting", starts_on: day(60), ends_on: day(61) }));
+    expect(sent.status).toBe(201);
+    const waiting = sent.body;
+    const gone = (await as("staff").post("/attendance/me/temporary-sites", body({ name: "Views Withdrawn", starts_on: day(63), ends_on: day(64) }))).body;
+    expect((await as("staff").post(`/attendance/me/temporary-sites/${gone.temporary_site_id}/withdraw`, { reason: "The partner moved it online" })).status).toBe(200);
+    const ops = people.ops.user.user_id;
+    await readAll(pool, ops);
+    await noticeAbout(pool, ops, { entity_type: "attendance_temporary_site", entity_id: waiting.temporary_site_id });
+    await noticeAbout(pool, ops, { entity_type: "attendance_temporary_site", entity_id: gone.temporary_site_id });
+    await noticeAbout(pool, ops, { entity_type: "attendance_temporary_site", entity_id: gone.temporary_site_id });
+
+    const views = await as("ops").get("/notifications/views?module=people&tab=worksites");
+    expect(views.status).toBe(200);
+    // Withdrawn has no chip of its own: it counts on Temporary, Sites and All, as the list shows it.
+    expect(views.body.views).toEqual({
+      temporary: { unread: 3, urgent: false },
+      "temporary/sites": { unread: 3, urgent: false },
+      "temporary/sites/submitted": { unread: 1, urgent: false },
+      "temporary/sites/withdrawn": { unread: 2, urgent: false },
+    });
+    // The tab's count is the same notices.
+    expect((await as("ops").get("/notifications/badges")).body.tabs.people.worksites).toBe(3);
+    // The State chip that names a site finds it there.
+    const listed = (await as("ops").get("/attendance/temporary-sites?state=submitted")).body.data.map((x) => x.temporary_site_id);
+    expect(listed).toContain(waiting.temporary_site_id);
   });
 });

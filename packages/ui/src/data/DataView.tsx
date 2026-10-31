@@ -5,7 +5,7 @@
  * @use Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners.
  * @avoid A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone.
  * @phone The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11).
- * @a11y The table has a caption, sortable headers carry aria-sort and are buttons, a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy.
+ * @a11y The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. A row marked as new (RowMarksContext: something unread is about it) says Unread before its first value as well as showing its dot and tint.
  * @status stable
  * @exports LoadingRows
  * @example <DataView list={list} columns={columns} rowKey={(r) => r.employee_id} caption="Employees" noun="employee" search="Search People" />
@@ -13,6 +13,7 @@
  */
 import { useId, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { useRowMarks } from "../lib/marks";
 import { content, slot } from "../lib/slots";
 import { useIsPhone } from "../lib/media";
 import { ActionGroup } from "../actions/ActionGroup";
@@ -24,6 +25,7 @@ import { EmptyValue } from "../display/EmptyValue";
 import { Skeleton } from "../display/Skeleton";
 import { ErrorState } from "../feedback/ErrorState";
 import { Menu, type MenuItem } from "../overlay/Menu";
+import { Tooltip } from "../overlay/Tooltip";
 import { SearchInput } from "../form/SearchInput";
 import { Tick } from "../form/Tick";
 import { ApiError, type PageMeta } from "./createApi";
@@ -42,6 +44,8 @@ export interface DataViewColumn<R> {
   render: (row: R, index: number) => ReactNode;
   /** The column header offers the server's sort on `key`, ascending then descending then off. */
   sortable?: boolean;
+  /** The column's name in words for its sort control, when `label` holds more than words (a help term). */
+  sortLabel?: string;
   /** Dropped on a phone, decided per screen in the feature guide's §10 (gate 11). */
   desktop?: boolean;
   /** Layout classes only (width, alignment). */
@@ -217,6 +221,21 @@ export function DataView<R>({
   const togglePage = () => selection?.onChange(allPicked ? keys.filter((k) => !pageKeys.includes(k)) : [...new Set([...keys, ...pageKeys])]);
   const toggleRow = (key: string) => selection?.onChange(keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]);
 
+  /* ───── rows new to the reader: a dot and a tint until opened ───── */
+
+  const marks = useRowMarks(pageKeys);
+  const isMarked = (key: string) => marks.marked.has(key);
+  const openRow = (row: R) => {
+    const key = rowKey(row);
+    if (isMarked(key)) marks.opened(key);
+    onRowClick?.(row);
+  };
+  const unreadDot = (where: string) => (
+    <>
+      <span aria-hidden="true" data-unread="" className={cn("absolute size-2 rounded-full bg-primary", where)} />
+      <span className="sr-only">Unread, </span>
+    </>
+  );
 
   /* ───── sort, as an action sheet where there is no table header ───── */
 
@@ -247,9 +266,10 @@ export function DataView<R>({
             key={key}
             className={cn(
               "relative isolate flex w-full items-start gap-2.5 border-b border-border px-3.5 py-3 text-left last:border-b-0",
-              (selectedKey === key || keys.includes(key)) && "bg-muted",
+              (selectedKey === key || keys.includes(key)) ? "bg-muted" : isMarked(key) && "bg-warning-soft",
             )}
           >
+            {isMarked(key) && unreadDot("top-4.5 left-1")}
             {/* Above the card's stretched open button (kept inside the card by `isolate`): a tap on the tick picks the row, never opens it. */}
             {selection && (
               <Tick className="relative z-10" checked={keys.includes(key)} onChange={() => toggleRow(key)} label={`Select ${typeof headCell === "string" ? headCell : "row"}`} />
@@ -257,7 +277,7 @@ export function DataView<R>({
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="text-sm font-semibold wrap-any">
                 {onRowClick ? (
-                  <button type="button" onClick={() => onRowClick(row)} className="stretch-link text-left">
+                  <button type="button" data-row-open="" onClick={() => openRow(row)} className="stretch-link text-left">
                     {headCell}
                   </button>
                 ) : (
@@ -284,7 +304,7 @@ export function DataView<R>({
   const onRowKeyDown = (e: KeyboardEvent<HTMLTableRowElement>, row: R) => {
     if (onRowClick && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
-      onRowClick(row);
+      openRow(row);
     }
   };
 
@@ -317,6 +337,22 @@ export function DataView<R>({
                 >
                   {!c.label ? (
                     <span className="sr-only">Actions</span>
+                  ) : canSort && typeof c.label !== "string" ? (
+                    /* A label with its own control (a help term) cannot sit inside the sort button:
+                       the sort is the glyph beside it. */
+                    <span {...slot("header")} className={cn("inline-flex items-center gap-1", active && "text-foreground")}>
+                      {c.label}
+                      <Tooltip label={`Sort by ${c.sortLabel ?? "This Column"}`}>
+                        <button
+                          type="button"
+                          aria-label={`Sort by ${c.sortLabel ?? "This Column"}`}
+                          onClick={() => setSort?.(nextSort(sort, c.key))}
+                          className="inline-flex items-center hover:text-foreground"
+                        >
+                          <Icon name={active ? (sorted.dir === "asc" ? "up" : "down") : "sort"} size="s" className={cn(!active && "opacity-40")} />
+                        </button>
+                      </Tooltip>
+                    </span>
                   ) : canSort ? (
                     <button
                       type="button"
@@ -342,21 +378,26 @@ export function DataView<R>({
               <tr
                 key={key}
                 tabIndex={onRowClick ? 0 : undefined}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onClick={onRowClick ? () => openRow(row) : undefined}
                 onKeyDown={onRowClick ? (e) => onRowKeyDown(e, row) : undefined}
                 className={cn(
                   "transition-colors hover:bg-muted [&:last-child>td]:border-b-0",
                   onRowClick && "cursor-pointer hover:bg-accent focus-visible:-outline-offset-2",
-                  (selectedKey === key || keys.includes(key)) && "[&>td]:bg-muted",
+                  (selectedKey === key || keys.includes(key)) ? "[&>td]:bg-muted" : isMarked(key) && "bg-warning-soft",
                 )}
               >
                 {selection && (
-                  <td className="border-b border-border px-3 py-2">
+                  <td className={cn("border-b border-border px-3 py-2", isMarked(key) && "relative")}>
+                    {isMarked(key) && unreadDot("top-1/2 left-0.5 -translate-y-1/2")}
                     <Tick checked={keys.includes(key)} onChange={() => toggleRow(key)} label={`Select row ${i + 1}`} />
                   </td>
                 )}
-                {columns.map((c) => (
-                  <td key={c.key} className={cn("border-b border-border px-3 py-2", c.align === "n" && "text-right tabular-nums", c.desktop && "max-md:hidden", c.className)}>
+                {columns.map((c, n) => (
+                  <td
+                    key={c.key}
+                    className={cn("border-b border-border px-3 py-2", c.align === "n" && "text-right tabular-nums", c.desktop && "max-md:hidden", !selection && n === 0 && isMarked(key) && "relative", c.className)}
+                  >
+                    {!selection && n === 0 && isMarked(key) && unreadDot("top-1/2 left-0.5 -translate-y-1/2")}
                     {cell(c.render(row, i))}
                   </td>
                 ))}

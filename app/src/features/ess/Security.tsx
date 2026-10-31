@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import identity from "@mycity/contract/schemas/identity.js";
 import security from "@mycity/contract/schemas/security.js";
 import type { MyDevice, Passkey, SignIn, SignInMethods, TwoStepSetup } from "@mycity/contract/contract.gen.ts";
@@ -116,9 +116,13 @@ export function MySecurityPage() {
   };
   const others = async () => {
     if (!(await confirm({ title: "Sign Out Others", confirmLabel: "Sign Out" }))) return;
-    const r = await endOthers.run({ body: {} });
-    refresh();
-    toast(r.ended === 1 ? "1 device signed out" : `${r.ended} devices signed out`);
+    try {
+      const r = await endOthers.run({ body: {} });
+      refresh();
+      toast(r.ended === 1 ? "1 device signed out" : `${r.ended} devices signed out`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not signed out. Try again.");
+    }
   };
 
   const pw = (
@@ -234,6 +238,8 @@ function TwoStepCard() {
   const often = useMutation("POST /api/v1/security/two-step/frequency");
   const codes = useMutation("POST /api/v1/security/two-step/recovery-codes");
   const off = useMutation("POST /api/v1/security/two-step/off");
+  /* One choice, one request (F26): a second choice while the first saves is refused, and the field shows what is saved. */
+  const asking = useRef(false);
   const t = ways.data?.two_step;
   if (!t) return <Card><LoadingRows count={2} /></Card>;
 
@@ -245,6 +251,13 @@ function TwoStepCard() {
     } catch (e) {
       say(e);
     }
+  };
+  const choose = (v: Frequency) => {
+    if (asking.current || v === t.mfa_frequency) return;
+    asking.current = true;
+    void ask(v).finally(() => {
+      asking.current = false;
+    });
   };
   const ask = async (v: Frequency) => {
     try {
@@ -289,7 +302,7 @@ function TwoStepCard() {
       {t.on ? (
         <>
           <Field label="Ask for a Code">
-            <ChoiceField value={t.mfa_frequency} onChange={(v) => void ask(v)} options={HOW_OFTEN} />
+            <ChoiceField value={t.mfa_frequency} onChange={choose} options={HOW_OFTEN} />
           </Field>
           <p className="text-sm text-muted-foreground">{t.recovery_codes_left === 1 ? "1 recovery code left" : `${t.recovery_codes_left} recovery codes left`}</p>
           <Inline className="mt-3" gap={2}>
@@ -430,7 +443,7 @@ function PasskeysCard() {
           </Button>
         ) : undefined
       }
-      empty={{ title: "No Passkeys Yet", text: "Sign in with your fingerprint or face." }}
+      empty={passkeysWork() ? { title: "No Passkeys Yet", text: "Sign in with your fingerprint or face." } : { title: "No Passkeys Yet", text: "This browser cannot add one." }}
       onRowClick={(p) => modal.open({ title: "Passkey", body: (close) => <PasskeyForm passkey={p} close={close} /> })}
       columns={[
         {
@@ -615,8 +628,9 @@ function PasswordForm({ close }: { close: () => void }) {
       invalidate("/api/v1/auth/s");
       close();
       toast(r.sessions_signed_out ? "Password changed, other devices signed out" : "Password changed");
-    } catch {
-      /* the fields show why */
+    } catch (e) {
+      // A field's problem shows on it; anything else (too many tries, no connection) says why here.
+      if (!(e instanceof ApiError && Object.keys(e.fields).length)) toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Password not changed. Try again.");
     }
   };
   const cur = f.field("cur");

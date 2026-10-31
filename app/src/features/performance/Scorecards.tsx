@@ -9,19 +9,22 @@
  * Scorecards and Commitments switch opens the Commitments view beside it (Commitments.tsx;
  * `?view=commitments`, or `?set=` from an approval's link).
  */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
+import scoring from "@mycity/contract/schemas/scoring.js";
 import targetsContract from "@mycity/contract/schemas/targets.js";
 import type { KeyResult, ScorecardDetail, ScorecardLine } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { PagedTable } from "@/features/shared/sections";
+import { paging } from "@/features/shared/wire";
 import { ReasonForm } from "@/features/workspace/Commitment";
 import { useSearchParams } from "@/lib/router";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -32,6 +35,7 @@ import {
   Chain,
   DataView,
   DateField,
+  ErrorState,
   Field,
   FilterSelect,
   formatDate,
@@ -40,38 +44,51 @@ import {
   FormFooter,
   HelpTerm,
   KeyValue,
+  LoadingRows,
+  NumberField,
   PageHeader,
   SegmentedControl,
   SelectField,
   StatusPill,
   TextField,
+  Tick,
   toast,
   Toolbar,
   useContractForm,
   useModal,
 } from "@mycity/ui";
 import { Commitments } from "./Commitments";
-import { cardStatus, figureOf, fieldMessage, monthShort, person, rating, score, SECTION_NAMES, targetOf, useQuarter } from "./shared";
+import { cardStatus, figureOf, fieldMessage, monthChoices, monthScores, monthShort, person, rating, score, SECTION_NAMES, startMonth, targetOf, useDepartmentFilter, useQuarter } from "./shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
 const AUTO = new Set(["key_result", "team_result", "function_kpi", "commitments", "update_on_time", "team_reviews", "tasks"]);
 
-/** The Scorecards and Commitments switch; the view lives in the address. */
-function ViewSwitch({ view }: { view: "scorecards" | "commitments" }) {
+type View = "scorecards" | "commitments";
+const VIEWS: Array<[View, string]> = [
+  ["scorecards", "Scorecards"],
+  ["commitments", "Commitments"],
+];
+
+/** Shows a view: it lives in the address. */
+function useShowView() {
   const [, setParams] = useSearchParams();
-  return (
-    <SegmentedControl
-      value={view}
-      onChange={(v) => setParams({ view: v === "commitments" ? "commitments" : null, set: null }, { replace: true })}
-      options={[["scorecards", "Scorecards"], ["commitments", "Commitments"]]}
-    />
-  );
+  return useCallback((v: View) => setParams({ view: v === "commitments" ? "commitments" : null, set: null }, { replace: true }), [setParams]);
+}
+
+/** The Scorecards and Commitments switch, each with what waits on the reader there. */
+function ViewSwitch({ view }: { view: View }) {
+  const show = useShowView();
+  const news = useViewNews();
+  return <SegmentedControl value={view} onChange={show} options={withNews(news, VIEWS)} />;
 }
 
 export function Scorecards() {
   const [params] = useSearchParams();
   const commitments = params.get("view") === "commitments" || Boolean(params.get("set"));
+  // Opens where something waits on the reader, unless the address names a view or a record.
+  const show = useShowView();
+  useOpenWhereNews({ value: commitments ? "commitments" : "scorecards", onChange: show, values: ["scorecards", "commitments"], skip: Boolean(params.get("view") || params.get("set") || params.get("id")) });
   if (commitments) return <Commitments switcher={<ViewSwitch view="commitments" />} />;
   return <ScorecardsView />;
 }
@@ -109,8 +126,9 @@ function ScorecardsView() {
   const modal = useModal();
   const quarter = useQuarter();
   const period = quarter.period;
-  const departments = useApi("GET /api/v1/departments", { query: {} });
-  const [dept, setDept] = useState("");
+  const [pickedDept, setDept] = useState("");
+  const departments = useDepartmentFilter("All Departments", pickedDept);
+  const dept = departments.value;
   const [status, setStatus] = useState("");
   const filters = {
     ...(quarter.periodId ? { period_id: quarter.periodId } : {}),
@@ -122,7 +140,6 @@ function ScorecardsView() {
   const agreed = usePaged("GET /api/v1/performance/scorecards", { filters: { ...(quarter.periodId ? { period_id: quarter.periodId } : {}), status: "agreed" }, enabled: Boolean(quarter.periodId) });
   const waiting = usePaged("GET /api/v1/performance/scorecards", { filters: { ...(quarter.periodId ? { period_id: quarter.periodId } : {}), status: "binding" }, enabled: Boolean(quarter.periodId) });
   const below = usePaged("GET /api/v1/performance/scorecards", { filters: { ...(quarter.periodId ? { period_id: quarter.periodId } : {}), rating: "below" }, enabled: Boolean(quarter.periodId) });
-  const deptOptions: Array<[string, string]> = [["", "All Departments"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
 
   const mayDraft = (me.manages_people || hasCapability(me, "performance.manage")) && Boolean(me.grants.performance?.includes("create"));
   const newCard = () => modal.open({ title: "New Scorecard", body: (close) => <NewScorecardForm close={close} periodId={quarter.periodId} onOpen={openCard} /> });
@@ -143,8 +160,8 @@ function ScorecardsView() {
         }
       />
       <Toolbar>
-        <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} />
-        <FilterSelect label="Department" value={dept} onChange={setDept} options={deptOptions} />
+        <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} {...quarter.paging} />
+        {departments.pick && <FilterSelect label="Department" value={dept} onChange={setDept} options={departments.options} {...departments.paging} />}
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
       </Toolbar>
       <KpiTiles
@@ -192,6 +209,8 @@ function NewScorecardForm({ close, periodId, onOpen }: { close: () => void; peri
       onOpen(card.scorecard_id);
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      // Someone outside the reader's reach reads as not found: say so on the person picked.
+      else if (e instanceof ApiError && e.status === 404) f.setServerErrors({ employee_id: ["Not in your team"] });
       else say(e);
     }
   };
@@ -237,7 +256,8 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
   const send = useMutation("POST /api/v1/performance/scorecards/:id/submit");
   const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
   const c = read.data;
-  if (!c) return null;
+  if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
+  if (!c) return <LoadingRows count={4} />;
   const months = period.data?.months ?? [];
   const mine = c.employee.employee_id === me.employee_id;
   const w = amendmentId ? amendment.data : undefined;
@@ -263,7 +283,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
     amendmentId &&
     modal.open({ title: "Request Changes", body: (done) => <ReasonForm instanceId={amendmentId} close={() => (done(), refreshApprovals())} done="Scorecard sent back" /> });
   const reopen = () => modal.open({ title: "Scorecard", wide: true, body: (done) => <ScorecardSheet id={c.scorecard_id} close={done} /> });
-  const openLine = (line: ScorecardLine) => modal.open({ title: "Scorecard Line", body: () => <LineSheet line={line} back={reopen} /> });
+  const openLine = (line: ScorecardLine) => modal.open({ title: "Scorecard Line", body: () => <LineSheet line={line} months={months} back={reopen} /> });
   const agreeCard = async () => {
     try {
       await agree.run({ params: { id: c.scorecard_id }, body: {} });
@@ -397,7 +417,7 @@ function SectionLines({ section, card, months, onOpen }: { section: ScorecardLin
  * the function's head while no change waits (§3.5, §6.7).
  */
 // search:none Change Target on a line is reached through its scorecard, which search finds
-function LineSheet({ line, back }: { line: ScorecardLine; back: () => void }) {
+function LineSheet({ line, months, back }: { line: ScorecardLine; months: string[]; back: () => void }) {
   const modal = useModal();
   const waiting = line.pending_change;
   const items: Array<[string, ReactNode]> = [
@@ -410,9 +430,10 @@ function LineSheet({ line, back }: { line: ScorecardLine; back: () => void }) {
     ["Linked To", line.key_result?.code ?? line.kpi?.code ?? (line.team_key_results.map((k) => k.code).join(", ") || "–")],
     ["Due", line.milestone_due_on ?? line.due_on ? formatDate((line.milestone_due_on ?? line.due_on)!) : "–"],
     ["Weight", `${line.weight}%`],
+    ...monthScores(line, months),
     ["Score", score(line.score)],
   ];
-  const change = () => modal.open({ title: "Change Target", body: () => <LineChangeForm line={line} done={back} /> });
+  const change = () => modal.open({ title: "Change Target", body: () => <LineChangeForm line={line} months={months} done={back} /> });
   return (
     <>
       <KeyValue items={items} />
@@ -434,9 +455,9 @@ const thisMonth = () => {
  * Change Target on a binding line: the new figure, or words where the line's target is in words
  * (their number kept beside them), the month it applies from and the reason; to the CEO.
  */
-function LineChangeForm({ line, done }: { line: ScorecardLine; done: () => void }) {
+function LineChangeForm({ line, months, done }: { line: ScorecardLine; months: string[]; done: () => void }) {
   const words = line.target_text !== null || line.measure === "milestone";
-  const f = useContractForm({ employee_target_id: line.employee_target_id, to_value: "", to_text: "", from_month: thisMonth(), reason: "" }, goalsContract.TargetChangeCreate);
+  const f = useContractForm({ employee_target_id: line.employee_target_id, to_value: "", to_text: "", from_month: startMonth(months) || thisMonth(), reason: "" }, goalsContract.TargetChangeCreate);
   const save = useMutation("POST /api/v1/performance/target-changes");
   const submit = async () => {
     if (!f.check()) return;
@@ -467,9 +488,11 @@ function LineChangeForm({ line, done }: { line: ScorecardLine; done: () => void 
   return (
     <>
       <Field label="New Target" {...mark}>
-        {words ? <TextField {...f.field("to_text")} /> : <TextField {...f.field("to_value")} inputMode="decimal" />}
+        {words ? <TextField {...f.field("to_text")} /> : <NumberField decimal signed {...f.field("to_value")} />}
       </Field>
-      <Field label="From Month" {...f.status("from_month")}><DateField {...f.field("from_month")} /></Field>
+      <Field label="From Month" {...f.status("from_month")}>
+        <SelectField {...f.field("from_month")} options={monthChoices(months)} />
+      </Field>
       <Field label="Reason" {...f.status("reason")}><TextField {...f.field("reason")} /></Field>
       <FormFooter>
         <Button onClick={done}>Cancel</Button>
@@ -501,6 +524,8 @@ type LineRow = {
   source: ScorecardLine["source"];
   okr_key_result_id: string;
   kpi_definition_id: string;
+  /** A Team result line's key results, picked on the line (a line copied from last quarter starts with none). */
+  team_key_result_ids: string[];
   due_on: string;
   kept: Pick<ScorecardLine, "direction" | "unit" | "frequency_text" | "share_value" | "target_value" | "target_text" | "okr_key_result_id" | "kpi_definition_id"> & {
     team_key_result_ids: string[];
@@ -518,6 +543,7 @@ const rowOf = (l: ScorecardLine): LineRow => ({
   source: l.source,
   okr_key_result_id: l.okr_key_result_id ?? "",
   kpi_definition_id: l.kpi_definition_id ?? "",
+  team_key_result_ids: l.team_key_results.map((k) => k.okr_key_result_id),
   // A milestone's date is its own; a line copied without one is asked for it, never given the quarter's end.
   due_on: (l.measure === "milestone" ? l.milestone_due_on : l.due_on) ?? "",
   kept: {
@@ -544,6 +570,7 @@ const NEW_LINE: LineRow = {
   source: "own",
   okr_key_result_id: "",
   kpi_definition_id: "",
+  team_key_result_ids: [],
   due_on: "",
   kept: { direction: "higher", unit: null, frequency_text: null, share_value: null, target_value: null, target_text: null, okr_key_result_id: null, kpi_definition_id: null, team_key_result_ids: [] },
 };
@@ -580,37 +607,86 @@ function lineOf(r: LineRow) {
     ...(r.kpi_definition_id ? { kpi_definition_id: r.kpi_definition_id } : {}),
     // A share is of one key result: moving the line to another leaves it behind.
     ...(r.okr_key_result_id && r.okr_key_result_id === r.kept.okr_key_result_id && r.kept.share_value ? { share_value: r.kept.share_value } : {}),
-    team_key_result_ids: r.kept.team_key_result_ids,
+    team_key_result_ids: r.team_key_result_ids,
     ...(r.due_on ? (r.measure === "milestone" ? { milestone_due_on: r.due_on } : { due_on: r.due_on }) : {}),
   };
 }
 
+/** What the contract refuses in the lines as typed, keyed as the API names them (`lines.3.title`). */
+function linesProblems(rows: LineRow[]): Record<string, string[]> {
+  const r = targetsContract.ScorecardLinesSave.safeParse({ lines: rows.map(lineOf) });
+  const out: Record<string, string[]> = {};
+  for (const issue of r.success ? [] : r.error.issues) (out[issue.path.join(".")] ??= []).push(issue.message);
+  return out;
+}
+
+/** The API's keys each field of Edit Lines feeds, so changing a field checks its marks again. */
+const FEEDS: Partial<Record<keyof LineRow, string[]>> = {
+  title: ["title"],
+  measure: ["measure"],
+  target: ["target_value", "target_text"],
+  due_on: ["milestone_due_on", "due_on"],
+  weight: ["weight"],
+  okr_key_result_id: ["okr_key_result_id", "share_value"],
+  kpi_definition_id: ["kpi_definition_id"],
+  team_key_result_ids: ["team_key_result_ids"],
+};
+
 /** Every line of a draft scorecard in one save: a line left out is removed. */
 function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }) {
-  const okrs = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: card.performance_period_id, ...(card.department_id ? { department_id: card.department_id } : {}) } });
-  const kpis = usePaged("GET /api/v1/performance/kpis", { filters: card.department_id ? { department_id: card.department_id } : {} });
+  const okrs = useInfinite("GET /api/v1/performance/okrs", { filters: { period_id: card.performance_period_id, ...(card.department_id ? { department_id: card.department_id } : {}) } });
+  const kpis = useInfinite("GET /api/v1/performance/kpis", { filters: card.department_id ? { department_id: card.department_id } : {} });
   const [rows, setRows] = useState<LineRow[]>(card.lines.map(rowOf));
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const save = useMutation("PUT /api/v1/performance/scorecards/:id/lines");
-  const set = (i: number, patch: Partial<LineRow>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const set = (i: number, patch: Partial<LineRow>) => {
+    const next = rows.map((x, j) => (j === i ? { ...x, ...patch } : x));
+    setRows(next);
+    // A marked field is checked again as it changes, so its mark clears the moment it is right.
+    const keys = Object.keys(patch).flatMap((k) => FEEDS[k as keyof LineRow] ?? []).map((k) => `lines.${i}.${k}`);
+    if (keys.some((k) => errors[k])) {
+      const now = linesProblems(next);
+      setErrors((e) => Object.fromEntries([...Object.entries(e).filter(([k]) => !keys.includes(k)), ...keys.filter((k) => now[k]).map((k) => [k, now[k]] as const)]));
+    }
+  };
   const krOptions: Array<[string, string]> = [["", "None"], ...okrs.rows.flatMap((o) => o.key_results.map((k: KeyResult) => [k.okr_key_result_id, `${k.code} · ${k.statement}`] as [string, string]))];
   const kpiOptions: Array<[string, string]> = [["", "None"], ...kpis.rows.map((k) => [k.kpi_definition_id, `${k.code} · ${k.name}`] as [string, string])];
+  // A saved line names its key result and KPI, so a link on a page not loaded yet still reads as itself.
+  const saved = new Map(
+    card.lines.flatMap((l) => [
+      ...(l.key_result ? [[l.key_result.okr_key_result_id, `${l.key_result.code} · ${l.key_result.statement}`] as const] : []),
+      ...(l.kpi ? [[l.kpi.kpi_definition_id, `${l.kpi.code} · ${l.kpi.name}`] as const] : []),
+    ]),
+  );
+  /** A refusal on its fields; what no field shows is said in a toast, naming its line. */
+  const refuse = (fields: Record<string, string[]>, message: string) => {
+    setErrors(fields);
+    const unshown = Object.entries(fields).find(([k]) => !/^lines\.\d+\./.test(k) || !SHOWN.has(k.split(".").slice(2).join(".")));
+    if (unshown) {
+      const at = /^lines\.(\d+)\./.exec(unshown[0]);
+      toast(at ? `Line ${Number(at[1]) + 1}: ${unshown[1][0]}` : message);
+    }
+  };
   const submit = async () => {
+    // What the contract refuses (a line added and left without its Goal) is marked here and never sent.
+    const problems = linesProblems(rows);
+    if (Object.keys(problems).length) return refuse(problems, "Check the highlighted lines");
     try {
       await save.run({ params: { id: card.scorecard_id }, body: { lines: rows.map(lineOf) } });
       close();
       toast("Lines saved");
     } catch (e) {
       if (!(e instanceof ApiError) || !Object.keys(e.fields).length) return say(e);
-      setErrors(e.fields);
-      // What no field shows is said in a toast, naming its line.
-      const unshown = Object.entries(e.fields).find(([k]) => !/^lines\.\d+\./.test(k) || !SHOWN.has(k.split(".").slice(2).join(".")));
-      if (unshown) {
-        const at = /^lines\.(\d+)\./.exec(unshown[0]);
-        toast(at ? `Line ${Number(at[1]) + 1}: ${unshown[1][0]}` : e.message);
-      }
+      refuse(e.fields, e.message);
     }
   };
+  // Each section's lines against its share as typed, by the rule the scorecard is held to (scoring.sectionWeightProblems).
+  const shares = { results: card.results_weight, kpis: card.kpis_weight, accountability: card.accountability_weight };
+  const off = scoring.sectionWeightProblems(rows.map((r) => ({ section: r.section, weight: r.weight })), shares);
+  const totals = (["results", "kpis", "accountability"] as const).map((section) => {
+    const p = off.find((x) => x.section === section);
+    return { section, total: p ? p.total : shares[section], expected: shares[section], adds: !p };
+  });
   const err = (i: number, ...keys: string[]) => keys.map((k) => errors[`lines.${i}.${k}`]?.[0]).find(Boolean);
   const mark = (i: number, short: string, ...keys: string[]) => {
     const message = fieldMessage(err(i, ...keys), short);
@@ -618,6 +694,11 @@ function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }
   };
   return (
     <>
+      <div role="group" aria-label="Section Weights" className="mb-3 flex flex-wrap gap-1.5">
+        {totals.map((t) => (
+          <StatusPill key={t.section} s={{ tone: t.adds ? "ok" : "err", text: `${SECTION_NAMES[t.section]} ${formatNumber(t.total)} of ${t.expected}` }} />
+        ))}
+      </div>
       {rows.map((r, i) => (
         <Card key={r.employee_target_id || `new-${i}`} className="mb-2">
           <CardHeader
@@ -659,10 +740,25 @@ function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }
           )}
           <Field label="Weight" {...mark(i, "Check the weight", "weight")}><TextField value={r.weight} onChange={(v) => set(i, { weight: v.replace(/[^\d.]/g, "") })} inputMode="decimal" /></Field>
           {r.section === "kpis" ? (
-            <Field label="KPI" optional {...mark(i, "Link a KPI", "kpi_definition_id")}><SelectField options={kpiOptions} value={r.kpi_definition_id} onChange={(v) => set(i, { kpi_definition_id: v })} /></Field>
+            <Field label="KPI" optional {...mark(i, "Link a KPI", "kpi_definition_id")}><SelectField options={kpiOptions} value={r.kpi_definition_id} onChange={(v) => set(i, { kpi_definition_id: v })} valueLabel={saved.get(r.kpi_definition_id)} {...paging(kpis)} /></Field>
+          ) : r.source === "team_result" ? (
+            <Field label="Team Key Results" {...mark(i, "Pick the key results", "team_key_result_ids")}>
+              <ul className="m-0 flex list-none flex-col p-0" aria-label={`Line ${i + 1} Team Key Results`}>
+                {krOptions.slice(1).map(([id, name]) => (
+                  <li key={id} className="flex min-h-tap items-center gap-2 text-sm">
+                    <Tick
+                      checked={r.team_key_result_ids.includes(id)}
+                      label={name}
+                      onChange={(on) => set(i, { team_key_result_ids: on ? [...r.team_key_result_ids, id] : r.team_key_result_ids.filter((x) => x !== id) })}
+                    />
+                    <span>{name}</span>
+                  </li>
+                ))}
+              </ul>
+            </Field>
           ) : (
             <Field label="Key Result" optional {...mark(i, "Link a key result", "okr_key_result_id", "team_key_result_ids", "share_value")}>
-              <SelectField options={krOptions} value={r.okr_key_result_id} onChange={(v) => set(i, { okr_key_result_id: v })} />
+              <SelectField options={krOptions} value={r.okr_key_result_id} onChange={(v) => set(i, { okr_key_result_id: v })} valueLabel={saved.get(r.okr_key_result_id)} {...paging(okrs)} />
             </Field>
           )}
         </Card>

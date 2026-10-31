@@ -8,6 +8,7 @@
  *   objective, key result           CO-O1 and CO-KR1.2 for the company; BM-O2, BM-KR2.1 for a function
  *   month                           one report per key result per month; the latest is "now"
  *   plan                            a function's (or the company's) quarter, approved as one
+ *   plan unbind                     a request to the CEO to reopen a binding plan for changes
  *   target change                   a binding target changed through the CEO
  *
  * Every link (a line to its key result, a function key result to a company one) is by id; codes
@@ -17,7 +18,7 @@ const { z } = require("zod");
 const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
 const { ScoreValue, Quantity, Direction, KrBand, Rating, ScoringRules } = require("./scoring");
-const { MonthStart, Kpi, KpiMonth, KpiResult } = require("./kpis");
+const { MonthStart, Kpi, KpiMonth, KpiResult, hasActual, ACTUAL_REQUIRED } = require("./kpis");
 const { KeyResultRef, Scorecard, Contribution } = require("./targets");
 
 /* ------------------------------------------------------------------ *
@@ -37,7 +38,7 @@ const clearable = (schema) =>
     .transform((v) => (v === "" ? null : v));
 const clearableText = (max) => clearable(z.string().trim().max(max));
 
-/** A quarter: its dates, its lock date, the first day the system ran it, and its rules. */
+/** A quarter: its dates, the first day the system ran it, and its rules. */
 const PerformancePeriod = z
   .object({
     performance_period_id: uuid,
@@ -45,7 +46,6 @@ const PerformancePeriod = z
     starts_on: isoDate,
     ends_on: isoDate,
     plan_year_starts_on: isoDate,
-    targets_lock_on: isoDate.nullable(),
     live_from: isoDate.nullable(),
     status: PeriodStatus,
     rules: ScoringRules,
@@ -74,21 +74,19 @@ const PeriodListQuery = listQuery(
  */
 const PeriodCreate = z
   .object({
-    starts_on: isoDate.refine((v) => /-(01|04|07|10)-01$/.test(v), "Pick a quarter's first day"),
+    starts_on: isoDate.refine((v) => /-(01|04|07|10)-01$/.test(v), "Pick a quarter start"),
     name: optionalText(40),
     plan_year_starts_on: blank(isoDate),
-    targets_lock_on: blank(isoDate),
     live_from: blank(isoDate),
     status: z.enum(["planning", "active"]).optional(),
     rules: ScoringRules.optional(),
   })
   .strict();
 
-/** PATCH /performance/periods/:id: the name, the lock date, the first live day, the rules, the status. */
+/** PATCH /performance/periods/:id: the name, the first live day, the rules, the status. */
 const PeriodEdit = z
   .object({
     name: text(40),
-    targets_lock_on: isoDate.nullable(),
     live_from: isoDate.nullable(),
     rules: ScoringRules,
     status: PeriodStatus,
@@ -101,11 +99,63 @@ const PeriodEdit = z
  * Organisational goals
  * ------------------------------------------------------------------ */
 
+/**
+ * GET /performance/departments: the departments the reader's Performance lists can be filtered by:
+ * every active one for a reader with `all`, else those of the people in their scope, the people
+ * whose reviews and scorecards name them, their own and the ones they head. The Department and
+ * Function filters of Scorecards, Commitments, Reviews and Analytics offer only these.
+ */
+const PerformanceDepartment = z
+  .object({
+    department_id: uuid,
+    code: z.string(),
+    name: z.string(),
+  })
+  .strict();
+
+/**
+ * Who a share reaches (§6.24): `all` is every holder of `performance` view; `departments` the people of the
+ * departments named. A share is read only.
+ */
+const ShareAudience = z.enum(["all", "departments"]);
+
+/** A shared organisational goal or company objective, as its sharer reads it. */
+const GoalShare = z
+  .object({
+    goal_share_id: uuid,
+    organisational_goal_id: uuid.nullable(),
+    okr_objective_id: uuid.nullable(),
+    audience: ShareAudience,
+    departments: z.array(PerformanceDepartment),
+    shared_by: PersonRef.nullable(),
+    created_at: isoDateTime,
+    updated_at: isoDateTime,
+  })
+  .strict();
+
+/**
+ * PUT /performance/goals/:id/share and /objectives/:id/share. `department_ids` are the departments a
+ * `departments` share reaches (at least one, active); an `all` share names none.
+ */
+const GoalShareSave = z
+  .object({
+    audience: ShareAudience,
+    department_ids: z.array(uuid).max(50).default([]),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.audience === "departments" && v.department_ids.length === 0)
+      ctx.addIssue({ code: "custom", path: ["department_ids"], message: "Pick a department" });
+    if (v.audience === "all" && v.department_ids.length > 0)
+      ctx.addIssue({ code: "custom", path: ["department_ids"], message: "All staff names none" });
+  });
+
 const OrganisationalGoalStatus = z.enum(["active", "closed"]);
 
 const OrganisationalGoal = z
   .object({
     organisational_goal_id: uuid,
+    /** Its ID, ORG-2026-01, given by the service from Documents & Numbering (§6.1); null only for an old row outside the plan. */
     code: z.string().nullable(),
     title: z.string(),
     strategic_theme: z.string().nullable(),
@@ -120,6 +170,10 @@ const OrganisationalGoal = z
     ends_on: isoDate,
     status: OrganisationalGoalStatus,
     owner: PersonRef.nullable(),
+    /** The reader may share it (`goals.organisation`). */
+    can_share: z.boolean(),
+    /** How it is shared, given only to a reader who may share it; null when it is not shared. */
+    share: GoalShare.nullable(),
     created_at: isoDateTime,
     updated_at: isoDateTime,
   })
@@ -171,8 +225,8 @@ const OrganisationalGoalDetail = OrganisationalGoal.extend({
   progress: ScoreValue.nullable(),
 }).strict();
 
+/** What a person writes of a goal. Never its ID: the service gives it (§6.1, JBS Praxis, 27/10/2026). */
 const GOAL_FIELDS = {
-  code: optionalText(20),
   strategic_theme: optionalText(200),
   detail: optionalText(4000),
   success_measure: optionalText(1000),
@@ -196,7 +250,6 @@ const OrganisationalGoalCreate = z
 const OrganisationalGoalEdit = z
   .object({
     title: text(300),
-    code: clearableText(20),
     strategic_theme: clearableText(200),
     detail: clearableText(4000),
     success_measure: clearableText(1000),
@@ -226,7 +279,11 @@ const KrType = z.enum([
 ]);
 const KrMeasure = z.enum(["numeric", "dated", "yes_no", "multi_part"]);
 const KrMonthStatus = z.enum(["not_started", "on_track", "at_risk", "off_track", "done", "missed"]);
-const PlanStatus = z.enum(["draft", "submitted", "binding", "returned"]);
+/**
+ * A plan's states. `unbound` and `revising` (§6.22) are binding's: the quarter keeps running on the plan
+ * while its head changes it and while the CEO decides the changes.
+ */
+const PlanStatus = z.enum(["draft", "submitted", "binding", "returned", "unbound", "revising"]);
 
 /** One part of a multi-part key result, scored on its own; the key result is their mean. */
 const KeyResultPart = z
@@ -278,8 +335,6 @@ const KeyResult = z
     baseline_text: z.string().nullable(),
     target_value: Quantity.nullable(),
     target_text: z.string().nullable(),
-    target_provisional: z.boolean(),
-    target_locked_at: isoDateTime.nullable(),
     parts: z.array(KeyResultPart).nullable(),
     starts_on: isoDate.nullable(),
     finishes_on: isoDate.nullable(),
@@ -308,19 +363,28 @@ const Objective = z
     plan_status: PlanStatus,
     score: ScoreValue.nullable(),
     key_results: z.array(KeyResult),
-    /** The reader may edit or delete it and its key results: its plan is draft or returned, and they set its goals. */
+    /** The reader may edit or delete it and its key results: its plan is draft, returned, unbound or awaiting approval, and they set its goals. */
     can_edit: z.boolean(),
+    /** The reader may share it: a company objective and `goals.company`. */
+    can_share: z.boolean(),
+    /** How it is shared, given only to a reader who may share it; null when it is not shared. */
+    share: GoalShare.nullable(),
   })
   .strict();
 
 const ObjectivePage = Paged(Objective);
 
-/** GET /performance/okrs. `department_id` "company" lists the company's objectives. */
+/**
+ * GET /performance/okrs. `department_id` "company" lists the company's objectives. `status` is a plan's
+ * state, `live` for the plans the quarter runs on (binding, unbound and revising: Report Month's), or
+ * `editable` for the plans whose goals their head may still add to and change (draft, returned,
+ * unbound, submitted and revising: New Key Result's).
+ */
 const OkrListQuery = listQuery(
   {
     period_id: uuid.optional(),
     department_id: z.union([uuid, z.literal("company")]).optional(),
-    status: PlanStatus.optional(),
+    status: z.union([PlanStatus, z.literal("live"), z.literal("editable")]).optional(),
   },
   ["position", "code"],
 );
@@ -335,7 +399,10 @@ const OkrSummaryQuery = z
 
 const OkrSummary = z
   .object({
+    /** The company's score: given only to a reader of the whole plan (§6.23), null for everyone else. */
     company_score: ScoreValue.nullable(),
+    /** The mean of the functions' objectives the reader reads (the one function picked, or all they read); null with none scored. */
+    function_score: ScoreValue.nullable(),
     key_results: z.number().int().min(0),
     on_track: z.number().int().min(0),
     in_recovery: z.number().int().min(0),
@@ -374,7 +441,6 @@ const KEY_RESULT_FIELDS = {
   baseline_text: optionalText(1000),
   target_value: blank(Quantity),
   target_text: optionalText(1000),
-  target_provisional: z.boolean().default(false),
   parts: z.array(KeyResultPart).max(10).optional(),
   starts_on: blank(isoDate),
   finishes_on: blank(isoDate),
@@ -397,7 +463,8 @@ const KeyResultCreate = z
 
 /**
  * PATCH /performance/key-results/:id: every field while the plan is a draft or returned (an empty
- * one clears it); once binding, only an open TBC target, by its owner or the function's head (§6.7).
+ * one clears it), and unbound too, except a reported key result's target, measure, direction, unit
+ * and parts (§6.22); once binding, a key result changes only through a target change (§6.7).
  */
 const KeyResultEdit = z
   .object({
@@ -409,7 +476,6 @@ const KeyResultEdit = z
     baseline_text: clearableText(1000),
     target_value: clearable(Quantity),
     target_text: clearableText(1000),
-    target_provisional: z.boolean(),
     parts: z.array(KeyResultPart).max(10).nullable(),
     starts_on: clearable(isoDate),
     finishes_on: clearable(isoDate),
@@ -509,8 +575,6 @@ const KeyResultDetail = KeyResult.extend({
   can_change_target: z.boolean(),
   /** The reader may edit or delete it: its plan is draft or returned, and they set its goals. */
   can_edit: z.boolean(),
-  /** The reader may set its TBC target in place: before the lock date, its owner or the function's head. */
-  can_set_target: z.boolean(),
 }).strict();
 
 /* ------------------------------------------------------------------ *
@@ -533,7 +597,7 @@ const KeyResultReport = z
   })
   .strict();
 
-/** One KPI's figure in a month's report. */
+/** One KPI's figure in a month's report; Met and Not Met need it, as on Record Actual. */
 const KpiReport = z
   .object({
     kpi_definition_id: uuid,
@@ -542,7 +606,8 @@ const KpiReport = z
     actual_text: optionalText(500),
     comment: optionalText(2000),
   })
-  .strict();
+  .strict()
+  .refine(hasActual, ACTUAL_REQUIRED);
 
 /** POST /performance/reports: a function's (or the company's) month, in one save. */
 const MonthReport = z
@@ -606,12 +671,76 @@ const PlanListQuery = listQuery(
   ["department", "status"],
 );
 
+/**
+ * GET /performance/functions: the company (first, `department_id` null) and each active
+ * function, whether the reader may set its goals and KPIs (goals.authority, the server's rule
+ * alone), and its plan's status in the quarter asked for (null with no plan yet, or no quarter).
+ * New Objective and New KPI offer only the rows the reader may set (§6.4).
+ */
+const PerformanceFunction = z
+  .object({
+    department_id: uuid.nullable(),
+    name: z.string().nullable(),
+    may_set: z.boolean(),
+    plan_status: PlanStatus.nullable(),
+    /** Its plan is binding, the reader sets it, no request waits: Goals shows Request To Unbind in place of New Goal (§6.22). */
+    can_request_unbind: z.boolean(),
+  })
+  .strict();
+
+const PerformanceFunctionPage = Paged(PerformanceFunction);
+
+const PerformanceFunctionListQuery = listQuery({ period_id: uuid.optional() });
+
+const PerformanceDepartmentPage = Paged(PerformanceDepartment);
+
+const PerformanceDepartmentListQuery = listQuery({});
+
 /** Why a plan cannot be sent yet (§6.4). */
 const PlanProblem = z
   .object({
     code: z.enum(["PLAN_EMPTY", "WEIGHTS_NOT_100", "CONTRIBUTION_REBALANCE", "LINK_OTHER_QUARTER", "OBJECTIVE_ONE_RESULT"]),
     message: z.string(),
     blocking: z.boolean(),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
+ * Unbinding a binding plan (§6.22)
+ * ------------------------------------------------------------------ */
+
+const PlanUnbindStatus = z.enum(["pending", "approved", "rejected"]);
+
+/** A request to unbind a binding plan, to the CEO. */
+const PlanUnbind = z
+  .object({
+    plan_unbind_id: uuid,
+    performance_plan_id: uuid,
+    reason: z.string(),
+    status: PlanUnbindStatus,
+    workflow_instance_id: uuid.nullable(),
+    requested_by: PersonRef.nullable(),
+    decided_at: isoDateTime.nullable(),
+    decision_reason: z.string().nullable(),
+    created_at: isoDateTime,
+  })
+  .strict();
+
+/** POST /performance/plans/:id/unbind: why the plan is to be unbound. */
+const PlanUnbindCreate = z.object({ reason: text(1000) }).strict();
+
+/** GET /performance/unbinds/:id: one request, named in full, for its sheet. */
+const PlanUnbindDetail = PlanUnbind.extend({
+  department_id: uuid.nullable(),
+  department: z.string().nullable(),
+  period_name: z.string(),
+}).strict();
+
+/** The stage a plan awaiting approval is with (§6.4): the one whose approvers the engine told and whose Waiting On You lists it. */
+const PlanApproval = z
+  .object({
+    stage_key: z.string(),
+    stage_name: z.string(),
   })
   .strict();
 
@@ -623,6 +752,10 @@ const PlanDetail = Plan.extend({
   contributions: z.array(Contribution),
   problems: z.array(PlanProblem),
   can_submit: z.boolean(),
+  /** Who it is with while it is sent or its changes are (Line Manager, Operations & People or CEO); null otherwise. */
+  approval: PlanApproval.nullable(),
+  /** The latest request to unbind it, pending or decided (null when none was made). */
+  unbind: PlanUnbind.nullable(),
 }).strict();
 
 /* ------------------------------------------------------------------ *
@@ -683,13 +816,13 @@ const TargetChangeDetail = TargetChange.extend({
  * Approvals waiting on the reader (§6.4, §6.7)
  * ------------------------------------------------------------------ */
 
-/** A function's plan, a target change, or a mid-quarter scorecard sent on its own (§11). */
-const PerformanceApprovalKind = z.enum(["plan", "target_change", "scorecard"]);
+/** A function's plan, a request to unbind one, a target change, or a mid-quarter scorecard sent on its own (§11). */
+const PerformanceApprovalKind = z.enum(["plan", "unbind", "target_change", "scorecard"]);
 
 /**
- * A plan stage, a target change or a mid-quarter scorecard the reader decides: Goals · Waiting On
- * You. `record_id` is the plan, the change or the scorecard; `employee` the person whose
- * scorecard it is (a scorecard, or a line's target change).
+ * A plan stage, an unbind request, a target change or a mid-quarter scorecard the reader decides: Goals ·
+ * Waiting On You. `record_id` is the plan, the request, the change or the scorecard; `employee` the person
+ * whose scorecard it is (a scorecard, or a line's target change).
  */
 const PerformanceApproval = z
   .object({
@@ -827,8 +960,9 @@ const SelfAgainstFinal = z
   .strict();
 
 /**
- * Performance Analytics (§6.21) for a quarter, within the reader's scope. The OKR figures are the
- * company's shared plan, read whole; scorecards, reviews and commitments are the reader's scope's.
+ * Performance Analytics (§6.21) for a quarter, within the reader's scope. The OKR figures count what the
+ * reader may read of the tree (§6.23: the company's, `company_score` included, only for the whole plan's
+ * reader); scorecards, reviews and commitments are the reader's scope's.
  */
 const PerformanceAnalytics = z
   .object({
@@ -893,7 +1027,11 @@ const KR_VIRTUAL = {
   linked_company_key_results: "the company key results in okr_key_result_link",
   latest: "the key result's latest okr_key_result_month",
 };
-const GOAL_VIRTUAL = { owner: "the person in organisational_goal.owner_employee_id" };
+const GOAL_VIRTUAL = {
+  owner: "the person in organisational_goal.owner_employee_id",
+  can_share: "the reader holds goals.organisation",
+  share: "the goal_share row, for a reader who may share it",
+};
 const PLAN_VIRTUAL = {
   submitted_by: "the employee of performance_plan.submitted_by",
   period_name: "performance_period.name",
@@ -954,7 +1092,9 @@ const TABLES = {
       plan_status: "performance_plan.status",
       score: "the mean of its key results' latest scores (§6.8)",
       key_results: "its okr_key_result rows",
-      can_edit: "the reader may change it now: a draft or returned plan, and goals.authority",
+      can_edit: "the reader may change it now: a draft, returned or unbound plan, and goals.authority",
+      can_share: "a company objective, and the reader holds goals.company",
+      share: "the goal_share row, for a reader who may share it",
     },
   },
   ObjectivePage: { table: null, reason: "a page of objectives with their key results" },
@@ -999,8 +1139,7 @@ const TABLES = {
       target_history: "its target_change rows",
       trace: "what it rolls up to",
       can_change_target: "the reader may ask to change its target now (goals.authority)",
-      can_edit: "the reader may change it now: a draft or returned plan, and goals.authority",
-      can_set_target: "the reader may set its TBC target in place before the lock date (§6.7)",
+      can_edit: "the reader may change it now: a draft, returned or unbound plan, and goals.authority",
     },
   },
   KeyResultReport: {
@@ -1020,6 +1159,31 @@ const TABLES = {
   Plan: { table: "performance_plan", virtual: PLAN_VIRTUAL },
   PlanPage: { table: null, reason: "a page of quarter plans" },
   PlanListQuery: { table: null, reason: "list controls and filters for the plans" },
+  PerformanceFunction: {
+    table: "department",
+    virtual: {
+      name: "department.name; null for the company",
+      may_set: "the reader may set its goals and KPIs (goals.authority)",
+      plan_status: "the quarter's performance_plan.status, null without one",
+      can_request_unbind: "its plan is binding, the reader sets it and no plan_unbind waits (§6.22)",
+    },
+  },
+  PerformanceFunctionPage: { table: null, reason: "a page of the functions a reader may set goals for" },
+  PerformanceFunctionListQuery: { table: null, reason: "list controls and the quarter for the functions" },
+  PerformanceDepartment: { table: "department", virtual: {} },
+  GoalShare: {
+    table: "goal_share",
+    virtual: {
+      departments: "the departments in goal_share_department",
+      shared_by: "the person behind goal_share.shared_by",
+    },
+  },
+  GoalShareSave: {
+    table: "goal_share",
+    virtual: { department_ids: "written as goal_share_department rows" },
+  },
+  PerformanceDepartmentPage: { table: null, reason: "a page of the departments a reader's Performance lists filter by" },
+  PerformanceDepartmentListQuery: { table: null, reason: "list controls for the departments" },
   PlanProblem: { table: null, reason: "a reason the plan cannot be sent, worked out" },
   PlanDetail: {
     table: "performance_plan",
@@ -1031,6 +1195,23 @@ const TABLES = {
       contributions: "its split key results",
       problems: "what stops it being sent",
       can_submit: "the reader may send it now",
+      approval: "the current stage of its pending workflow_instance, null when none is pending",
+      unbind: "its latest plan_unbind row, null when none was made",
+    },
+  },
+  PlanApproval: { table: null, reason: "the stage a plan awaiting approval is with, read from its pending workflow_instance" },
+  PlanUnbind: {
+    table: "plan_unbind",
+    virtual: { requested_by: "the employee of plan_unbind.requested_by" },
+  },
+  PlanUnbindCreate: { table: "plan_unbind" },
+  PlanUnbindDetail: {
+    table: "plan_unbind",
+    virtual: {
+      requested_by: "the employee of plan_unbind.requested_by",
+      department_id: "performance_plan.department_id; null for the company plan",
+      department: "department.name; null for the company plan",
+      period_name: "performance_period.name",
     },
   },
   TargetChangeCreate: { table: "target_change" },
@@ -1050,7 +1231,7 @@ const TABLES = {
   },
   PerformanceApproval: {
     table: null,
-    reason: "a pending performance.plan (a plan, or a scorecard sent on its own) or performance.target_change workflow_instance naming the reader, with its record",
+    reason: "a pending performance.plan (a plan, or a scorecard sent on its own), performance.plan_change (an unbind request, or an unbound plan's changes) or performance.target_change workflow_instance naming the reader, with its record",
   },
   PerformanceApprovalPage: { table: null, reason: "a page of approvals waiting on the reader" },
   PerformanceApprovalQuery: { table: null, reason: "list controls for the approvals waiting on the reader" },
@@ -1130,7 +1311,21 @@ module.exports = {
   Plan,
   PlanPage,
   PlanListQuery,
+  PerformanceFunction,
+  PerformanceFunctionPage,
+  PerformanceFunctionListQuery,
+  PerformanceDepartment,
+  ShareAudience,
+  GoalShare,
+  GoalShareSave,
+  PerformanceDepartmentPage,
+  PerformanceDepartmentListQuery,
   PlanProblem,
+  PlanUnbindStatus,
+  PlanUnbind,
+  PlanUnbindCreate,
+  PlanUnbindDetail,
+  PlanApproval,
   PlanDetail,
   TargetChangeCreate,
   TargetChangePage,

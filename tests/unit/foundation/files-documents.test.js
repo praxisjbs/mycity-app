@@ -254,6 +254,24 @@ describe("markdown and the template language", () => {
     expect(() => parse(templates.layout("email").body)).not.toThrow();
   });
 
+  test("the letterhead repeats its head and foot on every page, and signs a signed document", () => {
+    const org = { name: "MyCity App Ltd", display_name: "MyCity App", address: "Lagos" };
+    const page = (doc) => render(templates.layout("document").body, { org, number: "LTR-0001", today: "2026-10-26", doc }, { body: "<p>Body</p>" });
+    const plain = page({ title: "Letter" });
+    // A table's thead and tfoot repeat on each printed page (Chromium): the header and the
+    // organisation's line sit there; the body runs between them.
+    expect(plain.indexOf("<thead>")).toBeLessThan(plain.indexOf('class="lh-head"'));
+    expect(plain.indexOf("<tfoot>")).toBeLessThan(plain.indexOf('class="lh-foot"'));
+    expect(plain.indexOf("<tbody>")).toBeLessThan(plain.indexOf("<p>Body</p>"));
+    expect(plain).not.toContain("lh-sign\"");
+    const png = "data:image/png;base64,iVBORw0KGgo=";
+    const signed = page({ title: "Letter", signer: { name: "Ada Obi", role: "Operations Lead", signature: png } });
+    expect(signed).toContain(`<img src="${png}" alt="Signature of Ada Obi">`);
+    expect(signed.indexOf("Operations Lead")).toBeGreaterThan(signed.indexOf("<p>Body</p>"));
+    // Without a drawn signature the block keeps the name and role.
+    expect(page({ title: "Letter", signer: { name: "Operations & People", role: "Operations & People", signature: null } })).not.toContain("<img src=\"data:");
+  });
+
   test("canonical signature payloads: fixed key order, money as strings, versioned, Map lookup", () => {
     const contract = {
       number: "CON-0001", date: "2026-10-14", employee: "Ada Obi", job_title: "Analyst",

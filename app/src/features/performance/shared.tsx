@@ -1,14 +1,55 @@
 /** What the Performance tabs share: the quarter switcher, the words for codes, a person in a cell. */
 import { useState } from "react";
-import type { PerformancePeriod } from "@mycity/contract/contract.gen.ts";
-import { useApi, usePaged } from "@/api/hooks";
+import type { KpiUnit, PerformancePeriod } from "@mycity/contract/contract.gen.ts";
+import { ApiError } from "@/api/client";
+import { useApi, useInfinite, usePaged } from "@/api/hooks";
+import { paging } from "@/features/shared/wire";
 import type { PersonRef } from "@/api/types/common";
-import { formatMonth, formatNumber, Who, type ContractSchema } from "@mycity/ui";
+import { ComboField, formatMonth, formatNumber, plural, shortMessage, todayIso, Who, type ComboFieldProps, type ContractSchema, type ServerFields } from "@mycity/ui";
 
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 
+/**
+ * The Unit field of a KPI and of a key result: it suggests the units already in use, 25 at a time, narrowed as
+ * it is typed, and a unit it does not know is kept as typed and offered from then on (§5).
+ */
+export function UnitField(binding: Omit<ComboFieldProps<KpiUnit>, "list" | "option" | "sub" | "placeholder">) {
+  const units = usePaged("GET /api/v1/performance/kpis/units", { filters: {} });
+  return <ComboField {...binding} list={units} option={(u) => u.unit} sub={(u) => plural(u.uses, "use")} placeholder="users" />;
+}
+
 /** A person in a table cell: their name, and their department beneath it. */
 export const person = (p: PersonRef) => <Who name={p.display_name} sub={p.department ?? undefined} />;
+
+/**
+ * The company (`department_id` null) and the functions the reader may set goals and KPIs for, as
+ * the server's goals.authority answers (GET /performance/functions), each with its plan's status
+ * in the quarter when one is given. New Objective and New KPI offer only these (§6.4).
+ */
+export function useSettableFunctions(periodId: string | null) {
+  const list = useInfinite("GET /api/v1/performance/functions", { filters: periodId ? { period_id: periodId } : {} });
+  // `paging` loads the next 25 as a Function select's menu nears its end (FRONTEND_GUIDE §4); `loading` is the
+  // first page's alone, so a form open on these never turns back into a skeleton while the next one comes.
+  // `all` is every row the reader reads (the company for whoever reads its plan, then their functions): what
+  // the Function select of Goals offers, and nothing the reader may not open (§6.23).
+  return { rows: list.rows.filter((f) => f.may_set), all: list.rows, loading: list.loading && !list.page, error: list.error, reload: list.reload, paging: paging(list) };
+}
+
+/**
+ * The Department (or Function) filter of a list that shows people: the `all` choice, then the
+ * departments the reader's `performance` scope reaches (GET /performance/departments, the server's
+ * answer: everyone's for a reader who sees everyone, else their own, their team's and those they
+ * review or head). `pick` is false when there is nothing to choose between, so the select is left
+ * off; `value` is the picked department while it is still one of the choices, else none.
+ */
+export function useDepartmentFilter(all: string, picked: string) {
+  const list = useInfinite("GET /api/v1/performance/departments");
+  const more = Boolean(list.page?.has_next);
+  const options: Array<[string, string]> = [["", all], ...list.rows.map((d) => [d.department_id, d.name] as [string, string])];
+  // A department on a page not loaded yet may still be one of the choices.
+  const known = list.loading || more || list.rows.some((d) => d.department_id === picked);
+  return { options, paging: paging(list), pick: list.rows.length > 1 || more, value: known ? picked : "" };
+}
 
 /** The quarter the screen shows: the current one until another is picked. */
 export function useQuarter(): {
@@ -16,11 +57,15 @@ export function useQuarter(): {
   /** The quarters set up, newest first: the latest is the one a new quarter copies. */
   periods: PerformancePeriod[];
   options: Array<[string, string]>;
+  /** The Quarter select's next 25 as its menu nears its end, and the quarter in view's name meanwhile. */
+  paging: { more: boolean; onMore: () => void; valueLabel?: string };
   periodId: string;
   setPeriodId: (id: string) => void;
   loading: boolean;
+  /** The quarters' first page is in, so `periods[0]` is the latest (what Set Up Quarter copies). */
+  listed: boolean;
 } {
-  const list = usePaged("GET /api/v1/performance/periods");
+  const list = useInfinite("GET /api/v1/performance/periods");
   const current = useApi("GET /api/v1/performance/periods/current");
   const [picked, setPicked] = useState("");
   const period = list.rows.find((p) => p.performance_period_id === picked) ?? current.data ?? list.rows[0] ?? null;
@@ -28,9 +73,11 @@ export function useQuarter(): {
     period,
     periods: [...list.rows].sort((a, b) => b.starts_on.localeCompare(a.starts_on)),
     options: list.rows.map((p) => [p.performance_period_id, p.name] as [string, string]),
+    paging: { ...paging(list), valueLabel: period?.name },
     periodId: period?.performance_period_id ?? "",
     setPeriodId: setPicked,
     loading: current.loading && list.loading,
+    listed: Boolean(list.page),
   };
 }
 
@@ -55,15 +102,43 @@ export function reportingMonth(months: string[], today = new Date().toISOString(
   return months.filter((m) => m < first).at(-1) ?? months[0] ?? "";
 }
 
+/**
+ * A refused save, said in the form that sent it (FRONTEND_GUIDE §8.3): each mark on the field the
+ * server named, and the server's sentence on the form's error line (FormError) when it names no
+ * field here or refuses rather than checks (a plan already binding, a function that is not the
+ * reader's). A toast alone was gone before it was read, leaving the form open with no reason.
+ */
+export function sayRefusal(e: unknown, form: { values: object; setServerErrors: (fields: ServerFields) => void }, setProblem: (problem: string | null) => void) {
+  if (!(e instanceof ApiError)) return setProblem("Not saved. Try again.");
+  const keys = Object.keys(e.fields);
+  if (keys.length) form.setServerErrors(e.fields);
+  const onFields = keys.length > 0 && keys.every((k) => k in form.values);
+  setProblem(onFields && e.status === 422 ? null : e.message);
+}
+
 /** A field's error as a form shows it: the API's words when they fit in four, else the short form given. */
-export const fieldMessage = (message: string | undefined, short: string) =>
-  message === undefined ? undefined : message.trim().split(/\s+/).length <= 4 ? message : short;
+export const fieldMessage = (message: string | undefined, short: string) => {
+  if (message === undefined) return undefined;
+  // Zod's own sentences read as their limit ("Required", "At most 200 characters"); a short message as it is.
+  const said = shortMessage({ type: "custom", message });
+  return said && said !== "Check this value" ? said : short;
+};
 
 /** A month's short name for a column ("Oct"), from its first day. */
 export const monthShort = (m: string) => formatMonth(m).slice(0, 3);
 
+/** A quarter's months as a choice ("October 2026"): a target change's From Month, never a day. */
+export const monthChoices = (months: string[]): Array<[string, string]> => months.map((m) => [m, formatMonth(m)]);
+
+/** The From Month a change starts on: this month while it is in the quarter, else the quarter's first. */
+export const startMonth = (months: string[]) => months.find((m) => m.slice(0, 7) === todayIso().slice(0, 7)) ?? months[0] ?? "";
+
 /** A score from 0 to 1 as people read it, two places; a dash when there is none. */
 export const score = (s: string | null | undefined) => (s === null || s === undefined ? "–" : Number(s).toFixed(2));
+
+/** A line's score in each month of its quarter, as a line's sheet lists them (the phone's only place for them, §10.2). */
+export const monthScores = (line: { months: Array<{ month: string; score: string | null }> }, months: string[]): Array<[string, string]> =>
+  months.map((m) => [formatMonth(m), score(line.months.find((x) => x.month === m)?.score)]);
 
 /** A key result's band as a pill's tone and word. */
 export function band(b: "good" | "watch" | "recovery" | null | undefined): { tone: Tone; text: string } {
@@ -95,6 +170,9 @@ const PLAN: Record<string, [string, Tone]> = {
   submitted: ["Awaiting Approval", "warn"],
   binding: ["Binding", "ok"],
   returned: ["Returned", "err"],
+  // Unbound: live and open for changes; revising: its changes are with the CEO (§6.22).
+  unbound: ["Unbound", "info"],
+  revising: ["Awaiting Approval", "warn"],
 };
 
 /** A plan's status as a pill. */

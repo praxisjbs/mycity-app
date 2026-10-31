@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ModalProvider } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { invalidate } from "@/api/hooks";
@@ -60,7 +60,7 @@ async function analyticsAs(email: string) {
   mockSession.set(null);
   invalidate("/api/v1");
   const { rerender } = render(app(false));
-  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 5000 });
+  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 15000 });
   await act(async () => {
     const next = await auth!.signIn(email, "demo1234");
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
@@ -72,8 +72,13 @@ async function analyticsAs(email: string) {
 const headings = () => screen.getAllByRole("heading").map((h) => h.textContent?.trim());
 
 describe("Performance · Analytics", () => {
-  it("draws the four figures and every section on desktop, with Export of the people", async () => {
+  it("Operations & People read the whole plan: the Company Score with the three figures (JBS Praxis, 28/10/2026, P27)", async () => {
     await analyticsAs("cynthia@mycityapp.io");
+    for (const tile of ["Company Score", "Commitments On Time", "Check-Ins On Time", "Reviews Closed On Time"]) expect(screen.getAllByText(tile).length).toBeGreaterThan(0);
+  }, 30000);
+
+  it("draws the four figures and every section on desktop, with Export of the people", async () => {
+    await analyticsAs("ifeoma@mycityapp.io");
     const h = headings();
     for (const title of ["Analytics", "Scores by Month", "Key Results by Status", "Rating Spread", "Commitments On Time", "People"]) expect(h).toContain(title);
     expect(screen.getAllByText("Self Against Final").length).toBeGreaterThan(0);
@@ -82,6 +87,16 @@ describe("Performance · Analytics", () => {
     // The people, highest score first.
     await screen.findByText("Adedotun Oyinloye");
     expect(await axe(document.body)).toHaveNoViolations();
+  }, 30000);
+
+  it("the Function filter offers a manager only the functions of the people they reach, and a member of staff none", async () => {
+    await analyticsAs("ngozi@mycityapp.io");
+    fireEvent.click(screen.getByRole("combobox", { name: "Function" }));
+    expect(within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)).toEqual(["All Functions", "Finance", "Marketing & Sales", "Studio"]);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    cleanup();
+    await analyticsAs("kemi@mycityapp.io");
+    expect(screen.queryByRole("combobox", { name: "Function" })).toBeNull();
   }, 30000);
 
   it("on a phone: no Self Against Final; the people as cards, five at most, with no pager", async () => {

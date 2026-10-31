@@ -1,18 +1,34 @@
-import { useState } from "react";
-import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import "@/api/types/queries";
-import type { Firing, LetterTemplate, Outcome, QueryRow, Rule, RuleCreate, SanctionCreate, SanctionRow } from "@/api/types/queries";
-import type { PersonRef } from "@/api/types/common";
+import queries from "@mycity/contract/schemas/queries.js";
+import query_rules from "@mycity/contract/schemas/query_rules.js";
+import sanctions from "@mycity/contract/schemas/sanctions.js";
+import templates from "@mycity/contract/schemas/templates.js";
+import type { ConsequenceStep, LetterTemplate, LetterTemplateDetail, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { api, ApiError } from "@/api/client";
+import { saveBlob, useFileBlob } from "@/api/download";
+import type { PersonRef as PickedPerson } from "@/api/types/common";
+import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
-import { Letter } from "@/features/shared/Letter";
-import { useRouter } from "@/lib/router";
+import { Letter, LetterFile, PolicyCited } from "@/features/shared/Letter";
+import { withSignature } from "@/features/shared/signature";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, PagedTable, TrailCard } from "@/features/shared/sections";
+import { EmployeePicker, PolicyPicker, type PolicyChoice } from "@/features/shared/pickers";
+import { BarsCard, PagedTable } from "@/features/shared/sections";
+import { paging } from "@/features/shared/wire";
+import { hasCapability } from "@/shell/access";
+import { useScreenAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Banner, Button, Card, CardHeader, Chain, Chips, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, KeyValue, LoadingRows, Money, MoneyField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useModal, Who } from "@mycity/ui";
-import { EmployeePicker } from "@/features/shared/pickers";
+import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
+import {
+  ActionGroup, Button, Card, IconButton, Menu, CardHeader, ChoiceField, Chips, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
+  DocumentPreview, KeyValue, PdfViewer, ListDetail, LoadingRows, Pager, RecordPicker, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useConfirm, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
+} from "@mycity/ui";
 
+/**
+ * Queries & Sanctions (docs/guides/queries.md §10): Queries, Rules, Sanctions and Letter
+ * Templates, on the generated contract. Who sees what is the API's rule (§6.1); the
+ * configure buttons follow `queries.configure`, and the API refuses what they would not.
+ */
 export default function Queries({ tab, id }: ModuleScreenProps) {
   if (tab === "rules") return <Rules />;
   if (tab === "sanctions") return <Sanctions />;
@@ -20,152 +36,345 @@ export default function Queries({ tab, id }: ModuleScreenProps) {
   return <QueriesTab id={id} />;
 }
 
+type Tone = "ok" | "warn" | "err" | "info" | "neutral";
+const pill = (tone: Tone, text: string) => ({ tone, text });
 const person = (p: PersonRef) => <Who name={p.display_name} sub={p.department ?? undefined} />;
+const useConfigure = () => {
+  const { me } = useAuth();
+  return !!me && hasCapability(me, "queries.configure");
+};
+/**
+ * A save that failed: on its fields when the API named fields this form has, otherwise in a toast,
+ * so a refusal about something the form does not show is never silent.
+ */
+const failed = (f: { values: object; setServerErrors: (x: Record<string, string[]>) => void }) => (e: unknown) => {
+  const fields = e instanceof ApiError ? (e.fields ?? {}) : {};
+  const known = Object.keys(fields).filter((k) => k in f.values);
+  if (known.length) f.setServerErrors(fields);
+  if (known.length < Object.keys(fields).length || !known.length) toast(e instanceof ApiError ? e.message : "Not saved");
+};
+/** May this reader raise a query: `queries` create, which the API asks for (guide §8). */
+const useMayRaise = () => {
+  const { me } = useAuth();
+  return !!me?.grants.queries?.includes("create");
+};
 
 /* ───────────── Queries ───────────── */
 
+const ESCALATED_HELP = "A sanction is waiting for approval.";
+
+function queryStatus(q: Pick<Query, "status" | "outcome" | "escalated">) {
+  if (q.status === "resolved") return q.outcome === "sanctioned" ? pill("neutral", "Sanctioned") : pill("ok", "Closed, No Action");
+  if (q.escalated) return pill("err", "Escalated");
+  return q.status === "under_review" ? pill("info", "Under Review") : pill("warn", "Awaiting Response");
+}
+
 function QueriesTab({ id }: { id: string | null }) {
   const modal = useModal();
-  const { navigate } = useRouter();
-  const { me } = useAuth();
-  const full = !!(me?.grants.settings?.includes("view") || me?.is_ceo);
-  const [scope, setScope] = useState<"all" | "mine">(full ? "all" : "mine");
+  const phone = useIsPhone();
+  const mayRaise = useMayRaise();
+  const raise = () => modal.open({ title: "Raise a Query", body: (close) => <RaiseQuery close={close} /> });
+  useScreenAction(mayRaise ? { label: "Raise a Query", onSelect: raise } : null);
+  const [raised, setRaised] = useState<"all" | "mine">("all");
   const s = useApi("GET /api/v1/queries/summary");
-  const list = usePaged("GET /api/v1/queries", { filters: { scope } });
-  const focus = id ?? s.data?.focus_id ?? null;
+  const list = usePaged("GET /api/v1/queries", { filters: raised === "mine" ? { raised: "mine" } : {}, sort: "-created_at" });
+  // A query opens in its sheet when its row is pressed, or at once when the address names it.
+  const openQuery = useQuerySheet();
+  useEffect(() => {
+    if (id) openQuery(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  const top = Math.max(1, ...(s.data?.by_reason ?? []).map((r) => r.count));
   return (
     <>
       <PageHeader
         title="Queries"
         sub="Every query and its outcome"
-        actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Raise a Query", body: (close) => <RaiseQuery close={close} /> })}>Raise a Query</Button>}
+        actions={mayRaise ? <Button variant="primary" icon="plus" onClick={raise}>Raise a Query</Button> : undefined}
       />
-      {s.data && <KpiTiles items={[{ label: "Open", value: String(s.data.open), tone: s.data.open ? "warn" : "ok" }, { label: "Awaiting Response", value: String(s.data.awaiting_response) }, { label: "Closed This Month", value: String(s.data.closed_this_month), tone: "ok" }, { label: "Escalated", value: String(s.data.escalated), tone: s.data.escalated ? "err" : undefined }]} />}
-      {full && <Chips value={scope} onChange={setScope} options={[["all", "All Queries"], ["mine", "Raised by Me"]]} />}
-      <PagedTable<QueryRow>
-        title={scope === "mine" ? "Queries I Raised" : "All Queries"}
+      {s.data && (
+        // A phone shows the two that ask for action (guide §10.2).
+        <KpiTiles
+          mobileCols={2}
+          items={[
+            { label: "Open", value: String(s.data.open), tone: s.data.open ? "warn" : "ok" },
+            { label: "Awaiting Response", value: String(s.data.awaiting_response) },
+            ...(phone
+              ? []
+              : [
+                  { label: "Closed This Month", value: String(s.data.closed_this_month), tone: "ok" as const },
+                  { label: "Escalated", value: String(s.data.escalated), tone: s.data.escalated ? ("err" as const) : undefined, help: ESCALATED_HELP },
+                ]),
+          ]}
+        />
+      )}
+      <Chips value={raised} onChange={setRaised} options={[["all", "All Queries"], ["mine", "Raised by Me"]]} label="Raised By" />
+      <PagedTable<Query>
+        title={raised === "mine" ? "Queries I Raised" : "All Queries"}
         list={list}
         search="Search name, number or subject"
-        rowKey={(q) => q.query_id}
+        rowKey={(q) => q.employee_query_id}
         noun="query"
         nounPlural="queries"
-        onRowClick={(q) => navigate(`/queries?tab=queries&id=${q.query_id}`)}
-        wide
-        empty={{ title: "No Queries", text: "Queries you raise, and those rules raise on your team, appear here." }}
+        onRowClick={(q) => openQuery(q.employee_query_id)}
+        empty={{ title: "No Queries", text: "Queries you raise appear here." }}
         columns={[
           { key: "e", label: "Employee", render: (q) => person(q.employee) },
           { key: "n", label: "Number", render: (q) => q.number, desktop: true },
           { key: "s", label: "Subject", render: (q) => q.subject },
-          { key: "b", label: "Raised By", render: (q) => q.raised_by, desktop: true },
-          { key: "d", label: "Raised", render: (q) => formatDate(q.raised_on) },
-          { key: "r", label: "Response", render: (q) => q.response ?? "Not yet", desktop: true },
-          { key: "st", label: "Status", render: (q) => <StatusPill s={q.status} /> },
+          { key: "b", label: "Raised By", render: (q) => q.raised_by_name ?? q.rule_name ?? "Rule", desktop: true },
+          { key: "d", label: "Raised", render: (q) => formatDate(q.created_at) },
         ]}
       />
-      <Grid cols={2} className="mt-3">
-        {focus ? <QueryCard id={focus} /> : <Card><p className="text-xs text-subtle-foreground">Pick a query to see it here.</p></Card>}
-        {s.data ? <BarsCard title="Queries by Reason" rows={s.data.by_reason} /> : <Card><LoadingRows /></Card>}
-      </Grid>
+      {/* Below the list on a computer; a phone leaves it off (guide §10.2). */}
+      {!phone && s.data && (
+        <div className="mt-3">
+          <BarsCard title="Queries by Reason" rows={s.data.by_reason.map((r) => ({ label: r.label, pct: Math.round((r.count / top) * 100), value: String(r.count) }))} />
+        </div>
+      )}
     </>
   );
+}
+
+/** The query's sanction as its card names it: a refused or withdrawn proposal says so. */
+function sanctionLine(s: NonNullable<QueryDetail["sanction"]>) {
+  if (s.status === "rejected") return `${s.step_name}, Not Approved`;
+  if (s.status === "withdrawn") return `${s.step_name}, Withdrawn`;
+  return `${s.step_name}${s.number ? `, ${s.number}` : ""}`;
+}
+
+/** Opens a query in its sheet, replacing whatever sheet is open (Sanctions' Open Query too). */
+function useQuerySheet() {
+  const modal = useModal();
+  return (id: string) => modal.open({ title: "Query", wide: true, body: <QueryCard id={id} /> });
 }
 
 function QueryCard({ id }: { id: string }) {
   const modal = useModal();
   const q = useApi("GET /api/v1/queries/:id", { params: { id } });
   const remind = useMutation("POST /api/v1/queries/:id/remind");
-  if (q.error) return <Card><ErrorState error={q.error} onRetry={q.reload} /></Card>;
-  if (!q.data) return <Card><LoadingRows /></Card>;
+  if (q.error) return <ErrorState error={q.error} onRetry={q.reload} />;
+  if (!q.data) return <LoadingRows />;
   const d = q.data;
-  return (
-    <Card>
-      <CardHeader record title={`${d.number} · ${d.employee.display_name}`} right={<StatusPill s={d.status} />} />
-      <KeyValue
-        items={[
-          ["Subject", d.subject],
-          ["Raised by", d.raised_by === "System rule" ? "A system rule, not a manager" : d.raised_by],
-          ["Raised", formatDateTime(d.raised_at)],
-          ["Response due", d.respond_by ? formatDateTime(d.respond_by) : "Closed"],
-          ...(d.instances.length ? ([["Instances", d.instances.join(", ")]] as Array<[string, string]>) : []),
-          ["Letter", d.letter],
-          ...(d.response_text ? ([["Response", d.response_text]] as Array<[string, string]>) : []),
-        ]}
-      />
-      <div className="mt-3.5 flex flex-wrap gap-2">
-        <Button icon="doc" onClick={() => modal.open({ title: `${d.number} · Query Letter`, wide: true, body: <LetterById id={d.query_id} /> })}>View Letter</Button>
-        {d.can_remind && (
-          <Button busy={remind.pending} onClick={async () => { await remind.run({ params: { id: d.query_id }, body: {} }); toast(`Reminder sent to ${d.employee.display_name}`); }}>Send Reminder</Button>
-        )}
-        {d.can_decide && <Button variant="primary" onClick={() => modal.open({ title: `Decision on ${d.number}`, body: (close) => <Decide id={d.query_id} hasResponse={!!d.response_text} close={close} /> })}>Record a Decision</Button>}
-      </div>
-    </Card>
-  );
-}
-
-function LetterById({ id }: { id: string }) {
-  const l = useApi("GET /api/v1/queries/:id/letter", { params: { id } });
-  return l.data ? <Letter l={l.data} note="Query letter as it is sent. Everything underlined came from the record, not from typing." /> : l.error ? <ErrorState error={l.error} /> : <LoadingRows count={6} />;
-}
-
-function RaiseQuery({ close }: { close: () => void }) {
-  const [who, setWho] = useState<PersonRef[]>([]);
-  const f = useContractForm({ subject: "", details: "" }, { subject: (v) => (v.trim().length < 4 ? "Name the subject" : null), details: (v) => (v.trim().length < 20 ? "Give the facts" : null) });
-  const [tried, setTried] = useState(false);
-  const save = useMutation("POST /api/v1/queries");
-  const submit = async () => {
-    setTried(true);
-    if (!f.check() || !who.length) return;
-    try {
-      const q = await save.run({ body: { employee_id: who[0].employee_id, subject: f.values.subject.trim(), details: f.values.details.trim() } });
-      invalidate("/api/v1/queries");
-      close();
-      toast(`${q.number} raised. Letter sent by email and app`);
-    } catch (e) {
-      f.setServerErrors(save.fields);
-      if (e instanceof ApiError && !e.fields) toast(e.message);
-    }
+  // A sanction settles after the approval commits (the worker issues it): read the card again then.
+  const settled = () => {
+    q.reload();
+    for (const ms of [1500, 4000]) window.setTimeout(() => (invalidate("/api/v1/queries"), invalidate("/api/v1/sanctions"), q.reload()), ms);
+  };
+  const sendReminder = async () => {
+    await remind.run({ params: { id: d.employee_query_id }, body: {} });
+    q.reload();
+    toast(`Reminder sent to ${d.employee.display_name}`);
   };
   return (
     <>
-      <Banner tone="info" icon="info">The employee has 48 hours to respond in writing. Their response is read before any decision.</Banner>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label="Subject" {...f.field("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out Thursday" /></Field>
-      <Field label="What Happened" {...f.field("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" busy={save.pending} onClick={submit}>Raise Query</Button>
-      </FormFooter>
+      <CardHeader record title={`${d.number} · ${d.employee.display_name}`} right={<StatusPill s={queryStatus(d)} />} />
+      <KeyValue
+        items={[
+          ["Subject", d.subject],
+          ["Raised By", d.raised_by_name ?? d.rule_name ?? "Rule"],
+          ["Raised", formatDateTime(d.created_at)],
+          ...(d.status === "awaiting_response" && d.response_due_at ? ([[<HelpTerm key="due" help="The employee has 24 hours to respond in writing.">Response Due</HelpTerm>, formatDateTime(d.response_due_at)]] as Array<[React.ReactNode, string]>) : []),
+          ...(d.evidence.length ? ([["Counted", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),
+          ...(d.policy ? ([["Policy", <PolicyCited key="p" policy={d.policy} clause={d.policy_clause} />]] as Array<[string, React.ReactNode]>) : []),
+          ...(d.response ? ([["Response", <RichText key="r" blocks={d.response.blocks} top={4} />]] as Array<[string, React.ReactNode]>) : []),
+          ...(d.responded_at ? ([["Responded", formatDateTime(d.responded_at)]] as Array<[string, string]>) : []),
+          ...(d.sanction ? ([["Sanction", sanctionLine(d.sanction)]] as Array<[string, string]>) : []),
+          ...(d.approval ? ([[<HelpTerm key="w" help={ESCALATED_HELP}>Waiting On</HelpTerm>, d.approval.stage_name]] as Array<[React.ReactNode, string]>) : []),
+        ]}
+      />
+      <ActionGroup>
+        <div className="mt-3.5 flex flex-wrap gap-2">
+        <Button icon="doc" onClick={() => modal.open({ title: `${d.number} · Query Letter`, wide: true, body: <LetterFile documentId={d.letter_document_id} name={d.number} /> })}>View Letter</Button>
+        {d.can_remind && <Button onClick={sendReminder}>Send Reminder</Button>}
+        {d.can_decide && <Button variant="primary" onClick={() => modal.open({ title: `Decision on ${d.number}`, body: (close) => <Decide q={d} close={close} onDone={q.reload} /> })}>Record Decision</Button>}
+        {d.approval?.can_decide && d.sanction && (
+          <>
+            <Button onClick={() => modal.open({ title: `Reject ${d.sanction!.step_name}`, body: (close) => <RejectSanction id={d.sanction!.sanction_id} close={close} onDone={settled} /> })}>Reject</Button>
+            <Button variant="primary" onClick={() => modal.open({ title: `Approve ${d.sanction!.step_name}`, body: (close) => <ApproveSanction id={d.sanction!.sanction_id} signs={d.approval!.signs} close={close} onDone={settled} /> })}>Approve Sanction</Button>
+          </>
+        )}
+        </div>
+      </ActionGroup>
     </>
   );
 }
 
-const OUTCOMES: Array<[Outcome, string]> = [["no_action", "Close, No Action"], ["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"]];
+type RaiseValues = { subject: string; details: string; policy_id: string; policy_clause: string; signature: string };
 
-function Decide({ id, hasResponse, close }: { id: string; hasResponse: boolean; close: () => void }) {
-  const f = useContractForm({ outcome: "no_action", note: "", fine: "" }, { note: (v) => (v.trim().length < 10 ? "Record the reason" : null) });
-  const save = useMutation("POST /api/v1/queries/:id/decision");
+function RaiseQuery({ close }: { close: () => void }) {
+  const [who, setWho] = useState<PickedPerson[]>([]);
+  const [policy, setPolicy] = useState<PolicyChoice[]>([]);
+  const [tried, setTried] = useState(false);
+  // The policy cited and the clause quoted, only once a policy is picked (guide §6.2).
+  const cited = (v: RaiseValues) => {
+    const { policy_id: policyId, policy_clause: clause, ...rest } = v;
+    return policyId ? { ...rest, policy_id: policyId, ...(clause.trim() && { policy_clause: clause.trim() }) } : rest;
+  };
+  const employee = who[0]?.employee_id ?? "";
+  const pad = useRef<SignatureFieldHandle>(null);
+  const f = useContractForm<RaiseValues>(
+    { subject: "", details: "", policy_id: "", policy_clause: "", signature: "" },
+    withSignature({ safeParse: (v: unknown) => queries.QueryCreate.safeParse({ employee_id: employee || undefined, ...cited(v as RaiseValues) }) }, pad),
+  );
+  const save = useMutation("POST /api/v1/queries");
+  const ai = useApi("GET /api/v1/queries/assist");
+  // The pad starts from the signature saved on Letter Templates (guide §6.9).
+  const mine = useApi("GET /api/v1/queries/my-signature");
+  // Write With AI: mounted from its first opening, so Back keeps what was typed in it (mailbox §10).
+  const [step, setStep] = useState<{ mounted: boolean; open: boolean }>({ mounted: false, open: false });
+  const draft = async (instruction: string) => {
+    if (!employee) {
+      setTried(true);
+      toast("Pick the employee first");
+      return null;
+    }
+    const { policy_id: policyId, policy_clause: clause } = cited(f.values) as { policy_id?: string; policy_clause?: string };
+    const r = await api.call("POST /api/v1/queries/assist", {
+      body: { employee_id: employee, instruction, subject: f.values.subject.trim(), details: f.values.details.trim(), ...(policyId && { policy_id: policyId }), ...(clause && { policy_clause: clause }) },
+    });
+    if (!r.available) {
+      offToast(r.reason);
+      return null;
+    }
+    return { subject: r.subject ?? "", details: r.details ?? "" };
+  };
   const submit = async () => {
-    if (!f.check()) return;
+    setTried(true);
+    if (!f.check() || !employee) return;
     try {
-      const q = await save.run({ params: { id }, body: { outcome: f.values.outcome as Outcome, note: f.values.note.trim(), ...(f.values.fine && { fine_amount: f.values.fine }) } });
+      const q = await save.run({
+        body: { employee_id: employee, ...cited(f.values), subject: f.values.subject.trim(), details: f.values.details.trim(), signature: pad.current?.toPng() ?? "" },
+      });
       invalidate("/api/v1/queries");
       close();
-      toast(`${q.number}: ${q.status.text}`);
+      toast(`${q.number} raised, letter sent`);
     } catch (e) {
-      f.setServerErrors(save.fields);
-      if (e instanceof ApiError && !e.fields) toast(e.message);
+      failed(f)(e);
     }
   };
   return (
     <>
-      {!hasResponse && <Banner tone="warn">No response yet. A sanction waits until the employee has answered or the 48 hours have passed.</Banner>}
-      <Field label="Outcome"><SelectField options={OUTCOMES} {...f.field("outcome")} /></Field>
-      {f.values.outcome !== "no_action" && (
-        <Field label="Fine (Optional)" info="A fine reaches payroll as a pending deduction. Finance or Operations accepts it; it is never automatic.">
-          <MoneyField {...f.field("fine")} />
-        </Field>
+      {step.mounted && (
+        <div className={step.open ? undefined : "hidden"}>
+          <WriteWithAiStep
+            ask={draft}
+            show={(d) => (
+              <>
+                <p className="mb-1 text-xs font-semibold" data-copy="content">{d.subject}</p>
+                <p className="text-sm" data-copy="content">{d.details}</p>
+              </>
+            )}
+            use={(d) => (f.set("subject", d.subject), f.set("details", d.details), setStep({ mounted: true, open: false }))}
+            back={() => setStep({ mounted: true, open: false })}
+          />
+        </div>
       )}
-      <Field label="Reason" {...f.field("note")}><TextAreaField {...f.field("note")} placeholder="Explanation accepted" /></Field>
+      <div className={step.open ? "hidden" : undefined}>
+      <WriteWithAiButton status={ai.data} open={() => setStep({ mounted: true, open: true })} />
+      <Field label="Employee" state={tried && !employee ? "bad" : undefined} message={tried && !employee ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
+      <Field label="Subject" {...f.status("subject")}><TextField {...f.field("subject")} placeholder="Late weekly report" /></Field>
+      <Field label="What Happened" {...f.status("details")}><TextAreaField {...f.field("details")} placeholder="Report due 14/10, sent 16/10" /></Field>
+      <Field label="Policy" optional {...f.status("policy_id")}>
+        <PolicyPicker value={policy} onChange={(p) => (setPolicy(p), f.set("policy_id", p[0]?.policy_id ?? ""))} />
+      </Field>
+      {policy.length > 0 && <Field label={<HelpTerm help="The line of the policy the letter quotes.">Clause</HelpTerm>} optional {...f.status("policy_clause")}><TextField {...f.field("policy_clause")} /></Field>}
+      <Field label="Your Signature" {...f.status("signature")}>
+        <SignatureField ref={pad} label="Your Signature" initial={mine.data?.signature} onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" icon="send" busy={save.pending} onClick={submit}>Raise Query</Button>
+      </FormFooter>
+      </div>
+    </>
+  );
+}
+
+type DecideValues = { outcome: string; consequence_step_id: string; reason: string; fine_amount: string; effective_on: string; ends_on: string; evidence: string };
+/** The evidence typed, one item a line (a rung may require it, guide §6.4). */
+const evidenceOf = (v: DecideValues) =>
+  v.evidence
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((label) => ({ label: label.slice(0, 200) }));
+const decisionOf = (v: DecideValues) => ({
+  outcome: v.outcome as "no_action" | "sanction",
+  reason: v.reason,
+  ...(v.outcome === "sanction" && {
+    consequence_step_id: v.consequence_step_id || undefined,
+    fine_amount: v.fine_amount.replace(/,/g, ""),
+    effective_on: v.effective_on,
+    ends_on: v.ends_on,
+    ...(evidenceOf(v).length && { evidence: evidenceOf(v) }),
+  }),
+});
+const money = (s: string) => (s && !s.includes(".") ? `${s}.00` : s && /\.\d$/.test(s) ? `${s}0` : s);
+
+function Decide({ q, close, onDone, start = "no_action" }: { q: QueryDetail; close: () => void; onDone: () => void; start?: "no_action" | "sanction" }) {
+  const chain = useApi("GET /api/v1/sanctions/chain", { query: { active: "true" } });
+  // Nobody signs a proposal: Operations & People sign when they approve it (guide §6.4).
+  const f = useContractForm<DecideValues>(
+    { outcome: start, consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "", evidence: "" },
+    {
+      safeParse: (value: unknown) => {
+        const v = value as DecideValues;
+        return queries.QueryDecision.safeParse({ ...decisionOf(v), ...(v.outcome === "sanction" && { fine_amount: money(v.fine_amount.replace(/,/g, "")) }) });
+      },
+    },
+  );
+  const save = useMutation("POST /api/v1/queries/:id/decision");
+  const steps = (chain.data?.data ?? []).filter((s) => s.letter_ready);
+  const chosen = steps.find((s) => s.consequence_step_id === f.values.consequence_step_id);
+  const needsEvidence = f.values.outcome === "sanction" && !!chosen?.evidence_required;
+  const submit = async () => {
+    if (!f.check()) return;
+    if (needsEvidence && !evidenceOf(f.values).length) {
+      f.setServerErrors({ evidence: ["Add the evidence"] });
+      return;
+    }
+    try {
+      const body = {
+        ...decisionOf(f.values),
+        ...(f.values.outcome === "sanction" && { fine_amount: money(f.values.fine_amount.replace(/,/g, "")) || undefined }),
+      };
+      const r = await save.run({ params: { id: q.employee_query_id }, body });
+      invalidate("/api/v1/queries");
+      onDone();
+      close();
+      toast(r.escalated ? "Sanction sent for approval" : `${r.number} closed`);
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
+  return (
+    <>
+      <Field label="Outcome" {...f.status("outcome")}>
+        <ChoiceField {...f.field("outcome")} options={[["no_action", "Close, No Action"], ["sanction", "Sanction"]]} />
+      </Field>
+      {f.values.outcome === "sanction" && (
+        <>
+          <Field label={<HelpTerm help="The step after the highest one still in force for this person.">Sanction</HelpTerm>} {...f.status("consequence_step_id")}>
+            <SelectField placeholder="Pick a step" options={steps.map((s) => [s.consequence_step_id, s.consequence_step_id === q.next_step?.consequence_step_id ? `${s.name} (Next)` : s.name])} {...f.field("consequence_step_id")} />
+          </Field>
+          {chosen?.financial_effect === "unpaid_days" && (
+            <Grid cols={2}>
+              <Field label="From" optional {...f.status("effective_on")}><DateField {...f.field("effective_on")} /></Field>
+              <Field label="To" optional {...f.status("ends_on")}><DateField {...f.field("ends_on")} /></Field>
+            </Grid>
+          )}
+          {needsEvidence && (
+            <Field label={<HelpTerm help="This step needs the facts it rests on. One item a line.">Evidence</HelpTerm>} {...f.status("evidence")}>
+              <TextAreaField {...f.field("evidence")} rows={3} placeholder="Site log, 14/10" />
+            </Field>
+          )}
+          <Field label={<HelpTerm help="A fine reaches payroll as a pending deduction, accepted there, never automatic.">Fine</HelpTerm>} optional {...f.status("fine_amount")}>
+            <MoneyField {...f.field("fine_amount")} />
+          </Field>
+        </>
+      )}
+      <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} placeholder="Explanation accepted" /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Record Decision</Button>
@@ -174,91 +383,264 @@ function Decide({ id, hasResponse, close }: { id: string; hasResponse: boolean; 
   );
 }
 
-/* ───────────── Rules ───────────── */
-
-function Rules() {
-  const modal = useModal();
-  const s = useApi("GET /api/v1/queries/rules/summary");
-  const rules = usePaged("GET /api/v1/queries/rules");
-  const firings = usePaged("GET /api/v1/queries/rules/firings");
-  const activate = useMutation("POST /api/v1/queries/rules/:id/activate");
-  return (
-    <>
-      <PageHeader title="Rules" sub="Automatic queries, configured not coded" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })}>New Rule</Button>} />
-      {s.data && <KpiTiles items={[{ label: "Active Rules", value: String(s.data.active) }, { label: "Draft", value: String(s.data.draft) }, { label: "Fired This Month", value: String(s.data.fired_this_month) }, { label: "Queries Raised", value: String(s.data.queries_raised) }]} />}
-      {rules.loading && !rules.rows.length ? <Card><LoadingRows /></Card> : (
-        <Grid cols={3}>
-          {rules.rows.map((r: Rule) => (
-            <div key={r.rule_id} className="rounded-box border border-border bg-card p-3.5">
-              <h2 data-copy="content" className="text-sm font-semibold">{r.name}</h2>
-              <p className="mt-1 text-xs text-muted-foreground">{r.description}</p>
-              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                <StatusPill s={r.status} />
-                {r.threshold && <StatusPill s={{ tone: "neutral", text: r.threshold }} />}
-                {r.status.text === "Draft" && (
-                  <Button size="sm" className="ml-auto" busy={activate.pending} onClick={async () => { await activate.run({ params: { id: r.rule_id }, body: {} }); invalidate("/api/v1/queries/rules"); toast(`${r.name} is now active`); }}>Activate</Button>
-                )}
-              </div>
-            </div>
-          ))}
-        </Grid>
-      )}
-      <Grid cols={2} className="mt-3">
-        <PagedTable<Firing>
-          title="Recent Firings"
-          right={<span className="text-2xs text-subtle-foreground">Last 7 days</span>}
-          list={firings}
-          rowKey={(x) => x.firing_id}
-          noun="firing"
-          columns={[
-            { key: "r", label: "Rule", render: (x) => x.rule },
-            { key: "f", label: "Fired", render: (x) => formatWhen(x.fired_at) },
-            { key: "e", label: "Employee", render: (x) => person(x.employee) },
-            { key: "o", label: "Outcome", render: (x) => <StatusPill s={x.outcome} /> },
-          ]}
-        />
-      </Grid>
-    </>
+/**
+ * Approve Sanction (guide §6.4): whoever the approval waits on lets it stand. At the Operations &
+ * People stage they sign it, and their signature is printed on its letters.
+ */
+function ApproveSanction({ id, signs, close, onDone }: { id: string; signs: boolean; close: () => void; onDone: () => void }) {
+  const pad = useRef<SignatureFieldHandle>(null);
+  const f = useContractForm<{ signature: string }>(
+    { signature: "" },
+    withSignature(sanctions.SanctionApprove, pad, () => signs),
   );
-}
-
-const TRIGGERS: Array<[RuleCreate["trigger"], string]> = [["lateness", "Late arrival"], ["missing_clock_out", "Missing Clock-Out"], ["unenrolled_device", "Punch from an unenrolled device"], ["absence", "Absence without notice"], ["overdue_task", "Overdue task"], ["missed_kpi", "KPI closed below 50%"]];
-
-function RuleForm({ close }: { close: () => void }) {
-  const tpl = usePaged("GET /api/v1/queries/templates");
-  const f = useContractForm({ name: "", trigger: "lateness", count: "3", window_days: "30", template_id: "" }, {
-    name: (v) => (v.trim().length < 3 ? "Name the rule" : null),
-    count: (v) => (!(Number(v) >= 1) ? "At least 1" : null),
-    window_days: (v) => (!(Number(v) >= 1) ? "At least 1 day" : null),
-    template_id: (v) => (!v ? "Pick a letter" : null),
-  });
-  const save = useMutation("POST /api/v1/queries/rules");
-  const num = (k: "count" | "window_days") => ({ ...f.field(k), onChange: (v: string) => f.set(k, v.replace(/\D/g, "").slice(0, 3)), inputMode: "numeric" as const });
+  const save = useMutation("POST /api/v1/sanctions/:id/approve");
+  const mine = useApi("GET /api/v1/queries/my-signature", { enabled: signs });
   const submit = async () => {
     if (!f.check()) return;
     try {
-      const r = await save.run({ body: { name: f.values.name.trim(), trigger: f.values.trigger as RuleCreate["trigger"], count: Number(f.values.count), window_days: Number(f.values.window_days), template_id: f.values.template_id } });
-      invalidate("/api/v1/queries/rules");
+      const r = await save.run({ params: { id }, body: signs ? { signature: pad.current?.toPng() ?? "" } : {} });
+      invalidate("/api/v1/queries");
+      invalidate("/api/v1/sanctions");
+      onDone();
       close();
-      toast(`${r.name} saved as a draft`);
+      // Approving the last stage issues it a moment later; a further stage names who is next.
+      toast(r.status === "issued" ? `${r.number} issued, letter sent` : r.waiting_on ? `Sent on to the ${r.waiting_on}` : "Sanction approved, letter follows");
     } catch (e) {
-      f.setServerErrors(save.fields);
-      if (e instanceof ApiError && !e.fields) toast(e.message);
+      failed(f)(e);
     }
   };
   return (
     <>
-      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. Repeated lateness" /></Field>
-      <Field label="What Sets It Off"><SelectField options={TRIGGERS} {...f.field("trigger")} /></Field>
-      <Field label="How Many Times" {...f.field("count")}><TextField {...num("count")} /></Field>
-      <Field label="Within (Days)" {...f.field("window_days")}><TextField {...num("window_days")} /></Field>
-      <Field label="Letter It Sends" {...f.field("template_id")}>
-        <SelectField placeholder="Pick a template" options={tpl.rows.filter((t) => t.status.tone === "ok").map((t) => [t.template_id, t.name])} {...f.field("template_id")} />
-      </Field>
-      <p className="text-2xs text-subtle-foreground">Saved as a draft. Nothing fires until it is activated.</p>
+      {signs && (
+        <Field label={<HelpTerm help="Your signature is printed on this sanction's letters.">Your Signature</HelpTerm>} {...f.status("signature")}>
+          <SignatureField ref={pad} label="Your Signature" initial={mine.data?.signature} onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
+        </Field>
+      )}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Save Rule</Button>
+        <Button variant="primary" icon="ok" busy={save.pending} onClick={submit}>Approve Sanction</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/** Reject a proposed sanction with a reason: the query goes back under review (guide §6.4). */
+function RejectSanction({ id, close, onDone }: { id: string; close: () => void; onDone: () => void }) {
+  const f = useContractForm<{ reason: string }>({ reason: "" }, sanctions.SanctionReject);
+  const save = useMutation("POST /api/v1/sanctions/:id/reject");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id }, body: { reason: f.values.reason.trim() } });
+      invalidate("/api/v1/queries");
+      invalidate("/api/v1/sanctions");
+      onDone();
+      close();
+      toast("Sanction rejected");
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
+  return (
+    <>
+      <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} placeholder="Too heavy" /></Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="danger" busy={save.pending} onClick={submit}>Reject</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/* ───────────── Rules ───────────── */
+
+const TRIGGERS: Array<[QueryRuleSource, string]> = [
+  ["lateness", "Late Arrival"],
+  ["absence", "Absence"],
+  ["missing_clock_out", "Missing Clock-Out"],
+  ["unenrolled_device", "Unregistered Device"],
+  ["overdue_task", "Overdue Task"],
+  ["low_performance", "Low Monthly Score"],
+  ["missed_target", "Missed Target"],
+];
+const TRIGGER_NAME = Object.fromEntries(TRIGGERS) as Record<QueryRuleSource, string>;
+/** What a new or edited rule may count: late arrivals, absences and missing clock-outs are the Attendance policy's (guide §6.3). */
+const OFFERED = new Set<QueryRuleSource>(["unenrolled_device", "overdue_task", "low_performance", "missed_target"]);
+const OFFERED_TRIGGERS = TRIGGERS.filter(([key]) => OFFERED.has(key));
+/** What something counts today, so a rule on it can be switched on: Missed Target waits for M2's KPIs. */
+const COUNTED_NOW = new Set<QueryRuleSource>(["unenrolled_device", "overdue_task", "low_performance"]);
+const ruleState = (r: QueryRule) => (r.state === "active" ? pill("ok", "Active") : r.state === "paused" ? pill("neutral", "Paused") : pill("warn", "Draft"));
+const threshold = (r: QueryRule) => (r.measure === "minutes" ? `${r.threshold} min in ${r.window_days} days` : `${r.threshold} in ${r.window_days} days`);
+
+function Rules() {
+  const modal = useModal();
+  const phone = useIsPhone();
+  const configure = useConfigure();
+  const s = useApi("GET /api/v1/query-rules/summary");
+  const rules = usePaged("GET /api/v1/query-rules", { sort: "name" });
+  const firings = usePaged("GET /api/v1/query-rules/firings", { sort: "created_at" });
+  const activate = useMutation("POST /api/v1/query-rules/:id/activate");
+  const pause = useMutation("POST /api/v1/query-rules/:id/pause");
+  const drop = useMutation("DELETE /api/v1/query-rules/:id");
+  const confirm = useConfirm();
+  // Only a rule that never raised a query; one that has keeps its history and is paused (guide §6.3).
+  const remove = async (r: QueryRule) => {
+    if (!(await confirm({ title: "Delete Rule", body: `${r.name} goes for good.`, confirmLabel: "Delete Rule", destructive: true }))) return;
+    try {
+      await drop.run({ params: { id: r.query_rule_id } });
+      invalidate("/api/v1/query-rules");
+      toast(`${r.name} deleted`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not deleted");
+    }
+  };
+  const flip = async (r: QueryRule) => {
+    try {
+      if (r.active) await pause.run({ params: { id: r.query_rule_id }, body: {} });
+      else await activate.run({ params: { id: r.query_rule_id }, body: {} });
+      invalidate("/api/v1/query-rules");
+      toast(r.active ? `${r.name} paused` : `${r.name} is now active`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not saved");
+    }
+  };
+  return (
+    <>
+      <PageHeader
+        title="Rules"
+        sub="Automatic queries, configured not coded"
+        actions={configure && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })}>New Rule</Button>}
+      />
+      {s.data && <KpiTiles items={[{ label: "Active Rules", value: String(s.data.active) }, { label: "Draft", value: String(s.data.draft) }, { label: "Fired This Month", value: String(s.data.fired_this_month) }, { label: "Queries Raised", value: String(s.data.queries_raised) }]} />}
+      {rules.error ? <Card><ErrorState error={rules.error} onRetry={() => invalidate("/api/v1/query-rules")} /></Card> : rules.loading && !rules.rows.length ? <Card><LoadingRows /></Card> : !rules.rows.length ? (
+        <Card><EmptyState bare icon="doc" title="No Rules Yet" text="A rule raises a query by itself." /></Card>
+      ) : (
+        <Grid cols={3}>
+          {rules.rows.map((r: QueryRule) => (
+            <Card key={r.query_rule_id}>
+              <CardHeader record title={r.name} right={<StatusPill s={ruleState(r)} />} />
+              <KeyValue items={[["Counts", !r.active && OFFERED.has(r.source_event) && !COUNTED_NOW.has(r.source_event) ? <HelpTerm key="c" help="Nothing counts this yet. The rule can be switched on once KPI targets are in use.">{TRIGGER_NAME[r.source_event]}</HelpTerm> : TRIGGER_NAME[r.source_event]], ["Threshold", threshold(r)], ...(r.policy ? ([["Policy", r.policy.title]] as Array<[string, string]>) : [])]} />
+              {configure && (
+                <ActionGroup>
+                  <div className="mt-2.5 flex justify-end gap-2">
+                    {OFFERED.has(r.source_event) && <Button size="sm" icon="edit" onClick={() => modal.open({ title: "Edit Rule", body: (close) => <RuleForm rule={r} close={close} /> })}>Edit Rule</Button>}
+                    {(r.active || COUNTED_NOW.has(r.source_event)) && <Button size="sm" onClick={() => flip(r)}>{r.active ? "Pause" : "Activate"}</Button>}
+                    {!r.has_fired && <Button size="sm" icon="trash" onClick={() => remove(r)}>Delete Rule</Button>}
+                  </div>
+                </ActionGroup>
+              )}
+            </Card>
+          ))}
+        </Grid>
+      )}
+      {rules.rows.length > 0 && <Pager page={rules.page} onPage={rules.setPage} noun="rule" label="Rules" />}
+      {/* Left off a phone (guide §10.2). */}
+      {!phone && (
+      <Grid cols={2} className="mt-3">
+        <PagedTable<QueryRuleFiring>
+          title="Recent Firings"
+          list={firings}
+          rowKey={(x) => x.employee_query_id}
+          noun="firing"
+          empty={{ title: "No Firings", text: "Nothing has reached a rule." }}
+          columns={[
+            { key: "r", label: "Rule", render: (x) => x.rule_name },
+            { key: "f", label: "Fired", render: (x) => formatWhen(x.created_at) },
+            { key: "e", label: "Employee", render: (x) => person(x.employee) },
+            { key: "o", label: "Query", render: (x) => <StatusPill s={queryStatus({ status: x.status, outcome: null, escalated: false })} /> },
+          ]}
+        />
+      </Grid>
+      )}
+    </>
+  );
+}
+
+type RuleValues = { name: string; source_event: string; threshold: string; window_days: string; letter_template: string; policy_id: string; policy_clause: string };
+const ruleOf = (v: RuleValues) => ({
+  name: v.name,
+  source_event: v.source_event as QueryRuleSource,
+  threshold: v.threshold === "" ? undefined : Number(v.threshold),
+  window_days: v.window_days === "" ? undefined : Number(v.window_days),
+  ...(v.letter_template && { letter_template: v.letter_template }),
+  ...(v.policy_id && { policy_id: v.policy_id }),
+  ...(v.policy_id && v.policy_clause.trim() && { policy_clause: v.policy_clause.trim() }),
+});
+type OfferedSource = "unenrolled_device" | "overdue_task" | "low_performance" | "missed_target";
+
+/**
+ * New Rule, or Edit Rule on a rule's card (guide §6.3): saved as a draft when new; an edit applies
+ * from the next event, and a rule that has fired keeps its trigger (the API refuses a change).
+ */
+function RuleForm({ rule, close }: { rule?: QueryRule; close: () => void }) {
+  const editing = Boolean(rule);
+  const f = useContractForm<RuleValues>(
+    {
+      name: rule?.name ?? "",
+      source_event: rule?.source_event ?? "overdue_task",
+      threshold: String(rule?.threshold ?? 3),
+      window_days: String(rule?.window_days ?? 14),
+      letter_template: rule?.letter_template ?? "",
+      policy_id: rule?.policy?.policy_id ?? "",
+      policy_clause: rule?.policy_clause ?? "",
+    },
+    { safeParse: (v: RuleValues) => (editing ? query_rules.QueryRuleUpdate : query_rules.QueryRuleCreate).safeParse(ruleOf(v)) },
+  );
+  const [policy, setPolicy] = useState<PolicyChoice[]>(rule?.policy ? [rule.policy] : []);
+  const create = useMutation("POST /api/v1/query-rules");
+  const update = useMutation("PATCH /api/v1/query-rules/:id");
+  // The query letters a rule may send; none picked sends the Query Letter (guide §6.3).
+  const letters = useInfinite("GET /api/v1/letter-templates", { filters: { purpose: "query", status: "active" } });
+  const submit = async () => {
+    if (!f.check()) return;
+    const body = ruleOf(f.values) as { name: string; source_event: OfferedSource; threshold: number; window_days: number; letter_template?: string; policy_id?: string; policy_clause?: string };
+    try {
+      if (rule) {
+        const { source_event: sourceEvent, ...rest } = body;
+        const r = await update.run({
+          params: { id: rule.query_rule_id },
+          body: { ...rest, ...(!rule.has_fired && { source_event: sourceEvent }), letter_template: body.letter_template ?? null, policy_id: body.policy_id ?? null, policy_clause: body.policy_clause ?? null },
+        });
+        invalidate("/api/v1/query-rules");
+        close();
+        toast(`${r.name} saved`);
+        return;
+      }
+      const r = await create.run({ body });
+      invalidate("/api/v1/query-rules");
+      close();
+      toast(`${r.name} saved as a draft`);
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
+  return (
+    <>
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Overdue Tasks" /></Field>
+      {rule?.has_fired ? (
+        // Its queries were counted this way: the trigger stays (guide §6.3).
+        <KeyValue items={[[<HelpTerm key="t" help="Fixed once the rule has raised a query.">What Sets It Off</HelpTerm>, TRIGGER_NAME[rule.source_event]]]} />
+      ) : (
+        <Field label={<HelpTerm help="Late arrivals, absences and missing clock-outs are set on the Attendance Policy, which raises their queries.">What Sets It Off</HelpTerm>} {...f.status("source_event")}><SelectField options={OFFERED_TRIGGERS} {...f.field("source_event")} /></Field>
+      )}
+      <Grid cols={2}>
+        <Field label="How Many Times" {...f.status("threshold")}><NumberField {...f.field("threshold")} /></Field>
+        <Field label="Within, Days" {...f.status("window_days")}><NumberField {...f.field("window_days")} /></Field>
+      </Grid>
+      <Field label={<HelpTerm help="The letter this rule's queries send. None picked sends the Query Letter.">Letter</HelpTerm>} optional {...f.status("letter_template")}>
+        <SelectField placeholder="Query Letter" options={letters.rows.map((l) => [l.key, l.name])} {...paging(letters)} {...f.field("letter_template")} />
+      </Field>
+      <Field label={<HelpTerm help="The policy this rule enforces. Its queries' letters quote it.">Policy</HelpTerm>} optional {...f.status("policy_id")}>
+        <PolicyPicker value={policy} onChange={(p) => {
+          setPolicy(p);
+          f.set("policy_id", p[0]?.policy_id ?? "");
+          if (!p.length) f.set("policy_clause", "");
+        }} />
+      </Field>
+      {policy.length > 0 && <Field label={<HelpTerm help="The line of the policy this rule's letters quote.">Clause</HelpTerm>} optional {...f.status("policy_clause")}><TextField {...f.field("policy_clause")} /></Field>}
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" busy={create.pending || update.pending} onClick={submit}>Save Rule</Button>
       </FormFooter>
     </>
   );
@@ -266,10 +648,55 @@ function RuleForm({ close }: { close: () => void }) {
 
 /* ───────────── Sanctions ───────────── */
 
+const sanctionStatus = (s: Sanction) =>
+  s.status === "issued" ? pill("neutral", "Issued") : s.status === "pending_approval" ? pill("warn", "Awaiting Approval") : s.status === "rejected" ? pill("err", "Not Approved") : pill("neutral", "Withdrawn");
+
+/**
+ * Issue Sanction (guide §10): pick the query it follows, then Record Decision opens on it at
+ * Sanction. Only queries under review are offered; one that cannot be decided yet says why.
+ */
+function IssueSanction({ close }: { close: () => void }) {
+  // Answered, or past the deadline unanswered: the queries a decision may be recorded on now.
+  const list = usePaged("GET /api/v1/queries", { filters: { ready: "true" }, sort: "-created_at" });
+  const [picked, setPicked] = useState<Query[]>([]);
+  const chosen = picked[0] ?? null;
+  const q = useApi("GET /api/v1/queries/:id", { params: { id: chosen?.employee_query_id ?? "" }, enabled: !!chosen });
+  return (
+    <>
+      <Field label="Query">
+        <RecordPicker<Query>
+          list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+          value={picked}
+          onChange={(rows) => setPicked(rows.slice(-1))}
+          id={(r) => r.employee_query_id}
+          title={(r) => `${r.number} · ${r.employee.display_name}`}
+          sub={(r) => r.subject}
+          placeholder="Search queries"
+        />
+      </Field>
+      {chosen && !q.data && !q.error && <LoadingRows count={3} />}
+      {q.error && <ErrorState error={q.error} onRetry={q.reload} />}
+      {q.data && !q.data.can_decide && (
+        <EmptyState bare icon="doc" title="Not Ready" text={q.data.escalated ? "A sanction already waits for approval." : "It waits for the response."} />
+      )}
+      {q.data?.can_decide ? (
+        <Decide q={q.data} start="sanction" close={close} onDone={() => invalidate("/api/v1/sanctions")} />
+      ) : (
+        <FormFooter>
+          <Button onClick={close}>Cancel</Button>
+        </FormFooter>
+      )}
+    </>
+  );
+}
+
 function Sanctions() {
   const modal = useModal();
-  const s = useApi("GET /api/v1/queries/sanctions/summary");
-  const list = usePaged("GET /api/v1/queries/sanctions");
+  const configure = useConfigure();
+  const { me } = useAuth();
+  const decides = !!me?.grants.queries?.includes("edit");
+  const s = useApi("GET /api/v1/sanctions/summary");
+  const list = usePaged("GET /api/v1/sanctions", { sort: "-created_at" });
   return (
     <>
       <PageHeader
@@ -277,80 +704,170 @@ function Sanctions() {
         sub="The consequence chain · MyCity ladder"
         actions={
           <>
-            <Button icon="cog" onClick={() => modal.open({ title: "Chain Settings", body: <ChainSettings /> })}>Chain Settings</Button>
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Issue Sanction", body: (close) => <IssueSanction close={close} /> })}>Issue Sanction</Button>
+            <Button icon="cog" onClick={() => modal.open({ title: "Chain Settings", wide: true, body: <ChainSettings configure={configure} /> })}>Chain Settings</Button>
+            {decides && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Issue Sanction", body: (close) => <IssueSanction close={close} /> })}>Issue Sanction</Button>}
           </>
         }
       />
-      {s.data?.focus && (
-        <Card className="mb-3">
-          <CardHeader record title={s.data.focus.title} right={<StatusPill s={s.data.focus.status} />} />
-          <ChainSteps steps={s.data.focus.chain} />
-        </Card>
+      {s.data && (
+        <KpiTiles
+          items={[
+            { label: "Active Sanctions", value: String(s.data.active) },
+            { label: "Awaiting Approval", value: String(s.data.pending_approval), tone: s.data.pending_approval ? "warn" : undefined },
+            { label: "Fines, This Year", value: <Money value={s.data.fines_this_year} /> },
+            { label: "Fines Recovered", value: <Money value={s.data.fines_recovered} />, tone: "ok" },
+          ]}
+        />
       )}
-      {s.data && <KpiTiles items={[{ label: "Active Sanctions", value: String(s.data.active) }, { label: "Served", value: String(s.data.served) }, { label: "Financial, This Year", value: <Money value={s.data.financial_this_year} /> }, { label: "Recovered", value: <Money value={s.data.recovered} />, tone: "ok" }]} />}
-      <PagedTable<SanctionRow>
+      <PagedTable<Sanction>
         title="Sanction History"
         list={list}
         search="Search people or reasons"
         rowKey={(x) => x.sanction_id}
         noun="sanction"
-        wide
+        empty={{ title: "No Sanctions", text: "Sanctions follow a query's decision." }}
+        // The reason, who decided, the fine and the letters are on the sanction's sheet.
+        onRowClick={(x) => modal.open({ title: "Sanction", wide: true, body: <SanctionSheet id={x.sanction_id} /> })}
         columns={[
           { key: "e", label: "Employee", render: (x) => person(x.employee) },
-          { key: "k", label: "Sanction", render: (x) => x.kind },
-          { key: "r", label: "Reason", render: (x) => x.reason },
-          { key: "b", label: "Issued By", render: (x) => x.issued_by, desktop: true },
-          { key: "d", label: "Date", render: (x) => formatDate(x.date) },
-          { key: "m", label: "Financial", align: "n", render: (x) => (x.amount ? <Money value={x.amount} /> : "None") },
-          { key: "s", label: "Status", render: (x) => <StatusPill s={x.status} /> },
+          { key: "k", label: "Sanction", render: (x) => x.step_name },
+          { key: "q", label: "Query", render: (x) => x.query_number, desktop: true },
+          { key: "d", label: "Date", render: (x) => formatDate(x.effective_on), desktop: true },
+          { key: "s", label: "Status", render: (x) => <StatusPill s={sanctionStatus(x)} /> },
         ]}
       />
-      <Grid cols={2} className="mt-3">
-        {s.data ? <TrailCard title="Chain Activity" items={s.data.activity.map((x) => ({ ...x, when: formatDate(x.when) }))} /> : <Card><LoadingRows /></Card>}
-      </Grid>
     </>
   );
 }
 
-const ChainSteps = ({ steps }: { steps: Array<{ label: string; state: "done" | "now" | null }> }) => <Chain steps={steps.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />;
+const FINE_STATUS: Record<NonNullable<Sanction["fine"]>["settlement_status"], string> = {
+  pending: "Waiting for Payroll", accepted: "Accepted by Payroll", rejected: "Refused by Payroll", settled: "Deducted", waived: "Waived",
+};
 
-function ChainSettings() {
+/** One sanction in full: what, why, who decided, the fine and its letters. */
+function SanctionSheet({ id }: { id: string }) {
+  const modal = useModal();
+  const openQuery = useQuerySheet();
+  const s = useApi("GET /api/v1/sanctions/:id", { params: { id } });
+  if (s.error) return <ErrorState error={s.error} onRetry={s.reload} />;
+  if (!s.data) return <LoadingRows />;
+  const d = s.data;
+  const letter = (docId: string, name: string) => modal.open({ title: name, wide: true, body: <LetterFile documentId={docId} name={name} /> });
   return (
     <>
-      <p className="mb-3 text-xs text-muted-foreground">The MyCity ladder, in order. Each step names the letter it sends; a step without an active letter cannot send one.</p>
-      <KeyValue items={[["1 · Caution", "Caution letter"], ["2 · Warning", "Warning letter"], ["3 · Suspension", "Suspension letter (awaiting sample)"], ["4 · Suspension without pay", "Awaiting sample"], ["5 · Dismissal", "Termination letter (awaiting sample)"], ["Fines", "Attach to any step"]]} />
+      <CardHeader record title={`${d.step_name} · ${d.employee.display_name}`} right={<StatusPill s={sanctionStatus(d)} />} />
+      <KeyValue
+        items={[
+          ["Number", d.number ?? "Not yet"],
+          ["Query", d.query_number],
+          ["Reason", d.reason],
+          ["Decided By", d.decided_by_name ?? ""],
+          ...(d.waiting_on ? ([[<HelpTerm key="w" help={ESCALATED_HELP}>Waiting On</HelpTerm>, d.waiting_on]] as Array<[React.ReactNode, string]>) : []),
+          ["From", formatDate(d.effective_on)],
+          ...(d.ends_on ? ([["Until", formatDate(d.ends_on)]] as Array<[string, string]>) : []),
+          ["Fine", d.fine ? <span key="f"><Money value={d.fine.amount_ngn} />, {FINE_STATUS[d.fine.settlement_status]}</span> : "None"],
+          ...(d.evidence.length ? ([["Evidence", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),
+        ]}
+      />
+      <ActionGroup>
+        <div className="mt-3.5 flex flex-wrap gap-2">
+          {d.letter_document_id && <Button icon="doc" onClick={() => letter(d.letter_document_id!, d.number ?? d.step_name)}>View Letter</Button>}
+          {d.fine_letter_document_id && <Button icon="doc" onClick={() => letter(d.fine_letter_document_id!, `${d.number ?? d.step_name} Deduction`)}>Deduction Letter</Button>}
+          <Button onClick={() => openQuery(d.employee_query_id)}>Open Query</Button>
+        </div>
+      </ActionGroup>
     </>
   );
 }
 
-function IssueSanction({ close }: { close: () => void }) {
-  const [who, setWho] = useState<PersonRef[]>([]);
-  const [tried, setTried] = useState(false);
-  const f = useContractForm({ kind: "caution", reason: "", amount: "" }, { reason: (v) => (v.trim().length < 6 ? "Give the reason" : null), amount: (v, all) => (all.kind === "fine" && !(Number(v) > 0) ? "Enter the fine" : null) });
-  const save = useMutation("POST /api/v1/queries/sanctions");
-  const submit = async () => {
-    setTried(true);
-    if (!f.check() || !who.length) return;
+const EFFECT: Record<ConsequenceStep["financial_effect"], string> = { none: "None", unpaid_days: "Unpaid Days", ends_employment: "Ends Employment" };
+
+function ChainSettings({ configure }: { configure: boolean }) {
+  const modal = useModal();
+  const chain = useApi("GET /api/v1/sanctions/chain", { query: {} });
+  const move = useMutation("PATCH /api/v1/sanctions/chain/:id");
+  const steps = chain.data?.data ?? [];
+  const patch = async (step: ConsequenceStep, body: { position?: number; active?: boolean }) => {
     try {
-      const x = await save.run({ body: { employee_id: who[0].employee_id, kind: f.values.kind as SanctionCreate["kind"], reason: f.values.reason.trim(), ...(f.values.amount && { amount: f.values.amount }) } });
-      invalidate("/api/v1/queries/sanctions");
-      close();
-      toast(x.kind === "Fine" ? "Fine recorded. It waits in Payroll, Deductions for acceptance" : `${x.kind} issued to ${x.employee.display_name}`);
+      await move.run({ params: { id: step.consequence_step_id }, body });
+      chain.reload();
     } catch (e) {
-      f.setServerErrors(save.fields);
-      if (e instanceof ApiError && !e.fields) toast(e.message);
+      toast(e instanceof ApiError ? e.message : "Not saved");
+    }
+  };
+  if (chain.error) return <ErrorState error={chain.error} onRetry={chain.reload} />;
+  if (!chain.data) return <LoadingRows />;
+  return (
+    <>
+      {!steps.length && <EmptyState bare icon="flag" title="No Steps Yet" text="Add MyCity's ladder, top to bottom." />}
+      {steps.map((step) => (
+        <Card key={step.consequence_step_id} className="mb-2">
+          <CardHeader record title={`${step.position} · ${step.name}`} right={<StatusPill s={!step.active ? pill("neutral", "Retired") : step.letter_ready ? pill("ok", "Ready") : pill("warn", "Needs a Letter")} />} />
+          <KeyValue items={[["Letter", step.letter_template ?? "None"], ["Financial Effect", EFFECT[step.financial_effect as ConsequenceStep["financial_effect"]]], [<HelpTerm key="v" help="How long this step counts for the next offence.">In Force For</HelpTerm>, step.valid_days ? `${step.valid_days} days` : "Always"]]} />
+          {configure && (
+            <ActionGroup>
+              <div className="mt-2 flex flex-wrap justify-end gap-2">
+              {step.position > 1 && <Button size="sm" icon="up" onClick={() => patch(step, { position: step.position - 1 })}>Move Up</Button>}
+              {step.position < steps.length && <Button size="sm" icon="down" onClick={() => patch(step, { position: step.position + 1 })}>Move Down</Button>}
+              <Button size="sm" onClick={() => patch(step, { active: !step.active })}>{step.active ? "Retire" : "Restore"}</Button>
+              </div>
+            </ActionGroup>
+          )}
+        </Card>
+      ))}
+      {configure && (
+        <FormFooter>
+          <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Step", body: (close) => <StepForm count={steps.length} close={() => (close(), chain.reload())} /> })}>Add Step</Button>
+        </FormFooter>
+      )}
+    </>
+  );
+}
+
+type StepValues = { name: string; position: string; letter_template: string; financial_effect: string; default_days: string; valid_days: string };
+const stepOf = (v: StepValues) => ({
+  name: v.name,
+  position: v.position === "" ? undefined : Number(v.position),
+  letter_template: v.letter_template || null,
+  financial_effect: v.financial_effect as ConsequenceStep["financial_effect"],
+  default_days: v.default_days === "" ? null : Number(v.default_days),
+  valid_days: v.valid_days === "" ? null : Number(v.valid_days),
+});
+
+function StepForm({ count, close }: { count: number; close: () => void }) {
+  const letters = useInfinite("GET /api/v1/letter-templates", { filters: { purpose: "sanction" }, sort: "name" });
+  const f = useContractForm<StepValues>(
+    { name: "", position: String(count + 1), letter_template: "", financial_effect: "none", default_days: "", valid_days: "365" },
+    { safeParse: (v: StepValues) => sanctions.ConsequenceStepCreate.safeParse(stepOf(v)) },
+  );
+  const save = useMutation("POST /api/v1/sanctions/chain");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      const s = await save.run({ body: stepOf(f.values) });
+      close();
+      toast(`${s.name} added at step ${s.position}`);
+    } catch (e) {
+      failed(f)(e);
     }
   };
   return (
     <>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label="Sanction"><SelectField options={[["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"], ["fine", "Fine"]]} {...f.field("kind")} /></Field>
-      {f.values.kind === "fine" && <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>}
-      <Field label="Reason" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Follows QRY-0042" /></Field>
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Final Warning" /></Field>
+      <Grid cols={2}>
+        <Field label="Position" {...f.status("position")}><NumberField {...f.field("position")} /></Field>
+        <Field label="In Force, Days" optional {...f.status("valid_days")}><NumberField {...f.field("valid_days")} /></Field>
+      </Grid>
+      <Field label="Letter" optional {...f.status("letter_template")}>
+        <SelectField placeholder="Pick a letter" options={letters.rows.map((t: LetterTemplate) => [t.key, t.name])} {...paging(letters)} {...f.field("letter_template")} />
+      </Field>
+      <Field label="Financial Effect" {...f.status("financial_effect")}>
+        <ChoiceField {...f.field("financial_effect")} options={[["none", "None"], ["unpaid_days", "Unpaid Days"], ["ends_employment", "Ends Employment"]]} />
+      </Field>
+      {f.values.financial_effect === "unpaid_days" && <Field label="Days" {...f.status("default_days")}><NumberField {...f.field("default_days")} /></Field>}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Issue</Button>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Add Step</Button>
       </FormFooter>
     </>
   );
@@ -358,13 +875,65 @@ function IssueSanction({ close }: { close: () => void }) {
 
 /* ───────────── Letter templates ───────────── */
 
+const letterStatus = (t: LetterTemplate) =>
+  t.status === "active" ? pill("ok", "Active") : t.status === "awaiting_sample" ? pill("warn", "Awaiting Sample") : t.status === "retired" ? pill("neutral", "Retired") : pill("info", "Draft");
+
+/** The demo build holds no PDFs: its letter previews are the wording on paper. */
+const MOCK = import.meta.env.VITE_API_MODE === "mock";
+
 function Templates() {
   const modal = useModal();
-  const s = useApi("GET /api/v1/queries/templates/summary");
-  const list = usePaged("GET /api/v1/queries/templates");
-  const [sel, setSel] = useState<LetterTemplate | null>(null);
-  const shown = sel ?? list.rows[0] ?? null;
-  const preview = useApi("GET /api/v1/queries/templates/:id/preview", { params: { id: shown?.template_id ?? "" }, enabled: !!shown });
+  const configure = useConfigure();
+  const s = useApi("GET /api/v1/letter-templates/summary");
+  const list = usePaged("GET /api/v1/letter-templates", { sort: "name" });
+  const [sel, setSel] = useState<string | null>(null);
+  const beside = useSideBySide();
+  // Beside the list the first template shows unasked; elsewhere one opens when it is pressed (F31).
+  const shown = list.rows.find((t) => t.letter_template_id === sel) ?? (beside ? (list.rows[0] ?? null) : null);
+  const written = !!shown && shown.status !== "awaiting_sample";
+  const [redraw, setRedraw] = useState(0);
+  // The PDF as sent; only the demo build, which has no PDFs, shows the wording on paper instead.
+  const preview = useApi("GET /api/v1/letter-templates/:id/preview", { params: { id: shown?.letter_template_id ?? "" }, enabled: MOCK && written });
+  // It signs with the reader's saved signature: a new one shows at once. The PDF waits for the
+  // signature's answer, so it is rendered once, not again when that answer lands.
+  const mine = useApi("GET /api/v1/queries/my-signature");
+  const pdfUrl = shown && written && !mine.loading
+    ? `/api/v1/letter-templates/${shown.letter_template_id}/preview.pdf?v=${encodeURIComponent(`${shown.version}-${shown.updated_at}-${mine.data?.updated_at ?? ""}`)}${redraw ? `&r=${redraw}` : ""}`
+    : null;
+  const pdf = useFileBlob(pdfUrl);
+  const activate = useMutation("POST /api/v1/letter-templates/:id/activate");
+  const deactivate = useMutation("POST /api/v1/letter-templates/:id/deactivate");
+  // Activate a draft; Deactivate an active letter nothing sends (the refusal names what does).
+  const flip = async () => {
+    if (!shown) return;
+    const on = shown.status !== "active";
+    try {
+      await (on ? activate : deactivate).run({ params: { id: shown.letter_template_id }, body: {} });
+      invalidate("/api/v1/letter-templates");
+      invalidate("/api/v1/sanctions/chain");
+      toast(on ? `${shown.name} is active` : `${shown.name} is a draft`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not saved");
+    }
+  };
+  // The letter's own actions sit on its preview, beside Download PDF.
+  const edit = () => shown && modal.open({ title: shown.name, wide: true, body: (close) => <EditTemplate id={shown.letter_template_id} close={close} /> });
+  const manage = configure && shown ? (
+    <Menu
+      label="Letter Actions"
+      trigger={(p) => <IconButton {...p} icon="dots" label={`${shown.name} Actions`} size="sm" />}
+      items={[
+        { label: "Edit Template", icon: "edit" as const, onSelect: edit },
+        ...(shown.status === "draft" || shown.status === "active" ? [{ label: shown.status === "active" ? "Deactivate" : "Activate", onSelect: flip }] : []),
+      ]}
+    />
+  ) : null;
+  const above = (body: ReactNode) => (
+    <>
+      {manage && <ActionGroup><div className="mb-2.5 flex flex-wrap justify-end gap-2">{manage}</div></ActionGroup>}
+      {body}
+    </>
+  );
   return (
     <>
       <PageHeader
@@ -372,58 +941,236 @@ function Templates() {
         sub="The system fills name, date and reason"
         actions={
           <>
-            <Button icon="doc" disabled={!preview.data} onClick={() => preview.data && modal.open({ title: shown!.name, wide: true, body: <Letter l={preview.data} /> })}>Preview</Button>
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>
+            <Button icon="signature" onClick={() => modal.open({ title: "My Signature", body: (close) => <EditSignature close={close} /> })}>Edit Signature</Button>
+            {configure && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>}
           </>
         }
       />
-      {s.data && <StatStrip items={[{ label: "Templates", value: s.data.templates }, { label: "Active", value: s.data.active, tone: "ok" }, { label: "Awaiting Sample", value: s.data.awaiting, tone: "warn" }, { label: "Letters Sent, 90d", value: s.data.sent_90d }, { label: "Languages", value: s.data.languages, desktop: true }]} />}
-      <Grid cols="1/1.5">
-        <PagedTable<LetterTemplate>
-          title="Templates"
-          list={list}
-          rowKey={(t) => t.template_id}
-          noun="template"
-          onRowClick={setSel}
-          columns={[
-            { key: "n", label: "Template", render: (t) => <span className={t.template_id === shown?.template_id ? "font-semibold" : undefined}>{t.name}</span> },
-            { key: "u", label: "Used For", render: (t) => t.used_for },
-            { key: "s", label: "Status", render: (t) => <StatusPill s={t.status} /> },
-          ]}
-        />
-        <div>
-          {preview.data ? <Letter l={preview.data} /> : preview.error ? <Card><Banner tone="warn">{preview.error.message}</Banner></Card> : <Card><LoadingRows count={6} /></Card>}
-        </div>
-      </Grid>
+      {s.data && <StatStrip items={[{ label: "Templates", value: s.data.templates }, { label: "Active", value: s.data.active, tone: "ok" }, { label: "Awaiting Sample", value: s.data.awaiting_sample, tone: "warn" }, { label: "Letters Sent, 90d", value: s.data.sent_90d }]} />}
+      <ListDetail
+        cols="1/1.5"
+        full
+        open={sel !== null}
+        onClose={() => setSel(null)}
+        title="Letter Template"
+        list={
+          <PagedTable<LetterTemplate>
+            title="Templates"
+            list={list}
+            rowKey={(t) => t.letter_template_id}
+            noun="template"
+            onRowClick={(t) => setSel(t.letter_template_id)}
+            columns={[
+              { key: "n", label: "Template", render: (t) => <span className={t.letter_template_id === shown?.letter_template_id ? "font-semibold" : undefined}>{t.name}</span> },
+              { key: "u", label: "Used By", render: (t) => (t.used_by.length ? t.used_by.join(", ") : t.purpose === "query" ? "Queries" : t.purpose === "fine" ? "Fines" : "None"), desktop: true },
+              { key: "s", label: "Status", render: (t) => <StatusPill s={letterStatus(t)} /> },
+            ]}
+          />
+        }
+        detail={
+          !shown ? null : shown.status === "awaiting_sample" ? (
+            <Card><EmptyState bare icon="doc" title="Awaiting Sample" text="Write the letter to preview it." action={configure ? <Button icon="edit" onClick={edit}>Edit Template</Button> : undefined} /></Card>
+          ) : MOCK ? (
+            above(preview.data ? <Letter l={preview.data} /> : preview.error ? <Card><ErrorState error={preview.error} onRetry={preview.reload} /></Card> : <Card><LoadingRows count={6} /></Card>)
+          ) : pdf.blob && pdf.href ? (
+            // The real PDF the employee would receive, signed with the reader's saved signature.
+            <DocumentPreview
+              name={`${shown.name}.pdf`}
+              mime="application/pdf"
+              href={pdf.href}
+              file={pdf.blob}
+              height="page"
+              trailing={manage}
+              actions={
+                <Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, `${shown.name}.pdf`)}>Download PDF</Button>
+              }
+            />
+          ) : pdf.failed ? (
+            above(<Card><EmptyState bare icon="doc" title="Preview Not Ready" text="The letter could not be drawn." action={<Button icon="refresh" onClick={() => setRedraw((n) => n + 1)}>Try Again</Button>} /></Card>)
+          ) : (
+            // The letter's own frame while it is drawn, never the wording first.
+            // The actions arrive with the PDF's bar, so they never jump from above it into it.
+            <Card pad={false}><PdfViewer data={null} name={`${shown.name}.pdf`} height="page" /></Card>
+          )
+        }
+      />
     </>
   );
 }
 
-function TemplateForm({ close }: { close: () => void }) {
-  const f = useContractForm({ name: "", used_for: "", body: "" }, { name: (v) => (v.trim().length < 3 ? "Name the template" : null), used_for: (v) => (!v.trim() ? "Pick when it sends" : null), body: (v) => (v.trim().length < 40 ? "Write the letter" : null) });
-  const save = useMutation("POST /api/v1/queries/templates");
+/**
+ * Edit Signature (guide §6.9): the reader's own signature, drawn once and kept through the vault.
+ * Raise a Query and Approve Sanction start from it; a letter already sent keeps its own copy.
+ */
+function EditSignature({ close }: { close: () => void }) {
+  const pad = useRef<SignatureFieldHandle>(null);
+  const mine = useApi("GET /api/v1/queries/my-signature");
+  const f = useContractForm<{ signature: string }>({ signature: "" }, withSignature(queries.LetterSignatureSave, pad));
+  const save = useMutation("PUT /api/v1/queries/my-signature");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: { name: f.values.name.trim(), used_for: f.values.used_for.trim(), body: f.values.body } });
-      invalidate("/api/v1/queries/templates");
+      await save.run({ body: { signature: pad.current?.toPng() ?? "" } });
+      invalidate("/api/v1/queries/my-signature");
+      invalidate("/api/v1/letter-templates");
       close();
-      toast("Template saved as a draft");
-    } catch {
-      f.setServerErrors(save.fields);
+      toast("Signature saved");
+    } catch (e) {
+      failed(f)(e);
     }
   };
+  if (mine.loading && !mine.data) return <LoadingRows count={2} />;
   return (
     <>
-      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Final warning letter" /></Field>
-      <Field label="Used For" {...f.field("used_for")}><TextField {...f.field("used_for")} placeholder="Step name" /></Field>
-      <Field label="Letter" info="Use {name}, {date}, {reason} and {hours} where the record fills in. Everything else is sent as written." {...f.field("body")}>
-        <TextAreaField {...f.field("body")} rows={8} placeholder="Dear {name}, ..." />
+      <Field label={<HelpTerm help="Your letters start from it. You can still redraw it on each one.">Your Signature</HelpTerm>} {...f.status("signature")}>
+        <SignatureField ref={pad} label="Your Signature" initial={mine.data?.signature} onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Save Template</Button>
+        <Button variant="primary" icon="ok" busy={save.pending} onClick={submit}>Save Signature</Button>
       </FormFooter>
     </>
+  );
+}
+
+type TemplateValues = { name: string; purpose: string; body_html: string };
+
+function TemplateForm({ close }: { close: () => void }) {
+  const f = useContractForm<TemplateValues>({ name: "", purpose: "sanction", body_html: "" }, templates.LetterTemplateCreate);
+  const save = useMutation("POST /api/v1/letter-templates");
+  // Save Draft keeps it out of use; Save and Activate makes it ready to be chosen at once.
+  const submit = (status: "draft" | "active") => async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ body: { ...f.values, purpose: f.values.purpose as "query" | "sanction" | "fine", status } });
+      invalidate("/api/v1/letter-templates");
+      close();
+      toast(status === "active" ? "Template saved and active" : "Template saved as a draft");
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
+  return (
+    <LetterAi
+      letter={() => ({ name: f.values.name.trim() || "New Letter", purpose: f.values.purpose as LetterPurposeKey })}
+      body={() => f.values.body_html}
+      use={(html) => f.set("body_html", html)}
+    >
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Final Warning" /></Field>
+      <Field label="Used For" {...f.status("purpose")}><ChoiceField {...f.field("purpose")} options={[["query", "Queries"], ["sanction", "Sanctions"]]} /></Field>
+      <LetterBody f={f} />
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button busy={save.pending} onClick={submit("draft")}>Save Draft</Button>
+        <Button variant="primary" busy={save.pending} onClick={submit("active")}>Save and Activate</Button>
+      </FormFooter>
+    </LetterAi>
+  );
+}
+
+type LetterPurposeKey = "query" | "sanction" | "fine";
+
+/**
+ * Write With AI on the letter editor (guide §9): the step in the form's own window, its draft shown
+ * read-only, Use Draft putting it in the editor. Nothing is saved until the person saves the letter.
+ */
+function LetterAi({ letter, body, use, children }: { letter: () => { name: string; purpose: LetterPurposeKey }; body: () => string; use: (html: string) => void; children: React.ReactNode }) {
+  const ai = useApi("GET /api/v1/letter-templates/assist");
+  const [step, setStep] = useState<{ mounted: boolean; open: boolean }>({ mounted: false, open: false });
+  const ask = async (instruction: string) => {
+    const r = await api.call("POST /api/v1/letter-templates/assist", { body: { ...letter(), body_html: body(), instruction } });
+    if (!r.available) {
+      offToast(r.reason);
+      return null;
+    }
+    return r.body_html ?? "";
+  };
+  return (
+    <>
+      {step.mounted && (
+        <div className={step.open ? undefined : "hidden"}>
+          <WriteWithAiStep
+            ask={ask}
+            show={(html) => <RichTextField label="Draft" value={html} onChange={() => undefined} readOnly />}
+            use={(html) => (use(html), setStep({ mounted: true, open: false }))}
+            back={() => setStep({ mounted: true, open: false })}
+          />
+        </div>
+      )}
+      <div className={step.open ? "hidden" : undefined}>
+        <WriteWithAiButton status={ai.data} open={() => setStep({ mounted: true, open: true })} />
+        {children}
+      </div>
+    </>
+  );
+}
+
+function LetterBody({ f }: { f: { status: (k: "body_html") => object; field: (k: "body_html") => object } }) {
+  return (
+    <Field label={<HelpTerm help="Write {{ employee.first_name }}, {{ query_number }}, {{ reason }} or {{ step_name }} where the record fills in.">Letter</HelpTerm>} {...f.status("body_html")}>
+      <RichTextField label="Letter" {...(f.field("body_html") as Omit<Parameters<typeof RichTextField>[0], "label">)} />
+    </Field>
+  );
+}
+
+function EditTemplate({ id, close }: { id: string; close: () => void }) {
+  const t = useApi("GET /api/v1/letter-templates/:id", { params: { id } });
+  if (t.error) return <ErrorState error={t.error} onRetry={t.reload} />;
+  if (!t.data) return <LoadingRows count={6} />;
+  return <EditTemplateForm t={t.data} close={close} />;
+}
+
+type EditValues = { name: string; purpose: string; body_html: string };
+
+/**
+ * Edit Template: the name, what it is used for (while nothing sends it), and the wording, which
+ * opens as saved (a shipped letter's file, converted for the editor). Only what changed is sent:
+ * the wording as its next version, the name and use through PATCH.
+ */
+function EditTemplateForm({ t, close }: { t: LetterTemplateDetail; close: () => void }) {
+  const body = t.body_html ?? "";
+  const f = useContractForm<EditValues>(
+    { name: t.name, purpose: t.purpose, body_html: body },
+    {
+      safeParse: (value: unknown) => {
+        const v = value as EditValues;
+        const named = templates.LetterTemplateUpdate.safeParse({ name: v.name, ...(t.purpose !== "fine" && { purpose: v.purpose }) });
+        if (!named.success) return named;
+        return v.body_html === body ? named : templates.LetterTemplateBodySave.safeParse({ body_html: v.body_html });
+      },
+    },
+  );
+  const rename = useMutation("PATCH /api/v1/letter-templates/:id");
+  const save = useMutation("PUT /api/v1/letter-templates/:id/body");
+  const id = t.letter_template_id;
+  const submit = async () => {
+    if (!f.check()) return;
+    const name = f.values.name.trim();
+    const purpose = f.values.purpose as "query" | "sanction";
+    try {
+      if (name !== t.name || (t.purpose !== "fine" && purpose !== t.purpose))
+        await rename.run({ params: { id }, body: { ...(name !== t.name && { name }), ...(t.purpose !== "fine" && purpose !== t.purpose && { purpose }) } });
+      const r = f.values.body_html !== body ? await save.run({ params: { id }, body: { body_html: f.values.body_html } }) : null;
+      invalidate("/api/v1/letter-templates");
+      close();
+      toast(r ? `Saved as version ${r.version}` : `${name} saved`);
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
+  return (
+    <LetterAi letter={() => ({ name: f.values.name.trim() || t.name, purpose: t.purpose })} body={() => f.values.body_html} use={(html) => f.set("body_html", html)}>
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} /></Field>
+      {t.purpose === "fine" ? null : t.in_use ? (
+        <KeyValue items={[[<HelpTerm key="u" help="A step or rule sends it, or every manual query does. Move them first.">Used For</HelpTerm>, t.purpose === "query" ? "Queries" : "Sanctions"]]} />
+      ) : (
+        <Field label="Used For" {...f.status("purpose")}><ChoiceField {...f.field("purpose")} options={[["query", "Queries"], ["sanction", "Sanctions"]]} /></Field>
+      )}
+      <LetterBody f={f} />
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" busy={save.pending || rename.pending} onClick={submit}>Save Letter</Button>
+      </FormFooter>
+    </LetterAi>
   );
 }

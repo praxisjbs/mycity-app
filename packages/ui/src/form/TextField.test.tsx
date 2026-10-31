@@ -42,6 +42,36 @@ describe("TextField family", () => {
     expect(screen.getByLabelText("Value")).toHaveValue("125");
   });
 
+  it("NumberField signed keeps a leading minus and nothing else a figure is written with", async () => {
+    const user = userEvent.setup();
+    function Signed() {
+      const [v, setV] = useState("");
+      return (
+        <Field label="Actual">
+          <NumberField decimal signed value={v} onChange={setV} />
+        </Field>
+      );
+    }
+    const { unmount } = render(<Signed />);
+    const input = screen.getByLabelText("Actual");
+    await user.type(input, "64,000");
+    expect(input).toHaveValue("64000");
+    await user.clear(input);
+    await user.type(input, "-2.5%");
+    expect(input).toHaveValue("-2.5");
+    await user.clear(input);
+    await user.type(input, "5-");
+    expect(input).toHaveValue("5");
+    await user.clear(input);
+    await user.type(input, "−12");
+    expect(input).toHaveValue("-12");
+    unmount();
+    // Unsigned, the minus never gets in.
+    render(<Bound kind="number" />);
+    await user.type(screen.getByLabelText("Value"), "-7");
+    expect(screen.getByLabelText("Value")).toHaveValue("7");
+  });
+
   it("PhoneField shows +234 and keeps phone characters", async () => {
     const user = userEvent.setup();
     render(<Bound kind="phone" />);

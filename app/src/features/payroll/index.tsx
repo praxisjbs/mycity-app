@@ -9,7 +9,7 @@ import { SlipPaper } from "@/features/ess/Payslips";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { ChainCard, ExportAction, KvCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AreaChart, BandChart, Banner, Button, Card, CardHeader, Chain, DataView, DateField, Field, formatMoneyShort, formatMonth, FormFooter, Grid, Icon, LoadingRows, Money, MoneyField, PageHeader, rules, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { AreaChart, BandChart, Banner, Button, Card, CardHeader, Chain, DataView, DateField, DetailPane, Field, formatMoneyShort, formatMonth, FormFooter, Grid, Icon, LoadingRows, Money, MoneyField, PageHeader, rules, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useIsPhone, useModal, Who } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Payroll({ tab }: ModuleScreenProps) {
@@ -90,8 +90,10 @@ function Payslips() {
   const s = useApi("GET /api/v1/payroll/runs/summary");
   const c = s.data?.current;
   const list = usePaged("GET /api/v1/payslips", { filters: { scope: "all", ...(c ? { period: c.period } : {}) }, enabled: !!c });
+  const phone = useIsPhone();
   const [sel, setSel] = useState<PayslipRow | null>(null);
-  const shown = sel ?? list.rows.find((r) => r.has_query_deduction) ?? list.rows[0] ?? null;
+  // Under the list on desktop the first payslip with a deduction shows unasked; on a phone one opens when tapped (F31).
+  const shown = sel ?? (phone ? null : (list.rows.find((r) => r.has_query_deduction) ?? list.rows[0] ?? null));
   const email = useMutation("POST /api/v1/payroll/runs/:id/email-payslips");
   const locked = c && c.stage !== "awaiting_approval" && c.stage !== "review";
   return (
@@ -122,12 +124,14 @@ function Payslips() {
           { key: "p", label: "", render: (r) => <Button size="sm" icon="doc" onClick={(e) => (e.stopPropagation(), modal.open({ title: `${r.employee.display_name} · ${formatMonth(r.period)}`, wide: true, body: <SlipPaper id={r.payslip_id} /> }))}>PDF</Button> },
         ]}
       />
-      {shown && (
-        <div className="mt-3">
-          <SlipPaper id={shown.payslip_id} />
-          {shown.has_query_deduction && <p className="mt-3 text-2xs text-subtle-foreground">{shown.employee.display_name} carries a deduction accepted into this run from Queries and Sanctions. The line names its reason, not the sanction.</p>}
-        </div>
-      )}
+      <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Payslip" full>
+        {shown && (
+          <div className="mt-3 phone:mt-0">
+            <SlipPaper id={shown.payslip_id} />
+            {shown.has_query_deduction && <p className="mt-3 text-2xs text-subtle-foreground">{shown.employee.display_name} carries a deduction accepted into this run from Queries and Sanctions. The line names its reason, not the sanction.</p>}
+          </div>
+        )}
+      </DetailPane>
     </>
   );
 }

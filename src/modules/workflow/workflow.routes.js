@@ -59,6 +59,10 @@ route(router, "get", "/settings/approvals/summary",
   { response: w.ApprovalsSummary, summary: "The figures above the approval flows" },
   requirePermission("settings", "view"), controller.flowsSummary);
 
+route(router, "post", "/settings/approvals",
+  { body: w.ApprovalFlowCreate, response: w.ApprovalFlow, summary: "Make an approval flow and its stages" },
+  requirePermission("settings", "create"), controller.createFlow);
+
 route(router, "put", "/settings/approvals/:id/steps",
   { params: c.common.IdParams, body: w.ApprovalStepsUpdate, response: w.ApprovalFlow, summary: "Save a flow's stages as a new version" },
   requirePermission("settings", "edit"), controller.saveSteps);

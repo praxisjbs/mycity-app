@@ -3,22 +3,24 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/knowledge";
 import "@/api/types/community";
-import type { Announcement } from "@/api/types/community";
 import type { ArticleKind, Block, Overdue, Resource } from "@/api/types/knowledge";
 import { useAuth } from "@/auth/AuthProvider";
-import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { PagedTable, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { PoliciesTab } from "@/features/policies/PoliciesHub";
 import { Accordion, ArticleBody, Button, Card, Chips, ChoiceField, DataView, DateField, ErrorState, Field, formatDate, FormFooter, Grid, LoadingRows, Meter, PageHeader, Pill, Reader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { UserGuide } from "./UserGuide";
 
 export default function Knowledge({ tab, id }: ModuleScreenProps) {
-  if (tab === "sops") return <Articles kind="sop" id={id} />;
-  if (tab === "faqs") return <Faqs />;
-  if (tab === "training") return <Training />;
-  if (tab === "announcements") return <Announcements />;
-  return <PoliciesTab />;
+  switch (tab) {
+    case "sops": return <Articles kind="sop" id={id} />;
+    case "faqs": return <Faqs />;
+    case "training": return <Training />;
+    case "user-guide":
+      return <UserGuide id={id} />;
+    default: return <PoliciesTab />;
+  }
 }
 
 const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : "Something went wrong");
@@ -236,7 +238,7 @@ function Training() {
 }
 
 function ResourceForm({ close }: { close: () => void }) {
-  const depts = useDepartmentOptions("Pick the department");
+  const { options: depts, ...deptPaging } = useDepartmentOptions();
   const [aud, setAud] = useState<"everyone" | "department">("everyone");
   const f = useContractForm({ title: "", description: "", kind: "Document", due: "", department: "" }, { title: (v) => (!v.trim() ? "Name the resource" : null), description: (v) => (v.trim().length < 10 ? "Say what it covers" : null) });
   const save = useMutation("POST /api/v1/knowledge/training");
@@ -258,45 +260,11 @@ function ResourceForm({ close }: { close: () => void }) {
       <Field label="Kind"><SelectField options={[["Document", "Document"], ["Video", "Video"], ["Course", "Course"]]} {...f.field("kind")} /></Field>
       <Field label="Due (Optional)"><DateField {...f.field("due")} min={todayIso()} /></Field>
       <Field label="Assign To"><ChoiceField value={aud} onChange={setAud} options={[["everyone", "Everyone"], ["department", "A Department"]]} /></Field>
-      {aud === "department" && <Field label="Department" {...f.field("department")}><SelectField placeholder="Pick the department" options={depts.slice(1)} {...f.field("department")} /></Field>}
+      {aud === "department" && <Field label="Department" {...f.field("department")}><SelectField placeholder="Pick the department" options={depts} {...deptPaging} {...f.field("department")} /></Field>}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Assign</Button>
       </FormFooter>
-    </>
-  );
-}
-
-/* ───────────── Announcements: the permanent record of what Staff Community posts ───────────── */
-
-function Announcements() {
-  const { navigate } = useRouter();
-  const { can } = useAuth();
-  const list = usePaged("GET /api/v1/community/announcements");
-  const pub = list.rows.filter((a) => a.status === "published");
-  const avg = pub.length ? Math.round((pub.reduce((s, a) => s + a.reads / Math.max(1, a.audience_size), 0) * 100) / pub.length) : 0;
-  return (
-    <>
-      <PageHeader title="Announcements" sub="Also posted to the staff community" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => navigate("/community?tab=announcements")}>New Announcement</Button>} />
-      <KpiTiles items={[{ label: "Published", value: String(pub.length) }, { label: "Scheduled", value: String(list.rows.length - pub.length) }, { label: "Average Read", value: `${avg}%`, tone: "ok" }, { label: "This Quarter", value: String(list.page?.total ?? 0) }]} />
-      <PagedTable<Announcement>
-        title="Announcements"
-        list={list}
-        search="Search announcements"
-        rowKey={(a) => a.announcement_id}
-        noun="announcement"
-        columns={[
-          { key: "t", label: "Title", render: (a) => <span className="font-semibold">{a.title}</span> },
-          { key: "b", label: "Posted By", render: (a) => a.author?.display_name ?? "", desktop: true },
-          { key: "d", label: "Date", render: (a) => formatDate((a.published_at ?? a.publish_at)!) },
-          { key: "a", label: "Audience", render: (a) => (a.audience.kind === "all" ? "Everyone" : a.departments.join(", ")), desktop: true },
-          { key: "r", label: "Read", align: "n", render: (a) => (a.status === "scheduled" ? "None yet" : `${a.reads} of ${a.audience_size}`) },
-          { key: "s", label: "Status", render: (a) => (a.status === "scheduled" ? <Pill>Scheduled {formatDate(a.publish_at!)}</Pill> : <Pill tone="ok">Published</Pill>) },
-        ]}
-      />
-      <Grid cols={2} className="mt-3">
-        <TrailCard title="Recent" items={pub.slice(0, 4).map((a) => ({ title: a.title, when: formatDate(a.published_at!), text: `Posted by ${a.author?.display_name}. ${a.reads} of ${a.audience_size} have read it.`, tone: a.reads === a.audience_size ? "ok" : "hi" }))} />
-      </Grid>
     </>
   );
 }

@@ -36,7 +36,7 @@ export type FormRules<T> = Partial<{ [K in keyof T]: Validator<T[K]> }>;
 
 /** A contract schema: anything with Zod's safeParse. The frontend declares no Zod of its own. */
 export interface ContractSchema {
-  safeParse(value: unknown): { success: boolean; data?: unknown; error?: { issues: Array<{ path: PropertyKey[]; message: string; code?: string }> } };
+  safeParse(value: unknown): { success: boolean; data?: unknown; error?: { issues: Array<{ path: PropertyKey[]; message: string; code?: string; type?: string; minimum?: unknown; maximum?: unknown }> } };
 }
 
 export interface ContractFormOptions {
@@ -47,39 +47,106 @@ export interface ContractFormOptions {
 const words = (s: string) => s.trim().split(/\s+/).filter((w) => /\p{L}/u.test(w));
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** A contract problem as at most 4 words: its own message when it fits, else one by kind. */
-export function shortMessage(error: { type?: string; message?: string } | undefined): string | undefined {
+/** A limit as a person reads it: 4000 is "4,000". */
+const grouped = (n: string) => (/^\d{4,}$/.test(n) ? Number(n).toLocaleString("en-GB") : n);
+
+/**
+ * Zod's own sentence for a limit, as the limit in short words: "Number must be less than or equal
+ * to 168" reads "At most 168", "String must contain at least 3 character(s)" reads "At least 3
+ * characters", "Array must contain at most 5 element(s)" reads "At most 5". A server 422 carries
+ * these sentences raw, so they are read whatever kind the problem arrives as.
+ */
+function zodLimit(message: string): string | undefined {
+  const size = /^(String|Array|Set) must contain (at least|at most|exactly) (\d+) /.exec(message);
+  if (size) {
+    const [, kind, how, count = "0"] = size;
+    const n = Number(count);
+    if (how === "at least" && n <= 1) return "Required";
+    const unit = kind === "String" ? (n === 1 ? " character" : " characters") : "";
+    return `${how === "at least" ? "At least" : how === "at most" ? "At most" : "Exactly"} ${grouped(count)}${unit}`;
+  }
+  const bound = /^(?:Number|BigInt|Date) must be (greater than or equal to|greater than|less than or equal to|less than|exactly equal to) (\S+?)\.?$/.exec(message);
+  const words: Record<string, string> = { "greater than or equal to": "At least", "greater than": "Over", "less than or equal to": "At most", "less than": "Under", "exactly equal to": "Exactly" };
+  if (bound) return `${words[bound[1] ?? ""] ?? "Check"} ${grouped(bound[2] ?? "")}`;
+  if (/^Number must be a multiple of/.test(message)) return "Check the number";
+  if (/^Expected integer/.test(message)) return "Whole numbers only";
+  return undefined;
+}
+
+/** Zod's own words for a wrong string ("Invalid", "Invalid email"), never a schema's. */
+const zodInvalid = (message: string) => !message || /^Invalid( |$)/.test(message);
+
+/**
+ * A limit no schema worded, by what it limits: a number is never "Too long" (a latitude of 91
+ * read so), it is At most its bound; a list has too many, a date is too late.
+ */
+function limitWords(big: boolean, kind?: string, bound?: unknown): string {
+  if (kind === "number" || kind === "bigint") {
+    if (typeof bound === "number" || typeof bound === "bigint") return `${big ? "At most" : "At least"} ${grouped(String(bound))}`;
+    return big ? "Too high" : "Too low";
+  }
+  if (kind === "array" || kind === "set") return big ? "Too many" : "Too few";
+  if (kind === "date") return big ? "Too late" : "Too early";
+  return big ? "Too long" : "Too short";
+}
+
+/**
+ * A contract problem as at most 4 words: its own message when it fits, else one by kind. `kind`
+ * and the bounds are the issue's own (what was limited, and to what), when the schema gave them.
+ */
+export function shortMessage(error: { type?: string; message?: string; kind?: string; minimum?: unknown; maximum?: unknown } | undefined): string | undefined {
   if (!error) return undefined;
   const message = String(error.message ?? "");
+  const limit = zodLimit(message);
+  if (limit) return limit;
   switch (error.type) {
     case "invalid_type":
       // A schema's own message for a missing or wrong value ("Pick an address") over the generic one.
       return message && !/^(Required|Expected )/.test(message) && words(message).length <= 4 ? sentence(message) : "Required";
     case "too_small":
-      return /at least 1 /.test(message) ? "Required" : "Too short";
     case "too_big":
-      return "Too long";
+      // A schema's own words for its limit ("At least 150 m", "Add a recipient"); a limit Zod worded
+      // itself has already been read above.
+      if (message && words(message).length <= 4) return sentence(message);
+      return error.type === "too_big" ? limitWords(true, error.kind, error.maximum) : limitWords(false, error.kind, error.minimum);
     case "invalid_enum_value":
       return "Choose one";
     case "invalid_date":
       return "Not a real date";
     case "invalid_string":
+      // A schema's own words for a pattern ("Ten digits", "Not a price") when they fit.
+      if (!zodInvalid(message) && words(message).length <= 4) return sentence(message);
       return /email/i.test(message) ? "Check the email" : "Check the format";
     default:
       return message && words(message).length <= 4 ? sentence(message) : "Check this value";
   }
 }
 
+/** The schema's own words for an empty field ("Pick a model"), when they were written for it. */
+function emptyMessage(issue: { code?: string; message: string }): string {
+  const own = issue.code === "invalid_type" || issue.code === "too_small";
+  if (own && issue.message && !/^(Required|Expected |String must|Array must|Number must)/.test(issue.message) && words(issue.message).length <= 4) return sentence(issue.message);
+  return "Required";
+}
+
 const isSchema = (r: unknown): r is ContractSchema => !!r && typeof (r as ContractSchema).safeParse === "function";
 
-/** Every field's first problem, from the schema or the INTERIM rules. */
+const isEmpty = (v: unknown) => v === "" || v === null || v === undefined || (Array.isArray(v) && v.length === 0);
+
+/**
+ * Every field's first problem, from the schema or the INTERIM rules. A field left empty that the
+ * schema needs reads Required, whatever the type would have said of a wrong value ("Check the
+ * format" on an empty date or department said nothing useful); a rule's own words ("Pick a
+ * worksite") still speak for themselves.
+ */
 function problemsOf<T extends Record<string, unknown>>(values: T, rules: FormRules<T> | ContractSchema): Partial<Record<keyof T, string>> {
   const out: Partial<Record<keyof T, string>> = {};
   if (isSchema(rules)) {
     const r = rules.safeParse(values);
     for (const issue of r.success ? [] : (r.error?.issues ?? [])) {
       const k = String(issue.path[0] ?? "") as keyof T;
-      if (k && !out[k]) out[k] = shortMessage({ type: issue.code, message: issue.message });
+      if (!k || out[k]) continue;
+      out[k] = isEmpty(values[k]) && issue.code !== "custom" ? emptyMessage(issue) : shortMessage({ type: issue.code, message: issue.message, kind: issue.type, minimum: issue.minimum, maximum: issue.maximum });
     }
     return out;
   }
@@ -214,13 +281,26 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
 
   /** Back to the initial values (or `next`), with no marks. */
   const reset = (next?: T) => {
+    // A pause check still waiting from the last key would mark the emptied field (a comment box
+    // cleared after a quick send read Required).
+    Object.values(timers.current).forEach((t) => window.clearTimeout(t));
+    timers.current = {};
     form.reset((next ?? initial) as DefaultValues<FieldValues>);
     setTouched({});
     setServer({});
     setOwn({});
   };
 
-  const setServerErrors = (fields: ServerFields) => setServer(Object.fromEntries(Object.entries(fields).filter((e): e is [string, string[]] => !!e[1]?.length)));
+  /** The server's per-field messages on the marks, each kept to four words like the form's own. */
+  const setServerErrors = (fields: ServerFields) =>
+    setServer(
+      Object.fromEntries(
+        // Only a list of messages marks a field: a refusal's details (a mail server's reason, a code) are not marks.
+        Object.entries(fields)
+          .filter((e): e is [string, string[]] => Array.isArray(e[1]) && e[1].length > 0 && e[1].every((m) => typeof m === "string"))
+          .map(([k, msgs]) => [k, msgs.map((m) => shortMessage({ type: "custom", message: m }) ?? m)]),
+      ),
+    );
 
   return { values, setValues, set, field, status, errors, check, submit, reset, setServerErrors, isDirty: form.formState.isDirty, valid: Object.keys(errors).length === 0 };
 }

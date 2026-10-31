@@ -195,7 +195,6 @@ const DOMAIN_TO_CATEGORY = Object.freeze({
   sop: "knowledge",
   faq: "knowledge",
   training_course: "knowledge",
-  knowledge_announcement: "knowledge",
 });
 
 /** Module key → category, for an event whose first segment is not mapped above. */

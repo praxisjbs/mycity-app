@@ -483,10 +483,13 @@ export function createApi<E>(config: ApiConfig) {
     return { rows: body?.data ?? [], page: body?.page, loading: res.loading, error: res.error, pageNumber, setPage, q, setQ: setQText, sort, setSort, reload: res.reload };
   }
 
-  /** The same paged API for a phone: rows accumulate as the person scrolls, fetching page + 1 while has_next. */
-  function useInfinite<K extends PagedKey & K0>(key: K, opts: { params?: ParamsOf<E, K>; filters?: Filters<K>; q?: string; enabled?: boolean } = {}) {
+  /**
+   * The same paged API for a phone, and for a select's options: rows accumulate as the person scrolls,
+   * fetching page + 1 while has_next. A `sort` is the list's one order; changing it starts from page 1.
+   */
+  function useInfinite<K extends PagedKey & K0>(key: K, opts: { params?: ParamsOf<E, K>; filters?: Filters<K>; q?: string; sort?: SortOf<E, K>; enabled?: boolean } = {}) {
     const [pages, setPages] = useState<number>(1);
-    const resetKey = JSON.stringify([key, opts.params ?? null, opts.filters ?? {}, opts.q ?? ""]);
+    const resetKey = JSON.stringify([key, opts.params ?? null, opts.filters ?? {}, opts.q ?? "", opts.sort ?? ""]);
     const [state, setState] = useState<{ reset: string; rows: RowOf<E, K>[]; page?: PageMeta; loading: boolean; error: ApiError | null }>({
       reset: resetKey,
       rows: [],
@@ -527,7 +530,7 @@ export function createApi<E>(config: ApiConfig) {
       let live = true;
       const gen = generation;
       const settle = () => waiting.current.splice(0).forEach((done) => done());
-      const [k, p, f, q] = JSON.parse(resetKey) as [K, ParamsOf<E, K>, Record<string, unknown>, string];
+      const [k, p, f, q, sort] = JSON.parse(resetKey) as [K, ParamsOf<E, K>, Record<string, unknown>, string, string];
       setState((s) => ({ ...s, loading: !(soft && s.reset === resetKey && s.rows.length > 0) }));
       // Rows from before clear() belong to the last session: start again from the first page.
       const stale = () => {
@@ -539,7 +542,7 @@ export function createApi<E>(config: ApiConfig) {
         }
         return true;
       };
-      call(k, { params: p ?? undefined, query: { ...f, page: pages, ...(q ? { q } : {}) } } as Opts<K>)
+      call(k, { params: p ?? undefined, query: { ...f, page: pages, ...(q ? { q } : {}), ...(sort ? { sort } : {}) } } as Opts<K>)
         .then((body) => {
           if (stale()) return;
           const b = body as { data: RowOf<E, K>[]; page: PageMeta };

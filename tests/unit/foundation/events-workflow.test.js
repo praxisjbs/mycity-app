@@ -251,8 +251,21 @@ describe("route map", () => {
     expect(routeMap.linkFor("performance_plan", "pl1").path).toBe("/performance?tab=goals&plan=pl1");
     expect(routeMap.linkFor("performance_plan", "pl1", { self: true })).toMatchObject({ module: "ess", tab: "my-performance" });
     expect(routeMap.linkFor("target_change", "tc1").path).toBe("/performance?tab=goals&change=tc1");
+    expect(routeMap.linkFor("plan_unbind", "pu1").path).toBe("/performance?tab=goals&unbind=pu1");
     expect(routeMap.linkFor("unknown_type", "x")).toBeNull();
     expect(routeMap.linkFor("query", "")).toBeNull();
+  });
+
+  test("a type's screen without an id, and the types that open on a screen", () => {
+    expect(routeMap.screenOf("leave_request")).toEqual({ module: "people", tab: "leave" });
+    expect(routeMap.screenOf("leave_request", { self: true })).toEqual({ module: "ess", tab: "my-leave" });
+    // No screen of its own for the person it concerns: the staff screen either way.
+    expect(routeMap.screenOf("worksite", { self: true })).toEqual({ module: "people", tab: "worksites" });
+    expect(routeMap.screenOf("unknown_type")).toBeNull();
+    expect(routeMap.typesOn("people", "leave")).toEqual(["leave_request"]);
+    expect(routeMap.typesOn("ess", "my-leave")).toEqual(["leave_request"]);
+    expect(routeMap.typesOn("people", "employees")).toEqual(expect.arrayContaining(["employee", "employee_photo", "document"]));
+    expect(routeMap.typesOn("people", "nope")).toEqual([]);
   });
 
   test("screenPath refuses a screen that does not exist", () => {
@@ -279,7 +292,7 @@ describe("route map", () => {
       if (row && !/\| Dropped \|/.test(line)) (found[module] = found[module] || []).push(row[1]);
     }
     expect(found).toEqual(routeMap.SCREENS);
-    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(94);
+    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(95);
   });
 });
 

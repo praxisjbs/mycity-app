@@ -6,8 +6,16 @@ import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import { Button, Chips, DataView, Field, formatDate, formatDateTime, FormFooter, HelpTerm, KeyValue, PageHeader, Pill, TextAreaField, toast, useContractForm, useModal, Who } from "@mycity/ui";
 import { DEVICE_STATUS, DEVICE_STATUS_HELP } from "./labels";
+
+const STATUS_CHIPS: Array<[DeviceStatus | "all", string]> = [
+  ["all", "All"],
+  ["registered", "Registered"],
+  ["observed", "New"],
+  ["removed", "Removed"],
+];
 
 /**
  * People · Devices (#27, docs/guides/attendance.md §10): the devices people clock in from, within
@@ -33,6 +41,7 @@ export function Devices() {
     }
   });
 
+  const news = useViewNews();
   return (
     <>
       <PageHeader title="Devices" sub="Devices used to clock in" />
@@ -40,12 +49,7 @@ export function Devices() {
         label="Status"
         value={status}
         onChange={setStatus}
-        options={[
-          ["all", "All"],
-          ["registered", "Registered"],
-          ["observed", "New"],
-          ["removed", "Removed"],
-        ]}
+        options={withNews(news, STATUS_CHIPS, { all: "all" })}
       />
       <DataView
         title="Devices"

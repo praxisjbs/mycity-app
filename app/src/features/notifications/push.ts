@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { api } from "@/api/client";
+import { toast } from "@mycity/ui";
+import { api, ApiError } from "@/api/client";
 import { clearDevice, readDevice, writeDevice } from "./device-store";
 
 /**
@@ -153,6 +154,17 @@ export async function enablePush(): Promise<PushState> {
   return syncPush();
 }
 
+/** Turn On, from wherever it is pressed: the push is turned on and the person is told what became of it. */
+export async function turnOnPush(): Promise<PushState> {
+  const s = await enablePush();
+  if (s === "on") toast("Notifications are on");
+  else if (s === "blocked") toast.error("Notifications are blocked here");
+  else if (s === "needs-install") toast.info("Install the app first");
+  else if (s === "ask") toast.info("Notifications not turned on");
+  else toast.error("Not available on this device");
+  return s;
+}
+
 /** Turn Off on this device: the server stops sending here, and the next start does not subscribe again. */
 export async function disablePush(): Promise<void> {
   rememberOff(true);
@@ -170,6 +182,16 @@ export async function sendTestPush(): Promise<number> {
   const held = await readDevice();
   const out = await api.call("POST /api/v1/notifications/push/test", { body: held ? { push_subscription_id: held.id } : {} });
   return out.devices;
+}
+
+/** Send Test, from wherever it is pressed: the server's reason when it cannot send. */
+export async function testPush(): Promise<void> {
+  try {
+    await sendTestPush();
+    toast("Test sent");
+  } catch (e) {
+    toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Could not send the test");
+  }
 }
 
 /** This device's id on the server, to tell it apart from the person's other devices. */

@@ -143,21 +143,35 @@ const roleRef = (code: string) => {
   return { code: r.code, name: r.name };
 };
 type MockUser = Omit<UserRow, "two_step" | "photo_url"> & { role: string; mfa: boolean };
+/**
+ * Two logins not yet in use, as the staff roster makes them: Damilola was invited three days ago,
+ * Tolu's invitation was never sent (Invite All Pending sends it). The register reads the same
+ * (organisation.ts loginOf, through loginOfEmployee), so both screens agree.
+ */
+const INVITED: Record<string, string | null> = { damilola: at(3, "10:00"), tolu: null };
 const USERS: MockUser[] = PEOPLE.slice(0, 22).map((p, i) => ({
   user_id: sid(`user:${p.user_key}`),
   employee_id: p.employee_id,
   display_name: p.display_name,
   email: p.work_email,
+  work_email: p.work_email,
   job_title: p.job_title,
   department: p.department,
   roles: [roleRef(ROLE_CODE[ROLE_OF(p.user_key)])],
   is_ceo: p.user_key === "ifeoma",
-  status: p.status === "suspended" ? "suspended" : "active",
-  last_seen_at: p.status === "suspended" ? at(30, "10:00") : at(i % 4 === 0 ? 0 : i % 4, `${String(8 + (i % 9)).padStart(2, "0")}:${String((i * 7) % 60).padStart(2, "0")}`),
+  status: p.status === "suspended" ? "suspended" : p.user_key in INVITED ? "invited" : "active",
+  invited_at: p.user_key in INVITED ? INVITED[p.user_key]! : at(45 - i, "09:00"),
+  last_seen_at: p.user_key in INVITED ? null : p.status === "suspended" ? at(30, "10:00") : at(i % 4 === 0 ? 0 : i % 4, `${String(8 + (i % 9)).padStart(2, "0")}:${String((i * 7) % 60).padStart(2, "0")}`),
   created_at: at(40 - i, "09:00"),
   role: ROLE_OF(p.user_key),
   mfa: ["ifeoma", "cynthia", "amara"].includes(p.user_key),
 }));
+
+/** An employee's login as the register shows it (organisation.ts), from the same list as Settings · Users. */
+export function loginOfEmployee(employeeId: string) {
+  const u = USERS.find((x) => x.employee_id === employeeId);
+  return u ? { user_id: u.user_id, email: u.email, state: u.status, roles: u.roles, last_seen_at: u.last_seen_at } : null;
+}
 const out = (u: MockUser): UserRow => {
   const { role: _role, mfa, ...row } = u;
   void _role;
@@ -201,10 +215,10 @@ route("POST /api/v1/users", (req) => {
   const b = req.body as { employee_id?: string; role_codes?: string[] };
   const p = byId(b.employee_id);
   if (!p) return invalid({ employee_id: ["Pick the employee"] });
-  if (USERS.some((u) => u.employee_id === p.employee_id)) return fail(409, "LOGIN_EXISTS", "This employee already has a login.");
+  if (USERS.some((u) => u.employee_id === p.employee_id)) return fail(409, "LOGIN_EXISTS", "This employee already has a login.", { employee_id: ["Already has a login"] });
   const codes = (b.role_codes ?? []).filter((c) => ACCESS_ROLES.some((r) => r.code === c));
   if (!codes.length) return invalid({ role_codes: ["Pick a role"] });
-  const u: MockUser = { user_id: sid(`user:${p.user_key}`), employee_id: p.employee_id, display_name: p.display_name, email: p.work_email, job_title: p.job_title, department: p.department, roles: codes.map(roleRef), is_ceo: false, status: "invited", last_seen_at: null, created_at: new Date().toISOString(), role: "Staff", mfa: false };
+  const u: MockUser = { user_id: sid(`user:${p.user_key}`), employee_id: p.employee_id, display_name: p.display_name, email: p.work_email, work_email: p.work_email, job_title: p.job_title, department: p.department, roles: codes.map(roleRef), is_ceo: false, status: "invited", invited_at: new Date().toISOString(), last_seen_at: null, created_at: new Date().toISOString(), role: "Staff", mfa: false };
   USERS.unshift(u);
   audit(who(req.user!), "Invitation sent", `User · ${p.display_name}`, null, u.roles.map((r) => r.name).join(", "), "Link valid 72 hours", "Settings");
   return created(out(u));
@@ -237,7 +251,24 @@ act("POST /api/v1/users/:id/reactivate", (u, _b, actor) => {
   u.status = u.last_seen_at ? "active" : "invited";
   return ok(out(u));
 });
-act("POST /api/v1/users/:id/invite", (u) => (u.status === "invited" ? ok({ sent: true as const, email: u.email }) : fail(422, "ALREADY_ACTIVE", "This person has already chosen a password.")));
+act("POST /api/v1/users/:id/invite", (u) => {
+  if (u.status !== "invited") return fail(422, "ALREADY_ACTIVE", "This person has already chosen a password.");
+  u.invited_at = new Date().toISOString();
+  return ok({ sent: true as const, email: u.email });
+});
+route("POST /api/v1/users/invite-pending", (req) => {
+  if (!settingsEditor(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const pending = USERS.filter((u) => u.status === "invited" && !u.invited_at);
+  for (const u of pending) u.invited_at = new Date().toISOString();
+  return ok({ sent: pending.length });
+});
+act("POST /api/v1/users/:id/use-work-email", (u, _b, actor) => {
+  if (u.employee_id === byKey(actor)!.employee_id) return fail(422, "NOT_ON_YOURSELF", "You cannot move the email of your own login here.");
+  if (USERS.some((x) => x !== u && x.email === u.work_email)) return fail(409, "LOGIN_EXISTS", "Another login signs in with this email.", { email: ["Already has a login"] });
+  audit(who(actor), "Sign-in email changed", `User · ${u.display_name}`, u.email, u.work_email, "Signed out everywhere", "Settings");
+  u.email = u.work_email;
+  return ok(out(u));
+});
 act("POST /api/v1/users/:id/reset-link", (u) => (u.status === "suspended" ? fail(422, "NOT_ACTIVE", "Reactivate this login before sending a link.") : ok({ sent: true as const, email: u.email })));
 act("POST /api/v1/users/:id/end-sessions", () => ok({ ended: 2 }));
 act("POST /api/v1/users/:id/reset-two-step", (u, _b, actor) => {
@@ -266,7 +297,7 @@ const MODULE_LIST: Array<[string, string, string, string]> = [
   ["community", "Staff Community", "work", "Channels, direct messages and announcements"], ["mailbox", "Mailbox", "work", "Your work email"], ["people", "People", "people", "Employees, attendance, leave, devices and worksites"],
   ["performance", "Performance", "people", "Goals, targets, KPIs and reviews"], ["queries", "Queries & Sanctions", "people", "Queries, rules, sanctions and letter templates"], ["recruitment", "Recruitment", "people", "Vacancies through to onboarding"],
   ["payroll", "Payroll", "people", "Payroll runs, payslips, salary structure and statutory"], ["partnerships", "Partnerships", "business", "Pipeline, partners, leads, proposals and contracts"], ["expenses", "Expenses", "business", "Requests, approvals, requisitions, disbursements and budgets"],
-  ["knowledge", "Knowledge Hub", "system", "Policies, SOPs, FAQs, training and announcements"], ["praxis_ai", "Praxis AI", "system", "The assistant, and AI controls"], ["settings", "Settings", "system", "Organisation, users, roles, approvals and system settings"],
+  ["knowledge", "Knowledge Hub", "system", "Policies, SOPs, FAQs and training"], ["praxis_ai", "Praxis AI", "system", "The assistant, and AI controls"], ["settings", "Settings", "system", "Organisation, users, roles, approvals and system settings"],
 ];
 const FIELDS = [["employee.salary", "Salary and pay"], ["employee.bank", "Bank details"], ["employee.personal", "Personal details"], ["employee.statutory", "Tax and pension numbers"]] as const;
 const CATALOGUE: AccessCatalogue = {
@@ -413,6 +444,7 @@ const LABELS: Array<[NumberingScheme["doc_type"], string, string, number, string
   ["employee", "Staff Number", "", 5, "", "never", 18], ["document", "Document", "DOC", 4, "-", "never", 240], ["import_batch", "Import", "IMP", 4, "-", "never", 3],
   ["location_request", "Work Location Request", "WLR", 4, "-", "never", 5],
   ["field_assignment", "Field Assignment", "FA", 4, "-", "never", 3],
+  ["organisational_goal", "Organisational Goal", "ORG", 2, "-", "yearly", 3],
   ["query", "Query", "QRY", 4, "-", "never", 15], ["sanction", "Sanction", "SAN", 4, "-", "never", 4], ["letter", "Letter", "LTR", 4, "-", "never", 9],
   ["vacancy", "Vacancy", "VAC", 4, "-", "never", 6], ["offer", "Offer Letter", "OFF", 4, "-", "never", 19], ["contract", "Employment Contract", "CON", 4, "-", "never", 16],
   ["payroll_run", "Payroll Run", "PAY", 0, "-", "monthly", 1], ["payslip", "Payslip", "PAY", 4, "-", "monthly", 18], ["proposal", "Proposal", "PRO", 4, "-", "never", 30],

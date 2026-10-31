@@ -1,10 +1,9 @@
 /**
  * Performance · Goals, New Key Result and Edit Key Result (docs/guides/performance.md §3.2, §6.3, §10):
  * one form, checked by the goals contract (KeyResultCreate, or KeyResultEdit for a draft's key result).
- * Open: objective, key result, measure, target, target in words, TBC, unit, finish, owner, and Feeds for
- * a function's key result (the company key results it feeds, 25 a page from the server). Behind More:
- * Scored From for a company key result, co-owner, direction, baseline, start, type and owner note.
- * Set Target: a TBC target set in place before its lock date (§6.7).
+ * Open: objective, key result, measure, target, unit, target in words, start, finish, type, owner, and
+ * Feeds for a function's key result (the company key results it feeds, 25 a page from the server). Behind
+ * More: Scored From for a company key result, co-owner, direction, baseline and owner note.
  */
 import { useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
@@ -13,8 +12,8 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { Button, CheckboxField, ChoiceField, DateField, EmptyState, Field, FormFooter, MoreFields, RecordPicker, SelectField, TextField, toast, useContractForm } from "@mycity/ui";
-import { bodySchema } from "./shared";
+import { Button, ChoiceField, DateField, EmptyState, Field, FormFooter, MoreFields, NumberField, RecordPicker, SelectField, TextField, toast, useContractForm } from "@mycity/ui";
+import { bodySchema, UnitField } from "./shared";
 
 export const KR_TYPES: Record<string, string> = {
   diagnostic_gate: "Diagnostic Gate",
@@ -26,8 +25,11 @@ export const KR_TYPES: Record<string, string> = {
   output: "Output",
 };
 const MEASURES: Array<[string, string]> = [["numeric", "Numeric"], ["dated", "Dated"], ["yes_no", "Yes or No"]];
+/** Measures with no number to reach: scored on done (§6.8), so the form offers no target figure, unit or direction. */
+const NUMBERLESS = new Set(["dated", "yes_no"]);
+const NO_NUMBERS = { target_value: "", unit: "", direction: "higher" };
 /** The fields behind More: it opens itself while one of them is marked. */
-const MORE = ["scored_from_key_result_id", "co_accountable_employee_id", "direction", "baseline_text", "starts_on", "kr_type", "accountable_note"];
+const MORE = ["scored_from_key_result_id", "co_accountable_employee_id", "direction", "baseline_text", "accountable_note"];
 
 type Values = {
   okr_objective_id: string;
@@ -35,7 +37,6 @@ type Values = {
   measure: string;
   target_value: string;
   target_text: string;
-  target_provisional: boolean;
   unit: string;
   finishes_on: string;
   accountable_employee_id: string;
@@ -49,7 +50,7 @@ type Values = {
   accountable_note: string;
 };
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const refOf = (k: { okr_key_result_id: string; code: string; statement: string }): KeyResultRef => ({ okr_key_result_id: k.okr_key_result_id, code: k.code, statement: k.statement });
 
 /** A quarter's key results to pick from: the company's (Feeds) or the functions' (Scored From). */
@@ -82,7 +83,6 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
       measure: k?.measure ?? "numeric",
       target_value: k?.target_value ?? "",
       target_text: k?.target_text ?? "",
-      target_provisional: k?.target_provisional ?? false,
       unit: k?.unit ?? "",
       finishes_on: k?.finishes_on ?? "",
       accountable_employee_id: k?.accountable?.employee_id ?? "",
@@ -98,6 +98,7 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
     k ? bodySchema<Values>(goalsContract.KeyResultEdit, (v) => editBody(v, k)) : bodySchema<Values>(goalsContract.KeyResultCreate, (v) => createBody(v, objectives)),
   );
   const v = f.values as Values;
+  const numbers = !NUMBERLESS.has(v.measure);
   const objective = objectives.find((o) => o.okr_objective_id === v.okr_objective_id);
   const company = k ? k.department_id === null : objective?.department_id === null;
   const periodId = k ? k.performance_period_id : (objective?.performance_period_id ?? "");
@@ -145,13 +146,14 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
           <ChoiceField label="Measure" options={MEASURES} value={v.measure} onChange={(x) => f.field("measure").onChange(x)} />
         </Field>
       )}
-      <Field label="Target" optional {...f.status("target_value")}><TextField {...f.field("target_value")} inputMode="decimal" placeholder="64000" /></Field>
-      <Field label="Target in Words" optional {...f.status("target_text")}><TextField {...f.field("target_text")} placeholder="64,000 users" /></Field>
-      <Field label="TBC" {...f.status("target_provisional")}>
-        <CheckboxField label="Target to be confirmed" value={v.target_provisional} onChange={(x) => f.field("target_provisional").onChange(x)} />
-      </Field>
-      <Field label="Unit" optional {...f.status("unit")}><TextField {...f.field("unit")} placeholder="users" /></Field>
+      {numbers && <Field label="Target" optional {...f.status("target_value")}><NumberField decimal signed {...f.field("target_value")} placeholder="64000" /></Field>}
+      {numbers && <Field label="Unit" optional {...f.status("unit")}><UnitField {...f.field("unit")} /></Field>}
+      <Field label="Target in Words" optional {...f.status("target_text")}><TextField {...f.field("target_text")} placeholder={numbers ? "64,000 users" : "Launch in Kano"} /></Field>
+      <Field label="Start" optional {...f.status("starts_on")}><DateField {...f.field("starts_on")} /></Field>
       <Field label="Finish" optional {...f.status("finishes_on")}><DateField {...f.field("finishes_on")} /></Field>
+      <Field label="Type" optional {...f.status("kr_type")}>
+        <SelectField placeholder="None" options={[["", "None"], ...Object.entries(KR_TYPES)]} {...f.field("kr_type")} />
+      </Field>
       <Field label="Owner" optional {...f.status("accountable_employee_id")}>
         <EmployeePicker
           value={owner}
@@ -177,7 +179,7 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
       )}
       <MoreFields invalid={moreMarked}>
         {company && periodId && (
-          <Field label="Scored From" optional {...f.status("scored_from_key_result_id")}>
+          <Field label="Scored From" optional info="This key result takes its figures from the function key result named." {...f.status("scored_from_key_result_id")}>
             <KeyResultPicker
               periodId={periodId}
               level="function"
@@ -199,14 +201,12 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
             }}
           />
         </Field>
-        <Field label="Direction" {...f.status("direction")}>
-          <ChoiceField label="Direction" options={[["higher", "Higher Is Better"], ["lower", "Lower Is Better"]]} value={v.direction} onChange={(x) => f.field("direction").onChange(x)} />
-        </Field>
+        {numbers && (
+          <Field label="Direction" {...f.status("direction")}>
+            <ChoiceField label="Direction" options={[["higher", "Higher Is Better"], ["lower", "Lower Is Better"]]} value={v.direction} onChange={(x) => f.field("direction").onChange(x)} />
+          </Field>
+        )}
         <Field label="Baseline" optional {...f.status("baseline_text")}><TextField {...f.field("baseline_text")} /></Field>
-        <Field label="Start" optional {...f.status("starts_on")}><DateField {...f.field("starts_on")} /></Field>
-        <Field label="Type" optional {...f.status("kr_type")}>
-          <SelectField placeholder="None" options={[["", "None"], ...Object.entries(KR_TYPES)]} {...f.field("kr_type")} />
-        </Field>
         <Field label="Owner Note" optional {...f.status("accountable_note")}><TextField {...f.field("accountable_note")} /></Field>
       </MoreFields>
       <FormFooter>
@@ -217,54 +217,32 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
   );
 }
 
-/** The form as KeyResultCreate: a company key result feeds nothing; only a company key result is Scored From. */
+/**
+ * The form as KeyResultCreate: a company key result feeds nothing; only a company key result is Scored From;
+ * a dated or yes or no key result carries no target figure, unit or direction, whatever was typed before the measure changed.
+ */
 function createBody(v: Values, objectives: Objective[]) {
   const company = objectives.find((o) => o.okr_objective_id === v.okr_objective_id)?.department_id === null;
   return {
     ...v,
+    ...(NUMBERLESS.has(v.measure) ? NO_NUMBERS : {}),
     linked_company_key_result_ids: company ? [] : v.linked_company_key_result_ids,
     scored_from_key_result_id: company ? v.scored_from_key_result_id : "",
   };
 }
 
-/** The form as KeyResultEdit: every field the form shows (an empty one clears it); a multi-part key result keeps its measure and parts. */
+/**
+ * The form as KeyResultEdit: every field the form shows (an empty one clears it); a multi-part key result keeps its
+ * measure and parts. A key result moved to dated or yes or no clears its target figure, unit and direction.
+ */
 function editBody(v: Values, k: KeyResultDetail) {
   const { okr_objective_id: _objective, measure, ...rest } = v;
   const company = k.department_id === null;
   return {
     ...rest,
+    ...(NUMBERLESS.has(measure) && measure !== k.measure ? NO_NUMBERS : {}),
     ...(k.measure === "multi_part" ? {} : { measure }),
     linked_company_key_result_ids: company ? [] : v.linked_company_key_result_ids,
     scored_from_key_result_id: company ? v.scored_from_key_result_id : "",
   };
-}
-
-/** Set Target: a TBC target set in place by its owner or the function's head before the lock date; it stays TBC until then. */
-export function SetTargetForm({ keyResult, close, onSaved }: { keyResult: KeyResultDetail; close: () => void; onSaved?: () => void }) {
-  type Target = { target_value: string; target_text: string };
-  const f = useContractForm<Target>({ target_value: keyResult.target_value ?? "", target_text: keyResult.target_text ?? "" }, goalsContract.KeyResultEdit);
-  const save = useMutation("PATCH /api/v1/performance/key-results/:id");
-  const submit = async () => {
-    if (!f.check()) return;
-    try {
-      await save.run({ params: { id: keyResult.okr_key_result_id }, body: f.values as Endpoints["PATCH /api/v1/performance/key-results/:id"]["body"] });
-      invalidate("/api/v1/performance/okrs");
-      close();
-      toast("Target set");
-      onSaved?.();
-    } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else say(e);
-    }
-  };
-  return (
-    <>
-      <Field label="Target" optional {...f.status("target_value")}><TextField {...f.field("target_value")} inputMode="decimal" placeholder="64000" /></Field>
-      <Field label="Target in Words" optional {...f.status("target_text")}><TextField {...f.field("target_text")} placeholder="64,000 users" /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={submit}>Set Target</Button>
-      </FormFooter>
-    </>
-  );
 }

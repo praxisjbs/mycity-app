@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import type { DataViewList } from "../data/DataView";
+import { Field } from "./Field";
 import { RecordPicker } from "./RecordPicker";
 
 interface Worksite {
@@ -47,6 +48,19 @@ describe("RecordPicker", () => {
     expect(within(box).getAllByRole("option")).toHaveLength(2);
     expect(screen.getByText("Lekki Office")).toBeInTheDocument();
     expect(screen.getByText("Lagos Island")).toBeInTheDocument();
+  });
+
+  it("inside a Field, its label names the box and the list, and its error is read with them", () => {
+    render(
+      <Field label="Worksite" state="bad" message="Pick a worksite">
+        <RecordPicker list={list()} value={[]} onChange={vi.fn()} id={(w) => w.worksite_id} title={(w) => w.name} />
+      </Field>,
+    );
+    const box = screen.getByLabelText("Worksite", { selector: "input" });
+    expect(box).toHaveRole("searchbox");
+    expect(box).toHaveAccessibleDescription("Pick a worksite");
+    expect(box).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("listbox", { name: "Worksite" })).toBeInTheDocument();
   });
 
   it("sends what is typed to the server, never filtering the rows it has", async () => {

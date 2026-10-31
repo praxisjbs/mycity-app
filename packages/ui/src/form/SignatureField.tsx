@@ -7,7 +7,7 @@
  * @phone This is where it is used most: the pad is full width and drawn with a finger, and Clear is a 44 px target.
  * @a11y The pad is named, and Clear says whether anything has been drawn, so the state is never only visual; a typed-name fallback stays the screen's choice.
  * @status stable
- * @example <SignatureField label="Your Signature" onChange={setInk} ref={pad} />
+ * @example <SignatureField label="Your Signature" onChange={setInk} ref={pad} initial={saved} />
  */
 import { forwardRef, useEffect, useImperativeHandle, useRef, type PointerEvent } from "react";
 import { cn } from "../lib/cn";
@@ -30,6 +30,11 @@ export interface SignatureFieldProps {
   disabled?: boolean;
   /** Hide the Clear button, where the screen offers its own. */
   noClear?: boolean;
+  /**
+   * A signature the person saved before, as a PNG data URL: drawn on the pad as its ink when it
+   * opens, so they need not draw again. Clear Signature wipes it; drawing adds to it.
+   */
+  initial?: string | null;
   /** Layout classes only (spacing, height). */
   className?: string;
 }
@@ -37,7 +42,57 @@ export interface SignatureFieldProps {
 /** The ink's width, in CSS pixels, before the screen's own density is applied. */
 const STROKE = 2.2;
 
-export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldProps>(function SignatureField({ label, onChange, disabled, noClear, className }, ref) {
+/**
+ * Lay the paper into the bitmap itself, across the whole pad. A browser that darkens every site
+ * repaints the canvas's CSS background but never its pixels, so paper drawn there stays white
+ * under the dark ink; the PNG carries it, white on the white page it is stamped into.
+ */
+function paper(pad: HTMLCanvasElement, ink: CanvasRenderingContext2D) {
+  ink.save();
+  ink.setTransform(1, 0, 0, 1, 0, 0);
+  ink.fillStyle = getComputedStyle(pad).backgroundColor;
+  ink.fillRect(0, 0, pad.width, pad.height);
+  ink.restore();
+}
+
+/**
+ * The signature cut to its ink, with a little paper around it: the document sets the image to a
+ * signature's height, so the whole wide pad would shrink the strokes to a mark. A pad whose pixels
+ * cannot be read (a test's canvas) is kept whole.
+ */
+function cropped(pad: HTMLCanvasElement): string {
+  const ink = pad.getContext("2d");
+  if (!ink || typeof ink.getImageData !== "function" || !pad.width || !pad.height) return pad.toDataURL("image/png");
+  const { data, width, height } = ink.getImageData(0, 0, pad.width, pad.height);
+  let left = width, right = -1, top = height, bottom = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      // Ink is anything clearly darker than the paper.
+      if (data[i + 3]! > 0 && data[i]! + data[i + 1]! + data[i + 2]! < 600) {
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+    }
+  }
+  if (right < 0) return pad.toDataURL("image/png");
+  const margin = Math.round(6 * (window.devicePixelRatio || 1));
+  const x = Math.max(0, left - margin);
+  const y = Math.max(0, top - margin);
+  const w = Math.min(width, right + margin + 1) - x;
+  const h = Math.min(height, bottom + margin + 1) - y;
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const copy = out.getContext("2d");
+  if (!copy) return pad.toDataURL("image/png");
+  copy.drawImage(pad, x, y, w, h, 0, 0, w, h);
+  return out.toDataURL("image/png");
+}
+
+export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldProps>(function SignatureField({ label, onChange, disabled, noClear, initial, className }, ref) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const inked = useRef(false);
@@ -68,6 +123,7 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
       pad.height = height;
       const ink = pad.getContext("2d");
       if (!ink) return;
+      paper(pad, ink);
       if (keep) ink.drawImage(keep, 0, 0, keep.width, keep.height, 0, 0, width, height);
       ink.setTransform(ratio, 0, 0, ratio, 0, 0);
       ink.lineCap = "round";
@@ -80,6 +136,27 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
     watch.observe(pad);
     return () => watch.disconnect();
   }, []);
+
+  /* The saved signature, fitted inside the pad and centred, as ink. Once per image. */
+  const drawn = useRef<string | null>(null);
+  useEffect(() => {
+    const pad = canvas.current;
+    if (!pad || !initial || drawn.current === initial) return;
+    drawn.current = initial;
+    const image = new Image();
+    image.onload = () => {
+      const ink = pad.getContext("2d");
+      if (!ink || !image.width || !image.height) return;
+      const box = pad.getBoundingClientRect();
+      const scale = Math.min(box.width / image.width, box.height / image.height, 1);
+      const w = image.width * scale;
+      const h = image.height * scale;
+      ink.drawImage(image, (box.width - w) / 2, (box.height - h) / 2, w, h);
+      inked.current = true;
+      onChange(true);
+    };
+    image.src = initial;
+  }, [initial, onChange]);
 
   const at = (e: PointerEvent<HTMLCanvasElement>) => {
     const box = canvas.current!.getBoundingClientRect();
@@ -118,17 +195,14 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
     const pad = canvas.current;
     const ink = pad?.getContext("2d");
     if (!pad || !ink) return;
-    ink.save();
-    ink.setTransform(1, 0, 0, 1, 0, 0);
-    ink.clearRect(0, 0, pad.width, pad.height);
-    ink.restore();
+    paper(pad, ink);
     inked.current = false;
     onChange(false);
   };
 
   useImperativeHandle(ref, () => ({
     clear: wipe,
-    toPng: () => (inked.current ? (canvas.current?.toDataURL("image/png") ?? null) : null),
+    toPng: () => (inked.current && canvas.current ? cropped(canvas.current) : null),
   }));
 
   return (
@@ -140,7 +214,7 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
         /*
          * Paper in both themes with dark ink: the image is stamped into the
          * execution block of a white PDF, so it is never drawn in the theme's
-         * own foreground colour.
+         * own foreground colour. The bitmap carries the paper too (paper()).
          */
         className={cn(
           "block h-24 w-full touch-none rounded-box border border-dashed border-paper-dash bg-paper text-paper-heading",

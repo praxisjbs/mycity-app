@@ -2,7 +2,17 @@ import type { PlaceValue } from "@mycity/ui";
 import type { IsoDate, IsoDateTime, Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
 import type { Status, Step, Trail } from "./performance";
-import type { LetterPreview } from "./queries";
+
+/** A letter as the document engine fills it (INTERIM for the offer letter; owner TB). `filled` marks the words that came from the record. */
+export interface LetterPreview {
+  reference: string;
+  title: string;
+  date_line: string;
+  paragraphs: Array<Array<{ text: string; filled?: boolean }>>;
+  signer: string;
+  signer_role: string;
+  fields_note: string;
+}
 
 /** INTERIM Recruitment shapes (owner TB; MILESTONES §9). Candidates apply and take assessments on the public site. */
 export type Stage = "applied" | "shortlisted" | "interview" | "offer" | "hired" | "rejected";

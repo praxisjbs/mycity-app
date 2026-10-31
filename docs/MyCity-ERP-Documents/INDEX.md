@@ -1,6 +1,7 @@
 # MyCity App ERP — document pack
 
-Prepared by [JBS Praxis](https://jbspraxis.com). Six files, 12 October 2026.
+Prepared by [JBS Praxis](https://jbspraxis.com). Six files, 12 October 2026; the files added since are
+listed with them below.
 
 | File | What it is | How to open |
 | --- | --- | --- |
@@ -10,6 +11,7 @@ Prepared by [JBS Praxis](https://jbspraxis.com). Six files, 12 October 2026.
 | `milestones.html` | The twelve-page presentation deck. Brand aware, with the Gantt, the reuse chart and the architecture diagram. | Double click. Opens in any browser |
 | `demo.html` | The clickable prototype. Fifteen modules, seventy-nine tabs, the six-page public site, two record 360s. Light and dark. | Double click. Opens in any browser |
 | `EMAIL-naming-approval.md` | The naming approval section to paste into the requirements email to Cynthia. Not a client document on its own. | Any markdown reader, or a text editor |
+| `letter-samples/` | MyCity's six disciplinary letters (query, attendance query, caution, warning, suspension, dismissal), redacted: names, dates and offences are placeholders. Added 27 October 2026 for M3's letter templates. | Any markdown reader, or a text editor |
 
 ## Opening the two HTML files
 

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import organisation from "@mycity/contract/schemas/organisation.js";
+import type { Query, Sanction } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { usePhoto } from "@/api/download";
 import { saveExport } from "@/api/exports";
@@ -17,8 +19,10 @@ import {
   Card,
   CardHeader,
   DataView,
+  DateField,
   ErrorState,
   Field,
+  Form,
   FormFooter,
   formatDate,
   Grid,
@@ -31,7 +35,9 @@ import {
   Tabs,
   TextField,
   toast,
+  todayIso,
   useConfirm,
+  useContractForm,
   useModal,
 } from "@mycity/ui";
 import { EditEmployee } from "./EmployeeForm";
@@ -39,8 +45,9 @@ import { employmentStatus, employmentType, loginStatus, RESTRICTED_HELP, workPat
 
 /**
  * The employee 360 (docs/guides/foundation.md §2, §10): one person, with their profile,
- * job, work schedule (their week, attendance.md §6.13), reporting line, login and history as tabs.
- * Documents arrive with the documents module's own tab.
+ * job, work schedule (their week, attendance.md §6.13), reporting line, login and history as tabs,
+ * and their queries and sanctions for a viewer holding `queries` view (queries.md §2, §6.1: only
+ * the ones that viewer may see). Documents arrive with the documents module's own tab.
  *
  * A field the viewer may not see comes back null and shows Restricted, with a help term
  * naming who may see it (§10.1). A person's own record is never masked from them.
@@ -52,6 +59,11 @@ const TABS = [
   { value: "line", label: "Reporting Line" },
   { value: "login", label: "Login" },
   { value: "history", label: "History" },
+];
+/** Shown only to a viewer holding `queries` view; the lists keep the query visibility rule. */
+const QUERY_TABS = [
+  { value: "queries", label: "Queries" },
+  { value: "sanctions", label: "Sanctions" },
 ];
 
 /** A restricted value: the value itself, or Restricted with the help term. */
@@ -90,14 +102,16 @@ export function Employee360({ id }: { id: string }) {
   if (!e) return <LoadingRows count={8} />;
 
   const canEdit = me.grants.people?.includes("edit");
+  const seesQueries = Boolean(me.grants.queries?.includes("view"));
   const canArchive = me.grants.people?.includes("delete");
-  const canInvite = me.grants.settings?.includes("create") && e.login.state === "none";
+  // Only someone on the active staff list is invited (the API refuses anyone else, users.invite.js).
+  const canInvite = me.grants.settings?.includes("create") && e.login.state === "none" && e.status === "active";
   const status = employmentStatus(e);
 
   const putAway = () =>
     modal.open({
       title: "Archive Record",
-      body: (close) => <ArchiveForm id={id} name={e.display_name} close={close} onDone={reload} />,
+      body: (close) => <ArchiveForm id={id} name={e.display_name} startDate={e.start_date} close={close} onDone={reload} />,
     });
 
   /* Download Their Data: the CEO only, downloaded here; the person's one a day (docs/guides/ess.md §6). */
@@ -112,7 +126,12 @@ export function Employee360({ id }: { id: string }) {
 
   const bringBack = async () => {
     if (!(await confirm({ title: "Restore Record", body: `${e.display_name} goes back on the register.` }))) return;
-    await restore.run({ params: { id }, body: {} });
+    try {
+      await restore.run({ params: { id }, body: {} });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Not restored. Try again.");
+      return;
+    }
     invalidate("/api/v1/employees", "/api/v1/org-chart");
     reload();
     toast(`${e.display_name} restored`);
@@ -148,7 +167,7 @@ export function Employee360({ id }: { id: string }) {
                     title: "Invite to Sign In",
                     body: (close) => (
                       <InviteToSignIn
-                        close={close}
+                        close={() => (close(), reload())}
                         person={{ employee_id: e.employee_id, display_name: e.display_name, job_title: e.job_title, department: e.department }}
                       />
                     ),
@@ -163,7 +182,7 @@ export function Employee360({ id }: { id: string }) {
                 Restore Record
               </Button>
             )}
-            {canArchive && e.status !== "archived" && <Button onClick={putAway}>Archive Record</Button>}
+            {canArchive && e.status !== "archived" && !e.is_ceo && <Button onClick={putAway}>Archive Record</Button>}
             {canEdit && (
               <Button
                 variant="primary"
@@ -176,48 +195,54 @@ export function Employee360({ id }: { id: string }) {
           </ActionGroup>
         }
       />
-      <Tabs items={TABS} value={tab} onValueChange={setTab} label="Employee Record" className="mb-3" />
+      <Tabs items={seesQueries ? [...TABS, ...QUERY_TABS] : TABS} value={tab} onValueChange={setTab} label="Employee Record" className="mb-3" />
       {tab === "profile" && <Profile employee={e} />}
       {tab === "job" && <Job employee={e} />}
       {tab === "schedule" && <EmployeeWorkSchedule id={id} />}
       {tab === "line" && <ReportingLine employee={e} onChanged={reload} />}
       {tab === "login" && <Login employee={e} onChanged={reload} />}
       {tab === "history" && <History id={id} />}
+      {seesQueries && tab === "queries" && <PersonQueries id={id} />}
+      {seesQueries && tab === "sanctions" && <PersonSanctions id={id} />}
     </>
   );
 }
 
-/** Archive asks why: the reason is kept on the audit row, and the record keeps its history. */
-function ArchiveForm({ id, name, close, onDone }: { id: string; name: string; close: () => void; onDone: () => void }) {
-  const [reason, setReason] = useState("");
-  const [tried, setTried] = useState(false);
+/**
+ * Archive asks why and their last day: the reason is kept on the audit row, the day as their
+ * `left_on` (Attrition counts it), and the record keeps its history.
+ */
+function ArchiveForm({ id, name, startDate, close, onDone }: { id: string; name: string; startDate: string | null; close: () => void; onDone: () => void }) {
+  const f = useContractForm({ archive_reason: "", left_on: todayIso() }, organisation.EmployeeArchive);
   const archive = useMutation("POST /api/v1/employees/:id/archive");
-  const bad = reason.trim().length < 5;
   const submit = async () => {
-    setTried(true);
-    if (bad) return;
     try {
-      await archive.run({ params: { id }, body: { archive_reason: reason.trim() } });
+      await archive.run({ params: { id }, body: { archive_reason: f.values.archive_reason.trim(), left_on: f.values.left_on } });
       invalidate("/api/v1/employees", "/api/v1/org-chart");
       close();
       onDone();
       toast(`${name} archived`);
-    } catch {
-      toast(archive.error?.message ?? "Not archived");
+    } catch (err) {
+      // The refusal itself (CEO_PROTECTED, ALREADY_ARCHIVED): the mutation's state is not yet the new one here.
+      if (err instanceof ApiError && Object.keys(err.fields).length) f.setServerErrors(err.fields);
+      else toast.error(err instanceof ApiError ? err.message : "Not archived. Try again.");
     }
   };
   return (
-    <>
-      <Field label="Reason" state={tried ? (bad ? "bad" : "good") : undefined} message="At least 5 characters">
-        <TextField value={reason} onChange={setReason} placeholder="Left the company" state={tried ? (bad ? "bad" : "good") : undefined} />
+    <Form onSubmit={f.submit(submit)}>
+      <Field label="Reason" {...f.status("archive_reason")}>
+        <TextField {...f.field("archive_reason")} placeholder="Left the company" maxLength={200} />
+      </Field>
+      <Field label="Last Day" {...f.status("left_on")}>
+        <DateField {...f.field("left_on")} max={todayIso()} min={startDate ?? undefined} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={archive.pending} onClick={() => submit()}>
+        <Button variant="primary" type="submit">
           Archive Record
         </Button>
       </FormFooter>
-    </>
+    </Form>
   );
 }
 
@@ -352,6 +377,20 @@ function Login({ employee: e, onChanged }: { employee: Record360; onChanged: () 
   const me = useMe();
   const modal = useModal();
   const login = loginStatus(e.login.state);
+  const resend = useMutation("POST /api/v1/users/:id/invite");
+  /* A login made by the staff roster is Invited but was never emailed: Send Invite sends its
+     first invitation, or a fresh one that replaces the last (docs/guides/identity.md §6.1). */
+  const sendAgain = async () => {
+    if (!e.login.user_id) return;
+    try {
+      const sent = await resend.run({ params: { id: e.login.user_id }, body: {} });
+      invalidate("/api/v1/users");
+      onChanged();
+      toast(`Invitation sent to ${sent.email}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Not sent. Try again.");
+    }
+  };
   return (
     <Grid cols={2}>
       <Card>
@@ -363,7 +402,14 @@ function Login({ employee: e, onChanged }: { employee: Record360; onChanged: () 
             ["Last signed in", e.login.last_sign_in_at ? formatDate(e.login.last_sign_in_at.slice(0, 10)) : "Never"],
           ]}
         />
-        {me.grants.settings?.includes("create") && e.login.state === "none" && (
+        {me.grants.settings?.includes("edit") && e.login.state === "invited" && e.status === "active" && (
+          <div className="mt-3">
+            <Button variant="primary" icon="send" onClick={sendAgain}>
+              Send Invite
+            </Button>
+          </div>
+        )}
+        {me.grants.settings?.includes("create") && e.login.state === "none" && e.status === "active" && (
           <div className="mt-3">
             <Button
               variant="primary"
@@ -402,6 +448,73 @@ function History({ id }: { id: string }) {
         { key: "w", label: "What", render: (r) => r.summary },
         { key: "a", label: "Who", render: (r) => r.actor_name ?? "System" },
         { key: "d", label: "When", render: (r) => formatDate(r.occurred_at.slice(0, 10)) },
+      ]}
+    />
+  );
+}
+
+const QUERY_STATUS = {
+  awaiting_response: { tone: "warn", text: "Awaiting Response" },
+  under_review: { tone: "info", text: "Under Review" },
+} as const;
+
+/** A query's status in the words Queries & Sanctions uses: a closed one says how it ended. */
+function queryPill(q: Query) {
+  if (q.status === "resolved") return q.outcome === "sanctioned" ? <Pill tone="neutral">Sanctioned</Pill> : <Pill tone="ok">Closed, No Action</Pill>;
+  if (q.escalated) return <Pill tone="err">Escalated</Pill>;
+  return <Pill tone={QUERY_STATUS[q.status].tone}>{QUERY_STATUS[q.status].text}</Pill>;
+}
+
+/** The person's queries the viewer may see (queries.md §6.1); a row opens it on Queries & Sanctions. */
+function PersonQueries({ id }: { id: string }) {
+  const { navigate } = useRouter();
+  const list = usePaged("GET /api/v1/queries", { filters: { employee_id: id }, sort: "-created_at" });
+  return (
+    <DataView
+      title="Queries"
+      list={list}
+      rowKey={(q: Query) => q.employee_query_id}
+      noun="query"
+      nounPlural="queries"
+      onRowClick={(q: Query) => navigate(hrefFor("queries", "queries", { id: q.employee_query_id }))}
+      empty={{ title: "No Queries", text: "None you can see." }}
+      columns={[
+        { key: "n", label: "Number", render: (q: Query) => q.number },
+        { key: "s", label: "Subject", render: (q: Query) => q.subject },
+        { key: "b", label: "Raised By", desktop: true, render: (q: Query) => q.raised_by_name ?? q.rule_name ?? "Rule" },
+        { key: "d", label: "Raised", render: (q: Query) => formatDate(q.created_at) },
+        { key: "t", label: "Status", render: queryPill },
+      ]}
+    />
+  );
+}
+
+const SANCTION_STATUS = {
+  pending_approval: { tone: "warn", text: "Awaiting Approval" },
+  issued: { tone: "neutral", text: "Issued" },
+  rejected: { tone: "err", text: "Not Approved" },
+  withdrawn: { tone: "neutral", text: "Withdrawn" },
+} as const;
+
+/** The person's sanctions the viewer may see; a row opens the query it follows, which shows it and its letter. */
+function PersonSanctions({ id }: { id: string }) {
+  const { navigate } = useRouter();
+  const list = usePaged("GET /api/v1/sanctions", { filters: { employee_id: id }, sort: "-created_at" });
+  return (
+    <DataView
+      title="Sanctions"
+      list={list}
+      rowKey={(s: Sanction) => s.sanction_id}
+      noun="sanction"
+      onRowClick={(s: Sanction) => navigate(hrefFor("queries", "queries", { id: s.employee_query_id }))}
+      empty={{ title: "No Sanctions", text: "None you can see." }}
+      columns={[
+        { key: "k", label: "Sanction", render: (s: Sanction) => s.step_name },
+        { key: "q", label: "Query", desktop: true, render: (s: Sanction) => s.query_number },
+        { key: "r", label: "Reason", render: (s: Sanction) => <span data-copy="content">{s.reason}</span> },
+        { key: "d", label: "Date", render: (s: Sanction) => formatDate(s.effective_on) },
+        { key: "m", label: "Fine", align: "n", render: (s: Sanction) => (s.fine ? <Money value={s.fine.amount_ngn} /> : "None") },
+        { key: "t", label: "Status", render: (s: Sanction) => <Pill tone={SANCTION_STATUS[s.status].tone}>{SANCTION_STATUS[s.status].text}</Pill> },
       ]}
     />
   );

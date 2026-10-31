@@ -22,6 +22,9 @@ import { byId, byKey, DEPARTMENTS, PEOPLE, ref, refKey, teamOf } from "../data/p
 import { me as meOf } from "./identity";
 import { leaveRequests } from "./organisation";
 import { exportFile } from "./shared";
+import { personalExport, personalRun } from "./home";
+import workspaceContract from "@mycity/contract/schemas/workspace.js";
+import reportsContract from "@mycity/contract/schemas/reports.js";
 
 /**
  * My Workspace in the browser, in the contract's shapes (docs/guides/workspace.md §5).
@@ -574,7 +577,10 @@ route("POST /api/v1/tasks/:id/move", (req) => {
   const from = t.status;
   if (from === "todo" && to !== "todo") {
     const e = EDGES.find((x) => x.task_id === t.task_id && !satisfied(x));
-    if (e) return fail(409, "TASK_WAITING", `Waiting on ${TASKS.find((x) => x.task_id === e.depends_on_task_id)!.number}`);
+    if (e) {
+      const other = TASKS.find((x) => x.task_id === e.depends_on_task_id)!;
+      return fail(409, "TASK_WAITING", `Waiting on ${other.number}: ${other.title}`, { status: [`Waiting on ${other.number}`] });
+    }
   }
   if (to === "done" && why && !reasonOn(why)) return invalid({ late_reason: ["Pick a reason"] });
   if (to === "done" && why) t.late_reason = why;
@@ -623,7 +629,7 @@ route("POST /api/v1/tasks/:id/unblock", (req) => {
 route("POST /api/v1/tasks/:id/cancel", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
-  if (!manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can cancel it");
+  if (!manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only whoever set this task, or the lead's manager, can cancel it");
   if (t.is_commitment && t.original_due_at) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
   log(req.user!, t, "cancelled", t.status, "cancelled");
   Object.assign(t, { status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: (req.body as { cancel_reason: string }).cancel_reason });
@@ -688,8 +694,12 @@ route("POST /api/v1/tasks/:id/waiting-on", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
   const other = find(req.user!, (req.body as { depends_on_task_id: string }).depends_on_task_id);
-  if (!other || other.task_id === t.task_id) return invalid({ depends_on_task_id: ["Not a task you can see"] });
-  if (reaches(other.task_id, t.task_id)) return invalid({ depends_on_task_id: [`${other.number} already waits on this task`] });
+  // Each refusal under its own rule, as the API says it.
+  const refuse = (code: string, message: string) => fail(422, code, message, { depends_on_task_id: [message] });
+  if (other?.task_id === t.task_id) return refuse("TASK_LINK_SELF", "Pick another task");
+  if (!other) return refuse("TASK_LINK_UNSEEN", "Not a task you can see");
+  if (other.status === "cancelled") return refuse("TASK_LINK_CANCELLED", "That task was cancelled");
+  if (reaches(other.task_id, t.task_id)) return refuse("TASK_LINK_LOOP", `${other.number} already waits on this task`);
   if (!EDGES.some((e) => e.task_id === t.task_id && e.depends_on_task_id === other.task_id))
     EDGES.push({ task_dependency_id: sid(`edge:${Date.now()}`), task_id: t.task_id, depends_on_task_id: other.task_id, overridden_at: null, override_reason: null });
   log(req.user!, t, "waiting_added");
@@ -708,6 +718,7 @@ route("POST /api/v1/tasks/:id/waiting-on/:child_id/override", (req) => {
   const t = find(req.user!, req.params.id);
   const e = t && EDGES.find((x) => x.task_dependency_id === req.params.child_id && x.task_id === t.task_id);
   if (!t || !e) return notFound();
+  if (!plans(req.user!, t)) return fail(403, "FORBIDDEN", "Only its assignee or the person who set it can change that");
   Object.assign(e, { overridden_at: new Date().toISOString(), override_reason: (req.body as { override_reason?: string }).override_reason ?? null });
   log(req.user!, t, "waiting_overridden");
   return ok(detail(req.user!, t));
@@ -908,7 +919,43 @@ route("GET /api/v1/workspace/today", (req) => {
     since: { data: since.map((a) => ({ task_id: a.task_id, task_title: a.task_title, actor: a.actor, kind: a.kind, to_status: a.to_status, created_at: a.created_at })), total: since.length },
   });
 });
+/** A refused query or body, its issues on their fields as the API's validator names them. */
+const refusedFields = (issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>, prefix = "") =>
+  invalid(Object.fromEntries(issues.map((i) => [`${prefix}${i.path.join(".")}`, [i.message]])));
+
+/** The days a period covers, as the API reads them (workspace.analytics periodOf). */
+function analyticsDays(q: { period?: string; from?: string; to?: string }) {
+  const today = isoDaysAgo(0);
+  if (q.period === "custom") return { from: q.from!, to: q.to! };
+  if (q.period === "week") {
+    const day = new Date(`${today}T00:00:00Z`).getUTCDay();
+    return { from: isoDaysAgo(day === 0 ? 6 : day - 1), to: today };
+  }
+  if (q.period === "year") return { from: `${today.slice(0, 4)}-01-01`, to: today };
+  return { from: isoDaysAgo((q.period === "90d" ? 90 : 30) - 1), to: today };
+}
+
+const mayExport = (user: string) => meOf(user).is_ceo || (meOf(user).grants.workspace ?? []).includes("export");
+
+route("POST /api/v1/workspace/analytics/export", (req) => {
+  if (!mayExport(req.user!)) return fail(403, "FORBIDDEN", "You cannot export My Workspace");
+  const body = reportsContract.WorkspaceAnalyticsExport.safeParse(req.body);
+  if (!body.success) return refusedFields(body.error.issues);
+  const b = body.data;
+  if (b.period === "custom" && b.to! > isoDaysAgo(0)) return invalid({ to: ["Not after today"] });
+  const custom = b.period === "custom";
+  const filters = { task_scope: b.scope, analytics_period: b.period, ...(custom ? { period_from: b.from, period_to: b.to } : {}) };
+  return personalExport(req.user!, "workspace_analytics", b.format, filters, req.idempotency_key);
+});
+
+route("GET /api/v1/workspace/analytics/export/:id", (req) =>
+  mayExport(req.user!) ? personalRun(req.user!, "workspace_analytics", req.params.id) : fail(403, "FORBIDDEN", "You cannot export My Workspace"),
+);
+
 route("GET /api/v1/workspace/analytics", (req) => {
+  const asked = workspaceContract.AnalyticsQuery.safeParse(req.query);
+  if (!asked.success) return refusedFields(asked.error.issues, "query.");
+  if (asked.data.period === "custom" && asked.data.to! > isoDaysAgo(0)) return invalid({ to: ["Not after today"] });
   // Mine is what the reader leads or shares; a task they set for someone else counts under My Team.
   const own = (t: Task) => t.assignee?.employee_id === me(req.user) || onIt(req.user!, t);
   const l = (req.query.scope === "team" ? scoped(req.user!, "team") : TASKS.filter(own)).map(fresh);
@@ -921,12 +968,11 @@ route("GET /api/v1/workspace/analytics", (req) => {
     e.open += 1;
     by.set(t.assignee.employee_id, e);
   }
-  // The last 30 or 90 days, or the calendar year from 1 January (Africa/Lagos).
-  const today = isoDaysAgo(0);
-  const from = req.query.period === "year" ? `${today.slice(0, 4)}-01-01` : isoDaysAgo((req.query.period === "90d" ? 90 : 30) - 1);
+  // This week, the last 30 or 90 days, the calendar year, or the reader's own days (Africa/Lagos).
+  const { from, to } = analyticsDays(asked.data);
   return ok({
     from,
-    to: today,
+    to,
     completion_rate: done.length + openNow.length ? Math.round((done.length / (done.length + openNow.length)) * 1000) / 10 : null,
     overdue: openNow.filter((t) => t.overdue).length,
     avg_completion_days: 2.4,
@@ -1093,7 +1139,14 @@ route("GET /api/v1/performance/commitments", (req) => {
   const rows = commitmentsFor(req.user!, waiting_on_me === "true").filter((t) => !month || t.commitment_month === monthOf(month)).map(commitmentOf);
   return paged(rows, { ...req, query }, {
     search: (c) => [c.title, c.number, c.employee?.display_name],
-    filters: { state: (c, v) => c.state === v, employee_id: (c, v) => c.employee?.employee_id === v, department_id: () => true },
+    filters: {
+      // An unapproved month as its pill reads: sent and waiting, not sent, or returned.
+      state: (c, v) =>
+        v === "sent" ? c.state === "awaiting_approval" && c.set_status === "submitted"
+        : v === "returned" ? c.state === "awaiting_approval" && c.set_status === "returned"
+        : v === "not_sent" ? c.state === "awaiting_approval" && (c.set_status === null || c.set_status === "draft")
+        : c.state === v,
+      employee_id: (c, v) => c.employee?.employee_id === v, department_id: () => true },
     sort: { due_at: (a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9"), employee: (a, b) => (a.employee?.display_name ?? "").localeCompare(b.employee?.display_name ?? "") },
   });
 });

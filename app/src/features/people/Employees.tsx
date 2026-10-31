@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { usePhotos } from "@/api/download";
-import { useApi, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useInfinite, usePaged } from "@/api/hooks";
 import type { EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { toBars } from "@/features/shared/wire";
-import { hrefFor, useRouter } from "@/lib/router";
+import { paging, toBars } from "@/features/shared/wire";
+import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
   Bars,
@@ -22,8 +22,10 @@ import {
   StatStrip,
   Toolbar,
   Who,
+  useIsPhone,
   useModal,
 } from "@mycity/ui";
+import { MoveForm } from "./Departments";
 import { AddEmployee } from "./EmployeeForm";
 import { employmentStatus, INVITED_HELP, loginStatus, workPattern } from "./status";
 
@@ -32,31 +34,58 @@ import { employmentStatus, INVITED_HELP, loginStatus, workPattern } from "./stat
  *
  * The server pages, searches, filters and sorts (25 a row, F20); nothing here slices
  * rows. A row opens that person's record. Import Staff opens the Import wizard on
- * Settings · Imports, already set to the employees importer.
+ * Settings · Imports, already set to the employees importer. On a computer, People who may
+ * edit tick rows and Move To Department moves them, as People · Departments does
+ * (docs/guides/organogram.md §6.1); a phone has no bulk actions.
  */
 export function Employees() {
   const me = useMe();
+  const [params] = useSearchParams();
   const modal = useModal();
   const { navigate } = useRouter();
   const summary = useApi("GET /api/v1/employees/summary");
-  const departments = usePaged("GET /api/v1/departments");
+  const departments = useInfinite("GET /api/v1/departments");
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
   const [pattern, setPattern] = useState("");
+  // `?contract=ending` (Needs a Decision's Contracts Ending) opens on the contracts ending in 30 days.
+  const [contract, setContract] = useState(params.get("contract") === "ending" ? "ending" : "");
   const list = usePaged("GET /api/v1/employees", {
     filters: {
       ...(department && { department_id: department }),
       ...(status && { status }),
       ...(pattern && { work_pattern: pattern }),
+      ...(contract === "ending" && { contract: "ending" as const }),
     },
   });
   const photo = usePhotos(list.rows.map((r) => r.photo_url));
   const canCreate = me.grants.people?.includes("create");
+  const phone = useIsPhone();
+  const [picked, setPicked] = useState<string[]>([]);
+  const canMove = Boolean(me.grants.people?.includes("edit")) && !phone;
+  const moveSelected = () =>
+    modal.open({
+      title: "Move People",
+      body: (close) => (
+        <MoveForm
+          people={list.rows.filter((r) => picked.includes(r.employee_id))}
+          close={close}
+          onDone={() => {
+            setPicked([]);
+            invalidate("/api/v1/employees");
+            invalidate("/api/v1/departments");
+            invalidate("/api/v1/org-chart");
+          }}
+        />
+      ),
+    });
   const open = (r: EmployeeRow) => navigate(hrefFor("people", "employees", { id: r.employee_id }));
   const add = () => modal.open({ title: "Add Employee", wide: true, body: (close) => <AddEmployee close={close} /> });
   useScreenAction(canCreate ? { label: "Add Employee", onSelect: add } : null);
-  // The assistant's Add Employee button: ?new=1 and the names and job (docs/guides/praxis-ai.md §6.4).
-  useNewLink(canCreate ? add : null);
+  /* The assistant's Add Employee button: ?new=1 and the names and job (docs/guides/praxis-ai.md §6.4).
+     It opens for everyone, so someone who may only view is told so on the first step rather than
+     finding nothing happens (docs/guides/foundation.md §6.16). */
+  useNewLink(add);
 
   return (
     <>
@@ -85,6 +114,7 @@ export function Employees() {
           value={department}
           onChange={setDepartment}
           options={[["", "All Departments"], ...departments.rows.map((d) => [d.department_id, d.name] as [string, string])]}
+          {...paging(departments)}
         />
         <FilterSelect
           label="Status"
@@ -109,12 +139,34 @@ export function Employees() {
             ["remote", "Remote"],
           ]}
         />
+        <FilterSelect
+          label="Contract"
+          value={contract}
+          onChange={setContract}
+          options={[
+            ["", "Any Contract"],
+            ["ending", "Ending in 30 Days"],
+          ]}
+        />
       </Toolbar>
       <DataView
         title="All Employees"
         list={list}
         rowKey={(r) => r.employee_id}
         onRowClick={open}
+        selection={
+          canMove
+            ? {
+                keys: picked,
+                onChange: setPicked,
+                actions: (
+                  <Button icon="users" onClick={moveSelected}>
+                    Move To Department
+                  </Button>
+                ),
+              }
+            : undefined
+        }
         empty={{ icon: "srch", title: "Nobody Matches", text: "Clear the search or filters." }}
         columns={[
           { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.display_name} sub={r.job_title} src={photo(r.photo_url)} /> },

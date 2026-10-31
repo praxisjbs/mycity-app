@@ -41,8 +41,13 @@ on:
   # webhook events, and an empty commit to re-trigger would invent history.
   workflow_dispatch:
 
+# A run that does no work (on a draft, or after an edit to the title alone: the scope job's
+# condition below) has a group of its own, so it never cancels a run that does (27/10/2026).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: >-
+    ${{ (github.event_name == 'pull_request' && (github.event.pull_request.draft ||
+    (github.event.action == 'edited' && !github.event.changes.body && !github.event.changes.base)))
+    && format('ci-{0}-idle-{1}', github.ref, github.run_id) || format('ci-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -155,6 +160,26 @@ jobs:
           fi
           ffmpeg -version | head -1
 
+      # The job prints the service's log after its steps, and the transaction probe in
+      # src/shared/db/tx.js has PostgreSQL log an ERROR on every call outside a transaction:
+      # thousands of lines that buried the failing test at the end of each red backend log
+      # (27/10/2026). From here it logs fatal errors only. A warning, never a failure, if it cannot.
+      - name: PostgreSQL logs fatal errors only
+        run: |
+          node -e '
+            const { Client } = require("pg");
+            const db = new Client({ connectionString: process.env.DATABASE_URL });
+            (async () => {
+              await db.connect();
+              await db.query("ALTER SYSTEM SET log_min_messages = fatal");
+              await db.query("ALTER SYSTEM SET log_min_error_statement = panic");
+              await db.query("SELECT pg_reload_conf()");
+              await db.end();
+            })().catch((e) => console.log(`::warning::PostgreSQL keeps logging errors: ${e.message}`));
+          '
+        env:
+          DATABASE_URL: postgres://mycity:mycity@127.0.0.1:5432/mycity_test
+
       - name: Backend gates
         run: npm run ci -- --group=backend
         env:
@@ -223,13 +248,31 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+      # Both install through the runner's apt mirror, which once hung 14 minutes and took the run
+      # with it (26/10/2026): each try is capped, a second follows, then the step fails saying so.
       - name: Chromium for the screen gates
         if: steps.chromium.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 22
+        run: |
+          for attempt in 1 2; do
+            timeout 600 npx playwright install --with-deps chromium && exit 0
+            echo "::warning::Installing Chromium did not finish (try $attempt of 2)"
+            sudo dpkg --configure -a || true
+          done
+          echo "::error::Chromium could not be installed in two tries: its download or the runner's apt mirror is not answering. Re-run the job."
+          exit 1
       # The browser comes from the cache; the system libraries it needs do not.
       - name: Chromium's system libraries
         if: steps.chromium.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        timeout-minutes: 12
+        run: |
+          for attempt in 1 2; do
+            timeout 300 npx playwright install-deps chromium && exit 0
+            echo "::warning::Installing Chromium's system libraries did not finish (try $attempt of 2)"
+            sudo dpkg --configure -a || true
+          done
+          echo "::error::Chromium's system libraries could not be installed in two tries: the runner's apt mirror is not answering. Re-run the job."
+          exit 1
 
       - name: Screen gates
         run: npm run ci -- --group=screens
@@ -261,11 +304,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
   # The one check branch protection requires: green only when every job above passed, or was
-  # skipped because this run's scope did not need it.
+  # skipped because this run's scope did not need it. A cancelled run reports cancelled, not a
+  # failed ci (always() did); the newer run that cancelled it reports for the commit.
   ci:
     name: ci
     needs: [scope, backend, frontend, screens, checks]
-    if: always() && needs.scope.result != 'skipped'
+    if: ${{ !cancelled() && needs.scope.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

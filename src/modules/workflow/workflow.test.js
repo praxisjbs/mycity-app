@@ -6,12 +6,24 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
+const c = require("@mycity/contract");
 const definitions = require("../../shared/workflow/definitions");
 const cond = require("../../shared/workflow/conditions");
 const service = require("./workflow.service");
 
 const LEAVE = definitions.DEFAULTS["leave.approval"];
 const names = { roles: new Map([["operations_people", "Operations & People"]]), users: new Map(), employees: new Map([["e1", "Kemi Alade"]]) };
+
+describe("a route's problems, plainly", () => {
+  test("name the stage and say the rule in words", () => {
+    const stages = [{ name: "Line Manager" }, { name: "Finance" }];
+    expect(service.plainly("stage 2 (finance): sla_hours is between 1 and 2160", stages)).toBe("Finance: the time limit is 1 to 2,160 hours");
+    expect(service.plainly("stage 1 (line_manager): name at least one approver", stages)).toBe("Line Manager: it names nobody to decide");
+    expect(service.plainly("stage 1 (line_manager) condition: field \"x\" is not declared in context", stages)).toBe("Line Manager: its condition does not fit these requests");
+    expect(service.plainly("stage 3 (x): something new", stages)).toBe("Stage 3: check its settings");
+    expect(service.plainly("at least one stage is required", stages)).toBe("Add a stage");
+  });
+});
 
 describe("the leave flow", () => {
   test("is valid, and the line manager alone decides five days or fewer", () => {
@@ -82,5 +94,48 @@ describe("a request's route", () => {
     expect(route({ state: "approved", current_stage: "operations_people" })).toEqual(["done", "done"]);
     expect(route({ state: "rejected", current_stage: "line_manager" })).toEqual(["stopped", "skipped"]);
     expect(route({ state: "cancelled", current_stage: "operations_people" })).toEqual(["done", "stopped"]);
+  });
+});
+
+describe("the key of a flow made on screen", () => {
+  test("is its module and its name in snake_case", () => {
+    expect(definitions.keyFor("expenses", "Petty Cash")).toBe("expenses.petty_cash");
+    expect(definitions.keyFor("people", "Operations & People")).toBe("people.operations_people");
+    expect(definitions.keyFor("people", "Café Run")).toBe("people.cafe_run");
+  });
+
+  test("starts with a letter, stays short, and is null when the name has none to give", () => {
+    expect(definitions.keyFor("people", "2nd Opinion")).toBe("people.flow_2nd_opinion");
+    const long = definitions.keyFor("people", "a ".repeat(40));
+    expect(long.split(".")[1].length).toBeLessThanOrEqual(40);
+    expect(long).not.toMatch(/_$/);
+    expect(definitions.keyFor("people", "???")).toBeNull();
+  });
+
+  test("makes a definition the engine accepts", () => {
+    const key = definitions.keyFor("expenses", "Petty Cash");
+    const stage = { key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 48 };
+    expect(definitions.problemsOf({ key, module: "expenses", name: "Petty Cash", context: {}, stages: [stage] })).toEqual([]);
+  });
+});
+
+describe("making a flow: the contract", () => {
+  const stage = { key: "ceo", name: "CEO", approvers: [{ type: "ceo" }], condition: [], sla_hours: 48, on_timeout: "escalate", on_approve: "next", on_reject: "reject" };
+  const flow = { name: "Petty Cash", module_key: "expenses", context_types: { amount: "money" }, stages: [stage] };
+
+  test("takes a name, a module, its values and its stages", () => {
+    const r = c.workflow.ApprovalFlowCreate.safeParse(flow);
+    expect(r.success).toBe(true);
+    expect(r.data.description).toBeUndefined();
+  });
+
+  test("refuses no stage, more than 5 values, a value type it does not know and a key the caller chose", () => {
+    const bad = (patch) => c.workflow.ApprovalFlowCreate.safeParse({ ...flow, ...patch }).success;
+    expect(bad({ stages: [] })).toBe(false);
+    const six = Object.fromEntries(["a", "b", "c", "d", "e", "f"].map((k) => [k, "text"]));
+    expect(bad({ context_types: six })).toBe(false);
+    expect(bad({ context_types: { amount: "euro" } })).toBe(false);
+    expect(bad({ context_types: { "Amount Due": "money" } })).toBe(false);
+    expect(bad({ key: "expenses.petty_cash" })).toBe(false);
   });
 });

@@ -7,10 +7,13 @@
  *    the modules where the caller holds `approve` (the CEO approves everywhere).
  *  - A request is read by whoever opened it, the employee it is about, the people its
  *    current stage names, anyone who decided on it, and a holder of `view` on its
- *    module whose scope covers that employee. Anyone else gets a 404.
+ *    module whose scope covers that employee (for `queries`, scope `all` only). Anyone
+ *    else gets a 404.
  *  - Deciding needs both: the stage names the caller (the engine checks, and nobody
  *    decides their own request, the CEO excepted), and the caller holds `approve` on
  *    the request's module (shared/workflow/approvers.js leaves that to the route).
+ *  - A request decided on its own record (definitions.decidedOnRecord: a sanction, decided on its
+ *    query's card) is listed and read here, but never decided here: 409, and can_decide false.
  *  - Withdrawing is the requester's (or the CEO's), while it is pending.
  *  - Reassigning a stage whose approver has gone needs `approve` with scope `all` on
  *    the request's module: Operations & People, Management, the CEO (§11).
@@ -23,6 +26,7 @@ const { emit } = require("../../shared/events/emit");
 const catalog = require("../../shared/access/access.catalog");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const routeMap = require("../../shared/route-map");
+const deliveryPlan = require("../../shared/delivery-plan");
 const engine = require("../../shared/workflow/engine");
 const cond = require("../../shared/workflow/conditions");
 const definitions = require("../../shared/workflow/definitions");
@@ -128,7 +132,9 @@ function flowView(row, names) {
     context_types: row.context_types || {},
     stages: cond.stagesOf(def).map((s) => stageView(s, names)),
     open_requests: Number(row.open_requests) || 0,
-    problems: definitions.problemsOf(def),
+    problems: definitions.problemsOf(def).map((p) => plainly(p, def.stages)),
+    // A flow the code ships is in use before its first request; one made on screen is not until a module opens it.
+    used: definitions.getDefault(row.key) !== null || row.ever_opened === true,
     created_by_name: row.created_by_name || null,
     created_at: row.created_at,
   };
@@ -179,22 +185,80 @@ function authoredStages(stages) {
   }));
 }
 
+/** What a definition problem means to the person who set the stages: the stage by its name, the rule in words. */
+const PLAIN = [
+  [/sla_hours/, "the time limit is 1 to 2,160 hours"],
+  [/name at least one approver/, "it names nobody to decide"],
+  [/approver needs a value|named person's value/, "pick who decides"],
+  [/user approver's value/, "pick a person"],
+  [/key is used twice/, "two stages share a key"],
+  [/never approves itself/, "a request with money never approves itself on time out"],
+  [/condition/, "its condition does not fit these requests"],
+];
+function plainly(problem, stages = []) {
+  const m = /^stage (\d+)(?: \([^)]*\))?( condition)?: (.*)$/.exec(problem);
+  if (!m) return problem === "at least one stage is required" ? "Add a stage" : "Check the stages";
+  const n = Number(m[1]);
+  const name = (stages[n - 1] && stages[n - 1].name) || `Stage ${n}`;
+  const rule = `${m[2] ? "condition " : ""}${m[3]}`;
+  const words = (PLAIN.find(([re]) => re.test(rule)) || [null, "check its settings"])[1];
+  return `${name}: ${words}`;
+}
+
+/** The person-facing refusal of a route: each problem plainly, on Stages. */
+const refuseRoute = (problems) =>
+  new AppError("WORKFLOW_DEFINITION_INVALID", "Fix the stages first", 422, { stages: problems });
+
 /** Every role a stage names is a role, and every login is a login: a stage nobody can decide is refused. */
 async function assertApproversExist(client, stages) {
-  const all = stages.flatMap((s) => s.approvers);
-  const codes = all.filter((a) => a.type === "role").map((a) => a.value);
-  const users = all.filter((a) => a.type === "user").map((a) => a.value);
-  const roles = await repo.roleNames(client, codes);
-  const logins = await repo.namesOfUsers(client, users);
-  const problems = [
-    ...codes.filter((code) => !roles.has(code)).map((code) => `no role "${code}"`),
-    ...users.filter((id) => !logins.has(id)).map((id) => `no login ${id}`),
-  ];
-  if (problems.length) {
-    throw new AppError("WORKFLOW_DEFINITION_INVALID", `This approval route is not valid: ${problems.join("; ")}`, 422, {
-      stages: problems,
-    });
+  const problems = [];
+  for (const s of stages) {
+    const codes = s.approvers.filter((a) => a.type === "role").map((a) => a.value);
+    const users = s.approvers.filter((a) => a.type === "user").map((a) => a.value);
+    const roles = await repo.roleNames(client, codes);
+    const logins = await repo.namesOfUsers(client, users);
+    if (codes.some((code) => !roles.has(code))) problems.push(`${s.name}: a role it names no longer exists`);
+    if (users.some((id) => !logins.has(id))) problems.push(`${s.name}: a person it names has no login`);
   }
+  if (problems.length) throw refuseRoute(problems);
+}
+
+const nameRefused = (message) => new AppError("VALIDATION_FAILED", message, 422, { name: [message] });
+
+/**
+ * Make a flow on screen: version 1, under the key its module and name give. Nothing opens it
+ * until a module's service calls openInstance with that key, so it lists as Not Used Yet.
+ */
+async function createFlow(actor, body) {
+  return tx(async (client) => {
+    if (!catalog.isModule(body.module_key)) {
+      throw new AppError("VALIDATION_FAILED", "Pick a module", 422, { module_key: ["Pick a module"] });
+    }
+    const key = definitions.keyFor(body.module_key, body.name);
+    if (!key) throw nameRefused("Use letters");
+    if (await definitions.keyTaken(client, key)) throw nameRefused("Name already used");
+    const proposed = {
+      key,
+      module: body.module_key,
+      name: body.name,
+      description: body.description ?? null,
+      context: body.context_types,
+      stages: authoredStages(body.stages),
+    };
+    const problems = definitions.problemsOf(proposed);
+    if (problems.length) throw refuseRoute(problems.map((p) => plainly(p, body.stages)));
+    await assertApproversExist(client, body.stages);
+    const saved = await definitions.saveVersion(client, proposed, { created_by: actor.user_id });
+    await emit(client, {
+      key: EVENTS.WORKFLOW_DEFINITION_CREATED,
+      entity: { type: "workflow_definition", id: saved.workflow_definition_id },
+      actor,
+      after: { key: saved.key, version: saved.version, module: saved.module, name: saved.name, stages: saved.stages },
+      payload: { key: saved.key, version: saved.version, module_key: saved.module },
+    });
+    const row = await repo.flowById(client, saved.workflow_definition_id);
+    return (await flowsView(client, [row]))[0];
+  });
 }
 
 /**
@@ -209,14 +273,18 @@ async function saveSteps(actor, id, { stages }) {
       throw new AppError("WORKFLOW_DEFINITION_STALE", "This flow changed since you opened it. Open it again.", 409);
     }
     const before = definitions.fromRow(current);
-    const next = definitions.assertValid({
+    const proposed = {
       key: before.key,
       module: before.module,
       name: before.name,
       description: before.description,
       context: before.context,
       stages: authoredStages(stages),
-    });
+    };
+    // Refused in the words of the stages, never the engine's (definitions.assertValid is for code).
+    const problems = definitions.problemsOf(proposed);
+    if (problems.length) throw refuseRoute(problems.map((p) => plainly(p, stages)));
+    const next = definitions.assertValid(proposed);
     await assertApproversExist(client, stages);
     const saved = await definitions.saveVersion(client, next, { created_by: actor.user_id });
     await emit(client, {
@@ -240,7 +308,8 @@ async function saveSteps(actor, id, { stages }) {
 async function mine(user, query, client = pool) {
   const roleCodes = await approvers.roleCodesOf(client, user.role_ids || []);
   const modules = await approveModules(user);
-  const page = await repo.waiting(client, user, roleCodes, modules, query);
+  // A request about a record whose screen has not shipped would open Coming Soon: never offered.
+  const page = await repo.waiting(client, user, roleCodes, modules, query, deliveryPlan.closedTypes());
   return {
     ...page,
     data: page.data.map(({ stages, ...r }) => {
@@ -260,7 +329,7 @@ async function mineCount(user) {
     approvers.roleCodesOf(pool, user.role_ids || []),
     approveModules(user),
   ]);
-  return repo.waitingCount(pool, user, roleCodes, modules);
+  return repo.waitingCount(pool, user, roleCodes, modules, deliveryPlan.closedTypes());
 }
 
 /* ------------------------------------------------------------------ *
@@ -279,6 +348,9 @@ async function named(client, snapshot, user) {
   return held.some((code) => wanted.includes(code));
 }
 
+/** Modules whose `view` scope `team` does not reach their people's requests (queries.md §6.1). */
+const NARROW_MODULES = new Set(["queries"]);
+
 /** May the caller read this request? */
 async function mayRead(client, instance, user) {
   if (user.is_ceo === true) return true;
@@ -289,6 +361,9 @@ async function mayRead(client, instance, user) {
   const scope = await rbac().scopeFor(user, instance.module_key, "view");
   if (!scope) return false;
   if (scope.scope === "all") return true;
+  // A module whose records a team scope never widens (a sanction, queries.md §6.1) is read here
+  // only by those above, or with scope all.
+  if (NARROW_MODULES.has(instance.module_key)) return false;
   return Boolean(instance.subject_employee_id && (scope.scope_ids || []).includes(instance.subject_employee_id));
 }
 
@@ -367,7 +442,10 @@ async function detail(client, id, user) {
       };
     }),
     can_decide:
-      pending && Boolean(approves) && (await approvers.canAct(client, instance.stage_approvers, user, instance)),
+      pending &&
+      !definitions.decidedOnRecord(instance.definition_key) &&
+      Boolean(approves) &&
+      (await approvers.canAct(client, instance.stage_approvers, user, instance)),
     can_withdraw: pending && (user.is_ceo === true || instance.opened_by === user.user_id),
     can_reassign: pending && approves === "all",
     link: linkOf(instance, user),
@@ -388,15 +466,56 @@ async function readable(client, id, user) {
   return found;
 }
 
-/** Approve, reject or request changes on the current stage. */
+/**
+ * Approve, reject or request changes on the current stage, on the caller's transaction: a module
+ * that keeps something with the decision (a sanction's signature, queries.md §6.4) writes it and
+ * decides in one transaction. The same checks as decide().
+ */
+async function decideIn(client, user, id, decision, reason = null) {
+  const found = await readable(client, id, user);
+  if (!(await approveScope(user, found.module_key))) {
+    throw new AppError("PERMISSION_DENIED", "You do not approve these requests", 403);
+  }
+  await engine.act(client, { instance_id: id, actor: user, decision, reason });
+  return detail(client, id, user);
+}
+
+/**
+ * Whether the caller may act on the stage a request waits on, wherever it is decided: the record
+ * that decides its own approval (decidedOnRecord) asks this for its card.
+ */
+async function mayAct(user, id) {
+  const instance = await engine.getInstance(pool, id);
+  if (!instance || instance.state !== "pending") return false;
+  if (!(await approveScope(user, instance.module_key))) return false;
+  return approvers.canAct(pool, instance.stage_approvers, user, instance);
+}
+
+/**
+ * The stage a request waits on and its name, for a record that has already checked its reader may
+ * see it (a query's card, queries.md §6.1): no read check of its own. Null once it has completed.
+ */
+async function pendingStage(id) {
+  const instance = await engine.getInstance(pool, id);
+  if (!instance || instance.state !== "pending" || !instance.current_stage) return null;
+  const def = await definitions.findById(pool, instance.workflow_definition_id);
+  const stage = cond.stageByKey(def, instance.current_stage);
+  return { key: instance.current_stage, name: stage ? stage.name : instance.current_stage };
+}
+
+/** The stage a request waits on, under the caller's transaction (null once it has completed). */
+async function stageOf(client, id) {
+  const found = await engine.getInstance(client, id);
+  return found && found.state === "pending" ? found.current_stage : null;
+}
+
+/** Approve, reject or request changes on the current stage, from My Approvals. */
 async function decide(user, id, decision, reason = null) {
   return tx(async (client) => {
     const found = await readable(client, id, user);
-    if (!(await approveScope(user, found.module_key))) {
-      throw new AppError("PERMISSION_DENIED", "You do not approve these requests", 403);
-    }
-    await engine.act(client, { instance_id: id, actor: user, decision, reason });
-    return detail(client, id, user);
+    if (definitions.decidedOnRecord(found.definition_key))
+      throw new AppError("DECIDE_ON_RECORD", "Decide this on its record", 409);
+    return decideIn(client, user, id, decision, reason);
   });
 }
 
@@ -478,11 +597,17 @@ module.exports = {
   authoredStages,
   listFlows,
   summary,
+  createFlow,
   saveSteps,
+  plainly,
   mine,
   mineCount,
   getInstance,
   decide,
+  decideIn,
+  stageOf,
+  mayAct,
+  pendingStage,
   withdraw,
   reassign,
 };

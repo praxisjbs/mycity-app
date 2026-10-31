@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import integrations from "@mycity/contract/schemas/integrations.js";
 import type { Integration, IntegrationCode, IntegrationPlan, IntegrationSave, SecretState } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
@@ -40,9 +40,36 @@ export function EditSettings({ c, done }: { c: Integration; done: () => void }) 
 }
 
 /**
+ * What was typed when a fresh sign-in replaced the form and the test then failed: kept by
+ * connection, with the marks, so Edit Settings opens again with both (never what is saved).
+ */
+const KEPT = new Map<IntegrationCode, { values: unknown; fields: Fields }>();
+
+/** The form's starting values: what was kept for this connection, else `fresh`; and its marks, applied once. */
+function useKept<T>(code: IntegrationCode, fresh: T): { initial: T; marks: Fields | null } {
+  const [kept] = useState(() => {
+    const k = KEPT.get(code) ?? null;
+    KEPT.delete(code);
+    return k;
+  });
+  return { initial: (kept?.values as T | undefined) ?? fresh, marks: kept?.fields ?? null };
+}
+
+/** The kept marks, on the form once it is up. */
+function useMarks(marks: Fields | null, apply: (fields: Fields) => void) {
+  const applied = useRef(false);
+  useEffect(() => {
+    if (!marks || applied.current) return;
+    applied.current = true;
+    apply(marks);
+  }, [marks, apply]);
+}
+
+/**
  * The save every form shares: PUT, then back to the connection. A sign-in that has
  * lapsed is asked for and the save runs once more; that replaces the form, so what
- * follows is said in a toast and the connection opens again.
+ * follows is said in a toast and the connection opens again. A failed test keeps what
+ * was typed and its marks for Edit Settings (KEPT).
  */
 function useSave(c: Integration, done: () => void, onFields: (fields: Fields) => void) {
   const fresh = useFreshSignIn();
@@ -55,7 +82,7 @@ function useSave(c: Integration, done: () => void, onFields: (fields: Fields) =>
     };
   }, []);
 
-  const save = async (body: IntegrationSave) => {
+  const save = async (body: IntegrationSave, values: unknown) => {
     setProblem(null);
     try {
       const saved = await fresh.guard(() => api.call("PUT /api/v1/integrations/:code", { params: { code: c.code }, body }));
@@ -71,7 +98,12 @@ function useSave(c: Integration, done: () => void, onFields: (fields: Fields) =>
         return done();
       }
       if (!alive.current) {
-        toast(err?.message ?? "Not saved");
+        if (err && Object.keys(err.fields).length) {
+          // A secret typed is never kept: it is typed again.
+          const plain = Object.fromEntries(Object.entries(values as Record<string, unknown>).map(([k, v]) => [k, k === "password" || k === "api_key" ? "" : v]));
+          KEPT.set(c.code, { values: plain, fields: err.fields });
+          toast.error("Not saved. Press Edit Settings to fix it.");
+        } else toast.error(err?.message ?? "Not saved");
         return done();
       }
       if (err && Object.keys(err.fields).length) return onFields(err.fields);
@@ -96,25 +128,26 @@ const SENDER_STEPS = [["host", "port", "security", "username", "password"], ["fr
 function SenderForm({ c, done }: { c: Integration; done: () => void }) {
   const s = c.settings?.code === "mail_sender" ? c.settings : null;
   const body = (v: SenderValues) => ({ code: "mail_sender" as const, ...v, port: num(v.port), per_hour: num(v.per_hour), saved_at: c.saved_at });
-  const f = useContractForm<SenderValues>(
-    {
-      host: text(s?.host),
-      port: text(s?.port, "465"),
-      security: s?.security ?? "tls",
-      username: text(s?.username),
-      password: "",
-      from: text(s?.from),
-      reply_to: text(s?.reply_to),
-      per_hour: text(s?.per_hour, "50"),
-      local_domains: text(s?.local_domains),
-    },
-    { safeParse: (v: SenderValues) => integrations.MailSenderSave.safeParse(body(v)) },
-  );
+  const kept = useKept<SenderValues>(c.code, {
+    host: text(s?.host),
+    port: text(s?.port, "465"),
+    security: s?.security ?? "tls",
+    username: text(s?.username),
+    password: "",
+    from: text(s?.from),
+    reply_to: text(s?.reply_to),
+    per_hour: text(s?.per_hour, "50"),
+    local_domains: text(s?.local_domains),
+  });
+  const f = useContractForm<SenderValues>(kept.initial, { safeParse: (v: SenderValues) => integrations.MailSenderSave.safeParse(body(v)) });
   const [jump, setJump] = useState({ key: 0, step: 0 });
-  const { save, problem } = useSave(c, done, (fields) => {
+  const mark = useCallback((fields: Fields) => {
     f.setServerErrors(fields);
     setJump((j) => ({ key: j.key + 1, step: stepOf(SENDER_STEPS, fields) }));
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the form's own setter
+  }, []);
+  useMarks(kept.marks, mark);
+  const { save, problem } = useSave(c, done, mark);
   const password = secretOf(c, "password");
   const steps = [
     {
@@ -171,7 +204,7 @@ function SenderForm({ c, done }: { c: Integration; done: () => void }) {
       onCancel={done}
       onFinish={async () => {
         if (!f.check()) return;
-        await save(body(f.values) as IntegrationSave);
+        await save(body(f.values) as IntegrationSave, f.values);
       }}
     />
   );
@@ -195,23 +228,24 @@ function ServerForm({ c, done }: { c: Integration; done: () => void }) {
     live_connections: num(v.live_connections),
     saved_at: c.saved_at,
   });
-  const f = useContractForm<ServerValues>(
-    {
-      imap_host: text(s?.imap_host),
-      imap_port: text(s?.imap_port, "993"),
-      smtp_host: text(s?.smtp_host),
-      smtp_port: text(s?.smtp_port, "465"),
-      per_person_per_hour: text(s?.per_person_per_hour, "50"),
-      sync_every_min: text(s?.sync_every_min, "5"),
-      live_connections: text(s?.live_connections, "20"),
-    },
-    { safeParse: (v: ServerValues) => integrations.MailboxServerSave.safeParse(body(v)) },
-  );
+  const kept = useKept<ServerValues>(c.code, {
+    imap_host: text(s?.imap_host),
+    imap_port: text(s?.imap_port, "993"),
+    smtp_host: text(s?.smtp_host),
+    smtp_port: text(s?.smtp_port, "465"),
+    per_person_per_hour: text(s?.per_person_per_hour, "50"),
+    sync_every_min: text(s?.sync_every_min, "5"),
+    live_connections: text(s?.live_connections, "20"),
+  });
+  const f = useContractForm<ServerValues>(kept.initial, { safeParse: (v: ServerValues) => integrations.MailboxServerSave.safeParse(body(v)) });
   const [jump, setJump] = useState({ key: 0, step: 0 });
-  const { save, problem } = useSave(c, done, (fields) => {
+  const mark = useCallback((fields: Fields) => {
     f.setServerErrors(fields);
     setJump((j) => ({ key: j.key + 1, step: stepOf(SERVER_STEPS, fields) }));
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the form's own setter
+  }, []);
+  useMarks(kept.marks, mark);
+  const { save, problem } = useSave(c, done, mark);
   const steps = [
     {
       title: "Servers",
@@ -261,7 +295,7 @@ function ServerForm({ c, done }: { c: Integration; done: () => void }) {
       onCancel={done}
       onFinish={async () => {
         if (!f.check()) return;
-        await save(body(f.values) as IntegrationSave);
+        await save(body(f.values) as IntegrationSave, f.values);
       }}
     />
   );
@@ -294,14 +328,13 @@ function KeyForm({ c, done }: { c: Integration; done: () => void }) {
   const code = c.code as KeyCode;
   const schema = KEY_SCHEMA[code];
   const body = (v: KeyValues) => ({ code, api_key: v.api_key, daily_limit: num(v.daily_limit) ?? null, plan: v.plan, saved_at: c.saved_at });
-  const f = useContractForm<KeyValues>(
-    { api_key: "", daily_limit: text(c.daily_limit), plan: c.plan ?? "paid" },
-    { safeParse: (v: KeyValues) => schema.safeParse(body(v)) },
-  );
+  const kept = useKept<KeyValues>(c.code, { api_key: "", daily_limit: text(c.daily_limit), plan: c.plan ?? "paid" });
+  const f = useContractForm<KeyValues>(kept.initial, { safeParse: (v: KeyValues) => schema.safeParse(body(v)) });
   const key = secretOf(c, "api_key");
+  useMarks(kept.marks, f.setServerErrors);
   const { save, problem } = useSave(c, done, f.setServerErrors);
   return (
-    <Form onSubmit={f.submit(() => save(body(f.values) as IntegrationSave))}>
+    <Form onSubmit={f.submit(() => save(body(f.values) as IntegrationSave, f.values))}>
       <Field label="API Key" {...f.status("api_key")}>
         <SecretField {...f.field("api_key")} saved={key?.set} hint={key?.hint} noun="key" />
       </Field>
@@ -329,10 +362,12 @@ type PushValues = { subject: string };
 function PushForm({ c, done }: { c: Integration; done: () => void }) {
   const s = c.settings?.code === "web_push" ? c.settings : null;
   const body = (v: PushValues) => ({ code: "web_push" as const, subject: v.subject, saved_at: c.saved_at });
-  const f = useContractForm<PushValues>({ subject: text(s?.subject) }, { safeParse: (v: PushValues) => integrations.WebPushSave.safeParse(body(v)) });
+  const kept = useKept<PushValues>(c.code, { subject: text(s?.subject) });
+  const f = useContractForm<PushValues>(kept.initial, { safeParse: (v: PushValues) => integrations.WebPushSave.safeParse(body(v)) });
+  useMarks(kept.marks, f.setServerErrors);
   const { save, problem } = useSave(c, done, f.setServerErrors);
   return (
-    <Form onSubmit={f.submit(() => save(body(f.values)))}>
+    <Form onSubmit={f.submit(() => save(body(f.values), f.values))}>
       <Field label="Subject" {...f.status("subject")}>
         <TextField {...f.field("subject")} placeholder="mailto:it@mycityapp.io" maxLength={200} />
       </Field>

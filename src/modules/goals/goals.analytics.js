@@ -9,9 +9,10 @@
  *   buildExport(event, ctx)        analytics.export_requested, in the worker after commit
  *
  * Every figure is worked out in SQL; nothing is filtered or counted in JavaScript. The OKR
- * figures (scores by month, the company score, key results by status) read the whole tree, the
- * company's shared plan that everyone sees (§8). Scorecards, reviews and commitments are read in
- * the reader's `performance` scope, over the person each is about.
+ * figures (scores by month, the company score, key results by status) read the tree as the reader
+ * may (goals.visibility.js, §6.23): the company's only for the whole plan, a function's where the
+ * reader reads it. Scorecards, reviews and commitments are read in the reader's `performance`
+ * scope, over the person each is about.
  *
  *   score of a key result   its month's confirmed score, else the proposed one
  *   objective               the mean of its key results, to two places (their sheet)
@@ -46,6 +47,7 @@ const { scopeClause } = require("../../shared/rbac/scope");
 const { exportFilename } = require("../../shared/spreadsheet/cells");
 const { COMMITMENT_STATE } = require("../tasks/tasks.repo");
 const { objectiveScores } = require("./goals.cascade");
+const visibility = require("./goals.visibility");
 const { monthsOf } = require("./goals.periods");
 const repo = require("./goals.repo");
 const { EVENTS } = require("./goals.events");
@@ -82,14 +84,25 @@ async function periodFor(db, periodId) {
 }
 
 /* ------------------------------------------------------------------ *
- * The OKR figures: the whole tree
+ * The OKR figures: the tree as the reader reads it
  * ------------------------------------------------------------------ */
+
+/**
+ * Which objectives a figure counts for this reader: all of them for the whole plan, else the functions'
+ * objectives they read whole. The company's mean is never made of the few company objectives shared with
+ * someone, so it is the whole plan's alone.
+ */
+function counted(reach, o, params) {
+  return reach.full ? "TRUE" : `${o}.department_id IS NOT NULL AND ${visibility.objectiveOpen(reach, o, params)}`;
+}
 
 /**
  * Scores by Month: the company's and each function's month scores (one function and the company
  * when one is picked), company first. Months with nothing scored are null.
  */
-async function scoresByMonth(db, period, months, departmentId) {
+async function scoresByMonth(db, period, months, departmentId, reach) {
+  const params = [period.performance_period_id, months[0], months[months.length - 1], departmentId || null];
+  const read = counted(reach, "o", params);
   // pagination:complete the company and the functions with objectives this quarter, a handful
   const { rows } = await completeQuery(
     db,
@@ -103,6 +116,7 @@ async function scoresByMonth(db, period, months, departmentId) {
          LEFT JOIN okr_key_result_month km ON km.okr_key_result_id = k.okr_key_result_id AND km.month = qm.month
         WHERE o.performance_period_id = $1
           AND ($4::uuid IS NULL OR o.department_id IS NULL OR o.department_id = $4)
+          AND ${read}
      ), objective_month AS (
        SELECT okr_objective_id, department_id, month, round(avg(score), 2) AS score
          FROM key_result_month GROUP BY okr_objective_id, department_id, month
@@ -117,14 +131,15 @@ async function scoresByMonth(db, period, months, departmentId) {
        LEFT JOIN department d ON d.department_id = fm.department_id
       GROUP BY fm.department_id, d.name
       ORDER BY (fm.department_id IS NOT NULL), d.name, fm.department_id`,
-    [period.performance_period_id, months[0], months[months.length - 1], departmentId || null],
+    params,
     { label: "a quarter's scores by month", ceiling: 100 },
   );
   return rows.map((r) => ({ department_id: r.department_id, department: r.department, months: r.months }));
 }
 
 /** The company's score as Goals shows it: the mean of the company objectives at their latest. */
-async function companyScore(db, period) {
+async function companyScore(db, period, reach) {
+  if (!reach.full) return null;
   const { rows } = await db.query(
     `WITH objective_score AS (${objectiveScores("$1")})
      SELECT trim_scale(round(avg(os.score) FILTER (WHERE os.department_id IS NULL), 4))::text AS company_score
@@ -138,7 +153,9 @@ async function companyScore(db, period) {
  * Key results by their latest month's status, the function's or every one; Recovery is a latest
  * score under the quarter's Watch band.
  */
-async function keyResultStatuses(db, period, departmentId) {
+async function keyResultStatuses(db, period, departmentId, reach) {
+  const params = [period.performance_period_id, departmentId || null, scoring.DEFAULT_RULES.key_results.band_watch];
+  const read = counted(reach, "o", params);
   const { rows } = await db.query(
     `SELECT count(*)::int AS key_results,
             count(*) FILTER (WHERE km.status = 'not_started')::int AS not_started,
@@ -155,8 +172,8 @@ async function keyResultStatuses(db, period, departmentId) {
        JOIN okr_key_result k ON k.okr_objective_id = o.okr_objective_id
        LEFT JOIN okr_key_result_month km ON km.okr_key_result_id = k.okr_key_result_id
         AND km.month = (SELECT max(kx.month) FROM okr_key_result_month kx WHERE kx.okr_key_result_id = k.okr_key_result_id)
-      WHERE o.performance_period_id = $1 AND ($2::uuid IS NULL OR o.department_id = $2)`,
-    [period.performance_period_id, departmentId || null, scoring.DEFAULT_RULES.key_results.band_watch],
+      WHERE o.performance_period_id = $1 AND ($2::uuid IS NULL OR o.department_id = $2) AND ${read}`,
+    params,
   );
   return rows[0];
 }
@@ -350,17 +367,19 @@ const NOTHING = Object.freeze({
  * where one is picked.
  * @param {{period_id?: string, department_id?: string}} query
  * @param {{scope: string, scope_ids: string[]|null}} scope  the reader's `performance` view scope
- * @param {{now?: Date, db?: {query: Function}}} [at]
+ * @param {{now?: Date, db?: {query: Function}, actor?: object|null, reach?: object}} [at]  the reader, for what
+ *   they read of the OKR tree (§6.23); no reader, no reach, reads none of it
  */
-async function figures(query, scope, { now = new Date(), db = pool } = {}) {
+async function figures(query, scope, { now = new Date(), db = pool, actor = null, reach = null } = {}) {
   const period = await periodFor(db, query.period_id);
   if (!period) return NOTHING;
+  const read = reach || (await visibility.readerOf(db, actor));
   const months = monthsOf(day(period.starts_on));
   const dept = query.department_id || null;
   // One read after the other: an Analytics page holds one connection of the pool at a time.
-  const scores = await scoresByMonth(db, period, months, dept);
-  const company = await companyScore(db, period);
-  const statuses = await keyResultStatuses(db, period, dept);
+  const scores = await scoresByMonth(db, period, months, dept, read);
+  const company = await companyScore(db, period, read);
+  const statuses = await keyResultStatuses(db, period, dept, read);
   const ratings = await ratingSpread(db, period, dept, scope);
   const committed = await commitments(db, period, months, dept, scope);
   const checkIns = await onTime(db, period, months, dept, scope, now, "check_in");

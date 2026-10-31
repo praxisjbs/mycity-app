@@ -1,0 +1,137 @@
+{
+  "workspace-analytics": {
+    "spec": "ed374a22f32b5d5a",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-analytics-custom": {
+    "spec": "70ccd62cff694f10",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-analytics-export": {
+    "spec": "a9148489de4edb7c",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "workspace-calendar": {
+    "spec": "e7d07fdd6af9efca",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-event": {
+    "spec": "752dce0bf7737d8e",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-late-reasons": {
+    "spec": "3ff607456e509a8f",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-more-actions": {
+    "spec": "aba62bb474f910a6",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-new-event": {
+    "spec": "cc3f8a2278affbeb",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-new-task": {
+    "spec": "c0e527bf9bdb2bb2",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-project-page": {
+    "spec": "f0eba72519c93932",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-projects": {
+    "spec": "d25db6eab19e4f84",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-send-commitments": {
+    "spec": "1b7e4f434a5d64b7",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-share": {
+    "spec": "29ed5742766b4979",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-support-needed": {
+    "spec": "f3bef088690041a9",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-task-panel": {
+    "spec": "f50c62b6cd592bd9",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-tasks": {
+    "spec": "f1c456fa5ee86286",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-today": {
+    "spec": "aa99a9a4e9dab0b8",
+    "source": "e68f57aea6374fa3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

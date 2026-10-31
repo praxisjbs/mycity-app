@@ -25,6 +25,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Actions | [Button](#button) | `Button`, `IconButton`, `BigButton` | The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side; busy from the press until the work it starts is done. | stable |
 | Layout | [Card](#card) | `Card`, `CardHeader` | The raised panel every section sits in, with an optional title row (CardHeader) and one Details row at its foot. | stable |
 | Layout | [Grid](#grid) | `Grid` | The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsing to one column on a phone. | stable |
+| Layout | [ListDetail](#listdetail) | `ListDetail`, `DetailPane` | A list and the record a row opens: side by side on a wide desktop, and on a phone the list alone with the opened record in a bottom sheet, never below the list (F31). | stable |
 | Layout | [PageHeader](#pageheader) | `PageHeader` | A page's title, its one-line subtitle (desktop only) and the page's actions. | stable |
 | Layout | [PhoneOnly](#phoneonly) | `PhoneOnly`, `DesktopOnly` | Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen. | stable |
 | Layout | [SplitPanes](#splitpanes) | `SplitPanes` | A list beside the record it opens, with a divider the person can drag; on a phone the list fills the screen and the record covers it. | stable |
@@ -93,12 +94,13 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [ColorField](#colorfield) | `ColorField` | A colour as #RRGGBB, pasted or typed, with a square of it beside the value. | beta |
+| Forms | [ComboField](#combofield) | `ComboField` | A value typed or picked: the server suggests what is already in use as the person types, and what they type that it does not know is kept as it is. | stable |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
-| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
+| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped. | stable |
 | Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
@@ -120,6 +122,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Data | [Calendar](#calendar) | `Calendar` | A month at a glance, Monday first, with what happens on each day. | stable |
 | Data | [DataView](#dataview) | `DataView`, `LoadingRows` | THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export. | stable |
 | Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file and saves it on the device that pressed, once the worker has made it. | stable |
+| Data | [FormatButton](#formatbutton) | `FormatButton` | A button that makes one file in a format: the format straight away when there is one, a choice of formats when there are two or more. | stable |
 | Data | [Kanban](#kanban) | `Kanban`, `KanbanCardBody` | A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19). | stable |
 | Data | [Pager](#pager) | `Pager` | Page controls under a list, showing the server's true total ("312 employees") and Previous and Next. | stable |
 | Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
@@ -133,6 +136,8 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both. | stable |
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
+| Documents | [GuideBody](#guidebody) | `GuideBody` | A User Guide chapter's body: numbered steps with Open links, notes, tables and annotated pictures. | beta |
+| Documents | [GuideResults](#guideresults) | `GuideResults`, `GuideAnswerCard` | The User Guide's search results, each a section or task with the line that answers marked, and its short answer with numbered sources. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
 | Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it. | beta |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
@@ -357,6 +362,54 @@ The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsin
 ```tsx
 <Grid cols={4} phoneCols={2}>{kpis}</Grid>
 <Grid cols="1.4/1"><Card /><Card /></Grid>
+```
+
+### ListDetail
+
+A list and the record a row opens: side by side on a wide desktop, and on a phone the list alone with the opened record in a bottom sheet, never below the list (F31).
+
+| | |
+|---|---|
+| Use | Any list whose row opens a record on the same screen: leave requests, payslips, proposals, offers, letter templates. DetailPane is the same rule for a record the desktop layout places elsewhere on the page (under the list beside a chart, above the list). `useSideBySide()` says when a first pick may show unasked. |
+| Avoid | A record with its own screen (navigate to its `id`); a reader read one at a time that fills the screen (SplitPanes: the mailbox, chat); a form (Modal); a record shown below its list on a phone, in any shape. |
+| Phone | No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. |
+| Accessibility | The sheet is the shared Modal: titled by `title`, focus moves in and returns to the row on close, Esc and the phone's Back close it (F29). Side by side, the record is a plain column after the list in reading order. |
+| Status | stable |
+| Exports | `ListDetail`, `DetailPane` |
+| Import | `import { ListDetail, DetailPane } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/ListDetail.tsx` |
+| Test | `packages/ui/src/layout/ListDetail.test.tsx` |
+| Gallery | `packages/ui/src/layout/ListDetail.gallery.tsx` (`npm run gallery`, `#/ListDetail`) |
+
+**ListDetail** props (`ListDetailProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `list` | `ReactNode` | yes | The list: a DataView or a paged table whose `onRowClick` picks the record. |
+| `detail` | `ReactNode` | yes | The record in view: the picked one, or side by side the screen's first pick (null for none). |
+| `open` | `boolean` | yes | A row was picked: on a phone, and on a desktop too narrow for two columns, its record opens in a sheet. |
+| `onClose` | `() => void` | yes | Closes the opened record (a drag down, Esc, Back or the close button); the screen drops its pick. |
+| `title` | `ReactNode` | yes | The sheet's title: a noun phrase of at most 4 words, Title Case ("Leave Request"). |
+| `cols` | `"1.4/1" \| "1/1.5"` |  | Side by side, which column is wider: the list (`1.4/1`, the default) or the record (`1/1.5`: a payslip, a letter). |
+| `full` | `boolean` |  | The sheet fills the phone's screen, for a record read like a document (a payslip, a letter). |
+| `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
+| `className` | `string` |  | Layout classes only (spacing), on the side-by-side grid. |
+
+**DetailPane** props (`DetailPaneProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | A record was picked: on a phone it opens in a sheet. |
+| `onClose` | `() => void` | yes | Closes the opened record on a phone (a drag down, Esc, Back or the close button); the screen drops its pick. |
+| `title` | `ReactNode` | yes | The sheet's title: a noun phrase of at most 4 words, Title Case ("Expense Request"). |
+| `full` | `boolean` |  | The sheet fills the phone's screen, for a record read like a document. |
+| `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
+| `children` | `ReactNode` |  | The record, drawn where the pane sits on desktop. |
+
+```tsx
+const beside = useSideBySide(); const shown = picked ?? (beside ? rows[0] : null);
+<ListDetail open={!!picked} onClose={() => setPicked(null)} title="Leave Request" list={<DataView ... onRowClick={setPicked} />} detail={shown && <RequestCard leave={shown} />} />
+<DetailPane open={!!picked} onClose={() => setPicked(null)} title="Query">{focus && <QueryCard id={focus} />}</DetailPane>
 ```
 
 ### PageHeader
@@ -785,7 +838,7 @@ Nothing to show, said plainly: a drawing, a title, one short line and at most on
 | Use | A list, a search or a page with nothing in it yet; a filter that matched nothing; a first visit. |
 | Avoid | An explanation of the feature (tier 3); more than one action; a screen that has data on it. |
 | Phone | Centred, the drawing at the smaller size; the action is full width within thumb reach. |
-| Accessibility | The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet; at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
+| Accessibility | The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet, or the `level` its place needs (a bare one straight under the page title is 2); at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
 | Status | stable |
 | Exports | `EmptyState` |
 | Import | `import { EmptyState } from "@mycity/ui";` |
@@ -803,6 +856,7 @@ Nothing to show, said plainly: a drawing, a title, one short line and at most on
 | `text` | `ReactNode` |  | One line, at most 8 words: what the person can do about it. |
 | `action` | `ReactNode` |  | At most one action, usually a primary Button. |
 | `bare` | `boolean` |  | Draw it without its card (inside a card or a sheet that already has one). |
+| `level` | `2 \| 3` |  | The title's heading level when the default does not fit its place: 2 for a bare one straight under the page title. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -1624,7 +1678,7 @@ A strip of labelled figures across the top of a record: smaller than KPI cards, 
 | Use | At the head of a record (an expense claim's totals, a payroll run's counts, a vacancy's pipeline). |
 | Avoid | A role's dashboard figures (use KpiGrid); more than six figures; a figure with a sentence under it. |
 | Phone | Two to a row, and only the first four show unless a figure is marked `desktop` (gate 11). |
-| Accessibility | A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value. |
+| Accessibility | A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value. A figure's help is a help term on its label (hover on a computer, tap on a phone), never inside a button. |
 | Status | stable |
 | Exports | `StatStrip` |
 | Import | `import { StatStrip } from "@mycity/ui";` |
@@ -1895,7 +1949,7 @@ A row of filter chips above a list, each with an optional count: one chosen (sin
 | Use | Narrowing a list by a status or a group (Everyone, Late 4, Remote 2); a board's stage switcher on a phone (F19); picking several departments with `selected`. |
 | Avoid | Switching between views (use SegmentedControl or Tabs); a choice inside a form (use ChoiceField or CheckboxField); a status shown on a record (use Pill). |
 | Phone | One row that scrolls sideways inside itself, never the page; each chip is a 44 px target. |
-| Accessibility | A group named by `label`; each chip is a button with aria-pressed, so a screen reader hears which are on. The count is read with the label (Late 4). |
+| Accessibility | A group named by `label`; each chip is a button with aria-pressed, so a screen reader hears which are on. The count is read with the label (Late 4), and an unread count after it, as a tab reads its own (Late 4 1, Pending 1). |
 | Status | stable |
 | Exports | `Chips` |
 | Import | `import { Chips } from "@mycity/ui";` |
@@ -1907,7 +1961,7 @@ A row of filter chips above a list, each with an optional count: one chosen (sin
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `options` | `ReadonlyArray<Choice<V>>` | yes | The merged tuple ["late", "Late"], or { value, label, count, icon, disabled }. Labels Title Case, at most 3 words; counts as numbers. |
+| `options` | `ReadonlyArray<Choice<V>>` | yes | The merged tuple ["late", "Late"], or { value, label, count, unread, urgent, icon, disabled }. Labels Title Case, at most 3 words; counts as numbers; `unread` the reader's unread notifications behind the chip, in yellow. |
 | `value` | `V` |  | Single select: the chip that is on. |
 | `onChange` | `(value: V) => void` |  | Single select: called with the chip pressed. |
 | `selected` | `readonly V[]` |  | Toggle: the chips that are on (several may be). Using it switches the row to toggle mode. |
@@ -1943,7 +1997,7 @@ Two to five views of the same thing side by side in one pill (Mine, My Team; Wee
 |---|---|---|---|
 | `value` | `V` | yes | The view showing. |
 | `onChange` | `(value: V) => void` | yes | Called with the chosen view. |
-| `options` | `ReadonlyArray<Choice<V>>` | yes | Two to five options: the merged tuple ["team", "My Team"], or { value, label, icon, count, disabled }. |
+| `options` | `ReadonlyArray<Choice<V>>` | yes | Two to five options: the merged tuple ["team", "My Team"], or { value, label, icon, count, unread, urgent, disabled }; `unread` the reader's unread notifications behind a view, in yellow. |
 | `label` | `string` |  | Names the group for assistive technology ("Whose Tasks"); give one unless a visible label sits beside it. |
 | `disabled` | `readonly V[]` |  | Values shown but not choosable (the merged Seg's `disabled`). |
 | `small` | `boolean` |  | The 28 px desktop size for a dense toolbar (still 44 px on a phone). |
@@ -1961,7 +2015,7 @@ The module's tab strip: one row of tabs under the page header, one of them activ
 |---|---|
 | Use | Sibling views of one module or record (Register, Field Assignments, Location Requests). Controlled by value, so the router drives it from ?tab=; give each tab an href so it opens in a new tab and survives a reload. |
 | Avoid | Two or three views of one list in a toolbar (use SegmentedControl); filtering a list (use Chips); steps of a form (use Wizard); more than one strip on a screen. |
-| Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). |
+| Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). A count's `tone` reads the same on both: yellow for what waits on the reader, red when it is urgent. |
 | Accessibility | A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing. |
 | Status | stable |
 | Exports | `Tabs`, `TabPanel` |
@@ -2741,6 +2795,45 @@ A colour as #RRGGBB, pasted or typed, with a square of it beside the value.
 <ColorField {...form.field("background")} />
 ```
 
+### ComboField
+
+A value typed or picked: the server suggests what is already in use as the person types, and what they type that it does not know is kept as it is.
+
+| | |
+|---|---|
+| Use | A short text that records tend to share and that new records may extend: a unit, a data source, a team name. The suggestions are a server-paged list, 25 at a time. |
+| Avoid | A value that must be one of a fixed list (SelectField, ChoiceField) or one that points at another record (RecordPicker, PersonPicker); an address (AddressField). |
+| Phone | The suggestions open under the field as 44 px rows inside the sheet's own scroll; Add and the typed text is the first row. |
+| Accessibility | A combobox over a listbox: arrows move, Enter picks, Esc closes; the count found is announced. Takes its label and error links from the Field around it. |
+| Status | stable |
+| Exports | `ComboField` |
+| Import | `import { ComboField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/ComboField.tsx` |
+| Test | `packages/ui/src/form/ComboField.test.tsx` |
+| Gallery | `packages/ui/src/form/ComboField.gallery.tsx` (`npm run gallery`, `#/ComboField`) |
+
+**ComboField** props (`ComboFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The text, from form.field(name): typed, or put there by a pick. |
+| `onChange` | `(value: string) => void` | yes | Called with the new text, on each key and on a pick. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Unused here (the text is always the form's); accepted so {...form.field(name)} spreads cleanly. |
+| `name` | `string` |  | The form field's name, on the input. |
+| `id` | `string` |  | The control's id; the Field around it supplies one otherwise. |
+| `list` | `DataViewList<R>` | yes | The server-paged suggestions (a `usePaged()` result); the field drives its search as the person types. |
+| `option` | `(row: R) => string` | yes | The text a suggestion puts in the field. |
+| `sub` | `(row: R) => ReactNode` |  | The line beside a suggestion (how often it is used). |
+| `placeholder` | `string` |  | A format example of at most 3 words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ComboField list={units} option={(u) => u.unit} {...f.field("unit")} />
+```
+
 ### DateField
 
 Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField.
@@ -2750,7 +2843,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | Use | Every date a person enters (gate 15); DateRangeField for a from and to pair (a report period); TimeField for a 24-hour time. |
 | Avoid | <input type="date"> (its format follows the browser's locale); a date shown and not entered (use formatDate). |
 | Phone | The calendar opens as a bottom sheet; days are 44 px targets; the keyboard is numeric. |
-| Accessibility | The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. |
+| Accessibility | The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. A range's ends each have their own id, a visible From or To label and their own error, tied to that end alone; their calendar buttons are named From and To too. |
 | Status | stable |
 | Exports | `DateField`, `DateRangeField`, `TimeField` |
 | Import | `import { DateField, DateRangeField, TimeField } from "@mycity/ui";` |
@@ -2768,11 +2861,14 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Told what is wrong with what was typed ("Not a real date", "Pick 21/10/2026 or later"), or undefined once it is right. |
 | `min` | `string` |  | The earliest date that may be picked or typed, ISO. |
 | `max` | `string` |  | The latest date that may be picked or typed, ISO. |
-| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
-| `message` | `string` |  | Unused here (the Field shows it). |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise (an end of a period takes only its own). |
+| `message` | `ReactNode` |  | Unused on its own (the Field shows it). On an end of a period: the period's message about this end, shown under it. |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `name` | `string` |  | The field's name, so a failed submit can focus it. |
 | `placeholder` | `string` |  | The format example; DD/MM/YYYY. |
+| `disabled` | `boolean` |  | Shown and not changed (a record already sent): no typing and no calendar. |
+| `end` | `"From" \| "To"` |  | Which end of a period this is (DateRangeField): the field shows the end as a small label above it and is named by its Field's label and the end ("Dates From"), as is its calendar button. What is wrong with it is said under it and tied to it alone. |
+| `describedBy` | `string` |  | On an end of a period: the ids of the period's messages that are about both ends. |
 
 **DateRangeField** props (`DateRangeFieldProps`)
 
@@ -2785,7 +2881,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `min` | `string` |  | The earliest date either end may take, ISO. |
 | `max` | `string` |  | The latest date either end may take, ISO. |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
-| `message` | `string` |  | Unused here (the Field shows it). |
+| `message` | `string` |  | Unused here: the Field's message is shown beside the end it is about. |
 
 **TimeField** props (`TimeFieldProps`)
 
@@ -2970,7 +3066,7 @@ The sign-in screen's larger field: label, control, its mark, and a message that 
 
 ### MoneyField
 
-An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float.
+An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped.
 
 | | |
 |---|---|
@@ -2990,8 +3086,9 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `value` | `string` | yes | What the person typed ("250,000" or "250000.5"). |
-| `onChange` | `(value: string) => void` | yes | Called with what they type, digits, commas and one point only. |
+| `onChange` | `(value: string) => void` | yes | Called with what they type: digits, commas and points, and a leading minus when they typed one. |
 | `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Told what is wrong with the amount as typed ("Not below zero", "Two decimals at most"), or undefined once it is right. |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it). |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
@@ -3183,7 +3280,7 @@ Picks records the server searches: one page of 25, narrowed as the person types,
 | Use | A field that points at another record: a worksite, a department, a partner, a vacancy, an expense category. |
 | Avoid | Fetching every record to fill a `<select>` (FRONTEND_GUIDE §4); a picker over a list short enough to be a SelectField; filtering the 25 rows on screen. |
 | Phone | The search box and the results are full width, each result a 44 px row; the picked chips wrap above it. |
-| Accessibility | A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely. |
+| Accessibility | A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely. Inside a Field, both are named by its label. |
 | Status | stable |
 | Exports | `RecordPicker` |
 | Import | `import { RecordPicker } from "@mycity/ui";` |
@@ -3252,10 +3349,10 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 
 | | |
 |---|---|
-| Use | Above every list that searches; FilterSelect for one of a list's server filters. |
+| Use | Above every list that searches; FilterSelect for one of a list's server filters, with `more` and `onMore` when its options are a server list. |
 | Avoid | Filtering the 25 rows on screen in the browser (FRONTEND_GUIDE §4); a second search box design. |
 | Phone | Full width, 44 px tall; the keyboard's search key; FilterSelect opens a branded bottom sheet, never the phone's own picker. |
-| Accessibility | The box is a searchbox named by its label (or its placeholder); FilterSelect's label is visible and linked. |
+| Accessibility | The box is a searchbox named by its label (or its placeholder), or by its Field's label when it is a picker's box; FilterSelect's label is visible and linked. |
 | Status | stable |
 | Exports | `SearchInput`, `FilterSelect` |
 | Import | `import { SearchInput, FilterSelect } from "@mycity/ui";` |
@@ -3275,6 +3372,7 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | `controls` | `string` |  | The id of the list this box narrows, when it moves through it (a searchable SelectField). |
 | `activeId` | `string` |  | The id of that list's highlighted option. |
 | `onKeyDown` | `(e: KeyboardEvent<HTMLInputElement>) => void` |  | Keys pressed in the box (the arrow keys and Enter of that list). |
+| `field` | `SearchField` |  | The Field this box is the control of (a picker's box): its id, its label and its error. |
 
 **FilterSelect** props (`FilterSelectProps`)
 
@@ -3284,6 +3382,9 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | `value` | `string` | yes | The chosen value; "" for all. |
 | `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
 | `options` | `ReadonlyArray<Option>` | yes | The filter's options. |
+| `more` | `boolean` |  | The options are a server list with more pages to load (SelectMenu's `more`). |
+| `onMore` | `() => unknown` |  | Loads the server list's next 25 as the menu nears its end (SelectMenu's `onMore`). |
+| `valueLabel` | `ReactNode` |  | The chosen value's label while it is on a page not loaded yet (SelectMenu's `valueLabel`). |
 
 ```tsx
 <SearchInput label="Search Employees" placeholder="Name or Email" value={q} onChange={setQ} />
@@ -3331,10 +3432,10 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 
 | | |
 |---|---|
-| Use | SelectField for more than five options, `searchable` once a fixed list is long enough to scroll (a purpose, a country); ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
-| Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown). |
-| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker, and a searchable one a search box above them; ChoiceField segments are 44 px tall and wrap rather than scroll. |
-| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field; a searchable one a search box that owns the listbox (arrow keys move through what matches, Enter chooses). Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
+| Use | SelectField for more than five options, `searchable` once a fixed list is long enough to scroll (a purpose, a country); options from a server list with `more` and `onMore`, so its next 25 load as the menu nears its end; ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
+| Avoid | People and records a person searches for (use the server-searching picker); options cut to one page of a server list (pass `more` and `onMore`); a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown). |
+| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker, and a searchable one a search box above them; a server list's next 25 load as the sheet nears its end; ChoiceField segments are 44 px tall and wrap rather than scroll. |
+| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field; a searchable one a search box that owns the listbox (arrow keys move through what matches, Enter chooses). Phone: a sheet named by the field's label holding a listbox. Moving through a server list with the keys loads its next 25 as the end nears; the spinner that ends it is hidden from assistive technology. ChoiceField is a radio group with arrow-key movement. |
 | Status | stable |
 | Exports | `SelectField`, `ChoiceField`, `SelectMenu` |
 | Import | `import { SelectField, ChoiceField, SelectMenu } from "@mycity/ui";` |
@@ -3360,6 +3461,9 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default. |
 | `searchable` | `boolean` |  | A search box above the options (SelectMenu's `searchable`). |
+| `more` | `boolean` |  | The options are a server list with more pages to load (SelectMenu's `more`). |
+| `onMore` | `() => unknown` |  | Loads the server list's next 25 as the menu nears its end (SelectMenu's `onMore`). |
+| `valueLabel` | `ReactNode` |  | The chosen value's label while it is on a page not loaded yet (SelectMenu's `valueLabel`). |
 
 **ChoiceField** props (`ChoiceFieldProps`)
 
@@ -3395,6 +3499,9 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `name` | `string` |  | Its name in a submitted form. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default (the gallery passes its themed frame). |
 | `searchable` | `boolean` |  | A search box above the options, narrowing them as the person types: for a fixed list long enough to scroll. |
+| `more` | `boolean` |  | The options are a server list with more pages to load (FRONTEND_GUIDE §4). |
+| `onMore` | `() => unknown` |  | Loads the server list's next 25; called as the menu nears its end, or as it opens too short to scroll. |
+| `valueLabel` | `ReactNode` |  | The chosen value's label while it is on a page not loaded yet (a saved record's own name). |
 
 ```tsx
 <SelectField placeholder="Choose One" options={[["ops", "Operations"], ["hr", "People"]]} {...form.field("department")} />
@@ -3425,10 +3532,11 @@ A signature drawn with a finger or a mouse, which leaves as a PNG for the docume
 | `onChange` | `(hasInk: boolean) => void` | yes | Called true the moment the first stroke lands, and false when it is cleared. |
 | `disabled` | `boolean` |  | Nothing can be drawn (the document is already signed, or the link has been used). |
 | `noClear` | `boolean` |  | Hide the Clear button, where the screen offers its own. |
+| `initial` | `string \| null` |  | A signature the person saved before, as a PNG data URL: drawn on the pad as its ink when it opens, so they need not draw again. Clear Signature wipes it; drawing adds to it. |
 | `className` | `string` |  | Layout classes only (spacing, height). |
 
 ```tsx
-<SignatureField label="Your Signature" onChange={setInk} ref={pad} />
+<SignatureField label="Your Signature" onChange={setInk} ref={pad} initial={saved} />
 ```
 
 ### StepBar
@@ -3471,7 +3579,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | Use | Switch when the change saves on its own (with a toast); CheckboxField when the form's own button saves it; ToggleRow for a list of settings. |
 | Avoid | A Switch inside a form that has a save button; a checkbox for something that applies at once. |
 | Phone | The switch and the checkbox sit in a 44 px tap area; ToggleRow keeps the words on the left, the switch on the right. |
-| Accessibility | Switch has role switch and needs a label; CheckboxField's label is its own; both work with Space. |
+| Accessibility | Switch has role switch and needs a label; CheckboxField's label is its own; both work with Space. A switch whose change hands back its work (F26) says aria-busy and refuses another change until the work settles. |
 | Status | stable |
 | Exports | `Switch`, `ToggleRow`, `CheckboxField` |
 | Import | `import { Switch, ToggleRow, CheckboxField } from "@mycity/ui";` |
@@ -3484,7 +3592,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `checked` | `boolean` | yes | On or off. |
-| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `onChange` | `(checked: boolean) => unknown` | yes | Called with the new state. Hand back the work it starts (onChange={save}) and the switch is busy until it settles (F26). |
 | `label` | `string` | yes | What it switches, for assistive technology when no visible label names it. |
 | `disabled` | `boolean` |  | Not switchable now. |
 | `className` | `string` |  | Layout classes only. |
@@ -3496,7 +3604,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | `title` | `ReactNode` | yes | What the setting is, Title Case, at most 4 words. |
 | `text` | `ReactNode` |  | One short line about it, when the title is not enough. |
 | `checked` | `boolean` | yes | On or off. |
-| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `onChange` | `(checked: boolean) => unknown` | yes | Called with the new state; hand back its work and the switch is busy until it settles. |
 | `changed` | `boolean` |  | Marks a row changed but not yet published (a policy draft). |
 | `disabled` | `boolean` |  | Not switchable now. |
 
@@ -3551,6 +3659,7 @@ The text input of the form system, with its typed relatives: password, whole num
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `decimal` | `boolean` |  | Allow a decimal point. Off: whole numbers only. |
+| `signed` | `boolean` |  | Allow a minus before the figure (a fall, a loss). Off: zero and above only. |
 
 **PhoneField** props (`PhoneFieldProps`, extends `BoundProps`, `NativeInput`)
 
@@ -3703,6 +3812,8 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 | `onCancel` | `() => void` |  | Cancel, shown on the first step instead of Back. |
 | `initialStep` | `number` |  | The step to start on (a draft resumed); 0. |
 | `onStepChange` | `(index: number) => void` |  | Called with the step index each time it changes, so a draft can remember it. |
+| `step` | `number` |  | The step in view, when the form decides it (a refusal on a field of step 1 takes the person back there). Set it with `onStepChange`; left unset, the wizard keeps its own step. |
+| `error` | `ReactNode` |  | The one general error, above the footer: a refusal that names no field (FRONTEND_GUIDE §8.3). |
 
 ```tsx
 <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
@@ -3753,7 +3864,7 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 | Use | Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners. |
 | Avoid | A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone. |
 | Phone | The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11). |
-| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons, a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. |
+| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. A row marked as new (RowMarksContext: something unread is about it) says Unread before its first value as well as showing its dot and tint. |
 | Status | stable |
 | Exports | `DataView`, `LoadingRows` |
 | Import | `import { DataView, LoadingRows } from "@mycity/ui";` |
@@ -3833,6 +3944,39 @@ Asks the server for the whole filtered list as a file and saves it on the device
 <ExportButton onExport={() => saveExport(api.call("POST /api/v1/audit/exports", { body: filters }))} />
 ```
 
+### FormatButton
+
+A button that makes one file in a format: the format straight away when there is one, a choice of formats when there are two or more.
+
+| | |
+|---|---|
+| Use | A screen's own export of what it shows, in a format the person picks (the Overview's and Workspace Analytics' Export, Run Now on a report). |
+| Avoid | A list's export of its filtered rows in one format (ExportButton); several unrelated actions behind one button (Menu). |
+| Phone | The choice opens as an action sheet from the bottom, large rows; one format is a plain button. |
+| Accessibility | A Button, busy from the press until the file is saved and pressable rather than disabled; the choice is a Radix menu (arrow keys, Enter, Esc returns focus) named by `label`. |
+| Status | stable |
+| Exports | `FormatButton` |
+| Import | `import { FormatButton } from "@mycity/ui";` |
+| File | `packages/ui/src/data/FormatButton.tsx` |
+| Test | `packages/ui/src/data/FormatButton.test.tsx` |
+| Gallery | `packages/ui/src/data/FormatButton.gallery.tsx` (`npm run gallery`, `#/FormatButton`) |
+
+**FormatButton** props (`FormatButtonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | The button's words: Verb Noun, at most 3 words ("Export", "Run Now"). |
+| `formats` | `readonly F[]` | yes | The formats it can make, in the order offered; one makes the button press straight to it. |
+| `onRun` | `(format: F) => Promise<unknown>` | yes | Makes the file in the chosen format and saves it; the button is busy until it settles. |
+| `item` | `(format: F) => string` | yes | A choice's words, from its format ("Export PDF", "Run as XLSX"). |
+| `busy` | `boolean` |  | Busy for work the press did not hand back (a request already waiting). |
+| `size` | `"sm" \| "md"` |  | Small on a card (the default); the page header's own size beside its other actions. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<FormatButton label="Export" formats={["pdf", "xlsx"]} onRun={exportAs} item={(f) => `Export ${f.toUpperCase()}`} />
+```
+
 ### Kanban
 
 A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19).
@@ -3841,8 +3985,8 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 |---|---|
 | Use | A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions. |
 | Avoid | A list that is not staged (use DataView); dragging as the only way to move a card; more than six stages. |
-| Phone | No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. |
-| Accessibility | Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26). |
+| Phone | No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. The board opens on the first stage holding the reader's unread notifications when the first holds none, until the person picks one. |
+| Accessibility | Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26). A card new to its reader (RowMarksContext) says Unread before its title, beside its dot and tint, as a list's row does. |
 | Status | stable |
 | Exports | `Kanban`, `KanbanCardBody` |
 | Import | `import { Kanban, KanbanCardBody } from "@mycity/ui";` |
@@ -4209,10 +4353,11 @@ A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a 
 | `name` | `string` | yes | The file's name, as the person uploaded it. |
 | `mime` | `string` | yes | Its type, as the SERVER decided, not as the browser guessed. |
 | `href` | `string` | yes | The file, ready for the browser (a blob URL the app fetched with the session): what Open in Tab and Download open. |
-| `file` | `Blob \| null` |  | A PDF's bytes, for PdfViewer to draw; null while they arrive. |
+| `file` | `Blob \| null` |  | A PDF's bytes, for PdfViewer to draw; null while they arrive. Left out, they are read from `href`. |
 | `sizeBytes` | `number` |  | Its size, for the line under the name. |
-| `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller. |
-| `actions` | `ReactNode` |  | What sits beside Open in Tab (Replace, Remove). |
+| `height` | `"sm" \| "md" \| "lg" \| "page"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller; `page` grows a PDF to its pages (a letter). |
+| `actions` | `ReactNode` |  | What sits beside Open in Tab, before it (Replace, Remove). |
+| `trailing` | `ReactNode` |  | What closes the bar, after Open in Tab: a record's ⋯ menu. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -4285,6 +4430,78 @@ A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its n
 
 ```tsx
 <FileCard name="Call sheet.pdf" mime="application/pdf" sizeBytes={245000} pages={3} preview={src} hasPreview onOpen={open} onDownload={save} />
+```
+
+### GuideBody
+
+A User Guide chapter's body: numbered steps with Open links, notes, tables and annotated pictures.
+
+| | |
+|---|---|
+| Use | The Knowledge Hub's User Guide, the Full Guide and the Quick Start cards, fed the blocks the API sent (docs/guides/user-guide.md §6.2). |
+| Avoid | An article someone wrote (ArticleBody); a document the product generated (Paper); help on a field (HelpTerm). |
+| Phone | Steps keep their numbers on the left, a picture is the phone shot when there is one, and a wide table scrolls inside its own box. |
+| Accessibility | Steps are an ordered list, each with its own id so a reader can come back to it; a picture carries its text and its marks are listed under it. A link to another site says it opens in a new tab. |
+| Status | beta |
+| Exports | `GuideBody` |
+| Import | `import { GuideBody } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/GuideBody.tsx` |
+| Test | `packages/ui/src/documents/GuideBody.test.tsx` |
+| Gallery | `packages/ui/src/documents/GuideBody.gallery.tsx` (`npm run gallery`, `#/GuideBody`) |
+
+**GuideBody** props (`GuideBodyProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `blocks` | `GuideBlock[]` | yes | The blocks, as the API sent them. |
+| `anchor` | `string` | yes | The section's or task's slug: each step's id is `<anchor>-step-<n>`. |
+| `picture` | `(shot: string) => GuidePicture \| null` |  | A picture's files and marks by its shot id; null when it has none. |
+| `fetchImage` | `(url: string) => Promise<Blob>` |  | Fetches a picture that needs the session; without it the address is drawn as it is. |
+| `onLink` | `(href: string, from: GuideLinkFrom) => void` |  | Called for a screen (`/people?tab=x`) or a section (`#slug`) link; without it they are plain links. |
+| `onZoom` | `(shot: string) => void` |  | Called when a picture is pressed, to show it full size. |
+| `highlight` | `number \| null` |  | The step to mark as the one the reader came back to. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<GuideBody blocks={section.blocks} anchor="people-add-employee" picture={pictureOf} onLink={open} />
+```
+
+### GuideResults
+
+The User Guide's search results, each a section or task with the line that answers marked, and its short answer with numbered sources.
+
+| | |
+|---|---|
+| Use | The Knowledge Hub's User Guide while a search is typed: the results the API ranked (GuideResults) and, once asked, the answer written from them (GuideAnswerCard). |
+| Avoid | A list of records (DataView); ⌘K's own results (CommandPalette); a match in text a person wrote (LinkText). |
+| Phone | The same list: each result is a full width row at least 44 px tall, its step a pill under the title; the answer's sources are full width rows below it. |
+| Accessibility | Results are an ordered list of buttons named by their titles, the marked words a mark element; the answer is a live region, each source a button naming its number and title. |
+| Status | beta |
+| Exports | `GuideResults`, `GuideAnswerCard` |
+| Import | `import { GuideResults, GuideAnswerCard } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/GuideResults.tsx` |
+| Test | `packages/ui/src/documents/GuideResults.test.tsx` |
+| Gallery | `packages/ui/src/documents/GuideResults.gallery.tsx` (`npm run gallery`, `#/GuideResults`) |
+
+**GuideResults** props (`GuideResultsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `hits` | `GuideHitView[]` | yes | The results, best first, as the API sent them. |
+| `onOpen` | `(hit: GuideHitView) => void` | yes | Opens a result: the guide at its section or task, at its step. |
+| `label` | `string` |  | Names the list for assistive technology. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**GuideAnswerCard** props (`GuideAnswerCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `answer` | `GuideAnswerView \| null` | yes | The answer once written; null while it is being written. |
+| `onOpen` | `(hit: GuideHitView) => void` | yes | Opens one of its sources, as a result does. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<GuideResults hits={page.data} onOpen={open} label="Guide Results" />
 ```
 
 ### ImageViewer
@@ -4423,7 +4640,7 @@ A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and des
 |---|---|
 | Use | Reading a PDF someone uploaded or sent: a chat file in the file viewer, a document's preview on My Documents, a mail attachment. |
 | Avoid | A document the product generated and prints (Paper); a photo (ImageViewer); editing or signing a PDF (it only shows one). |
-| Phone | Fills its frame; pages fit the width and scroll, Zoom In and Zoom Out sit at the foot with the page number, each a 44 px target. |
+| Phone | Fills its frame (or, as `page`, grows to its pages so only the screen scrolls); pages fit the width and scroll, Zoom In and Zoom Out sit at the foot with the page number, each a 44 px target. |
 | Accessibility | The pages are one focusable document named by the file and the page in view, scrolled by the keyboard; zoom buttons are named and the page number is announced; a PDF that cannot be opened says so in words. |
 | Status | beta |
 | Exports | `PdfViewer` |
@@ -4438,7 +4655,7 @@ A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and des
 |---|---|---|---|
 | `data` | `Blob \| ArrayBuffer \| Uint8Array \| null` | yes | The PDF's bytes, fetched with the session; null while they arrive. |
 | `name` | `string` | yes | The file's name: the document's accessible name. |
-| `height` | `"sm" \| "md" \| "lg" \| "fill"` |  | A frame of fixed height (`sm`, `md`, `lg`, as DocumentPreview's), or `fill` its parent (the full-screen viewer). |
+| `height` | `"sm" \| "md" \| "lg" \| "fill" \| "page"` |  | A frame of fixed height (`sm`, `md`, `lg`, as DocumentPreview's), `fill` its parent (the full-screen viewer), or `page`: as tall as its pages, for a letter beside a list or in a sheet, so the screen scrolls once rather than a frame scrolling inside it. |
 | `tone` | `"card" \| "deep"` |  | The page area's backdrop: the muted card (`card`), or the viewer's deep green (`deep`). |
 | `onError` | `(reason: "password" \| "invalid") => void` |  | Called when the file cannot be drawn: locked with a password, or damaged. |
 | `className` | `string` |  | Layout classes only (spacing). |
@@ -5302,6 +5519,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `monthName` | `lib/format.ts` | Month name from a zero-based index: 0 → "January". |
 | `zoneClock` | `lib/format.ts` | The wall clock in another city, for the sign-in screen's cities: the time ("19:42"), the day as a person says it ("Wednesday 16 October", day first), and the hour as a number (with minutes as a fraction) for the scene's light. |
 | `todayIso` | `lib/format.ts` | Today in Lagos as ISO "YYYY-MM-DD". |
+| `addDaysIso` | `lib/format.ts` | An ISO day some days on (or back, for a negative n): a date field's `max`, "2026-10-26" and 90 → "2027-01-24". |
 | `parseDayFirst` | `lib/format.ts` | Day-first text a person typed ("13/10/2026", "13-10-2026", "13.10.26") → ISO, or null. |
 | `formatMoney` | `lib/format.ts` | Full amount with kobo, for tables and documents. |
 | `formatMoneyShort` | `lib/format.ts` | Short form for KPI tiles only: "₦1.3M", "₦850K". |
@@ -5336,6 +5554,9 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `normaliseLink` | `lib/links.ts` | The form a link's card is asked for in: https:// added, the host in lower case, the fragment dropped. |
 | `firstLink` | `lib/links.ts` | The first link in a text in its card form, or null when there is none or it may not have a card. |
 | `hostOf` | `lib/links.ts` | The host a link goes to, without www., for a card's last line. |
+| `RowMarks` (type) | `lib/marks.ts` | Rows a list marks as new to its reader, because something unread is about them (the hub's notifications, docs/guides/notifications.md §6). |
+| `RowMarksContext` | `lib/marks.ts` | The app's row marks; give a `RowMarks` whose `useMarked` is one stable hook. |
+| `useRowMarks` | `lib/marks.ts` | A list's marked rows, and what to call when one of them is opened. |
 | `PHONE_QUERY` | `lib/media.ts` | A phone: 760 px wide and below (gate 11). |
 | `useMediaQuery` | `lib/media.ts` | true while the media query matches; false before the first render on a server. |
 | `useIsPhone` | `lib/media.ts` | true on a phone: the phone shell renders (gate 11). |

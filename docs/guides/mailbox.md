@@ -142,7 +142,7 @@ dictation's recording is removed once it is transcribed.
    change it, or Send Now) and **Done**, which keeps that time with what is on screen (GE, 20/10/2026).
 6. **Layout.** On desktop the message list and the reader scroll on their own and the page does not
    scroll behind them. The divider between them can be dragged, or moved with the arrow keys, to
-   widen the list; double click resets it. The width is remembered per browser.
+   widen the list. The width is remembered per browser.
 7. **Signature, what it is made of** (`signature/`). `signature.resolve.js` (pure) builds one model
    from the records: the name (preferred name, else first name, then last name), job title and
    department from the employee; the mobile from `employee.phone` unless the person hid it, with a
@@ -353,10 +353,12 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
   - **Spam** is never drafted from or summarised (`SPAM_NOT_READ`); its bodies are not shown either.
   - **Limits**: What To Say 2,000 characters, the Note 4,000, an answer 1,000; a dictation two
     minutes and 10 MB.
-  - **AI off** (switched off, the month's cap reached, every model passed by, or no provider set up
-    so only the stub would answer): Write With AI answers `available: false` and the step says
-    "Write With AI is off"; Summarise Thread says "AI summaries are off". The composer and the mail
-    are untouched.
+  - **AI off** (switched off, the month's cap reached, or no provider set up so only the stub would
+    answer): Write With AI answers `available: false` and the step says "Write With AI is off";
+    Summarise Thread says "AI summaries are off". Every model passed by is not AI off: it is
+    `AI_UNAVAILABLE`, "The AI service is not answering. Try again in a few minutes.". A dropped
+    connection says "Could not reach the server. Try again."; an unusable summary "The summary could
+    not be made. Try again.". The composer and the mail are untouched.
   - Each press is one AI run under its action, on AI Control · Spend (`ai-control.md` §6.5).
 - **The mail host's limits** (Namecheap plan, `docs/runbooks/dns-and-mail.md` §4): IMAP and SMTP
   at `mycityapp.io` (993, 465), strict certificate check on that name. At most **30 IMAP connections
@@ -565,6 +567,8 @@ interface copy; the copy rules apply to the chrome around them.
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · The ready-to-send guard (`placeholdersIn`, the gaps it refuses) moved to `services/ai/drafts.js`, shared with Queries & Sanctions' Write With AI (queries.md §9); Write With AI, Tidy Up and Summarise Thread behave as before.
+- 26/10/2026 · JP · From the User Guide audit's screen defects and the owner's decision of 26/10/2026: a message moved out of Spam is read again from the mail server (`provider.fetchOne`), so it shows as written; Connect says why a refusal failed (a field's marks only for the form's fields; `setServerErrors` ignores details that are not messages); Refresh says "Checking for new mail" and is refused while the mailbox needs reconnecting; Attachments counts the folder (`ThreadListQuery.attachments`); Reply on one's own message goes to whom it was sent; the composer marks To, Cc and Bcc each, checks 50 a row, shows the schedule's own refusal ("Within 90 days") and offers no day past 90, says when a draft did not save or discard; a deferral out of tries says it will not be retried; Write With AI and Summarise say when the connection dropped, and a refusal on what the step does not draw shows; the buttons follow the `mailbox` grants (Compose, Reply, Forward create; Empty delete; numbers and switches edit) and Forward to a chat `community` create. §3 step 6 no longer promises a double click on the divider; §6 says every model passed by is not AI off.
 - 13/10/2026 · GE · First version, from the 12 October internal workflow meeting and MILESTONES §6.5.
 - 13/10/2026 · GE · Schedule send at any date and time; independent panes with a resizable list (TB review).
 - 13/10/2026 · GE · Page header slides away while reading so the panes get the full height (TB review).
@@ -597,3 +601,4 @@ interface copy; the copy rules apply to the chrome around them.
 - 20/10/2026 · TB · Nothing in the mailbox changed. Always Show Images' `sender_address` is an email address, marked `address:none` in the contract so gate 22 (addresses picked, never typed, `docs/guides/addresses.md`) knows it is not a place.
 - 23/10/2026 · TB · Faults #2 and #3 (staging, 22/10/2026): the worker restarted twice because an IMAP connection had no error listener, so the mail server hanging up during sign-in (`Connection not available`) or going silent for 5 minutes (`Socket timeout`) was thrown as an uncaught exception. Every IMAP connection now has one: the failure reaches the call waiting on it, is logged as a warning and is not a fault. Short-lived connections give up after 2 silent minutes, IDLE after 5 (§6, §11). A send is now marked sent the moment the server accepts it, before the copy to Sent (`send()` and `copyToSent()` apart), so a worker that stops afterwards never sends it twice (§3 step 5, §11). Nothing was sent twice on 22/10.
 - 22/10/2026 · TB · Write With AI and Summarise Thread, from TB's brief and eight answers (§1.1; M10's mail AI brought forward): in the composer, a step that drafts a reply, a forward's note or a new message from the conversation, What To Say and a note (each dictated or typed), or tidies the person's words, asking up to three questions first when a fact only the person knows is missing, then Use Draft; in the reader, a Summary card (gist, Key Points, Asked of You) kept until new mail (`mail_thread_summary`, migration 10300). Actions `mail-draft`, `mail-tidy`, `mail-summary` (Default) and `mail-dictation` (Transcription), personal data. Contact details are swapped for tokens before anything leaves and put back in the draft; every answer is checked for placeholders. §1, §1.1, §2 to §14 updated.
+- 25/10/2026 · JP · Refresh, the move menu, Always Show Images, Cancel Schedule and Empty Spam or Trash say why when refused (a toast with the server's reason, or a Try Again line); Empty no longer spins for good after a failure (`Mailbox.test.tsx`). Found while writing the M1 User Guide.

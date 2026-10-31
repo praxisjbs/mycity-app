@@ -267,6 +267,42 @@ describe("Ask", () => {
     expect(screen.queryByRole("button", { name: "Try Again" })).toBeNull();
   });
 
+  it("AI switched off goes back to the box too: asking again cannot help", async () => {
+    m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
+    m.call.mockRejectedValueOnce(new ApiError(503, { error: { code: "AI_DISABLED", message: "AI features are switched off." } }));
+    ui("ask");
+    const box = screen.getByRole("textbox", { name: "Ask a Question" });
+    await userEvent.type(box, "Who is late?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect((box as HTMLInputElement).value).toBe("Who is late?"));
+    expect(screen.queryByRole("button", { name: "Try Again" })).toBeNull();
+  });
+
+  it("an unexpected fault shows the reference to quote", async () => {
+    m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
+    m.call.mockRejectedValueOnce(new ApiError(500, { error: { code: "INTERNAL_ERROR", message: "Something went wrong on our side.", reference: "REQ-7F3A" } } as never));
+    ui("ask");
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask a Question" }), "Who is late?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("Reference REQ-7F3A");
+  });
+
+  it("Send pressed while an answer is coming waits on it, the words kept in the box", async () => {
+    m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
+    let land: (a: AiAnswer) => void = () => undefined;
+    m.call.mockImplementationOnce(() => new Promise((r) => (land = r as (a: AiAnswer) => void)));
+    ui("ask");
+    const box = screen.getByRole("textbox", { name: "Ask a Question" });
+    await userEvent.type(box, "Who is late?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await userEvent.type(box, "And who is away?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(asked()).toHaveLength(1);
+    expect((box as HTMLInputElement).value).toBe("And who is away?");
+    land(answer({ question: "Who is late?" }));
+    expect(await screen.findByText("Two requests wait on you.")).toBeTruthy();
+  });
+
   it("a conversation that is gone when opened starts a new one", async () => {
     m.turnsError = new ApiError(404, { error: { code: "NOT_FOUND", message: "Not found" } });
     ui("ask", CONV);

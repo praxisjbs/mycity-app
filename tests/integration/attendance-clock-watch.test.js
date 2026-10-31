@@ -346,6 +346,10 @@ describeDb("the clock watch against the real migrations", () => {
     const again = await give("staff", out.attendance_event_id, { employee_note: "Again", real_time: "16:10" });
     expect(again.status).toBe(409);
     expect(again.body.error.code).toBe("ALREADY_EXPLAINED");
+    // The day shows the time given, in place of a second Give Real Time.
+    const punches = (await as("staff").get(`/attendance/me/events?date=${DAY}`)).body.data;
+    expect(punches.find((e) => e.attendance_event_id === out.attendance_event_id)).toMatchObject({ real_time_given: "16:00" });
+    expect(punches.find((e) => e.attendance_event_id === clockIn.attendance_event_id)).toMatchObject({ real_time_given: null });
 
     const id = res.body.attendance_exception_id;
     const reject = await as("ops").post(`/attendance/exceptions/${id}/decision`, { decision: "reject", resolution: "Not a real clock-out" });

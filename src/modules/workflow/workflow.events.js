@@ -5,6 +5,7 @@
  * shared/events/catalogue.js and shared/notifications/fanout.js). What is left to
  * this module is what Settings and Operations & People do around it:
  *
+ *   workflow.definition_created a flow made on screen, saved as version 1 (audit only)
  *   workflow.definition_saved   a flow's stages saved as a new version (audit only)
  *   workflow.reassigned         a stage given to someone else; they are told
  */
@@ -12,6 +13,7 @@ const { defineEvents } = require("../../shared/events/catalogue");
 const { defineNotification } = require("../../shared/notifications/fanout");
 
 const EVENTS = defineEvents("settings", {
+  "workflow.definition_created": { summary: "An approval flow was made" },
   "workflow.definition_saved": { summary: "An approval flow was saved as a new version" },
   "workflow.reassigned": { summary: "An approval stage was given to someone else" },
 });

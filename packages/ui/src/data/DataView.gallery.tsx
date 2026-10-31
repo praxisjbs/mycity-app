@@ -4,6 +4,7 @@ import { Button } from "../actions/Button";
 import { Money } from "../display/Money";
 import { StatusPill } from "../display/Pill";
 import { formatDate } from "../lib/format";
+import { RowMarksContext, type RowMarks } from "../lib/marks";
 import { ApiError } from "./createApi";
 import { DataView, type DataViewColumn, type DataViewList } from "./DataView";
 import { SAMPLE_PAGE, SAMPLE_ROWS, type SampleRow } from "./fixtures";
@@ -58,11 +59,26 @@ const Everything = () => {
   );
 };
 
+/** As the hub marks them: two rows have something unread about them until they are opened. */
+function Marked() {
+  const [opened, setOpened] = useState<string[]>([]);
+  const marks: RowMarks = {
+    useMarked: (keys) => new Set(keys.filter((k) => (k === "e2" || k === "e4") && !opened.includes(k))),
+    opened: (key) => setOpened((o) => [...o, key]),
+  };
+  return (
+    <RowMarksContext.Provider value={marks}>
+      <DataView list={useSample()} columns={columns} rowKey={(r) => r.employee_id} title="Employees" noun="employee" onRowClick={() => undefined} />
+    </RowMarksContext.Provider>
+  );
+}
+
 export default {
   component: "DataView",
   states: {
     Basic,
     "Everything On": Everything,
+    "Unread Rows": Marked,
     Sorted: () => <DataView list={useSample({ sort: "-owed" })} columns={columns} rowKey={(r) => r.employee_id} title="Employees" noun="employee" />,
     Selected: () => (
       <DataView

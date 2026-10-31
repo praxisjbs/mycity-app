@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { VoiceField } from "./VoiceField";
+import { ApiError } from "../data/createApi";
 
 /** A MediaRecorder double: jsdom has none, and no microphone either. */
 class FakeRecorder {
@@ -103,6 +104,14 @@ describe("VoiceField", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Stop Recording" }));
     expect(await screen.findByText("Could not transcribe")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Record Comments" })).toBeInTheDocument();
+  });
+
+  it("gives the server's own reason when it refuses", async () => {
+    const refused = new ApiError(503, { error: { code: "AI_DISABLED", message: "AI is switched off." } } as never);
+    render(<VoiceField label="Comments" transcribe={vi.fn().mockRejectedValue(refused)} onTranscript={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Record Comments" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Stop Recording" }));
+    expect(await screen.findByText("AI is switched off.")).toBeInTheDocument();
   });
 
   it("turns the microphone off when the person leaves mid-recording", async () => {

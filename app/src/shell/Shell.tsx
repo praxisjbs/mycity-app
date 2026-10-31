@@ -26,17 +26,19 @@ import { useApi } from "@/api/hooks";
 import { useAuth, useMe, useMyPhoto } from "@/auth/AuthProvider";
 import { ClockButton, ClockPrompts, useClockSync } from "@/features/attendance/ClockButton";
 import { AcknowledgePrompts } from "@/features/policies/AcknowledgeSheet";
-import { UrgentNotices, urgentModules, useUrgentNotices } from "@/features/notifications/UrgentNotices";
+import { RecordMarks } from "@/features/notifications/marks";
+import { UrgentNotices, urgentModules, urgentTabs, useUrgentNotices } from "@/features/notifications/UrgentNotices";
 import { useScreenState } from "@/lib/plan";
 import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
 import { goTrail, startTrail, useTrail } from "@/lib/trail";
+import { guideAt } from "@/features/knowledge/guide/return";
 import { visibleModules, visibleTabs } from "./access";
 import { BellButton } from "./Bell";
 import { moduleByKey, type ModuleDef, type TabDef } from "./catalogue";
 import { Fab } from "./Fab";
 import { FitContext } from "./layout-context";
 import { More } from "./More";
-import { bottomItems, bottomKey, railItems } from "./nav";
+import { bottomItems, bottomKey, railItems, tabItems } from "./nav";
 import { ShellNotices, useInstallApp } from "./Notices";
 import { OfflinePage, useOnline } from "./offline";
 import { PlannedScreen, ViewBar } from "./Planned";
@@ -58,6 +60,9 @@ import { useTextSizeSheet } from "./TextSize";
  *            opens More; the module's name over its tabs), the page, the
  *            FloatingButton (F18) and the BottomBar (F16) with More (F17)
  *
+ * Each module's tabs carry their share of its count, and a list on the screen marks the records
+ * its reader has something unread about until they are opened (features/notifications/marks.tsx).
+ *
  * Navigation comes from the /me grants (access.ts) and the one URL shape,
  * /<module>?tab=<tab>&id=<id> (lib/router.tsx). An unknown module or tab, or
  * one the person may not open, lands on the first allowed screen. What a
@@ -77,6 +82,7 @@ export function Shell() {
   const { data: badges } = useApi("GET /api/v1/notifications/badges");
   const urgentRows = useUrgentNotices();
   const urgent = useMemo(() => urgentModules(urgentRows), [urgentRows]);
+  const urgentHere = useMemo(() => urgentTabs(urgentRows), [urgentRows]);
 
   const key = location.module ? moduleKeyOf(location.module) : null;
   const mod = moduleByKey(key);
@@ -138,7 +144,7 @@ export function Shell() {
         label={allowed.label}
         value={tab.slug}
         onValueChange={(slug) => navigate(hrefFor(allowed.key, slug))}
-        items={tabs.map((t) => ({ value: t.slug, label: t.label, href: hrefFor(allowed.key, t.slug) }))}
+        items={tabItems(allowed.key, tabs, badges, urgentHere)}
       />
     ) : undefined;
   const frame: FrameProps = {
@@ -148,7 +154,7 @@ export function Shell() {
     tabs: strip,
     page,
     fit,
-    badges,
+    badges: badges?.modules,
     urgent,
     alert: <UrgentNotices rows={urgentRows} />,
     openSearch,
@@ -159,7 +165,9 @@ export function Shell() {
   return (
     <FitContext.Provider value={useCallback((f: boolean) => setFit(f), [])}>
       <ScreenActionProvider>
-        {phone ? <PhoneFrame {...frame} /> : <DesktopFrame {...frame} />}
+        <RecordMarks module={allowed?.key ?? null} tab={tab?.slug ?? null} count={allowed && tab ? (badges?.tabs[allowed.key]?.[tab.slug] ?? 0) : 0}>
+          {phone ? <PhoneFrame {...frame} /> : <DesktopFrame {...frame} />}
+        </RecordMarks>
         <Search open={search} onClose={() => setSearch(false)} />
         <ClockPrompts />
         <AcknowledgePrompts />
@@ -283,10 +291,11 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, op
   );
 }
 
-/** The desktop account menu: the person's own screens, theme, density, text size, Install App, Sign Out. */
+/** The desktop account menu: the person's own screens, the User Guide at the screen in view, theme, density, text size, Install App, Sign Out. */
 function useAccountMenu(): MenuItem[] {
-  const { signOut } = useAuth();
-  const { navigate } = useRouter();
+  const { signOut, can } = useAuth();
+  const { location, navigate } = useRouter();
+  const here = location.module && location.tab ? `${moduleKeyOf(location.module)}/${location.tab}` : null;
   const { theme, toggle } = useTheme();
   const density = useDensity();
   const textSize = useTextSizeSheet();
@@ -295,6 +304,7 @@ function useAccountMenu(): MenuItem[] {
   return [
     { label: "My Profile", icon: "user", onSelect: () => navigate(hrefFor("ess", "my-profile")) },
     { label: "My Security", icon: "shield", onSelect: () => navigate(hrefFor("ess", "my-security")) },
+    ...(can("knowledge") ? [{ label: "User Guide", icon: "book" as const, onSelect: () => navigate(guideAt(here)) }] : []),
     "sep",
     { label: theme === "dark" ? "Light Theme" : "Dark Theme", icon: theme === "dark" ? "sun" : "moon", onSelect: toggle },
     { label: density.density === "compact" ? "Comfortable Density" : "Compact Density", icon: "rows", onSelect: density.toggle },

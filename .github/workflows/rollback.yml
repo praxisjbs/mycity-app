@@ -28,17 +28,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # Production approvers: GE and TB (SYSTEM_ARCHITECTURE §9.3). The same list is in release.yml.
+      # Production approvers: GE, TB and the praxisjbs account (SYSTEM_ARCHITECTURE §9.3). The same list is in release.yml.
       - name: Only a production approver, from main, with a full sha
         env:
           ACTOR: ${{ github.triggering_actor }}
           REF: ${{ github.ref }}
           SHA: ${{ inputs.sha }}
-          APPROVERS: "swizfcodes tomblakeasaah196"
+          APPROVERS: "swizfcodes tomblakeasaah196 praxisjbs"
         run: |
           case " $APPROVERS " in
             *" $ACTOR "*) ;;
-            *) echo "::error::$ACTOR is not a production approver (GE or TB)"; exit 1 ;;
+            *) echo "::error::$ACTOR is not a production approver (GE, TB or praxisjbs)"; exit 1 ;;
           esac
           if [ "$REF" != "refs/heads/main" ]; then
             echo "::error::run it from main, not $REF"; exit 1

@@ -58,7 +58,7 @@ const SCREENS = Object.freeze({
   ],
   community: ["channels", "direct-messages", "announcements"],
   mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash", "signature"],
-  people: ["employees", "attendance", "leave", "devices", "worksites", "organogram"],
+  people: ["employees", "attendance", "leave", "devices", "worksites", "organogram", "departments"],
   performance: ["goals", "targets", "kpis", "reviews", "analytics"],
   queries: ["queries", "rules", "sanctions", "letter-templates"],
   recruitment: [
@@ -93,7 +93,7 @@ const SCREENS = Object.freeze({
     "budgets",
     "categories",
   ],
-  knowledge: ["policies", "sops", "faqs", "training", "announcements"],
+  knowledge: ["policies", "sops", "faqs", "training", "user-guide"],
   praxis_ai: ["ask", "history"],
   ai_control: ["actions", "models", "spend"],
   settings: [
@@ -171,6 +171,8 @@ const ENTITY_ROUTES = Object.freeze({
   data_export: screen("ess", "my-profile"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   // A post nobody holds yet opens on the Organogram, focused on it.
   org_seat: screen("people", "organogram"),
+  // A department opens on People · Departments with its record open (docs/guides/organogram.md §9).
+  department: screen("people", "departments"),
   // A Download PDF file: its record opens the Org Chart, where it is asked for.
   org_chart_export: screen("ess", "org-chart"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   import_batch: screen("settings", "imports"),
@@ -196,6 +198,9 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
+  // All of one person's days, ⌘K's last row after the days it lists (attendance.search.js `more`):
+  // People · Attendance lists them by month (`?person=`, an employee's id).
+  attendance_days: { ...screen("people", "attendance"), param: "person" },
   // A pending deduction or overtime (§6.17): People · Attendance opens its day; the person's own opens on
   // My Attendance (both read /attendance/records/:id).
   // search:none a pay item is found through its day, never looked up on its own
@@ -291,6 +296,8 @@ const ENTITY_ROUTES = Object.freeze({
   performance_plan: { ...screen("performance", "goals"), param: "plan", self: screen("ess", "my-performance") },
   // search:none a target change is opened from its approval and from the key result it changes, which search finds
   target_change: { ...screen("performance", "goals"), param: "change" },
+  // search:none a request to unbind a plan is opened from its approval (the bell, Need You, ⌘K's Waiting on You) and read on Goals
+  plan_unbind: { ...screen("performance", "goals"), param: "unbind" },
   scorecard: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
@@ -321,14 +328,13 @@ const ENTITY_ROUTES = Object.freeze({
   performance_period: screen("performance", "goals"),
 
   // Queries & Sanctions
-  query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") }, // search:none not built yet (src/modules/queries)
-  query_rule: screen("queries", "rules"), // search:none not built yet (src/modules/query_rules)
-  // search:none not built yet (src/modules/sanctions)
+  query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") },
+  query_rule: screen("queries", "rules"), // search:none a handful of rules, listed whole on Rules, which ⌘K finds by name
   sanction: {
     ...screen("queries", "sanctions"),
     self: screen("ess", "my-queries"),
   },
-  letter_template: screen("queries", "letter-templates"), // search:none not built yet (src/modules/templates)
+  letter_template: screen("queries", "letter-templates"), // search:none a handful of letters, listed whole on Letter Templates, which ⌘K finds by name
 
   // Recruitment
   vacancy: screen("recruitment", "vacancies"), // search:none not built yet (src/modules/vacancies)
@@ -375,17 +381,17 @@ const ENTITY_ROUTES = Object.freeze({
   expense_category: screen("expenses", "categories"), // search:none not built yet (src/modules/expense_categories)
 
   // Knowledge Hub
+  // A section or task of the User Guide, by its slug: the guide opens at it (user_guide.search.js).
+  guide_section: screen("knowledge", "user-guide"),
   sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge)
   faq: screen("knowledge", "faqs"), // search:none not built yet (src/modules/knowledge)
   training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/knowledge)
-  knowledge_announcement: screen("knowledge", "announcements"), // search:none not built yet (src/modules/knowledge)
 
   // Praxis AI
   // A conversation opens on Ask, where it can be read and continued (docs/guides/praxis-ai.md §9).
   ai_conversation: screen("praxis_ai", "ask"),
 
   // Settings
-  department: screen("settings", "organisation"),
   app_user: screen("settings", "users"),
   // A person's own login, as they see it: sign-ins, sessions, their password.
   account: screen("ess", "my-security"), // search:none a person's own login opens from My Security; logins are found as Users (app_user)
@@ -393,7 +399,7 @@ const ENTITY_ROUTES = Object.freeze({
   workflow_definition: screen("settings", "approvals"),
   numbering_scheme: screen("settings", "documents-and-numbering"),
   public_holiday: screen("settings", "organisation"),
-  template: screen("settings", "documents-and-numbering"), // search:none not built yet (src/modules/templates)
+  template: screen("settings", "documents-and-numbering"), // search:none a template is opened from Settings, Documents and Numbering, which ⌘K finds by name; letters are letter_template
   // Status, Performance, Faults and Integrations sit in Settings but are held by keys of their
   // own (docs/guides/system-health.md §8, integrations.md §8): `permission` is what a viewer must
   // hold to open them. A fault opens its sheet on Faults; a check going down or coming back, and
@@ -480,6 +486,34 @@ function linkFor(entityType, entityId, { self = false } = {}) {
 }
 
 /**
+ * The screen a record of this type opens on, without naming the record: its staff screen, or with
+ * `self` its own employee's where the route has one. Null for a type with no screen. The bell's
+ * badges count by it, per module and per tab.
+ * @param {string} entityType
+ * @param {{self?: boolean}} [opts]
+ * @returns {{module: string, tab: string}|null}
+ */
+function screenOf(entityType, { self = false } = {}) {
+  const r = ENTITY_ROUTES[entityType];
+  if (!r) return null;
+  const target = self && r.self ? r.self : r;
+  return { module: target.module, tab: target.tab };
+}
+
+/**
+ * The record types that open on one screen, as their staff screen or as their own employee's:
+ * what a list on that screen may mark as unread.
+ * @param {string} module
+ * @param {string} tab
+ * @returns {string[]}
+ */
+function typesOn(module, tab) {
+  return Object.entries(ENTITY_ROUTES)
+    .filter(([, r]) => [r, r.self].some((s) => s && s.module === module && s.tab === tab))
+    .map(([type]) => type);
+}
+
+/**
  * The module a viewer must hold to open a record (its staff view), or null. Used to check
  * the viewer may open it: the screen's module, or the `permission` its route names.
  */
@@ -497,6 +531,8 @@ module.exports = {
   moduleSlug,
   screenPath,
   linkFor,
+  screenOf,
+  typesOn,
   moduleOf,
   hasRoute,
 };

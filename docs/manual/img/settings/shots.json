@@ -1,0 +1,233 @@
+{
+  "settings-add-model": {
+    "spec": "31202827ab922a45",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-appearance": {
+    "spec": "024d179d2283c685",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-approvals": {
+    "spec": "73c98f8a166aecc9",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-audit-log": {
+    "spec": "f9689b0da0e6de11",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-connection": {
+    "spec": "8071df7d5ff5fa53",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-fault": {
+    "spec": "e1bdb2829e61386a",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-faults": {
+    "spec": "dee09ded64305fc2",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-holiday": {
+    "spec": "ce66ec69aa1136f5",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-import-wizard": {
+    "spec": "8ee07e662b55541d",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-imports": {
+    "spec": "9101f23f850baab6",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-integration-edit": {
+    "spec": "75e55754f77f00be",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-integrations": {
+    "spec": "977ac329cb861236",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-new-flow": {
+    "spec": "df5bf06fe05e638e",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-notice": {
+    "spec": "63753d212846f1e0",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-notifications": {
+    "spec": "fe2e4fdc5a247410",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-numbering": {
+    "spec": "a70a7c3dfc5fab40",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-organisation": {
+    "spec": "816a9d58ee18739a",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-performance": {
+    "spec": "79d9b9ff3e775699",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-profile": {
+    "spec": "69e2b8bd57bcde1e",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-reminders": {
+    "spec": "302eee0524494d10",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-role-access": {
+    "spec": "ca4283fe87f912c0",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-roles": {
+    "spec": "30eb49b933a978a9",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-security": {
+    "spec": "ca54753bbd5331f9",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-stages": {
+    "spec": "c162a5a3f585f63f",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-status": {
+    "spec": "bb87914e1cc8f22f",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-targets": {
+    "spec": "a4b0cd1a8cfb31e4",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-user-login": {
+    "spec": "f7d996462829d2b5",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-users": {
+    "spec": "49d0dba53bfdd851",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-week": {
+    "spec": "1511a7034737b7b3",
+    "source": "ca1341bbef881736",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

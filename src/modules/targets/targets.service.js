@@ -146,8 +146,8 @@ const amendmentOf = (db, scorecardId) => workflow.findOpenInstance(db, { type: "
 async function editable(db, card, actor, scope) {
   if (card.status !== "draft") return false;
   const plan = await plans.planFor(db, card.performance_period_id, card.department_id);
-  if (plan && plan.status === "submitted") return false;
-  if (plan && plan.status === "binding" && (await amendmentOf(db, card.scorecard_id))) return false;
+  if (plan && ["submitted", "revising"].includes(plan.status)) return false;
+  if (plan && plans.isLive(plan.status) && (await amendmentOf(db, card.scorecard_id))) return false;
   if (!actor) return false;
   if (actor.is_ceo) return true;
   if (card.employee_id === actor.employee_id) return false;
@@ -183,7 +183,7 @@ async function detail(db, card, actor, scope) {
   const agreeable = ["binding", "agreed"].includes(card.status);
   const canEdit = await editable(db, card, actor, scope);
   const plan = card.status === "draft" ? await plans.planFor(db, card.performance_period_id, card.department_id) : null;
-  const amendment = plan && plan.status === "binding" ? await amendmentOf(db, card.scorecard_id) : null;
+  const amendment = plan && plans.isLive(plan.status) ? await amendmentOf(db, card.scorecard_id) : null;
   return {
     ...cardView(card),
     scope_text: card.scope_text,
@@ -197,7 +197,7 @@ async function detail(db, card, actor, scope) {
     contributions: splits.map(weights.contribution),
     can_edit: canEdit,
     can_agree: agreeable && ((mine && !card.employee_agreed_at) || (reviewer && !card.reviewer_agreed_at)),
-    can_send: canEdit && Boolean(plan && plan.status === "binding") && !weights.weightProblems(card, views).length,
+    can_send: canEdit && Boolean(plan && plans.isLive(plan.status)) && !weights.weightProblems(card, views).length,
     amendment_instance_id: amendment ? amendment.workflow_instance_id : null,
   };
 }
@@ -281,7 +281,7 @@ async function create(actor, scope, body, opts = {}) {
       const plan = await plans.ensurePlan(client, period.performance_period_id, person.department_id);
       // A sent plan takes no new scorecard: it would bind unchecked. A binding one takes it as an
       // amendment, sent on its own (§11).
-      if (!opts.system && plan.status === "submitted")
+      if (!opts.system && ["submitted", "revising"].includes(plan.status))
         throw new AppError("PLAN_NOT_OPEN", "This function's plan is already sent for the quarter", 409);
     }
     const sections = period.rules.sections;
@@ -536,7 +536,7 @@ async function submit(actor, scope, id) {
   const card = await repo.get(pool, id);
   if (!card) throw notFound();
   const plan = card.department_id ? await plans.planFor(pool, card.performance_period_id, card.department_id) : null;
-  if (!plan || plan.status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Send the function's plan instead", 409);
+  if (!plan || !plans.isLive(plan.status)) throw new AppError("PLAN_NOT_BINDING", "Send the function's plan instead", 409);
   if (!(await editable(pool, card, actor, scope))) throw new AppError("SCORECARD_LOCKED", "This scorecard is already sent", 409);
   const views = (await repo.lines(pool, id)).map((l) => lineView(l, []));
   const problems = weights.weightProblems(card, views);

@@ -774,6 +774,7 @@ function cardOf(card: MockCard, f: Figure): HomeKpiCard {
     tone: card.tone && !isZero(card.unit, f) ? card.tone : null,
     trend: null,
     opens: true,
+    module: card.module,
   };
 }
 
@@ -830,7 +831,7 @@ function pickerOf(user: string): HomeKpiPicker {
   const c = choiceOf(user);
   return {
     max: MAX_CARDS,
-    cards: CARDS.filter((card) => pickable(card.key, c.eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit })),
+    cards: CARDS.filter((card) => pickable(card.key, c.eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit, module: card.module })),
     kpi_ids: c.picks ? keepEligible(c.picks, c.eligible).slice(0, MAX_CARDS) : null,
     default_ids: c.fallback.ids,
     locked_ids: c.locked.slice(0, MAX_CARDS),
@@ -1428,6 +1429,8 @@ interface MockRun extends Omit<HomeReportRun, "report_name" | "report_key" | "re
   recipient: string;
   requested_by: string | null;
   settles_at: number | null;
+  /** A personal export's own filters (its period), as JSON with sorted keys; none for any other run. */
+  filters?: string | null;
 }
 
 /** How long a run asked for here stays Pending before its file is there. */
@@ -1604,7 +1607,10 @@ function mayReadReport(user: string, r: MockReport): boolean {
 }
 const mayEditReport = (user: string, r: MockReport) => r.owner === user || me(user).is_ceo;
 /** The reports Reports lists: never the Overview Export's own report. */
-const listedReports = (user: string) => REPORTS.filter((r) => r.report_key !== "overview" && mayReadReport(user, r));
+/** A personal export's own report (the Overview's, Workspace Analytics'), never listed or read on Reports. */
+const PERSONAL_NAME: Partial<Record<ReportSource, string>> = { overview: "Overview", workspace_analytics: "Workspace Analytics" };
+const personal = (r: MockReport) => PERSONAL_NAME[r.report_key] !== undefined;
+const listedReports = (user: string) => REPORTS.filter((r) => !personal(r) && mayReadReport(user, r));
 const statusOfReport = (r: MockReport): HomeReport["status"] => (!r.schedule ? "on_demand" : r.schedule.active ? "scheduled" : "paused");
 
 /** Recent Runs: the files the reader received, and every file of the reports they own; the CEO sees every one. */
@@ -1678,7 +1684,7 @@ function reportOf(r: MockReport, user: string): HomeReport {
 }
 
 function runOf(run: MockRun): HomeReportRun {
-  const { recipient, requested_by, settles_at: _settles, ...rest } = run;
+  const { recipient, requested_by, settles_at: _settles, filters: _filters, ...rest } = run;
   const report = REPORTS.find((r) => r.saved_report_id === run.saved_report_id)!;
   return {
     ...rest,
@@ -1701,11 +1707,11 @@ const queued = (run: HomeReportRun) => ({ status: 202, body: run });
  * still being made. Pressed again while that file waits (or with the same Idempotency-Key), it
  * answers the same run.
  */
-function runFor(report: MockReport, user: string, format: ReportFormat, key: string | undefined): HomeReportRun {
+function runFor(report: MockReport, user: string, format: ReportFormat, key: string | undefined, filters: string | null = null): HomeReportRun {
   RUNS.forEach(settle);
   const replay =
     (key ? RUN_REPLAYS.get(`${user}:${key}`) : undefined) ??
-    RUNS.find((r) => r.saved_report_id === report.saved_report_id && r.report_schedule_id === null && r.recipient === user && r.format === format && r.status === "pending");
+    RUNS.find((r) => r.saved_report_id === report.saved_report_id && r.report_schedule_id === null && r.recipient === user && r.format === format && r.status === "pending" && (r.filters ?? null) === filters);
   if (replay) return runOf(replay);
   const number = nextRunNumber();
   const run: MockRun = {
@@ -1723,6 +1729,7 @@ function runFor(report: MockReport, user: string, format: ReportFormat, key: str
     run_at: new Date().toISOString(),
     finished_at: null,
     settles_at: Date.now() + SETTLE_MS,
+    filters,
   };
   RUNS.push(run);
   if (key) RUN_REPLAYS.set(`${user}:${key}`, run);
@@ -1737,6 +1744,31 @@ function overviewReportOf(user: string): MockReport {
   const made: MockReport = { saved_report_id: sid(`report:overview:${user}`), owner: user, name: "Overview", report_key: "overview", filters: {}, shared: false, schedule: null, archived_at: null, created_at: now, updated_at: now };
   REPORTS.push(made);
   return made;
+}
+
+/**
+ * A personal export other than the Overview's (Workspace Analytics'), as the API runs it: the
+ * reader's own hidden report, and each run keeping the filters it was pressed with, so a run still
+ * waiting never holds up a press for another period.
+ */
+export function personalExport(user: string, key: ReportSource, format: ReportFormat, filters: HomeReportFilters, idem: string | undefined) {
+  RUNS.forEach(settle);
+  let report = REPORTS.find((r) => r.report_key === key && r.owner === user);
+  if (!report) {
+    const now = new Date().toISOString();
+    report = { saved_report_id: sid(`report:${key}:${user}`), owner: user, name: PERSONAL_NAME[key] ?? key, report_key: key, filters: {}, shared: false, schedule: null, archived_at: null, created_at: now, updated_at: now };
+    REPORTS.push(report);
+  }
+  const own = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b))));
+  return queued(runFor(report, user, format, idem, own));
+}
+
+/** One of the reader's own runs of a personal export, which the screen that pressed waits on. */
+export function personalRun(user: string, key: ReportSource, id: string) {
+  RUNS.forEach(settle);
+  const run = RUNS.find((r) => r.home_report_run_id === id && r.recipient === user);
+  const report = run && REPORTS.find((r) => r.saved_report_id === run.saved_report_id);
+  return run && report?.report_key === key ? ok(runOf(run)) : notFound();
 }
 
 /**
@@ -1794,7 +1826,7 @@ function scheduleFrom(save: HomeReportScheduleSave, was: MockSchedule | null, re
 }
 
 /** A report the reader may see, by id: archived ones too, since a link may name one. */
-const readableReport = (user: string, id: string) => REPORTS.find((r) => r.saved_report_id === id && r.report_key !== "overview" && mayReadReport(user, r));
+const readableReport = (user: string, id: string) => REPORTS.find((r) => r.saved_report_id === id && !personal(r) && mayReadReport(user, r));
 const archivedRefusal = () => fail(409, "REPORT_ARCHIVED", "This report is archived");
 const notYours = () => fail(403, "PERMISSION_DENIED", "Only its owner or the CEO can change it");
 
@@ -1848,7 +1880,7 @@ function roleCardsOf(roleId: string, code: string): HomeRoleKpis {
     locked_ids: row ? keepEligible(row.locked_ids, eligible).filter((id) => defaults.includes(id)) : [],
     configured: !!row,
     view_default_ids: keepEligible(VIEW_DEFAULTS[me(ROLE_HOLDER[code]).home_view] ?? [], eligible).slice(0, MAX_CARDS),
-    cards: CARDS.filter((card) => pickable(card.key, eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit })),
+    cards: CARDS.filter((card) => pickable(card.key, eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit, module: card.module })),
   };
 }
 

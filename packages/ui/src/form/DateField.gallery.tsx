@@ -40,6 +40,16 @@ export default {
       </Field>
     ),
     Period: () => <Range />,
+    "Period, To Missing": () => (
+      <Field label="Report Period" state="bad" message="Required">
+        <DateRangeField value={{ from: "2026-10-01", to: "" }} onChange={() => undefined} />
+      </Field>
+    ),
+    "Period, Too Long": () => (
+      <Field label="Report Period" state="bad" message="At most 31 days">
+        <DateRangeField value={{ from: "2026-01-01", to: "2026-03-01" }} onChange={() => undefined} />
+      </Field>
+    ),
     Time: () => <Time />,
   },
 } satisfies GalleryEntry;

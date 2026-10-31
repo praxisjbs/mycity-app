@@ -734,6 +734,21 @@ Every outcome records reason, evidence, decision-maker, date.
 **Employee response and review.** The employee responds in ESS; the manager reviews; the full
 history is on the employee 360 and is append-only.
 
+**Ratified 27/10/2026 (GE, with AJ and TB, from MyCity's sample letters and handbook).** Three
+changes to the above, recorded in `docs/guides/queries.md` §6.3, §6.5 and §13:
+
+- **The ladder** is Caution → Warning → Second Warning → Suspension Without Pay → Dismissal or
+  Termination. A disciplinary suspension is always without pay (handbook §4.6.2, §4.7.4); a
+  suspension on full pay is a precaution during an investigation, not a rung, so the ladder has one
+  suspension. Second Warning is the definition of done's own rung. The ladder stays data, entered on
+  Chain Settings at go-live.
+- **Who decides:** Operations & People for every rung, who sign its letters as they approve; then
+  the CEO for a rung that suspends without pay or ends employment (handbook §4.7.4).
+- **Late punches, absences and missing clock-outs** are counted by the Attendance policy's own rules,
+  which raise the query through the same `queries` path; Rules keeps the other triggers. So the
+  definition of done's "three late arrivals in thirty days" is an Attendance policy rule, set on
+  screen, and the response window is 24 hours (handbook §4.7.1).
+
 Reuse: `attendance.query.js` (124) for the one real auto-query that exists; `hr_ops.service.js`'s
 waive/uphold loop as the pattern for financial consequence; `document_vault` and the PDF service for
 letters; the M0 workflow engine for the chain.
@@ -1323,6 +1338,28 @@ Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.j
 `src/shared/search/screens.js` and `docs/PROGRESS.md` (row #101). Its engineering shape is in
 `docs/guides/workspace.md`.
 
+**Ratified 25/10/2026 (JBS Praxis).** One screen joins the inventory, taking the admin surface to 95
+and the inventory to 101: **Knowledge Hub · User Guide** (`user-guide`), a sixth tab in the
+Knowledge Hub, brought forward from M11 to M0. M11's manual ("written per module against the
+screens as shipped, with screenshots from the shipped build") becomes a tab of the hub instead of a
+document beside it: a Quick Start of illustrated cards by role and the Full Guide, each step linked
+to its screen with a way back to the same step, pictures taken on desktop and phone with numbered
+marks, and each reader sent only the parts for what they may open, down to the step. It is written
+milestone by milestone as each is approved, and a gate holds it to the screens. It reuses the
+`knowledge` permission key. Applied to the table below, `scripts/check/progress.js`,
+`src/shared/route-map.js`, `src/shared/search/screens.js` and `docs/PROGRESS.md` (row #102). Its
+engineering shape is in `docs/guides/user-guide.md`.
+
+**Ratified 27/10/2026 (JBS Praxis).** One screen joins the inventory, taking the admin surface to 96
+and the inventory to 102: **People · Departments** (`departments`), a seventh tab in People, after
+Organogram, M2. MyCity's departments are kept there and nowhere in code: add one, rename it, set its
+head (a person, or an open role the person above acts for), move people in, merge, retire, restore,
+and delete one nothing names. Each department in use is a function on Performance, and its head sets
+its goals: the head holds Head of Department while they head, and the reporting lines follow the
+head (JBS Praxis's four answers of 27/10/2026). It reuses the `people` permission key. Applied to the
+table below, `scripts/check/progress.js`, `src/shared/route-map.js`, `src/shared/search/screens.js`
+and `docs/PROGRESS.md` (row #103). Its engineering shape is in `docs/guides/organogram.md` §6.1.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1335,14 +1372,14 @@ staff never navigates to it to do their job.
 | (ungrouped) | **Employee Self-Service** | 12 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · Org Chart · My Security | M1 |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |
-| People | **People** | 6 | Employees · Organogram · Attendance · Leave · Devices · Worksites | M1 |
+| People | **People** | 7 | Employees · Organogram · Departments · Attendance · Leave · Devices · Worksites | M1, M2 (Departments) |
 | People | **Performance** | 5 | Goals · Scorecards · KPIs · Reviews · Analytics | M2 |
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
 | People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |
 | People | **Payroll** | 5 | Payroll Runs · Payslips · Salary Structure · Deductions · Statutory | M6 |
 | Business | **Partnerships** | 6 | Pipeline · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 |
 | Business | **Expenses** | 6 | My Requests · Approvals · Requisitions · Disbursements · Budgets · Categories | M8 |
-| System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · Announcements | M1 (Policies), M10 |
+| System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · User Guide | M1 (Policies), M10, M0 (User Guide) |
 | System | **Praxis AI** | 2 | Ask · History | M10 |
 | System | **Settings** | 13 | Organisation · Status · Performance · Faults · Users · Roles & Permissions · Approvals · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |
 
@@ -1352,7 +1389,7 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | Public | **Public site** | 6 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document | M4, M5 |
 
-Three of the above span a milestone boundary. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026) and SOPs, FAQs, Training and Announcements in M10. **Recruitment** gets Vacancies through Interviews in M4 and
+Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews in M4 and
 Offers, Onboarding and Talent Pool in M5. The **public site** gets Careers, Vacancy, Apply and
 Assessment in M4, and Sign Offer and Verify Document in M5. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to

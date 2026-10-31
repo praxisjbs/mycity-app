@@ -95,7 +95,7 @@ export function MyAttendancePage() {
         title="Today"
         right={
           <Pill tone={t.state === "clocked_in" ? (t.review ? "warn" : "ok") : t.state === "unavailable" ? "info" : "neutral"}>
-            {t.state === "clocked_in" ? (t.review ? "Review Required" : "Clocked In") : t.state === "clocked_out" ? "Clocked Out" : t.state === "unavailable" ? "On Leave" : "Not Clocked In"}
+            {t.state === "clocked_in" ? (t.review ? "Review Required" : "Clocked In") : t.state === "clocked_out" ? "Clocked Out" : t.state === "unavailable" ? (t.unavailable_reason === "leave" ? "On Leave" : "Not Available") : "Not Clocked In"}
           </Pill>
         }
       />
@@ -191,8 +191,8 @@ export function MyAttendancePage() {
   );
 }
 
-/** A day's columns, as My Days and a figure's days show them. */
-const DAY_COLUMNS: Array<{ key: string; label: string; sortable?: boolean; align?: "n"; desktop?: boolean; render: (d: AttendanceDay) => ReactNode }> = [
+/** A day's columns, as My Days, a figure's days and People · Attendance's All Days show them. */
+export const DAY_COLUMNS: Array<{ key: string; label: string; sortable?: boolean; align?: "n"; desktop?: boolean; render: (d: AttendanceDay) => ReactNode }> = [
   { key: "attendance_date", label: "Date", sortable: true, render: (d) => formatDate(d.attendance_date) },
   { key: "i", label: "Clock In", render: (d) => (d.first_clock_in_at ? formatTime(d.first_clock_in_at) : null) },
   { key: "o", label: "Clock Out", render: (d) => clockOutOf(d.last_clock_out_at, d.clock_out_automatic) },
@@ -245,16 +245,18 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
             key: "r",
             label: "Result",
             render: (e: AttendanceEvent) =>
-              e.excluded ? <Pill tone="err">Not Counted</Pill> : e.source === "system" ? <Pill tone="info">System Clock-Out</Pill> : <Pill tone={PUNCH_STATE[e.validation_state].tone}>{PUNCH_STATE[e.validation_state].text}</Pill>,
+              e.excluded ? <Pill tone="err">Rejected</Pill> : e.source === "system" ? <Pill tone="info">System Clock-Out</Pill> : <Pill tone={PUNCH_STATE[e.validation_state].tone}>{PUNCH_STATE[e.validation_state].text}</Pill>,
           },
         ]}
       />
       <DayRoute className="mt-3" punches={events.rows} checkIns={checkIns.rows} />
-      {automatic && (
+      {automatic?.real_time_given ? (
+        <KeyValue className="mt-3" items={[["Real Time Given", automatic.real_time_given]]} />
+      ) : automatic ? (
         <FormFooter>
           <Button className="phone:w-full" icon="clock" onClick={() => giveTime(automatic)}>Give Real Time</Button>
         </FormFooter>
-      )}
+      ) : null}
     </>
   );
 }
@@ -371,7 +373,9 @@ export function MyDevicesPage() {
   const remove = useMutation("POST /api/v1/devices/mine/:id/remove");
   const d = today.data?.device;
   const thisRegistered = d?.state === "registered";
-  const full = !!d && !thisRegistered && !d.can_register;
+  // A session the hub has not tied to a device cannot register it, whatever the count: signing in again ties it.
+  const unknown = d?.state === "none";
+  const full = !!d && !unknown && !thisRegistered && !d.can_register;
   const register = () => modal.open({ title: "Register This Device", body: (close) => <RegisterForm close={close} /> });
   useScreenAction(d && !thisRegistered && d.can_register ? { label: "Register This Device", onSelect: register } : null);
 
@@ -383,7 +387,7 @@ export function MyDevicesPage() {
       invalidate("/api/v1/attendance/me/today");
       toast("Device removed");
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Device not removed");
+      toast.error(e instanceof ApiError ? e.message : "Device not removed");
     }
   };
   const open = (row: MyDevice) =>
@@ -427,6 +431,7 @@ export function MyDevicesPage() {
         actions={d && !thisRegistered && d.can_register ? <Button variant="primary" icon="plus" onClick={register}>Register This Device</Button> : undefined}
       />
       {full && <Banner tone="info" icon="info">You have three registered devices. Remove one to add this one.</Banner>}
+      {unknown && <Banner tone="info" icon="info">Sign in again on this device to register it.</Banner>}
       <DataView
         title="Devices"
         list={list}

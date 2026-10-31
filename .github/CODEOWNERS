@@ -137,6 +137,8 @@
 /src/modules/interviews/                           @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/interviews.js           @tomblakeasaah196 @swizfcodes
 /src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
+/src/modules/user_guide/                           @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/user_guide.js           @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/knowledge.js            @tomblakeasaah196 @swizfcodes
 /src/modules/policies/                             @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/policies.js             @tomblakeasaah196 @swizfcodes
@@ -218,6 +220,7 @@
 /docs/guides/organogram.md                         @swizfcodes @tomblakeasaah196
 /docs/guides/home.md                               @swizfcodes @tomblakeasaah196
 /docs/guides/identity.md                           @swizfcodes @tomblakeasaah196
+/docs/guides/user-guide.md                         @tomblakeasaah196 @swizfcodes
 /docs/guides/foundation.md                         @swizfcodes @tomblakeasaah196
 /docs/guides/notifications.md                      @swizfcodes @tomblakeasaah196
 /docs/guides/workspace.md                          @Ghosted34 @tomblakeasaah196 @swizfcodes
@@ -228,3 +231,4 @@
 /docs/guides/policies.md                           @tomblakeasaah196 @LovedataX @swizfcodes
 /docs/guides/praxis-ai.md                          @tomblakeasaah196 @swizfcodes
 /docs/guides/ai-control.md                         @tomblakeasaah196 @swizfcodes
+/docs/guides/queries.md                            @swizfcodes @tomblakeasaah196

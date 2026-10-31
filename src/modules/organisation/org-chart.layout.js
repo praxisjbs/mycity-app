@@ -15,7 +15,7 @@
  * PDF page stops at 200 inches.
  */
 
-/** A card, in mm: room for two lines of name, two of title, the chip, the since line and a tag. */
+/** A card, in mm: room for two lines of name, two of title, the chip and Head mark, the since line and a tag. */
 const CARD = Object.freeze({ width: 44, height: 38 });
 /** The width one card's place takes across, the gap to the next included. */
 const SLOT = 50;
@@ -97,6 +97,7 @@ function layout(nodes, { maxSide = MAX_SIDE } = {}) {
       dotted: n.dotted_line_to || null,
       vacant: Boolean(n.vacant),
       ceo: Boolean(n.is_ceo),
+      heads: (n.heads || []).map((h) => ({ mark: h.mark })),
     });
   const down = (x, y, h) => lines.push({ x: round(x), y: round(y), w: 0, h: round(h), across: false });
   const across = (x, y, w) => lines.push({ x: round(x), y: round(y), w: round(w), h: 0, across: true });

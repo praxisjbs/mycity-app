@@ -1,25 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatBytes,
-  formatCount,
-  formatDate,
-  formatDateTime,
-  formatMoney,
-  formatMoneyShort,
-  formatMonth,
-  formatNumber,
-  formatPhone,
-  formatPhoneLocal,
-  formatTime,
-  formatWhen,
-  initials,
-  isNegative,
-  monthName,
-  parseDayFirst,
-  plural,
-  todayIso,
-  zoneClock,
-} from "./format";
+import { addDaysIso, formatBytes, formatCount, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, formatNumber, formatPhone, formatPhoneLocal, formatTime, formatWhen, initials, isNegative, monthName, parseDayFirst, plural, todayIso, zoneClock } from "./format";
 
 describe("dates, day-first in Lagos time", () => {
   it("formats an ISO date and a timestamp day-first", () => {
@@ -41,6 +21,8 @@ describe("dates, day-first in Lagos time", () => {
     expect(formatMonth("2026-10")).toBe("October 2026");
     expect(monthName(0)).toBe("January");
     expect(todayIso(new Date("2026-10-13T23:30:00Z"))).toBe("2026-10-14");
+    expect(addDaysIso("2026-10-26", 90)).toBe("2027-01-24");
+    expect(addDaysIso("2026-03-01", -1)).toBe("2026-02-28");
   });
 
   it("reads the wall clock in another city, day first", () => {

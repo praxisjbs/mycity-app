@@ -12,7 +12,7 @@ import { ApiError } from "@/api/client";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
-import { EmployeePicker, TaskPeoplePicker } from "@/features/shared/pickers";
+import { TaskPeoplePicker } from "@/features/shared/pickers";
 import {
   ActionGroup,
   Button,
@@ -200,8 +200,9 @@ function RecoveryForm({ t, close }: { t: TaskDetail; close: () => void }) {
   };
   return (
     <>
+      {/* The people the reader may set work for, as a task's Assign To: no People grant needed. */}
       <Field label="Owner" {...f.status("primary_assignee_id")}>
-        <EmployeePicker
+        <TaskPeoplePicker
           value={who}
           onChange={(v) => {
             setWho(v);
@@ -270,7 +271,7 @@ export function SendCommitmentsForm({ close }: { close: () => void }) {
       />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={submit}>Send Commitments</Button>
+        {(list.page?.total ?? 0) > 0 && <Button variant="primary" onClick={submit}>Send Commitments</Button>}
       </FormFooter>
     </>
   );
