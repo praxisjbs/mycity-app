@@ -180,7 +180,7 @@ column to the migrated schema, and the schema gate holds every query to them.
 
 | Adapter | Owning module · milestone · owner | Reads |
 |---|---|---|
-| `tasks.source.js` | tasks · M2 · AJ | `task`: overdue tasks and what is due this week (a person's Open Tasks on Team stays empty until M2) |
+| `tasks.source.js` | tasks · M2 · AJ | `task`: overdue tasks and what is due this week; a person's Open Tasks on Team is `openCounts` (workspace.md §2) |
 | `goals.source.js` | goals and targets · M2 · TB | `organisational_goal`, `employee_target`, `scorecard`, `performance_period`, `okr_objective`, `okr_key_result`, `okr_key_result_month`, and the review tables a line's score reads (`performance_review`, `performance_review_item`, `performance_cycle`): Goals This Quarter with each goal's progress, My Goals with each line's score, the CEO's Org KPI, Goals On Track, My Scorecard and the Team roster's score, as Performance works them out (performance.md §6.21); it owes nothing |
 | `reviews.source.js` | reviews · M2 · AJ | `performance_review`, `performance_cycle`: Reviews Due (a monthly review not yet through its reviewer: `check_in`, `with_reviewer` or `returned`, its round closing within 30 days or past) and My Reviews Due (those with the reader to score now); nothing owed since Performance PR 3 |
 | `calendar.source.js` | calendar · M2 · AJ | `calendar_event`: Your Week |
@@ -243,7 +243,7 @@ All three routers mount at `/api/v1/home` (`basePath: "/home"`); a literal path 
 | `PUT /api/v1/home/roles/:role_id/kpis` | `HomeRoleKpisSave` → `HomeRoleKpis` | `settings` edit | n/a | Up to four defaults; locks among them. None takes the role back to its Home view's cards, as DELETE does |
 | `DELETE /api/v1/home/roles/:role_id/kpis` | no content | `settings` edit | n/a | Back to the Home view's defaults |
 | `GET /api/v1/home/team/summary` | → `HomeTeamSummary` | `home` view · its scope (all, team or own), `home.team` | n/a | `scope`, and today's four Team cards, each the number of records it opens (`GET /home/kpi/:key`) |
-| `GET /api/v1/home/team` | `HomeTeamQuery` → `HomeTeamPage` | as above | yes, 25 | Today's roster. Filters: department, status, no clock-out yesterday, `q` (name or job title); sort by name (the default), department, Clock-In. KPI is the person's score to date where the reader's `performance` view reaches them; Open Tasks is null until it is built |
+| `GET /api/v1/home/team` | `HomeTeamQuery` → `HomeTeamPage` | as above | yes, 25 | Today's roster. Filters: department, status, no clock-out yesterday, `q` (name or job title); sort by name (the default), department, Clock-In. KPI is the person's score to date where the reader's `performance` view reaches them; Open Tasks is the open tasks the person leads, where the reader's `workspace` view reaches them (null otherwise) |
 | `GET /api/v1/home/team/attendance` | `HomeTeamAttendanceQuery` → `HomeTeamAttendancePage` | as above | yes, 25 | Attendance This Month, one row a person. Filters: department, `q`; sort by name (the default) or days on time |
 | `GET /api/v1/home/alerts` | `HomeAlertQuery` → `HomeAlertPage` | `home` view, `alerts.clear` or `alerts.manage` · each rule's module scope over `subject_employee_id`, never the reader's own | yes, 25 | Filters: category, severity, state (open, cleared, dismissed: View Dismissed), mine, overdue, rule, `q` (title or trigger). Open newest first, a closed list most recently closed first; sort by raised or severity. Each row says `can_clear` and Who Can Clear (`who_can_clear`) |
 | `GET /api/v1/home/alerts/summary` | → `HomeAlertSummary` | as above | n/a | Open, Needs You, Overdue 7 Days +, Cleared This Week, the category chips, Alert Sources |
@@ -416,7 +416,8 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   clock-out yesterday, each counted once, so someone who is both is one flag and appears under both
   of its chips. KPI on a roster row is the person's score to date on this quarter's scorecard, as a
   percentage, where the reader's `performance` view reaches them (null otherwise, and until a review
-  of theirs closes); Open Tasks stays null until it is built.
+  of theirs closes); Open Tasks is the open tasks the person leads (not done or cancelled), where
+  the reader's `workspace` view reaches them, null otherwise.
 - **Attendance This Month** is one row a person on the register on any day from the 1st of this
   month (Lagos) to today, in the same scope, with My Attendance's own figures for those days
   (`attendance.repo.js` `daysSummary`): on time, late, absent and on leave, a day counting once the
@@ -828,6 +829,9 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 23/10/2026 · JP · Team's Open Tasks is filled: each person's open tasks they lead, for a reader whose `workspace` view reaches them, null otherwise (`docs/guides/workspace.md` §2; §5, §6 here).
+
+- 22/10/2026 · TB · Need You: a Quarter Plan stage or a Target Change waiting on the reader now opens its sheet on Performance · Goals (the route map's `performance_plan` and `target_change`, performance.md §9); before, those rows opened nothing. The CEO's demonstration Need You shows the mock's target change.
 - 22/10/2026 · TB · Performance PR 5 (performance.md §6.21): Goals On Track and My Scorecard (My Targets relabelled, same card id) are live, so the CEO's and Staff's Overviews lead with them and their fifth default leaves the row; Goals This Quarter shows each goal's progress, My Goals each line's score, the Org KPI the company's and each department's score, and the Team roster's KPI each person's score to date where the reader's `performance` view reaches them. `goals.source.js` reads the quarter's objectives, key results and closed reviews and owes nothing; its owner is TB. §13's Goals On Track and KPI scores are settled. Home's tests follow the new defaults.
 - 22/10/2026 · TB · Performance PR 3: `reviews.source.js` reads the review's real stages (`docs/guides/performance.md` §6.12): Reviews Due counts a monthly review until its reviewer submits it, My Reviews Due those with the reader to score now; its `owes` is empty. The staging seed's own review cycle and reviews are gone from `seeds/staging/lib/forward-rows.js`: `46_performance_reviews.js` writes October's round through the reviews service.
 - 22/10/2026 · TB · Performance PR 2: `goals.source.js` pays three of its four owed items (the cascade, a target's statuses: My Goals lists a person's lines once their scorecard binds, and the indexes of migration 2100); progress stays owed to Performance PR 5. §11: `seeds/staging/45_performance_plan.js` loads MyCity's Q4 2026 plan before Home's seed and takes Home's forward rows out of `organisational_goal` and `employee_target` (lib/home-staging-rows.js steps 1 to 3); `lib/forward-rows.js` keeps the review cycle until Performance PR 3. Home's seed tests run the Performance seed after the Workspace seed.

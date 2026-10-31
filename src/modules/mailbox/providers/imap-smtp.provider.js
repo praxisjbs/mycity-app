@@ -17,12 +17,22 @@
  *  - Read state comes from the server's \Seen flag, or a first sync of Sent and Archive
  *    would leave thousands of messages unread.
  *  - `keepCidLinks` keeps inline images as cid: links rather than inlining them as data.
+ *  - Every IMAP connection listens for "error": imapflow raises a server that hangs up or goes
+ *    silent as an event as well as failing the command waiting on it, and an event nobody
+ *    hears is thrown, which ends the process (mailbox.md §6).
  */
 const crypto = require("node:crypto");
+const { logger } = require("../../../config/logger");
 
 const SENT_FALLBACKS = ["Sent", "INBOX.Sent", "Sent Items", "Sent Mail"];
 const PARSE = { keepCidLinks: true };
 const MAX_FETCH = 500;
+/**
+ * How long a short-lived connection waits on a server that has stopped answering. A command
+ * answers in well under a second and a fetch with data arriving never trips it; IDLE keeps
+ * the library's 5 minutes, since the server's own keepalive comes every 2 (mailbox.md §6).
+ */
+const SOCKET_TIMEOUT_MS = 2 * 60 * 1000;
 
 /** "Name <a@b>" → "a@b". */
 function bareAddress(value) {
@@ -81,22 +91,35 @@ class ImapSmtpProvider {
    * @param {{email: string, username: string, password: string, incoming_host: string,
    *          incoming_port: number, outgoing_host: string, outgoing_port: number, tls: boolean,
    *          from_name?: string}} conn
+   * @param {{socketTimeout?: number}} [opts]  ms a short-lived connection waits on a silent server
    */
-  constructor(conn) {
+  constructor(conn, { socketTimeout = SOCKET_TIMEOUT_MS } = {}) {
     this.conn = conn;
+    this.socketTimeout = socketTimeout;
   }
 
-  imap() {
+  /**
+   * An IMAP client, not yet connected. Without `socketTimeout` it keeps the library's own wait,
+   * which is what IDLE uses (loops/mail-idle.js).
+   * @param {{socketTimeout?: number}} [opts]
+   */
+  imap({ socketTimeout } = {}) {
     const { ImapFlow } = require("imapflow");
     const c = this.conn;
-    return new ImapFlow({
+    const client = new ImapFlow({
       host: c.incoming_host,
       port: c.incoming_port || 993,
       secure: c.tls !== false,
       auth: { user: c.username || c.email, pass: c.password },
       logger: false,
       tls: c.tls === false ? undefined : { servername: c.incoming_host },
+      ...(socketTimeout ? { socketTimeout } : {}),
     });
+    // The caller's await carries the failure; this only keeps the event from ending the process.
+    client.on("error", (err) =>
+      logger.warn({ err: err.message, code: err.code, host: c.incoming_host }, "mail server connection error"),
+    );
+    return client;
   }
 
   smtp() {
@@ -113,7 +136,7 @@ class ImapSmtpProvider {
   }
 
   async withImap(fn) {
-    const client = this.imap();
+    const client = this.imap({ socketTimeout: this.socketTimeout });
     await client.connect();
     try {
       return await fn(client);
@@ -252,9 +275,9 @@ class ImapSmtpProvider {
   }
 
   /**
-   * Send one message: SMTP, then a copy appended to Sent. The copy is best effort; the
-   * send has happened whatever it does.
-   * @returns {Promise<{messageId: string, raw: Buffer, sentPath: string|null}>}
+   * Send one message through SMTP. Once this returns the server has it: the caller marks it
+   * sent before anything else (mailbox.md §3 step 5), then calls copyToSent.
+   * @returns {Promise<{messageId: string, raw: Buffer}>}
    */
   async send(msg) {
     const c = this.conn;
@@ -298,18 +321,28 @@ class ImapSmtpProvider {
       to: [...msg.to, ...(msg.cc || []), ...(msg.bcc || [])].map(bareAddress),
     };
     await this.smtp().sendMail({ envelope, raw });
-    let sentPath = null;
+    return { messageId, raw };
+  }
+
+  /**
+   * A sent message's copy appended to the server's Sent folder. Best effort: the message has
+   * gone whatever this does, so it never throws.
+   * @param {Buffer} raw  the MIME send() returned
+   * @param {string|null} [path]  the folder; else the one the server marks \Sent
+   * @returns {Promise<string|null>} the folder it went to
+   */
+  async copyToSent(raw, path = null) {
     try {
-      sentPath = await this.withImap(async (imap) => {
-        const target = msg.sentPath || (await this.sentFolder(imap));
+      return await this.withImap(async (imap) => {
+        const target = path || (await this.sentFolder(imap));
         if (!target) return null;
         await imap.append(target, raw, ["\\Seen"]);
         return target;
       });
     } catch {
       /* the message is sent; a missing copy in Sent is filled by the next sync's own copy */
+      return null;
     }
-    return { messageId, raw, sentPath };
   }
 
   async sentFolder(imap) {

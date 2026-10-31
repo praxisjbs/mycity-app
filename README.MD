@@ -63,8 +63,10 @@ mycity-app/
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
 ├── seeds/staging/            demonstration data, staging only. Never production
-│                             (40_workspace.js: My Workspace's tasks and calendar through their
-│                             services; 45_performance_plan.js: MyCity's Q4 2026 plan, its quarter,
+│                             (40_workspace.js: My Workspace's tasks, shared, repeating and
+│                             reminded ones, the week's Support Needed lines and the calendar,
+│                             through their services, tested by tests/integration/
+│                             workspace-staging-seed.test.js; 45_performance_plan.js: MyCity's Q4 2026 plan, its quarter,
 │                             goals and the workbooks in performance/ through the import engine;
 │                             46_performance_reviews.js: October 2026's round with a review at
 │                             every stage, through the reviews service and the approval engine;
@@ -150,6 +152,10 @@ mycity-app/
 │   ├── handoff/              a build carried across sessions: its decisions, plan and log
 │   │                         (push-notifications)
 │   └── manual/               user manual, one file per module (M11, written as each ships)
+│       └── performance-guide/ the Performance training and test guide, A4 for trainers and MyCity:
+│                             template.html, img/ (screenshots on the staging seed), brand/ (logos,
+│                             fonts) and build.js (the standalone page in dist/; --check fits each
+│                             page to A4, at most 17, and prints the PDF)
 ├── .github/
 │   ├── workflows/            ci.yml (`npm run ci` as four parallel jobs, backend, frontend, screens and checks, and the `ci` check over them; none on a draft PR), release.yml, rollback.yml, uptime.yml
 │   │                         (the uptime probe every 10 minutes)
@@ -298,7 +304,7 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | Permission key | Backend modules |
 |---|---|
 | `home` | `dashboard`, `alerts`, `reports` |
-| `workspace` | `workspace`, `tasks`, `calendar` |
+| `workspace` | `workspace`, `tasks`, `projects`, `calendar` |
 | `ess` | `ess` (always `own` scope) |
 | `community` | `community`, `announcements` |
 | `mailbox` | `mailbox` |
@@ -419,13 +425,14 @@ for this device), tested in `app/src/features/attendance/location.test.ts`.
 
 | Module | Files beyond the template |
 |---|---|
-| `tasks` | `.audience` (reporting line scope), `.recurrence` |
-| `calendar` | |
+| `tasks` | `.audience` (reporting line scope), `.recurrence`, `.reasons` (Why Late's reasons, kept by holders of `workspace.late_reasons`; migration `2510_task_late_reasons.sql`, seed `2590_seed_workspace_reasons.sql`); the screens' board in `app/src/features/workspace/TaskBoard.tsx` (Tasks and a project's page) and Late Reasons in `LateReasons.tsx` |
+| `projects` | the template only (`.routes`, `.controller`, `.service`, `.repo`, `.events`, `.search`, `.ai`); migration `2500_workspace_projects.sql`; the screen in `app/src/features/workspace/Projects.tsx`, tested by `Projects.test.tsx` |
+| `calendar` | invitations by email from `.events` (`templates/email/calendar-invite.html`, `services/calendar/ics`); migration `2520_calendar_invitations.sql` |
 | `workspace` | `.today`, `.analytics` (aggregator), `.week` (My Week, Team This Week and Tidy With AI, Performance PR 4), `.events` (`week.summary_saved`); the screens' commitment and week parts in `app/src/features/workspace/` `Commitment.tsx` and `Week.tsx` |
-| `goals` | `.periods` (quarters and their rounds' deadlines in business days), `.authority` (who sets which goals: the CEO, `goals.company`, `goals.function` and the function's head), `.plans` (one plan per function per quarter), `.okrs` (objectives, key results, Report Month, Confirm Score and the workbook import's writes), `.cascade` (codes G1 and the roll-up), `.trace` (key result → company key result → organisational goal), `.approval` (the plan and target change completions: `performance.plan`, `performance.target_change`), `.workbook` (MyCity's OKR workbook as it is kept), `.import` (`okr_workbook`), `.analytics` (Performance Analytics, PR 5) |
+| `goals` | `.periods` (quarters and their rounds' deadlines in business days), `.authority` (who sets which goals: the CEO, `goals.company`, `goals.function` and the function's head), `.plans` (one plan per function per quarter), `.okrs` (objectives, key results, Report Month, Confirm Score and the workbook import's writes), `.cascade` (codes G1 and the roll-up), `.trace` (key result → company key result → organisational goal), `.approval` (the plan and target change completions: `performance.plan`, `performance.target_change`), `.workbook` (MyCity's OKR workbook as it is kept), `.import` (`okr_workbook`), `.analytics` (Performance Analytics, PR 5); set and changed on screen (quarters with their rules, goals, objectives and key results, Set Target) tested by `tests/integration/performance-goals-edit.test.js`; the Goals screen's parts in `app/src/features/performance/` `Quarter.tsx` (Set Up Quarter and Edit Quarter) and `KeyResultForm.tsx` (New and Edit Key Result, Set Target), tested by `Goals.test.tsx` |
 | `targets` | `.weights` (sections and the contribution check), `.progress` (automatic lines, PR 3), `.commitments` (commitments and their approval, PR 4), `.import` (`scorecards`); agreement and its reminder in `.service` |
 | `kpis` | `.import` (`okr_kpis`) |
-| `reviews` | `.cycle` (monthly rounds, `review-cycle-open`), `.sequence` (self first, A17, and the stages), `.pip` (improvement plans), `.pdf` (`templates/documents/review-summary.html`), `.dictation` (A18); migration `2300_performance_reviews.sql` (status CHECKs, the second level, corrective actions); tested by `tests/integration/performance-reviews.test.js`; on the in-browser mock in `app/src/api/mock/{data,modules}/reviews.ts` |
+| `reviews` | `.cycle` (monthly rounds, `review-cycle-open`), `.sequence` (self first, A17, and the stages), `.pip` (improvement plans), `.pdf` (`templates/documents/review-summary.html`), `.dictation` (A18); migration `2300_performance_reviews.sql` (status CHECKs, the second level, corrective actions) and `2310_performance_review_withdrawn.sql` (Score Without Check-In's reason, the Withdrawn status); tested by `tests/integration/performance-reviews.test.js`; on the in-browser mock in `app/src/api/mock/{data,modules}/reviews.ts` |
 | `ess` | `.performance` (My Performance and the check-in, PR 3) |
 
 The files each Performance pull request fills are listed in `docs/guides/performance.md` §12 (Files by

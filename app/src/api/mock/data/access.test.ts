@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CAPABILITIES, capabilitiesOf, ROLE_CAPABILITIES } from "./access";
 
 const GOALS = ["goals.company", "goals.confirm", "goals.function", "goals.organisation"];
-const EVERY = ["alerts.clear", "alerts.manage", "announcements.post", ...GOALS, "home.reports", "home.team", "mailbox.signature", "performance.manage", "policies.manage"];
+const EVERY = ["alerts.clear", "alerts.manage", "announcements.post", ...GOALS, "home.reports", "home.team", "mailbox.signature", "performance.manage", "policies.manage", "workspace.late_reasons"];
 
 describe("mock capabilities", () => {
   it("the catalogue is the seeded one, A to Z", () => {
@@ -11,8 +11,8 @@ describe("mock capabilities", () => {
 
   it("each role holds what the reference seeds give it", () => {
     expect(capabilitiesOf(["implementation"], false)).toEqual(EVERY);
-    expect(capabilitiesOf(["operations_people"], false)).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "goals.function", "home.reports", "home.team", "performance.manage", "policies.manage"]);
-    expect(capabilitiesOf(["management"], false)).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "goals.company", "goals.function", "home.reports", "home.team"]);
+    expect(capabilitiesOf(["operations_people"], false)).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "goals.function", "home.reports", "home.team", "performance.manage", "policies.manage", "workspace.late_reasons"]);
+    expect(capabilitiesOf(["management"], false)).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "goals.company", "goals.function", "home.reports", "home.team", "workspace.late_reasons"]);
     expect(capabilitiesOf(["head_of_department"], false)).toEqual(["alerts.clear", "goals.function", "home.reports", "home.team"]);
     expect(capabilitiesOf(["manager"], false)).toEqual(["alerts.clear", "home.reports", "home.team"]);
     expect(capabilitiesOf(["administrator"], false)).toEqual(["mailbox.signature"]);

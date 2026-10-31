@@ -89,6 +89,26 @@ function dueBetween(client, { employee_id: employeeId, from, to }, query) {
   );
 }
 
+/**
+ * How many open tasks each of these people leads: Open Tasks on Home's roster, for one page of
+ * it. Only the ids the caller may count are passed (dashboard.team.js).
+ * @param {{query: Function}} client
+ * @param {string[]} employeeIds  at most a page of 25
+ * @returns {Promise<Map<string, number>>}
+ */
+async function openCounts(client, employeeIds) {
+  if (!employeeIds.length) return new Map();
+  const { rows } = await client.query(
+    `SELECT t.primary_assignee_id AS employee_id, count(*)::int AS open
+       FROM task t
+      WHERE t.primary_assignee_id = ANY($1::uuid[]) AND t.archived_at IS NULL
+        AND t.status NOT IN ('done', 'cancelled')
+      GROUP BY t.primary_assignee_id`,
+    [employeeIds],
+  );
+  return new Map(rows.map((r) => [r.employee_id, r.open]));
+}
+
 module.exports = {
   module: "tasks",
   milestone: "M2",
@@ -98,4 +118,5 @@ module.exports = {
   overdueCount,
   overduePage,
   dueBetween,
+  openCounts,
 };

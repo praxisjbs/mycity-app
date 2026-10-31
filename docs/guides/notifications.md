@@ -332,6 +332,8 @@ row per reminder.
    payload }]`, called every tick; what it returns is added once (Probation Ending works this way).
 6. Test it with `reminders.tick({ now })` in an integration test: it finds, fires and returns what
    it did, with the clock you give it.
+7. **Show what is set** with `reminders.pendingFor(db, { key, entity })`: the record's pending
+   occurrences (a handful at most), for a screen that lists them (a task's Reminders, workspace.md §6).
 
 ## 8 · Permissions and visibility by role
 
@@ -456,7 +458,10 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · §7.1: `pendingFor` reads a record's pending occurrences of a reminder, so a screen can list them; My Workspace's task reminders are its first user (`task_reminder`).
+
 - 22/10/2026 · TB · Performance PR 3: `notifications.reminders.js` exports `PEOPLE_EVENTS`, so the reviews module subscribes to `employee.probation_ending` by its constant and opens a probation review (`docs/guides/performance.md` §6.16, §7). Its own reminders (`check_in_due`, `review_due`, `review_close_due`, `pip_review_due`, `kr_report_due`) are declared with `reminders.defineReminder` as §7.1 sets out.
+
 - 21/10/2026 · TB · With Pause Mail (`docs/guides/integrations.md` §6.15): while system mail is paused a notice due by email is pushed instead (`instead_of_email` on `notification-push`, past the person's push switch for the category) and never emailed later, and the day's digest is dropped. The daily digest goes only to people who have signed in at least once. A notice's email refused for good is done, not retried (§6, §7, §11).
 
 - 20/10/2026 · TB · A notice whose record's screen the reader cannot open falls back to the

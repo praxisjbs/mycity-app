@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, refreshSession, session } from "@/api/client";
 import { clearPhotos, useFileUrl } from "@/api/download";
-import { invalidate } from "@/api/hooks";
+import { clear as clearReads, invalidate } from "@/api/hooks";
 import { connectRealtime, disconnectRealtime } from "@/api/realtime";
 import type { Me, Session } from "@/api/types/identity";
 import type { SignInResult } from "@mycity/contract/contract.gen.ts";
@@ -167,6 +167,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signedOut = useCallback(() => {
     session.setToken(null);
+    // Nothing read for this person is kept for, or shown to, the next one on the device.
+    clearReads();
     clearPhotos();
     clock.current.sessionUntil = Number.POSITIVE_INFINITY;
     setMe(null);
@@ -185,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!(await refreshSession())) return;
     try {
       const user = await api.call("GET /api/v1/auth/me");
+      if (!cur.me) clearReads();
       lastActive.current = Date.now();
       setMe(user);
       setLockReason(null);
@@ -197,6 +200,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let live = true;
+    // A fresh start reads everything again: no answer kept from before belongs to this session.
+    clearReads();
     session.onRefreshed(applyClock);
     session.onEnded((code) => {
       if (current.current.status === "signed-in" && current.current.me) lock(reasonOf(code));
@@ -296,6 +301,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         window.location.assign(hrefFor("home"));
         return;
       }
+      if (before.me?.user_id !== s.user.user_id) clearReads();
       session.setToken(s.access_token);
       applyClock(s);
       lastActive.current = Date.now();

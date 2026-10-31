@@ -125,6 +125,20 @@ describe("createApi", () => {
     await waitFor(() => expect(seen.at(-1)!.query).toEqual({ status: "active", page: 1, q: "ada" }));
   });
 
+  it("usePaged keeps the page moved to before the first search pause, and a stray space", async () => {
+    const { transport, seen } = fake((req) => ({ status: 200, body: page(Number(req.query.page)) }));
+    const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });
+    const { result } = renderHook(() => core.usePaged("GET /api/v1/employees"));
+    act(() => result.current.setPage(2));
+    await waitFor(() => expect(result.current.page?.number).toBe(2));
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    expect(result.current.pageNumber).toBe(2);
+    act(() => result.current.setQ(" "));
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    expect(result.current.pageNumber).toBe(2);
+    expect(seen.at(-1)!.query).toEqual({ page: 2 });
+  });
+
   it("invalidate refetches every mounted read under a path", async () => {
     const { transport, seen } = fake(() => ({ status: 200, body: page(1) }));
     const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });
@@ -210,5 +224,63 @@ describe("createApi", () => {
     expect(result.current.page?.total).toBe(61);
     expect(result.current.rows).toHaveLength(1);
     expect(seen.at(-1)!.query.page).toBe(1);
+  });
+
+  it("clear forgets kept answers, and a read still on its way at clear never fills the next session", async () => {
+    let who = "ada";
+    const answers: Array<() => void> = [];
+    const transport = vi.fn(
+      (req: RawRequest) =>
+        new Promise<RawResponse>((resolve) => {
+          const body = { employee_id: `${who}-${req.path.split("/").at(-1)}` };
+          answers.push(() => resolve({ status: 200, body }));
+        }),
+    );
+    const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });
+    const first = renderHook(() => core.useApi("GET /api/v1/employees/:id", { params: { id: "e1" } }));
+    await waitFor(() => expect(answers).toHaveLength(1));
+    // Ada signs out while her read is on its way; Bola signs in.
+    act(() => core.clear());
+    who = "bola";
+    await act(async () => answers[0]!());
+    // Ada's answer is neither shown nor kept: the read asks again, as Bola.
+    await waitFor(() => expect(answers).toHaveLength(2));
+    expect(first.result.current.data).toBeUndefined();
+    await act(async () => answers[1]!());
+    expect(first.result.current.data?.employee_id).toBe("bola-e1");
+    first.unmount();
+
+    // A kept answer is gone after clear: the next screen asks the server rather than showing it.
+    act(() => core.clear());
+    const next = renderHook(() => core.useApi("GET /api/v1/employees/:id", { params: { id: "e1" } }));
+    expect(next.result.current.data).toBeUndefined();
+    expect(next.result.current.loading).toBe(true);
+    await waitFor(() => expect(answers).toHaveLength(3));
+  });
+
+  it("clear starts a phone list again from its first page", async () => {
+    let who = "ada";
+    const answers: Array<() => void> = [];
+    const transport = vi.fn(
+      (req: RawRequest) =>
+        new Promise<RawResponse>((resolve) => {
+          const n = Number(req.query.page);
+          const body = { data: [{ employee_id: `${who}-${n}` }], page: { number: n, size: 25, total: 60, pages: 3, has_next: n < 3 } };
+          answers.push(() => resolve({ status: 200, body }));
+        }),
+    );
+    const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });
+    const { result } = renderHook(() => core.useInfinite("GET /api/v1/employees"));
+    await waitFor(() => expect(answers).toHaveLength(1));
+    await act(async () => answers[0]!());
+    act(() => result.current.more());
+    await waitFor(() => expect(answers).toHaveLength(2));
+    act(() => core.clear());
+    who = "bola";
+    await act(async () => answers[1]!());
+    await waitFor(() => expect(answers).toHaveLength(3));
+    expect(result.current.rows).toEqual([]);
+    await act(async () => answers[2]!());
+    expect(result.current.rows).toEqual([{ employee_id: "bola-1" }]);
   });
 });

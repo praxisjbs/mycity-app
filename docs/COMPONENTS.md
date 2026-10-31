@@ -99,6 +99,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
+| Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
 | Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
@@ -3000,6 +3001,37 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 <MoneyField {...form.field("amount")} />
 ```
 
+### MoreFields
+
+The fields a form rarely needs, closed under one More row until the person opens it.
+
+| | |
+|---|---|
+| Use | Optional fields most people leave alone, where the feature guide names them for More (a key result's co-owner, baseline and start). Pass `invalid` so a marked field inside is never hidden. |
+| Avoid | A required field (it stays open); support text (use HelpTerm or Details); a second topic (use Wizard); more than one More in a form. |
+| Phone | A 44 px row that opens the fields in place, inside the form's sheet, never a sheet of its own. |
+| Accessibility | A button with aria-expanded that controls the fields. Closed fields stay mounted and keep their values; it opens itself while one is marked, so check() can reach it. |
+| Status | beta |
+| Exports | `MoreFields` |
+| Import | `import { MoreFields } from "@mycity/ui";` |
+| File | `packages/ui/src/form/MoreFields.tsx` |
+| Test | `packages/ui/src/form/MoreFields.test.tsx` |
+| Gallery | `packages/ui/src/form/MoreFields.gallery.tsx` (`npm run gallery`, `#/MoreFields`) |
+
+**MoreFields** props (`MoreFieldsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` |  | The fields behind the row (Field and its control, from the form system). |
+| `label` | `string` |  | The row's word, Title Case, at most 3 words. Default "More". |
+| `invalid` | `boolean` |  | A field inside is marked: it opens and stays open while one is. |
+| `defaultOpen` | `boolean` |  | Opens on arrival (an edit whose fields here hold values). Closed otherwise. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<MoreFields invalid={Boolean(f.status("baseline_text").message)}><Field label="Baseline" optional><TextField {...f.field("baseline_text")} /></Field></MoreFields>
+```
+
 ### OtpField
 
 A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all.
@@ -3686,8 +3718,8 @@ A month at a glance, Monday first, with what happens on each day.
 |---|---|
 | Use | Leave across a month, a shift pattern, interviews, a payroll calendar, anything a person reads by date. |
 | Avoid | A list of dated records (use DataView); a date to type into a form (use DateField); more than three events on one day without opening it. |
-| Phone | The same seven columns at a shorter height; a day's events are one tap each, and the page never scrolls sideways. |
-| Accessibility | A table of weeks with the weekdays as real headers, so a screen reader can say "Wednesday 14"; Sundays are marked in words, not only by their shade. |
+| Phone | The same seven columns at a shorter height; a day's events are one tap each, an empty day a 44 px tap that adds to it, and the page never scrolls sideways. |
+| Accessibility | A table of weeks with the weekdays as real headers, so a screen reader can say "Wednesday 14"; Sundays are marked in words, not only by their shade. An empty day that adds is a button named by what it adds and the day ("Add Task, Friday 23 October"). |
 | Status | stable |
 | Exports | `Calendar` |
 | Import | `import { Calendar } from "@mycity/ui";` |
@@ -3703,6 +3735,9 @@ A month at a glance, Monday first, with what happens on each day.
 | `month` | `number` | yes | The month, 0 for January, as `Date` counts them. |
 | `events` | `CalendarEvent[]` | yes | Everything happening that month; days outside it are ignored. |
 | `actions` | `ReactNode` |  | What sits at the right of the title row (the month's own controls); the time zone otherwise. |
+| `onAddDay` | `(date: string) => void` |  | An empty day becomes a button that hands its date (ISO) here: New Task for that day, say. |
+| `addLabel` | `string` |  | What an empty day adds, Verb Noun (Add Task): its name and its hover label. Default `Add`. |
+| `addFrom` | `string` |  | The first day that can be added to (ISO, usually today); days before it, and Sundays, stay plain. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -3807,7 +3842,7 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 | Use | A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions. |
 | Avoid | A list that is not staged (use DataView); dragging as the only way to move a card; more than six stages. |
 | Phone | No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. |
-| Accessibility | Each column is a named group; Move To is a real menu, so a card can be moved by keyboard and by screen reader, never only by dragging. |
+| Accessibility | Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26). |
 | Status | stable |
 | Exports | `Kanban`, `KanbanCardBody` |
 | Import | `import { Kanban, KanbanCardBody } from "@mycity/ui";` |
@@ -3821,7 +3856,10 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 |---|---|---|---|
 | `columns` | `KanbanColumn[]` | yes | The stages, left to right. |
 | `onOpen` | `(card: string, column: string) => void` |  | Opens a card's record. |
-| `onMove` | `(card: string, from: string, to: string) => void` |  | Moves a card to another stage. Without it the board is read only. On desktop a card can also be dragged; Move To exists either way, because a keyboard and a phone cannot drag (F19). |
+| `onMove` | `(card: string, from: string, to: string, before: string \| null) => unknown` |  | Moves a card to another stage, or within its own. `before` is the card it now sits above (null: the foot of the stage). Without it the board is read only. On desktop a card can also be dragged onto a stage or onto a card; Move To (with Move Up and Move Down) exists either way, because a keyboard and a phone cannot drag (F19). Hand back the work (a promise) and the card is held until it settles: its Move To spins and does not open, and it is neither dragged nor dropped again, so a quick second press never moves it twice (F26). |
+| `reorder` | `boolean` |  | The stages keep an order the person sets: Move Up and Move Down in the menu, and a drop onto a card places it above that card. Without it a card only moves between stages. |
+| `empty` | `ReactNode` |  | What shows in place of the board when no stage holds a card (an EmptyState). |
+| `loading` | `boolean` |  | The stages' cards are still on their way: an empty stage shows a placeholder rather than saying it is empty, and `empty` waits, so a board that is loading never reads as one with nothing on it. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 **KanbanCardBody** props (`KanbanCardBodyProps`)
@@ -3831,7 +3869,7 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 | `card` | `KanbanCard` | yes | The card. |
 
 ```tsx
-<Kanban columns={stages} onMove={(card, from, to) => move(card, to)} onOpen={openRecord} />
+<Kanban columns={stages} onMove={(card, from, to) => move(card, to)} onOpen={openRecord} empty={<EmptyState title="No Tasks Yet" />} />
 ```
 
 ### Pager
@@ -5269,6 +5307,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `formatMoneyShort` | `lib/format.ts` | Short form for KPI tiles only: "₦1.3M", "₦850K". |
 | `isNegative` | `lib/format.ts` | Is this amount below zero? (string check; no float) |
 | `formatCount` | `lib/format.ts` | Whole-number count with thousands separators. |
+| `formatNumber` | `lib/format.ts` | A target, actual, baseline or KPI figure as people write it: thousands grouped, trailing zeros dropped, a per cent sign against it ("40%"), a currency sign before it ("₦30,000,000") and any other unit after it ("64,000 users"). |
 | `initials` | `lib/format.ts` | Initials for an avatar: "Cynthia Osakunih" → "CO". |
 | `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB", "23.4 GB", "1.25 TB" from a byte count. |
 | `plural` | `lib/format.ts` | Plural with count: plural(3, "employee") → "3 employees". |

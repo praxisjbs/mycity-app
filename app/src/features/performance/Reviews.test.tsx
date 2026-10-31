@@ -144,6 +144,23 @@ describe("Performance · Reviews", () => {
     const rows = (await api.call("GET /api/v1/performance/reviews", { query: { q: "Cynthia" } })) as { data: Array<{ performance_review_id: string }> };
     await expect(api.call("GET /api/v1/performance/reviews/:id", { params: { id: rows.data[0].performance_review_id } })).rejects.toMatchObject({ code: "CHECK_IN_FIRST" });
   }, 30000);
+
+  it("opens on the newest round, which the API lists first", async () => {
+    const real = vi.mocked(dispatch).getMockImplementation()!;
+    vi.mocked(dispatch).mockImplementation(async (req) => {
+      const res = await real(req);
+      if (req.method !== "GET" || !req.path.endsWith("/performance/rounds")) return res;
+      const body = res.body as { data: Array<Record<string, unknown>> };
+      const november = { ...body.data[0], performance_cycle_id: "00000000-0000-4000-8000-0000000000b1", name: "November 2026", month: "2026-11-01", close_due_on: "2026-12-11" };
+      return { ...res, body: { ...body, data: [november, ...body.data] } };
+    });
+    try {
+      await openAs("cynthia@mycityapp.io", "/performance?tab=reviews");
+      expect(screen.getByText(/^November 2026 · closes/)).toBeTruthy();
+    } finally {
+      vi.mocked(dispatch).mockImplementation(real);
+    }
+  }, 30000);
 });
 
 describe("ESS · My Performance", () => {

@@ -190,10 +190,12 @@ async function loadCalendar(client, { now = Date.now() } = {}) {
     "SELECT holiday_date, name FROM public_holiday ORDER BY holiday_date",
   );
   const hours = {};
+  // A day off stores no hours: null, never the text "null".
+  const hm = (t) => (t === null || t === undefined ? null : String(t).slice(0, 5));
   for (const r of week)
     hours[r.weekday] = {
-      starts_at: String(r.starts_at).slice(0, 5),
-      ends_at: String(r.ends_at).slice(0, 5),
+      starts_at: hm(r.starts_at),
+      ends_at: hm(r.ends_at),
     };
   const days = week.length
     ? week.filter((r) => r.is_working_day).map((r) => r.weekday)

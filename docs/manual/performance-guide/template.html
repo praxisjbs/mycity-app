@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance Management Guide · MyCity App ERP · JBS Praxis</title>
+<meta name="description" content="A practical training and test guide to the Performance Management System of the MyCity App ERP, by JBS Praxis.">
+<style>
+{{FONTS}}
+:root{
+  --navy:#0A1128; --navy-2:#121B3D; --navy-3:#1B2550;
+  --teal:#00E5FF; --teal-d:#00B8D4; --teal-ink:#00707C; --teal-soft:#E6FBFF;
+  --ink:#141A2E; --body:#2D3142; --muted:#5B6474; --faint:#8A93A3;
+  --line:#E2E6EC; --line-2:#D3D9E2; --soft:#F4F6F9; --row:#F8FAFB;
+  --ok:#0B7A54; --ok-bg:#E5F5EE; --plan:#1F4FB8; --plan-bg:#E8EFFD; --warn:#8A5A00; --warn-bg:#FFF3D6; --bad:#B42318; --bad-bg:#FDECEA;
+  --mc-deep:#01221D; --mc-green:#014339; --mc-yellow:#FFDF55;
+  --ff-h:'Montserrat',Helvetica,Arial,sans-serif;
+  --ff-b:'Inter',Helvetica,Arial,sans-serif;
+  --ff-m:'Fira Code',ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{margin:0;background:#E7EBF0;padding:78px 0 64px;display:flex;flex-direction:column;align-items:center;
+  font-family:var(--ff-b);font-size:9pt;line-height:1.48;color:var(--body);
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+b,strong{color:var(--ink);font-weight:600;}
+p{margin:0 0 2mm;}
+ol,ul{margin:0;padding-left:4.6mm;}
+li{margin-bottom:1mm;}
+
+/* toolbar (screen only) */
+.bar{position:fixed;top:0;left:0;right:0;z-index:50;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;
+  padding:10px 20px;box-shadow:0 4px 18px rgba(10,17,40,.35);}
+.bar .brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+.bar .brand i{width:22px;height:28px;background:var(--logo-grey) center/contain no-repeat;flex-shrink:0;}
+.bar .brand span{font-family:var(--ff-m);font-size:7.6pt;color:rgba(255,255,255,.6);letter-spacing:.6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar a,.bar button{font-family:var(--ff-h);font-weight:700;font-size:8pt;letter-spacing:.8px;text-transform:uppercase;border-radius:4px;padding:9px 14px;
+  cursor:pointer;border:1.5px solid rgba(0,229,255,.55);background:transparent;color:#fff;text-decoration:none;white-space:nowrap;}
+.bar button.primary{background:var(--teal);color:var(--navy);border-color:var(--teal);}
+.bar a:hover,.bar button:hover{background:rgba(0,229,255,.14);}
+.bar button.primary:hover{background:#5DF0FF;}
+
+/* A4 page model */
+.page{width:210mm;height:297mm;background:#fff;box-shadow:0 20px 40px rgba(10,17,40,.10);position:relative;display:flex;flex-direction:column;
+  margin-bottom:36px;overflow:hidden;}
+.pc{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+.inner{padding:5mm 15mm 0;flex:1;display:flex;flex-direction:column;min-height:0;}
+.pf{flex-shrink:0;margin:0 15mm;padding:3mm 0 7mm;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:6mm;
+  font-family:var(--ff-m);font-size:6.3pt;letter-spacing:.9px;text-transform:uppercase;color:var(--faint);}
+.page.dark{background:var(--navy);color:rgba(255,255,255,.8);}
+.page.dark .pf{border-top-color:rgba(255,255,255,.12);color:rgba(255,255,255,.4);}
+
+/* type */
+.lbl{font-family:var(--ff-m);font-size:6.4pt;letter-spacing:1.1px;text-transform:uppercase;color:var(--teal-ink);font-weight:500;}
+.dark .lbl{color:var(--teal);}
+.kick{font-family:var(--ff-m);font-size:8.2pt;letter-spacing:1.1px;color:var(--teal);border-left:2px solid var(--teal);padding-left:10px;}
+.h1{font-family:var(--ff-h);font-weight:800;color:#fff;margin:0;line-height:1.06;letter-spacing:-.2px;}
+.h1 em{font-style:normal;color:var(--teal);}
+h2.sec{font-family:var(--ff-h);font-weight:800;font-size:10.4pt;color:var(--ink);margin:3.4mm 0 1.8mm;letter-spacing:.1px;display:flex;align-items:baseline;gap:2.4mm;}
+h2.sec .n{font-family:var(--ff-m);font-size:7pt;color:var(--teal-ink);font-weight:500;}
+h3.sub{font-family:var(--ff-h);font-weight:800;font-size:8.6pt;color:var(--ink);margin:2.4mm 0 1.2mm;}
+.lead{font-size:9.4pt;color:var(--ink);line-height:1.5;margin-bottom:2.4mm;}
+.small{font-size:7.8pt;color:var(--muted);}
+.muted{color:var(--muted);}
+.ui{font-family:var(--ff-h);font-weight:700;font-size:.92em;color:var(--ink);background:var(--soft);border:1px solid var(--line-2);border-radius:1.2mm;padding:0 1.2mm;white-space:nowrap;}
+.path{font-family:var(--ff-m);font-size:.86em;color:var(--teal-ink);white-space:nowrap;}
+
+/* strip at the top of an inside page */
+.strip{background:var(--navy);color:rgba(255,255,255,.7);padding:4.2mm 15mm;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;position:relative;overflow:hidden;}
+.strip::after{content:"";position:absolute;right:-30mm;top:-26mm;width:70mm;height:70mm;border:1px solid rgba(0,229,255,.14);border-radius:50%;}
+.strip .t{font-family:var(--ff-h);font-weight:800;font-size:11pt;color:#fff;letter-spacing:.2px;}
+.strip .t .no{font-family:var(--ff-m);font-weight:500;font-size:8pt;color:var(--teal);margin-right:3mm;}
+.strip .t em{font-style:normal;color:var(--teal);}
+.strip .r{font-family:var(--ff-m);font-size:6.6pt;letter-spacing:1px;text-transform:uppercase;color:var(--teal);text-align:right;}
+
+/* layout */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:5mm;}
+.g2.wide-l{grid-template-columns:1.25fr 1fr;}
+.g2.wide-r{grid-template-columns:1fr 1.25fr;}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;}
+.stack > * + *{margin-top:3mm;}
+.grow{flex:1;}
+
+/* screenshots */
+figure.shot{margin:0;border:1px solid var(--line-2);border-radius:2mm;overflow:hidden;background:#fff;box-shadow:0 6px 16px rgba(10,17,40,.07);}
+figure.shot img{display:block;width:100%;height:auto;}
+figure.shot figcaption{font-size:7pt;color:var(--muted);padding:1.6mm 2.6mm;border-top:1px solid var(--line);background:var(--row);line-height:1.35;}
+figure.shot figcaption b{font-family:var(--ff-m);font-size:6.4pt;letter-spacing:.8px;text-transform:uppercase;color:var(--teal-ink);font-weight:500;margin-right:1.6mm;}
+figure.shot.phone{border-radius:4mm;border:2px solid var(--ink);}
+figure.shot.cap-h img{max-height:var(--h);object-fit:cover;object-position:top;}
+table.t.screens{font-size:7.5pt;}
+table.t.screens td{padding:1.15mm 2.2mm;}
+table.t.tight.run td{padding:.85mm 2mm;}
+.g3.p5cols{grid-template-columns:1.3fr .62fr 1.12fr;}
+.g2.p11cols{grid-template-columns:1fr 46mm;}
+.qa{display:grid;grid-template-columns:1fr 1fr;gap:2.4mm 5mm;}
+.qa > div{font-size:8pt;line-height:1.42;border-left:2px solid var(--teal-d);padding-left:3mm;}
+.qa > div b{display:block;font-family:var(--ff-h);font-weight:800;font-size:8.2pt;color:var(--ink);margin-bottom:.4mm;}
+
+/* try it */
+.try{border:1px solid #B8EEF6;background:var(--teal-soft);border-radius:2mm;padding:2.6mm 3.4mm;font-size:8.2pt;}
+.try .hd{display:flex;align-items:center;gap:2mm;margin-bottom:1.4mm;}
+.try .tag{white-space:nowrap;flex-shrink:0;font-family:var(--ff-m);font-size:6.3pt;letter-spacing:1px;text-transform:uppercase;background:var(--navy);color:var(--teal);padding:.7mm 1.8mm;border-radius:1mm;}
+.try .role{font-family:var(--ff-h);font-weight:800;font-size:8.4pt;color:var(--ink);}
+.try ol{padding-left:4.4mm;}
+.try li{margin-bottom:.6mm;}
+.try .see{margin-top:1.4mm;padding-top:1.4mm;border-top:1px dashed #9ADDE8;}
+.try .see b{color:var(--teal-ink);}
+
+/* callouts */
+.note{background:var(--soft);border-left:3px solid var(--teal-d);padding:2.6mm 3.6mm;font-size:8.2pt;}
+.note h4{font-family:var(--ff-h);font-size:7.6pt;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--ink);margin:0 0 1mm;}
+.note.warn{background:var(--warn-bg);border-left-color:#E0A100;}
+.note.navy{background:var(--navy);color:rgba(255,255,255,.82);border-left-color:var(--teal);}
+.note.navy h4,.note.navy b{color:#fff;}
+
+/* tables */
+table.t{width:100%;border-collapse:collapse;font-size:7.8pt;line-height:1.36;}
+table.t th{background:var(--navy);color:#fff;font-family:var(--ff-h);font-weight:700;font-size:6.6pt;letter-spacing:.7px;text-transform:uppercase;text-align:left;padding:1.8mm 2.2mm;vertical-align:bottom;}
+table.t td{padding:1.55mm 2.2mm;border-bottom:1px solid var(--line);vertical-align:top;}
+table.t tbody tr:nth-child(even) td{background:var(--row);}
+table.t td.k{font-weight:600;color:var(--ink);white-space:nowrap;}
+table.t td.c{text-align:center;}
+table.t.tight td{padding:1.15mm 2mm;}
+table.t td .sub{display:block;font-size:7pt;color:var(--muted);margin-top:.3mm;}
+.box{display:inline-block;width:3.6mm;height:3.6mm;border:1.2px solid var(--line-2);border-radius:.8mm;vertical-align:middle;}
+
+/* pills */
+.pill{display:inline-block;font-family:var(--ff-m);font-size:6.2pt;font-weight:500;letter-spacing:.6px;text-transform:uppercase;padding:.5mm 1.6mm;border-radius:2mm;white-space:nowrap;vertical-align:1px;}
+.pill.ok{background:var(--ok-bg);color:var(--ok);}
+.pill.plan{background:var(--plan-bg);color:var(--plan);}
+.pill.warn{background:var(--warn-bg);color:var(--warn);}
+.pill.bad{background:var(--bad-bg);color:var(--bad);}
+.pill.grey{background:var(--soft);color:var(--muted);}
+
+/* steps */
+.steps{list-style:none;padding:0;margin:0;counter-reset:s;}
+.steps > li{counter-increment:s;position:relative;padding-left:7mm;margin-bottom:1.5mm;font-size:8.3pt;}
+.steps > li::before{content:counter(s);position:absolute;left:0;top:.1mm;width:4.6mm;height:4.6mm;border-radius:50%;background:var(--navy);color:var(--teal);
+  font-family:var(--ff-m);font-size:6.6pt;display:flex;align-items:center;justify-content:center;}
+.ticks{list-style:none;margin:0;padding:0;}
+.ticks li{position:relative;padding-left:4.6mm;margin-bottom:1.1mm;font-size:8.3pt;}
+.ticks li::before{content:"";position:absolute;left:0;top:1.35mm;width:2mm;height:2mm;background:var(--teal-d);}
+
+/* cover */
+.cover{padding:13mm 16mm 0;position:relative;flex:1;display:flex;flex-direction:column;}
+.cover .ring{position:absolute;border-radius:50%;pointer-events:none;}
+.cover .r1{width:150mm;height:150mm;right:-60mm;top:-40mm;border:1px solid rgba(0,229,255,.14);}
+.cover .r2{width:100mm;height:100mm;right:-28mm;top:-10mm;border:1px solid rgba(255,255,255,.06);}
+.cover-top{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;}
+.logo-grey{display:block;width:17mm;height:22mm;background:var(--logo-grey) left center/contain no-repeat;}
+.logo-full{display:block;width:13mm;height:17mm;background:var(--logo-full) left center/contain no-repeat;}
+.chip{display:inline-flex;align-items:center;gap:2.4mm;border:1px solid rgba(255,255,255,.18);border-radius:10mm;padding:1.6mm 3.6mm 1.6mm 1.8mm;
+  font-family:var(--ff-h);font-weight:700;font-size:8.6pt;color:#fff;}
+.chip svg{width:6.4mm;height:6.4mm;}
+.eyebrow{font-family:var(--ff-m);font-size:7.6pt;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.55);}
+.cover .h1{font-size:30pt;}
+.cover .sub{font-family:var(--ff-h);font-weight:700;font-size:11.5pt;color:rgba(255,255,255,.88);margin-top:3mm;max-width:150mm;line-height:1.35;}
+.cover .lede{font-size:9.6pt;color:rgba(255,255,255,.72);max-width:150mm;margin-top:5mm;line-height:1.6;}
+.cstats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid rgba(255,255,255,.14);border-bottom:1px solid rgba(255,255,255,.14);margin-top:8mm;}
+.cstats > div{padding:3.6mm 3.4mm;border-left:1px solid rgba(255,255,255,.12);}
+.cstats > div:first-child{border-left:0;padding-left:0;}
+.cstats .v{font-family:var(--ff-h);font-weight:800;font-size:15pt;color:#fff;margin:1.4mm 0 .6mm;line-height:1.05;}
+.cstats .v.teal{color:var(--teal);}
+.cstats .d{font-size:7.4pt;color:rgba(255,255,255,.6);line-height:1.4;}
+.cover-shot{margin-top:8mm;border-radius:2.4mm;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 18px 40px rgba(0,0,0,.35);}
+.cover-shot img{display:block;width:100%;max-height:90mm;object-fit:cover;object-position:top left;}
+.meta-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6mm;margin-top:auto;padding:6mm 0 4mm;font-size:8.2pt;color:rgba(255,255,255,.85);line-height:1.5;}
+.meta-grid .lbl{margin-bottom:1mm;}
+
+/* cascade */
+.cascade{display:grid;grid-template-columns:repeat(6,1fr);gap:0;margin:1mm 0 2mm;}
+.cascade > div{position:relative;background:var(--soft);border:1px solid var(--line-2);padding:2.4mm 2.2mm 2.2mm 3.4mm;margin-right:3.2mm;border-radius:1.6mm;font-size:7.3pt;line-height:1.35;}
+.cascade > div:not(:last-child)::after{content:"";position:absolute;right:-3.3mm;top:50%;transform:translateY(-50%);border-style:solid;border-width:2.2mm 0 2.2mm 2.6mm;
+  border-color:transparent transparent transparent var(--teal-d);}
+.cascade > div:last-child{margin-right:0;}
+.cascade .lv{font-family:var(--ff-m);font-size:6pt;color:var(--teal-ink);letter-spacing:.8px;text-transform:uppercase;}
+.cascade .nm{font-family:var(--ff-h);font-weight:800;font-size:8.2pt;color:var(--ink);margin:.8mm 0 1mm;line-height:1.2;}
+.cascade .who{color:var(--muted);}
+.cascade > div.dark{background:var(--navy);border-color:var(--navy);color:rgba(255,255,255,.75);}
+.cascade > div.dark .nm{color:#fff;}
+.cascade > div.dark .lv{color:var(--teal);}
+
+/* connections */
+.hub{display:grid;grid-template-columns:repeat(3,1fr);gap:2.6mm;}
+.hub > div{border:1px solid var(--line-2);border-radius:1.8mm;padding:2.2mm 2.8mm;font-size:7.6pt;line-height:1.38;background:#fff;}
+.hub > div b{display:block;font-family:var(--ff-h);font-weight:800;font-size:8.2pt;color:var(--ink);margin-bottom:.6mm;}
+.hub > div .lbl{display:block;margin-bottom:.4mm;}
+.hub > div.core{background:var(--navy);border-color:var(--navy);color:rgba(255,255,255,.78);grid-row:span 2;display:flex;flex-direction:column;justify-content:center;}
+.hub > div.core b{color:#fff;font-size:11pt;}
+
+/* chain */
+.chain{display:flex;align-items:center;gap:1.6mm;flex-wrap:wrap;font-family:var(--ff-h);font-weight:700;font-size:7.6pt;margin:1.2mm 0 2mm;}
+.chain span{background:var(--soft);border:1px solid var(--line-2);border-radius:5mm;padding:.8mm 2.6mm;color:var(--ink);}
+.chain span.on{background:var(--mc-yellow);border-color:#E9C93F;}
+.chain i{font-style:normal;color:var(--faint);}
+
+/* phone and narrow screens: pages reflow so the guide reads on a phone */
+@media screen and (max-width:860px){
+  body{padding:66px 0 32px;}
+  .bar{padding:8px 12px;gap:8px;}
+  .bar .brand span{display:none;}
+  .bar a,.bar button{padding:8px 10px;font-size:7.4pt;}
+  .page{width:100%;height:auto;margin-bottom:16px;box-shadow:none;}
+  .pc{overflow:visible;}
+  .inner{padding:5mm 16px 0;}
+  .pf{margin:4mm 16px 0;}
+  .strip{padding:4mm 16px;}
+  .cover{padding:10mm 16px 0;}
+  .cover .h1{font-size:24pt;}
+  .g2,.g2.wide-l,.g2.wide-r,.g2.p11cols,.g3,.g3.p5cols,.g4,.hub,.meta-grid,.qa{grid-template-columns:1fr;}
+  figure.shot.phone{max-width:300px;}
+  .cstats{grid-template-columns:1fr 1fr;}
+  .cascade{grid-template-columns:1fr 1fr;row-gap:3mm;}
+  .cascade > div::after{display:none;}
+  .hub > div.core{grid-row:auto;}
+  table.t{font-size:7.6pt;}
+  .scroll-x{overflow-x:auto;}
+  figure.shot.cap-h img{max-height:none;}
+  table.t.screens,table.t.run,table.t.screens tbody,table.t.run tbody{display:block;}
+  table.t.screens thead,table.t.run thead{display:none;}
+  table.t.screens tr,table.t.run tr{display:block;border-bottom:1px solid var(--line);padding:1.8mm 0;}
+  table.t.screens td,table.t.tight.run td{display:block;border:0;padding:.3mm 0;background:none!important;white-space:normal;}
+  table.t.tight.run td:nth-child(1),table.t.tight.run td:nth-child(2){display:inline-block;margin-right:2mm;}
+  table.t.tight.run td:nth-child(4)::before{content:"You should see: ";color:var(--teal-ink);font-weight:600;}
+  table.t.tight.run td:nth-child(5){display:none;}
+}
+@page{size:A4;margin:0;}
+@media print{
+  body{background:#fff;padding:0;display:block;}
+  .bar{display:none!important;}
+  .page{margin:0;box-shadow:none;page-break-after:always;break-after:page;}
+  .page:last-child{page-break-after:auto;break-after:auto;}
+}
+:root{--logo-grey:url({{LOGO_GREY}});--logo-full:url({{LOGO_FULL}});}
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="brand"><i></i><span>JBS PRAXIS · PERFORMANCE MANAGEMENT · TRAINING AND TEST GUIDE</span></div>
+  <a href="#p4">Screens</a>
+  <a href="#p17">Test Run</a>
+  <button type="button" class="primary" onclick="window.print()">Print or Save PDF</button>
+</div>
+
+<!-- 1 · COVER -->
+<section class="page dark" id="p1">
+  <div class="pc">
+    <div class="cover">
+      <div class="ring r1"></div><div class="ring r2"></div>
+      <div class="cover-top">
+        <i class="logo-grey"></i>
+        <span class="chip"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="32" fill="#01221D"></rect><g transform="translate(8 7) scale(2)"><path d="M12 1.6c-4.2 0-7.6 3.4-7.6 7.6 0 5.7 7.6 13.2 7.6 13.2s7.6-7.5 7.6-13.2c0-4.2-3.4-7.6-7.6-7.6z" fill="#FFDF55"></path><circle cx="12" cy="7.6" r="2.3" fill="#01221D"></circle></g></svg> MyCity App ERP</span>
+      </div>
+      <div class="kick" style="margin-top:15mm">// TRAINING AND TEST GUIDE · MILESTONE 2</div>
+      <div class="eyebrow" style="margin-top:6mm">JBS Praxis engineering · for MyCity App Ltd</div>
+      <h1 class="h1" style="margin-top:3.5mm">Performance <em>Management</em></h1>
+      <div class="sub">From the CEO's goals to each person's week: goals, scorecards, commitments, check-ins and reviews, screen by screen.</div>
+      <p class="lede">Every screen the Performance Management System touches, in the order MyCity's year runs: what each screen is for, who uses it, what to press and what you should see. Written for the trainer to test the whole flow end to end, and for MyCity's team to keep beside them.</p>
+      <div class="cstats">
+        <div><div class="lbl">Screens it touches</div><div class="v teal">17</div><div class="d">Five Performance tabs, My Performance, Workspace, Home, Settings</div></div>
+        <div><div class="lbl">Roles</div><div class="v">6</div><div class="d">Employee to CEO, each with their own part</div></div>
+        <div><div class="lbl">Q4 2026 plan</div><div class="v">51 · 45</div><div class="d">Key results and KPIs, loaded from MyCity's own workbooks</div></div>
+        <div><div class="lbl">One rhythm</div><div class="v">Q · M · W</div><div class="d">Plan each quarter, score each month, work each week</div></div>
+      </div>
+      <div class="cover-shot"><img src="{{img:goals-hero}}" alt="Performance · Goals in the MyCity hub"></div>
+      <div class="meta-grid">
+        <div><div class="lbl">Prepared for</div>MyCity App Ltd: its trainers, managers and staff<br><span style="color:rgba(255,255,255,.55)">Training lead: Love Adeola</span></div>
+        <div><div class="lbl">Prepared by</div>JBS Praxis<br><span style="color:rgba(255,255,255,.55)">22 October 2026 · version 1.0</span></div>
+        <div><div class="lbl">Try it on</div>Staging<br><span style="color:rgba(255,255,255,.55)">hub.staging.mycityapp.io</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="pf"><span>Screens show the staging data: MyCity's real Q4 2026 plan and staff. Typed figures are examples.</span><span>01 / 17</span></div>
+</section>
+
+<!-- 2 · WORDS AND SHORT FORMS -->
+<section class="page" id="p2">
+  <div class="strip"><div class="t"><span class="no">00</span>The <em>words</em> in this guide</div><div class="r">Short forms · codes · terms</div></div>
+  <div class="pc"><div class="inner">
+    <p class="lead">Every short form, code and particular word this guide uses, in one place. The words on screen are in 1.3.</p>
+    <div class="g2">
+      <div>
+        <h2 class="sec" style="margin-top:0"><span class="n">0.1</span>Short forms</h2>
+        <table class="t tight">
+          <thead><tr><th style="width:17mm">Short</th><th>Means</th></tr></thead>
+          <tbody>
+            <tr><td class="k">OKR</td><td>Objectives and Key Results: each objective is a goal, and its key results are the measurable outcomes that show it was reached</td></tr>
+            <tr><td class="k">KR</td><td>Key Result, for example BM-KR1.3</td></tr>
+            <tr><td class="k">KPI</td><td>Key Performance Indicator: a function's routine measure, Met or Not Met each month</td></tr>
+            <tr><td class="k">TBC</td><td>To Be Confirmed: a provisional target, given its figure before the quarter's lock date</td></tr>
+            <tr><td class="k">PMS</td><td>Performance Management System: the Performance module as a whole</td></tr>
+            <tr><td class="k">PIP</td><td>Performance Improvement Plan: 30 days of agreed improvement after a Below rating</td></tr>
+            <tr><td class="k">HR</td><td>Human Resources; here, the Operations &amp; People team</td></tr>
+            <tr><td class="k">ESS</td><td>Employee Self-Service, where My Performance lives</td></tr>
+            <tr><td class="k">Q4 · Q1</td><td>Quarter 4 (October to December) and Quarter 1 (January to March)</td></tr>
+            <tr><td class="k">N/A</td><td>Not applicable: no eligible cases that month, so it never counts</td></tr>
+          </tbody>
+        </table>
+        <h2 class="sec"><span class="n">0.2</span>Codes in the OKR tree</h2>
+        <table class="t tight">
+          <thead><tr><th style="width:17mm">Code</th><th>Means</th></tr></thead>
+          <tbody>
+            <tr><td class="k">CO</td><td>The company's own objectives and key results (CO-O4, CO-KR4.3)</td></tr>
+            <tr><td class="k">GM · TBO · BM · PG · PC</td><td>The five functions: General Management, Technology &amp; Back-office Ops, Branding &amp; Marketing, Partnership &amp; Growth, People &amp; Culture. General Management has no function codes in Q4 2026</td></tr>
+            <tr><td class="k">O1 · KR1.3 · K01</td><td>Objective 1; key result 3 under objective 1; KPI 01. So BM-K01 is Branding &amp; Marketing's first KPI</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h2 class="sec" style="margin-top:0"><span class="n">0.3</span>Words with a particular meaning here</h2>
+        <table class="t tight">
+          <thead><tr><th style="width:30mm">Word</th><th>Means</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Function</td><td>One of the five departments as the plan sees them, each with its own objectives, KPIs and plan</td></tr>
+            <tr><td class="k">Quarter Plan</td><td>A function's objectives, key results and scorecards, approved as one; binding once the CEO approves</td></tr>
+            <tr><td class="k">Waiting On You</td><td>The requests waiting on your decision: on Goals, on Scorecards › Commitments and on Reviews</td></tr>
+            <tr><td class="k">Feeds · Rolls Up To</td><td>The company key result a function key result serves, and its chain up to a company objective</td></tr>
+            <tr><td class="k">Set Target</td><td>Gives a TBC target its figure before the lock date, with no approval</td></tr>
+            <tr><td class="k">Change Target</td><td>Asks the CEO to change a binding target; once approved, Was shows the old figure</td></tr>
+            <tr><td class="k">Proposed · Confirmed</td><td>The score worked out from the month's report, and the score the CEO confirms, which counts</td></tr>
+            <tr><td class="k">Good · Watch · Recovery</td><td>Score bands: 0.70 and above; 0.40 to 0.70; below 0.40, which needs a recovery owner and date</td></tr>
+            <tr><td class="k">Initiatives</td><td>A key result's tasks, for its owner, in My Workspace</td></tr>
+            <tr><td class="k">Sections</td><td>A scorecard's three parts: Results 60%, KPIs 25%, Accountability 15%</td></tr>
+            <tr><td class="k">Contribution · Rebalance</td><td>A key result shared among people: the shares must add up, or it reads Rebalance</td></tr>
+            <tr><td class="k">Round</td><td>One month's reviews, opened on the first business day after the month ends</td></tr>
+            <tr><td class="k">Second level</td><td>The reviewer's own line manager, who approves a review before HR closes it</td></tr>
+            <tr><td class="k">Dotted line</td><td>A second manager who gives input on a review, never an approval</td></tr>
+            <tr><td class="k">Not Assessable</td><td>A line with no evidence; it counts neither for nor against</td></tr>
+            <tr><td class="k">Rating</td><td>Exceeds, Meets, Partly Meets or Below, from the score (13.2)</td></tr>
+            <tr><td class="k">On Time · Late · Missed</td><td>A commitment done by its original date, done after it, or not done when the month ends</td></tr>
+            <tr><td class="k">Withdrawn</td><td>A leaver's open review, closed with a note when they leave</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 02 / 17</span></div>
+</section>
+
+<!-- 3 · WHAT IT IS -->
+<section class="page" id="p3">
+  <div class="strip"><div class="t"><span class="no">01</span>What it <em>is</em></div><div class="r">The cascade · the rhythm · the words</div></div>
+  <div class="pc"><div class="inner">
+    <p class="lead">MyCity already ran a complete performance system in two spreadsheets: company and function OKRs, operational KPIs, a scorecard for every person, fixed scoring rules and a commitment register. The Performance Management System makes that system <b>live, linked and quick</b> without changing how MyCity works. The two Q4 2026 workbooks went in as they are: their words, codes, sections, weights and rules are kept.</p>
+
+    <h2 class="sec"><span class="n">1.1</span>The cascade: every piece of work rolls up to a company goal</h2>
+    <div class="cascade">
+      <div class="dark"><div class="lv">Year</div><div class="nm">Organisational goals</div><div class="who">The CEO, once a year, for the calendar year: Q4 2026 shows 2026's goals</div></div>
+      <div><div class="lv">Quarter</div><div class="nm">Company OKRs</div><div class="who">CEO and Management: objectives and key results</div></div>
+      <div><div class="lv">Quarter</div><div class="nm">Function OKRs and KPIs</div><div class="who">Each function's head, linked to the company key results they feed</div></div>
+      <div><div class="lv">Quarter</div><div class="nm">Scorecards</div><div class="who">One per person: Results 60%, KPIs 25%, Accountability 15%</div></div>
+      <div><div class="lv">Month</div><div class="nm">Commitments</div><div class="who">Each person's priorities, approved by their reviewer (a head's by the CEO)</div></div>
+      <div><div class="lv">Week · day</div><div class="nm">Tasks</div><div class="who">Everyone, in My Workspace</div></div>
+    </div>
+    <p class="small">A scorecard line linked to a key result shows its path up to the company objective it serves (<span class="ui">Rolls Up To</span> on My Performance). KPI and Accountability lines are scored the same way, without a path.</p>
+
+    <h2 class="sec"><span class="n">1.2</span>The rhythm</h2>
+    <table class="t">
+      <thead><tr><th style="width:24mm">When</th><th>What happens</th><th style="width:40mm">Who</th><th style="width:34mm">By</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Before the quarter</td><td>Objectives, key results, KPIs and every scorecard are set; each function sends one plan; the CEO's approval makes it binding; each person and their reviewer agree the scorecard</td><td>Heads, managers, Operations &amp; People, CEO</td><td>Before the quarter starts</td></tr>
+        <tr><td class="k">Each month</td><td>Commitments for the month are sent and approved</td><td>Everyone · their reviewer (the CEO for a head)</td><td>3rd business day</td></tr>
+        <tr><td class="k"></td><td>The check-in: actual, evidence and action on each line</td><td>Everyone</td><td>2nd business day (heads 3rd)</td></tr>
+        <tr><td class="k"></td><td>Each function reports its key results and KPIs; the CEO confirms the scores</td><td>Function heads · CEO</td><td>3rd business day</td></tr>
+        <tr><td class="k"></td><td>The review: reviewer, then second level, then Operations &amp; People close it</td><td>Reviewer · their manager · HR</td><td>5th · 7th · 10th business day</td></tr>
+        <tr><td class="k">Each week</td><td>Tasks; My Week shows done, planned and blocked, with one line of Support Needed</td><td>Everyone</td><td>As the week runs</td></tr>
+        <tr><td class="k">Lock date</td><td>Provisional (TBC) targets lock</td><td>Automatic</td><td>7 November for Q4</td></tr>
+      </tbody>
+    </table>
+    <p class="small" style="margin-top:1.4mm">Business days are Monday to Friday, not public holidays.</p>
+
+    <h2 class="sec"><span class="n">1.3</span>The words used on screen</h2>
+    <table class="t tight">
+      <tbody>
+        <tr><td class="k">Objective</td><td>What a function or the company sets out to achieve this quarter (BM-O1)</td><td class="k">Line</td><td>One row of a scorecard, with its target, weight and source</td></tr>
+        <tr><td class="k">Key result</td><td>A measurable result under an objective (BM-KR1.3)</td><td class="k">Auto</td><td>A line the system scores itself; the reviewer may change it with a reason</td></tr>
+        <tr><td class="k">KPI</td><td>A function's operational measure, Met or Not Met each month (BM-K02)</td><td class="k">Commitment</td><td>A task promised for the month, with acceptance criteria and a fixed original date</td></tr>
+        <tr><td class="k">TBC</td><td>A provisional target: Set Target until the quarter's lock date</td><td class="k">Check-in</td><td>Each person's monthly report on their own lines</td></tr>
+        <tr><td class="k">Scored From</td><td>A company key result that takes its figures from one function key result</td><td class="k">Review</td><td>The reviewer's scores, approved by second level and closed by HR</td></tr>
+        <tr><td class="k">Binding</td><td>Approved by the CEO: targets change only through Change Target</td><td class="k">Score to date</td><td>The weighted score of the lines scored so far, from 0 to 1</td></tr>
+      </tbody>
+    </table>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 03 / 17</span></div>
+</section>
+
+<!-- 4 · SCREENS -->
+<section class="page" id="p4">
+  <div class="strip"><div class="t"><span class="no">02</span>Every <em>screen</em> it touches</div><div class="r">Where it is · who uses it · what for</div></div>
+  <div class="pc"><div class="inner">
+    <div class="scroll-x">
+    <table class="t screens">
+      <thead><tr><th style="width:36mm">Screen</th><th style="width:40mm">Where</th><th style="width:38mm">Who</th><th>What happens there</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Performance · Goals</td><td class="path">Performance › Goals</td><td>Everyone reads; heads, Management and the CEO set</td><td>The OKR tree and its edits, Manage Quarters, Plan Approval (Send Plan), Waiting On You, Report Month, Confirm Score, Set Target, Change Target</td></tr>
+        <tr><td class="k">Performance · Scorecards</td><td class="path">Performance › Scorecards</td><td>Managers, HR, CEO; staff see their own</td><td>Every scorecard, its sections and lines; New Scorecard; Send Scorecard; Agree Scorecard; Change Reviewer; a line's Change Target</td></tr>
+        <tr><td class="k">… Commitments view</td><td class="path">Scorecards › Commitments</td><td>Reviewers, heads, CEO</td><td>The month's commitments and their states; Approve Month; Export Report</td></tr>
+        <tr><td class="k">Performance · KPIs</td><td class="path">Performance › KPIs</td><td>Everyone reads; heads edit their own</td><td>Each function's KPIs with formula, target and source; Record Actual</td></tr>
+        <tr><td class="k">Performance · Reviews</td><td class="path">Performance › Reviews</td><td>Reviewers, second level, HR</td><td>The month's round; each review through its chain; Score Without Check-In; Withdraw Review; PIPs</td></tr>
+        <tr><td class="k">Performance · Analytics</td><td class="path">Performance › Analytics</td><td>Managers, Management, CEO</td><td>Scores by month, key results by status, ratings, on-time figures, people</td></tr>
+        <tr><td class="k">My Performance</td><td class="path">Self-Service › My Performance</td><td>Every employee</td><td>My score, scorecard, check-in, commitments and reviews; Agree Scorecard</td></tr>
+        <tr><td class="k">Workspace · Tasks</td><td class="path">My Workspace › Tasks</td><td>Everyone</td><td>Commitments are tasks; Counts Towards; Send Commitments; initiatives and corrective actions arrive as tasks</td></tr>
+        <tr><td class="k">Workspace · Today</td><td class="path">My Workspace › Today</td><td>Everyone; managers see their team</td><td>My Week: done, planned, blocked; Support Needed</td></tr>
+        <tr><td class="k">Workspace · Calendar</td><td class="path">My Workspace › Calendar</td><td>Everyone</td><td>Check-in due, reviews to write, key results finishing, PIP reviews</td></tr>
+        <tr><td class="k">Home · Overview</td><td class="path">Home</td><td>By role</td><td>Goals This Quarter, Org KPI, Goals On Track, My Scorecard, Reviews Due, Need You</td></tr>
+        <tr><td class="k">Home · Team</td><td class="path">Home › Team</td><td>Managers</td><td>Each person's score to date</td></tr>
+        <tr><td class="k">Settings · Imports</td><td class="path">Settings › Imports</td><td>Operations &amp; People</td><td>Load the OKR and scorecards workbooks: preview, commit, revert</td></tr>
+        <tr><td class="k">Settings · Approvals</td><td class="path">Settings › Approvals</td><td>Administrators</td><td>The four flows: Quarter Plan, Monthly Review, Monthly Commitments, Target Change</td></tr>
+        <tr><td class="k">People · Organogram</td><td class="path">People › Organogram</td><td>People administrators</td><td>Line managers and open seats, with each department's head set at set-up, decide who reviews and approves; dotted lines decide who gives input</td></tr>
+        <tr><td class="k">Notifications</td><td class="path">The bell, top right</td><td>Everyone</td><td>Plans waiting, scorecards to agree, check-ins due, reviews waiting, commitments approved</td></tr>
+        <tr><td class="k">Search</td><td class="path">Ctrl K · ⌘K</td><td>Everyone</td><td>Find key results, objectives, goals, KPIs, scorecards and reviews; New Scorecard, Report Month, Start Check-In, New Commitment, Set Up Quarter</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="g2 wide-l" style="margin-top:3.4mm">
+      <figure class="shot cap-h" style="--h:37mm"><img src="{{img:search}}" alt="Search for BM-KR1"><figcaption><b>Search</b>Ctrl K, then a code or a word: every key result, objective, KPI and scorecard is one search away.</figcaption></figure>
+      <div class="note"><h4>Where Performance lives</h4>Sidebar: <b>People › Performance</b>, five tabs: <span class="ui">Goals</span> <span class="ui">Scorecards</span> <span class="ui">KPIs</span> <span class="ui">Reviews</span> <span class="ui">Analytics</span>. A person sees by role: staff the OKR tree and their own scorecard; a manager their team; Operations &amp; People and the CEO everyone. Phone: <b>More › Performance</b>.</div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 04 / 17</span></div>
+</section>
+
+<!-- 5 · ROLES AND CONNECTIONS -->
+<section class="page" id="p5">
+  <div class="strip"><div class="t"><span class="no">03</span>Who does what, and what it <em>connects</em> to</div><div class="r">Roles · tasks · calendar · approvals</div></div>
+  <div class="pc"><div class="inner">
+    <h2 class="sec"><span class="n">3.1</span>Six roles</h2>
+    <table class="t">
+      <thead><tr><th style="width:34mm">Role</th><th style="width:44mm">Sees</th><th>Does</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Employee</td><td>Their own scorecard, check-ins, reviews and commitments; the whole OKR tree and every KPI</td><td>Agree Scorecard, Start Check-In, Send Commitments, Support Needed</td></tr>
+        <tr><td class="k">Line manager</td><td>Their reporting line</td><td>Drafts scorecards, scores reviews, asks the dotted-line manager for input, approves their people's commitments, is second level for the reviewers under them</td></tr>
+        <tr><td class="k">Head of department</td><td>Their function</td><td>All a manager does, plus the function's objectives, key results and KPIs, Report Month, Set Target and Send Plan</td></tr>
+        <tr><td class="k">Management · Program Manager</td><td>Everyone</td><td>The company's objectives and key results; approves the plan first for the heads they manage</td></tr>
+        <tr><td class="k">Operations &amp; People</td><td>Everyone</td><td>Approves the plan second; closes reviews; changes a reviewer; Mark Conduct; PIPs; probation outcomes; imports; sets up quarters; opens and closes rounds; withdraws a leaver's review</td></tr>
+        <tr><td class="k">CEO</td><td>Everyone</td><td>Organisational goals; approves the plan last and every target change; Confirm Score; the heads' commitments; Analytics</td></tr>
+      </tbody>
+    </table>
+    <p class="small" style="margin-top:1.4mm">A dotted-line manager gives input on a review, never an approval. Who reviews whom comes from People: the reviewer is the person's line manager, or the person above a vacant seat. A plan stage, a mid-quarter scorecard or a target change reaches its approver on the bell and Home › Need You, and is decided on <span class="path">Goals › Waiting On You</span> (see 7.1).</p>
+
+    <h2 class="sec"><span class="n">3.2</span>What Performance connects to</h2>
+    <div class="hub">
+      <div class="core"><span class="lbl">The centre</span><b>Performance</b>Goals, scorecards, commitments, check-ins, reviews and analytics, linked so that a figure entered once reaches everywhere it counts.</div>
+      <div><span class="lbl">My Workspace · Tasks</span><b>Work becomes evidence</b>Commitments are tasks. A key result's initiatives, a review's corrective actions and a missed commitment's recovery arrive as tasks. Counts Towards ties a task to a line or key result; done tasks are listed in the check-in.</div>
+      <div><span class="lbl">My Workspace · Calendar</span><b>The dates come to you</b>Check-in due, reviews to write, key results you own finishing, PIP review dates.</div>
+      <div><span class="lbl">Approvals</span><b>Four flows</b>Quarter Plan, Target Change, Monthly Commitments and Monthly Review run in the approvals engine, editable in Settings › Approvals.</div>
+      <div><span class="lbl">Notifications</span><b>Each step tells the next person</b>Plan waiting, scorecard to agree, check-in in, review waiting, commitments approved, target change decided.</div>
+      <div><span class="lbl">Home</span><b>The figures on the front page</b>Goals This Quarter, the Org KPI by department, Goals On Track, My Scorecard, Reviews Due and Need You.</div>
+      <div><span class="lbl">People · org chart</span><b>Who reviews whom</b>Department heads, line managers and vacant seats decide reviewers and approvers; dotted lines decide who gives input.</div>
+      <div><span class="lbl">Attendance · Staff Community</span><b>Context, never scored</b>A review shows the month's on-time, late and absent days and the recognitions received.</div>
+      <div><span class="lbl">Documents · Imports</span><b>Paper in and out</b>A closed review becomes a letterheaded PDF. The Q4 plan came in from MyCity's two workbooks.</div>
+      <div><span class="lbl">Praxis AI</span><b>Only when pressed</b>Record Answer turns speech into text; Tidy With AI tidies wording and never adds a fact. The original is kept until you choose.</div>
+      <div><span class="lbl">Queries &amp; Sanctions</span><b>Milestone 3</b>A caution raised after a review links back to it; until then HR acts outside the system.</div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 05 / 17</span></div>
+</section>
+
+<!-- 6 · GOALS -->
+<section class="page" id="p6">
+  <div class="strip"><div class="t"><span class="no">04</span>The quarter's plan: <em>Goals</em></div><div class="r">Performance › Goals</div></div>
+  <div class="pc"><div class="inner">
+    <p class="lead">Goals is the OKR tree. Everyone sees all of it: the OKRs are the company's shared plan, as the workbook was.</p>
+    <figure class="shot"><img src="{{img:goals-tree}}" alt="Branding & Marketing objectives and key results"><figcaption><b>Goals</b>Branding &amp; Marketing's objectives, each with its key results: code, owner, finish, status and score. The objective's score (top right of each card) is the mean of its key results.</figcaption></figure>
+    <div class="g3 p5cols" style="margin-top:3.4mm">
+      <div>
+        <h3 class="sub">Reading the screen</h3>
+        <ul class="ticks">
+          <li><b>The figures</b>: Company Score (the company's, for the quarter), then On Track, In Recovery and Awaiting Report for the function picked in <span class="ui">Function</span>.</li>
+          <li><b>Organisational Goals</b>: the year's goals, recorded by the CEO with <span class="ui">New Goal</span> and changed with <span class="ui">Edit Goal</span>.</li>
+          <li><b>Codes</b> follow the workbook: CO for the company, then TBO, BM, PG and PC for the functions. They freeze when the plan binds.</li>
+          <li><span class="pill plan">TBC</span> a provisional target. Until the quarter's lock date its owner or the head sets it with <span class="ui">Set Target</span>, no approval needed; after that, Change Target.</li>
+          <li><b>Editing</b>: while the plan is draft or returned, an objective has <span class="ui">Edit Objective</span> and <span class="ui">Delete Objective</span>, a key result <span class="ui">Edit Key Result</span> and <span class="ui">Delete Key Result</span>. A key result's <b>Feeds</b> names the company key results it serves.</li>
+          <li><b>Scored From</b>: a company key result wholly delivered by one function key result takes its figures, so nothing is entered twice.</li>
+        </ul>
+      </div>
+      <figure class="shot phone"><img src="{{img:phone-goals}}" alt="Goals on a phone"><figcaption><b>Phone</b>Same tabs; figures two to a row; lists as cards.</figcaption></figure>
+      <div class="stack">
+        <div class="note"><h4>Scores run from 0 to 1</h4><span class="pill ok">Good</span> 0.70 and above &nbsp; <span class="pill warn">Watch</span> 0.40 to 0.70 &nbsp; <span class="pill bad">Recovery</span> below 0.40, which needs a recovery owner and date. A dated key result scores 1 when done by its date.</div>
+        <div class="try"><div class="hd"><span class="tag">Try it</span><span class="role">Anyone, for example the CEO</span></div>
+          <ol><li>Open <span class="path">Performance › Goals</span>.</li><li>Pick <span class="ui">Function</span> › Branding &amp; Marketing.</li><li>Press <b>BM-KR1.3</b>.</li></ol>
+          <div class="see"><b>You should see</b> its panel: owner, target, This Month, Initiatives (tasks for its owner) and Rolls Up To: CO-KR4.3 › CO-O4.</div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 06 / 17</span></div>
+</section>
+
+<!-- 7 · REPORT MONTH -->
+<section class="page" id="p7">
+  <div class="strip"><div class="t"><span class="no">05</span>Reporting the month, <em>confirming</em> scores</div><div class="r">Report Month · Confirm Score · Change Target</div></div>
+  <div class="pc"><div class="inner">
+    <div class="g2 wide-l">
+      <div class="stack">
+        <figure class="shot"><img src="{{img:kr-panel}}" alt="A key result's panel"><figcaption><b>A key result</b>Target with what it was before a change, This Month with its proposed and confirmed score, the initiatives as tasks.</figcaption></figure>
+        <figure class="shot"><img src="{{img:change-sheet}}" alt="A target change waiting for the CEO"><figcaption><b>Target Change</b>Opened from Goals › Waiting On You: Refuse Change, with a reason, or Approve Change.</figcaption></figure>
+      </div>
+      <div class="stack">
+        <figure class="shot"><img src="{{img:report-month}}" alt="Report Month"><figcaption><b>Report Month</b>One function at a time; status, actual and update per key result.</figcaption></figure>
+        <h3 class="sub">The head reports, by the 3rd business day</h3>
+        <ol class="steps">
+          <li><span class="path">Goals › Report Month</span>. Your own function is picked; choose the <span class="ui">Month</span>.</li>
+          <li>For each key result that moved: <span class="ui">Status</span>, <span class="ui">Actual</span>, <span class="ui">Update</span>. Only the rows you change are sent.</li>
+          <li>A score under 0.40 asks for <span class="ui">Recovery Owner</span> and <span class="ui">Recovery Date</span>.</li>
+          <li>Press <span class="ui">Report Month</span>. The score is proposed from actual ÷ target and flows to any company key result Scored From it and to the scorecard lines it feeds.</li>
+        </ol>
+        <h3 class="sub">The CEO confirms</h3>
+        <p>Open a key result › <span class="ui">Confirm Score</span>. The confirmed score counts; until then the proposed one shows.</p>
+      </div>
+    </div>
+    <div class="g2" style="margin-top:3mm">
+      <div class="note warn"><h4>Targets written in words</h4>Most Q4 key results state their target in words ("At least 64,000 new users"). Until a figure is set, Report Month keeps the actual and the update but cannot score them. On a TBC key result its owner or head sets the figure with <b>Set Target</b> until the lock date, no approval needed. Any other figure goes through <b>Change Target</b>, which the CEO approves on <span class="path">Goals › Waiting On You</span>. Dated key results need no figure: Done by the finish date scores 1.</div>
+      <div class="try"><div class="hd"><span class="tag">Try it</span><span class="role">Head of department, then the CEO</span></div>
+        <ol><li><span class="ui">Report Month</span>: a dated key result, Status Done, with an update.</li><li>As the CEO, open it › <span class="ui">Confirm Score</span>.</li><li>On a key result with a target in words: <span class="ui">Set Target</span> if it is TBC, otherwise <span class="ui">Change Target</span> (figure, from month, reason).</li><li>As the CEO, <span class="path">Goals › Waiting On You</span> › the change › <span class="ui">Approve Change</span>.</li></ol>
+        <div class="see"><b>You should see</b> the dated key result scored 1.00, Good, then confirmed; the function's score on Analytics; the new target, with Was showing the old one.</div>
+      </div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 07 / 17</span></div>
+</section>
+
+<!-- 8 · KPIS AND SCORECARDS -->
+<section class="page" id="p8">
+  <div class="strip"><div class="t"><span class="no">06</span>KPIs and <em>scorecards</em></div><div class="r">Performance › KPIs · Performance › Scorecards</div></div>
+  <div class="pc"><div class="inner">
+    <figure class="shot cap-h" style="--h:68mm"><img src="{{img:kpis}}" alt="KPIs for Branding & Marketing"><figcaption><b>KPIs</b>Each function's operational KPIs with their target and direction; the latest month as Met, Not Met or N/A.</figcaption></figure>
+    <div class="g2" style="margin-top:2mm">
+      <div class="stack">
+        <div>
+          <h3 class="sub">KPIs</h3>
+          <ul class="ticks">
+            <li>Each KPI keeps the workbook's formula, unit, direction, target, frequency and data source.</li>
+            <li>Each month is <span class="pill ok">Met</span> <span class="pill bad">Not Met</span> or <span class="pill grey">N/A</span>. N/A means no eligible cases and never counts as met.</li>
+            <li>The function's head records a KPI's month with <span class="ui">Record Actual</span> on the KPI. <b>Lines Using It</b> lists the people scored on it.</li>
+          </ul>
+        </div>
+        <figure class="shot"><img src="{{img:kpi-sheet}}" alt="A KPI"><figcaption><b>A KPI</b>The workbook's definition, Lines Using It, then Edit KPI and Record Actual.</figcaption></figure>
+      </div>
+      <div class="stack">
+        <div>
+          <h3 class="sub">Scorecards</h3>
+          <ul class="ticks">
+            <li>One per person per quarter, in three sections: <b>Results 60%</b>, <b>KPIs 25%</b>, <b>Accountability 15%</b>.</li>
+            <li>Each line: goal, target, <b>Linked To</b> (the key result or KPI it feeds), due date, weight, October, November and December.</li>
+            <li><span class="pill plan">Auto</span> lines are worked out by the system: from a key result or KPI, on-time commitments, the monthly update and team reviews.</li>
+            <li><b>Contribution</b>: when a key result is shared out among people, the shares must add up: OK or Rebalance.</li>
+          </ul>
+        </div>
+        <figure class="shot"><img src="{{img:scorecard-sheet}}" alt="A scorecard"><figcaption><b>A scorecard</b>The person, reviewer, scope, agreement, then each section's lines.</figcaption></figure>
+      </div>
+    </div>
+    <div class="try" style="margin-top:3mm"><div class="hd"><span class="tag">Try it</span><span class="role">Manager, then the head</span></div>
+      <ol><li><span class="path">Performance › Scorecards</span>; filter by Department or Status. Press a person; read the sections and Auto lines.</li><li>As the function's head (or the CEO): <span class="path">KPIs</span>, open a KPI › <span class="ui">Record Actual</span>.</li></ol>
+      <div class="see"><b>You should see</b> the month under Months, and Met Last Month move when it is Met. Lines using the KPI take that month in the month's review.</div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 08 / 17</span></div>
+</section>
+
+<!-- 9 · PLANNING A QUARTER -->
+<section class="page" id="p9">
+  <div class="strip"><div class="t"><span class="no">07</span>Planning a quarter: <em>approval</em> and agreement</div><div class="r">Send Plan · approvals · agreement</div></div>
+  <div class="pc"><div class="inner">
+    <div class="g2 wide-l">
+      <div>
+        <ol class="steps">
+          <li><b>Operations &amp; People set up the quarter</b>: <span class="path">Goals › Manage Quarters › Set Up Quarter</span>, its dates, lock date and scoring rules, starting from the last quarter's.</li>
+          <li><b>The CEO records the year's goals</b>: <span class="path">Goals › New Goal › Organisational Goal</span>.</li>
+          <li><b>Management set the company's objectives and key results; each head sets the function's</b> (<span class="ui">New Goal</span> › Objective or Key Result; Edit and Delete while the plan is draft or returned). A key result's Feeds names the company key results it serves.</li>
+          <li><b>Managers draft scorecards</b>: <span class="path">Scorecards › New Scorecard</span>, pick the <span class="ui">Employee</span> and <span class="ui">Lines From</span> (Last Quarter or Start Blank), then <span class="ui">Edit Lines</span>. Never one's own.</li>
+          <li><b>The head sends the plan</b>: the Plan Approval card on Goals › <span class="ui">Send Plan</span>. It refuses an empty plan, a section whose line weights miss its share (60, 25, 15), a Rebalance, or a link to another quarter.</li>
+          <li><b>Approval</b>: the head's line manager, then Operations &amp; People, then the CEO (7.1 says when a stage is skipped). Each approver is told on the bell and Home › Need You, and decides on <span class="path">Goals › Waiting On You</span>: <span class="ui">Approve Plan</span>, or <span class="ui">Request Changes</span> with a reason, which returns it to the head.</li>
+          <li><b>The CEO's approval makes it binding</b>: codes freeze; each person and reviewer is told the scorecard is ready to agree, and reminded each working day from three business days after it binds.</li>
+          <li><b>Agreement</b>: <span class="ui">Agree Scorecard</span>, one tap each, or <span class="ui">Disagree With Reason</span>, which goes back to the reviewer.</li>
+        </ol>
+        <div class="try" style="margin-top:2mm"><div class="hd"><span class="tag">Try it</span><span class="role">CEO or head</span></div>
+          <ol><li><span class="path">Goals</span> › <span class="ui">Function</span> › General Management.</li><li>Read the Plan Approval card.</li><li>As a manager, <span class="ui">New Scorecard</span> for someone new to you.</li></ol>
+          <div class="see"><b>You should see</b> Draft, with "Add an objective first" until the plan has one. On a binding plan a new scorecard is drafted too; <span class="ui">Send Scorecard</span> sends it alone for approval, and its approvers decide it on <span class="path">Goals › Waiting On You</span> (Approve Scorecard).</div>
+        </div>
+      </div>
+      <div class="stack">
+        <figure class="shot"><img src="{{img:new-scorecard}}" alt="New Scorecard"><figcaption><b>New Scorecard</b>Pick the person and where the lines come from.</figcaption></figure>
+        <figure class="shot"><img src="{{img:quarter-setup}}" alt="Set Up Quarter"><figcaption><b>Set Up Quarter</b>Dates and lock date first, then the scoring rules, copied from the last quarter.</figcaption></figure>
+        <figure class="shot"><img src="{{img:plan-sheet}}" alt="A quarter plan waiting for the CEO"><figcaption><b>Quarter Plan</b>Opened from Goals › Waiting On You: who sent it, the stages so far, Request Changes or Approve Plan.</figcaption></figure>
+      </div>
+    </div>
+    <h2 class="sec"><span class="n">7.1</span>The four approval flows</h2>
+    <table class="t tight">
+      <thead><tr><th style="width:36mm">Flow</th><th style="width:62mm">Who approves, in order</th><th>A stage is skipped when</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Quarter Plan</td><td>Line Manager › Operations &amp; People › CEO</td><td>The head reports to the CEO, or Operations &amp; People sent it. The company plan goes straight to the CEO.</td></tr>
+        <tr><td class="k">Target Change</td><td>CEO</td><td>Never</td></tr>
+        <tr><td class="k">Monthly Commitments</td><td>The person's reviewer</td><td>A head's go to the CEO instead; skipped when the reviewer sends them</td></tr>
+        <tr><td class="k">Monthly Review</td><td>Second Level › Operations &amp; People</td><td>Second level, when the reviewer is the CEO</td></tr>
+      </tbody>
+    </table>
+    <p class="small" style="margin-top:1.2mm">All four are decided on screen and reach their approvers on the bell and Home › Need You. Quarter Plan (and a mid-quarter scorecard sent alone) and Target Change are decided on <span class="path">Goals › Waiting On You</span>; a refusal needs a reason. Administrators change stages and deadlines on <span class="path">Settings › Approvals</span>; a request keeps the version it started on.</p>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 09 / 17</span></div>
+</section>
+
+<!-- 10 · COMMITMENTS -->
+<section class="page" id="p10">
+  <div class="strip"><div class="t"><span class="no">08</span>Commitments: the month's <em>promises</em></div><div class="r">Tasks · Send Commitments · Approve Month</div></div>
+  <div class="pc"><div class="inner">
+    <figure class="shot cap-h" style="--h:92mm"><img src="{{img:commitments}}" alt="The Commitments view"><figcaption><b>Scorecards › Commitments</b>The month's figures, Waiting On You with Approve Month and Request Changes, and every commitment with its original date and state.</figcaption></figure>
+    <div class="g2 wide-l" style="margin-top:3mm">
+      <div>
+        <ol class="steps">
+          <li><b>Mark the month's priorities</b> on the task form: tick <span class="ui">Commitment</span>, add <span class="ui">Acceptance Criteria</span>, pick the <span class="ui">Month</span> and a <span class="ui">Due</span> date inside it. A manager may do it for their people.</li>
+          <li><span class="ui">Send Commitments</span> on Tasks (or My Commitments) by the 3rd business day. A reminder goes out on the 2nd.</li>
+          <li><b>The reviewer approves</b> (the CEO, for a head): <span class="ui">Approve Month</span> or <span class="ui">Request Changes</span>, here or from Home › Need You. A returned month comes with its reason on the bell: edit it and send again.</li>
+          <li><b>Approval fixes the Original Date.</b> A later due date moves Due Now, never the original.</li>
+          <li><b>States</b>: <span class="pill grey">Not Sent</span> <span class="pill grey">Awaiting Approval</span> <span class="pill warn">Returned</span> <span class="pill plan">Due</span> <span class="pill ok">On Time</span> <span class="pill warn">Late</span> <span class="pill bad">Missed</span> <span class="pill grey">Rescoped</span>. On time means done by the end of the original date.</li>
+          <li><span class="ui">Rescope Commitment</span> with a reason goes to the same approver; once approved it leaves the on-time count.</li>
+          <li><b>Missed at month end</b>: <span class="ui">Set Recovery</span>, an owner and a date, creates a Recovery task.</li>
+          <li><span class="ui">Export Report</span>: the month-end delivery report per function for the CEO. Each person's On-time Commitment Delivery line (target 80%) reads the same states on its own.</li>
+        </ol>
+      </div>
+      <div class="stack">
+        <figure class="shot"><img src="{{img:task-commitment}}" alt="A commitment task"><figcaption><b>A commitment</b>Its acceptance criteria, month, state and original date; a rescope keeps its reason.</figcaption></figure>
+        <div class="try"><div class="hd"><span class="tag">Try it</span><span class="role">Employee, then their reviewer</span></div>
+          <ol><li><span class="path">Tasks › New Task</span>: tick Commitment, criteria, Month: next month, a Due date in that month.</li><li><span class="ui">Send Commitments</span>, Month: next month.</li><li>As the reviewer: <span class="path">Scorecards › Commitments</span>, Month: next month › <span class="ui">Approve Month</span>.</li></ol>
+          <div class="see"><b>You should see</b> the person told, the dates fixed, and the state Due.</div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 10 / 17</span></div>
+</section>
+
+<!-- 11 · WEEK, CALENDAR, BELL -->
+<section class="page" id="p11">
+  <div class="strip"><div class="t"><span class="no">09</span>The week, the calendar and the <em>bell</em></div><div class="r">My Workspace · notifications</div></div>
+  <div class="pc"><div class="inner">
+    <figure class="shot"><img src="{{img:today-week}}" alt="My Week"><figcaption><b>Today › My Week</b>Done this week, planned next week and blocked, from each person's own tasks, with one line of Support Needed.</figcaption></figure>
+    <div class="g2 wide-l" style="margin-top:3mm">
+      <div class="stack">
+        <figure class="shot"><img src="{{img:calendar}}" alt="Calendar with performance dates"><figcaption><b>Calendar</b>November: Check-In Due on the 3rd beside the task deadlines.</figcaption></figure>
+        <ul class="ticks">
+          <li><b>Counts Towards</b> on a task picks one of the assignee's scorecard lines or key results; only the person who set the task can change it. Done tasks are listed in the check-in, where a line can name one as its evidence, and count for lines measured in tasks.</li>
+          <li><b>My Week</b> replaces the weekly tracker: nothing else to fill. <span class="ui">Write Support Needed</span> is the one line your manager reads; <span class="ui">Tidy With AI</span> offers a short summary only when pressed, with Use Summary or Discard Summary.</li>
+          <li>Managers see <b>Team This Week</b> on Today and open a person's week.</li>
+          <li>The <b>calendar</b> adds Check-In Due, Review Due, Key Result Due and PIP Review to each person's month.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <figure class="shot"><img src="{{img:notifications}}" alt="Notifications"><figcaption><b>The bell</b>Check-in open, commitments approved or rescoped, tasks set.</figcaption></figure>
+        <div class="try"><div class="hd"><span class="tag">Try it</span><span class="role">Any employee</span></div>
+          <ol><li><span class="path">My Workspace › Today</span> › <span class="ui">Write Support Needed</span>.</li><li><span class="ui">Tidy With AI</span>, then Use Summary.</li><li><span class="path">Calendar</span> › next month.</li></ol>
+          <div class="see"><b>You should see</b> your line on your manager's Team This Week and, while your check-in is open, its due date on the calendar.</div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 11 / 17</span></div>
+</section>
+
+<!-- 12 · MY PERFORMANCE -->
+<section class="page" id="p12">
+  <div class="strip"><div class="t"><span class="no">10</span>My Performance: <em>every employee's</em> page</div><div class="r">Self-Service › My Performance</div></div>
+  <div class="pc"><div class="inner">
+    <div class="g2 p11cols">
+      <div class="stack">
+        <figure class="shot"><img src="{{img:my-perf-top}}" alt="My Performance"><figcaption><b>The top</b>A banner when something waits for you, then the five figures and My Scorecard.</figcaption></figure>
+        <figure class="shot"><img src="{{img:ess-bottom}}" alt="Check-in, Rolls Up To, My Commitments, My Reviews"><figcaption><b>Further down</b>This Month's Check-In, Rolls Up To (each line linked to a key result, with its path to the company objective), My Commitments with their states, My Reviews.</figcaption></figure>
+      </div>
+      <div class="stack">
+        <figure class="shot phone"><img src="{{img:phone-me}}" alt="My Performance on a phone"><figcaption><b>On a phone</b>Icon cards; Start Check-In full width.</figcaption></figure>
+      </div>
+    </div>
+    <div class="g2" style="margin-top:3mm">
+      <ul class="ticks">
+        <li><b>The figures</b>: Score to Date, Rating, This Month, Commitments On Time, Agreement.</li>
+        <li><b>The banner</b> asks for what waits: <span class="ui">Agree Scorecard</span> with <span class="ui">Disagree With Reason</span>, or <span class="ui">Start Check-In</span> with its due date.</li>
+        <li><b>My Scorecard</b>: the three sections with each line's months and score.</li>
+        <li><b>My Reviews</b>: a closed month opens with the final scores and <span class="ui">Download PDF</span>. The reviewer's scores show only once the review is closed.</li>
+      </ul>
+      <div class="try"><div class="hd"><span class="tag">Try it</span><span class="role">Employee</span></div>
+        <ol><li><span class="path">Self-Service › My Performance</span>.</li><li>Read the path under each line in Rolls Up To.</li><li>Scroll to My Commitments and My Reviews.</li></ol>
+        <div class="see"><b>You should see</b> your own scorecard only, the path of each key-result line up to its company objective, and October's review stage.</div>
+      </div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 12 / 17</span></div>
+</section>
+
+<!-- 13 · CHECK-IN -->
+<section class="page" id="p13">
+  <div class="strip"><div class="t"><span class="no">11</span>The monthly <em>check-in</em></div><div class="r">Start Check-In · Save Draft · Submit Check-In</div></div>
+  <div class="pc"><div class="inner">
+    <p class="lead">A month's round opens on the first business day after the month ends (October's on 2 November): one review for each binding scorecard, and each person is told. The check-in replaces the monthly update, the work report and the paper form.</p>
+    <div class="g2">
+      <figure class="shot"><img src="{{img:check-auto}}" alt="Automatic lines in a check-in"><figcaption><b>Automatic lines</b>Arrive filled with their figure and proposed score; the month's tasks below.</figcaption></figure>
+      <figure class="shot"><img src="{{img:check-own}}" alt="A line the person reports"><figcaption><b>A line you report</b>Actual (Delivered On for a milestone), Evidence, Action, Record Answer, Change Score.</figcaption></figure>
+    </div>
+    <div class="g2" style="margin-top:3mm">
+      <ol class="steps">
+        <li><span class="ui">Start Check-In</span> on My Performance: in the banner or under This Month's Check-In.</li>
+        <li>Automatic lines need nothing: they come from key results, KPIs and commitments.</li>
+        <li>On your own lines: the <b>actual</b>, its <b>evidence</b> (a task, a link, a file, or the source named) and an <b>action</b> for anything behind.</li>
+        <li>Type the action, or <span class="ui">Record Answer</span> to say it. <span class="ui">Tidy With AI</span> tidies the wording only when pressed: <span class="ui">Use Tidied</span> or <span class="ui">Keep Original</span>.</li>
+        <li>A score is proposed. <span class="ui">Change Score</span> with a reason; your reviewer sees both.</li>
+        <li><span class="ui">Save Draft</span> any time, then <span class="ui">Submit Check-In</span> by the end of the 2nd business day (heads the 3rd).</li>
+      </ol>
+      <div class="stack">
+        <figure class="shot"><img src="{{img:check-foot}}" alt="Save Draft and Submit Check-In"><figcaption><b>The foot</b>Save Draft and Submit Check-In.</figcaption></figure>
+        <div class="note"><h4>Two rules people ask about</h4><b>Self first.</b> The reviewer cannot open a check-in until it is submitted. <b>No evidence, no score.</b> A line without evidence reads Not Assessable: it counts neither for nor against.</div>
+        <div class="note"><h4>Late or returned</h4>A late check-in is still taken until the reviewer presses <b>Score Without Check-In</b>, which they may once its due date has passed, with a reason you are told; either way its Monthly update on time line reads Late, proposed at 0. Once sent it opens as View Check-In. If the reviewer presses <b>Return Check-In</b>, the reason shows at the top: fix it and Submit Check-In again.</div>
+        <div class="try"><div class="hd"><span class="tag">Try it</span><span class="role">Employee in Checking In</span></div>
+          <ol><li><span class="ui">Start Check-In</span>; fill one line; <span class="ui">Save Draft</span>.</li><li>Reopen it; <span class="ui">Submit Check-In</span>.</li></ol>
+          <div class="see"><b>You should see</b> the stage move to With Reviewer and the reviewer told.</div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 13 / 17</span></div>
+</section>
+
+<!-- 14 · REVIEW CHAIN -->
+<section class="page" id="p14">
+  <div class="strip"><div class="t"><span class="no">12</span>The review: reviewer, second level, <em>HR</em></div><div class="r">Performance › Reviews</div></div>
+  <div class="pc"><div class="inner">
+    <figure class="shot cap-h" style="--h:58mm"><img src="{{img:reviews}}" alt="Reviews"><figcaption><b>Reviews</b>The round's figures, Waiting On You (here two reviews for the CEO to approve as second level) and every review with its stage and due date.</figcaption></figure>
+    <div class="chain" style="margin-top:2.6mm"><span>Check-In</span><i>›</i><span class="on">Reviewer · 5th</span><i>›</i><span>Second Level · 7th</span><i>›</i><span>HR · 10th business day</span><i>›</i><span>Closed</span></div>
+    <div class="g2 wide-r">
+      <div class="stack">
+        <figure class="shot"><img src="{{img:review-chain}}" alt="A review"><figcaption><b>A review</b>The chain shows where it is; each line with actual, evidence, action, proposed, self and final.</figcaption></figure>
+      </div>
+      <div>
+        <h3 class="sub">Reviewer</h3>
+        <p>Sees the check-in beside each line. Sets each <b>final score</b> (a reason where it differs from the proposed), a <b>corrective action</b> with owner and date for each missed line (it becomes a task) and a comment. <span class="ui">Save Scores</span>, <span class="ui">Return Check-In</span> (back to the employee with a reason) or <span class="ui">Submit Review</span>. <span class="ui">Ask For Input</span> asks the dotted-line manager first. Once the check-in's due date passes, <span class="ui">Score Without Check-In</span>, with a reason.</p>
+        <h3 class="sub">Second level</h3>
+        <p>The reviewer's own line manager: <span class="ui">Approve</span> or <span class="ui">Request Changes</span>. Skipped when the reviewer is the CEO.</p>
+        <h3 class="sub">HR (Operations &amp; People)</h3>
+        <p><span class="ui">Close Review</span> writes the score to date and rating onto the scorecard, files the PDF and tells the employee. <span class="ui">Mark Conduct</span> records a confirmed breach, which caps the rating at Partly Meets. <span class="ui">Withdraw Review</span> closes a leaver's review; it also closes by itself when People archive them.</p>
+      </div>
+    </div>
+    <div class="g3" style="margin-top:3mm">
+      <figure class="shot"><img src="{{img:review-foot}}" alt="Reviewer's foot"><figcaption><b>Reviewer</b>Save Scores · Return Check-In · Submit Review</figcaption></figure>
+      <figure class="shot"><img src="{{img:second-foot}}" alt="Second level's foot"><figcaption><b>Second level</b>Request Changes · Approve</figcaption></figure>
+      <figure class="shot"><img src="{{img:hr-foot}}" alt="HR's foot"><figcaption><b>HR</b>Mark Conduct · Request Changes · Close Review</figcaption></figure>
+    </div>
+    <div class="g3" style="margin-top:3mm">
+      <div class="note"><h4>Dotted-line input</h4>Asked on the bell when the check-in is submitted. Open the review from the notice, write Your Input and press <b>Give Input</b> while it is with the reviewer. Never needed to submit.</div>
+      <div class="note"><h4>Sent back</h4><b>Request Changes</b> at second level or HR returns the review to its reviewer with a reason. It reads Returned, the reviewer is told, and after Submit Review it runs the chain again.</div>
+      <div class="note"><h4>Rounds</h4>A round opens by itself on the first business day after a month ends. <b>Open Round</b> is for an ended month with no round yet; <b>Close Round</b> marks it closed, and open reviews carry on.</div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 14 / 17</span></div>
+</section>
+
+<!-- 15 · SCORES AND OUTCOMES -->
+<section class="page" id="p15">
+  <div class="strip"><div class="t"><span class="no">13</span>Scores, ratings and what <em>follows</em></div><div class="r">The rules MyCity's workbooks set</div></div>
+  <div class="pc"><div class="inner">
+    <div class="g2">
+      <div>
+        <h2 class="sec" style="margin-top:0"><span class="n">13.1</span>How a line scores</h2>
+        <table class="t tight">
+          <tbody>
+            <tr><td class="k">Numeric</td><td>Actual ÷ target, capped at 1. Lower is better: target ÷ actual.</td></tr>
+            <tr><td class="k">Milestone</td><td>1.0 accepted on time; 0.5 within 10 business days after; 0 later.</td></tr>
+            <tr><td class="k">Standard</td><td>KPI and accountability lines: 1.0 target met; 0.5 missed by up to 5 points; 0 otherwise.</td></tr>
+            <tr><td class="k">Yes or no</td><td>1 met, 0 not.</td></tr>
+            <tr><td class="k">N/A</td><td>No eligible cases: blank, never 1.</td></tr>
+            <tr><td class="k">Over the quarter</td><td>A Results line takes its latest month; a KPI or Accountability line the mean of its months.</td></tr>
+            <tr><td class="k">Score to date</td><td>Each line's weight × score, over the weight of the lines scored so far.</td></tr>
+          </tbody>
+        </table>
+        <p class="small" style="margin-top:1.4mm">Example: John Ojelola's Results line 3, weight 15: 4 South West placements targeted, 3 secured by November: 0.75 × 15 = 11.25.</p>
+      </div>
+      <div>
+        <h2 class="sec" style="margin-top:0"><span class="n">13.2</span>Ratings</h2>
+        <table class="t tight">
+          <thead><tr><th>Rating</th><th>Score</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill ok">Exceeds</span></td><td>0.90 and above</td></tr>
+            <tr><td><span class="pill plan">Meets</span></td><td>0.75 to under 0.90</td></tr>
+            <tr><td><span class="pill warn">Partly Meets</span></td><td>0.50 to under 0.75</td></tr>
+            <tr><td><span class="pill bad">Below</span></td><td>under 0.50</td></tr>
+          </tbody>
+        </table>
+        <p class="small" style="margin-top:1.4mm">October and November are progress against the whole quarter; December's is the quarter's final. A confirmed conduct breach caps the rating at Partly Meets.</p>
+        <figure class="shot" style="margin-top:2mm"><img src="{{img:closed-foot}}" alt="A closed review"><figcaption><b>A closed review</b>Score this month, score to date, rating and Download PDF.</figcaption></figure>
+      </div>
+    </div>
+    <h2 class="sec"><span class="n">13.3</span>What follows a review</h2>
+    <div class="g3">
+      <div class="note"><h4>Corrective actions</h4>A milestone, standard or yes-or-no line scored under 1 needs an action with an owner and a date before Submit Review; a numeric line only in December. Each becomes a task for its owner.</div>
+      <div class="note"><h4>Improvement plan (PIP)</h4>After a Below rating, Operations &amp; People may <b>Start PIP</b>: a start date, the lines to improve and a summary. It runs 30 days and is reviewed on its last day, with a reminder 3 business days before. <b>Close Plan</b> (Reviews › PIPs): Passed, Extended or Not Met.</div>
+      <div class="note"><h4>Probation</h4>A probation review opens 14 days before the probation end date, on the same form, with the line manager as reviewer. HR closes it: <b>Confirm</b>, <b>Extend 3 Months</b> (once) or <b>End Employment</b>.</div>
+    </div>
+    <figure class="shot" style="margin-top:3mm"><img src="{{img:my-reviews}}" alt="My Reviews with a closed month"><figcaption><b>My Reviews</b>October closed: score 1.00, Exceeds. Cautions are issued in Queries &amp; Sanctions (Milestone 3).</figcaption></figure>
+    <h2 class="sec"><span class="n">13.4</span>Questions people ask</h2>
+    <div class="qa">
+      <div><b>"My target is wrong."</b>Its owner or head sends Change Target on the key result (Set Target while it is TBC); a line's reviewer or head sends it on the line. Once approved, Was shows the old figure.</div>
+      <div><b>"I do not agree with my scorecard."</b>Press Disagree With Reason on My Performance. It clears both agreements and goes back to your reviewer.</div>
+      <div><b>"My commitment's date moved."</b>Rescope Commitment with a reason. The original date stays on record; once approved, it leaves the on-time count.</div>
+      <div><b>"Why can my reviewer not see my check-in?"</b>Self first: your reviewer opens it only after you press Submit Check-In.</div>
+      <div><b>"Why is one of my lines blank?"</b>It had no eligible cases (N/A) or no evidence (Not Assessable). Neither counts for or against you.</div>
+      <div><b>"Who reviews me?"</b>Your line manager, or the person above a vacant seat. Operations &amp; People can change it, with a reason.</div>
+      <div><b>"Does it still count if I disagree?"</b>Yes. The scorecard stays in force and each month is still reviewed on its lines as they stand. Your reason goes to your reviewer.</div>
+      <div><b>"Can I change my check-in after sending it?"</b>No: it opens as View Check-In. If your reviewer returns it with Return Check-In, fix it and press Submit Check-In again.</div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 15 / 17</span></div>
+</section>
+
+<!-- 16 · ANALYTICS AND HOME -->
+<section class="page" id="p16">
+  <div class="strip"><div class="t"><span class="no">14</span>Analytics and <em>Home</em></div><div class="r">Performance › Analytics · Home</div></div>
+  <div class="pc"><div class="inner">
+    <figure class="shot cap-h" style="--h:84mm"><img src="{{img:analytics}}" alt="Analytics"><figcaption><b>Analytics</b>Pick the quarter and function. Every figure is worked out within what the reader may see.</figcaption></figure>
+    <div class="g2" style="margin-top:3mm">
+      <table class="t tight">
+        <thead><tr><th style="width:34mm">Figure</th><th>Means</th></tr></thead>
+        <tbody>
+          <tr><td class="k">Company Score</td><td>The mean of the company objectives, as Goals shows it</td></tr>
+          <tr><td class="k">On-time figures</td><td>Commitments, check-ins and reviews closed on time, with "1 of 6" under each</td></tr>
+          <tr><td class="k">Scores by Month</td><td>The company and each function, October to December</td></tr>
+          <tr><td class="k">Key Results by Status</td><td>On Track to Missed, Awaiting Report, In Recovery</td></tr>
+          <tr><td class="k">Rating Spread</td><td>Ratings at the latest closed round</td></tr>
+          <tr><td class="k">Self Against Final</td><td>Above zero: people rate themselves higher than their reviewer</td></tr>
+          <tr><td class="k">People</td><td>Each person's score to date and rating; Search People; Export</td></tr>
+        </tbody>
+      </table>
+      <figure class="shot"><img src="{{img:home-ceo}}" alt="Home overview"><figcaption><b>Home</b>Goals On Track, Organisational Goals with progress, the Org KPI by department and Need You (approvals waiting).</figcaption></figure>
+    </div>
+    <div class="try" style="margin-top:3mm"><div class="hd"><span class="tag">Try it</span><span class="role">CEO, then a manager</span></div>
+      After Report Month, Confirm Score and a closed review: open <span class="path">Performance › Analytics</span> and <span class="path">Home</span> as the CEO, then as a manager. <b style="color:var(--teal-ink)">You should see</b> the function's score by month and the key results by status move, and a manager's Analytics limited to their own people.
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 16 / 17</span></div>
+</section>
+
+<!-- 17 · TEST RUN -->
+<section class="page" id="p17">
+  <div class="strip"><div class="t"><span class="no">15</span>The <em>test run</em>: the whole flow in one sitting</div><div class="r">Tick as you go</div></div>
+  <div class="pc"><div class="inner">
+    <p class="small" style="margin-bottom:2mm">Staging holds MyCity's real Q4 2026 plan, and October's round has a review at every stage, so each step below can be tried today. Sign in as someone in each role.</p>
+    <table class="t tight run">
+      <thead><tr><th style="width:6mm">#</th><th style="width:30mm">As</th><th>Do</th><th style="width:56mm">You should see</th><th style="width:6mm"></th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="k">CEO</td><td>Goals › Function: Branding &amp; Marketing</td><td>The figures, Plan Approval Binding, the objectives</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>2</td><td class="k">CEO</td><td>Open BM-KR1.3</td><td>Target, This Month, Initiatives, Rolls Up To</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>3</td><td class="k">Head</td><td>Change Target on a key result in words, not TBC</td><td>On the CEO's Waiting On You</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>4</td><td class="k">Head</td><td>Report Month: a dated key result, Status Done, an update</td><td>Score 1.00, band Good</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>5</td><td class="k">CEO</td><td>Open it › Confirm Score</td><td>Confirmed; the function's score on Analytics</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>6</td><td class="k">Head</td><td>KPIs › a KPI › Record Actual: Met</td><td>The month under Months; Met Last Month rises</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>7</td><td class="k">Employee</td><td>Tasks › New Task: Commitment, criteria, next month, a due date › Send Commitments, Month: next month</td><td>A Commitment pill; the reviewer told</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>8</td><td class="k">Reviewer</td><td>Scorecards › Commitments, Month: next month › Approve Month</td><td>Original Date fixed; state Due</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>9</td><td class="k">Employee</td><td>Your own task › Counts Towards one of your lines; mark it Done</td><td>It listed in the check-in's tasks</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>10</td><td class="k">Employee</td><td>My Performance › Start Check-In › Save Draft › Submit Check-In</td><td>Stage With Reviewer; reviewer told</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>11</td><td class="k">Reviewer</td><td>Reviews › Waiting On You › final scores, actions › Submit Review</td><td>Stage Second Level; actions as tasks</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>12</td><td class="k">Second level</td><td>Reviews › Waiting On You › Approve</td><td>Stage With HR</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>13</td><td class="k">Operations &amp; People</td><td>The review › Close Review</td><td>Closed; score and rating on the scorecard</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>14</td><td class="k">Employee</td><td>My Reviews › the month › Download PDF</td><td>The letterheaded review</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>15</td><td class="k">Employee</td><td>Today › Write Support Needed › Tidy With AI</td><td>A summary to use or discard</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>16</td><td class="k">Manager</td><td>Today › Team This Week</td><td>That line under the person</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>17</td><td class="k">Everyone</td><td>Calendar; the bell; Ctrl K "BM-KR"</td><td>Performance dates; notices; key results found</td><td class="c"><span class="box"></span></td></tr>
+        <tr><td>18</td><td class="k">CEO</td><td>Analytics and Home</td><td>The figures moved with the steps above</td><td class="c"><span class="box"></span></td></tr>
+      </tbody>
+    </table>
+    <h2 class="sec"><span class="n">15.1</span>Running the training</h2>
+    <table class="t tight">
+      <thead><tr><th style="width:36mm">Audience</th><th>Show them</th><th style="width:25mm">Pages</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Every employee</td><td>My Performance and Agree Scorecard; Start Check-In; commitments on Tasks; My Week and Support Needed</td><td>10 to 13</td></tr>
+        <tr><td class="k">Line managers</td><td>Scorecards and New Scorecard; Approve Month; the review: Save Scores, Submit Review; Team This Week</td><td>8 to 11, 14</td></tr>
+        <tr><td class="k">Heads of department</td><td>Goals, Report Month, KPIs and Record Actual, Send Plan, Set Target, Change Target</td><td>6 to 9</td></tr>
+        <tr><td class="k">Operations &amp; People</td><td>Set Up Quarter, Open and Close Round, Close Review, Withdraw Review, Mark Conduct, PIPs, Change Reviewer, Imports</td><td>9, 14, 15</td></tr>
+        <tr><td class="k">CEO and Management</td><td>Organisational goals, Confirm Score, Approve Month for the heads, Analytics and Home</td><td>6, 7, 9, 10, 16</td></tr>
+      </tbody>
+    </table>
+    <div class="g2" style="margin-top:3mm">
+      <div class="note"><h4>Good to know</h4>Deadlines count business days. Reminders come on the bell, and unread ones by email each morning: commitments on the 2nd business day, the check-in 2 business days before it is due, the scorecard to agree each working day.</div>
+      <div class="note navy"><h4>Support</h4><b>JBS Praxis</b> built and supports the system. Note a problem with the screen, the person signed in and the time, and send it with a screenshot.<br><span style="color:var(--teal)">// prepared by JBS Praxis for MyCity App Ltd</span></div>
+    </div>
+  </div></div>
+  <div class="pf"><span>JBS Praxis · Performance Management · Training and test guide</span><span>MyCity App ERP · 17 / 17</span></div>
+</section>
+</body></html>

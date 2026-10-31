@@ -32,6 +32,14 @@ describe("performance workbook import", () => {
     const { rows } = workbook.extractKpis(await sheetsOf("q4-2026-okrs.xlsx"));
     expect(rows).toHaveLength(45);
     expect(rows.find((r) => r.code === "TBO-K08")).toMatchObject({ former_codes: "OP-K01", unit: "%", direction: "Higher is better" });
+    // The KPI's name is the KPI column, not the KPI ID beside it.
+    expect(rows.find((r) => r.code === "TBO-K01").name).toBe("Payment and ticketing service availability rate");
+    expect(rows.every((r) => r.name !== r.code)).toBe(true);
+  });
+
+  test("a header row: the column equal to the name wins over one starting with it", () => {
+    const col = workbook.columnsOf(["KPI ID", "KPI", "Accountable owner"]);
+    expect([col("KPI"), col("KPI ID"), col("Accountable"), col("Missing")]).toEqual([1, 0, 2, -1]);
   });
 
   test("the scorecards: each person's numbered lines with their reviewer and scope", async () => {

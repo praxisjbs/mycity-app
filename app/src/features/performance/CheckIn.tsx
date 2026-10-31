@@ -32,7 +32,7 @@ import {
   UploadField,
   VoiceField,
 } from "@mycity/ui";
-import { fieldMessage, reviewStatus, score, SECTION_NAMES, targetOf } from "./shared";
+import { fieldMessage, figureOf, reviewStatus, score, SECTION_NAMES, targetOf } from "./shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 const BUCKET: Record<string, string> = { done: "Done This Month", ongoing: "Ongoing", next_month: "Next Month" };
@@ -302,7 +302,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
           rowKey={(i) => i.performance_review_item_id}
           columns={[
             { key: "line", label: "Line", render: (i) => <HelpTerm help="Worked out by the system. Your reviewer can change it with a reason.">{title(i)}</HelpTerm> },
-            { key: "figure", label: "Figure", render: (i) => i.actual_text ?? i.actual_value ?? "No Cases" },
+            { key: "figure", label: "Figure", render: (i) => figureOf(i.actual_value, i.actual_text, i.line?.unit) ?? "No Cases" },
             { key: "proposed", label: "Proposed", align: "n", render: (i) => score(i.proposed_score) },
           ]}
         />

@@ -6,6 +6,7 @@ import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_IN
 import roster from "../data/roster.json";
 import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
+import { decidePlan, decideTargetChange, performanceInstance, performanceWaitingOn } from "./performance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
 import { decideCommitment } from "./workspace";
 
@@ -658,7 +659,14 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
   const l = LEAVE.find((x) => x.workflow_instance_id === req.params.id);
   if (!l) {
     const reason = (req.body as { reason?: string } | undefined)?.reason;
-    return decideLocationRequest(req.user!, req.params.id, approve, reason) ?? decideReview(req.user!, req.params.id, approve, reason) ?? decideCommitment(req.user!, req.params.id, approve, reason) ?? notFound();
+    return (
+      decideLocationRequest(req.user!, req.params.id, approve, reason) ??
+      decideReview(req.user!, req.params.id, approve, reason) ??
+      decideCommitment(req.user!, req.params.id, approve, reason) ??
+      decidePlan(req.user!, req.params.id, approve, reason) ??
+      decideTargetChange(req.user!, req.params.id, approve, reason) ??
+      notFound()
+    );
   }
   if (l.status !== "submitted") return notFound();
   if (l.key === req.user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
@@ -672,8 +680,8 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
   return ok({ workflow_instance_id: l.workflow_instance_id, state: l.status, stage_name: null });
 };
 route("GET /api/v1/workflow/instances/:id", (req) => {
-  const wlr = locationRequestInstance(req.user!, req.params.id);
-  return wlr ? ok(wlr) : notFound();
+  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id);
+  return found ? ok(found) : notFound();
 });
 route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));
 route("POST /api/v1/workflow/instances/:id/reject", (req) => decide(req, false));
@@ -712,7 +720,7 @@ export function waitingOn(user: string): ApprovalWaiting[] {
         link: `/people?tab=leave&id=${l.leave_request_id}`,
       };
     })
-    .concat(locationRequestsWaitingOn(user), reviewsWaitingOn(user))
+    .concat(locationRequestsWaitingOn(user), reviewsWaitingOn(user), performanceWaitingOn(user))
     .sort((a, b) => a.stage_entered_at.localeCompare(b.stage_entered_at));
 }
 route("GET /api/v1/workflow/mine", (req) => paged(waitingOn(req.user!), req, { filters: { module_key: (r, v) => r.module_key === v } }));

@@ -164,12 +164,25 @@ const ACTIONS = Object.freeze([
     need: ["workspace", "create"],
     words: ["commitment", "commitments", "monthly commitment", "set my commitments", "priority for the month"],
   }),
+  a("new_project", "New Project", {
+    screen: "workspace.projects",
+    params: { action: "new" },
+    need: ["workspace", "create"],
+    words: ["project", "start a project", "new project", "workstream"],
+  }),
   // Performance (docs/guides/performance.md §9).
   a("new_goal", "New Goal", {
     screen: "performance.goals",
     params: { action: "new" },
     need: ["performance", "create"],
     words: ["objective", "key result", "okr", "organisational goal", "set a goal"],
+  }),
+  a("set_up_quarter", "Set Up Quarter", {
+    screen: "performance.goals",
+    params: { action: "quarter" },
+    need: ["performance", "create"],
+    capability: "performance.manage",
+    words: ["quarter", "new quarter", "next quarter", "open the quarter", "scoring rules", "rating bands", "section weights", "lock date"],
   }),
   a("report_month", "Report Month", {
     screen: "performance.goals",

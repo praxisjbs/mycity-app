@@ -15,6 +15,7 @@ export default {
     Default: () => <Calendar year={2026} month={9} events={EVENTS} />,
     Opening: () => <Calendar year={2026} month={9} events={EVENTS.map((e) => ({ ...e, onSelect: () => undefined }))} />,
     "Nothing On": () => <Calendar year={2026} month={10} events={[]} />,
+    "Adding To A Day": () => <Calendar year={2026} month={9} events={EVENTS} onAddDay={() => undefined} addLabel="Add Task" addFrom="2026-10-13" />,
     February: () => <Calendar year={2026} month={1} events={[{ date: "2026-02-25", label: "Payday", highlight: true }]} />,
   },
 } satisfies GalleryEntry;

@@ -7,7 +7,7 @@
 const { z } = require("zod");
 const { uuid, isoDate, isoDateTime, PAGE_SIZE, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
-const { Task, TaskPriority, TaskStatus, TaskActivityKind, TaskScope } = require("./tasks");
+const { Task, TaskRef, TaskPriority, TaskStatus, TaskActivityKind, TaskScope, LateReason, LATE_REASONS_MAX } = require("./tasks");
 const { CalendarItem } = require("./calendar");
 
 /** The first page of a list on Today, with how many there are in all. */
@@ -60,6 +60,22 @@ const WeekCount = z.object({ week_start: isoDate, count: z.number().int().min(0)
 const PersonLoad = z.object({ employee: PersonRef, open: z.number().int().min(0) }).strict();
 const PriorityLoad = z.object({ priority: TaskPriority, open: z.number().int().min(0) }).strict();
 
+/** How long open tasks have been overdue, in days: 1 to 3, 4 to 7, 8 to 14, 15 and more. */
+const AgingBand = z.enum(["1_3", "4_7", "8_14", "15_plus"]);
+const AgingCount = z.object({ band: AgingBand, count: z.number().int().min(0) }).strict();
+/** Open overdue tasks by the reason given; null: no reason recorded. */
+/** Overdue tasks with one late reason, by its words (null: none given). */
+const ReasonCount = z.object({ reason: LateReason.nullable(), label: z.string().nullable(), count: z.number().int().min(0) }).strict();
+/** A task held by a blockage now, oldest hold first. */
+const BlockedWork = z
+  .object({
+    task: TaskRef,
+    note: z.string(),
+    raised_at: isoDateTime,
+    blocked_days: z.number().min(0),
+  })
+  .strict();
+
 const WorkspaceAnalytics = z
   .object({
     from: isoDate,
@@ -69,9 +85,14 @@ const WorkspaceAnalytics = z
     avg_completion_days: z.number().min(0).nullable(),
     done: z.number().int().min(0),
     cancelled: z.number().int().min(0),
+    open: z.number().int().min(0),
+    cycle_days: z.number().min(0).nullable(),
     completed_per_week: z.array(WeekCount).max(60),
     workload: z.array(PersonLoad).max(PAGE_SIZE),
     by_priority: z.array(PriorityLoad).max(4),
+    overdue_aging: z.array(AgingCount).max(4),
+    overdue_by_reason: z.array(ReasonCount).max(LATE_REASONS_MAX + 1),
+    blocked: firstPage(BlockedWork),
   })
   .strict();
 
@@ -166,6 +187,9 @@ const TABLES = {
   WeekCount: { table: null, reason: "tasks done in one week" },
   PersonLoad: { table: null, reason: "open tasks of one person" },
   PriorityLoad: { table: null, reason: "open tasks of one priority" },
+  AgingCount: { table: null, reason: "open overdue tasks in one band of days" },
+  ReasonCount: { table: null, reason: "open overdue tasks with one late reason" },
+  BlockedWork: { table: null, reason: "a task and its open task_blockage" },
   WorkspaceAnalytics: { table: null, reason: "aggregates over task" },
 };
 
@@ -178,6 +202,10 @@ module.exports = {
   WeekCount,
   PersonLoad,
   PriorityLoad,
+  AgingBand,
+  AgingCount,
+  ReasonCount,
+  BlockedWork,
   WorkspaceAnalytics,
   WeekStart,
   WeekQuery,

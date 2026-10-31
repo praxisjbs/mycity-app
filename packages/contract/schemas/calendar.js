@@ -24,6 +24,8 @@ const CalendarVisibility = z.enum(["private", "attendees", "everyone"]);
 const AttendeeResponse = z.enum(["pending", "accepted", "declined"]);
 /** Records an event may belong to; each is a key of shared/route-map ENTITY_ROUTES. */
 const CalendarEntityType = z.enum(["interview", "partner", "vacancy"]);
+/** Up to three reminders before an event starts, in minutes (0: at the start; at most 14 days). */
+const ReminderMinutes = z.array(z.number().int().min(0).max(20160)).max(3);
 
 const Attendee = z
   .object({
@@ -51,6 +53,7 @@ const CalendarEvent = z
     entity_id: uuid.nullable(),
     link: Link.nullable(),
     cancelled_at: isoDateTime.nullable(),
+    reminder_minutes: ReminderMinutes,
     can_edit: z.boolean(),
     created_at: isoDateTime,
   })
@@ -91,7 +94,8 @@ const CalendarListQuery = listQuery(
   ["starts_at"],
 );
 
-const endsAfterStart = (v) => !v.starts_at || !v.ends_at || v.ends_at > v.starts_at;
+/** By the instant, not the text: 10:00+01:00 and 09:30Z are compared as times. */
+const endsAfterStart = (v) => !v.starts_at || !v.ends_at || Date.parse(v.ends_at) > Date.parse(v.starts_at);
 const ENDS_BEFORE = { message: "Ends before it starts", path: ["ends_at"] };
 
 /** POST /calendar */
@@ -107,6 +111,7 @@ const CalendarEventCreate = z
     location: optionalText(200),
     visibility: CalendarVisibility.default("attendees"),
     attendee_ids: z.array(uuid).max(50).default([]),
+    reminder_minutes: ReminderMinutes.default([]),
   })
   .strict()
   .refine(endsAfterStart, ENDS_BEFORE);
@@ -124,6 +129,24 @@ const CalendarEventPrefill = z
     ends_at: isoDateTime.optional(),
     // address:none a meeting's room or call link, not a street address
     location: optionalText(200),
+    /** The people the person named, found through the colleague card. */
+    attendee_ids: z.array(uuid).max(50).optional(),
+  })
+  .strict();
+
+/**
+ * The calendar-invite email (workspace.md §6 Invitations by email): what an attendee reads
+ * beside the .ics. `heading` says what happened: Invitation, Updated or Called Off.
+ */
+const CalendarInviteEmailVars = z
+  .object({
+    heading: z.enum(["Invitation", "Updated", "Called Off"]),
+    title: z.string(),
+    organiser: z.string(),
+    when: z.string(),
+    location: z.string().nullable(),
+    called_off: z.boolean(),
+    link_url: z.string(),
   })
   .strict();
 
@@ -140,6 +163,7 @@ const CalendarEventEdit = z
     location: z.string().trim().max(200).nullable().optional(),
     visibility: CalendarVisibility.optional(),
     attendee_ids: z.array(uuid).max(50).optional(),
+    reminder_minutes: ReminderMinutes.optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field")
@@ -163,6 +187,7 @@ const TABLES = {
       attendees: "calendar_event_attendee rows of the event",
       my_response: "the caller's calendar_event_attendee.response, null when not invited",
       link: "linkFor(calendar_event.entity_type, calendar_event.entity_id), never stored",
+      reminder_minutes: "the event's pending occurrences in the shared reminder engine",
       can_edit: "the caller owns the event",
     },
   },
@@ -174,22 +199,34 @@ const TABLES = {
   CalendarListQuery: { table: null, reason: "the month and list controls" },
   CalendarEventCreate: {
     table: "calendar_event",
-    virtual: { attendee_ids: "written to calendar_event_attendee" },
+    virtual: {
+      attendee_ids: "written to calendar_event_attendee",
+      reminder_minutes: "scheduled in the shared reminder engine",
+    },
   },
-  CalendarEventPrefill: { table: "calendar_event" },
+  CalendarEventPrefill: {
+    table: "calendar_event",
+    virtual: { attendee_ids: "the calendar_event_attendee rows the form starts with" },
+  },
+  CalendarInviteEmailVars: { table: null, reason: "an email template's variables" },
   CalendarEventEdit: {
     table: "calendar_event",
-    virtual: { attendee_ids: "replaces the calendar_event_attendee rows" },
+    virtual: {
+      attendee_ids: "replaces the calendar_event_attendee rows",
+      reminder_minutes: "replaces the event's reminders in the shared reminder engine",
+    },
   },
   CalendarRespond: { table: "calendar_event_attendee" },
 };
 
 module.exports = {
+  CalendarInviteEmailVars,
   TABLES,
   CalendarEventType,
   CalendarVisibility,
   AttendeeResponse,
   CalendarEntityType,
+  ReminderMinutes,
   PerformanceDateKind,
   CalendarItemKind,
   Attendee,

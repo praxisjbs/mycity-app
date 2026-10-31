@@ -85,7 +85,10 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
    gives a 301 to https.
 
 The deploy keys and the first release: `docs/runbooks/deploy.md`. Until the first release the
-units stay skipped and the hosts answer 502 over https.
+units stay skipped and the hosts answer 502 over https. The first release's migrations write which
+environment each database is (`system_marker`: staging on `mycity_stg`, production on `mycity_prod`);
+nothing is written here, since the table does not exist until then. Staging's demonstration data
+comes after that, by hand (`docs/runbooks/deploy.md` §2).
 
 ## 5 · Changing the server later
 

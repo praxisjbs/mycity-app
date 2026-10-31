@@ -7,10 +7,13 @@
  *    manager's reporting line, a head's department, everyone for `all`);
  *  - a person sees a task when its assignee is in their scope, or when they are its
  *    assignee, its setter or a co-assignee;
- *  - the setter manages a task (title, due day, cadence, assignee, KPI, record,
- *    cancel), and so does anyone whose scope covers an assignee other than
- *    themselves; the assignee of a task someone else set moves it, changes its
- *    priority and notes, blocks it and comments, and nothing more.
+ *  - the setter manages a task (title, due day, cadence, assignee, who shares it,
+ *    project, KPI, record, cancel), and so does anyone whose scope covers an assignee other
+ *    than themselves; the assignee of a task someone else set (even with an `all`
+ *    grant), and the people sharing a task, move it, change its priority and notes,
+ *    block it and comment;
+ *  - a shared task's people are anyone the caller may set a task for, and the
+ *    caller's own department when they lead it (tasks.service shareWith).
  */
 const { AppError } = require("../../shared/errors");
 
@@ -49,7 +52,6 @@ function mayManage(scope, task) {
   const me = scope.employee_id;
   if (me && task.set_by_employee_id === me) return true;
   if (!task.set_by_employee_id && task.primary_assignee_id === me) return true;
-  if (scope.scope === "all") return true;
   return task.primary_assignee_id !== me && inScope(scope, task.primary_assignee_id);
 }
 
@@ -59,9 +61,12 @@ const SETTER_FIELDS = Object.freeze([
   "cadence",
   "due_on",
   "primary_assignee_id",
+  "member_ids",
+  "department_id",
   "employee_target_id",
   "entity_type",
   "entity_id",
+  "project_id",
   "recurrence",
 ]);
 

@@ -2,13 +2,15 @@
 /**
  * Today: the reader's day on one screen (docs/guides/workspace.md §2, §6).
  *
- *   due_today, overdue, in_review, done_this_week   the four figures, the reader's own
- *   my_day          their open tasks due today or overdue, overdue first
+ *   due_today, overdue, in_review, done_this_week   the four figures, the reader's own;
+ *                   due today is open and not yet past its time (past it, a task is overdue)
+ *   my_day          their open tasks overdue or due today, overdue first
  *   set_by_manager  their open tasks someone else set, soonest due first
  *   diary           today's entries on their calendar
  *   since           what other people did to their tasks since the start of the
  *                   previous working day, newest first
- * Each list is its first page of 25 with its total; Tasks and the Calendar hold the rest.
+ * Each list is its first page of 25 with its true total, filtered on the server; Tasks and the
+ * Calendar hold the rest.
  */
 const { pool } = require("../../config/db");
 const lagos = require("../../shared/time/lagos");
@@ -37,28 +39,19 @@ async function today(user, scope, now = new Date()) {
   const mine = { ...scope, employee_id: user.employee_id };
   const own = { scope: "mine", assignee_id: user.employee_id };
 
+  const soonest = { field: "due_at", dir: "asc" };
   const [summary, dueToday, overdue, inReview, setByOthers, diary, since] = await Promise.all([
     tasksRepo.summary(pool, "mine", mine, at),
-    tasks.list({ ...own, due: "today", sort: { field: "due_at", dir: "asc" }, page: 1 }, mine),
-    tasks.list({ ...own, due: "overdue", sort: { field: "due_at", dir: "asc" }, page: 1 }, mine),
-    tasks.list({ ...own, status: "in_review", page: 1 }, mine),
-    tasks.list({ ...own, sort: { field: "due_at", dir: "asc" }, page: 1 }, mine),
-    calendar.month(user.employee_id, { month: day.slice(0, 7), page: 1, sort: { field: "starts_at", dir: "asc" } }),
+    tasks.list({ ...own, due: "today", sort: soonest, page: 1 }, mine, { open: true, notPast: true }, now),
+    tasks.list({ ...own, due: "overdue", sort: soonest, page: 1 }, mine, {}, now),
+    tasks.list({ ...own, status: "in_review", page: 1 }, mine, {}, now),
+    tasks.list({ ...own, sort: soonest, page: 1 }, mine, { open: true, setByOther: true }, now),
+    calendar.day(user.employee_id, day, { page: 1, sort: { field: "starts_at", dir: "asc" } }),
     tasksRepo.activitySince(pool, user.employee_id, user.user_id, sinceOf(day, cal)),
   ]);
 
-  const seen = new Set();
-  const myDay = [...overdue.data, ...dueToday.data].filter((t) => {
-    if (seen.has(t.task_id) || t.status === "done") return false;
-    seen.add(t.task_id);
-    return true;
-  });
-  const fromOthers = setByOthers.data.filter(
-    (t) => t.status !== "done" && t.set_by && t.set_by.employee_id !== user.employee_id,
-  );
-  const start = lagos.instant(day);
-  const end = lagos.instant(lagos.addDays(day, 1));
-  const todays = diary.data.filter((i) => new Date(i.starts_at) < end && new Date(i.ends_at) > start);
+  // Overdue and due today never share a task: one is past its time, the other is not yet.
+  const myDay = [...overdue.data, ...dueToday.data];
 
   return {
     date: day,
@@ -67,8 +60,8 @@ async function today(user, scope, now = new Date()) {
     in_review: inReview.page.total,
     done_this_week: summary.done_this_week,
     my_day: { data: myDay.slice(0, 25), total: overdue.page.total + dueToday.page.total },
-    set_by_manager: { data: fromOthers, total: fromOthers.length },
-    diary: { data: todays, total: todays.length },
+    set_by_manager: first(setByOthers),
+    diary: first(diary),
     since: first({
       data: since.data.map((a) => ({
         task_id: a.task_id,

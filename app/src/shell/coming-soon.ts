@@ -14,6 +14,7 @@ export const COMING: Record<string, string[]> = {
   /* My Workspace */
   "workspace/today": ["The tasks your manager set for today, and your own", "Your diary and the meetings ahead", "Tick off work as you go; your manager sees progress live"],
   "workspace/tasks": ["Every task on a board: to do, in progress, in review, done", "Tasks your manager set for the week, and ones you add", "Due dates, priorities and comments on each"],
+  "workspace/projects": ["Work that belongs together, on a board of its own", "Anyone starts one; everyone can find it", "Each task keeps who may see it"],
   "workspace/calendar": ["Your week: meetings, leave, public holidays and deadlines", "Invites go out as calendar files people can accept", "Book time with a colleague at a free slot"],
   "workspace/analytics": ["How your week went: tasks done, on time and late", "Trends over the month, against your team", "What is slipping, before it becomes a problem"],
 

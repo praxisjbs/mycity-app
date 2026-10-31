@@ -26,6 +26,17 @@ const { KeyResultRef, Scorecard, Contribution } = require("./targets");
 
 const PeriodStatus = z.enum(["planning", "active", "closed"]);
 
+/**
+ * A text or typed value an edit may clear: "" or null clears it (null on the row), anything else
+ * is held to the type's own rules. Left out, it is not changed (the edit is partial).
+ */
+const clearable = (schema) =>
+  schema
+    .or(z.literal(""))
+    .nullable()
+    .transform((v) => (v === "" ? null : v));
+const clearableText = (max) => clearable(z.string().trim().max(max));
+
 /** A quarter: its dates, its lock date, the first day the system ran it, and its rules. */
 const PerformancePeriod = z
   .object({
@@ -46,21 +57,30 @@ const PerformancePeriod = z
 
 const PeriodPage = Paged(PerformancePeriod);
 
-/** GET /performance/periods */
-const PeriodListQuery = listQuery({ status: PeriodStatus.optional() }, ["starts_on"]);
+/** GET /performance/periods. `plan_year` lists the quarters of one plan year (a goal's). */
+const PeriodListQuery = listQuery(
+  {
+    status: PeriodStatus.optional(),
+    plan_year: z.coerce.number().int().min(2020).max(2100).optional(),
+  },
+  ["starts_on"],
+);
 
 /**
  * POST /performance/periods. A quarter starts on the first day of January, April, July or
- * October; its name ("Q4 2026"), end and plan year follow unless given. Its rules are copied
- * from the last quarter (the code's defaults for the first).
+ * October; its name ("Q4 2026"), end and plan year follow unless given. Its rules are those given,
+ * else the last quarter's (the code's defaults for the first). It is set up planning, or active
+ * when no other quarter is; a quarter may be set up before it starts.
  */
 const PeriodCreate = z
   .object({
-    starts_on: isoDate.refine((v) => /-(01|04|07|10)-01$/.test(v), "must be the first day of a quarter"),
+    starts_on: isoDate.refine((v) => /-(01|04|07|10)-01$/.test(v), "Pick a quarter's first day"),
     name: optionalText(40),
     plan_year_starts_on: blank(isoDate),
     targets_lock_on: blank(isoDate),
     live_from: blank(isoDate),
+    status: z.enum(["planning", "active"]).optional(),
+    rules: ScoringRules.optional(),
   })
   .strict();
 
@@ -172,18 +192,18 @@ const OrganisationalGoalCreate = z
   })
   .strict();
 
-/** PATCH /performance/goals/:id. `targets` replaces the quarterly targets given. */
+/** PATCH /performance/goals/:id. `targets` replaces the quarterly targets given; an empty text clears it. */
 const OrganisationalGoalEdit = z
   .object({
     title: text(300),
-    code: z.string().trim().max(20).nullable(),
-    strategic_theme: z.string().trim().max(200).nullable(),
-    detail: z.string().trim().max(4000).nullable(),
-    success_measure: z.string().trim().max(1000).nullable(),
-    reference_target: z.string().trim().max(1000).nullable(),
-    baseline: z.string().trim().max(1000).nullable(),
-    key_decisions: z.string().trim().max(2000).nullable(),
-    function_cascade: z.string().trim().max(2000).nullable(),
+    code: clearableText(20),
+    strategic_theme: clearableText(200),
+    detail: clearableText(4000),
+    success_measure: clearableText(1000),
+    reference_target: clearableText(1000),
+    baseline: clearableText(1000),
+    key_decisions: clearableText(2000),
+    function_cascade: clearableText(2000),
     status: OrganisationalGoalStatus,
     targets: z.array(OrganisationalGoalTargetInput).max(4),
   })
@@ -288,6 +308,8 @@ const Objective = z
     plan_status: PlanStatus,
     score: ScoreValue.nullable(),
     key_results: z.array(KeyResult),
+    /** The reader may edit or delete it and its key results: its plan is draft or returned, and they set its goals. */
+    can_edit: z.boolean(),
   })
   .strict();
 
@@ -336,7 +358,7 @@ const ObjectiveCreate = z
 const ObjectiveEdit = z
   .object({
     title: text(500),
-    organisational_goal_id: uuid.nullable(),
+    organisational_goal_id: clearable(uuid),
     position: z.number().int().min(0),
   })
   .partial()
@@ -373,31 +395,53 @@ const KeyResultCreate = z
     path: ["finishes_on"],
   });
 
-/** PATCH /performance/key-results/:id: every field while the plan is a draft; none once binding. */
+/**
+ * PATCH /performance/key-results/:id: every field while the plan is a draft or returned (an empty
+ * one clears it); once binding, only an open TBC target, by its owner or the function's head (§6.7).
+ */
 const KeyResultEdit = z
   .object({
     statement: text(1000),
-    kr_type: KrType.nullable(),
+    kr_type: clearable(KrType),
     measure: KrMeasure,
     direction: Direction,
-    unit: z.string().trim().max(40).nullable(),
-    baseline_text: z.string().trim().max(1000).nullable(),
-    target_value: Quantity.nullable(),
-    target_text: z.string().trim().max(1000).nullable(),
+    unit: clearableText(40),
+    baseline_text: clearableText(1000),
+    target_value: clearable(Quantity),
+    target_text: clearableText(1000),
     target_provisional: z.boolean(),
     parts: z.array(KeyResultPart).max(10).nullable(),
-    starts_on: isoDate.nullable(),
-    finishes_on: isoDate.nullable(),
-    accountable_employee_id: uuid.nullable(),
-    co_accountable_employee_id: uuid.nullable(),
-    accountable_note: z.string().trim().max(300).nullable(),
-    scored_from_key_result_id: uuid.nullable(),
+    starts_on: clearable(isoDate),
+    finishes_on: clearable(isoDate),
+    accountable_employee_id: clearable(uuid),
+    co_accountable_employee_id: clearable(uuid),
+    accountable_note: clearableText(300),
+    scored_from_key_result_id: clearable(uuid),
     linked_company_key_result_ids: z.array(uuid).max(10),
     position: z.number().int().min(0),
   })
   .partial()
   .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+  .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" })
+  .refine((v) => !v.starts_on || !v.finishes_on || v.finishes_on >= v.starts_on, {
+    message: "Finishes before it starts",
+    path: ["finishes_on"],
+  });
+
+/**
+ * GET /performance/key-results: a quarter's key results, 25 a page, for a picker. `level` keeps the
+ * company's (Feeds) or the functions' (Scored From); `department_id` one function's.
+ */
+const KeyResultListQuery = listQuery(
+  {
+    period_id: uuid,
+    level: z.enum(["company", "function"]).optional(),
+    department_id: uuid.optional(),
+  },
+  ["code"],
+);
+
+const KeyResultRefPage = Paged(KeyResultRef);
 
 /** A task that carries out a key result (an initiative). */
 const Initiative = z
@@ -453,6 +497,7 @@ const TargetChange = z
 /** GET /performance/key-results/:id */
 const KeyResultDetail = KeyResult.extend({
   objective: ObjectiveRef,
+  performance_period_id: uuid,
   department_id: uuid.nullable(),
   department: z.string().nullable(),
   plan_status: PlanStatus,
@@ -462,6 +507,10 @@ const KeyResultDetail = KeyResult.extend({
   target_history: z.array(TargetChange),
   trace: Trace,
   can_change_target: z.boolean(),
+  /** The reader may edit or delete it: its plan is draft or returned, and they set its goals. */
+  can_edit: z.boolean(),
+  /** The reader may set its TBC target in place: before the lock date, its owner or the function's head. */
+  can_set_target: z.boolean(),
 }).strict();
 
 /* ------------------------------------------------------------------ *
@@ -534,6 +583,7 @@ const Plan = z
     department: z.string().nullable(),
     status: PlanStatus,
     workflow_instance_id: uuid.nullable(),
+    submitted_by: PersonRef.nullable(),
     submitted_at: isoDateTime.nullable(),
     returned_reason: z.string().nullable(),
     binding_at: isoDateTime.nullable(),
@@ -610,6 +660,58 @@ const TargetChangeListQuery = listQuery(
   },
   ["created_at"],
 );
+
+/** The scorecard line a target change is for. */
+const TargetChangeLine = z
+  .object({
+    employee_target_id: uuid,
+    title: z.string(),
+    employee: PersonRef,
+  })
+  .strict();
+
+/** GET /performance/target-changes/:id: one change, named in full, for its sheet. */
+const TargetChangeDetail = TargetChange.extend({
+  key_result: KeyResultRef.nullable(),
+  unit: z.string().nullable(),
+  line: TargetChangeLine.nullable(),
+  department: z.string().nullable(),
+  period_name: z.string().nullable(),
+}).strict();
+
+/* ------------------------------------------------------------------ *
+ * Approvals waiting on the reader (§6.4, §6.7)
+ * ------------------------------------------------------------------ */
+
+/** A function's plan, a target change, or a mid-quarter scorecard sent on its own (§11). */
+const PerformanceApprovalKind = z.enum(["plan", "target_change", "scorecard"]);
+
+/**
+ * A plan stage, a target change or a mid-quarter scorecard the reader decides: Goals · Waiting On
+ * You. `record_id` is the plan, the change or the scorecard; `employee` the person whose
+ * scorecard it is (a scorecard, or a line's target change).
+ */
+const PerformanceApproval = z
+  .object({
+    kind: PerformanceApprovalKind,
+    record_id: uuid,
+    workflow_instance_id: uuid,
+    period_name: z.string().nullable(),
+    department: z.string().nullable(),
+    key_result_code: z.string().nullable(),
+    line_title: z.string().nullable(),
+    employee: PersonRef.nullable(),
+    requested_by: PersonRef.nullable(),
+    stage_name: z.string(),
+    waiting_since: isoDateTime,
+    overdue: z.boolean(),
+  })
+  .strict();
+
+const PerformanceApprovalPage = Paged(PerformanceApproval);
+
+/** GET /performance/approvals: oldest first; `q` finds a function, a key result, a person or who asked. */
+const PerformanceApprovalQuery = listQuery({});
 
 /* ------------------------------------------------------------------ *
  * Import (§6.19)
@@ -793,6 +895,7 @@ const KR_VIRTUAL = {
 };
 const GOAL_VIRTUAL = { owner: "the person in organisational_goal.owner_employee_id" };
 const PLAN_VIRTUAL = {
+  submitted_by: "the employee of performance_plan.submitted_by",
   period_name: "performance_period.name",
   department: "department.name; null for the company plan",
   objective_count: "how many objectives it holds, counted",
@@ -805,7 +908,7 @@ const TABLES = {
     virtual: { months: "the quarter's three months, worked out from starts_on" },
   },
   PeriodPage: { table: null, reason: "a page of quarters" },
-  PeriodListQuery: { table: null, reason: "list controls and the status filter" },
+  PeriodListQuery: { table: null, reason: "list controls and the status and plan year filters" },
   PeriodCreate: { table: "performance_period" },
   PeriodEdit: { table: "performance_period" },
   OrganisationalGoal: { table: "organisational_goal", virtual: GOAL_VIRTUAL },
@@ -851,6 +954,7 @@ const TABLES = {
       plan_status: "performance_plan.status",
       score: "the mean of its key results' latest scores (§6.8)",
       key_results: "its okr_key_result rows",
+      can_edit: "the reader may change it now: a draft or returned plan, and goals.authority",
     },
   },
   ObjectivePage: { table: null, reason: "a page of objectives with their key results" },
@@ -867,6 +971,8 @@ const TABLES = {
     table: "okr_key_result",
     virtual: { linked_company_key_result_ids: "replaces the okr_key_result_link rows" },
   },
+  KeyResultListQuery: { table: null, reason: "list controls and filters for a key result picker" },
+  KeyResultRefPage: { table: null, reason: "a page of key results as a picker names them" },
   Initiative: {
     table: "task",
     virtual: { assignee: "the person in task.primary_assignee_id" },
@@ -883,6 +989,7 @@ const TABLES = {
     virtual: {
       ...KR_VIRTUAL,
       objective: "its okr_objective",
+      performance_period_id: "okr_objective.performance_period_id",
       department_id: "okr_objective.department_id",
       department: "department.name; null for a company key result",
       plan_status: "performance_plan.status",
@@ -892,6 +999,8 @@ const TABLES = {
       target_history: "its target_change rows",
       trace: "what it rolls up to",
       can_change_target: "the reader may ask to change its target now (goals.authority)",
+      can_edit: "the reader may change it now: a draft or returned plan, and goals.authority",
+      can_set_target: "the reader may set its TBC target in place before the lock date (§6.7)",
     },
   },
   KeyResultReport: {
@@ -927,6 +1036,24 @@ const TABLES = {
   TargetChangeCreate: { table: "target_change" },
   TargetChangePage: { table: null, reason: "a page of target changes" },
   TargetChangeListQuery: { table: null, reason: "list controls and filters for target changes" },
+  TargetChangeLine: { table: "employee_target", virtual: { employee: "the line's employee" } },
+  TargetChangeDetail: {
+    table: "target_change",
+    virtual: {
+      requested_by: "the employee of target_change.requested_by",
+      key_result: "the okr_key_result it changes",
+      unit: "the key result's or the line's unit",
+      line: "the employee_target it changes",
+      department: "the function of the key result or of the line's scorecard",
+      period_name: "the quarter of the key result or of the line's scorecard",
+    },
+  },
+  PerformanceApproval: {
+    table: null,
+    reason: "a pending performance.plan (a plan, or a scorecard sent on its own) or performance.target_change workflow_instance naming the reader, with its record",
+  },
+  PerformanceApprovalPage: { table: null, reason: "a page of approvals waiting on the reader" },
+  PerformanceApprovalQuery: { table: null, reason: "list controls for the approvals waiting on the reader" },
   PerformanceAnalyticsQuery: { table: null, reason: "which quarter and function to count" },
   OnTime: { table: null, reason: "how many were due and how many on time, counted" },
   MonthOnTime: { table: null, reason: "one month's due and on time, counted" },
@@ -986,6 +1113,8 @@ module.exports = {
   ObjectiveEdit,
   KeyResultCreate,
   KeyResultEdit,
+  KeyResultListQuery,
+  KeyResultRefPage,
   Initiative,
   TraceStep,
   Trace,
@@ -1006,6 +1135,12 @@ module.exports = {
   TargetChangeCreate,
   TargetChangePage,
   TargetChangeListQuery,
+  TargetChangeLine,
+  TargetChangeDetail,
+  PerformanceApprovalKind,
+  PerformanceApproval,
+  PerformanceApprovalPage,
+  PerformanceApprovalQuery,
   PerformanceAnalyticsQuery,
   ScoreGap,
   OnTime,

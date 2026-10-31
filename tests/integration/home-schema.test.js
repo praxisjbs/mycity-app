@@ -417,13 +417,14 @@ describeDb("Home schema and reference data against the real migrations", () => {
       const managers = ["alerts.clear", "home.reports", "home.team"];
       // 1129 (Mailbox) adds Configure Signature to System Administrator and Implementation; 1396
       // (policies) Manage Policies to Operations & People and Implementation; 2190 (Performance) the
-      // goals and performance capabilities (performance.md §8).
+      // goals and performance capabilities (performance.md §8); 2590 (My Workspace) Manage Late Reasons
+      // to Management, Operations & People and Implementation (workspace.md §8).
       const goals = ["goals.company", "goals.confirm", "goals.function", "goals.organisation"];
       const sorted = (codes) => [...codes].sort();
       expect(Object.fromEntries(rows.map((r) => [r.role, r.codes]))).toEqual({
-        implementation: sorted([...all, ...goals, "mailbox.signature", "performance.manage", "policies.manage"]),
-        operations_people: sorted([...all, "goals.function", "performance.manage", "policies.manage"]),
-        management: sorted([...all, "goals.company", "goals.function"]),
+        implementation: sorted([...all, ...goals, "mailbox.signature", "performance.manage", "policies.manage", "workspace.late_reasons"]),
+        operations_people: sorted([...all, "goals.function", "performance.manage", "policies.manage", "workspace.late_reasons"]),
+        management: sorted([...all, "goals.company", "goals.function", "workspace.late_reasons"]),
         head_of_department: sorted([...managers, "goals.function"]),
         manager: managers,
         administrator: ["mailbox.signature"],
@@ -493,8 +494,8 @@ describeDb("Home schema and reference data against the real migrations", () => {
         await c.query(SEED.down);
 
         const codes = await c.query("SELECT code::text AS code FROM capability ORDER BY code::text");
-        // 1129's capability is Mailbox's, 1396's the policies' and 2190's Performance's, untouched by
-        // undoing Home's seed.
+        // 1129's capability is Mailbox's, 1396's the policies', 2190's Performance's and 2590's My
+        // Workspace's, untouched by undoing Home's seed.
         expect(codes.rows.map((r) => r.code)).toEqual([
           "alerts.clear",
           "announcements.post",
@@ -506,6 +507,7 @@ describeDb("Home schema and reference data against the real migrations", () => {
           "mailbox.signature",
           "performance.manage",
           "policies.manage",
+          "workspace.late_reasons",
         ]);
         const heldBy = async (role) =>
           (
@@ -516,7 +518,7 @@ describeDb("Home schema and reference data against the real migrations", () => {
               [role],
             )
           ).rows.map((r) => r.code);
-        expect(await heldBy("operations_people")).toEqual(["alerts.clear", "announcements.post", "goals.function", "performance.manage", "policies.manage"]);
+        expect(await heldBy("operations_people")).toEqual(["alerts.clear", "announcements.post", "goals.function", "performance.manage", "policies.manage", "workspace.late_reasons"]);
         expect(await heldBy("manager")).toEqual([]);
         expect(await heldBy("studio_lead")).toEqual(["home.team"]);
         expect(await seededKeysLeft(c)).toEqual([...SEEDED_KEYS].sort());

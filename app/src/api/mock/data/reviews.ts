@@ -114,6 +114,10 @@ export function reviewOf(key: string, stage: number, reviewerKey?: string, round
     conduct_note: null,
     probation_outcome: null,
     returned_reason: null,
+    no_check_in_at: null,
+    no_check_in_reason: null,
+    withdrawn_at: null,
+    withdrawn_reason: null,
     document_id: closed ? sid(`rv:pdf:${seed}`) : null,
     workflow_instance_id: stage >= 2 ? sid(`rv:wf:${seed}`) : null,
     items,
@@ -128,7 +132,7 @@ export function reviewOf(key: string, stage: number, reviewerKey?: string, round
     })),
     context: { on_time: 19, late: 2, absent: 0, recognitions: 1 },
     improvement_plan_id: null,
-    can: { check_in: false, score: false, submit: false, return_check_in: false, ask_input: false, give_input: false, mark_conduct: false, decide_probation: false, decide: false, start_pip: false },
+    can: { check_in: false, score: false, submit: false, return_check_in: false, ask_input: false, give_input: false, mark_conduct: false, decide_probation: false, decide: false, start_pip: false, score_without_check_in: false, withdraw: false },
   };
 }
 
@@ -186,6 +190,8 @@ const cynthiaLines: ScorecardLine[] = SPECS.map((s) => ({
   share_value: null,
   months: [],
   score: null,
+  can_change_target: false,
+  pending_change: null,
 }));
 
 export const CYNTHIA_CARD: ScorecardDetail = {

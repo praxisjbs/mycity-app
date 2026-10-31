@@ -4,7 +4,8 @@
  * the chain's decisions, conduct, probation, Tidy and improvement plans, on ../data/reviews.ts.
  *
  * Who sees what follows reviews.sequence.js: the reviewer is answered 409 CHECK_IN_FIRST until the
- * check-in is in, and the employee sees the reviewer's scores only once the review is closed.
+ * check-in is in or late, and the employee sees the reviewer's scores only once the review is closed.
+ * A late check-in offers its reviewer Score Without Check-In; Operations & People Withdraw Review (§11).
  */
 import scoring from "@mycity/contract/schemas/scoring.js";
 import type { ApprovalWaiting, MyPerformance, Pip, ReviewCheckIn, ReviewDetail, ReviewItem, Round } from "@mycity/contract/contract.gen.ts";
@@ -19,6 +20,13 @@ const meOf = (user: string | null) => byKey(user);
 const isHr = (user: string | null) => SIGN_INS[user ?? ""]?.view === "operations" || SIGN_INS[user ?? ""]?.view === "ceo";
 const isOperations = (user: string | null) => SIGN_INS[user ?? ""]?.view === "operations";
 const WITH_REVIEWER = ["with_reviewer", "returned"];
+const ENDED = ["closed", "withdrawn"];
+
+/** Has the check-in's due date ended (Lagos, UTC+1) with nothing sent (§11)? */
+const lateOf = (r: ReviewDetail) => {
+  const due = r.status === "check_in" ? roundOf(r).check_in_due_on : null;
+  return Boolean(due) && Date.now() >= Date.parse(`${due}T23:00:00.000Z`);
+};
 
 function rolesOf(r: ReviewDetail, user: string | null) {
   const me = meOf(user);
@@ -47,11 +55,14 @@ const waitingOnMe = (r: ReviewDetail, user: string | null) => {
 function view(r: ReviewDetail, user: string | null): ReviewDetail {
   const roles = rolesOf(r, user);
   const closed = r.status === "closed";
-  const submitted = Boolean(r.check_in_submitted_at) || r.status !== "check_in";
+  // Not in yet, or scored without it: the employee's drafts are theirs alone.
+  const unsent = !r.check_in_submitted_at && (r.status === "check_in" || Boolean(r.no_check_in_at));
   const team = roles.reviewer || roles.full;
+  const waiting = r.status === "check_in" && roles.reviewer && !roles.employee;
   const parts = {
-    check_in: roles.employee || (submitted && (team || roles.dotted)),
-    scores: team || (closed && (roles.employee || roles.inScope)),
+    check_in: roles.employee || (!unsent && (team || roles.dotted)),
+    self: roles.employee || !unsent,
+    scores: (team && !waiting) || (closed && (roles.employee || roles.inScope)),
     notes: team || (closed && roles.employee),
     input: team || roles.dotted || (closed && roles.employee),
   };
@@ -60,6 +71,7 @@ function view(r: ReviewDetail, user: string | null): ReviewDetail {
     ...(parts.check_in
       ? {}
       : { actual_value: null, actual_text: null, achieved_on: null, evidence_kind: null, evidence_entity_type: null, evidence_entity_id: null, evidence_document_id: null, evidence_url: null, evidence_note: null, evidence_link: null, action_text: null, action_transcript: null, action_document_id: null, self_reason: null, ...(parts.scores ? {} : { proposed_score: null, self_score: null }) }),
+    ...(parts.self ? {} : { self_score: null }),
     ...(parts.scores ? {} : { score: null }),
     ...(parts.notes ? {} : { override_reason: null, comment: null }),
   });
@@ -82,10 +94,12 @@ function view(r: ReviewDetail, user: string | null): ReviewDetail {
       return_check_in: scoring_,
       ask_input: scoring_ && Boolean(r.dotted) && !r.dotted_input,
       give_input: roles.dotted && Boolean(r.check_in_submitted_at) && WITH_REVIEWER.includes(r.status),
-      mark_conduct: roles.hr && !roles.employee && r.status !== "check_in",
+      mark_conduct: roles.hr && !roles.employee && r.status !== "check_in" && r.status !== "withdrawn",
       decide_probation: roles.hrStage && !roles.employee && r.review_kind === "probation" && r.status === "with_hr",
       decide: mayDecide(r, roles),
       start_pip: roles.hr && !roles.employee && closed && r.rating === "below" && !PIPS.some((p) => p.performance_review_id === r.performance_review_id),
+      score_without_check_in: roles.reviewer && !roles.employee && lateOf(r),
+      withdraw: roles.hr && !roles.employee && !ENDED.includes(r.status),
     },
   };
 }
@@ -118,24 +132,34 @@ function readable(req: Req): { r: ReviewDetail } | { refused: ReturnType<typeof 
   if (!r) return { refused: notFound() };
   const roles = rolesOf(r, req.user);
   if (!roles.named && !roles.inScope) return { refused: notFound() };
-  if (roles.reviewer && !roles.employee && r.status === "check_in") return { refused: fail(409, "CHECK_IN_FIRST", "Waiting for the check-in") };
+  if (roles.reviewer && !roles.employee && r.status === "check_in" && !lateOf(r)) return { refused: fail(409, "CHECK_IN_FIRST", "Waiting for the check-in") };
   return { r };
 }
 
 const roundOf = (r: ReviewDetail) => ROUNDS.find((x) => x.performance_cycle_id === r.performance_cycle_id) ?? ROUNDS[0];
 const dueFor = (r: ReviewDetail): string | null => {
   const round = roundOf(r);
-  const at: Record<string, string | null> = { check_in: round.check_in_due_on, with_reviewer: round.review_due_on, returned: round.review_due_on, second_level: round.second_level_due_on, with_hr: round.close_due_on, closed: null };
+  const at: Record<string, string | null> = { check_in: round.check_in_due_on, with_reviewer: round.review_due_on, returned: round.review_due_on, second_level: round.second_level_due_on, with_hr: round.close_due_on, closed: null, withdrawn: null };
   return at[r.status] ?? null;
 };
 /** The chain as the review shows it, from where it stands. */
 function chainOf(r: ReviewDetail): ReviewDetail["chain"] {
   const order = ["check_in", "reviewer", "second_level", "hr"] as const;
   const at: Record<string, number> = { check_in: 0, with_reviewer: 1, returned: 1, second_level: 2, with_hr: 3, closed: 4 };
+  if (r.status === "withdrawn") {
+    // Ended at HR's stage: what happened stays done, the rest is skipped.
+    const happened = { check_in: Boolean(r.check_in_submitted_at), reviewer: Boolean(r.submitted_at), second_level: false, hr: true };
+    return order.map((key) => ({
+      key,
+      state: happened[key] ? "done" : "skipped",
+      person: key === "check_in" ? r.employee.display_name : key === "reviewer" ? r.reviewer.display_name : key === "second_level" ? (r.second_level?.display_name ?? null) : "Operations & People",
+      at: key === "hr" ? r.withdrawn_at : happened[key] ? (r.chain.find((s) => s.key === key)?.at ?? null) : null,
+    }));
+  }
   const stage = at[r.status];
   return order.map((key, i) => {
     const was = r.chain.find((s) => s.key === key);
-    const skipped = key === "second_level" && !r.second_level && stage > 1;
+    const skipped = (key === "second_level" && !r.second_level && stage > 1) || (key === "check_in" && Boolean(r.no_check_in_at) && !r.check_in_submitted_at);
     return {
       key,
       state: skipped ? "skipped" : i < stage ? "done" : i === stage ? "current" : "waiting",
@@ -268,6 +292,7 @@ function forReviewer(req: Req): { r: ReviewDetail } | { refused: ReturnType<type
   const got = readable(req);
   if ("refused" in got) return got;
   if (!rolesOf(got.r, req.user).reviewer) return { refused: fail(403, "PERMISSION_DENIED", "Only the reviewer can do that") };
+  if (got.r.status === "check_in") return { refused: fail(409, "CHECK_IN_FIRST", "Waiting for the check-in") };
   if (!WITH_REVIEWER.includes(got.r.status)) return { refused: fail(409, "REVIEW_NOT_WITH_REVIEWER", "This review is not with its reviewer") };
   return got;
 }
@@ -333,6 +358,39 @@ route("POST /api/v1/performance/reviews/:id/return", (req) => {
   moved(r, "check_in");
   return ok(rowOf(view(r, req.user)));
 });
+/** Score Without Check-In (§11): the check-in is late; the employee's own lines are Not Assessable, Monthly Update On Time 0. */
+route("POST /api/v1/performance/reviews/:id/score-without-check-in", (req) => {
+  const got = readable(req);
+  if ("refused" in got) return got.refused;
+  const r = got.r;
+  if (!rolesOf(r, req.user).reviewer) return fail(403, "PERMISSION_DENIED", "Only the reviewer can do that");
+  if (r.status !== "check_in") return fail(409, "CHECK_IN_SENT", "The check-in is already in");
+  if (!lateOf(r)) return fail(409, "CHECK_IN_NOT_LATE", "The check-in is not due yet");
+  const reason = String((req.body as { no_check_in_reason?: string }).no_check_in_reason ?? "").trim();
+  if (!reason) return invalid({ no_check_in_reason: ["Required"] });
+  Object.assign(r, { no_check_in_at: now(), no_check_in_reason: reason, returned_reason: null });
+  for (const i of r.items) {
+    if (i.line?.source === "update_on_time") Object.assign(i, { proposed_score: "0", actual_text: "Late", assessable: true, auto: true });
+    else if (!i.auto) Object.assign(i, { proposed_score: null, assessable: false });
+  }
+  moved(r, "with_reviewer");
+  return ok(view(r, req.user));
+});
+
+/** Withdraw Review (§11): Operations & People close an open review as Withdrawn, with a reason. */
+route("POST /api/v1/performance/reviews/:id/withdraw", (req) => {
+  const got = readable(req);
+  if ("refused" in got) return got.refused;
+  const r = got.r;
+  if (ENDED.includes(r.status)) return fail(409, "REVIEW_ENDED", "This review is already closed");
+  if (!view(r, req.user).can.withdraw) return fail(403, "PERMISSION_DENIED", "Operations & People withdraw a review");
+  const reason = String((req.body as { withdrawn_reason?: string }).withdrawn_reason ?? "").trim();
+  if (!reason) return invalid({ withdrawn_reason: ["Required"] });
+  Object.assign(r, { withdrawn_at: now(), withdrawn_reason: reason });
+  moved(r, "withdrawn");
+  return ok(view(r, req.user));
+});
+
 route("POST /api/v1/performance/reviews/:id/ask-input", (req) => {
   const got = forReviewer(req);
   if ("refused" in got) return got.refused;

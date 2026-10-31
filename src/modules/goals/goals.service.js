@@ -80,7 +80,9 @@ async function currentPeriod(db = pool) {
 
 /**
  * Set up a quarter: its name, end and plan year follow from its first day unless given; its rules
- * are copied from the quarter before it (the code's defaults for the first).
+ * are those given (Set Up Quarter starts them from the last quarter's), else copied from the quarter
+ * before it (the code's defaults for the first). It is planning unless set active while no other
+ * quarter is; the next quarter is set up while this one runs.
  */
 async function createPeriod(actor, body) {
   const startsOn = body.starts_on;
@@ -90,8 +92,11 @@ async function createPeriod(actor, body) {
   const id = await tx(async (client) => {
     if (await repo.periodStarting(client, startsOn))
       throw new AppError("PERIOD_EXISTS", "That quarter is already set up", 409, { starts_on: ["Already set up"] });
+    const status = body.status || "planning";
+    if (status === "active" && (await repo.otherActive(client, null)))
+      throw new AppError("PERIOD_ACTIVE_EXISTS", "Close the active quarter first", 409, { status: ["Another is active"] });
     const before = await repo.periodBefore(client, startsOn);
-    const rules = scoring.ScoringRules.parse(before ? before.rules : scoring.DEFAULT_RULES);
+    const rules = scoring.ScoringRules.parse(body.rules || (before ? before.rules : scoring.DEFAULT_RULES));
     const row = await repo.insertPeriod(client, {
       name: body.name || periods.quarterName(startsOn),
       starts_on: startsOn,
@@ -99,6 +104,7 @@ async function createPeriod(actor, body) {
       plan_year_starts_on: body.plan_year_starts_on || periods.planYearOf(startsOn),
       targets_lock_on: body.targets_lock_on || null,
       live_from: body.live_from || null,
+      status,
       rules,
     });
     const after = await repo.getPeriod(client, row.performance_period_id);
@@ -107,7 +113,12 @@ async function createPeriod(actor, body) {
       entity: { type: "performance_period", id: row.performance_period_id },
       actor,
       after,
-      payload: { performance_period_id: row.performance_period_id, name: after.name, copied_from: before ? before.performance_period_id : null },
+      payload: {
+        performance_period_id: row.performance_period_id,
+        name: after.name,
+        status,
+        copied_from: body.rules ? null : before ? before.performance_period_id : null,
+      },
     });
     return row.performance_period_id;
   });
@@ -245,6 +256,29 @@ async function updateGoal(actor, id, patch) {
   return goalView(await repo.getGoal(pool, id));
 }
 
+/**
+ * DELETE /performance/goals/:id: refused while a company objective serves the goal (or an older line
+ * or goal names it); its quarterly targets go with it.
+ */
+async function deleteGoal(actor, id) {
+  await tx(async (client) => {
+    const before = await repo.getGoal(client, id);
+    if (!before) throw new AppError("NOT_FOUND", "That goal does not exist", 404);
+    const uses = await repo.goalUses(client, id);
+    if (uses.objectives > 0)
+      throw new AppError("GOAL_IN_USE", "A company objective serves this goal", 409);
+    if (uses.other > 0) throw new AppError("GOAL_IN_USE", "Another record names this goal", 409);
+    await repo.deleteGoal(client, id);
+    await emit(client, {
+      key: EVENTS.ORGANISATIONAL_GOAL_DELETED,
+      entity: { type: "organisational_goal", id },
+      actor,
+      before: goalView(before),
+      payload: { organisational_goal_id: id, code: before.code, title: before.title },
+    });
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * Plans (§6.4)
  * ------------------------------------------------------------------ */
@@ -261,6 +295,7 @@ function planView(p) {
     department: p.department,
     status: p.status,
     workflow_instance_id: p.workflow_instance_id,
+    submitted_by: p.submitted_by_person || null,
     submitted_at: iso(p.submitted_at),
     returned_reason: p.returned_reason,
     binding_at: iso(p.binding_at),
@@ -311,7 +346,7 @@ async function planDetail(id, actor, scope = null) {
   const targets = require("../targets/targets.service");
   const targetsRepo = require("../targets/targets.repo");
   const weights = require("../targets/targets.weights");
-  const objectives = await okrs.objectivesOfPlan(pool, id);
+  const objectives = await okrs.objectivesOfPlan(pool, id, actor);
   const cards = plan.department_id ? await targetsRepo.ofDepartment(pool, plan.performance_period_id, plan.department_id) : [];
   const details = [];
   for (const c of cards) details.push(await targets.detail(pool, c, { ...actor, is_ceo: true }, { scope: "all", scope_ids: null }));
@@ -399,10 +434,76 @@ async function submitPlan(actor, id, scope = null) {
  * Target changes (§6.7)
  * ------------------------------------------------------------------ */
 
-async function listChanges(query) {
+async function listChanges(query, scope) {
   const okrs = require("./goals.okrs");
-  const page = await repo.listChanges(pool, query);
+  const page = await repo.listChanges(pool, query, scope);
   return { ...page, data: page.data.map(okrs.changeView) };
+}
+
+/**
+ * GET /performance/target-changes/:id: one change for its sheet. A key result's is anyone's to read
+ * (the OKR tree is shared); a line's is for whoever may read its scorecard (in scope, its person, its
+ * reviewer or dotted manager), its requester, or whoever runs the cycle (the CEO decides it).
+ */
+async function changeDetail(id, actor, scope) {
+  const okrs = require("./goals.okrs");
+  const row = await repo.getChangeDetail(pool, id);
+  if (!row) throw new AppError("NOT_FOUND", "That target change does not exist", 404);
+  const asked = Boolean(actor && row.requested_by && row.requested_by.employee_id === actor.employee_id);
+  if (row.line_employee_id && !asked && !(await authority.runsTheCycle(actor))) {
+    const targets = require("../targets/targets.service");
+    const card = await require("../targets/targets.repo").get(pool, row.line_scorecard_id);
+    if (!card || !(await targets.mayRead(pool, card, actor, scope)))
+      throw new AppError("NOT_FOUND", "That target change does not exist", 404);
+  }
+  return {
+    ...okrs.changeView(row),
+    key_result: row.key_result,
+    unit: row.unit,
+    line: row.line,
+    department: row.department,
+    period_name: row.period_name,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Approvals waiting on the reader (§6.4, §6.7)
+ * ------------------------------------------------------------------ */
+
+/**
+ * GET /performance/approvals: the plan stages, target changes and mid-quarter scorecards (sent on
+ * their own through the plan's flow, §11) the reader decides, oldest first; a scorecard is named by
+ * its person. Deciding stays the engine's (POST /workflow/instances/:id/approve or reject); the
+ * outcome is goals.approval.js's.
+ */
+async function approvals(query, actor) {
+  const approvers = require("../../shared/workflow/approvers");
+  const cond = require("../../shared/workflow/conditions");
+  const { scopeFor } = require("../../middleware/rbac");
+  // The engine refuses a decision without `performance` approve (workflow.service.decide); the CEO approves everywhere.
+  const mayDecide = actor.is_ceo === true || Boolean(await scopeFor(actor, "performance", "approve"));
+  const roleCodes = await approvers.roleCodesOf(pool, actor.role_ids || []);
+  const page = await repo.approvalsWaiting(pool, actor, roleCodes, mayDecide, query);
+  return {
+    ...page,
+    data: page.data.map((r) => {
+      const stage = cond.stageByKey({ stages: r.stages }, r.current_stage);
+      return {
+        kind: r.kind,
+        record_id: r.record_id,
+        workflow_instance_id: r.workflow_instance_id,
+        period_name: r.period_name,
+        department: r.department,
+        key_result_code: r.key_result_code,
+        line_title: r.line_title,
+        employee: r.employee,
+        requested_by: r.requested_by,
+        stage_name: stage ? stage.name : r.current_stage,
+        waiting_since: iso(r.stage_entered_at),
+        overdue: r.overdue,
+      };
+    }),
+  };
 }
 
 /** POST /performance/target-changes: a binding key result's or line's target, to the CEO. */
@@ -413,18 +514,21 @@ async function requestChange(actor, scope, body) {
     const ctx = await repo.keyResultContext(pool, body.okr_key_result_id);
     if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404);
     if (ctx.plan_status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
+    if (okrs.tbcOpen(ctx))
+      throw new AppError("TARGET_TBC", "Set this TBC target directly", 409);
     const owner = actor && actor.employee_id === ctx.accountable_employee_id;
     if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
     from = { value: ctx.target_value, text: ctx.target_text };
   } else {
-    const line = await require("../targets/targets.repo").lineWithCard(pool, body.employee_target_id);
+    const targetsRepo = require("../targets/targets.repo");
+    const line = await targetsRepo.lineWithCard(pool, body.employee_target_id);
     if (!line) throw new AppError("NOT_FOUND", "That line does not exist", 404);
     if (!["binding", "agreed"].includes(line.scorecard_status)) throw new AppError("SCORECARD_NOT_BINDING", "Edit a draft's lines directly", 409);
-    if (!(await authority.runsTheCycle(actor))) {
-      const { assertInScope } = require("../../shared/rbac/scope");
-      assertInScope(scope, line.employee_id);
-      if (line.employee_id === (actor && actor.employee_id)) throw new AppError("PERMISSION_DENIED", "Your reviewer changes your targets", 403);
-    }
+    // A line's target is changed by its scorecard's reviewer or the function's head, never its employee (§3.5).
+    if (line.employee_id === (actor && actor.employee_id)) throw new AppError("PERMISSION_DENIED", "Your reviewer changes your targets", 403);
+    const card = await targetsRepo.get(pool, line.scorecard_id);
+    if (!(await require("../targets/targets.service").mayChangeLineTarget(pool, card, actor)))
+      throw new AppError("PERMISSION_DENIED", "The reviewer or the function's head changes this target", 403);
     from = { value: line.target_value, text: line.target_text };
   }
   if (await repo.changePending(pool, body))
@@ -495,11 +599,14 @@ module.exports = {
   getGoal,
   createGoal,
   updateGoal,
+  deleteGoal,
   planView,
   listPlans,
   planDetail,
   submitPlan,
   listChanges,
+  changeDetail,
+  approvals,
   requestChange,
   lockTargets,
 };

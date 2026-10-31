@@ -39,6 +39,10 @@
  *  - One run at a time: a session advisory lock, so two deploys cannot interleave.
  *  - No statement timeout for the migration session (an index build may take minutes);
  *    the pool's 30 seconds still applies to the app.
+ *  - The database says which environment it is (`system_marker`, read by the seed): the first
+ *    run writes APP_ENV there, after the migrations that create the table. A server whose
+ *    database already says another environment (a wrong .env, or another environment's dump
+ *    restored into it) is refused before anything applies; off the servers it is only reported.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -315,6 +319,36 @@ async function down(client, { dir } = {}) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Which environment this database is
+ * ------------------------------------------------------------------ */
+
+/**
+ * What a run does about the database's marker (`marker` as seed.readMarker reads it: undefined
+ * before the table exists, null with no row): "mark" it after the migrations, "keep" one that
+ * already says APP_ENV, "refuse" another environment's on a server, or "report" it elsewhere.
+ * @param {{appEnv: string, marker: string|null|undefined}} t
+ * @returns {{action: "mark"|"keep"|"refuse"|"report", message?: string}}
+ */
+function markerPlan({ appEnv, marker }) {
+  if (marker === undefined || marker === null) return { action: "mark" };
+  if (marker === appEnv) return { action: "keep" };
+  const server = appEnv === "staging" || appEnv === "production";
+  return {
+    action: server ? "refuse" : "report",
+    message: `this database says it is ${marker}, but APP_ENV is ${appEnv}: its .env names the wrong database, or it was restored from another environment's dump`,
+  };
+}
+
+/** Writes the marker unless the database has one; true when it wrote it. */
+async function markEnvironment(db, appEnv) {
+  const { rowCount } = await db.query(
+    "INSERT INTO system_marker (environment) SELECT $1 WHERE NOT EXISTS (SELECT 1 FROM system_marker)",
+    [appEnv],
+  );
+  return rowCount === 1;
+}
+
+/* ------------------------------------------------------------------ *
  * Command line
  * ------------------------------------------------------------------ */
 
@@ -382,12 +416,25 @@ async function main(argv) {
       log(undone ? `undid ${undone}` : "nothing to undo");
       return 0;
     }
+    const { readMarker } = require("./seed");
+    const plan = markerPlan({
+      appEnv: config.APP_ENV,
+      marker: await readMarker(client),
+    });
+    if (plan.action === "refuse")
+      throw new Error(`refusing to migrate: ${plan.message}`);
+    if (plan.action === "report") log(`warning: ${plan.message}`);
     const r = await migrate(client, { log });
     log(
       r.applied.length
         ? `${r.applied.length} applied; head ${r.head}`
         : `nothing to apply; head ${r.head || "(none)"}`,
     );
+    if (
+      plan.action === "mark" &&
+      (await markEnvironment(client, config.APP_ENV))
+    )
+      log(`this database is marked ${config.APP_ENV}`);
     return 0;
   } finally {
     await client.end();
@@ -418,6 +465,8 @@ module.exports = {
   status,
   migrate,
   down,
+  markerPlan,
+  markEnvironment,
   parseArgs,
   main,
 };

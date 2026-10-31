@@ -300,7 +300,10 @@ use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 performance cycles, reviews and review items · `2010` a task's number, setter (`set_by_employee_id`),
 cadence, KPI (`employee_target_id`), record pointer (`entity_type`, `entity_id`), the cancelled
 status, blockers and `task_activity`; calendar visibility, record pointer, called-off events and
-`calendar_event_attendee`; the indexes Home asked for (docs/guides/workspace.md §4) · `2090` the
+`calendar_event_attendee`; the indexes Home asked for (docs/guides/workspace.md §4) · `2020` a task's
+steps (`task_step`), the tasks it waits on (`task_dependency`, with override), its watchers
+(`task_watcher`), its holds with their note, expected day and due-date shift (`task_blockage`), its
+`late_reason`, and the history kinds for them (docs/guides/workspace.md §4, GE 22/10/2026) · `2090` the
 `task` numbering scheme and the cancelled status · `2099` seed · `2100` the Performance foundation
 (`docs/guides/performance.md` §4, PR 1, 22/10/2026): department heads (`head_employee_id`,
 `head_seat_id`); quarters with their rules (`performance_period`); organisational goals' MyCity columns
@@ -318,8 +321,15 @@ scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance 
 `with_hr`, `closed`, `returned`) may hold, `NOT VALID` so earlier rows stand, with `open` and `check_in`
 the defaults; a review's second level (`second_level_employee_id`) and each item's corrective action
 (`corrective_title`, `corrective_owner_id`, `corrective_due_on`, `corrective_task_id`) (Performance PR 3). ·
+`2310` a review scored without its check-in (`no_check_in_at`, `no_check_in_reason`) and closed as
+Withdrawn (`withdrawn_at`, `withdrawn_reason`; the status `withdrawn`, `NOT VALID`) (after PR #130,
+`docs/guides/performance.md` §11) ·
 `2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
-missed commitment's Recovery task (Performance PR 4).
+missed commitment's Recovery task (Performance PR 4) · `2500` projects get a screen: `project.created_by`,
+its status CHECK (`active`, `completed`) and indexes · `2510` Why Late's reasons (`task_late_reason`,
+switched off rather than deleted; the CHECK on `task.late_reason` gives way to it) · `2520` an event's
+invitation SEQUENCE (`calendar_event.ics_sequence`) · `2590` seed: the six starting late reasons and the
+`workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit).
 
 **Owes:**
 - PRs 3 and 5 of `docs/guides/performance.md` use 2300 to 2399 and 2500 to 2599 only for a gap. The numbers 2020, 2030 and

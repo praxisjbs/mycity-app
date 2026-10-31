@@ -72,7 +72,7 @@ in M2**, which is where A16 to A18 land and which has the least slack in the sch
 | # | Decision | Consequence |
 |---|---|---|
 | A23 | **AI reads, never writes.** The assistant answers from the database within the caller's permissions and links the user to the module to make a change. | M10 loses the pending-action queue and the write contract. Gate 19 becomes read-manifest coverage only |
-| A24 | **The line manager sets the week; the employee can still add their own tasks.** Manager authorship of weekly and daily tasks is what Cynthia asked for, and it is a change to how MyCity works today. Employees keep the ability to log their own work alongside it. | M2 permission model: manager writes to their reporting line, employee writes to self |
+| A24 | **The line manager sets the week; the employee can still add their own tasks.** Manager authorship of weekly and daily tasks is what Cynthia asked for, and it is a change to how MyCity works today. Employees keep the ability to log their own work alongside it. | M2 permission model: manager writes to their reporting line, employee writes to self. Extended 23/10/2026 (JBS Praxis): a task may be Shared, one lead with several people or a department on it; the lead is still the caller or someone in their reporting line, and a person who leads a shared task may also add colleagues of their own department (`docs/guides/workspace.md` §6) |
 | A25 | **Budget versus actual is built and handed over empty.** MyCity has no budget lines until 2027. | M8 ships the screen, demonstrated with figures clearly marked as examples |
 | A26 | **Reference seeds hold only what the code cannot run without.** `seeds/reference/` runs in every environment, production included, so it carries system roles with their permissions, numbering schemes, validated workflow definitions and the code lists the code switches on. No people, no transactions, and no business choices: expense categories, partner stages, attendance policies and alert thresholds are entered by MyCity on their screens or through the import engine. Decided with TB, 16/10/2026. A public holiday set by law is not a business choice: Nigeria's are seeded, the moon-dated and weekend ones as expected until confirmed (TB, 17/10/2026; `seeds/reference/0448`) | Reconciles A5 with README §6.3; `docs/MIGRATIONS.md` §9. The PR 25 seeds that hold business choices move out in a fix-forward file |
 
@@ -1314,6 +1314,15 @@ Commitments view (`docs/guides/performance.md` P11). The inventory's count is un
 PR 1 applies the label to the table below, the app's catalogue, `src/shared/search/screens.js` and
 `docs/PROGRESS.md` (row #30).
 
+**Ratified 23/10/2026 (JBS Praxis).** One screen joins the inventory, taking the admin surface to 94
+and the inventory to 100: **My Workspace · Projects** (`projects`), a fifth tab in My Workspace, M2.
+Anyone starts a project and everyone sees the list; a project's page is a board of its tasks, which
+keep their own visibility (A24), and a task joins a project from New Task or from the project. The
+`project` table was in the 2000 schema without a screen. It reuses the `workspace` permission key.
+Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.js`,
+`src/shared/search/screens.js` and `docs/PROGRESS.md` (row #101). Its engineering shape is in
+`docs/guides/workspace.md`.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1322,7 +1331,7 @@ staff never navigates to it to do their job.
 | Area | Module | Tabs | Screens | Built in |
 |---|---|---|---|---|
 | (ungrouped) | **Home** | 4 | Overview · Team · Alerts · Reports | M1 |
-| (ungrouped) | **My Workspace** | 4 | Today · Tasks · Calendar · Analytics | M2 |
+| (ungrouped) | **My Workspace** | 5 | Today · Tasks · Projects · Calendar · Analytics | M2 |
 | (ungrouped) | **Employee Self-Service** | 12 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · Org Chart · My Security | M1 |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |

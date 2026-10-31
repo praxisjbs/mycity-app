@@ -4,22 +4,35 @@ import type {
   Commitment,
   CommitmentSetRow,
   CountsTowardsOption,
+  LateReasonOption,
+  Project,
   Task,
   TaskActivity,
+  TaskBlockage,
   TaskComment,
   TaskDetail,
+  TaskReminder,
+  TaskStep,
   TeamWeek,
   WeekView,
 } from "@mycity/contract/contract.gen.ts";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, uuid } from "../core";
 import { OBJECTIVES, SCORECARDS } from "../data/performance";
-import { byId, byKey, ref, refKey, teamOf } from "../data/people";
+import { byId, byKey, DEPARTMENTS, PEOPLE, ref, refKey, teamOf } from "../data/people";
+import { me as meOf } from "./identity";
+import { leaveRequests } from "./organisation";
 import { exportFile } from "./shared";
 
 /**
  * My Workspace in the browser, in the contract's shapes (docs/guides/workspace.md §5).
  * The same records seed staging (F13). Rules the API applies are kept where a screen
- * shows them: who may set a task for whom (A24), and a cancelled task off the board.
+ * shows them: who may set a task for whom (A24), who may share one (a lead and up to 25
+ * people beside them), who manages a task (its setter and those over its assignee, never
+ * the assignee of a task someone else set), who may watch one (someone who can see it),
+ * and a cancelled task off the board. The mock models no notices, so a repeat's quiet next
+ * copy has nothing to show here. Projects (anyone starts one, everyone lists it, a project's
+ * board and counts hold the tasks the reader can see) and Why Late's reasons (kept by holders of
+ * workspace.late_reasons) are here too, as is no live board: the mock has no server to push.
  */
 type Status = Task["status"];
 type R = [string, Status, string, number | null, Task["priority"], string | null, string | null];
@@ -56,55 +69,203 @@ const ROWS: R[] = [
 ];
 
 const due = (d: number | null) => (d == null ? null : at(-d, d === 0 ? "17:00" : "17:00"));
-const TASKS: Task[] = ROWS.map((r, i) => ({
-  task_id: sid(`task:${i}`),
-  number: `TSK-${String(400 - i).padStart(4, "0")}`,
-  title: r[0],
+/** The rows that are Shared: the people beside the lead, by key. */
+const SHARED: Record<number, string[]> = { 2: ["damilola", "funke"] };
+/** At most this many people share a task beside its lead (the contract's MEMBERS_MAX). */
+const MEMBERS_MAX = 25;
+
+/**
+ * A new task as the service writes one: To Do, nothing held, late, cancelled, repeating or
+ * committed until something says so, then what the caller names. Never a copy of another task.
+ */
+function newTask(fields: Pick<Task, "task_id" | "number" | "title" | "assignee" | "set_by"> & Partial<Task>): Task {
+  const now = new Date().toISOString();
+  return {
+    description: null,
+    status: "todo",
+    priority: "normal",
+    cadence: null,
+    members: [],
+    due_at: null,
+    overdue: false,
+    started_at: null,
+    completed_at: null,
+    cancelled_at: null,
+    cancel_reason: null,
+    blocked_reason: null,
+    blocked_at: null,
+    late_reason: null,
+    late_reason_label: null,
+    counts_towards: null,
+    project: null,
+    assignee_left: false,
+    entity_type: null,
+    entity_id: null,
+    link: null,
+    recurrence: null,
+    comment_count: 0,
+    steps_total: 0,
+    steps_done: 0,
+    waiting: false,
+    is_commitment: false,
+    acceptance_criteria: null,
+    commitment_month: null,
+    original_due_at: null,
+    rescoped_at: null,
+    rescope_reason: null,
+    commitment_set_id: null,
+    commitment_state: null,
+    created_at: now,
+    updated_at: now,
+    ...fields,
+  };
+}
+
+const TASKS: Task[] = ROWS.map((r, i) =>
+  newTask({
+    task_id: sid(`task:${i}`),
+    number: `TSK-${String(400 - i).padStart(4, "0")}`,
+    title: r[0],
+    status: r[1],
+    priority: r[4],
+    cadence: r[5] ? "weekly" : null,
+    assignee: refKey(r[2]),
+    members: (SHARED[i] ?? []).map(refKey),
+    set_by: refKey(r[5] ?? r[2]),
+    due_at: due(r[3]),
+    started_at: r[1] === "todo" ? null : at(3, "10:00"),
+    completed_at: r[1] === "done" ? at(Math.max(1, -(r[3] ?? 1)), "15:00") : null,
+    entity_type: r[6] ? "partner" : null,
+    entity_id: r[6] ? sid(`partner:${r[6]}`) : null,
+    link: r[6] ? { module: "partnerships", tab: "partners", id: sid(`partner:${r[6]}`), path: `/partnerships?tab=partners&id=${sid(`partner:${r[6]}`)}` } : null,
+    created_at: at(10, "09:00"),
+    updated_at: at(1, "09:00"),
+  }),
+);
+/* Why Late's reasons (workspace.md §6): six to start; their keepers add more and switch them off. */
+const REASONS: LateReasonOption[] = [
+  ["waiting_on_others", "Waiting on Others"],
+  ["waiting_on_client", "Waiting on Client"],
+  ["blocked_by_another_team", "Blocked by Another Team"],
+  ["underestimated", "Underestimated"],
+  ["deprioritised", "Deprioritised"],
+  ["other", "Other"],
+].map(([code, label], i) => ({ task_late_reason_id: sid(`late_reason:${code}`), code, label, active: true, display_order: (i + 1) * 10 }));
+const reasonOn = (code: string) => REASONS.some((r) => r.code === code && r.active);
+const keepsReasons = (user: string) => meOf(user).is_ceo || meOf(user).capabilities.includes("workspace.late_reasons");
+
+/* Projects (workspace.md §6): anyone starts one; its board and counts hold the tasks the reader can see. */
+type MockProject = Omit<Project, "open" | "done" | "can_edit">;
+const PROJECTS: MockProject[] = [
+  ["Enugu Launch", "cynthia", 18, "active"],
+  ["Q4 Campaigns", "tolu", 40, "active"],
+  ["Abuja Hub Opening", "cynthia", -12, "completed"],
+].map(([name, owner, dueIn, status], i) => ({
+  project_id: sid(`project:${i}`),
+  number: `PRJ-2026-${String(i + 1).padStart(6, "0")}`,
+  name: name as string,
   description: null,
-  status: r[1],
-  priority: r[4],
-  cadence: r[5] ? "weekly" : null,
-  assignee: refKey(r[2]),
-  set_by: refKey(r[5] ?? r[2]),
-  due_at: due(r[3]),
-  overdue: false,
-  started_at: r[1] === "todo" ? null : at(3, "10:00"),
-  completed_at: r[1] === "done" ? at(Math.max(1, -(r[3] ?? 1)), "15:00") : null,
-  cancelled_at: null,
-  cancel_reason: null,
-  blocked_reason: null,
-  blocked_at: null,
-  counts_towards: null,
-  entity_type: r[6] ? "partner" : null,
-  entity_id: r[6] ? sid(`partner:${r[6]}`) : null,
-  link: r[6] ? { module: "partnerships", tab: "partners", id: sid(`partner:${r[6]}`), path: `/partnerships?tab=partners&id=${sid(`partner:${r[6]}`)}` } : null,
-  recurrence: null,
-  comment_count: 0,
-  is_commitment: false,
-  acceptance_criteria: null,
-  commitment_month: null,
-  original_due_at: null,
-  rescoped_at: null,
-  rescope_reason: null,
-  commitment_set_id: null,
-  commitment_state: null,
-  created_at: at(10, "09:00"),
-  updated_at: at(1, "09:00"),
+  owner: refKey(owner as string),
+  due_on: isoDaysAhead(dueIn as number),
+  status: status as Project["status"],
+  completed_at: status === "completed" ? at(12, "16:00") : null,
+  created_at: at(30 - i, "09:00"),
 }));
+const projectRef = (p: MockProject) => ({ project_id: p.project_id, number: p.number, name: p.name });
+const projectRefOf = (id: string) => {
+  const p = PROJECTS.find((x) => x.project_id === id);
+  return p ? projectRef(p) : null;
+};
+const projectProblem = (id: string): Record<string, string[]> | null => {
+  const p = PROJECTS.find((x) => x.project_id === id);
+  if (!p) return { project_id: ["No such project"] };
+  return p.status === "active" ? null : { project_id: ["Project is closed"] };
+};
+// The Enugu hires and the launch blog posts belong to Enugu Launch; the social calendar to Q4 Campaigns.
+for (const [taskIdx, projectIdx] of [[8, 0], [9, 0], [18, 1]] as const) TASKS[taskIdx]!.project = projectRef(PROJECTS[projectIdx]!);
+
 const COMMENTS: TaskComment[] = [];
 const ACTIVITY: TaskActivity[] = [];
 
+/* What hangs off a task: steps, the tasks it waits on, watchers, holds and reminders. */
+const STEPS = new Map<string, TaskStep[]>();
+type Edge = { task_dependency_id: string; task_id: string; depends_on_task_id: string; overridden_at: string | null; override_reason: string | null };
+const EDGES: Edge[] = [];
+const WATCHERS = new Map<string, NonNullable<Task["assignee"]>[]>();
+const HOLDS = new Map<string, TaskBlockage[]>();
+const REMINDERS = new Map<string, TaskReminder[]>();
+const byNo = (i: number) => TASKS[i]!;
+const stepOf = (taskIdx: number, n: number, title: string, done: boolean, who = "cynthia"): TaskStep => ({
+  task_step_id: sid(`step:${taskIdx}:${n}`), task_id: byNo(taskIdx).task_id, title, due_on: null,
+  done_at: done ? at(1, "11:00") : null, done_by: done ? refKey(who) : null, sort_order: n, created_at: at(4, "09:00"),
+});
+STEPS.set(byNo(0).task_id, [stepOf(0, 1, "Shortlist four venues", true), stepOf(0, 2, "Site visit with MTN", true), stepOf(0, 3, "Send the final list", false)]);
+STEPS.set(byNo(7).task_id, [stepOf(7, 1, "Pull attendance for the month", true, "amara"), stepOf(7, 2, "Check the one deduction", false, "amara")]);
+EDGES.push({ task_dependency_id: sid("edge:1"), task_id: byNo(1).task_id, depends_on_task_id: byNo(0).task_id, overridden_at: null, override_reason: null });
+EDGES.push({ task_dependency_id: sid("edge:2"), task_id: byNo(13).task_id, depends_on_task_id: byNo(0).task_id, overridden_at: null, override_reason: null });
+WATCHERS.set(byNo(0).task_id, [refKey("ngozi")]);
+const hold = (i: number, note: string, daysBack: number): TaskBlockage => ({
+  task_blockage_id: sid(`hold:${i}`), note, estimated_resolve_on: null, raised_by: byNo(i).assignee, raised_at: at(daysBack, "10:00"),
+  resolved_at: null, resolved_by: null, resolve_note: null, due_shift_days: null, blocked_days: daysBack,
+});
+for (const [i, note, d] of [[3, "Waiting on the Council's reply", 6], [9, "Legal team on leave until Monday", 2]] as const) {
+  HOLDS.set(byNo(i).task_id, [hold(i, note, d)]);
+  Object.assign(byNo(i), { blocked_reason: note, blocked_at: at(d, "10:00") });
+}
+byNo(3).late_reason = "waiting_on_others";
+byNo(0).late_reason = "waiting_on_others";
+byNo(25).late_reason = "underestimated";
+
 const open = (t: Task) => t.status !== "done" && t.status !== "cancelled";
-const fresh = (t: Task): Task => ({ ...t, overdue: Boolean(open(t) && t.due_at && Date.parse(t.due_at) < Date.now()), commitment_state: stateOf(t) });
+const satisfied = (e: Edge) => Boolean(e.overridden_at) || TASKS.find((x) => x.task_id === e.depends_on_task_id)?.status === "done";
+const fresh = (t: Task): Task => {
+  const steps = STEPS.get(t.task_id) ?? [];
+  return {
+    ...t,
+    overdue: Boolean(open(t) && t.due_at && Date.parse(t.due_at) < Date.now()),
+    steps_total: steps.length,
+    steps_done: steps.filter((x) => x.done_at).length,
+    commitment_state: stateOf(t),
+    waiting: EDGES.some((e) => e.task_id === t.task_id && !satisfied(e)),
+    late_reason_label: t.late_reason ? (REASONS.find((r) => r.code === t.late_reason)?.label ?? t.late_reason) : null,
+    project: t.project ? projectRefOf(t.project.project_id) : null,
+  };
+};
 const me = (user?: string | null) => byKey(user)!.employee_id;
-const mine = (user: string, t: Task) => t.assignee?.employee_id === me(user) || t.set_by?.employee_id === me(user);
+const onIt = (user: string, t: Task) => t.members.some((p) => p.employee_id === me(user));
+const mine = (user: string, t: Task) => t.assignee?.employee_id === me(user) || t.set_by?.employee_id === me(user) || onIt(user, t);
 const scoped = (user: string, scope?: string) => {
   if (scope !== "team") return TASKS.filter((t) => mine(user, t));
   const team = new Set([me(user), ...teamOf(user).map((p) => p.employee_id)]);
   return TASKS.filter((t) => (t.assignee && team.has(t.assignee.employee_id)) || mine(user, t));
 };
 const canSetFor = (user: string, id: string) => id === me(user) || teamOf(user).some((p) => p.employee_id === id);
+/** The setter manages a task, and so does whoever is over its assignee; its assignee never does when someone else set it. */
 const manages = (user: string, t: Task) => t.set_by?.employee_id === me(user) || (t.assignee?.employee_id !== me(user) && canSetFor(user, t.assignee!.employee_id));
+/** Whether a person (by key) can see a task: they lead, share or set it, or its lead is in their team. */
+const seesTask = (user: string, t: Task) => mine(user, t) || Boolean(t.assignee && teamOf(user).some((p) => p.employee_id === t.assignee!.employee_id));
+const colleague = (user: string, id: string) => byId(id)?.department === byKey(user)?.department;
+/** Who the user may put on a task (GET /tasks/people): their team, and to share one, their department; never themselves. */
+const reachable = (user: string, shared: boolean) =>
+  PEOPLE.filter((p) => p.employee_id !== me(user) && (canSetFor(user, p.employee_id) || (shared && colleague(user, p.employee_id))));
+/** A shared task's people beside its lead, named or a department's, as the API's shareWith decides. */
+function shareWith(user: string, lead: string, b: { member_ids?: string[]; department_id?: string }): { ids: string[] } | { error: Record<string, string[]> } {
+  const peers = lead === me(user);
+  const allowed = (id: string) => canSetFor(user, id) || (peers && colleague(user, id));
+  if (b.department_id) {
+    const name = DEPARTMENTS.find((n) => sid(`dept:${n}`) === b.department_id);
+    if (!name) return { error: { department_id: ["Not a department"] } };
+    // The department's people the caller may add: their reach, so never the caller beside another lead.
+    const ids = PEOPLE.filter((p) => p.department === name && p.employee_id !== lead && p.employee_id !== me(user) && allowed(p.employee_id)).map((p) => p.employee_id);
+    if (!ids.length) return { error: { department_id: ["Nobody to share with"] } };
+    return ids.length > MEMBERS_MAX ? { error: { department_id: [`More than ${MEMBERS_MAX} people`] } } : { ids };
+  }
+  const ids = [...new Set(b.member_ids ?? [])].filter((id) => id !== lead);
+  if (ids.length > MEMBERS_MAX) return { error: { member_ids: [`At most ${MEMBERS_MAX} people`] } };
+  const bad = ids.find((id) => !byId(id) || !allowed(id));
+  if (bad) return { error: { member_ids: [colleague(user, bad) && !peers ? "Lead it yourself" : "Not in your team"] } };
+  return { ids };
+}
 const weekBounds = () => {
   const d = new Date();
   const wd = (d.getUTCDay() + 6) % 7;
@@ -116,17 +277,37 @@ const find = (user: string, id: string) => {
   const t = TASKS.find((x) => x.task_id === id);
   return t && (mine(user, t) || scoped(user, "team").includes(t)) ? t : undefined;
 };
+const refOf = (user: string, id: string) => {
+  const o = TASKS.find((x) => x.task_id === id)!;
+  const seen = Boolean(find(user, id));
+  return { task_id: o.task_id, number: o.number, title: seen ? o.title : "A task you cannot open", status: o.status, assignee: seen ? o.assignee : null, visible: seen };
+};
+const edgeOut = (user: string, e: Edge, other: string) => ({
+  task_dependency_id: e.task_dependency_id, task: refOf(user, other), satisfied: satisfied(e), overridden_at: e.overridden_at, override_reason: e.override_reason,
+});
+const plans = (user: string, t: Task) => manages(user, t) || t.assignee?.employee_id === me(user) || onIt(user, t);
 const detail = (user: string, t: Task): TaskDetail => {
   const f = fresh(t);
+  const watchers = WATCHERS.get(t.task_id) ?? [];
+  const blockage = (HOLDS.get(t.task_id) ?? []).find((b) => !b.resolved_at) ?? null;
   const approved = Boolean(t.is_commitment && t.original_due_at);
   const pending = RESCOPES.get(t.task_id);
   const rec = recoveryOf(t.task_id);
   const actsFor = t.assignee?.employee_id === me(user) || canSetFor(user, t.assignee!.employee_id);
   return {
     ...f,
-    can_edit: true,
+    steps: STEPS.get(t.task_id) ?? [],
+    waiting_on: EDGES.filter((e) => e.task_id === t.task_id).map((e) => edgeOut(user, e, e.depends_on_task_id)),
+    holding_up: EDGES.filter((e) => e.depends_on_task_id === t.task_id).map((e) => edgeOut(user, e, e.task_id)),
+    watchers,
+    watching: watchers.some((p) => p.employee_id === me(user)),
+    blockage,
+    reminders: REMINDERS.get(t.task_id) ?? [],
+    // Edit Task changes something for whoever manages, leads or shares it, while it is not cancelled.
+    can_edit: plans(user, t) && t.status !== "cancelled",
     can_reassign: manages(user, t),
     can_cancel: manages(user, t) && t.status !== "cancelled" && !approved,
+    can_plan: plans(user, t) && t.status !== "cancelled",
     set_status: setOf(t)?.status ?? null,
     rescope: pending ? { workflow_instance_id: pending, can_decide: t.assignee?.employee_id !== me(user) && canSetFor(user, t.assignee!.employee_id) } : null,
     recovery: rec,
@@ -150,9 +331,15 @@ route("GET /api/v1/tasks", (req) => {
       employee_target_id: (t, v) => t.counts_towards?.employee_target_id === v,
       is_commitment: (t, v) => t.is_commitment === (v === "true"),
       commitment_month: (t, v) => t.commitment_month === v,
+      project_id: (t, v) => t.project?.project_id === v,
       due: (t, v) => (v === "overdue" ? t.overdue : v === "today" ? Boolean(t.due_at?.startsWith(today)) : Boolean(t.due_at && t.due_at >= from && t.due_at < to)),
     },
-    sort: { due_at: (a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9"), created_at: (a, b) => a.created_at.localeCompare(b.created_at) },
+    sort: {
+      // The board's own order, as the API's sort_order: the order of TASKS, which a move rearranges.
+      sort_order: (a, b) => TASKS.findIndex((x) => x.task_id === a.task_id) - TASKS.findIndex((x) => x.task_id === b.task_id),
+      due_at: (a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9"),
+      created_at: (a, b) => a.created_at.localeCompare(b.created_at),
+    },
   });
 });
 route("GET /api/v1/tasks/summary", (req) => {
@@ -163,8 +350,106 @@ route("GET /api/v1/tasks/summary", (req) => {
     due_this_week: l.filter((t) => open(t) && t.due_at && t.due_at >= from && t.due_at < to).length,
     overdue: l.filter((t) => t.overdue).length,
     done_this_week: l.filter((t) => t.status === "done" && t.completed_at && t.completed_at >= from).length,
+    done_30d: l.filter((t) => t.status === "done" && t.completed_at && t.completed_at >= isoDaysAgo(29)).length,
   });
 });
+route("GET /api/v1/tasks/people", (req) => {
+  const { shared, department_id: dept, ...query } = req.query;
+  // A department's possible leads: its people the user may set work for, the user too when they work there.
+  const rows = dept
+    ? PEOPLE.filter((p) => sid(`dept:${p.department}`) === dept && canSetFor(req.user!, p.employee_id))
+    : reachable(req.user!, shared === "true");
+  return paged(rows.map((p) => ref(p)!), { ...req, query }, { search: (p) => [p.display_name] });
+});
+/** A shared task's lead, as the API's checkLead decides: from the department, or the user or one of the people. */
+function leadProblem(user: string, leadId: string, b: { primary_assignee_id?: string; member_ids?: string[]; department_id?: string }): Record<string, string[]> | null {
+  if (b.department_id) return byId(leadId) && sid(`dept:${byId(leadId)!.department}`) === b.department_id ? null : { primary_assignee_id: ["Not in that department"] };
+  if (b.primary_assignee_id && b.member_ids && leadId !== me(user) && !b.member_ids.includes(leadId)) return { primary_assignee_id: ["Pick from the people"] };
+  return null;
+}
+route("GET /api/v1/tasks/late-reasons", (req) => {
+  const { all, ...query } = req.query;
+  const every = all === "true" && keepsReasons(req.user!);
+  return paged(REASONS.filter((r) => every || r.active), { ...req, query }, {});
+});
+route("POST /api/v1/tasks/late-reasons", (req) => {
+  if (!keepsReasons(req.user!)) return fail(403, "FORBIDDEN", "You cannot change the late reasons");
+  const label = String((req.body as { label?: string }).label ?? "").trim();
+  const code = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^[^a-z]+/, "");
+  if (!code) return invalid({ label: ["Use some letters"] });
+  if (REASONS.some((r) => r.code === code || r.label.toLowerCase() === label.toLowerCase())) return invalid({ label: ["Already a reason"] });
+  if (REASONS.length >= 25) return fail(409, "TOO_MANY_REASONS", "Why Late holds at most 25 reasons");
+  const r: LateReasonOption = { task_late_reason_id: uuid(), code, label, active: true, display_order: (REASONS.length + 1) * 10 };
+  REASONS.push(r);
+  return created(r);
+});
+route("PATCH /api/v1/tasks/late-reasons/:id", (req) => {
+  if (!keepsReasons(req.user!)) return fail(403, "FORBIDDEN", "You cannot change the late reasons");
+  const r = REASONS.find((x) => x.task_late_reason_id === req.params.id);
+  if (!r) return notFound();
+  r.active = Boolean((req.body as { active?: boolean }).active);
+  return ok(r);
+});
+
+/** A project as the reader sees it: its counts only over the tasks they could open on Tasks. */
+const projectFor = (user: string, p: MockProject): Project => {
+  const seen = TASKS.filter((t) => t.project?.project_id === p.project_id && t.status !== "cancelled" && seesTask(user, t));
+  const role = meOf(user).roles[0]?.code ?? "employee";
+  return {
+    ...p,
+    open: seen.filter(open).length,
+    done: seen.filter((t) => t.status === "done").length,
+    can_edit: p.owner?.employee_id === me(user) || meOf(user).is_ceo || ["management", "operations_people", "implementation"].includes(role),
+  };
+};
+route("GET /api/v1/projects", (req) => {
+  const { status = "active", ...query } = req.query;
+  const list = PROJECTS.filter((p) => p.status === status).map((p) => projectFor(req.user!, p));
+  return paged(list, { ...req, query }, {
+    search: (p) => [p.name, p.number],
+    sort: {
+      name: (a, b) => a.name.localeCompare(b.name),
+      due_on: (a, b) => (a.due_on ?? "9").localeCompare(b.due_on ?? "9"),
+      created_at: (a, b) => a.created_at.localeCompare(b.created_at),
+    },
+  });
+});
+route("GET /api/v1/projects/:id", (req) => {
+  const p = PROJECTS.find((x) => x.project_id === req.params.id);
+  return p ? ok(projectFor(req.user!, p)) : notFound();
+});
+route("POST /api/v1/projects", (req) => {
+  const b = req.body as { name?: string; description?: string; due_on?: string };
+  if (!b.name || !b.name.trim()) return invalid({ name: ["Name the project"] });
+  const p: MockProject = {
+    project_id: uuid(),
+    number: `PRJ-2026-${String(PROJECTS.length + 1).padStart(6, "0")}`,
+    name: b.name.trim(),
+    description: b.description || null,
+    owner: refKey(req.user!),
+    due_on: b.due_on || null,
+    status: "active",
+    completed_at: null,
+    created_at: new Date().toISOString(),
+  };
+  PROJECTS.unshift(p);
+  return created(projectFor(req.user!, p));
+});
+route("PATCH /api/v1/projects/:id", (req) => {
+  const p = PROJECTS.find((x) => x.project_id === req.params.id);
+  if (!p) return notFound();
+  if (!projectFor(req.user!, p).can_edit) return fail(403, "FORBIDDEN", "Only its owner can change this project");
+  const b = req.body as { name?: string; description?: string | null; due_on?: string | null; status?: Project["status"] };
+  if (typeof b.name === "string") p.name = b.name.trim();
+  if ("description" in b) p.description = b.description || null;
+  if ("due_on" in b) p.due_on = b.due_on || null;
+  if (b.status && b.status !== p.status) {
+    p.status = b.status;
+    p.completed_at = b.status === "completed" ? new Date().toISOString() : null;
+  }
+  return ok(projectFor(req.user!, p));
+});
+
 route("GET /api/v1/tasks/:id", (req) => {
   const t = find(req.user!, req.params.id);
   return t ? ok(detail(req.user!, t)) : notFound();
@@ -173,54 +458,132 @@ route("POST /api/v1/tasks", (req) => {
   const b = req.body as {
     title?: string; primary_assignee_id?: string; due_on?: string; cadence?: Task["cadence"]; priority?: Task["priority"]; description?: string;
     is_commitment?: boolean; acceptance_criteria?: string; commitment_month?: string; employee_target_id?: string; entity_type?: Task["entity_type"]; entity_id?: string;
+    member_ids?: string[]; department_id?: string; project_id?: string;
   };
   if (!b.title || !b.title.trim()) return invalid({ title: ["Name the task"] });
+  const joins = b.project_id ? projectProblem(b.project_id) : null;
+  if (joins) return invalid(joins);
+  if (b.member_ids && b.department_id) return invalid({ department_id: ["People or a department"] });
+  if (b.department_id && !b.primary_assignee_id) return invalid({ primary_assignee_id: ["Pick a lead"] });
   const assignee = b.primary_assignee_id ? byId(b.primary_assignee_id) : byKey(req.user);
   if (!assignee || !canSetFor(req.user!, assignee.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
+  const share = b.member_ids || b.department_id ? shareWith(req.user!, assignee.employee_id, b) : { ids: [] };
+  if ("error" in share) return invalid(share.error);
+  const leadBad = b.member_ids || b.department_id ? leadProblem(req.user!, assignee.employee_id, b) : null;
+  if (leadBad) return invalid(leadBad);
   const problem = commitmentProblem(b);
   if (problem) return invalid(problem);
-  const t: Task = {
-    ...TASKS[0], task_id: sid(`task:${Date.now()}`), number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`, title: b.title.trim(),
-    description: b.description || null, status: "todo", priority: b.priority ?? "normal", cadence: b.cadence || null,
-    assignee: ref(assignee)!, set_by: refKey(req.user!), due_at: b.due_on ? `${b.due_on}T16:00:00.000Z` : null,
-    started_at: null, completed_at: null, entity_type: b.entity_type ?? null, entity_id: b.entity_id ?? null, link: null, comment_count: 0,
-    counts_towards: countsTowardsOf(b), is_commitment: Boolean(b.is_commitment), acceptance_criteria: b.is_commitment ? b.acceptance_criteria ?? null : null,
-    commitment_month: b.is_commitment ? b.commitment_month ?? null : null, original_due_at: null, rescoped_at: null, rescope_reason: null, commitment_set_id: null,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  };
+  const t = newTask({
+    task_id: sid(`task:${Date.now()}:${TASKS.length}`),
+    number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`,
+    title: b.title.trim(),
+    description: b.description || null,
+    priority: b.priority ?? "normal",
+    cadence: b.cadence || null,
+    assignee: ref(assignee)!,
+    members: share.ids.map((id) => ref(byId(id))!),
+    set_by: refKey(req.user!),
+    due_at: b.due_on ? `${b.due_on}T16:00:00.000Z` : null,
+    entity_type: b.entity_type ?? null,
+    entity_id: b.entity_id ?? null,
+    counts_towards: countsTowardsOf(b),
+    is_commitment: Boolean(b.is_commitment),
+    acceptance_criteria: b.is_commitment ? (b.acceptance_criteria ?? null) : null,
+    commitment_month: b.is_commitment ? (b.commitment_month ?? null) : null,
+    project: b.project_id ? projectRef(PROJECTS.find((p) => p.project_id === b.project_id)!) : null,
+  });
   TASKS.unshift(t);
   log(req.user!, t, "created", null, "todo");
   return created(fresh(t));
 });
+/** What only whoever manages a task changes (the API's SETTER_FIELDS). */
+const SETTER_FIELDS = ["title", "cadence", "due_on", "primary_assignee_id", "member_ids", "department_id", "employee_target_id", "entity_type", "entity_id", "project_id", "recurrence"];
+const COMMITMENT_FIELDS = ["is_commitment", "acceptance_criteria", "commitment_month"];
+
 route("PATCH /api/v1/tasks/:id", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
+  if (t.status === "cancelled") return fail(409, "TASK_CANCELLED", "This task was cancelled");
   const b = req.body as Record<string, unknown>;
-  if (["title", "due_on", "cadence", "primary_assignee_id"].some((k) => k in b) && !manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can change that");
+  const touched = SETTER_FIELDS.find((k) => k in b);
+  if (touched && !manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can change that", { [touched]: ["Set by someone else"] });
+  if (COMMITMENT_FIELDS.some((k) => k in b) && !manages(req.user!, t) && t.assignee?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only its lead can change that");
+
+  // Everything is checked against the task as it stands, and only then changed: a refused edit leaves it as it was.
   const approved = Boolean(t.is_commitment && t.original_due_at);
-  const marks = ["is_commitment", "acceptance_criteria", "commitment_month"].some((k) => k in b && b[k] !== (t as unknown as Record<string, unknown>)[k]);
-  if (approved && marks) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
-  if (!approved && marks) {
-    const will = { is_commitment: "is_commitment" in b ? Boolean(b.is_commitment) : t.is_commitment, acceptance_criteria: (b.acceptance_criteria as string) ?? t.acceptance_criteria, commitment_month: (b.commitment_month as string) ?? t.commitment_month, due_on: "due_on" in b ? (b.due_on as string) : t.due_at?.slice(0, 10) };
+  const leadId = typeof b.primary_assignee_id === "string" ? b.primary_assignee_id : t.assignee!.employee_id;
+  const reassigned = leadId !== t.assignee?.employee_id;
+  if (reassigned) {
+    const lead = byId(leadId);
+    if (!lead || !canSetFor(req.user!, lead.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
+  }
+  let members = reassigned ? t.members.filter((p) => p.employee_id !== leadId) : t.members;
+  if ("member_ids" in b || "department_id" in b) {
+    const share = shareWith(req.user!, leadId, b as { member_ids?: string[]; department_id?: string });
+    if ("error" in share) return invalid(share.error);
+    const leadBad = leadProblem(req.user!, leadId, b as { primary_assignee_id?: string; member_ids?: string[]; department_id?: string });
+    if (leadBad) return invalid(leadBad);
+    members = share.ids.map((id) => ref(byId(id))!);
+  }
+  const marks = COMMITMENT_FIELDS.some((k) => k in b && b[k] !== (t as unknown as Record<string, unknown>)[k]);
+  if (approved && (marks || reassigned)) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
+  const dueAt = "due_on" in b ? (b.due_on ? `${String(b.due_on)}T16:00:00.000Z` : null) : t.due_at;
+  const will = {
+    is_commitment: "is_commitment" in b ? Boolean(b.is_commitment) : t.is_commitment,
+    acceptance_criteria: "acceptance_criteria" in b ? ((b.acceptance_criteria as string | null) ?? null) : t.acceptance_criteria,
+    commitment_month: "commitment_month" in b ? ((b.commitment_month as string | null) ?? null) : t.commitment_month,
+    due_on: dueAt?.slice(0, 10) ?? null,
+  };
+  // A draft commitment is checked as it will stand; an approved one keeps its month while its date moves on.
+  if (!approved && (marks || "due_on" in b)) {
     const problem = commitmentProblem(will);
     if (problem) return invalid(problem);
-    Object.assign(t, { is_commitment: will.is_commitment, acceptance_criteria: will.is_commitment ? will.acceptance_criteria ?? null : null, commitment_month: will.is_commitment ? will.commitment_month ?? null : null });
   }
+  if (approved && !dueAt) return invalid({ due_on: ["Pick a due date"] });
+  const repeats = "recurrence" in b ? b.recurrence : t.recurrence;
+  if (repeats && !dueAt) return invalid({ recurrence: ["Needs a due date"] });
+  // A task may stay in a project completed since; joining one needs it open.
+  if (typeof b.project_id === "string" && b.project_id !== t.project?.project_id) {
+    const joins = projectProblem(b.project_id);
+    if (joins) return invalid(joins);
+  }
+  if (b.late_reason && !reasonOn(String(b.late_reason))) return invalid({ late_reason: ["Pick a reason"] });
+
+  if (reassigned) t.assignee = ref(byId(leadId))!;
+  t.members = members;
+  if (!approved && marks)
+    Object.assign(t, { is_commitment: will.is_commitment, acceptance_criteria: will.is_commitment ? will.acceptance_criteria : null, commitment_month: will.is_commitment ? will.commitment_month : null });
   if ("employee_target_id" in b || "entity_type" in b) t.counts_towards = countsTowardsOf({ employee_target_id: b.employee_target_id as string, entity_type: b.entity_type as Task["entity_type"], entity_id: b.entity_id as string });
   if ("entity_type" in b) Object.assign(t, { entity_type: b.entity_type ?? null, entity_id: b.entity_id ?? null });
   if (typeof b.title === "string") t.title = b.title;
   if ("description" in b) t.description = (b.description as string) || null;
   if (b.priority) t.priority = b.priority as Task["priority"];
-  if ("due_on" in b) t.due_at = b.due_on ? `${b.due_on}T16:00:00.000Z` : null;
-  log(req.user!, t, "edited");
+  t.due_at = dueAt;
+  if ("cadence" in b) t.cadence = (b.cadence as Task["cadence"]) ?? null;
+  if ("late_reason" in b) t.late_reason = (b.late_reason as Task["late_reason"]) ?? null;
+  if ("recurrence" in b) t.recurrence = (b.recurrence as Task["recurrence"]) ?? null;
+  if ("project_id" in b) t.project = b.project_id ? projectRef(PROJECTS.find((p) => p.project_id === b.project_id)!) : null;
+  log(req.user!, t, reassigned || "member_ids" in b || "department_id" in b ? "assigned" : "edited");
   return ok(fresh(t));
 });
 route("POST /api/v1/tasks/:id/move", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
   if (t.status === "cancelled") return fail(409, "TASK_CANCELLED", "This task was cancelled");
-  const to = (req.body as { status: Status }).status;
+  const { status: to, late_reason: why, before_task_id: before } = req.body as { status: Status; late_reason?: Task["late_reason"]; before_task_id?: string | null };
   const from = t.status;
+  if (from === "todo" && to !== "todo") {
+    const e = EDGES.find((x) => x.task_id === t.task_id && !satisfied(x));
+    if (e) return fail(409, "TASK_WAITING", `Waiting on ${TASKS.find((x) => x.task_id === e.depends_on_task_id)!.number}`);
+  }
+  if (to === "done" && why && !reasonOn(why)) return invalid({ late_reason: ["Pick a reason"] });
+  if (to === "done" && why) t.late_reason = why;
+  if (to === "done") REMINDERS.delete(t.task_id);
+  // The board reads TASKS in order: the card goes above `before`, or to the foot.
+  const target = before ? find(req.user!, before) : null;
+  if (before && (!target || target.status !== to)) return fail(409, "CONFLICT", "That card has moved, reload the board");
+  TASKS.splice(TASKS.indexOf(t), 1);
+  TASKS.splice(target ? TASKS.indexOf(target) : TASKS.length, 0, t);
   if (to === "in_progress" && !t.started_at) t.started_at = new Date().toISOString();
   t.completed_at = to === "done" ? new Date().toISOString() : null;
   t.status = to;
@@ -230,14 +593,28 @@ route("POST /api/v1/tasks/:id/move", (req) => {
 route("POST /api/v1/tasks/:id/block", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
-  t.blocked_reason = (req.body as { blocked_reason: string }).blocked_reason;
+  if (t.blocked_reason) return fail(409, "TASK_BLOCKED", "This task is already blocked; clear that first");
+  const b = req.body as { blocked_reason: string; estimated_resolve_on?: string };
+  t.blocked_reason = b.blocked_reason;
   t.blocked_at = new Date().toISOString();
+  HOLDS.set(t.task_id, [
+    { task_blockage_id: sid(`hold:${Date.now()}`), note: b.blocked_reason, estimated_resolve_on: b.estimated_resolve_on ?? null, raised_by: refKey(req.user!), raised_at: t.blocked_at, resolved_at: null, resolved_by: null, resolve_note: null, due_shift_days: null, blocked_days: 0 },
+    ...(HOLDS.get(t.task_id) ?? []),
+  ]);
   log(req.user!, t, "blocked");
   return ok(fresh(t));
 });
 route("POST /api/v1/tasks/:id/unblock", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
+  const b = req.body as { resolve_note?: string; push_due?: boolean };
+  const h = (HOLDS.get(t.task_id) ?? []).find((x) => !x.resolved_at);
+  if (h) {
+    const days = Math.max(1, Math.ceil((Date.now() - Date.parse(h.raised_at)) / 86_400_000));
+    const shift = b.push_due !== false && t.due_at && open(t) ? days : null;
+    Object.assign(h, { resolved_at: new Date().toISOString(), resolved_by: refKey(req.user!), resolve_note: b.resolve_note ?? null, due_shift_days: shift, blocked_days: days });
+    if (shift && t.due_at) t.due_at = new Date(Date.parse(t.due_at) + shift * 86_400_000).toISOString();
+  }
   t.blocked_reason = null;
   t.blocked_at = null;
   log(req.user!, t, "unblocked");
@@ -270,6 +647,116 @@ route("GET /api/v1/tasks/:id/activity", (req) => {
   return t ? paged(ACTIVITY.filter((a) => a.task_id === t.task_id), req, { sort: { created_at: (a, b) => a.created_at.localeCompare(b.created_at) } }) : notFound();
 });
 
+route("GET /api/v1/tasks/:id/blockages", (req) => {
+  const t = find(req.user!, req.params.id);
+  return t ? paged(HOLDS.get(t.task_id) ?? [], req, { sort: { raised_at: (a, b) => a.raised_at.localeCompare(b.raised_at) } }) : notFound();
+});
+route("POST /api/v1/tasks/:id/steps", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  if (!plans(req.user!, t)) return fail(403, "FORBIDDEN", "Only its assignee or the person who set it can change that");
+  const b = req.body as { title?: string; due_on?: string };
+  if (!b.title?.trim()) return invalid({ title: ["Name the step"] });
+  const list = STEPS.get(t.task_id) ?? [];
+  if (list.length >= 25) return fail(409, "TOO_MANY_STEPS", "A task holds at most 25 steps");
+  const step: TaskStep = { task_step_id: sid(`step:${Date.now()}`), task_id: t.task_id, title: b.title.trim(), due_on: b.due_on ?? null, done_at: null, done_by: null, sort_order: list.length + 1, created_at: new Date().toISOString() };
+  STEPS.set(t.task_id, [...list, step]);
+  log(req.user!, t, "step_added");
+  return created(step);
+});
+route("PATCH /api/v1/tasks/:id/steps/:child_id", (req) => {
+  const t = find(req.user!, req.params.id);
+  const step = t && (STEPS.get(t.task_id) ?? []).find((x) => x.task_step_id === req.params.child_id);
+  if (!t || !step) return notFound();
+  const b = req.body as { title?: string; due_on?: string | null; done?: boolean };
+  if (b.title) step.title = b.title;
+  if ("due_on" in b) step.due_on = b.due_on ?? null;
+  if (typeof b.done === "boolean") Object.assign(step, b.done ? { done_at: new Date().toISOString(), done_by: refKey(req.user!) } : { done_at: null, done_by: null });
+  log(req.user!, t, b.done === true ? "step_done" : b.done === false ? "step_reopened" : "edited");
+  return ok(step);
+});
+route("DELETE /api/v1/tasks/:id/steps/:child_id", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  STEPS.set(t.task_id, (STEPS.get(t.task_id) ?? []).filter((x) => x.task_step_id !== req.params.child_id));
+  log(req.user!, t, "step_removed");
+  return ok(detail(req.user!, t));
+});
+const reaches = (from: string, target: string, depth = 0): boolean =>
+  from === target || (depth < 50 && EDGES.filter((e) => e.task_id === from).some((e) => reaches(e.depends_on_task_id, target, depth + 1)));
+route("POST /api/v1/tasks/:id/waiting-on", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  const other = find(req.user!, (req.body as { depends_on_task_id: string }).depends_on_task_id);
+  if (!other || other.task_id === t.task_id) return invalid({ depends_on_task_id: ["Not a task you can see"] });
+  if (reaches(other.task_id, t.task_id)) return invalid({ depends_on_task_id: [`${other.number} already waits on this task`] });
+  if (!EDGES.some((e) => e.task_id === t.task_id && e.depends_on_task_id === other.task_id))
+    EDGES.push({ task_dependency_id: sid(`edge:${Date.now()}`), task_id: t.task_id, depends_on_task_id: other.task_id, overridden_at: null, override_reason: null });
+  log(req.user!, t, "waiting_added");
+  return ok(detail(req.user!, t));
+});
+route("DELETE /api/v1/tasks/:id/waiting-on/:child_id", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  const i = EDGES.findIndex((e) => e.task_dependency_id === req.params.child_id && e.task_id === t.task_id);
+  if (i < 0) return notFound();
+  EDGES.splice(i, 1);
+  log(req.user!, t, "waiting_removed");
+  return ok(detail(req.user!, t));
+});
+route("POST /api/v1/tasks/:id/waiting-on/:child_id/override", (req) => {
+  const t = find(req.user!, req.params.id);
+  const e = t && EDGES.find((x) => x.task_dependency_id === req.params.child_id && x.task_id === t.task_id);
+  if (!t || !e) return notFound();
+  Object.assign(e, { overridden_at: new Date().toISOString(), override_reason: (req.body as { override_reason?: string }).override_reason ?? null });
+  log(req.user!, t, "waiting_overridden");
+  return ok(detail(req.user!, t));
+});
+route("POST /api/v1/tasks/:id/watchers", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  const id = (req.body as { employee_id?: string }).employee_id || me(req.user);
+  const person = ref(byId(id));
+  if (!person) return invalid({ employee_id: ["Not on the staff"] });
+  // The caller watches it themselves; someone else is added by whoever plans it, and only if they can see it.
+  if (id !== me(req.user) && !plans(req.user!, t)) return fail(403, "FORBIDDEN", "Only its assignee or the person who set it can change that");
+  if (!seesTask(byId(id)!.user_key, t)) return invalid({ employee_id: ["Cannot see this task"] });
+  const list = WATCHERS.get(t.task_id) ?? [];
+  if (!list.some((p) => p.employee_id === id)) WATCHERS.set(t.task_id, [...list, person]);
+  log(req.user!, t, "watcher_added");
+  return ok(detail(req.user!, t));
+});
+route("DELETE /api/v1/tasks/:id/watchers/:child_id", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  WATCHERS.set(t.task_id, (WATCHERS.get(t.task_id) ?? []).filter((p) => p.employee_id !== req.params.child_id));
+  log(req.user!, t, "watcher_removed");
+  return ok(detail(req.user!, t));
+});
+route("POST /api/v1/tasks/:id/ping", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  log(req.user!, t, "pinged");
+  return ok(fresh(t));
+});
+route("PUT /api/v1/tasks/:id/reminders", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  const list = (req.body as { reminders: Array<{ minutes_before?: number; remind_at?: string }> }).reminders ?? [];
+  if (list.length > 3) return invalid({ reminders: ["At most three"] });
+  if (list.some((r) => r.minutes_before !== undefined) && !t.due_at) return invalid({ "reminders.0.minutes_before": ["Give the task a due date"] });
+  REMINDERS.set(
+    t.task_id,
+    list.map((r, i) => ({
+      slot: i + 1,
+      remind_at: r.remind_at ?? new Date(Date.parse(t.due_at!) - (r.minutes_before ?? 0) * 60000).toISOString(),
+      minutes_before: r.minutes_before ?? null,
+    })),
+  );
+  log(req.user!, t, "reminders_set");
+  return ok(detail(req.user!, t));
+});
+
 /* Calendar */
 type E = [number, string, CalendarEvent["event_type"], string, number];
 const EVENT_ROWS: E[] = [
@@ -282,10 +769,24 @@ const EVENTS: CalendarEvent[] = EVENT_ROWS.map(([d, title, type, hm, mins], i) =
   return {
     calendar_event_id: sid(`ev:${i}`), title, description: null, event_type: type, owner: refKey("cynthia"),
     starts_at: starts, ends_at: new Date(Date.parse(starts) + mins * 60000).toISOString(), all_day: false, location: null,
-    visibility: "everyone", attendees: [], my_response: null, entity_type: null, entity_id: null, link: null, cancelled_at: null, can_edit: false,
+    visibility: "everyone", attendees: [], my_response: null, entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [15], can_edit: false,
     created_at: at(20, "09:00"),
   };
 });
+/* An invitation from someone else, still to be answered, and one already declined: Accept and Decline. */
+const invitation = (i: number, owner: string, title: string, daysAhead: number, hm: string, mins: number, answers: Array<[string, "pending" | "accepted" | "declined"]>): CalendarEvent => {
+  const starts = at(-daysAhead, hm);
+  return {
+    calendar_event_id: sid(`ev:invite:${i}`), title, description: null, event_type: "meeting", owner: refKey(owner),
+    starts_at: starts, ends_at: new Date(Date.parse(starts) + mins * 60000).toISOString(), all_day: false, location: "Victoria Island office",
+    visibility: "attendees", attendees: answers.map(([key, response]) => ({ employee: refKey(key), response })), my_response: null,
+    entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [15], can_edit: false, created_at: at(3, "09:00"),
+  };
+};
+EVENTS.push(
+  invitation(0, "ngozi", "Partner pipeline review", 2, "14:00", 60, [["cynthia", "pending"], ["bashir", "accepted"]]),
+  invitation(1, "ifeoma", "Board pack walkthrough", 8, "16:00", 45, [["cynthia", "declined"], ["tolu", "pending"]]),
+);
 const asItem = (e: CalendarEvent): CalendarItem => ({ item_kind: "event", item_id: e.calendar_event_id, title: e.title, starts_at: e.starts_at, ends_at: e.ends_at, all_day: e.all_day, event_type: e.event_type, location: e.location, my_response: e.my_response, performance_kind: null, link: { module: "workspace", tab: "calendar", id: e.calendar_event_id, path: `/workspace?tab=calendar&id=${e.calendar_event_id}` } });
 const taskItem = (t: Task): CalendarItem => ({ item_kind: "task", item_id: t.task_id, title: t.title, starts_at: t.due_at!, ends_at: new Date(Date.parse(t.due_at!) + 60000).toISOString(), all_day: false, event_type: "deadline", location: null, my_response: null, performance_kind: null, link: { module: "workspace", tab: "tasks", id: t.task_id, path: `/workspace?tab=tasks&id=${t.task_id}` } });
 /** The reader's performance dates (performance.md §6.18): a check-in due and a key result finishing, all day. */
@@ -297,6 +798,25 @@ const performanceItems = (): CalendarItem[] => {
     { item_kind: "performance", item_id: sid("perf:kr:BM-KR1.2"), title: "BM-KR1.2 Publish 36 city stories across channels", ...allDay(day(6)), all_day: true, event_type: null, location: null, my_response: null, performance_kind: "key_result_due", link: { module: "performance", tab: "goals", id: sid("perf:kr:BM-KR1.2"), path: `/performance?tab=goals&id=${sid("perf:kr:BM-KR1.2")}` } },
   ];
 };
+/** The day after a date, as the end of an all-day item. */
+const dayAfter = (d: string) => new Date(Date.parse(`${d}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+/** The reader's approved leave touching a month (YYYY-MM), all day, as the API reads it through the leave service. */
+const leaveItems = (user: string, month: string): CalendarItem[] =>
+  leaveRequests()
+    .filter((l) => l.key === user && l.status === "approved" && l.starts_on.slice(0, 7) <= month && l.ends_on.slice(0, 7) >= month)
+    .map((l) => ({
+      item_kind: "leave",
+      item_id: l.leave_request_id,
+      title: l.leave_type_name,
+      starts_at: new Date(`${l.starts_on}T00:00:00+01:00`).toISOString(),
+      ends_at: new Date(`${dayAfter(l.ends_on)}T00:00:00+01:00`).toISOString(),
+      all_day: true,
+      event_type: null,
+      location: null,
+      my_response: null,
+      performance_kind: null,
+      link: { module: "people", tab: "leave", id: l.leave_request_id, path: `/people?tab=leave&id=${l.leave_request_id}` },
+    }));
 const sees = (user: string, e: CalendarEvent) => e.visibility === "everyone" || e.owner?.employee_id === me(user) || e.attendees.some((a) => a.employee.employee_id === me(user));
 const view = (user: string, e: CalendarEvent): CalendarEvent => ({ ...e, my_response: e.attendees.find((a) => a.employee.employee_id === me(user))?.response ?? null, can_edit: e.owner?.employee_id === me(user) && !e.cancelled_at });
 
@@ -304,10 +824,13 @@ route("GET /api/v1/calendar", (req) => {
   const { month } = req.query;
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return invalid({ month: ["must be a month as YYYY-MM"] });
   const items = [
-    ...EVENTS.filter((e) => !e.cancelled_at && sees(req.user!, e)).map(asItem),
-    ...TASKS.filter((t) => t.assignee?.employee_id === me(req.user) && open(t) && t.due_at).map(taskItem),
-    ...performanceItems(),
-  ].filter((i) => i.starts_at.startsWith(month)).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+    ...[
+      ...EVENTS.filter((e) => !e.cancelled_at && sees(req.user!, e)).map((e) => asItem(view(req.user!, e))),
+      ...TASKS.filter((t) => (t.assignee?.employee_id === me(req.user) || onIt(req.user!, t)) && open(t) && t.due_at).map(taskItem),
+      ...performanceItems(),
+    ].filter((i) => i.starts_at.startsWith(month)),
+    ...leaveItems(req.user!, month),
+  ].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   return paged(items, { ...req, query: Object.fromEntries(Object.entries(req.query).filter(([k]) => k !== "month")) }, {
     search: (i) => [i.title],
     filters: { item_kind: (i, v) => i.item_kind === v },
@@ -319,17 +842,17 @@ route("GET /api/v1/calendar/:id", (req) => {
   return e && sees(req.user!, e) ? ok(view(req.user!, e)) : notFound();
 });
 route("POST /api/v1/calendar", (req) => {
-  const b = req.body as { title?: string; starts_at?: string; ends_at?: string; event_type?: CalendarEvent["event_type"]; all_day?: boolean; location?: string; visibility?: CalendarEvent["visibility"]; attendee_ids?: string[] };
+  const b = req.body as { title?: string; starts_at?: string; ends_at?: string; event_type?: CalendarEvent["event_type"]; all_day?: boolean; location?: string; visibility?: CalendarEvent["visibility"]; attendee_ids?: string[]; reminder_minutes?: number[] };
   const f: Record<string, string[]> = {};
   if (!b.title) f.title = ["Name the event"];
   if (!b.starts_at) f.starts_at = ["Pick a start"];
-  if (b.starts_at && b.ends_at && b.ends_at <= b.starts_at) f.ends_at = ["Ends before it starts"];
+  if (b.starts_at && b.ends_at && Date.parse(b.ends_at) <= Date.parse(b.starts_at)) f.ends_at = ["Ends before it starts"];
   if (Object.keys(f).length) return invalid(f);
   const e: CalendarEvent = {
     calendar_event_id: sid(`ev:${Date.now()}`), title: b.title!, description: null, event_type: b.event_type ?? "meeting", owner: refKey(req.user!),
     starts_at: b.starts_at!, ends_at: b.ends_at!, all_day: Boolean(b.all_day), location: b.location || null, visibility: b.visibility ?? "attendees",
     attendees: (b.attendee_ids ?? []).map((id) => ({ employee: ref(byId(id))!, response: "pending" as const })), my_response: null,
-    entity_type: null, entity_id: null, link: null, cancelled_at: null, can_edit: true, created_at: new Date().toISOString(),
+    entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [...(b.reminder_minutes ?? [])].sort((x, y) => x - y), can_edit: true, created_at: new Date().toISOString(),
   };
   EVENTS.push(e);
   return created(view(req.user!, e));
@@ -338,7 +861,11 @@ route("PATCH /api/v1/calendar/:id", (req) => {
   const e = EVENTS.find((x) => x.calendar_event_id === req.params.id);
   if (!e || !sees(req.user!, e)) return notFound();
   if (e.owner?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only the person who made this event can change it");
-  Object.assign(e, req.body);
+  const { attendee_ids: ids, ...rest } = req.body as Partial<CalendarEvent> & { attendee_ids?: string[] };
+  // The end comes after the start as a time, whatever offset each is written in.
+  if (Date.parse(rest.ends_at ?? e.ends_at) <= Date.parse(rest.starts_at ?? e.starts_at)) return invalid({ ends_at: ["Ends before it starts"] });
+  Object.assign(e, rest);
+  if (ids) e.attendees = ids.map((id) => e.attendees.find((a) => a.employee.employee_id === id) ?? { employee: ref(byId(id))!, response: "pending" as const });
   return ok(view(req.user!, e));
 });
 route("POST /api/v1/calendar/:id/cancel", (req) => {
@@ -362,11 +889,12 @@ route("GET /api/v1/workspace/today", (req) => {
   const id = me(req.user);
   const today = isoDaysAgo(0);
   const own = TASKS.filter((t) => t.assignee?.employee_id === id && open(t)).map(fresh);
-  const dueToday = own.filter((t) => t.due_at?.startsWith(today));
+  // Due Today is open and not yet past its time; once past it a task is Overdue, so Your Day holds each once.
+  const dueToday = own.filter((t) => t.due_at?.startsWith(today) && !t.overdue);
   const overdue = own.filter((t) => t.overdue);
-  const fromOthers = own.filter((t) => t.set_by && t.set_by.employee_id !== id);
+  const fromOthers = own.filter((t) => t.set_by && t.set_by.employee_id !== id).sort((a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9"));
   const [from] = weekBounds();
-  const diary = EVENTS.filter((e) => sees(req.user!, e) && e.starts_at.startsWith(today)).map(asItem);
+  const diary = EVENTS.filter((e) => !e.cancelled_at && sees(req.user!, e) && e.starts_at.startsWith(today)).map((e) => asItem(view(req.user!, e)));
   const since = ACTIVITY.filter((a) => TASKS.some((t) => t.task_id === a.task_id && t.assignee?.employee_id === id) && a.actor?.employee_id !== id).slice(0, 25);
   return ok({
     date: today,
@@ -374,14 +902,16 @@ route("GET /api/v1/workspace/today", (req) => {
     overdue: overdue.length,
     in_review: own.filter((t) => t.status === "in_review").length,
     done_this_week: TASKS.filter((t) => t.assignee?.employee_id === id && t.status === "done" && (t.completed_at ?? "") >= from).length,
-    my_day: { data: [...overdue, ...dueToday.filter((t) => !t.overdue)].slice(0, 25), total: overdue.length + dueToday.length },
+    my_day: { data: [...overdue, ...dueToday].slice(0, 25), total: overdue.length + dueToday.length },
     set_by_manager: { data: fromOthers.slice(0, 25), total: fromOthers.length },
     diary: { data: diary, total: diary.length },
     since: { data: since.map((a) => ({ task_id: a.task_id, task_title: a.task_title, actor: a.actor, kind: a.kind, to_status: a.to_status, created_at: a.created_at })), total: since.length },
   });
 });
 route("GET /api/v1/workspace/analytics", (req) => {
-  const l = scoped(req.user!, req.query.scope).map(fresh);
+  // Mine is what the reader leads or shares; a task they set for someone else counts under My Team.
+  const own = (t: Task) => t.assignee?.employee_id === me(req.user) || onIt(req.user!, t);
+  const l = (req.query.scope === "team" ? scoped(req.user!, "team") : TASKS.filter(own)).map(fresh);
   const done = l.filter((t) => t.status === "done");
   const openNow = l.filter(open);
   const by = new Map<string, { employee: NonNullable<Task["assignee"]>; open: number }>();
@@ -391,10 +921,12 @@ route("GET /api/v1/workspace/analytics", (req) => {
     e.open += 1;
     by.set(t.assignee.employee_id, e);
   }
-  const days = req.query.period === "90d" ? 90 : req.query.period === "year" ? 290 : 30;
+  // The last 30 or 90 days, or the calendar year from 1 January (Africa/Lagos).
+  const today = isoDaysAgo(0);
+  const from = req.query.period === "year" ? `${today.slice(0, 4)}-01-01` : isoDaysAgo((req.query.period === "90d" ? 90 : 30) - 1);
   return ok({
-    from: isoDaysAgo(days - 1),
-    to: isoDaysAgo(0),
+    from,
+    to: today,
     completion_rate: done.length + openNow.length ? Math.round((done.length / (done.length + openNow.length)) * 1000) / 10 : null,
     overdue: openNow.filter((t) => t.overdue).length,
     avg_completion_days: 2.4,
@@ -403,6 +935,26 @@ route("GET /api/v1/workspace/analytics", (req) => {
     completed_per_week: [18, 22, 19, 26, 24, 31].map((count, i) => ({ week_start: isoDaysAgo(7 * (5 - i)), count })),
     workload: [...by.values()].sort((a, b) => b.open - a.open).slice(0, 25),
     by_priority: (["urgent", "high", "normal", "low"] as const).map((priority) => ({ priority, open: openNow.filter((t) => t.priority === priority).length })),
+    open: openNow.length,
+    cycle_days: 1.8,
+    overdue_aging: (["1_3", "4_7", "8_14", "15_plus"] as const).map((band) => ({
+      band,
+      count: openNow.filter((t) => {
+        if (!t.overdue || !t.due_at) return false;
+        const d = (Date.now() - Date.parse(t.due_at)) / 86_400_000;
+        return band === "1_3" ? d < 4 : band === "4_7" ? d >= 4 && d < 8 : band === "8_14" ? d >= 8 && d < 15 : d >= 15;
+      }).length,
+    })),
+    overdue_by_reason: [...REASONS.map((r) => [r.code, r.label] as const), [null, null] as const]
+      .map(([reason, label]) => ({ reason, label, count: openNow.filter((t) => t.overdue && t.late_reason === reason).length }))
+      .filter((r) => r.count > 0),
+    blocked: (() => {
+      const held = openNow.filter((t) => t.blocked_reason).map((t) => {
+        const h = (HOLDS.get(t.task_id) ?? []).find((x) => !x.resolved_at)!;
+        return { task: refOf(req.user!, t.task_id), note: t.blocked_reason!, raised_at: h?.raised_at ?? t.blocked_at!, blocked_days: h ? Math.round(((Date.now() - Date.parse(h.raised_at)) / 86_400_000) * 10) / 10 : 0 };
+      });
+      return { data: held.slice(0, 25), total: held.length };
+    })(),
   });
 });
 
@@ -587,13 +1139,18 @@ route("POST /api/v1/performance/commitments/:id/recovery", (req) => {
   if (recoveryOf(t.task_id)) return fail(409, "RECOVERY_SET", "This commitment already has a recovery");
   const owner = byId(String(req.body.primary_assignee_id ?? ""));
   if (!owner || !canSetFor(req.user!, owner.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
-  const r: Task = {
-    ...TASKS[0], task_id: sid(`task:recovery:${t.task_id}`), number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`, title: `Recovery: ${t.title}`.slice(0, 200),
-    description: null, status: "todo", priority: "high", cadence: null, assignee: ref(owner)!, set_by: refKey(req.user!), due_at: `${String(req.body.due_on)}T16:00:00.000Z`,
-    started_at: null, completed_at: null, entity_type: "task", entity_id: t.task_id, link: { module: "workspace", tab: "tasks", id: t.task_id, path: `/workspace?tab=tasks&id=${t.task_id}` },
-    comment_count: 0, counts_towards: null, is_commitment: false, acceptance_criteria: null, commitment_month: null, original_due_at: null, rescoped_at: null, rescope_reason: null,
-    commitment_set_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  };
+  const r = newTask({
+    task_id: sid(`task:recovery:${t.task_id}`),
+    number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`,
+    title: `Recovery: ${t.title}`.slice(0, 200),
+    priority: "high",
+    assignee: ref(owner)!,
+    set_by: refKey(req.user!),
+    due_at: `${String(req.body.due_on)}T16:00:00.000Z`,
+    entity_type: "task",
+    entity_id: t.task_id,
+    link: { module: "workspace", tab: "tasks", id: t.task_id, path: `/workspace?tab=tasks&id=${t.task_id}` },
+  });
   TASKS.unshift(r);
   return created(commitmentOf(t));
 });

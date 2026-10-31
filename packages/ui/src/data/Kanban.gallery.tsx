@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { GalleryEntry } from "../testing/gallery";
 import { Money } from "../display/Money";
 import { Pill } from "../display/Pill";
+import { EmptyState } from "../display/EmptyState";
 import { Kanban, type KanbanColumn } from "./Kanban";
 
 const START: KanbanColumn[] = [
@@ -19,21 +20,23 @@ const START: KanbanColumn[] = [
   { key: "signed", label: "Signed", series: 4, cards: [] },
 ];
 
-const Moving = () => {
+/** The board with its cards moving; `slow` hands back a move that takes a while, so the card is held meanwhile. */
+const Moving = ({ slow = false }: { slow?: boolean }) => {
   const [columns, setColumns] = useState(START);
+  const apply = (card: string, from: string, to: string) =>
+    setColumns((cols) => {
+      const moved = cols.find((c) => c.key === from)?.cards.find((c) => c.key === card);
+      if (!moved) return cols;
+      return cols.map((c) =>
+        c.key === from ? { ...c, cards: c.cards.filter((x) => x.key !== card) } : c.key === to ? { ...c, cards: [...c.cards, moved] } : c,
+      );
+    });
   return (
     <Kanban
       columns={columns}
       onOpen={() => undefined}
-      onMove={(card, from, to) =>
-        setColumns((cols) => {
-          const moved = cols.find((c) => c.key === from)?.cards.find((c) => c.key === card);
-          if (!moved) return cols;
-          return cols.map((c) =>
-            c.key === from ? { ...c, cards: c.cards.filter((x) => x.key !== card) } : c.key === to ? { ...c, cards: [...c.cards, moved] } : c,
-          );
-        })
-      }
+      reorder
+      onMove={(card, from, to) => (slow ? new Promise<void>((r) => setTimeout(() => (apply(card, from, to), r()), 1500)) : apply(card, from, to))}
     />
   );
 };
@@ -41,8 +44,14 @@ const Moving = () => {
 export default {
   component: "Kanban",
   states: {
-    Moving,
+    Moving: () => <Moving />,
+    "Slow Move": () => <Moving slow />,
+    Loading: () => <Kanban columns={START.map((c) => ({ ...c, cards: [], count: undefined }))} loading onMove={() => undefined} empty={<EmptyState title="No Deals Yet" />} />,
     "Read Only": () => <Kanban columns={START} />,
     "Empty Board": () => <Kanban columns={START.map((c) => ({ ...c, cards: [], count: 0 }))} onMove={() => undefined} />,
+    "Empty With State": () => (
+      <Kanban columns={START.map((c) => ({ ...c, cards: [], count: 0 }))} empty={<EmptyState title="No Deals Yet" text="Add the first partner to start" />} />
+    ),
+    "More To Load": () => <Kanban columns={START.map((c, i) => (i === 0 ? { ...c, count: 9, onMore: () => new Promise((r) => setTimeout(r, 800)) } : c))} onMove={() => undefined} />,
   },
 } satisfies GalleryEntry;

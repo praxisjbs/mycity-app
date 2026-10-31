@@ -15,7 +15,8 @@ const { emit } = require("../../shared/events/emit");
 const { linkFor } = require("../../shared/route-map");
 const lagos = require("../../shared/time/lagos");
 const repo = require("./calendar.repo");
-const { EVENTS } = require("./calendar.events");
+const reminders = require("../notifications/notifications.reminders");
+const { EVENTS, REMINDER_KEY } = require("./calendar.events");
 
 const iso = (v) => (v instanceof Date ? v.toISOString() : v || null);
 
@@ -29,6 +30,12 @@ async function tx(fn) {
 }
 
 const notFound = () => new AppError("NOT_FOUND", "That event does not exist", 404);
+
+/** A stored value and the one sent: times as instants, the rest as text, nothing as empty. */
+function same(stored, sent) {
+  if (stored instanceof Date) return Date.parse(sent) === stored.getTime();
+  return String(stored ?? "") === String(sent ?? "");
+}
 
 /** A month item as the contract's CalendarItem. */
 function toItem(row) {
@@ -67,6 +74,7 @@ function toEvent(row, employeeId) {
     entity_id: row.entity_id,
     link: row.entity_type ? linkFor(row.entity_type, row.entity_id) : null,
     cancelled_at: iso(row.cancelled_at),
+    reminder_minutes: row.reminder_minutes || [],
     can_edit: row.owner_employee_id === employeeId && !row.cancelled_at,
     created_at: iso(row.created_at),
   };
@@ -80,28 +88,92 @@ function whenOf(startsAt, allDay) {
   return allDay ? dd : `${dd}, ${lagos.timeOf(d)}`;
 }
 
-/** A person's month, YYYY-MM. */
-async function month(employeeId, query) {
-  const first = `${query.month}-01`;
-  const next = lagos.addMonths(first, 1);
+/** A person's days from `first` to `last` (YYYY-MM-DD, both kept), one page. */
+async function days(employeeId, first, last, query) {
   const page = await repo.month(
     pool,
     {
       employee_id: employeeId,
       from: lagos.instant(first),
-      to: lagos.instant(next),
+      to: lagos.instant(lagos.addDays(last, 1)),
       fromDay: first,
-      toDay: lagos.addDays(next, -1),
+      toDay: last,
     },
     query,
   );
   return { ...page, data: page.data.map(toItem) };
 }
 
+/** A person's month, YYYY-MM. */
+function month(employeeId, query) {
+  const first = `${query.month}-01`;
+  return days(employeeId, first, lagos.addDays(lagos.addMonths(first, 1), -1), query);
+}
+
+/** A person's one day, YYYY-MM-DD: Today's diary. */
+function oneDay(employeeId, date, query) {
+  return days(employeeId, date, date, query);
+}
+
+/* ------------------------------------------------------------------ *
+ * Reminders: up to three, minutes before the start, in the shared engine
+ * ------------------------------------------------------------------ */
+
+const entityOf = (id) => ({ type: "calendar_event", id });
+
+/** The event row with its reminders' lead times, as the panel and the edit form show them. */
+async function withReminders(db, row) {
+  if (!row) return row;
+  const pending = await reminders.pendingFor(db, { key: REMINDER_KEY, entity: entityOf(row.calendar_event_id) });
+  const minutes = pending
+    .map((r) => (r.payload && Number.isInteger(r.payload.minutes_before) ? r.payload.minutes_before : null))
+    .filter((m) => m !== null)
+    .sort((a, b) => a - b);
+  return { ...row, reminder_minutes: [...new Set(minutes)] };
+}
+
+/** Make the event's reminders exactly these lead times; any whose time has passed are left out. */
+async function scheduleReminders(client, id, startsAt, minutes) {
+  await reminders.cancel(client, { key: REMINDER_KEY, entity: entityOf(id) });
+  const now = Date.now();
+  const lead = [...new Set(minutes)].sort((a, b) => a - b);
+  for (const [i, m] of lead.entries()) {
+    const at = new Date(new Date(startsAt).getTime() - m * 60_000);
+    if (at.getTime() <= now) continue;
+    await reminders.schedule(client, { key: REMINDER_KEY, entity: entityOf(id), occurrence: String(i + 1), at, payload: { minutes_before: m } });
+  }
+}
+
+/** The engine's check before an event reminder fires: the event stands and has not started. */
+async function reminderCheck(client, row, ctx = {}) {
+  const now = ctx.now || new Date();
+  const { rows } = await client.query(
+    `SELECT calendar_event_id, title, owner_employee_id, starts_at, all_day, cancelled_at
+       FROM calendar_event WHERE calendar_event_id = $1`,
+    [row.entity_id],
+  );
+  const e = rows[0];
+  if (!e || e.cancelled_at || new Date(e.starts_at) <= now) return null;
+  const { rows: going } = await client.query(
+    "SELECT employee_id FROM calendar_event_attendee WHERE calendar_event_id = $1 AND response <> 'declined' ORDER BY employee_id",
+    [e.calendar_event_id],
+  );
+  return {
+    entity: entityOf(e.calendar_event_id),
+    payload: {
+      calendar_event_id: e.calendar_event_id,
+      title: e.title,
+      owner_employee_id: e.owner_employee_id,
+      attendee_ids: going.map((r) => r.employee_id),
+      when: whenOf(e.starts_at, e.all_day),
+    },
+  };
+}
+
 async function getFor(id, employeeId) {
   const row = await repo.getFor(pool, id, employeeId);
   if (!row) throw notFound();
-  return toEvent(row, employeeId);
+  return toEvent(await withReminders(pool, row), employeeId);
 }
 
 async function checkAttendees(client, ids, ownerId) {
@@ -140,7 +212,8 @@ async function create(actor, body) {
       created_by: actor.user_id,
     });
     await repo.setAttendees(client, id, attendees);
-    const row = await repo.getFor(client, id, actor.employee_id);
+    await scheduleReminders(client, id, body.starts_at, body.reminder_minutes || []);
+    const row = await withReminders(client, await repo.getFor(client, id, actor.employee_id));
     await emit(client, {
       key: EVENTS.CALENDAR_EVENT_CREATED,
       entity: { type: "calendar_event", id },
@@ -176,17 +249,35 @@ async function edit(actor, id, body) {
     for (const k of ["title", "description", "event_type", "starts_at", "ends_at", "all_day", "location", "visibility"])
       if (k in body) changes[k] = body[k];
     await repo.update(client, id, changes);
+    const was = await repo.attendeeIds(client, id);
     if (body.attendee_ids)
       await repo.setAttendees(client, id, await checkAttendees(client, body.attendee_ids, actor.employee_id));
-    const after = await repo.getFor(client, id, actor.employee_id);
+    const now = await repo.attendeeIds(client, id);
+    const added = now.filter((x) => !was.includes(x));
+    const removed = was.filter((x) => !now.includes(x));
+    // What the people already invited would notice; a change to who else comes, or to the
+    // reminders, is not news to them.
+    const noticed = Object.keys(changes).some((k) => !same(before[k], changes[k]));
+    if (noticed) await repo.nextSequence(client, id);
+    // New lead times replace the old; a move keeps the lead times and moves their times with it.
+    if (body.reminder_minutes || body.starts_at) {
+      const lead = body.reminder_minutes || (await withReminders(client, before)).reminder_minutes;
+      await scheduleReminders(client, id, starts, lead);
+    }
+    const after = await withReminders(client, await repo.getFor(client, id, actor.employee_id));
     await emit(client, {
       key: EVENTS.CALENDAR_EVENT_CHANGED,
       entity: { type: "calendar_event", id },
       actor,
       before: toEvent(before, actor.employee_id),
       after: toEvent(after, actor.employee_id),
-      payload: payloadOf(after, await repo.attendeeIds(client, id)),
+      payload: { ...payloadOf(after, now.filter((x) => !added.includes(x))), noticed },
     });
+    // Someone newly invited hears an invitation; someone taken off hears that.
+    if (added.length)
+      await emit(client, { key: EVENTS.CALENDAR_EVENT_INVITED, entity: { type: "calendar_event", id }, actor, payload: payloadOf(after, added) });
+    if (removed.length)
+      await emit(client, { key: EVENTS.CALENDAR_EVENT_UNINVITED, entity: { type: "calendar_event", id }, actor, payload: payloadOf(after, removed) });
     return toEvent(after, actor.employee_id);
   });
 }
@@ -195,6 +286,8 @@ async function cancel(actor, id) {
   return tx(async (client) => {
     const before = await owned(client, id, actor.employee_id);
     await repo.update(client, id, { cancelled_at: new Date() });
+    await repo.nextSequence(client, id);
+    await reminders.cancel(client, { key: REMINDER_KEY, entity: entityOf(id) });
     const after = await repo.getFor(client, id, actor.employee_id);
     await emit(client, {
       key: EVENTS.CALENDAR_EVENT_CANCELLED,
@@ -216,7 +309,7 @@ async function respond(actor, id, { response }) {
     if (!(await repo.respond(client, id, actor.employee_id, response))) {
       throw new AppError("NOT_INVITED", "You are not invited to this event", 409);
     }
-    const after = await repo.getFor(client, id, actor.employee_id);
+    const after = await withReminders(client, await repo.getFor(client, id, actor.employee_id));
     await emit(client, {
       key: EVENTS.CALENDAR_EVENT_ANSWERED,
       entity: { type: "calendar_event", id },
@@ -233,4 +326,4 @@ async function respond(actor, id, { response }) {
   });
 }
 
-module.exports = { toItem, month, getFor, create, edit, cancel, respond };
+module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, edit, cancel, respond, reminderCheck };

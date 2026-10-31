@@ -14,7 +14,7 @@ name: CI
 # requires that one check, so it keeps its name.
 #
 # Downloads that never change between runs are cached: npm's (setup-node), Chromium (keyed on the
-# pinned playwright version) and ffmpeg's packages.
+# pinned playwright version) and ffmpeg's packages (keyed on the runner image).
 #
 # This workflow never deploys and never references the production environment
 # (check/production-environment-refs.js). Deploys are release.yml.
@@ -126,21 +126,31 @@ jobs:
         run: npm ci
 
       # The integration suite transcodes voice notes and reads media durations. The .deb files
-      # are kept between runs; a cache miss (or a runner image they no longer fit) downloads them.
+      # are kept between runs, keyed on the runner image: its package lists decide which versions
+      # apt wants, so a new image saves a fresh set instead of downloading on every run (a fixed
+      # key never saved again, and on 23/10/2026 a slow mirror ran the whole 94 MB past the job's
+      # limit). A new image starts from the last image's files and fetches only what changed.
+      - name: Which runner image
+        id: image
+        run: echo "id=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
       - name: ffmpeg's packages, cached
         uses: actions/cache@v4
         with:
           path: ~/ffmpeg-debs
-          key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-v1
+          key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.id }}
+          restore-keys: ffmpeg-${{ runner.os }}-${{ runner.arch }}-
       - name: ffmpeg for the integration suite
         run: |
           if ls ~/ffmpeg-debs/*.deb >/dev/null 2>&1 && sudo apt-get install -y -q --no-download ~/ffmpeg-debs/*.deb; then
             echo "ffmpeg from the cache"
           else
+            # Files whose version the lists still name are used as they are; apt fetches the rest.
+            sudo cp ~/ffmpeg-debs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
             sudo apt-get update -q
-            sudo apt-get install -y -q --download-only ffmpeg
             sudo apt-get install -y -q ffmpeg
-            mkdir -p ~/ffmpeg-debs
+            # Versions no list names any more are dropped, so the cache does not grow each image.
+            sudo apt-get autoclean -q
+            rm -rf ~/ffmpeg-debs && mkdir -p ~/ffmpeg-debs
             cp /var/cache/apt/archives/*.deb ~/ffmpeg-debs/ 2>/dev/null || true
           fi
           ffmpeg -version | head -1

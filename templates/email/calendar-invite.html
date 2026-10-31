@@ -1,0 +1,11 @@
+---
+subject: "{{ heading }}: {{ title }}"
+title: "{{ heading }}"
+---
+<p style="margin:0 0 16px;">{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}</p>
+<p style="margin:0 0 8px;font-weight:700;">{{ title }}</p>
+<p style="margin:0 0 4px;">{{ when }}</p>
+{{#if location}}<p style="margin:0 0 4px;">{{ location }}</p>{{/if}}
+<p style="margin:0 0 20px;">Organised by {{ organiser }}.</p>
+{{#if called_off}}<p style="margin:0 0 20px;">The attached update takes it off your calendar.</p>{{else}}<p style="margin:0 0 20px;"><a href="{{ link_url }}" style="display:inline-block;background:#01221D;color:#FFFFFF;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:8px;">Open in MyCity App</a></p>
+<p style="margin:0;font-size:12px;color:#71717A;">The attached invitation adds it to your calendar.</p>{{/if}}

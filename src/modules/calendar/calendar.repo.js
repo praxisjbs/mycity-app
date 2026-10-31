@@ -8,7 +8,7 @@
  * `everyone` (docs/guides/workspace.md §6). A month is always the reader's own, so
  * scope does not widen it: a manager reads their team's work on Tasks, not here.
  */
-const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
 
 const SEES = (me) => `(ce.owner_employee_id = ${me} OR ce.visibility = 'everyone'
@@ -66,8 +66,8 @@ const PERFORMANCE_DATES = `
                              WHERE pr.performance_review_id = ip.performance_review_id AND pr.reviewer_employee_id = $1))`;
 
 /**
- * One page of a month: the reader's events, the deadlines of their open tasks, the days of
- * their approved leave and their performance dates, by start.
+ * One page of a month (or any run of days): the reader's events, the deadlines of the open tasks
+ * they lead or share, the days of their approved leave and their performance dates, by start.
  * @param {{query: Function}} db
  * @param {{employee_id: string, from: Date, to: Date, fromDay: string, toDay: string}} at
  * @param {{item_kind?: string, q?: string, sort?: object, page?: number}} query
@@ -90,7 +90,9 @@ function month(db, at, query) {
          SELECT 'task', t.task_id, t.title, t.due_at, t.due_at + interval '1 minute', false, 'deadline',
                 NULL, NULL, 'task', false, NULL
            FROM task t
-          WHERE t.primary_assignee_id = $1 AND t.archived_at IS NULL
+          WHERE (t.primary_assignee_id = $1
+                 OR EXISTS (SELECT 1 FROM task_assignee ta WHERE ta.task_id = t.task_id AND ta.employee_id = $1))
+            AND t.archived_at IS NULL
             AND t.status NOT IN ('done', 'cancelled') AND t.due_at >= $2 AND t.due_at < $3
          UNION ALL
          SELECT 'leave', lr.leave_request_id, lt.name, (lr.starts_on::timestamp AT TIME ZONE 'Africa/Lagos'),
@@ -161,6 +163,39 @@ async function update(client, id, changes) {
   );
 }
 
+/** One more change for its invitations (SEQUENCE). */
+async function nextSequence(client, id) {
+  await client.query("UPDATE calendar_event SET ics_sequence = ics_sequence + 1 WHERE calendar_event_id = $1", [id]);
+}
+
+/** What an invitation by email says: the event as it stands, and its owner by name and work email. */
+async function invitation(db, id) {
+  const { rows } = await db.query(
+    `SELECT ce.calendar_event_id, ce.title, ce.description, ce.starts_at, ce.ends_at, ce.all_day,
+            ce.location, ce.cancelled_at, ce.ics_sequence,
+            trim(oe.first_name || ' ' || oe.last_name) AS owner_name, oe.work_email::text AS owner_email
+       FROM calendar_event ce
+       LEFT JOIN employee oe ON oe.employee_id = ce.owner_employee_id
+      WHERE ce.calendar_event_id = $1`,
+    [id],
+  );
+  return rows[0] || null;
+}
+
+/** The people among these with a work email, by name. */
+async function mailable(db, ids) {
+  if (!ids.length) return [];
+  // pagination:complete an event's attendees, at most the contract's 50
+  const { rows } = await completeQuery(
+    db,
+    `SELECT employee_id, first_name, trim(first_name || ' ' || last_name) AS name, work_email::text AS email
+       FROM employee WHERE employee_id = ANY($1::uuid[]) AND work_email IS NOT NULL ORDER BY employee_id`,
+    [ids],
+    { label: "an event's attendees", ceiling: 100 },
+  );
+  return rows;
+}
+
 /** Make the attendee list exactly these people, keeping answers already given. */
 async function setAttendees(client, id, employeeIds) {
   await client.query(
@@ -204,4 +239,4 @@ async function activeOf(db, ids) {
   return rows.map((r) => r.employee_id);
 }
 
-module.exports = { month, getFor, lock, insert, update, setAttendees, attendeeIds, respond, activeOf };
+module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf };

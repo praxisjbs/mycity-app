@@ -240,6 +240,13 @@ const CAPABILITY_CATALOG = [
     label: "Configure Signature",
     description: "Set the company's signature links and what shows on everyone's email signature.",
   },
+  // M2 My Workspace (docs/guides/workspace.md §8), seeded in 2590.
+  {
+    code: "workspace.late_reasons",
+    module: "workspace",
+    label: "Manage Late Reasons",
+    description: "Add the reasons Why Late offers on a late task, and switch them off or on.",
+  },
   // M2 Performance (docs/guides/performance.md §8), seeded in 2190.
   {
     code: "goals.organisation",

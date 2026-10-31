@@ -21,7 +21,6 @@ const { rebuild } = require("./helpers/schema");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
-const workflow = require("../../src/shared/workflow/engine");
 const goals = require("../../src/modules/goals/goals.service");
 const homeGoals = require("../../src/modules/dashboard/sources/goals.source");
 
@@ -63,14 +62,6 @@ describeDb("performance plan against the real migrations", () => {
     del: (path) => request(app).delete(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`),
   });
   const emp = (who) => people[who].employee.employee_id;
-  const actor = (who) => ({
-    user_id: people[who].user.user_id,
-    employee_id: emp(who),
-    role_ids: [people[who].role.role_id],
-    is_ceo: who === "ceo",
-  });
-  const act = (instanceId, who, decision, reason) =>
-    tx((c) => workflow.act(c, { instance_id: instanceId, actor: actor(who), decision, reason }));
 
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
@@ -209,7 +200,7 @@ describeDb("performance plan against the real migrations", () => {
     const b = await as("head").post("/performance/scorecards", { employee_id: emp("musa"), performance_period_id: ids.period, copy_from: ids.cardA });
     ids.cardB = b.body.scorecard_id;
 
-    const accountability = a.body.lines.map((l) => ({ ...l, team_key_result_ids: [], key_result: undefined, kpi: undefined, team_key_results: undefined, months: undefined, score: undefined, scorecard_id: undefined, position: undefined }));
+    const accountability = a.body.lines.map((l) => ({ ...l, team_key_result_ids: [], key_result: undefined, kpi: undefined, team_key_results: undefined, months: undefined, score: undefined, can_change_target: undefined, pending_change: undefined, scorecard_id: undefined, position: undefined }));
     const strip = (l) => Object.fromEntries(Object.entries(l).filter(([, v]) => v !== undefined && v !== null));
     const lines = (share, kpiWeight = "25") => [
       { section: "results", title: "Users in my territories", measure: "numeric", source: "own", target_value: share, weight: "60", okr_key_result_id: ids.kr1, share_value: share },
@@ -242,9 +233,30 @@ describeDb("performance plan against the real migrations", () => {
     const sent = await as("head").post(`/performance/plans/${ids.plan}/submit`);
     expect(sent.status).toBe(200);
     expect(sent.body.status).toBe("submitted");
+    expect(sent.body.submitted_by).toMatchObject({ employee_id: emp("head") });
     const instance = await one("SELECT workflow_instance_id, current_stage FROM workflow_instance WHERE entity_id = $1 AND state = 'pending'", [ids.plan]);
     expect(instance.current_stage).toBe("line_manager");
-    await act(instance.workflow_instance_id, "pm", "reject", "Tighten BM-KR1.2");
+    // Goals · Waiting On You: the stage's approver, and nobody else, has the plan to decide.
+    const waiting = async (who, search = "") => (await as(who).get(`/performance/approvals${search}`)).body.data;
+    expect(await waiting("pm")).toEqual([
+      expect.objectContaining({
+        kind: "plan",
+        record_id: ids.plan,
+        workflow_instance_id: instance.workflow_instance_id,
+        department: "Branding & Marketing",
+        stage_name: "Line Manager",
+        requested_by: expect.objectContaining({ employee_id: emp("head") }),
+      }),
+    ]);
+    expect((await waiting("pm", "?q=brand")).map((r) => r.record_id)).toEqual([ids.plan]);
+    expect(await waiting("pm", "?q=finance")).toEqual([]);
+    for (const who of ["ops", "ceo", "head", "ada"]) expect(await waiting(who)).toEqual([]);
+    // Only the stage's approver decides; Request Changes is a refusal with a reason (§6.4).
+    expect((await as("ada").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(404);
+    expect((await as("head").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(403);
+    expect((await as("pm").post(`/workflow/instances/${instance.workflow_instance_id}/reject`, { reason: "" })).status).toBe(422);
+    expect((await as("pm").post(`/workflow/instances/${instance.workflow_instance_id}/reject`, { reason: "Tighten BM-KR1.2" })).status).toBe(200);
+    expect(await waiting("pm")).toEqual([]);
     await drain();
     let plan = (await as("head").get(`/performance/plans/${ids.plan}`)).body;
     expect(plan).toMatchObject({ status: "returned", returned_reason: "Tighten BM-KR1.2" });
@@ -252,9 +264,13 @@ describeDb("performance plan against the real migrations", () => {
     expect((await as("head").patch(`/performance/key-results/${ids.kr2}`, { target_value: "40" })).status).toBe(200);
     expect((await as("head").post(`/performance/plans/${ids.plan}/submit`)).status).toBe(200);
     const again = await one("SELECT workflow_instance_id FROM workflow_instance WHERE entity_id = $1 AND state = 'pending'", [ids.plan]);
-    expect((await act(again.workflow_instance_id, "pm", "approve")).current_stage).toBe("operations_people");
-    expect((await act(again.workflow_instance_id, "ops", "approve")).current_stage).toBe("ceo");
-    expect((await act(again.workflow_instance_id, "ceo", "approve")).state).toBe("approved");
+    const decide = (who) => as(who).post(`/workflow/instances/${again.workflow_instance_id}/approve`);
+    expect((await decide("pm")).body.stage_name).toBe("Operations & People");
+    expect((await waiting("ops")).map((r) => r.stage_name)).toEqual(["Operations & People"]);
+    expect((await decide("ops")).body.stage_name).toBe("CEO");
+    expect((await waiting("ceo")).map((r) => [r.kind, r.stage_name])).toEqual([["plan", "CEO"]]);
+    expect((await decide("ceo")).body.state).toBe("approved");
+    expect(await waiting("ceo")).toEqual([]);
     await drain();
     plan = (await as("head").get(`/performance/plans/${ids.plan}`)).body;
     expect(plan.status).toBe("binding");
@@ -378,8 +394,17 @@ describeDb("performance plan against the real migrations", () => {
     const mayChange = async (who, kr = ids.kr1) => (await as(who).get(`/performance/key-results/${kr}`)).body.can_change_target;
     expect([await mayChange("head"), await mayChange("ceo"), await mayChange("ada"), await mayChange("other")]).toEqual([true, true, false, false]);
     // The accountable person may ask, though they set no goals for the function.
+    const owner1 = (await one("SELECT accountable_employee_id FROM okr_key_result WHERE okr_key_result_id = $1", [ids.kr1])).accountable_employee_id;
+    await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr1, emp("other")]);
+    expect(await mayChange("other", ids.kr1)).toBe(true);
+    await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr1, owner1]);
+    // A TBC target before its lock date is set in place by its owner or the head, never asked for (§6.7).
     await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr2, emp("other")]);
-    expect(await mayChange("other", ids.kr2)).toBe(true);
+    const tbc = async (who) => {
+      const body = (await as(who).get(`/performance/key-results/${ids.kr2}`)).body;
+      return [body.can_set_target, body.can_change_target];
+    };
+    expect([await tbc("other"), await tbc("head"), await tbc("ada")]).toEqual([[true, false], [true, false], [false, false]]);
     await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr2, emp("head")]);
     const mayEdit = async (who) => (await as(who).get(`/performance/kpis/${ids.kpi}`)).body.can_edit;
     expect([await mayEdit("head"), await mayEdit("ops"), await mayEdit("ada"), await mayEdit("other")]).toEqual([true, true, false, false]);
@@ -400,12 +425,75 @@ describeDb("performance plan against the real migrations", () => {
     expect(second.body.error.code).toBe("CHANGE_PENDING");
     const instance = await one("SELECT workflow_instance_id, current_stage FROM workflow_instance WHERE entity_id = $1", [res.body.target_change_id]);
     expect(instance.current_stage).toBe("ceo");
-    await act(instance.workflow_instance_id, "ceo", "approve");
+    // While it waits, the key result offers no second Change Target.
+    expect((await as("head").get(`/performance/key-results/${ids.kr1}`)).body.can_change_target).toBe(false);
+    // The CEO's Waiting On You names it, and its sheet reads the key result it changes.
+    const kr1Code = (await one("SELECT code::text AS code FROM okr_key_result WHERE okr_key_result_id = $1", [ids.kr1])).code;
+    expect((await as("ceo").get("/performance/approvals")).body.data).toEqual([
+      expect.objectContaining({
+        kind: "target_change",
+        record_id: res.body.target_change_id,
+        key_result_code: kr1Code,
+        department: "Branding & Marketing",
+        stage_name: "CEO",
+      }),
+    ]);
+    const sheet = await as("ceo").get(`/performance/target-changes/${res.body.target_change_id}`);
+    expect(sheet.status).toBe(200);
+    expect(sheet.body).toMatchObject({
+      key_result: { okr_key_result_id: ids.kr1, code: kr1Code },
+      line: null,
+      department: "Branding & Marketing",
+      reason: "Two cities moved to Q1",
+    });
+    expect((await as("ada").get(`/performance/target-changes/${res.body.target_change_id}`)).status).toBe(200);
+    expect((await as("head").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(403);
+    expect((await as("ceo").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(200);
     await drain();
     const kr = await as("head").get(`/performance/key-results/${ids.kr1}`);
     expect(kr.body.target_value).toBe("60000");
     expect(kr.body.target_history).toEqual([expect.objectContaining({ status: "approved", from_value: "64000", to_value: "60000" })]);
     expect(kr.body.months[0].proposed_score).toBe("0.6");
+    expect(kr.body.can_change_target).toBe(true);
+  });
+
+  test("a line's target change: the CEO decides it; whoever reads its scorecard reads it, nobody else", async () => {
+    const line = await one("SELECT employee_target_id FROM employee_target WHERE scorecard_id = $1 ORDER BY position LIMIT 1", [ids.cardA]);
+    const lineOf = async (who) => (await as(who).get(`/performance/scorecards/${ids.cardA}`)).body.lines.find((l) => l.employee_target_id === line.employee_target_id);
+    // A line's own link (a task's Counts Towards) opens its scorecard.
+    expect((await as("head").get(`/performance/scorecards/${line.employee_target_id}`)).body.scorecard_id).toBe(ids.cardA);
+    // Change Target is the reviewer's or the function head's, never the employee's, nor anyone else's.
+    expect([(await lineOf("head")).can_change_target, (await lineOf("ada")).can_change_target, (await lineOf("ops")).can_change_target]).toEqual([true, false, false]);
+    const body = { employee_target_id: line.employee_target_id, to_value: "12", from_month: "2026-11-01", reason: "Fewer events in November" };
+    expect((await as("ada").post("/performance/target-changes", body)).status).toBe(403);
+    expect((await as("ops").post("/performance/target-changes", body)).status).toBe(403);
+    const res = await as("head").post("/performance/target-changes", body);
+    expect(res.status).toBe(201);
+    const id = res.body.target_change_id;
+    // While it waits, the line shows it and offers no second Change Target.
+    expect(await lineOf("head")).toMatchObject({ can_change_target: false, pending_change: { target_change_id: id, to_value: "12", from_month: "2026-11-01" } });
+    expect((await as("head").post("/performance/target-changes", { ...body, to_value: "11" })).body.error.code).toBe("CHANGE_PENDING");
+    const [row] = (await as("ceo").get("/performance/approvals")).body.data;
+    expect(row).toMatchObject({ kind: "target_change", record_id: id, key_result_code: null, department: "Branding & Marketing", employee: { employee_id: emp("ada") } });
+    expect(row.line_title).toEqual(expect.any(String));
+    const sheet = await as("ceo").get(`/performance/target-changes/${id}`);
+    expect(sheet.body).toMatchObject({ key_result: null, line: { employee_target_id: line.employee_target_id, employee: { employee_id: emp("ada") } } });
+    expect((await as("ada").get(`/performance/target-changes/${id}`)).status).toBe(200);
+    expect((await as("head").get(`/performance/target-changes/${id}`)).status).toBe(200);
+    expect((await as("musa").get(`/performance/target-changes/${id}`)).status).toBe(404);
+    // A dotted manager out of scope reads it as they read the scorecard.
+    await q("UPDATE scorecard SET dotted_employee_id = $1 WHERE scorecard_id = $2", [emp("musa"), ids.cardA]);
+    expect((await as("musa").get(`/performance/target-changes/${id}`)).status).toBe(200);
+    await q("UPDATE scorecard SET dotted_employee_id = NULL WHERE scorecard_id = $1", [ids.cardA]);
+    // The list keeps a line's change to the reader's scope, as the sheet does.
+    const listed = async (who) => (await as(who).get(`/performance/target-changes?employee_target_id=${line.employee_target_id}`)).body.data.length;
+    expect([await listed("ada"), await listed("head"), await listed("ceo"), await listed("musa")]).toEqual([1, 1, 1, 0]);
+    // The CEO refuses it with a reason; the target stays as it was.
+    const instance = res.body.workflow_instance_id;
+    expect((await as("ceo").post(`/workflow/instances/${instance}/reject`, { reason: "Keep the quarter's figure" })).status).toBe(200);
+    await drain();
+    expect((await as("ceo").get(`/performance/target-changes/${id}`)).body.status).toBe("rejected");
+    expect((await as("ceo").get("/performance/approvals")).body.data).toEqual([]);
   });
 
   test("TBC targets lock on the quarter's lock date, once", async () => {

@@ -20,8 +20,9 @@ const blank = {
   department_id: "",
 };
 
-function EmployeeForm({ onSave }: { onSave: (data: unknown) => void }) {
-  const form = useContractForm(blank, organisation.EmployeeCreate!, { pauseMs: 50 });
+/** `pauseMs`: how long a pause in typing waits before checking; long where a test checks on leaving only. */
+function EmployeeForm({ onSave, pauseMs = 50 }: { onSave: (data: unknown) => void; pauseMs?: number }) {
+  const form = useContractForm(blank, organisation.EmployeeCreate!, { pauseMs });
   return (
     <Form onSubmit={form.submit(onSave)}>
       <Field label="First Name" {...form.status("first_name")}>
@@ -38,7 +39,8 @@ function EmployeeForm({ onSave }: { onSave: (data: unknown) => void }) {
 describe("useContractForm", () => {
   it("checks a field when the person leaves it, with a short message", async () => {
     const user = userEvent.setup();
-    render(<EmployeeForm onSave={vi.fn()} />);
+    // No pause check in this test: a slow machine between two keys must not mark the field early.
+    render(<EmployeeForm onSave={vi.fn()} pauseMs={60_000} />);
     const email = screen.getByLabelText("Work Email");
     await user.type(email, "ada");
     expect(email).not.toHaveAttribute("aria-invalid");

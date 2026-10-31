@@ -32,7 +32,7 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
-import { kpiResult, monthShort, person, reportingMonth, useQuarter } from "./shared";
+import { figureOf, kpiResult, monthShort, person, reportingMonth, useQuarter } from "./shared";
 
 type KpiCreateBody = Endpoints["POST /api/v1/performance/kpis"]["body"];
 type KpiActualBody = Endpoints["POST /api/v1/performance/kpis/:id/actuals"]["body"];
@@ -90,7 +90,7 @@ export function Kpis() {
           { key: "code", label: "KPI ID", render: (k) => <span className="font-semibold">{k.code}</span> },
           { key: "name", label: "KPI", render: (k) => k.name },
           { key: "dept", label: "Function", render: (k) => k.department ?? "–", desktop: true },
-          { key: "target", label: "Target", render: (k) => k.target_text ?? k.target_value ?? "–", desktop: true },
+          { key: "target", label: "Target", render: (k) => figureOf(k.target_value, k.target_text, k.unit) ?? "–", desktop: true },
           { key: "direction", label: "Direction", render: (k) => (k.direction === "lower" ? "Lower" : "Higher"), desktop: true },
           {
             key: "latest",
@@ -98,7 +98,7 @@ export function Kpis() {
             render: (k) => (
               <span className="flex flex-wrap items-center gap-1.5">
                 <StatusPill s={kpiResult(k.latest?.result)} />
-                {k.latest?.actual_value ?? k.latest?.actual_text ?? ""}
+                {figureOf(k.latest?.actual_value, k.latest?.actual_text, k.unit) ?? ""}
               </span>
             ),
           },
@@ -128,7 +128,7 @@ function KpiSheet({ id, months, close }: { id: string; months: string[]; close: 
           ["Formula", k.formula ?? "–"],
           ["Unit", k.unit ?? "–"],
           ["Direction", k.direction === "lower" ? "Lower Is Better" : "Higher Is Better"],
-          ["Target", k.target_text ?? k.target_value ?? "–"],
+          ["Target", figureOf(k.target_value, k.target_text, k.unit) ?? "–"],
           ["Frequency", FREQUENCIES.find(([v]) => v === k.frequency)?.[1] ?? "–"],
           ["Data Source", k.data_source ?? "–"],
         ]}
@@ -142,7 +142,7 @@ function KpiSheet({ id, months, close }: { id: string; months: string[]; close: 
         columns={[
           { key: "month", label: "Month", render: (m) => monthShort(m.month) },
           { key: "result", label: <HelpTerm help={naHelp}>Result</HelpTerm>, render: (m) => <StatusPill s={kpiResult(m.result)} /> },
-          { key: "actual", label: "Actual", align: "n", render: (m) => m.actual_value ?? m.actual_text ?? "–" },
+          { key: "actual", label: "Actual", align: "n", render: (m) => figureOf(m.actual_value, m.actual_text, k.unit) ?? "–" },
           { key: "comment", label: "Comment", render: (m) => m.comment ?? "–", desktop: true },
         ]}
       />

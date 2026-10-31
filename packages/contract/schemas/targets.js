@@ -65,7 +65,21 @@ const LineMonth = z
   })
   .strict();
 
-/** A scorecard line, as the scorecard shows it. */
+/** A line's target change waiting for the CEO (§6.7): the new target and the month it applies from. */
+const LineChange = z
+  .object({
+    target_change_id: uuid,
+    to_value: Quantity.nullable(),
+    to_text: z.string().nullable(),
+    from_month: MonthStart,
+  })
+  .strict();
+
+/**
+ * A scorecard line, as the scorecard shows it. `can_change_target`: the reader may ask for a target
+ * change on it now (its reviewer or the function's head, never its employee, on a binding scorecard,
+ * with no change already waiting); `pending_change` is the change that waits.
+ */
 const ScorecardLine = z
   .object({
     employee_target_id: uuid,
@@ -91,6 +105,8 @@ const ScorecardLine = z
     share_value: Quantity.nullable(),
     months: z.array(LineMonth),
     score: ScoreValue.nullable(),
+    can_change_target: z.boolean(),
+    pending_change: LineChange.nullable(),
   })
   .strict();
 
@@ -405,6 +421,8 @@ const LINE_VIRTUAL = {
   team_key_results: "the key results in employee_target_key_result",
   months: "the line's monthly scores, from the reviews' items",
   score: "the line's score so far (§6.9): its latest month, or the mean of its months",
+  can_change_target: "the reader may ask for a change to its target now",
+  pending_change: "the target_change waiting on the CEO for this line",
 };
 const SCORECARD_VIRTUAL = {
   period_name: "performance_period.name",
@@ -420,6 +438,7 @@ const TABLES = {
   KeyResultRef: { table: "okr_key_result" },
   KpiRef: { table: "kpi_definition" },
   LineMonth: { table: null, reason: "one month of a line's score, from performance_review_item" },
+  LineChange: { table: "target_change" },
   ScorecardLine: { table: "employee_target", virtual: LINE_VIRTUAL },
   Scorecard: { table: "scorecard", virtual: SCORECARD_VIRTUAL },
   ScorecardPage: { table: null, reason: "a page of scorecards" },
@@ -513,6 +532,7 @@ module.exports = {
   KeyResultRef,
   KpiRef,
   LineMonth,
+  LineChange,
   ScorecardLine,
   Scorecard,
   ScorecardPage,

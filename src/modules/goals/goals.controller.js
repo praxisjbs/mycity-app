@@ -25,15 +25,21 @@ module.exports = {
   goal: async (req, res) => ok(res, await service.getGoal(id(req))),
   createGoal: async (req, res) => created(res, await service.createGoal(withActor(req), req.validated.body)),
   updateGoal: async (req, res) => ok(res, await service.updateGoal(withActor(req), id(req), req.validated.body)),
+  deleteGoal: async (req, res) => {
+    await service.deleteGoal(withActor(req), id(req));
+    return noContent(res);
+  },
 
-  okrs: async (req, res) => sendPaged(res, await okrs.listOkrs(req.validated.query)),
+  okrs: async (req, res) => sendPaged(res, await okrs.listOkrs(req.validated.query, withActor(req))),
   okrSummary: async (req, res) => ok(res, await okrs.okrSummary(req.validated.query)),
+  objective: async (req, res) => ok(res, await okrs.getObjective(id(req), withActor(req))),
   createObjective: async (req, res) => created(res, await okrs.createObjective(withActor(req), req.validated.body)),
   updateObjective: async (req, res) => ok(res, await okrs.updateObjective(withActor(req), id(req), req.validated.body)),
   deleteObjective: async (req, res) => {
     await okrs.deleteObjective(withActor(req), id(req));
     return noContent(res);
   },
+  keyResults: async (req, res) => sendPaged(res, await okrs.listKeyResults(req.validated.query)),
   createKeyResult: async (req, res) => created(res, await okrs.createKeyResult(withActor(req), req.validated.body)),
   keyResult: async (req, res) => ok(res, await okrs.getKeyResultDetail(id(req), withActor(req))),
   updateKeyResult: async (req, res) => ok(res, await okrs.updateKeyResult(withActor(req), id(req), req.validated.body)),
@@ -49,7 +55,9 @@ module.exports = {
   plan: async (req, res) => ok(res, await service.planDetail(id(req), withActor(req), scopeOf(req))),
   submitPlan: async (req, res) => ok(res, await service.submitPlan(withActor(req), id(req), scopeOf(req))),
 
-  changes: async (req, res) => sendPaged(res, await service.listChanges(req.validated.query)),
+  changes: async (req, res) => sendPaged(res, await service.listChanges(req.validated.query, scopeOf(req))),
+  change: async (req, res) => ok(res, await service.changeDetail(id(req), withActor(req), scopeOf(req))),
+  approvals: async (req, res) => sendPaged(res, await service.approvals(req.validated.query, withActor(req))),
   requestChange: async (req, res) => created(res, await service.requestChange(withActor(req), scopeOf(req), req.validated.body)),
 
   analytics: async (req, res) => ok(res, await analytics.figures(req.validated.query, scopeOf(req))),
