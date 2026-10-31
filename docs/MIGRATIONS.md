@@ -253,6 +253,11 @@ Then check by hand:
 - [ ] CHECK values equal the contract's enums; contract keys equal column names.
 - [ ] DOWN drops exactly what UP made and does not touch `schema_migration`.
 - [ ] Seeds contain only what §9 allows; schemes are in `schemes.js`; definitions validate.
+- [ ] Praxis AI: a migration changes nothing the assistant reads, since it only runs the reads in
+      the modules' `.ai.js` manifests (BACKEND_STRUCTURE §14.3). If the new table or column should
+      be answerable, its module adds or widens a read in the same PR; a renamed or dropped column a
+      read uses fails gate 6 like any other code. A restricted column is masked through
+      `shared/rbac/field-mask.js` (§6), which hides it from the assistant exactly as on screen.
 - [ ] `docs/DATABASE_SCHEMA.md` and the module's guide describe the tables as built.
 - [ ] `docs/PROGRESS.md` has a dated note under the milestone the tables belong to.
 - [ ] The PR body is filled in. A migration PR is reviewed by the owner of the milestone it

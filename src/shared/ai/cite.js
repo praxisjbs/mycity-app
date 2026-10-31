@@ -72,4 +72,55 @@ function mergeCitations(lists) {
   return out;
 }
 
-module.exports = { citationsFor, mergeCitations, labelOf };
+/**
+ * Each row's record, in the rows' own order: { type, id } or null where `cite` names none. Unlike
+ * citationsFor nothing is merged, so row i of an answer's table opens refs[i].
+ * @returns {Array<{type: string, id: string}|null>}
+ */
+function refsFor(read, rows) {
+  return (rows || []).map((row) => {
+    const c = read && typeof read.cite === "function" ? read.cite(row) : null;
+    if (!c || !c.type || c.id === undefined || c.id === null || c.id === "") return null;
+    return { type: c.type, id: String(c.id) };
+  });
+}
+
+/** A record's link when shown, from its ref: null for none, or a type with no screen. */
+function linkOfRef(ref) {
+  if (!ref || !ref.type) return null;
+  const link = routeMap.linkFor(ref.type, ref.id);
+  return link ? link.path : null;
+}
+
+/** Record types whose own words read badly as a source ("home kpi"): the name From shows instead. */
+const TYPE_NAMES = Object.freeze({
+  home_alert: "alert",
+  home_report: "report",
+  home_report_run: "report run",
+  home_kpi: "Home figure",
+  attendance_pay_item: "deduction or overtime",
+  attendance_temporary_site: "temporary site",
+  policy_version: "policy",
+  import_batch: "import",
+});
+
+/** A record type as From names it (§1.1 decision 9): "interaction log" for `interaction_log`. */
+function typeLabel(type) {
+  if (!type) return "record";
+  return TYPE_NAMES[type] || String(type).replace(/_/g, " ");
+}
+
+/**
+ * What an answer's From shows (decision 9): one entry per record type in the order first cited,
+ * with its count; or, when the answer rests on one record, that record, named and linked.
+ * @param {Array<{entity_type: string, count: number}>} groups  the answer's citations by type
+ * @param {{entity_type: string, label: string|null, link: string|null}|null} only  the one citation, when there is one
+ */
+function sourcesOf(groups, only) {
+  const total = groups.reduce((n, g) => n + g.count, 0);
+  if (total === 1 && only)
+    return [{ kind: "record", entity_type: only.entity_type, label: only.label || typeLabel(only.entity_type), count: 1, link: only.link || null }];
+  return groups.map((g) => ({ kind: "type", entity_type: g.entity_type, label: typeLabel(g.entity_type), count: g.count, link: null }));
+}
+
+module.exports = { citationsFor, mergeCitations, labelOf, refsFor, linkOfRef, typeLabel, sourcesOf, TYPE_NAMES };

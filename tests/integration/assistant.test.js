@@ -41,6 +41,7 @@ const authorise = require("../../src/shared/ai/authorise");
 const vault = require("../../src/shared/documents/vault");
 const suggestions = require("../../src/modules/assistant/assistant.suggestions");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
+const c = require("@mycity/contract");
 const { VOICE_QUESTION } = require("../../src/modules/assistant/assistant.events");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -170,6 +171,10 @@ describeDb("Praxis AI against the real migrations", () => {
     expect(res.body.table.rows[0][2]).toBe("05/01/2026");
     expect(res.body.citations).toHaveLength(3);
     expect(res.body.citations[0]).toMatchObject({ entity_type: "employee", read_key: "employees.list", link: expect.stringMatching(/^\/people\?/) });
+    // From names the kind of record and how many (decision 9); each table row opens its own record.
+    expect(res.body.sources).toEqual([{ kind: "type", entity_type: "employee", label: "employee", count: 3, link: null }]);
+    expect(res.body.table.links).toHaveLength(3);
+    for (const link of res.body.table.links) expect(link).toMatch(/^\/people\?tab=employees&id=/);
     opsConversation = res.body.ai_conversation_id;
     opsAnswer = res.body.ai_message_id;
 
@@ -240,11 +245,65 @@ describeDb("Praxis AI against the real migrations", () => {
     expect(turns.body.data.find((t) => t.ai_message_id === opsAnswer).feedback).toBeNull();
   });
 
-  test("this month's summary counts the person's own questions, by the module first read", async () => {
-    const res = await as("ops").get("/ai/history/summary");
+  test("History's figures: the company's for a person who holds AI Control, a member of staff's own for them", async () => {
+    // Operations & People holds AI Control view (seed 10290): everyone's questions, Praxis AI's spend, the cap.
+    const ops = await as("ops").get("/ai/history/summary");
+    expect(ops.status).toBe(200);
+    expect(c.assistant.AiHistorySummary.parse(ops.body)).toBeTruthy();
+    const everyone = (await one("SELECT count(*)::int AS n FROM ai_run WHERE purpose = 'data-answers' AND status = 'ok'")).n;
+    expect(ops.body).toMatchObject({ view: "company", your_questions: 3, questions_this_month: everyone });
+    expect(ops.body.cap_ngn).toBe((await governance.settings(pool)).monthly_cap_ngn);
+    expect(ops.body.spend_by_month).toHaveLength(6);
+    expect(ops.body.spend_by_month.at(-1)).toEqual({ month: ops.body.month, spend_ngn: ops.body.spend_ngn });
+    const praxisSpend = await one(
+      `SELECT round(COALESCE(sum(${governance.STEP_NGN}), 0), 2)::text AS spend FROM ai_run_step s JOIN ai_run r ON r.run_id = s.run_id
+        WHERE r.purpose IN ('data-answers', 'praxis-ai-voice')`,
+    );
+    expect(ops.body.spend_ngn).toBe(praxisSpend.spend);
+    // The company's questions by module count every answer still kept: the staff member's refused one is Other too.
+    expect(ops.body.by_module).toEqual(expect.arrayContaining([{ module_key: "people", label: "People", questions: 1 }]));
+    expect(ops.body.by_module.find((m) => m.module_key === null).questions).toBeGreaterThanOrEqual(3);
+
+    // A member of staff: their own, all their questions beside this month's, no cap, nobody else's spend.
+    const staff = await as("staff").get("/ai/history/summary");
+    expect(staff.body).toMatchObject({ view: "own", cap_ngn: null });
+    const mine = (await one(
+      `SELECT count(*)::int AS n FROM ai_message a JOIN ai_conversation c ON c.ai_conversation_id = a.ai_conversation_id
+        WHERE c.user_id = $1 AND a.role = 'assistant'`,
+      [people.staff.user_id],
+    )).n;
+    expect(staff.body).toMatchObject({ questions_this_month: mine, your_questions: mine });
+    const theirs = await one(
+      `SELECT round(COALESCE(sum(${governance.STEP_NGN}), 0), 2)::text AS spend FROM ai_run_step s JOIN ai_run r ON r.run_id = s.run_id
+        WHERE r.purpose IN ('data-answers', 'praxis-ai-voice') AND r.actor_user_id = $1`,
+      [people.staff.user_id],
+    );
+    expect(staff.body.spend_ngn).toBe(theirs.spend);
+  });
+
+  test("Your Questions: one row per answer, newest first, with its sources, tokens and cost; and the export", async () => {
+    const res = await as("ops").get("/ai/history/questions");
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ questions_this_month: 3, conversations: 2, rows_read_this_month: 3 });
-    expect(res.body.by_module).toEqual(expect.arrayContaining([{ module_key: "people", label: "People", questions: 1 }, { module_key: null, label: "Other", questions: 2 }]));
+    const page = c.assistant.AiQuestionPage.parse(res.body);
+    expect(page.page).toMatchObject({ size: 25, total: 3 });
+    const first = page.data.find((r) => r.ai_message_id === opsAnswer);
+    // Two rounds of 300 tokens in and 40 out (the script), and the records the answer was read from.
+    expect(first).toMatchObject({ question: "Who works here?", ai_conversation_id: opsConversation, sources: ["employee"], tokens: 680 });
+    expect(first.cost_ngn).toMatch(/^\d+\.\d{2}$/);
+    expect(page.data.map((r) => r.asked_at)).toEqual([...page.data.map((r) => r.asked_at)].sort().reverse());
+    expect((await as("ops").get("/ai/history/questions?q=works")).body.data.map((r) => r.ai_message_id)).toEqual([opsAnswer]);
+    // History is one's own: the staff member's list never holds Operations' questions.
+    expect((await as("staff").get("/ai/history/questions")).body.data.map((r) => r.ai_message_id)).not.toContain(opsAnswer);
+
+    const asked = await as("ops").post("/ai/history/export").send({});
+    expect(asked.status).toBe(202);
+    const file = c.documents.ExportFile.parse(asked.body);
+    expect(file.status).toBe("pending");
+    await drain();
+    const done = await as("ops").get(`/exports/${file.document_id}`);
+    expect(done.body.status).toBe("done");
+    // Only the person who asked may fetch it.
+    expect((await as("staff").get(`/exports/${file.document_id}`)).status).toBe(404);
   });
 
   test("Try Asking offers only what the person's reads can answer, and a capability's question only to its holders", async () => {

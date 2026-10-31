@@ -8,7 +8,9 @@
  *   GET    /conversations/:id/turns  view    one conversation's answers, newest page first
  *   DELETE /conversations/:id        view    delete one of the caller's conversations
  *   DELETE /history                  view    clear the caller's history
- *   GET    /history/summary          view    this Lagos month, the caller's own
+ *   GET    /history/summary          view    History's figures: the caller's own, or the company's with AI Control
+ *   GET    /history/questions        view    the caller's questions, 25 a page, with sources, tokens and cost
+ *   POST   /history/export           view    the caller's questions as a workbook (202, made in the worker)
  *   POST   /answers/:id/feedback     create  Helpful or Not Helpful
  *   POST   /transcribe               create  a spoken question to words; the recording is not kept
  *
@@ -52,8 +54,16 @@ route(router, "delete", "/history",
   view, controller.clearHistory);
 
 route(router, "get", "/history/summary",
-  { response: a.AiHistorySummary, summary: "This month's questions, conversations and records read" },
+  { response: a.AiHistorySummary, summary: "History's figures: questions, spend and questions by module" },
   view, controller.summary);
+
+route(router, "get", "/history/questions",
+  { query: a.AiQuestionListQuery, response: a.AiQuestionPage, summary: "My questions to the assistant, with what each cost" },
+  view, controller.questions);
+
+route(router, "post", "/history/export",
+  { body: c.common.EmptyBody, response: c.documents.ExportFile, summary: "Export my questions to the assistant as a workbook" },
+  view, controller.exportHistory);
 
 route(router, "post", "/answers/:id/feedback",
   { params: c.common.IdParams, body: a.AiFeedback, no_content: true, summary: "Mark an answer Helpful or Not Helpful" },

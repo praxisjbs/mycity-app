@@ -1,13 +1,16 @@
-import type { AiAnswer, AiCitation, AiConversation, AiHistorySummary } from "@mycity/contract/contract.gen.ts";
+import type { AiAnswer, AiCitation, AiConversation, AiHistorySummary, AiQuestion, AiSource } from "@mycity/contract/contract.gen.ts";
 import { at, fail, invalid, noContent, ok, paged, route, sid } from "../core";
-import { byKey, SIGN_INS } from "../data/people";
+import { byKey, grantsFor, SIGN_INS } from "../data/people";
 import { PARTNERS } from "../data/partners";
 import { ON_UPLOAD } from "../uploads";
+import { exportFile } from "./shared";
 
 /* ── Praxis AI (docs/guides/praxis-ai.md): answers from the mock records, within the asker's view, in the contract's shapes. It never writes. ── */
 
 type Kept = { owner: string; conversation: AiConversation; turns: AiAnswer[] };
 const KEPT: Kept[] = [];
+/** What each answer's run cost, as AI Control prices it: tokens in and out, and naira. */
+const COSTS = new Map<string, { tokens: number; cost_ngn: string }>();
 
 const nameOf = (key: string) => byKey(key)?.display_name ?? "";
 const partnerCite = (p: (typeof PARTNERS)[number]): AiCitation => ({ entity_type: "partner", entity_id: p.partner_id, label: p.name, link: `/partnerships?tab=pipeline&id=${p.partner_id}`, read_key: "partners.list" });
@@ -18,6 +21,22 @@ const personCite = (key: string): AiCitation | null => {
 
 type Draft = Pick<AiAnswer, "content" | "table" | "link" | "citations" | "reads" | "declined" | "more">;
 const said = (content: string, over: Partial<Draft> = {}): Draft => ({ content, table: null, link: null, citations: [], reads: [], declined: null, more: false, ...over });
+/** A table as the server sends it: each row's record link, or null where a row has none. */
+const tbl = (columns: string[], rows: string[][], numeric: number[], links: Array<string | null> = rows.map(() => null)) => ({ columns, rows, numeric, links });
+
+/** A record type as From names it (shared/ai/cite.js typeLabel). */
+const typeLabel = (type: string) => ({ home_alert: "alert", policy_version: "policy" })[type] ?? type.replace(/_/g, " ");
+
+/** From (§1.1 decision 9): kinds of record with how many, or the one record an answer rests on. */
+function sourcesOf(citations: AiCitation[]): AiSource[] {
+  if (citations.length === 1) {
+    const c = citations[0];
+    return [{ kind: "record", entity_type: c.entity_type, label: c.label, count: 1, link: c.link }];
+  }
+  const groups = new Map<string, number>();
+  for (const c of citations) groups.set(c.entity_type, (groups.get(c.entity_type) ?? 0) + 1);
+  return [...groups].map(([type, count]) => ({ kind: "type", entity_type: type, label: typeLabel(type), count, link: null }));
+}
 
 /** A day from today as YYYY-MM-DD, for the filled forms the change answers open. */
 const dayFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
@@ -37,50 +56,54 @@ function answerFor(question: string, view: string): Draft {
   if (l.includes("partner") || l.includes("inactive") || l.includes("quiet")) {
     if (view === "staff") return said("Partnership records are not available to you.", { declined: "not_available", reads: [{ key: "partners.list", rows: 0, total: null, first: null }] });
     const quiet = PARTNERS.filter((p) => p.quiet_days > 30).sort((x, y) => y.quiet_days - x.quiet_days);
+    const owners = [...new Set(quiet.map((p) => p.owner))].map(personCite).filter((c): c is AiCitation => c !== null);
     return said(`${quiet.length} partnerships have had no recorded contact in over 30 days. Each has an inactivity alert open on its owner.`, {
-      table: { columns: ["Partner", "Owner", "Days Quiet"], rows: quiet.map((p) => [p.name, byKey(p.owner)?.display_name ?? "", String(p.quiet_days)]), numeric: [2] },
-      citations: quiet.map(partnerCite),
-      reads: [{ key: "partners.list", rows: quiet.length, total: quiet.length, first: 1 }],
+      table: tbl(["Partner", "Owner", "Days Quiet"], quiet.map((p) => [p.name, byKey(p.owner)?.display_name ?? "", String(p.quiet_days)]), [2], quiet.map((p) => partnerCite(p).link)),
+      citations: [...quiet.map(partnerCite), ...owners],
+      reads: [
+        { key: "partners.list", rows: quiet.length, total: quiet.length, first: 1 },
+        { key: "employees.list", rows: owners.length, total: owners.length, first: 1 },
+      ],
     });
   }
   if (l.includes("happened") || l.includes("done today"))
     return said("Four things happened today: a leave approval, a new joiner, a recognition and a celebration.", {
-      table: {
-        columns: ["When", "What", "By", "About"],
-        rows: [
+      table: tbl(
+        ["When", "What", "By", "About"],
+        [
           ["11:20", "Recognition posted", nameOf("ngozi"), nameOf("adedotun")],
           ["10:05", "Employee added", nameOf("cynthia"), nameOf("samuel")],
           ["09:12", "Leave approved", nameOf("cynthia"), nameOf("tobi")],
           ["00:01", "Celebration posted", "", nameOf("hauwa")],
         ],
-        numeric: [],
-      },
+        [],
+      ),
       reads: [{ key: "activity.list", rows: 4, total: 4, first: 1 }],
       link: { label: "Open Home", path: "/home?tab=overview" },
     });
   if (l.includes("late"))
     return said("Seven late arrivals this month, from four people. One person has reached the query threshold.", {
-      table: { columns: ["Employee", "Late Arrivals"], rows: [["Bashir Lawal", "3"], ["Tobi Ojo", "2"], ["Emeka Obi", "1"], ["Cynthia Osakunih", "1"]], numeric: [1] },
+      table: tbl(["Employee", "Late Arrivals"], [["Bashir Lawal", "3"], ["Tobi Ojo", "2"], ["Emeka Obi", "1"], ["Cynthia Osakunih", "1"]], [1]),
       reads: [{ key: "attendance.exceptions", rows: 7, total: 7, first: 1 }],
       link: { label: "Open Attendance", path: "/people?tab=attendance" },
     });
   if (l.includes("confirm") || l.includes("probation"))
     return said("Two people are on probation; Chidera Nwosu's decision is due first.", {
-      table: { columns: ["Employee", "Started", "Decision Due"], rows: [["Chidera Nwosu", "24/07/2026", "24/10/2026"], ["Samuel Akpan", "13/04/2026", "Overdue"]], numeric: [] },
+      table: tbl(["Employee", "Started", "Decision Due"], [["Chidera Nwosu", "24/07/2026", "24/10/2026"], ["Samuel Akpan", "13/04/2026", "Overdue"]], []),
       reads: [{ key: "employees.list", rows: 2, total: 2, first: 1 }],
     });
   if (l.includes("leave"))
     return said("You have 14 of 20 annual leave days left this year.", { reads: [{ key: "my_leave.balances", rows: 1, total: 1, first: null }] });
   if (l.includes("next 25"))
     return said("Here are the next people on the list.", {
-      table: { columns: ["Name"], rows: [["Bashir Lawal"], ["Tobi Ojo"], ["Emeka Obi"]], numeric: [] },
+      table: tbl(["Name"], [["Bashir Lawal"], ["Tobi Ojo"], ["Emeka Obi"]], []),
       reads: [{ key: "employees.list", rows: 3, total: 312, first: 26 }],
       more: true,
     });
   if (l.includes("who") || l.includes("staff") || l.includes("people")) {
     const cites = ["cynthia", "ifeoma", "ngozi"].map(personCite).filter((c): c is AiCitation => c !== null);
     return said(`There are 312 people in all; here are the first ${cites.length}.`, {
-      table: { columns: ["Name"], rows: cites.map((c) => [c.label]), numeric: [] },
+      table: tbl(["Name"], cites.map((c) => [c.label]), [], cites.map((c) => c.link)),
       citations: cites,
       reads: [{ key: "employees.list", rows: cites.length, total: 312, first: 1 }],
       more: true,
@@ -113,7 +136,9 @@ route("POST /api/v1/ai/ask", async (req) => {
     KEPT.unshift(k);
   }
   const d = answerFor(question, SIGN_INS[user]?.view ?? "staff");
-  const answer: AiAnswer = { ...d, ai_message_id: sid(`answer:${now}:${k.turns.length}`), ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, feedback: null, created_at: now, provisional: true };
+  const answer: AiAnswer = { ...d, sources: sourcesOf(d.citations), ai_message_id: sid(`answer:${now}:${k.turns.length}`), ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, feedback: null, created_at: now, provisional: true };
+  const tokens = 900 + question.length * 7 + d.reads.length * 600;
+  COSTS.set(answer.ai_message_id, { tokens, cost_ngn: (tokens * 0.0076).toFixed(2) });
   k.turns.unshift(answer);
   k.conversation.questions += 1;
   k.conversation.last_asked_at = now;
@@ -143,18 +168,57 @@ route("DELETE /api/v1/ai/history", (req) => {
   return noContent();
 });
 
+/** A person who holds AI Control sees the company's figures on History (§1.1 decision 7 as amended). */
+const companyView = (user: string) => (grantsFor(user).ai_control ?? []).includes("view");
+const costOf = (id: string) => COSTS.get(id) ?? { tokens: 0, cost_ngn: "0.00" };
+const sum = (amounts: string[]) => amounts.reduce((n, a) => n + Number(a), 0);
+
 route("GET /api/v1/ai/history/summary", (req) => {
-  const mine = KEPT.filter((k) => k.owner === req.user);
-  const turns = mine.flatMap((k) => k.turns);
+  const company = companyView(req.user!);
+  const month = at(0, "09:00").slice(0, 7);
+  const mine = KEPT.filter((k) => k.owner === req.user).flatMap((k) => k.turns);
+  const everyone = KEPT.flatMap((k) => k.turns);
+  const counted = company ? everyone : mine;
+  // Earlier months as a staging ledger would show them; this month is what was asked here.
+  const before = company ? [420, 780, 1240, 1610, 1690] : [0, 0, 40, 85, 110];
+  const now = sum(counted.map((t) => costOf(t.ai_message_id).cost_ngn)) + (company ? 1720 : 95);
+  const [y, m] = month.split("-").map(Number);
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(Date.UTC(y, m - 1 - (5 - i), 1));
+    return d.toISOString().slice(0, 7);
+  });
+  const byModule = new Map<string, number>();
+  for (const t of counted) byModule.set(t.reads[0]?.key.split(".")[0] ?? "", (byModule.get(t.reads[0]?.key.split(".")[0] ?? "") ?? 0) + 1);
+  const LABEL: Record<string, [string | null, string]> = { partners: ["partnerships", "Partnerships"], employees: ["people", "People"], attendance: ["attendance", "Attendance"], activity: ["home", "Home"], my_leave: ["ess", "Self-Service"], "": [null, "Other"] };
   const summary: AiHistorySummary = {
-    month: at(0, "09:00").slice(0, 7),
-    questions_this_month: turns.length,
-    conversations: mine.length,
-    rows_read_this_month: turns.reduce((n, t) => n + t.reads.reduce((m, r) => m + r.rows, 0), 0),
-    by_module: turns.length ? [{ module_key: "people", label: "People", questions: turns.length }] : [],
+    month,
+    view: company ? "company" : "own",
+    questions_this_month: company ? everyone.length : mine.length,
+    your_questions: mine.length,
+    spend_ngn: now.toFixed(2),
+    cap_ngn: company ? "25000.00" : null,
+    spend_by_month: months.map((mo, i) => ({ month: mo, spend_ngn: (i === 5 ? now : before[i]).toFixed(2) })),
+    by_module: [...byModule].map(([k, n]) => ({ module_key: (LABEL[k] ?? [k, k])[0], label: (LABEL[k] ?? [k, k])[1], questions: n })).sort((a, b) => b.questions - a.questions),
   };
   return ok(summary);
 });
+
+route("GET /api/v1/ai/history/questions", (req) => {
+  const rows: AiQuestion[] = KEPT.filter((k) => k.owner === req.user)
+    .flatMap((k) => k.turns)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map((t) => ({
+      ai_message_id: t.ai_message_id,
+      ai_conversation_id: t.ai_conversation_id,
+      question: t.question,
+      asked_at: t.created_at,
+      sources: t.sources.map((s) => (s.kind === "record" ? typeLabel(s.entity_type) : s.label)),
+      ...costOf(t.ai_message_id),
+    }));
+  return paged(rows, req, { search: (q) => [q.question] });
+});
+
+route("POST /api/v1/ai/history/export", (req) => exportFile(req.user!, "praxis-ai-questions"));
 
 route("POST /api/v1/ai/answers/:id/feedback", (req) => {
   const t = KEPT.filter((k) => k.owner === req.user).flatMap((k) => k.turns).find((x) => x.ai_message_id === req.params.id);

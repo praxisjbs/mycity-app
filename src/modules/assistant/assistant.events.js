@@ -14,12 +14,15 @@ const vault = require("../../shared/documents/vault");
 
 /** The document type and the record type a spoken question is stored under (its id: the speaker's login). */
 const VOICE_QUESTION = "ai_voice_question";
+/** History's Export (§6.5): the person's questions as a workbook, read by the person who asked. */
+const HISTORY_EXPORT = "ai_history_export";
 
 const EVENTS = defineEvents("praxis_ai", {
   "assistant.answered": { summary: "A question to the assistant was answered, from the reads named" },
   "assistant.conversation_deleted": { summary: "A person deleted one of their conversations with the assistant" },
   "assistant.history_cleared": { summary: "A person cleared their history with the assistant" },
   "assistant.feedback_given": { summary: "A person marked an answer of the assistant Helpful or Not Helpful" },
+  "assistant.export_requested": { summary: "A person asked for their questions to the assistant as a workbook" },
 });
 
 /** A spoken question (praxis-ai.md §6.6): kept only while it is transcribed, never played. */
@@ -32,4 +35,15 @@ defineDocumentType(VOICE_QUESTION, {
 
 vault.defineAccess(VOICE_QUESTION, async (_client, user, doc) => doc.entity_id === user.user_id);
 
-module.exports = { EVENTS, VOICE_QUESTION };
+defineDocumentType(HISTORY_EXPORT, {
+  label: "Praxis AI history export",
+  module: "praxis_ai",
+  sensitivity: "personal",
+  export: true,
+});
+
+module.exports = { EVENTS, VOICE_QUESTION, HISTORY_EXPORT };
+
+// History's Export, registered with the worker's outbox here because the worker loads each module's
+// events file (src/worker.js).
+require("./assistant.export");

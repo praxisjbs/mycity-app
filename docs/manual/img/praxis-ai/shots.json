@@ -1,6 +1,6 @@
 {
   "praxis-answer": {
-    "spec": "48722632bdd2501c",
+    "spec": "11cf4be1784daa5c",
     "source": "e3b0c44298fc1c14",
     "devices": [
       "desktop",
@@ -8,7 +8,7 @@
     ]
   },
   "praxis-ask": {
-    "spec": "4553c6da32c98f17",
+    "spec": "2bc7e60d12787cf6",
     "source": "e3b0c44298fc1c14",
     "devices": [
       "desktop",
@@ -16,7 +16,7 @@
     ]
   },
   "praxis-history": {
-    "spec": "c317c8411ef47b5c",
+    "spec": "a781a16c14038fe3",
     "source": "e3b0c44298fc1c14",
     "devices": [
       "desktop",
@@ -26,6 +26,13 @@
   "praxis-panel": {
     "spec": "b33982f99312b2b9",
     "source": "eb227c20d7d58d74",
+    "devices": [
+      "phone"
+    ]
+  },
+  "praxis-phone": {
+    "spec": "101c42fac51f233b",
+    "source": "e3b0c44298fc1c14",
     "devices": [
       "phone"
     ]

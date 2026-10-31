@@ -632,14 +632,23 @@ describe("my workspace", () => {
   }, 40000);
 
   it("an empty day on the month asks New Task or New Event, and New Task starts on that day", async () => {
-    await signedIn(<Workspace tab="calendar" id={null} />);
-    await screen.findByText("Coming Up", undefined, { timeout: 8000 });
-    const days = await screen.findAllByRole("button", { name: /^Add To Day, / });
-    fireEvent.click(days[days.length - 1]!);
-    const choose = await screen.findByRole("dialog");
-    fireEvent.click(within(choose).getByRole("button", { name: /New Task/ }));
-    const form = await screen.findByRole("dialog", { name: "New Task" });
-    expect(within(form).getByRole("button", { name: "Create Task" })).toBeTruthy();
+    // Add To Day is offered only from today on, so on a month's last day the month has none:
+    // the clock stands at the 15th of this month so days are always left.
+    const now = new Date();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), 15, 9));
+    try {
+      await signedIn(<Workspace tab="calendar" id={null} />);
+      await screen.findByText("Coming Up", undefined, { timeout: 8000 });
+      const days = await screen.findAllByRole("button", { name: /^Add To Day, / });
+      fireEvent.click(days[days.length - 1]!);
+      const choose = await screen.findByRole("dialog");
+      fireEvent.click(within(choose).getByRole("button", { name: /New Task/ }));
+      const form = await screen.findByRole("dialog", { name: "New Task" });
+      expect(within(form).getByRole("button", { name: "Create Task" })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   }, 20000);
 
   it("New Event offers a reminder, 15 minutes before unless changed", async () => {

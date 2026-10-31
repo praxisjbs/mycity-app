@@ -13,7 +13,7 @@
  * An answer is provisional: its words are the model's; a table's cells are the records' (§6.4).
  */
 const { z } = require("zod");
-const { uuid, text, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, money, isoDateTime, listQuery, Paged } = require("./common");
 
 /** Why an answer did not give what was asked (§6.4): a read was refused, or a change was asked for. */
 const AiDeclined = z.enum(["not_available", "change"]);
@@ -51,6 +51,22 @@ const AiAnswerTable = z
     rows: z.array(z.array(z.string())).max(25),
     /** Columns to right-align: amounts and counts. */
     numeric: z.array(z.number().int().min(0)),
+    /** Each row's record, as a path worked out when shown; null where a row has no screen. */
+    links: z.array(z.string().nullable()).max(25),
+  })
+  .strict();
+
+/**
+ * What an answer's From shows (§1.1 decision 9): a kind of record and how many of it were read,
+ * or, when the answer rests on one record, that record, named and linked.
+ */
+const AiSource = z
+  .object({
+    kind: z.enum(["type", "record"]),
+    entity_type: z.string(),
+    label: z.string(),
+    count: z.number().int().min(1),
+    link: z.string().nullable(),
   })
   .strict();
 
@@ -87,6 +103,8 @@ const AiAnswer = z
     link: AiAnswerLink.nullable(),
     citations: z.array(AiCitation).max(50),
     citations_total: z.number().int().min(0),
+    /** From: the kinds of record read, or the one record (§6.4). */
+    sources: z.array(AiSource).max(25),
     reads: z.array(AiReadMade).max(5),
     declined: AiDeclined.nullable(),
     /** A read had another page: Show Next 25 asks for it. */
@@ -152,13 +170,26 @@ const AiConversationPage = Paged(AiConversation);
 const AiTurnListQuery = listQuery();
 const AiTurnPage = Paged(AiAnswer);
 
-/** GET /ai/history/summary: this Lagos month, the person's own. */
+const month = z.string().regex(/^\d{4}-\d{2}$/);
+
+/**
+ * GET /ai/history/summary (§6.5). `company` for a person who holds AI Control `view`: questions
+ * this month are everyone's, spend is Praxis AI's, the cap is AI Control's; `your_questions` is the
+ * person's own this month. `own` for everyone else: every figure is the person's, `your_questions`
+ * counts all their questions, and there is no cap.
+ */
 const AiHistorySummary = z
   .object({
-    month: z.string().regex(/^\d{4}-\d{2}$/),
+    month,
+    view: z.enum(["company", "own"]),
     questions_this_month: z.number().int().min(0),
-    conversations: z.number().int().min(0),
-    rows_read_this_month: z.number().int().min(0),
+    your_questions: z.number().int().min(0),
+    spend_ngn: money,
+    cap_ngn: money.nullable(),
+    /** The last six Lagos months, oldest first, this one last. */
+    spend_by_month: z
+      .array(z.object({ month, spend_ngn: money }).strict())
+      .max(6),
     by_module: z
       .array(
         z
@@ -172,6 +203,25 @@ const AiHistorySummary = z
       .max(25),
   })
   .strict();
+
+/** One of the person's questions on History: its answer, what it was read from, and what it cost. */
+const AiQuestion = z
+  .object({
+    /** The answer's message: the row History keeps per question. */
+    ai_message_id: uuid,
+    ai_conversation_id: uuid,
+    question: z.string(),
+    asked_at: isoDateTime,
+    /** The kinds of record its answer was read from, as From names them. */
+    sources: z.array(z.string()).max(25),
+    tokens: z.number().int().min(0),
+    cost_ngn: money,
+  })
+  .strict();
+
+/** GET /ai/history/questions: newest first unless sorted; `q` searches the questions. */
+const AiQuestionListQuery = listQuery({}, ["asked_at"]);
+const AiQuestionPage = Paged(AiQuestion);
 
 /** POST /ai/answers/:id/feedback: Helpful, Not Helpful, or neither again. */
 const AiFeedback = z
@@ -209,6 +259,7 @@ const TABLES = {
     virtual: { link: "worked out from shared/route-map when shown, never stored" },
   },
   AiAnswerTable: { table: null, reason: "an answer's table, kept in ai_message.metadata" },
+  AiSource: { table: null, reason: "an answer's citations grouped by record type, worked out when shown" },
   AiAnswerLink: { table: null, reason: "an answer's screen button, kept in ai_message.metadata" },
   AiReadMade: { table: null, reason: "a read an answer made, kept in ai_message.metadata" },
   AiAnswer: {
@@ -219,6 +270,7 @@ const TABLES = {
       link: "from ai_message.metadata",
       citations: "the answer's ai_message_citation rows, the first 50",
       citations_total: "how many ai_message_citation rows the answer has",
+      sources: "the answer's ai_message_citation rows grouped by entity_type",
       reads: "from ai_message.metadata",
       declined: "from ai_message.metadata",
       more: "from ai_message.metadata",
@@ -235,7 +287,19 @@ const TABLES = {
   AiConversationPage: { table: null, reason: "a page of the caller's conversations" },
   AiTurnListQuery: { table: null, reason: "list controls" },
   AiTurnPage: { table: null, reason: "a page of a conversation's answers" },
-  AiHistorySummary: { table: null, reason: "counts over the caller's ai_conversation and ai_message rows this Lagos month" },
+  AiHistorySummary: { table: null, reason: "counts over ai_message and ai_run rows, and spend over ai_run_step, by Lagos month" },
+  AiQuestion: {
+    table: "ai_message",
+    virtual: {
+      question: "the content of the question message, the answer's parent",
+      asked_at: "the answer's created_at",
+      sources: "the entity_type of the answer's ai_message_citation rows",
+      tokens: "the sum of input_tokens and output_tokens over the answer's ai_run_step rows",
+      cost_ngn: "the answer's ai_run_step rows priced as governance.STEP_NGN prices them",
+    },
+  },
+  AiQuestionListQuery: { table: null, reason: "list controls" },
+  AiQuestionPage: { table: null, reason: "a page of the caller's questions" },
   AiFeedback: { table: "ai_message" },
   AiTranscript: { table: null, reason: "the words of a recording, not kept" },
 };
@@ -247,6 +311,7 @@ module.exports = {
   AiAsk,
   AiCitation,
   AiAnswerTable,
+  AiSource,
   AiAnswerLink,
   AiReadMade,
   AiAnswer,
@@ -258,6 +323,9 @@ module.exports = {
   AiTurnListQuery,
   AiTurnPage,
   AiHistorySummary,
+  AiQuestion,
+  AiQuestionListQuery,
+  AiQuestionPage,
   AiFeedback,
   AiTranscript,
 };

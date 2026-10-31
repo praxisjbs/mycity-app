@@ -21,15 +21,18 @@ describe("the routes", () => {
       "DELETE /history",
       "GET /conversations",
       "GET /conversations/:id/turns",
+      "GET /history/questions",
       "GET /history/summary",
       "GET /suggestions",
       "POST /answers/:id/feedback",
       "POST /ask",
+      "POST /history/export",
       "POST /transcribe",
     ]);
     for (const key of ["POST /ask", "POST /answers/:id/feedback", "POST /transcribe"])
       expect(by[key].permission).toMatchObject({ key: "praxis_ai", action: "create" });
-    for (const key of ["GET /suggestions", "GET /conversations", "GET /conversations/:id/turns", "DELETE /conversations/:id", "DELETE /history", "GET /history/summary"])
+    // One's own History, its figures and its export: view, whatever the grant's scope (decision 7).
+    for (const key of ["GET /suggestions", "GET /conversations", "GET /conversations/:id/turns", "DELETE /conversations/:id", "DELETE /history", "GET /history/summary", "GET /history/questions", "POST /history/export"])
       expect(by[key].permission).toMatchObject({ key: "praxis_ai", action: "view" });
     for (const r of routes) expect(r.capability).toBeNull();
   });
@@ -72,7 +75,7 @@ describe("Try Asking", () => {
 });
 
 describe("an answer as History shows it", () => {
-  test("its table, button and reads from what was kept; a citation's link worked out now", () => {
+  test("its table, button and reads from what was kept; a citation's link and a row's link worked out now", () => {
     const shown = present(
       {
         ai_message_id: "00000000-0000-4000-8000-000000000001",
@@ -80,7 +83,7 @@ describe("an answer as History shows it", () => {
         question: "Whose leave waits on me?",
         content: "Two requests wait on you.",
         metadata: {
-          table: { columns: ["Employee"], rows: [["Ayo Bello"]], numeric: [] },
+          table: { columns: ["Employee"], rows: [["Ayo Bello"]], numeric: [], refs: [{ type: "employee", id: "00000000-0000-4000-8000-000000000003" }] },
           link: null,
           reads: [{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 2, first: 1 }],
           declined: null,
@@ -91,12 +94,38 @@ describe("an answer as History shows it", () => {
         citations_total: 1,
       },
       [{ entity_type: "employee", entity_id: "00000000-0000-4000-8000-000000000003", label: "Ayo Bello", read_key: "employees.list" }],
+      [{ entity_type: "employee", count: 1 }],
     );
     const c = require("@mycity/contract");
     expect(c.assistant.AiAnswer.safeParse(shown).success).toBe(true);
     expect(shown.reads).toEqual([{ key: "leave.requests", rows: 2, total: 2, first: 1 }]);
     expect(shown.citations[0]).toMatchObject({ entity_type: "employee", label: "Ayo Bello", read_key: "employees.list" });
     expect(shown.citations[0].link).toMatch(/^\/people\?/);
+    expect(shown.table.links).toEqual(["/people?tab=employees&id=00000000-0000-4000-8000-000000000003"]);
+    // Resting on one record, From names it and opens it (decision 9).
+    expect(shown.sources).toEqual([{ kind: "record", entity_type: "employee", label: "Ayo Bello", count: 1, link: shown.citations[0].link }]);
     expect(shown.created_at).toBe("2026-10-22T09:30:00.000Z");
+  });
+
+  test("a table kept before rows had links, and an answer read from several records", () => {
+    const shown = present(
+      {
+        ai_message_id: "00000000-0000-4000-8000-000000000001",
+        ai_conversation_id: "00000000-0000-4000-8000-000000000002",
+        question: "Who is in today?",
+        content: "Twenty people.",
+        metadata: { table: { columns: ["Employee"], rows: [["Ayo Bello"], ["Ngozi Eze"]], numeric: [] }, reads: [] },
+        created_at: new Date("2026-10-22T09:30:00Z"),
+        citations_total: 23,
+      },
+      [],
+      [{ entity_type: "attendance_record", count: 20 }, { entity_type: "employee", count: 2 }, { entity_type: "home_alert", count: 1 }],
+    );
+    expect(shown.table.links).toEqual([null, null]);
+    expect(shown.sources.map((s) => [s.kind, s.label, s.count, s.link])).toEqual([
+      ["type", "attendance record", 20, null],
+      ["type", "employee", 2, null],
+      ["type", "alert", 1, null],
+    ]);
   });
 });
