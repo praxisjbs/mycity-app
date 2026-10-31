@@ -16,13 +16,15 @@ you press that screen's own button.
 
 ## Ask {#praxis-ask screen=praxis_ai/ask icon=spark}
 
-Ask is a conversation: your questions on the right, Praxis AI's answers below them.
+Ask is a conversation: your questions on the right, Praxis AI's answers below them. On a phone,
+Ask opens on your conversations, and one opens full screen when you press it.
 
 ![Praxis AI, Ask](shot:praxis-ask)
 
 ### Ask a question {#praxis-ask-question needs="praxis_ai create"}
 
-1. Open [Praxis AI · Ask](/praxis-ai?tab=ask).
+1. Open [Praxis AI · Ask](/praxis-ai?tab=ask). On a phone, press **New Conversation** under the
+   title.
 2. A new conversation shows **Try Asking** with up to six questions you can ask. Press one to ask
    it. With none to offer, it shows **Ask a Question** instead.
 3. Or type your own question in **Ask a Question** at the foot of the screen, up to 500
@@ -34,8 +36,11 @@ Ask is a conversation: your questions on the right, Praxis AI's answers below th
 
 > **Tip:** On a computer, **Recent** beside the conversation lists your conversations, newest first,
 > 25 to a page: **Conversation** and **Last Asked**. Press one to open it again. Drag the line
-> between them to widen **Recent**. Before your first question it says **No Questions Yet**. A phone
-> has no **Recent**: open [Praxis AI · History](/praxis-ai?tab=history).
+> between them to widen **Recent**. Before your first question it says **No Questions Yet**. On a
+> phone, Ask opens on this list instead, with **Search Conversations** above it. Before your first
+> question it says **No Conversations Yet**.
+
+![Praxis AI, Ask on a phone](shot:praxis-phone)
 
 ### Read an answer {#praxis-ask-answer}
 
@@ -50,10 +55,11 @@ Ask is a conversation: your questions on the right, Praxis AI's answers below th
   "Show the next 25." for you, as a new question. The next answer reads *Showing 26 to 50 of 312*,
   and so on.
 - A button under the answer, such as *Open Attendance*, opens the screen where you would act on it.
-- **From** lists the records the answer was read from. Press one to open it. A record with no
-  screen of its own does not open.
-- When there are more than six, press *+12 More* to see the rest. An answer keeps its first 50
-  records; past them, *+N More* is only a count.
+- **From** lists the kinds of record the answer was read from, with how many, for example
+  *partnership ×4*.
+- When the answer rests on one record, **From** names it. Press it to open it.
+- Press a row of the answer's table to open its record. A record with no screen of its own does
+  not open.
 
 > **Important:** An answer is a first reading of your records, not a decision. Check the figures
 > on their screen before you act on them.
@@ -97,13 +103,23 @@ empty form: fill it in yourself.
 
 ### Start a new conversation {#praxis-ask-new needs="praxis_ai create"}
 
-1. Press **New Conversation** at the top of the screen. It shows once a conversation is open.
+1. Press **New Conversation** at the top of the screen. On a computer it shows once a conversation
+   is open. On a phone it is under the title of your conversations, and inside a conversation it is
+   the plus at the top right.
 2. Ask your question. A new conversation starts with it, titled by your first question.
 
 You can also open [Search](#start-search) and press **New Conversation**.
 
 A new conversation is best for a new subject: Praxis AI reads the last few questions of the
 conversation you are in, and an old subject can confuse a new question.
+
+### Switch conversations on a phone {#praxis-ask-switch needs="praxis_ai create"}
+
+1. Inside a conversation, press **Conversations**, the lines at the top right.
+2. A sheet lists your conversations, newest first. The one you are in is ticked.
+3. Press one to open it, or press **New Conversation** at the top of the sheet to start another.
+4. To see all your conversations again, press **Back** at the top left or use your phone's Back
+   gesture.
 
 ### When an answer does not come {#praxis-ask-problems}
 
@@ -136,38 +152,50 @@ conversation you are in, and an old subject can confuse a new question.
    there and closes Praxis AI.
 4. Press **Back** at the top left, swipe right, or use your phone's Back gesture. It closes and
    your screen is as you left it.
-5. Press **Praxis AI** again to come back to the same conversation. To start another, press
-   **New Conversation**, the plus at the top right.
+5. Press **Praxis AI** again to come back to the same conversation. Press **Conversations** to
+   switch to another, or **New Conversation**, the plus at the top right, to start one.
 
 ## History {#praxis-history screen=praxis_ai/history icon=history}
 
-History lists your own conversations. Nobody else sees them.
+History lists your own questions and what they cost. Nobody else sees them.
 
 ![Praxis AI, History](shot:praxis-history)
 
 ### Read your history {#praxis-history-read}
 
 1. Open [Praxis AI · History](/praxis-ai?tab=history).
-2. The tiles count this month's **Questions**, **Conversations** and **Records Read** (how many
-   records your answers were read from).
-3. **Conversations** lists them, 25 to a page: **Title** (your first question), **Last Asked**,
-   **Questions** and, on a computer, **Records Read**.
-4. Press **Title** or **Last Asked** at the top of a column to sort by it. On a phone, press
-   **Sort**.
-5. Type in **Search Conversations** to find one by its title.
-6. Press a conversation to open it again on [Praxis AI · Ask](/praxis-ai?tab=ask) and carry on.
-7. Or open [Search](#start-search) from anywhere, type words from the question, and press it under
+2. The tiles show **Questions This Month**, **Your Questions** (all time) and **Your Spend**, what
+   your questions and recordings cost this month.
+3. {needs="ai_control view"} With AI Control, the tiles are the company's: **Questions This Month**
+   counts everyone's, **Spend** is what Praxis AI cost this month, and **Monthly Cap** is the most
+   all AI may spend in a month.
+4. **Your Questions** lists them, 25 to a page: **Question**, **Asked**, **Cost** and, on a
+   computer, **Sources Read** and **Tokens**.
+5. Press **Asked** at the top of its column to sort by it. On a phone, press **Sort**.
+6. Type in **Search Questions** to find one by its words.
+7. Press a question to open its conversation on [Praxis AI · Ask](/praxis-ai?tab=ask) and carry on.
+8. Or open [Search](#start-search) from anywhere, type words from the question, and press it under
    **Conversations**.
 
 Before your first question the list says **No Questions Yet**.
 
-On a computer, **Questions by Module** shows which parts of the hub your questions were about.
-**Other** counts the questions whose answers read no records.
+On a computer, **Spend per Month, Naira** shows the last six months, and **Questions by Module**
+shows which parts of the hub your questions were about. **Other** counts the questions whose
+answers read no records.
+
+### Export your questions {#praxis-history-export}
+
+1. Press **Export** at the top right. On a phone it is in the menu at the top right,
+   **History Actions**.
+2. The file downloads when it is ready, and a message says **Export downloaded**.
+
+The file lists your newest questions, up to 2,500, with the same columns as the list.
 
 ### Delete a conversation, or all of them {#praxis-history-delete}
 
-1. To delete one, press the three dots at the end of its row (on a phone, on its card),
-   **Conversation Actions**, then **Delete Conversation**.
+1. To delete one, press the three dots at the end of a question's row (on a phone, on its card),
+   **Question Actions**, then **Delete Conversation**. The whole conversation goes, every question
+   in it.
 2. Confirm with **Delete Conversation**. A message says **Conversation deleted**.
 3. To delete every conversation, press **Clear History** at the top right. On a phone it is in the
    menu at the top right, **History Actions**.
@@ -185,6 +213,7 @@ Deleting removes the questions and answers for good. It does not change what AI 
 open: /praxis-ai?tab=ask
 as: staff
 do:
+  - phone click: button "New Conversation"
   - wait: text "Try Asking"
 marks:
   1: text "Try Asking" | Questions you can ask
@@ -197,6 +226,7 @@ marks:
 open: /praxis-ai?tab=ask
 as: operations
 do:
+  - phone click: button "New Conversation"
   - fill: label "Ask a Question" = Who works with us?
   - click: button "Send"
   - wait: button "Helpful"
@@ -220,10 +250,19 @@ marks:
   2: label "Ask a Question" | Type your question
 ```
 
+```shot praxis-phone
+open: /praxis-ai?tab=ask
+as: operations
+device: phone
+marks:
+  1: button "New Conversation" | Start a conversation
+  2: searchbox | Find a conversation
+```
+
 ```shot praxis-history
 open: /praxis-ai?tab=history
 as: operations
 marks:
-  1: text "Questions" | This month's questions
-  2: searchbox | Find a conversation
+  1: text "Questions This Month" | This month's questions
+  2: searchbox | Find a question
 ```

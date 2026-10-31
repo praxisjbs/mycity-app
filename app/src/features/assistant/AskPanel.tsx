@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { refresh } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
-import { moduleByKey } from "@/shell/catalogue";
-import { IconButton, PhonePage } from "@mycity/ui";
-import { Conversation } from "./Conversation";
+import { ChatPage } from "./PhoneChat";
 
 /**
  * Praxis AI over the screen the person is on (docs/guides/praxis-ai.md §10.2): the phone's floating
  * button opens it. The conversation is kept while the app is open, so the button comes back to it;
- * New Conversation starts another. Going anywhere (an answer's screen button, a record it was read
- * from) closes it, and the screen behind stays as it was left.
+ * Conversations switches to another and New Conversation starts one. Going anywhere (an answer's
+ * screen button, a record it was read from) closes it, and the screen behind stays as it was left.
  */
 export default function AskPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [id, setId] = useState<string | null>(null);
@@ -24,15 +22,5 @@ export default function AskPanel({ open, onClose }: { open: boolean; onClose: ()
   const answered = useCallback(() => void refresh("/api/v1/ai/history", "/api/v1/ai/conversations"), []);
   const fresh = useCallback(() => setId(null), []);
 
-  return (
-    <PhonePage
-      open={open}
-      onClose={onClose}
-      title={moduleByKey("praxis_ai")?.label ?? "Assistant"}
-      actions={id ? <IconButton icon="plus" label="New Conversation" onClick={fresh} /> : undefined}
-      bodyClassName="flex flex-col overflow-hidden"
-    >
-      <Conversation id={id} onOpened={setId} onGone={fresh} onAnswered={answered} />
-    </PhonePage>
-  );
+  return <ChatPage open={open} id={id} onClose={onClose} onOpen={setId} onNew={fresh} onAnswered={answered} />;
 }

@@ -14,7 +14,7 @@
  *       run: (client, params, actor) => repo.list(client, params, actor.scope),
  *       cite: (row) => ({ type: "employee", id: row.employee_id, label: row.full_name }),
  *     }],
- *     routes: [{ intent: "add an employee", screen: "people.employees", params: { action: "new" } }],
+ *     routes: [{ intent: "add an employee", screen: "people.employees", params: { new: "1" } }],
  *   });
  *
  * The assistant reads, it never writes (A23). A manifest that declares anything like
