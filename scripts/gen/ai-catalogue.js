@@ -34,7 +34,7 @@ function render(rows) {
 /** @returns {{stale: boolean, added: string[], removed: string[], changed: string[]}} */
 function compare() {
   const now = current();
-  let kept = [];
+  let kept;
   try {
     kept = JSON.parse(fs.readFileSync(FILE, "utf8")).entries || [];
   } catch {

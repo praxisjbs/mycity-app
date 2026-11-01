@@ -90,7 +90,7 @@ function check() {
   const actions = registry.actions();
   const forms = walk(FEATURES, (f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f)).flatMap((f) => formCalls(fs.readFileSync(f, "utf8")));
   const testText = TESTS.flatMap((d) => walk(d, (f) => f.endsWith(".test.js"))).map((f) => fs.readFileSync(f, "utf8")).join("\n");
-  let evalText = "";
+  let evalText;
   try {
     evalText = fs.readFileSync(EVAL, "utf8");
   } catch {

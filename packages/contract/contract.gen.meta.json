@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "dabf8782104ebc373bb5c4e43b9e9dc1ee48295105a60f6ed71955502b55e270",
+  "source_hash": "de27e281ae7b1c0549e0f2dc873efd55e8385ef84eaeb02efcbde26125267de1",
   "schemas": 1324,
   "endpoints": 647,
   "inputs": {
@@ -12,7 +12,7 @@
     "packages/contract/schemas/announcements.js": "fd6e37d081b609ad75ee98a84357db39b3b07fa995369f55100a0d2d4f727af5",
     "packages/contract/schemas/appearance.js": "19d4a590df5d59d507ad5f6df04600edf7137782027bec0f022a4f566caa3cbe",
     "packages/contract/schemas/assessments.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/assistant.js": "782607bc3a00308f01073b77b10b04e6aa7d05f86b4ae6d5f486714166dd96dd",
+    "packages/contract/schemas/assistant.js": "d849aa27459699119b29392540e1cb919b77ead886ce9ff53047b4b4037079fd",
     "packages/contract/schemas/attendance.js": "79ac1fd8a73ac236b3b2d17d702332c65589b38edaf5d6efa225fc0183b534b2",
     "packages/contract/schemas/audit.js": "0da325da2e49796743a8501459005a2cb952af522723ecc181498059f98458aa",
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

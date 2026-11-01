@@ -35,7 +35,7 @@ export function ChatList({ list, current, onOpen }: { list: PagedResult<AiConver
           />
         </div>
       ) : (
-        <EmptyState bare title={list.q ? "No Conversation Matches" : "No Conversations Yet"} text={list.q ? undefined : "Start one with New Conversation."} />
+        <EmptyState bare level={2} title={list.q ? "No Conversation Matches" : "No Conversations Yet"} text={list.q ? undefined : "Start one with New Conversation."} />
       )}
       <Pager page={list.page} onPage={list.setPage} noun="conversation" />
     </>
