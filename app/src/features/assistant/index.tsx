@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, refresh, useApi, usePaged, type PagedResult } from "@/api/hooks";
-import type { AiConversation, AiQuestion } from "@mycity/contract/contract.gen.ts";
+import type { AiAnswer, AiConversation, AiQuestion, AiShows } from "@mycity/contract/contract.gen.ts";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { hrefFor } from "@/lib/routes";
 import { moduleByKey } from "@/shell/catalogue";
@@ -11,9 +11,12 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { saveExport } from "@/api/exports";
 import { BarsCard } from "@/features/shared/sections";
 import { Conversation } from "./Conversation";
+import { contextOf, fromLabel, useBackTo } from "./context";
+import { AnswerPane, PhonePane, usePane } from "./Pane";
 import { ChatList, ChatPage } from "./PhoneChat";
 import {
   AreaChart,
+  AssistantShell,
   Button,
   CardHeader,
   DataView,
@@ -32,14 +35,12 @@ import {
   monthName,
   PageHeader,
   PhoneOnly,
-  SplitPanes,
   toast,
   useConfirm,
   useIsMobile,
-  useSplitPanes,
 } from "@mycity/ui";
 
-/** Praxis AI, Ask and History (docs/guides/praxis-ai.md §10). It reads what the person may see and never writes. */
+/** Praxis AI, Ask and History (docs/guides/praxis-ai.md §10). It reads what the person may see; a change is a card the person confirms (PR4). */
 export default function Assistant({ tab, id }: ModuleScreenProps) {
   return tab === "history" ? <History /> : <Ask id={id} />;
 }
@@ -47,47 +48,123 @@ export default function Assistant({ tab, id }: ModuleScreenProps) {
 /** The assistant's name, written once in the shell's catalogue (§1.1 decision 5). */
 const NAME = moduleByKey("praxis_ai")?.label ?? "Assistant";
 
+/** What the full-screen Praxis AI can draw (AiAsk.shows): the pane; cards come with PR4 of the Praxis AI Engine. */
+const SHOWS: AiShows[] = ["pane"];
+
 /* ───────────────────────── Ask ───────────────────────── */
 
+/**
+ * The full-screen Praxis AI (§1.2 decisions 12 and 13). Opened from a screen, its address carries
+ * that screen as `from`: the question's context, and where Back goes. On a phone without one it
+ * opens on the person's conversations, as a chat app does.
+ */
 function Ask({ id }: { id: string | null }) {
-  return useIsMobile() ? <AskPhone id={id} /> : <AskDesktop id={id} />;
+  const [params] = useSearchParams();
+  const from = params.get("from");
+  const phone = useIsMobile();
+  if (!phone) return <AskDesktop id={id} from={from} />;
+  return from ? <AskPhoneFrom id={id} from={from} /> : <AskPhone id={id} />;
 }
 
-/** On desktop: Recent beside the conversation, which fills the page. */
-function AskDesktop({ id }: { id: string | null }) {
+/** On desktop: the conversation beside the pane (about two fifths and three fifths), Recent behind a toggle, Back in the header. */
+function AskDesktop({ id, from }: { id: string | null; from: string | null }) {
   useFitPage(true);
   const { navigate } = useRouter();
   const [, setParams] = useSearchParams();
-  const split = useSplitPanes("praxis-ai", 280);
+  const context = useMemo(() => contextOf(from), [from]);
+  const back = useBackTo(from);
   const recent = usePaged("GET /api/v1/ai/conversations");
-  const open = useCallback((next: string) => setParams({ id: next }), [setParams]);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const pane = usePane();
+  const { show, clear } = pane;
+  const open = useCallback(
+    (next: string) => {
+      clear();
+      setParams({ id: next });
+    },
+    [clear, setParams],
+  );
   // A new address rather than a change to this one: ⌘K's New Conversation arrives as ?action=new,
-  // which a change made from this render's address would put back.
-  const fresh = useCallback(() => navigate(hrefFor("praxis_ai", "ask")), [navigate]);
+  // which a change made from this render's address would put back. The screen it came from stays.
+  const fresh = useCallback(() => navigate(hrefFor("praxis_ai", "ask", from ? { from } : {})), [navigate, from]);
   // A fit page has no floating button: ⌘K's New Conversation (?action=new) runs this.
   useScreenAction({ label: "New Conversation", onSelect: fresh });
+  // A new conversation empties the pane with it.
+  useEffect(() => {
+    if (!id) clear();
+  }, [id, clear]);
   const reloadRecent = recent.reload;
-  const answered = useCallback(() => {
-    void reloadRecent();
-    void refresh("/api/v1/ai/history");
-  }, [reloadRecent]);
+  const answered = useCallback(
+    (a: AiAnswer) => {
+      void reloadRecent();
+      void refresh("/api/v1/ai/history");
+      show(a);
+    },
+    [reloadRecent, show],
+  );
 
   return (
+    <AssistantShell
+      title={NAME}
+      back={{ to: fromLabel(from), onBack: back }}
+      actions={
+        <>
+          <Button icon="history" aria-pressed={recentOpen} onClick={() => setRecentOpen((o) => !o)}>
+            Recent
+          </Button>
+          {id && (
+            <Button icon="plus" onClick={fresh}>
+              New Conversation
+            </Button>
+          )}
+        </>
+      }
+      aside={<Recent list={recent} current={id} onOpen={open} />}
+      asideOpen={recentOpen}
+      conversation={
+        <Conversation
+          id={id}
+          context={context}
+          shows={SHOWS}
+          onOpened={(next) => setParams({ id: next }, { replace: true })}
+          onGone={fresh}
+          onAnswered={answered}
+          onPane={show}
+          paneFor={pane.shown?.answer.ai_message_id ?? null}
+        />
+      }
+      pane={<AnswerPane pane={pane} />}
+    />
+  );
+}
+
+/** On a phone, opened from a screen: the conversation full width with Back; an answer's Open Figures opens the pane as a sheet. */
+function AskPhoneFrom({ id, from }: { id: string | null; from: string }) {
+  useFitPage(true);
+  const { navigate } = useRouter();
+  const [, setParams] = useSearchParams();
+  const context = useMemo(() => contextOf(from), [from]);
+  const back = useBackTo(from);
+  const pane = usePane();
+  const fresh = useCallback(() => navigate(hrefFor("praxis_ai", "ask", { from })), [navigate, from]);
+  useScreenAction({ label: "New Conversation", onSelect: fresh });
+  const answered = useCallback(() => void refresh("/api/v1/ai/history", "/api/v1/ai/conversations"), []);
+  return (
     <>
-      <PageHeader title={NAME} actions={id ? <Button icon="plus" onClick={fresh}>New Conversation</Button> : undefined} />
-      <SplitPanes
-        split={split}
-        open
-        list={<Recent list={recent} current={id} onOpen={open} />}
-        detail={<Conversation id={id} onOpened={(next) => setParams({ id: next }, { replace: true })} onGone={fresh} onAnswered={answered} />}
+      <AssistantShell
+        title={NAME}
+        back={{ to: fromLabel(from), onBack: back }}
+        actions={id ? <IconButton icon="plus" label="New Conversation" onClick={fresh} /> : undefined}
+        conversation={<Conversation id={id} context={context} shows={SHOWS} onOpened={(next) => setParams({ id: next }, { replace: true })} onGone={fresh} onAnswered={answered} onPane={pane.show} />}
       />
+      <PhonePane pane={pane} />
     </>
   );
 }
 
 /**
- * On a phone (§10.2): the person's conversations with New Conversation; one, or a new one, opens
- * full screen over them, as the floating button's chat does.
+ * On a phone (§10.2), opened from the menu, ⌘K or History: the person's conversations with New
+ * Conversation; one, or a new one, opens full screen over them, as the floating button's chat does.
  */
 function AskPhone({ id }: { id: string | null }) {
   const [, setParams] = useSearchParams();
@@ -125,7 +202,7 @@ function AskPhone({ id }: { id: string | null }) {
   );
 }
 
-/** Beside the conversation on desktop: the person's conversations, newest first. On a phone they are the page (ChatList). */
+/** Behind the Recent toggle on desktop: the person's conversations, newest first. On a phone they are the page (ChatList). */
 function Recent({ list, current, onOpen }: { list: PagedResult<AiConversation>; current: string | null; onOpen: (id: string) => void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-3">

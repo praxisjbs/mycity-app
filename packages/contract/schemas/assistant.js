@@ -74,6 +74,8 @@ const AiAnswerTable = z
     numeric: z.array(z.number().int().min(0)),
     /** Each row's record, as a path worked out when shown; null where a row has no screen. */
     links: z.array(z.string().nullable()).max(25),
+    /** Which of the answer's reads it was drawn from (1 first): the Table pane pages that read again (§6.12); null on an answer kept before reads were numbered. */
+    read: z.number().int().min(1).max(5).nullable().default(null),
   })
   .strict();
 
@@ -117,6 +119,8 @@ const AiReadMade = z
     rows: z.number().int().min(0).max(25),
     total: z.number().int().min(0).nullable(),
     first: z.number().int().min(1).nullable(),
+    /** The restricted fields emptied for the person on this read (the field mask), as the Sources tab names them. */
+    masked: z.array(z.string().max(64)).max(40).default([]),
   })
   .strict();
 

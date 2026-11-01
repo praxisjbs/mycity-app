@@ -1,28 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { useApi, useInfinite } from "@/api/hooks";
+import { useRealtime } from "@/api/realtime";
 import { upload } from "@/api/upload";
-import type { AiAnswer, AiFeedbackValue, AiTranscript } from "@mycity/contract/contract.gen.ts";
+import type { AiAnswer, AiFeedbackValue, AiScreenContext, AiShows, AiTranscript } from "@mycity/contract/contract.gen.ts";
 import { useRouter } from "@/lib/router";
-import {
-  ActionGroup,
-  Button,
-  cn,
-  DataView,
-  EmptyState,
-  ErrorState,
-  Form,
-  HelpTerm,
-  Icon,
-  IconButton,
-  InlineInput,
-  ItemChip,
-  LoadingRows,
-  TapList,
-  toast,
-  VoiceField,
-  type DataViewColumn,
-} from "@mycity/ui";
+import { AnswerBubble, Button, DataView, EmptyState, ErrorState, Form, Icon, IconButton, InlineInput, LoadingRows, ProgressLine, QuestionBubble, SourceChip, TapList, toast, VoiceField, type DataViewColumn } from "@mycity/ui";
+import { pickForSource, type PanePick } from "./Pane";
 
 /** Praxis AI's conversation (docs/guides/praxis-ai.md §10): what is asked, what came back, and the box. */
 
@@ -33,6 +17,9 @@ const QUESTION_MAX = 500;
 
 /** The question waiting for its answer, or the one that failed. Try Again sends it with the same key (§11). */
 type Pending = { question: string; key: string; error: string | null; reference?: string };
+
+/** What the server says it is reading while a question runs (`ai:progress`, decision 23). */
+type Progress = { words: string; step: { n: number; of: number } };
 
 /** Refusals asking again cannot help (AI off, the module's AI off, an answer that could not be used): the words go back to the box. */
 const FINAL = new Set(["AI_DISABLED", "AI_MODULE_DISABLED", "AI_BAD_OUTPUT"]);
@@ -48,21 +35,44 @@ async function transcribe(audio: Blob): Promise<string> {
   return reply.text.trim();
 }
 
+export interface ConversationProps {
+  /** The conversation shown; null is a new one. */
+  id: string | null;
+  /** The screen the question is asked from (decision 12), sent with every question. */
+  context?: AiScreenContext | null;
+  /** What this screen can draw: the pane, and (PR4 of the Praxis AI Engine) cards. */
+  shows?: AiShows[];
+  /** A first answer opened its conversation: the parent moves the address there. */
+  onOpened: (id: string) => void;
+  /** The conversation is gone (deleted elsewhere): the parent starts a new one. */
+  onGone: () => void;
+  /** An answer landed: the parent refreshes Recent and History, and shows the answer's pane. */
+  onAnswered: (answer: AiAnswer) => void;
+  /** Shows an answer's pane (Open Figures, a source chip): the right pane on desktop, the sheet on a phone. */
+  onPane?: (answer: AiAnswer, pick?: PanePick) => void;
+  /** The answer whose pane is shown now, drawn in the accent. */
+  paneFor?: string | null;
+}
+
 /**
- * One conversation: its turns, the question waiting, and the box with the microphone and Send. Ask
- * shows it as the page; the phone's floating button shows it over any screen (AskPanel). The parent
- * holds which conversation it is and lays it out as a column it fills.
+ * One conversation: its turns, the question waiting with what is being read, and the box with the
+ * microphone and Send. The full-screen Praxis AI shows it beside the pane; the phone's floating
+ * button shows it over any screen (AskPanel). The parent holds which conversation it is and lays it
+ * out as a column it fills.
  */
-export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string | null; onOpened: (id: string) => void; onGone: () => void; onAnswered: () => void }) {
+export function Conversation({ id, context = null, shows = [], onOpened, onGone, onAnswered, onPane, paneFor = null }: ConversationProps) {
   const formId = useId();
   const turns = useInfinite("GET /api/v1/ai/conversations/:id/turns", { params: { id: id ?? "" }, enabled: Boolean(id) });
   const suggestions = useApi("GET /api/v1/ai/suggestions", { enabled: !id });
   /* Answers given on this screen, shown at once; the saved page catches up behind them. */
   const [given, setGiven] = useState<AiAnswer[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [text, setText] = useState("");
   const [feedback, setFeedback] = useState<Record<string, AiFeedbackValue | null>>({});
   const asking = useRef(false);
+  /* The key of the question being answered: a progress event for any other question is not this screen's. */
+  const askKey = useRef<string | null>(null);
   /* The question being answered: Send pressed meanwhile waits on it, spinning, with the words kept in the box. */
   const inflight = useRef<Promise<void> | null>(null);
   /* The conversation this screen is showing: an answer that opens one moves the address here, without starting over. */
@@ -71,9 +81,9 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
   const moves = useRef(0);
   /* Whether the screen is still open: an answer that lands after the person left changes nothing here. */
   const live = useRef(true);
-  /* The latest callbacks, for an answer that lands after a render or two. */
-  const calls = useRef({ onOpened, onGone, onAnswered });
-  calls.current = { onOpened, onGone, onAnswered };
+  /* The latest callbacks and context, for an answer that lands after a render or two. */
+  const calls = useRef({ onOpened, onGone, onAnswered, context, shows });
+  calls.current = { onOpened, onGone, onAnswered, context, shows };
   const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -88,9 +98,18 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
     showing.current = id;
     moves.current += 1;
     asking.current = false;
+    askKey.current = null;
     setGiven([]);
     setPending(null);
+    setProgress(null);
   }, [id]);
+
+  // Progress over realtime (decision 23): what is being read for this question, dropped when the answer lands.
+  useRealtime("ai:progress", (payload) => {
+    const p = payload as { ask_key?: unknown; n?: unknown; of?: unknown; words?: unknown } | null;
+    if (!p || !askKey.current || p.ask_key !== askKey.current) return;
+    setProgress({ words: typeof p.words === "string" ? p.words : "", step: { n: Number(p.n) || 1, of: Number(p.of) || 5 } });
+  });
 
   // Deleted in another tab, or not the person's: a new conversation instead of an empty pane (§11).
   const gone = Boolean(id) && turns.error?.status === 404;
@@ -109,7 +128,7 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
-  }, [newest, pending]);
+  }, [newest, pending, progress]);
 
   const ask = (words: string, key: string = crypto.randomUUID()): Promise<void> | undefined => {
     if (asking.current) return inflight.current ?? undefined;
@@ -126,10 +145,16 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
     /** Still where this question was asked: the screen open and no other conversation picked since (an answer opening its own conversation is not a move). */
     const here = () => live.current && moves.current === move;
     asking.current = true;
+    askKey.current = key;
     setPending({ question, key, error: null });
+    setProgress(null);
+    const { context: ctx, shows: draws } = calls.current;
     try {
-      const a = await api.call("POST /api/v1/ai/ask", { body: from ? { question, ai_conversation_id: from } : { question }, idempotencyKey: key });
-      calls.current.onAnswered();
+      const a = await api.call("POST /api/v1/ai/ask", {
+        body: { question, ...(from ? { ai_conversation_id: from } : {}), ...(ctx ? { context: ctx } : {}), shows: draws },
+        idempotencyKey: key,
+      });
+      calls.current.onAnswered(a);
       if (!here()) return;
       setGiven((g) => [...g, a]);
       setPending(null);
@@ -157,7 +182,11 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
         setPending({ question, key, error: err.message || "Could not reach the server", reference: err.reference });
       }
     } finally {
-      if (here()) asking.current = false;
+      if (here()) {
+        asking.current = false;
+        askKey.current = null;
+        setProgress(null);
+      }
     }
   };
 
@@ -192,7 +221,7 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
       <div role="log" aria-label="Conversation" className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-4 max-md:p-3">
         {empty ? (
           <div className="m-auto flex w-full max-w-120 flex-col gap-3">
-            {/* A section of the page beside Recent, and on a phone straight under its title: a second-level heading. */}
+            {/* A section of the page beside the pane, and on a phone straight under its title: a second-level heading. */}
             <EmptyState bare level={2} illustration="FirstRun" title={offered.length ? "Try Asking" : "Ask a Question"} />
             {suggestions.loading && <LoadingRows count={3} />}
             {offered.length > 0 && (
@@ -212,18 +241,20 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
             {id && turns.error && !gone && answers.length === 0 && <ErrorState error={turns.error} onRetry={turns.reload} />}
             {answers.map((a) => (
               <div key={a.ai_message_id} className="flex flex-col gap-3.5">
-                <Question words={a.question} />
+                <QuestionBubble words={a.question} />
                 <Answer
                   a={a}
                   feedback={a.ai_message_id in feedback ? feedback[a.ai_message_id] : a.feedback}
                   onFeedback={(value) => give(a, value)}
                   onNext={a.more && a.ai_message_id === newest && !pending ? () => ask(NEXT_PAGE) : undefined}
+                  onPane={onPane}
+                  paneOpen={paneFor === a.ai_message_id}
                 />
               </div>
             ))}
             {pending && (
               <div className="flex flex-col gap-3.5">
-                <Question words={pending.question} />
+                <QuestionBubble words={pending.question} />
                 {pending.error ? (
                   <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive">
                     <Icon name="alert" size="s" />
@@ -234,10 +265,7 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
                     </Button>
                   </div>
                 ) : (
-                  <div role="status" className="flex w-fit items-center gap-2 bubble-them border border-border px-3 py-2.5 text-xs text-subtle-foreground">
-                    <Icon name="spark" className="animate-pulse" />
-                    Reading Your Records
-                  </div>
+                  <ProgressLine words={progress?.words || null} step={progress?.step ?? null} />
                 )}
               </div>
             )}
@@ -264,70 +292,43 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
   );
 }
 
-function Question({ words }: { words: string }) {
-  return (
-    <p data-copy="content" className="ml-auto w-fit max-w-4/5 bubble-me border border-border bg-accent px-3 py-2.5 text-sm wrap-any">
-      {words}
-    </p>
-  );
+/** Where the answer's table rows sit in the whole list: "Showing 25 of 312", "Showing 26 to 50 of 312". */
+function pagingOf(a: AiAnswer): string | null {
+  if (!a.table?.rows.length) return null;
+  const read = (a.table.read ? a.reads.find((r) => r.n === a.table!.read) : undefined) ?? a.reads.find((r) => r.rows === a.table!.rows.length && r.total != null && r.total > r.rows);
+  if (!read || read.total == null || read.total <= read.rows) return null;
+  const from = read.first ?? null;
+  return from && from > 1 ? `Showing ${from} to ${from + read.rows - 1} of ${read.total}` : `Showing ${read.rows} of ${read.total}`;
 }
 
-function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: AiFeedbackValue | null; onFeedback: (value: AiFeedbackValue | null) => Promise<void>; onNext?: () => Promise<void> | undefined }) {
+function Answer({ a, feedback, onFeedback, onNext, onPane, paneOpen }: { a: AiAnswer; feedback: AiFeedbackValue | null; onFeedback: (value: AiFeedbackValue | null) => Promise<void>; onNext?: () => Promise<void> | undefined; onPane?: (answer: AiAnswer, pick?: PanePick) => void; paneOpen: boolean }) {
   const { navigate } = useRouter();
-  /* The read the table was drawn from, when it had more rows than the page it returned. */
-  const paged = a.table?.rows.length ? a.reads.find((r) => r.rows === a.table!.rows.length && r.total != null && r.total > r.rows) : undefined;
-  const from = paged?.first ?? null;
+  // Kinds of record with how many (decision 9); the one record, named, when the answer rests on one. A chip opens the pane on them.
+  const from = a.sources.map((s) =>
+    s.kind === "record" ? (
+      <SourceChip
+        key={`record:${s.entity_type}`}
+        kind="record"
+        label={s.label}
+        onSelect={onPane ? () => onPane(a, { tab: "record", record: { title: s.label, items: [], link: s.link } }) : s.link ? () => navigate(s.link!) : undefined}
+      />
+    ) : (
+      <SourceChip key={`type:${s.entity_type}`} label={s.label} count={s.count} onSelect={onPane ? () => onPane(a, pickForSource(a, s.entity_type)) : undefined} />
+    ),
+  );
   return (
-    <article aria-label="Answer" className="flex max-w-11/12 flex-col gap-2.5 bubble-them border border-border bg-card p-3 max-md:max-w-full">
-      <p data-copy="content" className="text-sm whitespace-pre-line wrap-any">
-        {a.content}
-      </p>
-      {a.table && <AnswerTable a={a} />}
-      {(paged || onNext) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {paged && (
-            <span className="text-xs text-subtle-foreground">
-              {from && from > 1 ? `Showing ${from} to ${from + paged.rows - 1} of ${paged.total}` : `Showing ${paged.rows} of ${paged.total}`}
-            </span>
-          )}
-          {onNext && (
-            <Button size="sm" onClick={onNext}>
-              Show Next 25
-            </Button>
-          )}
-        </div>
-      )}
-      {a.link && (
-        <div>
-          <Button iconRight="right" onClick={() => navigate(a.link!.path)}>
-            {a.link.label}
-          </Button>
-        </div>
-      )}
-      {a.sources.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-dashed border-border pt-2.5">
-          <span className="text-2xs font-strong tracking-caps text-subtle-foreground uppercase">
-            <HelpTerm help="The kinds of record this answer was read from, as you would see them. A table's rows open their own records.">From</HelpTerm>
-          </span>
-          {/* Kinds of record with how many (decision 9); the one record, named and opening it, when the answer rests on one. */}
-          {a.sources.map((s) =>
-            s.kind === "record" ? (
-              <ItemChip key={`record:${s.entity_type}`} onSelect={s.link ? () => navigate(s.link!) : undefined}>
-                {s.label}
-              </ItemChip>
-            ) : (
-              <ItemChip key={`type:${s.entity_type}`}>{s.count > 1 ? `${s.label} ×${s.count}` : s.label}</ItemChip>
-            ),
-          )}
-        </div>
-      )}
-      <div className="flex items-center gap-1">
-        <ActionGroup>
-          <IconButton size="sm" icon="thumb" label="Helpful" aria-pressed={feedback === "up"} className={cn(feedback === "up" && "bg-muted text-foreground")} onClick={() => onFeedback(feedback === "up" ? null : "up")} />
-          <IconButton size="sm" icon="thumbdown" label="Not Helpful" aria-pressed={feedback === "down"} className={cn(feedback === "down" && "bg-muted text-foreground")} onClick={() => onFeedback(feedback === "down" ? null : "down")} />
-        </ActionGroup>
-      </div>
-    </article>
+    <AnswerBubble
+      text={a.content}
+      table={a.table ? <AnswerTable a={a} /> : undefined}
+      paging={pagingOf(a)}
+      onNext={onNext}
+      link={a.link ? { label: a.link.label, onOpen: () => navigate(a.link!.path) } : null}
+      from={from.length ? from : undefined}
+      onPane={onPane && (a.reads.length || a.overview) ? () => onPane(a) : undefined}
+      paneOpen={paneOpen}
+      feedback={feedback}
+      onFeedback={onFeedback}
+    />
   );
 }
 

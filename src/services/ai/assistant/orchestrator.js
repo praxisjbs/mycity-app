@@ -240,12 +240,13 @@ function madeOf(n, key, params) {
  * @param {Array<{question: string, answer: string, reads?: Array<{key: string, params?: object, rows: number, total: number|null}>}>} [req.history]
  * @param {object|null} [req.context]   the screen asked from (AiScreenContext)
  * @param {string[]} [req.shows]        what the asking screen draws: "cards", "pane"
+ * @param {(read: {n: number, key: string, kind: string, of: number}) => void} [req.onRead]  told before each read or summary runs (the screen's progress line, decision 23); its failure never fails the question
  * @param {Date} [req.now]
  * @param {object} [req.vendors]   tests
  * @param {number} [req.deadlineMs]
  * @returns {Promise<{draft: object, reads: Array<object>, run_id: string, stub: boolean, routes: Array<object>, screens: Array<object>, actions: Array<object>, context: object|null}>}
  */
-async function answer({ db, actor, question, history = [], context = null, shows = [], now = new Date(), vendors, deadlineMs = DEADLINE_MS }) {
+async function answer({ db, actor, question, history = [], context = null, shows = [], now = new Date(), vendors, deadlineMs = DEADLINE_MS, onRead = null }) {
   const talk = await ai.converse({ purpose: "data-answers", module: "praxis_ai", actor, egress: "reasoning", db, vendors });
   const AiAnswerDraft = c.assistant.AiAnswerDraft;
   const reads = [];
@@ -283,6 +284,13 @@ async function answer({ db, actor, question, history = [], context = null, shows
         return { kind: "not_available", content: JSON.stringify({ read: n, key, error: "not_available" }) };
       };
       if (!t || t.kind === "action") return notAvailable();
+      if (onRead) {
+        try {
+          onRead({ n, key, kind: made.kind, of: MAX_READS });
+        } catch (err) {
+          logger.warn({ err, ai_read: key }, "Praxis AI: the progress hook failed; the read runs regardless");
+        }
+      }
       try {
         if (t.kind === "summary") {
           const res = await authorise.runSummary(db, actor, key, params);

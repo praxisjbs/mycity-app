@@ -91,7 +91,7 @@ function tableOf(spec, reads) {
 function presentTable(t) {
   if (!t) return null;
   const refs = Array.isArray(t.refs) ? t.refs : [];
-  return { columns: t.columns, rows: t.rows, numeric: t.numeric, links: t.rows.map((_, i) => linkOfRef(refs[i])) };
+  return { columns: t.columns, rows: t.rows, numeric: t.numeric, links: t.rows.map((_, i) => linkOfRef(refs[i])), read: t.read || null };
 }
 
 /** Citations grouped by record type, in the order first cited. */
@@ -140,7 +140,7 @@ function linkOf(intent, values, routes, screens) {
 }
 
 /** The reads as the wire and History carry them (AiReadMade), from the pane's sources. */
-const readsMade = (sources) => sources.map(({ n, key, kind, module_key, params, outcome, rows, total, first }) => ({ n, key, kind, module_key, params, outcome, rows, total, first }));
+const readsMade = (sources) => sources.map(({ n, key, kind, module_key, params, outcome, rows, total, first, masked }) => ({ n, key, kind, module_key, params, outcome, rows, total, first, masked: Array.isArray(masked) ? masked : [] }));
 
 /**
  * @param {{draft: object, reads: Array<object>, routes: Array<object>, screens: Array<object>, shows?: string[]}} q

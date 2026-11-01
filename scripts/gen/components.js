@@ -31,7 +31,7 @@ const PKG = path.join(ROOT, "packages", "ui");
 const SRC = path.join(PKG, "src");
 const OUT = path.join(ROOT, "docs", "COMPONENTS.md");
 
-const GROUPS = ["Foundations", "Actions", "Layout", "Display", "Navigation", "Overlays", "Help", "Feedback", "Forms", "Data", "Charts", "Documents", "Maps", "Shell"];
+const GROUPS = ["Foundations", "Actions", "Layout", "Display", "Navigation", "Overlays", "Help", "Feedback", "Forms", "Data", "Charts", "Documents", "Maps", "Shell", "Assistant"];
 const STATUSES = ["stable", "beta", "deprecated"];
 const REQUIRED = ["component", "group", "summary", "use", "avoid", "phone", "a11y", "status"];
 /** Where each group's components live by default (npm run new:component). */
@@ -50,6 +50,7 @@ const GROUP_DIRS = {
   Documents: "documents",
   Maps: "maps",
   Shell: "shell",
+  Assistant: "assistant",
 };
 
 const rel = (file) => path.relative(ROOT, file).split(path.sep).join("/");

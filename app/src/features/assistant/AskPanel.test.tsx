@@ -24,11 +24,12 @@ vi.mock("@/api/hooks", () => ({
 vi.mock("./Conversation", async () => {
   const { useRouter } = await import("@/lib/router");
   return {
-    Conversation: ({ id, onOpened }: { id: string | null; onOpened: (id: string) => void }) => {
+    Conversation: ({ id, context, onOpened }: { id: string | null; context: { module: string; tab: string } | null; onOpened: (id: string) => void }) => {
       const { navigate } = useRouter();
       return (
         <div>
           <p>{id ? `Conversation ${id}` : "A new conversation"}</p>
+          <p>{context ? `Asked from ${context.module}/${context.tab}` : "No context"}</p>
           <button type="button" onClick={() => onOpened("c1")}>
             Answer
           </button>
@@ -89,6 +90,8 @@ describe("Praxis AI from the floating button", () => {
     show();
     const page = await screen.findByRole("dialog", { name: "Praxis AI" });
     expect(page.textContent).toContain("A new conversation");
+    // The screen underneath is the question's context (decision 12).
+    expect(page.textContent).toContain("Asked from workspace/tasks");
     expect(screen.queryByRole("button", { name: "New Conversation" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Answer" }));
     expect(page.textContent).toContain("Conversation c1");

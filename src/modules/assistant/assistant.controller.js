@@ -17,7 +17,7 @@ const reads = require("./assistant.reads");
 const params = (req) => req.validated.params;
 
 module.exports = {
-  ask: async (req, res) => ok(res, await service.ask(req.validated.body, withActor(req))),
+  ask: async (req, res) => ok(res, await service.ask(req.validated.body, withActor(req), req.get("Idempotency-Key") || null)),
   suggestions: async (req, res) => ok(res, await service.suggestionsFor(req.user)),
   conversations: async (req, res) => sendPaged(res, await history.conversations(req.validated.query, req.user)),
   turns: async (req, res) => sendPaged(res, await history.turns(params(req).id, req.validated.query, req.user)),
