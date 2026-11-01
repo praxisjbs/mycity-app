@@ -94,7 +94,9 @@ mycity-app/
 │   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
 │   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test)
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md;
-│   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30)
+│   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30);
+│   │                         ai-catalogue.js writes src/shared/ai/catalogue.snapshot.json, the AI manifests as
+│   │                         the build declares them (npm run gen:ai-catalogue; gate 23 holds it current)
 │   ├── new-component.js      npm run new:component: a shared component with header, test and gallery page
 │   ├── new-screen.js         npm run new:screen: a staff-app screen in its module, the route map, PROGRESS and the gates
 │   ├── check/                the CI gates (§8); frontend: components (palette, contrast and more in PR 1)
@@ -248,7 +250,9 @@ src/
 │   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms;
 │   │                  screens.test: which tabs a reader sees) · actions (⌘K actions: each screen's
 │   │                  New action, Clock In, Request Leave)
-│   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
+│   ├── ai/            manifest (reads, summaries, actions and routes, checked at load) · registry · catalogue-sync ·
+│   │                  authorise (a read, a summary or an action with the person's rights) · cite ·
+│   │                  catalogue.snapshot.json (gate 23's committed snapshot of every read, summary, action and route)
 │   └── observability/ scrub · metrics · error-reporter · request-stats (a minute of traffic a
 │                      row and each route a quarter hour, with latency buckets, for Settings ·
 │                      Performance) · process-beat (each API and worker process's own row a
@@ -271,8 +275,14 @@ src/
 │   │                  its job) · jobs (each action's chain and each model's state, AI Control) ·
 │   │                  prices (what a step is charged at, in naira) · skips (a provider skipped until
 │   │                  its quota resets) · vendors/{http, gemini, groq, openai, anthropic, deepseek,
-│   │                  stub} · prompts/*.md · assistant/{orchestrator (one question: the reads
-│   │                  as tools, the loop, the answer), answer (what the screen shows)} (M10)
+│   │                  stub} · prompts/*.md · engine/{index (createEngine), turn (the rounds with the
+│   │                  model, the read cap, the forced answer, the correction and the rescue), cards (a
+│   │                  card's rules: fields, confirm classes, expiry, states), pane (Sources and Overview
+│   │                  from a turn), content (what of a read goes back to the model), matrix (the test
+│   │                  cases a registry implies), errors}: the Praxis AI Engine, pure, gate 24
+│   │                  (docs/guides/praxis-ai.md §6.14) · assistant/{orchestrator (the adapter: one
+│   │                  question, the reads and summaries as tools, the actions offered, the screen
+│   │                  context), answer (what the screen shows; the card drafted)} (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── maps/          geoapify.service (the address search, a pinned point's nearest address and the
@@ -572,10 +582,12 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 | Module | Files beyond the template |
 |---|---|
 | `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
-| `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read), `.search` (the caller's own conversations), `.events` (audit only, and the `ai_voice_question` document type). Engine in `services/ai/assistant/{orchestrator, answer}.js`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read (`docs/guides/praxis-ai.md`) |
+| `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read), `.search` (the caller's own conversations), `.events` (audit only, the card events, and the `ai_voice_question` document type), `.cards` (a card's life: read, edited, pressed with the five-minute confirm for a sensitive class, cancelled; `docs/guides/praxis-ai.md` §6.11), `.reads` (a read of an answer run again, 25 a page, §6.12). The adapter in `services/ai/assistant/{orchestrator, answer}.js` over the engine `services/ai/engine/`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read (`docs/guides/praxis-ai.md`) |
 | `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
-The assistant **reads only** (A23). It answers from the manifests every module has carried since M1.
+The assistant answers from the manifests every module has carried since M1, and acts only through
+a declared action a person confirms (A23 as amended 01/11/2026; `docs/guides/praxis-ai.md` §1.2,
+§6.11): the module's own service function runs it, with the person's rights re-checked at the press.
 
 ### 5.14 M11 · Handover & Training · TB, all · 14 to 18 Dec
 
@@ -787,10 +799,12 @@ group builds its own demo app and gallery under `node_modules/.cache/mycity/`, a
 | 16 No native dialogs | M1 | `check/native-dialogs.js` (and its aliases) and the lint rule in `packages/ui/eslint.shared.js` |
 | 17 No dashes | M1 | `check/dashes.js` (demo, both apps, `src/` strings, templates, the manual) |
 | 18 Upload engine | M1 | `check/upload.js` (no raw file input outside `packages/ui/src/form`) and the lint rule |
-| 19 AI read manifest only | M4 | `check/ai-no-writes.js` |
+| 19 AI manifests: reads, summaries, declared actions and routes only | M4 | `check/ai-no-writes.js`: no write by another name, no SQL and no `.query()` inside a manifest, every manifest loads (`docs/guides/praxis-ai.md` §6.11) |
 | 20 Money | M6 | `check/money.js` |
 | 21 Nothing the browser styles itself | M0 | `check/native-ui.js`: no native select, picker, spinner, checkbox, `title` tooltip, validation bubble or unbranded toast, in source and on every gallery page and app screen in Chromium (F25), no exemptions |
 | 22 Addresses picked, never typed | M0 | `check/addresses.js`: every request body field named like an address is the contract's `PlaceInput` and kept by a registered owner, every owner registers its rename, and every address field on a screen is an `AddressField` or a `PlacesField` (F27, `docs/guides/addresses.md` §6.10); a deliberate exception carries `address:none <reason>` |
+| 23 AI awareness | M10 | `check/ai-awareness.js`: the committed catalogue snapshot equals the manifests (`npm run gen:ai-catalogue`), an action's input is the schema its module's form validates with, every action has an integration test and an evaluation case, a module with actions accounts for every `<Thing>Create` schema, Try Asking names reads that exist (`docs/guides/praxis-ai.md` §6.15) |
+| 24 AI engine boundary | M10 | `check/ai-engine-boundary.js`: `services/ai/engine/` requires only Node's builtins and its siblings; nothing outside reaches past its index (`docs/guides/praxis-ai.md` §6.14) |
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/capabilities.js` (from M1: every capability catalogued once and seeded, §5.2), `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,

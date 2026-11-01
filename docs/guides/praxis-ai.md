@@ -10,12 +10,15 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | Praxis AI · Ask and History (#67, #68) |
 | Status | Draft |
-| Last changed | 22/10/2026 |
+| Last changed | 01/11/2026 |
 
-Sources: MILESTONES §15 (M10's assistant, its definition of done) and A23 (it reads, it never
-writes), BACKEND_STRUCTURE §14 (the AI pipe, the manifests, the registry), `ai-control.md` (jobs,
-chains, decision 22), REUSE_MAP §11, the M1 handover meeting of 21/10/2026 (00:42:41 to 00:45:03,
-Ifeoma's request) and the decisions of 21/10/2026 below.
+Sources: MILESTONES §15 (M10's assistant, its definition of done) and A23 (it reads; since
+01/11/2026 it acts only through a declared action a person confirms, §1.2), BACKEND_STRUCTURE §14
+(the AI pipe, the manifests, the registry), `ai-control.md` (jobs, chains, decision 22), REUSE_MAP
+§11, the M1 handover meeting of 21/10/2026 (00:42:41 to 00:45:03, Ifeoma's request), the decisions
+of 21/10/2026 below, and the Praxis AI Engine handover of 01/11/2026 checked and resolved in
+`docs/handoff/praxis-ai-engine.md` (§1.2 here; the build plan, its five PRs and their prompts live
+there).
 
 ---
 
@@ -38,8 +41,10 @@ their own screens would show them, and nothing more.
    reads the roster, the exceptions, the leave waiting and the alerts). The model may run up to 5,
    one after another, each checked as above. This changes `ai-control.md` decision 22, which said
    one read. A day's summary is an example of such a question, not a feature of its own.
-3. **It answers, it never acts** (A23). Asked to change something, it offers the screen where the
-   person makes the change, prefilled where the screen takes it (the manifests' `routes`).
+3. ~~**It answers, it never acts** (A23). Asked to change something, it offers the screen where the
+   person makes the change, prefilled where the screen takes it (the manifests' `routes`).~~
+   *Replaced 01/11/2026 by decision 10 (§1.2): it acts only through a declared action a person
+   confirms; a prefilled screen stays the fallback for a change no action declares.*
 4. **Voice in, not voice out.** Ask carries the shared `VoiceField`: the question is recorded,
    transcribed on the Transcription job, and lands in the box to be checked and sent. Answers are
    read, not spoken.
@@ -68,6 +73,49 @@ their own screens would show them, and nothing more.
    on that one record. The individual records open from the answer itself: each row of its table
    opens its record.
 
+### 1.2 Decisions (JBS Praxis, 01/11/2026, binding): the engine
+
+From the Praxis AI Engine handover, checked against the code and resolved in
+`docs/handoff/praxis-ai-engine.md` §1 and §2, which hold each decision's reason and the PR that
+builds it. The old rule "it answers, it never acts" was JBS's own scoping choice for the first
+build, not a MyCity requirement; JBS lifts it, and MILESTONES §15 carries the amendment.
+
+10. **The AI acts only through a declared action a person confirms.** The model proposes an action
+    and its values; the server validates them against the action's contract schema, checks the
+    person's rights, stores the card and shows it; the person's press runs the module's own service
+    function once, with their own rights re-checked at the press (§6.11). The model never calls an
+    API and never says something was done before the result line does.
+11. **One press for `standard` actions; `approval`, `money`, `payroll` and `delete` need Confirm
+    It's You within the last five minutes** (a passkey first, else the PIN, else the password,
+    through `POST /security/confirm`; 403 `REAUTH_REQUIRED` past the window, as My Security does).
+12. **Full screen from any screen, with Back** and the opening screen's context (PR2).
+13. **The right pane: Overview, Table, Record, Sources** (PR2, PR3).
+14. **Pages stay 25; the model reads figures.** Summary reads run in the database (§6.13); the
+    model sees figures and each read's first page of 25; five reads a question; the pane's Table
+    pages at 25 up to 200 rows, then Excel.
+15. **Excel through the one export path** (`foundation.md` §6.12), at most 25,000 rows, with an
+    About This File sheet (PR3).
+16. **The same rights everywhere, re-checked at the press**: grant, scope in the query, masks after,
+    and at the press the grant, the scope on each record, the approval chain and the record's state.
+17. **The engine is a boundary, not a repository**: `services/ai/engine/` pure and gated (§6.14);
+    extraction to JBS Praxis's own repository is a later PR there.
+18. **The existing tables stay; `ai_message_read`, `ai_action_draft` and `ai_action_run` are added**
+    (§4).
+19. **Mail and messages are actions; Praxis AI reads neither** (`mailbox.md` §9, `community.md` §9
+    stand): the person presses Send (PR4).
+20. **A suggested card**: at most one action the person did not ask for, marked suggested, never run
+    unasked; one card per answer.
+21. **Actions live in the module's manifest beside its reads** (`summaries` and `actions` next to
+    `reads` and `routes`); the engine knows nothing module-specific.
+22. **The engine is told when a form, a payload or a schema changes**: gate 23 (§6.15).
+23. **No streaming; progress over realtime** (PR2).
+24. **The system turn is a stable, cacheable prefix** (§6.1).
+25. **One AI action for the whole question**: Data Answers, one run per question (§6.7).
+26. **Proof in CI**: the matrix generated from the registry on every PR; the attack suite scripted
+    on every PR and nightly on staging with the real model (PR1, PR5).
+27. **The old Ask retires in PR5**, once the full-screen Praxis AI, the pane and the cards are on
+    staging.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -77,7 +125,9 @@ their own screens would show them, and nothing more.
 | Floating button (phone) | Staff app, every screen with the button | `praxis_ai` view | Praxis AI in the fan (F18); the chat over the screen the person is on | Ask as on Ask; switch to another conversation (Conversations); New Conversation; open an answer's screen or a cited record, which closes it. The conversation is kept until the app closes |
 | ⌘K | Staff app | `praxis_ai` view | Ask, History, the person's own conversations, New Conversation | Open them |
 | AI Control · Actions | Staff app | `ai_control` view | Data Answers marked built; the new Voice Question action; Data Answers' chain takes any text model as first choice or fallback | As built (`ai-control.md`) |
-| Every module's manifest | Backend | | The reads Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9) |
+| Every module's manifest | Backend | | The reads, summaries and actions Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9), summaries for its big tables (§6.13, PR3) and actions for the changes people ask for (§6.11, PR4) |
+| Praxis AI, full screen (`ask`, reshaped; PR2) | Staff app, from every screen, ⌘K and the menu | `praxis_ai` view | The conversation beside the right pane (Overview, Table, Record, Sources) with Back to the screen it was opened from; on a phone the conversation, the pane as a sheet | Ask, open the pane, page a table, download Excel (PR3), open a record, Back |
+| An action card (PR4) | Inside an answer on the full screen | The person who asked, for an action their grant allows | The action's fields as it will receive them, the records it touches, its buttons; the result line after the press | Edit, Cancel, press the verb (Confirm It's You first for a sensitive class) |
 
 ## 3 · How the screens relate
 
@@ -123,6 +173,17 @@ Migration `10310_assistant.sql` (M10's block). The tables are `10000`'s; this bu
 | `ai_message_citation` (10000) | `ai_message_id`, `label`; adds `entity_type`, `entity_id`, `read_key` and `position` (the order the answer cited them in) (10310); `knowledge_article_version_id`, `document_id` stay | 10000's CHECK required an article or a document; 10310 widens it to accept a record (`entity_type` and `entity_id`) |
 | `ai_run`, `ai_run_step` (M0, 10200) | `purpose` `data-answers` or `praxis-ai-voice` | One run per question, one step per round with the model. No question or answer text is kept here |
 
+Migration `10330_praxis_engine.sql` (decision 18; PR1) adds the engine's tables and widens two:
+
+| Table | Key columns | Notes |
+|---|---|---|
+| `ai_message_read` (10330) | `ai_message_id` (cascade), `n` (1 to 5), `read_key`, `kind` (`read`, `summary`), `module_key`, `params` jsonb, `page`, `rows`, `total`, `outcome` (`read`, `refused`, `invalid`, `failed`), `masked` text[] | Each read of an answer, with its parameters, so a later page (`GET /ai/answers/:id/reads/:n`), the Sources tab and an Excel file are rebuilt from the records with the person's rights now, never from the model. UNIQUE (`ai_message_id`, `n`) |
+| `ai_action_draft` (10330) | `ai_message_id` (cascade), `user_id`, `action_key`, `module_key`, `risk` (`standard`, `approval`, `money`, `payroll`, `delete`), `values` jsonb, `problems` jsonb, `records` jsonb, `suggested`, `status` (`shown`, `confirmed`, `done`, `failed`, `cancelled`, `expired`), `expires_at` | The card (§6.11): one per answer, the asker's own, valid 30 minutes. Index (`user_id`, `status`), (`ai_message_id`) |
+| `ai_action_run` (10330) | `ai_action_draft_id`, `user_id`, `confirmed_how` (`click`, `fresh_sign_in`), `idempotency_key`, `values` jsonb (as run), `result` jsonb (a line per record), `status` (`running`, `done`, `failed`), `error_code`, `started_at`, `finished_at` | The press and what came of it; the audit's `assistant.action_confirmed` names it. One per press; a second press of the same card is refused or replays |
+| `ai_catalogue` (0095) | `kind` widens to `summary` and `action`; adds `risk` | The deployed build's reads, summaries, actions and routes (`catalogue-sync.js`) |
+| `ai_conversation` (10000) | adds `opened_from` jsonb | The screen the conversation was opened from (decision 12), as `AiScreenContext` |
+| `ai_message` (10000) | adds `context` jsonb | The screen context sent with the question, kept for History |
+
 No reference seed: `praxis_ai` grants are `0290`'s. Nothing is seeded on production; staging's
 conversations come from asking.
 
@@ -132,7 +193,12 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `POST /ask` | `AiAsk` (`question` up to 500 characters, `ai_conversation_id` optional) → `AiAnswer` | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed |
+| `POST /ask` | `AiAsk` (`question` up to 500 characters, `ai_conversation_id` optional, `context` optional: the screen asked from, `shows`: what the asking screen can draw, `cards` and `pane`) → `AiAnswer` (adds `card`, `context`; `reads` carry `n`, `module_key`, `params`, `outcome`) | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed. A screen that does not say `shows: ["cards"]` is offered no action, and one without `"pane"` gets no overview spec (§6.11, §6.13) |
+| `GET /answers/:id/reads/:n` (`page`) | `PageQuery` → `AiReadRows` | `praxis_ai` view · own | yes, 25 | Read `n` of the answer run again with its stored parameters and the caller's rights now (§6.12): the Table's later pages, the Sources tab and Excel come from here. 404 for a summary or a read that was refused |
+| `GET /cards/:id` | → `AiActionCard` | `praxis_ai` view · own | | The card as the person sees it (§6.11); a status past `shown` is read only |
+| `PUT /cards/:id` | `AiActionEdit` (`values`) → `AiActionCard` | `praxis_ai` create · own | | The person's edits, re-validated with the action's schema; problems updated; 409 `CARD_NOT_OPEN` past `shown` |
+| `POST /cards/:id/confirm` | `AiActionConfirm` (`values` optional) → `AiActionResult` | `praxis_ai` create · own; the action's own grant inside | | `Idempotency-Key`. 403 `REAUTH_REQUIRED` for a sensitive class without Confirm It's You in the last 5 minutes; 403 `ACTION_FORBIDDEN` when the grant or scope is gone; 409 `CARD_EXPIRED`, `CARD_DONE`, `CARD_RUNNING`, `CARD_CANCELLED`; 422 on the fields; 422 `TOO_MANY_RECORDS` past 25 |
+| `POST /cards/:id/cancel` | `EmptyBody` → `AiActionCard` | `praxis_ai` create · own | | The person declines; 409 past `shown` |
 | `GET /suggestions` | → `AiSuggestions` (up to 6 questions) | `praxis_ai` view | no | Only questions the person's reads can answer (§6.8) |
 | `GET /conversations` (`q`, `sort`, `page`) | `AiConversationListQuery` → `AiConversationPage` | `praxis_ai` view · own always | yes, 25 | Newest first; `q` searches titles |
 | `GET /conversations/:id/turns` (`page`) | `AiTurnListQuery` → `AiTurnPage` | `praxis_ai` view · own | yes, 25 | Newest page first; Show Earlier loads the page before |
@@ -144,7 +210,7 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 | `POST /answers/:id/feedback` | `AiFeedback` (`up`, `down` or null) → `no_content` | `praxis_ai` create · own | | |
 | `POST /transcribe` | the recording, multipart through the upload engine (`documents.DocumentUpload`, purpose `voice_note`) → `AiTranscript` (the recording's `document_id`, already removed, which the upload engine resolves on; `text`, `draft`) | `praxis_ai` create | | One request: stored, transcribed, removed (§6.6) |
 
-Errors: 404 `NOT_FOUND` (a conversation or answer that is not the caller's, or no longer exists,
+Errors: 404 `NOT_FOUND` (a conversation, answer or card that is not the caller's, or no longer exists,
 reads as missing); 422 the contract's; governance's `AI_DISABLED`, `AI_MODULE_DISABLED`,
 `AI_CAP_REACHED`; `AI_UNAVAILABLE` (503) when every model is passed by or fails, or the question's
 60 seconds run out; `AI_VENDOR_CONFIG` (503) when a wrong key or model was the last word;
@@ -390,6 +456,133 @@ production. Run by hand before a change to the prompt or the loop ships; not in 
 key. `tests/unit/foundation/ai-eval.test.js` checks without a key that every question names reads
 and screens a manifest declares, and that the grading passes and fails what it should.
 
+### 6.11 Actions and cards (decisions 10, 11, 16, 20, 21; PR1 the lifecycle, PR4 the actions)
+
+A module declares its actions in its manifest beside its reads:
+
+```js
+actions: [{
+  key: "tasks.create",                       // <thing>.<verb>, unique across modules
+  description: "Set a task for me or someone I manage",
+  input: c.tasks.TaskCreate,                 // the card's fields: the form's own contract schema
+  permission: ["workspace", "create"],       // the grant; the scope comes with it as requirePermission gives it
+  risk: "standard",                          // standard | approval | money | payroll | delete
+  bulk: 1,                                   // records one press may touch, at most 25
+  records: (values) => [],                   // the records it touches, for the card and the re-check
+  check: async (client, values, actor) => {},  // the module's own rules, before run: scope, state, no self-approval
+  run: (values, actor, ctx) => service.create(actor, actor.scope, values),   // the same function the screen's button calls
+  readback: (result) => [{ type: "task", id: result.task_id, label: result.number, status: "created" }],
+  suggest: false,                            // may the model offer it unasked (decision 20)
+}],
+not_offered: { TaskStepCreate: "a step belongs to a task's own panel" },   // every other <Thing>Create of the module, with a reason (gate 23)
+```
+
+`defineManifest` checks every key at load: the input and the permission are the contract's and the
+catalogue's, `risk` is one of the five classes, `run` and `check` are functions, and no word that is
+a write by another name (`write`, `executor`, `execute`, `mutations`, `sql`, `query`) appears; gate 19
+reads the file too and refuses SQL inside it. The engine never sees a repo.
+
+**From question to done.**
+
+1. **Offered.** The system turn lists the actions the person may draft (`authorise.allowedActions`:
+   the grant held), each with its fields from the input schema's JSON Schema, only when the asking
+   screen says `shows: ["cards"]`. An action the person may not run is never offered.
+2. **Drafted.** The answer draft names one action and its values (`AiAnswerDraft.action`;
+   `suggested: true` when the person did not ask for it). `engine/cards.draft` parses the values with
+   the schema, drops a field the schema does not take, fills what it can from the context screen
+   (its record id as the action's record field, when the schema has one), keeps a parse problem on
+   its field for the person to fix, lists the records through `records()`, and refuses the whole
+   card when the grant is gone or the records exceed `bulk`. Stored as `ai_action_draft` in the
+   answer's transaction, status `shown`, 30 minutes.
+3. **Shown.** The card lists every field as the action will receive it, editable with the form
+   system from the same schema, the records named and linked, and nothing has happened.
+4. **Confirmed.** One press for `standard`. For `approval`, `money`, `payroll` and `delete` the
+   session must have confirmed within the last five minutes (`security.service.assertFresh` with the
+   card's window); else 403 `REAUTH_REQUIRED` and the screen asks Confirm It's You (passkey, PIN,
+   password) and presses again.
+5. **Re-checked and run.** At the press, in order: the card is `shown` and not expired; the grant
+   and scope now (`authorise.checkAction`); the values parse again (edited ones included); at most
+   `bulk` records; the action's own `check` (each record in scope and in the state the card saw, the
+   approval chain, no self-approval); then `ai_action_run` is opened `running` and `run()` is called
+   once with the person as actor carrying their scope and an idempotency key. `run()` is the
+   module's service function, which keeps its own transaction and `emit()`.
+6. **Result.** The run closes `done` with `readback()`'s lines, or `failed` with the error's code and
+   message; the card's status follows; `assistant.action_confirmed` or `assistant.action_failed`
+   is emitted with the card, how it was confirmed and the result, never the question's words. A
+   second press of the same card is `CARD_DONE` or `CARD_RUNNING`; the HTTP `Idempotency-Key`
+   replays the first answer.
+
+Limits: one card per answer; a bulk card touches at most 25 records; a card not pressed expires
+after 30 minutes and the answer offers to draw it again; the model's text never says something was
+done.
+
+### 6.12 Reads replayed (decision 18; PR1)
+
+Each read of an answer is kept as `ai_message_read` with its parameters. `GET /ai/answers/:id/reads/:n`
+runs it again through `authorise.runRead` with the stored parameters and the person's rights at
+that moment, 25 a page, and returns the rows as the Table shows them (`AiReadRows`: columns,
+rows, numeric columns, each row's link). A person who lost a grant since sees nothing more; a read
+that was refused or a summary is 404.
+
+### 6.13 Summaries and the pane (decisions 13, 14; PR1 the shape, PR3 the summaries)
+
+A module declares summary reads for its big tables beside its reads:
+
+```js
+summaries: [{
+  key: "attendance.summary",
+  description: "Lateness and absence counts by day, week or month, by person, department or site",
+  params: c.attendance.AttendanceSummaryQuery,   // filters and the grouping; no page
+  permission: ["people", "view"],
+  run: (client, params, actor) => repo.summary(client, params, actor.scope),   // one SQL, the scope in it
+}],
+```
+
+A summary returns `AiSummaryResult`: `figures` (up to 12: key, label, value, unit), `groups` (up to
+3 groupings of up to 20 rows: key, label, value, count), `series` (up to 6 of up to 60 points) and
+`total`; never rows. `authorise.runSummary` parses the result with the schema and refuses one that
+carries rows. It is offered to the model as a tool like a read, counts as one of the five, and runs
+inside the same read timeout (3 seconds, PR3).
+
+The pane is built by the server from the turn (`engine/pane.js`): **Sources** from every read made
+(name, filters, rows, total, outcome, masks); **Table** from the read the draft names, paged through
+§6.12; **Record** from a chip or a row, shown through the person's masks; **Overview** from the
+summary the draft names (`AiAnswerDraft.overview`: which summary, up to three figures by key, one
+chart of bar, stacked bar, line or donut over one of its groups or series, and a sentence title). A
+figure or series the summary does not hold is dropped; a title that names a value the summary does
+not hold is dropped. The overview spec is kept only when the asking screen says `shows: ["pane"]`.
+
+### 6.14 The engine boundary (decision 17; PR1)
+
+`src/services/ai/engine/` is the part that would travel: `turn.js` (the rounds with the model, the
+read cap, the forced answer, the correction and the rescue), `cards.js` (the draft rules, the
+states, the expiry, the confirm classes), `pane.js` (Sources, Table, Overview from a turn),
+`content.js` (what of a read goes back to the model), `matrix.js` (the test cases a registry
+implies) and `errors.js`. It requires nothing of MyCity: `createEngine(deps)` takes the pieces
+(how to run a read or a summary, how to check an action, how to talk to the model, the clock, the
+limits) and the adapter in `services/ai/assistant/` supplies them. Gate 24
+(`scripts/check/ai-engine-boundary.js`) fails a file in the folder that requires anything but Node's
+builtins and its siblings, and a file outside it that reaches past `engine/index.js`. The React
+views are a group in `packages/ui` (PR2). Extraction into JBS Praxis's own repository is a later
+PR there.
+
+### 6.15 The engine is told what changed (decision 22; gate 23, PR1)
+
+`scripts/check/ai-awareness.js` fails the build when:
+
+1. `src/shared/ai/catalogue.snapshot.json` differs from `registry.catalogue()`: every read, summary,
+   action and route with its module, permission, risk and the hash of its parameter, input or
+   prefill schema. A change to any of them is `npm run gen:ai-catalogue`, and the diff is reviewed
+   with the PR, so a widened filter, a new field on a form's schema or a new action is seen;
+2. an action's `input` is not a schema the module's own feature folder validates a form with
+   (`useContractForm(..., <schema>)` in `app/src/features/<module>/`), unless the action says
+   `form: "none: <reason>"` (a button with no form);
+3. an action key is exercised by no integration test, or graded by no case of
+   `scripts/ai/eval-assistant.js`;
+4. a module that declares `actions` leaves a `<Thing>Create` schema of its contract neither offered
+   nor in `not_offered` with a reason (PR5 makes this universal: every module with such a schema);
+5. a Try Asking line names a read that does not exist.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -399,6 +592,10 @@ and screens a manifest declares, and that the grading passes and fails what it s
 | `assistant.history_cleared` | Clear History | Audit only |
 | `assistant.feedback_given` | Helpful or Not Helpful | Audit only |
 | `assistant.export_requested` | Export on History | Outbox: the workbook of the person's questions, made after commit (`assistant.export_history`); a person no longer active gets a failed file |
+| `assistant.card_drafted` | An answer carried a card (§6.11) | Audit only: the card, the action key, the records; never the words |
+| `assistant.action_confirmed` | A card pressed and its action run (§6.11 step 6) | Audit only: the card, the run, how it was confirmed, the result lines; the module's own event carries the change |
+| `assistant.action_failed` | A press whose action refused or failed | Audit only: the card, the error code |
+| `assistant.card_cancelled` | Cancel on a card | Audit only |
 | `export-cleanup` (the vault's, not this module's) | Hourly | Removes recordings an hour old: their request never finished (§6.6) |
 
 Nobody is notified of anything.
@@ -420,7 +617,8 @@ module grant. Restricted fields reach the model only for a person who sees them 
 
 - **AI reads**: none (`// ai:none` in the controller): a person's questions are their own, and the
   assistant never reads its own history as data.
-- **AI routes**: none.
+- **AI routes**: none. **AI actions**: none of its own; the cards it runs belong to the modules
+  that declare them (§6.11).
 - **Search** (`assistant.search.js`): the person's own conversations by title, pinned to their
   `user_id` like the mailbox (`owner`), opening the conversation on Ask (`ai_conversation` in the
   route map, `/praxis-ai?tab=ask&id=`). Words: conversation, question, chat, asked. Screens: Ask ("ai", "assistant",
@@ -517,11 +715,18 @@ to this repository's rules, and ported code never names where it came from.
    correct an answer, kept as knowledge. Not in this build; Not Helpful is stored for now.
 3. **The per-module switch's screen** (`ai-control.md` §13 question 1): Praxis AI obeys
    `ai_setting.disabled_modules` already; where it is set waits on AI Control.
-4. **Streaming answers**: answers arrive whole, which suits a weak connection. Revisit if answers
-   take more than a few seconds on staging.
+4. **Streaming answers**: answers arrive whole, which suits a weak connection (decision 23:
+   progress over realtime instead). Revisit if answers take more than a few seconds on staging
+   once the summaries (PR3) have cut what the model reads.
+5. **Extraction** (decision 17): once PR5 ships, `services/ai/engine/` and the Assistant group of
+   `packages/ui` move into JBS Praxis's own repository as packages this project imports. What stays
+   here is the adapter, the manifests and the screens. Decided in that repository.
+6. **The job of the action draft** (decision 25): everything runs on Data Answers. If drafting a
+   card wants a stronger model, it is one `chain` line on a registered action, chosen by the owner.
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · The Praxis AI Engine (the handover of 01/11/2026, checked and resolved in `docs/handoff/praxis-ai-engine.md`): decision 3 replaced by §1.2's decisions 10 to 27 (the AI acts through declared actions a person confirms; the five-minute Confirm It's You for sensitive classes; full screen with Back; the four-tab pane; pages stay 25 with summary reads; Excel through the export path; the engine as a gated boundary; three tables added; mail and messages as actions; suggested cards; gate 23; no streaming; one AI action). PR1 built: §4 (10330), §5 (the card routes and read replay), §6.11 to §6.15, §7, §9, §13. PR2 to PR5 and their prompts are in the handoff. On the way: the phone list's No Conversations Yet is a second-level heading, as Ask's empty conversation already was (the accessibility gate refused h1 straight to h3); nothing on screen changes.
 - 26/10/2026 · JP · From the User Guide audit's screen defects: an unexpected failure answers `AI_FAILED` as §5 says (it was the generic 500); a 500 shows its reference; AI off and an unusable answer put the words back in the box (no Try Again); Send waits on an answer still coming; the microphone gives the server's reason; Helpful on, or Delete of, a conversation deleted elsewhere says so (§10, §11).
 - 26/10/2026 · JP · §6.9: the User Guide's `guide.search` read, so a how-to question is answered from the guide, cut to the asker's grants (`user-guide.md` §9).
 - 25/10/2026 · JP · Ask's empty conversation (Try Asking, Ask a Question) is a second-level heading (`EmptyState` `level={2}`): on a phone it sits straight under the page title, and the accessibility gate refused h1 straight to h3. Nothing on screen changes.

@@ -1,9 +1,11 @@
 "use strict";
 /**
- * Praxis AI's SQL (docs/guides/praxis-ai.md §4). Reads and writes ai_conversation, ai_message and
- * ai_message_citation; nothing else writes them. Every query of words is pinned to the asking
- * person's own user_id: History is theirs whatever their grant's scope (§1.1 decision 7). The
- * company's figures (summaryFigures with no user) are counts and naira only, never a question.
+ * Praxis AI's SQL (docs/guides/praxis-ai.md §4). Reads and writes ai_conversation, ai_message,
+ * ai_message_citation, ai_message_read (each read of an answer, §6.12), ai_action_draft and
+ * ai_action_run (a card and its press, §6.11); nothing else writes them. Every query of words is
+ * pinned to the asking person's own user_id: History is theirs whatever their grant's scope
+ * (§1.1 decision 7). The company's figures (summaryFigures with no user) are counts and naira
+ * only, never a question.
  */
 const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { STEP_NGN } = require("../../services/ai/governance");
@@ -20,12 +22,12 @@ function conversationOf(db, id, userId) {
   return one(db, `SELECT ${CONVERSATION} FROM ai_conversation c WHERE c.ai_conversation_id = $1 AND c.user_id = $2`, [id, userId]);
 }
 
-function insertConversation(client, { userId, title }) {
+function insertConversation(client, { userId, title, openedFrom = null }) {
   return one(
     client,
-    `INSERT INTO ai_conversation (user_id, title, last_asked_at, questions) VALUES ($1, $2, now(), 1)
+    `INSERT INTO ai_conversation (user_id, title, last_asked_at, questions, opened_from) VALUES ($1, $2, now(), 1, $3::jsonb)
      RETURNING ai_conversation_id, title, last_asked_at, questions`,
-    [userId, title],
+    [userId, title, openedFrom ? JSON.stringify(openedFrom) : null],
   );
 }
 
@@ -43,10 +45,10 @@ function touchConversation(client, id, userId) {
 function insertMessage(client, m) {
   return one(
     client,
-    `INSERT INTO ai_message (ai_conversation_id, parent_message_id, role, content, ai_run_id, rows_read, module_key, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+    `INSERT INTO ai_message (ai_conversation_id, parent_message_id, role, content, ai_run_id, rows_read, module_key, metadata, context)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb)
      RETURNING ai_message_id, ai_conversation_id, parent_message_id, role, content, ai_run_id, rows_read, module_key,
-               metadata, feedback, created_at`,
+               metadata, context, feedback, created_at`,
     [
       m.ai_conversation_id,
       m.parent_message_id || null,
@@ -56,6 +58,7 @@ function insertMessage(client, m) {
       m.rows_read || 0,
       m.module_key || null,
       JSON.stringify(m.metadata || {}),
+      m.context ? JSON.stringify(m.context) : null,
     ],
   );
 }
@@ -71,8 +74,112 @@ async function insertCitations(client, messageId, citations) {
   );
 }
 
+/** Each read of an answer, with the parameters it ran with (§6.12), in the order they were made. */
+async function insertReads(client, messageId, reads) {
+  if (!reads.length) return;
+  await client.query(
+    `INSERT INTO ai_message_read (ai_message_id, n, read_key, kind, module_key, params, page, rows, total, outcome, masked)
+     SELECT $1, x.n, x.key, x.kind, x.module_key, COALESCE(x.params, '{}'::jsonb), x.page, x.rows, x.total, x.outcome, COALESCE(x.masked, '{}'::text[])
+       FROM jsonb_to_recordset($2::jsonb) AS x(n int, key text, kind text, module_key text, params jsonb, page int, rows int, total int, outcome text, masked text[])`,
+    [messageId, JSON.stringify(reads.map((r) => ({ n: r.n, key: r.key, kind: r.kind, module_key: r.module_key, params: r.params || {}, page: r.first ? Math.floor((r.first - 1) / 25) + 1 : null, rows: r.rows, total: r.total, outcome: r.outcome, masked: r.masked || [] })))],
+  );
+}
+
+/** One read of the caller's answer, or null. */
+function readOf(db, messageId, n, userId) {
+  return one(
+    db,
+    `SELECT r.ai_message_read_id, r.ai_message_id, r.n, r.read_key, r.kind, r.module_key, r.params, r.page, r.rows, r.total, r.outcome, r.masked
+       FROM ai_message_read r
+       JOIN ai_message a ON a.ai_message_id = r.ai_message_id
+       JOIN ai_conversation c ON c.ai_conversation_id = a.ai_conversation_id
+      WHERE r.ai_message_id = $1 AND r.n = $2 AND c.user_id = $3`,
+    [messageId, n, userId],
+  );
+}
+
+const DRAFT = `d.ai_action_draft_id, d.ai_message_id, d.user_id, d.action_key, d.module_key, d.risk, d."values", d.problems, d.records,
+       d.suggested, d.status, d.expires_at, d.created_at`;
+
+/** A card an answer drew (§6.11), in the answer's transaction. */
+function insertDraft(client, d) {
+  return one(
+    client,
+    `INSERT INTO ai_action_draft AS d (ai_message_id, user_id, action_key, module_key, risk, "values", problems, records, suggested, status, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11)
+     RETURNING ${DRAFT}`,
+    [d.ai_message_id, d.user_id, d.action_key, d.module_key, d.risk, JSON.stringify(d.values || {}), JSON.stringify(d.problems || {}), JSON.stringify(d.records || []), d.suggested === true, d.status || "shown", d.expires_at],
+  );
+}
+
+/** The caller's card, or null; locked for the press when `lock` is set. */
+function draftOf(db, id, userId, { lock = false } = {}) {
+  return one(db, `SELECT ${DRAFT} FROM ai_action_draft d WHERE d.ai_action_draft_id = $1 AND d.user_id = $2${lock ? " FOR UPDATE" : ""}`, [id, userId]);
+}
+
+/** The cards of the answers named, by answer. */
+async function draftsOfMessages(db, messageIds) {
+  if (!messageIds.length) return new Map();
+  const { rows } = await db.query(`SELECT ${DRAFT} FROM ai_action_draft d WHERE d.ai_message_id = ANY($1::uuid[])`, [messageIds]);
+  return new Map(rows.map((r) => [r.ai_message_id, r]));
+}
+
+/** A card's status, and its values and problems when they changed. */
+function setDraft(client, id, patch) {
+  return one(
+    client,
+    `UPDATE ai_action_draft d
+        SET status = COALESCE($2, d.status),
+            "values" = COALESCE($3::jsonb, d."values"),
+            problems = COALESCE($4::jsonb, d.problems),
+            records = COALESCE($5::jsonb, d.records)
+      WHERE d.ai_action_draft_id = $1
+      RETURNING ${DRAFT}`,
+    [id, patch.status || null, patch.values ? JSON.stringify(patch.values) : null, patch.problems ? JSON.stringify(patch.problems) : null, patch.records ? JSON.stringify(patch.records) : null],
+  );
+}
+
+const RUN = `r.ai_action_run_id, r.ai_action_draft_id, r.user_id, r.confirmed_how, r.idempotency_key, r."values", r.result, r.status, r.error_code, r.started_at, r.finished_at`;
+
+/** A press opened, running (§6.11 step 5). */
+function insertRun(client, r) {
+  return one(
+    client,
+    `INSERT INTO ai_action_run AS r (ai_action_draft_id, user_id, confirmed_how, idempotency_key, "values")
+     VALUES ($1, $2, $3, $4, $5::jsonb)
+     RETURNING ${RUN}`,
+    [r.ai_action_draft_id, r.user_id, r.confirmed_how, r.idempotency_key || null, JSON.stringify(r.values || {})],
+  );
+}
+
+/** A press closed: done with its lines, or failed with its code and words. */
+function finishRun(client, id, { status, result, error_code: errorCode = null }) {
+  return one(
+    client,
+    `UPDATE ai_action_run r SET status = $2, result = $3::jsonb, error_code = $4, finished_at = now()
+      WHERE r.ai_action_run_id = $1 RETURNING ${RUN}`,
+    [id, status, JSON.stringify(result || []), errorCode],
+  );
+}
+
+/** A card's newest press, or null. */
+function latestRunOf(db, draftId) {
+  return one(db, `SELECT ${RUN} FROM ai_action_run r WHERE r.ai_action_draft_id = $1 ORDER BY r.started_at DESC, r.ai_action_run_id DESC LIMIT 1`, [draftId]);
+}
+
+/** The newest press of each card named, by card. */
+async function latestRunsOf(db, draftIds) {
+  if (!draftIds.length) return new Map();
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (r.ai_action_draft_id) ${RUN} FROM ai_action_run r
+      WHERE r.ai_action_draft_id = ANY($1::uuid[]) ORDER BY r.ai_action_draft_id, r.started_at DESC, r.ai_action_run_id DESC`,
+    [draftIds],
+  );
+  return new Map(rows.map((r) => [r.ai_action_draft_id, r]));
+}
+
 /** An answer with its question, as History and the replay read it. */
-const ANSWER = `a.ai_message_id, a.ai_conversation_id, a.content, a.metadata, a.feedback, a.created_at,
+const ANSWER = `a.ai_message_id, a.ai_conversation_id, a.content, a.metadata, a.context, a.feedback, a.created_at,
        a.rows_read, a.module_key, q.content AS question,
        (SELECT count(*)::int FROM ai_message_citation x WHERE x.ai_message_id = a.ai_message_id) AS citations_total`;
 
@@ -270,5 +377,15 @@ module.exports = {
   sourceGroups,
   questions,
   summaryFigures,
+  insertReads,
+  readOf,
+  insertDraft,
+  draftOf,
+  draftsOfMessages,
+  setDraft,
+  insertRun,
+  finishRun,
+  latestRunOf,
+  latestRunsOf,
   PRAXIS_ACTIONS,
 };

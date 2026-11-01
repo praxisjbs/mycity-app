@@ -29,6 +29,7 @@
     "gen:contract": "node scripts/gen/contract.js",
     "gen:env": "node scripts/gen/env-example.js",
     "gen:components": "node scripts/gen/components.js",
+    "gen:ai-catalogue": "node scripts/gen/ai-catalogue.js",
     "new:component": "node scripts/new-component.js",
     "new:screen": "node scripts/new-screen.js",
     "guide:shots": "node scripts/guide/shoot.js",

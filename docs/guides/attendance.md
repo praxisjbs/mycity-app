@@ -1637,6 +1637,8 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · Tests only, at the month boundary (the Praxis AI Engine's first full run fell on 01/11/2026): the pay-items tests step My Attendance back as many months as the item needs, since the mock's days run six weeks back from yesterday; All Days of a person reads the month that holds days (the month before, on a month's first day) and accepts the day's date shown more than once in its sheet. No screen or rule changes.
+
 - 27/10/2026 · AJ · Queries & Sanctions raises the query for a breach with Raise Query on (§3 step 11,
   §6.16): `queries.raise_from_breach`, linked back through `attachQuery`; migration 3040 adds the key
   from `attendance_rule_breach.employee_query_id` (§4). The alert no longer reads Query Due and is

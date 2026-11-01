@@ -19,8 +19,20 @@ const personCite = (key: string): AiCitation | null => {
   return p ? { entity_type: "employee", entity_id: p.employee_id, label: p.display_name, link: `/people?tab=employees&id=${p.employee_id}`, read_key: "employees.list" } : null;
 };
 
-type Draft = Pick<AiAnswer, "content" | "table" | "link" | "citations" | "reads" | "declined" | "more">;
-const said = (content: string, over: Partial<Draft> = {}): Draft => ({ content, table: null, link: null, citations: [], reads: [], declined: null, more: false, ...over });
+type Draft = Pick<AiAnswer, "content" | "table" | "link" | "citations" | "reads" | "declined" | "more" | "card" | "overview" | "context">;
+const said = (content: string, over: Partial<Draft> = {}): Draft => ({ content, table: null, link: null, citations: [], reads: [], declined: null, more: false, card: null, overview: null, context: null, ...over });
+/** A read as the server records it (AiReadMade): which of the question's reads, with the parameters it ran with. */
+const read = (key: string, rows: number, total: number | null, first: number | null, n = 1): AiAnswer["reads"][number] => ({
+  n,
+  key,
+  kind: "read",
+  module_key: key.split(".")[0],
+  params: first && first > 1 ? { page: Math.floor((first - 1) / 25) + 1 } : {},
+  outcome: total === null ? "refused" : "read",
+  rows,
+  total,
+  first,
+});
 /** A table as the server sends it: each row's record link, or null where a row has none. */
 const tbl = (columns: string[], rows: string[][], numeric: number[], links: Array<string | null> = rows.map(() => null)) => ({ columns, rows, numeric, links });
 
@@ -54,16 +66,13 @@ function answerFor(question: string, view: string): Draft {
   if (/\b(create|add|delete|approve|send|update|raise|book)\b/.test(l))
     return said("I do not create or change records. Make the change on its screen.", { declined: "change", link: changeLink(l) });
   if (l.includes("partner") || l.includes("inactive") || l.includes("quiet")) {
-    if (view === "staff") return said("Partnership records are not available to you.", { declined: "not_available", reads: [{ key: "partners.list", rows: 0, total: null, first: null }] });
+    if (view === "staff") return said("Partnership records are not available to you.", { declined: "not_available", reads: [read("partners.list", 0, null, null)] });
     const quiet = PARTNERS.filter((p) => p.quiet_days > 30).sort((x, y) => y.quiet_days - x.quiet_days);
     const owners = [...new Set(quiet.map((p) => p.owner))].map(personCite).filter((c): c is AiCitation => c !== null);
     return said(`${quiet.length} partnerships have had no recorded contact in over 30 days. Each has an inactivity alert open on its owner.`, {
       table: tbl(["Partner", "Owner", "Days Quiet"], quiet.map((p) => [p.name, byKey(p.owner)?.display_name ?? "", String(p.quiet_days)]), [2], quiet.map((p) => partnerCite(p).link)),
       citations: [...quiet.map(partnerCite), ...owners],
-      reads: [
-        { key: "partners.list", rows: quiet.length, total: quiet.length, first: 1 },
-        { key: "employees.list", rows: owners.length, total: owners.length, first: 1 },
-      ],
+      reads: [read("partners.list", quiet.length, quiet.length, 1), read("employees.list", owners.length, owners.length, 1, 2)],
     });
   }
   if (l.includes("happened") || l.includes("done today"))
@@ -78,26 +87,26 @@ function answerFor(question: string, view: string): Draft {
         ],
         [],
       ),
-      reads: [{ key: "activity.list", rows: 4, total: 4, first: 1 }],
+      reads: [read("activity.list", 4, 4, 1)],
       link: { label: "Open Home", path: "/home?tab=overview" },
     });
   if (l.includes("late"))
     return said("Seven late arrivals this month, from four people. One person has reached the query threshold.", {
       table: tbl(["Employee", "Late Arrivals"], [["Bashir Lawal", "3"], ["Tobi Ojo", "2"], ["Emeka Obi", "1"], ["Cynthia Osakunih", "1"]], [1]),
-      reads: [{ key: "attendance.exceptions", rows: 7, total: 7, first: 1 }],
+      reads: [read("attendance.exceptions", 7, 7, 1)],
       link: { label: "Open Attendance", path: "/people?tab=attendance" },
     });
   if (l.includes("confirm") || l.includes("probation"))
     return said("Two people are on probation; Chidera Nwosu's decision is due first.", {
       table: tbl(["Employee", "Started", "Decision Due"], [["Chidera Nwosu", "24/07/2026", "24/10/2026"], ["Samuel Akpan", "13/04/2026", "Overdue"]], []),
-      reads: [{ key: "employees.list", rows: 2, total: 2, first: 1 }],
+      reads: [read("employees.list", 2, 2, 1)],
     });
   if (l.includes("leave"))
-    return said("You have 14 of 20 annual leave days left this year.", { reads: [{ key: "my_leave.balances", rows: 1, total: 1, first: null }] });
+    return said("You have 14 of 20 annual leave days left this year.", { reads: [read("my_leave.balances", 1, 1, null)] });
   if (l.includes("next 25"))
     return said("Here are the next people on the list.", {
       table: tbl(["Name"], [["Bashir Lawal"], ["Tobi Ojo"], ["Emeka Obi"]], []),
-      reads: [{ key: "employees.list", rows: 3, total: 312, first: 26 }],
+      reads: [read("employees.list", 3, 312, 26)],
       more: true,
     });
   if (l.includes("who") || l.includes("staff") || l.includes("people")) {
@@ -105,7 +114,7 @@ function answerFor(question: string, view: string): Draft {
     return said(`There are 312 people in all; here are the first ${cites.length}.`, {
       table: tbl(["Name"], cites.map((c) => [c.label]), [], cites.map((c) => c.link)),
       citations: cites,
-      reads: [{ key: "employees.list", rows: cites.length, total: 312, first: 1 }],
+      reads: [read("employees.list", cites.length, 312, 1)],
       more: true,
     });
   }

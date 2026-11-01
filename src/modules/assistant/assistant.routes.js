@@ -12,10 +12,16 @@
  *   GET    /history/questions        view    the caller's questions, 25 a page, with sources, tokens and cost
  *   POST   /history/export           view    the caller's questions as a workbook (202, made in the worker)
  *   POST   /answers/:id/feedback     create  Helpful or Not Helpful
+ *   GET    /answers/:id/reads/:n     view    read n of an answer run again, 25 a page (§6.12)
+ *   GET    /cards/:id                view    a card the caller's answer drew (§6.11)
+ *   PUT    /cards/:id                create  the caller's edits to its values
+ *   POST   /cards/:id/confirm        create  the press: the action runs with the caller's rights
+ *   POST   /cards/:id/cancel         create  the caller declines the card
  *   POST   /transcribe               create  a spoken question to words; the recording is not kept
  *
  * Every role holds `praxis_ai` (seed 0290); whatever its scope, History is the caller's own
- * (§1.1 decision 7), so deleting one's own words needs only `view`.
+ * (§1.1 decision 7), so deleting one's own words needs only `view`. A card's press checks the
+ * action's own grant inside (authorise.checkAction).
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -68,6 +74,26 @@ route(router, "post", "/history/export",
 route(router, "post", "/answers/:id/feedback",
   { params: c.common.IdParams, body: a.AiFeedback, no_content: true, summary: "Mark an answer Helpful or Not Helpful" },
   create, controller.feedback);
+
+route(router, "get", "/answers/:id/reads/:n",
+  { params: a.AiReadParams, query: c.common.PageQuery, response: a.AiReadRows, summary: "One read of an answer, run again, 25 a page" },
+  view, controller.readRows);
+
+route(router, "get", "/cards/:id",
+  { params: c.common.IdParams, response: a.AiActionCard, summary: "A card one of my answers drew" },
+  view, controller.card);
+
+route(router, "put", "/cards/:id",
+  { params: c.common.IdParams, body: a.AiActionEdit, response: a.AiActionCard, summary: "Change a card's values" },
+  create, controller.editCard);
+
+route(router, "post", "/cards/:id/confirm",
+  { params: c.common.IdParams, body: a.AiActionConfirm, response: a.AiActionResult, summary: "Press a card: the action runs with my rights" },
+  create, controller.confirmCard);
+
+route(router, "post", "/cards/:id/cancel",
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: a.AiActionCard, summary: "Decline a card" },
+  create, controller.cancelCard);
 
 route(router, "post", "/transcribe",
   { body: c.documents.DocumentUpload, response: a.AiTranscript, summary: "A spoken question to words" },

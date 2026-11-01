@@ -11,6 +11,8 @@ const { readUpload } = require("../../middleware/upload");
 const service = require("./assistant.service");
 const history = require("./assistant.history");
 const historyExport = require("./assistant.export");
+const cards = require("./assistant.cards");
+const reads = require("./assistant.reads");
 
 const params = (req) => req.validated.params;
 
@@ -35,4 +37,9 @@ module.exports = {
     noContent(res);
   },
   transcribe: async (req, res) => ok(res, await service.transcribe(readUpload(req), withActor(req))),
+  readRows: async (req, res) => ok(res, await reads.rows(params(req).id, params(req).n, req.validated.query, req.user)),
+  card: async (req, res) => ok(res, await cards.get(params(req).id, req.user)),
+  editCard: async (req, res) => ok(res, await cards.edit(params(req).id, req.validated.body, withActor(req))),
+  confirmCard: async (req, res) => ok(res, await cards.confirm(params(req).id, req.validated.body, withActor(req), req.get("Idempotency-Key") || null)),
+  cancelCard: async (req, res) => ok(res, await cards.cancel(params(req).id, withActor(req))),
 };

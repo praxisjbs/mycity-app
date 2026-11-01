@@ -122,10 +122,12 @@ const GATES = [
   { id: "native-dialogs", label: "16 No native dialogs", script: "scripts/check/native-dialogs.js" },
   { id: "dashes", label: "17 No dashes (and gate 8 backend copy)", script: "scripts/check/dashes.js" },
   { id: "upload", label: "18 Files only through the upload field", script: "scripts/check/upload.js" },
-  { id: "ai-no-writes", label: "19 AI read manifest only", script: "scripts/check/ai-no-writes.js" },
+  { id: "ai-no-writes", label: "19 AI manifests: reads, summaries, declared actions and routes only", script: "scripts/check/ai-no-writes.js" },
   { id: "money", label: "20 Money", script: "scripts/check/money.js" },
   { id: "native-ui", label: "21 Nothing the browser styles itself", script: "scripts/check/native-ui.js", group: "screens" },
   { id: "addresses", label: "22 Addresses picked, never typed", script: "scripts/check/addresses.js" },
+  { id: "ai-awareness", label: "23 AI awareness (the catalogue snapshot, forms, tests, the evaluation set)", script: "scripts/check/ai-awareness.js" },
+  { id: "ai-engine-boundary", label: "24 AI engine boundary", script: "scripts/check/ai-engine-boundary.js" },
   // Pipeline guards
   { id: "contract", label: "Contract is generated and current", script: "scripts/gen/contract.js", args: ["--check"] },
   { id: "env-template", label: ".env.example matches the schema", script: "scripts/check/env-template.js" },

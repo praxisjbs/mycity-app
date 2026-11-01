@@ -971,8 +971,13 @@ module.exports = defineManifest({
 });
 ```
 
-`defineManifest()` validates the shape at load. It **rejects a `write` key** (A23), and any other
-write-shaped key (`writes`, `actions`, `executor`, `execute`, `mutations`). A read needs the `view`
+`defineManifest()` validates the shape at load. It **rejects a `write` key** and any other
+write-shaped key (`writes`, `executor`, `execute`, `mutations`, `sql`, `query`). Since 01/11/2026
+(`docs/guides/praxis-ai.md` §1.2, §6.11) a manifest may declare `summaries` (figures from the
+database, never rows) and `actions` (a change the assistant drafts as a card and the person
+confirms; its `run` is the module's own service function, its `input` the form's own contract
+schema, its `risk` class decides the confirmation); gate 19 refuses SQL inside a manifest and gate
+23 keeps the committed catalogue snapshot equal to the manifests. A read needs the `view`
 grant; its `params` and a route's `prefill` must be schemas exported from `packages/contract`. A
 `prefill` is the form's own fields (`<Thing>Prefill`), never a restricted one (`shared/rbac/field-mask`)
 nor a word the address already uses (`tab`, `id`, `action`, `new`, the route's params), because it
@@ -998,7 +1003,11 @@ This keeps a broad question from timing out the AI call or the request behind it
 - Gate 9 (`check/ai-manifest-coverage.js`, praxis) fails a module with records and neither a manifest
   nor `// ai:none <reason>`. It runs in M0 against the M0 modules so it is proven before M1 depends
   on it.
-- Gate 19 fails a manifest that declares a write.
+- Gate 19 fails a manifest that declares a write by another name, holds SQL, or whose action's
+  `run` is not a function; gate 23 (`check/ai-awareness.js`) fails a manifest change the committed
+  catalogue snapshot does not carry, an action whose input is not its form's schema, or one with
+  no test or evaluation case; gate 24 (`check/ai-engine-boundary.js`) keeps `services/ai/engine/`
+  free of MyCity requires (`docs/guides/praxis-ai.md` §6.14, §6.15).
 
 ### 14.5 What each milestone adds
 

@@ -100,9 +100,12 @@ const answer = (over: Partial<AiAnswer> = {}): AiAnswer => ({
     { kind: "type", entity_type: "leave_request", label: "leave request", count: 2, link: null },
     { kind: "type", entity_type: "employee", label: "employee", count: 8, link: null },
   ],
-  reads: [{ key: "leave.requests", rows: 2, total: 2, first: 1 }],
+  reads: [{ n: 1, key: "leave.requests", kind: "read", module_key: null, params: {}, outcome: "read", rows: 2, total: 2, first: 1 }],
   declined: null,
   more: false,
+  card: null,
+  overview: null,
+  context: null,
   feedback: null,
   created_at: "2026-10-22T09:30:00.000Z",
   provisional: true,
@@ -197,7 +200,7 @@ describe("Ask", () => {
   });
 
   it("an open conversation shows its turns; Show Next 25 asks for the next page in it", async () => {
-    m.turns[CONV] = [answer({ more: true, citations: [], citations_total: 0, reads: [{ key: "employees.list", rows: 2, total: 312, first: 1 }] })];
+    m.turns[CONV] = [answer({ more: true, citations: [], citations_total: 0, reads: [{ n: 1, key: "employees.list", kind: "read", module_key: null, params: {}, outcome: "read", rows: 2, total: 312, first: 1 }] })];
     m.call.mockImplementation(async () => answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a2", question: "Show the next 25.", content: "Here are the next people." }));
     ui("ask", CONV);
     expect(screen.getByText("Showing 2 of 312")).toBeTruthy();
@@ -310,7 +313,7 @@ describe("Ask", () => {
   });
 
   it("the second page of a list says which rows it shows", () => {
-    m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [], links: Array.from({ length: 25 }, () => null) }, reads: [{ key: "employees.list", rows: 25, total: 312, first: 26 }], citations: [], citations_total: 0 })];
+    m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [], links: Array.from({ length: 25 }, () => null) }, reads: [{ n: 1, key: "employees.list", kind: "read", module_key: null, params: {}, outcome: "read", rows: 25, total: 312, first: 26 }], citations: [], citations_total: 0 })];
     ui("ask", CONV);
     expect(screen.getByText("Showing 26 to 50 of 312")).toBeTruthy();
   });

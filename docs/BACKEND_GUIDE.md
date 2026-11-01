@@ -43,7 +43,7 @@ are enforced by review and by the gates.
 | Service | `<module>.service.js` | Business rules, the transaction, `emit()`, numbering, `documents.generate()` | Touches `req`/`res`. Sends mail, renders PDFs or calls AI inside the transaction |
 | Repo | `<module>.repo.js` | Parameterised SQL, honours `scope` | Emits events. Writes for another module. Writes its own `LIMIT` |
 | Events | `<module>.events.js` | Event keys emitted; outbox handlers registered | Does work synchronously in the request |
-| AI | `<module>.ai.js` | Read manifest: reads with permission and citation, routes to screens | Declares a write (A23) |
+| AI | `<module>.ai.js` | The manifest: reads and summaries with permission and citation, actions the assistant may draft as a card for the person to confirm (`docs/guides/praxis-ai.md` §6.11), routes to screens | Holds SQL, calls a repo, or declares a write by any other name (gate 19); an action's `run` is this module's service function |
 | Search | `<module>.search.js` | ⌘K provider | Is missing on a module with records (gate 10) |
 | Views | `<module>.views.js` | Where its records wait inside the screens they open on: a fixed view for a type, or each record placed by its state as the screen's filter reads it (`shared/notifications/views.js`, `docs/guides/notifications.md` §6) | Places a record by a rule of its own instead of the list's (export the list's expression and use it) |
 
@@ -261,9 +261,12 @@ module.exports = defineManifest({
 ```
 
 A read returns one page. When someone asks the assistant for "all my contacts", it answers with
-the first 25 and the total, and fetches page 2 when asked. It never writes; it links to the screen
-where the person makes the change (A23). A route's `screen` is `"<module>.<tab>"` as listed in
-`shared/route-map.js` SCREENS; `params` are extra query values for that screen (`action: "new"`).
+the first 25 and the total, and fetches page 2 when asked. A change is either a `route` to the screen
+where the person makes it, or an `action` (`docs/guides/praxis-ai.md` §6.11): the assistant drafts
+it as a card from the form's own contract schema, and the person's press runs this module's service
+function with their own rights, re-checked at the press. A route's `screen` is `"<module>.<tab>"`
+as listed in `shared/route-map.js` SCREENS; `params` are extra query values for that screen
+(`action: "new"`). A big table also declares a `summary` (figures, never rows, §6.13 there).
 
 A module with records also ships `<module>.search.js` for ⌘K:
 
@@ -574,6 +577,9 @@ These are the usual reasons a run is red:
 | **Feature guides** | You changed code a guide in `docs/guides/` covers and the guide got no Change log line | Update the guide to match what you built, add the line |
 | **README map** | You added a file outside the places the map already covers | Add it to the right section of `README.MD`, or put it where an existing file of that kind lives |
 | **CODEOWNERS** | A new module or guide has no owner line, or a username is wrong | Add `/src/modules/<m>/ @owner @backup` (or the guide's path) to `.github/CODEOWNERS` |
+| **AI manifests: reads and declared actions only** (gate 19) | A manifest holds SQL, a write by another name, or an action whose `run` is not a function | Declare the action on the module's service function (`docs/guides/praxis-ai.md` §6.11) |
+| **AI awareness** (gate 23) | A read, summary, action or route changed shape and the catalogue snapshot was not regenerated; an action's input is not the form's schema; an action has no test or evaluation case; a module with actions left a `<Thing>Create` schema unaccounted for | `npm run gen:ai-catalogue` and review the diff; name the form's schema; add the test and the case; offer it or write its `not_offered` reason (`praxis-ai.md` §6.15) |
+| **AI engine boundary** (gate 24) | A file under `services/ai/engine/` requires something of MyCity, or a file outside reaches past `engine/index.js` | Inject it through `createEngine(deps)` (`praxis-ai.md` §6.14) |
 
 **When a process check genuinely does not apply** (a refactor that moves no screen, a test-only
 change), say so with a reason in the PR description, one line each:

@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * Gate 19: the assistant reads, it never writes (MILESTONES A23).
+ * Gate 19: the AI manifests declare reads, summaries, actions and routes, and nothing else
+ * (MILESTONES A23 as amended 01/11/2026; docs/guides/praxis-ai.md §1.2 decision 10, §6.11).
  *
- * A change a person asks the assistant for is routed to the screen where they make it
- * themselves; the model executes nothing. Two checks, so neither a typo nor a clever
- * manifest gets past:
+ * The assistant never executes anything itself: a change is an action the module declares on
+ * its own service function and a person confirms, or a route to the screen. Three checks, so
+ * neither a typo nor a clever manifest gets past:
  *
- *  1. Static. Every `*.ai.js` with content calls defineManifest(...) and declares no
- *     write-shaped key (`write`, `writes`, `actions`, `executor`, `execute`, `mutations`,
- *     `creates`, `updates`, `deletes`), comments aside.
- *  2. Loaded. Every manifest goes through shared/ai/registry.js, where defineManifest
- *     refuses a write and anything malformed, exactly as the API and the worker do at
- *     boot.
+ *  1. Static. Every `*.ai.js` with content calls defineManifest(...) and declares no write by
+ *     another name (`write`, `writes`, `executor`, `execute`, `mutations`, `sql`, `creates`,
+ *     `updates`, `deletes`), comments aside.
+ *  2. Static. No SQL and no query call inside a manifest: an action's `run` is the module's
+ *     service function, never INSERT, UPDATE, DELETE or `.query(` of its own.
+ *  3. Loaded. Every manifest goes through shared/ai/registry.js, where defineManifest refuses
+ *     a malformed read, summary, action or route (an action's `run` not a function, a risk
+ *     outside the five classes, a `view` grant on an action, a summary that takes a page),
+ *     exactly as the API and the worker do at boot.
  *
  * Usage: node scripts/check/ai-no-writes.js     exit 0 ok, 1 on a write or a bad manifest
  */
@@ -25,8 +29,9 @@ process.env.LOG_LEVEL = "silent";
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const MODULES = path.join(ROOT, "src", "modules");
-const WRITE_KEY =
-  /(^|[{,\s])["']?(writes?|actions?|executors?|execute|mutations|creates|updates|deletes)["']?\s*:/m;
+const WRITE_KEY = /(^|[{,\s])["']?(writes?|executors?|execute|mutations?|sql|creates|updates|deletes)["']?\s*:/m;
+const SQL = /\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|TRUNCATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE)\b/;
+const QUERY_CALL = /\.\s*query\s*\(/;
 
 /** Source with comments removed (strings kept), so a comment that says "writes:" is not a write. */
 function stripComments(src) {
@@ -74,15 +79,11 @@ function check({ dir = MODULES } = {}) {
   for (const { file } of files) {
     const rel = path.relative(ROOT, file).split(path.sep).join("/");
     const code = stripComments(fs.readFileSync(file, "utf8"));
-    if (!/\bdefineManifest\s*\(/.test(code))
-      problems.push(
-        `${rel}: a manifest is built with defineManifest() (shared/ai/manifest.js)`,
-      );
+    if (!/\bdefineManifest\s*\(/.test(code)) problems.push(`${rel}: a manifest is built with defineManifest() (shared/ai/manifest.js)`);
     const m = WRITE_KEY.exec(code);
-    if (m)
-      problems.push(
-        `${rel}: declares "${m[2]}". The assistant reads, never writes (A23); route the change to its screen with routes: [...]`,
-      );
+    if (m) problems.push(`${rel}: declares "${m[2]}". The assistant acts only through a declared action's run, the module's own service function; declare an action or route the change to its screen`);
+    if (SQL.test(code)) problems.push(`${rel}: holds SQL. A manifest names the module's service and repo functions; it never writes a statement of its own`);
+    if (QUERY_CALL.test(code)) problems.push(`${rel}: calls .query(). A manifest's run and check call the module's service, never the database`);
   }
   if (problems.length === 0) {
     try {
@@ -97,14 +98,10 @@ function check({ dir = MODULES } = {}) {
 if (require.main === module) {
   const r = check();
   if (r.problems.length === 0) {
-    console.log(
-      `ai-no-writes: ok (${r.files} manifest(s), reads and routes only)`,
-    );
+    console.log(`ai-no-writes: ok (${r.files} manifest(s): reads, summaries, declared actions and routes only)`);
     process.exit(0);
   }
-  console.error(
-    "ai-no-writes: the AI manifests must declare reads and routes only (MILESTONES A23)\n",
-  );
+  console.error("ai-no-writes: the AI manifests declare reads, summaries, actions and routes only (praxis-ai.md §6.11)\n");
   for (const p of r.problems) console.error(`  - ${p}`);
   process.exit(1);
 }

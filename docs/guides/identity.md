@@ -473,6 +473,8 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · `identity.service.provedAgo(db, actor)`: seconds since the session signed in or last confirmed it is the person (the same proof `confirmedFor` reads), for a Praxis AI card of a sensitive class, which is pressed only within five minutes of Confirm It's You (`docs/guides/praxis-ai.md` §6.11 step 4, decision 11). No screen or route of this guide changes.
+
 - 27/10/2026 · JP · §8: Head of Department follows headship (JBS Praxis, 27/10/2026; `docs/guides/organogram.md` §6.1). Whoever heads a department, or acts for its open head role, holds it while they do unless a role of theirs already carries `goals.function`; the system gives it (`user_role.from_headship`, migration 2600) and takes back only what it gave. Invite User and Save Roles keep it on a head (`users.invite.js`, `users.service.setRoles`). Settings · Users shows it as any role.
 - 27/10/2026 · JP · From the 27/10 staging faults brief (fault #6, `WEAK_PASSWORD: new_password` at `POST /api/v1/auth/reset`, three times): the person had chosen a password found in a breach, which the reset page cannot check and no fix prevents. That refusal still marks the field Found in a breach, and is no longer recorded on System Health; the other password rules are (§6 Passwords).
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Settings · Users' Status chips carry the unread notices about the logins under each status, as the list reads it; a login that has left shows under Everyone alone (`users.views.js`, `users.repo.js` `statusesOf`).

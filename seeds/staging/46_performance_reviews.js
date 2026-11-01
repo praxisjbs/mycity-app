@@ -66,6 +66,19 @@ module.exports = async function seed({ pool, log = () => {} }) {
     return;
   }
   if (await repo.roundOf(pool, period.performance_period_id, MONTH)) return;
+  // The plans were bound when the seed ran, which from November on is after October ended, and a
+  // round takes only scorecards bound before its month ended (reviews.repo bindingScorecards): the
+  // binding is dated to the quarter's live day, as it would be on a staging server seeded in October.
+  const boundAt = `${period.live_from}T12:00:00+01:00`;
+  await pool.query("UPDATE performance_plan SET binding_at = LEAST(binding_at, $2::timestamptz) WHERE performance_period_id = $1 AND binding_at IS NOT NULL", [period.performance_period_id, boundAt]);
+  await pool.query("UPDATE scorecard SET created_at = LEAST(created_at, $2::timestamptz) WHERE performance_period_id = $1", [period.performance_period_id, boundAt]);
+  await pool.query(
+    `UPDATE workflow_instance wi SET completed_at = LEAST(wi.completed_at, $2::timestamptz)
+       FROM scorecard s
+      WHERE wi.entity_type = 'scorecard' AND wi.entity_id = s.scorecard_id::text AND wi.definition_key = 'performance.plan'
+        AND s.performance_period_id = $1 AND wi.completed_at IS NOT NULL`,
+    [period.performance_period_id, boundAt],
+  );
   const ceo = (await pool.query("SELECT user_id, employee_id FROM app_user WHERE is_ceo AND status = 'active' LIMIT 1")).rows[0];
   const opened = await inTx((client) => cycle.openRound(client, ceo ? { ...ceo, is_ceo: true } : null, period, MONTH));
   log(`performance reviews: October 2026 opened with ${opened.reviews} reviews`);

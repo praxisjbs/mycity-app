@@ -580,7 +580,14 @@ covered, its AI run) · `10310` Praxis AI's Ask and History (`docs/guides/praxis
 `ai_conversation` gains `last_asked_at` and `questions`; `ai_message` gains `rows_read`, `module_key`
 and a CHECK on `role`; `ai_message_citation` gains `entity_type`, `entity_id`, `read_key` and
 `position`, so a citation names a database record and keeps the answer's order · `10320` an
-`ai_run_step` may be an `embedding` (the Embeddings job's vectors, `docs/guides/ai-control.md` §6.6).
+`ai_run_step` may be an `embedding` (the Embeddings job's vectors, `docs/guides/ai-control.md` §6.6)
+· `10330` the Praxis AI Engine (`docs/guides/praxis-ai.md` §4, decision 18): `ai_message_read` (each
+read of an answer with its parameters, page, total and outcome, so a later page, the Sources tab and
+an Excel file are rebuilt from the records), `ai_action_draft` (the card an answer drew: action,
+values, problems, records, risk class, status, expiry) and `ai_action_run` (the press: how it was
+confirmed, the values as run, a result line per record); `ai_catalogue.kind` widened to `summary`
+and `action` with a `risk` column; `ai_conversation.opened_from` and `ai_message.context` (the screen
+a question was asked from).
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

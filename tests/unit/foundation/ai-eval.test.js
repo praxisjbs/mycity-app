@@ -14,12 +14,13 @@ const SCRIPT = path.join(__dirname, "../../../scripts/ai/eval-assistant.js");
 describe("the questions", () => {
   const reads = new Set(registry.reads().map((r) => r.key));
   const screens = new Set(registry.routes().map((r) => r.screen));
+  const actions = new Set(registry.actions().map((a) => a.key));
 
   test("each has its own id, a role to ask as, and something to grade", () => {
     expect(new Set(CASES.map((k) => k.id)).size).toBe(CASES.length);
     for (const k of CASES) {
       expect([k.id, typeof k.as]).toEqual([k.id, "string"]);
-      expect([k.id, Boolean(k.reads || k.never || k.route || k.needs)]).toEqual([k.id, true]);
+      expect([k.id, Boolean(k.reads || k.never || k.route || k.needs || k.action)]).toEqual([k.id, true]);
     }
   });
 
@@ -27,6 +28,8 @@ describe("the questions", () => {
     for (const k of CASES.filter((x) => !x.needs)) {
       for (const key of [...(k.reads || []), ...(k.never || [])]) expect([k.id, key, reads.has(key)]).toEqual([k.id, key, true]);
       if (k.route) expect([k.id, k.route, screens.has(k.route)]).toEqual([k.id, k.route, true]);
+      // A card case names a declared action and asks from a screen that draws cards (praxis-ai.md §6.11).
+      if (k.action) expect([k.id, k.action, actions.has(k.action), (k.shows || []).includes("cards")]).toEqual([k.id, k.action, true, true]);
     }
   });
 
