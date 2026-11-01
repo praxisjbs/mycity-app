@@ -542,6 +542,60 @@ const requestMyExport = (user, body) => requestExport(user, { kind: "month", mon
  * People's reads
  * ------------------------------------------------------------------ */
 
+/**
+ * The assistant's attendance summary (docs/guides/praxis-ai.md §6.13; §9): the period asked (else this
+ * month), the reader's `people` scope, figures never rows. Runs on the client the assistant hands over,
+ * inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   AttendanceSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @param {Date} [now]
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, top, series, periodOf } = require("../../shared/ai/summary");
+  const period = periodOf(params, now);
+  const r = await repo.summary(client, { ...params, ...period }, scope);
+  const f = r.figures || {};
+  const by = params.by || "department";
+  const words = { person: "person", department: "department", site: "site", day: "day", week: "week", month: "month" }[by];
+  const figures = [
+    figure("days", "Days recorded", f.days),
+    figure("people", "People", f.people),
+    figure("present", "Days present", f.present),
+    figure("late", "Late days", f.late),
+    figure("absent", "Absent days", f.absent),
+    figure("on_leave", "Days on leave", f.on_leave),
+    figure("late_minutes", "Minutes late", f.late_minutes, "minutes"),
+    figure("avg_late_minutes", "Minutes late per late day", f.late ? Math.round(f.late_minutes / f.late) : 0, "minutes"),
+    figure("worked_minutes", "Minutes worked", f.worked_minutes, "minutes"),
+    figure("exceptions", "Exceptions", f.exceptions),
+    figure("open_exceptions", "Open exceptions", f.open_exceptions),
+  ];
+  if (r.series) {
+    const at = (p) => p.at;
+    return {
+      figures,
+      groups: [],
+      series: [
+        series("late_days", `Late days by ${words}`, r.points.map((p) => ({ at: at(p), value: p.late }))),
+        series("absent_days", `Absent days by ${words}`, r.points.map((p) => ({ at: at(p), value: p.absent }))),
+        series("late_minutes", `Minutes late by ${words}`, r.points.map((p) => ({ at: at(p), value: p.late_minutes }))),
+      ],
+      total: f.days || 0,
+    };
+  }
+  return {
+    figures,
+    groups: [
+      group("late_days", `Late days by ${words}`, r.groups.late),
+      top("late_minutes", `Most minutes late by ${words}`, r.groups.minutes),
+      group("absent_days", `Absent days by ${words}`, r.groups.absent),
+    ],
+    series: [],
+    total: f.days || 0,
+  };
+}
+
 /** The date a register read is for: the one asked, or today in Lagos. */
 const dateOf = (query, now = new Date()) => query.date || lagos.today(now);
 
@@ -695,6 +749,7 @@ module.exports = {
   explainAutomatic: reconcile.explainAutomatic,
   requestMyExport,
   register,
+  aiSummary,
   summary,
   dayDetail,
   personDays,

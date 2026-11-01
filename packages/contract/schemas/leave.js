@@ -175,6 +175,26 @@ const LeaveListQuery = listQuery(
 /** GET /leave/requests/:id/clashes: who else in the department is away on those days. */
 const LeaveClashQuery = listQuery({}, ["starts_on"]);
 
+/**
+ * The assistant's leave summary (docs/guides/praxis-ai.md §6.13; ess.md §9): requests by status, type,
+ * person or department, days taken, booked and waiting, or a series by month. Figures, never rows; no
+ * page. `from` and `to` keep the requests that overlap those days; `year` the requests starting in it;
+ * with neither, this year in Lagos.
+ */
+const LeaveSummaryBy = z.enum(["status", "type", "month", "person", "department"]);
+const LeaveSummaryQuery = z
+  .object({
+    status: LeaveStatus.optional(),
+    leave_type_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    department_id: uuid.optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+    by: LeaveSummaryBy.default("status"),
+  })
+  .strict();
+
 /* ------------------------------------------------------------------ *
  * What is left of a year
  * ------------------------------------------------------------------ */
@@ -275,6 +295,7 @@ const TABLES = {
     table: null,
     reason: "why a request is withdrawn; kept with the approval and the audit row",
   },
+  LeaveSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's leave summary; figures, never a row" },
   LeaveListQuery: {
     table: null,
     reason: "list controls and filters for People's leave list",
@@ -311,6 +332,7 @@ module.exports = {
   LeaveRecordCreate,
   LeaveCancel,
   LeaveListQuery,
+  LeaveSummaryQuery,
   LeaveClashQuery,
   LeaveBalance,
   LeaveBalances,

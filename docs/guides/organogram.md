@@ -306,6 +306,13 @@ every capability and every field until handover, and training runs from it (TB, 
 - **AI reads** (`organisation.ai.js`): "who reports to whom", "who reports to X", "how many people
   in <department>", "which roles are vacant". Read only (A23), reading the same tree, in pages of
   25. No write.
+- **AI summary** (`organisation.ai.js`, `docs/guides/praxis-ai.md` §6.13): `employees.summary`
+  (`people` view, the caller's scope; `EmployeeSummaryQuery`: the register's filters and `by`
+  department, status, work pattern, employment type, manager or confirmation): people, active,
+  confirmed, on probation, confirmation due within 30 days or overdue, contracts ending within 30
+  days, no line manager, departments; by department and status always, then by the dimension asked
+  (managers 20, the confirmation bands). One SQL over the register (`organisation.repo.aiSummary`),
+  figures never rows.
 - **AI routes**: "show me the org chart" opens ESS · Org Chart (or People · Organogram for HR),
   optionally focused on a named person; "add an employee" opens People · Employees on
   `new=1` (`useNewLink`), Add Employee filled with the names and the job the person gave
@@ -470,6 +477,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · §9: `employees.summary`, the register counted for the assistant by department, status, arrangement, type, manager or confirmation due (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 28/10/2026 · JP · People · Employees' Department filter, Set Head's Open Role and the reporting form's Open Role read their lists 25 at a time and load the next page as the menu nears its end; a vacant seat already chosen reads as its role until its page loads (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18). They look as before.
 - 27/10/2026 · JP · The Head mark (JBS Praxis, 27/10/2026; §4, §6, §10): each department in use marks its head's card, Head on the person or the open head role and Acting Head on the first person above an open one, its code added when the department is not the card's own (*Acting Head · PG*). `OrgNode.heads` carries them from the read (`repo.departmentHeads`, `organisation.headOf`), so the desktop cards, the phone's tiles and the PDF say the same words; a person's sheet gains Head Of.
 - 27/10/2026 · JP · §6.1 records two more answers of JBS Praxis: a head's reach is their reporting line, not the whole department, and Head of Department goes to heads and acting heads who need it, as built.

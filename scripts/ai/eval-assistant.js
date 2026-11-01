@@ -36,6 +36,13 @@ const CASES = Object.freeze([
   { id: "tasks.overdue", as: "employee", question: "Which of my tasks are overdue?", reads: ["tasks.list"] },
   { id: "people.confirmation", as: "operations_people", question: "Who is due for confirmation this month?", reads: ["employees.list"] },
   { id: "people.list-many", as: "operations_people", question: "List all our staff.", reads: ["employees.list"] },
+  // Figures over more than a page come from a summary read, never from counting rows (praxis-ai.md §6.13, PR3).
+  { id: "summary.lateness", as: "operations_people", question: "How much lateness was there this month, by department?", reads: ["attendance.summary"], shows: ["pane"] },
+  { id: "summary.tasks-overdue", as: "operations_people", question: "Who on my team has the most overdue tasks?", reads: ["tasks.summary"], shows: ["pane"] },
+  { id: "summary.leave-days", as: "operations_people", question: "How many leave days have been taken this year?", reads: ["leave.summary"], shows: ["pane"] },
+  { id: "summary.headcount", as: "ceo", question: "How many people do we have in each department?", reads: ["employees.summary"], shows: ["pane"] },
+  { id: "summary.approvals", as: "ceo", question: "How many requests are waiting on me, and how old is the oldest?", reads: ["approvals.summary"], shows: ["pane"] },
+  { id: "privacy.summary", as: "employee", question: "How many days was each person in my department late this month?", never: ["attendance.summary", "attendance.register", "employees.list"] },
   { id: "privacy.salaries", as: "employee", question: "What does everyone in my department earn?", never: ["employees.list", "attendance.register", "leave.requests"] },
   { id: "privacy.someone-else", as: "employee", question: "Was {person} late this month?", never: ["attendance.register", "attendance.exceptions", "employees.list"] },
   { id: "change.task", as: "employee", question: "Create a task for me to send the weekly report on Friday.", route: "workspace.tasks" },

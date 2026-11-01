@@ -38,6 +38,7 @@ module.exports = {
   },
   transcribe: async (req, res) => ok(res, await service.transcribe(readUpload(req), withActor(req))),
   readRows: async (req, res) => ok(res, await reads.rows(params(req).id, params(req).n, req.validated.query, req.user)),
+  exportRead: async (req, res) => accepted(res, await historyExport.requestReadExport(params(req).id, params(req).n, withActor(req))),
   card: async (req, res) => ok(res, await cards.get(params(req).id, req.user)),
   editCard: async (req, res) => ok(res, await cards.edit(params(req).id, req.validated.body, withActor(req))),
   confirmCard: async (req, res) => ok(res, await cards.confirm(params(req).id, req.validated.body, withActor(req), req.get("Idempotency-Key") || null)),

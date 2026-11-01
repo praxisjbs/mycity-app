@@ -183,6 +183,89 @@ function list(db, query, scope, at, only = {}) {
   );
 }
 
+/** Where a task's due time stands, as the assistant's counts band it (never a row's words). */
+const DUE_BAND = (now, todayTo, weekTo) => `CASE
+    WHEN v.status IN ('done', 'cancelled') THEN 'closed'
+    WHEN v.due_at IS NULL THEN 'no_date'
+    WHEN v.due_at < ${now} THEN 'overdue'
+    WHEN v.due_at < ${todayTo} THEN 'today'
+    WHEN v.due_at < ${weekTo} THEN 'this_week'
+    ELSE 'later' END`;
+
+/**
+ * The assistant's task counts (docs/guides/praxis-ai.md §6.13; workspace.md §9): one SQL over the board
+ * as the reader sees it (the same ROWS and audience as the list), with the board's own filters. Figures
+ * and groupings, never a row. The third grouping is the dimension asked (`by`): assignee (the 20 with
+ * most tasks), due window or cadence; status and priority are always there.
+ * @param {{query: Function}} db
+ * @param {object} query   TaskCountsQuery
+ * @param {{scope: string, scope_ids: string[]|null, employee_id: string}} scope
+ * @param {{now: Date, today: {from: Date, to: Date}, week: {from: Date, to: Date}}} at
+ */
+async function counts(db, query, scope, at) {
+  const params = [
+    query.status || null,
+    query.assignee_id || null,
+    query.cadence || null,
+    query.priority || null,
+    query.due || null,
+    at.now,
+    at.today.from,
+    at.today.to,
+    at.week.from,
+    at.week.to,
+    query.project_id || null,
+  ];
+  const who = audience(query.scope, scope, params);
+  const band = DUE_BAND("$6", "$8", "$10");
+  const third = { assignee: { key: "COALESCE(v.primary_assignee_id::text, 'none')", label: "COALESCE(v.assignee ->> 'display_name', 'Nobody')" }, due: { key: band, label: band }, cadence: { key: "COALESCE(v.cadence, 'none')", label: "COALESCE(v.cadence, 'none')" } }[query.by] || { key: band, label: band };
+  const { rows } = await db.query(
+    `WITH t AS (
+       SELECT v.task_id, v.status, v.priority, v.cadence, v.due_at, v.completed_at, v.blocked_at, v.primary_assignee_id,
+              ${third.key} AS third_key, ${third.label} AS third_label,
+              (${OPEN}) AS is_open
+         FROM (${ROWS}) v
+        WHERE v.archived_at IS NULL
+          AND (($1::text IS NULL AND v.status <> 'cancelled') OR v.status = $1)
+          AND ($2::uuid IS NULL OR v.primary_assignee_id = $2)
+          AND ($3::text IS NULL OR v.cadence = $3)
+          AND ($4::text IS NULL OR v.priority = $4)
+          AND ($5::text IS NULL
+               OR ($5 = 'overdue' AND ${OPEN} AND v.due_at < $6)
+               OR ($5 = 'today' AND v.due_at >= $7 AND v.due_at < $8)
+               OR ($5 = 'week' AND v.due_at >= $9 AND v.due_at < $10))
+          AND ($11::uuid IS NULL OR v.project_id = $11)
+          ${who}
+     ), figures AS (
+       SELECT count(*)::int AS tasks,
+              count(*) FILTER (WHERE is_open)::int AS open,
+              count(*) FILTER (WHERE is_open AND due_at < $6)::int AS overdue,
+              count(*) FILTER (WHERE is_open AND due_at >= $7 AND due_at < $8)::int AS due_today,
+              count(*) FILTER (WHERE is_open AND due_at >= $9 AND due_at < $10)::int AS due_this_week,
+              count(*) FILTER (WHERE status = 'done')::int AS done,
+              count(*) FILTER (WHERE status = 'done' AND completed_at >= $9 AND completed_at < $10)::int AS done_this_week,
+              count(*) FILTER (WHERE is_open AND blocked_at IS NOT NULL)::int AS blocked,
+              count(DISTINCT primary_assignee_id)::int AS people
+         FROM t
+     ), by_third AS (
+       SELECT third_key AS key, min(third_label) AS label, count(*)::int AS value,
+              count(*) FILTER (WHERE is_open)::int AS count,
+              row_number() OVER (ORDER BY count(*) DESC, min(third_label), third_key) AS rank
+         FROM t GROUP BY third_key
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'label', status, 'value', n, 'count', o) ORDER BY status)
+               FROM (SELECT status, count(*)::int AS n, count(*) FILTER (WHERE is_open)::int AS o FROM t GROUP BY status) x) AS by_status,
+            (SELECT json_agg(json_build_object('key', priority, 'label', priority, 'value', n, 'count', o) ORDER BY priority)
+               FROM (SELECT priority, count(*)::int AS n, count(*) FILTER (WHERE is_open)::int AS o FROM t GROUP BY priority) x) AS by_priority,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value, 'count', count) ORDER BY rank)
+               FROM by_third WHERE rank <= 20) AS by_third`,
+    params,
+  );
+  const r = rows[0];
+  return { figures: r.figures, by_status: r.by_status || [], by_priority: r.by_priority || [], by_third: r.by_third || [] };
+}
+
 /** The four figures above the board, for `mine` or `team`, and what was done in the last 30 days. */
 async function summary(db, listScope, scope, at) {
   const params = [at.now, at.week.from, at.week.to, at.last30.from];
@@ -1164,6 +1247,7 @@ module.exports = {
   fixOriginalDates,
   list,
   summary,
+  counts,
   get,
   sharedWith,
   lock,

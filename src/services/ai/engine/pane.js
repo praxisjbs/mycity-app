@@ -1,9 +1,12 @@
 "use strict";
 /**
  * The right pane from a turn (docs/guides/praxis-ai.md §6.13): what the server builds from the
- * reads, never from the model's numbers. Sources from every read made; Overview from the
- * summary the draft names, its figures by key and one chart drawn from the summary's own
- * groups or series. A figure, group, series or title the summary does not hold is dropped.
+ * reads, never from the model's numbers. Sources from every read made (its outcome: read,
+ * refused, invalid, failed, or timed_out when the database cut it); Overview from the summary
+ * the draft names, its figures by key and one chart drawn from the summary's own groups or
+ * series. A figure, group or series the summary does not hold is dropped; a chart title that
+ * names a number the summary does not hold anywhere (a figure, a group's value or count, a
+ * point) is dropped for the chart's own label.
  */
 
 const CHART_KINDS = new Set(["bar", "stacked_bar", "line", "donut"]);
@@ -47,11 +50,45 @@ function chartOfSeries(spec, series) {
   };
 }
 
-/** Whether a chart's title names a number the chart does not carry (a figure the model made up). */
-function titleNamesAValueNotShown(title, chart, figures) {
-  const shown = new Set([...chart.series.flatMap((s) => s.values), ...figures.map((f) => num(f.value))].map((v) => String(v)));
-  const numbers = String(title).match(/\d[\d,]*(?:\.\d+)?/g) || [];
-  return numbers.some((n) => !shown.has(n.replace(/,/g, "")) && !shown.has(String(Number(n.replace(/,/g, "")))));
+/** Every number a summary holds, as strings: its figures, its groups' values and counts, its points. */
+function valuesOf(result) {
+  const out = new Set();
+  const add = (v) => {
+    if (v === null || v === undefined || v === "") return;
+    const n = typeof v === "number" ? v : Number(v);
+    if (Number.isFinite(n)) {
+      out.add(String(n));
+      out.add(String(Math.round(n)));
+    }
+    out.add(String(v));
+  };
+  for (const f of result.figures || []) add(f.value);
+  for (const g of result.groups || [])
+    for (const r of g.rows || []) {
+      add(r.value);
+      add(r.count);
+    }
+  for (const s of result.series || []) for (const p of s.points || []) add(p.value);
+  add(result.total);
+  return out;
+}
+
+/**
+ * Whether a chart's title names a number the summary does not hold anywhere (a figure the model made
+ * up). A year or a day in a date (2026, November 2026, 21/10/2026, 2026-11) is not a figure and is let through.
+ */
+function titleNamesAValueNotShown(title, chart, figures, result = null) {
+  const held = result ? valuesOf(result) : new Set();
+  for (const v of [...chart.series.flatMap((s) => s.values), ...figures.map((f) => num(f.value))]) held.add(String(v));
+  const text = String(title)
+    .replace(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g, " ")
+    .replace(/\b\d{4}-\d{2}(?:-\d{2})?\b/g, " ")
+    .replace(/\b(?:19|20)\d{2}\b/g, " ");
+  const numbers = text.match(/\d[\d,]*(?:\.\d+)?/g) || [];
+  return numbers.some((n) => {
+    const plain = n.replace(/,/g, "");
+    return !held.has(plain) && !held.has(String(Number(plain)));
+  });
 }
 
 /**
@@ -75,7 +112,7 @@ function overviewOf(spec, reads) {
       const s = c.series.map((k) => series.find((x) => x.key === k)).filter(Boolean);
       if (s.length && s[0].points.length) chart = chartOfSeries(c, s);
     }
-    if (chart && titleNamesAValueNotShown(chart.title, chart, picked)) chart = { ...chart, title: made.key.includes(".") ? chartLabel(chart) : chart.title };
+    if (chart && titleNamesAValueNotShown(chart.title, chart, picked, made.result)) chart = { ...chart, title: chartLabel(chart) };
   }
   return { summary: spec.summary, title: null, figures: picked, chart };
 }
@@ -83,4 +120,4 @@ function overviewOf(spec, reads) {
 /** A chart's own words when the model's title cannot be kept: its first series' label. */
 const chartLabel = (chart) => (chart.series[0] && chart.series[0].label) || "Overview";
 
-module.exports = { sourcesOf, overviewOf, chartOfGroup, chartOfSeries, titleNamesAValueNotShown, CHART_KINDS };
+module.exports = { sourcesOf, overviewOf, chartOfGroup, chartOfSeries, titleNamesAValueNotShown, valuesOf, CHART_KINDS };

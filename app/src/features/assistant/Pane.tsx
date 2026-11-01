@@ -1,4 +1,6 @@
 import { useCallback, useState } from "react";
+import { api } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { useApi } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
 import type { AiAnswer } from "@mycity/contract/contract.gen.ts";
@@ -9,7 +11,9 @@ import { EmptyState, formatDateTime, OverviewPane, PaneSheet, PaneTabs, paneValu
  * for one answer, the latest unless an earlier answer's chip or Open Figures brought its own back.
  * Desktop shows it beside the conversation (AnswerPane in AssistantShell); a phone opens it as a
  * sheet (PhonePane). The Table pages the answer's read again (GET /ai/answers/:id/reads/:n, §6.12),
- * so its rows come from the records with the person's rights now, never from the model.
+ * so its rows come from the records with the person's rights now, never from the model. The Table's
+ * Export asks for every row of that read as a workbook (POST /ai/answers/:id/reads/:n/export, §6.16),
+ * made in the worker and saved on this device like every export (foundation.md §6.12).
  */
 
 /** The answer in the pane, which view, which of its reads the Table pages, and the record picked. */
@@ -79,11 +83,12 @@ export function paneReadsOf(a: AiAnswer): PaneRead[] {
   }));
 }
 
-/** One read of the answer, run again and paged at 25 (§6.12), as the Table shows it. */
+/** One read of the answer, run again and paged at 25 (§6.12), as the Table shows it; Export saves every row (§6.16). */
 function ReplayTable({ id, n, onOpenRow }: { id: string; n: number; onOpenRow: (record: PaneRecord) => void }) {
   const [page, setPage] = useState(1);
   const res = useApi("GET /api/v1/ai/answers/:id/reads/:n", { params: { id, n }, query: { page } });
   const d = res.data;
+  const exportRows = () => saveExport(api.call("POST /api/v1/ai/answers/:id/reads/:n/export", { params: { id, n }, body: {} }));
   const recordOf = (i: number): PaneRecord => ({
     title: d?.rows[i]?.[0] || "Record",
     items: (d?.columns ?? []).map((c, j) => [c, d?.rows[i]?.[j] ?? ""] as const),
@@ -102,6 +107,7 @@ function ReplayTable({ id, n, onOpenRow }: { id: string; n: number; onOpenRow: (
       onPage={setPage}
       onReload={res.reload}
       onOpenRow={(i) => onOpenRow(recordOf(i))}
+      onExport={d ? exportRows : undefined}
     />
   );
 }

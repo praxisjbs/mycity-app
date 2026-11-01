@@ -12,7 +12,7 @@ const { CASES, grade, screenOf, waiting } = require("../../../scripts/ai/eval-as
 const SCRIPT = path.join(__dirname, "../../../scripts/ai/eval-assistant.js");
 
 describe("the questions", () => {
-  const reads = new Set(registry.reads().map((r) => r.key));
+  const reads = new Set([...registry.reads(), ...registry.summaries()].map((r) => r.key));
   const screens = new Set(registry.routes().map((r) => r.screen));
   const actions = new Set(registry.actions().map((a) => a.key));
 
@@ -21,6 +21,16 @@ describe("the questions", () => {
     for (const k of CASES) {
       expect([k.id, typeof k.as]).toEqual([k.id, "string"]);
       expect([k.id, Boolean(k.reads || k.never || k.route || k.needs || k.action)]).toEqual([k.id, true]);
+    }
+  });
+
+  test("the summary questions name summaries that exist, and ask from a screen with a pane", () => {
+    const summaries = new Set(registry.summaries().map((s) => s.key));
+    const cases = CASES.filter((k) => k.id.startsWith("summary."));
+    expect(cases.length).toBeGreaterThanOrEqual(3);
+    for (const k of cases) {
+      expect([k.id, k.reads.every((key) => summaries.has(key))]).toEqual([k.id, true]);
+      expect([k.id, (k.shows || []).includes("pane")]).toEqual([k.id, true]);
     }
   });
 

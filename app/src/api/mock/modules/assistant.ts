@@ -192,6 +192,16 @@ route("GET /api/v1/ai/answers/:id/reads/:n", (req) => {
   return ok(body);
 });
 
+/** Download Excel on a read (§6.16): the file pending, done at once, as every mock export is. */
+route("POST /api/v1/ai/answers/:id/reads/:n/export", (req) => {
+  const t = KEPT.filter((k) => k.owner === req.user)
+    .flatMap((k) => k.turns)
+    .find((x) => x.ai_message_id === req.params.id);
+  const r = t?.reads.find((x) => x.n === Number(req.params.n));
+  if (!t || !r || r.kind !== "read" || r.outcome !== "read") return fail(404, "NOT_FOUND", "Not found");
+  return exportFile(req.user!, `praxis-ai-${r.key.replace(/\./g, "-")}`);
+});
+
 route("DELETE /api/v1/ai/conversations/:id", (req) => {
   const i = KEPT.findIndex((k) => k.owner === req.user && k.conversation.ai_conversation_id === req.params.id);
   if (i < 0) return fail(404, "NOT_FOUND", "Not found");

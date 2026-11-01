@@ -172,6 +172,47 @@ async function summary(scope) {
 }
 
 /**
+ * The assistant's Audit Log summary (docs/guides/praxis-ai.md §6.13; foundation.md §9): only for a reader
+ * of the whole log, as the list is; the last 30 days in Lagos unless the filters say otherwise; entries
+ * by action (named as the catalogue names them), by actor, by module or record type, and by day. Figures,
+ * never an entry. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   AuditSummaryQuery, parsed
+ * @param {{scope: string}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series } = require("../../shared/ai/summary");
+  const lagos = require("../../shared/time/lagos");
+  if (!scope || scope.scope !== "all")
+    throw new AppError("AI_READ_FORBIDDEN", "That information is not available to you.", 403);
+  const { by, ...filters } = params;
+  const today = lagos.today(now);
+  if (!filters.from && !filters.to) filters.from = lagos.addDays(today, -30);
+  else if (!filters.from && filters.to) filters.from = lagos.addDays(filters.to, -30);
+  const r = await repo.aiSummary(client, filters, by);
+  const f = r.figures || {};
+  const label = (key) => (catalog.MODULE_META[key] ? catalog.MODULE_META[key].label : key);
+  return {
+    figures: [
+      figure("entries", "Entries", f.entries),
+      figure("sensitive", "Sensitive entries", f.sensitive),
+      figure("actors", "People who acted", f.actors),
+      figure("days", "Days with entries", f.days),
+      figure("kinds", by === "entity_type" ? "Record types" : "Modules", f.kinds),
+    ],
+    groups: [
+      group("action", "Entries by action", r.by_action.map((x) => ({ ...x, label: summaryOf(x.label) }))),
+      group("actor", "Entries by person", r.by_actor),
+      by === "entity_type"
+        ? group("entity_type", "Entries by record type", r.by_third.map((x) => ({ ...x, label: String(x.label).replace(/_/g, " ") })))
+        : group("module", "Entries by module", r.by_third.map((x) => ({ ...x, label: label(x.label) }))),
+    ],
+    series: [series("entries", "Entries by day", r.by_day)],
+    total: f.entries || 0,
+  };
+}
+
+/**
  * POST /audit/exports: reserve the whole filtered log's file for the person asking, which the
  * worker makes after commit and their screen downloads.
  * @returns {Promise<object>} the ExportFile, pending
@@ -226,6 +267,7 @@ async function gather(db, filters, reader) {
 module.exports = {
   list,
   summary,
+  aiSummary,
   requestExport,
   gather,
   present,

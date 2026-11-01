@@ -8,6 +8,7 @@ import type { PaneRead } from "./pane";
 const READS: PaneRead[] = [
   { n: 1, name: "Leave Requests", kind: "read", outcome: "read", filters: [["Status", "waiting"], ["Page", "1"]], rows: 25, total: 312, masked: [], opens: true },
   { n: 2, name: "Employees", kind: "read", outcome: "refused", filters: [], rows: 0, total: null, masked: ["salary", "bank"] },
+  { n: 3, name: "Attendance Register", kind: "read", outcome: "timed_out", filters: [["From", "01/01/2026"]], rows: 0, total: null, masked: [] },
 ];
 
 describe("SourcesPane", () => {
@@ -25,6 +26,10 @@ describe("SourcesPane", () => {
     expect(within(second).getByText("Not Available")).toBeInTheDocument();
     expect(within(second).getByText("salary, bank")).toBeInTheDocument();
     expect(within(second).queryByRole("button")).toBeNull();
+    // A read the database cut at its timeout says so in words, and opens nothing.
+    const third = screen.getByRole("listitem", { name: "Read 3, Attendance Register" });
+    expect(within(third).getByText("Too Much")).toBeInTheDocument();
+    expect(within(third).queryByRole("button")).toBeNull();
   });
 
   it("words the rows by what came back", () => {

@@ -407,6 +407,72 @@ async function figures(query, scope, { now = new Date(), db = pool, actor = null
   };
 }
 
+/** The key result statuses as Analytics names them, for the assistant's summary. */
+const STATUS_WORDS = Object.freeze({
+  on_track: "On Track",
+  done: "Done",
+  at_risk: "At Risk",
+  off_track: "Off Track",
+  missed: "Missed",
+  not_started: "Not Started",
+  awaiting_report: "Awaiting Report",
+});
+const RATING_WORDS_SHORT = Object.freeze({ exceeds: "Exceeds", meets: "Meets", partly_meets: "Partly Meets", below: "Below" });
+
+/**
+ * The assistant's performance summary (docs/guides/praxis-ai.md §6.13; performance.md §9): the quarter's
+ * key results by status, the scores by function and month, and the ratings at the latest closed round,
+ * worked out by the same SQL as Analytics within what the reader may read of the tree (§6.23) and their
+ * `performance` scope. Figures, never a row.
+ * @param {{period_id?: string, department_id?: string}} query
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @param {{db?: {query: Function}, actor?: object|null, now?: Date}} [at]
+ */
+async function aiSummary(query, scope, { db = pool, actor = null, now = new Date() } = {}) {
+  const { figure, group, series } = require("../../shared/ai/summary");
+  const period = await periodFor(db, query.period_id);
+  if (!period) return { figures: [], groups: [], series: [], total: 0 };
+  const reach = await visibility.readerOf(db, actor);
+  const months = monthsOf(day(period.starts_on));
+  const dept = query.department_id || null;
+  const scores = await scoresByMonth(db, period, months, dept, reach);
+  const company = await companyScore(db, period, reach);
+  const statuses = await keyResultStatuses(db, period, dept, reach);
+  const ratings = await ratingSpread(db, period, dept, scope);
+  void now;
+
+  const figs = [
+    figure("key_results", "Key results", statuses.key_results),
+    figure("on_track", "On track", statuses.on_track),
+    figure("done", "Done", statuses.done),
+    figure("at_risk", "At risk", statuses.at_risk),
+    figure("off_track", "Off track", statuses.off_track),
+    figure("missed", "Missed", statuses.missed),
+    figure("not_started", "Not started", statuses.not_started),
+    figure("awaiting_report", "Awaiting report", statuses.awaiting_report),
+    figure("recovery", "In recovery", statuses.recovery),
+  ];
+  if (company !== null && company !== undefined) figs.push(figure("company_score", "Company score", String(company), "score"));
+
+  const byStatus = Object.keys(STATUS_WORDS).map((k) => ({ key: k, label: STATUS_WORDS[k], value: statuses[k] || 0, count: null }));
+  const latest = (s) => {
+    const scored = (s.months || []).filter((m) => m.score !== null && m.score !== undefined);
+    return scored.length ? scored[scored.length - 1].score : null;
+  };
+  const functions = scores.map((s) => ({ key: s.department_id || "company", label: s.department || "Company", value: latest(s) ?? "0", count: null }));
+  const groups = [
+    group("status", "Key results by status", byStatus),
+    group("function", "Latest score by function", functions),
+    group("rating", "Ratings at the latest closed round", (ratings.counts || []).map((r) => ({ key: r.rating, label: RATING_WORDS_SHORT[r.rating] || r.rating, value: r.count, count: null }))),
+  ];
+  // The company first, then up to five functions: six lines a chart can carry.
+  const lines = scores.slice(0, 6).map((s) =>
+    series(s.department_id || "company", `${s.department || "Company"} score by month`.slice(0, 60),
+      (s.months || []).filter((m) => m.score !== null && m.score !== undefined).map((m) => ({ at: String(m.month).slice(0, 7), value: m.score }))),
+  );
+  return { figures: figs, groups, series: lines, total: statuses.key_results || 0 };
+}
+
 /* ------------------------------------------------------------------ *
  * People
  * ------------------------------------------------------------------ */
@@ -570,6 +636,7 @@ async function buildExport(event, ctx) {
 outbox.register(EVENTS.ANALYTICS_EXPORT_REQUESTED, "goals.analytics_export", (event, ctx) => buildExport(event, ctx));
 
 module.exports = {
+  aiSummary,
   EXPORT_DOC_TYPE,
   EXPORT_CEILING,
   periodFor,

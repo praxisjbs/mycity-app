@@ -80,7 +80,9 @@ conversations, and one opens full screen when you press it.
 2. **Overview** shows figures and a chart when an answer counted or summed something. Until an
    answer has figures, it is greyed out.
 3. **Table** lists every row the answer was read from, 25 to a page. Press **Next** and
-   **Previous** to page. Past 200 rows it says how many rows there are.
+   **Previous** to page. Past 200 rows it says how many rows there are. Press **Export** to save
+   every row as an Excel file on this device; its second sheet, About This File, says who exported
+   it, when, the question and what was read.
 4. Press a row to see it on **Record**. Press **Open Record** to open it on its own screen.
 5. **Sources** lists each read: its name, what it was filtered by, how many rows it returned, and
    whether it was read or not available to you. **Masked** names the fields you may not see. Press

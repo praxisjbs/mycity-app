@@ -121,6 +121,20 @@ const ReviewListQuery = listQuery(
   ["employee", "status", "due_on"],
 );
 
+/**
+ * The assistant's review summary (docs/guides/praxis-ai.md §6.13; performance.md §9): the reviews the asker
+ * may list, by stage, rating, department or round, and how many wait on them. Figures, never rows; no page.
+ */
+const ReviewSummaryBy = z.enum(["stage", "rating", "department", "round"]);
+const ReviewSummaryQuery = z
+  .object({
+    round_id: uuid.optional(),
+    kind: ReviewKind.optional(),
+    department_id: uuid.optional(),
+    by: ReviewSummaryBy.default("stage"),
+  })
+  .strict();
+
 /** The scorecard line an item scores, as the review shows it. */
 const ItemLine = z
   .object({
@@ -583,6 +597,7 @@ const TABLES = {
   Review: { table: "performance_review", virtual: REVIEW_VIRTUAL },
   ReviewPage: { table: null, reason: "a page of reviews" },
   ReviewListQuery: { table: null, reason: "list controls and filters for the reviews" },
+  ReviewSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's review summary; figures, never a row" },
   ItemLine: { table: "employee_target" },
   ReviewItem: {
     table: "performance_review_item",
@@ -706,6 +721,7 @@ module.exports = {
   Review,
   ReviewPage,
   ReviewListQuery,
+  ReviewSummaryQuery,
   ItemLine,
   ReviewItem,
   TaskBucket,

@@ -33,6 +33,7 @@ const OUTCOME = {
   refused: { tone: "err", word: "Not Available" },
   invalid: { tone: "warn", word: "Not Run" },
   failed: { tone: "warn", word: "Failed" },
+  timed_out: { tone: "warn", word: "Too Much" },
 } as const;
 
 /** "25 of 312 rows", "1 record", or nothing for a summary or a read that returned nothing. */

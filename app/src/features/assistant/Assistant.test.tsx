@@ -377,6 +377,20 @@ describe("The full screen: Back, the context and the pane", () => {
     expect(m.navigate).toHaveBeenCalledWith("/praxis-ai?tab=ask&from=%2Fpeople%3Ftab%3Dleave%26status%3Dwaiting%26id%3D00000000-0000-4000-8000-0000000000e1%26q%3Dayo%26page%3D2");
   });
 
+  it("Export on the Table asks for every row of the read as a file and saves it on this device (§6.16)", async () => {
+    m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
+    m.call.mockImplementation(async (key: unknown) => (key === "POST /api/v1/ai/ask" ? answer() : { document_id: "00000000-0000-4000-8000-0000000000e1", file_name: "praxis-ai-leave-requests-2026-11-01.xlsx", status: "pending" }));
+    ui("ask");
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask a Question" }), "Whose leave waits on me?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Two requests wait on you.");
+    const pane = screen.getByRole("region", { name: "Pane" });
+    expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+    await userEvent.click(within(pane).getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai/answers/:id/reads/:n/export", { params: { id: "00000000-0000-4000-8000-0000000000a1", n: 1 }, body: {} }));
+    expect(m.saveExport).toHaveBeenCalled();
+  });
+
   it("the latest answer fills the pane: its Table pages the read again, a row opens the Record, Sources lists the reads", async () => {
     m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
     m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;

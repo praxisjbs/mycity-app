@@ -416,6 +416,95 @@ function listDays(db, employeeId, from, to, query) {
   );
 }
 
+/** The dimensions the assistant's summary groups by, each as SQL written here (never the caller's words). */
+const SUMMARY_BY = Object.freeze({
+  person: { key: "ad.employee_id::text", label: "btrim(e.first_name || ' ' || e.last_name)", series: false },
+  department: { key: "COALESCE(e.department_id::text, 'none')", label: "COALESCE(d.name, 'No department')", series: false },
+  site: { key: "COALESCE(e.worksite_id::text, 'none')", label: "COALESCE(w.name, 'No site')", series: false },
+  day: { key: "to_char(ad.attendance_date, 'YYYY-MM-DD')", label: "to_char(ad.attendance_date, 'YYYY-MM-DD')", series: true },
+  week: { key: "to_char(date_trunc('week', ad.attendance_date), 'YYYY-MM-DD')", label: "to_char(date_trunc('week', ad.attendance_date), 'YYYY-MM-DD')", series: true },
+  month: { key: "to_char(ad.attendance_date, 'YYYY-MM')", label: "to_char(ad.attendance_date, 'YYYY-MM')", series: true },
+});
+
+/**
+ * The assistant's attendance summary (docs/guides/praxis-ai.md §6.13; attendance.md §9): one SQL over
+ * attendance_day in the reader's scope, grouped by the dimension asked. Figures, never a row: the
+ * database counts and the assistant reads the counts. `by` is one of SUMMARY_BY's keys, mapped to SQL
+ * here; nothing the caller typed reaches the query.
+ *
+ *   person, department, site   groups: late days (20), most minutes late (10), absent days (20)
+ *   day, week, month           series: late days, absent days, late minutes, the newest 60 buckets
+ *
+ * @param {{query: Function}} db
+ * @param {{from: string, to: string, department_id?: string|null, employee_id?: string|null, by: string}} q
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @returns {Promise<{series: boolean, figures: object, groups: {late: object[], minutes: object[], absent: object[]}, points: object[]}>}
+ */
+async function summary(db, q, scope) {
+  const dim = SUMMARY_BY[q.by] || SUMMARY_BY.department;
+  const params = [q.from, q.to, q.department_id || null, q.employee_id || null];
+  const s = scopeClause(scope, { column: "ad.employee_id" }, params);
+  const row = await one(
+    db,
+    `WITH days AS (
+       SELECT ad.employee_id, ad.status, ad.late_minutes, ad.worked_minutes,
+              ${dim.key} AS group_key, ${dim.label} AS group_label,
+              (SELECT count(*) FROM attendance_exception x WHERE x.attendance_day_id = ad.attendance_day_id) AS exceptions,
+              (SELECT count(*) FROM attendance_exception x
+                WHERE x.attendance_day_id = ad.attendance_day_id AND x.status IN ('open', 'under_review')) AS open_exceptions
+         FROM attendance_day ad
+         JOIN employee e ON e.employee_id = ad.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+         LEFT JOIN worksite w ON w.worksite_id = e.worksite_id
+        WHERE ad.attendance_date BETWEEN $1::date AND $2::date
+          AND ($3::uuid IS NULL OR e.department_id = $3)
+          AND ($4::uuid IS NULL OR ad.employee_id = $4)
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS days, count(DISTINCT employee_id)::int AS people,
+              count(*) FILTER (WHERE status IN ('present', 'late'))::int AS present,
+              count(*) FILTER (WHERE status = 'late')::int AS late,
+              count(*) FILTER (WHERE status = 'absent')::int AS absent,
+              count(*) FILTER (WHERE status = 'leave')::int AS on_leave,
+              COALESCE(sum(late_minutes), 0)::int AS late_minutes,
+              COALESCE(sum(worked_minutes), 0)::int AS worked_minutes,
+              COALESCE(sum(exceptions), 0)::int AS exceptions,
+              COALESCE(sum(open_exceptions), 0)::int AS open_exceptions
+         FROM days
+     ), grouped AS (
+       SELECT group_key, min(group_label) AS label, count(*)::int AS days,
+              count(*) FILTER (WHERE status = 'late')::int AS late,
+              count(*) FILTER (WHERE status = 'absent')::int AS absent,
+              COALESCE(sum(late_minutes), 0)::int AS late_minutes
+         FROM days
+        GROUP BY group_key
+     ), ranked AS (
+       SELECT g.*,
+              row_number() OVER (ORDER BY g.late DESC, g.days DESC, g.label, g.group_key) AS late_rank,
+              row_number() OVER (ORDER BY g.late_minutes DESC, g.label, g.group_key) AS minutes_rank,
+              row_number() OVER (ORDER BY g.absent DESC, g.days DESC, g.label, g.group_key) AS absent_rank,
+              row_number() OVER (ORDER BY g.group_key DESC) AS newest_rank
+         FROM grouped g
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', group_key, 'label', label, 'value', late, 'count', days) ORDER BY late_rank)
+               FROM ranked WHERE late_rank <= 20) AS late_by,
+            (SELECT json_agg(json_build_object('key', group_key, 'label', label, 'value', late_minutes, 'count', late) ORDER BY minutes_rank)
+               FROM ranked WHERE minutes_rank <= 10) AS minutes_by,
+            (SELECT json_agg(json_build_object('key', group_key, 'label', label, 'value', absent, 'count', days) ORDER BY absent_rank)
+               FROM ranked WHERE absent_rank <= 20) AS absent_by,
+            (SELECT json_agg(json_build_object('at', label, 'late', late, 'absent', absent, 'late_minutes', late_minutes, 'days', days) ORDER BY group_key)
+               FROM ranked WHERE newest_rank <= 60) AS points`,
+    params,
+  );
+  return {
+    series: dim.series,
+    figures: row.figures,
+    groups: { late: row.late_by || [], minutes: row.minutes_by || [], absent: row.absent_by || [] },
+    points: row.points || [],
+  };
+}
+
 /** One person's figures between two dates. */
 function daysSummary(db, employeeId, from, to) {
   return one(
@@ -1894,6 +1983,8 @@ module.exports = {
   openExceptionCount,
   listDays,
   daysSummary,
+  summary,
+  SUMMARY_BY,
   listEvents,
   listExceptions,
   getException,

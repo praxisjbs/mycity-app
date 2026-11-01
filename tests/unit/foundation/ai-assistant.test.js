@@ -88,6 +88,8 @@ beforeEach(async () => {
   jest.spyOn(integrations, "secret").mockResolvedValue("key");
   jest.spyOn(search, "readerOf").mockResolvedValue(READER);
   jest.spyOn(authorise, "allowedReads").mockResolvedValue(READS);
+  // The real manifests declare summaries since PR3; this suite has no database for their grants.
+  jest.spyOn(authorise, "allowedSummaries").mockResolvedValue([]);
   jest.spyOn(registry, "read").mockImplementation((k) => READS.find((r) => r.key === k) || null);
   jest.spyOn(registry, "routes").mockReturnValue(ROUTES);
 });

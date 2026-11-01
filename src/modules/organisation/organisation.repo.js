@@ -220,6 +220,92 @@ async function list(db, query, scope) {
   return { ...page, data: page.data.map(toRow) };
 }
 
+/** The dimensions the assistant's headcount summary groups by, as SQL written here (never the caller's words). */
+const HEADCOUNT_BY = Object.freeze({
+  department: { key: "e.department_id::text", label: "d.name" },
+  status: { key: "e.status", label: "e.status" },
+  work_pattern: { key: "e.work_pattern", label: "e.work_pattern" },
+  employment_type: { key: "e.employment_type", label: "e.employment_type" },
+  manager: { key: "COALESCE(e.line_manager_id::text, e.line_manager_seat_id::text, 'none')", label: `COALESCE(${MANAGER_NAME}, ms.title, 'No line manager')` },
+  confirmation: {
+    key: `CASE WHEN e.status <> 'active' THEN '6_not_active'
+               WHEN e.confirmed_on IS NOT NULL THEN '5_confirmed'
+               WHEN e.confirmation_due_on IS NULL THEN '7_no_date'
+               WHEN e.confirmation_due_on < $7::date THEN '1_overdue'
+               WHEN e.confirmation_due_on <= $7::date + 30 THEN '2_within_30_days'
+               WHEN e.confirmation_due_on <= $7::date + 90 THEN '3_within_90_days'
+               ELSE '4_later' END`,
+    label: null,
+  },
+});
+
+/**
+ * The assistant's headcount summary (docs/guides/praxis-ai.md §6.13; organogram.md §9): the register
+ * as the reader sees it, counted in one SQL with its own filters: by department and by status always,
+ * and by the dimension asked. Figures, never a row.
+ * @param {{query: Function}} db
+ * @param {{department_id?, status?, work_pattern?, employment_type?, line_manager_id?, by: string}} query
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @param {string} today  YYYY-MM-DD in Lagos
+ */
+async function aiSummary(db, query, scope, today) {
+  const dim = HEADCOUNT_BY[query.by] || HEADCOUNT_BY.department;
+  const params = [
+    query.department_id ?? null,
+    query.status ?? null,
+    query.work_pattern ?? null,
+    query.employment_type ?? null,
+    query.line_manager_id ?? null,
+    null,
+    today,
+  ];
+  const s = scopeClause(scope, { column: "e.employee_id" }, params);
+  const { rows } = await db.query(
+    `WITH p AS (
+       SELECT e.employee_id, e.status, e.department_id, d.name AS department, e.confirmed_on, e.confirmation_due_on,
+              e.contract_ends_on, e.line_manager_id, e.line_manager_seat_id, u.is_ceo,
+              ${dim.key} AS dim_key, ${dim.label || dim.key} AS dim_label
+         ${EMPLOYEE_JOINS}
+        WHERE ($1::uuid IS NULL OR e.department_id = $1)
+          AND ($2::text IS NULL OR e.status = $2)
+          AND ($2::text IS NOT NULL OR e.status <> 'archived')
+          AND ($3::text IS NULL OR e.work_pattern = $3)
+          AND ($4::text IS NULL OR e.employment_type = $4)
+          AND ($5::uuid IS NULL OR e.line_manager_id = $5)
+          AND $6::text IS NULL
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS people,
+              count(*) FILTER (WHERE status = 'active')::int AS active,
+              count(*) FILTER (WHERE status = 'active' AND confirmed_on IS NOT NULL)::int AS confirmed,
+              count(*) FILTER (WHERE status = 'active' AND confirmed_on IS NULL AND confirmation_due_on IS NOT NULL)::int AS on_probation,
+              count(*) FILTER (WHERE status = 'active' AND confirmed_on IS NULL AND confirmation_due_on IS NOT NULL
+                                 AND confirmation_due_on <= $7::date + 30)::int AS confirmation_due_30,
+              count(*) FILTER (WHERE status = 'active' AND confirmed_on IS NULL AND confirmation_due_on IS NOT NULL
+                                 AND confirmation_due_on < $7::date)::int AS confirmation_overdue,
+              count(*) FILTER (WHERE status = 'active' AND contract_ends_on IS NOT NULL AND contract_ends_on <= $7::date + 30)::int AS contracts_ending_30,
+              count(*) FILTER (WHERE status = 'active' AND line_manager_id IS NULL AND line_manager_seat_id IS NULL
+                                 AND COALESCE(is_ceo, false) = false)::int AS no_manager,
+              count(DISTINCT department_id)::int AS departments
+         FROM p
+     ), by_dim AS (
+       SELECT dim_key AS key, min(dim_label) AS label, count(*)::int AS n, count(*) FILTER (WHERE status = 'active')::int AS a,
+              row_number() OVER (ORDER BY count(*) DESC, min(dim_label), dim_key) AS rank
+         FROM p GROUP BY dim_key
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', department_id, 'label', department, 'value', n, 'count', a) ORDER BY n DESC, department)
+               FROM (SELECT department_id, min(department) AS department, count(*)::int AS n, count(*) FILTER (WHERE status = 'active')::int AS a
+                       FROM p GROUP BY department_id) x) AS by_department,
+            (SELECT json_agg(json_build_object('key', status, 'label', status, 'value', n, 'count', NULL) ORDER BY status)
+               FROM (SELECT status, count(*)::int AS n FROM p GROUP BY status) x) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', n, 'count', a) ORDER BY rank) FROM by_dim WHERE rank <= 20) AS by_dim`,
+    params,
+  );
+  const r = rows[0];
+  return { figures: r.figures, by_department: r.by_department || [], by_status: r.by_status || [], by_dim: r.by_dim || [] };
+}
+
 /**
  * The counts above the register, for the caller's own scope. `today` is the Lagos date
  * (shared/time/lagos.js) the 90 and 30 day windows count from, never the database's
@@ -1220,6 +1306,8 @@ module.exports = {
   toSeat,
   list,
   counts,
+  aiSummary,
+  HEADCOUNT_BY,
   byWorkPattern,
   byDepartment,
   vacantSeatCount,

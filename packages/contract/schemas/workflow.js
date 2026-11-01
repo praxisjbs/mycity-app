@@ -187,6 +187,19 @@ const ApprovalWaiting = z
 
 /** GET /workflow/mine: oldest waiting first; `module_key` keeps one module's requests. */
 const ApprovalMineQuery = listQuery({ module_key: ModuleKey.optional() });
+
+/**
+ * The assistant's approvals summary (docs/guides/praxis-ai.md §6.13; foundation.md §9): the requests
+ * waiting on the asker, how many are overdue and how old the oldest is, grouped by flow, stage, age
+ * band or module. Figures, never rows; no page.
+ */
+const ApprovalSummaryBy = z.enum(["flow", "stage", "age", "module"]);
+const ApprovalSummaryQuery = z
+  .object({
+    module_key: ModuleKey.optional(),
+    by: ApprovalSummaryBy.default("flow"),
+  })
+  .strict();
 const ApprovalWaitingPage = Paged(ApprovalWaiting);
 
 /** GET /workflow/mine/count: Home's Waiting on You. */
@@ -302,6 +315,7 @@ const TABLES = {
     },
   },
   ApprovalMineQuery: { table: null, reason: "list controls for My Approvals" },
+  ApprovalSummaryQuery: { table: null, reason: "the filter and grouping of the assistant's approvals summary; figures, never a row" },
   ApprovalWaitingPage: { table: null, reason: "a page of requests waiting on the caller" },
   ApprovalCount: { table: null, reason: "counts of requests waiting on the caller" },
   RouteStage: { table: null, reason: "a stage of the instance's version with where the request stands on it" },
@@ -357,6 +371,7 @@ module.exports = {
   ApprovalsSummary,
   ApprovalWaiting,
   ApprovalMineQuery,
+  ApprovalSummaryQuery,
   ApprovalWaitingPage,
   ApprovalCount,
   RouteStage,

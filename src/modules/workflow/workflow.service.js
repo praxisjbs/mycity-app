@@ -324,6 +324,48 @@ async function mine(user, query, client = pool) {
   };
 }
 
+/** The age bands as the assistant's summary reads them. */
+const AGE_WORDS = Object.freeze({
+  "1_under_a_day": "Under a day",
+  "2_one_to_three_days": "1 to 3 days",
+  "3_four_to_seven_days": "4 to 7 days",
+  "4_over_a_week": "Over a week",
+});
+
+/**
+ * The assistant's approvals summary (docs/guides/praxis-ai.md §6.13; foundation.md §9): what waits on
+ * the asker, counted by flow, age and stage or module; figures, never a row. Runs on the client the
+ * assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   ApprovalSummaryQuery, parsed
+ * @param {object} user     the asker
+ */
+async function aiSummary(client, params, user) {
+  const { figure, group } = require("../../shared/ai/summary");
+  const roleCodes = await approvers.roleCodesOf(client, user.role_ids || []);
+  const modules = await approveModules(user);
+  const r = await repo.waitingSummary(client, user, roleCodes, modules, params, deliveryPlan.closedTypes());
+  const f = r.figures || {};
+  const moduleLabel = (key) => (catalog.MODULE_META[key] ? catalog.MODULE_META[key].label : key);
+  const third = params.by === "stage" ? group("stage", "Waiting by stage", r.by_third) : group("module", "Waiting by module", r.by_third.map((x) => ({ ...x, label: moduleLabel(x.label) })));
+  return {
+    figures: [
+      figure("waiting", "Waiting on me", f.waiting),
+      figure("overdue", "Past their time", f.overdue),
+      figure("due_within_a_day", "Due within a day", f.due_within_a_day),
+      figure("oldest_days", "Oldest, in days", f.oldest_days, "days"),
+      figure("flows", "Flows", f.flows),
+    ],
+    groups: [
+      group("flow", "Waiting by flow", r.by_flow),
+      group("age", "Waiting by age", r.by_age.map((x) => ({ ...x, label: AGE_WORDS[x.label] || x.label }))),
+      third,
+    ],
+    series: [],
+    total: f.waiting || 0,
+  };
+}
+
 async function mineCount(user) {
   const [roleCodes, modules] = await Promise.all([
     approvers.roleCodesOf(pool, user.role_ids || []),
@@ -602,6 +644,7 @@ module.exports = {
   plainly,
   mine,
   mineCount,
+  aiSummary,
   getInstance,
   decide,
   decideIn,

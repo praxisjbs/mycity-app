@@ -1388,6 +1388,17 @@
       "screen": "settings.imports"
     },
     {
+      "key": "settings.route.see_the_audit_log",
+      "kind": "route",
+      "module_key": "settings",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "settings.audit-log"
+    },
+    {
       "key": "workspace.route.book_a_meeting",
       "kind": "route",
       "module_key": "workspace",
@@ -1441,6 +1452,94 @@
       "schema": null,
       "schema_sha": "1d75a37427875680",
       "screen": "workspace.projects"
+    },
+    {
+      "key": "approvals.summary",
+      "kind": "summary",
+      "module_key": "settings",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "workflow.ApprovalSummaryQuery",
+      "schema_sha": "02d124cb3a75d7be",
+      "screen": null
+    },
+    {
+      "key": "attendance.summary",
+      "kind": "summary",
+      "module_key": "people",
+      "permission": "people.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "attendance.AttendanceSummaryQuery",
+      "schema_sha": "db24f9969d163910",
+      "screen": null
+    },
+    {
+      "key": "audit.summary",
+      "kind": "summary",
+      "module_key": "settings",
+      "permission": "settings.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "audit.AuditSummaryQuery",
+      "schema_sha": "f85cb839fdfb61b4",
+      "screen": null
+    },
+    {
+      "key": "employees.summary",
+      "kind": "summary",
+      "module_key": "people",
+      "permission": "people.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "organisation.EmployeeSummaryQuery",
+      "schema_sha": "751f1790163d2ef0",
+      "screen": null
+    },
+    {
+      "key": "goals.summary",
+      "kind": "summary",
+      "module_key": "performance",
+      "permission": "performance.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "goals.PerformanceSummaryQuery",
+      "schema_sha": "e3943c914dd6c906",
+      "screen": null
+    },
+    {
+      "key": "leave.summary",
+      "kind": "summary",
+      "module_key": "people",
+      "permission": "people.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "leave.LeaveSummaryQuery",
+      "schema_sha": "69b79fd857991372",
+      "screen": null
+    },
+    {
+      "key": "reviews.summary",
+      "kind": "summary",
+      "module_key": "performance",
+      "permission": "performance.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "reviews.ReviewSummaryQuery",
+      "schema_sha": "e609f8081a8042ed",
+      "screen": null
+    },
+    {
+      "key": "tasks.summary",
+      "kind": "summary",
+      "module_key": "workspace",
+      "permission": "workspace.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "tasks.TaskCountsQuery",
+      "schema_sha": "815712491b73aed2",
+      "screen": null
     }
   ]
 }

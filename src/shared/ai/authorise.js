@@ -28,7 +28,12 @@
  *   7. the rows are cited (cite.js), from what was read.
  *
  * A summary goes the same way, and its result must parse as AiSummaryResult: figures, never
- * rows. An action is checked the same way at the draft and again at the press (checkAction):
+ * rows; one asked again within a minute with the same parameters and scope is served from the
+ * summary cache (summary-cache.js), never across people. Every read and summary runs inside its
+ * own transaction with a statement timeout of READ_TIMEOUT_MS (praxis-ai.md §6.3 step 8): a read
+ * that would scan too much is cut by the database and answers AI_READ_TIMEOUT, which the model
+ * receives as "narrow the question"; a read whose service runs on the pool is held to the same
+ * deadline here. An action is checked the same way at the draft and again at the press (checkAction):
  * the grant, the scope it gives, the values against the action's input schema, the records it
  * touches against its bulk limit; its own `check` and `run` are called by the card's service.
  *
@@ -38,7 +43,9 @@
  */
 const { logger } = require("../../config/logger");
 const { AppError } = require("../errors");
+const { atomically } = require("../db/tx");
 const { assertPage } = require("../http/paged");
+const summaryCache = require("./summary-cache");
 const { maskForUser, maskedKeysFor } = require("../rbac/field-mask");
 const metrics = require("../observability/metrics");
 const registry = require("./registry");
@@ -46,6 +53,55 @@ const { citationsFor } = require("./cite");
 const c = require("@mycity/contract");
 
 const scopeFor = (...args) => require("../../middleware/rbac").scopeFor(...args);
+
+/** How long one read or summary may run in the database (praxis-ai.md §6.3 step 8; decision 14). */
+const READ_TIMEOUT_MS = 3000;
+/** The deadline held here for a read whose service runs on the pool, past the database's own cut. */
+const READ_DEADLINE_MS = READ_TIMEOUT_MS + 1000;
+/** Postgres: the statement was cancelled, here by statement_timeout. */
+const QUERY_CANCELED = "57014";
+
+const timedOut = () => new AppError("AI_READ_TIMEOUT", "That read covers too much at once. Narrow the question.", 504);
+
+/**
+ * Run one read or summary with the person's rights, inside a transaction that cuts any statement
+ * at READ_TIMEOUT_MS. A pool opens a client of its own; a client already in a transaction keeps it
+ * (a savepoint takes the timeout and its failure, so the caller's work stands). The read's service
+ * may run on its own pool connection, which no SET LOCAL reaches: the same deadline is held here,
+ * and the database finishes that statement on its own.
+ * @param {{query: Function, connect?: Function}} db  a pool or a client
+ * @param {(client: {query: Function}) => Promise<T>} fn
+ * @template T
+ * @returns {Promise<T>}
+ */
+async function guarded(db, fn) {
+  const pooled = typeof db.connect === "function" && typeof db.release !== "function";
+  const client = pooled ? await db.connect() : db;
+  let timer = null;
+  try {
+    return await atomically(client, async () => {
+      await client.query("SAVEPOINT ai_read");
+      try {
+        await client.query(`SET LOCAL statement_timeout = ${READ_TIMEOUT_MS}`);
+        const deadline = new Promise((_, reject) => {
+          timer = setTimeout(() => reject(timedOut()), READ_DEADLINE_MS);
+        });
+        const out = await Promise.race([fn(client), deadline]);
+        clearTimeout(timer);
+        await client.query("RELEASE SAVEPOINT ai_read");
+        await client.query("SET LOCAL statement_timeout = DEFAULT");
+        return out;
+      } catch (err) {
+        clearTimeout(timer);
+        // ROLLBACK TO takes the SET LOCAL back with it, so a joined transaction keeps its own timeout.
+        await client.query("ROLLBACK TO SAVEPOINT ai_read").catch(() => {});
+        throw err && err.code === QUERY_CANCELED ? timedOut() : err;
+      }
+    });
+  } finally {
+    if (pooled) client.release();
+  }
+}
 
 /** Which of a kind this person may run. */
 async function allowedOf(list, actor) {
@@ -91,7 +147,7 @@ async function runRead(client, actor, key, params = {}) {
   if (!parsed.success)
     throw new AppError("AI_READ_INVALID", `The "${key}" read was asked for with parameters it does not take`, 422, fieldsOf(parsed));
 
-  const result = await read.run(client, parsed.data, { ...actor, scope });
+  const result = await guarded(client, (conn) => read.run(conn, parsed.data, { ...actor, scope }));
   let rows;
   if (read.list) {
     assertPage(result, `AI read ${key}`);
@@ -128,12 +184,15 @@ async function runSummary(client, actor, key, params = {}) {
   const parsed = summary.params.safeParse(params || {});
   if (!parsed.success)
     throw new AppError("AI_READ_INVALID", `The "${key}" summary was asked for with parameters it does not take`, 422, fieldsOf(parsed));
-  const raw = await summary.run(client, parsed.data, { ...actor, scope });
-  if (!raw || typeof raw !== "object" || Array.isArray(raw) || Array.isArray(raw.data) || Array.isArray(raw.rows))
-    throw new Error(`AI summary ${key}: a summary returns { figures, groups, series, total }, never rows`);
-  const shaped = c.assistant.AiSummaryResult.safeParse({ figures: [], groups: [], series: [], total: null, ...raw });
-  if (!shaped.success) throw new Error(`AI summary ${key}: its result does not match AiSummaryResult (${shaped.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")})`);
-  return { key, kind: "summary", result: shaped.data, masked: await maskedKeysFor(client, actor) };
+  const { result, cached } = await summaryCache.cached(actor, key, parsed.data, scope, async () => {
+    const raw = await guarded(client, (conn) => summary.run(conn, parsed.data, { ...actor, scope }));
+    if (!raw || typeof raw !== "object" || Array.isArray(raw) || Array.isArray(raw.data) || Array.isArray(raw.rows))
+      throw new Error(`AI summary ${key}: a summary returns { figures, groups, series, total }, never rows`);
+    const shaped = c.assistant.AiSummaryResult.safeParse({ figures: [], groups: [], series: [], total: null, ...raw });
+    if (!shaped.success) throw new Error(`AI summary ${key}: its result does not match AiSummaryResult (${shaped.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")})`);
+    return shaped.data;
+  });
+  return { key, kind: "summary", result, cached, masked: await maskedKeysFor(client, actor) };
 }
 
 /**
@@ -164,4 +223,4 @@ async function checkAction(actor, key, values = {}) {
   return { action, scope, ok: parsed.success, values: clean, problems, records };
 }
 
-module.exports = { allowedReads, allowedSummaries, allowedActions, runRead, runSummary, checkAction };
+module.exports = { allowedReads, allowedSummaries, allowedActions, runRead, runSummary, checkAction, guarded, READ_TIMEOUT_MS, READ_DEADLINE_MS };

@@ -897,6 +897,18 @@ const PerformanceAnalyticsQuery = z
   })
   .strict();
 
+/**
+ * The assistant's performance summary (docs/guides/praxis-ai.md §6.13; performance.md §9): a quarter's key
+ * results by status, the scores by function and month, the ratings at the latest closed round, within what
+ * the asker reads of the tree (§6.23). The current quarter unless one is named. Figures, never rows; no page.
+ */
+const PerformanceSummaryQuery = z
+  .object({
+    period_id: uuid.optional(),
+    department_id: uuid.optional(),
+  })
+  .strict();
+
 /** One score taken from another, signed and up to four places ("-0.12"): above zero, the first was higher. */
 const ScoreGap = z.string().regex(/^-?(0(\.\d{1,4})?|1(\.0{1,4})?)$/, "must be a difference of scores, like -0.12");
 
@@ -1236,6 +1248,7 @@ const TABLES = {
   PerformanceApprovalPage: { table: null, reason: "a page of approvals waiting on the reader" },
   PerformanceApprovalQuery: { table: null, reason: "list controls for the approvals waiting on the reader" },
   PerformanceAnalyticsQuery: { table: null, reason: "which quarter and function to count" },
+  PerformanceSummaryQuery: { table: null, reason: "which quarter and function the assistant's performance summary counts; figures, never a row" },
   OnTime: { table: null, reason: "how many were due and how many on time, counted" },
   MonthOnTime: { table: null, reason: "one month's due and on time, counted" },
   FunctionScores: { table: null, reason: "a function's month scores, rolled up from okr_key_result_month" },
@@ -1337,6 +1350,7 @@ module.exports = {
   PerformanceApprovalPage,
   PerformanceApprovalQuery,
   PerformanceAnalyticsQuery,
+  PerformanceSummaryQuery,
   ScoreGap,
   OnTime,
   MonthOnTime,

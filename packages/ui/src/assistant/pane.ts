@@ -46,7 +46,8 @@ export interface PaneRead {
   /** Its name in words (Leave Requests). */
   name: string;
   kind: "read" | "summary";
-  outcome: "read" | "refused" | "invalid" | "failed";
+  /** `timed_out`: the read covered too much at once and the database cut it (praxis-ai.md §6.3 step 8). */
+  outcome: "read" | "refused" | "invalid" | "failed" | "timed_out";
   /** The parameters it ran with, as label and value pairs. */
   filters: ReadonlyArray<readonly [string, string]>;
   /** Rows its page returned, and how many there are in all (null for one record, or nothing). */

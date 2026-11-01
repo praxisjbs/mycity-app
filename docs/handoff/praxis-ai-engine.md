@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, opened 01/11/2026 (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, opened 01/11/2026 (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -306,7 +306,7 @@ result line sits under the card. History is unchanged.
 |---|---|---|---|---|---|
 | **PR1** | Engine core | `claude/engine-upgrade-guide-xf4ynp` (this session) | Decisions 10, 14, 16 to 18, 21, 22, 24, 25 as code: manifest v2 (summaries, actions), registry and catalogue snapshot, authorise for summaries and actions, the engine boundary and gate 24, the card lifecycle with the five-minute confirm, read replay, migration 10330, the contract, prompt version 4, the matrix generator, the attack scaffold, gate 19 rewritten, gate 23, the documents | nothing | Every manifest loads unchanged; `tasks.create` is drafted, confirmed and a task exists, in an integration test on the real migrations; a replayed, expired or forbidden card is refused; the matrix passes for every read on every seeded role; gates 19, 23 and 24 are in `npm run ci`; nothing a person sees changes |
 | **PR2** | Full screen and the pane | `claude/sharp-planck-z0g9va` (praxisjbs/mycity-app#50) | Decisions 12, 13, 23: the full-screen Praxis AI with Back and context, the Assistant group in `packages/ui` (conversation, chips, the four pane views, charts, the phone sheet, progress), Table paging through read replay, Record, Sources; the User Guide chapter and pictures | PR1 | Every pane view works on desktop and at 375 px, light and dark; Back returns to the exact screen with its filters; progress shows while reads run; the old Ask's tests moved onto the new screen; gates 8, 11, 21 green |
-| **PR3** | Large data and Excel | `m10/praxis-ai-pr3` or the session's | Decisions 14, 15: summary reads for attendance, tasks, leave, approvals, performance, the Audit Log and employees; the statement timeout and the narrow-down answer; Overview's figures and chart; Download Excel with the provenance sheet through the export path; the summary cache | PR1 (runs beside PR2) | A 25,000-row export completes in the worker and downloads; a read that would scan too much asks to narrow; the model never receives rows from a summary (asserted); Overview shows a chart the server drew |
+| **PR3** | Large data and Excel | `claude/clever-pasteur-nt3rsc`, praxisjbs/mycity-app#51 (01/11/2026) | Decisions 14, 15: summary reads for attendance, tasks, leave, approvals, performance, the Audit Log and employees; the statement timeout and the narrow-down answer; Overview's figures and chart; Download Excel with the provenance sheet through the export path; the summary cache | PR1 (runs beside PR2) | A 25,000-row export completes in the worker and downloads; a read that would scan too much asks to narrow; the model never receives rows from a summary (asserted); Overview shows a chart the server drew |
 | **PR4** | Action cards | `m10/praxis-ai-pr4` or the session's | Decisions 10, 11, 19, 20, 21: actions declared in Workspace (tasks, calendar), ESS and People (leave request, approve, reject), Approvals (decide), Staff Community (message a colleague, post in a channel), Mailbox (send a mail), Performance (a check-in note where the service allows); the card on screen with Edit, Cancel and the confirm sheet (passkey, PIN, password); bulk up to 25; suggested cards; per-module `not_offered` accounting | PR1 and PR2 | Approve 4 leave requests from the chat works with a passkey and with a PIN; a card replayed after rights were removed is refused; "Tell Ada" drafts a direct message the person sends with one press; a mail drafted from the chat arrives with the company signature; gate 23's action rules green for every module |
 | **PR5** | Proof and switch-over | `m10/praxis-ai-pr5` or the session's | Decisions 26, 27: scope probes per module in the matrix, the attack suite in CI and nightly on staging with the real model, refusal and leak monitoring on AI Control, gate 23's `not_offered` rule made universal, the old Ask retired, `praxis-ai.md` §2 and §10 rewritten to what ships, the User Guide chapter final, the extraction note | PR3 and PR4 | Every listed attack fails safely with the model scripted and with the real model; a planted leak fails the build; the nightly run alerts on a refusal that leaked; the guide and the manual describe one screen |
 
@@ -676,14 +676,15 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 - [x] 01/11/2026 · The mock (the context echoed, the table's read, the reads' masks, a read run again with invented rows past the first page); the old Ask's tests moved onto the new screen; new tests for Back and Escape, the context sent, each pane tab, an earlier answer's pane, progress, the phone's sheet, the panel's context, the context helper, the orchestrator's hook and the service's push
 - [x] 01/11/2026 · Guide §2, §3, §5, §6.1.8, §7, §10 and §14; the User Guide chapter rewritten with its pictures retaken; PROGRESS #67; FRONTEND_GUIDE §9.1's tree; this handoff
 
-### 6.3 PR3 · Large data and Excel
+### 6.3 PR3 · Large data and Excel (started 01/11/2026)
 
-- [ ] Summary reads: attendance, tasks, leave, approvals, performance, employees, the Audit Log
-- [ ] The statement timeout and the narrow-down answer; the summary cache
-- [ ] Overview: figures and the chart from the summary; prompt version 5
-- [ ] Download Excel through the export path with About This File; the 25,000 cap; past 200 rows the pane says so
-- [ ] The evaluation set's summary questions; integration tests
-- [ ] Guide §6.13, §5, §7, §11; DATABASE_SCHEMA; PROGRESS; README
+- [x] 01/11/2026 · Summary reads: attendance, tasks, leave, approvals, performance (goals, and reviews), employees, the Audit Log (its `ai:none` dropped for a manifest with the summary alone); their query schemas in the contract; `shared/ai/summary.js` for the shape
+- [x] 01/11/2026 · The statement timeout and the narrow-down answer (`authorise.guarded`: 3 seconds in the database, a 4 second deadline for a read on the pool; `AI_READ_TIMEOUT`, the model told "too much", the read kept as `timed_out`, migration 10340); the summary cache (`shared/ai/summary-cache.js`, Redis, 60 seconds, by person and scope)
+- [x] 01/11/2026 · Overview: figures and the chart from the summary; the title checked against every value the summary holds; prompt version 5
+- [x] 01/11/2026 · Download Excel through the export path with About This File (`POST /ai/answers/:id/reads/:n/export`, `ai_answer_export`, `assistant.read_export_requested`, the worker's replay with the person's rights now); the 25,000 cap; past 200 rows the pane says so (the words are PR2's TablePane, the rule in guide §6.13)
+- [x] 01/11/2026 · The evaluation set's summary questions (six); `tests/unit/foundation/ai-summaries.test.js`; `tests/integration/ai-summaries.test.js` on the real migrations (scope, the caps, the cache, the timeout, Overview, the export and its cap); the matrix covers the summaries
+- [x] 01/11/2026 · Guide §4, §5, §6.3, §6.13, §6.16, §7, §11, §14; the module guides' §9 (attendance, workspace, ess, performance, foundation, organogram); DATABASE_SCHEMA; PROGRESS; README
+- [x] 01/11/2026 · After PR2 merged (#50): `main` merged in, the Table's Export wired on the full screen (`app/src/features/assistant/Pane.tsx` through `TablePane`'s `onExport`, the mock's route, a screen test), the User Guide chapter's pane step and its pictures retaken; OverviewPane already draws `AiOverview`, so nothing of PR3's is owed in `packages/ui`
 
 ### 6.4 PR4 · Action cards
 
@@ -747,6 +748,20 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   Table pages but does not sort yet (PR3, which gives reads their parameters, can add it); Overview
   draws figures and a chart already, so PR3 only has to produce them; the Pager at the capped last
   page keeps a disabled Next rather than none, so the 200-row cap reads as Page 8 of 8.
+- 01/11/2026 · JP · PR3 built (§6.3) beside PR2, in its own chat on `claude/clever-pasteur-nt3rsc`:
+  the eight summaries, each one SQL in its module's repo with the reader's scope and the dimension
+  mapped to SQL by the repo; the read guard; the summary cache; Overview's title rule; Download Excel
+  with About This File; prompt version 5; the evaluation set's summary questions. Found on the way:
+  a read whose `run` goes through a service on the pool is out of reach of `SET LOCAL`, so the guard
+  holds a deadline as well and the summaries all take the client they are given; `ai_message_read`'s
+  outcome CHECK had to widen for `timed_out` (10340); the audit module's `ai:none` went with its
+  manifest; the first of the month ties every "this month" ranking, so the suite reads ten weeks.
+  Touched outside PR3's files: `tests/unit/foundation/ai-assistant.test.js` (mocks
+  `allowedSummaries`, since the real manifests now declare summaries) and the audit module's
+  controller (the opt-out line). Nothing of `packages/ui` was touched; in `app/`, once PR2 merged,
+  only the Table's Export (`Pane.tsx`), the mock's route and a screen test. PR1's
+  catalogue snapshot was not on the `main` this branch left (it reached `main` with PR2), so this
+  branch carried it whole until `main` was merged in; the snapshot now adds PR3's nine entries.
 - 01/11/2026 · JP · The first full run fell on a month's first day and found the suite assumed
   October: the staging reviews seed bound the plans at the real clock, so October's round opened
   with no reviews (on staging too, from 1 November); four screen tests of attendance and the

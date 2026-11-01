@@ -251,7 +251,10 @@ src/
 │   │                  screens.test: which tabs a reader sees) · actions (⌘K actions: each screen's
 │   │                  New action, Clock In, Request Leave)
 │   ├── ai/            manifest (reads, summaries, actions and routes, checked at load) · registry · catalogue-sync ·
-│   │                  authorise (a read, a summary or an action with the person's rights) · cite ·
+│   │                  authorise (a read, a summary or an action with the person's rights, inside a 3 second
+│   │                  statement timeout) · summary (the shape of a summary's figures, groups, series and
+│   │                  period, one way for every module) · summary-cache (a summary's figures in Redis for
+│   │                  a minute, never across people) · cite ·
 │   │                  catalogue.snapshot.json (gate 23's committed snapshot of every read, summary, action and route)
 │   └── observability/ scrub · metrics · error-reporter · request-stats (a minute of traffic a
 │                      row and each route a quarter hour, with latency buckets, for Settings ·
@@ -582,7 +585,7 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 | Module | Files beyond the template |
 |---|---|
 | `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
-| `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read), `.search` (the caller's own conversations), `.events` (audit only, the card events, and the `ai_voice_question` document type), `.cards` (a card's life: read, edited, pressed with the five-minute confirm for a sensitive class, cancelled; `docs/guides/praxis-ai.md` §6.11), `.reads` (a read of an answer run again, 25 a page, §6.12); the service pushes `ai:progress` to the asker's realtime room before each read (§6.1.8). The adapter in `services/ai/assistant/{orchestrator, answer}.js` over the engine `services/ai/engine/`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read; the screens' views are the Assistant group of `packages/ui` (`docs/guides/praxis-ai.md`) |
+| `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read), `.search` (the caller's own conversations), `.events` (audit only, the card events, and the `ai_voice_question`, `ai_history_export` and `ai_answer_export` document types), `.cards` (a card's life: read, edited, pressed with the five-minute confirm for a sensitive class, cancelled; `docs/guides/praxis-ai.md` §6.11), `.reads` (a read of an answer run again, 25 a page, §6.12; the replay the export walks), `.export` (History's Export, and Download Excel on an answer's read through the one export path with About This File, §6.16); the service pushes `ai:progress` to the asker's realtime room before each read (§6.1.8). The adapter in `services/ai/assistant/{orchestrator, answer}.js` over the engine `services/ai/engine/`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read; the screens' views are the Assistant group of `packages/ui` (`docs/guides/praxis-ai.md`) |
 | `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
 The assistant answers from the manifests every module has carried since M1, and acts only through
