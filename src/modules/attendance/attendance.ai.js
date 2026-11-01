@@ -48,6 +48,16 @@ const siteForAi = (s) => ({
 
 const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
 
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): today's register lists everyone in the
+ * asker's `people` scope, punched or not, so it must carry a report of theirs (else themselves) and
+ * never an outsider.
+ */
+const registerProbe = {
+  inside: (ctx) => ({ type: "employee", id: ctx.report ? ctx.report.employee_id : ctx.actor.employee_id }),
+  outside: (ctx) => ({ type: "employee", id: ctx.outsider.employee_id }),
+};
+
 module.exports = defineManifest({
   module: "people",
   // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
@@ -87,6 +97,7 @@ module.exports = defineManifest({
         id: row.employee.employee_id,
         label: `${row.employee.display_name}, ${row.date}`,
       }),
+      matrix: registerProbe,
     },
     {
       key: "attendance.exceptions",

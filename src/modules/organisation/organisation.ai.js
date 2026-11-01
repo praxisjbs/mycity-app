@@ -14,6 +14,16 @@ const { defineManifest } = require("../../shared/ai/manifest");
 const repo = require("./organisation.repo");
 const service = require("./organisation.service");
 
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): the register must list someone in the
+ * asker's reach (a report of theirs, else themselves) and never an outsider, whose record a team or
+ * own scope does not reach.
+ */
+const probe = {
+  inside: (ctx) => ({ type: "employee", id: ctx.report ? ctx.report.employee_id : ctx.actor.employee_id }),
+  outside: (ctx) => ({ type: "employee", id: ctx.outsider.employee_id }),
+};
+
 module.exports = defineManifest({
   module: "people",
   // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
@@ -40,6 +50,7 @@ module.exports = defineManifest({
       permission: ["people", "view"],
       run: (client, params, actor) => repo.list(client, params, actor.scope),
       cite: (row) => ({ type: "employee", id: row.employee_id, label: row.display_name }),
+      matrix: probe,
     },
     {
       key: "departments.list",

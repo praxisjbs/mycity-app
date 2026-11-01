@@ -250,4 +250,24 @@ const hasBash = process.platform !== "win32" && spawnSync("bash", ["--version"])
   test("rollback only to a release still on the server", () => {
     expect(gate("production", `rollback production ${SHA}`).out).toMatch(/is not on the server any more/);
   });
+
+  test("attack: the staging key alone, with no arguments, on a release that carries the suite; the deploy lock is not taken", () => {
+    expect(gate("production", "attack").out).toMatch(/the production key may not run 'attack'/);
+    expect(gate("staging", `attack ${SHA}`).out).toMatch(/usage: attack/);
+    expect(gate("staging", "attack").out).toMatch(/staging runs nothing to attack/);
+    // A release from before the suite shipped carries no scripts/ai.
+    const rel = path.join(root, "stg", "releases", SHA);
+    put(rel, "src/server.js", "1");
+    fs.symlinkSync(rel, path.join(root, "stg", "current"));
+    expect(gate("staging", "attack").out).toMatch(/carries no attack suite/);
+    // With the suite in the release, the gate runs it as the environment's user with its .env and hands its exit code back.
+    put(rel, "scripts/ai/attack-assistant.js", "process.stdout.write(JSON.stringify({ id: 'run', result: 'leaked', argv: process.argv.slice(2) }) + '\\n'); process.exit(1);");
+    fs.mkdirSync(path.join(root, "stg", "shared"), { recursive: true });
+    fs.writeFileSync(path.join(root, "stg", "shared", ".env"), "APP_ENV=staging\n");
+    const run = gate("staging", "attack", { DG_NODE: process.execPath });
+    expect(run.status).toBe(1);
+    expect(run.out).toContain('"result":"leaked"');
+    expect(run.out).toContain('"argv":["--nightly","--json"]');
+    expect(fs.existsSync(path.join(home, "deploy-gate.lock"))).toBe(false);
+  });
 });

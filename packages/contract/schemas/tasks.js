@@ -505,7 +505,7 @@ const TaskMove = z
  */
 const TaskComplete = z
   .object({
-    task_ids: z.array(uuid).min(1, "Pick a task").max(25),
+    task_ids: z.array(uuid).min(1, "Pick a task").max(25, "At most 25"),
     late_reason: blank(LateReason),
   })
   .strict();

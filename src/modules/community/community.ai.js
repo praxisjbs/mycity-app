@@ -18,6 +18,30 @@ const announcements = require("../announcements/announcements.repo");
 const threadLink = (channelId) => (routeMap.linkFor("direct_thread", channelId) || {}).path || null;
 const channelLink = (channelId) => (routeMap.linkFor("channel", channelId) || {}).path || null;
 
+/** A private group channel of the outsider's alone, made once per asker through Channels' own service. */
+async function privateChannelOf(ctx) {
+  const name = `matrix-${ctx.role.replace(/_/g, "-")}`.slice(0, 30);
+  const had = (await service.listChannels(ctx.outsider.user, {})).data.find((ch) => ch.name === name);
+  if (had) return had.community_channel_id;
+  const ch = await service.createChannel({ name, description: null, post_policy: "everyone", member_ids: [], department_ids: [] }, ctx.outsider.user);
+  return ch.community_channel_id;
+}
+
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17). Membership decides what a person
+ * reaches here, whatever their grant's scope: #general, which everyone joins, is listed and may be
+ * posted in; a private channel of the outsider's alone is never listed and a card posting in it is
+ * refused. A message goes to a colleague on the staff, never to an id that is nobody's.
+ */
+const channelProbe = {
+  inside: (ctx) => ({ type: "channel", id: ctx.channelId("general"), values: { community_channel_id: ctx.channelId("general"), body: "A note from the matrix" } }),
+  outside: async (ctx) => ({ type: "channel", id: await privateChannelOf(ctx), values: { community_channel_id: await privateChannelOf(ctx), body: "A note from the matrix" } }),
+};
+const messageProbe = {
+  inside: (ctx) => ({ type: "employee", id: ctx.outsider.employee_id, values: { employee_id: ctx.outsider.employee_id, body: "A note from the matrix" } }),
+  outside: () => ({ type: "employee", id: "00000000-0000-4000-8000-0000000000ab", values: { employee_id: "00000000-0000-4000-8000-0000000000ab", body: "A note from the matrix" } }),
+};
+
 module.exports = defineManifest({
   module: "community",
   actions: [
@@ -36,6 +60,7 @@ module.exports = defineManifest({
       run: (values, actor) => service.sendDirect(values.employee_id, values.body, actor),
       readback: (m) => [{ type: "direct_message", id: m.community_message_id, label: "Message sent", status: "sent", link: threadLink(m.community_channel_id) }],
       labels: { employee_id: "To", body: "Message" },
+      matrix: messageProbe,
     },
     {
       key: "community.post",
@@ -50,6 +75,7 @@ module.exports = defineManifest({
       run: (values, actor) => service.postMessage(values.community_channel_id, { message_type: "text", body: values.body }, actor),
       readback: (m) => [{ type: "channel_message", id: m.community_message_id, label: "Posted", status: "posted", link: channelLink(m.community_channel_id) }],
       labels: { community_channel_id: "Channel", body: "Message" },
+      matrix: channelProbe,
     },
   ],
   // Every other Create schema of this module's contract, and why the assistant does not offer it (gate 23).
@@ -110,6 +136,7 @@ module.exports = defineManifest({
         id: row.community_channel_id,
         label: `#${row.name}`,
       }),
+      matrix: channelProbe,
     },
   ],
   routes: [

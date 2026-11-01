@@ -159,14 +159,14 @@ const LeaveRecordCreate = z
  */
 const LeaveApprove = z
   .object({
-    leave_request_ids: z.array(uuid).min(1, "Pick a request").max(25),
+    leave_request_ids: z.array(uuid).min(1, "Pick a request").max(25, "At most 25"),
     reason: optionalText(1000),
   })
   .strict();
 
 const LeaveReject = z
   .object({
-    leave_request_ids: z.array(uuid).min(1, "Pick a request").max(25),
+    leave_request_ids: z.array(uuid).min(1, "Pick a request").max(25, "At most 25"),
     reason: text(1000),
   })
   .strict();

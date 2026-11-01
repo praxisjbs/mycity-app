@@ -212,17 +212,18 @@ conversation you are in, and an old subject can confuse a new question.
 
 ### Ask from any screen on a phone {#praxis-ask-anywhere needs="praxis_ai create"}
 
-![Praxis AI over a screen, on a phone](shot:praxis-panel)
+![Praxis AI opened from a screen, on a phone](shot:praxis-panel)
 
 1. On a phone, press the round button with a plus at the bottom right, **Quick Actions**.
-2. Press **Praxis AI**. The conversation opens over the screen you are on, and Praxis AI knows
-   which screen that is.
+2. Press **Praxis AI**. Praxis AI opens full screen, and it knows which screen you came from:
+   "these" and "here" mean that screen's records.
 3. Ask as on [Praxis AI · Ask](/praxis-ai?tab=ask). Press **Open Figures** under an answer to see
-   its table and sources. Pressing an answer's button or a record goes there and closes Praxis AI.
-4. Press **Back** at the top left, swipe right, or use your phone's Back gesture. It closes and
-   your screen is as you left it.
-5. Press **Praxis AI** again to come back to the same conversation. Press **Conversations** to
-   switch to another, or **New Conversation**, the plus at the top right, to start one.
+   its table and sources. Pressing an answer's button or a record goes there.
+4. Press **Back** at the top left, or use your phone's Back gesture. The screen you came from opens
+   as you left it, with its filters and its place in the list.
+5. To carry on a conversation later, open it from [Praxis AI · History](/praxis-ai?tab=history) or
+   [Search](#start-search). On a computer, **Praxis AI** at the top right of any screen does the
+   same as the round button.
 
 ## History {#praxis-history screen=praxis_ai/history icon=history}
 
@@ -359,8 +360,9 @@ do:
   - click: button "Praxis AI"
   - wait: text "Try Asking"
 marks:
-  1: text "Try Asking" | Questions you can ask
-  2: label "Ask a Question" | Type your question
+  1: button "Back" | Back to your screen
+  2: text "Try Asking" | Questions you can ask
+  3: label "Ask a Question" | Type your question
 ```
 
 ```shot praxis-phone
