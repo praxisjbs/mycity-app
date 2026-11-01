@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026 (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, opened 01/11/2026 (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -308,7 +308,7 @@ result line sits under the card. History is unchanged.
 | **PR2** | Full screen and the pane | `claude/sharp-planck-z0g9va` (praxisjbs/mycity-app#50) | Decisions 12, 13, 23: the full-screen Praxis AI with Back and context, the Assistant group in `packages/ui` (conversation, chips, the four pane views, charts, the phone sheet, progress), Table paging through read replay, Record, Sources; the User Guide chapter and pictures | PR1 | Every pane view works on desktop and at 375 px, light and dark; Back returns to the exact screen with its filters; progress shows while reads run; the old Ask's tests moved onto the new screen; gates 8, 11, 21 green |
 | **PR3** | Large data and Excel | `claude/clever-pasteur-nt3rsc`, praxisjbs/mycity-app#51 (merged 01/11/2026) | Decisions 14, 15: summary reads for attendance, tasks, leave, approvals, performance, the Audit Log and employees; the statement timeout and the narrow-down answer; Overview's figures and chart; Download Excel with the provenance sheet through the export path; the summary cache | PR1 (runs beside PR2) | A 25,000-row export completes in the worker and downloads; a read that would scan too much asks to narrow; the model never receives rows from a summary (asserted); Overview shows a chart the server drew |
 | **PR4** | Action cards | `ccr-e4d934cb-hbbhlg` (the session's), praxisjbs/mycity-app#53 (merged 01/11/2026) | Decisions 10, 11, 19, 20, 21: actions declared in Workspace (tasks, calendar), ESS and People (leave request, approve, reject), Approvals (decide), Staff Community (message a colleague, post in a channel), Mailbox (send a mail), Performance (a check-in note where the service allows); the card on screen with Edit, Cancel and the confirm sheet (passkey, PIN, password); bulk up to 25; suggested cards; per-module `not_offered` accounting | PR1 and PR2 | Approve 4 leave requests from the chat works with a passkey and with a PIN; a card replayed after rights were removed is refused; "Tell Ada" drafts a direct message the person sends with one press; a mail drafted from the chat arrives with the company signature; gate 23's action rules green for every module |
-| **PR5** | Proof and switch-over | `m10/praxis-ai-pr5` or the session's | Decisions 26, 27: scope probes per module in the matrix, the attack suite in CI and nightly on staging with the real model, refusal and leak monitoring on AI Control, gate 23's `not_offered` rule made universal, the old Ask retired, `praxis-ai.md` §2 and §10 rewritten to what ships, the User Guide chapter final, the extraction note | PR3 and PR4 | Every listed attack fails safely with the model scripted and with the real model; a planted leak fails the build; the nightly run alerts on a refusal that leaked; the guide and the manual describe one screen |
+| **PR5** | Proof and switch-over | `ccr-0f62841c-d228ng` (the session's), praxisjbs/mycity-app#56 | Decisions 26, 27: scope probes per module in the matrix, the attack suite in CI and nightly on staging with the real model, refusal and leak monitoring on AI Control, gate 23's `not_offered` rule made universal, the old Ask retired, `praxis-ai.md` §2 and §10 rewritten to what ships, the User Guide chapter final, the extraction note | PR3 and PR4 | Every listed attack fails safely with the model scripted and with the real model; a planted leak fails the build; the nightly run alerts on a refusal that leaked; the guide and the manual describe one screen |
 
 **Order.** PR1 first and alone. PR2 and PR3 start together the moment PR1 merges, in two chats. PR4
 starts when PR2 merges (its card is drawn inside PR2's conversation; its backend half may start on
@@ -697,14 +697,14 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 - [x] 01/11/2026 · The evaluation set's eleven action cases and `card.not-mine` (`no_action`); the attack scaffold in `ai-cards.test.js` (one's own request, a grant never reached, a stranger as recipient, a mail without a mailbox); `ai-actions-{workspace,leave,approvals,community,mailbox}.test.js` on the real migrations (four leave requests approved with a passkey, two rejected with a PIN, self-approval and a request outside scope refused, Tell Ada, a mail queued with the signature baked); `tests/integration/helpers/ai-actions.js`
 - [x] 01/11/2026 · Guide §2, §5, §6.11, §8, §10, §11, §14; each module's guide §9 (workspace, ess, community, mailbox, foundation, performance) and `identity.md`; the User Guide chapter's card section with its picture; PROGRESS; README; FRONTEND_GUIDE §9.1
 
-### 6.5 PR5 · Proof and switch-over
+### 6.5 PR5 · Proof and switch-over (started 01/11/2026, praxisjbs/mycity-app#56)
 
-- [ ] Scope probes in the matrix for every module with team or own scopes
-- [ ] The attack suite in CI; attack-assistant.js; the nightly workflow on staging
-- [ ] Refusals and the nightly result on AI Control · Spend; the urgent notice on a leak
-- [ ] Gate 23's not_offered rule universal; every module swept
-- [ ] The old Ask retired; one screen; dead code removed
-- [ ] Guide §2, §3, §10, §13 final; the User Guide chapter final; MILESTONES §15; README; PROGRESS
+- [x] 01/11/2026 · Scope probes in the matrix: `matrix: { inside, outside }` on the scoped reads and actions of Workspace (`tasks.list`, `tasks.complete`, `tasks.comment`, `calendar.month`), People (`employees.list`, `leave.requests`, `leave.approve`, `leave.reject`, `attendance.register`), Home (`team.today`, `activity.list`), ESS (`my_profile.get`, `my_leave.list`), approvals (`approvals.mine`, `approvals.decide`) and Staff Community (`channels.list`, `community.post`, `community.message`), each built through the module's own service from the `ctx` the suite hands it; the matrix gives each role a report and itself an outsider, walks a list's pages, and asserts every probe (`praxis-ai.md` §6.17). Performance and Queries carry none, and say why
+- [x] 01/11/2026 · The attack suite: `scripts/ai/attack-assistant.js` (eleven attacks, the grades, the run recorded through `recordAttackRun`, production refused), `tests/integration/ai-attacks.test.js` (each attack with the model scripted, every refusal counted, a run recorded and its leak told), `tests/unit/foundation/ai-attacks.test.js`; `deploy-gate attack` (the staging key's third command, no deploy lock, the release's own code) with its refusals in `deploy.test.js`; `.github/workflows/ai-nightly.yml` at 02:17 Lagos, failing loudly on a leak and warning on a run that could not run; releases now carry `scripts/ai`
+- [x] 01/11/2026 · Refusals and the nightly result on AI Control · Spend: `AiSpend.praxis_ai` (`AiPraxisSpend`, `AiAttackRun`), migration `10350` `ai_attack_run`, `assistant.action_refused` recorded at a press refused for want of rights, Reads Refused, Presses Refused and Nightly Attacks as KpiCards with help terms on both shells; `ai_control.attack_leaked` the one notice AI Control sends (urgent, `ai_control` edit, Acknowledge, opens Spend)
+- [x] 01/11/2026 · Gate 23's not_offered rule universal: every module whose contract exports a `<Thing>Create` schema offers it, lists it in `not_offered` with a reason or opted out whole with one; thirteen manifests gained their reasons; `--list` prints the sweep
+- [x] 01/11/2026 · The old Ask retired (decision 27): the floating button's Praxis AI opens the one full-screen Praxis AI with the screen underneath as `from`; `AskPanel.tsx` and its test removed, `ChatPage` carries no context; guide §2, §3 step 8, §10 and the User Guide chapter follow
+- [x] 01/11/2026 · Guide §6.17, §4, §7, §13 (what an extraction moves and what stays), §14; `ai-control.md` §2, §4, §5, §7, §10, §14; `policies.md` (the `policies.read` fix the suite found); the User Guide chapters for Praxis AI and AI Control with their pictures; MILESTONES §15; README; DATABASE_SCHEMA; the runbooks (`deploy.md`, `monitoring.md`) and SYSTEM_ARCHITECTURE §9.5 for `attack`; PROGRESS
 
 ---
 
@@ -716,7 +716,7 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 | 23 · AI awareness | `scripts/check/ai-awareness.js` | (1) `src/shared/ai/catalogue.snapshot.json` differs from `registry.catalogue()` (keys, kinds, modules, permissions, risk, the hash of each parameter, input and prefill schema): run `npm run gen:ai-catalogue` and review the diff. (2) An action's `input` is not a schema the module's own feature folder validates a form with (`useContractForm(..., <schema>)`), unless the action says `form: "none: <reason>"`. (3) An action key that no integration test exercises, or that the evaluation set (`scripts/ai/eval-assistant.js`) does not grade. (4) A module that declares `actions` and leaves a `<Thing>Create` schema of its contract neither offered nor in `not_offered` with a reason (PR5 makes this rule universal). (5) A Try Asking line (`assistant.suggestions.js`) naming a read that does not exist |
 | 24 · AI engine boundary | `scripts/check/ai-engine-boundary.js` | A file under `src/services/ai/engine/` that requires anything but Node's builtins and its sibling files; a file outside it that reaches into the engine's internals rather than its `index.js` |
 | The matrix | `tests/integration/ai-matrix.test.js` | Any read, summary or action a role may run that `scopeFor` would refuse, or the reverse; a scoped person's rows that the CEO's do not contain; a masked field reaching a person without the field grant; a probe's outside record returned or acted on (PR5) |
-| The attack suite | `tests/integration/ai-cards.test.js` (PR1), `ai-attacks.test.js` (PR5), nightly `scripts/ai/attack-assistant.js` (PR5) | A card run twice, expired, after a grant was removed, over 25 records, or sensitive without a fresh confirm; and from PR5 every attack of §5's PR5 prompt |
+| The attack suite | `tests/integration/ai-cards.test.js` (PR1), `ai-attacks.test.js` (PR5), nightly `scripts/ai/attack-assistant.js` through `deploy-gate attack` and `.github/workflows/ai-nightly.yml` (PR5) | A card run twice, expired, after a grant was removed, over 25 records, or sensitive without a fresh confirm; and from PR5 every attack of §5's PR5 prompt: another person's pay, a guessed id, instructions planted in a message, a note and a policy, an action outside scope, self-approval, a card after the grant went, a bulk card over 25, a mail outside from a suggested card, a read never offered. With the real model a leak fails the nightly and is an urgent notice; AI Control · Spend shows the last run |
 
 ---
 
@@ -782,6 +782,24 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   `scripts/check/ai-awareness.js` (offered by any manifest), `app/src/auth/FreshSignIn.tsx` (the
   order, `onConfirmed`), the module services and repos the actions run through. Merged as
   praxisjbs/mycity-app#53 once CI was green on GitHub; PR5 may start.
+- 01/11/2026 · JP · PR5 built (§6.5) in one chat, on the session's branch, as praxisjbs/mycity-app#56,
+  once release run 73 had sealed `08f6f0b` (PR1 to PR4 and the boot fix #55) on staging. The matrix's
+  probes, the attack suite and its nightly run, Spend's three figures with the leak notice, gate 23
+  universal, the old Ask retired, the documents final. Found on the way: `policies.read` returned a
+  list envelope for one record and the read guard had refused it since it shipped (the attack suite's
+  planted-policy case found it; fixed, `policies.md`); the three bulk schemas' limit reached a card
+  as Zod's own words ("Array must contain at most 25 element(s)"), now "At most 25"; a scoped module's
+  probe cannot use SQL (gate 19 refused `ctx.db.query` in a manifest), so the suite hands probes the
+  annual leave type and the probes find #general through the service; a list read's inside record
+  may sit past the first page for an all-scope reader, so the matrix walks up to ten pages, which
+  also made the subset rule honest for a CEO's list longer than a page; `GET /notifications` carries
+  no event key, so the leak notice is found by its title on the urgent list. The `attack` command
+  changes `deploy-gate`, so the server's copy must be reinstalled (`deploy.md` §5) before the next
+  release and the first nightly pass check-gate; the nightly needs a provider set up on staging,
+  else it reads Could Not Run. A cloud session's image again lacked `node_modules`, Node 20 and
+  pgvector (installed by hand: `npm ci`, a Node 20 tarball under `/opt/node20`,
+  `postgresql-16-pgvector` after `apt-get update`). Performance and Queries carry no probe (their
+  records need a plan, a round or a raised query), said so in §6.17.
 - 01/11/2026 · JP · The first full run fell on a month's first day and found the suite assumed
   October: the staging reviews seed bound the plans at the real clock, so October's round opened
   with no reviews (on staging too, from 1 November); four screen tests of attendance and the

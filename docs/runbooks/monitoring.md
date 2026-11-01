@@ -159,6 +159,15 @@ gives the environment and certificate checks it does not.
 The server alerts on its own too: the nightly backup and the weekly restore drill post to
 production's alert channels (§2) when they fail (`docs/runbooks/backup-restore.md`).
 
+**Praxis AI's nightly attack run** (`.github/workflows/ai-nightly.yml`, 02:17 Lagos) asks the attack
+questions of `scripts/ai/attack-assistant.js` of the real model on staging, as a real person of each
+role, through `deploy-gate attack` (`docs/guides/praxis-ai.md` §6.17). A leak fails the run loudly,
+with each leak in the job summary, and is an urgent notice in the hub to whoever may change AI
+Control; AI Control · Spend shows the last run either way (Passed, Leaked, Could Not Run). A run
+that could not run (no provider set up on staging, nobody holding a role) is a warning, not a
+failure. Run it by hand on the server as the staging user from the current release:
+`node --env-file=/srv/mycity/stg/shared/.env scripts/ai/attack-assistant.js` (refused on production).
+
 Also worth a look each week, on the server:
 
 | What | Command | Act when |

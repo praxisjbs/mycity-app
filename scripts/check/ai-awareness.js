@@ -13,14 +13,17 @@
  *  3. Every action key is exercised by an integration test (a string literal in
  *     tests/integration or a module's test) and graded by the evaluation set
  *     (scripts/ai/eval-assistant.js, a case with `action: "<key>"`).
- *  4. A module that declares actions accounts for every `<Thing>Create` schema its contract
- *     exports: offered as an action's input (by any manifest: ESS offers leave's own request), or
- *     in `not_offered` with a reason; and every `not_offered` name is a schema of that contract.
- *     (PR5 makes this rule universal.)
+ *  4. Every `<Thing>Create` schema any module's contract exports is accounted for (universal
+ *     since PR5): offered as an action's input (by any manifest: ESS offers leave's own request),
+ *     or in its module's `not_offered` with a reason; and every `not_offered` name is a schema of
+ *     that contract. A module with no manifest is one that opted out whole (`// ai:none <reason>`
+ *     in its controller, gate 9): the assistant has no surface there at all, and that written
+ *     reason covers its Create schemas. A module not built yet (no filled controller) is not asked.
  *  5. Every Try Asking line (src/modules/assistant/assistant.suggestions.js) names a read that
  *     exists.
  *
- * Usage: node scripts/check/ai-awareness.js     exit 0 ok, 1 problems
+ * Usage: node scripts/check/ai-awareness.js [--list]     exit 0 ok, 1 problems
+ *        --list prints the sweep: each Create schema and how it is accounted for
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -35,6 +38,8 @@ const TESTS = [path.join(ROOT, "tests", "integration"), path.join(ROOT, "src", "
 const EVAL = path.join(ROOT, "scripts", "ai", "eval-assistant.js");
 const SUGGESTIONS = path.join(ROOT, "src", "modules", "assistant", "assistant.suggestions.js");
 const SCHEMAS = path.join(ROOT, "packages", "contract", "schemas");
+const MODULES = path.join(ROOT, "src", "modules");
+const coverage = require("./ai-manifest-coverage");
 
 function walk(dir, test, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -108,22 +113,39 @@ function check() {
     if (!new RegExp(`action:\\s*["']${a.key.replace(".", "\\.")}["']`).test(evalText)) problems.push(`${a.key}: the evaluation set (scripts/ai/eval-assistant.js) has no case with action: "${a.key}"`);
   }
 
-  // 4. Every Create schema of a module that declares actions is offered (by any manifest: ESS offers
-  //    leave's LeaveRequestCreate as the person's own request) or explained.
-  const offered = new Set(actions.map((a) => a.input));
-  for (const { folder, manifest } of registry.manifests()) {
-    if (!manifest.actions.length && !Object.keys(manifest.not_offered).length) continue;
-    const file = path.join(SCHEMAS, `${folder}.js`);
-    if (!fs.existsSync(file)) continue;
-    const mod = require(file);
-    const creates = Object.entries(mod).filter(([k, v]) => /Create$/.test(k) && v && typeof v.safeParse === "function");
+  // 4. Every Create schema of every module's contract is offered (by any manifest: ESS offers
+  //    leave's LeaveRequestCreate as the person's own request), explained in its manifest's
+  //    not_offered, or in a module that opted out whole with a written reason (gate 9).
+  const offered = new Map(actions.map((a) => [a.input, a.key]));
+  const byFolder = new Map(registry.manifests().map((m) => [m.folder, m.manifest]));
+  const optedOut = new Map(coverage.check().optedOut.map((o) => [o.module, o.reason]));
+  const sweep = [];
+  for (const file of fs.readdirSync(SCHEMAS).filter((f) => f.endsWith(".js")).sort()) {
+    const folder = file.replace(/\.js$/, "");
+    const creates = Object.entries(require(path.join(SCHEMAS, file))).filter(([k, v]) => /Create$/.test(k) && v && typeof v.safeParse === "function");
+    if (!creates.length) continue;
+    const manifest = byFolder.get(folder);
+    if (!manifest) {
+      if (!built(folder)) continue;
+      if (optedOut.has(folder)) {
+        for (const [name] of creates) sweep.push(`${folder}.${name}: the module opted out of the assistant whole (${optedOut.get(folder)})`);
+        continue;
+      }
+      problems.push(`${folder}: its contract exports ${creates.map(([k]) => k).join(", ")} and the module has neither a manifest with not_offered nor // ai:none <reason> in its controller`);
+      continue;
+    }
     for (const [name, schema] of creates) {
-      if (offered.has(schema) || manifest.not_offered[name]) continue;
-      problems.push(`${folder}.ai.js: ${name} is neither an action's input nor in not_offered; say whether the assistant may draft it, and why not if not`);
+      if (offered.has(schema)) sweep.push(`${folder}.${name}: offered as ${offered.get(schema)}`);
+      else if (manifest.not_offered[name]) sweep.push(`${folder}.${name}: not offered (${manifest.not_offered[name]})`);
+      else problems.push(`${folder}.ai.js: ${name} is neither an action's input nor in not_offered; say whether the assistant may draft it, and why not if not`);
     }
     for (const name of Object.keys(manifest.not_offered))
       if (!creates.some(([k]) => k === name)) problems.push(`${folder}.ai.js: not_offered names ${name}, which packages/contract/schemas/${folder}.js does not export as a Create schema`);
   }
+  // A manifest's not_offered with no contract file of its module's name explains nothing.
+  for (const { folder, manifest } of registry.manifests())
+    if (Object.keys(manifest.not_offered).length && !fs.existsSync(path.join(SCHEMAS, `${folder}.js`)))
+      problems.push(`${folder}.ai.js: not_offered names schemas, but packages/contract/schemas/${folder}.js does not exist`);
 
   // 5. Try Asking names reads that exist.
   try {
@@ -133,13 +155,21 @@ function check() {
     problems.push(`assistant.suggestions.js could not be read: ${err.message}`);
   }
 
-  return { problems, actions: actions.length };
+  return { problems, actions: actions.length, sweep };
+}
+
+/** A module counts once its controller has content, as gate 9 counts it; the map makes every module's files empty first. */
+function built(folder) {
+  const dir = path.join(MODULES, folder);
+  if (!fs.existsSync(dir)) return false;
+  return fs.readdirSync(dir).some((f) => f.endsWith(".controller.js") && fs.readFileSync(path.join(dir, f), "utf8").trim().length > 0);
 }
 
 if (require.main === module) {
   const r = check();
+  if (process.argv.includes("--list")) for (const line of r.sweep) console.log(`  ${line}`);
   if (r.problems.length === 0) {
-    console.log(`ai-awareness: ok (${r.actions} action(s); the snapshot, forms, tests and evaluation set agree with the manifests)`);
+    console.log(`ai-awareness: ok (${r.actions} action(s); the snapshot, forms, tests and evaluation set agree with the manifests; ${r.sweep.length} Create schema(s) accounted for)`);
     process.exit(0);
   }
   console.error("ai-awareness: the engine must be told what changed (praxis-ai.md §6.15)\n");
@@ -147,4 +177,4 @@ if (require.main === module) {
   process.exit(1);
 }
 
-module.exports = { check, formCalls };
+module.exports = { check, formCalls, built };

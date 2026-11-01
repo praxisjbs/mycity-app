@@ -1159,6 +1159,7 @@ screen.
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.15, §6.17): `approvals.mine` and `approvals.decide` carry matrix probes (a report's request waiting on the asker who holds approve, an outsider's never, a card naming it refused unless the asker reads every request); `ApprovalDecide` says At most 25 on a card; `imports.ai.js` and `organisation.ai.js` account for their Create schemas in `not_offered` (an import starts on Settings, Imports with its preview in view; Add Employee carries restricted fields, a department and a seat are set with the structure in view), as gate 23 asks of every module.
 - 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): My Approvals' card `approvals.decide` in `workflow.ai.js` (the requests waiting on the person decided from the chat through `decide()`, one after another, after Confirm It's You; `workflow.service.cardRecords`, `assertCardInstances`, `decideMany`); §9. Nothing on the Approvals screens changes.
 
 - 01/11/2026 · JP · §9: `approvals.summary` (D) and `audit.summary` (C), the requests waiting on a person and the Audit Log counted for the assistant; `audit` drops its `ai:none` for a manifest with the summary alone (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.

@@ -328,6 +328,43 @@ function spendByAction(db, from, to, query) {
   );
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's refusals and the attack suite's runs (praxis-ai.md §6.17)
+ * ------------------------------------------------------------------ */
+
+/**
+ * How often the assistant refused this month: reads the model asked for that the person's grant
+ * did not reach (ai_message_read, outcome refused), and cards whose press was refused before
+ * anything ran (the audit's assistant.action_refused).
+ */
+async function praxisRefusals(db, from, to) {
+  const row = await one(
+    db,
+    `SELECT (SELECT count(*) FROM ai_message_read r WHERE r.outcome = 'refused' AND r.created_at >= $1 AND r.created_at < $2)::int AS reads_refused,
+            (SELECT count(*) FROM event_log l WHERE l.event_key = 'assistant.action_refused' AND l.occurred_at >= $1 AND l.occurred_at < $2)::int AS presses_refused`,
+    [from, to],
+  );
+  return row || { reads_refused: 0, presses_refused: 0 };
+}
+
+const ATTACK_RUN = `a.ai_attack_run_id, a.environment, a.run_by, a.status, a.asked, a.passed, a.leaks, a.error_code, a.started_at, a.finished_at`;
+
+/** The newest run of the attack suite, or null before the first. */
+function latestAttackRun(db) {
+  return one(db, `SELECT ${ATTACK_RUN} FROM ai_attack_run a ORDER BY a.finished_at DESC, a.ai_attack_run_id DESC LIMIT 1`);
+}
+
+/** One run of the attack suite, as the script reports it. */
+function insertAttackRun(client, r) {
+  return one(
+    client,
+    `INSERT INTO ai_attack_run (environment, run_by, status, asked, passed, leaks, error_code, started_at, finished_at)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, now())
+     RETURNING ${ATTACK_RUN.replace(/a\./g, "")}`,
+    [r.environment, r.run_by, r.status, r.asked, r.passed, JSON.stringify(r.leaks || []), r.error_code || null, r.started_at],
+  );
+}
+
 /** A provider's cap row, or null. */
 function capOf(db, provider) {
   return one(db, "SELECT provider, monthly_cap_ngn::text AS monthly_cap_ngn FROM ai_provider_cap WHERE provider = $1", [provider]);
@@ -389,6 +426,9 @@ module.exports = {
   callsSince,
   spendByDay,
   spendByAction,
+  praxisRefusals,
+  latestAttackRun,
+  insertAttackRun,
   capOf,
   setCap,
   overallCap,

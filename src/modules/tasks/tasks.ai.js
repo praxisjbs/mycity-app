@@ -14,6 +14,18 @@ const service = require("./tasks.service");
 
 const taskLink = (id) => (routeMap.linkFor("task", id) || {}).path || null;
 
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): a task on the asker's own board, set by
+ * them for themselves, and one on an outsider's board, set by the outsider; the list must return the
+ * first and never the second, and a card naming the second is refused by the module's own check.
+ */
+/** A probe's answer for one task: the card's values as the tool being probed takes them. */
+const forTask = (ctx, t) => ({ type: "task", id: t.task_id, values: ctx.key === "tasks.comment" ? { task_id: t.task_id, body: "A note from the matrix" } : { task_ids: [t.task_id] } });
+const probe = {
+  inside: async (ctx) => forTask(ctx, await service.create(ctx.actor, ctx.actor.scope, { title: `Matrix task for ${ctx.role}` })),
+  outside: async (ctx) => forTask(ctx, await service.create(ctx.outsider.user, ctx.outsider.scope, { title: `Outsider's task, seen by ${ctx.role}` })),
+};
+
 module.exports = defineManifest({
   module: "workspace",
   actions: [
@@ -33,6 +45,7 @@ module.exports = defineManifest({
     {
       key: "tasks.complete",
       label: "Mark Done",
+      matrix: probe,
       description: "Mark one or more of my tasks done, with the late reason the board asks for an overdue one",
       input: c.tasks.TaskComplete,
       permission: ["workspace", "edit"],
@@ -50,6 +63,7 @@ module.exports = defineManifest({
     {
       key: "tasks.comment",
       label: "Add Comment",
+      matrix: probe,
       description: "Comment on a task I can see: the task and the words",
       input: c.tasks.TaskCommentAdd,
       permission: ["workspace", "edit"],
@@ -87,6 +101,7 @@ module.exports = defineManifest({
       permission: ["workspace", "view"],
       run: (_client, params, actor) => service.list(params, actor.scope),
       cite: (row) => ({ type: "task", id: row.task_id, label: `${row.number} ${row.title}` }),
+      matrix: probe,
     },
   ],
   routes: [

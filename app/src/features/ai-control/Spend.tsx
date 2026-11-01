@@ -1,5 +1,5 @@
 import aiControl from "@mycity/contract/schemas/ai_control.js";
-import type { AiProvider, AiProviderSpend, AiSpend, AiSpendAction } from "@mycity/contract/contract.gen.ts";
+import type { AiPraxisSpend, AiProvider, AiProviderSpend, AiSpend, AiSpendAction } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
@@ -19,6 +19,8 @@ import {
   Grid,
   HelpTerm,
   KeyValue,
+  KpiCard,
+  KpiGrid,
   LoadingRows,
   Meter,
   Money,
@@ -31,7 +33,7 @@ import {
   useModal,
 } from "@mycity/ui";
 import { useState } from "react";
-import { HELP, JOB, PROVIDER } from "./words";
+import { HELP, JOB, NIGHTLY, PROVIDER } from "./words";
 
 /** A cap's naira as the field shows it: "50000.00" → "50,000". */
 const typed = (cap: string | null) => (cap ? Number(cap).toLocaleString("en-NG", { maximumFractionDigits: 2 }) : "");
@@ -169,6 +171,28 @@ function Overall({ s }: { s: AiSpend }) {
   );
 }
 
+/**
+ * Praxis AI's refusals this month and the nightly attack run's last result (docs/guides/ai-control.md
+ * §10, praxis-ai.md §6.17): three figures with help terms. The run before the first reads Not Run.
+ */
+function PraxisFigures({ p }: { p: AiPraxisSpend }) {
+  const run = p.nightly;
+  const state = run ? NIGHTLY[run.status] : null;
+  return (
+    <KpiGrid cols={3} className="mt-3">
+      <KpiCard title="Reads Refused" value={p.reads_refused.toLocaleString("en-NG")} caption="Praxis AI, this month" help={HELP.readsRefused} />
+      <KpiCard title="Presses Refused" value={p.presses_refused.toLocaleString("en-NG")} caption="Praxis AI, this month" help={HELP.pressesRefused} />
+      <KpiCard
+        title="Nightly Attacks"
+        value={run && run.status !== "cannot_run" && run.status !== "failed" ? `${run.passed} of ${run.asked}` : (state?.text ?? "Not Run")}
+        tone={state?.tone}
+        caption={run ? `${state!.text} ${formatDate(run.finished_at)}` : "No run yet"}
+        help={HELP.nightly}
+      />
+    </KpiGrid>
+  );
+}
+
 /** AI Control · Spend (docs/guides/ai-control.md §2, §10). */
 export function Spend() {
   const read = useApi("GET /api/v1/ai-control/spend");
@@ -189,6 +213,7 @@ export function Spend() {
               <ProviderCard key={p.provider} p={p} />
             ))}
           </Grid>
+          <PraxisFigures p={s.praxis_ai} />
           <DesktopOnly>
             <BarChart className="mt-3" title="Spend by Day" bars={s.days.map((d) => ({ label: dayLabel(d.day), value: Number(d.spent_ngn) }))} />
           </DesktopOnly>

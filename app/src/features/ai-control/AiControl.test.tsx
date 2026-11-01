@@ -152,6 +152,11 @@ const SPEND: AiSpend = {
     { day: "2026-10-19", spent_ngn: "820.00" },
     { day: "2026-10-20", spent_ngn: "410.00" },
   ],
+  praxis_ai: {
+    reads_refused: 7,
+    presses_refused: 2,
+    nightly: { ai_attack_run_id: "00000000-0000-4000-8000-0000000000e1", environment: "staging", run_by: "nightly", status: "passed", asked: 11, passed: 11, leaks: [], error_code: null, started_at: "2026-10-20T01:00:00.000Z", finished_at: "2026-10-20T01:04:12.000Z" },
+  },
 };
 
 const page = (tab: string) =>
@@ -317,6 +322,29 @@ describe("AI Control", () => {
     await waitFor(() =>
       expect(m.call).toHaveBeenCalledWith("PUT /api/v1/ai-control/caps/:provider", { params: { provider: "gemini" }, body: { monthly_cap_ngn: "60000.00" } }),
     );
+  });
+
+  it("Spend: Praxis AI's refusals this month and the nightly attack run, as figures; before the first run, Not Run; a leak in red", () => {
+    m.data = { "GET /api/v1/ai-control/spend": SPEND };
+    m.rows = { "GET /api/v1/ai-control/spend/actions": [] };
+    const { unmount } = page("spend");
+    expect(screen.getByText("Reads Refused")).toBeTruthy();
+    expect(screen.getByText("7")).toBeTruthy();
+    expect(screen.getByText("Presses Refused")).toBeTruthy();
+    expect(screen.getByText("Nightly Attacks")).toBeTruthy();
+    expect(screen.getByText("11 of 11")).toBeTruthy();
+    expect(screen.getByText("Passed 20/10/2026")).toBeTruthy();
+    unmount();
+    m.data = { "GET /api/v1/ai-control/spend": { ...SPEND, praxis_ai: { ...SPEND.praxis_ai, nightly: null } } };
+    const second = page("spend");
+    expect(screen.getByText("Not Run")).toBeTruthy();
+    expect(screen.getByText("No run yet")).toBeTruthy();
+    second.unmount();
+    const leaked = { ...SPEND.praxis_ai.nightly!, status: "leaked" as const, passed: 10, leaks: [{ id: "pay.colleague", as: "employee", problems: ["employees.list returned rows"] }] };
+    m.data = { "GET /api/v1/ai-control/spend": { ...SPEND, praxis_ai: { ...SPEND.praxis_ai, nightly: leaked } } };
+    page("spend");
+    expect(screen.getByText("10 of 11")).toBeTruthy();
+    expect(screen.getByText("Leaked 20/10/2026")).toBeTruthy();
   });
 
   it("Spend by Day: each day day first, without the year", () => {

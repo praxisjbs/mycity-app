@@ -15,7 +15,10 @@
  * `bulk` records; the action's own check(); then the run is opened and run() called once, outside
  * the card's transaction, since the service keeps its own. A refusal a person can fix (an AppError
  * under 500 from check() or run()) comes back on the fields and the card stays open; anything else
- * is recorded on the card as failed.
+ * is recorded on the card as failed. A press refused before anything ran because the rights were
+ * not there (the grant gone, more records than the action allows, the action's own check: a record
+ * outside the person's scope, their own request) is recorded as `assistant.action_refused`, audit
+ * only, so AI Control · Spend can count the presses refused this month (praxis-ai.md §6.17).
  */
 const { pool } = require("../../config/db");
 const { logger } = require("../../config/logger");
@@ -138,7 +141,37 @@ function held(checked) {
 /** The action's own check, with the person carrying their scope; its refusals land on the fields. */
 async function ownCheck(client, action, values, actor) {
   if (!action.check) return;
-  await action.check(client, values, actor);
+  try {
+    await action.check(client, values, actor);
+  } catch (err) {
+    if (err instanceof AppError && err.status < 500) err.refusedAt = "check";
+    throw err;
+  }
+}
+
+/** The codes authorise.checkAction refuses a press with before anything runs (§6.11 step 5). */
+const REFUSED_CODES = new Set(["AI_ACTION_FORBIDDEN", "TOO_MANY_RECORDS"]);
+
+/**
+ * A press refused for want of rights is recorded, audit only, in a transaction of its own: the
+ * refusal rolled the press's back. The card itself is untouched; the person reads the refusal.
+ */
+async function recordRefusal(id, actor, err) {
+  if (!(err instanceof AppError) || !(REFUSED_CODES.has(err.code) || err.refusedAt === "check")) return;
+  try {
+    const found = await repo.draftOf(pool, id, actor.user_id);
+    if (!found) return;
+    await tx((client) =>
+      emit(client, {
+        key: EVENTS.ASSISTANT_ACTION_REFUSED,
+        entity: { type: "ai_action_draft", id: found.ai_action_draft_id },
+        actor,
+        payload: { action_key: found.action_key, error_code: err.code, at: err.refusedAt === "check" ? "check" : "grant" },
+      }),
+    );
+  } catch (recordErr) {
+    logger.warn({ err: recordErr, ai_action_draft_id: id }, "Praxis AI: a refused press could not be recorded");
+  }
 }
 
 /** The lines a press reads back, from the action's readback or the records it named. */
@@ -155,7 +188,19 @@ function linesOf(action, result, records) {
  * @returns {Promise<object>} AiActionResult
  */
 async function confirm(id, body, actor, idempotencyKey = null) {
-  const opened = await tx(async (client) => {
+  let opened;
+  try {
+    opened = await openPress(id, body, actor, idempotencyKey);
+  } catch (err) {
+    await recordRefusal(id, actor, err);
+    throw err;
+  }
+  return runPress(opened, actor, idempotencyKey);
+}
+
+/** The press's first half, in one transaction: the checks, then the run opened `running`. */
+function openPress(id, body, actor, idempotencyKey) {
+  return tx(async (client) => {
     const found = await repo.draftOf(client, id, actor.user_id, { lock: true });
     if (!found) throw notFound();
     try {
@@ -186,7 +231,10 @@ async function confirm(id, body, actor, idempotencyKey = null) {
     });
     return { found, action, who, values: checked.values, records: checked.records, run };
   });
+}
 
+/** The press's second half: run() outside the card's transaction, then the result recorded. */
+async function runPress(opened, actor, idempotencyKey) {
   const { found, action, who, values, records, run } = opened;
   let result;
   try {

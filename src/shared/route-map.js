@@ -126,6 +126,9 @@ const screen = (module, tab) => ({ module, tab });
  * otherwise.
  */
 const ENTITY_ROUTES = Object.freeze({
+  // AI Control: the nightly attack run's result is a figure on Spend (praxis-ai.md §6.17)
+  ai_attack_run: screen("ai_control", "spend"), // search:none a run of the attack suite is a figure on Spend, never a record anyone looks up
+
   // Home
   home_alert: screen("home", "alerts"),
   // A rule opens Edit Rule on the Alerts tab, whose `?id=` is an alert.

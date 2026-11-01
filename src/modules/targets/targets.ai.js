@@ -12,6 +12,10 @@ const commitments = require("./targets.commitments");
 
 module.exports = defineManifest({
   module: "performance",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    ScorecardCreate: "a scorecard is drafted line by line on Performance, Scorecards; the route opens Draft a Scorecard",
+  },
   reads: [
     {
       key: "scorecards.list",

@@ -1826,6 +1826,7 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · `kpis.ai.js`, `reviews.ai.js` and `targets.ai.js` account for their Create schemas in `not_offered` (a KPI is defined by its function's head on KPIs, a round is opened by People, an improvement plan is opened on a review, a scorecard is drafted line by line), as gate 23 asks of every module since the Praxis AI Engine's PR5 (`praxis-ai.md` §6.15). The performance reads carry no matrix probe: their records need a plan and a round the matrix does not build (§6.17).
 - 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): Performance declares no card. The check-in is a form of many lines and the goals service has no check-in, so `goals.ai.js` says so and lists every Create schema of its contract as `not_offered` with its screen; §9. Nothing on the Performance screens changes.
 
 - 01/11/2026 · JP · §9: `goals.summary` and `reviews.summary`, the quarter's key results, scores and ratings and the reviews by stage counted for the assistant, within the reader's reach and scope (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.

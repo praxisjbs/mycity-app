@@ -12,6 +12,11 @@ const service = require("./reviews.service");
 
 module.exports = defineManifest({
   module: "performance",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    PipCreate: "an improvement plan is opened on a review by People, with the review in view",
+    RoundCreate: "a review round is opened on Performance by People, for the whole company at once",
+  },
   summaries: [
     {
       key: "reviews.summary",

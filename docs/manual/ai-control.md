@@ -206,15 +206,22 @@ Spend shows what AI has cost this month, in naira, against each cap.
 3. Each provider shows **Free** or **Paid**, what it spent and this month's calls. A paid one shows
    its cap, or *no cap*. **Not Set Up** means it has no key; **At Cap** means it reached its cap.
    The bar turns amber at 80% and red at 100%.
-4. On a computer, **Spend by Day** shows a bar for each day.
-5. **By Action** lists **Action** (its job under it), **Calls** and **Spent**. With nothing spent
+4. Three tiles show Praxis AI: **Reads Refused** and **Presses Refused** this month, and
+   **Nightly Attacks**, the last result of the questions asked of Praxis AI every night to make sure
+   it gives nobody what their own screens would not. It reads, for example, *11 of 11* with
+   **Passed** and the day; in red, **Leaked**; **Could Not Run** or **Failed**; before the first
+   run, **Not Run**. Hover a tile's title (tap it on a phone) for what it counts.
+5. On a computer, **Spend by Day** shows a bar for each day.
+6. **By Action** lists **Action** (its job under it), **Calls** and **Spent**. With nothing spent
    this month it says **Nothing Spent**.
 
 If the tab says **This did not load** with **Try Again**, the spend could not be read: press
 **Try Again**.
 
 Nobody is notified when a cap is near or reached. Check Spend to know when to top up a provider's
-account.
+account. A leak the nightly questions find is the one thing AI Control tells you about: an urgent
+notice to everyone who may change AI Control, which stays until one of you presses **Acknowledge**,
+and opens Spend.
 
 ### Set a cap {#ai-control-spend-cap needs="ai_control edit"}
 

@@ -48,8 +48,26 @@ const siteForAi = (s) => ({
 
 const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
 
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): today's register lists everyone in the
+ * asker's `people` scope, punched or not, so it must carry a report of theirs (else themselves) and
+ * never an outsider.
+ */
+const registerProbe = {
+  inside: (ctx) => ({ type: "employee", id: ctx.report ? ctx.report.employee_id : ctx.actor.employee_id }),
+  outside: (ctx) => ({ type: "employee", id: ctx.outsider.employee_id }),
+};
+
 module.exports = defineManifest({
   module: "people",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    CheckInCreate: "a check-in is a punch from the person's own device at the site, with its time and place; never typed",
+    HomeRequestCreate: "a home location is an address and a point, personal data the assistant never reads or writes",
+    OvertimePreApprovalCreate: "overtime is pre-approved on People, Attendance with the day's roster in view",
+    PunchCreate: "a clock-in is made on the device at the worksite, with its location and time",
+    TemporarySiteCreate: "a temporary site's addresses are picked on a map, never typed, on Work Location Requests",
+  },
   summaries: [
     {
       key: "attendance.summary",
@@ -79,6 +97,7 @@ module.exports = defineManifest({
         id: row.employee.employee_id,
         label: `${row.employee.display_name}, ${row.date}`,
       }),
+      matrix: registerProbe,
     },
     {
       key: "attendance.exceptions",

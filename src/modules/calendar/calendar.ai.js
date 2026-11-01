@@ -30,6 +30,28 @@ async function attendeeRecords(db, ids) {
   return wanted.map((id) => ({ type: "employee", id, label: names.get(id) || null }));
 }
 
+/** An hour on a weekday a month ahead, as an event's start and end. */
+function slotOf(dayIso, hour) {
+  return { starts_at: `${dayIso}T${String(hour).padStart(2, "0")}:00:00+01:00`, ends_at: `${dayIso}T${String(hour + 1).padStart(2, "0")}:00:00+01:00`, month: dayIso.slice(0, 7) };
+}
+
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): the month is the asker's own calendar,
+ * so an event they made is on it and one the outsider made for themselves alone never is.
+ */
+const probe = {
+  inside: async (ctx) => {
+    const at = slotOf(ctx.freshDay(), 9);
+    const e = await service.create(ctx.actor, { title: `Matrix meeting for ${ctx.role}`, event_type: "meeting", starts_at: at.starts_at, ends_at: at.ends_at, all_day: false, visibility: "attendees", attendee_ids: [], reminder_minutes: [] });
+    return { type: "calendar_event", id: e.calendar_event_id, params: { month: at.month } };
+  },
+  outside: async (ctx) => {
+    const at = slotOf(ctx.freshDay(), 11);
+    const e = await service.create(ctx.outsider.user, { title: `Outsider's meeting, seen by ${ctx.role}`, event_type: "meeting", starts_at: at.starts_at, ends_at: at.ends_at, all_day: false, visibility: "attendees", attendee_ids: [], reminder_minutes: [] });
+    return { type: "calendar_event", id: e.calendar_event_id, params: { month: at.month } };
+  },
+};
+
 module.exports = defineManifest({
   module: "workspace",
   actions: [
@@ -58,6 +80,7 @@ module.exports = defineManifest({
       permission: ["workspace", "view"],
       run: (_client, params, actor) => service.month(actor.scope.employee_id, params),
       cite: (row) => ({ type: CITED[row.performance_kind || row.item_kind], id: row.item_id, label: row.title }),
+      matrix: probe,
     },
   ],
   routes: [{ intent: "book a meeting", screen: "workspace.calendar", params: { new: "1" }, prefill: c.calendar.CalendarEventPrefill }],

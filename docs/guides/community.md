@@ -627,6 +627,7 @@ fields, never in a toast.
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.17): `channels.list`, `community.post` and `community.message` carry matrix probes (#general listed and open to a post, a private channel of an outsider's alone never listed and refused as a card's channel, a message to an id that is nobody's refused); the probes go through the community service, never SQL.
 - 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11, decision 19): the assistant's cards `community.message` (a direct message a person sends with one press, `community.service.sendDirect`) and `community.post` (a post in a channel they may post in); the assistant reads no message still; §9. Nothing on the Staff Community screens changes.
 
 - 29/10/2026 · GE · Knowledge Hub's Announcements tab (#66, M10) is dropped (GE, 29/10/2026): announcements are published and kept on Staff Community · Announcements and read in #announcements. Its interim page, ⌘K screen and the `knowledge_announcement` record type are gone. Nothing on these screens changes.

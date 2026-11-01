@@ -39,6 +39,9 @@ const FILES = [
   { path: "scripts/db" },
   { path: "scripts/import" },
   { path: "scripts/ops" },
+  /* Praxis AI's attack suite and evaluation set, run on staging as the release's own code
+     (deploy-gate attack; docs/guides/praxis-ai.md §6.17). */
+  { path: "scripts/ai" },
   { path: "migrations" },
   { path: "seeds" },
   { path: "templates" },

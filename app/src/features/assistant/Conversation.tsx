@@ -57,9 +57,9 @@ export interface ConversationProps {
 
 /**
  * One conversation: its turns, the question waiting with what is being read, and the box with the
- * microphone and Send. The full-screen Praxis AI shows it beside the pane; the phone's floating
- * button shows it over any screen (AskPanel). The parent holds which conversation it is and lays it
- * out as a column it fills.
+ * microphone and Send. The full-screen Praxis AI shows it beside the pane on desktop and full width
+ * on a phone (index.tsx, PhoneChat.tsx). The parent holds which conversation it is and lays it out
+ * as a column it fills.
  */
 export function Conversation({ id, context = null, shows = [], onOpened, onGone, onAnswered, onPane, paneFor = null }: ConversationProps) {
   const formId = useId();

@@ -20,6 +20,10 @@ const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_n
 
 module.exports = defineManifest({
   module: "knowledge",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    PolicyCreate: "a policy is written and published on Knowledge Hub, Policies by those who manage policies, through its own flow",
+  },
   reads: [
     {
       key: "policies.mine",
@@ -34,7 +38,8 @@ module.exports = defineManifest({
       description: "Read one policy version that applies to me: its text, or its rules as sentences, what changed and when it applies",
       params: c.common.IdParams,
       permission: ["ess", "view"],
-      run: async (_client, params, actor) => ({ data: [await service.myVersion(actor, params.id)], page: { ...EMPTY.page, total: 1, pages: 1 } }),
+      // One record, as a read with an id and no page returns it (shared/ai/authorise.js); a list envelope here was refused as a read of many.
+      run: (_client, params, actor) => service.myVersion(actor, params.id),
       cite: (row) => ({ type: "policy_version", id: row.policy_version_id, label: `${row.title}, Version ${row.version}` }),
     },
     {
