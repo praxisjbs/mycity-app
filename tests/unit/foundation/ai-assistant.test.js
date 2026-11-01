@@ -254,6 +254,15 @@ describe("one question", () => {
   });
 });
 
+describe("a card's words, held to ready to send (praxis-ai.md §6.11, decision 19)", () => {
+  test("a gap left to fill, or a token that stands for nothing, is a problem on its field; whole words pass", () => {
+    expect(answer.gapsIn({ subject: "Venue visit", body: "Dear Ada,\n\nSee you on Thursday at 10:00." })).toEqual({});
+    expect(answer.gapsIn({ body: "Dear [name],\n\nSee you on Thursday." })).toEqual({ body: [answer.FILL_THE_GAP] });
+    expect(answer.gapsIn({ subject: "Insert subject here", body: "Signed, ______" })).toEqual({ subject: [answer.FILL_THE_GAP], body: [answer.FILL_THE_GAP] });
+    expect(answer.gapsIn({ body: "The amount is KEPT001", to_addresses: ["[someone]"] })).toEqual({ body: [answer.FILL_THE_GAP] });
+  });
+});
+
 describe("what the screen shows", () => {
   const READ = {
     n: 1,

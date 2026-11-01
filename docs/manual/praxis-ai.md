@@ -10,9 +10,10 @@ Praxis AI answers questions about MyCity's work in plain words: "Who came in lat
 screens show you, so two colleagues asking the same question can get different answers. Nobody
 else can read your questions, People and the CEO included.
 
-Praxis AI never changes anything. Ask it to do something, such as add a task or request leave, and
-it offers the screen where you do it, already filled in with what you said. Nothing is saved until
-you press that screen's own button.
+Praxis AI never changes anything by itself. Ask it to do something, such as add a task, approve the
+leave waiting on you or tell a colleague something, and it draws the change as a card for you to
+check and press. Nothing happens until you press the card's button. A change it has no card for
+opens the screen where you do it, already filled in with what you said.
 
 ## Ask {#praxis-ask screen=praxis_ai/ask icon=spark}
 
@@ -126,17 +127,47 @@ conversations, and one opens full screen when you press it.
 
 ### Have it do something for you {#praxis-ask-change needs="praxis_ai create"}
 
-1. Ask for what you want, for example "add a task to send the weekly report by Friday" or "book a
-   team meeting tomorrow at 10".
-2. Praxis AI answers with a button for the screen where you do it, such as *Open Tasks* or
-   *Open Calendar*.
-3. Press it. The screen opens, and for a new task, event, project, leave request or employee, its
-   form is filled in with what you said.
-4. Check every field, change what is wrong, and press the form's own button to save.
+![A card inside an answer](shot:praxis-card)
 
-Praxis AI can fill in a new task, a new event, a new project, a leave request and, for those who
-may add people, a new employee. For other changes, such as a new role, it opens the screen or an
-empty form: fill it in yourself.
+1. Ask for what you want, for example "add a task to send the weekly report by Friday", "approve
+   the leave requests waiting on me" or "tell Ada the report is ready".
+2. Praxis AI answers with a card: the change as it will be made, every field filled in from what
+   you said, and the records it touches. Nothing has happened yet.
+3. Check every field. To change the words, a day or a choice, press **Edit**, change the field and
+   press **Save Changes**. A field with a problem says so beside it, for example *Say why*.
+4. Press the card's button to make the change, for example **Create Task** or **Approve Leave**. A
+   card that touches several records says how many, for example *Approve Leave ×4*.
+5. Under the card, **Done** lists each record and what happened to it. Press **Open** on a line to
+   see the record.
+6. To do nothing, press **Cancel**.
+
+- A card you did not ask for reads as a question, for example *Send Message?*. Press its button to
+  send it, or **Not Now**.
+- A card left for half an hour says **This card has expired.** Press **Draw It Again** to ask the
+  question again.
+- A mail or a message is written from your words and the records Praxis AI read for the answer.
+  Read it before you press **Send Mail** or **Send Message**: it goes as it stands, with your own
+  signature on a mail.
+- A card the hub cannot make as it stands says why under the card, for example
+  **Connect your mailbox first** with **Open Mailbox**.
+
+Praxis AI draws a card for a task, marking tasks done, a comment, a meeting, your own leave
+request, the leave and other requests waiting on you, a message to a colleague, a post in a channel
+and a mail from your mailbox. For other changes, such as a new role, it opens the screen or a filled
+form: press that screen's own button to save.
+
+> **Important:** A card only ever does what your own screens let you do. A request you may not
+> decide, or a task that is not on your board, is refused when you press.
+
+### Confirm it is you for an approval {#praxis-ask-confirm needs="praxis_ai create"}
+
+1. Approving or rejecting a request, and any change about money, payroll or deleting, asks
+   **Confirm It's You** first unless you confirmed within the last five minutes.
+2. Choose under **Confirm With**: **Passkey** if you have one, **PIN** or **Password**. Press
+   **Use Passkey**, or enter it and press **Confirm**.
+3. The card is pressed for you once you have confirmed.
+4. If you have no passkey, a message offers **Set Passkey**, once. Press it to add one with your
+   fingerprint, face or screen lock, so the next confirmation is one touch.
 
 ### Start a new conversation {#praxis-ask-new needs="praxis_ai create"}
 
@@ -258,6 +289,19 @@ marks:
   2: label "Ask a Question" | Type your question
   3: button "Record Question" | Ask with your voice
   4: button "Send" | Send it
+```
+
+```shot praxis-card
+open: /praxis-ai?tab=ask&from=%2Fworkspace%3Ftab%3Dtasks
+as: staff
+do:
+  - fill: label "Ask a Question" = Create a task to send the weekly report on Friday
+  - click: button "Send"
+  - wait: button "Create Task"
+marks:
+  1: button "Create Task" | Make the change
+  2: button "Edit" | Change a field first
+  3: button "Cancel" | Do nothing
 ```
 
 ```shot praxis-answer

@@ -1019,6 +1019,18 @@ the log's filters say) by action, by person, by module or record type, and by da
 words (`audit.repo.aiSummary`). `documents` carries `ai:none`: a document is a
 file, and what it says about a person is read through that person's own module.
 
+Since PR4 of the Praxis AI Engine, My Approvals has a card (`approvals.decide`, `workflow.ai.js`,
+`docs/guides/praxis-ai.md` §6.11): approve, reject or request changes on up to 25 of the requests
+waiting on the person, after Confirm It's You (risk approval), with a reason required but to
+approve (`ApprovalDecide`); the card names each request by its flow and who it is about
+(`workflow.service.cardRecords`); at the press every request must be one the person may read
+(`assertCardInstances`), then each goes through `decide()` as the screen's buttons do, one after
+another (`decideMany`): a request already decided, not waiting on them, their own, or decided on
+its own record (a sanction) is its own line, the last with the record's screen, and the rest still
+go. Its grant is `ess` create, as the queue's read is `ess` view: the queue is the person's own;
+whether they may decide each request is the service's (the stage names them, `approve` held on the
+request's module, never the requester). `ApprovalFlowCreate` is `not_offered`.
+
 Search providers: `organisation.search.js` (employees, departments; A), `imports.search.js` (a batch
 by its number or the file; B), `access.search.js` (roles by name or code) and `settings.search.js`
 (numbering schemes by document, public holidays by name; C), `users.search.js` (exists), screens and
@@ -1146,6 +1158,8 @@ screen.
 - The sign-in screen's drawings or licensed photographs: TB (`identity.md` §13).
 
 ## 14 · Change log
+
+- 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): My Approvals' card `approvals.decide` in `workflow.ai.js` (the requests waiting on the person decided from the chat through `decide()`, one after another, after Confirm It's You; `workflow.service.cardRecords`, `assertCardInstances`, `decideMany`); §9. Nothing on the Approvals screens changes.
 
 - 01/11/2026 · JP · §9: `approvals.summary` (D) and `audit.summary` (C), the requests waiting on a person and the Audit Log counted for the assistant; `audit` drops its `ai:none` for a manifest with the summary alone (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 28/10/2026 · JP · §6.18, a select's server list loads as it scrolls (JBS Praxis, from Goals' Function select, fed by People · Departments, which stopped at 25): every select filled from a server list reads it 25 at a time (`useInfinite`, `paging`) and loads the next page as its menu nears its end, on both shells; it looks as before. In the folders this guide maps: People · Employees' Department filter, Departments' Open Role (Set Head) and the reporting form's Open Role. FRONTEND_FOUNDATION F32.
