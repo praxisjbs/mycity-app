@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 open 01/11/2026 (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, opened 01/11/2026 (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -664,7 +664,7 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 - [x] 01/11/2026 · Gate 19 rewritten (reads, summaries, declared actions and routes; no SQL or .query() in a manifest); gate 23 ai-awareness (the snapshot, the form's schema, a test and an evaluation case per action, not_offered, Try Asking's keys); both in ci-local.js and BACKEND_GUIDE §8.4
 - [x] 01/11/2026 · The matrix test (every read, summary and action by every seeded role and the CEO on the staging seeds: offered exactly as scopeFor allows, refused when run, rows a subset of the CEO's, no masked field; own-only reads wait for PR5's probes) and the cards test (drawn, kept, nothing written; no card for a screen that draws none; edited, pressed, the task created, the run and the audit, a second press refused; a fixable refusal on the fields, a failing service recorded; expired, cancelled, over bulk, forbidden after the grant went; a sensitive class past the window refused and pressed once confirmed; a read run again)
 - [x] 01/11/2026 · Unit tests: manifest v2, gate 19 on SQL, the turn loop, the card rules, the pane's Overview and Sources, the matrix generator, gate 24 (tests/unit/foundation/ai-engine.test.js, 26); the older suites brought to the new shapes
-- [ ] npm run ci green; PROGRESS note; the PR opened as a draft, then ready; CI green; merged
+- [x] 01/11/2026 · npm run ci green under Node 20 (every gate, the whole suite: 2961 backend tests, 1123 and 644 frontend, 95 screens crawled); PROGRESS note; PR #49 opened as a draft, then ready; merged once CI was green on GitHub
 
 ### 6.2 PR2 · Full screen and the pane
 
@@ -737,3 +737,10 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   Profile and ESS's other own-only reads are never a subset of the CEO's, so the subset rule skips
   the own-only module and PR5's probes take it; a `query`/`queries` key is not a write word (the
   queries module's manifest uses it), so gate 19 guards SQL by statement and `.query()` instead.
+- 01/11/2026 · JP · The first full run fell on a month's first day and found the suite assumed
+  October: the staging reviews seed bound the plans at the real clock, so October's round opened
+  with no reviews (on staging too, from 1 November); four screen tests of attendance and the
+  calendar read "this month" or moved the clock forward. Fixed in their own commit, each with its
+  guide's Change log line (`attendance.md`, `workspace.md`, `performance.md`); the same five fail
+  on main today. A cloud session's image lacks Node 20 under /opt and pgvector; both installed by
+  hand, and worth adding to the image (`.claude/hooks/session-start.sh` notes the first).
