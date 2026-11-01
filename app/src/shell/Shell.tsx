@@ -223,7 +223,7 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, op
   const { can } = useAuth();
   const { location, navigate } = useRouter();
   // Praxis AI from any screen (docs/guides/praxis-ai.md decision 12): the screen in view travels as the question's context and where Back goes.
-  const praxis = moduleByKey("praxis_ai");
+  const assistant = moduleByKey("praxis_ai");
   const askHere = () => navigate(askHref(`${location.path}?${location.params.toString()}`));
   const menu = useAccountMenu();
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -281,7 +281,7 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, op
           search={<SearchButton onClick={openSearch} />}
           actions={
             <>
-              {praxis && can("praxis_ai") && mod?.key !== "praxis_ai" && <IconButton icon="spark" label={praxis.label} onClick={askHere} />}
+              {assistant && can("praxis_ai") && mod?.key !== "praxis_ai" && <IconButton icon="spark" label={assistant.label} onClick={askHere} />}
               <ClockButton />
               <BellButton />
             </>
