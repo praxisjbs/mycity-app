@@ -19,6 +19,8 @@ describe("the routes", () => {
     expect(Object.keys(by).sort()).toEqual([
       "DELETE /conversations/:id",
       "DELETE /history",
+      "GET /answers/:id/reads/:n",
+      "GET /cards/:id",
       "GET /conversations",
       "GET /conversations/:id/turns",
       "GET /history/questions",
@@ -26,13 +28,17 @@ describe("the routes", () => {
       "GET /suggestions",
       "POST /answers/:id/feedback",
       "POST /ask",
+      "POST /cards/:id/cancel",
+      "POST /cards/:id/confirm",
       "POST /history/export",
       "POST /transcribe",
+      "PUT /cards/:id",
     ]);
-    for (const key of ["POST /ask", "POST /answers/:id/feedback", "POST /transcribe"])
+    // A card's edit, press and cancel are the asker's own (create); the action's own grant is checked inside (§6.11).
+    for (const key of ["POST /ask", "POST /answers/:id/feedback", "POST /transcribe", "PUT /cards/:id", "POST /cards/:id/confirm", "POST /cards/:id/cancel"])
       expect(by[key].permission).toMatchObject({ key: "praxis_ai", action: "create" });
-    // One's own History, its figures and its export: view, whatever the grant's scope (decision 7).
-    for (const key of ["GET /suggestions", "GET /conversations", "GET /conversations/:id/turns", "DELETE /conversations/:id", "DELETE /history", "GET /history/summary", "GET /history/questions", "POST /history/export"])
+    // One's own History, its figures, its export, a read run again and a card: view, whatever the grant's scope (decision 7).
+    for (const key of ["GET /suggestions", "GET /conversations", "GET /conversations/:id/turns", "DELETE /conversations/:id", "DELETE /history", "GET /history/summary", "GET /history/questions", "POST /history/export", "GET /answers/:id/reads/:n", "GET /cards/:id"])
       expect(by[key].permission).toMatchObject({ key: "praxis_ai", action: "view" });
     for (const r of routes) expect(r.capability).toBeNull();
   });
@@ -98,7 +104,7 @@ describe("an answer as History shows it", () => {
     );
     const c = require("@mycity/contract");
     expect(c.assistant.AiAnswer.safeParse(shown).success).toBe(true);
-    expect(shown.reads).toEqual([{ key: "leave.requests", rows: 2, total: 2, first: 1 }]);
+    expect(shown.reads).toEqual([{ n: 1, key: "leave.requests", kind: "read", module_key: null, params: { page: 1 }, outcome: "read", rows: 2, total: 2, first: 1 }]);
     expect(shown.citations[0]).toMatchObject({ entity_type: "employee", label: "Ayo Bello", read_key: "employees.list" });
     expect(shown.citations[0].link).toMatch(/^\/people\?/);
     expect(shown.table.links).toEqual(["/people?tab=employees&id=00000000-0000-4000-8000-000000000003"]);

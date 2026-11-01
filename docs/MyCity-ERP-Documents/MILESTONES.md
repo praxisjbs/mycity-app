@@ -1202,6 +1202,16 @@ removes the pending-action queue, the confirmation surface, the executor and the
 from this milestone, and **the capacity released goes to M2** (§1.3), which absorbed the most new
 scope.
 
+*Amended 1 November 2026 (JBS Praxis; `docs/guides/praxis-ai.md` §1.2, `docs/handoff/praxis-ai-engine.md`).*
+The "never writes" half was JBS's own scoping choice to keep the first build small, not a MyCity
+requirement, and JBS lifts it at no charge under the licence: the assistant still never executes
+anything itself; it drafts a change as a card from the module's own form schema, and the person's
+press runs the module's own service function with their own rights, re-checked at the press, the
+sensitive classes (approvals, money, payroll, deletes) after Confirm It's You. A module that
+declares no action keeps routing to its screen. The definition of done below reads accordingly:
+asked to create a task, the assistant draws the task as a card; the person creates it with one
+press, or opens the task screen if they prefer.
+
 `pixie-girl-hub/src/modules/praxis_ai/` (**4,482**): `praxis.orchestrator.js` runs one turn as
 RAG retrieve → LLM call → answer, tracing every step in `ai_run_steps` with real token usage and
 cost. Take the retrieval and tracing halves; **leave `praxis.executor.js` and the

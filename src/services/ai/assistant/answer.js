@@ -1,20 +1,29 @@
 "use strict";
 /**
- * What the screen shows for an answer (docs/guides/praxis-ai.md §6.4), from the model's draft and
- * the reads the question made. Nothing the model typed becomes a figure: a table's cells are the
- * named read's own rows, the screen button is one of the routes offered this question, and the
- * citations are the records the reads returned (shared/ai/cite.js), never the answer's words.
+ * What the screen shows for an answer (docs/guides/praxis-ai.md §6.4, §6.11, §6.13), from the
+ * model's draft and the reads the question made. Nothing the model typed becomes a figure: a
+ * table's cells are the named read's own rows, the screen button is one of the routes offered
+ * this question, the citations are the records the reads returned (shared/ai/cite.js), the
+ * Overview's figures and chart are a summary's own, and a card's values are checked against the
+ * action's schema and the person's rights before anyone sees them.
  *
- *   const shown = answer.build({ draft, reads, routes, screens });
- *   // → { content, table, link, citations, citations_total, sources, reads, declined, more, rows_read,
- *   //     module_key, metadata, stored_citations }
+ *   const shown = answer.build({ draft, reads, routes, screens, shows });
+ *   // → { content, table, link, citations, citations_total, sources, reads, declined, more, overview,
+ *   //     rows_read, module_key, metadata, stored_citations, stored_reads }
+ *   const card = await answer.draftCard({ draft, actions, actor, context });   // null when none
  */
 const { mergeCitations, linkOfRef, sourcesOf } = require("../../../shared/ai/cite");
 const routeMap = require("../../../shared/route-map");
+const authorise = require("../../../shared/ai/authorise");
+const { contractNameOf, shapeOf } = require("../../../shared/ai/manifest");
 const { formatDate, formatDateTime } = require("../../../shared/time/day-first");
 const { formatNaira } = require("../../../shared/money/money");
+const { jsonSchemaOf } = require("../structured");
+const { logger } = require("../../../config/logger");
+const engine = require("../engine");
 
 const MAX_CITATIONS = 50;
+const MAX_COLUMNS = 12;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 const MONEY = /^-?\d{1,16}\.\d{2}$/;
@@ -34,28 +43,48 @@ function cell(field, v) {
 }
 
 /**
- * The table the draft asked for, drawn from the read's rows, with each row's record (`refs`, kept in
- * the answer's metadata; its link is worked out when shown, presentTable). A field the rows do not
- * carry, or that holds a list or an object, is left out; a table with no field left is no table.
+ * A table from rows: the fields named, with their labels; a field the rows do not carry, or that
+ * holds a list or an object, is left out; no field left is no table. `refs` are each row's record.
  */
-function tableOf(spec, reads) {
-  if (!spec) return null;
-  const read = reads.find((r) => r.n === spec.read && r.ok);
-  if (!read || !read.rows.length) return null;
+function drawTable(rows, refs, fields, labels = []) {
+  if (!rows || !rows.length) return null;
   const cols = [];
-  spec.fields.forEach((f, i) => {
+  fields.forEach((f, i) => {
     if (cols.some((c) => c.field === f)) return;
-    const values = read.rows.map((row) => (row && Object.prototype.hasOwnProperty.call(row, f) ? cell(f, row[f]) : undefined));
+    const values = rows.map((row) => (row && Object.prototype.hasOwnProperty.call(row, f) ? cell(f, row[f]) : undefined));
     if (values.some((v) => v === undefined || v === null)) return;
-    cols.push({ field: f, label: spec.labels[i] || f, values });
+    cols.push({ field: f, label: labels[i] || engine.cards.humanise(f), values });
   });
   if (!cols.length) return null;
   return {
     columns: cols.map((c) => c.label),
-    rows: read.rows.map((_, r) => cols.map((c) => c.values[r].text)),
+    fields: cols.map((c) => c.field),
+    rows: rows.map((_, r) => cols.map((c) => c.values[r].text)),
     numeric: cols.map((c, i) => (c.values.some((v) => v.text !== "") && c.values.every((v) => v.text === "" || v.numeric) ? i : -1)).filter((i) => i >= 0),
-    refs: read.rows.map((_, r) => (read.refs && read.refs[r]) || null),
+    refs: rows.map((_, r) => (refs && refs[r]) || null),
   };
+}
+
+/** The first scalar fields of a row, for a table nobody named columns for (the Table pane's replay). */
+function defaultFields(rows) {
+  const first = rows.find((r) => r && typeof r === "object") || {};
+  return Object.keys(first)
+    .filter((k) => !/_id$|^id$|_at$/.test(k) || /_on$|due_at|created_at/.test(k))
+    .filter((k) => cell(k, first[k]) !== null)
+    .slice(0, MAX_COLUMNS);
+}
+
+/**
+ * The table the draft asked for, drawn from the read's rows, with each row's record (`refs`, kept in
+ * the answer's metadata; its link is worked out when shown, presentTable), and which read and fields
+ * it came from, so the Table pane pages it again (§6.12).
+ */
+function tableOf(spec, reads) {
+  if (!spec) return null;
+  const read = reads.find((r) => r.n === spec.read && r.ok && r.kind !== "summary");
+  if (!read || !read.rows.length) return null;
+  const t = drawTable(read.rows, read.refs, spec.fields, spec.labels);
+  return t ? { ...t, read: read.n } : null;
 }
 
 /** A kept table as the screen shows it: each row's record as a link, worked out now. */
@@ -79,9 +108,7 @@ function groupsOf(citations) {
 /** The values of a prefill its route's schema takes, each checked on its own; never one of the route's params. */
 function prefillOf(route, values) {
   if (!route.prefill || !values || typeof values !== "object") return {};
-  let s = route.prefill;
-  while (s && s._def && !s.shape && (s._def.schema || s._def.innerType)) s = s._def.schema || s._def.innerType;
-  const shape = (s && s.shape) || {};
+  const shape = shapeOf(route.prefill) || {};
   const out = {};
   for (const [k, v] of Object.entries(values)) {
     if (!Object.prototype.hasOwnProperty.call(shape, k) || (route.params && k in route.params)) continue;
@@ -112,10 +139,14 @@ function linkOf(intent, values, routes, screens) {
   };
 }
 
+/** The reads as the wire and History carry them (AiReadMade), from the pane's sources. */
+const readsMade = (sources) => sources.map(({ n, key, kind, module_key, params, outcome, rows, total, first }) => ({ n, key, kind, module_key, params, outcome, rows, total, first }));
+
 /**
- * @param {{draft: object, reads: Array<object>, routes: Array<object>, screens: Array<object>}} q
+ * @param {{draft: object, reads: Array<object>, routes: Array<object>, screens: Array<object>, shows?: string[]}} q
  */
-function build({ draft, reads, routes, screens }) {
+function build({ draft, reads, routes, screens, shows = [] }) {
+  const wants = new Set(shows);
   const ok = reads.filter((r) => r.ok);
   const table = tableOf(draft.table, reads);
   const link = linkOf(draft.route, draft.prefill, routes, screens);
@@ -131,14 +162,10 @@ function build({ draft, reads, routes, screens }) {
   let declined = null;
   if (link) declined = "change";
   else if (reads.some((r) => r.declined) && !ok.length) declined = "not_available";
-  const madeReads = reads.map((r) => ({
-    key: r.key,
-    params: r.params,
-    rows: r.rows.length,
-    total: r.ok ? r.total : null,
-    first: r.ok && r.page ? (r.page.number - 1) * r.page.size + 1 : null,
-  }));
+  const stored = engine.pane.sourcesOf(reads);
+  const madeReads = readsMade(stored);
   const more = Boolean(draft.more) && ok.some((r) => r.page && r.page.has_next);
+  const overview = wants.has("pane") ? engine.pane.overviewOf(draft.overview, reads) : null;
   const shown = {
     content: draft.text,
     table: presentTable(table),
@@ -146,17 +173,66 @@ function build({ draft, reads, routes, screens }) {
     citations,
     citations_total: all.length,
     sources,
-    reads: madeReads.map(({ key, rows, total, first }) => ({ key, rows, total, first })),
+    reads: madeReads,
     declined,
     more,
-    rows_read: ok.reduce((n, r) => n + r.rows.length, 0),
+    overview,
+    rows_read: ok.filter((r) => r.kind !== "summary").reduce((n, r) => n + r.rows.length, 0),
     module_key: ok.length ? ok[0].module : null,
   };
   // What is kept on the answer's message, for History and the next turn's replay, and every
-  // citation, whose count History shows beside the first fifty.
-  shown.metadata = { table, link, reads: madeReads, declined, more };
+  // citation, whose count History shows beside the first fifty; each read for ai_message_read.
+  shown.metadata = { table, link, reads: madeReads, declined, more, overview };
   shown.stored_citations = all;
+  shown.stored_reads = stored;
   return shown;
 }
 
-module.exports = { build, tableOf, presentTable, groupsOf, linkOf, prefillOf, cell, MAX_CITATIONS };
+/**
+ * The card the draft asked for (§6.11 steps 1 and 2), or null: the action must be one offered
+ * this turn, the person's rights are checked again, the values are parsed with the action's
+ * schema, problems kept by field, the records listed, the bulk limit held. What comes back is
+ * the row to store (ai_action_draft) and the fields the card shows.
+ * @param {{draft: object, actions: Array<object>, actor: object, context?: object|null, now?: number}} q
+ */
+async function draftCard({ draft, actions, actor, context = null, now = Date.now() }) {
+  const want = draft && draft.action;
+  if (!want || !want.key) return null;
+  const action = (actions || []).find((a) => a.key === want.key);
+  if (!action) {
+    logger.info({ ai_action: want.key }, "Praxis AI: the model named an action that was not offered; no card");
+    return null;
+  }
+  const fieldNames = Object.keys(shapeOf(action.input) || {});
+  const values = engine.cards.fillFromContext(want.values && typeof want.values === "object" ? want.values : {}, fieldNames, context);
+  let checked;
+  try {
+    checked = await authorise.checkAction(actor, action.key, values);
+  } catch (err) {
+    if (err && (err.code === "AI_ACTION_FORBIDDEN" || err.code === "TOO_MANY_RECORDS" || err.code === "AI_ACTION_UNKNOWN")) {
+      logger.info({ ai_action: want.key, code: err.code }, "Praxis AI: a card was refused at the draft");
+      return null;
+    }
+    throw err;
+  }
+  const card = engine.cards.draft({ action, fieldNames, values, suggested: want.suggested === true, checked, now });
+  return {
+    row: {
+      action_key: action.key,
+      module_key: action.module,
+      risk: action.risk,
+      values: card.values,
+      problems: card.problems,
+      records: card.records,
+      suggested: card.suggested,
+      status: card.status,
+      expires_at: card.expires_at,
+    },
+    action,
+    fields: engine.cards.fieldsOf(jsonSchemaOf(action.input), action.labels),
+    schema: contractNameOf(action.input),
+    confirm: card.confirm,
+  };
+}
+
+module.exports = { build, draftCard, tableOf, drawTable, defaultFields, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS };

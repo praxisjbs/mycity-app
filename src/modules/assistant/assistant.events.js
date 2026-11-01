@@ -23,6 +23,11 @@ const EVENTS = defineEvents("praxis_ai", {
   "assistant.history_cleared": { summary: "A person cleared their history with the assistant" },
   "assistant.feedback_given": { summary: "A person marked an answer of the assistant Helpful or Not Helpful" },
   "assistant.export_requested": { summary: "A person asked for their questions to the assistant as a workbook" },
+  // Cards (docs/guides/praxis-ai.md §6.11, §7): the card, how it was confirmed and the result; never the words.
+  "assistant.card_drafted": { summary: "An answer of the assistant drew an action card for the person to confirm" },
+  "assistant.action_confirmed": { summary: "A person pressed an assistant's card and its action ran with their rights" },
+  "assistant.action_failed": { summary: "A person pressed an assistant's card and its action refused or failed" },
+  "assistant.card_cancelled": { summary: "A person declined an assistant's card" },
 });
 
 /** A spoken question (praxis-ai.md §6.6): kept only while it is transcribed, never played. */

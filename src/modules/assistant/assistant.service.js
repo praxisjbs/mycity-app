@@ -45,7 +45,7 @@ function titleOf(question) {
 
 /**
  * POST /ai/ask.
- * @param {{question: string, ai_conversation_id?: string}} body
+ * @param {{question: string, ai_conversation_id?: string, context?: object, shows?: string[]}} body
  * @param {object} actor  req.user (withActor)
  */
 async function ask(body, actor) {
@@ -54,18 +54,23 @@ async function ask(body, actor) {
     conversation = await repo.conversationOf(pool, body.ai_conversation_id, actor.user_id);
     if (!conversation) throw new AppError("NOT_FOUND", "Not found", 404);
   }
+  const context = body.context || null;
+  const shows = Array.isArray(body.shows) ? body.shows : [];
   const past = conversation ? await history.replay(conversation.ai_conversation_id, actor.user_id) : [];
-  const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past });
-  const shown = answer.build({ draft: out.draft, reads: out.reads, routes: out.routes, screens: out.screens });
+  const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past, context, shows });
+  const shown = answer.build({ draft: out.draft, reads: out.reads, routes: out.routes, screens: out.screens, shows });
+  // The card (§6.11 step 2): only for a screen that draws one, checked against the person's rights now.
+  const card = shows.includes("cards") ? await answer.draftCard({ draft: out.draft, actions: out.actions, actor, context }) : null;
 
   const saved = await tx(async (client) => {
     // Deleted in another tab meanwhile: the question opens a new conversation.
     let conv = conversation ? await repo.touchConversation(client, conversation.ai_conversation_id, actor.user_id) : null;
-    if (!conv) conv = await repo.insertConversation(client, { userId: actor.user_id, title: titleOf(body.question) });
+    if (!conv) conv = await repo.insertConversation(client, { userId: actor.user_id, title: titleOf(body.question), openedFrom: context });
     const q = await repo.insertMessage(client, {
       ai_conversation_id: conv.ai_conversation_id,
       role: "user",
       content: body.question,
+      context,
     });
     const a = await repo.insertMessage(client, {
       ai_conversation_id: conv.ai_conversation_id,
@@ -76,12 +81,24 @@ async function ask(body, actor) {
       rows_read: shown.rows_read,
       module_key: shown.module_key,
       metadata: shown.metadata,
+      context,
     });
     await repo.insertCitations(
       client,
       a.ai_message_id,
       shown.stored_citations.map((c) => ({ entity_type: c.entity_type, entity_id: c.entity_id, read_key: c.read_key, label: c.label })),
     );
+    await repo.insertReads(client, a.ai_message_id, shown.stored_reads);
+    let draft = null;
+    if (card) {
+      draft = await repo.insertDraft(client, { ...card.row, ai_message_id: a.ai_message_id, user_id: actor.user_id });
+      await emit(client, {
+        key: EVENTS.ASSISTANT_CARD_DRAFTED,
+        entity: { type: "ai_action_draft", id: draft.ai_action_draft_id },
+        actor,
+        payload: { ai_message_id: a.ai_message_id, action_key: card.row.action_key, risk: card.row.risk, suggested: card.row.suggested, records: card.row.records.map((r) => ({ type: r.type, id: r.id })) },
+      });
+    }
     await emit(client, {
       key: EVENTS.ASSISTANT_ANSWERED,
       entity: { type: "ai_message", id: a.ai_message_id },
@@ -91,14 +108,15 @@ async function ask(body, actor) {
         ai_run_id: out.run_id,
         reads: shown.reads.map((r) => r.key),
         declined: shown.declined,
+        card: draft ? draft.action_key : null,
       },
     });
-    return a;
+    return { a, draft };
   });
 
   return {
-    ai_message_id: saved.ai_message_id,
-    ai_conversation_id: saved.ai_conversation_id,
+    ai_message_id: saved.a.ai_message_id,
+    ai_conversation_id: saved.a.ai_conversation_id,
     question: body.question,
     content: shown.content,
     table: shown.table,
@@ -109,11 +127,17 @@ async function ask(body, actor) {
     reads: shown.reads,
     declined: shown.declined,
     more: shown.more,
+    card: saved.draft ? cardsService().present(saved.draft, null) : null,
+    overview: shown.overview,
+    context,
     feedback: null,
-    created_at: new Date(saved.created_at).toISOString(),
+    created_at: new Date(saved.a.created_at).toISOString(),
     provisional: true,
   };
 }
+
+/** The cards service, required late: it requires this module's events, which require the export, which requires nothing here. */
+const cardsService = () => require("./assistant.cards");
 
 /** GET /ai/suggestions. */
 async function suggestionsFor(actor) {

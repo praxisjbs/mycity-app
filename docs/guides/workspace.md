@@ -456,6 +456,7 @@ set and a rescope are decided by the person the flow names (performance.md §6.1
   `projects.ai.js`: `projects.list` (ProjectListQuery: "which projects are open");
   `calendar.ai.js`: `calendar.month` ("what's on Thursday"). Both `workspace` view, scoped, paged at
   25. A performance date is cited as its own record (a review, a key result, a PIP). The `workspace` module itself (Today, Analytics) is `ai:none`: it is a view over these two.
+- **AI actions** (`tasks.ai.js`, `docs/guides/praxis-ai.md` §6.11): `tasks.create` (standard risk, `workspace` create; input `TaskCreate`, New Task's own schema; run `tasks.service.create` with the person's scope; the task's number and title read back). The other Create schemas are `not_offered` with their reasons; PR4 of the engine adds `tasks.complete` and `tasks.comment`.
 - **AI routes**: "create a task" → `workspace.tasks` with `new=1`, New Task filled from the address
   (`tasks.TaskPrefill`: title, notes, priority, cadence, due day, and for a manager the assignee,
   shown by name through the colleague card); "set my commitments" → `workspace.tasks` with
@@ -588,6 +589,8 @@ None. Projects, the late reasons and invitations by email were decided by JBS Pr
 and are built (§6).
 
 ## 14 · Change log
+
+- 01/11/2026 · JP · §9: `tasks.create` is the Praxis AI Engine's reference action (`docs/guides/praxis-ai.md` §6.11, decision 10): the assistant drafts a task as a card from `TaskCreate`, the same schema New Task validates with, and the person's press runs `tasks.service.create` with their own scope; the task's number and title read back. The module's other Create schemas are `not_offered` with their reasons (gate 23). Nothing on screen changes until PR4 draws the card.
 
 - 27/10/2026 · JP · A plan the CEO has unbound for changes (performance.md §6.22, P23) is still live: Counts Towards lists a key result its owner holds in a binding, unbound or revising plan (`tasks.repo`), and the calendar's key result dates (§6.18 of performance.md) read the same plans (`calendar.repo`), so neither goes dark while a head adds to a plan. No screen or route changed.
 

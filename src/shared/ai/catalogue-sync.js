@@ -6,12 +6,13 @@
  *
  *   node src/shared/ai/catalogue-sync.js     deploy-gate runs this after migrating
  *
- * Upserts a row per read and per route (registry.catalogue()), and deletes rows the
- * build no longer has, in one transaction. Rows record the build they came from.
+ * Upserts a row per read, summary, action and route (registry.catalogue()), and deletes rows
+ * the build no longer has, in one transaction. Rows record the build they came from.
  *
- * Table (migration 0095; BACKEND_STRUCTURE §11.1):
- *   ai_catalogue  key PK, kind ('read' | 'route'), module_key, description, permission,
- *                 params_schema jsonb, screen, path, build_sha, synced_at
+ * Table (migration 0095, widened by 10330; BACKEND_STRUCTURE §11.1):
+ *   ai_catalogue  key PK, kind ('read' | 'route' | 'summary' | 'action'), module_key, description,
+ *                 permission, risk (an action's class), params_schema jsonb, screen, path,
+ *                 build_sha, synced_at
  */
 const { atomically } = require("../db/tx");
 const { buildInfo } = require("../../config/build-info");
@@ -29,18 +30,19 @@ async function sync(db) {
     return await atomically(client, async () => {
       for (const r of rows) {
         await client.query(
-          `INSERT INTO ai_catalogue (key, kind, module_key, description, permission, params_schema, screen, path, build_sha, synced_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+          `INSERT INTO ai_catalogue (key, kind, module_key, description, permission, risk, params_schema, screen, path, build_sha, synced_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
            ON CONFLICT (key) DO UPDATE
              SET kind = EXCLUDED.kind, module_key = EXCLUDED.module_key, description = EXCLUDED.description,
-                 permission = EXCLUDED.permission, params_schema = EXCLUDED.params_schema, screen = EXCLUDED.screen,
-                 path = EXCLUDED.path, build_sha = EXCLUDED.build_sha, synced_at = now()`,
+                 permission = EXCLUDED.permission, risk = EXCLUDED.risk, params_schema = EXCLUDED.params_schema,
+                 screen = EXCLUDED.screen, path = EXCLUDED.path, build_sha = EXCLUDED.build_sha, synced_at = now()`,
           [
             r.key,
             r.kind,
             r.module_key,
             r.description,
             r.permission,
+            r.risk,
             r.params_schema ? JSON.stringify(r.params_schema) : null,
             r.screen,
             r.path,

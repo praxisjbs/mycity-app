@@ -19,6 +19,7 @@ const { presentTable } = require("../../services/ai/assistant/answer");
 const { sourcesOf, typeLabel } = require("../../shared/ai/cite");
 const money = require("../../shared/money/money");
 const repo = require("./assistant.repo");
+const cards = require("./assistant.cards");
 const { EVENTS } = require("./assistant.events");
 
 /** The route whose replies the idempotency layer keeps for a repeated press. */
@@ -48,7 +49,28 @@ function citationOf(c) {
  * @param {object[]} citations
  * @param {Array<{entity_type: string, count: number}>} groups
  */
-function present(row, citations = [], groups = []) {
+/** A read as the wire carries it (AiReadMade), from what was kept; an answer kept before §6.12 lacks the newer fields. */
+function readMade(r, i) {
+  return {
+    n: r.n || i + 1,
+    key: r.key,
+    kind: r.kind === "summary" ? "summary" : "read",
+    module_key: r.module_key === undefined ? null : r.module_key,
+    params: r.params && typeof r.params === "object" ? r.params : {},
+    outcome: r.outcome || (r.total === null && !r.rows ? "refused" : "read"),
+    rows: r.rows || 0,
+    total: r.total === undefined ? null : r.total,
+    first: r.first || null,
+  };
+}
+
+/**
+ * @param {object} row  repo.turns / repo.answerOf
+ * @param {object[]} citations
+ * @param {Array<{entity_type: string, count: number}>} groups
+ * @param {{draft?: object|null, run?: object|null}} [card]  the answer's card and its newest press
+ */
+function present(row, citations = [], groups = [], card = {}) {
   const md = row.metadata || {};
   const shown = citations.map(citationOf);
   return {
@@ -61,9 +83,12 @@ function present(row, citations = [], groups = []) {
     citations: shown,
     citations_total: Number(row.citations_total) || 0,
     sources: sourcesOf(groups, shown.length === 1 ? shown[0] : null),
-    reads: (md.reads || []).map((r) => ({ key: r.key, rows: r.rows, total: r.total === undefined ? null : r.total, first: r.first || null })),
+    reads: (md.reads || []).map(readMade),
     declined: md.declined || null,
     more: Boolean(md.more),
+    card: card && card.draft ? cards.present(card.draft, card.run || null) : null,
+    overview: md.overview || null,
+    context: row.context || null,
     feedback: row.feedback || null,
     created_at: iso(row.created_at),
     provisional: true,
@@ -90,8 +115,15 @@ async function turns(id, query, actor) {
   if (!(await repo.conversationOf(pool, id, actor.user_id))) throw new AppError("NOT_FOUND", "Not found", 404);
   const page = await repo.turns(pool, id, actor.user_id, query);
   const ids = page.data.map((r) => r.ai_message_id);
-  const [cites, groups] = await Promise.all([repo.citationsOf(pool, ids), repo.sourceGroups(pool, ids)]);
-  return { ...page, data: page.data.map((r) => present(r, cites.get(r.ai_message_id) || [], groups.get(r.ai_message_id) || [])) };
+  const [cites, groups, drafts] = await Promise.all([repo.citationsOf(pool, ids), repo.sourceGroups(pool, ids), repo.draftsOfMessages(pool, ids)]);
+  const runs = await repo.latestRunsOf(pool, [...drafts.values()].map((d) => d.ai_action_draft_id));
+  return {
+    ...page,
+    data: page.data.map((r) => {
+      const draft = drafts.get(r.ai_message_id) || null;
+      return present(r, cites.get(r.ai_message_id) || [], groups.get(r.ai_message_id) || [], { draft, run: draft ? runs.get(draft.ai_action_draft_id) || null : null });
+    }),
+  };
 }
 
 /**

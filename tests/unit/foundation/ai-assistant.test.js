@@ -192,7 +192,7 @@ describe("one question", () => {
     const rescue = vendors.gemini.complete.mock.calls[3][0];
     expect(rescue.tools).toBeNull();
     expect(JSON.parse(rescue.messages[1].content)).toMatchObject({ question: "Whose leave waits on me?", data: [{ read: "leave.requests", rows: [{ employee: "Ayo Bello" }] }] });
-    expect(out.draft).toEqual({ text: "Ayo Bello's leave waits on you.", table: null, route: null, prefill: null, more: false });
+    expect(out.draft).toEqual({ text: "Ayo Bello's leave waits on you.", table: null, route: null, prefill: null, more: false, action: null, overview: null });
     expect(steps.map((s) => s[0])).toEqual(["completion", "completion", "retry", "retry"]);
   });
 
@@ -280,7 +280,7 @@ describe("what the screen shows", () => {
     expect(shown.sources).toEqual([{ kind: "type", entity_type: "leave_request", label: "leave request", count: 2, link: null }]);
     expect(shown).toMatchObject({ more: true, rows_read: 2, module_key: "ess", citations_total: 2, declined: null });
     expect(shown.citations[0]).toEqual({ entity_type: "leave_request", entity_id: "l1", label: "Ayo Bello", link: "/x?id=l1", read_key: "leave.requests" });
-    expect(shown.metadata.reads).toEqual([{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 40, first: 1 }]);
+    expect(shown.metadata.reads).toEqual([{ n: 1, key: "leave.requests", kind: "read", module_key: "ess", params: { page: 1 }, outcome: "read", rows: 2, total: 40, first: 1 }]);
   });
 
   test("the screen button is an offered route by its intent, with only the prefill its schema takes", () => {
