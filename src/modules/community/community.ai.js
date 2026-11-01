@@ -33,8 +33,16 @@ async function privateChannelOf(ctx) {
  * posted in; a private channel of the outsider's alone is never listed and a card posting in it is
  * refused. A message goes to a colleague on the staff, never to an id that is nobody's.
  */
+/** #general, which every login joins the first time it lists its channels. */
+async function generalChannelOf(ctx) {
+  const general = (await service.listChannels(ctx.actor, {})).data.find((ch) => ch.name === "general");
+  return general ? general.community_channel_id : null;
+}
 const channelProbe = {
-  inside: (ctx) => ({ type: "channel", id: ctx.channelId("general"), values: { community_channel_id: ctx.channelId("general"), body: "A note from the matrix" } }),
+  inside: async (ctx) => {
+    const id = await generalChannelOf(ctx);
+    return id ? { type: "channel", id, values: { community_channel_id: id, body: "A note from the matrix" } } : null;
+  },
   outside: async (ctx) => ({ type: "channel", id: await privateChannelOf(ctx), values: { community_channel_id: await privateChannelOf(ctx), body: "A note from the matrix" } }),
 };
 const messageProbe = {

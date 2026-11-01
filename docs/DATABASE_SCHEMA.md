@@ -589,8 +589,11 @@ confirmed, the values as run, a result line per record); `ai_catalogue.kind` wid
 and `action` with a `risk` column; `ai_conversation.opened_from` and `ai_message.context` (the screen
 a question was asked from) · `10340` `ai_message_read.outcome` widened to `timed_out`, a read or
 summary the database cut at the assistant's 3 second statement timeout (`docs/guides/praxis-ai.md`
-§6.3 step 8; PR3). An answer's Excel file (§6.16) is a `document` of type `ai_answer_export`, no
-table of its own.
+§6.3 step 8; PR3) · `10350` `ai_attack_run` (`docs/guides/praxis-ai.md` §6.17, `ai-control.md` §4;
+PR5): one row per run of Praxis AI's attack suite against the real model, nightly on staging or by
+hand, with its status, how many attacks were asked and passed, a line per leak and when it ran, so
+AI Control · Spend shows the last run. An answer's Excel file (§6.16) is a `document` of type
+`ai_answer_export`, no table of its own.
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

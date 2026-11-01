@@ -104,14 +104,14 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
   const reports = new Map();
   let outsider = null;
   let leaveTypeId = null;
-  const channels = new Map();
   let roles = [];
   let cases = [];
-  /* Weekdays ahead, each handed out once: a probe's leave request or meeting never overlaps another's. */
+  /* Working days ahead (the company's week, public holidays out), each handed out once: a probe's leave request or meeting never overlaps another's. */
+  let calendar = null;
   let dayCursor = new Date(Date.now() + 21 * 86_400_000);
   const freshDay = () => {
     do dayCursor = new Date(dayCursor.getTime() + 86_400_000);
-    while (dayCursor.getUTCDay() === 0 || dayCursor.getUTCDay() === 6);
+    while (!workingWeek.isWorkingDay(dayCursor.toISOString().slice(0, 10), calendar));
     return dayCursor.toISOString().slice(0, 10);
   };
 
@@ -172,7 +172,7 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
     outsider.scope = await scopeFor(outsider.user, "workspace", "create");
     people.set("ceo", await grantsCache.getAuthUser(pool, ceo.user_id));
     leaveTypeId = (await q("SELECT leave_type_id FROM leave_type WHERE code = 'annual' AND active")).rows[0].leave_type_id;
-    for (const r of (await q("SELECT community_channel_id, name FROM community_channel")).rows) channels.set(r.name, r.community_channel_id);
+    calendar = await workingWeek.loadCalendar(pool);
     await drainOutbox();
     registry.load();
     const tools = [...registry.reads(), ...registry.summaries(), ...registry.actions()];
@@ -279,11 +279,11 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
       const actor = { ...u, scope };
       const ctx = {
         actor,
+        key: k.key,
         role: k.role,
         report: reports.get(k.role) || null,
         outsider,
         leaveTypeId,
-        channelId: (name) => channels.get(name),
         freshDay,
         capabilities: u.is_ceo === true ? ["home.team"] : await grantsCache.getCapabilities(pool, u.user_id),
         scopeOf: (module, action) => scopeFor(u, module, action),

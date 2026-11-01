@@ -28,11 +28,12 @@ async function waitingFrom(ctx, who) {
 
 /**
  * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): the queue is what waits on the asker, so
- * a report's request (they are its line manager) is in it and an outsider's never; a card naming the
- * outsider's is refused by the module's own check, unless the asker reads every request (`people` all).
+ * a report's request (they are its line manager, and they hold approve on leave's module, which the
+ * queue asks for too) is in it and an outsider's never; a card naming the outsider's is refused by the
+ * module's own check, unless the asker reads every request (`people` all).
  */
 const probe = {
-  inside: (ctx) => (ctx.report ? waitingFrom(ctx, ctx.report) : null),
+  inside: async (ctx) => (ctx.report && (await ctx.scopeOf("people", "approve")) ? waitingFrom(ctx, ctx.report) : null),
   outside: async (ctx) => {
     const people = await ctx.scopeOf("people", "view");
     return people && people.scope === "all" ? null : waitingFrom(ctx, ctx.outsider);

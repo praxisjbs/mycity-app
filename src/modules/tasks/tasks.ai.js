@@ -19,15 +19,11 @@ const taskLink = (id) => (routeMap.linkFor("task", id) || {}).path || null;
  * them for themselves, and one on an outsider's board, set by the outsider; the list must return the
  * first and never the second, and a card naming the second is refused by the module's own check.
  */
+/** A probe's answer for one task: the card's values as the tool being probed takes them. */
+const forTask = (ctx, t) => ({ type: "task", id: t.task_id, values: ctx.key === "tasks.comment" ? { task_id: t.task_id, body: "A note from the matrix" } : { task_ids: [t.task_id] } });
 const probe = {
-  inside: async (ctx) => {
-    const t = await service.create(ctx.actor, ctx.actor.scope, { title: `Matrix task for ${ctx.role}` });
-    return { type: "task", id: t.task_id, values: { task_ids: [t.task_id], task_id: t.task_id, body: "A note from the matrix" } };
-  },
-  outside: async (ctx) => {
-    const t = await service.create(ctx.outsider.user, ctx.outsider.scope, { title: `Outsider's task, seen by ${ctx.role}` });
-    return { type: "task", id: t.task_id, values: { task_ids: [t.task_id], task_id: t.task_id, body: "A note from the matrix" } };
-  },
+  inside: async (ctx) => forTask(ctx, await service.create(ctx.actor, ctx.actor.scope, { title: `Matrix task for ${ctx.role}` })),
+  outside: async (ctx) => forTask(ctx, await service.create(ctx.outsider.user, ctx.outsider.scope, { title: `Outsider's task, seen by ${ctx.role}` })),
 };
 
 module.exports = defineManifest({

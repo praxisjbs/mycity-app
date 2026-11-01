@@ -595,6 +595,7 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.15, §6.17): `tasks.list`, `tasks.complete`, `tasks.comment` and `calendar.month` carry matrix probes (a task the asker set for themselves on their board and a meeting of theirs on their month, an outsider's never, a card naming the outsider's task refused by the board's own check); `TaskComplete` says At most 25 on a card; `projects.ai.js` accounts for `ProjectCreate` in `not_offered` (New Project, opened filled by its route).
 - 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): the assistant's cards for Workspace, `tasks.complete` (Mark Done on up to 25 tasks through `move()`, `tasks.service.completeMany`), `tasks.comment` (`TaskCommentAdd`) and `calendar.create` (New Event's own service, the attendees named by `calendar.repo.namesOf`); §9. Nothing on the Workspace screens changes.
 
 - 01/11/2026 · JP · §9: `tasks.summary`, the board counted for the assistant by status, assignee, priority, due window or cadence (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.

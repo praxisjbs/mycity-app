@@ -1644,6 +1644,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · `attendance.ai.js` and `worksites.ai.js` account for their Create schemas in `not_offered` (a punch and a check-in are made on the device, a home location and a temporary site are picked on a map, overtime is pre-approved on the screen, a worksite is picked on a map), as gate 23 asks of every module since the Praxis AI Engine's PR5 (`praxis-ai.md` §6.15); `attendance.register` carries a matrix probe (a report of the asker's on today's register, an outsider never; `praxis-ai.md` §6.17).
 - 01/11/2026 · JP · §9: `attendance.summary`, the assistant's figures over a period by person, department, site, day, week or month (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 01/11/2026 · JP · Tests only, at the month boundary (the Praxis AI Engine's first full run fell on 01/11/2026): the pay-items tests step My Attendance back as many months as the item needs, since the mock's days run six weeks back from yesterday; All Days of a person reads the month that holds days (the month before, on a month's first day) and accepts the day's date shown more than once in its sheet. No screen or rule changes.
 
