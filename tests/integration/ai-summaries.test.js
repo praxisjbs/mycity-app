@@ -374,7 +374,7 @@ describeDb("Praxis AI summaries, the read timeout and Download Excel against the
     const res = await ask("ceo", { question: "Count everything ever.", shows: ["pane"] });
     expect(res.status).toBe(200);
     expect(c.assistant.AiAnswer.safeParse(res.body).success).toBe(true);
-    expect(res.body.reads).toEqual([{ n: 1, key: "sample.slow", kind: "summary", module_key: "workspace", params: {}, outcome: "timed_out", rows: 0, total: null, first: null }]);
+    expect(res.body.reads).toEqual([{ n: 1, key: "sample.slow", kind: "summary", module_key: "workspace", params: {}, outcome: "timed_out", rows: 0, total: null, first: null, masked: [] }]);
     const told = sent[1].messages.find((m) => m.role === "tool");
     expect(JSON.parse(told.content)).toMatchObject({ read: 1, key: "sample.slow", error: "too_much" });
     expect(await one("SELECT outcome FROM ai_message_read WHERE ai_message_id = $1", [res.body.ai_message_id])).toEqual({ outcome: "timed_out" });
