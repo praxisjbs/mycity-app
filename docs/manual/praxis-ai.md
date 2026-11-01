@@ -16,29 +16,35 @@ you press that screen's own button.
 
 ## Ask {#praxis-ask screen=praxis_ai/ask icon=spark}
 
-Ask is a conversation: your questions on the right, Praxis AI's answers below them. On a phone,
-Ask opens on your conversations, and one opens full screen when you press it.
+Ask is a conversation: your questions on the right, Praxis AI's answers below them. On a computer
+a pane on the right shows the newest answer's figures, table, a record and what was read. Open it
+from any screen, and **Back** returns you there. On a phone opened from the menu, Ask opens on your
+conversations, and one opens full screen when you press it.
 
 ![Praxis AI, Ask](shot:praxis-ask)
 
 ### Ask a question {#praxis-ask-question needs="praxis_ai create"}
 
-1. Open [Praxis AI · Ask](/praxis-ai?tab=ask). On a phone, press **New Conversation** under the
-   title.
+1. On a computer, press **Praxis AI** at the top right of any screen, or open
+   [Praxis AI · Ask](/praxis-ai?tab=ask). On a phone, press **New Conversation** under the title,
+   or ask from the round button ([Ask from any screen on a phone](#praxis-ask-anywhere)).
 2. A new conversation shows **Try Asking** with up to six questions you can ask. Press one to ask
    it. With none to offer, it shows **Ask a Question** instead.
 3. Or type your own question in **Ask a Question** at the foot of the screen, up to 500
    characters. Press **Send**, or Enter.
-4. While Praxis AI reads your records, it says **Reading Your Records**. The answer appears under
-   your question. Wait for it: **Send** does nothing until it comes.
+4. While Praxis AI reads your records, it says **Reading Your Records**, then what it is reading,
+   for example *Reading leave requests · 2 of 5*. The answer appears under your question. Wait for
+   it: **Send** does nothing until it comes.
 5. Ask a follow-up in the same box. Praxis AI remembers the conversation, so "and last week?" is
    enough.
+6. Opened from a screen, Praxis AI knows which screen you were on. "These" and "here" mean that
+   screen's records, with its filters as you left them.
 
-> **Tip:** On a computer, **Recent** beside the conversation lists your conversations, newest first,
-> 25 to a page: **Conversation** and **Last Asked**. Press one to open it again. Drag the line
-> between them to widen **Recent**. Before your first question it says **No Questions Yet**. On a
-> phone, Ask opens on this list instead, with **Search Conversations** above it. Before your first
-> question it says **No Conversations Yet**.
+> **Tip:** On a computer, press **Recent** at the top right to show your conversations beside the
+> chat, newest first, 25 to a page: **Conversation** and **Last Asked**. Press one to open it
+> again. Press **Recent** again to hide them. Before your first question it says
+> **No Questions Yet**. On a phone opened from the menu, Ask opens on this list instead, with
+> **Search Conversations** above it. Before your first question it says **No Conversations Yet**.
 
 ![Praxis AI, Ask on a phone](shot:praxis-phone)
 
@@ -56,13 +62,44 @@ Ask opens on your conversations, and one opens full screen when you press it.
   and so on.
 - A button under the answer, such as *Open Attendance*, opens the screen where you would act on it.
 - **From** lists the kinds of record the answer was read from, with how many, for example
-  *partnership ×4*.
-- When the answer rests on one record, **From** names it. Press it to open it.
+  *partnership ×4*. Press one to see those records in the pane.
+- When the answer rests on one record, **From** names it. Press it to see it on **Record**, then
+  **Open Record** to open it.
 - Press a row of the answer's table to open its record. A record with no screen of its own does
   not open.
 
 > **Important:** An answer is a first reading of your records, not a decision. Check the figures
 > on their screen before you act on them.
+
+### Read the pane {#praxis-ask-pane}
+
+![The pane beside an answer](shot:praxis-pane)
+
+1. On a computer, the pane on the right fills with the newest answer. On a phone, press
+   **Open Figures** under an answer. The pane opens as a sheet, **Figures**.
+2. **Overview** shows figures and a chart when an answer counted or summed something. Until an
+   answer has figures, it is greyed out.
+3. **Table** lists every row the answer was read from, 25 to a page. Press **Next** and
+   **Previous** to page. Past 200 rows it says how many rows there are. Press **Export** to save
+   every row as an Excel file on this device; its second sheet, About This File, says who exported
+   it, when, the question and what was read.
+4. Press a row to see it on **Record**. Press **Open Record** to open it on its own screen.
+5. **Sources** lists each read: its name, what it was filtered by, how many rows it returned, and
+   whether it was read or not available to you. **Masked** names the fields you may not see. Press
+   **Open Table** to see its rows.
+6. Press a chip under **From** on any answer to show those records in the pane. Press
+   **Open Figures** under an earlier answer to bring its pane back.
+7. On a phone, press **Close** or swipe the sheet down to return to the conversation.
+
+![The pane on a phone](shot:praxis-figures)
+
+### Go back to your screen {#praxis-ask-back}
+
+1. Press **Back** at the top left, or press Escape. The screen you came from opens as you left it,
+   with its filters and its place in the list.
+2. Opened from the menu, [Search](#start-search) or History, **Back** opens
+   [Praxis AI · History](/praxis-ai?tab=history).
+3. On a phone, your phone's own Back gesture does the same.
 
 ### Say how good an answer was {#praxis-ask-feedback needs="praxis_ai create"}
 
@@ -147,9 +184,10 @@ conversation you are in, and an old subject can confuse a new question.
 ![Praxis AI over a screen, on a phone](shot:praxis-panel)
 
 1. On a phone, press the round button with a plus at the bottom right, **Quick Actions**.
-2. Press **Praxis AI**. The conversation opens over the screen you are on.
-3. Ask as on [Praxis AI · Ask](/praxis-ai?tab=ask). Pressing an answer's button or a record goes
-   there and closes Praxis AI.
+2. Press **Praxis AI**. The conversation opens over the screen you are on, and Praxis AI knows
+   which screen that is.
+3. Ask as on [Praxis AI · Ask](/praxis-ai?tab=ask). Press **Open Figures** under an answer to see
+   its table and sources. Pressing an answer's button or a record goes there and closes Praxis AI.
 4. Press **Back** at the top left, swipe right, or use your phone's Back gesture. It closes and
    your screen is as you left it.
 5. Press **Praxis AI** again to come back to the same conversation. Press **Conversations** to
@@ -235,6 +273,37 @@ marks:
   2: text "From" | The records it read
   3: button "Helpful" | Say how good it was
   4: button "New Conversation" | Start again
+```
+
+```shot praxis-pane
+open: /praxis-ai?tab=ask&from=%2Fpeople%3Ftab%3Demployees
+as: operations
+device: desktop
+do:
+  - fill: label "Ask a Question" = Who works with us?
+  - click: button "Send"
+  - wait: button "Helpful"
+marks:
+  1: button "Back" | Back to your screen
+  2: tab "Table" | Every row, 25 to a page
+  3: tab "Sources" | What was read
+  4: button "Recent" | Your conversations
+```
+
+```shot praxis-figures
+open: /praxis-ai?tab=ask&from=%2Fhome%3Ftab%3Doverview
+as: operations
+device: phone
+do:
+  - fill: label "Ask a Question" = Who works with us?
+  - click: button "Send"
+  - wait: button "Open Figures"
+  - click: button "Open Figures"
+  - wait: tab "Sources"
+crop: modal
+marks:
+  1: tab "Table" | Every row, 25 to a page
+  2: tab "Sources" | What was read
 ```
 
 ```shot praxis-panel

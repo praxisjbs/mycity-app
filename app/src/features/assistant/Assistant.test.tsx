@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AiAnswer, AiHistorySummary, AiQuestion } from "@mycity/contract/contract.gen.ts";
 import { ModalProvider } from "@mycity/ui";
@@ -17,6 +17,7 @@ const m = vi.hoisted(() => ({
   turns: {} as Record<string, unknown[]>,
   navigate: vi.fn(),
   setParams: vi.fn(),
+  params: new URLSearchParams(),
   action: null as null | { label: string; onSelect: () => void },
   turnsError: null as unknown,
   saveExport: vi.fn(async (asked: Promise<unknown>) => (await asked, true)),
@@ -37,7 +38,7 @@ vi.mock("@/api/hooks", () => ({
 vi.mock("@/api/client", async () => ({ api: { call: m.call }, ApiError: (await import("@mycity/ui")).ApiError }));
 vi.mock("@/api/upload", () => ({ upload: vi.fn() }));
 vi.mock("@/api/exports", () => ({ saveExport: m.saveExport }));
-vi.mock("@/lib/router", () => ({ useRouter: () => ({ navigate: m.navigate }), useSearchParams: () => [new URLSearchParams(), m.setParams] }));
+vi.mock("@/lib/router", () => ({ useRouter: () => ({ navigate: m.navigate, location: { path: "/praxis-ai", module: "praxis-ai", tab: "ask", id: null, params: new URLSearchParams("tab=ask") } }), useSearchParams: () => [m.params, m.setParams] }));
 vi.mock("@/shell/layout-context", () => ({ useFitPage: () => undefined }));
 vi.mock("@/shell/screen-action", () => ({
   useScreenAction: (a: { label: string; onSelect: () => void } | null) => {
@@ -46,6 +47,7 @@ vi.mock("@/shell/screen-action", () => ({
 }));
 
 import { ApiError } from "@mycity/ui";
+import { emitRealtimeForTest } from "@/api/realtime";
 import Assistant from "./index";
 
 beforeAll(() => {
@@ -80,6 +82,7 @@ afterEach(() => {
   m.data = {};
   m.rows = {};
   m.turns = {};
+  m.params = new URLSearchParams();
   m.turnsError = null;
   m.call.mockReset();
   m.call.mockImplementation(async () => ({}));
@@ -92,7 +95,7 @@ const answer = (over: Partial<AiAnswer> = {}): AiAnswer => ({
   ai_conversation_id: CONV,
   question: "Whose leave waits on me?",
   content: "Two requests wait on you.",
-  table: { columns: ["Employee", "Days"], rows: [["Ayo Bello", "3"], ["Kemi Ade", "2"]], numeric: [1], links: ["/people?tab=leave&id=l1", "/people?tab=leave&id=l2"] },
+  table: { columns: ["Employee", "Days"], rows: [["Ayo Bello", "3"], ["Kemi Ade", "2"]], numeric: [1], links: ["/people?tab=leave&id=l1", "/people?tab=leave&id=l2"], read: 1 },
   link: { label: "Open Leave", path: "/people?tab=leave" },
   citations: Array.from({ length: 8 }, (_, i) => ({ entity_type: "employee", entity_id: `00000000-0000-4000-8000-00000000000${i}`, label: `Person ${i + 1}`, link: `/people?tab=employees&id=${i}`, read_key: "employees.list" })),
   citations_total: 8,
@@ -100,7 +103,7 @@ const answer = (over: Partial<AiAnswer> = {}): AiAnswer => ({
     { kind: "type", entity_type: "leave_request", label: "leave request", count: 2, link: null },
     { kind: "type", entity_type: "employee", label: "employee", count: 8, link: null },
   ],
-  reads: [{ n: 1, key: "leave.requests", kind: "read", module_key: null, params: {}, outcome: "read", rows: 2, total: 2, first: 1 }],
+  reads: [{ n: 1, key: "leave.requests", kind: "read", module_key: null, params: {}, outcome: "read", rows: 2, total: 2, first: 1, masked: [] }],
   declined: null,
   more: false,
   card: null,
@@ -131,7 +134,7 @@ describe("Ask", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Whose leave waits on me/ }));
     expect(await screen.findByText("Two requests wait on you.")).toBeTruthy();
-    expect(asked()).toEqual([{ body: { question: "Whose leave waits on me?" }, idempotencyKey: expect.any(String) }]);
+    expect(asked()).toEqual([{ body: { question: "Whose leave waits on me?", shows: ["pane"] }, idempotencyKey: expect.any(String) }]);
     // The new conversation goes into the address without a new history entry.
     expect(m.setParams).toHaveBeenCalledWith({ id: CONV }, { replace: true });
 
@@ -148,7 +151,7 @@ describe("Ask", () => {
     expect(m.navigate).toHaveBeenCalledWith("/people?tab=leave&id=l1");
   });
 
-  it("an answer that rests on one record names it in From, and opens it", async () => {
+  it("an answer that rests on one record names it in From; the chip shows it in the pane, and Open Record opens it", async () => {
     m.turns[CONV] = [
       answer({
         table: null,
@@ -160,6 +163,10 @@ describe("Ask", () => {
     ui("ask", CONV);
     const card = screen.getByRole("article", { name: "Answer" });
     await userEvent.click(within(card).getByRole("button", { name: "Ayo Bello" }));
+    const pane = screen.getByRole("region", { name: "Pane" });
+    expect(within(pane).getByRole("tab", { name: "Record" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(pane).getByRole("heading", { name: "Ayo Bello" })).toBeTruthy();
+    await userEvent.click(within(pane).getByRole("button", { name: "Open Record" }));
     expect(m.navigate).toHaveBeenCalledWith("/people?tab=employees&id=e1");
   });
 
@@ -180,7 +187,7 @@ describe("Ask", () => {
     await userEvent.type(box, "And this week?");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("One more this week.")).toBeTruthy();
-    expect(asked().map((a) => a.body)).toEqual([{ question: "Whose leave waits on me?" }, { question: "And this week?", ai_conversation_id: CONV }]);
+    expect(asked().map((a) => a.body)).toEqual([{ question: "Whose leave waits on me?", shows: ["pane"] }, { question: "And this week?", ai_conversation_id: CONV, shows: ["pane"] }]);
   });
 
   it("a failed question keeps its words and tries again with the same key", async () => {
@@ -196,17 +203,17 @@ describe("Ask", () => {
     expect(await screen.findByText("Nobody is late today.")).toBeTruthy();
     const [first, second] = asked();
     expect(second.idempotencyKey).toBe(first.idempotencyKey);
-    expect(second.body).toEqual({ question: "Who is late today?" });
+    expect(second.body).toEqual({ question: "Who is late today?", shows: ["pane"] });
   });
 
   it("an open conversation shows its turns; Show Next 25 asks for the next page in it", async () => {
-    m.turns[CONV] = [answer({ more: true, citations: [], citations_total: 0, reads: [{ n: 1, key: "employees.list", kind: "read", module_key: null, params: {}, outcome: "read", rows: 2, total: 312, first: 1 }] })];
+    m.turns[CONV] = [answer({ more: true, citations: [], citations_total: 0, reads: [{ n: 1, key: "employees.list", kind: "read", module_key: null, params: {}, outcome: "read", rows: 2, total: 312, first: 1, masked: [] }] })];
     m.call.mockImplementation(async () => answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a2", question: "Show the next 25.", content: "Here are the next people." }));
     ui("ask", CONV);
     expect(screen.getByText("Showing 2 of 312")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Show Next 25" }));
     expect(await screen.findByText("Here are the next people.")).toBeTruthy();
-    expect(asked()[0].body).toEqual({ question: "Show the next 25.", ai_conversation_id: CONV });
+    expect(asked()[0].body).toEqual({ question: "Show the next 25.", ai_conversation_id: CONV, shows: ["pane"] });
     expect(m.setParams).not.toHaveBeenCalled();
   });
 
@@ -313,9 +320,161 @@ describe("Ask", () => {
   });
 
   it("the second page of a list says which rows it shows", () => {
-    m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [], links: Array.from({ length: 25 }, () => null) }, reads: [{ n: 1, key: "employees.list", kind: "read", module_key: null, params: {}, outcome: "read", rows: 25, total: 312, first: 26 }], citations: [], citations_total: 0 })];
+    m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [], links: Array.from({ length: 25 }, () => null), read: 1 }, reads: [{ n: 1, key: "employees.list", kind: "read", module_key: null, params: {}, outcome: "read", rows: 25, total: 312, first: 26, masked: [] }], citations: [], citations_total: 0 })];
     ui("ask", CONV);
     expect(screen.getByText("Showing 26 to 50 of 312")).toBeTruthy();
+  });
+});
+
+describe("The full screen: Back, the context and the pane", () => {
+  const FROM = "/people?tab=leave&status=waiting";
+  const rows = {
+    n: 1,
+    key: "leave.requests",
+    label: "Leave requests waiting on someone",
+    columns: ["Employee", "Days"],
+    rows: [
+      ["Ayo Bello", "3"],
+      ["Kemi Ade", "2"],
+    ],
+    numeric: [1],
+    links: ["/people?tab=leave&id=l1", "/people?tab=leave&id=l2"],
+    page: { number: 1, size: 25, total: 2, pages: 1, has_next: false },
+  };
+
+  it("Back and Escape return to the screen it was opened from, named under the title", async () => {
+    m.params = new URLSearchParams({ from: FROM });
+    ui("ask");
+    expect(screen.getByText("From People · Leave")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(m.navigate).toHaveBeenCalledWith(FROM);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(m.navigate).toHaveBeenCalledTimes(2);
+    expect(m.navigate).toHaveBeenLastCalledWith(FROM);
+  });
+
+  it("with no screen to return to, Back goes to History", async () => {
+    ui("ask");
+    expect(screen.queryByText(/^From /)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(m.navigate).toHaveBeenCalledWith("/praxis-ai?tab=history");
+  });
+
+  it("the screen's context goes with every question, with the pane asked for; New Conversation keeps the screen", async () => {
+    m.params = new URLSearchParams({ from: "/people?tab=leave&status=waiting&id=00000000-0000-4000-8000-0000000000e1&q=ayo&page=2" });
+    m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
+    m.call.mockImplementation(async () => answer());
+    ui("ask");
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask a Question" }), "Approve these");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Two requests wait on you.");
+    expect(asked()[0].body).toEqual({
+      question: "Approve these",
+      shows: ["pane"],
+      context: { module: "people", tab: "leave", id: "00000000-0000-4000-8000-0000000000e1", q: "ayo", filters: { status: "waiting" } },
+    });
+    m.action!.onSelect();
+    expect(m.navigate).toHaveBeenCalledWith("/praxis-ai?tab=ask&from=%2Fpeople%3Ftab%3Dleave%26status%3Dwaiting%26id%3D00000000-0000-4000-8000-0000000000e1%26q%3Dayo%26page%3D2");
+  });
+
+  it("Export on the Table asks for every row of the read as a file and saves it on this device (§6.16)", async () => {
+    m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
+    m.call.mockImplementation(async (key: unknown) => (key === "POST /api/v1/ai/ask" ? answer() : { document_id: "00000000-0000-4000-8000-0000000000e1", file_name: "praxis-ai-leave-requests-2026-11-01.xlsx", status: "pending" }));
+    ui("ask");
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask a Question" }), "Whose leave waits on me?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Two requests wait on you.");
+    const pane = screen.getByRole("region", { name: "Pane" });
+    expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+    await userEvent.click(within(pane).getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai/answers/:id/reads/:n/export", { params: { id: "00000000-0000-4000-8000-0000000000a1", n: 1 }, body: {} }));
+    expect(m.saveExport).toHaveBeenCalled();
+  });
+
+  it("the latest answer fills the pane: its Table pages the read again, a row opens the Record, Sources lists the reads", async () => {
+    m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
+    m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
+    m.call.mockImplementation(async () => answer());
+    ui("ask");
+    expect(screen.getByRole("heading", { name: "No Answer Yet" })).toBeTruthy();
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask a Question" }), "Whose leave waits on me?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Two requests wait on you.");
+    const pane = screen.getByRole("region", { name: "Pane" });
+    expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(pane).getByRole("tab", { name: "Overview" }).hasAttribute("disabled")).toBe(true);
+    expect(within(pane).getByRole("table", { name: "Leave Requests" })).toBeTruthy();
+    expect(screen.getByRole("article", { name: "Answer" }).getAttribute("aria-current")).toBe("true");
+    await userEvent.click(within(pane).getByRole("row", { name: /Kemi Ade/ }));
+    expect(within(pane).getByRole("tab", { name: "Record" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(pane).getByRole("heading", { name: "Kemi Ade" })).toBeTruthy();
+    await userEvent.click(within(pane).getByRole("button", { name: "Open Record" }));
+    expect(m.navigate).toHaveBeenCalledWith("/people?tab=leave&id=l2");
+    await userEvent.click(within(pane).getByRole("tab", { name: "Sources" }));
+    const read = within(pane).getByRole("listitem", { name: "Read 1, Leave Requests" });
+    expect(read.textContent).toContain("2 rows");
+    await userEvent.click(within(read).getByRole("button", { name: "Open Table" }));
+    expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("an earlier answer's chip brings its pane back, and Open Figures on another moves it there", async () => {
+    const A1 = "00000000-0000-4000-8000-0000000000a1";
+    const A2 = "00000000-0000-4000-8000-0000000000a2";
+    const first = answer({
+      ai_message_id: A1,
+      content: "First.",
+      citations: [{ entity_type: "leave_request", entity_id: "l1", label: "Ayo Bello", link: "/people?tab=leave&id=l1", read_key: "leave.requests" }],
+      citations_total: 1,
+      sources: [{ kind: "type", entity_type: "leave_request", label: "leave request", count: 2, link: null }],
+    });
+    const second = answer({ ai_message_id: A2, content: "Second.", sources: [], citations: [], citations_total: 0 });
+    m.turns[CONV] = [second, first];
+    m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
+    ui("ask", CONV);
+    expect(screen.getByRole("heading", { name: "No Answer Yet" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "leave request, 2 records" }));
+    const pane = screen.getByRole("region", { name: "Pane" });
+    expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+    const articles = screen.getAllByRole("article", { name: "Answer" });
+    expect(articles[0].getAttribute("aria-current")).toBe("true");
+    expect(articles[1].getAttribute("aria-current")).toBeNull();
+    await userEvent.click(within(articles[1]).getByRole("button", { name: "Open Figures" }));
+    expect(articles[1].getAttribute("aria-current")).toBe("true");
+    expect(articles[0].getAttribute("aria-current")).toBeNull();
+  });
+
+  it("while the question runs, the line says what is being read for this question, and goes when the answer lands", async () => {
+    m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
+    let land: (a: AiAnswer) => void = () => undefined;
+    m.call.mockImplementationOnce(() => new Promise((r) => (land = r as (a: AiAnswer) => void)));
+    ui("ask");
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask a Question" }), "Whose leave waits on me?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByText("Reading Your Records")).toBeTruthy();
+    const key = asked()[0].idempotencyKey;
+    act(() => emitRealtimeForTest("ai:progress", { ask_key: "another-question", n: 1, of: 5, read_key: "payroll.runs", kind: "read", words: "payroll runs" }));
+    expect(screen.getByText("Reading Your Records")).toBeTruthy();
+    act(() => emitRealtimeForTest("ai:progress", { ask_key: key, n: 2, of: 5, read_key: "leave.requests", kind: "read", words: "leave requests" }));
+    expect(screen.getByRole("status").textContent).toBe("Reading leave requests · 2 of 5");
+    land(answer());
+    await screen.findByText("Two requests wait on you.");
+    expect(screen.queryByText(/^Reading /)).toBeNull();
+  });
+
+  it("on a phone, opened from a screen: the conversation full width with Back, and Open Figures opens the pane as a sheet", async () => {
+    setViewport(390);
+    m.params = new URLSearchParams({ from: FROM });
+    m.turns[CONV] = [answer()];
+    m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
+    ui("ask", CONV);
+    expect(screen.getByRole("textbox", { name: "Ask a Question" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Pane" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(m.navigate).toHaveBeenCalledWith(FROM);
+    await userEvent.click(screen.getByRole("button", { name: "Open Figures" }));
+    const sheet = await screen.findByRole("dialog", { name: "Figures" });
+    expect(within(sheet).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+    expect(await within(sheet).findByRole("button", { name: /Kemi Ade/ })).toBeTruthy();
   });
 });
 

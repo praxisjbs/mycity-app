@@ -18,6 +18,12 @@ const VOICE_QUESTION = "ai_voice_question";
 const HISTORY_EXPORT = "ai_history_export";
 /** Download Excel on an answer's Table (§6.16): one read of the answer, every row, read by the person who asked. */
 const ANSWER_EXPORT = "ai_answer_export";
+/**
+ * Progress over realtime (§1.2 decision 23): pushed to the asking person's room before each read
+ * of a question runs, with the question's Idempotency-Key, which read it is of the five and its
+ * words. Not an outbox event: nothing is recorded, and a lost push changes nothing.
+ */
+const PROGRESS_EVENT = "ai:progress";
 
 const EVENTS = defineEvents("praxis_ai", {
   "assistant.answered": { summary: "A question to the assistant was answered, from the reads named" },
@@ -58,7 +64,7 @@ defineDocumentType(ANSWER_EXPORT, {
   export: true,
 });
 
-module.exports = { EVENTS, VOICE_QUESTION, HISTORY_EXPORT, ANSWER_EXPORT };
+module.exports = { EVENTS, VOICE_QUESTION, HISTORY_EXPORT, ANSWER_EXPORT, PROGRESS_EVENT };
 
 // History's Export, registered with the worker's outbox here because the worker loads each module's
 // events file (src/worker.js).

@@ -175,6 +175,23 @@ describe("one question", () => {
     expect(shown).toMatchObject({ declined: "not_available", citations: [], rows_read: 0, module_key: null });
   });
 
+  test("the progress hook is told before each read, which of the five it is; its failure never fails the question (decision 23)", async () => {
+    jest.spyOn(authorise, "runRead").mockResolvedValue(page([{ id: "l1", employee: "Ayo Bello" }]));
+    const vendors = model([reply("", [call("leave__requests", {})]), reply("", [call("tasks__list", {})]), reply(DRAFT())]);
+    const seen = [];
+    const onRead = jest.fn((r) => {
+      seen.push(r);
+      if (r.n === 2) throw new Error("the socket is down");
+    });
+    const out = await ask(vendors, { onRead });
+    expect(seen).toEqual([
+      { n: 1, key: "leave.requests", kind: "read", of: 5 },
+      { n: 2, key: "tasks.list", kind: "read", of: 5 },
+    ]);
+    expect(out.reads).toHaveLength(2);
+    expect(out.draft.text).toBe("Two requests wait on you.");
+  });
+
   test("parameters that do not parse go back once, uncounted; a second time counts as nothing returned", async () => {
     const bad = new AppError("AI_READ_INVALID", "bad", 422, { page: ["Expected number"] });
     jest.spyOn(authorise, "runRead").mockRejectedValue(bad);
@@ -274,6 +291,8 @@ describe("what the screen shows", () => {
       numeric: [2, 3],
       // Each row opens its record; a row with no record opens nothing.
       links: ["/people?tab=leave&id=l1", null],
+      // Which read it was drawn from, so the Table pane pages that read again (§6.12).
+      read: 1,
     });
     // What is kept is the record, not its link, which is worked out each time the answer is shown.
     expect(shown.metadata.table.refs).toEqual([{ type: "leave_request", id: "l1" }, null]);
@@ -282,7 +301,7 @@ describe("what the screen shows", () => {
     expect(shown.sources).toEqual([{ kind: "type", entity_type: "leave_request", label: "leave request", count: 2, link: null }]);
     expect(shown).toMatchObject({ more: true, rows_read: 2, module_key: "ess", citations_total: 2, declined: null });
     expect(shown.citations[0]).toEqual({ entity_type: "leave_request", entity_id: "l1", label: "Ayo Bello", link: "/x?id=l1", read_key: "leave.requests" });
-    expect(shown.metadata.reads).toEqual([{ n: 1, key: "leave.requests", kind: "read", module_key: "ess", params: { page: 1 }, outcome: "read", rows: 2, total: 40, first: 1 }]);
+    expect(shown.metadata.reads).toEqual([{ n: 1, key: "leave.requests", kind: "read", module_key: "ess", params: { page: 1 }, outcome: "read", rows: 2, total: 40, first: 1, masked: [] }]);
   });
 
   test("the screen button is an offered route by its intent, with only the prefill its schema takes", () => {

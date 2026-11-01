@@ -1,4 +1,4 @@
-import type { AiAnswer, AiCitation, AiConversation, AiHistorySummary, AiQuestion, AiSource } from "@mycity/contract/contract.gen.ts";
+import type { AiAnswer, AiCitation, AiConversation, AiHistorySummary, AiQuestion, AiReadRows, AiSource } from "@mycity/contract/contract.gen.ts";
 import { at, fail, invalid, noContent, ok, paged, route, sid } from "../core";
 import { byKey, grantsFor, SIGN_INS } from "../data/people";
 import { PARTNERS } from "../data/partners";
@@ -32,9 +32,10 @@ const read = (key: string, rows: number, total: number | null, first: number | n
   rows,
   total,
   first,
+  masked: [],
 });
 /** A table as the server sends it: each row's record link, or null where a row has none. */
-const tbl = (columns: string[], rows: string[][], numeric: number[], links: Array<string | null> = rows.map(() => null)) => ({ columns, rows, numeric, links });
+const tbl = (columns: string[], rows: string[][], numeric: number[], links: Array<string | null> = rows.map(() => null)) => ({ columns, rows, numeric, links, read: 1 });
 
 /** A record type as From names it (shared/ai/cite.js typeLabel). */
 const typeLabel = (type: string) => ({ home_alert: "alert", policy_version: "policy" })[type] ?? type.replace(/_/g, " ");
@@ -145,7 +146,9 @@ route("POST /api/v1/ai/ask", async (req) => {
     KEPT.unshift(k);
   }
   const d = answerFor(question, SIGN_INS[user]?.view ?? "staff");
-  const answer: AiAnswer = { ...d, sources: sourcesOf(d.citations), ai_message_id: sid(`answer:${now}:${k.turns.length}`), ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, feedback: null, created_at: now, provisional: true };
+  // The screen the question was asked from travels back with the answer (decision 12).
+  const context = (req.body.context as AiAnswer["context"] | undefined) ?? null;
+  const answer: AiAnswer = { ...d, context, sources: sourcesOf(d.citations), ai_message_id: sid(`answer:${now}:${k.turns.length}`), ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, feedback: null, created_at: now, provisional: true };
   const tokens = 900 + question.length * 7 + d.reads.length * 600;
   COSTS.set(answer.ai_message_id, { tokens, cost_ngn: (tokens * 0.0076).toFixed(2) });
   k.turns.unshift(answer);
@@ -163,6 +166,40 @@ route("GET /api/v1/ai/conversations", (req) => {
 route("GET /api/v1/ai/conversations/:id/turns", (req) => {
   const k = kept(req.user!, req.params.id);
   return k ? paged(k.turns, req) : fail(404, "NOT_FOUND", "Not found");
+});
+
+/**
+ * A read of an answer run again, 25 a page (§6.12), as the Table pane shows it: the answer's own
+ * table on its first page, invented rows after it up to the read's total.
+ */
+route("GET /api/v1/ai/answers/:id/reads/:n", (req) => {
+  const t = KEPT.filter((k) => k.owner === req.user)
+    .flatMap((k) => k.turns)
+    .find((x) => x.ai_message_id === req.params.id);
+  const n = Number(req.params.n);
+  const r = t?.reads.find((x) => x.n === n);
+  if (!t || !r || r.kind !== "read" || r.outcome !== "read") return fail(404, "NOT_FOUND", "Not found");
+  const page = Math.max(1, Number(req.query.page ?? 1) || 1);
+  const total = r.total ?? r.rows;
+  const table = t.table && t.table.read === n ? t.table : null;
+  const columns = table ? table.columns : ["Name"];
+  const pages = Math.max(1, Math.ceil(total / 25));
+  const start = (page - 1) * 25;
+  const count = Math.max(0, Math.min(25, total - start));
+  const rows = Array.from({ length: count }, (_, i) => (table && start + i < table.rows.length ? table.rows[start + i]! : columns.map((_, j) => (j === 0 ? `Person ${start + i + 1}` : ""))));
+  const links = rows.map((_, i) => (table && start + i < table.links.length ? (table.links[start + i] ?? null) : null));
+  const body: AiReadRows = { n, key: r.key, label: r.key, columns, rows, numeric: table ? table.numeric : [], links, page: { number: page, size: 25, total, pages, has_next: page < pages } };
+  return ok(body);
+});
+
+/** Download Excel on a read (§6.16): the file pending, done at once, as every mock export is. */
+route("POST /api/v1/ai/answers/:id/reads/:n/export", (req) => {
+  const t = KEPT.filter((k) => k.owner === req.user)
+    .flatMap((k) => k.turns)
+    .find((x) => x.ai_message_id === req.params.id);
+  const r = t?.reads.find((x) => x.n === Number(req.params.n));
+  if (!t || !r || r.kind !== "read" || r.outcome !== "read") return fail(404, "NOT_FOUND", "Not found");
+  return exportFile(req.user!, `praxis-ai-${r.key.replace(/\./g, "-")}`);
 });
 
 route("DELETE /api/v1/ai/conversations/:id", (req) => {

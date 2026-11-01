@@ -8,6 +8,11 @@
  * Voice (§6.6): the recording is held in the vault only while it is transcribed, then removed;
  * its document type is transient, so one whose removal never ran goes with the vault's sweep
  * (vault.purgeTransient).
+ *
+ * Progress (§1.2 decision 23): the answer arrives whole, never streamed; while the question runs,
+ * each read is announced on the person's realtime room (`ai:progress`) before it runs, best
+ * effort, so the screen can say "Reading leave requests" and "Reading 2 of 5". The event carries
+ * the question's Idempotency-Key, so a screen showing another conversation ignores it.
  */
 const { pool } = require("../../config/db");
 const { logger } = require("../../config/logger");
@@ -17,13 +22,14 @@ const { AppError } = require("../../shared/errors");
 const authorise = require("../../shared/ai/authorise");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const vault = require("../../shared/documents/vault");
+const realtime = require("../../services/realtime/emitter");
 const orchestrator = require("../../services/ai/assistant/orchestrator");
 const answer = require("../../services/ai/assistant/answer");
 const transcription = require("../../services/ai/transcription");
 const repo = require("./assistant.repo");
 const history = require("./assistant.history");
 const suggestions = require("./assistant.suggestions");
-const { EVENTS, VOICE_QUESTION } = require("./assistant.events");
+const { EVENTS, VOICE_QUESTION, PROGRESS_EVENT } = require("./assistant.events");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -43,12 +49,38 @@ function titleOf(question) {
   return (space > 60 ? cut.slice(0, space) : cut).trim();
 }
 
+/** The words of a read for the progress line ("leave requests", "employees"): its key as words, "list" dropped. */
+function readWords(key) {
+  const words = String(key || "")
+    .split(".")
+    .map((s) => s.replace(/_/g, " ").trim())
+    .filter((s) => s && s !== "list" && s !== "get");
+  return words.join(" ") || String(key || "");
+}
+
+/**
+ * Progress over realtime (decision 23): told before each read, it pushes `ai:progress` to the
+ * asking person's room. Best effort: nothing waits on it and a failure changes nothing.
+ * @param {object} actor
+ * @param {string|null} askKey  the question's Idempotency-Key, which the screen sent and matches on
+ */
+function progressFor(actor, askKey) {
+  return ({ n, key, kind, of }) => {
+    try {
+      realtime.toUser(actor.user_id, PROGRESS_EVENT, { ask_key: askKey || null, n, of, read_key: key, kind, words: readWords(key) });
+    } catch (err) {
+      logger.debug({ err, ai_read: key }, "Praxis AI: progress not pushed");
+    }
+  };
+}
+
 /**
  * POST /ai/ask.
  * @param {{question: string, ai_conversation_id?: string, context?: object, shows?: string[]}} body
  * @param {object} actor  req.user (withActor)
+ * @param {string|null} [askKey]  the request's Idempotency-Key, carried on the progress events
  */
-async function ask(body, actor) {
+async function ask(body, actor, askKey = null) {
   let conversation = null;
   if (body.ai_conversation_id) {
     conversation = await repo.conversationOf(pool, body.ai_conversation_id, actor.user_id);
@@ -57,7 +89,7 @@ async function ask(body, actor) {
   const context = body.context || null;
   const shows = Array.isArray(body.shows) ? body.shows : [];
   const past = conversation ? await history.replay(conversation.ai_conversation_id, actor.user_id) : [];
-  const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past, context, shows });
+  const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past, context, shows, onRead: progressFor(actor, askKey) });
   const shown = answer.build({ draft: out.draft, reads: out.reads, routes: out.routes, screens: out.screens, shows });
   // The card (§6.11 step 2): only for a screen that draws one, checked against the person's rights now.
   const card = shows.includes("cards") ? await answer.draftCard({ draft: out.draft, actions: out.actions, actor, context }) : null;
@@ -197,4 +229,4 @@ async function transcribe(file, actor) {
   }
 }
 
-module.exports = { ask, suggestionsFor, feedback, transcribe, titleOf };
+module.exports = { ask, suggestionsFor, feedback, transcribe, titleOf, readWords, progressFor };

@@ -61,6 +61,7 @@ function readMade(r, i) {
     rows: r.rows || 0,
     total: r.total === undefined ? null : r.total,
     first: r.first || null,
+    masked: Array.isArray(r.masked) ? r.masked : [],
   };
 }
 
