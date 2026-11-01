@@ -32,6 +32,7 @@ import { useScreenState } from "@/lib/plan";
 import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
 import { goTrail, startTrail, useTrail } from "@/lib/trail";
 import { guideAt } from "@/features/knowledge/guide/return";
+import { askHref } from "@/features/assistant/context";
 import { visibleModules, visibleTabs } from "./access";
 import { BellButton } from "./Bell";
 import { moduleByKey, type ModuleDef, type TabDef } from "./catalogue";
@@ -219,7 +220,11 @@ function readCollapsed() {
 function DesktopFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, openSearch, history }: FrameProps) {
   const me = useMe();
   const photo = useMyPhoto();
-  const { navigate } = useRouter();
+  const { can } = useAuth();
+  const { location, navigate } = useRouter();
+  // Praxis AI from any screen (docs/guides/praxis-ai.md decision 12): the screen in view travels as the question's context and where Back goes.
+  const praxis = moduleByKey("praxis_ai");
+  const askHere = () => navigate(askHref(`${location.path}?${location.params.toString()}`));
   const menu = useAccountMenu();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const toggle = () =>
@@ -276,6 +281,7 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, op
           search={<SearchButton onClick={openSearch} />}
           actions={
             <>
+              {praxis && can("praxis_ai") && mod?.key !== "praxis_ai" && <IconButton icon="spark" label={praxis.label} onClick={askHere} />}
               <ClockButton />
               <BellButton />
             </>

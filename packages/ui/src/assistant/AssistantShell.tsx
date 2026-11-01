@@ -17,8 +17,8 @@ import { Button } from "../actions/Button";
 export interface AssistantShellProps {
   /** The page's name, at most 3 words: the assistant's name from the shell's catalogue. */
   title: ReactNode;
-  /** Where Back goes: the screen's name in words (People · Leave), and the press. Without it there is no Back. */
-  back?: { to: string; onBack: () => void } | null;
+  /** Back: the press, and the screen's name in words (People · Leave) for the subtitle when one is known. Without it there is no Back. */
+  back?: { to?: string | null; onBack: () => void } | null;
   /** The header's actions: New Conversation, the Recent toggle. */
   actions?: ReactNode;
   /** The conversation: the log and the box, a column that fills. */
@@ -38,9 +38,10 @@ const PANEL = "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border
 export function AssistantShell({ title, back, actions, conversation, pane, aside, asideOpen, className }: AssistantShellProps) {
   const goBack = useRef(back?.onBack);
   goBack.current = back?.onBack;
+  const hasBack = Boolean(back);
   // Escape goes Back, as the button does, unless an open overlay took it first (Radix prevents its default).
   useEffect(() => {
-    if (!back) return;
+    if (!hasBack) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
@@ -49,7 +50,7 @@ export function AssistantShell({ title, back, actions, conversation, pane, aside
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [back]);
+  }, [hasBack]);
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
@@ -63,7 +64,7 @@ export function AssistantShell({ title, back, actions, conversation, pane, aside
           <h1 data-ui="page-title" className="text-2xl phone:text-xl">
             {title}
           </h1>
-          {back && (
+          {back?.to && (
             <p data-ui="page-subtitle" className="text-xs text-muted-foreground phone:hidden">
               From {back.to}
             </p>

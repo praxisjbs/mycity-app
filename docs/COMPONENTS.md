@@ -5546,7 +5546,7 @@ The full-screen Praxis AI: Back to the screen it was opened from, the title and 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `title` | `ReactNode` | yes | The page's name, at most 3 words: the assistant's name from the shell's catalogue. |
-| `back` | `{ to: string; onBack: () => void } \| null` |  | Where Back goes: the screen's name in words (People · Leave), and the press. Without it there is no Back. |
+| `back` | `{ to?: string \| null; onBack: () => void } \| null` |  | Back: the press, and the screen's name in words (People · Leave) for the subtitle when one is known. Without it there is no Back. |
 | `actions` | `ReactNode` |  | The header's actions: New Conversation, the Recent toggle. |
 | `conversation` | `ReactNode` | yes | The conversation: the log and the box, a column that fills. |
 | `pane` | `ReactNode` |  | The right pane (PaneTabs); desktop only. |
