@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, opened 01/11/2026 (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, opened 01/11/2026 (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -305,7 +305,7 @@ result line sits under the card. History is unchanged.
 | PR | Name | Branch (new chat) | Scope | Depends on | Done when |
 |---|---|---|---|---|---|
 | **PR1** | Engine core | `claude/engine-upgrade-guide-xf4ynp` (this session) | Decisions 10, 14, 16 to 18, 21, 22, 24, 25 as code: manifest v2 (summaries, actions), registry and catalogue snapshot, authorise for summaries and actions, the engine boundary and gate 24, the card lifecycle with the five-minute confirm, read replay, migration 10330, the contract, prompt version 4, the matrix generator, the attack scaffold, gate 19 rewritten, gate 23, the documents | nothing | Every manifest loads unchanged; `tasks.create` is drafted, confirmed and a task exists, in an integration test on the real migrations; a replayed, expired or forbidden card is refused; the matrix passes for every read on every seeded role; gates 19, 23 and 24 are in `npm run ci`; nothing a person sees changes |
-| **PR2** | Full screen and the pane | `m10/praxis-ai-pr2` or the session's | Decisions 12, 13, 23: the full-screen Praxis AI with Back and context, the Assistant group in `packages/ui` (conversation, chips, the four pane views, charts, the phone sheet, progress), Table paging through read replay, Record, Sources; the User Guide chapter and pictures | PR1 | Every pane view works on desktop and at 375 px, light and dark; Back returns to the exact screen with its filters; progress shows while reads run; the old Ask's tests moved onto the new screen; gates 8, 11, 21 green |
+| **PR2** | Full screen and the pane | `claude/sharp-planck-z0g9va` (praxisjbs/mycity-app#50) | Decisions 12, 13, 23: the full-screen Praxis AI with Back and context, the Assistant group in `packages/ui` (conversation, chips, the four pane views, charts, the phone sheet, progress), Table paging through read replay, Record, Sources; the User Guide chapter and pictures | PR1 | Every pane view works on desktop and at 375 px, light and dark; Back returns to the exact screen with its filters; progress shows while reads run; the old Ask's tests moved onto the new screen; gates 8, 11, 21 green |
 | **PR3** | Large data and Excel | `m10/praxis-ai-pr3` or the session's | Decisions 14, 15: summary reads for attendance, tasks, leave, approvals, performance, the Audit Log and employees; the statement timeout and the narrow-down answer; Overview's figures and chart; Download Excel with the provenance sheet through the export path; the summary cache | PR1 (runs beside PR2) | A 25,000-row export completes in the worker and downloads; a read that would scan too much asks to narrow; the model never receives rows from a summary (asserted); Overview shows a chart the server drew |
 | **PR4** | Action cards | `m10/praxis-ai-pr4` or the session's | Decisions 10, 11, 19, 20, 21: actions declared in Workspace (tasks, calendar), ESS and People (leave request, approve, reject), Approvals (decide), Staff Community (message a colleague, post in a channel), Mailbox (send a mail), Performance (a check-in note where the service allows); the card on screen with Edit, Cancel and the confirm sheet (passkey, PIN, password); bulk up to 25; suggested cards; per-module `not_offered` accounting | PR1 and PR2 | Approve 4 leave requests from the chat works with a passkey and with a PIN; a card replayed after rights were removed is refused; "Tell Ada" drafts a direct message the person sends with one press; a mail drafted from the chat arrives with the company signature; gate 23's action rules green for every module |
 | **PR5** | Proof and switch-over | `m10/praxis-ai-pr5` or the session's | Decisions 26, 27: scope probes per module in the matrix, the attack suite in CI and nightly on staging with the real model, refusal and leak monitoring on AI Control, gate 23's `not_offered` rule made universal, the old Ask retired, `praxis-ai.md` §2 and §10 rewritten to what ships, the User Guide chapter final, the extraction note | PR3 and PR4 | Every listed attack fails safely with the model scripted and with the real model; a planted leak fails the build; the nightly run alerts on a refusal that leaked; the guide and the manual describe one screen |
@@ -321,7 +321,7 @@ PR1 alone and rebase). PR5 starts when PR3 and PR4 are merged. Each PR branches 
 | PR | Owns |
 |---|---|
 | PR1 | `packages/contract/schemas/assistant.js`, `migrations/10330_praxis_engine.sql`, `src/shared/ai/{manifest,registry,authorise,catalogue-sync}.js`, `src/shared/ai/catalogue.snapshot.json`, `src/services/ai/engine/*`, `src/services/ai/assistant/*`, `src/services/ai/prompts/data-answers.md`, `src/modules/assistant/*`, `src/modules/tasks/tasks.ai.js` (the reference action), `scripts/check/{ai-no-writes,ai-awareness,ai-engine-boundary}.js`, `scripts/gen/ai-catalogue.js`, `scripts/ai/eval-assistant.js` (the `action` grade), `tests/integration/{ai-matrix,ai-cards}.test.js`, the documents |
-| PR2 | `packages/ui/src/assistant/*` (the Assistant group), `app/src/features/assistant/*`, `app/src/shell/*` (the way in and Back), `app/src/api/mock/modules/assistant.ts`, `docs/manual/praxis-ai.md` and its pictures; in the backend only `assistant.service.js` (progress events) and `assistant.events.js` |
+| PR2 | `packages/ui/src/assistant/*` (the Assistant group), `app/src/features/assistant/*`, `app/src/shell/*` (the way in and Back), `app/src/api/mock/modules/assistant.ts`, `docs/manual/praxis-ai.md` and its pictures; in the backend only `assistant.service.js` (progress events) and `assistant.events.js`. As built it also touched, and said so: the controller (the `Idempotency-Key` handed to the service), one `onRead` hook in the orchestrator, and two fields on the contract (`AiReadMade.masked`, `AiAnswerTable.read`) so the Sources and Table panes have what they show |
 | PR3 | `src/modules/<module>/<module>.ai.js` for the summaries (attendance, tasks, leave, workflow, goals, kpis, reviews, audit, organisation), `packages/contract/schemas/<module>.js` (their query schemas), `src/modules/assistant/assistant.export.js` (the answer export), `src/shared/ai/authorise.js` (the timeout), `services/ai/engine/pane.js` (Overview), `packages/ui/src/assistant/Overview*.tsx` only after PR2 merged |
 | PR4 | `src/modules/<module>/<module>.ai.js` for the actions, `packages/ui/src/assistant/Card*.tsx`, `app/src/features/assistant/*` (the card and the confirm sheet), `scripts/ai/eval-assistant.js` (action cases), `tests/integration/ai-actions-*.test.js` |
 | PR5 | `tests/integration/ai-attacks.test.js`, `scripts/ai/attack-assistant.js`, `.github/workflows/ai-nightly.yml`, `src/modules/ai_governance/*` (refusals and leaks on Spend), the retirement of the old Ask, the final documents |
@@ -666,15 +666,15 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 - [x] 01/11/2026 · Unit tests: manifest v2, gate 19 on SQL, the turn loop, the card rules, the pane's Overview and Sources, the matrix generator, gate 24 (tests/unit/foundation/ai-engine.test.js, 26); the older suites brought to the new shapes
 - [x] 01/11/2026 · npm run ci green under Node 20 (every gate, the whole suite: 2961 backend tests, 1123 and 644 frontend, 95 screens crawled); PROGRESS note; PR #49 opened as a draft, then ready; merged once CI was green on GitHub
 
-### 6.2 PR2 · Full screen and the pane
+### 6.2 PR2 · Full screen and the pane (started 01/11/2026)
 
-- [ ] The Assistant group in packages/ui (AssistantShell, AnswerBubble, SourceChip, PaneTabs, OverviewPane, TablePane, RecordPane, SourcesPane, ProgressLine, the phone sheet)
-- [ ] The way in from every screen, ⌘K and the menu; the context kept and sent; Back to the exact screen
-- [ ] The layout on desktop and on a phone; Recent behind a toggle; an earlier answer's pane
-- [ ] Table paging through read replay; Record; Sources
-- [ ] Progress over realtime
-- [ ] The mock, the tests moved and added
-- [ ] Guide §2 and §10; the User Guide chapter and pictures; PROGRESS; README
+- [x] 01/11/2026 · The Assistant group in packages/ui (AssistantShell, AnswerBubble with QuestionBubble, SourceChip, PaneTabs, OverviewPane, TablePane, RecordPane, SourcesPane, ProgressLine, PaneSheet; `pane.ts` their shapes), each with header, test and gallery page; the group in `scripts/gen/components.js` and the catalogue; tokens only, light and dark
+- [x] 01/11/2026 · The way in: the Praxis AI button on every desktop screen's top bar, the floating button's chat on a phone, ⌘K and the menu; the opening screen travels as `from` on the address (`features/assistant/context.ts`): its module, tab, record, search and filters as `AiAsk.context` with `shows: ["pane"]` on every question; Back (the button, Escape, the browser's and the phone's Back) returns to that screen as it was (a step back when it is the step behind, else by its address); from the menu, ⌘K or History, Back goes to History
+- [x] 01/11/2026 · The layout: desktop the conversation beside the pane (two fifths, three fifths) with Recent behind a toggle, the latest answer's pane shown and an earlier answer's chip or Open Figures bringing its own back; a phone opened from a screen the conversation full width with the pane as a sheet from Open Figures; a phone from the menu the conversations first, as before
+- [x] 01/11/2026 · Table paging through `GET /ai/answers/:id/reads/:n` (25 a page, up to 200 rows, then "Showing the first 200 of 1,240 rows"; Download Excel's slot waits on PR3); Record from a row or the one record, with Open Record; Sources with each read's filters, rows and total, outcome and masks, Open Table; Overview draws figures and a chart when an answer carries them (PR3 produces them)
+- [x] 01/11/2026 · Progress over realtime: `orchestrator.answer` takes `onRead`; `assistant.service` pushes `ai:progress` to the asker's room before each read with the question's `Idempotency-Key` (the controller hands it over); the screen shows Reading leave requests · 2 of 5 for that question alone and drops it when the answer lands
+- [x] 01/11/2026 · The mock (the context echoed, the table's read, the reads' masks, a read run again with invented rows past the first page); the old Ask's tests moved onto the new screen; new tests for Back and Escape, the context sent, each pane tab, an earlier answer's pane, progress, the phone's sheet, the panel's context, the context helper, the orchestrator's hook and the service's push
+- [x] 01/11/2026 · Guide §2, §3, §5, §6.1.8, §7, §10 and §14; the User Guide chapter rewritten with its pictures retaken; PROGRESS #67; FRONTEND_GUIDE §9.1's tree; this handoff
 
 ### 6.3 PR3 · Large data and Excel
 
@@ -737,6 +737,16 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   Profile and ESS's other own-only reads are never a subset of the CEO's, so the subset rule skips
   the own-only module and PR5's probes take it; a `query`/`queries` key is not a write word (the
   queries module's manifest uses it), so gate 19 guards SQL by statement and `.query()` instead.
+- 01/11/2026 · JP · PR2 built (§6.2) in one chat, on the session's branch, as praxisjbs/mycity-app#50:
+  the Assistant group, the full screen with Back and context on both shells, the pane with Table
+  paging through read replay, Record and Sources, progress over realtime. Found on the way: a cloud
+  session's image had no node_modules and no Node 20 (both installed by hand again, `npm ci` and
+  `/opt/node20`); the Sources tab needs each read's masks and the Table which read the answer's
+  table came from, which PR1's wire shapes dropped, so `AiReadMade.masked` and `AiAnswerTable.read`
+  were added (History fills them for older answers); the replay route takes only `page`, so the
+  Table pages but does not sort yet (PR3, which gives reads their parameters, can add it); Overview
+  draws figures and a chart already, so PR3 only has to produce them; the Pager at the capped last
+  page keeps a disabled Next rather than none, so the 200-row cap reads as Page 8 of 8.
 - 01/11/2026 · JP · The first full run fell on a month's first day and found the suite assumed
   October: the staging reviews seed bound the plans at the real clock, so October's round opened
   with no reviews (on staging too, from 1 November); four screen tests of attendance and the

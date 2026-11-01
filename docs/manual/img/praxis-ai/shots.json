@@ -15,12 +15,26 @@
       "phone"
     ]
   },
+  "praxis-figures": {
+    "spec": "b9fe5823d45dc801",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "phone"
+    ]
+  },
   "praxis-history": {
     "spec": "a781a16c14038fe3",
     "source": "e3b0c44298fc1c14",
     "devices": [
       "desktop",
       "phone"
+    ]
+  },
+  "praxis-pane": {
+    "spec": "622bb70bdeb72e5c",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop"
     ]
   },
   "praxis-panel": {
