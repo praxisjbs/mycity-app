@@ -488,6 +488,22 @@ function spend(): AiSpend {
       calls: SPENT[p].calls,
     })),
     days,
+    praxis_ai: {
+      reads_refused: 7,
+      presses_refused: 2,
+      nightly: {
+        ai_attack_run_id: "00000000-0000-4000-8000-0000000000e1",
+        environment: "staging",
+        run_by: "nightly",
+        status: "passed",
+        asked: 11,
+        passed: 11,
+        leaks: [],
+        error_code: null,
+        started_at: `${TODAY}T01:00:00.000Z`,
+        finished_at: `${TODAY}T01:04:12.000Z`,
+      },
+    },
   };
 }
 

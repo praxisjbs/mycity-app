@@ -21,6 +21,11 @@ const cite = (row) => ({
 
 module.exports = defineManifest({
   module: "queries",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    QueryCreate: "a query is raised on Queries with its letter and the person's record in view, along the consequence chain",
+    QueryResponseCreate: "a response is the person's own words on their query, written on Self-Service",
+  },
   reads: [
     {
       key: "queries.list",

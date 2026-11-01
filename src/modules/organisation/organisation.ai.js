@@ -16,6 +16,12 @@ const service = require("./organisation.service");
 
 module.exports = defineManifest({
   module: "people",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    DepartmentCreate: "a department is added on People, Departments with its head and code in view",
+    EmployeeCreate: "Add Employee is a form of many restricted fields (pay, bank, personal); the route opens it filled with the names and job",
+    OrgSeatCreate: "a seat is placed on the organogram, where the structure is in view",
+  },
   summaries: [
     {
       key: "employees.summary",

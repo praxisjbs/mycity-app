@@ -20,6 +20,10 @@ const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_n
 
 module.exports = defineManifest({
   module: "knowledge",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    PolicyCreate: "a policy is written and published on Knowledge Hub, Policies by those who manage policies, through its own flow",
+  },
   reads: [
     {
       key: "policies.mine",
