@@ -651,6 +651,24 @@ const RegisterRow = z
 const RegisterPage = Paged(RegisterRow);
 
 const RegisterSummaryQuery = z.object({ date: isoDate.optional() }).strict();
+
+/**
+ * The assistant's attendance summary (docs/guides/praxis-ai.md §6.13; attendance.md §9): days, lateness
+ * counts and minutes, absences and exceptions over a period, grouped by person, department or site, or
+ * as a series by day, week or month. Figures, never rows; no page. The period is `from` and `to`, or a
+ * `month`, else this month in Lagos.
+ */
+const AttendanceSummaryBy = z.enum(["day", "week", "month", "person", "department", "site"]);
+const AttendanceSummaryQuery = z
+  .object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    month: month.optional(),
+    department_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    by: AttendanceSummaryBy.default("department"),
+  })
+  .strict();
 const RegisterSummary = z
   .object({
     date: isoDate,
@@ -1587,6 +1605,7 @@ const TABLES = {
     },
   },
   RegisterQuery: { table: null, reason: "list controls for the register" },
+  AttendanceSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's attendance summary; figures, never a row" },
   RegisterRow: {
     table: null,
     reason: "one person on one day, from employee, attendance_day and the day's latest punch",
@@ -1742,6 +1761,7 @@ module.exports = {
   RealTimeGiven,
   ExceptionDecision,
   RegisterQuery,
+  AttendanceSummaryQuery,
   RegisterRow,
   RegisterPage,
   RegisterSummaryQuery,

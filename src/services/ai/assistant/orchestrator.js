@@ -18,7 +18,9 @@
  *   loop     the engine's: the model calls reads or answers. Each call runs through authorise
  *            here (runTool), so the grant, the scope, the page of 25 and the field mask are
  *            code's, never the model's. At most 5 reads; a repeated read, the fifth read or the
- *            eighth round makes the next round an answer with no tools
+ *            eighth round makes the next round an answer with no tools. A read the database cut
+ *            at its timeout (AI_READ_TIMEOUT, §6.3 step 8) is kept as timed_out and the model is
+ *            told to narrow the question
  *   answer   one JSON object (AiAnswerDraft). One that does not parse is sent back once with its
  *            problems; a second failure is answered in plain words from the reads already made,
  *            with no tools; if that fails too, AI_BAD_OUTPUT
@@ -174,7 +176,7 @@ function systemTurn(prompt, ctx, now, { context = null, actions = [], pane = fal
     "",
     ...(pane
       ? [
-          "The pane's Overview: when a summary read answered, name it in \"overview\" with up to three of its figure keys and one chart over one of its groups (group: its \"by\") or series (series: their keys), with a short true title.",
+          "The pane's Overview: when a summary read answered, name it in \"overview\" with up to three of its figure keys and one chart over one of its groups (group: its \"by\") or series (series: their keys). The chart's title is a short sentence; a number in it must be one of the summary's own figures or values, or the title is dropped.",
           "",
         ]
       : []),
@@ -310,6 +312,15 @@ async function answer({ db, actor, question, history = [], context = null, shows
       } catch (err) {
         const code = err && err.code;
         if (code === "AI_READ_FORBIDDEN" || code === "AI_READ_UNKNOWN") return notAvailable();
+        if (code === "AI_READ_TIMEOUT") {
+          // The database cut the read at its timeout: the question covers too much at once (§6.3 step 8).
+          made.outcome = "timed_out";
+          reads.push(made);
+          return {
+            kind: "no_result",
+            content: JSON.stringify({ read: n, key, error: "too_much", message: "That read covers too much at once. Ask about a shorter period, one department or one person, or use a summary read." }),
+          };
+        }
         if (code === "AI_READ_INVALID") {
           // Sent back once to be corrected, uncounted (the engine's rule); the second time is recorded.
           if (!invalidSeen.has(key)) {

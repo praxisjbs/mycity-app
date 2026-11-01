@@ -1008,8 +1008,15 @@ Each module ships a read manifest (`<module>.ai.js`) or `// ai:none <reason>`: e
 departments (A), import history and the caller's own documents (B, `imports.ai.js` and `ess.ai.js`),
 roles and settings (C, reads only: `access.ai.js` lists and opens roles; `settings.ai.js` reads
 public holidays, the working week and the organisation profile with `ess` view, and numbering with
-`settings` view), my approvals (D). `audit` carries `ai:none`: the ledger is for the people who hold
-Settings over everything, and the assistant does not answer from it. `documents` carries `ai:none`: a document is a
+`settings` view), my approvals (D), and since PR3 of the Praxis AI Engine the queue counted
+(`approvals.summary`, `workflow.ai.js`, `docs/guides/praxis-ai.md` §6.13; `ApprovalSummaryQuery`:
+a module and `by` flow, stage, age or module): waiting, past their time, due within a day, the
+oldest in days, by flow and age band always, then by stage or module, over the same WHERE as My
+Approvals (`workflow.repo.waitingSummary`). `audit` carries `audit.ai.js` (PR3): no read of an
+entry, and `audit.summary` for a reader of the whole log alone (`settings` view with scope `all`,
+and the CEO; anyone else is told it is not available): entries of a period (the last 30 days unless
+the log's filters say) by action, by person, by module or record type, and by day, never an entry's
+words (`audit.repo.aiSummary`). `documents` carries `ai:none`: a document is a
 file, and what it says about a person is read through that person's own module.
 
 Search providers: `organisation.search.js` (employees, departments; A), `imports.search.js` (a batch
@@ -1140,6 +1147,7 @@ screen.
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · §9: `approvals.summary` (D) and `audit.summary` (C), the requests waiting on a person and the Audit Log counted for the assistant; `audit` drops its `ai:none` for a manifest with the summary alone (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 28/10/2026 · JP · §6.18, a select's server list loads as it scrolls (JBS Praxis, from Goals' Function select, fed by People · Departments, which stopped at 25): every select filled from a server list reads it 25 at a time (`useInfinite`, `paging`) and loads the next page as its menu nears its end, on both shells; it looks as before. In the folders this guide maps: People · Employees' Department filter, Departments' Open Role (Set Head) and the reporting form's Open Role. FRONTEND_FOUNDATION F32.
 - 27/10/2026 · JP · Nothing in this guide changed. In the `organisation` module it maps, the reporting tree's read carries each node's department and the Head marks (`OrgNode.heads`, `repo.departmentHeads`), and Download PDF's cards carry them too (`docs/guides/organogram.md` §6).
 - 27/10/2026 · JP · §6.1: the deploy loader gives the departments, their codes and heads only to a database that has never had MyCity's names, and then leaves them to People · Departments (#103, `docs/guides/organogram.md` §6.1, JBS Praxis 27/10/2026), even when `nomenclature.json` changes; it finds a department renamed on screen by MyCity's code, the roster never makes its old name again, and each deploy gives every department head their Head of Department role. §10: People · Employees gains Move To Department on the rows picked (desktop).

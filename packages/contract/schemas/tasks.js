@@ -345,6 +345,25 @@ const TaskListQuery = listQuery(
 
 /** GET /tasks/summary: the four figures above the board. */
 const TaskSummaryQuery = z.object({ scope: TaskScope.default("mine") }).strict();
+
+/**
+ * The assistant's task counts (docs/guides/praxis-ai.md §6.13; workspace.md §9): how many tasks match the
+ * board's own filters, open, overdue and done, grouped by status, assignee, priority, due window or
+ * cadence. Figures, never rows; no page.
+ */
+const TaskCountsBy = z.enum(["status", "assignee", "priority", "due", "cadence"]);
+const TaskCountsQuery = z
+  .object({
+    scope: TaskScope.default("mine"),
+    status: TaskStatus.optional(),
+    assignee_id: uuid.optional(),
+    cadence: TaskCadence.optional(),
+    priority: TaskPriority.optional(),
+    due: z.enum(["overdue", "today", "week"]).optional(),
+    project_id: uuid.optional(),
+    by: TaskCountsBy.default("status"),
+  })
+  .strict();
 const TaskSummary = z
   .object({
     open: z.number().int().min(0),
@@ -699,6 +718,7 @@ const TABLES = {
   TaskReminderSet: { table: null, reason: "the task's reminders in the shared reminder engine" },
   TaskPage: { table: null, reason: "a page of tasks" },
   TaskListQuery: { table: null, reason: "list controls and filters for the board" },
+  TaskCountsQuery: { table: null, reason: "the filters and grouping of the assistant's task counts; figures, never a row" },
   TaskSummaryQuery: { table: null, reason: "whose figures: mine or my team" },
   TaskSummary: { table: null, reason: "counts over task" },
   TaskCreate: {
@@ -795,6 +815,7 @@ module.exports = {
   TaskDetail,
   TaskPage,
   TaskListQuery,
+  TaskCountsQuery,
   TaskSummaryQuery,
   TaskSummary,
   TaskCreate,

@@ -202,6 +202,23 @@ const EmployeeListQuery = listQuery(
   ["display_name", "staff_number", "job_title", "department", "start_date", "created_at"],
 );
 
+/**
+ * The assistant's headcount summary (docs/guides/praxis-ai.md §6.13; organogram.md §9): people by
+ * department, status, work arrangement, employment type, line manager or when their confirmation is
+ * due, with the register's own filters. Figures, never rows; no page.
+ */
+const EmployeeSummaryBy = z.enum(["department", "status", "work_pattern", "employment_type", "manager", "confirmation"]);
+const EmployeeSummaryQuery = z
+  .object({
+    department_id: uuid.optional(),
+    status: EmployeeStatus.optional(),
+    work_pattern: WorkPattern.optional(),
+    employment_type: EmploymentType.optional(),
+    line_manager_id: uuid.optional(),
+    by: EmployeeSummaryBy.default("department"),
+  })
+  .strict();
+
 /** One row of the register. */
 const EmployeeRow = z
   .object({
@@ -822,6 +839,7 @@ const TABLES = {
     table: "employee",
     virtual: { reason: "why the line changed: kept on the audit row, not on the record" },
   },
+  EmployeeSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's headcount summary; figures, never a row" },
   EmployeeListQuery: {
     table: null,
     reason: "list controls and the register's filters, not a row",
@@ -963,6 +981,7 @@ module.exports = {
   EmployeeArchive,
   EmployeeReportingUpdate,
   EmployeeListQuery,
+  EmployeeSummaryQuery,
   EmployeeRow,
   EmployeePage,
   EmployeesSummary,

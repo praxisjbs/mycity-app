@@ -5,7 +5,9 @@
  *
  * It answers "who reports to whom", "who reports to X", "how many people are in
  * <department>", "who heads <department>" and "which roles are vacant" from the same rows the screens read, in
- * the caller's own scope, 25 at a time (docs/guides/organogram.md §9).
+ * the caller's own scope, 25 at a time (docs/guides/organogram.md §9); employees.summary counts the
+ * register by department, status, arrangement, type, manager or confirmation due (figures, never rows,
+ * docs/guides/praxis-ai.md §6.13).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -14,6 +16,15 @@ const service = require("./organisation.service");
 
 module.exports = defineManifest({
   module: "people",
+  summaries: [
+    {
+      key: "employees.summary",
+      description: "Headcount figures: people by department, status, work arrangement, employment type or line manager, on probation and due for confirmation, contracts ending",
+      params: c.organisation.EmployeeSummaryQuery,
+      permission: ["people", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
+    },
+  ],
   reads: [
     {
       key: "employees.list",

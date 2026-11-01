@@ -186,6 +186,50 @@ async function list(query, scope, only = {}, now = new Date()) {
 
 const summary = (query, scope) => repo.summary(pool, query.scope, scope, windows());
 
+/** The board's words for a status, priority, cadence or due window, as the assistant's counts name them. */
+const COUNT_WORDS = Object.freeze({
+  todo: "To Do", in_progress: "In Progress", in_review: "In Review", done: "Done", cancelled: "Cancelled",
+  low: "Low", normal: "Normal", high: "High", urgent: "Urgent",
+  daily: "Daily", weekly: "Weekly", none: "None",
+  overdue: "Overdue", today: "Due Today", this_week: "Due This Week", later: "Later", no_date: "No Due Date", closed: "Closed",
+});
+const worded = (rows) => rows.map((r) => ({ ...r, label: COUNT_WORDS[r.label] || r.label }));
+
+/**
+ * The assistant's task counts (docs/guides/praxis-ai.md §6.13; workspace.md §9): the board the reader
+ * sees, counted, never a row. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   TaskCountsQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null, employee_id: string}} scope
+ */
+async function aiCounts(client, params, scope, now = new Date()) {
+  const { figure, group } = require("../../shared/ai/summary");
+  const r = await repo.counts(client, params, scope, windows(now));
+  const f = r.figures || {};
+  const by = params.by || "status";
+  const thirdLabel = { assignee: "Tasks by assignee", due: "Tasks by due window", cadence: "Tasks by cadence" }[by] || "Tasks by due window";
+  return {
+    figures: [
+      figure("tasks", "Tasks", f.tasks),
+      figure("open", "Open", f.open),
+      figure("overdue", "Overdue", f.overdue),
+      figure("due_today", "Due today", f.due_today),
+      figure("due_this_week", "Due this week", f.due_this_week),
+      figure("done", "Done", f.done),
+      figure("done_this_week", "Done this week", f.done_this_week),
+      figure("blocked", "Blocked", f.blocked),
+      figure("people", "People with tasks", f.people),
+    ],
+    groups: [
+      group("status", "Tasks by status", worded(r.by_status)),
+      group("priority", "Tasks by priority", worded(r.by_priority)),
+      group(by === "status" || by === "priority" ? "due" : by, thirdLabel, by === "assignee" ? r.by_third : worded(r.by_third)),
+    ],
+    series: [],
+    total: f.tasks || 0,
+  };
+}
+
 /** A task the caller may see, as a repo row; 404 otherwise. `member`: the caller shares it. */
 async function visible(db, id, scope) {
   const row = await repo.get(db, id);
@@ -1316,6 +1360,7 @@ async function settleRescope(client, actor, id, approved) {
 }
 
 module.exports = {
+  aiCounts,
   people,
   linkCommitments,
   fixOriginalDates,

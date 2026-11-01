@@ -6,6 +6,10 @@
  * (docs/guides/performance.md §8, §9). It reads only what the asker reads on Goals (§6.23): their
  * department's, what is shared with them, the key results they own; the whole plan for the CEO and Management.
  * It never reports a month or confirms a score (A23); it sends the head to Report Month.
+ *
+ * goals.summary counts the quarter (docs/guides/praxis-ai.md §6.13): key results by status, the
+ * scores by function and month, the ratings at the latest closed round; figures, never rows, within
+ * the same reach and scope as Analytics.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -14,6 +18,15 @@ const analytics = require("./goals.analytics");
 
 module.exports = defineManifest({
   module: "performance",
+  summaries: [
+    {
+      key: "goals.summary",
+      description: "A quarter's performance figures: key results by status, the company's and each function's score by month, ratings at the latest closed round",
+      params: c.goals.PerformanceSummaryQuery,
+      permission: ["performance", "view"],
+      run: (client, params, actor) => analytics.aiSummary(params, actor.scope, { db: client, actor }),
+    },
+  ],
   reads: [
     {
       key: "goals.okrs",

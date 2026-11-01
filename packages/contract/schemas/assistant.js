@@ -113,7 +113,8 @@ const AiReadMade = z
     module_key: z.string().nullable(),
     /** The parameters it ran with, as the Sources tab shows them. */
     params: z.record(z.string(), z.unknown()),
-    outcome: z.enum(["read", "refused", "invalid", "failed"]),
+    /** `timed_out`: the read looked at too much at once and was cut at the statement timeout (§6.3 step 8). */
+    outcome: z.enum(["read", "refused", "invalid", "failed", "timed_out"]),
     rows: z.number().int().min(0).max(25),
     total: z.number().int().min(0).nullable(),
     first: z.number().int().min(1).nullable(),

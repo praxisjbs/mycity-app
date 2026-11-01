@@ -587,7 +587,10 @@ an Excel file are rebuilt from the records), `ai_action_draft` (the card an answ
 values, problems, records, risk class, status, expiry) and `ai_action_run` (the press: how it was
 confirmed, the values as run, a result line per record); `ai_catalogue.kind` widened to `summary`
 and `action` with a `risk` column; `ai_conversation.opened_from` and `ai_message.context` (the screen
-a question was asked from).
+a question was asked from) · `10340` `ai_message_read.outcome` widened to `timed_out`, a read or
+summary the database cut at the assistant's 3 second statement timeout (`docs/guides/praxis-ai.md`
+§6.3 step 8; PR3). An answer's Excel file (§6.16) is a `document` of type `ai_answer_export`, no
+table of its own.
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

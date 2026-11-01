@@ -12,6 +12,9 @@
  *   attendance.temporary_sites  temporary sites with someone in the asker's `people` scope on
  *                           them (PR 4): number, purpose, name, dates, state and who is on them;
  *                           never an address, a point or a description
+ *   attendance.summary      figures over a period, never rows (docs/guides/praxis-ai.md §6.13): days,
+ *                           late days and minutes, absences, exceptions, by person, department or
+ *                           site, or by day, week or month; the asker's `people` scope
  *
  * The Attendance policy's rules are read through policies.read and policies.mine
  * (src/modules/policies/policies.ai.js).
@@ -47,6 +50,15 @@ const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_n
 
 module.exports = defineManifest({
   module: "people",
+  summaries: [
+    {
+      key: "attendance.summary",
+      description: "Attendance figures over a period: days present, late days and minutes late, absences and exceptions, by person, department or site, or by day, week or month",
+      params: c.attendance.AttendanceSummaryQuery,
+      permission: ["people", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
+    },
+  ],
   reads: [
     {
       key: "attendance.my_days",

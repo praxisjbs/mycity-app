@@ -676,14 +676,15 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 - [ ] The mock, the tests moved and added
 - [ ] Guide §2 and §10; the User Guide chapter and pictures; PROGRESS; README
 
-### 6.3 PR3 · Large data and Excel
+### 6.3 PR3 · Large data and Excel (started 01/11/2026)
 
-- [ ] Summary reads: attendance, tasks, leave, approvals, performance, employees, the Audit Log
-- [ ] The statement timeout and the narrow-down answer; the summary cache
-- [ ] Overview: figures and the chart from the summary; prompt version 5
-- [ ] Download Excel through the export path with About This File; the 25,000 cap; past 200 rows the pane says so
-- [ ] The evaluation set's summary questions; integration tests
-- [ ] Guide §6.13, §5, §7, §11; DATABASE_SCHEMA; PROGRESS; README
+- [x] 01/11/2026 · Summary reads: attendance, tasks, leave, approvals, performance (goals, and reviews), employees, the Audit Log (its `ai:none` dropped for a manifest with the summary alone); their query schemas in the contract; `shared/ai/summary.js` for the shape
+- [x] 01/11/2026 · The statement timeout and the narrow-down answer (`authorise.guarded`: 3 seconds in the database, a 4 second deadline for a read on the pool; `AI_READ_TIMEOUT`, the model told "too much", the read kept as `timed_out`, migration 10340); the summary cache (`shared/ai/summary-cache.js`, Redis, 60 seconds, by person and scope)
+- [x] 01/11/2026 · Overview: figures and the chart from the summary; the title checked against every value the summary holds; prompt version 5
+- [x] 01/11/2026 · Download Excel through the export path with About This File (`POST /ai/answers/:id/reads/:n/export`, `ai_answer_export`, `assistant.read_export_requested`, the worker's replay with the person's rights now); the 25,000 cap; past 200 rows the pane says so (the words are PR2's TablePane, the rule in guide §6.13)
+- [x] 01/11/2026 · The evaluation set's summary questions (six); `tests/unit/foundation/ai-summaries.test.js`; `tests/integration/ai-summaries.test.js` on the real migrations (scope, the caps, the cache, the timeout, Overview, the export and its cap); the matrix covers the summaries
+- [x] 01/11/2026 · Guide §4, §5, §6.3, §6.13, §6.16, §7, §11, §14; the module guides' §9 (attendance, workspace, ess, performance, foundation, organogram); DATABASE_SCHEMA; PROGRESS; README
+- [ ] `packages/ui` Overview drawing: PR2 has not merged; its OverviewPane reads `AiOverview` as PR1's contract already shapes it, so nothing of PR3's is owed there
 
 ### 6.4 PR4 · Action cards
 
@@ -737,6 +738,17 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   Profile and ESS's other own-only reads are never a subset of the CEO's, so the subset rule skips
   the own-only module and PR5's probes take it; a `query`/`queries` key is not a write word (the
   queries module's manifest uses it), so gate 19 guards SQL by statement and `.query()` instead.
+- 01/11/2026 · JP · PR3 built (§6.3) beside PR2, in its own chat on `claude/clever-pasteur-nt3rsc`:
+  the eight summaries, each one SQL in its module's repo with the reader's scope and the dimension
+  mapped to SQL by the repo; the read guard; the summary cache; Overview's title rule; Download Excel
+  with About This File; prompt version 5; the evaluation set's summary questions. Found on the way:
+  a read whose `run` goes through a service on the pool is out of reach of `SET LOCAL`, so the guard
+  holds a deadline as well and the summaries all take the client they are given; `ai_message_read`'s
+  outcome CHECK had to widen for `timed_out` (10340); the audit module's `ai:none` went with its
+  manifest; the first of the month ties every "this month" ranking, so the suite reads ten weeks.
+  Touched outside PR3's files: `tests/unit/foundation/ai-assistant.test.js` (mocks
+  `allowedSummaries`, since the real manifests now declare summaries) and the audit module's
+  controller (the opt-out line). Nothing of `packages/ui` or `app/` was touched.
 - 01/11/2026 · JP · The first full run fell on a month's first day and found the suite assumed
   October: the staging reviews seed bound the plans at the real clock, so October's round opened
   with no reviews (on staging too, from 1 November); four screen tests of attendance and the

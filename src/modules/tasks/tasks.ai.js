@@ -2,9 +2,10 @@
 /**
  * What the assistant may read and do about tasks: the board within the asker's own
  * `workspace` scope (their own, and their reporting line's for a manager), one page of
- * 25 at a time; and, as a card the person confirms (docs/guides/praxis-ai.md §6.11), setting
- * a task through the same service function New Task's Create Task calls. Moving, commenting
- * and cancelling are PR4's; until then they are routes to the screen.
+ * 25 at a time; the board counted (tasks.summary: by status, assignee, priority, due window
+ * or cadence; figures, never rows, docs/guides/praxis-ai.md §6.13); and, as a card the person
+ * confirms (§6.11), setting a task through the same service function New Task's Create Task
+ * calls. Moving, commenting and cancelling are PR4's; until then they are routes to the screen.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -34,6 +35,15 @@ module.exports = defineManifest({
     TaskDependencyCreate: "a dependency is set on the task's panel with both tasks in view",
     LateReasonCreate: "late reasons are Settings, set by Operations & People on the Tasks screen",
   },
+  summaries: [
+    {
+      key: "tasks.summary",
+      description: "Task counts for me or my team: open, overdue, due today or this week, done, by status, assignee, priority, due window or cadence",
+      params: c.tasks.TaskCountsQuery,
+      permission: ["workspace", "view"],
+      run: (client, params, actor) => service.aiCounts(client, params, actor.scope),
+    },
+  ],
   reads: [
     {
       key: "tasks.list",

@@ -3,7 +3,8 @@
  * What the assistant may read about reviews: their stages and scores within the asker's own
  * `performance` scope and the reviews that name them, 25 at a time (docs/guides/performance.md §9).
  * Never a check-in's actions, evidence or transcripts, a reviewer's comments, a dotted manager's
- * input, conduct or an improvement plan, and never a write (A23).
+ * input, conduct or an improvement plan, and never a write (A23). reviews.summary counts the same
+ * reviews by stage, rating, department or round (figures, never rows, docs/guides/praxis-ai.md §6.13).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -11,6 +12,15 @@ const service = require("./reviews.service");
 
 module.exports = defineManifest({
   module: "performance",
+  summaries: [
+    {
+      key: "reviews.summary",
+      description: "Review counts in my scope: at check-in, with reviewers, second level, with HR, closed, withdrawn, waiting on me, by stage, rating, department or round",
+      params: c.reviews.ReviewSummaryQuery,
+      permission: ["performance", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor, actor.scope),
+    },
+  ],
   reads: [
     {
       key: "reviews.list",

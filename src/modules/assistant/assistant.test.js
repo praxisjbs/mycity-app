@@ -27,6 +27,7 @@ describe("the routes", () => {
       "GET /history/summary",
       "GET /suggestions",
       "POST /answers/:id/feedback",
+      "POST /answers/:id/reads/:n/export",
       "POST /ask",
       "POST /cards/:id/cancel",
       "POST /cards/:id/confirm",
@@ -38,7 +39,7 @@ describe("the routes", () => {
     for (const key of ["POST /ask", "POST /answers/:id/feedback", "POST /transcribe", "PUT /cards/:id", "POST /cards/:id/confirm", "POST /cards/:id/cancel"])
       expect(by[key].permission).toMatchObject({ key: "praxis_ai", action: "create" });
     // One's own History, its figures, its export, a read run again and a card: view, whatever the grant's scope (decision 7).
-    for (const key of ["GET /suggestions", "GET /conversations", "GET /conversations/:id/turns", "DELETE /conversations/:id", "DELETE /history", "GET /history/summary", "GET /history/questions", "POST /history/export", "GET /answers/:id/reads/:n", "GET /cards/:id"])
+    for (const key of ["GET /suggestions", "GET /conversations", "GET /conversations/:id/turns", "DELETE /conversations/:id", "DELETE /history", "GET /history/summary", "GET /history/questions", "POST /history/export", "GET /answers/:id/reads/:n", "POST /answers/:id/reads/:n/export", "GET /cards/:id"])
       expect(by[key].permission).toMatchObject({ key: "praxis_ai", action: "view" });
     for (const r of routes) expect(r.capability).toBeNull();
   });

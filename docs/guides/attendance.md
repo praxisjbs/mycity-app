@@ -1330,6 +1330,13 @@ never leave identity, and no log line carries them.
 
 ## 9 · AI and search
 
+- **AI summary** (`attendance.ai.js`, `docs/guides/praxis-ai.md` §6.13): `attendance.summary`
+  (`people` view, the caller's scope; `AttendanceSummaryQuery`: a period, a department, a person,
+  and `by` person, department, site, day, week or month): days, people, present, late, absent, on
+  leave, minutes late and per late day, minutes worked, exceptions and open ones; by person,
+  department or site the late days (20), most minutes late (10) and absent days (20); by day, week
+  or month the same as series of the newest 60 buckets. One SQL over `attendance_day`
+  (`attendance.repo.summary`), figures never rows, inside the assistant's 3 second read timeout.
 - **AI reads** (`attendance.ai.js`): `attendance.my_days` (ess view, own), `attendance.register`
   and `attendance.exceptions` (`people` view, the caller's scope); the rules in force are read through
   `policies.text` (`policies.md` §9; `attendance.policy` is removed in PR 1);
@@ -1637,6 +1644,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · §9: `attendance.summary`, the assistant's figures over a period by person, department, site, day, week or month (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 01/11/2026 · JP · Tests only, at the month boundary (the Praxis AI Engine's first full run fell on 01/11/2026): the pay-items tests step My Attendance back as many months as the item needs, since the mock's days run six weeks back from yesterday; All Days of a person reads the month that holds days (the month before, on a month's first day) and accepts the day's date shown more than once in its sheet. No screen or rule changes.
 
 - 27/10/2026 · AJ · Queries & Sanctions raises the query for a breach with Raise Query on (§3 step 11,

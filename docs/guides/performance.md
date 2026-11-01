@@ -1556,6 +1556,15 @@ the CEO. They never go to search, Home, Analytics (scores only) or the AI (§9).
   `commitments.list` (a month's commitments and their states in scope; "what did Marketing miss in
   October"). `reviews.ai.js`: `reviews.list` (stages and scores only; never
   actions, evidence, transcripts, comments, input, conduct or PIPs).
+- **AI summaries** (`docs/guides/praxis-ai.md` §6.13): `goals.summary` (`goals.ai.js`, `performance`
+  view; `PerformanceSummaryQuery`: a quarter and a function) counts the quarter as Analytics does
+  (`goals.analytics.aiSummary`): key results by status and in recovery, the company score for a
+  reader of the whole plan, the latest score by function, the ratings at the latest closed round, and
+  the company's and up to five functions' scores by month as series, within the reader's reach of the
+  tree and their `performance` scope. `reviews.summary` (`reviews.ai.js`; `ReviewSummaryQuery`: a
+  round, a kind, a department, `by` stage, rating, department or round) counts the reviews the reader
+  may list: at each stage, waiting on them, the average closed score; by stage and rating always,
+  then by department or round; never a check-in's words. Figures, never rows.
 - **Reach** (§6.23, P25): the assistant's `goals.okrs`, `goals.trace` and `kpis.list`, and ⌘K's key results,
   objectives, organisational goals and KPIs, read only what the asker may read on Goals and KPIs: a
   department's, what is shared with them, the key results they own; whoever reads the whole plan (§6.25) everything. A
@@ -1811,6 +1820,7 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · §9: `goals.summary` and `reviews.summary`, the quarter's key results, scores and ratings and the reviews by stage counted for the assistant, within the reader's reach and scope (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 01/11/2026 · JP · The staging reviews seed (`seeds/staging/46_performance_reviews.js`) dates the plans' binding, the scorecards and their approvals to the quarter's live day before opening October's round: a round takes only scorecards bound before its month ended (`reviews.repo.bindingScorecards`), and from November on the seed had bound them at the real clock, so staging and `tests/integration/home-staging-seed.test.js` opened October with no reviews. Nothing in the module changes.
 
 - 28/10/2026 · JP · The Plan Approval card says who a plan awaiting approval is with, and Send Plan's toast says who it went to (JBS Praxis, 28/10/2026, from staging: a General Management plan sent from the build account went to Operations & People, whose stage comes before the CEO's, so the CEO was not told and the plan was not on their Waiting On You; the card read only Awaiting Approval; §2, §3.2, §5, §6.4, §7, §10.1, §13), guide first. `GET /performance/plans/:id` and Send Plan's answer carry `approval` (`stage_key`, `stage_name`) from the plan's pending instance, null when none is pending; the card gains **Approval**, *With Operations & People*, and the toast reads *Plan sent to Operations & People*. No change to who the engine tells: each stage's approvers on Send Plan and on each approval, never a stage ahead; an integration test now holds that for every stage and for the CEO. No migration. Left: a stage whose role has no active login (§13).

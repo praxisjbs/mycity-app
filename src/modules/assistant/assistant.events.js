@@ -16,6 +16,8 @@ const vault = require("../../shared/documents/vault");
 const VOICE_QUESTION = "ai_voice_question";
 /** History's Export (§6.5): the person's questions as a workbook, read by the person who asked. */
 const HISTORY_EXPORT = "ai_history_export";
+/** Download Excel on an answer's Table (§6.16): one read of the answer, every row, read by the person who asked. */
+const ANSWER_EXPORT = "ai_answer_export";
 
 const EVENTS = defineEvents("praxis_ai", {
   "assistant.answered": { summary: "A question to the assistant was answered, from the reads named" },
@@ -23,6 +25,7 @@ const EVENTS = defineEvents("praxis_ai", {
   "assistant.history_cleared": { summary: "A person cleared their history with the assistant" },
   "assistant.feedback_given": { summary: "A person marked an answer of the assistant Helpful or Not Helpful" },
   "assistant.export_requested": { summary: "A person asked for their questions to the assistant as a workbook" },
+  "assistant.read_export_requested": { summary: "A person asked for every row of one of an answer's reads as a workbook" },
   // Cards (docs/guides/praxis-ai.md §6.11, §7): the card, how it was confirmed and the result; never the words.
   "assistant.card_drafted": { summary: "An answer of the assistant drew an action card for the person to confirm" },
   "assistant.action_confirmed": { summary: "A person pressed an assistant's card and its action ran with their rights" },
@@ -47,7 +50,15 @@ defineDocumentType(HISTORY_EXPORT, {
   export: true,
 });
 
-module.exports = { EVENTS, VOICE_QUESTION, HISTORY_EXPORT };
+/** An answer's read as a workbook (§6.16): the rows the person may see now, kept a day like every export. */
+defineDocumentType(ANSWER_EXPORT, {
+  label: "Praxis AI answer export",
+  module: "praxis_ai",
+  sensitivity: "personal",
+  export: true,
+});
+
+module.exports = { EVENTS, VOICE_QUESTION, HISTORY_EXPORT, ANSWER_EXPORT };
 
 // History's Export, registered with the worker's outbox here because the worker loads each module's
 // events file (src/worker.js).

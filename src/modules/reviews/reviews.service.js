@@ -270,6 +270,43 @@ async function detail(db, r, actor, roles) {
 const roleCodes = (actor) => repo.roleCodesOfUser(pool, actor && actor.user_id);
 
 /** GET /performance/reviews */
+/** The stages and ratings as Reviews names them, for the assistant's summary. */
+const STAGE_WORDS = Object.freeze({ check_in: "Check-In", with_reviewer: "With Reviewer", second_level: "Second Level", with_hr: "With HR", closed: "Closed", withdrawn: "Withdrawn" });
+const RATING_WORDS = Object.freeze({ exceeds: "Exceeds", meets: "Meets", partly_meets: "Partly Meets", below: "Below" });
+
+/**
+ * The assistant's review summary (docs/guides/praxis-ai.md §6.13; performance.md §9): the reviews the
+ * asker may list, counted by stage, rating and department or round; never a check-in's words, evidence
+ * or comments. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   ReviewSummaryQuery, parsed
+ * @param {object} actor
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, actor, scope) {
+  const { figure, group } = require("../../shared/ai/summary");
+  const r = await repo.aiSummary(client, params, scope, actor || {}, await roleCodes(actor));
+  const f = r.figures || {};
+  const by = params.by || "stage";
+  const groups = [
+    group("stage", "Reviews by stage", r.by_stage.map((x) => ({ ...x, label: STAGE_WORDS[x.label] || x.label }))),
+    group("rating", "Closed reviews by rating", r.by_rating.map((x) => ({ ...x, label: RATING_WORDS[x.label] || x.label }))),
+    group(by === "round" ? "round" : "department", by === "round" ? "Reviews by round" : "Reviews by department", r.by_third),
+  ];
+  const figures = [
+    figure("reviews", "Reviews", f.reviews),
+    figure("check_in", "At check-in", f.check_in),
+    figure("with_reviewer", "With reviewers", f.with_reviewer),
+    figure("second_level", "At second level", f.second_level),
+    figure("with_hr", "With HR", f.with_hr),
+    figure("closed", "Closed", f.closed),
+    figure("withdrawn", "Withdrawn", f.withdrawn),
+    figure("waiting_on_me", "Waiting on me", f.waiting_on_me),
+  ];
+  if (f.average_score !== null && f.average_score !== undefined) figures.push(figure("average_score", "Average score to date, closed", String(f.average_score), "score"));
+  return { figures, groups, series: [], total: f.reviews || 0 };
+}
+
 async function list(actor, query, scope) {
   const page = await repo.list(pool, query, scope, actor || {}, await roleCodes(actor));
   return { ...page, data: page.data.map(reviewView) };
@@ -1277,6 +1314,7 @@ async function myReviews(actor, query) {
 }
 
 module.exports = {
+  aiSummary,
   reviewView,
   itemView,
   chainOf,

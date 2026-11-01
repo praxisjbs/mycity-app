@@ -132,6 +132,61 @@ function waiting(client, user, roleCodes, modules, query, hidden = []) {
   );
 }
 
+/** The stage a request waits at, by the name its flow gives it (an aggregate: the rows are not paged here, but LIMIT is paged.js's). */
+const STAGE_NAME = `(SELECT min(s ->> 'name') FROM jsonb_array_elements(d.stages) s WHERE s ->> 'key' = i.current_stage)`;
+
+/** How old a waiting request is, in the bands the assistant's summary names (never a row's words). */
+const AGE_BAND = `CASE
+    WHEN i.stage_entered_at > now() - interval '1 day' THEN '1_under_a_day'
+    WHEN i.stage_entered_at > now() - interval '3 days' THEN '2_one_to_three_days'
+    WHEN i.stage_entered_at > now() - interval '7 days' THEN '3_four_to_seven_days'
+    ELSE '4_over_a_week' END`;
+
+/**
+ * The assistant's approvals summary (docs/guides/praxis-ai.md §6.13; foundation.md §9): the requests
+ * waiting on the person, counted in one SQL over the same WHERE as My Approvals: by flow, by age band,
+ * and by stage or module as asked. Figures, never a row.
+ * @param {{by: string, module_key?: string|null}} query
+ */
+async function waitingSummary(client, user, roleCodes, modules, query, hidden = []) {
+  const params = [];
+  const where = waitingWhere(user, roleCodes, modules, query.module_key, params, hidden);
+  const third = query.by === "stage" ? { key: `d.name || ' · ' || COALESCE(${STAGE_NAME}, i.current_stage)`, label: `d.name || ' · ' || COALESCE(${STAGE_NAME}, i.current_stage)` } : { key: "i.module_key", label: "i.module_key" };
+  const { rows } = await client.query(
+    `WITH w AS (
+       SELECT i.workflow_instance_id, i.module_key, d.name AS flow, i.stage_entered_at, i.stage_due_at,
+              (i.stage_due_at IS NOT NULL AND i.stage_due_at < now()) AS overdue,
+              ${AGE_BAND} AS age_band, ${third.key} AS third_key, ${third.label} AS third_label
+         FROM workflow_instance i
+         JOIN workflow_definition d ON d.workflow_definition_id = i.workflow_definition_id
+        WHERE ${where}
+     ), figures AS (
+       SELECT count(*)::int AS waiting,
+              count(*) FILTER (WHERE overdue)::int AS overdue,
+              COALESCE(max(extract(epoch FROM (now() - stage_entered_at)) / 86400), 0)::int AS oldest_days,
+              count(DISTINCT flow)::int AS flows,
+              count(*) FILTER (WHERE stage_due_at IS NOT NULL AND stage_due_at >= now() AND stage_due_at < now() + interval '1 day')::int AS due_within_a_day
+         FROM w
+     ), by_flow AS (
+       SELECT flow, count(*)::int AS n, count(*) FILTER (WHERE overdue)::int AS o,
+              row_number() OVER (ORDER BY count(*) DESC, flow) AS rank
+         FROM w GROUP BY flow
+     ), by_third AS (
+       SELECT third_key AS key, min(third_label) AS label, count(*)::int AS n, count(*) FILTER (WHERE overdue)::int AS o,
+              row_number() OVER (ORDER BY count(*) DESC, min(third_label), third_key) AS rank
+         FROM w GROUP BY third_key
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', flow, 'label', flow, 'value', n, 'count', o) ORDER BY rank) FROM by_flow WHERE rank <= 20) AS by_flow,
+            (SELECT json_agg(json_build_object('key', age_band, 'label', age_band, 'value', n, 'count', o) ORDER BY age_band)
+               FROM (SELECT age_band, count(*)::int AS n, count(*) FILTER (WHERE overdue)::int AS o FROM w GROUP BY age_band) x) AS by_age,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', n, 'count', o) ORDER BY rank) FROM by_third WHERE rank <= 20) AS by_third`,
+    params,
+  );
+  const r = rows[0];
+  return { figures: r.figures, by_flow: r.by_flow || [], by_age: r.by_age || [], by_third: r.by_third || [] };
+}
+
 /** How many wait on the person, and how many of those are past their time limit. */
 async function waitingCount(client, user, roleCodes, modules, hidden = []) {
   const params = [];
@@ -263,6 +318,7 @@ module.exports = {
   activeDefinitions,
   waiting,
   waitingCount,
+  waitingSummary,
   instanceNames,
   namesOfUsers,
   roleNames,

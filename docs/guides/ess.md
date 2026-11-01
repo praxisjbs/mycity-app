@@ -288,7 +288,12 @@ People's or a manager's. The workbook opens for the person it is about and the C
 ## 9 · AI and search
 
 - **AI reads** (`ess.ai.js`): built: the caller's own documents, leave requests (`my_leave.list`) and
-  year (`my_leave.balances`); `leave.ai.js` reads leave requests within the asker's `people` scope.
+  year (`my_leave.balances`); `leave.ai.js` reads leave requests within the asker's `people` scope,
+  and counts them (`leave.summary`, `docs/guides/praxis-ai.md` §6.13; `LeaveSummaryQuery`: the
+  list's filters, a department, a year or a period, `by` status, type, person, department or month):
+  requests by status, days approved, taken, booked ahead and waiting, people, on leave today; by
+  status and type always, then by person or department (20) or by month as series. One SQL over the
+  requests (`leave.repo.aiSummary`), figures never rows.
   Still to come: the caller's own profile summary, latest payslip
   summary, open queries count. Never another person's record. Paged at 25.
 - **AI routes**: "my payslip" → My Payslips; "request leave" → My Leave with `new=1`, Request
@@ -399,6 +404,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · §9: `leave.summary`, People's leave counted for the assistant by status, type, person, department or month, with the days taken, booked and waiting (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 27/10/2026 · GE · My Queries' window is 24 hours (§10.1), lateness raises its query through the
   Attendance policy (§3), and who sees a query (§8) matches `queries.md` §6.1.
 - 27/10/2026 · AJ · A query's response window is 24 hours, as MyCity's handbook sets it (queries.md §6.2).

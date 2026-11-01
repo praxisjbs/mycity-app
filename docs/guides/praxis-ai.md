@@ -126,7 +126,7 @@ build, not a MyCity requirement; JBS lifts it, and MILESTONES §15 carries the a
 | ⌘K | Staff app | `praxis_ai` view | Ask, History, the person's own conversations, New Conversation | Open them |
 | AI Control · Actions | Staff app | `ai_control` view | Data Answers marked built; the new Voice Question action; Data Answers' chain takes any text model as first choice or fallback | As built (`ai-control.md`) |
 | Every module's manifest | Backend | | The reads, summaries and actions Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9), summaries for its big tables (§6.13, PR3) and actions for the changes people ask for (§6.11, PR4) |
-| Praxis AI, full screen (`ask`, reshaped; PR2) | Staff app, from every screen, ⌘K and the menu | `praxis_ai` view | The conversation beside the right pane (Overview, Table, Record, Sources) with Back to the screen it was opened from; on a phone the conversation, the pane as a sheet | Ask, open the pane, page a table, download Excel (PR3), open a record, Back |
+| Praxis AI, full screen (`ask`, reshaped; PR2) | Staff app, from every screen, ⌘K and the menu | `praxis_ai` view | The conversation beside the right pane (Overview, Table, Record, Sources) with Back to the screen it was opened from; on a phone the conversation, the pane as a sheet. Overview's figures and chart, and Download Excel, are served since PR3 (§6.13, §6.16); PR2 draws them | Ask, open the pane, page a table, download Excel, open a record, Back |
 | An action card (PR4) | Inside an answer on the full screen | The person who asked, for an action their grant allows | The action's fields as it will receive them, the records it touches, its buttons; the result line after the press | Edit, Cancel, press the verb (Confirm It's You first for a sensitive class) |
 
 ## 3 · How the screens relate
@@ -184,6 +184,12 @@ Migration `10330_praxis_engine.sql` (decision 18; PR1) adds the engine's tables 
 | `ai_conversation` (10000) | adds `opened_from` jsonb | The screen the conversation was opened from (decision 12), as `AiScreenContext` |
 | `ai_message` (10000) | adds `context` jsonb | The screen context sent with the question, kept for History |
 
+Migration `10340_praxis_read_timeout.sql` (PR3) widens `ai_message_read.outcome` to `timed_out`: a read
+or summary the database cut at the 3 second statement timeout (§6.3 step 8), so the Sources tab can
+say the question covered too much. An answer's Excel file (§6.16) is a `document` of type
+`ai_answer_export` (`export: true`, personal, the asker's own, kept 24 hours by the vault's sweep),
+reserved in the request and filled by the worker; no table of its own.
+
 No reference seed: `praxis_ai` grants are `0290`'s. Nothing is seeded on production; staging's
 conversations come from asking.
 
@@ -193,8 +199,9 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `POST /ask` | `AiAsk` (`question` up to 500 characters, `ai_conversation_id` optional, `context` optional: the screen asked from, `shows`: what the asking screen can draw, `cards` and `pane`) → `AiAnswer` (adds `card`, `context`; `reads` carry `n`, `module_key`, `params`, `outcome`) | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed. A screen that does not say `shows: ["cards"]` is offered no action, and one without `"pane"` gets no overview spec (§6.11, §6.13) |
-| `GET /answers/:id/reads/:n` (`page`) | `PageQuery` → `AiReadRows` | `praxis_ai` view · own | yes, 25 | Read `n` of the answer run again with its stored parameters and the caller's rights now (§6.12): the Table's later pages, the Sources tab and Excel come from here. 404 for a summary or a read that was refused |
+| `POST /ask` | `AiAsk` (`question` up to 500 characters, `ai_conversation_id` optional, `context` optional: the screen asked from, `shows`: what the asking screen can draw, `cards` and `pane`) → `AiAnswer` (adds `card`, `context`; `reads` carry `n`, `module_key`, `params`, `outcome`: `read`, `refused`, `invalid`, `failed` or `timed_out`) | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed. A screen that does not say `shows: ["cards"]` is offered no action, and one without `"pane"` gets no overview spec (§6.11, §6.13) |
+| `GET /answers/:id/reads/:n` (`page`) | `PageQuery` → `AiReadRows` | `praxis_ai` view · own | yes, 25 | Read `n` of the answer run again with its stored parameters and the caller's rights now (§6.12): the Table's later pages, the Sources tab and Excel come from here. 404 for a summary or a read that was refused or timed out |
+| `POST /answers/:id/reads/:n/export` | `EmptyBody` → `documents.ExportFile`, 202 | `praxis_ai` view · own | | Download Excel (§6.16): every row of read `n`, replayed in the worker with the caller's rights and masks as they stand then, at most 25,000 rows, with an About This File sheet; the screen waits on `GET /exports/:id` and downloads as every export does (`foundation.md` §6.12). 404 as the replay is |
 | `GET /cards/:id` | → `AiActionCard` | `praxis_ai` view · own | | The card as the person sees it (§6.11); a status past `shown` is read only |
 | `PUT /cards/:id` | `AiActionEdit` (`values`) → `AiActionCard` | `praxis_ai` create · own | | The person's edits, re-validated with the action's schema; problems updated; 409 `CARD_NOT_OPEN` past `shown` |
 | `POST /cards/:id/confirm` | `AiActionConfirm` (`values` optional) → `AiActionResult` | `praxis_ai` create · own; the action's own grant inside | | `Idempotency-Key`. 403 `REAUTH_REQUIRED` for a sensitive class without Confirm It's You in the last 5 minutes; 403 `ACTION_FORBIDDEN` when the grant or scope is gone; 409 `CARD_EXPIRED`, `CARD_DONE`, `CARD_RUNNING`, `CARD_CANCELLED`; 422 on the fields; 422 `TOO_MANY_RECORDS` past 25 |
@@ -294,7 +301,16 @@ A refused read is not an error: it becomes an answer that says the information i
    the rows as read;
 6. the result sent to the model is the page, its total and the rows, cut at 12,000 characters on a
    row boundary with a note when cut;
-7. its citations are kept for the answer (`cite.js`).
+7. its citations are kept for the answer (`cite.js`);
+8. **it runs inside its own transaction with a statement timeout of 3 seconds** (PR3; decision 14;
+   `authorise.guarded`: `SET LOCAL statement_timeout` on a client of its own, under a savepoint when
+   the caller's transaction is joined). A read the database cuts answers `AI_READ_TIMEOUT`; a read
+   whose service runs on the pool, which no `SET LOCAL` reaches, is held to the same deadline here
+   (4 seconds) while the database finishes its statement on its own. The model receives
+   `{ error: "too_much" }` with the words "narrow the question" and is told, in the prompt, to ask
+   for a shorter period, one department or one person, or a summary; the read is kept as
+   `timed_out` (`ai_message_read.outcome`, `AiReadMade.outcome`), so the Sources tab says so, and
+   it cannot be paged or exported (404). A summary read runs under the same guard.
 
 ### 6.4 The answer
 
@@ -542,15 +558,45 @@ A summary returns `AiSummaryResult`: `figures` (up to 12: key, label, value, uni
 3 groupings of up to 20 rows: key, label, value, count), `series` (up to 6 of up to 60 points) and
 `total`; never rows. `authorise.runSummary` parses the result with the schema and refuses one that
 carries rows. It is offered to the model as a tool like a read, counts as one of the five, and runs
-inside the same read timeout (3 seconds, PR3).
+inside the same read timeout (3 seconds, §6.3 step 8).
+
+**The summaries (PR3).** Each is one SQL in its module's repo, with the reader's scope through
+`scopeClause` (or the list's own audience: tasks, approvals, reviews), the grouping picked by a
+`by` value the contract allow-lists and the repo maps to SQL (never the caller's words), groups
+cut to 20 rows and top lists to 10 by `row_number()`, a series to its newest 60 buckets. The
+figures, groups and series are named through `shared/ai/summary.js` (`figure`, `group`, `top`,
+`series`, `periodOf`), so no module invents its own words for a count. A period is `from` and
+`to`, or a `month`, else this Lagos month to today, at most a year.
+
+| Summary | Module, grant | Params | Figures, groups and series |
+|---|---|---|---|
+| `attendance.summary` | `people` view | `AttendanceSummaryQuery`: period, `department_id`, `employee_id`, `by` person, department, site, day, week or month | Days, people, present, late, absent, on leave, minutes late and per late day, minutes worked, exceptions and open ones; by person, department or site: late days (20), most minutes late (10), absent days (20); by day, week or month: late days, absent days, minutes late as series |
+| `tasks.summary` | `workspace` view | `TaskCountsQuery`: the board's `scope`, `status`, `assignee_id`, `cadence`, `priority`, `due`, `project_id`, `by` status, assignee, priority, due or cadence | Tasks, open, overdue, due today, due this week, done, done this week, blocked, people; by status and by priority always, then by assignee (20), due window or cadence |
+| `leave.summary` | `people` view | `LeaveSummaryQuery`: the list's filters, `department_id`, `year` (this year unless a period is given), `by` status, type, person, department or month | Requests by status, days approved, taken, booked ahead and waiting, people, on leave today; by status and by type always, then by person or department (20), or by month as series (days approved, requests) |
+| `approvals.summary` | `ess` view (the asker's own queue) | `ApprovalSummaryQuery`: `module_key`, `by` flow, stage, age or module | Waiting, past their time, due within a day, the oldest in days, flows; by flow and by age band always, then by stage or module |
+| `goals.summary` | `performance` view, the reader's reach of the tree (`performance.md` §6.23) | `PerformanceSummaryQuery`: `period_id`, `department_id` | Key results by status, in recovery, the company score where the reader reads the whole plan; groups by status, latest score by function, ratings at the latest closed round; the company's and up to five functions' scores by month as series |
+| `reviews.summary` | `performance` view, the reviews the reader may list | `ReviewSummaryQuery`: `round_id`, `kind`, `department_id`, `by` stage, rating, department or round | Reviews at each stage, waiting on me, the average score of closed ones; by stage and by rating always, then by department or round. Never a check-in's words |
+| `employees.summary` | `people` view | `EmployeeSummaryQuery`: the register's filters, `by` department, status, work pattern, employment type, manager or confirmation | People, active, confirmed, on probation, confirmation due within 30 days or overdue, contracts ending within 30 days, no line manager, departments; by department and by status always, then by the dimension asked (managers 20, confirmation bands) |
+| `audit.summary` | `settings` view with scope `all` and the CEO (anyone else is told it is not available, as the log refuses them) | `AuditSummaryQuery`: the log's filters (the last 30 days unless `from` or `to` says), `by` module or entity type | Entries, sensitive, people who acted, days, modules; by action (the catalogue's words, 20), by person (20), by module or record type; entries by day as a series |
+
+**The summary cache** (`shared/ai/summary-cache.js`): the same summary with the same parameters
+and the same scope asked again within 60 seconds is served from Redis, keyed by the asking person's
+login and their scope, so a manager's figures never reach another person and a changed grant is a
+new key; without Redis every call runs. `runSummary` says `cached: true` when it was.
+
+**Past 200 rows** the pane's Table does not page on: it says how many rows there are ("1,240 rows:
+download Excel to see them all", PR2's TablePane) and offers Download Excel (§6.16).
 
 The pane is built by the server from the turn (`engine/pane.js`): **Sources** from every read made
 (name, filters, rows, total, outcome, masks); **Table** from the read the draft names, paged through
 §6.12; **Record** from a chip or a row, shown through the person's masks; **Overview** from the
 summary the draft names (`AiAnswerDraft.overview`: which summary, up to three figures by key, one
 chart of bar, stacked bar, line or donut over one of its groups or series, and a sentence title). A
-figure or series the summary does not hold is dropped; a title that names a value the summary does
-not hold is dropped. The overview spec is kept only when the asking screen says `shows: ["pane"]`.
+figure, group or series the summary does not hold is dropped; a chart title that names a number the
+summary holds nowhere (not a figure, a group's value or count, a point or the total; a year or a date
+is not a figure) is dropped for the group's or series' own label. The prompt (version 5) says how to
+name the summary, the figures and the chart, and which chart suits a group (bar, donut) or a series
+(line). The overview spec is kept only when the asking screen says `shows: ["pane"]`.
 
 ### 6.14 The engine boundary (decision 17; PR1)
 
@@ -583,6 +629,33 @@ PR there.
    nor in `not_offered` with a reason (PR5 makes this universal: every module with such a schema);
 5. a Try Asking line names a read that does not exist.
 
+### 6.16 Download Excel (decision 15; PR3)
+
+Every answer export takes the one export path (`foundation.md` §6.12), never a file built inside the
+request:
+
+1. `POST /ai/answers/:id/reads/:n/export` finds the read as §6.12 does (the caller's, a list or
+   record read that returned; 404 otherwise), reserves an `ai_answer_export` document for the caller
+   in the request's transaction (`exports.reserve`) and emits `assistant.read_export_requested`
+   (the asker, the document, the answer, `n`, the read key; never the words), answering 202
+   `ExportFile`.
+2. The outbox handler (`assistant.export.js` `buildReadExport`) runs in the worker after commit: the
+   asker must still be active and the answer still theirs; it replays the read page by page through
+   `authorise.runRead` with the asker's rights and masks as they stand then, up to 25,000 rows
+   (`READ_EXPORT_CEILING`, one constant), drawing each page as the Table shows it (the answer's own
+   columns when its table came from this read, else the rows' first plain fields; dates day first,
+   naira with two places), and writes the workbook with `shared/spreadsheet`.
+3. The workbook has two sheets: the rows, named after the read, and **About This File**: who exported
+   it and when (Lagos), the question and when it was asked, the read and its filters, the rows in the
+   file and the rows the read has now, whether it was cut at the cap, the masked fields the asker's
+   role hides (by their names), and the environment (a staging file says so, as its name does).
+4. The screen waits on `GET /exports/:id` and downloads `GET /documents/:id/content`; the vault keeps
+   the file 24 hours and the `export-cleanup` job removes it. Only the asker (and the CEO, as every
+   document) may open it.
+
+A person who lost the read's grant between the press and the build gets a failed file; one who lost
+part of their scope gets fewer rows. Nothing is emailed.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -592,6 +665,7 @@ PR there.
 | `assistant.history_cleared` | Clear History | Audit only |
 | `assistant.feedback_given` | Helpful or Not Helpful | Audit only |
 | `assistant.export_requested` | Export on History | Outbox: the workbook of the person's questions, made after commit (`assistant.export_history`); a person no longer active gets a failed file |
+| `assistant.read_export_requested` | Download Excel on an answer's Table (§6.16) | Outbox: every row of the read, replayed with the asker's rights now, into the file the request reserved (`assistant.export_read`); at most 25,000 rows; a person no longer active, or an answer that is gone, gets a failed file |
 | `assistant.card_drafted` | An answer carried a card (§6.11) | Audit only: the card, the action key, the records; never the words |
 | `assistant.action_confirmed` | A card pressed and its action run (§6.11 step 6) | Audit only: the card, the run, how it was confirmed, the result lines; the module's own event carries the change |
 | `assistant.action_failed` | A press whose action refused or failed | Audit only: the card, the error code |
@@ -662,10 +736,17 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **Five reads used, or the same read asked twice**: the model is told to answer with what it has.
 - **A huge list** ("all our staff"): the first 25 and the total; Show Next 25 asks for the next page
   as a follow-up in the same conversation.
-- **A question that needs a total over more than one page** (a sum of 400 records): answered only
-  where a read returns that total; otherwise the answer gives the total, says it looked at the
-  first 25 and names the screen (the prompt says so and never to estimate the rest). A module adds
-  a summary read when its questions need one.
+- **A question that needs a total over more than one page** (a sum of 400 records): answered from
+  the module's summary read (§6.13: attendance, tasks, leave, approvals, performance, reviews,
+  employees, the Audit Log); where a module has none, the answer gives the total, says it looked at
+  the first 25 and names the screen (the prompt says so and never to estimate the rest). A module
+  adds a summary read when its questions need one.
+- **A read that would scan too much** (a year of attendance by person for the whole company on a
+  slow night): the database cuts it at 3 seconds (§6.3 step 8); the model is told "too much" and
+  asks for a shorter period, a department or a person, or uses a summary; the Sources tab shows the
+  read as timed out; nothing is estimated.
+- **A list past 200 rows in the pane**: the Table stops paging and offers Download Excel (§6.13,
+  §6.16); the file holds at most 25,000 rows and its About This File says when it was cut.
 - **The connection drops while waiting** (Ifeoma's bad network zone): the answer is saved; the
   conversation shows it on reload, and a first question's answer is in Recent and History. Try
   Again sends the same `Idempotency-Key`, which returns the same answer, never a second run.
@@ -726,6 +807,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · Praxis AI Engine PR3, large data and Excel (`docs/handoff/praxis-ai-engine.md` §6.3; decisions 14 and 15): eight summary reads declared beside their modules' reads (§6.13 table: attendance, tasks, leave, approvals, performance, reviews, employees, the Audit Log, which drops its `ai:none`), each one SQL with the reader's scope, 20 groups, 10 in a top list, 60 points, never a row, shaped through `shared/ai/summary.js`; every read and summary runs inside its own transaction with a 3 second statement timeout and a 4 second deadline (§6.3 step 8, `authorise.guarded`), a read the database cuts is `timed_out` (migration `10340`, §4; `AiReadMade.outcome`) and the model is told "too much"; the summary cache in Redis, 60 seconds, never across people; Overview drawn from the summary with a title check against every value the summary holds, prompt version 5; Download Excel through the one export path with About This File and a 25,000-row cap (§5, §6.16, §7); the evaluation set's summary questions (§6.10). Found on the way: a read whose service runs on the pool cannot be reached by `SET LOCAL`, so the deadline is held in the guard as well; the attendance seed does not reach the test database, so the suite inserts its own days.
 - 01/11/2026 · JP · The Praxis AI Engine (the handover of 01/11/2026, checked and resolved in `docs/handoff/praxis-ai-engine.md`): decision 3 replaced by §1.2's decisions 10 to 27 (the AI acts through declared actions a person confirms; the five-minute Confirm It's You for sensitive classes; full screen with Back; the four-tab pane; pages stay 25 with summary reads; Excel through the export path; the engine as a gated boundary; three tables added; mail and messages as actions; suggested cards; gate 23; no streaming; one AI action). PR1 built: §4 (10330), §5 (the card routes and read replay), §6.11 to §6.15, §7, §9, §13. PR2 to PR5 and their prompts are in the handoff. On the way: the phone list's No Conversations Yet is a second-level heading, as Ask's empty conversation already was (the accessibility gate refused h1 straight to h3); nothing on screen changes.
 - 26/10/2026 · JP · From the User Guide audit's screen defects: an unexpected failure answers `AI_FAILED` as §5 says (it was the generic 500); a 500 shows its reference; AI off and an unusable answer put the words back in the box (no Try Again); Send waits on an answer still coming; the microphone gives the server's reason; Helpful on, or Delete of, a conversation deleted elsewhere says so (§10, §11).
 - 26/10/2026 · JP · §6.9: the User Guide's `guide.search` read, so a how-to question is answered from the guide, cut to the asker's grants (`user-guide.md` §9).

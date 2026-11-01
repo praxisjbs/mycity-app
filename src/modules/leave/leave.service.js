@@ -72,6 +72,55 @@ const payloadOf = (row, type) => ({
 const list = ({ live, ...query }, scope) => repo.list(pool, { ...query, ...(live && { statuses: ["approved", "submitted"] }) }, scope);
 
 /** One request People may see. */
+/** Statuses as the list reads them, for the assistant's summary. */
+const STATUS_WORDS = Object.freeze({ submitted: "Waiting", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled", draft: "Draft" });
+
+/**
+ * The assistant's leave summary (docs/guides/praxis-ai.md §6.13; ess.md §9): this year in Lagos unless a
+ * period or a year is asked, within the reader's `people` scope; figures, never a row. Runs on the
+ * client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   LeaveSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series } = require("../../shared/ai/summary");
+  const today = lagos.today(now);
+  const year = !params.from && !params.to && !params.year ? Number(today.slice(0, 4)) : params.year || null;
+  const r = await repo.aiSummary(client, { ...params, year, today }, scope);
+  const f = r.figures || {};
+  const by = params.by || "status";
+  const figures = [
+    figure("requests", "Requests", f.requests),
+    figure("waiting", "Waiting", f.waiting),
+    figure("approved", "Approved", f.approved),
+    figure("rejected", "Rejected", f.rejected),
+    figure("cancelled", "Cancelled", f.cancelled),
+    figure("days_approved", "Days approved", f.days_approved, "days"),
+    figure("days_taken", "Days taken", f.days_taken, "days"),
+    figure("days_booked", "Days booked ahead", f.days_booked, "days"),
+    figure("days_waiting", "Days waiting", f.days_waiting, "days"),
+    figure("people", "People with approved leave", f.people),
+    figure("on_leave_today", "On leave today", f.on_leave_today),
+  ];
+  const groups = [
+    group("status", "Requests by status", r.by_status.map((x) => ({ ...x, label: STATUS_WORDS[x.label] || x.label }))),
+    group("type", "Days approved by type", r.by_type),
+  ];
+  if (r.series)
+    return {
+      figures,
+      groups,
+      series: [
+        series("days_approved", "Days approved by month", r.points.map((p) => ({ at: p.at, value: p.days }))),
+        series("requests", "Requests by month", r.points.map((p) => ({ at: p.at, value: p.requests }))),
+      ],
+      total: f.requests || 0,
+    };
+  if (by === "person" || by === "department") groups.push(group(by, `Days approved by ${by}`, r.by_dim));
+  return { figures, groups, series: [], total: f.requests || 0 };
+}
+
 async function getFor(id, scope) {
   const row = await repo.get(pool, id);
   if (!row) throw notFound();
@@ -431,6 +480,7 @@ async function deleteType(actor, id) {
 }
 
 module.exports = {
+  aiSummary,
   MAX_ACTIVE_TYPES,
   list,
   getFor,
