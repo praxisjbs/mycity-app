@@ -632,11 +632,14 @@ describe("my workspace", () => {
   }, 40000);
 
   it("an empty day on the month asks New Task or New Event, and New Task starts on that day", async () => {
-    // Add To Day is offered only from today on, so on a month's last day the month has none:
-    // the clock stands at the 15th of this month so days are always left.
+    // Add To Day is offered only from today on, so on a month's last day the month has none: late
+    // in a month the clock stands back at its 15th, so days are always left. Never forward: the
+    // session an earlier test signed in with would be past its token's time and the page would lock.
     const now = new Date();
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), 15, 9));
+    if (now.getDate() > 20) {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), 15, 9));
+    }
     try {
       await signedIn(<Workspace tab="calendar" id={null} />);
       await screen.findByText("Coming Up", undefined, { timeout: 8000 });
@@ -669,7 +672,8 @@ describe("my workspace", () => {
     const name = days[2]!.textContent!;
     fireEvent.click(days[2]!);
     expect(screen.getByRole("radio", { name: "Day" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+    // The day may sit in the month before (the week that straddles a month's first days): its items load first.
+    expect((await screen.findAllByText(name, undefined, { timeout: 5000 })).length).toBeGreaterThan(0);
     expect(screen.queryByText("Africa/Lagos")).toBeNull();
   }, 20000);
 
