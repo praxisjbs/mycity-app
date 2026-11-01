@@ -748,7 +748,10 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   manifest; the first of the month ties every "this month" ranking, so the suite reads ten weeks.
   Touched outside PR3's files: `tests/unit/foundation/ai-assistant.test.js` (mocks
   `allowedSummaries`, since the real manifests now declare summaries) and the audit module's
-  controller (the opt-out line). Nothing of `packages/ui` or `app/` was touched.
+  controller (the opt-out line). Nothing of `packages/ui` or `app/` was touched. Found too: PR1's
+  committed snapshot `src/shared/ai/catalogue.snapshot.json` is not on `main` (its session wrote it
+  after its last commit, or the squash lost it), so gate 23 would fail any branch from `main` until
+  this PR, which carries the snapshot whole (140 entries: the 131 of PR1 and the 9 of PR3).
 - 01/11/2026 · JP · The first full run fell on a month's first day and found the suite assumed
   October: the staging reviews seed bound the plans at the real clock, so October's round opened
   with no reviews (on staging too, from 1 November); four screen tests of attendance and the
