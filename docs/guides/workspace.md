@@ -461,7 +461,7 @@ set and a rescope are decided by the person the flow names (performance.md §6.1
   assignee, priority, due window or cadence): tasks, open, overdue, due today and this week, done and
   done this week, blocked, people; by status and priority always, then by assignee (20), due window
   or cadence. One SQL over the board's rows (`tasks.repo.counts`), figures never rows.
-- **AI actions** (`tasks.ai.js`, `docs/guides/praxis-ai.md` §6.11): `tasks.create` (standard risk, `workspace` create; input `TaskCreate`, New Task's own schema; run `tasks.service.create` with the person's scope; the task's number and title read back). The other Create schemas are `not_offered` with their reasons; PR4 of the engine adds `tasks.complete` and `tasks.comment`.
+- **AI actions** (`tasks.ai.js`, `calendar.ai.js`, `docs/guides/praxis-ai.md` §6.11): `tasks.create` (standard risk, `workspace` create, may be suggested; input `TaskCreate`, New Task's own schema; run `tasks.service.create` with the person's scope; the task's number and title read back); `tasks.complete` (`workspace` edit, up to 25 tasks a press; input `TaskComplete`: the tasks and the late reason the board asks for an overdue one; each moved to Done through `move()` as Mark Done does, one after another, a cancelled or waiting one its own line; `tasks.service.completeMany`); `tasks.comment` (`workspace` edit; input `TaskCommentAdd`: the task, filled from the screen the question came from, and the words; `tasks.service.comment`); `calendar.create` (`workspace` create; input `CalendarEventCreate`, which New Event's form joins from a day and two clock times; the attendees named through the calendar's repo and someone not on the staff refused on the field; `calendar.service.create`). The card names the tasks it touches by number and title (`tasks.service.cardRecords`) and the press refuses a task off the person's board (`assertCardTasks`). The other Create schemas are `not_offered` with their reasons.
 - **AI routes**: "create a task" → `workspace.tasks` with `new=1`, New Task filled from the address
   (`tasks.TaskPrefill`: title, notes, priority, cadence, due day, and for a manager the assignee,
   shown by name through the colleague card); "set my commitments" → `workspace.tasks` with
@@ -594,6 +594,8 @@ None. Projects, the late reasons and invitations by email were decided by JBS Pr
 and are built (§6).
 
 ## 14 · Change log
+
+- 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): the assistant's cards for Workspace, `tasks.complete` (Mark Done on up to 25 tasks through `move()`, `tasks.service.completeMany`), `tasks.comment` (`TaskCommentAdd`) and `calendar.create` (New Event's own service, the attendees named by `calendar.repo.namesOf`); §9. Nothing on the Workspace screens changes.
 
 - 01/11/2026 · JP · §9: `tasks.summary`, the board counted for the assistant by status, assignee, priority, due window or cadence (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 01/11/2026 · JP · §9: `tasks.create` is the Praxis AI Engine's reference action (`docs/guides/praxis-ai.md` §6.11, decision 10): the assistant drafts a task as a card from `TaskCreate`, the same schema New Task validates with, and the person's press runs `tasks.service.create` with their own scope; the task's number and title read back. The module's other Create schemas are `not_offered` with their reasons (gate 23). Nothing on screen changes until PR4 draws the card.

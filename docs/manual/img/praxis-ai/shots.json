@@ -15,6 +15,14 @@
       "phone"
     ]
   },
+  "praxis-card": {
+    "spec": "7b51d75761db25cc",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "praxis-figures": {
     "spec": "b9fe5823d45dc801",
     "source": "e3b0c44298fc1c14",

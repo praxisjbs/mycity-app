@@ -6,6 +6,7 @@ import { upload } from "@/api/upload";
 import type { AiAnswer, AiFeedbackValue, AiScreenContext, AiShows, AiTranscript } from "@mycity/contract/contract.gen.ts";
 import { useRouter } from "@/lib/router";
 import { AnswerBubble, Button, DataView, EmptyState, ErrorState, Form, Icon, IconButton, InlineInput, LoadingRows, ProgressLine, QuestionBubble, SourceChip, TapList, toast, VoiceField, type DataViewColumn } from "@mycity/ui";
+import { AnswerCard } from "./Card";
 import { pickForSource, type PanePick } from "./Pane";
 
 /** Praxis AI's conversation (docs/guides/praxis-ai.md §10): what is asked, what came back, and the box. */
@@ -40,7 +41,7 @@ export interface ConversationProps {
   id: string | null;
   /** The screen the question is asked from (decision 12), sent with every question. */
   context?: AiScreenContext | null;
-  /** What this screen can draw: the pane, and (PR4 of the Praxis AI Engine) cards. */
+  /** What this screen can draw: the pane, and an action card inside an answer (§6.11). */
   shows?: AiShows[];
   /** A first answer opened its conversation: the parent moves the address there. */
   onOpened: (id: string) => void;
@@ -249,6 +250,7 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
                   onNext={a.more && a.ai_message_id === newest && !pending ? () => ask(NEXT_PAGE) : undefined}
                   onPane={onPane}
                   paneOpen={paneFor === a.ai_message_id}
+                  onRedraw={!pending ? () => ask(a.question) : undefined}
                 />
               </div>
             ))}
@@ -301,7 +303,7 @@ function pagingOf(a: AiAnswer): string | null {
   return from && from > 1 ? `Showing ${from} to ${from + read.rows - 1} of ${read.total}` : `Showing ${read.rows} of ${read.total}`;
 }
 
-function Answer({ a, feedback, onFeedback, onNext, onPane, paneOpen }: { a: AiAnswer; feedback: AiFeedbackValue | null; onFeedback: (value: AiFeedbackValue | null) => Promise<void>; onNext?: () => Promise<void> | undefined; onPane?: (answer: AiAnswer, pick?: PanePick) => void; paneOpen: boolean }) {
+function Answer({ a, feedback, onFeedback, onNext, onPane, paneOpen, onRedraw }: { a: AiAnswer; feedback: AiFeedbackValue | null; onFeedback: (value: AiFeedbackValue | null) => Promise<void>; onNext?: () => Promise<void> | undefined; onPane?: (answer: AiAnswer, pick?: PanePick) => void; paneOpen: boolean; onRedraw?: () => Promise<void> | undefined }) {
   const { navigate } = useRouter();
   // Kinds of record with how many (decision 9); the one record, named, when the answer rests on one. A chip opens the pane on them.
   const from = a.sources.map((s) =>
@@ -319,6 +321,7 @@ function Answer({ a, feedback, onFeedback, onNext, onPane, paneOpen }: { a: AiAn
   return (
     <AnswerBubble
       text={a.content}
+      card={a.card ? <AnswerCard card={a.card} onRedraw={onRedraw} /> : undefined}
       table={a.table ? <AnswerTable a={a} /> : undefined}
       paging={pagingOf(a)}
       onNext={onNext}

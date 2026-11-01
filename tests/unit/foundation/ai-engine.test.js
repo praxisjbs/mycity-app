@@ -190,7 +190,9 @@ describe("cards (engine/cards.js)", () => {
   test("the card's fields come from the input schema: kinds, labels, required, choices; the context's record fills the one empty id field", () => {
     const fields = cards.fieldsOf(jsonSchemaOf(c.tasks.TaskCreate), { due_on: "Due Day" });
     const by = Object.fromEntries(fields.map((f) => [f.name, f]));
-    expect(by.title).toMatchObject({ label: "Title", kind: "text", required: true, options: null });
+    expect(by.title).toMatchObject({ label: "Title", kind: "text", required: true, options: null, long: false });
+    // A text of 300 characters or more is written in a box of several lines (praxis-ai.md §6.11).
+    expect(by.description).toMatchObject({ kind: "text", long: true });
     expect(by.due_on).toMatchObject({ label: "Due Day", kind: "date", required: false });
     expect(by.priority).toMatchObject({ kind: "choice", options: expect.arrayContaining(["normal"]) });
     expect(by.primary_assignee_id).toMatchObject({ label: "Primary Assignee", kind: "id" });

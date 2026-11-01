@@ -1,15 +1,18 @@
 "use strict";
 /**
- * What the assistant may read in Employee Self-Service: the caller's own
- * record, documents and leave, and where it sends them to add a document or ask for
- * leave (A23: it reads, it never writes). Never another person's record; every
- * read is given the caller's own employee id and nothing else.
+ * What the assistant may read and do in Employee Self-Service: the caller's own
+ * record, documents and leave, and where it sends them to add a document; and, as a card the
+ * person confirms (docs/guides/praxis-ai.md §6.11), a leave request of their own through the
+ * same service function Request Leave's Send calls. Never another person's record; every read
+ * is given the caller's own employee id and nothing else.
  *
  * The rest of ESS (the latest payslip, open queries, docs/guides/ess.md §9) joins
  * this manifest as each of those tabs lands.
  */
 const c = require("@mycity/contract");
+const { AppError } = require("../../shared/errors");
 const { defineManifest } = require("../../shared/ai/manifest");
+const routeMap = require("../../shared/route-map");
 const documents = require("../documents/documents.service");
 const leave = require("../leave/leave.service");
 const profile = require("./ess.profile");
@@ -18,6 +21,24 @@ const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_n
 
 module.exports = defineManifest({
   module: "ess",
+  actions: [
+    {
+      key: "my_leave.request",
+      label: "Request Leave",
+      description: "Ask for leave for myself: the leave type, the first and last day, and a note for my line manager",
+      input: c.leave.LeaveRequestCreate,
+      permission: ["ess", "create"],
+      risk: "standard",
+      // The request is the person's own: the card names no other record.
+      check: async (_client, _values, actor) => {
+        if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee asks for leave", 403);
+      },
+      // The same function Request Leave's Send calls (ess.leave.request); the type, the days and the year's allowance are its checks.
+      run: (values, actor) => leave.request(actor, actor.employee_id, values),
+      readback: (r) => [{ type: "leave_request", id: r.leave_request_id, label: `${r.leave_type_name}, ${r.days} ${r.days === 1 ? "day" : "days"}`, status: "sent", link: (routeMap.linkFor("leave_request", r.leave_request_id, { self: true }) || {}).path || null }],
+      labels: { leave_type_id: "Leave Type", starts_on: "First Day", ends_on: "Last Day", reason: "Note" },
+    },
+  ],
   reads: [
     {
       key: "my_profile.get",

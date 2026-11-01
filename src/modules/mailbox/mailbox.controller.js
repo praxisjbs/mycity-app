@@ -1,5 +1,5 @@
 "use strict";
-// ai:none mail is private correspondence; the assistant reads none of it (mailbox.md §9). Write With AI and Summarise Thread are the owner's own presses (mailbox.assist.js)
+// Mail is private correspondence: the assistant reads none of it (mailbox.md §9; mailbox.ai.js declares no read). Write With AI and Summarise Thread are the owner's own presses (mailbox.assist.js); a mail the assistant drafts is the mail.send card the person sends
 const { ok, created, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { readUpload } = require("../../middleware/upload");

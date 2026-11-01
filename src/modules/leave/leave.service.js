@@ -377,6 +377,74 @@ async function cancelFor(actor, scope, id, body) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11): the requests waiting on the person
+ * approved or rejected together, each on its approval's current stage through the same call
+ * People · Leave's Approve and Reject make (workflow.service.decide), never one's own.
+ * ------------------------------------------------------------------ */
+
+/** The approvals service, required late: it requires this module's events through the engine. */
+const workflow = () => require("../workflow/workflow.service");
+
+const requestLabel = (row) => `${row.employee && row.employee.display_name ? row.employee.display_name : "Someone"}, ${row.leave_type_name}, ${Number(row.days)} ${Number(row.days) === 1 ? "day" : "days"}`;
+
+/**
+ * The requests a card names, as the person may see them: who, the type and the days for each in
+ * their scope; one outside it keeps its id alone, and the re-check refuses the card.
+ */
+async function cardRecords(db, ids, scope) {
+  const out = [];
+  for (const id of [...new Set(ids || [])].slice(0, 25)) {
+    const row = await repo.get(db, id);
+    const seen = row && (scope.scope === "all" || (scope.scope_ids || []).includes(row.employee_id));
+    out.push({ type: "leave_request", id, label: seen ? requestLabel(row) : null });
+  }
+  return out;
+}
+
+/**
+ * The card's re-check (§6.11 step 5): every request is one the person may see; the rest (waiting,
+ * named on its stage, not their own) is each request's own line at the press.
+ */
+async function assertCardRequests(db, ids, actor) {
+  for (const id of [...new Set(ids || [])]) {
+    const row = await repo.get(db, id);
+    if (!row || !(actor.scope.scope === "all" || (actor.scope.scope_ids || []).includes(row.employee_id)))
+      throw new AppError("LEAVE_NOT_YOURS", "One of these requests is not in your scope", 404, { leave_request_ids: ["Not in your scope"] });
+  }
+}
+
+/**
+ * Approve or reject the requests a card names, one after another, each through its approval;
+ * a request already decided, not waiting on this person, or their own is a line of its own and
+ * the rest still go. Nothing decided is a refusal, so the card stays open with the reason.
+ * @param {object} actor   the person, with the scope their `people` approve gives
+ * @param {{leave_request_ids: string[], reason?: string}} values
+ * @param {"approve"|"reject"} decision
+ * @returns {Promise<{lines: Array<{type: string, id: string, label: string, ok: boolean, message: string|null}>}>}
+ */
+async function decideMany(actor, values, decision) {
+  const lines = [];
+  let firstRefusal = null;
+  for (const id of [...new Set(values.leave_request_ids || [])]) {
+    const row = await repo.get(pool, id);
+    const label = row ? requestLabel(row) : id;
+    try {
+      if (!row) throw notFound();
+      if (row.employee_id && actor.employee_id === row.employee_id) throw new AppError("SELF_APPROVAL", "Nobody decides their own request", 403);
+      if (row.status !== "submitted" || !row.workflow_instance_id) throw new AppError("LEAVE_DECIDED", "This request was already decided", 409);
+      await workflow().decide(actor, row.workflow_instance_id, decision, values.reason || null);
+      lines.push({ type: "leave_request", id, label, ok: true, message: decision === "approve" ? "approved" : "rejected" });
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status >= 500) throw err;
+      firstRefusal = firstRefusal || err;
+      lines.push({ type: "leave_request", id, label, ok: false, message: err.message });
+    }
+  }
+  if (lines.length && !lines.some((l) => l.ok)) throw firstRefusal;
+  return { lines };
+}
+
+/* ------------------------------------------------------------------ *
  * After an approval ends
  * ------------------------------------------------------------------ */
 
@@ -497,6 +565,9 @@ module.exports = {
   record,
   cancelOwn,
   cancelFor,
+  cardRecords,
+  assertCardRequests,
+  decideMany,
   settle,
   listTypes,
   createType,

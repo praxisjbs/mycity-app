@@ -793,6 +793,34 @@ async function send(body, user, idempotencyKey) {
   };
 }
 
+/**
+ * Praxis AI's card (docs/guides/praxis-ai.md §6.11; decision 19): a mail written as plain text
+ * from the person's words, saved as a new draft and queued exactly as Send does, the signature
+ * baked in. The assistant reads no mail (mailbox.md §9); it only carries what the person sends.
+ * @param {{to_addresses: string[], cc_addresses?: string[], subject: string, body: string}} values
+ * @param {object} user
+ * @param {string|null} [idempotencyKey]
+ */
+async function sendNew(values, user, idempotencyKey = null) {
+  const body = {
+    mail_draft_id: crypto.randomUUID(),
+    to_addresses: values.to_addresses,
+    cc_addresses: values.cc_addresses || [],
+    bcc_addresses: [],
+    subject: values.subject,
+    body_html: textToHtml(values.body) || "",
+    document_ids: [],
+    in_reply_to: null,
+  };
+  return send(body, user, idempotencyKey);
+}
+
+/** The card's re-check: the person's own mailbox is connected. */
+async function assertConnected(db, user) {
+  const a = await account(user, db);
+  if (a.status !== "connected") throw new AppError("MAIL_AUTH_FAILED", "Reconnect your mailbox", 409);
+}
+
 async function cancel(queueId, user) {
   const row = await repo.cancelQueued(pool, user.user_id, queueId);
   if (!row) throw new AppError("ALREADY_SENT", "It has already gone", 409);
@@ -1057,6 +1085,8 @@ module.exports = {
   deleteDraft,
   storeAttachment,
   send,
+  sendNew,
+  assertConnected,
   cancel,
   deliver,
   flush,

@@ -632,7 +632,9 @@ packages/ui/
     illustrations/            Illustration, in token colours; CityShowcase, the sign-in screen's photographs
     assistant/                the Assistant group (docs/guides/praxis-ai.md §6.14, decision 17): the full-screen
                               Praxis AI's views, AssistantShell, AnswerBubble, SourceChip, PaneTabs, OverviewPane,
-                              TablePane, RecordPane, SourcesPane, ProgressLine, PaneSheet, and pane.ts (their shapes)
+                              TablePane, RecordPane, SourcesPane, ProgressLine, PaneSheet, ActionCard and ResultLine
+                              (an action drafted for the person to confirm, and what came of the press, §6.11),
+                              and pane.ts (their shapes)
     shell/                    the frame both apps' shells are built from (PR 2): Brand, ComingSoon,
                               NavCapsule and TrailMenu (F28, F29), PullIndicator and pull (F28),
                               PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,

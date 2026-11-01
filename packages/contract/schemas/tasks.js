@@ -497,6 +497,21 @@ const TaskMove = z
   })
   .strict();
 
+/**
+ * Praxis AI's cards for a task (docs/guides/praxis-ai.md §6.11): Mark Done on several tasks at
+ * once, with the late reason the board asks for an overdue one (tasks.complete); and a comment that
+ * names its task, which the panel's own form never has to because the panel is the task
+ * (tasks.comment). Each press runs the same service function the screen's button calls.
+ */
+const TaskComplete = z
+  .object({
+    task_ids: z.array(uuid).min(1, "Pick a task").max(25),
+    late_reason: blank(LateReason),
+  })
+  .strict();
+
+const TaskCommentAdd = z.object({ task_id: uuid, body: text(2000) }).strict();
+
 /** POST /tasks/:id/block: a hold, with the day it is expected to clear. */
 const TaskBlock = z
   .object({
@@ -747,6 +762,11 @@ const TABLES = {
     table: "task",
     virtual: { before_task_id: "the card it now sits above; decides task.sort_order" },
   },
+  TaskComplete: {
+    table: "task",
+    virtual: { task_ids: "the tasks the card moves to Done, each a task row" },
+  },
+  TaskCommentAdd: { table: "task_comment" },
   TaskBlock: {
     table: "task",
     virtual: { estimated_resolve_on: "written to the task_blockage it raises" },
@@ -824,6 +844,8 @@ module.exports = {
   TaskPeopleQuery,
   TaskPersonPage,
   TaskMove,
+  TaskComplete,
+  TaskCommentAdd,
   TaskBlock,
   TaskUnblock,
   TaskChildParams,

@@ -296,6 +296,18 @@ People's or a manager's. The workbook opens for the person it is about and the C
   requests (`leave.repo.aiSummary`), figures never rows.
   Still to come: the caller's own profile summary, latest payslip
   summary, open queries count. Never another person's record. Paged at 25.
+- **AI actions** (`docs/guides/praxis-ai.md` §6.11): `my_leave.request` (`ess.ai.js`; `ess` create,
+  standard risk; input `LeaveRequestCreate`, Request Leave's own form: the type, the first and last
+  day, a note; run `leave.service.request` for the person's own employee, so the type, the days,
+  the clash and the year's allowance are its checks; the request read back with its link on My
+  Leave). For People: `leave.approve` and `leave.reject` (`leave.ai.js`; `people` approve, risk
+  approval, so Confirm It's You within five minutes; up to 25 requests a press; inputs
+  `LeaveApprove` and `LeaveReject`, a reason required to reject; the requests named who, type and
+  days through `leave.service.cardRecords`; at the press every request must be in the person's
+  `people` scope (`assertCardRequests`), then each is decided through the approval's own
+  `workflow.service.decide` as People · Leave's Approve and Reject are, one after another, a request
+  already decided, not waiting on them or their own its own line; `leave.service.decideMany`).
+  `LeaveTypeCreate` and `LeaveRecordCreate` are `not_offered`.
 - **AI routes**: "my payslip" → My Payslips; "request leave" → My Leave with `new=1`, Request
   Leave open and filled with the type, the days and the note the person gave
   (`leave.LeaveRequestPrefill`, `docs/guides/praxis-ai.md` §6.4); "change my password" → My
@@ -403,6 +415,8 @@ Deductions figure and every form open the shared modal.
 - **My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?
 
 ## 14 · Change log
+
+- 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): the assistant's leave cards, `my_leave.request` (the person's own, Request Leave's service) and, for People, `leave.approve` and `leave.reject` (the requests waiting on them, up to 25 a press, each through the approval's own decide after Confirm It's You; never their own; `leave.service.cardRecords`, `assertCardRequests`, `decideMany`); §9. Nothing on the ESS or People · Leave screens changes.
 
 - 01/11/2026 · JP · §9: `leave.summary`, People's leave counted for the assistant by status, type, person, department or month, with the days taken, booked and waiting (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 27/10/2026 · GE · My Queries' window is 24 hours (§10.1), lateness raises its query through the

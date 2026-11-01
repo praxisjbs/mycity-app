@@ -1,11 +1,12 @@
-import type { AiAnswer, AiCitation, AiConversation, AiHistorySummary, AiQuestion, AiReadRows, AiSource } from "@mycity/contract/contract.gen.ts";
+import type { AiActionCard, AiActionResult, AiAnswer, AiCitation, AiConversation, AiHistorySummary, AiQuestion, AiReadRows, AiSource } from "@mycity/contract/contract.gen.ts";
 import { at, fail, invalid, noContent, ok, paged, route, sid } from "../core";
 import { byKey, grantsFor, SIGN_INS } from "../data/people";
 import { PARTNERS } from "../data/partners";
 import { ON_UPLOAD } from "../uploads";
 import { exportFile } from "./shared";
+import { stale } from "./security";
 
-/* ── Praxis AI (docs/guides/praxis-ai.md): answers from the mock records, within the asker's view, in the contract's shapes. It never writes. ── */
+/* ── Praxis AI (docs/guides/praxis-ai.md): answers from the mock records, within the asker's view, in the contract's shapes. A change is a card the person confirms (§6.11); nothing else writes. ── */
 
 type Kept = { owner: string; conversation: AiConversation; turns: AiAnswer[] };
 const KEPT: Kept[] = [];
@@ -62,10 +63,142 @@ function changeLink(l: string): Draft["link"] {
   return null;
 }
 
+/* ── Cards (§6.11): the change asked for, drawn as a card from the action's own fields; pressed, the mock records the result. ── */
+
+type KeptCard = { owner: string; card: AiActionCard };
+const CARDS: KeptCard[] = [];
+const cardOf = (user: string, id: string) => CARDS.find((k) => k.owner === user && k.card.ai_action_draft_id === id);
+const nowIso = () => new Date().toISOString();
+const inHalfAnHour = () => new Date(Date.now() + 30 * 60_000).toISOString();
+const field = (name: string, label: string, kind: AiActionCard["fields"][number]["kind"], over: Partial<AiActionCard["fields"][number]> = {}): AiActionCard["fields"][number] => ({ name, label, kind, required: false, options: null, long: false, ...over });
+
+/** The card a change question draws, for a screen that draws cards; null when the question asks for no change the mock offers. */
+function cardFor(question: string, messageId: string): AiActionCard | null {
+  const l = question.toLowerCase();
+  const base = { ai_action_draft_id: sid(`card:${messageId}`), ai_message_id: messageId, problems: {}, suggested: false, status: "shown" as const, expires_at: inHalfAnHour(), result: null, created_at: nowIso() };
+  if (/\bapprove\b/.test(l) && /\bleave\b/.test(l)) {
+    const people = ["tobi", "bashir", "emeka", "hauwa"].map(byKey).filter((p): p is NonNullable<typeof p> => Boolean(p));
+    return {
+      ...base,
+      action_key: "leave.approve",
+      module_key: "people",
+      label: "Approve Leave",
+      description: "Approve leave requests waiting on me, with a note for the person if I like",
+      schema: "leave.LeaveApprove",
+      risk: "approval",
+      confirm: "fresh_sign_in",
+      bulk: 25,
+      values: { leave_request_ids: people.map((p) => sid(`leave:${p.employee_id}`)) },
+      records: people.map((p) => ({ type: "leave_request", id: sid(`leave:${p.employee_id}`), label: `${p.display_name}, Annual, 2 days`, link: `/people?tab=leave&id=${sid(`leave:${p.employee_id}`)}` })),
+      fields: [field("leave_request_ids", "Requests", "list", { required: true }), field("reason", "Reason", "text", { long: true })],
+    };
+  }
+  if (/\b(tell|message)\b/.test(l)) {
+    const to = byKey("cynthia")!;
+    return {
+      ...base,
+      action_key: "community.message",
+      module_key: "community",
+      label: "Send Message",
+      description: "Send a direct message to a colleague, written from what I said and the records read",
+      schema: "community.DirectMessageSend",
+      risk: "standard",
+      confirm: "press",
+      bulk: 1,
+      values: { employee_id: to.employee_id, body: "The weekly report is ready for you." },
+      records: [{ type: "employee", id: to.employee_id, label: to.display_name, link: `/people?tab=employees&id=${to.employee_id}` }],
+      fields: [field("employee_id", "To", "id", { required: true }), field("body", "Message", "text", { required: true, long: true })],
+    };
+  }
+  if (/\b(email|mail)\b/.test(l)) {
+    return {
+      ...base,
+      action_key: "mail.send",
+      module_key: "mailbox",
+      label: "Send Mail",
+      description: "Send an email from my mailbox: to, cc, subject and the words, written from what I said",
+      schema: "mailbox.MailCompose",
+      risk: "standard",
+      confirm: "press",
+      bulk: 1,
+      values: { to_addresses: ["ada@partner.test"], cc_addresses: [], subject: "Venue visit on Thursday", body: "Dear Ada,\n\nThis confirms our visit to the venue on Thursday at 10:00.\n\nWe look forward to seeing you." },
+      records: [],
+      fields: [field("to_addresses", "To", "list", { required: true }), field("cc_addresses", "Cc", "list"), field("subject", "Subject", "text", { required: true }), field("body", "Message", "text", { required: true, long: true })],
+    };
+  }
+  if (/\b(task|todo)\b/.test(l)) {
+    return {
+      ...base,
+      action_key: "tasks.create",
+      module_key: "workspace",
+      label: "Create Task",
+      description: "Set a task: a title, notes, priority, cadence, due day, and for a manager who it is for",
+      schema: "tasks.TaskCreate",
+      risk: "standard",
+      confirm: "press",
+      bulk: 1,
+      values: { title: "Send the weekly report", priority: "high", due_on: dayFromNow(2), is_commitment: false },
+      records: [],
+      fields: [field("title", "Title", "text", { required: true }), field("description", "Notes", "text", { long: true }), field("priority", "Priority", "choice", { options: ["low", "normal", "high"] }), field("cadence", "Cadence", "choice", { options: ["daily", "weekly", "monthly"] }), field("due_on", "Due Day", "date"), field("primary_assignee_id", "For", "id"), field("is_commitment", "Commitment", "boolean")],
+    };
+  }
+  return null;
+}
+
+/** What a press comes back with: one line per record, or the one record the action made. */
+function resultFor(card: AiActionCard): AiActionResult {
+  const lines = card.records.length
+    ? card.records.map((r) => ({ type: r.type, id: r.id, label: r.label, ok: true, message: card.action_key === "leave.approve" ? "approved" : "done", link: r.link }))
+    : card.action_key === "tasks.create"
+      ? [{ type: "task", id: sid(`task:${card.ai_action_draft_id}`), label: `T-118 ${String(card.values.title ?? "")}`, ok: true, message: "created", link: `/workspace?tab=tasks&id=${sid(`task:${card.ai_action_draft_id}`)}` }]
+      : [{ type: card.action_key === "mail.send" ? "mail_send_queue" : "record", id: sid(`made:${card.ai_action_draft_id}`), label: card.action_key === "mail.send" ? "Mail queued" : "Done", ok: true, message: card.action_key === "mail.send" ? "queued" : "done", link: card.action_key === "mail.send" ? "/mailbox?tab=sent" : null }];
+  return { ai_action_run_id: sid(`run:${card.ai_action_draft_id}`), status: "done", lines, error_code: null, message: null, finished_at: nowIso() };
+}
+
+route("GET /api/v1/ai/cards/:id", (req) => {
+  const k = cardOf(req.user!, req.params.id);
+  return k ? ok(k.card) : fail(404, "NOT_FOUND", "Not found");
+});
+
+route("PUT /api/v1/ai/cards/:id", (req) => {
+  const k = cardOf(req.user!, req.params.id);
+  if (!k) return fail(404, "NOT_FOUND", "Not found");
+  if (k.card.status !== "shown") return fail(409, "CARD_NOT_OPEN", "This card is no longer open.");
+  const values = { ...k.card.values, ...((req.body as { values?: Record<string, unknown> }).values ?? {}) };
+  const problems: Record<string, string[]> = {};
+  for (const f of k.card.fields) if (f.required && (values[f.name] === "" || values[f.name] == null || (Array.isArray(values[f.name]) && !(values[f.name] as unknown[]).length))) problems[f.name] = ["Required"];
+  k.card = { ...k.card, values, problems };
+  return ok(k.card);
+});
+
+route("POST /api/v1/ai/cards/:id/confirm", (req) => {
+  const k = cardOf(req.user!, req.params.id);
+  if (!k) return fail(404, "NOT_FOUND", "Not found");
+  if (k.card.status === "done" || k.card.status === "failed") return fail(409, "CARD_DONE", "This was already done.");
+  if (k.card.status === "cancelled") return fail(409, "CARD_CANCELLED", "This card was cancelled.");
+  if (k.card.status !== "shown" || Date.parse(k.card.expires_at) <= Date.now()) return fail(409, "CARD_EXPIRED", "This card has expired. Ask again to draw it afresh.");
+  if (k.card.confirm === "fresh_sign_in") {
+    const refused = stale(req.user!);
+    if (refused) return refused;
+  }
+  if (Object.keys(k.card.problems).length) return fail(422, "VALIDATION", "Check the card's fields", k.card.problems);
+  const result = resultFor(k.card);
+  k.card = { ...k.card, status: "done", result };
+  return ok(result);
+});
+
+route("POST /api/v1/ai/cards/:id/cancel", (req) => {
+  const k = cardOf(req.user!, req.params.id);
+  if (!k) return fail(404, "NOT_FOUND", "Not found");
+  if (k.card.status !== "shown") return fail(409, "CARD_NOT_OPEN", "This card is no longer open.");
+  k.card = { ...k.card, status: "cancelled" };
+  return ok(k.card);
+});
+
 function answerFor(question: string, view: string): Draft {
   const l = question.toLowerCase();
-  if (/\b(create|add|delete|approve|send|update|raise|book)\b/.test(l))
-    return said("I do not create or change records. Make the change on its screen.", { declined: "change", link: changeLink(l) });
+  if (/\b(create|add|delete|approve|send|update|raise|book|tell|message|email|mail)\b/.test(l))
+    return said("Here it is as a card. Check the fields and press it, or make the change on its screen.", { declined: "change", link: changeLink(l) });
   if (l.includes("partner") || l.includes("inactive") || l.includes("quiet")) {
     if (view === "staff") return said("Partnership records are not available to you.", { declined: "not_available", reads: [read("partners.list", 0, null, null)] });
     const quiet = PARTNERS.filter((p) => p.quiet_days > 30).sort((x, y) => y.quiet_days - x.quiet_days);
@@ -148,7 +281,12 @@ route("POST /api/v1/ai/ask", async (req) => {
   const d = answerFor(question, SIGN_INS[user]?.view ?? "staff");
   // The screen the question was asked from travels back with the answer (decision 12).
   const context = (req.body.context as AiAnswer["context"] | undefined) ?? null;
-  const answer: AiAnswer = { ...d, context, sources: sourcesOf(d.citations), ai_message_id: sid(`answer:${now}:${k.turns.length}`), ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, feedback: null, created_at: now, provisional: true };
+  const messageId = sid(`answer:${now}:${k.turns.length}`);
+  // A card only for a screen that draws one (§6.11), and only for a change the mock offers; otherwise the screen button stands.
+  const shows = Array.isArray(req.body.shows) ? (req.body.shows as string[]) : [];
+  const card = d.declined === "change" && shows.includes("cards") ? cardFor(question, messageId) : null;
+  if (card) CARDS.push({ owner: user, card });
+  const answer: AiAnswer = { ...d, card, link: card ? null : d.link, declined: card ? null : d.declined, context, sources: sourcesOf(d.citations), ai_message_id: messageId, ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, feedback: null, created_at: now, provisional: true };
   const tokens = 900 + question.length * 7 + d.reads.length * 600;
   COSTS.set(answer.ai_message_id, { tokens, cost_ngn: (tokens * 0.0076).toFixed(2) });
   k.turns.unshift(answer);

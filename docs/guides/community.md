@@ -484,6 +484,16 @@ Nobody, including People and the CEO, can read a direct message they are not par
 - **AI reads** (`community.ai.js`): `announcements.list` (published announcements, any staff);
   `channels.list` (the caller's channels). **No read over message bodies or direct messages.**
   Private conversation is not material for the assistant. Paged at 25.
+- **AI actions** (`docs/guides/praxis-ai.md` §6.11, decision 19): `community.message` (`community`
+  create, standard risk, may be suggested: "Tell Ada her leave is approved?"; input
+  `DirectMessageSend`: the colleague and the words; the colleague named through the repo; at the
+  press on the staff with a login (`assertColleague`); run `sendDirect`: the conversation opened if
+  there is none, then `postMessage` as the chat box posts, the message linking to the conversation)
+  and `community.post` (`community` create; input `ChannelPost`: the channel and the words; the
+  channel named for a member; at the press a member who may post there (`assertMayPost`, so never
+  #announcements); run `postMessage`). The words are the person's and the records the reads
+  returned: the assistant still reads no message. `ChannelCreate`, `WishCreate`, `MessageCreate`,
+  `RecognitionCreate` and `DirectCreate` are `not_offered`.
 - **AI routes**: "post an announcement" → Announcements · New Announcement; "message someone" →
   Direct Messages · New Message, prefilled with the person.
 - **Search** (`community.search.js`, ⌘K): published announcements by headline and text. Words
@@ -616,6 +626,8 @@ fields, never in a toast.
   switch off read receipts?
 
 ## 14 · Change log
+
+- 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11, decision 19): the assistant's cards `community.message` (a direct message a person sends with one press, `community.service.sendDirect`) and `community.post` (a post in a channel they may post in); the assistant reads no message still; §9. Nothing on the Staff Community screens changes.
 
 - 29/10/2026 · GE · Knowledge Hub's Announcements tab (#66, M10) is dropped (GE, 29/10/2026): announcements are published and kept on Staff Community · Announcements and read in #announcements. Its interim page, ⌘K screen and the `knowledge_announcement` record type are gone. Nothing on these screens changes.
 - 26/10/2026 · JP · From the QA bug register (M1): a poll's options must differ, their case and spaces ignored; a repeat reads "Already an option" on its own field as it is typed, and the contract (`PollChoices`), the service and the mock refuse it on Start a Poll and Edit Poll (§5, §6, §10.1). A refused option's mark lands on the field it came from when an optional one was left empty. The shell's update, install and notifications offers no longer float over the composer: they wait off every Staff Community tab (FRONTEND_GUIDE, PWA). Left: nothing.

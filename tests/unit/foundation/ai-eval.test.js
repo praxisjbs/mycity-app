@@ -20,7 +20,7 @@ describe("the questions", () => {
     expect(new Set(CASES.map((k) => k.id)).size).toBe(CASES.length);
     for (const k of CASES) {
       expect([k.id, typeof k.as]).toEqual([k.id, "string"]);
-      expect([k.id, Boolean(k.reads || k.never || k.route || k.needs || k.action)]).toEqual([k.id, true]);
+      expect([k.id, Boolean(k.reads || k.never || k.route || k.needs || k.action || k.no_action)]).toEqual([k.id, true]);
     }
   });
 
@@ -40,7 +40,14 @@ describe("the questions", () => {
       if (k.route) expect([k.id, k.route, screens.has(k.route)]).toEqual([k.id, k.route, true]);
       // A card case names a declared action and asks from a screen that draws cards (praxis-ai.md §6.11).
       if (k.action) expect([k.id, k.action, actions.has(k.action), (k.shows || []).includes("cards")]).toEqual([k.id, k.action, true, true]);
+      for (const key of k.no_action || []) expect([k.id, key, actions.has(key), (k.shows || []).includes("cards")]).toEqual([k.id, key, true, true]);
     }
+  });
+
+  test("every declared action has a card case (gate 23), and a change the person may not make has a case that refuses it", () => {
+    const graded = new Set(CASES.filter((k) => k.action).map((k) => k.action));
+    for (const key of actions) expect([key, graded.has(key)]).toEqual([key, true]);
+    expect(CASES.some((k) => k.no_action && k.no_action.length)).toBe(true);
   });
 
   test("Ifeoma's questions are asked, through Home's activity.list", () => {

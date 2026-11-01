@@ -1570,6 +1570,12 @@ the CEO. They never go to search, Home, Analytics (scores only) or the AI (§9).
   department's, what is shared with them, the key results they own; whoever reads the whole plan (§6.25) everything. A
   citation never opens a record the reader cannot. A shared goal or objective is found and cited like the
   rest.
+- **AI actions**: none (`docs/guides/praxis-ai.md` §6.11, PR4 of the engine). The monthly check-in
+  is written line by line on My Performance (an actual, evidence and an action per key result,
+  `reviews.service.saveCheckIn`, then Submit Check-In), which no card carries whole, and the goals
+  service has no check-in of its own; "do my check-in" stays a route to the form. Every Create
+  schema of the goals contract (a quarter, an organisational goal, an objective, a key result, a
+  plan unbind, a target change) is `not_offered` in `goals.ai.js` with the screen that owns it.
 - **AI routes**: "do my check-in" → `ess.my-performance` with `check_in=1`; "set my commitments" →
   `workspace.tasks` with `new=1&commitment=1` (New Task with Commitment ticked); "open Ada's scorecard" → `performance.targets` with the
   scorecard; "report the month" → `performance.goals` with `report=1`; "see performance analytics" →
@@ -1819,6 +1825,8 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
   engine should tell the CEO at once when a stage has nobody to tell is for GE to decide.
 
 ## 14 · Change log
+
+- 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): Performance declares no card. The check-in is a form of many lines and the goals service has no check-in, so `goals.ai.js` says so and lists every Create schema of its contract as `not_offered` with its screen; §9. Nothing on the Performance screens changes.
 
 - 01/11/2026 · JP · §9: `goals.summary` and `reviews.summary`, the quarter's key results, scores and ratings and the reviews by stage counted for the assistant, within the reader's reach and scope (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 01/11/2026 · JP · The staging reviews seed (`seeds/staging/46_performance_reviews.js`) dates the plans' binding, the scorecards and their approvals to the quarter's live day before opening October's round: a round takes only scorecards bound before its month ended (`reviews.repo.bindingScorecards`), and from November on the seed had bound them at the real clock, so staging and `tests/integration/home-staging-seed.test.js` opened October with no reviews. Nothing in the module changes.

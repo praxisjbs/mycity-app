@@ -397,6 +397,14 @@ const ConversationPage = Paged(Conversation);
 const DirectCreate = z.object({ employee_id: uuid }).strict();
 
 /**
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11): a text message to one colleague, in the
+ * conversation with them (opened when there is none), and a post in a channel the person may post
+ * in. The words are the card's; the press posts them as the chat box would.
+ */
+const DirectMessageSend = z.object({ employee_id: uuid, body: text(4000) }).strict();
+const ChannelPost = z.object({ community_channel_id: uuid, body: text(4000) }).strict();
+
+/**
  * GET /community/people: colleagues to message or recognise, for every member of staff.
  * Public work fields only (the people picker); the staff register itself needs People.
  */
@@ -592,6 +600,11 @@ const TABLES = {
   ConversationListQuery: { table: null, reason: "list controls and the unread filter for direct messages" },
   ConversationPage: { table: null, reason: "a page of conversations" },
   DirectCreate: { table: null, reason: "the colleague to talk to; becomes a direct community_channel and two members" },
+  DirectMessageSend: {
+    table: "community_message",
+    virtual: { employee_id: "the colleague; the message lands in the direct community_channel with them" },
+  },
+  ChannelPost: { table: "community_message" },
   ColleagueListQuery: { table: null, reason: "list controls for the colleague picker, and whether to offer the caller" },
   ColleaguePage: { table: null, reason: "a page of colleagues, each a PersonRef with their photo_url" },
   ForwardTarget: {
@@ -658,6 +671,8 @@ module.exports = {
   ConversationListQuery,
   ConversationPage,
   DirectCreate,
+  DirectMessageSend,
+  ChannelPost,
   ColleagueListQuery,
   ColleaguePage,
   FORWARDABLE,

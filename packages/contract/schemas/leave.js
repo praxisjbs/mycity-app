@@ -152,6 +152,25 @@ const LeaveRecordCreate = z
   .refine(endsAfterStart, ENDS_BEFORE)
   .refine(oneYear, OTHER_YEAR);
 
+/**
+ * Praxis AI's cards on People · Leave (docs/guides/praxis-ai.md §6.11): the requests waiting on
+ * the person, decided together, up to 25 a press; a rejection always says why, as the screen's
+ * own form does (workflow.ReasonBody). Each request is decided on its approval's current stage.
+ */
+const LeaveApprove = z
+  .object({
+    leave_request_ids: z.array(uuid).min(1, "Pick a request").max(25),
+    reason: optionalText(1000),
+  })
+  .strict();
+
+const LeaveReject = z
+  .object({
+    leave_request_ids: z.array(uuid).min(1, "Pick a request").max(25),
+    reason: text(1000),
+  })
+  .strict();
+
 /** POST /ess/leave/:id/cancel and POST /leave/requests/:id/cancel */
 const LeaveCancel = z.object({ reason: optionalText(500) }).strict();
 
@@ -295,6 +314,14 @@ const TABLES = {
     table: null,
     reason: "why a request is withdrawn; kept with the approval and the audit row",
   },
+  LeaveApprove: {
+    table: "workflow_decision",
+    virtual: { leave_request_ids: "each request's approval, decided on its current stage" },
+  },
+  LeaveReject: {
+    table: "workflow_decision",
+    virtual: { leave_request_ids: "each request's approval, decided on its current stage" },
+  },
   LeaveSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's leave summary; figures, never a row" },
   LeaveListQuery: {
     table: null,
@@ -331,6 +358,8 @@ module.exports = {
   LeaveRequestPrefill,
   LeaveRecordCreate,
   LeaveCancel,
+  LeaveApprove,
+  LeaveReject,
   LeaveListQuery,
   LeaveSummaryQuery,
   LeaveClashQuery,

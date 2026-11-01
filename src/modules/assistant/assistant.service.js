@@ -92,7 +92,7 @@ async function ask(body, actor, askKey = null) {
   const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past, context, shows, onRead: progressFor(actor, askKey) });
   const shown = answer.build({ draft: out.draft, reads: out.reads, routes: out.routes, screens: out.screens, shows });
   // The card (§6.11 step 2): only for a screen that draws one, checked against the person's rights now.
-  const card = shows.includes("cards") ? await answer.draftCard({ draft: out.draft, actions: out.actions, actor, context }) : null;
+  const card = shows.includes("cards") ? await answer.draftCard({ draft: out.draft, actions: out.actions, actor, context, db: pool }) : null;
 
   const saved = await tx(async (client) => {
     // Deleted in another tab meanwhile: the question opens a new conversation.

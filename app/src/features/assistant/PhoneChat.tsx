@@ -113,7 +113,7 @@ export function ChatPage({
       }
       bodyClassName="flex flex-col overflow-hidden"
     >
-      <Conversation id={id} context={context} shows={["pane"]} onOpened={onOpen} onGone={onNew} onAnswered={onAnswered} onPane={pane.show} />
+      <Conversation id={id} context={context} shows={["cards", "pane"]} onOpened={onOpen} onGone={onNew} onAnswered={onAnswered} onPane={pane.show} />
       <PhonePane pane={pane} />
     </PhonePage>
   );

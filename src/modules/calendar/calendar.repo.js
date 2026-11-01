@@ -239,4 +239,14 @@ async function activeOf(db, ids) {
   return rows.map((r) => r.employee_id);
 }
 
-module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf };
+/** The names of the people a card invites (docs/guides/praxis-ai.md §6.11), active or not: id to name. */
+async function namesOf(db, ids) {
+  if (!ids.length) return new Map();
+  const { rows } = await db.query(
+    "SELECT employee_id, btrim(first_name || ' ' || last_name) AS display_name FROM employee WHERE employee_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return new Map(rows.map((r) => [r.employee_id, r.display_name]));
+}
+
+module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf, namesOf };

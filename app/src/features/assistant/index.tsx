@@ -48,8 +48,8 @@ export default function Assistant({ tab, id }: ModuleScreenProps) {
 /** The assistant's name, written once in the shell's catalogue (§1.1 decision 5). */
 const NAME = moduleByKey("praxis_ai")?.label ?? "Assistant";
 
-/** What the full-screen Praxis AI can draw (AiAsk.shows): the pane; cards come with PR4 of the Praxis AI Engine. */
-const SHOWS: AiShows[] = ["pane"];
+/** What the full-screen Praxis AI can draw (AiAsk.shows): an action card inside an answer (§6.11), and the pane. */
+const SHOWS: AiShows[] = ["cards", "pane"];
 
 /* ───────────────────────── Ask ───────────────────────── */
 

@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026 (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, opened 01/11/2026 (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -307,7 +307,7 @@ result line sits under the card. History is unchanged.
 | **PR1** | Engine core | `claude/engine-upgrade-guide-xf4ynp` (this session) | Decisions 10, 14, 16 to 18, 21, 22, 24, 25 as code: manifest v2 (summaries, actions), registry and catalogue snapshot, authorise for summaries and actions, the engine boundary and gate 24, the card lifecycle with the five-minute confirm, read replay, migration 10330, the contract, prompt version 4, the matrix generator, the attack scaffold, gate 19 rewritten, gate 23, the documents | nothing | Every manifest loads unchanged; `tasks.create` is drafted, confirmed and a task exists, in an integration test on the real migrations; a replayed, expired or forbidden card is refused; the matrix passes for every read on every seeded role; gates 19, 23 and 24 are in `npm run ci`; nothing a person sees changes |
 | **PR2** | Full screen and the pane | `claude/sharp-planck-z0g9va` (praxisjbs/mycity-app#50) | Decisions 12, 13, 23: the full-screen Praxis AI with Back and context, the Assistant group in `packages/ui` (conversation, chips, the four pane views, charts, the phone sheet, progress), Table paging through read replay, Record, Sources; the User Guide chapter and pictures | PR1 | Every pane view works on desktop and at 375 px, light and dark; Back returns to the exact screen with its filters; progress shows while reads run; the old Ask's tests moved onto the new screen; gates 8, 11, 21 green |
 | **PR3** | Large data and Excel | `claude/clever-pasteur-nt3rsc`, praxisjbs/mycity-app#51 (merged 01/11/2026) | Decisions 14, 15: summary reads for attendance, tasks, leave, approvals, performance, the Audit Log and employees; the statement timeout and the narrow-down answer; Overview's figures and chart; Download Excel with the provenance sheet through the export path; the summary cache | PR1 (runs beside PR2) | A 25,000-row export completes in the worker and downloads; a read that would scan too much asks to narrow; the model never receives rows from a summary (asserted); Overview shows a chart the server drew |
-| **PR4** | Action cards | `m10/praxis-ai-pr4` or the session's | Decisions 10, 11, 19, 20, 21: actions declared in Workspace (tasks, calendar), ESS and People (leave request, approve, reject), Approvals (decide), Staff Community (message a colleague, post in a channel), Mailbox (send a mail), Performance (a check-in note where the service allows); the card on screen with Edit, Cancel and the confirm sheet (passkey, PIN, password); bulk up to 25; suggested cards; per-module `not_offered` accounting | PR1 and PR2 | Approve 4 leave requests from the chat works with a passkey and with a PIN; a card replayed after rights were removed is refused; "Tell Ada" drafts a direct message the person sends with one press; a mail drafted from the chat arrives with the company signature; gate 23's action rules green for every module |
+| **PR4** | Action cards | `ccr-e4d934cb-hbbhlg` (the session's), praxisjbs/mycity-app#53 | Decisions 10, 11, 19, 20, 21: actions declared in Workspace (tasks, calendar), ESS and People (leave request, approve, reject), Approvals (decide), Staff Community (message a colleague, post in a channel), Mailbox (send a mail), Performance (a check-in note where the service allows); the card on screen with Edit, Cancel and the confirm sheet (passkey, PIN, password); bulk up to 25; suggested cards; per-module `not_offered` accounting | PR1 and PR2 | Approve 4 leave requests from the chat works with a passkey and with a PIN; a card replayed after rights were removed is refused; "Tell Ada" drafts a direct message the person sends with one press; a mail drafted from the chat arrives with the company signature; gate 23's action rules green for every module |
 | **PR5** | Proof and switch-over | `m10/praxis-ai-pr5` or the session's | Decisions 26, 27: scope probes per module in the matrix, the attack suite in CI and nightly on staging with the real model, refusal and leak monitoring on AI Control, gate 23's `not_offered` rule made universal, the old Ask retired, `praxis-ai.md` §2 and §10 rewritten to what ships, the User Guide chapter final, the extraction note | PR3 and PR4 | Every listed attack fails safely with the model scripted and with the real model; a planted leak fails the build; the nightly run alerts on a refusal that leaked; the guide and the manual describe one screen |
 
 **Order.** PR1 first and alone. PR2 and PR3 start together the moment PR1 merges, in two chats. PR4
@@ -686,16 +686,16 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 - [x] 01/11/2026 · Guide §4, §5, §6.3, §6.13, §6.16, §7, §11, §14; the module guides' §9 (attendance, workspace, ess, performance, foundation, organogram); DATABASE_SCHEMA; PROGRESS; README
 - [x] 01/11/2026 · After PR2 merged (#50): `main` merged in, the Table's Export wired on the full screen (`app/src/features/assistant/Pane.tsx` through `TablePane`'s `onExport`, the mock's route, a screen test), the User Guide chapter's pane step and its pictures retaken; OverviewPane already draws `AiOverview`, so nothing of PR3's is owed in `packages/ui`
 
-### 6.4 PR4 · Action cards
+### 6.4 PR4 · Action cards (started 01/11/2026, praxisjbs/mycity-app#53)
 
-- [ ] Actions declared: tasks (complete, comment), calendar.create, my_leave.request, leave.approve, leave.reject, approvals.decide, community.message, community.post, mail.send, goals.check_in or not_offered
-- [ ] not_offered for every other Create schema of those modules
-- [ ] The confirm sheet: passkey, PIN, password; Set Passkey offered once
-- [ ] ActionCard and ResultLine; the card on both shells; Edit, Cancel, busy, the result line, Draw It Again
-- [ ] Suggested cards; prompt version 6
-- [ ] Mail and message drafts written as Write With AI writes
-- [ ] The evaluation set's action cases; the attack scaffold extended; integration tests per module
-- [ ] Guide §2, §6.11, §8, §10, §11; each module's guide §9; the User Guide chapter; PROGRESS; README
+- [x] 01/11/2026 · Actions declared: `tasks.complete` and `tasks.comment` (`TaskComplete`, `TaskCommentAdd`), `calendar.create`, `my_leave.request`, `leave.approve` and `leave.reject` (`LeaveApprove`, `LeaveReject`), `approvals.decide` (`ApprovalDecide`), `community.message` and `community.post` (`DirectMessageSend`, `ChannelPost`), `mail.send` (`MailCompose`, in a new `mailbox.ai.js` with no read); goals declares none, the check-in being a form of many lines, and says so. Each `records()` names its records through the module's own repo (`checkAction` hands it a database handle), each `check()` refuses a record the person may not see, each `run()` is the screen's own service function, a bulk one a line per record (`completeMany`, `leave.decideMany`, `workflow.decideMany`)
+- [x] 01/11/2026 · `not_offered` for every other Create schema of those modules; gate 23 counts an input offered by any manifest (ESS offers leave's own request)
+- [x] 01/11/2026 · The confirm sheet: `useFreshSignIn` starts on a passkey when the person has one, else the PIN, else the password, and tells its caller the way used; Set Passkey offered once on the device (a toast with the button) to a person who confirmed another way and has none
+- [x] 01/11/2026 · `ActionCard` and `ResultLine` in the Assistant group (header, test, gallery page each); the card on both shells inside the answer (`app/src/features/assistant/Card.tsx`; the full screen and the phone's chat send `shows: ["cards", "pane"]`): the verb with the count (the decision's own word on an approvals card), Edit through the form system from the action's schema by its name with Save Changes, Cancel, busy with the buttons waiting (F26), problems on their fields and under the card with the screen that answers one (Open Mailbox), the result line per record with Open, Draw It Again on an expired card; the mock's card routes
+- [x] 01/11/2026 · Suggested cards as a question with Not Now, never run unasked; prompt version 6
+- [x] 01/11/2026 · Mail and message drafts held to ready to send as Write With AI is (`answer.gapsIn`, "Fill the gap", at the draft, an edit and the press); `AiCardField.long`
+- [x] 01/11/2026 · The evaluation set's eleven action cases and `card.not-mine` (`no_action`); the attack scaffold in `ai-cards.test.js` (one's own request, a grant never reached, a stranger as recipient, a mail without a mailbox); `ai-actions-{workspace,leave,approvals,community,mailbox}.test.js` on the real migrations (four leave requests approved with a passkey, two rejected with a PIN, self-approval and a request outside scope refused, Tell Ada, a mail queued with the signature baked); `tests/integration/helpers/ai-actions.js`
+- [x] 01/11/2026 · Guide §2, §5, §6.11, §8, §10, §11, §14; each module's guide §9 (workspace, ess, community, mailbox, foundation, performance) and `identity.md`; the User Guide chapter's card section with its picture; PROGRESS; README; FRONTEND_GUIDE §9.1
 
 ### 6.5 PR5 · Proof and switch-over
 
@@ -764,6 +764,23 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   branch carried it whole until `main` was merged in; the snapshot now adds PR3's nine entries.
   Merged as praxisjbs/mycity-app#51 once CI was green on GitHub; the one red run before it was an
   expectation in the new suite that lacked PR2's `masked` on a read. PR4 may start; PR5 waits on it.
+- 01/11/2026 · JP · PR4 built (§6.4) in one chat, on the session's branch: ten actions beside their
+  modules' reads, the card on both shells, Confirm It's You reordered to a passkey first, suggested
+  cards, the drafts held to ready to send, the suites per module. Found on the way: a form's own
+  schema rarely names the record the form stands on (a comment's panel is its task, Approve is one
+  press on a request), so most cards take a schema of their own (`TaskCommentAdd`, `LeaveApprove`,
+  `ApprovalDecide`, `DirectMessageSend`, `MailCompose`) and say `form: "none: <reason>"`, as gate 23
+  allows; a card that only knows its records by id cannot be read before it is pressed, so `records()`
+  took a database handle and names them through the module's repo; a bulk press that stops at the
+  first refusal would leave a manager's four approvals half done, so each record is its own line and
+  only a press that did nothing is a refusal; the cloud session lacked pgvector (apt) and Node 20
+  (nvm), both installed by hand again; the seeded leave type reads "Annual", not "Annual Leave";
+  the password policy refuses a password that holds the email's name. Touched outside PR4's files,
+  and said in the PR: `shared/ai/authorise.js` (`checkAction` takes a database handle, `records()`
+  may be async), `engine/cards.js` (`fieldsOf` marks a long text), `answer.js` (`draftCard` takes
+  the handle and holds the words), `assistant.cards.js` (the same guard at an edit and the press),
+  `scripts/check/ai-awareness.js` (offered by any manifest), `app/src/auth/FreshSignIn.tsx` (the
+  order, `onConfirmed`), the module services and repos the actions run through.
 - 01/11/2026 · JP · The first full run fell on a month's first day and found the suite assumed
   October: the staging reviews seed bound the plans at the real clock, so October's round opened
   with no reviews (on staging too, from 1 November); four screen tests of attendance and the

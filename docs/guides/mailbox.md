@@ -417,8 +417,17 @@ in the file only (off for a local test server).
 
 ## 9 · AI and search
 
-- **AI reads**: `// ai:none`. Mail is private correspondence, and Praxis AI reads none of it: the
-  module has no read manifest, so no question to the assistant reaches anyone's mail (A23).
+- **AI reads**: none. Mail is private correspondence, and Praxis AI reads none of it: `mailbox.ai.js`
+  declares no read and no summary, so no question to the assistant reaches anyone's mail (A23 as
+  amended, `docs/guides/praxis-ai.md` decision 19).
+- **AI action** (`mailbox.ai.js`, `praxis-ai.md` §6.11): `mail.send` (`mailbox` create, standard
+  risk; input `MailCompose`: to, cc, subject and the words as plain text, written by the assistant
+  from the person's words and the records read, held to ready to send as Write With AI is; the
+  person presses Send Mail; at the press their mailbox must be connected (`assertConnected`, else
+  `NO_MAILBOX` and the screen offers Mailbox); run `mailbox.service.sendNew`: a new draft saved and
+  queued exactly as Send does, from the person's own address with their signature baked, the
+  request's `Idempotency-Key` carried so a repeated press queues once). A reply inside a
+  conversation stays Write With AI in the composer.
 - **Feature AI**, each run only when its owner presses it, on their own mail (§1.1, §3 steps 12 to
   14, §6), registered in `services/ai/actions.js` with personal data, chosen by TB on 22/10/2026:
 
@@ -566,6 +575,8 @@ interface copy; the copy rules apply to the chrome around them.
 - A monthly AI allowance per person for mail, beside AI Control's provider caps?
 
 ## 14 · Change log
+
+- 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11, decision 19): the mailbox gains `mailbox.ai.js`, which declares no read and one action, `mail.send` (a mail the assistant wrote from the person's words, saved as a draft and queued through `send` with the signature baked, `mailbox.service.sendNew`; refused without a connected mailbox); the controller's `ai:none` goes with it; §9. Nothing on the Mailbox screens changes.
 
 - 26/10/2026 · GE · The ready-to-send guard (`placeholdersIn`, the gaps it refuses) moved to `services/ai/drafts.js`, shared with Queries & Sanctions' Write With AI (queries.md §9); Write With AI, Tidy Up and Summarise Thread behave as before.
 - 26/10/2026 · JP · From the User Guide audit's screen defects and the owner's decision of 26/10/2026: a message moved out of Spam is read again from the mail server (`provider.fetchOne`), so it shows as written; Connect says why a refusal failed (a field's marks only for the form's fields; `setServerErrors` ignores details that are not messages); Refresh says "Checking for new mail" and is refused while the mailbox needs reconnecting; Attachments counts the folder (`ThreadListQuery.attachments`); Reply on one's own message goes to whom it was sent; the composer marks To, Cc and Bcc each, checks 50 a row, shows the schedule's own refusal ("Within 90 days") and offers no day past 90, says when a draft did not save or discard; a deferral out of tries says it will not be retried; Write With AI and Summarise say when the connection dropped, and a refusal on what the step does not draw shows; the buttons follow the `mailbox` grants (Compose, Reply, Forward create; Empty delete; numbers and switches edit) and Forward to a chat `community` create. §3 step 6 no longer promises a double click on the divider; §6 says every model passed by is not AI off.

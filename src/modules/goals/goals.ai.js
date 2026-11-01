@@ -10,6 +10,12 @@
  * goals.summary counts the quarter (docs/guides/praxis-ai.md §6.13): key results by status, the
  * scores by function and month, the ratings at the latest closed round; figures, never rows, within
  * the same reach and scope as Analytics.
+ *
+ * No action (praxis-ai.md §6.11): the monthly check-in is written line by line on My Performance
+ * (an actual, evidence and an action per key result, reviews.service.saveCheckIn, then Submit
+ * Check-In), which no card carries whole; the goals service has no check-in of its own. The
+ * route "do my check-in" opens the form. Every Create schema of this contract is accounted for
+ * below, with the screen that owns it.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -18,6 +24,15 @@ const analytics = require("./goals.analytics");
 
 module.exports = defineManifest({
   module: "performance",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    PeriodCreate: "a quarter is set up by whoever manages performance, on Goals with Manage Quarters",
+    OrganisationalGoalCreate: "an organisational goal is the plan year's, written on Goals by the people who own it",
+    ObjectiveCreate: "an objective is written on Goals inside its function's plan, with its key results beside it",
+    KeyResultCreate: "a key result's measure, target and owner are set on Goals with the objective in view",
+    PlanUnbindCreate: "unbinding a plan is a request with a reason, decided by the CEO; it is asked from the plan itself",
+    TargetChangeCreate: "a target change names a line and a month on the scorecard; it is asked from that line",
+  },
   summaries: [
     {
       key: "goals.summary",

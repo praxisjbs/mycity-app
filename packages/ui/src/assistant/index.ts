@@ -4,6 +4,7 @@
  * client. A screen fills them from the contract's answer. Each component file in this folder is
  * exported here (npm run new:component adds the line).
  */
+export * from "./ActionCard";
 export * from "./AnswerBubble";
 export * from "./AssistantShell";
 export * from "./OverviewPane";
@@ -11,6 +12,7 @@ export * from "./PaneSheet";
 export * from "./PaneTabs";
 export * from "./ProgressLine";
 export * from "./RecordPane";
+export * from "./ResultLine";
 export * from "./SourceChip";
 export * from "./SourcesPane";
 export * from "./TablePane";

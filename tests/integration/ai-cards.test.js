@@ -7,7 +7,10 @@
  * card, a cancelled one, one whose grant was removed since, one over its bulk limit, a sensitive
  * class without a fresh sign-in, and a refusal the person can fix each do what §6.11 says; the
  * reads of an answer are kept and one is run again, 25 a page (§6.12); a screen that draws no
- * cards is offered no action.
+ * cards is offered no action. The attack scaffold (the handoff §7; PR5 widens it): a card naming
+ * one's own leave request, an action the person's grant never reached, a message to someone who
+ * is not on the staff, and a mail from a person with no mailbox connected are each refused with
+ * nothing run; a request outside a manager's scope on a bulk card is ai-actions-leave's case.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/ai-cards
  *
@@ -211,7 +214,7 @@ describeDb("Praxis AI action cards against the real migrations", () => {
       status: "shown",
       result: null,
     });
-    expect(body.card.fields.find((f) => f.name === "due_on")).toEqual({ name: "due_on", label: "Due Day", kind: "date", required: false, options: null });
+    expect(body.card.fields.find((f) => f.name === "due_on")).toEqual({ name: "due_on", label: "Due Day", kind: "date", required: false, options: null, long: false });
     expect(body.context).toEqual({ module: "workspace", tab: "tasks" });
     // The reads carry the fields masked for the asker (a member of staff sees no pay, bank, personal or statutory field), for the Sources tab.
     expect(body.reads).toEqual([{ n: 1, key: "tasks.list", kind: "read", module_key: "workspace", params: {}, outcome: "read", rows: 0, total: 0, first: 1, masked: ["employee.bank", "employee.personal", "employee.salary", "employee.statutory"] }]);
@@ -325,10 +328,11 @@ describeDb("Praxis AI action cards against the real migrations", () => {
       expect(gone.status).toBe(403);
       expect(gone.body.error.code).toBe("AI_ACTION_FORBIDDEN");
       expect(await one("SELECT status FROM ai_action_draft WHERE ai_action_draft_id = $1", [third.body.card.ai_action_draft_id])).toEqual({ status: "shown" });
-      // And the model is not offered it any more.
+      // And the model is not offered it any more (the actions its other grants reach stay).
       const sent = script(say({ text: "Nothing to offer." }));
       await ask("staff", { question: "Create a task.", shows: ["cards"] });
-      expect(sent[0].messages[0].content).toMatch(/- none: offer a route instead/);
+      expect(sent[0].messages[0].content).not.toMatch(/- tasks\.create: /);
+      expect(sent[0].messages[0].content).toMatch(/- my_leave\.request: /);
     } finally {
       await q("UPDATE permission SET can_create = true WHERE role_id = $1 AND module_key = 'workspace'", [staffRole.role_id]);
       await grantsCache.invalidateGrants();
@@ -351,6 +355,62 @@ describeDb("Praxis AI action cards against the real migrations", () => {
     expect(done.status).toBe(200);
     expect(done.body).toMatchObject({ status: "done", lines: [{ type: "sample", id: "s1", label: "Approved", ok: true, message: "approved" }] });
     expect(await one("SELECT confirmed_how FROM ai_action_run WHERE ai_action_run_id = $1", [done.body.ai_action_run_id])).toEqual({ confirmed_how: "fresh_sign_in" });
+  });
+
+  describe("the attack scaffold: a card is refused with nothing run when (decisions 16, 19)", () => {
+    const annualType = async () => (await as("staff").get("/leave/types?active=true")).body.data.find((t) => t.code === "annual").leave_type_id;
+    /** A day two weeks ahead on a weekday, `plus` days later. */
+    const weekday = (plus = 0) => {
+      const d = new Date(Date.now() + 14 * 86_400_000);
+      while (d.getUTCDay() !== 1) d.setUTCDate(d.getUTCDate() + 1);
+      return new Date(d.getTime() + plus * 86_400_000).toISOString().slice(0, 10);
+    };
+
+    test("it names the person's own leave request, however they hold approve", async () => {
+      const annual = await annualType();
+      const own = await as("ops").post("/ess/leave").send({ leave_type_id: annual, starts_on: weekday(0), ends_on: weekday(0), reason: "A day off" });
+      expect(own.status).toBe(201);
+      script(say({ text: "Approve mine.", action: { key: "leave.approve", values: { leave_request_ids: [own.body.leave_request_id] }, suggested: false } }));
+      const asked = await ask("ops", { question: "Approve my own leave.", shows: ["cards"] });
+      expect(asked.body.card).toMatchObject({ action_key: "leave.approve", risk: "approval" });
+      await as("ops").post("/security/confirm").send({ method: "password", password: PASSWORD.ops });
+      const pressed = await press("ops", asked.body.card.ai_action_draft_id);
+      expect(pressed.status).toBe(403);
+      expect(pressed.body.error.code).toBe("SELF_APPROVAL");
+      expect((await as("ops").get(`/ess/leave/${own.body.leave_request_id}`)).body.status).toBe("submitted");
+    });
+
+    test("it names an action the person's grant does not reach: never offered, never drawn (a request outside a manager's scope on a bulk card is ai-actions-leave's case)", async () => {
+      const annual = await annualType();
+      const theirs = await as("staff").post("/ess/leave").send({ leave_type_id: annual, starts_on: weekday(1), ends_on: weekday(1), reason: "A day off" });
+      expect(theirs.status).toBe(201);
+      // A member of staff holds no people approve: the action was never offered, and a card the model names anyway is refused at the draft.
+      const sent = script(say({ text: "Approve it.", action: { key: "leave.approve", values: { leave_request_ids: [theirs.body.leave_request_id] }, suggested: false } }));
+      const asked = await ask("staff", { question: "Approve this.", shows: ["cards"] });
+      expect(sent[0].messages[0].content).not.toMatch(/- leave\.approve:/);
+      expect(asked.body.card).toBeNull();
+      expect((await as("staff").get(`/ess/leave/${theirs.body.leave_request_id}`)).body.status).toBe("submitted");
+    });
+
+    test("a message names someone who is not on the staff", async () => {
+      script(say({ text: "Tell them.", action: { key: "community.message", values: { employee_id: "00000000-0000-4000-8000-0000000000ab", body: "Hello" }, suggested: true } }));
+      const asked = await ask("staff", { question: "Was the report sent?", shows: ["cards"] });
+      expect(asked.body.card).toMatchObject({ action_key: "community.message", suggested: true });
+      const pressed = await press("staff", asked.body.card.ai_action_draft_id);
+      expect(pressed.status).toBe(422);
+      expect(pressed.body.error).toMatchObject({ code: "NOT_A_COLLEAGUE", fields: { employee_id: ["Not a colleague"] } });
+      expect((await one("SELECT count(*)::int AS n FROM community_message")).n).toBe(0);
+    });
+
+    test("a mail is pressed by a person with no mailbox connected", async () => {
+      script(say({ text: "Here is the email.", action: { key: "mail.send", values: { to_addresses: ["ada@partner.test"], subject: "Thursday", body: "See you on Thursday at 10." }, suggested: false } }));
+      const asked = await ask("ops", { question: "Email the partner about Thursday.", shows: ["cards"] });
+      expect(asked.body.card).toMatchObject({ action_key: "mail.send" });
+      const pressed = await press("ops", asked.body.card.ai_action_draft_id);
+      expect(pressed.status).toBe(409);
+      expect(pressed.body.error.code).toBe("NO_MAILBOX");
+      expect((await one("SELECT count(*)::int AS n FROM mail_send_queue")).n).toBe(0);
+    });
   });
 
   test("a read of an answer run again, 25 a page, with the person's rights now; a read that was not made is missing (§6.12)", async () => {

@@ -1239,6 +1239,51 @@ async function openDirect(employeeId, user) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11; decision 19): a message to a colleague,
+ * in the conversation with them, and a post in a channel, each sent as the chat box sends it.
+ * The assistant reads no conversation (community.md §9); it only carries the person's words.
+ * ------------------------------------------------------------------ */
+
+/** A text message to one colleague: their conversation opened when there is none, then posted. */
+async function sendDirect(employeeId, body, user) {
+  const channelId = await tx((client) => directWith(client, employeeId, user));
+  return postMessage(channelId, { message_type: "text", body }, user);
+}
+
+/** The colleagues a card names, by name; an id that is nobody's keeps its id alone. */
+async function colleagueRecords(db, ids) {
+  const people = await repo.people(db, [...new Set(ids || [])].slice(0, 25));
+  return [...new Set(ids || [])].slice(0, 25).map((id) => {
+    const p = people.get(id);
+    return { type: "employee", id, label: p && p.display_name ? p.display_name : null };
+  });
+}
+
+/** The channels a card names, by name, for the person who is a member; another keeps its id alone. */
+async function channelRecords(db, ids, user) {
+  const out = [];
+  for (const id of [...new Set(ids || [])].slice(0, 25)) {
+    const ch = await repo.membership(db, id, user.user_id);
+    out.push({ type: "channel", id, label: ch && ch.name ? `#${ch.name}` : null });
+  }
+  return out;
+}
+
+/** The card's re-check for a message: the colleague works here and can sign in. */
+async function assertColleague(db, employeeId) {
+  const people = await repo.people(db, [employeeId]);
+  if (!people.has(employeeId)) throw new AppError("NOT_A_COLLEAGUE", "That person is not on the staff", 422, { employee_id: ["Not a colleague"] });
+  if (!(await repo.userOfEmployee(db, employeeId))) throw new AppError("NO_LOGIN", "That colleague has no login yet", 422, { employee_id: ["No login yet"] });
+}
+
+/** The card's re-check for a post: a member of the channel who may post in it. */
+async function assertMayPost(db, channelId, user) {
+  const m = await repo.membership(db, channelId, user.user_id);
+  if (!m) throw new AppError("NOT_A_MEMBER", "You are not in that channel", 404, { community_channel_id: ["Not a member"] });
+  if (!mayPost(m)) throw new AppError("CANNOT_POST", "You cannot post in this channel", 403, { community_channel_id: ["Cannot post here"] });
+}
+
+/* ------------------------------------------------------------------ *
  * Forwarding (§3 step 19)
  * ------------------------------------------------------------------ */
 
@@ -1495,6 +1540,11 @@ module.exports = {
   transcript,
   listConversations,
   openDirect,
+  sendDirect,
+  colleagueRecords,
+  channelRecords,
+  assertColleague,
+  assertMayPost,
   listColleagues,
   listForwardTargets,
   forward,
