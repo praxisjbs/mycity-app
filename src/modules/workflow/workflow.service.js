@@ -579,9 +579,9 @@ async function cardRecords(db, ids, user) {
   const out = [];
   for (const id of [...new Set(ids || [])].slice(0, 25)) {
     const found = await engine.getInstance(db, id);
-    const readable = found && (await mayRead(db, found, user));
+    const mayReadIt = found && (await mayRead(db, found, user));
     let label = null;
-    if (readable) {
+    if (mayReadIt) {
       const def = await definitions.findById(db, found.workflow_definition_id);
       const name = found.subject_employee_id ? (await repo.employeeNames(db, [found.subject_employee_id])).get(found.subject_employee_id) || null : null;
       label = instanceLabel({ ...found, definition_name: def ? def.name : null, subject_name: name });
@@ -614,8 +614,8 @@ async function decideMany(user, { workflow_instance_ids: ids, decision, reason =
   let firstRefusal = null;
   for (const id of [...new Set(ids || [])]) {
     const found = await engine.getInstance(pool, id);
-    const named = found ? (await cardRecords(pool, [id], user))[0] : null;
-    const label = named && named.label ? named.label : id;
+    const record = found ? (await cardRecords(pool, [id], user))[0] : null;
+    const label = record && record.label ? record.label : id;
     const link = found ? linkOf(found, user) : null;
     try {
       if (!found) throw notFound();
