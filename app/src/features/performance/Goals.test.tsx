@@ -756,6 +756,32 @@ describe("Performance · Goals, set and changed on screen", () => {
   /** A select's choices, read by opening it. */
   const choices = (root: HTMLElement, label: string) => optionLabels(within(root).getByRole("combobox", { name: label }));
 
+  it("the Plan Approval card shows a reader who does not set the plan only while it is awaiting approval or binding; whoever sets it has it in every state (JBS Praxis, 01/11/2026)", async () => {
+    const content = PLANS.find((p) => p.performance_plan_id === sid("perf:plan:content"))!;
+    const marketing = PLANS.find((p) => p.performance_plan_id === sid("perf:plan:bm"))!;
+    const was = { content: content.status, marketing: marketing.status };
+    const shown = () => screen.queryByText("Plan Approval") !== null;
+    try {
+      // Content's staff do not set its plan: Draft, Returned and Unbound are the head's to work on, so they read no card.
+      for (const [state, reads] of [["draft", false], ["returned", false], ["unbound", false], ["submitted", true], ["revising", true], ["binding", true]] as const) {
+        Object.assign(content, { status: state });
+        await openAs("chidera@mycityapp.io", "/performance?tab=goals");
+        expect(shown(), `Content staff, plan ${state}`).toBe(reads);
+        cleanup();
+      }
+      // Marketing & Sales' head sets its plan: the card is theirs, to send it or send it again, whatever its state.
+      for (const state of ["draft", "returned", "unbound", "submitted", "binding"] as const) {
+        Object.assign(marketing, { status: state });
+        await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+        expect(shown(), `Marketing & Sales head, plan ${state}`).toBe(true);
+        cleanup();
+      }
+    } finally {
+      Object.assign(content, { status: was.content });
+      Object.assign(marketing, { status: was.marketing });
+    }
+  }, 180000);
+
   it("Staff read only: New Goal, Report Month and New KPI are not offered", async () => {
     await openAs("chidera@mycityapp.io", "/performance?tab=goals");
     expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
