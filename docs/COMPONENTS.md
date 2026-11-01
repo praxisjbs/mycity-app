@@ -165,6 +165,16 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
+| Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
+| Assistant | [AssistantShell](#assistantshell) | `AssistantShell` | The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone. | beta |
+| Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary. | beta |
+| Assistant | [PaneSheet](#panesheet) | `PaneSheet` | The phone's pane: a full-height sheet that holds the four views (PaneTabs) for one answer, opened from Open Figures under it. | beta |
+| Assistant | [PaneTabs](#panetabs) | `PaneTabs` | The pane's four views, Overview, Table, Record and Sources, as tabs; a view with nothing to show stays, disabled, so the layout never jumps. | beta |
+| Assistant | [ProgressLine](#progressline) | `ProgressLine` | What Praxis AI is doing while a question runs: Reading leave requests, 2 of 5; nothing is streamed, the answer lands whole. | beta |
+| Assistant | [RecordPane](#recordpane) | `RecordPane` | The pane's Record: the record behind a chip or a table row, its fields as the person may see them, and Open Record to its own screen. | beta |
+| Assistant | [SourceChip](#sourcechip) | `SourceChip` | A kind of record an answer was read from, with how many ("partnership ×4"), or the one record it rests on; pressed, it opens the pane on them. | beta |
+| Assistant | [SourcesPane](#sourcespane) | `SourcesPane` | The pane's Sources: every read a question made, in order, with its filters, rows and total, outcome and the fields masked for the person; a read with rows opens in the Table. | beta |
+| Assistant | [TablePane](#tablepane) | `TablePane` | The pane's Table: every row of one read, 25 a page from the server, each row opening its record; past 200 rows it says how many there are. | beta |
 
 ## Foundations
 
@@ -5465,6 +5475,340 @@ The trail: the last places a person went on this device and the one ahead, each 
 
 ```tsx
 <TrailMenu open={open} onOpenChange={setOpen} items={trail} onGo={(offset) => go(offset)}><NavCapsule ... /></TrailMenu>
+```
+
+## Assistant
+
+### AnswerBubble
+
+One answer of Praxis AI: its words, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful.
+
+| | |
+|---|---|
+| Use | Each answer in the conversation, on the full screen and in the phone's chat; the screen passes the table it drew, the chips and what each press does. `card` is the slot the action card fills (PR4 of the Praxis AI Engine). |
+| Avoid | A message a person wrote (QuestionBubble, exported here); a notice or a banner; any other chat (Staff Community has its own). |
+| Phone | Full width; the table above it is cards (DataView); Open Figures opens the pane as a sheet; the buttons are 44 px targets. |
+| Accessibility | An article named Answer; the words are content; Helpful and Not Helpful say their pressed state (aria-pressed) and wait for each other (ActionGroup); the chips are buttons when they open the pane. |
+| Status | beta |
+| Exports | `AnswerBubble`, `QuestionBubble` |
+| Import | `import { AnswerBubble, QuestionBubble } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/AnswerBubble.tsx` |
+| Test | `packages/ui/src/assistant/AnswerBubble.test.tsx` |
+| Gallery | `packages/ui/src/assistant/AnswerBubble.gallery.tsx` (`npm run gallery`, `#/AnswerBubble`) |
+
+**AnswerBubble** props (`AnswerBubbleProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `text` | `string` | yes | The answer's words, as the model wrote them (content, not interface copy). |
+| `table` | `ReactNode` |  | The table drawn from the read's rows (a bare DataView), under the words. |
+| `paging` | `string \| null` |  | Where the table's rows sit in the whole list ("Showing 25 of 312", "Showing 26 to 50 of 312"). |
+| `onNext` | `() => Promise<unknown> \| void` |  | Show Next 25: asks for the next page as a follow-up; the button is busy until it lands. |
+| `link` | `{ label: string; onOpen: () => void } \| null` |  | The screen button: where the person would act, or the form a change opens filled. |
+| `from` | `ReactNode` |  | The source chips after From (SourceChip), one per kind of record read. |
+| `onPane` | `() => void` |  | Opens this answer's pane (Open Figures): the right pane on desktop, the sheet on a phone. |
+| `paneOpen` | `boolean` |  | This answer's pane is the one shown: drawn in the accent, with no Open Figures. |
+| `feedback` | `AnswerFeedback \| null` |  | Where Helpful or Not Helpful stands. |
+| `onFeedback` | `(value: AnswerFeedback \| null) => Promise<unknown> \| void` |  | The press on Helpful or Not Helpful; null takes it back. |
+| `card` | `ReactNode` |  | The action card drawn under the words, when the answer carries one (filled by PR4 of the Praxis AI Engine). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**QuestionBubble** props (`QuestionBubbleProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `words` | `string` | yes | The person's words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<AnswerBubble text={a.content} table={table} paging="Showing 25 of 312" onNext={next} link={{ label: "Open Leave", onOpen }} from={chips} feedback={null} onFeedback={give} onPane={showPane} />
+```
+
+### AssistantShell
+
+The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone.
+
+| | |
+|---|---|
+| Use | Once, as the Ask screen's frame (docs/guides/praxis-ai.md decision 12, 13): the screen passes the conversation, the pane (PaneTabs) and, behind a toggle, Recent as the aside. Escape goes Back like the button. |
+| Avoid | Any other screen; a chat over the screen on a phone (PhonePage); a list beside its record (SplitPanes, ListDetail). |
+| Phone | The conversation fills the page, the box at its foot; no pane (an answer's Open Figures opens PaneSheet); Back is a 44 px target and the subtitle is left off. |
+| Accessibility | One h1 (the page title); Back is a named button, and Escape does the same outside an open overlay; the conversation and the pane are named regions. |
+| Status | beta |
+| Exports | `AssistantShell` |
+| Import | `import { AssistantShell } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/AssistantShell.tsx` |
+| Test | `packages/ui/src/assistant/AssistantShell.test.tsx` |
+| Gallery | `packages/ui/src/assistant/AssistantShell.gallery.tsx` (`npm run gallery`, `#/AssistantShell`) |
+
+**AssistantShell** props (`AssistantShellProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The page's name, at most 3 words: the assistant's name from the shell's catalogue. |
+| `back` | `{ to: string; onBack: () => void } \| null` |  | Where Back goes: the screen's name in words (People · Leave), and the press. Without it there is no Back. |
+| `actions` | `ReactNode` |  | The header's actions: New Conversation, the Recent toggle. |
+| `conversation` | `ReactNode` | yes | The conversation: the log and the box, a column that fills. |
+| `pane` | `ReactNode` |  | The right pane (PaneTabs); desktop only. |
+| `aside` | `ReactNode` |  | Recent, as a narrow column before the conversation while `asideOpen`; desktop only. |
+| `asideOpen` | `boolean` |  | Whether the aside is showing. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<AssistantShell title="Praxis AI" back={{ to: "People · Leave", onBack }} actions={<Button icon="plus">New Conversation</Button>} conversation={log} pane={<PaneTabs ... />} />
+```
+
+### OverviewPane
+
+The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary.
+
+| | |
+|---|---|
+| Use | In PaneTabs' overview slot with the answer's `overview` (AiAnswer.overview); the tab is disabled while it is null. The figures and the chart come from the server (docs/guides/praxis-ai.md §6.13; the summary reads land with PR3 of the Praxis AI Engine). |
+| Avoid | Figures a screen worked out itself; a dashboard (Home's KpiGrid and its charts); a table (TablePane). |
+| Phone | The figures two to a row, the chart below, inside the pane sheet; no chart caption. |
+| Accessibility | The figures are KpiCards (a named figure each); the chart is one of the shared charts, read out as a list of label and figure. |
+| Status | beta |
+| Exports | `OverviewPane` |
+| Import | `import { OverviewPane } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/OverviewPane.tsx` |
+| Test | `packages/ui/src/assistant/OverviewPane.test.tsx` |
+| Gallery | `packages/ui/src/assistant/OverviewPane.gallery.tsx` (`npm run gallery`, `#/OverviewPane`) |
+
+**OverviewPane** props (`OverviewPaneProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `overview` | `PaneOverview \| null` | yes | The Overview the answer carried, or null when no summary read answered. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<OverviewPane overview={answer.overview} />
+```
+
+### PaneSheet
+
+The phone's pane: a full-height sheet that holds the four views (PaneTabs) for one answer, opened from Open Figures under it.
+
+| | |
+|---|---|
+| Use | On a phone, around PaneTabs, opened by an AnswerBubble's Open Figures; desktop shows the pane beside the conversation instead (AssistantShell). |
+| Avoid | Desktop (AssistantShell's `pane`); a record's own sheet (ListDetail); a short choice (Sheet). |
+| Phone | This is its phone form: the whole height, dragged down, Back or Esc to close; the phone's own Back closes it first (F29). |
+| Accessibility | A modal dialog named Figures (Sheet underneath): focus moves in and is trapped, Esc and Back close it, focus returns to Open Figures. |
+| Status | beta |
+| Exports | `PaneSheet` |
+| Import | `import { PaneSheet } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/PaneSheet.tsx` |
+| Test | `packages/ui/src/assistant/PaneSheet.test.tsx` |
+| Gallery | `packages/ui/src/assistant/PaneSheet.gallery.tsx` (`npm run gallery`, `#/PaneSheet`) |
+
+**PaneSheet** props (`PaneSheetProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the sheet is showing. |
+| `onClose` | `() => void` | yes | Called when the person closes it (drag down, scrim, Esc, the close button, the phone's Back). |
+| `title` | `ReactNode` |  | The heading, at most 4 words; Figures unless set. |
+| `children` | `ReactNode` | yes | The PaneTabs. |
+| `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<PaneSheet open={open} onClose={close}><PaneTabs value={tab} onValueChange={setTab} table={table} sources={sources} /></PaneSheet>
+```
+
+### PaneTabs
+
+The pane's four views, Overview, Table, Record and Sources, as tabs; a view with nothing to show stays, disabled, so the layout never jumps.
+
+| | |
+|---|---|
+| Use | Inside AssistantShell's pane on desktop and inside PaneSheet on a phone, with each view's component in its slot (docs/guides/praxis-ai.md decision 13). |
+| Avoid | A module's tab strip (the shell's Tabs); views that are not these four; hiding an empty tab. |
+| Phone | The same four tabs, scrolling sideways if they must, inside the sheet; each is a 44 px target. |
+| Accessibility | A Radix tab list named Pane; a disabled tab is still read, so a person knows the view exists; the shown panel is the active tab's. |
+| Status | beta |
+| Exports | `PaneTabs` |
+| Import | `import { PaneTabs } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/PaneTabs.tsx` |
+| Test | `packages/ui/src/assistant/PaneTabs.test.tsx` |
+| Gallery | `packages/ui/src/assistant/PaneTabs.gallery.tsx` (`npm run gallery`, `#/PaneTabs`) |
+
+**PaneTabs** props (`PaneTabsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `PaneTab` | yes | The tab in view; a disabled one falls back to the first that has something to show. |
+| `onValueChange` | `(tab: PaneTab) => void` | yes | Called with the tab pressed. |
+| `overview` | `ReactNode` |  | The Overview's view (OverviewPane); nothing disables its tab. |
+| `table` | `ReactNode` |  | The Table's view (TablePane); nothing disables its tab. |
+| `record` | `ReactNode` |  | The Record's view (RecordPane); nothing disables its tab. |
+| `sources` | `ReactNode` |  | The Sources' view (SourcesPane); nothing disables its tab. |
+| `label` | `string` |  | Names the strip for assistive technology; Pane unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PaneTabs value={tab} onValueChange={setTab} table={<TablePane {...rows} />} sources={<SourcesPane reads={reads} />} />
+```
+
+### ProgressLine
+
+What Praxis AI is doing while a question runs: Reading leave requests, 2 of 5; nothing is streamed, the answer lands whole.
+
+| | |
+|---|---|
+| Use | Under the question waiting for its answer, fed by the `ai:progress` realtime events; drop it the moment the answer arrives. |
+| Avoid | A spinner for any other wait (use Spinner or Skeleton); a toast; a line that stays once the answer is on screen. |
+| Phone | The same line, in the conversation's column; its words wrap. |
+| Accessibility | A polite live region (role status), so a screen reader hears each step without being interrupted. |
+| Status | beta |
+| Exports | `ProgressLine` |
+| Import | `import { ProgressLine } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/ProgressLine.tsx` |
+| Test | `packages/ui/src/assistant/ProgressLine.test.tsx` |
+| Gallery | `packages/ui/src/assistant/ProgressLine.gallery.tsx` (`npm run gallery`, `#/ProgressLine`) |
+
+**ProgressLine** props (`ProgressLineProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `words` | `string \| null` |  | What is being read, as the reads' own words ("leave requests"); Your Records when nothing is known yet. |
+| `step` | `{ n: number; of: number } \| null` |  | Which read of the question's five is running. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ProgressLine words="leave requests" step={{ n: 2, of: 5 }} />
+```
+
+### RecordPane
+
+The pane's Record: the record behind a chip or a table row, its fields as the person may see them, and Open Record to its own screen.
+
+| | |
+|---|---|
+| Use | In PaneTabs' record slot, filled when a SourceChip names one record or a TablePane row is pressed; the cells are the read's own, already masked for the person (docs/guides/praxis-ai.md decision 13). |
+| Avoid | A record's full screen (its own tab and `id`); an edit form; a 360. |
+| Phone | The same fields stacked, label above value, inside the pane sheet; Open Record full width at the foot. |
+| Accessibility | The title is a heading of the pane; the fields are a description list; Open Record is a button that says where it goes. |
+| Status | beta |
+| Exports | `RecordPane` |
+| Import | `import { RecordPane } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/RecordPane.tsx` |
+| Test | `packages/ui/src/assistant/RecordPane.test.tsx` |
+| Gallery | `packages/ui/src/assistant/RecordPane.gallery.tsx` (`npm run gallery`, `#/RecordPane`) |
+
+**RecordPane** props (`RecordPaneProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `record` | `PaneRecord \| null` | yes | The record in view, or null before a chip or a row picked one. |
+| `onOpen` | `(link: string) => void` |  | Opens the record's own screen, by its path. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<RecordPane record={{ title: "Ayo Bello", items: [["Days", "3"]], link: "/people?tab=leave&id=l1" }} onOpen={navigate} />
+```
+
+### SourceChip
+
+A kind of record an answer was read from, with how many ("partnership ×4"), or the one record it rests on; pressed, it opens the pane on them.
+
+| | |
+|---|---|
+| Use | Under an answer's words, after From (docs/guides/praxis-ai.md decision 9): one chip per kind of record, or one for the single record. |
+| Avoid | A chip for every record (From names kinds); a filter chip (use Chips); a status (use Pill). |
+| Phone | A 44 px target; the row of chips wraps. |
+| Accessibility | An ItemChip: a button named by the kind and its count ("partnership, 4 records") when it opens something, a plain label otherwise. |
+| Status | beta |
+| Exports | `SourceChip` |
+| Import | `import { SourceChip } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/SourceChip.tsx` |
+| Test | `packages/ui/src/assistant/SourceChip.test.tsx` |
+| Gallery | `packages/ui/src/assistant/SourceChip.gallery.tsx` (`npm run gallery`, `#/SourceChip`) |
+
+**SourceChip** props (`SourceChipProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | The kind of record in words ("partnership"), or the one record's name. |
+| `kind` | `"type" \| "record"` |  | `type` (the default): a kind of record with a count. `record`: the one record the answer rests on. |
+| `count` | `number` |  | How many of the kind were read; shown as ×N from 2. |
+| `onSelect` | `() => void` |  | Opens the pane on them (the Table for a kind, the Record for one). Without it the chip is a label. |
+| `selected` | `boolean` |  | The chip whose records the pane shows now. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<SourceChip label="partnership" count={4} onSelect={showTable} />
+<SourceChip kind="record" label="Ayo Bello" onSelect={showRecord} />
+```
+
+### SourcesPane
+
+The pane's Sources: every read a question made, in order, with its filters, rows and total, outcome and the fields masked for the person; a read with rows opens in the Table.
+
+| | |
+|---|---|
+| Use | In PaneTabs' sources slot with the answer's reads (AiAnswer.reads), named in words by the screen (docs/guides/praxis-ai.md decision 13). |
+| Avoid | The citations themselves (From's chips); the Audit Log; a list of the person's questions (History). |
+| Phone | The same cards, one under the other, inside the pane sheet; Open Table is a 44 px target. |
+| Accessibility | A list of the reads, each a region named by the read; the outcome is a Pill with words, never colour alone. |
+| Status | beta |
+| Exports | `SourcesPane` |
+| Import | `import { SourcesPane } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/SourcesPane.tsx` |
+| Test | `packages/ui/src/assistant/SourcesPane.test.tsx` |
+| Gallery | `packages/ui/src/assistant/SourcesPane.gallery.tsx` (`npm run gallery`, `#/SourcesPane`) |
+
+**SourcesPane** props (`SourcesPaneProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `reads` | `PaneRead[]` | yes | The reads, first to last. |
+| `when` | `string \| null` |  | When the question was answered, day first, as the screen formats it. |
+| `onOpenTable` | `(n: number) => void` |  | Opens a read's rows in the Table, by its number. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<SourcesPane reads={reads} when="22/10/2026 09:30" onOpenTable={showTable} />
+```
+
+### TablePane
+
+The pane's Table: every row of one read, 25 a page from the server, each row opening its record; past 200 rows it says how many there are.
+
+| | |
+|---|---|
+| Use | In PaneTabs' table slot, fed by a read run again (GET /ai/answers/:id/reads/:n, docs/guides/praxis-ai.md §6.12): the screen passes each page as it lands and asks for the next. `onExport` is the slot Download Excel fills (PR3 of the Praxis AI Engine); without it no button is drawn. |
+| Avoid | A list of a screen's own (DataView with usePaged); the answer's own table under its words (the screen draws that bare DataView itself); sorting on the client. |
+| Phone | A card list (DataView's phone form) inside the pane sheet, the pager under it; a row is one tap target. |
+| Accessibility | A DataView: a named table on desktop, a list of buttons on a phone; the pager is a navigation landmark; a cell with nothing shows the empty marker. |
+| Status | beta |
+| Exports | `TablePane` |
+| Import | `import { TablePane } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/TablePane.tsx` |
+| Test | `packages/ui/src/assistant/TablePane.test.tsx` |
+| Gallery | `packages/ui/src/assistant/TablePane.gallery.tsx` (`npm run gallery`, `#/TablePane`) |
+
+**TablePane** props (`TablePaneProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `caption` | `string` | yes | Names the table for screen readers: the read in words ("Leave requests"). |
+| `columns` | `string[]` | yes | The column headers, as the server sent them. |
+| `rows` | `string[][]` | yes | This page's rows, each a cell per column, already formatted for a person. |
+| `numeric` | `number[]` | yes | Columns to right-align: amounts and counts. |
+| `links` | `Array<string \| null>` | yes | Each row's record, as a path; null where a row has no screen. |
+| `page` | `PageMeta \| null` |  | The server's page; the pager is drawn from it. |
+| `loading` | `boolean` |  | A page is on its way. |
+| `error` | `ApiError \| null` |  | The read failed; Try Again asks again. |
+| `onPage` | `(n: number) => void` |  | Asks for a page number. |
+| `onReload` | `() => void` |  | Asks for the page again, behind Try Again. |
+| `onOpenRow` | `(index: number) => void` |  | Opens a row (its index on this page) in the Record view. |
+| `onExport` | `() => Promise<unknown>` |  | Download Excel: the whole read as a workbook through the export path (filled by PR3 of the Praxis AI Engine). No button without it. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<TablePane caption="Leave requests" columns={rows.columns} rows={rows.rows} numeric={rows.numeric} links={rows.links} page={rows.page} onPage={setPage} onOpenRow={show} />
 ```
 
 ## Helpers

@@ -80,6 +80,30 @@ describe("Try Asking", () => {
   });
 });
 
+describe("progress over realtime (decision 23)", () => {
+  const realtime = require("../../services/realtime/emitter");
+  const { readWords, progressFor } = require("./assistant.service");
+
+  test("a read's words for the line: its key as words, 'list' dropped", () => {
+    expect(readWords("leave.requests")).toBe("leave requests");
+    expect(readWords("employees.list")).toBe("employees");
+    expect(readWords("my_leave.balances")).toBe("my leave balances");
+    expect(readWords("activity.list")).toBe("activity");
+  });
+
+  test("each read is pushed to the asker's room with the question's key; a push that fails changes nothing", () => {
+    const sent = jest.spyOn(realtime, "toUser").mockReturnValue(true);
+    const tell = progressFor({ user_id: "u1" }, "k-1");
+    tell({ n: 2, key: "leave.requests", kind: "read", of: 5 });
+    expect(sent).toHaveBeenCalledWith("u1", "ai:progress", { ask_key: "k-1", n: 2, of: 5, read_key: "leave.requests", kind: "read", words: "leave requests" });
+    sent.mockImplementation(() => {
+      throw new Error("no redis");
+    });
+    expect(() => tell({ n: 3, key: "tasks.list", kind: "read", of: 5 })).not.toThrow();
+    sent.mockRestore();
+  });
+});
+
 describe("an answer as History shows it", () => {
   test("its table, button and reads from what was kept; a citation's link and a row's link worked out now", () => {
     const shown = present(
@@ -104,7 +128,7 @@ describe("an answer as History shows it", () => {
     );
     const c = require("@mycity/contract");
     expect(c.assistant.AiAnswer.safeParse(shown).success).toBe(true);
-    expect(shown.reads).toEqual([{ n: 1, key: "leave.requests", kind: "read", module_key: null, params: { page: 1 }, outcome: "read", rows: 2, total: 2, first: 1 }]);
+    expect(shown.reads).toEqual([{ n: 1, key: "leave.requests", kind: "read", module_key: null, params: { page: 1 }, outcome: "read", rows: 2, total: 2, first: 1, masked: [] }]);
     expect(shown.citations[0]).toMatchObject({ entity_type: "employee", label: "Ayo Bello", read_key: "employees.list" });
     expect(shown.citations[0].link).toMatch(/^\/people\?/);
     expect(shown.table.links).toEqual(["/people?tab=employees&id=00000000-0000-4000-8000-000000000003"]);

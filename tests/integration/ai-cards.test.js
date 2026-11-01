@@ -213,7 +213,7 @@ describeDb("Praxis AI action cards against the real migrations", () => {
     });
     expect(body.card.fields.find((f) => f.name === "due_on")).toEqual({ name: "due_on", label: "Due Day", kind: "date", required: false, options: null });
     expect(body.context).toEqual({ module: "workspace", tab: "tasks" });
-    expect(body.reads).toEqual([{ n: 1, key: "tasks.list", kind: "read", module_key: "workspace", params: {}, outcome: "read", rows: 0, total: 0, first: 1 }]);
+    expect(body.reads).toEqual([{ n: 1, key: "tasks.list", kind: "read", module_key: "workspace", params: {}, outcome: "read", rows: 0, total: 0, first: 1, masked: [] }]);
     expect((await one("SELECT count(*)::int AS n FROM task")).n).toBe(before);
     const draft = await one("SELECT status, user_id, expires_at > now() AS open FROM ai_action_draft WHERE ai_action_draft_id = $1", [body.card.ai_action_draft_id]);
     expect(draft).toEqual({ status: "shown", user_id: people.staff.user_id, open: true });
