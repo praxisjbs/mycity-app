@@ -5507,7 +5507,7 @@ An action Praxis AI drafted for the person to confirm: every field as the action
 | `values` | `Record<string, unknown>` | yes | The values as the action will receive them. |
 | `problems` | `Record<string, string[]>` | yes | Problems the person must fix, by field. |
 | `records` | `CardRecord[]` | yes | The records the card touches. |
-| `status` | `"shown" \| "confirmed" \| "done" \| "failed" \| "cancelled" \| "expired"` | yes |  |
+| `status` | `"shown" \| "confirmed" \| "done" \| "failed" \| "cancelled" \| "expired"` | yes | Where the card stands: open (shown), running, done, failed, cancelled or expired. |
 | `confirm` | `"press" \| "fresh_sign_in"` | yes | `fresh_sign_in`: the press asks Confirm It's You first; the verb carries a lock. |
 | `suggested` | `boolean` |  | Offered unasked: the title reads as a question, and Cancel reads Not Now. |
 | `result` | `CardResult \| null` |  | What the press came back with, once it has. |

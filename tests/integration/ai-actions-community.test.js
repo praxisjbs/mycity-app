@@ -24,7 +24,7 @@ const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const realtime = require("../../src/services/realtime/emitter");
 const registry = require("../../src/shared/ai/registry");
-const { one, fresh, script, say, harness } = require("./helpers/praxis");
+const { one, fresh, script, say, harness } = require("./helpers/ai-actions");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 

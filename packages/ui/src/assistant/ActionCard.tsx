@@ -61,6 +61,7 @@ export interface ActionCardProps {
   problems: Record<string, string[]>;
   /** The records the card touches. */
   records: CardRecord[];
+  /** Where the card stands: open (shown), running, done, failed, cancelled or expired. */
   status: CardStatus;
   /** `fresh_sign_in`: the press asks Confirm It's You first; the verb carries a lock. */
   confirm: "press" | "fresh_sign_in";

@@ -25,7 +25,7 @@ const { rebuild } = require("./helpers/schema");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const registry = require("../../src/shared/ai/registry");
-const { q, one, fresh, script, callRead, say, harness } = require("./helpers/praxis");
+const { q, one, fresh, script, callRead, say, harness } = require("./helpers/ai-actions");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 

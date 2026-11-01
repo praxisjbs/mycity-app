@@ -26,7 +26,7 @@ const outbox = require("../../src/shared/events/outbox");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
 const workingWeek = require("../../src/shared/time/working-week");
 const registry = require("../../src/shared/ai/registry");
-const { q, one, drain, fresh, script, callRead, say, harness } = require("./helpers/praxis");
+const { q, one, drain, fresh, script, callRead, say, harness } = require("./helpers/ai-actions");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 

@@ -1,6 +1,6 @@
 "use strict";
 /**
- * What the Praxis AI action suites share (tests/integration/ai-actions-*.test.js,
+ * What the assistant's action suites share (tests/integration/ai-actions-*.test.js,
  * ai-cards.test.js; docs/guides/praxis-ai.md §6.11): people made as the first administrator is
  * made, their logins, requests as each of them, Gemini answering from a script, the outbox
  * drained as the worker would, and the three ways a session confirms it is the person
