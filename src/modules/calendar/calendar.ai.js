@@ -1,12 +1,16 @@
 "use strict";
 /**
  * What the assistant may read of the asker's calendar: their own month (events,
- * invitations, task deadlines, approved leave), one page of 25 at a time. It never
- * books or answers anything (A23); it sends the person to New Event.
+ * invitations, task deadlines, approved leave), one page of 25 at a time; and, as a card the
+ * person confirms (docs/guides/praxis-ai.md §6.11), an event with its attendees, created through
+ * the same service function New Event's Create Event calls. Answering an invitation and changing
+ * an event stay on the calendar.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
+const routeMap = require("../../shared/route-map");
 const service = require("./calendar.service");
+const repo = require("./calendar.repo");
 
 /** What each kind of item on the month links to, as the route map names it; a performance date by its kind. */
 const CITED = {
@@ -19,8 +23,33 @@ const CITED = {
   pip_review: "improvement_plan",
 };
 
+/** The people a card invites, by name; an id that is nobody's keeps its id alone, and the service refuses it. */
+async function attendeeRecords(db, ids) {
+  const wanted = [...new Set(ids || [])].slice(0, 25);
+  const names = db ? await repo.namesOf(db, wanted) : new Map();
+  return wanted.map((id) => ({ type: "employee", id, label: names.get(id) || null }));
+}
+
 module.exports = defineManifest({
   module: "workspace",
+  actions: [
+    {
+      key: "calendar.create",
+      label: "Create Event",
+      description: "Book a meeting or an event on my calendar: title, kind, start and end, location, who to invite",
+      input: c.calendar.CalendarEventCreate,
+      permission: ["workspace", "create"],
+      risk: "standard",
+      bulk: 25,
+      // New Event's form takes a day and two clock times and joins them into starts_at and ends_at before it sends.
+      form: "none: New Event's form takes a day and two clock times, joined into starts_at and ends_at as it sends",
+      records: (values, _actor, db) => attendeeRecords(db, values.attendee_ids),
+      // The same function Create Event calls; someone invited who is not on the staff is refused on the field (§6).
+      run: (values, actor) => service.create(actor, values),
+      readback: (event) => [{ type: "calendar_event", id: event.calendar_event_id, label: event.title, status: "booked", link: (routeMap.linkFor("calendar_event", event.calendar_event_id) || {}).path || null }],
+      labels: { title: "Title", description: "Notes", event_type: "Kind", starts_at: "Starts", ends_at: "Ends", all_day: "All Day", location: "Location", visibility: "Visibility", attendee_ids: "Attendees", reminder_minutes: "Reminders" },
+    },
+  ],
   reads: [
     {
       key: "calendar.month",

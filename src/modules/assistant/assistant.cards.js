@@ -29,6 +29,7 @@ const { contractNameOf } = require("../../shared/ai/manifest");
 const identity = require("../identity/identity.service");
 const { jsonSchemaOf } = require("../../services/ai/structured");
 const engine = require("../../services/ai/engine");
+const { gapsIn } = require("../../services/ai/assistant/answer");
 const repo = require("./assistant.repo");
 const { EVENTS } = require("./assistant.events");
 
@@ -122,10 +123,16 @@ async function edit(id, body, actor) {
       throw atEdge(err);
     }
     if (!registry.action(found.action_key)) throw new AppError("CARD_EXPIRED", "This card has expired. Ask again to draw it afresh.", 409);
-    const checked = await authorise.checkAction(actor, found.action_key, body.values);
+    const checked = held(await authorise.checkAction(actor, found.action_key, body.values, client));
     return repo.setDraft(client, found.ai_action_draft_id, { values: checked.ok ? checked.values : body.values, problems: checked.ok ? {} : checked.problems, records: checked.records });
   });
   return present(row, null);
+}
+
+/** A card's words held to ready to send, at an edit and at the press as at the draft (answer.gapsIn): a gap left to fill is a problem on its field. */
+function held(checked) {
+  const gaps = gapsIn(checked.values);
+  return Object.keys(gaps).length ? { ...checked, ok: false, problems: { ...checked.problems, ...gaps } } : checked;
 }
 
 /** The action's own check, with the person carrying their scope; its refusals land on the fields. */
@@ -162,7 +169,7 @@ async function confirm(id, body, actor, idempotencyKey = null) {
     if (cards.SENSITIVE.has(found.risk) && !cards.confirmed(found.risk, await identity.provedAgo(client, actor)))
       throw new AppError("REAUTH_REQUIRED", "Confirm it is you to continue.", 403);
     const values = body && body.values ? body.values : found.values || {};
-    const checked = await authorise.checkAction(actor, found.action_key, values);
+    const checked = held(await authorise.checkAction(actor, found.action_key, values, client));
     if (!checked.ok) {
       await repo.setDraft(client, found.ai_action_draft_id, { values, problems: checked.problems });
       throw new AppError("VALIDATION", "Check the card's fields", 422, checked.problems);

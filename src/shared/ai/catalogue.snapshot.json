@@ -2,6 +2,116 @@
   "about": "The AI manifests as the build declares them (docs/guides/praxis-ai.md §6.15). Rewrite with npm run gen:ai-catalogue; never by hand.",
   "entries": [
     {
+      "key": "approvals.decide",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "ess.create",
+      "risk": "approval",
+      "bulk": 25,
+      "schema": "workflow.ApprovalDecide",
+      "schema_sha": "d50253499741bfdc",
+      "screen": null
+    },
+    {
+      "key": "calendar.create",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.create",
+      "risk": "standard",
+      "bulk": 25,
+      "schema": "calendar.CalendarEventCreate",
+      "schema_sha": "a1b44f32963ed280",
+      "screen": null
+    },
+    {
+      "key": "community.message",
+      "kind": "action",
+      "module_key": "community",
+      "permission": "community.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "community.DirectMessageSend",
+      "schema_sha": "a4f120bbd54c48ca",
+      "screen": null
+    },
+    {
+      "key": "community.post",
+      "kind": "action",
+      "module_key": "community",
+      "permission": "community.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "community.ChannelPost",
+      "schema_sha": "c7f2cf806e53f4f0",
+      "screen": null
+    },
+    {
+      "key": "leave.approve",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.approve",
+      "risk": "approval",
+      "bulk": 25,
+      "schema": "leave.LeaveApprove",
+      "schema_sha": "251c3692d03c783a",
+      "screen": null
+    },
+    {
+      "key": "leave.reject",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.approve",
+      "risk": "approval",
+      "bulk": 25,
+      "schema": "leave.LeaveReject",
+      "schema_sha": "0c450676f04d4ec9",
+      "screen": null
+    },
+    {
+      "key": "mail.send",
+      "kind": "action",
+      "module_key": "mailbox",
+      "permission": "mailbox.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "mailbox.MailCompose",
+      "schema_sha": "0bedf6cf9d13a0e5",
+      "screen": null
+    },
+    {
+      "key": "my_leave.request",
+      "kind": "action",
+      "module_key": "ess",
+      "permission": "ess.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "leave.LeaveRequestCreate",
+      "schema_sha": "73c8bbf479a2db68",
+      "screen": null
+    },
+    {
+      "key": "tasks.comment",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "tasks.TaskCommentAdd",
+      "schema_sha": "c019f413d6cb84f4",
+      "screen": null
+    },
+    {
+      "key": "tasks.complete",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 25,
+      "schema": "tasks.TaskComplete",
+      "schema_sha": "bda137dd72919877",
+      "screen": null
+    },
+    {
       "key": "tasks.create",
       "kind": "action",
       "module_key": "workspace",

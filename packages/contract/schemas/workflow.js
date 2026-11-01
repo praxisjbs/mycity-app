@@ -271,6 +271,23 @@ const ApproveBody = z.object({ reason: optionalText(1000) }).strict();
 /** POST …/reject and …/request-changes: the requester is always told why. */
 const ReasonBody = z.object({ reason: text(1000) }).strict();
 
+/**
+ * Praxis AI's card on My Approvals (docs/guides/praxis-ai.md §6.11): approve, reject or request
+ * changes on the requests waiting on the person, up to 25 a press, each on its current stage. A
+ * rejection or a request for changes says why, as the screen's own forms do.
+ */
+const CardDecision = z.enum(["approve", "reject", "request_changes"]);
+const ApprovalDecide = z
+  .object({
+    workflow_instance_ids: z.array(uuid).min(1, "Pick a request").max(25),
+    decision: CardDecision,
+    reason: optionalText(1000),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.decision !== "approve" && !v.reason) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["reason"], message: "Say why" });
+  });
+
 /** POST …/withdraw: the requester takes it back, saying why if they like. */
 const WithdrawBody = z.object({ reason: optionalText(1000) }).strict();
 
@@ -345,6 +362,10 @@ const TABLES = {
   ApproveBody: { table: "workflow_decision" },
   ReasonBody: { table: "workflow_decision" },
   WithdrawBody: { table: "workflow_decision" },
+  ApprovalDecide: {
+    table: "workflow_decision",
+    virtual: { workflow_instance_ids: "the requests, each decided on its current stage" },
+  },
   ReassignBody: {
     table: "workflow_decision",
     virtual: { user_id: "the login the current stage goes to; stored in workflow_instance.stage_approvers" },
@@ -380,5 +401,6 @@ module.exports = {
   ApproveBody,
   ReasonBody,
   WithdrawBody,
+  ApprovalDecide,
   ReassignBody,
 };

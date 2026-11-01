@@ -19,6 +19,7 @@ const { contractNameOf, shapeOf } = require("../../../shared/ai/manifest");
 const { formatDate, formatDateTime } = require("../../../shared/time/day-first");
 const { formatNaira } = require("../../../shared/money/money");
 const { jsonSchemaOf } = require("../structured");
+const { placeholdersIn } = require("../drafts");
 const { logger } = require("../../../config/logger");
 const engine = require("../engine");
 
@@ -188,14 +189,35 @@ function build({ draft, reads, routes, screens, shows = [] }) {
   return shown;
 }
 
+/** A field problem the person fixes on the card, at most four words (gate 12). */
+const FILL_THE_GAP = "Fill the gap";
+
+/**
+ * The words a card carries, held to "ready to send" as the mailbox's Write With AI holds a draft
+ * (services/ai/drafts.js; decision 19): a gap left to fill (a bracket, "insert here", XXX, a
+ * blank line) or a redaction token that stands for nothing is a problem on its field, so a mail
+ * or a message with a placeholder never leaves on one press.
+ * @param {object} values
+ * @returns {Record<string, string[]>}
+ */
+function gapsIn(values) {
+  const out = {};
+  for (const [k, v] of Object.entries(values || {})) {
+    if (typeof v !== "string") continue;
+    if (placeholdersIn(v).length) out[k] = [FILL_THE_GAP];
+  }
+  return out;
+}
+
 /**
  * The card the draft asked for (§6.11 steps 1 and 2), or null: the action must be one offered
  * this turn, the person's rights are checked again, the values are parsed with the action's
- * schema, problems kept by field, the records listed, the bulk limit held. What comes back is
- * the row to store (ai_action_draft) and the fields the card shows.
- * @param {{draft: object, actions: Array<object>, actor: object, context?: object|null, now?: number}} q
+ * schema, problems kept by field, the records listed (named through the action's own module
+ * when a database handle is given), the bulk limit held, and every text held to ready to send.
+ * What comes back is the row to store (ai_action_draft) and the fields the card shows.
+ * @param {{draft: object, actions: Array<object>, actor: object, context?: object|null, db?: {query: Function}|null, now?: number}} q
  */
-async function draftCard({ draft, actions, actor, context = null, now = Date.now() }) {
+async function draftCard({ draft, actions, actor, context = null, db = null, now = Date.now() }) {
   const want = draft && draft.action;
   if (!want || !want.key) return null;
   const action = (actions || []).find((a) => a.key === want.key);
@@ -207,7 +229,7 @@ async function draftCard({ draft, actions, actor, context = null, now = Date.now
   const values = engine.cards.fillFromContext(want.values && typeof want.values === "object" ? want.values : {}, fieldNames, context);
   let checked;
   try {
-    checked = await authorise.checkAction(actor, action.key, values);
+    checked = await authorise.checkAction(actor, action.key, values, db);
   } catch (err) {
     if (err && (err.code === "AI_ACTION_FORBIDDEN" || err.code === "TOO_MANY_RECORDS" || err.code === "AI_ACTION_UNKNOWN")) {
       logger.info({ ai_action: want.key, code: err.code }, "Praxis AI: a card was refused at the draft");
@@ -215,6 +237,8 @@ async function draftCard({ draft, actions, actor, context = null, now = Date.now
     }
     throw err;
   }
+  const gaps = gapsIn(checked.values);
+  if (Object.keys(gaps).length) checked = { ...checked, ok: false, problems: { ...checked.problems, ...gaps } };
   const card = engine.cards.draft({ action, fieldNames, values, suggested: want.suggested === true, checked, now });
   return {
     row: {
@@ -235,4 +259,4 @@ async function draftCard({ draft, actions, actor, context = null, now = Date.now
   };
 }
 
-module.exports = { build, draftCard, tableOf, drawTable, defaultFields, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS };
+module.exports = { build, draftCard, gapsIn, tableOf, drawTable, defaultFields, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, FILL_THE_GAP };

@@ -14,8 +14,9 @@
  *     tests/integration or a module's test) and graded by the evaluation set
  *     (scripts/ai/eval-assistant.js, a case with `action: "<key>"`).
  *  4. A module that declares actions accounts for every `<Thing>Create` schema its contract
- *     exports: offered as an action's input, or in `not_offered` with a reason; and every
- *     `not_offered` name is a schema of that contract. (PR5 makes this rule universal.)
+ *     exports: offered as an action's input (by any manifest: ESS offers leave's own request), or
+ *     in `not_offered` with a reason; and every `not_offered` name is a schema of that contract.
+ *     (PR5 makes this rule universal.)
  *  5. Every Try Asking line (src/modules/assistant/assistant.suggestions.js) names a read that
  *     exists.
  *
@@ -107,14 +108,15 @@ function check() {
     if (!new RegExp(`action:\\s*["']${a.key.replace(".", "\\.")}["']`).test(evalText)) problems.push(`${a.key}: the evaluation set (scripts/ai/eval-assistant.js) has no case with action: "${a.key}"`);
   }
 
-  // 4. Every Create schema of a module that declares actions is offered or explained.
+  // 4. Every Create schema of a module that declares actions is offered (by any manifest: ESS offers
+  //    leave's LeaveRequestCreate as the person's own request) or explained.
+  const offered = new Set(actions.map((a) => a.input));
   for (const { folder, manifest } of registry.manifests()) {
     if (!manifest.actions.length && !Object.keys(manifest.not_offered).length) continue;
     const file = path.join(SCHEMAS, `${folder}.js`);
     if (!fs.existsSync(file)) continue;
     const mod = require(file);
     const creates = Object.entries(mod).filter(([k, v]) => /Create$/.test(k) && v && typeof v.safeParse === "function");
-    const offered = new Set(manifest.actions.map((a) => a.input));
     for (const [name, schema] of creates) {
       if (offered.has(schema) || manifest.not_offered[name]) continue;
       problems.push(`${folder}.ai.js: ${name} is neither an action's input nor in not_offered; say whether the assistant may draft it, and why not if not`);

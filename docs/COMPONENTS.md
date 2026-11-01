@@ -165,6 +165,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
+| Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
 | Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
 | Assistant | [AssistantShell](#assistantshell) | `AssistantShell` | The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone. | beta |
 | Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary. | beta |
@@ -172,6 +173,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Assistant | [PaneTabs](#panetabs) | `PaneTabs` | The pane's four views, Overview, Table, Record and Sources, as tabs; a view with nothing to show stays, disabled, so the layout never jumps. | beta |
 | Assistant | [ProgressLine](#progressline) | `ProgressLine` | What Praxis AI is doing while a question runs: Reading leave requests, 2 of 5; nothing is streamed, the answer lands whole. | beta |
 | Assistant | [RecordPane](#recordpane) | `RecordPane` | The pane's Record: the record behind a chip or a table row, its fields as the person may see them, and Open Record to its own screen. | beta |
+| Assistant | [ResultLine](#resultline) | `ResultLine` | What came of pressing an action card: Done or Could Not Finish, then one line per record with a tick or a cross, the record's own words and Open where it has a screen. | beta |
 | Assistant | [SourceChip](#sourcechip) | `SourceChip` | A kind of record an answer was read from, with how many ("partnership ×4"), or the one record it rests on; pressed, it opens the pane on them. | beta |
 | Assistant | [SourcesPane](#sourcespane) | `SourcesPane` | The pane's Sources: every read a question made, in order, with its filters, rows and total, outcome and the fields masked for the person; a read with rows opens in the Table. | beta |
 | Assistant | [TablePane](#tablepane) | `TablePane` | The pane's Table: every row of one read, 25 a page from the server, each row opening its record; past 200 rows it says how many there are. | beta |
@@ -5479,6 +5481,50 @@ The trail: the last places a person went on this device and the one ahead, each 
 
 ## Assistant
 
+### ActionCard
+
+An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired.
+
+| | |
+|---|---|
+| Use | Inside an answer (AnswerBubble's card slot) when the answer carries a card (docs/guides/praxis-ai.md §6.11): the screen passes the card as the API drew it, the action's contract schema for Edit, and what each press does. A suggested card reads as a question with the verb and Not Now. |
+| Avoid | A form the person fills from empty (the screen's own form); a confirmation dialog (useConfirm); an answer's screen button (AnswerBubble's link); a list of records to browse (DataView). |
+| Phone | Full width inside the answer; the buttons are 44 px targets with the verb full width at the foot; Edit's fields are one column; the result's Open buttons are 44 px. |
+| Accessibility | A group named by the card's title; the fields are a description list, and in Edit the form system's own fields with their labels and marks; the verb says aria-busy while the press runs and the buttons beside it wait (ActionGroup); the result line is a status; a refusal is an alert. |
+| Status | beta |
+| Exports | `ActionCard` |
+| Import | `import { ActionCard } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/ActionCard.tsx` |
+| Test | `packages/ui/src/assistant/ActionCard.test.tsx` |
+| Gallery | `packages/ui/src/assistant/ActionCard.gallery.tsx` (`npm run gallery`, `#/ActionCard`) |
+
+**ActionCard** props (`ActionCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | The card's button, Verb Noun (the action's label). |
+| `fields` | `CardField[]` | yes | The fields the action takes. |
+| `values` | `Record<string, unknown>` | yes | The values as the action will receive them. |
+| `problems` | `Record<string, string[]>` | yes | Problems the person must fix, by field. |
+| `records` | `CardRecord[]` | yes | The records the card touches. |
+| `status` | `"shown" \| "confirmed" \| "done" \| "failed" \| "cancelled" \| "expired"` | yes |  |
+| `confirm` | `"press" \| "fresh_sign_in"` | yes | `fresh_sign_in`: the press asks Confirm It's You first; the verb carries a lock. |
+| `suggested` | `boolean` |  | Offered unasked: the title reads as a question, and Cancel reads Not Now. |
+| `result` | `CardResult \| null` |  | What the press came back with, once it has. |
+| `schema` | `ContractSchema` |  | The action's contract schema, for Edit's fields; without it Edit is left out. |
+| `onConfirm` | `() => Promise<unknown> \| void` |  | The press: the verb. Hand back the work and the card is busy until it settles. |
+| `onCancel` | `() => Promise<unknown> \| void` |  | Cancel, or Not Now on a suggested card. |
+| `onSave` | `(values: Record<string, unknown>) => Promise<unknown> \| void` |  | Edit's Save Changes, with the values as edited; the parent re-validates them with the API. |
+| `onRedraw` | `() => Promise<unknown> \| void` |  | Draw It Again on an expired card: the question is asked again. |
+| `onOpen` | `(path: string) => void` |  | Opens a record's screen. |
+| `problem` | `string \| null` |  | Why the last press was refused, in the server's words. |
+| `problemAction` | `{ label: string; onPress: () => void } \| null` |  | A button beside the refusal, where a screen answers it (Open Mailbox). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ActionCard label="Approve Leave" fields={fields} values={values} records={records} problems={{}} status="shown" confirm="fresh_sign_in" onConfirm={press} onCancel={cancel} onSave={save} schema={schemas.leave.LeaveApprove} />
+```
+
 ### AnswerBubble
 
 One answer of Praxis AI: its words, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful.
@@ -5707,6 +5753,35 @@ The pane's Record: the record behind a chip or a table row, its fields as the pe
 
 ```tsx
 <RecordPane record={{ title: "Ayo Bello", items: [["Days", "3"]], link: "/people?tab=leave&id=l1" }} onOpen={navigate} />
+```
+
+### ResultLine
+
+What came of pressing an action card: Done or Could Not Finish, then one line per record with a tick or a cross, the record's own words and Open where it has a screen.
+
+| | |
+|---|---|
+| Use | Under an ActionCard once its press has finished (docs/guides/praxis-ai.md §6.11 step 6): the screen passes the result the API answered with (AiActionResult) and what Open does. |
+| Avoid | A card still open (ActionCard draws its buttons); a toast for the outcome (the line stays with the card); a list of records a person browses (DataView). |
+| Phone | The same lines, each Open a 44 px target; long record names wrap. |
+| Accessibility | A status line named by its outcome, announced politely; the lines are a list, each naming its record and whether it went through; the icons are decorative and the words carry the meaning. |
+| Status | beta |
+| Exports | `ResultLine` |
+| Import | `import { ResultLine } from "@mycity/ui";` |
+| File | `packages/ui/src/assistant/ResultLine.tsx` |
+| Test | `packages/ui/src/assistant/ResultLine.test.tsx` |
+| Gallery | `packages/ui/src/assistant/ResultLine.gallery.tsx` (`npm run gallery`, `#/ResultLine`) |
+
+**ResultLine** props (`ResultLineProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `result` | `CardResult` | yes | What the press came back with. |
+| `onOpen` | `(path: string) => void` |  | Opens a record's screen. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ResultLine result={{ status: "done", lines: [{ type: "task", id: "t1", label: "T-12 Send the report", ok: true, message: "created", link: "/workspace?tab=tasks&id=t1" }], message: null, error_code: null }} onOpen={navigate} />
 ```
 
 ### SourceChip

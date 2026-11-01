@@ -240,6 +240,8 @@ const AiCardField = z
     kind: z.enum(["text", "number", "boolean", "date", "datetime", "money", "choice", "list", "id", "other"]),
     required: z.boolean(),
     options: z.array(z.string()).max(50).nullable(),
+    /** A text long enough for a box of several lines (a message, a note, a reason). */
+    long: z.boolean(),
   })
   .strict();
 

@@ -792,6 +792,60 @@ async function move(actor, scope, id, { status, before_task_id: beforeId, late_r
 }
 
 /**
+ * Praxis AI's Mark Done card (docs/guides/praxis-ai.md §6.11): each task moved to Done through
+ * move(), one after another, each in its own transaction as the board's own press is; a task
+ * that refuses (cancelled, waiting on another, moved meanwhile) is a line of its own and the rest
+ * still go. Nothing done is a refusal, so the card stays open with the reason.
+ * @returns {Promise<{lines: Array<{type: string, id: string, label: string, ok: boolean, message: string|null}>}>}
+ */
+async function completeMany(actor, scope, { task_ids: ids, late_reason: lateReason }) {
+  const lines = [];
+  let firstRefusal = null;
+  for (const id of [...new Set(ids || [])]) {
+    try {
+      const t = await move(actor, scope, id, { status: "done", before_task_id: null, late_reason: lateReason || undefined });
+      lines.push({ type: "task", id, label: `${t.number} ${t.title}`, ok: true, message: "done" });
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status >= 500) throw err;
+      firstRefusal = firstRefusal || err;
+      lines.push({ type: "task", id, label: id, ok: false, message: err.message });
+    }
+  }
+  if (lines.length && !lines.some((l) => l.ok)) throw firstRefusal;
+  return { lines };
+}
+
+/**
+ * The tasks a card names, as the person may see them (the card's records, §6.11): number and
+ * title for each task in their scope; one they cannot see keeps its id alone, and check() refuses it.
+ */
+async function cardRecords(db, ids, scope) {
+  const out = [];
+  for (const id of [...new Set(ids || [])].slice(0, 25)) {
+    try {
+      const t = await visible(db, id, scope);
+      out.push({ type: "task", id, label: `${t.number} ${t.title}` });
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status !== 404) throw err;
+      out.push({ type: "task", id, label: null });
+    }
+  }
+  return out;
+}
+
+/** The card's re-check (§6.11 step 5): every task on it is one the person may see and act on. */
+async function assertCardTasks(db, ids, scope) {
+  for (const id of [...new Set(ids || [])]) {
+    try {
+      await visible(db, id, scope);
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status !== 404) throw err;
+      throw new AppError("TASK_NOT_YOURS", "One of these tasks is not on your board", 404, { task_ids: ["Not on your board"] });
+    }
+  }
+}
+
+/**
  * A task is done: the people on each open task waiting on it hear, about their own task, so the
  * notice names nothing they may not open.
  */
@@ -1393,6 +1447,9 @@ module.exports = {
   create,
   edit,
   move,
+  completeMany,
+  cardRecords,
+  assertCardTasks,
   block,
   unblock,
   cancel,

@@ -198,13 +198,16 @@ async function runSummary(client, actor, key, params = {}) {
 /**
  * Check an action for one person, at the draft and again at the press (praxis-ai.md §6.11): the
  * grant and the scope it gives, the values against the input schema, the records it touches
- * against its bulk limit. Nothing runs here.
+ * against its bulk limit. Nothing runs here. The action's `records(values, actor, db)` may read
+ * the records' names through its module's own repo when given a pool or a client, so the card
+ * names what it touches; without one it names them by id alone.
  * @param {object} actor
  * @param {string} key
  * @param {object} values
+ * @param {{query: Function}|null} [db]  a pool or a client for the records' names
  * @returns {Promise<{action: object, scope: object, ok: boolean, values: object, problems: object, records: Array<{type: string, id: string, label?: string}>}>}
  */
-async function checkAction(actor, key, values = {}) {
+async function checkAction(actor, key, values = {}, db = null) {
   const action = registry.action(key);
   if (!action) throw new AppError("AI_ACTION_UNKNOWN", `There is no "${key}" action`, 404);
   const scope = await scopeFor(actor, action.permission[0], action.permission[1]);
@@ -214,7 +217,7 @@ async function checkAction(actor, key, values = {}) {
   const clean = parsed.success ? parsed.data : values || {};
   let records = [];
   try {
-    records = (action.records(clean, { ...actor, scope }) || []).filter((r) => r && r.type && r.id !== undefined && r.id !== null && r.id !== "").map((r) => ({ type: String(r.type), id: String(r.id), label: r.label ? String(r.label) : null }));
+    records = ((await action.records(clean, { ...actor, scope }, db)) || []).filter((r) => r && r.type && r.id !== undefined && r.id !== null && r.id !== "").map((r) => ({ type: String(r.type), id: String(r.id), label: r.label ? String(r.label) : null }));
   } catch (err) {
     logger.warn({ err, ai_action: key }, "Praxis AI: an action's records() threw; the card names none");
   }

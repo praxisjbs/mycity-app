@@ -58,11 +58,14 @@ function kindOf(name, p) {
   return "other";
 }
 
+/** A text this long or longer is written in a box of several lines (a message, a note, a reason). */
+const LONG_TEXT = 300;
+
 /**
  * The card's fields from the action's input schema (JSON Schema, structured.jsonSchemaOf).
  * @param {object} jsonSchema
  * @param {Record<string, string>} [labels]
- * @returns {Array<{name: string, label: string, kind: string, required: boolean, options: string[]|null}>}
+ * @returns {Array<{name: string, label: string, kind: string, required: boolean, options: string[]|null, long: boolean}>}
  */
 function fieldsOf(jsonSchema, labels = {}) {
   const props = (jsonSchema && jsonSchema.properties) || {};
@@ -71,12 +74,14 @@ function fieldsOf(jsonSchema, labels = {}) {
     .slice(0, 40)
     .map(([name, p]) => {
       const node = nodeOf(p);
+      const kind = kindOf(name, p);
       return {
         name,
         label: labels[name] || humanise(name),
-        kind: kindOf(name, p),
+        kind,
         required: required.has(name),
         options: node.enum ? node.enum.map(String).slice(0, 50) : null,
+        long: kind === "text" && (node.maxLength === undefined || node.maxLength >= LONG_TEXT),
       };
     });
 }
@@ -164,6 +169,7 @@ module.exports = {
   TTL_MS,
   CONFIRM_WINDOW_SECONDS,
   BULK_MAX,
+  LONG_TEXT,
   confirmOf,
   humanise,
   fieldsOf,

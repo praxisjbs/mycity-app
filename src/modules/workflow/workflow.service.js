@@ -561,6 +561,79 @@ async function decide(user, id, decision, reason = null) {
   });
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's card on My Approvals (docs/guides/praxis-ai.md §6.11): the requests waiting on
+ * the person decided together, each through decide(), the same call the screen's buttons make.
+ * ------------------------------------------------------------------ */
+
+const DECIDED_WORD = Object.freeze({ approve: "approved", reject: "rejected", request_changes: "returned for changes" });
+
+/** A request as a card names it: what it is, about whom. */
+const instanceLabel = (i) => `${i.definition_name || i.definition_key}${i.subject_name ? `, ${i.subject_name}` : ""}`;
+
+/**
+ * The requests a card names, as the person may read them: the flow and who it is about for each
+ * they may read; one they may not keeps its id alone, and the re-check refuses the card.
+ */
+async function cardRecords(db, ids, user) {
+  const out = [];
+  for (const id of [...new Set(ids || [])].slice(0, 25)) {
+    const found = await engine.getInstance(db, id);
+    const readable = found && (await mayRead(db, found, user));
+    let label = null;
+    if (readable) {
+      const def = await definitions.findById(db, found.workflow_definition_id);
+      const name = found.subject_employee_id ? (await repo.employeeNames(db, [found.subject_employee_id])).get(found.subject_employee_id) || null : null;
+      label = instanceLabel({ ...found, definition_name: def ? def.name : null, subject_name: name });
+    }
+    out.push({ type: "workflow_instance", id, label });
+  }
+  return out;
+}
+
+/** The card's re-check (§6.11 step 5): every request is one the person may read; the stage, the state and the chain are each request's own line at the press. */
+async function assertCardInstances(db, ids, user) {
+  for (const id of [...new Set(ids || [])]) {
+    const found = await engine.getInstance(db, id);
+    if (!found || !(await mayRead(db, found, user)))
+      throw new AppError("APPROVAL_NOT_YOURS", "One of these requests is not yours to read", 404, { workflow_instance_ids: ["Not yours to read"] });
+  }
+}
+
+/**
+ * Decide the requests a card names, one after another, each through decide(): one already
+ * decided, not waiting on this person, their own, or decided on its record is a line of its own
+ * (the last with the record's screen) and the rest still go. Nothing decided is a refusal, so
+ * the card stays open with the reason.
+ * @param {object} user
+ * @param {{workflow_instance_ids: string[], decision: "approve"|"reject"|"request_changes", reason?: string}} values
+ * @returns {Promise<{lines: Array<{type: string, id: string, label: string, ok: boolean, message: string|null, link: string|null}>}>}
+ */
+async function decideMany(user, { workflow_instance_ids: ids, decision, reason = null }) {
+  const lines = [];
+  let firstRefusal = null;
+  for (const id of [...new Set(ids || [])]) {
+    const found = await engine.getInstance(pool, id);
+    const named = found ? (await cardRecords(pool, [id], user))[0] : null;
+    const label = named && named.label ? named.label : id;
+    const link = found ? linkOf(found, user) : null;
+    try {
+      if (!found) throw notFound();
+      if (user.employee_id && found.subject_employee_id === user.employee_id && user.is_ceo !== true)
+        throw new AppError("SELF_APPROVAL", "Nobody decides their own request", 403);
+      if (found.state !== "pending") throw new AppError("WORKFLOW_CLOSED", "This request was already decided", 409);
+      await decide(user, id, decision, reason);
+      lines.push({ type: "workflow_instance", id, label, ok: true, message: DECIDED_WORD[decision] || decision, link });
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status >= 500) throw err;
+      firstRefusal = firstRefusal || err;
+      lines.push({ type: "workflow_instance", id, label, ok: false, message: err.message, link });
+    }
+  }
+  if (lines.length && !lines.some((l) => l.ok)) throw firstRefusal;
+  return { lines };
+}
+
 /** The requester takes a pending request back. */
 async function withdraw(user, id, reason = null) {
   return tx(async (client) => {
@@ -648,6 +721,9 @@ module.exports = {
   getInstance,
   decide,
   decideIn,
+  decideMany,
+  cardRecords,
+  assertCardInstances,
   stageOf,
   mayAct,
   pendingStage,

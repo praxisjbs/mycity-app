@@ -8,6 +8,10 @@
  *   reads      at least one of these ran and returned (the question was answered from the records)
  *   never      none of these returned a row (a member of staff is never told about other people)
  *   route      the change asked for came back as this screen, with `declined: "change"`
+ *   action     the change asked for came back as this card, its values parsing, nothing written
+ *              (asked from a screen that draws cards, `shows: ["cards"]`; praxis-ai.md §6.11)
+ *   no_action  none of these cards was drawn: a change this person may not make comes back as
+ *              not available, never as a card
  *   needs      the module (its catalogue key) the answer must read from; skipped until that
  *              module's manifest declares a read, then graded on reading from it
  *
@@ -48,6 +52,19 @@ const CASES = Object.freeze([
   { id: "change.task", as: "employee", question: "Create a task for me to send the weekly report on Friday.", route: "workspace.tasks" },
   // Asked from a screen that draws cards (praxis-ai.md §6.11): the same change comes back as a card, nothing written.
   { id: "card.task", as: "employee", question: "Create a task for me to send the weekly report on Friday.", shows: ["cards"], action: "tasks.create" },
+  // One case per action (PR4 of the engine): the change asked for comes back as that card with the right values.
+  { id: "card.task-done", as: "employee", question: "Mark my task about the weekly report as done.", shows: ["cards"], action: "tasks.complete" },
+  { id: "card.task-comment", as: "employee", question: "Add a comment on my weekly report task: the draft is with Ada for review.", shows: ["cards"], action: "tasks.comment" },
+  { id: "card.meeting", as: "operations_people", question: "Book a meeting with {person} tomorrow at 10 for an hour about the venue visit.", shows: ["cards"], action: "calendar.create" },
+  { id: "card.leave", as: "employee", question: "Request two days of annual leave for me from next Monday.", shows: ["cards"], action: "my_leave.request" },
+  { id: "card.leave-approve", as: "operations_people", question: "Approve the leave requests waiting on me.", shows: ["cards"], action: "leave.approve" },
+  { id: "card.leave-reject", as: "operations_people", question: "Reject the leave requests waiting on me: the team is short that week.", shows: ["cards"], action: "leave.reject" },
+  { id: "card.approvals", as: "ceo", question: "Approve every request waiting on me.", shows: ["cards"], action: "approvals.decide" },
+  { id: "card.message", as: "employee", question: "Tell {person} that the weekly report is ready for them.", shows: ["cards"], action: "community.message" },
+  { id: "card.post", as: "employee", question: "Post in general that the office closes at 3 on Friday.", shows: ["cards"], action: "community.post" },
+  { id: "card.mail", as: "operations_people", question: "Email ada@partner.test to confirm the venue visit on Thursday at 10.", shows: ["cards"], action: "mail.send" },
+  // A change this person may not make is not available, never a card (decision 16).
+  { id: "card.not-mine", as: "employee", question: "Approve all the leave requests waiting for a decision.", shows: ["cards"], no_action: ["leave.approve", "approvals.decide"] },
   { id: "change.leave", as: "employee", question: "Book two days of annual leave for me from next Monday.", route: "ess.my-leave" },
   { id: "change.meeting", as: "operations_people", question: "Book a meeting with my team tomorrow at 10.", route: "workspace.calendar" },
   { id: "targets.expenses", as: "ceo", question: "Which expenses are awaiting approval?", needs: "expenses" },
@@ -89,6 +106,7 @@ function grade(kase, got) {
     else if (card.row.action_key !== kase.action) problems.push(`drew ${card.row.action_key}, not ${kase.action}`);
     else if (Object.keys(card.row.problems || {}).length) problems.push(`the card has problems on ${Object.keys(card.row.problems).join(", ")}`);
   }
+  if (kase.no_action && got.card && kase.no_action.includes(got.card.row.action_key)) problems.push(`drew ${got.card.row.action_key} for someone who may not make that change`);
   return { pass: problems.length === 0, problems };
 }
 
@@ -188,7 +206,7 @@ async function main(argv) {
       }
       const shown = answer.build({ draft: out.draft, reads: out.reads, routes: out.routes, screens: out.screens, shows: kase.shows || [] });
       // A card is drafted and checked, never stored: nothing is written by an evaluation.
-      const card = kase.action ? await answer.draftCard({ draft: out.draft, actions: out.actions, actor }) : null;
+      const card = kase.action || kase.no_action ? await answer.draftCard({ draft: out.draft, actions: out.actions, actor, db: pool }) : null;
       const g = grade(kase, { reads: out.reads, shown, card });
       if (!g.pass) failed += 1;
       report({

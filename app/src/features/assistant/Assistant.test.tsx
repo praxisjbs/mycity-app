@@ -2,7 +2,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AiAnswer, AiHistorySummary, AiQuestion } from "@mycity/contract/contract.gen.ts";
+import type { AiActionCard, AiActionResult, AiAnswer, AiHistorySummary, AiQuestion } from "@mycity/contract/contract.gen.ts";
 import { ModalProvider } from "@mycity/ui";
 import { installMatchMedia, setViewport } from "@mycity/ui/testing";
 
@@ -134,7 +134,7 @@ describe("Ask", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Whose leave waits on me/ }));
     expect(await screen.findByText("Two requests wait on you.")).toBeTruthy();
-    expect(asked()).toEqual([{ body: { question: "Whose leave waits on me?", shows: ["pane"] }, idempotencyKey: expect.any(String) }]);
+    expect(asked()).toEqual([{ body: { question: "Whose leave waits on me?", shows: ["cards", "pane"] }, idempotencyKey: expect.any(String) }]);
     // The new conversation goes into the address without a new history entry.
     expect(m.setParams).toHaveBeenCalledWith({ id: CONV }, { replace: true });
 
@@ -187,7 +187,7 @@ describe("Ask", () => {
     await userEvent.type(box, "And this week?");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("One more this week.")).toBeTruthy();
-    expect(asked().map((a) => a.body)).toEqual([{ question: "Whose leave waits on me?", shows: ["pane"] }, { question: "And this week?", ai_conversation_id: CONV, shows: ["pane"] }]);
+    expect(asked().map((a) => a.body)).toEqual([{ question: "Whose leave waits on me?", shows: ["cards", "pane"] }, { question: "And this week?", ai_conversation_id: CONV, shows: ["cards", "pane"] }]);
   });
 
   it("a failed question keeps its words and tries again with the same key", async () => {
@@ -203,7 +203,7 @@ describe("Ask", () => {
     expect(await screen.findByText("Nobody is late today.")).toBeTruthy();
     const [first, second] = asked();
     expect(second.idempotencyKey).toBe(first.idempotencyKey);
-    expect(second.body).toEqual({ question: "Who is late today?", shows: ["pane"] });
+    expect(second.body).toEqual({ question: "Who is late today?", shows: ["cards", "pane"] });
   });
 
   it("an open conversation shows its turns; Show Next 25 asks for the next page in it", async () => {
@@ -213,7 +213,7 @@ describe("Ask", () => {
     expect(screen.getByText("Showing 2 of 312")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Show Next 25" }));
     expect(await screen.findByText("Here are the next people.")).toBeTruthy();
-    expect(asked()[0].body).toEqual({ question: "Show the next 25.", ai_conversation_id: CONV, shows: ["pane"] });
+    expect(asked()[0].body).toEqual({ question: "Show the next 25.", ai_conversation_id: CONV, shows: ["cards", "pane"] });
     expect(m.setParams).not.toHaveBeenCalled();
   });
 
@@ -370,7 +370,7 @@ describe("The full screen: Back, the context and the pane", () => {
     await screen.findByText("Two requests wait on you.");
     expect(asked()[0].body).toEqual({
       question: "Approve these",
-      shows: ["pane"],
+      shows: ["cards", "pane"],
       context: { module: "people", tab: "leave", id: "00000000-0000-4000-8000-0000000000e1", q: "ayo", filters: { status: "waiting" } },
     });
     m.action!.onSelect();
@@ -475,6 +475,144 @@ describe("The full screen: Back, the context and the pane", () => {
     const sheet = await screen.findByRole("dialog", { name: "Figures" });
     expect(within(sheet).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
     expect(await within(sheet).findByRole("button", { name: /Kemi Ade/ })).toBeTruthy();
+  });
+});
+
+describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
+  const CARD = "00000000-0000-4000-8000-0000000000d1";
+  const card = (over: Partial<AiActionCard> = {}): AiActionCard => ({
+    ai_action_draft_id: CARD,
+    ai_message_id: "00000000-0000-4000-8000-0000000000a1",
+    action_key: "tasks.create",
+    module_key: "workspace",
+    label: "Create Task",
+    description: "Set a task: a title, notes, priority, cadence, due day, and for a manager who it is for",
+    schema: "tasks.TaskCreate",
+    risk: "standard",
+    confirm: "press",
+    bulk: 1,
+    values: { title: "Send the weekly report", priority: "high", due_on: "2026-11-06" },
+    problems: {},
+    records: [],
+    fields: [
+      { name: "title", label: "Title", kind: "text", required: true, options: null, long: false },
+      { name: "priority", label: "Priority", kind: "choice", required: false, options: ["low", "normal", "high"], long: false },
+      { name: "due_on", label: "Due Day", kind: "date", required: false, options: null, long: false },
+    ],
+    suggested: false,
+    status: "shown",
+    expires_at: "2026-10-22T10:00:00.000Z",
+    result: null,
+    created_at: "2026-10-22T09:30:00.000Z",
+    ...over,
+  });
+  const result = (): AiActionResult => ({ ai_action_run_id: "00000000-0000-4000-8000-0000000000f1", status: "done", lines: [{ type: "task", id: "t1", label: "T-118 Send the weekly report", ok: true, message: "created", link: "/workspace?tab=tasks&id=t1" }], error_code: null, message: null, finished_at: "2026-10-22T09:31:00.000Z" });
+  const pressed = () => m.call.mock.calls.filter(([key]) => key === "POST /api/v1/ai/cards/:id/confirm").map(([, opts]) => opts as { params: { id: string }; body: unknown; idempotencyKey: string });
+
+  it("shows the card with its fields and values; pressed, the action runs once with an idempotency key and the result line follows", async () => {
+    m.turns[CONV] = [answer({ card: card() })];
+    m.call.mockImplementation(async (key: unknown) => (key === "POST /api/v1/ai/cards/:id/confirm" ? result() : {}));
+    ui("ask", CONV);
+    const group = screen.getByRole("group", { name: "Create Task" });
+    expect(within(group).getByText("Send the weekly report")).toBeTruthy();
+    expect(within(group).getByText("High")).toBeTruthy();
+    expect(within(group).getByText("06/11/2026")).toBeTruthy();
+    await userEvent.click(within(group).getByRole("button", { name: "Create Task" }));
+    await waitFor(() => expect(within(group).getByRole("status").textContent).toBe("Done"));
+    expect(pressed()).toEqual([{ params: { id: CARD }, body: {}, idempotencyKey: expect.any(String) }]);
+    expect(within(group).getByRole("listitem", { name: "T-118 Send the weekly report, done" })).toBeTruthy();
+    expect(within(group).queryByRole("button", { name: "Create Task" })).toBeNull();
+    await userEvent.click(within(group).getByRole("button", { name: "Open" }));
+    expect(m.navigate).toHaveBeenCalledWith("/workspace?tab=tasks&id=t1");
+    expect(m.refresh).toHaveBeenCalledWith("/api/v1");
+  });
+
+  it("a sensitive card refused past the window asks Confirm It's You, then presses again with the same key (decision 11)", async () => {
+    const approve = card({ action_key: "leave.approve", module_key: "people", label: "Approve Leave", schema: "leave.LeaveApprove", risk: "approval", confirm: "fresh_sign_in", bulk: 25, values: { leave_request_ids: ["l1", "l2"] }, fields: [{ name: "leave_request_ids", label: "Requests", kind: "list", required: true, options: null, long: false }, { name: "reason", label: "Reason", kind: "text", required: false, options: null, long: true }], records: [{ type: "leave_request", id: "l1", label: "Ayo Bello, Annual, 3 days", link: "/people?tab=leave&id=l1" }, { type: "leave_request", id: "l2", label: "Kemi Ade, Annual, 2 days", link: "/people?tab=leave&id=l2" }] });
+    m.turns[CONV] = [answer({ card: approve })];
+    m.data["GET /api/v1/security"] = { two_step: { on: false, required: false, mfa_frequency: "every_sign_in", mfa_enrolled_at: null, recovery_codes_left: 0 }, passkeys: 0, pin: { on: false, pin_changed_at: null }, confirmed_for: 0 };
+    let presses = 0;
+    m.call.mockImplementation(async (key: unknown) => {
+      if (key !== "POST /api/v1/ai/cards/:id/confirm") return {};
+      presses += 1;
+      if (presses === 1) throw new ApiError(403, { error: { code: "REAUTH_REQUIRED", message: "Confirm it is you to continue." } });
+      return { ...result(), lines: approve.records.map((r) => ({ type: r.type, id: r.id, label: r.label, ok: true, message: "approved", link: r.link })) };
+    });
+    ui("ask", CONV);
+    const group = screen.getByRole("group", { name: "Approve Leave" });
+    expect(within(group).getByText("Ayo Bello, Annual, 3 days, Kemi Ade, Annual, 2 days")).toBeTruthy();
+    await userEvent.click(within(group).getByRole("button", { name: "Approve Leave ×2" }));
+    const dialog = await screen.findByRole("dialog", { name: "Confirm It's You" });
+    await userEvent.type(within(dialog).getByLabelText("Password"), "Opera!ions2026");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(within(group).getByRole("status").textContent).toBe("Done"));
+    expect(m.call).toHaveBeenCalledWith("POST /api/v1/security/confirm", { body: { method: "password", password: "Opera!ions2026" } });
+    const [first, second] = pressed();
+    expect(second.idempotencyKey).toBe(first.idempotencyKey);
+    expect(within(group).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("a refusal on the fields lands on the card and stays open; Edit saves the values through the API", async () => {
+    m.turns[CONV] = [answer({ card: card() })];
+    m.call.mockImplementation(async (key: unknown, opts: unknown) => {
+      if (key === "PUT /api/v1/ai/cards/:id") return card({ values: (opts as { body: { values: Record<string, unknown> } }).body.values });
+      if (key === "POST /api/v1/ai/cards/:id/confirm") throw new ApiError(422, { error: { code: "VALIDATION", message: "Check the card's fields", fields: { title: ["Too long"] } } });
+      return {};
+    });
+    ui("ask", CONV);
+    const group = screen.getByRole("group", { name: "Create Task" });
+    await userEvent.click(within(group).getByRole("button", { name: "Create Task" }));
+    expect((await within(group).findByRole("alert")).textContent).toContain("Check the card's fields");
+    expect(within(group).getByText("Too long")).toBeTruthy();
+    await userEvent.click(within(group).getByRole("button", { name: "Edit" }));
+    const title = within(group).getByRole("textbox", { name: "Title" });
+    await userEvent.clear(title);
+    await userEvent.type(title, "Send the report");
+    await userEvent.click(within(group).getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("PUT /api/v1/ai/cards/:id", { params: { id: CARD }, body: { values: expect.objectContaining({ title: "Send the report", priority: "high" }) } }));
+    expect(await within(group).findByText("Send the report")).toBeTruthy();
+    expect(within(group).getByRole("button", { name: "Create Task" })).toBeTruthy();
+  });
+
+  it("an expired card offers Draw It Again, which asks the question afresh; a suggested card reads as a question and Not Now cancels it", async () => {
+    const SUGGESTED = "00000000-0000-4000-8000-0000000000d2";
+    m.turns[CONV] = [
+      answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a2", content: "Ada's leave is approved. Shall I tell her?", card: card({ ai_action_draft_id: SUGGESTED, ai_message_id: "00000000-0000-4000-8000-0000000000a2", action_key: "community.message", module_key: "community", label: "Send Message", schema: "community.DirectMessageSend", suggested: true, values: { employee_id: "e1", body: "Your leave is approved." }, fields: [{ name: "employee_id", label: "To", kind: "id", required: true, options: null, long: false }, { name: "body", label: "Message", kind: "text", required: true, options: null, long: true }], records: [{ type: "employee", id: "e1", label: "Ada Obi", link: "/people?tab=employees&id=e1" }] }) }),
+      answer({ card: card({ status: "expired" }) }),
+    ];
+    m.call.mockImplementation(async (key: unknown) => (key === "POST /api/v1/ai/cards/:id/cancel" ? card({ ai_action_draft_id: SUGGESTED, status: "cancelled", suggested: true, label: "Send Message" }) : key === "POST /api/v1/ai/ask" ? answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a3", content: "Drawn again.", card: card({ ai_action_draft_id: "00000000-0000-4000-8000-0000000000d3" }) }) : {}));
+    ui("ask", CONV);
+    const expired = screen.getByRole("group", { name: "Create Task" });
+    expect(within(expired).getByText("This card has expired.")).toBeTruthy();
+    await userEvent.click(within(expired).getByRole("button", { name: "Draw It Again" }));
+    expect(await screen.findByText("Drawn again.")).toBeTruthy();
+    expect(asked()[0].body).toMatchObject({ question: "Whose leave waits on me?", ai_conversation_id: CONV });
+    const suggested = screen.getByRole("group", { name: "Send Message?" });
+    expect(within(suggested).getByRole("button", { name: "Ada Obi" })).toBeTruthy();
+    await userEvent.click(within(suggested).getByRole("button", { name: "Not Now" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai/cards/:id/cancel", { params: { id: SUGGESTED }, body: {} }));
+    expect(await within(suggested).findByText("Cancelled")).toBeTruthy();
+    expect(within(suggested).queryByRole("button", { name: "Send Message" })).toBeNull();
+  });
+
+  it("a mail refused for want of a mailbox offers the Mailbox screen", async () => {
+    m.turns[CONV] = [answer({ card: card({ action_key: "mail.send", module_key: "mailbox", label: "Send Mail", schema: "mailbox.MailCompose", values: { to_addresses: ["ada@partner.test"], subject: "Thursday", body: "See you on Thursday at 10." }, fields: [{ name: "to_addresses", label: "To", kind: "list", required: true, options: null, long: false }, { name: "subject", label: "Subject", kind: "text", required: true, options: null, long: false }, { name: "body", label: "Message", kind: "text", required: true, options: null, long: true }] }) })];
+    m.call.mockRejectedValueOnce(new ApiError(409, { error: { code: "NO_MAILBOX", message: "Connect your mailbox first" } }));
+    ui("ask", CONV);
+    const group = screen.getByRole("group", { name: "Send Mail" });
+    await userEvent.click(within(group).getByRole("button", { name: "Send Mail" }));
+    expect((await within(group).findByRole("alert")).textContent).toContain("Connect your mailbox first");
+    await userEvent.click(within(group).getByRole("button", { name: "Open Mailbox" }));
+    expect(m.navigate).toHaveBeenCalledWith("/mailbox?tab=inbox");
+  });
+
+  it("on a phone the card sits inside the chat with the verb full width", () => {
+    setViewport(390);
+    m.params = new URLSearchParams({ from: "/people?tab=leave" });
+    m.turns[CONV] = [answer({ card: card() })];
+    ui("ask", CONV);
+    const group = screen.getByRole("group", { name: "Create Task" });
+    expect(within(group).getByRole("button", { name: "Create Task" }).className).toContain("phone:w-full");
   });
 });
 
