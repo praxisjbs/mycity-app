@@ -337,9 +337,11 @@ Open the task and press **More Actions**, the three dots at the foot of the pane
    **Nudge sent**.
 2. **Set Reminders** sets up to three reminders before the due time. Choose **First Reminder**, and
    **Second Reminder** and **Third Reminder** if you like: **At Due Time**, **15 Minutes Before**,
-   **1 Hour Before**, **1 Day Before** or **2 Days Before**. Press **Set Reminders**. The hub says
-   **Reminders set**. A task needs a due date for this. To clear them, set each to **None** and
-   press **Set Reminders**: the hub says **Reminders cleared**.
+   **1 Hour Before**, **1 Day Before**, **2 Days Before** or **Custom Time**. For **Custom Time**,
+   pick the day in **Remind On** and type the time in **Remind At**, such as `09:30`. It begins at the
+   due time and can be any time up to it. Press **Set Reminders**. The hub says **Reminders set**. A
+   task needs a due date for this. To clear them, set each to **None** and press **Set Reminders**:
+   the hub says **Reminders cleared**.
 3. **Set Repeat** makes the task come back. In **Repeat**, choose **Every Working Day**, **Weekly**
    or **Monthly**. For **Weekly**, tick the days under **On**. For **Monthly**, pick the day in
    **On Day**. Press **Save Repeat**. The hub says **Repeat set**. Details then shows **Repeats**.
@@ -355,6 +357,7 @@ A repeat needs a due date to count from. Without one, **Repeat** says **Needs a 
 |---|---|---|
 | **Nobody else to tell** | Only you would get the nudge | Add a watcher first, or nudge a task someone else leads |
 | **That time has passed** | A reminder would fall before now | Pick a later reminder, or move the due date |
+| **After the due time** (on **Remind On**) | The custom time comes after the task is due | Pick a time at or before the due time |
 | **Pick a day** | **Weekly** has no day ticked | Tick at least one day under **On** |
 | **Pick a reason** | **Why Late** is empty, or the reason was just switched off | Pick a reason from the list |
 
@@ -623,7 +626,9 @@ Review**; press one to open its record.
 6. Choose **Who Can See**. **Attendees** is you and the people invited. **Everyone** puts it on
    every calendar. **Only Me** keeps it private.
 7. Choose a **Reminder**: **None**, **At Start**, **15 Minutes Before** (the default),
-   **1 Hour Before** or **1 Day Before**.
+   **1 Hour Before**, **1 Day Before** or **Custom Time**. For **Custom Time**, pick the day in
+   **Remind On** and type the time in **Remind At**: any time up to the start, at most 14 days
+   before it. A custom reminder moves with the event if you change its start.
 8. Press **Add Event**. The hub says **Added to the calendar**.
 
 Everyone you invite is told in the hub. Those with a work email also get the invitation by email,
@@ -634,6 +639,9 @@ which adds it to Outlook, Gmail or their phone's calendar.
 | **Name the event** | Type the event's name |
 | **Pick a date** | Pick its date |
 | **Ends before it starts** | Set an end time after the start |
+| **After the start** (on **Remind On**) | Pick a reminder time at or before the start |
+| **That time has passed** (on **Remind On**) | Pick a reminder time still to come |
+| **At most 14 days** (on **Remind On**) | Pick a reminder time nearer the start |
 | **Not on the staff** (on **Attendees**) | Someone invited has left MyCity: take them off **Attendees** and save again |
 
 ### Add to an empty day {#workspace-calendar-day needs="workspace create"}
