@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, opened 02/11/2026 (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026 (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -729,7 +729,7 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 
 ---
 
-### 6.6 After PR5 · Seamless tasks and meetings (decisions 28 to 31; started 01/11/2026, branch `claude/determined-dirac-b4ivrd`, praxisjbs/mycity-app#57)
+### 6.6 After PR5 · Seamless tasks and meetings (decisions 28 to 31; started 01/11/2026, branch `claude/determined-dirac-b4ivrd`, praxisjbs/mycity-app#57, merged 02/11/2026)
 
 - [x] 01/11/2026 · The decisions in `praxis-ai.md` §1.3 and here (§2), `workspace.md` §6's watcher rule
 - [x] 01/11/2026 · The contract: `TaskCreate.watcher_ids` and `watcher_department_id`; `AiAnswerDraft.ask`, `AiAnswer.choices`; `AiCardField.picks`, `AiActionCard.names`; gen:contract
@@ -739,7 +739,7 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 - [x] 01/11/2026 · The screens: choices under an answer (`AnswerBubble` `choices`), a tap asked as the next question; `ActionCard` Edit with the app's pickers and names; New Task's Watchers and Watching Department; the panel read only for a watcher; the mock
 - [x] 01/11/2026 · Tests: unit (manifest, cards, the guard, the system turn), integration on the real migrations (names, watchers, the guard's run of questions with the model scripted), screens; the evaluation set's follow-up cases; the catalogue snapshot
 - [x] 01/11/2026 · Documents: `praxis-ai.md` (§2, §4, §5, §6, §10, §11, §14), `workspace.md` (§3, §5, §6, §7, §9, §10, §11, §14), `community.md` §9, the User Guide chapters (Praxis AI, My Workspace) with their pictures, PROGRESS, README, DATABASE_SCHEMA
-- [x] 02/11/2026 · `npm run ci` green, run group by group in a cloud session (a command there stops at 10 minutes): checks, frontend (the app's tests in three shards), screens (each gate on its own) and backend (Jest in six shards, the database on); two tests that failed on main too, by the date, fixed in their own commit; pushed as `71d7935` and `e851aaa`
+- [x] 02/11/2026 · `npm run ci` green, run group by group in a cloud session (a command there stops at 10 minutes): checks, frontend (the app's tests in three shards), screens (each gate on its own) and backend (Jest in six shards, the database on); two tests that failed on main too, by the date, fixed in their own commit; merged as praxisjbs/mycity-app#57 (`c7195d8`, squashed) once every CI job was green on GitHub, at the first run
 
 ## 7 · Gates this work adds
 
@@ -851,3 +851,7 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   everyone; `CardPicker` already named a form component, so the card's slot type is
   `ActionCardPicker`. A cloud session's image again lacked Node 20, pgvector and `node_modules`
   (installed by hand: nvm's Node 20 linked at `/opt/node20`, `postgresql-16-pgvector`, `npm ci`).
+- 02/11/2026 · JP · praxisjbs/mycity-app#57 merged with Squash and merge as `c7195d8`, its six CI jobs
+  (scope, checks, backend, frontend, screens, ci) green at the first run and no review thread open;
+  staging takes it with the next release. Left: run the evaluation set's follow-up and card cases
+  on staging with the real model (`node scripts/ai/eval-assistant.js --only=ask`, `--only=card`).
