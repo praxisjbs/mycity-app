@@ -93,11 +93,10 @@ const setterWhenOther = (e, client) =>
 const both = (e, client) =>
   loginsOf(client, [e.payload.primary_assignee_id, e.payload.set_by_employee_id, ...membersOf(e)]);
 
-/** The people watching the task who may still see it (the service is required when called, as below). */
+/** The people watching the task, with a login: watching gives them sight of it (workspace.md §6). */
 async function watchersOf(e, client) {
   const { rows } = await client.query("SELECT employee_id FROM task_watcher WHERE task_id = $1", [e.payload.task_id]);
-  const able = await require("./tasks.service").whoMaySee(client, e.payload, rows.map((r) => r.employee_id));
-  return loginsOf(client, able);
+  return loginsOf(client, rows.map((r) => r.employee_id));
 }
 
 /** Everyone on the task: its lead and the people sharing it. */

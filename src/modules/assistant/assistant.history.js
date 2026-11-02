@@ -88,6 +88,7 @@ function present(row, citations = [], groups = [], card = {}) {
     declined: md.declined || null,
     more: Boolean(md.more),
     card: card && card.draft ? cards.present(card.draft, card.run || null) : null,
+    choices: (md.ask && Array.isArray(md.ask.choices) ? md.ask.choices : []).slice(0, 6),
     overview: md.overview || null,
     context: row.context || null,
     feedback: row.feedback || null,
@@ -129,14 +130,16 @@ async function turns(id, query, actor) {
 
 /**
  * The turns the model is reminded of, oldest first: the newest page's last ten (orchestrator's
- * HISTORY_TURNS), with the reads each made, so "show the next 25" knows which read to page.
+ * HISTORY_TURNS), with the reads each made, so "show the next 25" knows which read to page, and
+ * what each question asked for (§1.3 decision 29), so the next answer neither asks it again nor
+ * forgets what it was gathering.
  */
 async function replay(id, userId, limit = 10) {
   const page = await repo.turns(pool, id, userId, { page: 1 });
   return page.data
     .slice(0, limit)
     .reverse()
-    .map((r) => ({ question: r.question || "", answer: r.content, reads: (r.metadata && r.metadata.reads) || [] }));
+    .map((r) => ({ question: r.question || "", answer: r.content, reads: (r.metadata && r.metadata.reads) || [], ask: (r.metadata && r.metadata.ask) || null }));
 }
 
 /** DELETE /ai/conversations/:id. */

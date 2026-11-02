@@ -13,6 +13,10 @@
 #                                             load the staff roster, switch, restart, wait for
 #                                             readiness on that sha
 #                    seal <sha> <run-id>      after verify-staging passed: write STAGING_VERIFIED
+#                    attack                   Praxis AI's attack suite asked of the real model on
+#                                             staging, as the release's own code (ai-nightly.yml;
+#                                             docs/guides/praxis-ai.md §6.17); its exit code is
+#                                             the caller's: 0 safe, 1 a leak, 2 it could not run
 #                    status                   this script's sha256, then each environment's release
 #   production key   promote <sha> <run-id>   the sealed staging tree, byte for byte, to production
 #                    rollback production <sha>  switch production back to a release still on disk
@@ -71,6 +75,8 @@ case "$KEY:$CMD" in
     if ! { [[ ${#WORDS[@]} -eq 2 ]] && is_sha "${WORDS[1]}"; }; then die "usage: stage <40-character sha>"; fi ;;
   staging:seal)
     if ! { [[ ${#WORDS[@]} -eq 3 ]] && is_sha "${WORDS[1]}" && is_run "${WORDS[2]}"; }; then die "usage: seal <sha> <run-id>"; fi ;;
+  staging:attack)
+    if [[ ${#WORDS[@]} -ne 1 ]]; then die "usage: attack"; fi ;;
   production:promote)
     if ! { [[ ${#WORDS[@]} -eq 3 ]] && is_sha "${WORDS[1]}" && is_run "${WORDS[2]}"; }; then die "usage: promote <sha> <run-id>"; fi ;;
   production:rollback)
@@ -81,9 +87,13 @@ case "$KEY:$CMD" in
 esac
 
 # One deploy at a time, on either environment: two runs interleaving a migration and a restart
-# is how a database ends up ahead of its code.
-exec 9>"$STATE/deploy-gate.lock"
-flock -w 600 9 || die "another deploy has held the lock for 10 minutes"
+# is how a database ends up ahead of its code. The attack suite deploys nothing and may run for
+# minutes, so it never holds the lock: a release during it restarts staging under it, and the
+# run reports that it could not finish rather than making a release wait.
+if [[ "$CMD" != attack ]]; then
+  exec 9>"$STATE/deploy-gate.lock"
+  flock -w 600 9 || die "another deploy has held the lock for 10 minutes"
+fi
 say "$KEY key: ${SSH_ORIGINAL_COMMAND:-}"
 
 # ---------------------------------------------------------------------------------------
@@ -316,6 +326,20 @@ promote() {
   say "production runs ${sha:0:12}"
 }
 
+# Praxis AI's attack suite on staging (docs/guides/praxis-ai.md §6.17): the questions of
+# scripts/ai/attack-assistant.js asked of the real model as staging's own people, by the release
+# staging runs, with its settings. It writes its result row and nothing of a person's; its JSON
+# lines are the caller's stdout and its exit code the caller's.
+attack() {
+  local sha
+  sha="$(current_sha stg)"
+  [[ -n "$sha" && -d "$ROOT/stg/releases/$sha" ]] || die "staging runs nothing to attack"
+  [[ -s "$ROOT/stg/releases/$sha/scripts/ai/attack-assistant.js" ]] || die "release ${sha:0:12} carries no attack suite (scripts/ai); deploy a newer release first"
+  say "attack: the suite runs on staging's ${sha:0:12}"
+  (cd "$ROOT/stg/releases/$sha" &&
+    as_env_user stg "$NODE" --env-file="$ROOT/stg/shared/.env" scripts/ai/attack-assistant.js --nightly --json)
+}
+
 rollback() {
   local sha="$1"
   [[ -d "$ROOT/prod/releases/$sha" ]] || die "${sha:0:12} is not on the server any more (the last $KEEP_RELEASES are kept)"
@@ -346,5 +370,6 @@ case "$CMD" in
   seal) seal "${WORDS[1]}" "${WORDS[2]}" ;;
   promote) promote "${WORDS[1]}" "${WORDS[2]}" ;;
   rollback) rollback "${WORDS[2]}" ;;
+  attack) attack ;;
   status) status ;;
 esac

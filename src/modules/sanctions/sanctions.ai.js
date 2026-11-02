@@ -12,6 +12,10 @@ const service = require("./sanctions.service");
 
 module.exports = defineManifest({
   module: "queries",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    ConsequenceStepCreate: "a step on the consequence chain is Settings, set on Queries, Rules",
+  },
   reads: [
     {
       key: "sanctions.list",

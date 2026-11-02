@@ -845,6 +845,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.15, §6.17): `team.today` and `activity.list` carry matrix probes (a report of the asker's on the roster for a reader who may open the Team tab, their arrival on Activity Today for a reader with a `people` grant, an outsider never); `alerts.ai.js` and `reports.ai.js` account for their Create schemas in `not_offered` (a rule is set on Alerts with its threshold in view, a report is built on Reports with its sources and schedule in view).
 - 28/10/2026 · JP · Team's Department filter and a report's Department and Leave Type read their lists 25 at a time and load the next page as the menu nears its end (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18); they look as before.
 - 27/10/2026 · AJ · A policy breach's alert no longer reads Query Due and is raised only with Alert
   on: Queries & Sanctions raises the query itself (attendance.md §6.16, queries.md §6.2).

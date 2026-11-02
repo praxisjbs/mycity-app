@@ -232,6 +232,13 @@ const AiCardRecord = z
   })
   .strict();
 
+/**
+ * What an id field of a card points at, so Edit picks it with the screen's own picker (§1.3 decision
+ * 31): anyone with a login, who a task may be set for, who it may be shared with, a department, a
+ * project.
+ */
+const AiCardPicks = z.enum(["colleague", "task_assignee", "task_member", "department", "project"]);
+
 /** One field of a card, as the action's schema takes it; the screen draws it with the form system. */
 const AiCardField = z
   .object({
@@ -242,6 +249,8 @@ const AiCardField = z
     options: z.array(z.string()).max(50).nullable(),
     /** A text long enough for a box of several lines (a message, a note, a reason). */
     long: z.boolean(),
+    /** The picker an id field, or a list of ids, is chosen with on Edit; null for any other field. */
+    picks: AiCardPicks.nullable(),
   })
   .strict();
 
@@ -289,7 +298,10 @@ const AiActionCard = z
     values: z.record(z.string(), z.unknown()),
     /** Problems the person must fix, by field, as the form system shows them. */
     problems: z.record(z.string(), z.array(z.string())),
+    /** The records a press acts on: the verb's count, and the chips under the fields. */
     records: z.array(AiCardRecord).max(25),
+    /** The people, departments and projects the fields hold, by name (§1.3 decision 31); never counted. */
+    names: z.array(AiCardRecord).max(80),
     fields: z.array(AiCardField).max(40),
     suggested: z.boolean(),
     status: AiCardStatus,
@@ -357,6 +369,11 @@ const AiAnswer = z
     more: z.boolean(),
     /** The action drafted for the person to confirm (§6.11); null when none was, or the screen shows no cards. */
     card: AiActionCard.nullable(),
+    /**
+     * Answers to tap when the answer is a question (§1.3 decision 28: "When is it due?" with Today,
+     * Tomorrow, Friday, No Due Day); a tap is asked as the person's next question. Empty otherwise.
+     */
+    choices: z.array(z.string().min(1).max(60)).max(6),
     /** The pane's Overview (§6.13); null without a summary, or when the screen shows no pane. */
     overview: AiOverview.nullable(),
     /** The screen the question was asked from (§1.2 decision 12). */
@@ -399,6 +416,20 @@ const AiAnswerDraft = z
         key: z.string().max(80),
         values: z.record(z.string(), z.unknown()),
         suggested: z.boolean().default(false),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    /**
+     * The answer is a question (§1.3 decisions 28 and 29): `text` asks it, `choices` are up to six
+     * short answers to tap, and `action` and `field` name what it asks for when it is one of an
+     * action's fields ("tasks.create", "due_on"), so the server does not ask it again.
+     */
+    ask: z
+      .object({
+        action: z.string().max(80).nullable().default(null),
+        field: z.string().max(64).nullable().default(null),
+        choices: z.array(z.string().trim().min(1).max(60)).max(6).default([]),
       })
       .strict()
       .nullable()
@@ -586,7 +617,7 @@ const TABLES = {
       schema: "the input schema's name in packages/contract, from the manifest",
       confirm: "worked out from risk (the four sensitive classes need a fresh sign-in)",
       bulk: "the action's record limit, from its manifest",
-      fields: "the input schema's fields, from the schema itself",
+      fields: "the input schema's fields the card carries, from the schema and the manifest",
       result: "the card's ai_action_run, when it was pressed",
     },
   },
@@ -607,6 +638,7 @@ const TABLES = {
       declined: "from ai_message.metadata",
       more: "from ai_message.metadata",
       card: "the answer's ai_action_draft, when it drew one",
+      choices: "from ai_message.metadata, the question's answers to tap",
       overview: "from ai_message.metadata",
       provisional: "every answer is provisional (BACKEND_STRUCTURE §14.2)",
     },
@@ -663,6 +695,7 @@ module.exports = {
   AiConfirm,
   AiCardStatus,
   AiCardRecord,
+  AiCardPicks,
   AiCardField,
   AiActionLine,
   AiActionResult,

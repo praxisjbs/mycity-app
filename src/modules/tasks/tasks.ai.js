@@ -14,25 +14,58 @@ const service = require("./tasks.service");
 
 const taskLink = (id) => (routeMap.linkFor("task", id) || {}).path || null;
 
+/**
+ * When is it due? answered with a tap (docs/guides/praxis-ai.md §1.3 decision 29): today, tomorrow,
+ * the coming Friday (the next one when Friday is today or tomorrow), or no due day. The model reads
+ * the word against today's date, which the system turn gives it.
+ */
+function dueChoices({ today }) {
+  const day = today ? new Date(`${today}T12:00:00Z`).getUTCDay() : null;
+  const toFriday = day === null ? 3 : (5 - day + 7) % 7;
+  return ["Today", "Tomorrow", toFriday <= 1 ? "Next Friday" : "Friday", "No Due Day"];
+}
+
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): a task on the asker's own board, set by
+ * them for themselves, and one on an outsider's board, set by the outsider; the list must return the
+ * first and never the second, and a card naming the second is refused by the module's own check.
+ */
+/** A probe's answer for one task: the card's values as the tool being probed takes them. */
+const forTask = (ctx, t) => ({ type: "task", id: t.task_id, values: ctx.key === "tasks.comment" ? { task_id: t.task_id, body: "A note from the matrix" } : { task_ids: [t.task_id] } });
+const probe = {
+  inside: async (ctx) => forTask(ctx, await service.create(ctx.actor, ctx.actor.scope, { title: `Matrix task for ${ctx.role}` })),
+  outside: async (ctx) => forTask(ctx, await service.create(ctx.outsider.user, ctx.outsider.scope, { title: `Outsider's task, seen by ${ctx.role}` })),
+};
+
 module.exports = defineManifest({
   module: "workspace",
   actions: [
     {
       key: "tasks.create",
-      description: "Set a task: a title, notes, priority, cadence, due day, and for a manager who it is for",
+      description: "Set a task: title, notes, due day, priority, lead; share it with people (member_ids) or a department (department_id), never both; watchers see it and hear when it moves",
       input: c.tasks.TaskCreate,
       permission: ["workspace", "create"],
       risk: "standard",
       suggest: true,
-      records: (values) => (values.primary_assignee_id ? [{ type: "employee", id: values.primary_assignee_id }] : []),
+      // New Task's own fields (decision 31): commitments, repeats, Counts Towards and a record stay on the form.
+      fields: ["title", "description", "primary_assignee_id", "member_ids", "department_id", "watcher_ids", "watcher_department_id", "due_on", "priority", "cadence", "project_id"],
+      picks: { primary_assignee_id: "task_assignee", member_ids: "task_member", department_id: "department", watcher_ids: "colleague", watcher_department_id: "department", project_id: "project" },
+      // Nothing is acted on but the task it makes; the people, departments and project on it are named.
+      names: (values, _actor, db) => (db ? service.cardNames(db, values) : []),
+      asks: [
+        { field: "title", question: "What is the task?" },
+        { field: "due_on", question: "When is it due?", choices: dueChoices, none: true },
+        { field: "priority", question: "How urgent is it?", choices: ["Low", "Normal", "High", "Urgent"] },
+      ],
       // The same function the screen's Create Task calls, with the scope the grant gives (§6).
       run: (values, actor) => service.create(actor, actor.scope, values),
       readback: (task) => [{ type: "task", id: task.task_id, label: `${task.number} ${task.title}`, status: "created", link: taskLink(task.task_id) }],
-      labels: { title: "Title", description: "Notes", priority: "Priority", cadence: "Cadence", due_on: "Due Day", primary_assignee_id: "For", member_ids: "Shared With", department_id: "Department", project_id: "Project" },
+      labels: { title: "Title", description: "Notes", priority: "Priority", cadence: "Cadence", due_on: "Due Day", primary_assignee_id: "For", member_ids: "Shared With", department_id: "Department", watcher_ids: "Watchers", watcher_department_id: "Watching Department", project_id: "Project" },
     },
     {
       key: "tasks.complete",
       label: "Mark Done",
+      matrix: probe,
       description: "Mark one or more of my tasks done, with the late reason the board asks for an overdue one",
       input: c.tasks.TaskComplete,
       permission: ["workspace", "edit"],
@@ -50,6 +83,7 @@ module.exports = defineManifest({
     {
       key: "tasks.comment",
       label: "Add Comment",
+      matrix: probe,
       description: "Comment on a task I can see: the task and the words",
       input: c.tasks.TaskCommentAdd,
       permission: ["workspace", "edit"],
@@ -87,6 +121,7 @@ module.exports = defineManifest({
       permission: ["workspace", "view"],
       run: (_client, params, actor) => service.list(params, actor.scope),
       cite: (row) => ({ type: "task", id: row.task_id, label: `${row.number} ${row.title}` }),
+      matrix: probe,
     },
   ],
   routes: [

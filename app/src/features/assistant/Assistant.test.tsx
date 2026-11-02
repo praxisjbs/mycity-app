@@ -37,6 +37,8 @@ vi.mock("@/api/hooks", () => ({
 }));
 vi.mock("@/api/client", async () => ({ api: { call: m.call }, ApiError: (await import("@mycity/ui")).ApiError }));
 vi.mock("@/api/upload", () => ({ upload: vi.fn() }));
+// The card asks whether the reader may view People (its department picker, as on New Task).
+vi.mock("@/auth/AuthProvider", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/auth/AuthProvider")>()), useMe: () => ({ employee_id: "00000000-0000-4000-8000-0000000000e1", grants: { people: ["view"] } }) }));
 vi.mock("@/api/exports", () => ({ saveExport: m.saveExport }));
 vi.mock("@/lib/router", () => ({ useRouter: () => ({ navigate: m.navigate, location: { path: "/praxis-ai", module: "praxis-ai", tab: "ask", id: null, params: new URLSearchParams("tab=ask") } }), useSearchParams: () => [m.params, m.setParams] }));
 vi.mock("@/shell/layout-context", () => ({ useFitPage: () => undefined }));
@@ -95,6 +97,7 @@ const answer = (over: Partial<AiAnswer> = {}): AiAnswer => ({
   ai_conversation_id: CONV,
   question: "Whose leave waits on me?",
   content: "Two requests wait on you.",
+  choices: [],
   table: { columns: ["Employee", "Days"], rows: [["Ayo Bello", "3"], ["Kemi Ade", "2"]], numeric: [1], links: ["/people?tab=leave&id=l1", "/people?tab=leave&id=l2"], read: 1 },
   link: { label: "Open Leave", path: "/people?tab=leave" },
   citations: Array.from({ length: 8 }, (_, i) => ({ entity_type: "employee", entity_id: `00000000-0000-4000-8000-00000000000${i}`, label: `Person ${i + 1}`, link: `/people?tab=employees&id=${i}`, read_key: "employees.list" })),
@@ -215,6 +218,19 @@ describe("Ask", () => {
     expect(await screen.findByText("Here are the next people.")).toBeTruthy();
     expect(asked()[0].body).toEqual({ question: "Show the next 25.", ai_conversation_id: CONV, shows: ["cards", "pane"] });
     expect(m.setParams).not.toHaveBeenCalled();
+  });
+
+  it("a question's answers are taps on the newest answer: a tap is asked as the next question in the conversation (decision 28)", async () => {
+    m.turns[CONV] = [answer({ question: "Assign a task to Bode to send the weekly report", content: "When is it due?", table: null, link: null, citations: [], citations_total: 0, sources: [], reads: [], choices: ["Today", "Tomorrow", "Friday", "No Due Day"] })];
+    m.call.mockImplementation(async () => answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a3", question: "Friday", content: "How urgent is it?", table: null, link: null, citations: [], citations_total: 0, sources: [], reads: [], choices: ["Low", "Normal", "High", "Urgent"] }));
+    ui("ask", CONV);
+    const taps = screen.getByRole("group", { name: "Answers" });
+    await userEvent.click(within(taps).getByRole("button", { name: "Friday" }));
+    expect(await screen.findByText("How urgent is it?")).toBeTruthy();
+    expect(asked()[0].body).toEqual({ question: "Friday", ai_conversation_id: CONV, shows: ["cards", "pane"] });
+    // Only the newest answer's choices may be tapped: the earlier question's have gone.
+    expect(screen.getAllByRole("group", { name: "Answers" })).toHaveLength(1);
+    expect(within(screen.getByRole("group", { name: "Answers" })).getByRole("button", { name: "Normal" })).toBeTruthy();
   });
 
   it("Helpful is sent, and pressed again takes it back", async () => {
@@ -494,10 +510,11 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
     values: { title: "Send the weekly report", priority: "high", due_on: "2026-11-06" },
     problems: {},
     records: [],
+    names: [],
     fields: [
-      { name: "title", label: "Title", kind: "text", required: true, options: null, long: false },
-      { name: "priority", label: "Priority", kind: "choice", required: false, options: ["low", "normal", "high"], long: false },
-      { name: "due_on", label: "Due Day", kind: "date", required: false, options: null, long: false },
+      { name: "title", label: "Title", kind: "text", required: true, options: null, long: false, picks: null },
+      { name: "priority", label: "Priority", kind: "choice", required: false, options: ["low", "normal", "high"], long: false, picks: null },
+      { name: "due_on", label: "Due Day", kind: "date", required: false, options: null, long: false, picks: null },
     ],
     suggested: false,
     status: "shown",
@@ -528,7 +545,7 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
   });
 
   it("a sensitive card refused past the window asks Confirm It's You, then presses again with the same key (decision 11)", async () => {
-    const approve = card({ action_key: "leave.approve", module_key: "people", label: "Approve Leave", schema: "leave.LeaveApprove", risk: "approval", confirm: "fresh_sign_in", bulk: 25, values: { leave_request_ids: ["l1", "l2"] }, fields: [{ name: "leave_request_ids", label: "Requests", kind: "list", required: true, options: null, long: false }, { name: "reason", label: "Reason", kind: "text", required: false, options: null, long: true }], records: [{ type: "leave_request", id: "l1", label: "Ayo Bello, Annual, 3 days", link: "/people?tab=leave&id=l1" }, { type: "leave_request", id: "l2", label: "Kemi Ade, Annual, 2 days", link: "/people?tab=leave&id=l2" }] });
+    const approve = card({ action_key: "leave.approve", module_key: "people", label: "Approve Leave", schema: "leave.LeaveApprove", risk: "approval", confirm: "fresh_sign_in", bulk: 25, values: { leave_request_ids: ["l1", "l2"] }, fields: [{ name: "leave_request_ids", label: "Requests", kind: "list", required: true, options: null, long: false, picks: null }, { name: "reason", label: "Reason", kind: "text", required: false, options: null, long: true, picks: null }], records: [{ type: "leave_request", id: "l1", label: "Ayo Bello, Annual, 3 days", link: "/people?tab=leave&id=l1" }, { type: "leave_request", id: "l2", label: "Kemi Ade, Annual, 2 days", link: "/people?tab=leave&id=l2" }] });
     m.turns[CONV] = [answer({ card: approve })];
     m.data["GET /api/v1/security"] = { two_step: { on: false, required: false, mfa_frequency: "every_sign_in", mfa_enrolled_at: null, recovery_codes_left: 0 }, passkeys: 0, pin: { on: false, pin_changed_at: null }, confirmed_for: 0 };
     let presses = 0;
@@ -577,7 +594,7 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
   it("an expired card offers Draw It Again, which asks the question afresh; a suggested card reads as a question and Not Now cancels it", async () => {
     const SUGGESTED = "00000000-0000-4000-8000-0000000000d2";
     m.turns[CONV] = [
-      answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a2", content: "Ada's leave is approved. Shall I tell her?", card: card({ ai_action_draft_id: SUGGESTED, ai_message_id: "00000000-0000-4000-8000-0000000000a2", action_key: "community.message", module_key: "community", label: "Send Message", schema: "community.DirectMessageSend", suggested: true, values: { employee_id: "e1", body: "Your leave is approved." }, fields: [{ name: "employee_id", label: "To", kind: "id", required: true, options: null, long: false }, { name: "body", label: "Message", kind: "text", required: true, options: null, long: true }], records: [{ type: "employee", id: "e1", label: "Ada Obi", link: "/people?tab=employees&id=e1" }] }) }),
+      answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a2", content: "Ada's leave is approved. Shall I tell her?", card: card({ ai_action_draft_id: SUGGESTED, ai_message_id: "00000000-0000-4000-8000-0000000000a2", action_key: "community.message", module_key: "community", label: "Send Message", schema: "community.DirectMessageSend", suggested: true, values: { employee_id: "e1", body: "Your leave is approved." }, fields: [{ name: "employee_id", label: "To", kind: "id", required: true, options: null, long: false, picks: null }, { name: "body", label: "Message", kind: "text", required: true, options: null, long: true, picks: null }], records: [{ type: "employee", id: "e1", label: "Ada Obi", link: "/people?tab=employees&id=e1" }] }) }),
       answer({ card: card({ status: "expired" }) }),
     ];
     m.call.mockImplementation(async (key: unknown) => (key === "POST /api/v1/ai/cards/:id/cancel" ? card({ ai_action_draft_id: SUGGESTED, status: "cancelled", suggested: true, label: "Send Message" }) : key === "POST /api/v1/ai/ask" ? answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a3", content: "Drawn again.", card: card({ ai_action_draft_id: "00000000-0000-4000-8000-0000000000d3" }) }) : {}));
@@ -596,7 +613,7 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
   });
 
   it("a mail refused for want of a mailbox offers the Mailbox screen", async () => {
-    m.turns[CONV] = [answer({ card: card({ action_key: "mail.send", module_key: "mailbox", label: "Send Mail", schema: "mailbox.MailCompose", values: { to_addresses: ["ada@partner.test"], subject: "Thursday", body: "See you on Thursday at 10." }, fields: [{ name: "to_addresses", label: "To", kind: "list", required: true, options: null, long: false }, { name: "subject", label: "Subject", kind: "text", required: true, options: null, long: false }, { name: "body", label: "Message", kind: "text", required: true, options: null, long: true }] }) })];
+    m.turns[CONV] = [answer({ card: card({ action_key: "mail.send", module_key: "mailbox", label: "Send Mail", schema: "mailbox.MailCompose", values: { to_addresses: ["ada@partner.test"], subject: "Thursday", body: "See you on Thursday at 10." }, fields: [{ name: "to_addresses", label: "To", kind: "list", required: true, options: null, long: false, picks: null }, { name: "subject", label: "Subject", kind: "text", required: true, options: null, long: false, picks: null }, { name: "body", label: "Message", kind: "text", required: true, options: null, long: true, picks: null }] }) })];
     m.call.mockRejectedValueOnce(new ApiError(409, { error: { code: "NO_MAILBOX", message: "Connect your mailbox first" } }));
     ui("ask", CONV);
     const group = screen.getByRole("group", { name: "Send Mail" });

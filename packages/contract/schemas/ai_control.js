@@ -317,6 +317,49 @@ const AiProviderSpend = z
 
 const AiSpendDay = z.object({ day: isoDate, spent_ngn: money }).strict();
 
+/** One attack that leaked in a run of the suite: which attack, who asked, what was wrong; never a record. */
+const AiAttackLeak = z
+  .object({
+    id: z.string().min(1).max(80),
+    as: z.string().min(1).max(40),
+    problems: z.array(z.string().max(400)).max(10),
+  })
+  .strict();
+
+/**
+ * One run of Praxis AI's attack suite against the real model (`scripts/ai/attack-assistant.js`;
+ * docs/guides/praxis-ai.md §6.17, decision 26): nightly from GitHub against staging, or by hand.
+ * `passed` means every attack failed safely; `leaked` names each leak; `cannot_run` is a run with
+ * nobody holding a role, AI switched off or no provider set up; `failed` is the script falling over.
+ */
+const AiAttackRun = z
+  .object({
+    ai_attack_run_id: uuid,
+    environment: z.enum(["development", "test", "staging", "production"]),
+    run_by: z.enum(["nightly", "hand"]),
+    status: z.enum(["passed", "leaked", "cannot_run", "failed"]),
+    asked: z.number().int().min(0),
+    passed: z.number().int().min(0),
+    leaks: z.array(AiAttackLeak).max(50),
+    error_code: z.string().nullable(),
+    started_at: isoDateTime,
+    finished_at: isoDateTime,
+  })
+  .strict();
+
+/**
+ * Praxis AI on Spend (docs/guides/ai-control.md §10, praxis-ai.md §6.17): the reads the assistant
+ * refused this month for want of a grant, the cards refused at the press, and the nightly attack
+ * run's last result (null before the first run).
+ */
+const AiPraxisSpend = z
+  .object({
+    reads_refused: z.number().int().min(0),
+    presses_refused: z.number().int().min(0),
+    nightly: AiAttackRun.nullable(),
+  })
+  .strict();
+
 /** GET /spend: this Lagos month. */
 const AiSpend = z
   .object({
@@ -333,6 +376,8 @@ const AiSpend = z
     providers: z.array(AiProviderSpend).max(5),
     /** Each day of the month so far. */
     days: z.array(AiSpendDay).max(31),
+    /** Praxis AI's refusals this month and the nightly attack run (§10). */
+    praxis_ai: AiPraxisSpend,
   })
   .strict();
 
@@ -410,6 +455,9 @@ const TABLES = {
   AiProviderSpend: { table: null, reason: "ai_run_step summed per provider for the Lagos month, against ai_provider_cap" },
   AiSpendDay: { table: null, reason: "ai_run_step summed per Lagos day" },
   AiSpend: { table: null, reason: "this Lagos month's spend, summed from ai_run_step" },
+  AiAttackLeak: { table: null, reason: "one line of ai_attack_run.leaks: which attack leaked, who asked, what was wrong" },
+  AiAttackRun: { table: "ai_attack_run" },
+  AiPraxisSpend: { table: null, reason: "ai_message_read (outcome refused) and event_log (assistant.action_refused) counted for the Lagos month, with the newest ai_attack_run" },
   AiSpendAction: { table: null, reason: "ai_run_step summed per action (ai_run.purpose)" },
   AiSpendActionPage: { table: null, reason: "a page of this month's spend by action" },
   AiCapParams: { table: null, reason: "the :provider path parameter" },
@@ -448,6 +496,9 @@ module.exports = {
   AiAcceptAll,
   AiProviderSpend,
   AiSpendDay,
+  AiAttackLeak,
+  AiAttackRun,
+  AiPraxisSpend,
   AiSpend,
   AiSpendAction,
   AiSpendActionPage,

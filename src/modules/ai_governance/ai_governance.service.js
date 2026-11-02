@@ -579,7 +579,7 @@ async function spend() {
   const { from, to } = governance.monthWindow(now);
   const today = lagos.today(now);
   const month = `${today.slice(0, 7)}-01`;
-  const [total, byProvider, limits, s, days, rate, plan, cat] = await Promise.all([
+  const [total, byProvider, limits, s, days, rate, plan, cat, refusals, nightly] = await Promise.all([
     governance.spentThisMonth(pool, now),
     governance.spentByProvider(pool, now),
     governance.caps(pool),
@@ -588,6 +588,8 @@ async function spend() {
     rateNow(),
     plans(),
     aiJobs.catalogue(pool),
+    repo.praxisRefusals(pool, from, to),
+    repo.latestAttackRun(pool),
   ]);
   const byDay = new Map(days.map((d) => [d.day, money.toWire(d.spent)]));
   const series = [];
@@ -614,7 +616,44 @@ async function spend() {
       };
     }),
     days: series,
+    praxis_ai: { reads_refused: refusals.reads_refused, presses_refused: refusals.presses_refused, nightly: nightly ? attackRunView(nightly) : null },
   };
+}
+
+/** One run of the attack suite as the wire carries it (AiAttackRun). */
+function attackRunView(row) {
+  return {
+    ai_attack_run_id: row.ai_attack_run_id,
+    environment: row.environment,
+    run_by: row.run_by,
+    status: row.status,
+    asked: row.asked,
+    passed: row.passed,
+    leaks: Array.isArray(row.leaks) ? row.leaks : [],
+    error_code: row.error_code || null,
+    started_at: iso(row.started_at),
+    finished_at: iso(row.finished_at),
+  };
+}
+
+/**
+ * The attack suite reports a run (scripts/ai/attack-assistant.js; praxis-ai.md §6.17): the row is
+ * kept for Spend, audited, and a leak is told to whoever may change AI Control, urgently.
+ * @param {{environment: string, run_by: "nightly"|"hand", status: string, asked: number, passed: number, leaks: Array<{id: string, as: string, problems: string[]}>, error_code?: string|null, started_at: Date|string}} result
+ * @returns {Promise<object>} AiAttackRun
+ */
+async function recordAttackRun(result) {
+  const row = await tx(async (client) => {
+    const r = await repo.insertAttackRun(client, { ...result, leaks: (result.leaks || []).slice(0, 50) });
+    const entity = { type: "ai_attack_run", id: r.ai_attack_run_id };
+    await emit(client, { key: EVENTS.AI_CONTROL_ATTACK_RUN_RECORDED, entity, actor: null, payload: { environment: r.environment, run_by: r.run_by, status: r.status, asked: r.asked, passed: r.passed, leaks: r.leaks.length } });
+    if (r.status === "leaked") {
+      const first = r.leaks[0] ? `${r.leaks[0].id} as ${r.leaks[0].as}` : null;
+      await emit(client, { key: EVENTS.AI_CONTROL_ATTACK_LEAKED, entity, actor: null, payload: { environment: r.environment, run_by: r.run_by, asked: r.asked, leaks: r.leaks.length, first } });
+    }
+    return r;
+  });
+  return attackRunView(row);
 }
 
 /** GET /ai-control/spend/actions: this month by action, 25 a page. */
@@ -689,6 +728,8 @@ module.exports = {
   runFindPrices,
   spend,
   spendActions,
+  recordAttackRun,
+  attackRunView,
   setCap,
   setOverallCap,
   SITES,

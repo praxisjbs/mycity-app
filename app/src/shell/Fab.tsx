@@ -1,14 +1,12 @@
-import { lazy, Suspense, useCallback, useState } from "react";
+import { useState } from "react";
 import { FloatingButton, type FabAction } from "@mycity/ui";
 import { useAuth } from "@/auth/AuthProvider";
 import { useClock } from "@/features/attendance/ClockButton";
+import { askHref } from "@/features/assistant/context";
 import { moduleKeyOf, useRouter } from "@/lib/router";
 import { guideAt } from "@/features/knowledge/guide/return";
 import { moduleByKey } from "./catalogue";
 import { useRegisteredAction, useRegisteredSecond } from "./screen-action";
-
-/** Loaded the first time Praxis AI is pressed, so the shell does not carry the conversation. */
-const AskPanel = lazy(() => import("@/features/assistant/AskPanel"));
 
 /**
  * The phone's floating button (F18). The fan: the screen's own New action when
@@ -18,9 +16,9 @@ const AskPanel = lazy(() => import("@/features/assistant/AskPanel"));
  * it hidden on this page until the person leaves it: `page` is the path, so
  * coming back to the page shows it again.
  *
- * Praxis AI opens over the screen the person is on, not in place of it
- * (docs/guides/praxis-ai.md §10.2); its conversation is kept until the app
- * closes, so the button comes back to it.
+ * Praxis AI opens the one full-screen Praxis AI (docs/guides/praxis-ai.md §1.2 decisions 12 and
+ * 27), as the desktop top bar's button does: the screen in view travels as `from`, so it is the
+ * question's context and where Back returns.
  */
 export function Fab({ page }: { page: string }) {
   const { can } = useAuth();
@@ -30,9 +28,6 @@ export function Fab({ page }: { page: string }) {
   const second = useRegisteredSecond();
   const clock = useClock();
   const [hiddenOn, setHiddenOn] = useState<string | null>(null);
-  /* null until Praxis AI is first pressed: the panel then stays mounted, holding its conversation. */
-  const [asking, setAsking] = useState<boolean | null>(null);
-  const closeAsk = useCallback(() => setAsking(false), []);
 
   const actions: FabAction[] = [];
   if (screen) actions.push({ key: "screen", label: screen.label, icon: screen.icon ?? "plus", onSelect: screen.onSelect });
@@ -40,17 +35,8 @@ export function Fab({ page }: { page: string }) {
   if (can("attendance") || can("ess")) {
     if ((clock.ready || clock.done) && !clock.unavailable) actions.push({ key: "clock", label: clock.label, icon: "clock", onSelect: clock.open });
   }
-  if (can("praxis_ai")) actions.push({ key: "ai", label: moduleByKey("praxis_ai")?.label ?? "Assistant", icon: "spark", onSelect: () => setAsking(true) });
+  if (can("praxis_ai")) actions.push({ key: "ai", label: moduleByKey("praxis_ai")?.label ?? "Assistant", icon: "spark", onSelect: () => navigate(askHref(`${location.path}?${location.params.toString()}`)) });
   if (can("knowledge")) actions.push({ key: "help", label: "Help", icon: "help", onSelect: () => navigate(guideAt(here)) });
 
-  return (
-    <>
-      <FloatingButton actions={actions} hidden={hiddenOn === page} onHideHere={() => setHiddenOn(page)} />
-      {asking !== null && (
-        <Suspense fallback={null}>
-          <AskPanel open={asking} onClose={closeAsk} />
-        </Suspense>
-      )}
-    </>
-  );
+  return <FloatingButton actions={actions} hidden={hiddenOn === page} onHideHere={() => setHiddenOn(page)} />;
 }

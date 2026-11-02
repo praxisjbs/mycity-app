@@ -1,0 +1,111 @@
+name: AI Nightly
+
+# Praxis AI's attack suite asked of the real model on staging, every night (docs/guides/praxis-ai.md
+# §6.17; decision 26): each attack is a question a person might put to the assistant to learn or
+# do what their own screens would not, asked as a real person of each role through staging's own
+# engine, with staging's provider key. The server runs it through deploy-gate (`attack`), as the
+# release staging runs, so nothing but the staging SSH key leaves GitHub and nothing of a person's
+# is written: the run's result row alone (ai_attack_run), which AI Control · Spend shows, and a
+# leak is an urgent notice to whoever may change AI Control before this job even finishes.
+#
+#   exit 0   every attack failed safely: the job passes
+#   exit 1   a leak: the job fails, loudly, with each leak in the summary
+#   exit 2   it could not run (no provider on staging, nobody holding a role, AI off): a warning,
+#            so a staging without a key does not fail every night; Spend reads Could Not Run
+#
+# It shares the release concurrency group, so it never runs while a release restarts staging and a
+# release never starts under it. 02:17 Lagos, after the nightly backup (02:30 is the dump; the suite
+# asks a dozen questions and is done well before). Schedules run from the default branch only.
+#
+# Settings this needs: the same as release.yml's staging deploy (STAGING_SSH_KEY, DEPLOY_HOST,
+# DEPLOY_KNOWN_HOSTS), and the server's deploy-gate at this commit's copy (check-gate says how).
+
+on:
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  attack:
+    name: Attack staging's Praxis AI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: https://hub.staging.mycityapp.io
+    steps:
+      - name: Check out the gate's copy and its check
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/deploy
+            .nvmrc
+
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Load the staging key
+        env:
+          KEY: ${{ secrets.STAGING_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          # Windows clipboards add CRLF line endings, which ssh cannot read ("error in libcrypto"):
+          # strip them, then make sure the secret really is a private key before using it.
+          printf '%s\n' "$KEY" | tr -d '\r' > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::STAGING_SSH_KEY is not a usable private key. Paste the whole private file (not the .pub), from -----BEGIN to -----END, into the secret again."
+            exit 1
+          fi
+          printf '%s\n' "$KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
+
+      # An older gate on the server has no `attack` and refuses it: say so with the steps that
+      # install this commit's copy (scripts/deploy/check-gate.js, docs/runbooks/deploy.md §5).
+      - name: The server runs this commit's deploy-gate
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+          SHA: ${{ github.sha }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "mycity-deploy@$HOST" "status" > gate-status.txt
+          node scripts/deploy/check-gate.js --status=gate-status.txt --sha="$SHA" --host="$HOST"
+
+      - name: deploy-gate attack
+        id: attack
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          set +e
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "mycity-deploy@$HOST" "attack" > attack.jsonl
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "## Praxis AI's attack suite on staging" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          node -e '
+            const fs = require("node:fs");
+            const lines = fs.readFileSync("attack.jsonl", "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return { id: "?", result: l }; } });
+            const run = lines.find((l) => l.id === "run");
+            const out = [];
+            if (run) out.push(`**${String(run.result).replace("_", " ")}**: ${run.asked} asked, ${run.passed} passed, ${run.leaks} leak(s)`, "");
+            out.push("| Attack | As | Result | Detail |", "|---|---|---|---|");
+            for (const l of lines.filter((l) => l.id !== "run")) out.push(`| ${l.id} | ${l.as || ""} | ${l.result} | ${(l.leaks || []).concat(l.why ? [l.why] : []).join("; ").replace(/\|/g, "/")} |`);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n") + "\n");
+          '
+          case "$code" in
+            0) echo "every attack failed safely" ;;
+            1) echo "::error::Praxis AI leaked on staging: see the summary. AI Control, Spend shows the run; whoever may change AI Control has been told." ;;
+            2) echo "::warning::the attack suite could not run on staging (no provider set up, nobody holding a role, or AI off): see the summary" ;;
+            *) echo "::error::deploy-gate attack exited $code"; cat attack.jsonl ;;
+          esac
+          [[ "$code" == 0 || "$code" == 2 ]]

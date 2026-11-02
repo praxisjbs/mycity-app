@@ -18,6 +18,28 @@ const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const service = require("./workflow.service");
 
+/** A leave request by `who`, which waits on their line manager: its request and its approval. */
+async function waitingFrom(ctx, who) {
+  const leave = require("../leave/leave.service");
+  const day = ctx.freshDay();
+  const r = await leave.request(who.user, who.employee_id, { leave_type_id: ctx.leaveTypeId, starts_on: day, ends_on: day, reason: `A matrix day for ${ctx.role}` });
+  return { type: "leave_request", id: r.leave_request_id, values: { workflow_instance_ids: [r.workflow_instance_id], decision: "approve" } };
+}
+
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): the queue is what waits on the asker, so
+ * a report's request (they are its line manager, and they hold approve on leave's module, which the
+ * queue asks for too) is in it and an outsider's never; a card naming the outsider's is refused by the
+ * module's own check, unless the asker reads every request (`people` all).
+ */
+const probe = {
+  inside: async (ctx) => (ctx.report && (await ctx.scopeOf("people", "approve")) ? waitingFrom(ctx, ctx.report) : null),
+  outside: async (ctx) => {
+    const people = await ctx.scopeOf("people", "view");
+    return people && people.scope === "all" ? null : waitingFrom(ctx, ctx.outsider);
+  },
+};
+
 module.exports = defineManifest({
   module: "settings",
   actions: [
@@ -36,6 +58,7 @@ module.exports = defineManifest({
       run: (values, actor) => service.decideMany(actor, values),
       readback: (r) => r.lines,
       labels: { workflow_instance_ids: "Requests", decision: "Decision", reason: "Reason" },
+      matrix: probe,
     },
   ],
   // Every other Create schema of this module's contract, and why the assistant does not offer it (gate 23).
@@ -59,6 +82,7 @@ module.exports = defineManifest({
       permission: ["ess", "view"],
       run: (_client, params, actor) => service.mine(actor, params),
       cite: (row) => ({ type: row.entity_type, id: row.entity_id, label: row.definition_name }),
+      matrix: probe,
     },
   ],
   routes: [{ intent: "change who approves a request", screen: "settings.approvals" }],

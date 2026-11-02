@@ -379,12 +379,13 @@ describeDb("my workspace against the real migrations", () => {
     expect(cancelled.body.error.code).toBe("TASK_LINK_CANCELLED");
   });
 
-  test("watchers are people who can already see the task; they hear about it, and a ping reaches whoever it names", async () => {
+  test("watching gives sight: any colleague may watch; a watcher opens the task and comments but never works it, and hears about it", async () => {
     const t = await as("manager").post("/tasks", { title: "Confirm caterer for the launch", primary_assignee_id: emp("staff") });
-    // Zainab works beside Musa but cannot open his tasks: she is never made a watcher of one.
-    const unseen = await as("manager").post(`/tasks/${t.body.task_id}/watchers`, { employee_id: emp("peer") });
-    expect(unseen.status).toBe(422);
-    expect(unseen.body.error.fields.employee_id).toEqual(["Cannot see this task"]);
+    // Zainab works beside Musa and cannot open his tasks by her own grant; made a watcher, she may (JBS Praxis, 01/11/2026).
+    expect((await as("peer").get(`/tasks/${t.body.task_id}`)).status).toBe(404);
+    const watched = await as("manager").post(`/tasks/${t.body.task_id}/watchers`, { employee_id: emp("peer") });
+    expect(watched.status).toBe(200);
+    expect(watched.body.watchers.map((p) => p.employee_id)).toContain(emp("peer"));
     const added = await as("manager").post(`/tasks/${t.body.task_id}/watchers`, { employee_id: emp("director") });
     expect(added.status).toBe(200);
     expect(added.body.watchers.map((p) => p.employee_id)).toContain(emp("director"));
@@ -392,15 +393,61 @@ describeDb("my workspace against the real migrations", () => {
     expect(notMine.body.watching).toBe(true);
     expect((await as("outsider").post(`/tasks/${t.body.task_id}/watchers`, {})).status).toBe(404);
 
+    // The watcher's panel: to read and comment on, nothing to change.
+    const panel = await as("peer").get(`/tasks/${t.body.task_id}`);
+    expect(panel.status).toBe(200);
+    expect(panel.body).toMatchObject({ watching: true, can_edit: false, can_plan: false, can_reassign: false, can_cancel: false });
+    const said = await as("peer").post(`/tasks/${t.body.task_id}/comments`, { body: "The caterer can do Friday" });
+    expect(said.status).toBe(201);
+    expect((await as("peer").get(`/tasks/${t.body.task_id}/comments`)).body.data.map((c) => c.body)).toContain("The caterer can do Friday");
+    expect((await as("peer").get(`/tasks/${t.body.task_id}/activity`)).status).toBe(200);
+    expect((await as("peer").post(`/tasks/${t.body.task_id}/move`, { status: "in_progress" })).status).toBe(404);
+    expect((await as("peer").patch(`/tasks/${t.body.task_id}`, { priority: "high" })).status).toBe(404);
+    expect((await as("peer").post(`/tasks/${t.body.task_id}/block`, { blocked_reason: "Not mine" })).status).toBe(404);
+    // Never on her board as her work; ⌘K finds it.
+    expect((await as("peer").get("/tasks?scope=mine")).body.data.map((r) => r.task_id)).not.toContain(t.body.task_id);
+    const found = (await as("peer").get("/search?q=caterer")).body.groups.flatMap((g) => g.items.map((i) => i.id));
+    expect(found).toContain(t.body.task_id);
+
     const pinged = await as("manager").post(`/tasks/${t.body.task_id}/ping`, { message: "Need this by noon", to: "everyone" });
     expect(pinged.status).toBe(200);
     await drain();
     expect(await bell("director")).toEqual(expect.arrayContaining([expect.stringMatching(/nudged you/)]));
-    expect(await bell("peer")).not.toEqual(expect.arrayContaining([expect.stringMatching(/nudged you on/)]));
+    expect(await bell("peer")).toEqual(expect.arrayContaining([expect.stringMatching(/You are watching/), expect.stringMatching(/nudged you on/)]));
 
+    // She stops watching herself, and with it loses sight of the task.
+    expect((await as("peer").del(`/tasks/${t.body.task_id}/watchers/${emp("peer")}`)).body.watching).toBe(false);
+    expect((await as("peer").get(`/tasks/${t.body.task_id}`)).status).toBe(404);
     const left = await as("staff").del(`/tasks/${t.body.task_id}/watchers/${emp("staff")}`);
     expect(left.body.watching).toBe(false);
     expect((await as("staff").del(`/tasks/${t.body.task_id}/watchers/${emp("director")}`)).status).toBe(200);
+  });
+
+  test("New Task names watchers, people or a whole department; never the lead, and at most 25; each is told", async () => {
+    const t = await as("manager").post("/tasks", { title: "Brief the launch team", primary_assignee_id: emp("staff"), watcher_ids: [emp("peer"), emp("staff")] });
+    expect(t.status).toBe(201);
+    const panel = await as("manager").get(`/tasks/${t.body.task_id}`);
+    // The lead hears of it already, so they are never a watcher too.
+    expect(panel.body.watchers.map((p) => p.employee_id)).toEqual([emp("peer")]);
+    expect((await as("peer").get(`/tasks/${t.body.task_id}`)).body.watching).toBe(true);
+    await drain();
+    expect(await bell("peer")).toEqual(expect.arrayContaining([expect.stringMatching(/You are watching/)]));
+    const history = await as("manager").get(`/tasks/${t.body.task_id}/activity`);
+    expect(history.body.data.map((a) => a.kind)).toEqual(expect.arrayContaining(["created", "watcher_added"]));
+
+    const nobody = await as("manager").post("/tasks", { title: "A stranger watching", watcher_ids: ["00000000-0000-4000-8000-0000000000ee"] });
+    expect(nobody.status).toBe(422);
+    expect(nobody.body.error.fields.watcher_ids).toEqual(["Not on the staff"]);
+    const noDepartment = await as("manager").post("/tasks", { title: "A department that is not", watcher_department_id: "00000000-0000-4000-8000-0000000000ef" });
+    expect(noDepartment.status).toBe(422);
+    expect(noDepartment.body.error.fields.watcher_department_id).toEqual(["Not a department"]);
+
+    const department = (await q("SELECT department_id FROM employee WHERE employee_id = $1", [emp("peer")])).rows[0].department_id;
+    const team = await as("manager").post("/tasks", { title: "Watched by a department", watcher_department_id: department });
+    expect(team.status).toBe(201);
+    const theirs = (await as("manager").get(`/tasks/${team.body.task_id}`)).body.watchers.map((p) => p.employee_id);
+    expect(theirs).toContain(emp("peer"));
+    expect(theirs).not.toContain(emp("manager"));
   });
 
   test("a hold has a note and an expected day; clearing it moves the due time on and keeps the history", async () => {

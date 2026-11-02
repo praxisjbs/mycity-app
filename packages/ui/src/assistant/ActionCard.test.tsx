@@ -55,6 +55,39 @@ describe("ActionCard", () => {
     expect(screen.queryByRole("button", { name: "Save Changes" })).toBeNull();
   });
 
+  it("names what its id fields hold, never counts them on the verb, and Edit picks them with the screen's picker", async () => {
+    const taskFields: CardField[] = [
+      { name: "title", label: "Title", kind: "text", required: true, options: null, long: false },
+      { name: "primary_assignee_id", label: "For", kind: "id", required: false, options: null, long: false, picks: "task_assignee" },
+      { name: "watcher_ids", label: "Watchers", kind: "list", required: false, options: null, long: false, picks: "colleague" },
+      { name: "project_id", label: "Project", kind: "id", required: false, options: null, long: false },
+    ];
+    const names: CardRecord[] = [
+      { type: "employee", id: "e1", label: "JBS Praxis Team", link: null },
+      { type: "employee", id: "e2", label: "Tobiloba Dada", link: null },
+      { type: "employee", id: "e3", label: "Bassey Ekpe", link: null },
+    ];
+    const onSave = vi.fn(async () => undefined);
+    // The screen's picker, bound to its own endpoint: here a button that picks one more person.
+    const picker = vi.fn(({ field, value, onChange }: { field: CardField; value: unknown; onChange: (v: unknown) => void }) =>
+      field.name === "watcher_ids" ? <button type="button" onClick={() => onChange([...((value as string[]) ?? []), "e4"])}>Pick Someone</button> : null,
+    );
+    render(
+      <ActionCard label="Create Task" fields={taskFields} values={{ title: "Review milestone 3", primary_assignee_id: "e1", watcher_ids: ["e2", "e3"], project_id: "p9" }} problems={{}} records={[]} names={names} picker={picker} status="shown" confirm="press" schema={schema} onConfirm={() => undefined} onSave={onSave} />,
+    );
+    expect(screen.getByText("JBS Praxis Team")).toBeInTheDocument();
+    expect(screen.getByText("Tobiloba Dada, Bassey Ekpe")).toBeInTheDocument();
+    // An id nothing names keeps the id; the verb counts no name.
+    expect(screen.getByText("p9")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Task" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Pick Someone" }));
+    // A field the screen gives no picker for stays as it is.
+    expect(screen.getByRole("textbox", { name: "For" })).toHaveAttribute("disabled");
+    await userEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ watcher_ids: ["e2", "e3", "e4"] })));
+  });
+
   it("once pressed, the result line sits under it with no buttons; expired offers Draw It Again; a refusal is an alert with its screen", async () => {
     const onRedraw = vi.fn();
     const onPress = vi.fn();

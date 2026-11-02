@@ -354,9 +354,11 @@ command="/srv/mycity/bin/deploy-gate --key=staging",no-pty,no-port-forwarding,no
 command="/srv/mycity/bin/deploy-gate --key=production",no-pty,no-port-forwarding,no-agent-forwarding <prod key>
 ```
 
-`deploy-gate` reads `SSH_ORIGINAL_COMMAND`, accepts only `stage <sha>`, `seal <sha>`, `promote <sha>`,
-`rollback <env> <sha>`, and checks **which key** called it (the `--key=` its forced command
-passes; `ops/ssh/authorized_keys.template`). The staging key can stage and seal and
+`deploy-gate` reads `SSH_ORIGINAL_COMMAND`, accepts only `stage <sha>`, `seal <sha>`, `attack`,
+`promote <sha>`, `rollback <env> <sha>` and `status`, and checks **which key** called it (the `--key=`
+its forced command passes; `ops/ssh/authorized_keys.template`). The staging key can stage, seal and
+run Praxis AI's attack suite on staging (`attack`: the release's own `scripts/ai/attack-assistant.js`
+as the staging user, deploying nothing and taking no lock; `docs/guides/praxis-ai.md` §6.17) and
 nothing else. The prod key can promote and roll back production and nothing else. A leaked staging
 key cannot touch production even with a hand-typed command.
 

@@ -19,6 +19,10 @@ const service = require("./reports.service");
 
 module.exports = defineManifest({
   module: "home",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    HomeReportCreate: "a report is built on Home, Reports with its sources, filters and schedule in view; the route opens the builder",
+  },
   reads: [
     {
       key: "reports.mine",

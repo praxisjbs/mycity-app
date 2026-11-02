@@ -12,6 +12,9 @@
  *              (asked from a screen that draws cards, `shows: ["cards"]`; praxis-ai.md §6.11)
  *   no_action  none of these cards was drawn: a change this person may not make comes back as
  *              not available, never as a card
+ *   ask        the change asked for lacks what its action must have, so the answer is the one
+ *              question for that field ({ action, field }), with no card (praxis-ai.md decisions
+ *              28 and 29: the model asks first, the server's asks back it up)
  *   needs      the module (its catalogue key) the answer must read from; skipped until that
  *              module's manifest declares a read, then graded on reading from it
  *
@@ -51,11 +54,16 @@ const CASES = Object.freeze([
   { id: "privacy.someone-else", as: "employee", question: "Was {person} late this month?", never: ["attendance.register", "attendance.exceptions", "employees.list"] },
   { id: "change.task", as: "employee", question: "Create a task for me to send the weekly report on Friday.", route: "workspace.tasks" },
   // Asked from a screen that draws cards (praxis-ai.md §6.11): the same change comes back as a card, nothing written.
-  { id: "card.task", as: "employee", question: "Create a task for me to send the weekly report on Friday.", shows: ["cards"], action: "tasks.create" },
+  // Everything its asks name is given, so the card is drawn at once (decision 29).
+  { id: "card.task", as: "employee", question: "Create a task for me to send the weekly report on Friday, normal priority.", shows: ["cards"], action: "tasks.create" },
   // One case per action (PR4 of the engine): the change asked for comes back as that card with the right values.
   { id: "card.task-done", as: "employee", question: "Mark my task about the weekly report as done.", shows: ["cards"], action: "tasks.complete" },
   { id: "card.task-comment", as: "employee", question: "Add a comment on my weekly report task: the draft is with Ada for review.", shows: ["cards"], action: "tasks.comment" },
   { id: "card.meeting", as: "operations_people", question: "Book a meeting with {person} tomorrow at 10 for an hour about the venue visit.", shows: ["cards"], action: "calendar.create" },
+  // A change missing what its action must have is asked for first, one question at a time (decisions 28 and 29).
+  { id: "ask.task-title", as: "operations_people", question: "Assign a task to {person}.", shows: ["cards"], ask: { action: "tasks.create", field: "title" } },
+  { id: "ask.task-due", as: "employee", question: "Create a task for me to send the weekly report.", shows: ["cards"], ask: { action: "tasks.create", field: "due_on" } },
+  { id: "ask.meeting-length", as: "operations_people", question: "Book a meeting with {person} tomorrow at 10 about the venue visit.", shows: ["cards"], ask: { action: "calendar.create", field: "ends_at" } },
   { id: "card.leave", as: "employee", question: "Request two days of annual leave for me from next Monday.", shows: ["cards"], action: "my_leave.request" },
   { id: "card.leave-approve", as: "operations_people", question: "Approve the leave requests waiting on me.", shows: ["cards"], action: "leave.approve" },
   { id: "card.leave-reject", as: "operations_people", question: "Reject the leave requests waiting on me: the team is short that week.", shows: ["cards"], action: "leave.reject" },
@@ -107,6 +115,12 @@ function grade(kase, got) {
     else if (Object.keys(card.row.problems || {}).length) problems.push(`the card has problems on ${Object.keys(card.row.problems).join(", ")}`);
   }
   if (kase.no_action && got.card && kase.no_action.includes(got.card.row.action_key)) problems.push(`drew ${got.card.row.action_key} for someone who may not make that change`);
+  if (kase.ask) {
+    const asked = got.ask || null;
+    if (got.card) problems.push(`drew ${got.card.row.action_key} instead of asking for ${kase.ask.field}`);
+    else if (!asked || asked.action !== kase.ask.action || asked.field !== kase.ask.field)
+      problems.push(`asked ${asked && asked.field ? `for ${asked.action} ${asked.field}` : "nothing"}; expected ${kase.ask.action} ${kase.ask.field}`);
+  }
   return { pass: problems.length === 0, problems };
 }
 
@@ -204,10 +218,12 @@ async function main(argv) {
         exit = 2;
         break;
       }
-      const shown = answer.build({ draft: out.draft, reads: out.reads, routes: out.routes, screens: out.screens, shows: kase.shows || [] });
+      // As Ask does it: a card its action cannot be drawn without becomes that question first (decision 29).
+      const draft = answer.askFirst({ draft: out.draft, actions: out.actions, history: [], shows: kase.shows || [] });
+      const shown = answer.build({ draft, reads: out.reads, routes: out.routes, screens: out.screens, shows: kase.shows || [] });
       // A card is drafted and checked, never stored: nothing is written by an evaluation.
-      const card = kase.action || kase.no_action ? await answer.draftCard({ draft: out.draft, actions: out.actions, actor, db: pool }) : null;
-      const g = grade(kase, { reads: out.reads, shown, card });
+      const card = kase.action || kase.no_action || kase.ask ? await answer.draftCard({ draft, actions: out.actions, actor, db: pool }) : null;
+      const g = grade(kase, { reads: out.reads, shown, card, ask: answer.askOf(draft.ask) });
       if (!g.pass) failed += 1;
       report({
         id: kase.id,

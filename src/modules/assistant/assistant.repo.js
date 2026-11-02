@@ -99,16 +99,16 @@ function readOf(db, messageId, n, userId) {
 }
 
 const DRAFT = `d.ai_action_draft_id, d.ai_message_id, d.user_id, d.action_key, d.module_key, d.risk, d."values", d.problems, d.records,
-       d.suggested, d.status, d.expires_at, d.created_at`;
+       d.names, d.suggested, d.status, d.expires_at, d.created_at`;
 
 /** A card an answer drew (§6.11), in the answer's transaction. */
 function insertDraft(client, d) {
   return one(
     client,
-    `INSERT INTO ai_action_draft AS d (ai_message_id, user_id, action_key, module_key, risk, "values", problems, records, suggested, status, expires_at)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11)
+    `INSERT INTO ai_action_draft AS d (ai_message_id, user_id, action_key, module_key, risk, "values", problems, records, names, suggested, status, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11, $12)
      RETURNING ${DRAFT}`,
-    [d.ai_message_id, d.user_id, d.action_key, d.module_key, d.risk, JSON.stringify(d.values || {}), JSON.stringify(d.problems || {}), JSON.stringify(d.records || []), d.suggested === true, d.status || "shown", d.expires_at],
+    [d.ai_message_id, d.user_id, d.action_key, d.module_key, d.risk, JSON.stringify(d.values || {}), JSON.stringify(d.problems || {}), JSON.stringify(d.records || []), JSON.stringify(d.names || []), d.suggested === true, d.status || "shown", d.expires_at],
   );
 }
 
@@ -124,7 +124,7 @@ async function draftsOfMessages(db, messageIds) {
   return new Map(rows.map((r) => [r.ai_message_id, r]));
 }
 
-/** A card's status, and its values and problems when they changed. */
+/** A card's status, and its values, problems, records and names when they changed. */
 function setDraft(client, id, patch) {
   return one(
     client,
@@ -132,10 +132,11 @@ function setDraft(client, id, patch) {
         SET status = COALESCE($2, d.status),
             "values" = COALESCE($3::jsonb, d."values"),
             problems = COALESCE($4::jsonb, d.problems),
-            records = COALESCE($5::jsonb, d.records)
+            records = COALESCE($5::jsonb, d.records),
+            names = COALESCE($6::jsonb, d.names)
       WHERE d.ai_action_draft_id = $1
       RETURNING ${DRAFT}`,
-    [id, patch.status || null, patch.values ? JSON.stringify(patch.values) : null, patch.problems ? JSON.stringify(patch.problems) : null, patch.records ? JSON.stringify(patch.records) : null],
+    [id, patch.status || null, patch.values ? JSON.stringify(patch.values) : null, patch.problems ? JSON.stringify(patch.problems) : null, patch.records ? JSON.stringify(patch.records) : null, patch.names ? JSON.stringify(patch.names) : null],
   );
 }
 

@@ -23,6 +23,22 @@ const service = require("./dashboard.service");
 const team = require("./dashboard.team");
 const activity = require("./dashboard.activity");
 
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17). The roster is the asker's `home`
+ * scope, for a person who may open the Team tab (nothing to assert for one who may not): a report of
+ * theirs is on it, an outsider never. Activity Today carries each event's subject in the reader's
+ * scope on that module: the report's own arrival (`employee.created`, today) for a reader with a
+ * `people` grant, never the outsider's.
+ */
+const teamProbe = {
+  inside: (ctx) => (ctx.capabilities.includes(team.CAPABILITY) && ctx.report ? { type: "employee", id: ctx.report.employee_id } : null),
+  outside: (ctx) => ({ type: "employee", id: ctx.outsider.employee_id }),
+};
+const activityProbe = {
+  inside: async (ctx) => ((await ctx.scopeOf("people", "view")) && ctx.report ? { type: "employee", id: ctx.report.employee_id } : null),
+  outside: (ctx) => ({ type: "employee", id: ctx.outsider.employee_id }),
+};
+
 module.exports = defineManifest({
   module: "home",
   reads: [
@@ -41,6 +57,7 @@ module.exports = defineManifest({
       permission: ["home", "view"],
       run: (client, params, actor) => team.forAssistant(client, actor, params),
       cite: (row) => ({ type: "employee", id: row.employee.employee_id, label: row.employee.display_name }),
+      matrix: teamProbe,
     },
     {
       key: "activity.list",
@@ -49,6 +66,7 @@ module.exports = defineManifest({
       permission: ["home", "view"],
       run: (client, params, actor) => activity.forAssistant(client, actor, params),
       cite: (row) => ({ type: row.entity_type, id: row.entity_id, label: row.subject || row.actor_name }),
+      matrix: activityProbe,
     },
   ],
   routes: [

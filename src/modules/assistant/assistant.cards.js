@@ -15,7 +15,10 @@
  * `bulk` records; the action's own check(); then the run is opened and run() called once, outside
  * the card's transaction, since the service keeps its own. A refusal a person can fix (an AppError
  * under 500 from check() or run()) comes back on the fields and the card stays open; anything else
- * is recorded on the card as failed.
+ * is recorded on the card as failed. A press refused before anything ran because the rights were
+ * not there (the grant gone, more records than the action allows, the action's own check: a record
+ * outside the person's scope, their own request) is recorded as `assistant.action_refused`, audit
+ * only, so AI Control · Spend can count the presses refused this month (praxis-ai.md §6.17).
  */
 const { pool } = require("../../config/db");
 const { logger } = require("../../config/logger");
@@ -96,7 +99,8 @@ function present(row, run = null, now = Date.now()) {
     values: row.values || {},
     problems: row.problems || {},
     records: (row.records || []).slice(0, 25).map(recordView),
-    fields: action ? cards.fieldsOf(jsonSchemaOf(action.input), action.labels) : [],
+    names: (row.names || []).slice(0, cards.NAMES_MAX).map(recordView),
+    fields: action ? cards.fieldsOf(jsonSchemaOf(action.input), action.labels, { fields: action.fields, picks: action.picks }) : [],
     suggested: row.suggested === true,
     status,
     expires_at: iso(row.expires_at),
@@ -124,7 +128,7 @@ async function edit(id, body, actor) {
     }
     if (!registry.action(found.action_key)) throw new AppError("CARD_EXPIRED", "This card has expired. Ask again to draw it afresh.", 409);
     const checked = held(await authorise.checkAction(actor, found.action_key, body.values, client));
-    return repo.setDraft(client, found.ai_action_draft_id, { values: checked.ok ? checked.values : body.values, problems: checked.ok ? {} : checked.problems, records: checked.records });
+    return repo.setDraft(client, found.ai_action_draft_id, { values: checked.ok ? checked.values : body.values, problems: checked.ok ? {} : checked.problems, records: checked.records, names: checked.names });
   });
   return present(row, null);
 }
@@ -138,7 +142,37 @@ function held(checked) {
 /** The action's own check, with the person carrying their scope; its refusals land on the fields. */
 async function ownCheck(client, action, values, actor) {
   if (!action.check) return;
-  await action.check(client, values, actor);
+  try {
+    await action.check(client, values, actor);
+  } catch (err) {
+    if (err instanceof AppError && err.status < 500) err.refusedAt = "check";
+    throw err;
+  }
+}
+
+/** The codes authorise.checkAction refuses a press with before anything runs (§6.11 step 5). */
+const REFUSED_CODES = new Set(["AI_ACTION_FORBIDDEN", "TOO_MANY_RECORDS"]);
+
+/**
+ * A press refused for want of rights is recorded, audit only, in a transaction of its own: the
+ * refusal rolled the press's back. The card itself is untouched; the person reads the refusal.
+ */
+async function recordRefusal(id, actor, err) {
+  if (!(err instanceof AppError) || !(REFUSED_CODES.has(err.code) || err.refusedAt === "check")) return;
+  try {
+    const found = await repo.draftOf(pool, id, actor.user_id);
+    if (!found) return;
+    await tx((client) =>
+      emit(client, {
+        key: EVENTS.ASSISTANT_ACTION_REFUSED,
+        entity: { type: "ai_action_draft", id: found.ai_action_draft_id },
+        actor,
+        payload: { action_key: found.action_key, error_code: err.code, at: err.refusedAt === "check" ? "check" : "grant" },
+      }),
+    );
+  } catch (recordErr) {
+    logger.warn({ err: recordErr, ai_action_draft_id: id }, "Praxis AI: a refused press could not be recorded");
+  }
 }
 
 /** The lines a press reads back, from the action's readback or the records it named. */
@@ -155,7 +189,19 @@ function linesOf(action, result, records) {
  * @returns {Promise<object>} AiActionResult
  */
 async function confirm(id, body, actor, idempotencyKey = null) {
-  const opened = await tx(async (client) => {
+  let opened;
+  try {
+    opened = await openPress(id, body, actor, idempotencyKey);
+  } catch (err) {
+    await recordRefusal(id, actor, err);
+    throw err;
+  }
+  return runPress(opened, actor, idempotencyKey);
+}
+
+/** The press's first half, in one transaction: the checks, then the run opened `running`. */
+function openPress(id, body, actor, idempotencyKey) {
+  return tx(async (client) => {
     const found = await repo.draftOf(client, id, actor.user_id, { lock: true });
     if (!found) throw notFound();
     try {
@@ -171,12 +217,12 @@ async function confirm(id, body, actor, idempotencyKey = null) {
     const values = body && body.values ? body.values : found.values || {};
     const checked = held(await authorise.checkAction(actor, found.action_key, values, client));
     if (!checked.ok) {
-      await repo.setDraft(client, found.ai_action_draft_id, { values, problems: checked.problems });
+      await repo.setDraft(client, found.ai_action_draft_id, { values, problems: checked.problems, names: checked.names });
       throw new AppError("VALIDATION", "Check the card's fields", 422, checked.problems);
     }
     const who = { ...actor, scope: checked.scope };
     await ownCheck(client, action, checked.values, who);
-    await repo.setDraft(client, found.ai_action_draft_id, { status: "confirmed", values: checked.values, problems: {}, records: checked.records });
+    await repo.setDraft(client, found.ai_action_draft_id, { status: "confirmed", values: checked.values, problems: {}, records: checked.records, names: checked.names });
     const run = await repo.insertRun(client, {
       ai_action_draft_id: found.ai_action_draft_id,
       user_id: actor.user_id,
@@ -186,7 +232,10 @@ async function confirm(id, body, actor, idempotencyKey = null) {
     });
     return { found, action, who, values: checked.values, records: checked.records, run };
   });
+}
 
+/** The press's second half: run() outside the card's transaction, then the result recorded. */
+async function runPress(opened, actor, idempotencyKey) {
   const { found, action, who, values, records, run } = opened;
   let result;
   try {

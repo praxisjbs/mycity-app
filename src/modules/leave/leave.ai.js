@@ -19,6 +19,23 @@ const service = require("./leave.service");
 
 const requestLink = (id) => (routeMap.linkFor("leave_request", id) || {}).path || null;
 
+/** A leave request for `who`, of the annual type the matrix names, on a fresh weekday ahead, through Request Leave's own service. */
+async function requestFor(ctx, who) {
+  const day = ctx.freshDay();
+  const r = await service.request(who.user, who.employee_id, { leave_type_id: ctx.leaveTypeId, starts_on: day, ends_on: day, reason: `A matrix day for ${ctx.role}` });
+  return { type: "leave_request", id: r.leave_request_id, values: { leave_request_ids: [r.leave_request_id], reason: "Not that week" } };
+}
+
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): a request by someone in the asker's
+ * reach (a report of theirs; nothing to assert for a person with none) and one by an outsider; the
+ * list returns the first and never the second, and a card naming the second is refused.
+ */
+const probe = {
+  inside: (ctx) => (ctx.report ? requestFor(ctx, ctx.report) : null),
+  outside: (ctx) => requestFor(ctx, ctx.outsider),
+};
+
 /** What the approve and reject cards share: the requests named, the re-check, the lines read back. */
 const decision = (verb) => ({
   permission: ["people", "approve"],
@@ -31,6 +48,7 @@ const decision = (verb) => ({
   run: (values, actor) => service.decideMany(actor, values, verb),
   readback: (r) => r.lines.map((l) => ({ ...l, link: requestLink(l.id) })),
   labels: { leave_request_ids: "Requests", reason: "Reason" },
+  matrix: probe,
 });
 
 module.exports = defineManifest({
@@ -77,6 +95,7 @@ module.exports = defineManifest({
         id: row.leave_request_id,
         label: `${row.employee.display_name}, ${row.leave_type_name}`,
       }),
+      matrix: probe,
     },
   ],
   routes: [
