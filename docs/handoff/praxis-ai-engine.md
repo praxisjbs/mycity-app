@@ -739,7 +739,7 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 - [x] 01/11/2026 · The screens: choices under an answer (`AnswerBubble` `choices`), a tap asked as the next question; `ActionCard` Edit with the app's pickers and names; New Task's Watchers and Watching Department; the panel read only for a watcher; the mock
 - [x] 01/11/2026 · Tests: unit (manifest, cards, the guard, the system turn), integration on the real migrations (names, watchers, the guard's run of questions with the model scripted), screens; the evaluation set's follow-up cases; the catalogue snapshot
 - [x] 01/11/2026 · Documents: `praxis-ai.md` (§2, §4, §5, §6, §10, §11, §14), `workspace.md` (§3, §5, §6, §7, §9, §10, §11, §14), `community.md` §9, the User Guide chapters (Praxis AI, My Workspace) with their pictures, PROGRESS, README, DATABASE_SCHEMA
-- [ ] `npm run ci` green; pushed
+- [x] 02/11/2026 · `npm run ci` green, run group by group in a cloud session (a command there stops at 10 minutes): checks, frontend (the app's tests in three shards), screens (each gate on its own) and backend (Jest in six shards, the database on); two tests that failed on main too, by the date, fixed in their own commit; pushed as `71d7935` and `e851aaa`
 
 ## 7 · Gates this work adds
 
