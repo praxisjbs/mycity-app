@@ -72,6 +72,8 @@ type OrganisationalGoalRow = OrganisationalGoal;
 const scoreHelp = ({ band_good: good, band_watch: watch }: PerformancePeriod["rules"]["key_results"]) =>
   `Scores run from 0 to 1. Good is ${good} or above; Watch ${watch} to ${good}; Recovery below ${watch} needs a recovery plan.`;
 const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
+/** The plan states whose Plan Approval card a reader who does not set the plan sees: sent for approval (a revision's changes too), or binding. */
+const READ_PLAN_STATES: ReadonlySet<string> = new Set(["submitted", "revising", "binding"]);
 
 export function Goals() {
   const me = useMe();
@@ -96,6 +98,9 @@ export function Goals() {
   const goals = usePaged("GET /api/v1/performance/goals", { filters: period ? { plan_year: Number(period.starts_on.slice(0, 4)) } : {} });
   const plans = usePaged("GET /api/v1/performance/plans", { filters: quarter.periodId ? { period_id: quarter.periodId } : {}, enabled: Boolean(quarter.periodId) });
   const plan = dept ? plans.rows.find((p) => (dept === "company" ? p.department_id === null : p.department_id === dept)) : undefined;
+  // The Plan Approval card is where a plan is prepared and sent, so whoever sets the function's goals has it in every state; everyone else
+  // reads it once the plan is awaiting approval or binding, not while it is draft, returned or unbound (§10.1).
+  const setsPlan = Boolean(plan && settable.rows.some((x) => x.department_id === plan.department_id));
 
   const summary = useApi("GET /api/v1/performance/okrs/summary", {
     query: { period_id: quarter.periodId, ...(dept ? { department_id: dept } : {}) },
@@ -203,7 +208,7 @@ export function Goals() {
       </Toolbar>
       <KpiTiles items={tiles} mobileCols={2} />
       <WaitingOnYou />
-      {plan && <PlanCard id={plan.performance_plan_id} />}
+      {plan && (setsPlan || READ_PLAN_STATES.has(plan.status)) && <PlanCard id={plan.performance_plan_id} />}
       {(readsCompany || goals.loading || goals.rows.length > 0) && (
         <PagedTable
           title="Organisational Goals"
