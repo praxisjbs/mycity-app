@@ -664,17 +664,19 @@ async function bindDepartment(client, { performance_period_id: periodId, departm
 }
 
 /** An approved target change on a line takes effect (§6.7). In the caller's transaction. */
-async function applyTargetChange(client, { employee_target_id: lineId, target_value: value, target_text: text, target_change_id: changeId }) {
+async function applyTargetChange(client, { employee_target_id: lineId, target_value: value, target_text: text, target_change_id: changeId, from_month: fromMonth }) {
   const line = await repo.lineWithCard(client, lineId);
   if (!line) return;
   await repo.updateLine(client, lineId, { target_value: value ?? null, target_text: text ?? null });
+  // What the employee is told: which line, the new target and the month it applies from.
+  const label = require("../goals/goals.okrs").changeLabel(line.title, { to_value: value, to_text: text, from_month: fromMonth });
   await emit(client, {
     key: EVENTS.SCORECARD_LINE_TARGET_CHANGED,
     entity: { type: "scorecard", id: line.scorecard_id },
     actor: null,
     before: { target_value: line.target_value, target_text: line.target_text },
     after: { target_value: value ?? null, target_text: text ?? null },
-    payload: { scorecard_id: line.scorecard_id, employee_target_id: lineId, employee_id: line.employee_id, target_change_id: changeId },
+    payload: { scorecard_id: line.scorecard_id, employee_target_id: lineId, employee_id: line.employee_id, target_change_id: changeId, label },
   });
 }
 

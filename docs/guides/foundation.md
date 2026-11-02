@@ -979,7 +979,7 @@ About thirty selects across the hub read their options that way. JBS Praxis's an
 | `settings.changed` (organisation, working week, holidays, numbering, appearance) | C | Audit only; the working week and holidays clear the calendar cache; an appearance change reaches each hub through `/auth/me` (§6.15) |
 | `audit.export_requested` | C | `audit.build_export` makes the workbook of the whole filtered log (at most 10,000 entries, masked for the person who asked) into the file the request reserved, which the Audit Log downloads (§6.12); nothing is emailed |
 | `export-cleanup` (scheduler, every hour at twenty past) | B | Removes every export file 24 hours after it was made (`vault.remove`, `document.removed`; §6.12) |
-| The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
+| The engine's own events (`workflow.*`) | D | Approvers told when a stage starts (the CEO too when they opened it themself: they decide their own request, 02/11/2026); the requester when decided |
 | `workflow.definition_saved` | D | Audit only (the stages before and after) |
 | `workflow.definition_created` | D | Audit only (a flow made on screen: its key, module and stages) |
 | `workflow.reassigned` | D | The new approver is told; the stage's time limit starts again |

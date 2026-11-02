@@ -667,6 +667,7 @@ async function approvals(query, actor) {
 async function requestChange(actor, scope, body) {
   const okrs = require("./goals.okrs");
   let from;
+  let subject; // what the notices call the target: the key result's code or the line's title
   if (body.okr_key_result_id) {
     const ctx = await repo.keyResultContext(pool, body.okr_key_result_id);
     if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404);
@@ -674,6 +675,7 @@ async function requestChange(actor, scope, body) {
     const owner = actor && actor.employee_id === ctx.accountable_employee_id;
     if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
     from = { value: ctx.target_value, text: ctx.target_text };
+    subject = ctx.code;
   } else {
     const targetsRepo = require("../targets/targets.repo");
     const line = await targetsRepo.lineWithCard(pool, body.employee_target_id);
@@ -685,6 +687,7 @@ async function requestChange(actor, scope, body) {
     if (!(await require("../targets/targets.service").mayChangeLineTarget(pool, card, actor)))
       throw new AppError("PERMISSION_DENIED", "The reviewer or the function's head changes this target", 403);
     from = { value: line.target_value, text: line.target_text };
+    subject = line.title;
   }
   if (await repo.changePending(pool, body))
     throw new AppError("CHANGE_PENDING", "A change to this target is already waiting for a decision", 409);
@@ -708,7 +711,14 @@ async function requestChange(actor, scope, body) {
       key: EVENTS.TARGET_CHANGE_REQUESTED,
       entity: { type: "target_change", id: changeId },
       actor,
-      payload: { target_change_id: changeId, okr_key_result_id: body.okr_key_result_id || null, employee_target_id: body.employee_target_id || null },
+      payload: {
+        target_change_id: changeId,
+        okr_key_result_id: body.okr_key_result_id || null,
+        employee_target_id: body.employee_target_id || null,
+        label: okrs.changeLabel(subject, body),
+        // The CEO is told by the engine that it waits on them, so not twice (§6.7).
+        requested_by_ceo: Boolean(actor && actor.is_ceo),
+      },
     });
     return changeId;
   });

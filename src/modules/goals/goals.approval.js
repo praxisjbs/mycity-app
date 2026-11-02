@@ -98,6 +98,10 @@ async function settleChange(changeId, { state }) {
     const change = await repo.getChangeRow(client, changeId);
     if (!change || change.status !== "pending") return null;
     const approved = state === "approved" || state === "timeout_approved";
+    // What the notices call the target, and who answers for a key result (a line's employee is told
+    // by the scorecard, applyTargetChange); read before the target changes (§6.7).
+    const keyResult = change.okr_key_result_id ? await repo.keyResultOwners(client, change.okr_key_result_id) : null;
+    const line = keyResult || !change.employee_target_id ? null : await require("../targets/targets.repo").lineWithCard(client, change.employee_target_id);
     if (approved) {
       const target = { target_value: change.to_value ?? null, target_text: change.to_text ?? null };
       if (change.okr_key_result_id) {
@@ -117,8 +121,10 @@ async function settleChange(changeId, { state }) {
         status: approved ? "approved" : "rejected",
         okr_key_result_id: change.okr_key_result_id,
         employee_target_id: change.employee_target_id,
-        label: `New target ${change.to_text || change.to_value} from ${String(change.from_month).slice(0, 7)}`,
+        label: require("./goals.okrs").changeLabel(keyResult ? keyResult.code : line ? line.title : "Target", change),
         requested_by_employee_id: await employeeOfUser(client, change.requested_by),
+        // A key result's owners hear of an approved change; a refusal changes nothing for them.
+        owner_employee_ids: approved && keyResult ? [keyResult.accountable_employee_id, keyResult.co_accountable_employee_id].filter(Boolean) : [],
       },
     });
     return approved ? "approved" : "rejected";

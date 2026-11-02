@@ -420,7 +420,7 @@ and Home rows of §2 and §10.
 | Settings · Approvals (M0) | staff app | `settings` | the flows Performance Plan, Performance Review, Commitments, Target Change, and the new approver kind | edit the stages |
 | Settings · Documents & Numbering (M0) | staff app | `settings` | no new scheme: Performance codes are positional (G1) | none |
 | AI Control (M10, brought forward) | staff app | `ai_control` | the three actions `review-dictation`, `review-cleanup`, `week-summary` with their jobs | change a chain |
-| Notifications bell | both shells | the people §7 names | plan waiting, plan binding, scorecard to agree, check-in due and in, review waiting, input asked, review closed, commitments waiting, PIP started, target change decided | open the record |
+| Notifications bell | both shells | the people §7 names | plan waiting, plan binding, scorecard to agree, check-in due and in, review waiting, input asked, review closed, commitments waiting, PIP started, target change sent and decided, your target changed | open the record |
 | ⌘K search | both shells | per scope | key results, objectives, organisational goals (each opening its sheet), KPIs, scorecards, reviews; actions New Goal, Set Up Quarter, New Scorecard, Report Month, Start Check-In, New Commitment | open the record or the action |
 | Queries & Sanctions (M3, GE) | staff app | as M3 | a caution raised from a review links back to it | M3 builds the screen; M2 hands over the event (§7) |
 
@@ -895,7 +895,8 @@ grant, as above.
   nor shown it). The engine tells the approvers of the stage the plan has reached, and only them: on Send
   Plan (`workflow.opened`, "Approval needed: Quarter Plan") and on each approval that moves it on
   (`workflow.advanced`); Goals · Waiting On You lists the plan for those approvers alone. The CEO may decide
-  any stage (`approvers.canAct`) but hears at their own. Where a plan goes first follows its context: the
+  any stage (`approvers.canAct`) but hears at their own, and at a plan they sent themself (the CEO is the one
+  sender who may decide it, so the engine tells them, 02/11/2026). Where a plan goes first follows its context: the
   head of General Management is the CEO, so Line Manager is skipped, and Operations & People is skipped
   only when the sender holds the `operations_people` role, which the Implementation Team's build account
   does not. So that the sender sees where it went, `GET /performance/plans/:id` and the answer to Send Plan
@@ -977,6 +978,22 @@ grant, as above.
   while a change to that target waits (`pending_change` on the line, shown as Change Waiting).
 - The CEO decides a change on Goals · Waiting On You: Approve Change, or Refuse Change with a reason
   (`/reject`); a refused change keeps the target, and its reason stays on the request's decisions.
+- **Who is told** (JBS Praxis, 02/11/2026, from staging: the CEO changed a target and was shown nothing
+  about it; the bell held only the reminder and the overdue notice that came days later). Each notice
+  names what changed (the key result's code or the line's title), the new target and the month it
+  applies from, as *October 2026*.
+  - *Asking.* The person who asked is told **Target change sent** (their own confirmation, `target_change.requested`),
+    unless they are the CEO. The CEO is told **Approval needed: Target Change** by the engine. When the
+    CEO asks for a change themself it waits on them alone, and the engine tells them too: the CEO is the
+    one person who may decide their own request (`approvers.canAct`), so it is the one request they are
+    asked to decide that they also opened. The fan-out used to leave out whoever acted, so that request
+    reached the CEO only as the 3 day reminder.
+  - *Deciding.* The person who asked is told **Target change approved** or **Target change refused**
+    (`target_change.decided`). The CEO who decides is not told of their own decision, unless they also asked.
+  - *On approval,* the person whose target changed is told as well: a line's employee **Your target
+    changed** (`scorecard.line_target_changed`; never the person who asked, who is never the employee), a
+    key result's accountable and co-accountable people **Target change approved** (`target_change.decided`).
+    A refusal changes no target, so it tells the person who asked and nobody else.
 
 ### 6.8 Key result scoring and the roll-up (PR 1 maths, PR 2 screens)
 
@@ -1470,7 +1487,8 @@ capabilities, `goals.view_all`, `goals.company` and `goals.organisation`:
 | `plan.revision_submitted` · `plan.revised` · `plan.revision_returned` | Send Plan on an unbound plan; the CEO's approval; Request Changes | the engine tells the CEO; the sender is told the plan is binding again, or needs changes with the reason |
 | `scorecard.agreed` · `scorecard.disagreed` | agreement | notice to the other party; disagreement to the reviewer |
 | `scorecard.sent` · `scorecard.amendment_decided` (PR 3) | Send Scorecard; the plan flow's decision on it | the stages are told; on approval the scorecard binds and its people are told to agree it |
-| `target_change.requested` · `target_change.decided` | request; the CEO's decision | the CEO's notice opens the change's sheet on Goals (`?change=`); the requester is told; the target applies on approval |
+| `target_change.requested` · `target_change.decided` | request; the CEO's decision | the engine tells the CEO (the CEO who asked too: they decide their own request), whose notice opens the change's sheet on Goals (`?change=`); the requester is told "Target change sent" (not when they are the CEO), then "Target change approved" or "Target change refused"; on approval a key result's accountable and co-accountable people are told "Target change approved"; the target applies on approval (§6.7) |
+| `scorecard.line_target_changed` | an approved target change applies to a scorecard line | the line's employee is told "Your target changed", with the new target and the month it applies from; its notice opens their scorecard (§6.7) |
 | `kpi.actual_recorded` | Record Actual or Report Month | lines fed by it recount |
 | `kpi.removed` | reverting the import that created a KPI | audit only: the KPI, its months and former codes are gone |
 | job `review-cycles` (06:00 Lagos) with handler `review-cycle-open` | the first business day after a month ends | opens the round and its reviews (idempotent per scorecard and month); `review_round.opened` tells each person their check-in is due |
@@ -1825,6 +1843,8 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
   engine should tell the CEO at once when a stage has nobody to tell is for GE to decide.
 
 ## 14 · Change log
+
+- 02/11/2026 · JP · Target changes tell the people they concern (JBS Praxis, 02/11/2026, from staging: "when the CEO changes a target, no notification is shown about a target change"; §6.4, §6.7, §7), guide first. Found: the CEO's own request waits on the CEO, and the fan-out leaves out whoever acted, so the engine's *Approval needed* never reached them and the bell held only the 3 day reminder and the overdue notice; `scorecard.line_target_changed` declared no notice, so the employee whose target changed was never told; `target_change.decided` told only whoever asked, so a key result's owner was not told either; and nobody was told their request was sent. **Now:** the engine tells the CEO of a request they opened themself (the CEO is the one person who may decide their own, `approvers.canAct`); the person who asked is told **Target change sent** (not the CEO, who has the notice above); on approval a line's employee is told **Your target changed** and a key result's accountable and co-accountable people **Target change approved**; each notice names the key result or line, the new target and its month. A refusal tells only whoever asked. No migration, no contract change, no screen change. `goals.approval.js`, `goals.service.js`, `goals.events.js`, `goals.repo.js`, `targets.events.js`, `targets.service.js`; `goals.okrs.js` (`changeLabel`), `shared/notifications/fanout.js` (`include_actor` may be a function), notifications.md §6 and §11, foundation.md §7; `tests/integration/performance-plan.test.js`, `tests/integration/workflow.test.js`, `tests/unit/foundation/events-workflow.test.js`. Assumption: a CEO who asks for a change is told once, **Approval needed**, not also **Target change sent**. Left: a plan the CEO sends themself reads **Approval needed: Quarter Plan** the same way; every approval the CEO opens and decides themself now tells them.
 
 - 01/11/2026 · JP · §10.1: the Plan Approval card shows whoever sets the function's goals the plan in every state (Send Plan, Returned, Unbound), and every other reader only while it is Awaiting Approval or Binding, never Draft, Returned or Unbound (JBS Praxis, 01/11/2026, from staging: a staff member read the card on an Unbound plan). Screen only: `GET /performance/plans` and `/plans/:id` still answer any reader of the function.
 - 01/11/2026 · JP · `kpis.ai.js`, `reviews.ai.js` and `targets.ai.js` account for their Create schemas in `not_offered` (a KPI is defined by its function's head on KPIs, a round is opened by People, an improvement plan is opened on a review, a scorecard is drafted line by line), as gate 23 asks of every module since the Praxis AI Engine's PR5 (`praxis-ai.md` §6.15). The performance reads carry no matrix probe: their records need a plan and a round the matrix does not build (§6.17).
