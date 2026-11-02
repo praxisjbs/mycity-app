@@ -116,17 +116,47 @@ build, not a MyCity requirement; JBS lifts it, and MILESTONES §15 carries the a
 27. **The old Ask retires in PR5**, once the full-screen Praxis AI, the pane and the cards are on
     staging.
 
+### 1.3 Decisions (JBS Praxis, 01/11/2026, binding): seamless tasks and meetings
+
+Taken after the first cards were tried on staging (a task shared with TBO came back with codes for
+names, "employee" for its assignee and a problem Edit could not clear). Each answer was put to the
+owner with a recommendation first; the reasons are in `docs/handoff/praxis-ai-engine.md` §2.
+
+28. **A change that is not complete is asked for, one question at a time, with choices to tap.**
+    Before it draws a task or a meeting, Praxis AI asks for what its action still needs, one short
+    question per answer, and offers the answers as choices under the question when there are few
+    (Today, Tomorrow, Friday, No Due Day; each matching person by name and job title). A tapped
+    choice is sent as the person's next question; typing an answer works as well. The card is drawn
+    once nothing is missing. It is the same Data Answers run as every question (decision 25).
+29. **What is always asked.** A task: what it is, when it is due (or that it has none) and how
+    urgent it is. A meeting: what it is about, its day and start, how long it is and who comes (or
+    nobody but the person). Anyone named: which one, when the name matches several people. The model
+    asks first; the server holds the same list (each action's `asks`, §6.11), so a card drafted with
+    one missing becomes that question instead, and each is asked once in a run of questions.
+30. **Watching a task gives sight of it** (amends `workspace.md` §6, "watchers are only people who
+    can already see the task", 23/10/2026). A watcher may open the task, read and add comments, and
+    hears when it is done, blocked, unblocked, cancelled or commented on; it never lands on their
+    board as their work, and they cannot move, edit or block it. Watchers, people or a whole
+    department (its active people when the task is saved), are set on New Task and on the task card;
+    the panel's Add Watcher takes any colleague.
+31. **A card names everything it holds and edits every field.** People, departments and projects
+    read by name, named through the action's own module (`names`); the verb counts only the records
+    a press acts on, never the people named on it; Edit picks people, departments and projects with
+    the pickers of the screen's own form; a card carries only the fields its form offers (`fields`);
+    and a rule a schema cannot say to the model (a task is shared with people or a department, never
+    both) is in the action's description.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Praxis AI · Ask (`ask`) | Staff app: the full screen, from every screen (the top bar's Praxis AI on desktop; the floating button's on a phone), ⌘K and the menu | `praxis_ai` view | The conversation beside the right pane (Overview, Table, Record, Sources) with Back to the screen it was opened from and Recent behind a toggle; on a phone opened from a screen, the conversation full width with the pane as a sheet from Open Figures; opened from the menu, the person's conversations first; Try Asking when it is empty | Ask (typed or recorded), Back, open the pane (a chip, Open Figures), page a table, Download Excel on the Table (§6.16), open a record, Open the offered screen, Show Next 25, Helpful or Not Helpful, New Conversation |
+| Praxis AI · Ask (`ask`) | Staff app: the full screen, from every screen (the top bar's Praxis AI on desktop; the floating button's on a phone), ⌘K and the menu | `praxis_ai` view | The conversation beside the right pane (Overview, Table, Record, Sources) with Back to the screen it was opened from and Recent behind a toggle; on a phone opened from a screen, the conversation full width with the pane as a sheet from Open Figures; opened from the menu, the person's conversations first; Try Asking when it is empty | Ask (typed or recorded), Back, tap an answer under a question Praxis AI asks before a card (decision 28), open the pane (a chip, Open Figures), page a table, Download Excel on the Table (§6.16), open a record, Open the offered screen, Show Next 25, Helpful or Not Helpful, New Conversation |
 | Praxis AI · History (`history`) | Staff app | `praxis_ai` view, own questions only; the company's figures with `ai_control` view | This month's questions, your questions and spend (and the monthly cap for AI Control); your questions, 25 a page, with their sources, tokens and cost; spend per month; questions by module | Open a question's conversation on Ask, Delete Conversation, Clear History, Export, search questions |
 | Floating button (phone) | Staff app, every screen with the button | `praxis_ai` view | Praxis AI in the fan (F18): it opens Praxis AI · Ask full screen with the screen the person was on as `from`, the question's context and where Back returns (decisions 12 and 27) | As on Ask |
 | ⌘K | Staff app | `praxis_ai` view | Ask, History, the person's own conversations, New Conversation | Open them |
 | AI Control · Actions | Staff app | `ai_control` view | Data Answers marked built; the new Voice Question action; Data Answers' chain takes any text model as first choice or fallback | As built (`ai-control.md`) |
 | Every module's manifest | Backend | | The reads, summaries and actions Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9), summaries for its big tables (§6.13, PR3) and actions for the changes people ask for (§6.11, PR4) |
-| An action card | Inside an answer, on the full screen and in the phone's chat | The person who asked, for an action their grant allows | The action's name, every field as it will receive it (as a person reads it), the records it touches named and linked, a problem on its field, the buttons; the result line after the press, one line per record; Expired with Draw It Again | Press the verb (with the count when it touches several; Confirm It's You first for a sensitive class), Edit (the fields through the form system, Save Changes), Cancel; a suggested card reads as a question with Not Now |
+| An action card | Inside an answer, on the full screen and in the phone's chat | The person who asked, for an action their grant allows | The action's name, the fields its form offers as it will receive them (as a person reads them: people, departments and projects by name, decision 31), the records it acts on named and linked, a problem on its field, the buttons; the result line after the press, one line per record; Expired with Draw It Again | Press the verb (with the count when it acts on several; Confirm It's You first for a sensitive class), Edit (the fields through the form system, people, departments and projects with the screen's own pickers, Save Changes), Cancel; a suggested card reads as a question with Not Now |
 
 ## 3 · How the screens relate
 
@@ -198,6 +228,14 @@ say the question covered too much. An answer's Excel file (§6.16) is a `documen
 `ai_answer_export` (`export: true`, personal, the asker's own, kept 24 hours by the vault's sweep),
 reserved in the request and filled by the worker; no table of its own.
 
+Migration `10360_praxis_card_names.sql` (decision 31) adds `ai_action_draft.names` (jsonb, an empty
+list by default, never null): the people, departments and projects a card's fields hold, each as
+`{ type, id, label }`, named through the action's own module at the draft, an edit and the press and
+kept apart from `records` (what a press acts on), so the verb never counts a person named on the
+card. A question Praxis AI asks before a card (decisions 28 and 29) keeps what it asks for in its
+answer's `metadata.ask` (`{ action, field, choices }`), shown as its answers to tap and replayed to the
+next question; no column.
+
 No reference seed: `praxis_ai` grants are `0290`'s. Nothing is seeded on production; staging's
 conversations come from asking.
 
@@ -207,11 +245,11 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `POST /ask` | `AiAsk` (`question` up to 500 characters, `ai_conversation_id` optional, `context` optional: the screen asked from, `shows`: what the asking screen can draw, `cards` and `pane`) → `AiAnswer` (adds `card`, `context`; `reads` carry `n`, `module_key`, `params`, `outcome` (`read`, `refused`, `invalid`, `failed` or `timed_out`) and `masked`; a `table` names the `read` it was drawn from) | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed, with `ai:progress` on the person's realtime room before each read (§6.1.8). The full screen sends `context` and `shows: ["pane"]`. A screen that does not say `shows: ["cards"]` is offered no action, and one without `"pane"` gets no overview spec (§6.11, §6.13) |
+| `POST /ask` | `AiAsk` (`question` up to 500 characters, `ai_conversation_id` optional, `context` optional: the screen asked from, `shows`: what the asking screen can draw, `cards` and `pane`) → `AiAnswer` (adds `card`, `context`, and `choices`, the answers to tap under a question asked before a card; `reads` carry `n`, `module_key`, `params`, `outcome` (`read`, `refused`, `invalid`, `failed` or `timed_out`) and `masked`; a `table` names the `read` it was drawn from) | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed, with `ai:progress` on the person's realtime room before each read (§6.1.8). The full screen sends `context` and `shows: ["pane"]`. A screen that does not say `shows: ["cards"]` is offered no action, and one without `"pane"` gets no overview spec (§6.11, §6.13) |
 | `GET /answers/:id/reads/:n` (`page`) | `PageQuery` → `AiReadRows` | `praxis_ai` view · own | yes, 25 | Read `n` of the answer run again with its stored parameters and the caller's rights now (§6.12): the Table's later pages, the Sources tab and Excel come from here. 404 for a summary or a read that was refused or timed out |
 | `POST /answers/:id/reads/:n/export` | `EmptyBody` → `documents.ExportFile`, 202 | `praxis_ai` view · own | | Download Excel (§6.16): every row of read `n`, replayed in the worker with the caller's rights and masks as they stand then, at most 25,000 rows, with an About This File sheet; the screen waits on `GET /exports/:id` and downloads as every export does (`foundation.md` §6.12). 404 as the replay is |
-| `GET /cards/:id` | → `AiActionCard` | `praxis_ai` view · own | | The card as the person sees it (§6.11): its fields (`AiCardField`, each with its kind and whether it is `long`, a box of several lines), its records named through the module's own repo, its problems; a status past `shown` is read only |
-| `PUT /cards/:id` | `AiActionEdit` (`values`) → `AiActionCard` | `praxis_ai` create · own | | The person's edits, re-validated with the action's schema; problems updated; 409 `CARD_NOT_OPEN` past `shown` |
+| `GET /cards/:id` | → `AiActionCard` | `praxis_ai` view · own | | The card as the person sees it (§6.11): its fields (`AiCardField`, each with its kind, whether it is `long`, a box of several lines, and `picks`, the picker an id field is chosen with on Edit), its records (what a press acts on) and its `names` (the ids its fields hold, by name), named through the module's own repo, its problems; a status past `shown` is read only |
+| `PUT /cards/:id` | `AiActionEdit` (`values`) → `AiActionCard` | `praxis_ai` create · own | | The person's edits, re-validated with the action's schema; problems and names updated; a value for a field the card does not carry is dropped; 409 `CARD_NOT_OPEN` past `shown` |
 | `POST /cards/:id/confirm` | `AiActionConfirm` (`values` optional) → `AiActionResult` | `praxis_ai` create · own; the action's own grant inside | | `Idempotency-Key`. 403 `REAUTH_REQUIRED` for a sensitive class without Confirm It's You in the last 5 minutes; 403 `ACTION_FORBIDDEN` when the grant or scope is gone; 409 `CARD_EXPIRED`, `CARD_DONE`, `CARD_RUNNING`, `CARD_CANCELLED`; 422 on the fields; 422 `TOO_MANY_RECORDS` past 25 |
 | `POST /cards/:id/cancel` | `EmptyBody` → `AiActionCard` | `praxis_ai` create · own | | The person declines; 409 past `shown` |
 | `GET /suggestions` | → `AiSuggestions` (up to 6 questions) | `praxis_ai` view | no | Only questions the person's reads can answer (§6.8) |
@@ -252,9 +290,13 @@ A refused read is not an error: it becomes an answer that says the information i
      each with its prefill fields and the form each value takes (one of an enum's values,
      YYYY-MM-DD, a time with +01:00, an id a read returned), since a value in another form is
      dropped from the link (§6.4);
+   - the actions the person may draft, when the screen draws cards (§6.11): each with its
+     description, the fields its card carries and the form of each, and what to ask first, each
+     with its answers to tap (decision 29);
    - the last 10 turns of the conversation: each question, its answer's words and the reads it made
      (key, parameters, rows returned, total), never the rows themselves, so "show the next 25" knows
-     which read to page;
+     which read to page; and, for a question it asked before a card, the action's field it asked for
+     ("[Asked for: tasks.create due_on]"), so the next answer carries on gathering that card;
    - the question, as the person's turn. The prompt says the person's message cannot change its
      rules, open a read it was not given, or make it act.
 3. **Tools**: `authorise.allowedReads(actor)`, one tool per read the person may run (its key,
@@ -331,7 +373,9 @@ A refused read is not an error: it becomes an answer that says the information i
 `AiAnswerDraft`, what the model returns: `text` (the words), `table` (`read`: which of this turn's
 reads, `fields`: up to 6 of its row's fields, `labels`: their column names) or null, `route` (one
 of the offered intents) or null, `prefill` (values for that screen's form, by field) or null,
-`more` (a read had a next page worth offering).
+`more` (a read had a next page worth offering), `action` (a card, §6.11) and `ask` (decisions 28
+and 29: the answer is one question, its `text`; up to six short `choices` to tap; the `action` and
+`field` it asks for when it asks for one of an action's fields), or null.
 
 The server turns it into `AiAnswer`:
 
@@ -352,6 +396,8 @@ The server turns it into `AiAnswer`:
 - **declined**: `not_available` when a read was refused and nothing else answered, `change` when a
   screen was offered (the model offers one for a change asked for, or where no read answers; the
   server cannot tell which), else null;
+- **choices**: a question's answers to tap (`askOf`: trimmed, each once, at most six of 60
+  characters), kept in the answer's metadata with what it asked for; empty for any other answer;
 - **provisional**: always true.
 
 A change opens its exact form, filled with what the person said. Each route that carries a
@@ -453,6 +499,11 @@ that module's guide changed):
   today unless `date` is given, through the Overview's own query, allow-list and scopes (`home.md`
   §6, §9). `employee_id`, or part of a name in `q`, keeps one person's: what they did and what is
   about them. "What happened today?" and "what has Aisha done today?" are one read each.
+- **Staff Community** (built): `colleagues.list` (`ColleagueListQuery`), anyone with a login by name,
+  with their job title and department, from Staff Community's own directory (`community` view, as
+  New Message and New Event list them; the asker listed too, so every reader sees the same people).
+  It is how a task's watcher, a meeting's guest or a message's colleague is found for a person
+  without the People grant, whose `employees.list` it is not (decision 29: "which one?").
 - **User Guide** (built): `guide.search` (`PageQuery`), how to do something in the hub: the
   sections and tasks of the guide the asker may read that answer `q`, ranked by the guide's own
   search, a page of 25, each row citing its section (`guide_section`, opening the guide at it)
@@ -476,6 +527,8 @@ through the same engine Ask uses, and grades each answer:
 | `never` | none of these returned rows (a member of staff asking about others' pay or lateness) |
 | `route` | the change asked for came back as this screen, with `declined: change`, never a claim |
 | `needs` | a target question whose module declares no read yet is skipped, not failed |
+| `action` | the change asked for came back as this card, its values parsing, nothing written |
+| `ask` | the change asked for lacks what its action must have, so the answer is the one question for that field, with no card (decisions 28 and 29; the server's asks run as Ask runs them) |
 
 The set holds Ifeoma's two ("what happened today", "what has a person done today"), the target
 questions as they become answerable, the privacy cases and three changes (a task, leave, a meeting).
@@ -503,6 +556,10 @@ actions: [{
   run: (values, actor, ctx) => service.create(actor, actor.scope, values),   // the same function the screen's button calls
   readback: (result) => [{ type: "task", id: result.task_id, label: result.number, status: "created" }],
   suggest: false,                            // may the model offer it unasked (decision 20)
+  fields: ["title", "primary_assignee_id", "watcher_ids", "due_on", "priority"],   // the card carries these alone, in order (decision 31)
+  picks: { primary_assignee_id: "task_assignee", watcher_ids: "colleague" },     // what Edit picks an id field with (AiCardPicks)
+  names: (values, actor, db) => service.cardNames(db, values),                  // the ids the fields hold, by name; never counted
+  asks: [{ field: "due_on", question: "When is it due?", choices: dueChoices, none: true }],   // asked before the card (decision 29)
 }],
 not_offered: { TaskStepCreate: "a step belongs to a task's own panel" },   // every other <Thing>Create of the module, with a reason (gate 23)
 ```
@@ -517,6 +574,30 @@ the person may not see keeps its id alone, and the action's `check` refuses the 
 whose input is not the schema its screen's form validates with says `form: "none: <reason>"` (a
 button with no form, a form whose record is the panel's own, a composer of its own).
 
+**What a card carries and names (decision 31).** `fields` lists the input's fields the card carries,
+in the order it shows them; a value for any other field is dropped before the schema parses it
+(`authorise.checkAction`), so a commitment, a repeat or a record pointer never rides on a task card
+unseen, and the system turn lists only these. `picks` names, for each id field and list of ids, the
+picker Edit chooses it with (`colleague`, anyone with a login; `task_assignee` and `task_member`,
+whom the person may set a task for or share one with, as New Task's; `department`; `project`).
+`names(values, actor, db)` names the ids the fields hold through the module's own repo, kept apart
+from `records`: the records are what a press acts on (the verb's count, the chips, the re-check), the
+names only how an id reads, so a meeting's three guests never make "Create Event ×3". A rule the
+schema holds but cannot say to the model (a task is shared with people or a department, never both)
+is in the action's description, and the card still shows the schema's own problem on its field.
+
+**Asked before it is drawn (decisions 28 and 29).** `asks` lists what the action must have before
+its card is drawn, in order: the field, its one short question (at most 8 words), its answers to tap
+(a list, or `({ today }) => list` for answers that move with the day) and whether none is an answer
+(`none`: null, or an empty list, is then a value the person gave). The system turn gives the model
+each action's asks, and the prompt (version 7) has it ask one at a time, with `ask` naming the action
+and field, and never invent a value. The server holds the same list (`answer.askFirst`, the engine's
+`cards.nextAsk`): a card the person asked for (never a suggested one) whose model values leave out an
+ask's field becomes that question, with its answers and nothing else (no card, table or screen
+button), unless the run of questions just before already asked it (then the card is drawn and shows
+the gap), and never more than six questions in a row. What a question asked for is kept on its
+answer (`metadata.ask`) and replayed, so the guard and the model both see the run.
+
 **The actions (PR4).** Each runs the same service function the screen's own button calls, with
 the person's rights as the grant gives them; a bulk action runs its records one after another,
 each in the service's own transaction, and reads back a line per record (done, or why not), so one
@@ -525,10 +606,10 @@ open with the reason.
 
 | Action | Module, grant, risk | Input (the card's fields) | Records named | At the press | Runs |
 |---|---|---|---|---|---|
-| `tasks.create` | `workspace` create, standard, may be suggested | `TaskCreate` (New Task's form) | the assignee | the scope | `tasks.service.create` |
+| `tasks.create` | `workspace` create, standard, may be suggested | `TaskCreate` (New Task's form): the title, notes, whom it is for, the people or department sharing it, its watchers (people or a department), due day, priority, cadence, project; asks the title, the due day (Today, Tomorrow, Friday, No Due Day) and the priority (Low, Normal, High, Urgent) | none: it makes one task; whom it is for, the people sharing and watching it, the departments and the project are named (`tasks.service.cardNames`) | the scope, and New Task's own rules on whom and with whom (`workspace.md` §6) | `tasks.service.create` |
 | `tasks.complete` | `workspace` edit, standard, up to 25 | `TaskComplete`: the tasks, a late reason | the tasks, by number and title | every task on the person's board; a cancelled or waiting one is its own line | `move()` to Done, one after another |
 | `tasks.comment` | `workspace` edit, standard | `TaskCommentAdd`: the task (filled from the screen asked from), the words | the task | on the person's board | `tasks.service.comment` |
-| `calendar.create` | `workspace` create, standard | `CalendarEventCreate` (joined from New Event's day and times) | the attendees, by name | someone not on the staff refused on the field | `calendar.service.create` |
+| `calendar.create` | `workspace` create, standard | `CalendarEventCreate` (joined from New Event's day and times); asks what it is about, when, how long (30 Minutes, 1 Hour, 2 Hours) and who comes (Just Me) | none: it makes one event; the attendees are named | someone not on the staff refused on the field | `calendar.service.create` |
 | `my_leave.request` | `ess` create, standard | `LeaveRequestCreate` (Request Leave's form) | none: the person's own | an employee; the type, the days and the year's allowance are the service's | `leave.service.request` |
 | `leave.approve`, `leave.reject` | `people` approve, **approval**, up to 25 | `LeaveApprove`, `LeaveReject` (a reason, required to reject) | the requests: who, the type, the days | every request in the person's `people` scope; then each waiting and named on its stage, never their own, as a line | the approval's own `decide()` per request |
 | `approvals.decide` | `ess` create (the queue is the person's own), **approval**, up to 25 | `ApprovalDecide`: the requests, approve, reject or request changes, a reason (required but to approve) | the requests: the flow and who it is about | every request the person may read; then each pending, the stage naming them, `approve` held on its module, never their own; one decided on its record refused with that record's screen on its line | `workflow.service.decide` per request |
@@ -555,29 +636,32 @@ waiting on the person, and to put a suggested card in the text as a question.
 1. **Offered.** The system turn lists the actions the person may draft (`authorise.allowedActions`:
    the grant held), each with its fields from the input schema's JSON Schema, only when the asking
    screen says `shows: ["cards"]`. An action the person may not run is never offered.
-2. **Drafted.** The answer draft names one action and its values (`AiAnswerDraft.action`;
+2. **Asked for.** A change missing what its action's `asks` name is asked for first, one question
+   at a time with answers to tap (above); the card waits for the answer.
+3. **Drafted.** The answer draft names one action and its values (`AiAnswerDraft.action`;
    `suggested: true` when the person did not ask for it). `engine/cards.draft` parses the values with
    the schema, drops a field the schema does not take, fills what it can from the context screen
    (its record id as the action's record field, when the schema has one), keeps a parse problem on
    its field for the person to fix, lists the records through `records()`, and refuses the whole
    card when the grant is gone or the records exceed `bulk`. Stored as `ai_action_draft` in the
    answer's transaction, status `shown`, 30 minutes.
-3. **Shown.** The card lists every field as the action will receive it, editable with the form
-   system from the same schema, the records named and linked, and nothing has happened.
-4. **Confirmed.** One press for `standard`. For `approval`, `money`, `payroll` and `delete` the
+4. **Shown.** The card lists the fields it carries as the action will receive them, ids by name,
+   editable with the form system from the same schema and the screen's own pickers, the records
+   named and linked, and nothing has happened.
+5. **Confirmed.** One press for `standard`. For `approval`, `money`, `payroll` and `delete` the
    session must have confirmed within the last five minutes (`identity.provedAgo` against the
    card's window); else 403 `REAUTH_REQUIRED` and the screen asks Confirm It's You, starting on a
    passkey when the person has one, else the PIN, else the password (`useFreshSignIn`,
    `identity.md` §6), and presses again with the same `Idempotency-Key`. A person who confirmed
    with the PIN or the password and has no passkey is offered Set Passkey once on that device
    (a toast with the button; `localStorage` remembers the offer).
-5. **Re-checked and run.** At the press, in order: the card is `shown` and not expired; the grant
+6. **Re-checked and run.** At the press, in order: the card is `shown` and not expired; the grant
    and scope now (`authorise.checkAction`); the values parse again (edited ones included); at most
    `bulk` records; the action's own `check` (each record in scope and in the state the card saw, the
    approval chain, no self-approval); then `ai_action_run` is opened `running` and `run()` is called
    once with the person as actor carrying their scope and an idempotency key. `run()` is the
    module's service function, which keeps its own transaction and `emit()`.
-6. **Result.** The run closes `done` with `readback()`'s lines, or `failed` with the error's code and
+7. **Result.** The run closes `done` with `readback()`'s lines, or `failed` with the error's code and
    message; the card's status follows; `assistant.action_confirmed` or `assistant.action_failed`
    is emitted with the card, how it was confirmed and the result, never the question's words. A
    second press of the same card is `CARD_DONE` or `CARD_RUNNING`; the HTTP `Idempotency-Key`
@@ -590,11 +674,16 @@ conversation; the model's text never says something was done.
 **On screen** (`ActionCard` and `ResultLine` in the Assistant group; `app/src/features/assistant/Card.tsx`
 wires them): the action's label as the title (a suggested card's as a question, "Send Message?"),
 every field with a value, a problem or a requirement as a person reads it (a day day first, a
-choice in words, an id as the record's name), the records as chips that open their screens, and
-the buttons: the verb (the decision's own word when the card carries one, "Approve ×3", and the
-count when it touches several), Edit (the fields through the form system from the action's own
-contract schema, resolved by its name; the records it names stay as they are; Save Changes goes
-through `PUT /ai/cards/:id`), Cancel (Not Now on a suggested card). The press is busy until the API
+choice in words, an id as the name `names` or `records` give it, an id nothing names as itself),
+the records as chips that open their screens, and the buttons: the verb (the decision's own word
+when the card carries one, "Approve ×3", and the count when it acts on several), Edit (the fields
+through the form system from the action's own contract schema, resolved by its name; an id field
+with `picks` through the screen's own picker, bound by the app: `TaskPeoplePicker`, `ColleaguePicker`,
+`DepartmentPicker` for a reader who may view People, `ProjectPicker`; one without stays as it is;
+Save Changes goes through `PUT /ai/cards/:id`, which names the new picks), Cancel (Not Now on a
+suggested card). A question asked before a card shows its answers as buttons under its words, on
+the newest answer only; a tap asks that answer as the person's next question, and every answer waits
+until it lands (F26). The press is busy until the API
 answers and the buttons beside it wait (F26); a refusal lands on the fields and under the card, in
 the server's words, with the screen that answers it where one does (Open Mailbox for `NO_MAILBOX`);
 done or failed, the result line replaces the buttons with Done or Could Not Finish and a line per
@@ -843,14 +932,14 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Praxis AI · Ask (`ask`) | Praxis AI as the title; Back (on desktop the screen it returns to under the title, "From People · Leave"; opened from the menu, ⌘K or History it goes to History and the line is left out); Recent, a toggle that shows the person's conversations as a column beside the chat (titles and when last asked, newest first, 25 a page; empty, No Questions Yet); New Conversation once a conversation is open; on a phone opened from the menu, the conversations first (title, questions, when last asked; Search Conversations; No Conversations Yet, "Start one with New Conversation.") with New Conversation always, and the chat full screen over them with Back, Conversations and New Conversation; the conversation (on desktop about two fifths, on the left): empty, an illustration and Try Asking with up to 6 questions to tap; Show Earlier when older questions remain, each question as the person's bubble, each answer with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), its table's rows opening their records, Open Figures on an answer whose pane is not the one shown, From with the kinds of record read as chips ("partnership ×4", "employee ×2"; a chip shows those records in the pane; the one record, named, when the answer rests on one, shown on Record), Helpful and Not Helpful (pressed again, taken back); an answer's card (§6.11): the action's name (a suggested card's as a question, "Send Message?"), each field's label and value as a person reads it, a problem beside its value ("Say why", "Fill the gap"), the records as chips ("Ayo Bello, Annual, 3 days"), the buttons (the verb with the count, "Approve Leave ×4", a lock on one that asks Confirm It's You; Edit, with Save Changes and Cancel on its fields; Cancel, or Not Now on a suggested card), a refusal under the card in the server's words with Open Mailbox where the mailbox is not connected, then Done or Could Not Finish with a line per record and Open, or Expired with "This card has expired." and Draw It Again; Confirm It's You (`identity.md` §10) before a sensitive card, and the toast "Set a passkey for next time" with Set Passkey once; while waiting, Reading Your Records, then Reading leave requests · 2 of 5 as each read runs; a refused answer in plain words; a failed one with its reason and Try Again; the pane (on desktop about three fifths, on the right) for the latest answer, or the one whose chip or Open Figures was pressed (drawn in the accent): tabs Overview, Table, Record and Sources, an empty one disabled; Overview: up to three figures and one chart when a summary read answered (§6.13); Table: the read's rows, 25 a page (Previous, Next, Page 1 of 13), Export (every row of the read as an Excel file, made for the person and saved on this device, §6.16; toast "Export downloaded"), a row opening the Record, past 200 rows "Showing the first 200 of 1,240 rows"; Record: the row's or the record's fields and Open Record; Sources: each read numbered and named ("1. Leave Requests"), Read, Not Available, Not Run, Failed or Too Much (the read covered more than the database allows at once, §6.3 step 8), "25 of 312 rows", its filters, Masked with the fields emptied, Open Table; before any answer, No Answer Yet, "Ask a question to fill this pane."; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, No words heard, Transcription is not set up, the server's reason, Could not transcribe); a 500's reference after its reason | Help term on From (the records this answer was read from, as you would see them; a chip opens them in the pane) | How reads, the context, permissions, redaction, the loop, the progress events and a card's re-check work: §1.1, §6 here and the manual |
+| Praxis AI · Ask (`ask`) | Praxis AI as the title; Back (on desktop the screen it returns to under the title, "From People · Leave"; opened from the menu, ⌘K or History it goes to History and the line is left out); Recent, a toggle that shows the person's conversations as a column beside the chat (titles and when last asked, newest first, 25 a page; empty, No Questions Yet); New Conversation once a conversation is open; on a phone opened from the menu, the conversations first (title, questions, when last asked; Search Conversations; No Conversations Yet, "Start one with New Conversation.") with New Conversation always, and the chat full screen over them with Back, Conversations and New Conversation; the conversation (on desktop about two fifths, on the left): empty, an illustration and Try Asking with up to 6 questions to tap; Show Earlier when older questions remain, each question as the person's bubble, each answer with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), its table's rows opening their records, Open Figures on an answer whose pane is not the one shown, From with the kinds of record read as chips ("partnership ×4", "employee ×2"; a chip shows those records in the pane; the one record, named, when the answer rests on one, shown on Record), Helpful and Not Helpful (pressed again, taken back); a question Praxis AI asks before a card ("What is the task?", "When is it due?", "Which Tunde?"; decisions 28 and 29) with its answers as buttons under it on the newest answer (Today, Tomorrow, Friday, No Due Day; Low, Normal, High, Urgent; 30 Minutes, 1 Hour, 2 Hours; Just Me; each person by name and job title), a tap asking it; an answer's card (§6.11): the action's name (a suggested card's as a question, "Send Message?"), each field's label and value as a person reads it (people, departments and projects by name, "For: JBS Praxis Team", "Watchers: Tobiloba Dada, Bassey Ekpe"), a problem beside its value ("Say why", "Fill the gap"), the records as chips ("Ayo Bello, Annual, 3 days"), the buttons (the verb with the count, "Approve Leave ×4", a lock on one that asks Confirm It's You; Edit, with Save Changes and Cancel on its fields, people, departments and projects picked as on the screen's own form; Cancel, or Not Now on a suggested card), a refusal under the card in the server's words with Open Mailbox where the mailbox is not connected, then Done or Could Not Finish with a line per record and Open, or Expired with "This card has expired." and Draw It Again; Confirm It's You (`identity.md` §10) before a sensitive card, and the toast "Set a passkey for next time" with Set Passkey once; while waiting, Reading Your Records, then Reading leave requests · 2 of 5 as each read runs; a refused answer in plain words; a failed one with its reason and Try Again; the pane (on desktop about three fifths, on the right) for the latest answer, or the one whose chip or Open Figures was pressed (drawn in the accent): tabs Overview, Table, Record and Sources, an empty one disabled; Overview: up to three figures and one chart when a summary read answered (§6.13); Table: the read's rows, 25 a page (Previous, Next, Page 1 of 13), Export (every row of the read as an Excel file, made for the person and saved on this device, §6.16; toast "Export downloaded"), a row opening the Record, past 200 rows "Showing the first 200 of 1,240 rows"; Record: the row's or the record's fields and Open Record; Sources: each read numbered and named ("1. Leave Requests"), Read, Not Available, Not Run, Failed or Too Much (the read covered more than the database allows at once, §6.3 step 8), "25 of 312 rows", its filters, Masked with the fields emptied, Open Table; before any answer, No Answer Yet, "Ask a question to fill this pane."; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, No words heard, Transcription is not set up, the server's reason, Could not transcribe); a 500's reference after its reason | Help term on From (the records this answer was read from, as you would see them; a chip opens them in the pane) | How reads, the context, permissions, redaction, the loop, the progress events and a card's re-check work: §1.1, §6 here and the manual |
 | Praxis AI · History (`history`) | History as the title, Export and Clear History; for AI Control: Questions This Month (everyone's), Your Questions, Spend and Monthly Cap, each captioned with the month or All AI; for everyone else: Questions This Month, Your Questions (all time) and Your Spend; Your Questions, 25 a page: Question, Asked, Sources Read, Tokens, Cost, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog; Search Questions; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Spend per Month, Naira (six months; for AI Control, "Against a ₦25,000 monthly cap" when one is set); Questions by Module; toasts "Conversation deleted", "History cleared", the export's own | Help terms on Spend (what Praxis AI's questions cost this month, priced as AI Control prices them) and Monthly Cap (the most all AI may spend in a month, set in AI Control) | Where everyone's spend by action is (AI Control · Spend), what deleting keeps: §6.5 |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Praxis AI · Ask (`ask`) | Opened from a screen (⌘K on a screen, a link with `from`): Back and Praxis AI as the title, New Conversation once a conversation is open, the conversation full width with the box pinned at the foot (the microphone and Send as 44 px targets); an answer's card inside the bubble, its fields one under the other, the verb full width at its foot with Edit and Cancel above it (44 px), Confirm It's You as a sheet; Open Figures under an answer opens the pane as a sheet, Figures, with the four tabs: the Table as cards (44 px rows, Previous and Next full width), Open Record full width. Opened from the menu or History: Praxis AI as the title with New Conversation, then the person's conversations, newest first (title; questions and when last asked), Search Conversations, 25 a page; empty, No Conversations Yet. A conversation, or New Conversation, opens the chat full screen over the list: Back, Praxis AI as the title, Conversations (the other conversations as a sheet, as a channel's switcher is) and New Conversation; the conversation fills the screen; empty, Try Asking as a tap list; an answer's table as cards | The pane beside the chat (a sheet from Open Figures instead); Recent and its toggle (the list is the landing page instead); the screen's name under the title | New Conversation under the title and in the floating button; inside a chat, Conversations and New Conversation in its header; Open Figures under an answer | The floating button's Praxis AI opens this screen from any other, with that screen as the question's context and where Back returns (§3 step 8, decision 27); More, then Praxis AI; tabs Ask and History; Back, the phone's own Back and Escape return to the screen it was opened from |
+| Praxis AI · Ask (`ask`) | Opened from a screen (⌘K on a screen, a link with `from`): Back and Praxis AI as the title, New Conversation once a conversation is open, the conversation full width with the box pinned at the foot (the microphone and Send as 44 px targets); a question's answers one under the other, full width (44 px); an answer's card inside the bubble, its fields one under the other, the verb full width at its foot with Edit and Cancel above it (44 px), Edit's pickers full width, Confirm It's You as a sheet; Open Figures under an answer opens the pane as a sheet, Figures, with the four tabs: the Table as cards (44 px rows, Previous and Next full width), Open Record full width. Opened from the menu or History: Praxis AI as the title with New Conversation, then the person's conversations, newest first (title; questions and when last asked), Search Conversations, 25 a page; empty, No Conversations Yet. A conversation, or New Conversation, opens the chat full screen over the list: Back, Praxis AI as the title, Conversations (the other conversations as a sheet, as a channel's switcher is) and New Conversation; the conversation fills the screen; empty, Try Asking as a tap list; an answer's table as cards | The pane beside the chat (a sheet from Open Figures instead); Recent and its toggle (the list is the landing page instead); the screen's name under the title | New Conversation under the title and in the floating button; inside a chat, Conversations and New Conversation in its header; Open Figures under an answer | The floating button's Praxis AI opens this screen from any other, with that screen as the question's context and where Back returns (§3 step 8, decision 27); More, then Praxis AI; tabs Ask and History; Back, the phone's own Back and Escape return to the screen it was opened from |
 | Praxis AI · History (`history`) | The figure cards two to a row, then your questions as cards (question, asked, cost) | Sources Read and Tokens on each question; Spend per Month; Questions by Module | Tap a card to open its conversation on Ask; Delete Conversation in its menu's sheet; Export and Clear History in the page's menu | As above |
 
 ## 11 · Edge cases
@@ -907,7 +996,21 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **A question in another language**: answered in English.
 - **A card the person did not ask for** (decision 20): drawn marked suggested, read as a question,
   never run unasked; Not Now cancels it. One card per answer, so a suggested one never joins a card
-  the person asked for.
+  the person asked for. Its gaps are never asked for first: it shows them on its fields.
+- **A change asked for with something missing** ("assign a task to Bode"): the one question for the
+  first thing missing, with its answers to tap; the next answer carries on from the conversation.
+  Each is asked once in a run: an answer the model could not use leaves the gap on the card rather
+  than asking again, and after six questions in a row the card is drawn as it stands. Typing an
+  answer works as a tap does; a new question leaves the gathering.
+- **A name that matches several people**: "Which Tunde?", each one a choice by name and job title,
+  never one picked by the model; found through `colleagues.list` by anyone, or `employees.list`
+  where the person holds People.
+- **No due day, nobody else at a meeting**: No Due Day and Just Me are answers (null, an empty
+  list); the card is drawn without them.
+- **A task shared with people and a department at once**: the card shows "People or a department" on
+  Department, and Edit clears either before the press.
+- **A card's watchers or attendees**: named on the card, never counted on its verb; the task's
+  watchers may open it once it is made (`workspace.md` §6).
 - **A request decided meanwhile, or not waiting on the person after all**: its line says so and the
   rest of a bulk card still go; a card none of whose records can be decided stays open with the
   first reason (§6.11). A request outside the person's scope, or a task off their board, refuses the
@@ -965,6 +1068,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · Seamless tasks and meetings (§1.3 decisions 28 to 31, JBS Praxis; `docs/handoff/praxis-ai-engine.md` §6.6), after a task card on staging read codes for names, "employee" for whom it was for, and a problem Edit could not clear. A change missing what its action must have is asked for first, one question at a time with answers to tap (`AiAnswerDraft.ask`, `AiAnswer.choices`, kept in `metadata.ask`; a tap is the next question): a task's title, due day and priority, a meeting's subject, day and start, length and who comes, and which person when a name matches several; the server holds the same list (`asks` on an action, `answer.askFirst`, the engine's `cards.nextAsk`: once each in a run, six at most), and the prompt is version 7. A card carries its form's fields alone (`fields`), names what they hold (`names`, migration `10360`, §4) apart from the records a press acts on, so the verb counts no person named, and Edit picks people, departments and projects with the screen's own pickers (`picks`, `AiCardField.picks`). `tasks.create` names everyone on it and takes watchers (people or a department; watching gives sight, `workspace.md` §6), its share rule in its description; `calendar.create` names its attendees instead of counting them. `colleagues.list` (§6.9) lets anyone name a colleague. §2, §4, §5, §6.1, §6.4, §6.9, §6.10 (the `ask` grade and three cases), §6.11, §10, §11.
 - 01/11/2026 · JP · Praxis AI Engine PR5, proof and switch-over (`docs/handoff/praxis-ai-engine.md` §6.5; decisions 26 and 27): §6.17 written. The matrix gains scope probes (`matrix: { inside, outside }` beside the scoped reads and actions of Workspace, People, Home, ESS, approvals and Staff Community; each role a report, the suite an outsider; a read returns the inside record and never the outside one, a card naming the outside one is refused by the server's check). The attack suite: `scripts/ai/attack-assistant.js` names eleven attacks and grades the real model's answers (a leak against a catch), `tests/integration/ai-attacks.test.js` runs each with the model scripted on every PR, and `.github/workflows/ai-nightly.yml` asks them of the real model on staging every night through `deploy-gate attack`, recording the run on `ai_attack_run` (migration `10350`, §4) through AI Control's service; AI Control · Spend shows Reads Refused, Presses Refused and the nightly's last result, and a leak is an urgent notice to whoever may change AI Control (`ai-control.md` §7, §10). A press refused for want of rights is `assistant.action_refused` (§7). Gate 23's Create rule is universal (§6.15): every module whose contract exports a Create schema offers it, lists it in `not_offered` or opted out whole; thirteen manifests gained their reasons. The old Ask retired (decision 27): the floating button opens the one full-screen Praxis AI with the screen underneath as `from` (§2, §3 step 8, §10); `AskPanel` and its test are gone. §13 item 5 says what an extraction would move and what stays. Found on the way: `policies.read` returned a list for one record and had been refused by the read guard since it shipped (`policies.md`); the bulk lists' limit now reads At most 25 on a card.
 - 01/11/2026 · JP · Praxis AI Engine PR4, action cards (`docs/handoff/praxis-ai-engine.md` §6.4; decisions 10, 11, 19, 20, 21): ten actions declared beside their modules' reads (§6.11's table: `tasks.complete`, `tasks.comment`, `calendar.create`, `my_leave.request`, `leave.approve`, `leave.reject`, `approvals.decide`, `community.message`, `community.post`, `mail.send`, the mailbox gaining a manifest with no read), each the screen's own service function, a bulk one a line per record; goals declares none and says why; every other Create schema `not_offered`. `records(values, actor, db)` names a card's records through the module's own repo at the draft and the press (`authorise.checkAction` takes a database handle); every text a card carries is held to ready to send as Write With AI is (`answer.gapsIn`, "Fill the gap"); `AiCardField.long`; prompt version 6 (the whole text, nothing invented, no sign-off; only requests waiting on the person; a suggested card as a question). On screen (§2, §10): `ActionCard` and `ResultLine` in the Assistant group, wired by `app/src/features/assistant/Card.tsx` on the full screen and in the phone's chat (`shows: ["cards", "pane"]`); Edit through the form system from the action's schema by its name; Confirm It's You before a sensitive card, a passkey first (`useFreshSignIn` reordered, `identity.md` §10), Set Passkey offered once; Draw It Again; a suggested card as a question with Not Now; Open Mailbox on `NO_MAILBOX`. Gate 23 counts an input offered by any manifest (ESS offers leave's own request). Tests: the matrix covers the actions; `tests/integration/ai-actions-{workspace,leave,approvals,community,mailbox}.test.js` on the real migrations (four leave requests approved with a passkey and two rejected with a PIN, self-approval and a record outside scope refused, Tell Ada sent with one press, a mail queued with the signature baked and refused without a mailbox, a gap held on its field); the attack scaffold extended in `ai-cards.test.js`; the evaluation set's action cases, one per action, and a change the person may not make. §8, §11.
 

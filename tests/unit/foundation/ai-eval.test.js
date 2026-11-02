@@ -20,7 +20,7 @@ describe("the questions", () => {
     expect(new Set(CASES.map((k) => k.id)).size).toBe(CASES.length);
     for (const k of CASES) {
       expect([k.id, typeof k.as]).toEqual([k.id, "string"]);
-      expect([k.id, Boolean(k.reads || k.never || k.route || k.needs || k.action || k.no_action)]).toEqual([k.id, true]);
+      expect([k.id, Boolean(k.reads || k.never || k.route || k.needs || k.action || k.no_action || k.ask)]).toEqual([k.id, true]);
     }
   });
 
@@ -86,6 +86,19 @@ describe("the grade", () => {
     const k = { id: "x", needs: "partnerships" };
     expect(grade(k, { reads: [{ ...read("partners.list"), module: "partnerships" }], shown: shown() }).pass).toBe(true);
     expect(grade(k, { reads: [{ ...read("employees.list"), module: "people" }], shown: shown() }).problems[0]).toMatch(/read nothing from partnerships/);
+  });
+
+  test("a change missing what its action must have is asked for, the one field named, with no card (decisions 28 and 29)", () => {
+    const k = { id: "x", ask: { action: "tasks.create", field: "due_on" } };
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: { action: "tasks.create", field: "due_on", choices: ["Today"] } }).pass).toBe(true);
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: null }).problems).toEqual(["asked nothing; expected tasks.create due_on"]);
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: { action: "tasks.create", field: "priority", choices: [] } }).problems).toEqual(["asked for tasks.create priority; expected tasks.create due_on"]);
+    expect(grade(k, { reads: [], shown: shown(), card: { row: { action_key: "tasks.create", problems: {} } }, ask: null }).problems).toEqual(["drew tasks.create instead of asking for due_on"]);
+    // Each ask case names an action and a field its manifest asks for.
+    for (const c of CASES.filter((x) => x.ask)) {
+      const action = registry.action(c.ask.action);
+      expect([c.id, action && action.asks.some((q) => q.field === c.ask.field)]).toEqual([c.id, true]);
+    }
   });
 
   test("a change is a screen offered with declined change, never a claim", () => {

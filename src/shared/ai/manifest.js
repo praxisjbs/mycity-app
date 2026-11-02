@@ -33,6 +33,10 @@
  *       check: async (client, values, actor) => {},   // the module's own rules before run: state, scope
  *       run: (values, actor, ctx) => service.confirm(actor, actor.scope, values),   // the screen's own function
  *       readback: (result) => [{ type: "employee", id: result.employee_id, label: result.full_name, status: "confirmed" }],
+ *       fields: ["employee_id", "confirmed_on"],     // the input's fields the card carries, in order (all unless given)
+ *       picks: { employee_id: "colleague" },          // what Edit picks an id field with (AiCardPicks)
+ *       names: (values, actor, db) => service.cardNames(db, values),   // ids the fields hold, by name; never counted
+ *       asks: [{ field: "confirmed_on", question: "From which day?", choices: ["Today"] }],   // asked before the card
  *     }],
  *     routes: [{ intent: "add an employee", screen: "people.employees", params: { new: "1" } }],
  *     not_offered: { EmployeeImportRow: "an import row is loaded through the import engine" },
@@ -55,7 +59,8 @@
  *  - keys are `<thing>.<verb>`, unique across reads, summaries and actions (they share the
  *    model's tool names); descriptions are short, plain and have no em dash;
  *  - an action's risk is one of the five classes, its bulk 1 to 25, its run a function, its
- *    check, records and readback functions when given;
+ *    check, records, readback and names functions when given; its fields, picks and asks name
+ *    fields its input takes (praxis-ai.md §1.3 decisions 29 and 31), each ask one short question;
  *  - a route names a real screen (shared/route-map SCREENS) as "<module>.<tab>";
  *  - a route's prefill is the form's own fields (packages/contract `<Thing>Prefill`), never a
  *    restricted field nor one of the address's own words (tab, id, action, new, its params);
@@ -102,8 +107,17 @@ const ACTION_KEYS = new Set([
   "form",
   "labels",
   "matrix",
+  "fields",
+  "picks",
+  "names",
+  "asks",
 ]);
 const ROUTE_KEYS = new Set(["intent", "screen", "params", "prefill"]);
+/** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decision 31). */
+const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project"]);
+const ASK_KEYS = new Set(["field", "question", "choices", "none"]);
+/** The answers to tap under a question, at most (AiAnswer.choices). */
+const CHOICES_MAX = 6;
 const KEY_RE = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
 /** An action's grant: never `view`, which cannot change anything. */
 const ACTION_GRANTS = new Set(["create", "edit", "approve", "delete", "export"]);
@@ -240,13 +254,28 @@ function checkAction(where, a, seen) {
     throw new Error(`${at}: label is the card's button, Verb Noun, at most 3 words`);
   if (a.form !== undefined && !/^none: \S/.test(String(a.form)))
     throw new Error(`${at}: form is "none: <reason>" when the screen has no form for it, else left out`);
+  const shape = shapeOf(a.input);
+  const takes = (k) => Object.prototype.hasOwnProperty.call(shape, k);
   if (a.labels !== undefined) {
     if (!a.labels || typeof a.labels !== "object" || Object.values(a.labels).some((v) => typeof v !== "string" || !v.trim()))
       throw new Error(`${at}: labels is { field: "Label" }`);
-    const shape = shapeOf(a.input);
-    for (const k of Object.keys(a.labels))
-      if (!Object.prototype.hasOwnProperty.call(shape, k)) throw new Error(`${at}: labels names "${k}", which input does not take`);
+    for (const k of Object.keys(a.labels)) if (!takes(k)) throw new Error(`${at}: labels names "${k}", which input does not take`);
   }
+  if (a.fields !== undefined) {
+    if (!Array.isArray(a.fields) || !a.fields.length || new Set(a.fields).size !== a.fields.length)
+      throw new Error(`${at}: fields lists the input's fields the card carries, each once`);
+    for (const k of a.fields) if (typeof k !== "string" || !takes(k)) throw new Error(`${at}: fields names "${k}", which input does not take`);
+  }
+  const carried = (k) => !a.fields || a.fields.includes(k);
+  if (a.picks !== undefined) {
+    if (!a.picks || typeof a.picks !== "object" || Array.isArray(a.picks)) throw new Error(`${at}: picks is { field: "colleague" }`);
+    for (const [k, v] of Object.entries(a.picks)) {
+      if (!takes(k) || !carried(k)) throw new Error(`${at}: picks names "${k}", which the card does not carry`);
+      if (!PICKS.has(v)) throw new Error(`${at}: picks.${k} is one of ${[...PICKS].join(", ")}`);
+    }
+  }
+  if (a.names !== undefined && typeof a.names !== "function") throw new Error(`${at}: names is (values, actor, db) => [{ type, id, label }]`);
+  const asks = checkAsks(at, a.asks, takes, carried);
   checkMatrix(at, a.matrix);
   return Object.freeze({
     ...a,
@@ -258,7 +287,42 @@ function checkAction(where, a, seen) {
     readback: a.readback || null,
     check: a.check || null,
     labels: Object.freeze({ ...(a.labels || {}) }),
+    fields: a.fields ? Object.freeze([...a.fields]) : null,
+    picks: Object.freeze({ ...(a.picks || {}) }),
+    names: a.names || null,
+    asks,
   });
+}
+
+/**
+ * What an action must have before its card is drawn (praxis-ai.md §1.3 decision 29): each a field
+ * the card carries, the short question that asks for it, the answers to tap (a list, or a function
+ * of `{ today }` for answers that move with the day), and whether "none" is an answer (`none`: null,
+ * or an empty list, is then a value the person gave).
+ */
+function checkAsks(at, asks, takes, carried) {
+  if (asks === undefined) return Object.freeze([]);
+  if (!Array.isArray(asks)) throw new Error(`${at}: asks is [{ field, question, choices?, none? }]`);
+  const seen = new Set();
+  return Object.freeze(
+    asks.map((q) => {
+      if (!q || typeof q !== "object") throw new Error(`${at}: each ask is { field, question, choices?, none? }`);
+      for (const k of Object.keys(q)) if (!ASK_KEYS.has(k)) throw new Error(`${at}: an ask takes no "${k}"`);
+      if (!takes(q.field) || !carried(q.field)) throw new Error(`${at}: asks names "${q.field}", which the card does not carry`);
+      if (seen.has(q.field)) throw new Error(`${at}: asks names "${q.field}" twice`);
+      seen.add(q.field);
+      const words = String(q.question || "").trim();
+      if (!words.endsWith("?") || words.split(/\s+/).length > 8 || /[—–]/.test(words))
+        throw new Error(`${at}: ask ${q.field}'s question is one short question, at most 8 words`);
+      const fixed = Array.isArray(q.choices);
+      if (q.choices !== undefined && !fixed && typeof q.choices !== "function")
+        throw new Error(`${at}: ask ${q.field}'s choices are a list, or ({ today }) => a list`);
+      if (fixed && (q.choices.length > CHOICES_MAX || q.choices.some((c) => typeof c !== "string" || !c.trim() || c.length > 60)))
+        throw new Error(`${at}: ask ${q.field} offers at most ${CHOICES_MAX} short choices`);
+      if (q.none !== undefined && typeof q.none !== "boolean") throw new Error(`${at}: ask ${q.field}'s none is true or false`);
+      return Object.freeze({ field: q.field, question: words, choices: q.choices || [], none: q.none === true });
+    }),
+  );
 }
 
 /** Words the screen's address already uses: a prefill field may not take one over. */

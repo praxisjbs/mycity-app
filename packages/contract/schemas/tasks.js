@@ -376,6 +376,8 @@ const TaskSummary = z
 
 /** The people a Shared task is shared with, beside its lead: named, or a whole department. */
 const MEMBERS_MAX = 25;
+/** Watchers named on a new task, people or a whole department's (workspace.md §6); a task holds at most 25. */
+const WATCHERS_MAX = 25;
 const oneShare = (v) => !(v.member_ids !== undefined && v.department_id !== undefined);
 const ONE_SHARE = { message: "People or a department", path: ["department_id"] };
 
@@ -401,7 +403,9 @@ function commitmentProblems(v, ctx) {
 
 /**
  * POST /tasks. No assignee: the caller's own task. `member_ids` or `department_id` makes it
- * Shared, with `primary_assignee_id` its lead (workspace.md §6).
+ * Shared, with `primary_assignee_id` its lead (workspace.md §6). `watcher_ids` and
+ * `watcher_department_id` name who watches it: they may open it and hear when it moves, and it is
+ * never on their board (JBS Praxis, 01/11/2026).
  */
 const TaskCreate = z
   .object({
@@ -413,6 +417,8 @@ const TaskCreate = z
     primary_assignee_id: blank(uuid),
     member_ids: z.array(uuid).max(MEMBERS_MAX).optional(),
     department_id: blank(uuid),
+    watcher_ids: z.array(uuid).max(WATCHERS_MAX).optional(),
+    watcher_department_id: blank(uuid),
     employee_target_id: blank(uuid),
     entity_type: blank(TaskEntityType),
     entity_id: blank(uuid),
@@ -742,6 +748,8 @@ const TABLES = {
       due_on: "written to task.due_at: the end of that working day, Africa/Lagos",
       member_ids: "written to task_assignee, one row each",
       department_id: "the department's active people, written to task_assignee",
+      watcher_ids: "written to task_watcher, one row each",
+      watcher_department_id: "the department's active people, written to task_watcher",
     },
   },
   TaskPrefill: {

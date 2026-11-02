@@ -7,16 +7,18 @@
  * Overview's figures and chart are a summary's own, and a card's values are checked against the
  * action's schema and the person's rights before anyone sees them.
  *
- *   const shown = answer.build({ draft, reads, routes, screens, shows });
+ *   const asked = answer.askFirst({ draft, actions, history, shows, now });   // the draft, or its question instead
+ *   const shown = answer.build({ draft: asked, reads, routes, screens, shows });
  *   // → { content, table, link, citations, citations_total, sources, reads, declined, more, overview,
- *   //     rows_read, module_key, metadata, stored_citations, stored_reads }
- *   const card = await answer.draftCard({ draft, actions, actor, context });   // null when none
+ *   //     choices, rows_read, module_key, metadata, stored_citations, stored_reads }
+ *   const card = await answer.draftCard({ draft: asked, actions, actor, context });   // null when none
  */
 const { mergeCitations, linkOfRef, sourcesOf } = require("../../../shared/ai/cite");
 const routeMap = require("../../../shared/route-map");
 const authorise = require("../../../shared/ai/authorise");
 const { contractNameOf, shapeOf } = require("../../../shared/ai/manifest");
 const { formatDate, formatDateTime } = require("../../../shared/time/day-first");
+const lagos = require("../../../shared/time/lagos");
 const { formatNaira } = require("../../../shared/money/money");
 const { jsonSchemaOf } = require("../structured");
 const { placeholdersIn } = require("../drafts");
@@ -167,6 +169,7 @@ function build({ draft, reads, routes, screens, shows = [] }) {
   const madeReads = readsMade(stored);
   const more = Boolean(draft.more) && ok.some((r) => r.page && r.page.has_next);
   const overview = wants.has("pane") ? engine.pane.overviewOf(draft.overview, reads) : null;
+  const ask = askOf(draft.ask);
   const shown = {
     content: draft.text,
     table: presentTable(table),
@@ -178,15 +181,70 @@ function build({ draft, reads, routes, screens, shows = [] }) {
     declined,
     more,
     overview,
+    choices: ask ? ask.choices : [],
     rows_read: ok.filter((r) => r.kind !== "summary").reduce((n, r) => n + r.rows.length, 0),
     module_key: ok.length ? ok[0].module : null,
   };
   // What is kept on the answer's message, for History and the next turn's replay, and every
   // citation, whose count History shows beside the first fifty; each read for ai_message_read.
-  shown.metadata = { table, link, reads: madeReads, declined, more, overview };
+  // A question keeps what it asked for, so the next answer's guard does not ask it again (askFirst).
+  shown.metadata = { table, link, reads: madeReads, declined, more, overview, ask };
   shown.stored_citations = all;
   shown.stored_reads = stored;
   return shown;
+}
+
+/** At most this many answers to tap under a question (AiAnswer.choices). */
+const MAX_CHOICES = 6;
+
+/**
+ * A question's ask as it is kept and shown (decision 28): its answers to tap, trimmed, each once,
+ * at most six of 60 characters; what it asks for when that is an action's field. Null when the
+ * answer asks nothing.
+ */
+function askOf(ask) {
+  if (!ask || typeof ask !== "object") return null;
+  const choices = [...new Set((Array.isArray(ask.choices) ? ask.choices : []).map((c) => String(c).trim()).filter((c) => c && c.length <= 60))].slice(0, MAX_CHOICES);
+  const action = typeof ask.action === "string" && ask.action ? ask.action : null;
+  const field = typeof ask.field === "string" && ask.field ? ask.field : null;
+  if (!choices.length && !action) return null;
+  return { action, field, choices };
+}
+
+/**
+ * The questions asked in a row just before this answer, newest first: each answer of the
+ * conversation's replay that asked for an action's field, back to the last one that did not.
+ * @param {Array<{ask?: {action: string|null, field: string|null}|null}>} history  oldest first
+ */
+function askedRun(history) {
+  const run = [];
+  for (let i = (history || []).length - 1; i >= 0; i -= 1) {
+    const ask = history[i] && history[i].ask;
+    if (!ask || !ask.action) break;
+    run.push({ action: ask.action, field: ask.field || null });
+  }
+  return run;
+}
+
+/**
+ * The server's half of decision 29: a card the person asked for is drawn only once its action has
+ * what its `asks` name. When the model drafted one with a field left out, the answer becomes that
+ * question instead (its words, its choices, what it asks for), with no card, table or screen
+ * button; each field is asked once in a run of questions, and the run stops after six, so asking
+ * never loops. A suggested card, an action not offered and a screen that draws no card are left
+ * as they are.
+ * @param {{draft: object, actions: Array<object>, history?: Array<object>, shows?: string[], now?: Date}} q
+ * @returns {object} the draft, or the question that replaces it
+ */
+function askFirst({ draft, actions, history = [], shows = [], now = new Date() }) {
+  const want = draft && draft.action;
+  if (!want || !want.key || want.suggested === true || !shows.includes("cards")) return draft;
+  const action = (actions || []).find((a) => a.key === want.key);
+  if (!action) return draft;
+  const q = engine.cards.nextAsk(action, want.values && typeof want.values === "object" ? want.values : {}, askedRun(history), { today: lagos.today(now) });
+  if (!q) return draft;
+  logger.info({ ai_action: action.key, field: q.field }, "Praxis AI: a card waited on a question first");
+  return { ...draft, text: q.question, action: null, ask: { action: q.action, field: q.field, choices: q.choices }, table: null, route: null, prefill: null, more: false, overview: null };
 }
 
 /** A field problem the person fixes on the card, at most four words (gate 12). */
@@ -225,7 +283,7 @@ async function draftCard({ draft, actions, actor, context = null, db = null, now
     logger.info({ ai_action: want.key }, "Praxis AI: the model named an action that was not offered; no card");
     return null;
   }
-  const fieldNames = Object.keys(shapeOf(action.input) || {});
+  const fieldNames = action.fields ? [...action.fields] : Object.keys(shapeOf(action.input) || {});
   const values = engine.cards.fillFromContext(want.values && typeof want.values === "object" ? want.values : {}, fieldNames, context);
   let checked;
   try {
@@ -248,15 +306,16 @@ async function draftCard({ draft, actions, actor, context = null, db = null, now
       values: card.values,
       problems: card.problems,
       records: card.records,
+      names: card.names,
       suggested: card.suggested,
       status: card.status,
       expires_at: card.expires_at,
     },
     action,
-    fields: engine.cards.fieldsOf(jsonSchemaOf(action.input), action.labels),
+    fields: engine.cards.fieldsOf(jsonSchemaOf(action.input), action.labels, { fields: action.fields, picks: action.picks }),
     schema: contractNameOf(action.input),
     confirm: card.confirm,
   };
 }
 
-module.exports = { build, draftCard, gapsIn, tableOf, drawTable, defaultFields, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, FILL_THE_GAP };
+module.exports = { build, draftCard, askFirst, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };

@@ -32,6 +32,8 @@ const choiceOf = (t?: TaskDetail): CountsChoice[] =>
     : [];
 
 export const LEAD_HELP = "Answers for the task, and it counts on their scorecard.";
+/** What watching gives (workspace.md §6, JBS Praxis 01/11/2026): sight and notices, never the work. */
+export const WATCHERS_HELP = "Watchers can open the task, comment and hear when it is done, blocked or cancelled. It never lands on their board.";
 
 type Kind = "individual" | "shared";
 type ShareBy = "people" | "department";
@@ -112,6 +114,10 @@ export function TaskForm({
   const [picked, setPicked] = useState<Department[]>([]);
   const department = picked[0]?.department_id ?? "";
   const [deptLead, setDeptLead] = useState<PersonRef[]>([]);
+  // Who watches a new task: people, or a whole department's (Edit Task leaves watchers to the panel).
+  const [watchers, setWatchers] = useState<PersonRef[]>([]);
+  const [watchDept, setWatchDept] = useState<Department[]>([]);
+  const [watchMark, setWatchMark] = useState<string | null>(null);
   const [shareMark, setShareMark] = useState<string | null>(null);
   const [leadMark, setLeadMark] = useState<string | null>(null);
   const shared = kind === "shared";
@@ -246,6 +252,8 @@ export function TaskForm({
             ...(project[0] && { project_id: project[0].project_id }),
             ...leading(),
             ...sharing(),
+            ...(watchers.length > 0 && { watcher_ids: watchers.map((p) => p.employee_id) }),
+            ...(watchDept[0] && { watcher_department_id: watchDept[0].department_id }),
             ...(c?.kind === "line" && c.employee_target_id && { employee_target_id: c.employee_target_id }),
             ...(c?.kind === "key_result" && c.okr_key_result_id && { entity_type: "key_result" as const, entity_id: c.okr_key_result_id }),
             ...(isCommitment && { is_commitment: true, acceptance_criteria: v.acceptance_criteria, commitment_month: v.commitment_month }),
@@ -259,14 +267,17 @@ export function TaskForm({
       const raw = e instanceof ApiError ? (e.fields.member_ids ?? e.fields.department_id)?.[0] : undefined;
       const mark = raw ? shortMessage({ type: "custom", message: raw }) : undefined;
       const onLead = e instanceof ApiError ? e.fields.primary_assignee_id?.[0] : undefined;
+      const onWatch = e instanceof ApiError ? (e.fields.watcher_ids ?? e.fields.watcher_department_id)?.[0] : undefined;
+      setWatchMark(onWatch ? (shortMessage({ type: "custom", message: onWatch }) ?? onWatch) : null);
       // Counts Towards and Project are pickers outside the form: their refusal is said here.
       const loose = e instanceof ApiError ? Object.entries(e.fields).find(([k]) => k in LOOSE) : undefined;
+      // A refusal of the watchers is marked on Watchers itself (above), never said twice.
       if (mark || onLead) {
         setShareMark(mark ?? null);
         setLeadMark(onLead ?? null);
-      } else if (loose) toast.error(`${LOOSE[loose[0]]}: ${loose[1][0]}`);
-      else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else say(e);
+      } else if (loose && !onWatch) toast.error(`${LOOSE[loose[0]]}: ${loose[1][0]}`);
+      else if (e instanceof ApiError && Object.keys(e.fields).length && !onWatch) f.setServerErrors(e.fields);
+      else if (!onWatch) say(e);
     }
   };
   const assigneeId = !shared ? (who[0]?.employee_id ?? (task ? me.employee_id : null)) : by === "department" ? (deptLead[0]?.employee_id ?? null) : lead;
@@ -348,6 +359,32 @@ export function TaskForm({
             onChange={(p) => {
               setDeptLead(p);
               setLeadMark(null);
+            }}
+          />
+        </Field>
+      )}
+      {!task && (
+        <Field label="Watchers" optional help={WATCHERS_HELP} state={watchMark ? "bad" : undefined} message={watchMark ?? undefined}>
+          <ColleaguePicker
+            multiple
+            placeholder="Search staff"
+            value={watchers}
+            onChange={(p) => {
+              // A task has at most 25 watchers (tasks.service): the picker stops there.
+              if (p.length > MAX_MEMBERS) return setWatchMark(`At most ${MAX_MEMBERS} people`);
+              setWatchers(p);
+              setWatchMark(null);
+            }}
+          />
+        </Field>
+      )}
+      {!task && peopleView && (
+        <Field label="Watching Department" optional>
+          <DepartmentPicker
+            value={watchDept}
+            onChange={(d) => {
+              setWatchDept(d);
+              setWatchMark(null);
             }}
           />
         </Field>

@@ -9,7 +9,7 @@
   },
   "qs-add-task": {
     "spec": "221d9119480a0a72",
-    "source": "e68f57aea6374fa3",
+    "source": "74c09341affaa296",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,7 @@
   },
   "qs-commitments": {
     "spec": "16ba03ab7983c1b5",
-    "source": "e68f57aea6374fa3",
+    "source": "74c09341affaa296",
     "devices": [
       "desktop",
       "phone"
@@ -153,7 +153,7 @@
   },
   "qs-plan-day": {
     "spec": "0abe755a36a0bce0",
-    "source": "e68f57aea6374fa3",
+    "source": "74c09341affaa296",
     "devices": [
       "desktop",
       "phone"
@@ -249,7 +249,7 @@
   },
   "qs-team-tasks": {
     "spec": "62cb18ba88056ba8",
-    "source": "e68f57aea6374fa3",
+    "source": "74c09341affaa296",
     "devices": [
       "desktop",
       "phone"

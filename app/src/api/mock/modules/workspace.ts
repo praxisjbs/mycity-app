@@ -280,6 +280,12 @@ const find = (user: string, id: string) => {
   const t = TASKS.find((x) => x.task_id === id);
   return t && (mine(user, t) || scoped(user, "team").includes(t)) ? t : undefined;
 };
+/** Watching gives sight of a task (workspace.md §6): its panel, comments and history, never its board or a change to it. */
+const watches = (user: string, t: Task) => (WATCHERS.get(t.task_id) ?? []).some((p) => p.employee_id === me(user));
+const findSeen = (user: string, id: string) => {
+  const t = TASKS.find((x) => x.task_id === id);
+  return find(user, id) ?? (t && watches(user, t) ? t : undefined);
+};
 const refOf = (user: string, id: string) => {
   const o = TASKS.find((x) => x.task_id === id)!;
   const seen = Boolean(find(user, id));
@@ -291,6 +297,8 @@ const edgeOut = (user: string, e: Edge, other: string) => ({
 const plans = (user: string, t: Task) => manages(user, t) || t.assignee?.employee_id === me(user) || onIt(user, t);
 const detail = (user: string, t: Task): TaskDetail => {
   const f = fresh(t);
+  // Seen only by watching: nothing to change on it.
+  const works = Boolean(find(user, t.task_id));
   const watchers = WATCHERS.get(t.task_id) ?? [];
   const blockage = (HOLDS.get(t.task_id) ?? []).find((b) => !b.resolved_at) ?? null;
   const approved = Boolean(t.is_commitment && t.original_due_at);
@@ -306,16 +314,16 @@ const detail = (user: string, t: Task): TaskDetail => {
     watching: watchers.some((p) => p.employee_id === me(user)),
     blockage,
     reminders: REMINDERS.get(t.task_id) ?? [],
-    // Edit Task changes something for whoever manages, leads or shares it, while it is not cancelled.
-    can_edit: plans(user, t) && t.status !== "cancelled",
-    can_reassign: manages(user, t),
-    can_cancel: manages(user, t) && t.status !== "cancelled" && !approved,
-    can_plan: plans(user, t) && t.status !== "cancelled",
+    // Anyone who may work it, as the API says; seen only by watching, nothing (the panel hides Edit Task and the rest).
+    can_edit: works,
+    can_reassign: works && manages(user, t),
+    can_cancel: works && manages(user, t) && t.status !== "cancelled" && !approved,
+    can_plan: works && plans(user, t) && t.status !== "cancelled",
     set_status: setOf(t)?.status ?? null,
     rescope: pending ? { workflow_instance_id: pending, can_decide: t.assignee?.employee_id !== me(user) && canSetFor(user, t.assignee!.employee_id) } : null,
     recovery: rec,
-    can_rescope: approved && !pending && !t.rescoped_at && open(t) && actsFor,
-    can_set_recovery: f.commitment_state === "missed" && !rec && actsFor,
+    can_rescope: works && approved && !pending && !t.rescoped_at && open(t) && actsFor,
+    can_set_recovery: works && f.commitment_state === "missed" && !rec && actsFor,
   };
 };
 
@@ -454,14 +462,14 @@ route("PATCH /api/v1/projects/:id", (req) => {
 });
 
 route("GET /api/v1/tasks/:id", (req) => {
-  const t = find(req.user!, req.params.id);
+  const t = findSeen(req.user!, req.params.id);
   return t ? ok(detail(req.user!, t)) : notFound();
 });
 route("POST /api/v1/tasks", (req) => {
   const b = req.body as {
     title?: string; primary_assignee_id?: string; due_on?: string; cadence?: Task["cadence"]; priority?: Task["priority"]; description?: string;
     is_commitment?: boolean; acceptance_criteria?: string; commitment_month?: string; employee_target_id?: string; entity_type?: Task["entity_type"]; entity_id?: string;
-    member_ids?: string[]; department_id?: string; project_id?: string;
+    member_ids?: string[]; department_id?: string; project_id?: string; watcher_ids?: string[]; watcher_department_id?: string;
   };
   if (!b.title || !b.title.trim()) return invalid({ title: ["Name the task"] });
   const joins = b.project_id ? projectProblem(b.project_id) : null;
@@ -476,6 +484,14 @@ route("POST /api/v1/tasks", (req) => {
   if (leadBad) return invalid(leadBad);
   const problem = commitmentProblem(b);
   if (problem) return invalid(problem);
+  // Watchers, people or a whole department's, never the lead, the setter or the people sharing it, at most 25 (tasks.service watchersFor).
+  if ((b.watcher_ids ?? []).some((id) => !byId(id))) return invalid({ watcher_ids: ["Not on the staff"] });
+  const watchDept = b.watcher_department_id ? DEPARTMENTS.find((n) => sid(`dept:${n}`) === b.watcher_department_id) : undefined;
+  if (b.watcher_department_id && !watchDept) return invalid({ watcher_department_id: ["Not a department"] });
+  const skip = new Set([assignee.employee_id, me(req.user), ...share.ids]);
+  const watching = [...new Set([...(b.watcher_ids ?? []), ...(watchDept ? PEOPLE.filter((p) => p.department === watchDept).map((p) => p.employee_id) : [])])].filter((id) => !skip.has(id));
+  if (watchDept && !(b.watcher_ids ?? []).length && !watching.length) return invalid({ watcher_department_id: ["Nobody to add"] });
+  if (watching.length > 25) return invalid({ [(b.watcher_ids ?? []).length ? "watcher_ids" : "watcher_department_id"]: ["At most 25 watchers"] });
   const t = newTask({
     task_id: sid(`task:${Date.now()}:${TASKS.length}`),
     number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`,
@@ -497,6 +513,10 @@ route("POST /api/v1/tasks", (req) => {
   });
   TASKS.unshift(t);
   log(req.user!, t, "created", null, "todo");
+  if (watching.length) {
+    WATCHERS.set(t.task_id, watching.map((id) => ref(byId(id))!));
+    for (let i = 0; i < watching.length; i += 1) log(req.user!, t, "watcher_added");
+  }
   return created(fresh(t));
 });
 /** What only whoever manages a task changes (the API's SETTER_FIELDS). */
@@ -636,11 +656,11 @@ route("POST /api/v1/tasks/:id/cancel", (req) => {
   return ok(fresh(t));
 });
 route("GET /api/v1/tasks/:id/comments", (req) => {
-  const t = find(req.user!, req.params.id);
+  const t = findSeen(req.user!, req.params.id);
   return t ? paged(COMMENTS.filter((c) => c.task_id === t.task_id), req, { sort: { created_at: (a, b) => a.created_at.localeCompare(b.created_at) } }) : notFound();
 });
 route("POST /api/v1/tasks/:id/comments", (req) => {
-  const t = find(req.user!, req.params.id);
+  const t = findSeen(req.user!, req.params.id);
   if (!t) return notFound();
   const c: TaskComment = { task_comment_id: sid(`c:${Date.now()}`), task_id: t.task_id, author: refKey(req.user!), body: (req.body as { body: string }).body, created_at: new Date().toISOString() };
   COMMENTS.push(c);
@@ -649,12 +669,12 @@ route("POST /api/v1/tasks/:id/comments", (req) => {
   return created(c);
 });
 route("GET /api/v1/tasks/:id/activity", (req) => {
-  const t = find(req.user!, req.params.id);
+  const t = findSeen(req.user!, req.params.id);
   return t ? paged(ACTIVITY.filter((a) => a.task_id === t.task_id), req, { sort: { created_at: (a, b) => a.created_at.localeCompare(b.created_at) } }) : notFound();
 });
 
 route("GET /api/v1/tasks/:id/blockages", (req) => {
-  const t = find(req.user!, req.params.id);
+  const t = findSeen(req.user!, req.params.id);
   return t ? paged(HOLDS.get(t.task_id) ?? [], req, { sort: { raised_at: (a, b) => a.raised_at.localeCompare(b.raised_at) } }) : notFound();
 });
 route("POST /api/v1/tasks/:id/steps", (req) => {
@@ -724,21 +744,21 @@ route("POST /api/v1/tasks/:id/waiting-on/:child_id/override", (req) => {
   return ok(detail(req.user!, t));
 });
 route("POST /api/v1/tasks/:id/watchers", (req) => {
-  const t = find(req.user!, req.params.id);
-  if (!t) return notFound();
   const id = (req.body as { employee_id?: string }).employee_id || me(req.user);
+  const self = id === me(req.user);
+  const t = self ? findSeen(req.user!, req.params.id) : find(req.user!, req.params.id);
+  if (!t) return notFound();
   const person = ref(byId(id));
   if (!person) return invalid({ employee_id: ["Not on the staff"] });
-  // The caller watches it themselves; someone else is added by whoever plans it, and only if they can see it.
-  if (id !== me(req.user) && !plans(req.user!, t)) return fail(403, "FORBIDDEN", "Only its assignee or the person who set it can change that");
-  if (!seesTask(byId(id)!.user_key, t)) return invalid({ employee_id: ["Cannot see this task"] });
+  // The caller watches it themselves; someone else is added by whoever plans it, and watching gives them sight of it.
+  if (!self && !plans(req.user!, t)) return fail(403, "FORBIDDEN", "Only its assignee or the person who set it can change that");
   const list = WATCHERS.get(t.task_id) ?? [];
   if (!list.some((p) => p.employee_id === id)) WATCHERS.set(t.task_id, [...list, person]);
   log(req.user!, t, "watcher_added");
   return ok(detail(req.user!, t));
 });
 route("DELETE /api/v1/tasks/:id/watchers/:child_id", (req) => {
-  const t = find(req.user!, req.params.id);
+  const t = req.params.child_id === me(req.user) ? findSeen(req.user!, req.params.id) : find(req.user!, req.params.id);
   if (!t) return notFound();
   WATCHERS.set(t.task_id, (WATCHERS.get(t.task_id) ?? []).filter((p) => p.employee_id !== req.params.child_id));
   log(req.user!, t, "watcher_removed");

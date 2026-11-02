@@ -94,7 +94,8 @@ export function TaskPanel({ id, close, onOpenTask, onTitle }: { id: string; clos
     refresh();
   };
   const form = (title: string, body: (done: () => void) => ReactNode) => modal.open({ title, body });
-  const open = t.status !== "cancelled";
+  // Seen only by watching (workspace.md §6): the panel to read and comment on, with nothing to change.
+  const open = t.status !== "cancelled" && t.can_edit;
   // A lead time needs a due time to count back from; without one only reminders already set can change.
   const remindable = t.can_plan && t.status !== "done" && (Boolean(t.due_at) || t.reminders.length > 0);
   const more = [
@@ -129,7 +130,7 @@ export function TaskPanel({ id, close, onOpenTask, onTitle }: { id: string; clos
         {open && t.status !== "done" && !t.blocked_reason && (
           <Button onClick={() => form("Mark Blocked", (done) => <BlockForm id={t.task_id} close={done} onDone={changed} />)}>Mark Blocked</Button>
         )}
-        {t.blocked_reason && <Button onClick={() => form("Clear Blocker", (done) => <UnblockForm task={t} close={done} onDone={changed} />)}>Clear Blocker</Button>}
+        {t.blocked_reason && t.can_edit && <Button onClick={() => form("Clear Blocker", (done) => <UnblockForm task={t} close={done} onDone={changed} />)}>Clear Blocker</Button>}
         {t.is_commitment && <CommitmentActions t={t} onChanged={changed} />}
         {open && <Menu label="More Actions" items={more} trigger={(p) => <IconButton {...p} icon="dots" label="More Actions" />} />}
       </div>
@@ -280,7 +281,7 @@ function Steps({ t, changed, form }: { t: TaskDetail; changed: () => void; form:
     <>
       {t.steps.map((s) => (
         <div key={s.task_step_id} className="flex items-center gap-2 border-b border-border py-1.5 last:border-b-0">
-          <Tick checked={Boolean(s.done_at)} label={`Done: ${s.title}`} onChange={(done) => run(() => tick.run({ params: { id: t.task_id, child_id: s.task_step_id }, body: { done } }))} disabled={t.status === "cancelled"} />
+          <Tick checked={Boolean(s.done_at)} label={`Done: ${s.title}`} onChange={(done) => run(() => tick.run({ params: { id: t.task_id, child_id: s.task_step_id }, body: { done } }))} disabled={t.status === "cancelled" || !t.can_edit} />
           <span className="min-w-0 flex-1">
             <span className={s.done_at ? "block text-xs text-subtle-foreground line-through" : "block text-xs font-semibold"} data-copy="content">{s.title}</span>
             {(s.due_on || s.done_by) && <span className="text-2xs text-subtle-foreground">{s.done_by ? `Done by ${s.done_by.display_name}` : `Due ${formatDate(s.due_on!)}`}</span>}

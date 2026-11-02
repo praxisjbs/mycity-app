@@ -34,5 +34,11 @@ export default {
       <AnswerBubble text="There are 312 people in all. Here are the first 25." paging="Showing 25 of 312" onNext={() => Promise.resolve()} feedback="up" onFeedback={() => undefined} from={<SourceChip label="employee" count={25} />} />
     ),
     "One Record": () => <AnswerBubble text="Ayo Bello has 14 of 20 annual leave days left." from={<SourceChip kind="record" label="Ayo Bello" onSelect={() => undefined} />} feedback={null} onFeedback={() => undefined} />,
+    "A Question": () => (
+      <div className="flex max-w-2xl flex-col gap-3.5">
+        <QuestionBubble words="Assign a task to Bode to send the weekly report." />
+        <AnswerBubble text="When is it due?" choices={["Today", "Tomorrow", "Friday", "No Due Day"]} onChoose={() => Promise.resolve()} feedback={null} onFeedback={() => undefined} />
+      </div>
+    ),
   },
 } satisfies GalleryEntry;

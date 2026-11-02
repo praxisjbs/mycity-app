@@ -214,7 +214,12 @@ describeDb("Praxis AI action cards against the real migrations", () => {
       status: "shown",
       result: null,
     });
-    expect(body.card.fields.find((f) => f.name === "due_on")).toEqual({ name: "due_on", label: "Due Day", kind: "date", required: false, options: null, long: false });
+    expect(body.card.fields.find((f) => f.name === "due_on")).toEqual({ name: "due_on", label: "Due Day", kind: "date", required: false, options: null, long: false, picks: null });
+    // The card carries New Task's own fields alone (decision 31), each id field with the picker Edit uses.
+    expect(body.card.fields.map((f) => f.name)).toEqual(["title", "description", "primary_assignee_id", "member_ids", "department_id", "watcher_ids", "watcher_department_id", "due_on", "priority", "cadence", "project_id"]);
+    expect(body.card.fields.find((f) => f.name === "watcher_ids")).toMatchObject({ label: "Watchers", kind: "list", picks: "colleague" });
+    expect(body.card.names).toEqual([]);
+    expect(body.choices).toEqual([]);
     expect(body.context).toEqual({ module: "workspace", tab: "tasks" });
     // The reads carry the fields masked for the asker (a member of staff sees no pay, bank, personal or statutory field), for the Sources tab.
     expect(body.reads).toEqual([{ n: 1, key: "tasks.list", kind: "read", module_key: "workspace", params: {}, outcome: "read", rows: 0, total: 0, first: 1, masked: ["employee.bank", "employee.personal", "employee.salary", "employee.statutory"] }]);
@@ -279,7 +284,8 @@ describeDb("Praxis AI action cards against the real migrations", () => {
   });
 
   test("a refusal the person can fix comes back on the fields and the card stays open; a service that falls over is recorded as failed", async () => {
-    const { body } = await cardFor("staff", { title: "Shared task", department_id: "00000000-0000-4000-8000-000000000099" });
+    // Everything its asks name is given (no due day, said so), so the card is drawn and the press finds the gap.
+    const { body } = await cardFor("staff", { title: "Shared task", due_on: null, priority: "normal", department_id: "00000000-0000-4000-8000-000000000099" });
     const id = body.card.ai_action_draft_id;
     const res = await press("staff", id);
     expect(res.status).toBe(422);

@@ -205,25 +205,52 @@ async function runSummary(client, actor, key, params = {}) {
  * @param {string} key
  * @param {object} values
  * @param {{query: Function}|null} [db]  a pool or a client for the records' names
- * @returns {Promise<{action: object, scope: object, ok: boolean, values: object, problems: object, records: Array<{type: string, id: string, label?: string}>}>}
+ * @returns {Promise<{action: object, scope: object, ok: boolean, values: object, problems: object, records: Array<{type: string, id: string, label?: string}>, names: Array<{type: string, id: string, label: string}>}>}
  */
 async function checkAction(actor, key, values = {}, db = null) {
   const action = registry.action(key);
   if (!action) throw new AppError("AI_ACTION_UNKNOWN", `There is no "${key}" action`, 404);
   const scope = await scopeFor(actor, action.permission[0], action.permission[1]);
   if (!scope) throw refused(key, actor, "action");
-  const parsed = action.input.safeParse(values && typeof values === "object" ? values : {});
+  const given = carried(action, values && typeof values === "object" ? values : {});
+  const parsed = action.input.safeParse(given);
   const problems = parsed.success ? {} : fieldsOf(parsed);
-  const clean = parsed.success ? parsed.data : values || {};
+  const clean = parsed.success ? parsed.data : given;
+  const who = { ...actor, scope };
   let records = [];
   try {
-    records = ((await action.records(clean, { ...actor, scope }, db)) || []).filter((r) => r && r.type && r.id !== undefined && r.id !== null && r.id !== "").map((r) => ({ type: String(r.type), id: String(r.id), label: r.label ? String(r.label) : null }));
+    records = ((await action.records(clean, who, db)) || []).filter((r) => r && r.type && r.id !== undefined && r.id !== null && r.id !== "").map((r) => ({ type: String(r.type), id: String(r.id), label: r.label ? String(r.label) : null }));
   } catch (err) {
     logger.warn({ err, ai_action: key }, "Praxis AI: an action's records() threw; the card names none");
   }
   if (records.length > action.bulk)
     throw new AppError("TOO_MANY_RECORDS", `At most ${action.bulk} at a time`, 422, { records: [`At most ${action.bulk}`] });
-  return { action, scope, ok: parsed.success, values: clean, problems, records };
+  return { action, scope, ok: parsed.success, values: clean, problems, records, names: await namesOf(action, clean, who, db) };
+}
+
+/** Only the fields the card carries (decision 31): a value for any other field never reaches the action. */
+function carried(action, values) {
+  if (!action.fields) return values;
+  return Object.fromEntries(Object.entries(values).filter(([k]) => action.fields.includes(k)));
+}
+
+/**
+ * The people, departments and projects a card's fields hold, by name (decision 31), through the
+ * action's own module; never counted and never a reason to refuse. An id that names nothing is
+ * left out, and the card shows the id.
+ */
+async function namesOf(action, values, who, db) {
+  if (!action.names || !db) return [];
+  try {
+    const named = (await action.names(values, who, db)) || [];
+    return named
+      .filter((n) => n && n.type && n.id && typeof n.label === "string" && n.label.trim())
+      .slice(0, 80)
+      .map((n) => ({ type: String(n.type), id: String(n.id), label: n.label.trim() }));
+  } catch (err) {
+    logger.warn({ err, ai_action: action.key }, "Praxis AI: an action's names() threw; the card shows ids");
+    return [];
+  }
 }
 
 module.exports = { allowedReads, allowedSummaries, allowedActions, runRead, runSummary, checkAction, guarded, READ_TIMEOUT_MS, READ_DEADLINE_MS };

@@ -99,7 +99,8 @@ function present(row, run = null, now = Date.now()) {
     values: row.values || {},
     problems: row.problems || {},
     records: (row.records || []).slice(0, 25).map(recordView),
-    fields: action ? cards.fieldsOf(jsonSchemaOf(action.input), action.labels) : [],
+    names: (row.names || []).slice(0, cards.NAMES_MAX).map(recordView),
+    fields: action ? cards.fieldsOf(jsonSchemaOf(action.input), action.labels, { fields: action.fields, picks: action.picks }) : [],
     suggested: row.suggested === true,
     status,
     expires_at: iso(row.expires_at),
@@ -127,7 +128,7 @@ async function edit(id, body, actor) {
     }
     if (!registry.action(found.action_key)) throw new AppError("CARD_EXPIRED", "This card has expired. Ask again to draw it afresh.", 409);
     const checked = held(await authorise.checkAction(actor, found.action_key, body.values, client));
-    return repo.setDraft(client, found.ai_action_draft_id, { values: checked.ok ? checked.values : body.values, problems: checked.ok ? {} : checked.problems, records: checked.records });
+    return repo.setDraft(client, found.ai_action_draft_id, { values: checked.ok ? checked.values : body.values, problems: checked.ok ? {} : checked.problems, records: checked.records, names: checked.names });
   });
   return present(row, null);
 }
@@ -216,12 +217,12 @@ function openPress(id, body, actor, idempotencyKey) {
     const values = body && body.values ? body.values : found.values || {};
     const checked = held(await authorise.checkAction(actor, found.action_key, values, client));
     if (!checked.ok) {
-      await repo.setDraft(client, found.ai_action_draft_id, { values, problems: checked.problems });
+      await repo.setDraft(client, found.ai_action_draft_id, { values, problems: checked.problems, names: checked.names });
       throw new AppError("VALIDATION", "Check the card's fields", 422, checked.problems);
     }
     const who = { ...actor, scope: checked.scope };
     await ownCheck(client, action, checked.values, who);
-    await repo.setDraft(client, found.ai_action_draft_id, { status: "confirmed", values: checked.values, problems: {}, records: checked.records });
+    await repo.setDraft(client, found.ai_action_draft_id, { status: "confirmed", values: checked.values, problems: {}, records: checked.records, names: checked.names });
     const run = await repo.insertRun(client, {
       ai_action_draft_id: found.ai_action_draft_id,
       user_id: actor.user_id,

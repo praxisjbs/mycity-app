@@ -18,7 +18,7 @@
       "module_key": "workspace",
       "permission": "workspace.create",
       "risk": "standard",
-      "bulk": 25,
+      "bulk": 1,
       "schema": "calendar.CalendarEventCreate",
       "schema_sha": "a1b44f32963ed280",
       "screen": null
@@ -119,7 +119,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "tasks.TaskCreate",
-      "schema_sha": "6ea11d64a483fecf",
+      "schema_sha": "b3dbd57183abcb9e",
       "screen": null
     },
     {
@@ -263,6 +263,17 @@
       "bulk": null,
       "schema": "community.ChannelListQuery",
       "schema_sha": "463693b1b2726c8c",
+      "screen": null
+    },
+    {
+      "key": "colleagues.list",
+      "kind": "read",
+      "module_key": "community",
+      "permission": "community.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "community.ColleagueListQuery",
+      "schema_sha": "c7a6bd698a6fd04a",
       "screen": null
     },
     {

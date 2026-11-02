@@ -2,14 +2,14 @@
  * @component ActionCard
  * @group Assistant
  * @summary An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired.
- * @use Inside an answer (AnswerBubble's card slot) when the answer carries a card (docs/guides/praxis-ai.md §6.11): the screen passes the card as the API drew it, the action's contract schema for Edit, and what each press does. A suggested card reads as a question with the verb and Not Now.
+ * @use Inside an answer (AnswerBubble's card slot) when the answer carries a card (docs/guides/praxis-ai.md §6.11): the screen passes the card as the API drew it (its records, and the names its id fields hold, so no id reads as a code), the action's contract schema for Edit, a `picker` that binds each id field's `picks` to the screen's own picker, and what each press does. A suggested card reads as a question with the verb and Not Now.
  * @avoid A form the person fills from empty (the screen's own form); a confirmation dialog (useConfirm); an answer's screen button (AnswerBubble's link); a list of records to browse (DataView).
  * @phone Full width inside the answer; the buttons are 44 px targets with the verb full width at the foot; Edit's fields are one column; the result's Open buttons are 44 px.
  * @a11y A group named by the card's title; the fields are a description list, and in Edit the form system's own fields with their labels and marks; the verb says aria-busy while the press runs and the buttons beside it wait (ActionGroup); the result line is a status; a refusal is an alert.
  * @status beta
  * @example <ActionCard label="Approve Leave" fields={fields} values={values} records={records} problems={{}} status="shown" confirm="fresh_sign_in" onConfirm={press} onCancel={cancel} onSave={save} schema={schemas.leave.LeaveApprove} />
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { content, slot } from "../lib/slots";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
@@ -37,7 +37,16 @@ export interface CardField {
   options: string[] | null;
   /** A text of several lines (a message, a note, a reason). */
   long: boolean;
+  /** What an id field, or a list of ids, is picked with on Edit (AiCardPicks); the screen's `picker` draws it. */
+  picks?: "colleague" | "task_assignee" | "task_member" | "department" | "project" | null;
 }
+
+/**
+ * Edit's picker for one id field (`field.picks`), bound by the screen to its own endpoint: the value is
+ * the id (or the ids of a list) as the action takes it, and `names` holds the names the card knows for
+ * them. Null leaves the field as it is.
+ */
+export type ActionCardPicker = (props: { field: CardField; value: unknown; onChange: (value: unknown) => void; names: CardRecord[] }) => ReactNode | null;
 
 /** A record the card touches, named and linked (AiCardRecord). */
 export interface CardRecord {
@@ -59,8 +68,12 @@ export interface ActionCardProps {
   values: Record<string, unknown>;
   /** Problems the person must fix, by field. */
   problems: Record<string, string[]>;
-  /** The records the card touches. */
+  /** The records a press acts on: the verb's count and the chips under the fields. */
   records: CardRecord[];
+  /** The people, departments and projects the fields hold, by name: an id reads as its name. Never counted. */
+  names?: CardRecord[];
+  /** Edit's picker for an id field that names what it picks (`picks`); without it such a field cannot be changed. */
+  picker?: ActionCardPicker;
   /** Where the card stands: open (shown), running, done, failed, cancelled or expired. */
   status: CardStatus;
   /** `fresh_sign_in`: the press asks Confirm It's You first; the verb carries a lock. */
@@ -114,15 +127,15 @@ export function verbOf(label: string, fields: CardField[], values: Record<string
   return count > 1 ? `${base} ×${count}` : base;
 }
 
-/** A value as the person reads it, from the field's kind; the records name an id. */
-function shown(f: CardField, value: unknown, records: CardRecord[]): string | null {
+/** A value as the person reads it, from the field's kind; the names and records name an id. */
+function shown(f: CardField, value: unknown, known: CardRecord[]): string | null {
   if (isBlank(value)) return null;
-  const nameOf = (id: unknown) => records.find((r) => r.id === String(id))?.label ?? asString(id);
+  const nameOf = (id: unknown) => known.find((r) => r.id === String(id))?.label ?? asString(id);
   switch (f.kind) {
     case "id":
       return nameOf(value);
     case "list":
-      return Array.isArray(value) ? value.map((v) => (typeof v === "string" && records.some((r) => r.id === v) ? nameOf(v) : asString(v))).join(", ") : asString(value);
+      return Array.isArray(value) ? value.map((v) => (typeof v === "string" ? nameOf(v) : asString(v))).join(", ") : asString(value);
     case "date":
       return formatDate(asString(value));
     case "datetime":
@@ -143,8 +156,9 @@ const listed = (fields: CardField[], values: Record<string, unknown>, problems: 
 
 const idsOf = (f: CardField) => f.kind === "id" || (f.kind === "list" && /_ids?$/.test(f.name));
 
-export function ActionCard({ label, fields, values, problems, records, status, confirm, suggested = false, result = null, schema, onConfirm, onCancel, onSave, onRedraw, onOpen, problem = null, problemAction = null, className }: ActionCardProps) {
+export function ActionCard({ label, fields, values, problems, records, names = [], picker, status, confirm, suggested = false, result = null, schema, onConfirm, onCancel, onSave, onRedraw, onOpen, problem = null, problemAction = null, className }: ActionCardProps) {
   const [editing, setEditing] = useState(false);
+  const known = [...names, ...records];
   useEffect(() => {
     if (status !== "shown") setEditing(false);
   }, [status]);
@@ -168,13 +182,13 @@ export function ActionCard({ label, fields, values, problems, records, status, c
         {status === "confirmed" && <Pill tone="info">Running</Pill>}
       </div>
       {editing && schema ? (
-        <EditFields fields={fields} values={values} problems={problems} records={records} schema={schema} onSave={onSave} onDone={() => setEditing(false)} />
+        <EditFields fields={fields} values={values} problems={problems} known={known} picker={picker} schema={schema} onSave={onSave} onDone={() => setEditing(false)} />
       ) : (
         <>
           <KeyValue
             layout="stacked"
             items={listed(fields, values, problems).map((f) => {
-              const value = shown(f, values[f.name], records);
+              const value = shown(f, values[f.name], known);
               const bad = problemOn(f.name);
               return {
                 key: f.name,
@@ -261,8 +275,11 @@ export function ActionCard({ label, fields, values, problems, records, status, c
   );
 }
 
-/** Edit: the fields as the form system draws them, from the action's own schema; the records it names stay as they are. */
-function EditFields({ fields, values, problems, records, schema, onSave, onDone }: { fields: CardField[]; values: Record<string, unknown>; problems: Record<string, string[]>; records: CardRecord[]; schema: ContractSchema; onSave?: (values: Record<string, unknown>) => Promise<unknown> | void; onDone: () => void }) {
+/**
+ * Edit: the fields as the form system draws them, from the action's own schema; an id field with a
+ * picker is picked as on the screen's own form, and one without stays as it is.
+ */
+function EditFields({ fields, values, problems, known, picker, schema, onSave, onDone }: { fields: CardField[]; values: Record<string, unknown>; problems: Record<string, string[]>; known: CardRecord[]; picker?: ActionCardPicker; schema: ContractSchema; onSave?: (values: Record<string, unknown>) => Promise<unknown> | void; onDone: () => void }) {
   const f = useContractForm<Record<string, unknown>>({ ...values }, schema);
   const { setServerErrors } = f;
   useEffect(() => {
@@ -281,7 +298,14 @@ function EditFields({ fields, values, problems, records, schema, onSave, onDone 
         const b = f.field(field.name);
         const status = f.status(field.name);
         if (idsOf(field)) {
-          const value = shown(field, values[field.name], records);
+          const picked = field.picks && picker ? picker({ field, value: b.value, onChange: b.onChange, names: known }) : null;
+          if (picked)
+            return (
+              <Field key={field.name} label={field.label} optional={!field.required} {...status}>
+                {picked}
+              </Field>
+            );
+          const value = shown(field, values[field.name], known);
           return value === null ? null : (
             <Field key={field.name} label={field.label} {...status}>
               <TextField {...b} value={value} disabled />

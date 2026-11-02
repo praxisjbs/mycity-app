@@ -65,11 +65,12 @@ const ISO_DAY = "^\\d{4}-\\d{2}-\\d{2}$";
  * The fields a schema takes, each with the form its value is written in, for the lists the model
  * reads: a value in any other form (a day written day first) is dropped from a link or a card.
  */
-function schemaFields(schema, { required = false } = {}) {
+function schemaFields(schema, { required = false, only = null } = {}) {
   const js = jsonSchemaOf(schema) || {};
   const props = js.properties || {};
   const must = new Set(js.required || []);
-  return Object.entries(props).map(([k, p]) => {
+  const keep = Array.isArray(only) && only.length ? only.filter((k) => Object.prototype.hasOwnProperty.call(props, k)) : Object.keys(props);
+  return keep.map((k) => [k, props[k]]).map(([k, p]) => {
     const node = p && Array.isArray(p.anyOf) ? p.anyOf.find((x) => x && x.type !== "null") || p : p;
     let form = "";
     if (node.enum) form = ` (one of ${node.enum.join(", ")})`;
@@ -84,6 +85,25 @@ function schemaFields(schema, { required = false } = {}) {
 
 /** The route list's prefill fields, as before. */
 const prefillFields = (schema) => schemaFields(schema);
+
+/**
+ * An action as the model reads it (§6.11, decisions 29 and 31): its key and description, the
+ * fields its card carries with the form of each, and what to ask before drafting it, each with
+ * its answers to tap and whether none is an answer.
+ */
+function actionLine(a, today) {
+  const parts = [`- ${a.key}: ${a.description}; fields: ${schemaFields(a.input, { required: true, only: a.fields }).join(", ")}`];
+  if (a.bulk > 1) parts.push(`at most ${a.bulk} records`);
+  if (a.suggest) parts.push("may be offered unasked, marked suggested");
+  if (a.asks && a.asks.length) {
+    const asks = a.asks.map((q) => {
+      const choices = typeof q.choices === "function" ? q.choices({ today }) : q.choices || [];
+      return `${q.field} ("${q.question}"${choices.length ? `, choices: ${choices.join(", ")}` : ""}${q.none ? `; null when the person says there is none` : ""})`;
+    });
+    parts.push(`ask first, one at a time, unless the person gave it: ${asks.join("; ")}`);
+  }
+  return parts.join("; ");
+}
 
 /**
  * Who is asking, what they may open, and where they would make a change.
@@ -170,9 +190,7 @@ function systemTurn(prompt, ctx, now, { context = null, actions = [], pane = fal
       : ["- none"]),
     "",
     "Actions you may draft as a card for the person to confirm (name one by its key in \"action\"; the person presses it; you never say it was done):",
-    ...(actions.length
-      ? actions.map((a) => `- ${a.key}: ${a.description}; fields: ${schemaFields(a.input, { required: true }).join(", ")}${a.bulk > 1 ? `; at most ${a.bulk} records` : ""}${a.suggest ? "; may be offered unasked, marked suggested" : ""}`)
-      : ["- none: offer a route instead"]),
+    ...(actions.length ? actions.map((a) => actionLine(a, today)) : ["- none: offer a route instead"]),
     "",
     ...(pane
       ? [
@@ -185,7 +203,11 @@ function systemTurn(prompt, ctx, now, { context = null, actions = [], pane = fal
   return { role: "system", content: lines.join("\n") };
 }
 
-/** Earlier turns as the model reads them: the question, the answer, and what it read. */
+/**
+ * Earlier turns as the model reads them: the question, the answer, what it read, and, for a
+ * question it asked before a card, which action's field it asked for (decision 29), so the next
+ * answer carries on gathering that card.
+ */
 function historyTurns(history) {
   const out = [];
   for (const t of (history || []).slice(-HISTORY_TURNS)) {
@@ -193,7 +215,8 @@ function historyTurns(history) {
     const reads = (t.reads || [])
       .map((r) => `${r.key} ${stable(r.params || {})}: ${r.rows} row(s)${r.total !== null && r.total !== undefined ? ` of ${r.total}` : ""}`)
       .join("; ");
-    out.push({ role: "assistant", content: reads ? `${t.answer}\n[Read: ${reads}]` : t.answer });
+    const notes = [reads && `[Read: ${reads}]`, t.ask && t.ask.action && `[Asked for: ${t.ask.action} ${t.ask.field || ""}`.trim() + "]"].filter(Boolean);
+    out.push({ role: "assistant", content: notes.length ? `${t.answer}\n${notes.join("\n")}` : t.answer });
   }
   return out;
 }
