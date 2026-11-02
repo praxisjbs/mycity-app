@@ -500,6 +500,25 @@ describeDb("my workspace against the real migrations", () => {
     expect((await as("staff").get(`/tasks/${t.body.task_id}`)).body.reminders).toHaveLength(0);
   });
 
+  test("a reminder at a set time: before the due time, never after it, and it stays when the due date moves", async () => {
+    const t = await as("staff").post("/tasks", { title: "Book the hall", due_on: later(4) });
+    const due = Date.parse(t.body.due_at);
+    const at = new Date(due - 3 * 3_600_000).toISOString();
+    const set = await as("staff").put(`/tasks/${t.body.task_id}/reminders`, { reminders: [{ remind_at: at }, { minutes_before: 15 }] });
+    expect(set.status).toBe(200);
+    expect(set.body.reminders.map((r) => [Date.parse(r.remind_at), r.minutes_before])).toEqual([[Date.parse(at), null], [due - 15 * 60000, 15]]);
+
+    const late = await as("staff").put(`/tasks/${t.body.task_id}/reminders`, { reminders: [{ remind_at: new Date(due + 60_000).toISOString() }] });
+    expect(late.status).toBe(422);
+    expect(late.body.error.fields["reminders.0.remind_at"]).toEqual(["After the due time"]);
+    const past = await as("staff").put(`/tasks/${t.body.task_id}/reminders`, { reminders: [{ remind_at: new Date(Date.now() - 60_000).toISOString() }] });
+    expect(past.status).toBe(422);
+
+    await as("staff").patch(`/tasks/${t.body.task_id}`, { due_on: later(6) });
+    const after = await as("staff").get(`/tasks/${t.body.task_id}`);
+    expect(after.body.reminders.find((r) => r.minutes_before === null).remind_at).toBe(set.body.reminders[0].remind_at);
+  });
+
   test("a late task carries its reason, and Analytics counts the overdue by reason and by age", async () => {
     const late = await as("staff").post("/tasks", { title: "Return the projector", due_on: later(-6) });
     const why = await as("staff").patch(`/tasks/${late.body.task_id}`, { late_reason: "waiting_on_others" });

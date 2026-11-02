@@ -387,6 +387,34 @@ describe("my workspace", () => {
     expect(screen.queryByRole("menuitem", { name: "Set Reminders" })).toBeNull();
   }, 20000);
 
+  it("Set Reminders takes a Custom Time at or before the due time (TB, 28/10/2026)", async () => {
+    await board();
+    const due = isoDaysAhead(3);
+    await arrange({ title: "Print the badges", due_on: due });
+    const panel = await openCard("Print the badges");
+    await userEvent.click(within(panel).getByRole("button", { name: "More Actions" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Set Reminders" }));
+    const form = await screen.findByRole("dialog", { name: "Set Reminders" });
+    expect(within(form).queryByRole("textbox", { name: "Remind On" })).toBeNull();
+    await chooseOption(within(form).getByRole("combobox", { name: /First Reminder/ }), "Custom Time");
+    const on = within(form).getByRole("textbox", { name: "Remind On" });
+    // It opens on the due day and time.
+    expect((on as HTMLInputElement).value).toBe(typed(due));
+    expect((within(form).getByRole("textbox", { name: "Remind At" }) as HTMLInputElement).value).toBe("17:00");
+    await userEvent.clear(on);
+    await userEvent.type(on, typed(isoDaysAhead(4)));
+    fireEvent.click(within(form).getByRole("button", { name: "Set Reminders" }));
+    await within(form).findByText("After the due time", undefined, { timeout: 5000 });
+    await userEvent.clear(on);
+    await userEvent.type(on, typed(due));
+    const at = within(form).getByRole("textbox", { name: "Remind At" });
+    await userEvent.clear(at);
+    await userEvent.type(at, "0900");
+    fireEvent.click(within(form).getByRole("button", { name: "Set Reminders" }));
+    await closed("Set Reminders");
+    await within(panel).findByText("At a set time", undefined, { timeout: 5000 });
+  }, 30000);
+
   it("the panel sets a repeat, and says how the task repeats", async () => {
     await board();
     fireEvent.click(screen.getByRole("button", { name: /Approve 5 expense requests/ }));
@@ -676,6 +704,31 @@ describe("my workspace", () => {
     expect(within(form).getByText("Reminder")).toBeTruthy();
     expect(within(form).getByText("15 Minutes Before")).toBeTruthy();
   }, 20000);
+
+  it("New Event's Custom Time is a day and time at or before the start, sent as its lead time (TB, 28/10/2026)", async () => {
+    await signedIn(<Workspace tab="calendar" id={null} />);
+    await screen.findByText("Coming Up", undefined, { timeout: 8000 });
+    fireEvent.click(screen.getAllByRole("button", { name: /New Event/ })[0]!);
+    const form = await screen.findByRole("dialog", { name: "New Event" });
+    const day = isoDaysAhead(2);
+    fireEvent.change(within(form).getByRole("textbox", { name: /Event/ }), { target: { value: "Venue walk" } });
+    await userEvent.type(within(form).getByRole("textbox", { name: "Date" }), typed(day));
+    await chooseOption(within(form).getByRole("combobox", { name: /Reminder/ }), "Custom Time");
+    const on = within(form).getByRole("textbox", { name: "Remind On" });
+    await userEvent.clear(on);
+    await userEvent.type(on, typed(isoDaysAhead(3)));
+    fireEvent.click(within(form).getByRole("button", { name: "Add Event" }));
+    await within(form).findByText("After the start", undefined, { timeout: 5000 });
+    await userEvent.clear(on);
+    await userEvent.type(on, typed(day));
+    const at = within(form).getByRole("textbox", { name: "Remind At" });
+    await userEvent.clear(at);
+    await userEvent.type(at, "0920");
+    fireEvent.click(within(form).getByRole("button", { name: "Add Event" }));
+    await closed("New Event");
+    const sent = vi.mocked(dispatch).mock.calls.map(([r]) => r).filter((r) => r.method === "POST" && r.path === "/api/v1/calendar");
+    expect((sent[sent.length - 1]!.body as { reminder_minutes: number[] }).reminder_minutes).toEqual([40]);
+  }, 30000);
 
   it("the calendar's Week shows seven days, and a day opens Day", async () => {
     await signedIn(<Workspace tab="calendar" id={null} />);

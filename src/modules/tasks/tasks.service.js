@@ -1259,7 +1259,7 @@ function reminderAt(r, dueAt) {
   return new Date(new Date(dueAt).getTime() - r.minutes_before * 60_000);
 }
 
-/** Replace a task's reminders to its assignee (up to three). A lead time needs a due time. */
+/** Replace a task's reminders to its assignee (up to three). A lead time needs a due time; a set time comes before it. */
 async function setReminders(actor, scope, id, { reminders: wanted }) {
   await tx(async (client) => {
     const row = await planned(client, id, scope);
@@ -1269,6 +1269,8 @@ async function setReminders(actor, scope, id, { reminders: wanted }) {
       const at = reminderAt(r, row.due_at);
       if (!at) throw invalid(`reminders.${i}.minutes_before`, "Give the task a due date");
       if (at <= now) throw invalid(`reminders.${i}`, "That time has passed");
+      // A set time comes at or before the due time, never after it (TB, 28/10/2026).
+      if (r.remind_at && row.due_at && at > new Date(row.due_at)) throw invalid(`reminders.${i}.remind_at`, "After the due time");
       return { at, minutes: r.minutes_before ?? null };
     });
     await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id } });

@@ -79,8 +79,14 @@ function useMonth(month: string) {
   return list;
 }
 
-const REMIND: Array<[string, string]> = [["", "None"], ["0", "At Start"], ["15", "15 Minutes Before"], ["60", "1 Hour Before"], ["1440", "1 Day Before"]];
-const remindText = (m: number) => (REMIND.find(([v]) => v === String(m))?.[1] ?? `${m} minutes before`);
+const PRESETS: Array<[string, string]> = [["", "None"], ["0", "At Start"], ["15", "15 Minutes Before"], ["60", "1 Hour Before"], ["1440", "1 Day Before"]];
+/** Custom Time: a day and time of the person's own, at or before the start, kept as its lead time (TB, 28/10/2026). */
+const REMIND: Array<[string, string]> = [...PRESETS, ["custom", "Custom Time"]];
+const isPreset = (m: number) => PRESETS.some(([v]) => v === String(m));
+/** A reminder as the panel reads it: the preset's name, or the time it comes. */
+const remindText = (m: number, startsAt: string) => (isPreset(m) ? PRESETS.find(([v]) => v === String(m))![1] : formatDateTime(new Date(Date.parse(startsAt) - m * 60_000).toISOString()));
+/** The longest lead time the API keeps: 14 days. */
+const MAX_LEAD = 20160;
 
 const KIND: Record<string, string> = { meeting: "Meeting", deadline: "Deadline", campaign: "Campaign", event: "Event", interview: "Interview" };
 /** What a performance date is, as Coming Up names it (performance.md §10). */
@@ -319,7 +325,7 @@ function EventPanel({ id, close }: { id: string; close: () => void }) {
           ["When", e.all_day ? formatDate(e.starts_at) : `${formatDateTime(e.starts_at)} to ${formatTime(e.ends_at)}`],
           ["Kind", KIND[e.event_type] ?? "Event"],
           ["Organiser", e.owner?.display_name ?? ""],
-          ...(e.reminder_minutes.length ? ([["Reminder", e.reminder_minutes.map(remindText).join(", ")]] as Array<[string, string]>) : []),
+          ...(e.reminder_minutes.length ? ([["Reminder", e.reminder_minutes.map((m) => remindText(m, e.starts_at)).join(", ")]] as Array<[string, string]>) : []),
           ...(e.location ? ([["Where", e.location]] as Array<[string, string]>) : []),
           ["Attendees", e.attendees.map((a) => `${a.employee.display_name}${a.response === "accepted" ? "" : a.response === "declined" ? " (declined)" : " (pending)"}`).join(", ") || "Nobody invited"],
         ]}
@@ -340,7 +346,11 @@ const lagosInstant = (day: string, hm: string) => new Date(`${day}T${hm}:00+01:0
 
 /** The form's field for each body field the API may name: a start or end lands on its time, the lead times on Reminder. */
 const ON_FORM: Record<string, string> = { starts_at: "start", ends_at: "end", reminder_minutes: "remind" };
-const FORM_FIELDS = new Set(["title", "day", "start", "end", "event_type", "location", "visibility", "remind"]);
+const FORM_FIELDS = new Set(["title", "day", "start", "end", "event_type", "location", "visibility", "remind", "remind_day"]);
+
+/** The lead time a custom reminder is, in whole minutes before the start. */
+const leadOf = (v: { day: string; start: string; remind_day: string; remind_time: string }) =>
+  Math.round((Date.parse(lagosInstant(v.day, v.start)) - Date.parse(lagosInstant(v.remind_day, v.remind_time))) / 60_000);
 
 /** A refused event's messages, by the form's fields (`reminder_minutes.0` is Reminder); attendees and the rest apart. */
 function eventMarks(fields: Record<string, string[]>) {
@@ -378,21 +388,36 @@ function EventForm({ close, day = "", event }: { close: () => void; day?: string
     };
   }, [named]);
   const ends = filled.ends_at ?? (filled.starts_at ? new Date(Date.parse(filled.starts_at) + 3_600_000).toISOString() : undefined);
+  const first = event?.reminder_minutes[0];
+  // An event's own reminder that is no preset opens as Custom Time, on the day and time it comes.
+  const customAt = event && first !== undefined && !isPreset(first) ? new Date(Date.parse(event.starts_at) - first * 60_000).toISOString() : null;
+  const startDay = event ? lagosDay(event.starts_at) : filled.starts_at ? lagosDay(filled.starts_at) : day;
   const f = useContractForm(
     {
       title: event?.title ?? filled.title ?? "",
-      day: event ? lagosDay(event.starts_at) : filled.starts_at ? lagosDay(filled.starts_at) : day,
+      day: startDay,
       start: event ? lagosClock(event.starts_at) : filled.starts_at ? lagosClock(filled.starts_at) : "10:00",
       end: event ? lagosClock(event.ends_at) : ends ? lagosClock(ends) : "11:00",
       event_type: (event?.event_type ?? filled.event_type ?? "meeting") as string,
       location: event?.location ?? filled.location ?? "",
       visibility: (event?.visibility ?? "attendees") as string,
-      remind: event ? (event.reminder_minutes[0] !== undefined ? String(event.reminder_minutes[0]) : "") : "15",
+      remind: customAt ? "custom" : event ? (first !== undefined ? String(first) : "") : "15",
+      remind_day: customAt ? lagosDay(customAt) : startDay,
+      remind_time: customAt ? lagosClock(customAt) : "09:00",
     },
     {
       title: (v: string) => (!v.trim() ? "Name the event" : null),
       day: (v: string) => (!v ? "Pick a date" : null),
       end: (v: string, all: Record<string, unknown>) => (v && all.start && v <= String(all.start) ? "Ends before it starts" : null),
+      remind_day: (v: string, all: Record<string, unknown>) => {
+        if (all.remind !== "custom") return null;
+        if (!v || !all.remind_time || !all.day || !all.start) return "Pick a date";
+        const at = Date.parse(lagosInstant(v, String(all.remind_time)));
+        if (at > Date.parse(lagosInstant(String(all.day), String(all.start)))) return "After the start";
+        if (at <= Date.now()) return "That time has passed";
+        if (leadOf(all as never) > MAX_LEAD) return "At most 14 days";
+        return null;
+      },
     },
   );
   const create = useMutation("POST /api/v1/calendar");
@@ -409,7 +434,11 @@ function EventForm({ close, day = "", event }: { close: () => void; day?: string
       location: v.location.trim() || (event ? null : undefined),
       attendee_ids: who.map((p) => p.employee_id),
       // The form sets one; more set elsewhere are kept unless this one changes.
-      reminder_minutes: v.remind === "" ? [] : event && event.reminder_minutes[0] === Number(v.remind) ? event.reminder_minutes : [Number(v.remind)],
+      reminder_minutes: (() => {
+        if (v.remind === "") return [];
+        const lead = v.remind === "custom" ? leadOf(v) : Number(v.remind);
+        return event && first === lead ? event.reminder_minutes : [lead];
+      })(),
     };
     try {
       if (event) await edit.run({ params: { id: event.calendar_event_id }, body: body as never });
@@ -445,7 +474,13 @@ function EventForm({ close, day = "", event }: { close: () => void; day?: string
       {/* address:none a meeting's room or call link, not a street address */}
       <Field label="Location" optional><TextField {...f.field("location")} /></Field>
       <Field label="Who Can See"><SelectField options={[["attendees", "Attendees"], ["everyone", "Everyone"], ["private", "Only Me"]]} {...f.field("visibility")} /></Field>
-      <Field label="Reminder" optional><SelectField options={REMIND} {...f.field("remind")} /></Field>
+      <Field label="Reminder" optional {...f.field("remind")}><SelectField options={REMIND} {...f.field("remind")} /></Field>
+      {f.values.remind === "custom" && (
+        <Grid cols={2}>
+          <Field label="Remind On" {...f.field("remind_day")}><DateField {...f.field("remind_day")} /></Field>
+          <Field label="Remind At"><TimeField {...f.field("remind_time")} /></Field>
+        </Grid>
+      )}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>{event ? "Save Event" : "Add Event"}</Button>

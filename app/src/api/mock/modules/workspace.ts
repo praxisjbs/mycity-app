@@ -776,6 +776,12 @@ route("PUT /api/v1/tasks/:id/reminders", (req) => {
   const list = (req.body as { reminders: Array<{ minutes_before?: number; remind_at?: string }> }).reminders ?? [];
   if (list.length > 3) return invalid({ reminders: ["At most three"] });
   if (list.some((r) => r.minutes_before !== undefined) && !t.due_at) return invalid({ "reminders.0.minutes_before": ["Give the task a due date"] });
+  // As the API: a set time still to come, at or before the due time.
+  for (const [i, r] of list.entries()) {
+    if (!r.remind_at) continue;
+    if (Date.parse(r.remind_at) <= Date.now()) return invalid({ [`reminders.${i}`]: ["That time has passed"] });
+    if (t.due_at && Date.parse(r.remind_at) > Date.parse(t.due_at)) return invalid({ [`reminders.${i}.remind_at`]: ["After the due time"] });
+  }
   REMINDERS.set(
     t.task_id,
     list.map((r, i) => ({
