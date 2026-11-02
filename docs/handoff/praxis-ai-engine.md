@@ -741,6 +741,19 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 - [x] 01/11/2026 · Documents: `praxis-ai.md` (§2, §4, §5, §6, §10, §11, §14), `workspace.md` (§3, §5, §6, §7, §9, §10, §11, §14), `community.md` §9, the User Guide chapters (Praxis AI, My Workspace) with their pictures, PROGRESS, README, DATABASE_SCHEMA
 - [x] 02/11/2026 · `npm run ci` green, run group by group in a cloud session (a command there stops at 10 minutes): checks, frontend (the app's tests in three shards), screens (each gate on its own) and backend (Jest in six shards, the database on); two tests that failed on main too, by the date, fixed in their own commit; merged as praxisjbs/mycity-app#57 (`c7195d8`, squashed) once every CI job was green on GitHub, at the first run
 
+### 6.7 After staging · Answers that read well (JBS Praxis, 02/11/2026; branch `claude/determined-dirac-b4ivrd-answers`)
+
+From JBS Praxis's questions on staging: a register tabled with no names ("What are the names?"),
+statuses as codes (`not_in`), "nobody is absent" while 21 had not clocked in, a question with no
+answers to tap, Open Figures under every answer and an empty pane on a reopened conversation.
+
+- [x] 02/11/2026 · `praxis-ai.md` first: §6.2 (words, never codes; absent in the person's sense), §6.4 (a table names its records; codes as words; an ask's choices from the action's `asks`), §6.12, §10.1 and §10.2 (Open Figures, a question's words alone, the latest answer's pane on opening), §11, §14
+- [x] 02/11/2026 · The answer: `drawTable` reaches into a row and names its records (`whoOf`), a record reads as its name, a list as one cell, an id never; `defaultFields` leads with who; `withChoices` fills a question's answers from the action's `asks`; prompt version 8; the register read says what Not In and Absent mean
+- [x] 02/11/2026 · The screens: Open Figures only under an answer with a table or figures, a question without From, and `onLatest` with `usePane().showFirst` so a conversation opened from Recent or History shows its latest answer's pane
+- [x] 02/11/2026 · Tests: unit (`ai-assistant.test.js`, `ai-eval.test.js`), integration (the register through the engine and its replay, `ai-cards.test.js`), screens (`Assistant.test.tsx`); the evaluation set's `attendance.absent` and `ask.task-priority`
+- [x] 02/11/2026 · Documents: the User Guide's Praxis AI chapter, PROGRESS #67, this file
+- [ ] Run the evaluation set on staging with the real model: `node scripts/ai/eval-assistant.js --only=attendance`, `--only=ask`, `--only=card`
+
 ## 7 · Gates this work adds
 
 | Gate | Script | Refuses |
@@ -855,3 +868,9 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   (scope, checks, backend, frontend, screens, ci) green at the first run and no review thread open;
   staging takes it with the next release. Left: run the evaluation set's follow-up and card cases
   on staging with the real model (`node scripts/ai/eval-assistant.js --only=ask`, `--only=card`).
+- 02/11/2026 · JP · Answers that read well (§6.7), after JBS Praxis asked on staging who was absent
+  and got a register with no names, statuses as codes and "nobody is absent": a table now names
+  its records and reads codes as words, the Table pane draws by the same rules, a question for a
+  card always has its answers to tap, prompt version 8 answers "absent" in the person's sense, and
+  Open Figures sits only under an answer with a table or figures. Left: the evaluation set on
+  staging with the real model.

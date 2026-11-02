@@ -49,6 +49,8 @@ export interface ConversationProps {
   onGone: () => void;
   /** An answer landed: the parent refreshes Recent and History, and shows the answer's pane. */
   onAnswered: (answer: AiAnswer) => void;
+  /** A saved conversation opened: its latest answer, once, so desktop's pane shows it (§10.1). */
+  onLatest?: (answer: AiAnswer) => void;
   /** Shows an answer's pane (Open Figures, a source chip): the right pane on desktop, the sheet on a phone. */
   onPane?: (answer: AiAnswer, pick?: PanePick) => void;
   /** The answer whose pane is shown now, drawn in the accent. */
@@ -61,7 +63,7 @@ export interface ConversationProps {
  * on a phone (index.tsx, PhoneChat.tsx). The parent holds which conversation it is and lays it out
  * as a column it fills.
  */
-export function Conversation({ id, context = null, shows = [], onOpened, onGone, onAnswered, onPane, paneFor = null }: ConversationProps) {
+export function Conversation({ id, context = null, shows = [], onOpened, onGone, onAnswered, onLatest, onPane, paneFor = null }: ConversationProps) {
   const formId = useId();
   const turns = useInfinite("GET /api/v1/ai/conversations/:id/turns", { params: { id: id ?? "" }, enabled: Boolean(id) });
   const suggestions = useApi("GET /api/v1/ai/suggestions", { enabled: !id });
@@ -83,9 +85,11 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
   /* Whether the screen is still open: an answer that lands after the person left changes nothing here. */
   const live = useRef(true);
   /* The latest callbacks and context, for an answer that lands after a render or two. */
-  const calls = useRef({ onOpened, onGone, onAnswered, context, shows });
-  calls.current = { onOpened, onGone, onAnswered, context, shows };
+  const calls = useRef({ onOpened, onGone, onAnswered, onLatest, context, shows });
+  calls.current = { onOpened, onGone, onAnswered, onLatest, context, shows };
   const end = useRef<HTMLDivElement>(null);
+  /* The conversation whose latest answer was handed up: once each, as its saved turns first land. */
+  const latestFor = useRef<string | null>(null);
 
   useEffect(() => {
     live.current = true;
@@ -119,6 +123,14 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
     toast("That conversation was deleted");
     calls.current.onGone();
   }, [gone]);
+
+  // A saved conversation opened (Recent, History, a reload): its latest answer goes up once, for the pane.
+  const latestSaved = turns.rows[0];
+  useEffect(() => {
+    if (!id || !latestSaved || latestSaved.ai_conversation_id !== id || latestFor.current === id) return;
+    latestFor.current = id;
+    calls.current.onLatest?.(latestSaved);
+  }, [id, latestSaved]);
 
   const answers = useMemo(() => {
     const saved = [...turns.rows].reverse();
@@ -319,6 +331,9 @@ function Answer({ a, feedback, onFeedback, onNext, onChoose, onPane, paneOpen, o
       <SourceChip key={`type:${s.entity_type}`} label={s.label} count={s.count} onSelect={onPane ? () => onPane(a, pickForSource(a, s.entity_type)) : undefined} />
     ),
   );
+  // A question is its words and its answers to tap; Open Figures only where there are figures or a table (§10.1).
+  const asks = a.choices.length > 0;
+  const figures = Boolean(a.overview || a.table?.rows.length);
   return (
     <AnswerBubble
       text={a.content}
@@ -330,8 +345,8 @@ function Answer({ a, feedback, onFeedback, onNext, onChoose, onPane, paneOpen, o
       paging={pagingOf(a)}
       onNext={onNext}
       link={a.link ? { label: a.link.label, onOpen: () => navigate(a.link!.path) } : null}
-      from={from.length ? from : undefined}
-      onPane={onPane && (a.reads.length || a.overview) ? () => onPane(a) : undefined}
+      from={!asks && from.length ? from : undefined}
+      onPane={onPane && !asks && figures ? () => onPane(a) : undefined}
       paneOpen={paneOpen}
       feedback={feedback}
       onFeedback={onFeedback}

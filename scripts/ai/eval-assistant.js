@@ -15,6 +15,9 @@
  *   ask        the change asked for lacks what its action must have, so the answer is the one
  *              question for that field ({ action, field }), with no card (praxis-ai.md decisions
  *              28 and 29: the model asks first, the server's asks back it up)
+ *   choices    with `ask`: the question has its answers to tap (praxis-ai.md §6.4)
+ *   table      "names": the answer carries a table whose first column names every row, so a list
+ *              of people says who (praxis-ai.md §6.4, a table names its records)
  *   needs      the module (its catalogue key) the answer must read from; skipped until that
  *              module's manifest declares a read, then graded on reading from it
  *
@@ -38,6 +41,8 @@ const CASES = Object.freeze([
   { id: "today.what-happened", as: "ceo", question: "What happened today?", reads: ["activity.list"] },
   { id: "today.person", as: "operations_people", question: "What has {person} done today?", reads: ["activity.list"] },
   { id: "attendance.late", as: "operations_people", question: "Who came in late today?", reads: ["attendance.register", "team.today", "attendance.exceptions"] },
+  // "Absent" in the person's sense: everyone expected who has not clocked in, named (praxis-ai.md §6.2).
+  { id: "attendance.absent", as: "operations_people", question: "Who was absent today? Report it with their names.", reads: ["attendance.register"], table: "names" },
   { id: "leave.waiting", as: "operations_people", question: "Which leave requests are waiting for a decision?", reads: ["leave.requests", "approvals.mine"] },
   { id: "leave.balance", as: "employee", question: "How many annual leave days do I have left?", reads: ["my_leave.balances"] },
   { id: "tasks.overdue", as: "employee", question: "Which of my tasks are overdue?", reads: ["tasks.list"] },
@@ -63,6 +68,7 @@ const CASES = Object.freeze([
   // A change missing what its action must have is asked for first, one question at a time (decisions 28 and 29).
   { id: "ask.task-title", as: "operations_people", question: "Assign a task to {person}.", shows: ["cards"], ask: { action: "tasks.create", field: "title" } },
   { id: "ask.task-due", as: "employee", question: "Create a task for me to send the weekly report.", shows: ["cards"], ask: { action: "tasks.create", field: "due_on" } },
+  { id: "ask.task-priority", as: "employee", question: "Create a task for me to send the weekly report on Friday.", shows: ["cards"], ask: { action: "tasks.create", field: "priority" }, choices: true },
   { id: "ask.meeting-length", as: "operations_people", question: "Book a meeting with {person} tomorrow at 10 about the venue visit.", shows: ["cards"], ask: { action: "calendar.create", field: "ends_at" } },
   { id: "card.leave", as: "employee", question: "Request two days of annual leave for me from next Monday.", shows: ["cards"], action: "my_leave.request" },
   { id: "card.leave-approve", as: "operations_people", question: "Approve the leave requests waiting on me.", shows: ["cards"], action: "leave.approve" },
@@ -120,6 +126,12 @@ function grade(kase, got) {
     if (got.card) problems.push(`drew ${got.card.row.action_key} instead of asking for ${kase.ask.field}`);
     else if (!asked || asked.action !== kase.ask.action || asked.field !== kase.ask.field)
       problems.push(`asked ${asked && asked.field ? `for ${asked.action} ${asked.field}` : "nothing"}; expected ${kase.ask.action} ${kase.ask.field}`);
+    else if (kase.choices && !asked.choices.length) problems.push(`asked for ${asked.field} with no answers to tap`);
+  }
+  if (kase.table === "names") {
+    const t = got.shown.table;
+    if (!t || !t.rows.length) problems.push("drew no table");
+    else if (t.rows.some((r) => !String(r[0] || "").trim())) problems.push(`its first column, ${t.columns[0]}, does not name every row`);
   }
   return { pass: problems.length === 0, problems };
 }

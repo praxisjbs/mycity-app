@@ -441,4 +441,22 @@ describeDb("Praxis AI action cards against the real migrations", () => {
     expect((await as("ops").get(`/ai/answers/${res.body.ai_message_id}/reads/2?page=1`)).status).toBe(404);
     expect((await as("staff").get(`/ai/answers/${res.body.ai_message_id}/reads/1?page=1`)).status).toBe(404);
   });
+
+  test("the register tabled without names, as on staging: the answer and its replay put each person first, and codes read as words (§6.4, §6.12)", async () => {
+    script(callRead("attendance__register", {}), say({ text: "Here is today's register.", table: { read: 1, fields: ["work_pattern", "status"], labels: ["Work Pattern", "Today's Status"] } }));
+    const res = await ask("ops", { question: "Who was absent from work today? Report for me please.", shows: ["pane"] });
+    expect(res.status).toBe(200);
+    expect(res.body.table.columns).toEqual(["Employee", "Work Pattern", "Today's Status"]);
+    const names = res.body.table.rows.map((r) => r[0]);
+    expect(names).toEqual(expect.arrayContaining(["Ada Obi", "Amaka Eze", "Tunde Ade"]));
+    for (const row of res.body.table.rows) {
+      expect(row[1]).toBe("Remote");
+      // A status reads as its words (Not In, Off, Late), never the code the register keeps.
+      expect(row[2]).toMatch(/^[A-Z][a-z]+( [A-Z][a-z]+)?$/);
+    }
+    const page = await as("ops").get(`/ai/answers/${res.body.ai_message_id}/reads/1?page=1`);
+    expect(page.status).toBe(200);
+    expect(page.body.columns).toEqual(["Employee", "Work Pattern", "Today's Status"]);
+    expect(page.body.rows.map((r) => r[0]).sort()).toEqual([...names].sort());
+  });
 });

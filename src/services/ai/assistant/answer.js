@@ -32,33 +32,133 @@ const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 const MONEY = /^-?\d{1,16}\.\d{2}$/;
 /** Fields named like an amount: a two-place string there is naira. */
 const MONEY_FIELD = /(amount|total|salary|cost|price|fee|balance|pay|ngn|naira|budget|spend|deduction|value)/i;
+/** A record's id: never a cell a person reads. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The keys a row names its own record by, the most telling first, and the column each makes. */
+const NAME_KEYS = Object.freeze(["display_name", "full_name", "name", "title", "subject", "number"]);
+const NAME_LABELS = Object.freeze({ display_name: "Name", full_name: "Name", name: "Name", title: "Title", subject: "Subject", number: "Number" });
+/** Where a row holds the person it is about (a register's `employee`), looked at before any other record it holds. */
+const PERSON_KEYS = Object.freeze(["employee", "person", "colleague", "requester", "member", "assignee", "owner", "user"]);
+/** A field whose value is a code (a status, a kind, a pattern), and a code as the database writes one ("not_in"). */
+const CODE_FIELD = /(^|_)(status|state|kind|type|pattern|priority|stage|outcome|mode|level|category|cadence|risk|decision|verdict|channel|source)$/i;
+const CODE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
 
-/** One cell for a person to read, and whether it right-aligns. */
+/** A field's last part: "employee.display_name" → "display_name". */
+const lastOf = (field) => String(field).split(".").pop();
+
+/** A code in words: "not_in" → "Not In", "remote" → "Remote". */
+const wordsOf = (code) =>
+  code
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(" ");
+
+/** The value at a field of a row, a dotted field reaching into it ("employee.display_name"); undefined when the row has none. */
+function valueAt(row, field) {
+  let v = row;
+  for (const k of String(field).split(".")) {
+    if (v === null || typeof v !== "object" || Array.isArray(v) || !Object.prototype.hasOwnProperty.call(v, k)) return undefined;
+    v = v[k];
+  }
+  return v;
+}
+
+/** A record's name as a person reads it, from the first of its name keys that holds one; null when it has none. */
+function nameOf(v) {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  for (const k of NAME_KEYS) {
+    const x = v[k];
+    if ((typeof x === "string" && x.trim()) || typeof x === "number") return String(x).trim();
+  }
+  return null;
+}
+
+/** One cell for a person to read, and whether it right-aligns; null for a value no person reads (an id, a record with no name). */
 function cell(field, v) {
   if (v === null || v === undefined || v === "") return { text: "", numeric: false };
   if (typeof v === "number") return { text: String(v), numeric: true };
   if (typeof v === "boolean") return { text: v ? "Yes" : "No", numeric: false };
-  if (typeof v !== "string") return null;
+  if (Array.isArray(v)) return listCell(field, v);
+  if (typeof v === "object") {
+    const name = nameOf(v);
+    return name ? { text: name, numeric: false } : null;
+  }
+  if (typeof v !== "string" || UUID.test(v)) return null;
   if (ISO_DATE.test(v)) return { text: formatDate(v), numeric: false };
   if (ISO_INSTANT.test(v) && !Number.isNaN(Date.parse(v))) return { text: formatDateTime(v), numeric: false };
   if (MONEY.test(v) && MONEY_FIELD.test(field)) return { text: formatNaira(v), numeric: true };
+  if (CODE.test(v) && CODE_FIELD.test(lastOf(field))) return { text: wordsOf(v), numeric: false };
   return { text: v, numeric: false };
 }
 
+/** A list in one cell, its names or plain values comma-separated; null when an item is neither. */
+function listCell(field, list) {
+  const parts = [];
+  for (const item of list) {
+    const c = Array.isArray(item) ? null : cell(field, item);
+    if (!c) return null;
+    if (c.text) parts.push(c.text);
+  }
+  return { text: parts.join(", "), numeric: false };
+}
+
 /**
- * A table from rows: the fields named, with their labels; a field the rows do not carry, or that
- * holds a list or an object, is left out; no field left is no table. `refs` are each row's record.
+ * Who or what each row is: the row's own name (a task's title, an employee's name), else the person
+ * it is about (a register's or a leave request's `employee`), else its number, else the first record
+ * it holds with a name. Null when the rows name nothing (a person's own days).
+ */
+function whoOf(rows) {
+  const first = rows.find((r) => r && typeof r === "object" && !Array.isArray(r));
+  if (!first) return null;
+  const own = (k) => typeof first[k] === "string" && first[k].trim() && !UUID.test(first[k]);
+  const named = NAME_KEYS.find((k) => k !== "number" && own(k));
+  if (named) return { field: named, label: NAME_LABELS[named] };
+  const person = PERSON_KEYS.find((p) => nameOf(first[p]) || own(p));
+  if (person) return { field: person, label: engine.cards.humanise(person) };
+  if (own("number") || typeof first.number === "number") return { field: "number", label: NAME_LABELS.number };
+  const held = Object.keys(first).find((k) => nameOf(first[k]));
+  return held ? { field: held, label: engine.cards.humanise(held) } : null;
+}
+
+/** Whether a column already says who each row is: the field `whoOf` found, or a name reached through it ("employee.display_name"). */
+function namesRows(field, who) {
+  if (field === who.field) return true;
+  if (field.startsWith(`${who.field}.`)) return NAME_KEYS.includes(lastOf(field));
+  return !who.field.includes(".") && NAME_KEYS.includes(who.field) && NAME_KEYS.includes(field);
+}
+
+/** A column's label from its field when the model gave none: a name reached into a record reads as that record ("employee.display_name" → "Employee"). */
+function labelOf(field) {
+  const parts = String(field).split(".");
+  if (parts.length > 1 && NAME_KEYS.includes(parts[parts.length - 1])) return engine.cards.humanise(parts[parts.length - 2]);
+  return engine.cards.humanise(parts[parts.length - 1]);
+}
+
+/**
+ * A table from rows: the fields named, each reaching into a row with a dot where it must, with their
+ * labels; a field the rows do not carry, or whose value no person reads (an id, a record with no
+ * name, a list of either), is left out; no field left is no table. A table names its records
+ * (docs/guides/praxis-ai.md §6.4): when no column says who or what each row is, the row's name goes
+ * first. `refs` are each row's record.
  */
 function drawTable(rows, refs, fields, labels = []) {
   if (!rows || !rows.length) return null;
   const cols = [];
-  fields.forEach((f, i) => {
-    if (cols.some((c) => c.field === f)) return;
-    const values = rows.map((row) => (row && Object.prototype.hasOwnProperty.call(row, f) ? cell(f, row[f]) : undefined));
+  (fields || []).forEach((f, i) => {
+    if (typeof f !== "string" || !f || cols.some((c) => c.field === f)) return;
+    const values = rows.map((row) => {
+      const v = valueAt(row, f);
+      return v === undefined ? undefined : cell(f, v);
+    });
     if (values.some((v) => v === undefined || v === null)) return;
-    cols.push({ field: f, label: labels[i] || engine.cards.humanise(f), values });
+    cols.push({ field: f, label: labels[i] || labelOf(f), values });
   });
   if (!cols.length) return null;
+  const who = whoOf(rows);
+  if (who && !cols.some((c) => namesRows(c.field, who))) {
+    cols.unshift({ field: who.field, label: who.label, values: rows.map((row) => cell(who.field, valueAt(row, who.field)) || { text: "", numeric: false }) });
+  }
   return {
     columns: cols.map((c) => c.label),
     fields: cols.map((c) => c.field),
@@ -68,13 +168,14 @@ function drawTable(rows, refs, fields, labels = []) {
   };
 }
 
-/** The first scalar fields of a row, for a table nobody named columns for (the Table pane's replay). */
+/** A row's own fields a person reads, who it is first, for a table nobody named columns for (the Table pane's replay). */
 function defaultFields(rows) {
   const first = rows.find((r) => r && typeof r === "object") || {};
-  return Object.keys(first)
-    .filter((k) => !/_id$|^id$|_at$/.test(k) || /_on$|due_at|created_at/.test(k))
-    .filter((k) => cell(k, first[k]) !== null)
-    .slice(0, MAX_COLUMNS);
+  const who = whoOf(rows);
+  const own = Object.keys(first)
+    .filter((k) => !/_ids?$|^id$|_at$/.test(k) || /_on$|due_at|created_at/.test(k))
+    .filter((k) => cell(k, first[k]) !== null);
+  return [...new Set([...(who ? [who.field] : []), ...own])].slice(0, MAX_COLUMNS);
 }
 
 /**
@@ -227,6 +328,25 @@ function askedRun(history) {
 }
 
 /**
+ * A question the model asked for one of an offered action's fields, with that field's own answers
+ * to tap from the action's `asks` when it gave none (§6.4): "How urgent is it?" always has Low,
+ * Normal, High and Urgent under it. Any other draft is returned as it came.
+ * @param {object} draft
+ * @param {Array<object>} actions  the actions offered this turn
+ * @param {Date} now
+ */
+function withChoices(draft, actions, now) {
+  const ask = draft && draft.ask;
+  if (!ask || typeof ask !== "object" || !ask.action || !ask.field) return draft;
+  if (Array.isArray(ask.choices) && ask.choices.some((c) => String(c).trim())) return draft;
+  const action = (actions || []).find((a) => a.key === ask.action);
+  const entry = action && Array.isArray(action.asks) ? action.asks.find((a) => a.field === ask.field) : null;
+  if (!entry || !entry.choices) return draft;
+  const choices = typeof entry.choices === "function" ? entry.choices({ today: lagos.today(now) }) : entry.choices;
+  return { ...draft, ask: { ...ask, choices: [...new Set(choices.map((c) => String(c).trim()).filter(Boolean))].slice(0, MAX_CHOICES) } };
+}
+
+/**
  * The server's half of decision 29: a card the person asked for is drawn only once its action has
  * what its `asks` name. When the model drafted one with a field left out, the answer becomes that
  * question instead (its words, its choices, what it asks for), with no card, table or screen
@@ -237,14 +357,15 @@ function askedRun(history) {
  * @returns {object} the draft, or the question that replaces it
  */
 function askFirst({ draft, actions, history = [], shows = [], now = new Date() }) {
-  const want = draft && draft.action;
-  if (!want || !want.key || want.suggested === true || !shows.includes("cards")) return draft;
+  const given = withChoices(draft, actions, now);
+  const want = given && given.action;
+  if (!want || !want.key || want.suggested === true || !shows.includes("cards")) return given;
   const action = (actions || []).find((a) => a.key === want.key);
-  if (!action) return draft;
+  if (!action) return given;
   const q = engine.cards.nextAsk(action, want.values && typeof want.values === "object" ? want.values : {}, askedRun(history), { today: lagos.today(now) });
-  if (!q) return draft;
+  if (!q) return given;
   logger.info({ ai_action: action.key, field: q.field }, "Praxis AI: a card waited on a question first");
-  return { ...draft, text: q.question, action: null, ask: { action: q.action, field: q.field, choices: q.choices }, table: null, route: null, prefill: null, more: false, overview: null };
+  return { ...given, text: q.question, action: null, ask: { action: q.action, field: q.field, choices: q.choices }, table: null, route: null, prefill: null, more: false, overview: null };
 }
 
 /** A field problem the person fixes on the card, at most four words (gate 12). */
@@ -318,4 +439,4 @@ async function draftCard({ draft, actions, actor, context = null, db = null, now
   };
 }
 
-module.exports = { build, draftCard, askFirst, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };
+module.exports = { build, draftCard, askFirst, withChoices, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, whoOf, valueAt, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };

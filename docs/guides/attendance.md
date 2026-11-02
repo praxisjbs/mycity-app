@@ -1338,7 +1338,9 @@ never leave identity, and no log line carries them.
   or month the same as series of the newest 60 buckets. One SQL over `attendance_day`
   (`attendance.repo.summary`), figures never rows, inside the assistant's 3 second read timeout.
 - **AI reads** (`attendance.ai.js`): `attendance.my_days` (ess view, own), `attendance.register`
-  and `attendance.exceptions` (`people` view, the caller's scope); the rules in force are read through
+  and `attendance.exceptions` (`people` view, the caller's scope; the register's description tells
+  the model that Not In is a working day still open with no clock-in and Absent a closed one, so
+  "who is absent today" counts the people Not In, `praxis-ai.md` §6.2); the rules in force are read through
   `policies.text` (`policies.md` §9; `attendance.policy` is removed in PR 1);
   `attendance.my_pay_items` (ess view, own) and `attendance.pay_items` (`people` view, the caller's
   scope, `pay_amount` masked as the salary is, the assistant's own reads included); from PR 4 `attendance.temporary_sites` (the reader's scope, no addresses); `devices.ai.js`: `devices.mine`,
@@ -1644,6 +1646,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
+- 02/11/2026 · JP · `attendance.register`'s AI description says what Not In and Absent mean (a working day still open with no clock-in; a closed one), after Praxis AI told JBS Praxis on staging that nobody was absent while 21 people had not clocked in (`praxis-ai.md` §6.2, §14). No read, scope or screen changed.
 - 02/11/2026 · JP · A screen test made independent of the day (no screen changed): All Days of a person opens on the month of the newest day the mock holds, read from the mock itself, so on a month's first days whose 1st was not a working day, before that day's clock-in time, it turns to the month before rather than finding November empty (`PeopleAttendance.test.tsx`; it failed on Monday 02/11/2026).
 - 01/11/2026 · JP · `attendance.ai.js` and `worksites.ai.js` account for their Create schemas in `not_offered` (a punch and a check-in are made on the device, a home location and a temporary site are picked on a map, overtime is pre-approved on the screen, a worksite is picked on a map), as gate 23 asks of every module since the Praxis AI Engine's PR5 (`praxis-ai.md` §6.15); `attendance.register` carries a matrix probe (a report of the asker's on today's register, an outsider never; `praxis-ai.md` §6.17).
 - 01/11/2026 · JP · §9: `attendance.summary`, the assistant's figures over a period by person, department, site, day, week or month (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
