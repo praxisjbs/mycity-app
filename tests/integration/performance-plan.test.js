@@ -61,6 +61,15 @@ describeDb("performance plan against the real migrations", () => {
     del: (path) => request(app).delete(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`),
   });
   const emp = (who) => people[who].employee.employee_id;
+  /** What a person was told about a record by those events: [title, body] pairs, in title order. */
+  const told = async (who, entityId, ...keys) =>
+    (
+      await q(
+        `SELECT n.title, n.body FROM notification n JOIN app_user u ON u.user_id = n.user_id
+          WHERE u.employee_id = $1 AND n.entity_id = $2 AND n.event_key = ANY($3::text[]) ORDER BY n.title`,
+        [emp(who), String(entityId), keys],
+      )
+    ).rows.map((r) => [r.title, r.body]);
 
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
@@ -471,10 +480,16 @@ describeDb("performance plan against the real migrations", () => {
     expect(second.body.error.code).toBe("CHANGE_PENDING");
     const instance = await one("SELECT workflow_instance_id, current_stage FROM workflow_instance WHERE entity_id = $1", [res.body.target_change_id]);
     expect(instance.current_stage).toBe("ceo");
+    // The head is told it was sent and waits on the CEO; the CEO is told it needs them, and not that it was sent.
+    await drain();
+    const kr1Code = (await one("SELECT code::text AS code FROM okr_key_result WHERE okr_key_result_id = $1", [ids.kr1])).code;
+    ids.kr1Code = kr1Code;
+    const id = res.body.target_change_id;
+    expect(await told("head", id, "target_change.requested")).toEqual([["Target change sent", `${kr1Code}: New target 60000 from November 2026. Waiting on the CEO.`]]);
+    expect(await told("ceo", id, "target_change.requested", "workflow.opened")).toEqual([["Approval needed: Target Change", "CEO is waiting on you."]]);
     // While it waits, the key result offers no second Change Target.
     expect((await as("head").get(`/performance/key-results/${ids.kr1}`)).body.can_change_target).toBe(false);
     // The CEO's Waiting On You names it, and its sheet reads the key result it changes.
-    const kr1Code = (await one("SELECT code::text AS code FROM okr_key_result WHERE okr_key_result_id = $1", [ids.kr1])).code;
     expect((await as("ceo").get("/performance/approvals")).body.data).toEqual([
       expect.objectContaining({
         kind: "target_change",
@@ -494,8 +509,20 @@ describeDb("performance plan against the real migrations", () => {
     });
     expect((await as("ada").get(`/performance/target-changes/${res.body.target_change_id}`)).status).toBe(200);
     expect((await as("head").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(403);
+    // Others answer for the key result when it is decided: its accountable and co-accountable people.
+    const owners = await one("SELECT accountable_employee_id, co_accountable_employee_id FROM okr_key_result WHERE okr_key_result_id = $1", [ids.kr1]);
+    await q("UPDATE okr_key_result SET accountable_employee_id = $2, co_accountable_employee_id = $3 WHERE okr_key_result_id = $1", [ids.kr1, emp("ada"), emp("musa")]);
     expect((await as("ceo").post(`/workflow/instances/${instance.workflow_instance_id}/approve`)).status).toBe(200);
     await drain();
+    await q("UPDATE okr_key_result SET accountable_employee_id = $2, co_accountable_employee_id = $3 WHERE okr_key_result_id = $1", [
+      ids.kr1,
+      owners.accountable_employee_id,
+      owners.co_accountable_employee_id,
+    ]);
+    // Whoever asked and both owners are told it was approved; the CEO who decided it is not told of their own decision.
+    const approved = [["Target change approved", `${kr1Code}: New target 60000 from November 2026`]];
+    for (const who of ["head", "ada", "musa"]) expect(await told(who, id, "target_change.decided")).toEqual(approved);
+    expect(await told("ceo", id, "target_change.decided", "workflow.completed")).toEqual([]);
     const kr = await as("head").get(`/performance/key-results/${ids.kr1}`);
     expect(kr.body.target_value).toBe("60000");
     expect(kr.body.target_history).toEqual([expect.objectContaining({ status: "approved", from_value: "64000", to_value: "60000" })]);
@@ -516,6 +543,11 @@ describeDb("performance plan against the real migrations", () => {
     const res = await as("head").post("/performance/target-changes", body);
     expect(res.status).toBe(201);
     const id = res.body.target_change_id;
+    // The head is told it was sent, naming the line; the employee is told nothing while it waits.
+    await drain();
+    const title = (await one("SELECT title FROM employee_target WHERE employee_target_id = $1", [line.employee_target_id])).title;
+    expect(await told("head", id, "target_change.requested")).toEqual([["Target change sent", `${title}: New target 12 from November 2026. Waiting on the CEO.`]]);
+    expect(await told("ada", id, "target_change.requested", "workflow.opened")).toEqual([]);
     // While it waits, the line shows it and offers no second Change Target.
     expect(await lineOf("head")).toMatchObject({ can_change_target: false, pending_change: { target_change_id: id, to_value: "12", from_month: "2026-11-01" } });
     expect((await as("head").post("/performance/target-changes", { ...body, to_value: "11" })).body.error.code).toBe("CHANGE_PENDING");
@@ -540,5 +572,39 @@ describeDb("performance plan against the real migrations", () => {
     await drain();
     expect((await as("ceo").get(`/performance/target-changes/${id}`)).body.status).toBe("rejected");
     expect((await as("ceo").get("/performance/approvals")).body.data).toEqual([]);
+    // Refused, the head is told so; nothing changed for the employee, who is told nothing.
+    expect(await told("head", id, "target_change.decided")).toEqual([["Target change refused", `${title}: New target 12 from November 2026`]]);
+    expect(await told("ada", id, "target_change.decided")).toEqual([]);
+    expect(await told("ada", ids.cardA, "scorecard.line_target_changed")).toEqual([]);
+  });
+
+  test("an approved line change tells the person whose line it is, and not the CEO who approved it", async () => {
+    const line = await one("SELECT employee_target_id, title FROM employee_target WHERE scorecard_id = $1 ORDER BY position LIMIT 1", [ids.cardA]);
+    const res = await as("head").post("/performance/target-changes", { employee_target_id: line.employee_target_id, to_value: "14.5000", from_month: "2026-12-01", reason: "Bigger December" });
+    expect(res.status).toBe(201);
+    expect((await as("ceo").post(`/workflow/instances/${res.body.workflow_instance_id}/approve`)).status).toBe(200);
+    await drain();
+    const id = res.body.target_change_id;
+    const label = `${line.title}: New target 14.5 from December 2026`;
+    // The employee hears of it from their scorecard, once; the head who asked, from the change.
+    expect(await told("ada", ids.cardA, "scorecard.line_target_changed")).toEqual([["Your target changed", label]]);
+    expect(await told("ada", id, "target_change.decided")).toEqual([]);
+    expect(await told("head", id, "target_change.decided")).toEqual([["Target change approved", label]]);
+    expect(await told("ceo", id, "target_change.decided", "workflow.completed")).toEqual([]);
+    expect(await told("ceo", ids.cardA, "scorecard.line_target_changed")).toEqual([]);
+  });
+
+  test("a change the CEO asks for themself waits on them, tells them once, and tells them how it was decided", async () => {
+    const res = await as("ceo").post("/performance/target-changes", { okr_key_result_id: ids.kr1, to_value: "62000", from_month: "2026-12-01", reason: "A stretch" });
+    expect(res.status).toBe(201);
+    await drain();
+    const id = res.body.target_change_id;
+    // The engine tells them it needs them (they alone may decide their own); they are not also told it was sent.
+    expect(await told("ceo", id, "target_change.requested", "workflow.opened")).toEqual([["Approval needed: Target Change", "CEO is waiting on you."]]);
+    expect((await as("ceo").get("/performance/approvals")).body.data.map((r) => r.record_id)).toContain(id);
+    expect((await as("ceo").post(`/workflow/instances/${res.body.workflow_instance_id}/approve`)).status).toBe(200);
+    await drain();
+    // As whoever asked, they are told it was approved, once.
+    expect(await told("ceo", id, "target_change.decided")).toEqual([["Target change approved", `${ids.kr1Code}: New target 62000 from December 2026`]]);
   });
 });

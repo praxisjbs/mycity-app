@@ -495,6 +495,15 @@ const keyResultContext = (db, id) =>
     [id],
   );
 
+/** A key result's code and the people who answer for it, for telling them its target changed. */
+const keyResultOwners = (db, id) =>
+  one(
+    db,
+    `SELECT kr.code::text AS code, kr.accountable_employee_id, kr.co_accountable_employee_id
+       FROM okr_key_result kr WHERE kr.okr_key_result_id = $1`,
+    [id],
+  );
+
 const MONTH = `m.okr_key_result_month_id, m.okr_key_result_id, m.month, m.status, trim_scale(m.actual_value)::text AS actual_value,
   m.actual_text, m.actual_source, m.update_text, m.recovery_employee_id, m.recovery_due_on,
   trim_scale(m.proposed_score)::text AS proposed_score, trim_scale(m.confirmed_score)::text AS confirmed_score, m.confirmed_at`;
@@ -1117,6 +1126,7 @@ module.exports = {
   keyResultsOf,
   getKeyResult,
   keyResultContext,
+  keyResultOwners,
   latestMonths,
   monthsOf,
   monthOf,

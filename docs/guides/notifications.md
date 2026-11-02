@@ -277,7 +277,9 @@ Reference-data file(s): none.
 - **Copies.** People may add roles and named people to a notice written about someone else: its
   declaration gives `copy` (`true`, or the title and text a copy reads, as "Waiting on its
   approvers" where the notice says "Waiting on you"). They receive it as the copy, through their own
-  channels, unless they are already in its audience; nobody is told of their own action. A notice
+  channels, unless they are already in its audience; nobody is told of their own action, except where a
+  declaration says so (`include_actor`: a confirmation, or, for the engine's **Approval needed**, the
+  CEO who opened a request that waits on them). A notice
   personal to its audience (a direct message, a channel post, mail, a person's own account and
   sign-in, "your import finished", an announcement, whose audience its poster chose) takes no
   copies. Suspended people and people who left are never told; a role's holders are read when the
@@ -460,7 +462,11 @@ listed here as tier 1 or tier 2.
 - **A burst in one channel.** Every post alerts; on a device they share one notification that
   counts them ("#general · 4 new").
 - **The person who acted.** Never told of their own action, so an announcement posted from an
-  account never alerts a device signed in as that same account. Test with two people.
+  account never alerts a device signed in as that same account. Test with two people. Two
+  exceptions, both declared: a confirmation (`include_actor: true`, as "Target change sent"), and an
+  approval the CEO opened that waits on the CEO, which the engine tells them (`include_actor` is a
+  function there, true only for the CEO, the one person `approvers.canAct` lets decide their own
+  request). Anyone else who opens something waiting on a role they hold is not told: they cannot decide it.
 - **Acknowledged on one device.** The bar closes on every other device at once (`notification_read`)
   and the repeats stop; the device's earlier notification closes when the app comes to the front.
 - **Urgent with no device turned on.** The bar and the banner in the app still repeat; nothing is
@@ -521,6 +527,8 @@ The design choices of Settings · Notifications (copies only on notices about so
 channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5, open to TB.
 
 ## 14 · Change log
+
+- 02/11/2026 · JP · §6, §11: the fan-out's `include_actor` may be a function `(event, db)`, true or false, besides a boolean. The engine's **Approval needed** (`workflow.opened`) uses it to tell the CEO of a request they opened themself, since the CEO is the one person who may decide their own (`approvers.canAct`) and the request is on their Waiting On You; before, it was dropped with every other notice about the person's own action, and a CEO's own request reached them only as the 3 day reminder (found in Performance's target changes, `docs/guides/performance.md` §6.7). Anyone else who opens something waiting on a role they hold is still not told. No migration, no screen change.
 
 - 26/10/2026 · JP · Where it waits, inside a tab (JBS Praxis, the QA register's Worksites 2 with neither Permanent nor Temporary marked): `GET /notifications/views` counts a screen's unread notices by the inner view each record sits in, as its module places it (`<module>.views.js`, `shared/notifications/views.js`); the screens' switches, chips and board columns carry their share and open where the news is (§2, §3 step 7, §5, §6, §10). The numbers stay unread notices, as on the tab.
 

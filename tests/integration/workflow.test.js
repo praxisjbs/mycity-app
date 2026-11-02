@@ -467,6 +467,34 @@ describeDb("approvals against the real migrations", () => {
     expect((await as("ceo").post(`/workflow/instances/${id}/approve`, {})).body.state).toBe("approved");
   });
 
+  test("the CEO who opens a request that waits on them is told; anyone else who opens one waiting on their role is not", async () => {
+    // The CEO has nobody above them, so the line manager stage is theirs: they decide their own request.
+    const own = await openLeave("ceo", 3);
+    // Operations & People hold a temporary site's one stage and open one themselves: they may not decide it.
+    const site = await tx((client) =>
+      engine.openInstance(client, {
+        definition_key: "attendance.temporary_site",
+        entity: { type: "temporary_site", id: crypto.randomUUID() },
+        subject_employee_id: people.ops.employee.employee_id,
+        context: { days: 2 },
+        actor: people.ops.user,
+      }),
+    );
+    await drain();
+    const opened = async (who, entityId) =>
+      (await q("SELECT title, body FROM notification WHERE user_id = $1 AND event_key = 'workflow.opened' AND entity_id = $2", [people[who].user.user_id, entityId])).rows;
+    const waitingOf = async (who) => (await as(who).get("/workflow/mine")).body.data.map((r) => r.workflow_instance_id);
+
+    expect(await opened("ceo", own.entity_id)).toEqual([{ title: "Approval needed: Leave Request", body: "Line Manager is waiting on you." }]);
+    expect(await waitingOf("ceo")).toContain(own.workflow_instance_id);
+    expect(await opened("ops", site.entity_id)).toEqual([]);
+    expect(await waitingOf("ops")).not.toContain(site.workflow_instance_id);
+
+    // Left decided, so no later test finds them waiting.
+    expect((await as("ceo").post(`/workflow/instances/${own.workflow_instance_id}/approve`, {})).body.state).toBe("approved");
+    expect((await as("ceo").post(`/workflow/instances/${site.workflow_instance_id}/approve`, {})).body.state).toBe("approved");
+  });
+
   test("a request about a record whose screen has not shipped waits in nobody's Need You (QA DEF-01)", async () => {
     const { workflow_instance_id: id } = await openLeave("staff", 1);
     // As a request about an expense would read, before Expenses has its API on staging.

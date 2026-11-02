@@ -17,6 +17,7 @@ const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const lagos = require("../../shared/time/lagos");
+const dayFirst = require("../../shared/time/day-first");
 const { scoring } = require("@mycity/contract");
 const { scopeFor } = require("../../middleware/rbac");
 const authority = require("./goals.authority");
@@ -513,6 +514,20 @@ function changeView(c) {
 }
 
 /**
+ * What a target change says in the notices about it (docs/guides/performance.md §6.7): what changes,
+ * the new target and the month it applies from, as "TBO-KR1.2: New target 70000 from October 2026".
+ * A figure keeps no trailing zeros ("2.0000" reads 2).
+ * @param {string} subject  the key result's code or the line's title
+ * @param {{to_value?: string|null, to_text?: string|null, from_month?: string|Date|null}} change
+ */
+function changeLabel(subject, change) {
+  const figure = (v) => (typeof v === "string" && v.includes(".") ? v.replace(/\.?0+$/, "") : v);
+  const target = change.to_text || figure(change.to_value) || "not set";
+  const from = change.from_month ? ` from ${dayFirst.formatMonth(change.from_month)}` : "";
+  return `${subject}: New target ${target}${from}`;
+}
+
+/**
  * A multi-part key result's parts for a report: the stored parts (label, measure, target, due
  * date), with only the actuals the report gives (actual, done on, partly), matched in order. A
  * report never changes a binding key result's parts.
@@ -915,6 +930,7 @@ module.exports = {
   monthView,
   keyResultView,
   changeView,
+  changeLabel,
   withKeyResults,
   listKeyResults,
   listOkrs,

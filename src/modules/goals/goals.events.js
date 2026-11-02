@@ -5,8 +5,9 @@
  * Quarters, organisational goals, the OKR tree, monthly reports, plans and target changes. The
  * approval engine tells each stage of a plan, an unbind request or a target change itself; this tells
  * the people a decision concerns: a binding plan's employees and reviewers that their scorecard is
- * ready to agree, a returned plan's sender, an unbound plan's sender of its changes, and the requester
- * of an unbind request or a target change.
+ * ready to agree, a returned plan's sender, an unbound plan's sender of its changes, the requester
+ * of an unbind request, and a target change's requester (told it was sent, then how it was decided)
+ * and, once approved, a key result's owners (§6.7).
  */
 const { defineEvents } = require("../../shared/events/catalogue");
 const { defineNotification } = require("../../shared/notifications/fanout");
@@ -78,8 +79,23 @@ defineNotification(EVENTS.PLAN_REVISION_RETURNED, {
   include_actor: true,
 });
 
+/** The person who asked for the change is told it was sent (the CEO, who is told it waits on them, is not). */
+defineNotification(EVENTS.TARGET_CHANGE_REQUESTED, {
+  to: [{ users: (e) => (e.payload.requested_by_ceo || !e.actor_user_id ? [] : [e.actor_user_id]) }],
+  who: "Whoever asked for the change, unless they are the CEO",
+  title: "Target change sent",
+  body: (e) => (e.payload.label ? `${e.payload.label}. Waiting on the CEO.` : "Waiting on the CEO."),
+  include_actor: true,
+});
+
+/** Whoever asked is told either way; on approval a key result's owners are told too (a line's employee is told by the scorecard). */
 defineNotification(EVENTS.TARGET_CHANGE_DECIDED, {
-  to: [{ users: (e, client) => loginsOf(client, [e.payload.requested_by_employee_id]) }],
+  to: [
+    {
+      users: (e, client) => loginsOf(client, [e.payload.requested_by_employee_id, ...(e.payload.owner_employee_ids || [])]),
+    },
+  ],
+  who: "Whoever asked for the change, and a key result's owners once it is approved",
   title: (e) => (e.payload.status === "approved" ? "Target change approved" : "Target change refused"),
   body: (e) => e.payload.label || "",
   include_actor: true,

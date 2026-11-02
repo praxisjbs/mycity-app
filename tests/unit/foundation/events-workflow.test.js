@@ -324,6 +324,11 @@ describe("notification declarations", () => {
     expect(() => fanout.defineNotification(EV.UNIT_NOTICE_SENT, { to: [{ ceo: true }], title: "A \u2014 B" })).toThrow(/em dash/);
   });
 
+  test("include_actor is a boolean or a function, nothing else", () => {
+    expect(() => fanout.defineNotification(EV.UNIT_NOTICE_SENT, { to: [{ ceo: true }], title: "x", include_actor: "yes" })).toThrow(/include_actor/);
+    expect(() => fanout.defineNotification(EV.UNIT_NOTICE_SENT, { to: [{ ceo: true }], title: "x", include_actor: 1 })).toThrow(/include_actor/);
+  });
+
   test("an event nobody declared and that is not security writes nothing", async () => {
     const db = { query: jest.fn() };
     const out = await fanout.handle({ key: "unit_widget.created", entity: { type: "x", id: "1" }, payload: {} }, {}, { db });

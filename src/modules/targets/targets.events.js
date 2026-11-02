@@ -2,6 +2,7 @@
 /**
  * What the scorecards module records, and who it tells (docs/guides/performance.md §7).
  *
+ * An approved target change tells the line's employee (`scorecard.line_target_changed`, §6.7).
  * Agreement tells the other party; a disagreement tells the reviewer. A scorecard ready to agree
  * is told when its plan binds (goals.approval.js), and asked again each working day from 3
  * business days after binding until both sides agree (§6.6). The person who acted is never told
@@ -81,6 +82,15 @@ defineNotification(EVENTS.SCORECARD_DISAGREED, {
   ],
   title: "A scorecard was disagreed",
   body: (e) => e.payload.reason || "",
+});
+
+// An approved target change tells the person whose line it is (docs/guides/performance.md §6.7);
+// whoever asked is told by the target change itself (goals.events.js).
+defineNotification(EVENTS.SCORECARD_LINE_TARGET_CHANGED, {
+  to: [{ users: (e, client) => loginsOf(client, [e.payload.employee_id]) }],
+  who: "The person whose scorecard line it is",
+  title: "Your target changed",
+  body: (e) => e.payload.label || "",
 });
 
 defineNotification(EVENTS.SCORECARD_AGREE_DUE, {
