@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, opened 01/11/2026 (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, opened 02/11/2026 (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -729,7 +729,7 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 
 ---
 
-### 6.6 After PR5 · Seamless tasks and meetings (decisions 28 to 31; started 01/11/2026, branch `claude/determined-dirac-b4ivrd`)
+### 6.6 After PR5 · Seamless tasks and meetings (decisions 28 to 31; started 01/11/2026, branch `claude/determined-dirac-b4ivrd`, praxisjbs/mycity-app#57)
 
 - [x] 01/11/2026 · The decisions in `praxis-ai.md` §1.3 and here (§2), `workspace.md` §6's watcher rule
 - [x] 01/11/2026 · The contract: `TaskCreate.watcher_ids` and `watcher_department_id`; `AiAnswerDraft.ask`, `AiAnswer.choices`; `AiCardField.picks`, `AiActionCard.names`; gen:contract
