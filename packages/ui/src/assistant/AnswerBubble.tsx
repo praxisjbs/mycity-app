@@ -1,11 +1,11 @@
 /**
  * @component AnswerBubble
  * @group Assistant
- * @summary One answer of Praxis AI: its words, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful.
- * @use Each answer in the conversation, on the full screen and in the phone's chat; the screen passes the table it drew, the chips and what each press does. `card` is the slot the action card fills (PR4 of the Praxis AI Engine).
+ * @summary One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful.
+ * @use Each answer in the conversation, on the full screen and in the phone's chat; the screen passes the table it drew, the chips and what each press does. `card` is the slot the action card fills (PR4 of the Praxis AI Engine); `choices` with `onChoose` are the answers to a question it asks before a card (docs/guides/praxis-ai.md decision 28), on the newest answer only.
  * @avoid A message a person wrote (QuestionBubble, exported here); a notice or a banner; any other chat (Staff Community has its own).
- * @phone Full width; the table above it is cards (DataView); Open Figures opens the pane as a sheet; the buttons are 44 px targets.
- * @a11y An article named Answer; the words are content; Helpful and Not Helpful say their pressed state (aria-pressed) and wait for each other (ActionGroup); the chips are buttons when they open the pane.
+ * @phone Full width; the answers to tap are one under the other, full width; the table above it is cards (DataView); Open Figures opens the pane as a sheet; the buttons are 44 px targets.
+ * @a11y An article named Answer; the words are content; the answers to tap are a group named Answers whose buttons wait for each other while one is asked (ActionGroup); Helpful and Not Helpful say their pressed state (aria-pressed) and wait for each other (ActionGroup); the chips are buttons when they open the pane.
  * @status beta
  * @exports QuestionBubble
  * @example <AnswerBubble text={a.content} table={table} paging="Showing 25 of 312" onNext={next} link={{ label: "Open Leave", onOpen }} from={chips} feedback={null} onFeedback={give} onPane={showPane} />
@@ -42,13 +42,18 @@ export interface AnswerBubbleProps {
   onFeedback?: (value: AnswerFeedback | null) => Promise<unknown> | void;
   /** The action card drawn under the words, when the answer carries one (filled by PR4 of the Praxis AI Engine). */
   card?: ReactNode;
+  /** Answers to tap when the answer is a question ("Today", "Tomorrow", a person's name), at most six. */
+  choices?: string[];
+  /** A tap on a choice: the screen asks it as the person's next question; every choice is busy until it lands. Left out, the choices are not shown. */
+  onChoose?: (choice: string) => Promise<unknown> | void;
   /** Layout classes only (spacing). */
   className?: string;
 }
 
 const FROM_HELP = "The kinds of record this answer was read from, as you would see them. A chip opens them in the pane; a table's rows open their own records.";
 
-export function AnswerBubble({ text, table, paging, onNext, link, from, onPane, paneOpen, feedback = null, onFeedback, card, className }: AnswerBubbleProps) {
+export function AnswerBubble({ text, table, paging, onNext, link, from, onPane, paneOpen, feedback = null, onFeedback, card, choices = [], onChoose, className }: AnswerBubbleProps) {
+  const taps = onChoose ? choices.slice(0, 6) : [];
   return (
     <article
       aria-label="Answer"
@@ -58,6 +63,18 @@ export function AnswerBubble({ text, table, paging, onNext, link, from, onPane, 
       <p data-copy="content" className="text-sm whitespace-pre-line wrap-any">
         {text}
       </p>
+      {taps.length > 0 && onChoose && (
+        // The model's own answers to its question (content, like the words): one tap asks it, and the others wait (F26).
+        <div role="group" aria-label="Answers" data-copy="content" className="flex flex-wrap gap-1.5 phone:flex-col phone:items-stretch">
+          <ActionGroup>
+            {taps.map((choice) => (
+              <Button key={choice} size="sm" className="phone:w-full" onClick={() => onChoose(choice)}>
+                {choice}
+              </Button>
+            ))}
+          </ActionGroup>
+        </div>
+      )}
       {card}
       {table}
       {(paging || onNext) && (

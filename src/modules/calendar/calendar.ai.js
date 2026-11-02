@@ -23,11 +23,16 @@ const CITED = {
   pip_review: "improvement_plan",
 };
 
-/** The people a card invites, by name; an id that is nobody's keeps its id alone, and the service refuses it. */
-async function attendeeRecords(db, ids) {
-  const wanted = [...new Set(ids || [])].slice(0, 25);
-  const names = db ? await repo.namesOf(db, wanted) : new Map();
-  return wanted.map((id) => ({ type: "employee", id, label: names.get(id) || null }));
+/**
+ * The people a card invites, by name (docs/guides/praxis-ai.md §1.3 decision 31): named on the card,
+ * never counted as records it acts on. An id that is nobody's is left out, so the card shows the id
+ * and the service refuses it at the press.
+ */
+async function attendeeNames(db, ids) {
+  const wanted = [...new Set(ids || [])].slice(0, 50);
+  if (!db || !wanted.length) return [];
+  const names = await repo.namesOf(db, wanted);
+  return wanted.filter((id) => names.get(id)).map((id) => ({ type: "employee", id, label: names.get(id) }));
 }
 
 /** An hour on a weekday a month ahead, as an event's start and end. */
@@ -62,10 +67,18 @@ module.exports = defineManifest({
       input: c.calendar.CalendarEventCreate,
       permission: ["workspace", "create"],
       risk: "standard",
-      bulk: 25,
       // New Event's form takes a day and two clock times and joins them into starts_at and ends_at before it sends.
       form: "none: New Event's form takes a day and two clock times, joined into starts_at and ends_at as it sends",
-      records: (values, _actor, db) => attendeeRecords(db, values.attendee_ids),
+      fields: ["title", "starts_at", "ends_at", "all_day", "attendee_ids", "event_type", "location", "visibility", "description", "reminder_minutes"],
+      picks: { attendee_ids: "colleague" },
+      // One event is made, so the verb counts nothing; the people invited are named, never counted.
+      names: (values, _actor, db) => attendeeNames(db, values.attendee_ids),
+      asks: [
+        { field: "title", question: "What is the meeting about?" },
+        { field: "starts_at", question: "When is it?" },
+        { field: "ends_at", question: "How long is it?", choices: ["30 Minutes", "1 Hour", "2 Hours"] },
+        { field: "attendee_ids", question: "Who should come?", choices: ["Just Me"], none: true },
+      ],
       // The same function Create Event calls; someone invited who is not on the staff is refused on the field (§6).
       run: (values, actor) => service.create(actor, values),
       readback: (event) => [{ type: "calendar_event", id: event.calendar_event_id, label: event.title, status: "booked", link: (routeMap.linkFor("calendar_event", event.calendar_event_id) || {}).path || null }],

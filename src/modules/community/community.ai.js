@@ -96,6 +96,23 @@ module.exports = defineManifest({
   },
   reads: [
     {
+      // Staff Community's own directory: anyone with a login, as New Message and New Event list them,
+      // so a task's watcher, a meeting's guest or a message's colleague is found by name for anyone
+      // (docs/guides/praxis-ai.md §6.9). The caller is listed too, so every reader sees the same people.
+      key: "colleagues.list",
+      description: "Find colleagues by name: everyone with a login, with their job title and department",
+      params: c.community.ColleagueListQuery,
+      permission: ["community", "view"],
+      run: async (client, params, actor) => {
+        const page = await repo.listColleagues(client, { ...params, with_self: true }, actor.user_id);
+        return {
+          ...page,
+          data: page.data.map(({ person: p }) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department })),
+        };
+      },
+      cite: (row) => ({ type: "employee", id: row.employee_id, label: row.display_name }),
+    },
+    {
       key: "announcements.list",
       description:
         "Published company announcements, newest first, with how many have read each",

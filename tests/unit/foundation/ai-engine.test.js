@@ -59,6 +59,30 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     expect(() => defineManifest({ module: "workspace", not_offered: { TaskStepCreate: "" } })).toThrow(/needs a reason/);
   });
 
+  test("an action's fields, picks, names and asks are checked at load (decisions 29 and 31)", () => {
+    const good = defineManifest({
+      module: "workspace",
+      actions: [{ ...ACTION, fields: ["title", "due_on", "watcher_ids"], picks: { watcher_ids: "colleague" }, names: async () => [], asks: [{ field: "due_on", question: "When is it due?", choices: () => ["Today"], none: true }, { field: "title", question: "What is the task?" }] }],
+    });
+    const a = good.actions[0];
+    expect(a.fields).toEqual(["title", "due_on", "watcher_ids"]);
+    expect(a.picks).toEqual({ watcher_ids: "colleague" });
+    expect(a.asks.map((q) => [q.field, q.none])).toEqual([["due_on", true], ["title", false]]);
+    expect(defineManifest({ module: "workspace", actions: [ACTION] }).actions[0]).toMatchObject({ fields: null, picks: {}, names: null, asks: [] });
+    const refused = (over) => () => defineManifest({ module: "workspace", actions: [{ ...ACTION, ...over }] });
+    expect(refused({ fields: ["nope"] })).toThrow(/fields names "nope"/);
+    expect(refused({ fields: ["title", "title"] })).toThrow(/each once/);
+    expect(refused({ fields: ["title"], picks: { watcher_ids: "colleague" } })).toThrow(/picks names "watcher_ids", which the card does not carry/);
+    expect(refused({ picks: { watcher_ids: "anyone" } })).toThrow(/picks\.watcher_ids is one of colleague/);
+    expect(refused({ names: [] })).toThrow(/names is \(values, actor, db\)/);
+    expect(refused({ asks: [{ field: "due_on", question: "Due" }] })).toThrow(/one short question/);
+    expect(refused({ asks: [{ field: "due_on", question: "When will this task you set for your colleague be due?" }] })).toThrow(/at most 8 words/);
+    expect(refused({ asks: [{ field: "due_on", question: "When is it due?", choices: ["A", "B", "C", "D", "E", "F", "G"] }] })).toThrow(/at most 6 short choices/);
+    expect(refused({ asks: [{ field: "due_on", question: "When is it due?", when: "now" }] })).toThrow(/an ask takes no "when"/);
+    expect(refused({ fields: ["title"], asks: [{ field: "due_on", question: "When is it due?" }] })).toThrow(/asks names "due_on", which the card does not carry/);
+    expect(refused({ asks: [{ field: "title", question: "What is it?" }, { field: "title", question: "What is it?" }] })).toThrow(/twice/);
+  });
+
   test("gate 19 refuses SQL and a query call inside a manifest, and a write key, comments aside", () => {
     const dir = tmp("mycity-gate19v2-");
     const src = (p) => JSON.stringify(path.resolve(__dirname, "../../..", p));
@@ -200,6 +224,44 @@ describe("cards (engine/cards.js)", () => {
     expect(cards.fillFromContext({ title: "x" }, ["title", "task_id"], { id: "t1" })).toEqual({ title: "x", task_id: "t1" });
     expect(cards.fillFromContext({ title: "x" }, ["title", "task_id", "project_id"], { id: "t1" })).toEqual({ title: "x" });
     expect(cards.fillFromContext({ title: "x", task_id: "kept" }, ["title", "task_id"], { id: "t1" })).toEqual({ title: "x", task_id: "kept" });
+    expect(by.title.picks).toBeNull();
+  });
+
+  test("a card may carry only some fields, in its order, each id field with its picker; a draft keeps the names apart from the records (decision 31)", () => {
+    const fields = cards.fieldsOf(jsonSchemaOf(c.tasks.TaskCreate), { watcher_ids: "Watchers" }, { fields: ["watcher_ids", "title", "nope"], picks: { watcher_ids: "colleague" } });
+    expect(fields.map((f) => [f.name, f.label, f.picks])).toEqual([["watcher_ids", "Watchers", "colleague"], ["title", "Title", null]]);
+    const drawn = cards.draft({ action: { key: "tasks.create", risk: "standard", bulk: 1 }, fieldNames: ["title"], values: { title: "x" }, checked: { ok: true, values: { title: "x" }, problems: {}, records: [], names: [{ type: "employee", id: "e1", label: "Ada Obi" }] } });
+    expect(drawn.records).toEqual([]);
+    expect(drawn.names).toEqual([{ type: "employee", id: "e1", label: "Ada Obi" }]);
+  });
+
+  test("nextAsk: the first field an action asks for that the values leave out, once in a run, never more than six in a row (decision 29)", () => {
+    const asking = {
+      key: "tasks.create",
+      asks: [
+        { field: "title", question: "What is the task?", choices: [], none: false },
+        { field: "due_on", question: "When is it due?", choices: ({ today }) => [today ? "Today" : "Soon", "No Due Day"], none: true },
+        { field: "priority", question: "How urgent is it?", choices: ["Low", "Normal", "Low"], none: false },
+      ],
+    };
+    expect(cards.nextAsk(asking, {}, [], { today: "2026-11-01" })).toEqual({ action: "tasks.create", field: "title", question: "What is the task?", choices: [] });
+    expect(cards.nextAsk(asking, { title: "  " }, []).field).toBe("title");
+    expect(cards.nextAsk(asking, { title: "Report" }, [], { today: "2026-11-01" })).toEqual({ action: "tasks.create", field: "due_on", question: "When is it due?", choices: ["Today", "No Due Day"] });
+    // None is an answer where the ask allows it: no due day said is given.
+    expect(cards.nextAsk(asking, { title: "Report", due_on: null }, []).field).toBe("priority");
+    expect(cards.nextAsk(asking, { title: "Report", due_on: null }, []).choices).toEqual(["Low", "Normal"]);
+    // Priority null is not an answer, so it is asked; once asked in this run, it is not asked again.
+    expect(cards.nextAsk(asking, { title: "Report", due_on: "2026-11-06", priority: null }, []).field).toBe("priority");
+    expect(cards.nextAsk(asking, { title: "Report", due_on: "2026-11-06" }, [{ action: "tasks.create", field: "priority" }])).toBeNull();
+    expect(cards.nextAsk(asking, { title: "Report" }, [{ action: "tasks.create", field: "due_on" }]).field).toBe("priority");
+    // Another action's question asked before is not this one's.
+    expect(cards.nextAsk(asking, { title: "Report" }, [{ action: "calendar.create", field: "due_on" }]).field).toBe("due_on");
+    expect(cards.nextAsk(asking, {}, Array.from({ length: cards.ASK_RUN_MAX }, () => ({ action: "x", field: "y" })))).toBeNull();
+    expect(cards.nextAsk({ key: "a.b" }, {}, [])).toBeNull();
+    // A list may be answered with none (an empty list) only where none is allowed.
+    const meeting = { key: "calendar.create", asks: [{ field: "attendee_ids", question: "Who should come?", choices: ["Just Me"], none: true }] };
+    expect(cards.nextAsk(meeting, { attendee_ids: [] }, [])).toBeNull();
+    expect(cards.nextAsk(meeting, {}, []).choices).toEqual(["Just Me"]);
   });
 });
 

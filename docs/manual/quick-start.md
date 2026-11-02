@@ -219,8 +219,9 @@ icon: spark
 
 1. Open [My Workspace · Tasks](/workspace?tab=tasks) and press **New Task**.
 2. Type the **Task** and choose its **Due** date and **Priority**.
-3. Press **Create Task**. It joins your board under **To Do**.
-4. Drag it along the board as the work moves. Read [Add a task](#workspace-add-task).
+3. To have colleagues follow it, pick them in **Watchers**.
+4. Press **Create Task**. It joins your board under **To Do**.
+5. Drag it along the board as the work moves. Read [Add a task](#workspace-add-task).
 
 ## Send Your Commitments {#qs-commitments role="Everyone" icon=flag screen=workspace/tasks needs="workspace create"}
 

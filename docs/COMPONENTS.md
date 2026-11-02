@@ -166,7 +166,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
-| Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
+| Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
 | Assistant | [AssistantShell](#assistantshell) | `AssistantShell` | The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone. | beta |
 | Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary. | beta |
 | Assistant | [PaneSheet](#panesheet) | `PaneSheet` | The phone's pane: a full-height sheet that holds the four views (PaneTabs) for one answer, opened from Open Figures under it. | beta |
@@ -5487,7 +5487,7 @@ An action Praxis AI drafted for the person to confirm: every field as the action
 
 | | |
 |---|---|
-| Use | Inside an answer (AnswerBubble's card slot) when the answer carries a card (docs/guides/praxis-ai.md §6.11): the screen passes the card as the API drew it, the action's contract schema for Edit, and what each press does. A suggested card reads as a question with the verb and Not Now. |
+| Use | Inside an answer (AnswerBubble's card slot) when the answer carries a card (docs/guides/praxis-ai.md §6.11): the screen passes the card as the API drew it (its records, and the names its id fields hold, so no id reads as a code), the action's contract schema for Edit, a `picker` that binds each id field's `picks` to the screen's own picker, and what each press does. A suggested card reads as a question with the verb and Not Now. |
 | Avoid | A form the person fills from empty (the screen's own form); a confirmation dialog (useConfirm); an answer's screen button (AnswerBubble's link); a list of records to browse (DataView). |
 | Phone | Full width inside the answer; the buttons are 44 px targets with the verb full width at the foot; Edit's fields are one column; the result's Open buttons are 44 px. |
 | Accessibility | A group named by the card's title; the fields are a description list, and in Edit the form system's own fields with their labels and marks; the verb says aria-busy while the press runs and the buttons beside it wait (ActionGroup); the result line is a status; a refusal is an alert. |
@@ -5506,7 +5506,9 @@ An action Praxis AI drafted for the person to confirm: every field as the action
 | `fields` | `CardField[]` | yes | The fields the action takes. |
 | `values` | `Record<string, unknown>` | yes | The values as the action will receive them. |
 | `problems` | `Record<string, string[]>` | yes | Problems the person must fix, by field. |
-| `records` | `CardRecord[]` | yes | The records the card touches. |
+| `records` | `CardRecord[]` | yes | The records a press acts on: the verb's count and the chips under the fields. |
+| `names` | `CardRecord[]` |  | The people, departments and projects the fields hold, by name: an id reads as its name. Never counted. |
+| `picker` | `ActionCardPicker` |  | Edit's picker for an id field that names what it picks (`picks`); without it such a field cannot be changed. |
 | `status` | `"shown" \| "confirmed" \| "done" \| "failed" \| "cancelled" \| "expired"` | yes | Where the card stands: open (shown), running, done, failed, cancelled or expired. |
 | `confirm` | `"press" \| "fresh_sign_in"` | yes | `fresh_sign_in`: the press asks Confirm It's You first; the verb carries a lock. |
 | `suggested` | `boolean` |  | Offered unasked: the title reads as a question, and Cancel reads Not Now. |
@@ -5527,14 +5529,14 @@ An action Praxis AI drafted for the person to confirm: every field as the action
 
 ### AnswerBubble
 
-One answer of Praxis AI: its words, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful.
+One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful.
 
 | | |
 |---|---|
-| Use | Each answer in the conversation, on the full screen and in the phone's chat; the screen passes the table it drew, the chips and what each press does. `card` is the slot the action card fills (PR4 of the Praxis AI Engine). |
+| Use | Each answer in the conversation, on the full screen and in the phone's chat; the screen passes the table it drew, the chips and what each press does. `card` is the slot the action card fills (PR4 of the Praxis AI Engine); `choices` with `onChoose` are the answers to a question it asks before a card (docs/guides/praxis-ai.md decision 28), on the newest answer only. |
 | Avoid | A message a person wrote (QuestionBubble, exported here); a notice or a banner; any other chat (Staff Community has its own). |
-| Phone | Full width; the table above it is cards (DataView); Open Figures opens the pane as a sheet; the buttons are 44 px targets. |
-| Accessibility | An article named Answer; the words are content; Helpful and Not Helpful say their pressed state (aria-pressed) and wait for each other (ActionGroup); the chips are buttons when they open the pane. |
+| Phone | Full width; the answers to tap are one under the other, full width; the table above it is cards (DataView); Open Figures opens the pane as a sheet; the buttons are 44 px targets. |
+| Accessibility | An article named Answer; the words are content; the answers to tap are a group named Answers whose buttons wait for each other while one is asked (ActionGroup); Helpful and Not Helpful say their pressed state (aria-pressed) and wait for each other (ActionGroup); the chips are buttons when they open the pane. |
 | Status | beta |
 | Exports | `AnswerBubble`, `QuestionBubble` |
 | Import | `import { AnswerBubble, QuestionBubble } from "@mycity/ui";` |
@@ -5557,6 +5559,8 @@ One answer of Praxis AI: its words, its table, Showing 25 of 312 with Show Next 
 | `feedback` | `AnswerFeedback \| null` |  | Where Helpful or Not Helpful stands. |
 | `onFeedback` | `(value: AnswerFeedback \| null) => Promise<unknown> \| void` |  | The press on Helpful or Not Helpful; null takes it back. |
 | `card` | `ReactNode` |  | The action card drawn under the words, when the answer carries one (filled by PR4 of the Praxis AI Engine). |
+| `choices` | `string[]` |  | Answers to tap when the answer is a question ("Today", "Tomorrow", a person's name), at most six. |
+| `onChoose` | `(choice: string) => Promise<unknown> \| void` |  | A tap on a choice: the screen asks it as the person's next question; every choice is busy until it lands. Left out, the choices are not shown. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 **QuestionBubble** props (`QuestionBubbleProps`)

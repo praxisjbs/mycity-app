@@ -5,8 +5,9 @@
  * pressed, how each risk class is confirmed, how long it lives.
  *
  *   cards.draft({ key, values, suggested, check, context, now })
- *     → { ok, values, problems, records, expires_at, ... } or null when the card is refused
- *   cards.fieldsOf(jsonSchema, labels)   the card's fields from the input schema
+ *     → { ok, values, problems, records, names, expires_at, ... } or null when the card is refused
+ *   cards.fieldsOf(jsonSchema, labels, { fields, picks })   the card's fields from the input schema
+ *   cards.nextAsk(action, values, asked, { today })          the question to ask before the card, or null
  *   cards.confirmOf(risk)                "press" or "fresh_sign_in"
  *   cards.assertPressable(card, now)     throws an EngineError naming why not
  *   cards.statusOf(card, now)            `expired` for a shown card past its time
@@ -22,6 +23,10 @@ const TTL_MS = 30 * 60 * 1000;
 const CONFIRM_WINDOW_SECONDS = 5 * 60;
 /** Records one press may touch, at most. */
 const BULK_MAX = 25;
+/** The people, departments and projects a card's fields may name, at most (decision 31). */
+const NAMES_MAX = 80;
+/** Questions asked in a row before a card is drawn whatever is missing, so asking never loops (decision 29). */
+const ASK_RUN_MAX = 6;
 const STATUSES = Object.freeze(["shown", "confirmed", "done", "failed", "cancelled", "expired"]);
 
 const confirmOf = (risk) => (SENSITIVE.has(risk) ? "fresh_sign_in" : "press");
@@ -62,28 +67,66 @@ function kindOf(name, p) {
 const LONG_TEXT = 300;
 
 /**
- * The card's fields from the action's input schema (JSON Schema, structured.jsonSchemaOf).
+ * The card's fields from the action's input schema (JSON Schema, structured.jsonSchemaOf): every
+ * field, or only those the action carries (`fields`, in that order, decision 31), each with the
+ * picker an id field is chosen with on Edit (`picks`).
  * @param {object} jsonSchema
  * @param {Record<string, string>} [labels]
- * @returns {Array<{name: string, label: string, kind: string, required: boolean, options: string[]|null, long: boolean}>}
+ * @param {{fields?: string[]|null, picks?: Record<string, string>}} [shape]
+ * @returns {Array<{name: string, label: string, kind: string, required: boolean, options: string[]|null, long: boolean, picks: string|null}>}
  */
-function fieldsOf(jsonSchema, labels = {}) {
+function fieldsOf(jsonSchema, labels = {}, { fields = null, picks = {} } = {}) {
   const props = (jsonSchema && jsonSchema.properties) || {};
   const required = new Set((jsonSchema && jsonSchema.required) || []);
-  return Object.entries(props)
-    .slice(0, 40)
-    .map(([name, p]) => {
-      const node = nodeOf(p);
-      const kind = kindOf(name, p);
-      return {
-        name,
-        label: labels[name] || humanise(name),
-        kind,
-        required: required.has(name),
-        options: node.enum ? node.enum.map(String).slice(0, 50) : null,
-        long: kind === "text" && (node.maxLength === undefined || node.maxLength >= LONG_TEXT),
-      };
-    });
+  const names = Array.isArray(fields) && fields.length ? fields.filter((f) => Object.prototype.hasOwnProperty.call(props, f)) : Object.keys(props);
+  return names.slice(0, 40).map((name) => {
+    const p = props[name];
+    const node = nodeOf(p);
+    const kind = kindOf(name, p);
+    return {
+      name,
+      label: labels[name] || humanise(name),
+      kind,
+      required: required.has(name),
+      options: node.enum ? node.enum.map(String).slice(0, 50) : null,
+      long: kind === "text" && (node.maxLength === undefined || node.maxLength >= LONG_TEXT),
+      picks: (picks && picks[name]) || null,
+    };
+  });
+}
+
+/** Is a field still to be given? Absent, blank, or "none" where none is not an answer. */
+function missing(ask, values) {
+  if (!values || !Object.prototype.hasOwnProperty.call(values, ask.field)) return true;
+  const v = values[ask.field];
+  if (v === undefined) return true;
+  if (typeof v === "string") return !v.trim();
+  if (v === null || (Array.isArray(v) && !v.length)) return !ask.none;
+  return false;
+}
+
+/**
+ * The question to ask before a card is drawn (decision 29): the first of the action's asks whose
+ * field the model's values leave out, unless the run of questions just before already asked it
+ * (the person answered "none", or the model could not use the answer: the card shows the gap
+ * instead), or the run is already ASK_RUN_MAX long. Pure: the adapter gives today's date for
+ * answers that move with the day.
+ * @param {{key: string, asks?: Array<{field: string, question: string, choices: string[]|Function, none: boolean}>}} action
+ * @param {object} values  what the model gave, before any default fills it
+ * @param {Array<{action: string|null, field: string|null}>} asked  the questions asked in a row just before this answer
+ * @param {{today?: string}} [at]
+ * @returns {{action: string, field: string, question: string, choices: string[]}|null}
+ */
+function nextAsk(action, values, asked = [], { today = null } = {}) {
+  if (!action || !Array.isArray(action.asks) || !action.asks.length) return null;
+  if (asked.length >= ASK_RUN_MAX) return null;
+  for (const ask of action.asks) {
+    if (!missing(ask, values)) continue;
+    if (asked.some((a) => a && a.action === action.key && a.field === ask.field)) continue;
+    const choices = typeof ask.choices === "function" ? ask.choices({ today }) : ask.choices || [];
+    return { action: action.key, field: ask.field, question: ask.question, choices: [...new Set(choices.map((c) => String(c).trim()).filter(Boolean))].slice(0, 6) };
+  }
+  return null;
 }
 
 /**
@@ -113,6 +156,7 @@ function draft({ action, fieldNames, values, suggested = false, checked, now = D
     values: checked.ok ? checked.values : kept,
     problems: checked.problems || {},
     records: (checked.records || []).slice(0, BULK_MAX),
+    names: (checked.names || []).slice(0, NAMES_MAX),
     suggested: Boolean(suggested),
     status: "shown",
     expires_at: new Date(now + TTL_MS).toISOString(),
@@ -169,10 +213,13 @@ module.exports = {
   TTL_MS,
   CONFIRM_WINDOW_SECONDS,
   BULK_MAX,
+  NAMES_MAX,
+  ASK_RUN_MAX,
   LONG_TEXT,
   confirmOf,
   humanise,
   fieldsOf,
+  nextAsk,
   draft,
   fillFromContext,
   statusOf,

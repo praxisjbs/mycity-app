@@ -2,11 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { addDaysIso, formatDate, ModalProvider, todayIso } from "@mycity/ui";
+import { formatDate, ModalProvider, todayIso } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { clear, invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
 import { byKey } from "@/api/mock/data/people";
+import { searchableDays } from "@/api/mock/modules/attendance";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
 import { PeopleAttendance } from "./PeopleAttendance";
@@ -68,8 +69,14 @@ describe("All Days of a person", () => {
     await openAt(`/people?tab=attendance&person=${bashir.employee_id}`);
     const sheet = await screen.findByRole("dialog", { name: "Bashir Lawal" }, { timeout: 8000 });
     await within(sheet).findAllByText("All Days", undefined, { timeout: 5000 });
-    // The mock's days end yesterday: on a month's first day this month has none yet, so the month before is the one with days.
-    const month = addDaysIso(todayIso(), -1).slice(0, 7);
+    // The month of the person's newest day the mock holds: its days end yesterday, with today's once its clock-in time has
+    // passed, so early in a month whose first days were not working days this month has none yet, and the month before is shown.
+    const newest = searchableDays()
+      .filter((d) => d.person.user_key === "bashir" && d.status)
+      .map((d) => d.attendance_date)
+      .sort()
+      .at(-1)!;
+    const month = newest.slice(0, 7);
     if (month !== todayIso().slice(0, 7)) fireEvent.click(within(sheet).getByRole("button", { name: "Previous Month" }));
     const rows = (await within(sheet).findAllByRole("row", undefined, { timeout: 5000 })).slice(1);
     expect(rows.length).toBeGreaterThan(0);

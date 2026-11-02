@@ -419,10 +419,24 @@ describe("my workspace", () => {
     // The field follows the reader's team, which the form loads as it opens.
     expect(await within(form).findByText("Assign To")).toBeTruthy();
     named(form, "File the October minutes");
-    fireEvent.click(await within(form).findByRole("option", { name: /Bashir Lawal/ }));
+    // Assign To and Watchers both list people: the pick is Assign To's.
+    fireEvent.click(await within(within(form).getByRole("listbox", { name: /Assign To/ })).findByRole("option", { name: /Bashir Lawal/ }));
     fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
     await closed("New Task");
     await waitFor(() => expect(inStage("To Do", "File the October minutes")).toBeTruthy(), { timeout: 5000 });
+  }, 30000);
+
+  it("New Task names watchers, who are on the task's panel once it is made (JBS Praxis, 01/11/2026)", async () => {
+    await board();
+    const form = await newTask();
+    named(form, "Book the launch venue");
+    const watchers = await within(form).findByRole("listbox", { name: /Watchers/ });
+    fireEvent.click(await within(watchers).findByRole("option", { name: /Bashir Lawal/ }));
+    fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
+    await closed("New Task");
+    await waitFor(() => expect(inStage("To Do", "Book the launch venue")).toBeTruthy(), { timeout: 5000 });
+    fireEvent.click(inStage("To Do", "Book the launch venue")!);
+    expect(await screen.findByText("Bashir Lawal", undefined, { timeout: 5000 })).toBeTruthy();
   }, 30000);
 
   it("Shared with People: Lead offers You and each person picked, and goes back to You when its person is removed", async () => {

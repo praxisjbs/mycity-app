@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, opened 01/11/2026 (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, opened 02/11/2026 (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -217,6 +217,27 @@ reason and the PR that builds each.
 27. **The old Ask retires in PR5**, once PR2 to PR4 are on staging: the full-screen Praxis AI is the
     one screen, History stays, the phone's floating button opens the same screen, the guide and the
     User Guide chapter are rewritten, and `praxis-ai.md` §2 and §10 describe only what ships.
+
+**Decided after PR5 (JBS Praxis, 01/11/2026), on the branch `claude/determined-dirac-b4ivrd`.** The
+owner tried a task card on staging: a task for JBS Praxis Team shared with TBO came back with codes
+for names, "employee" for whom it was for, a problem ("People or a department") on a field Edit
+could not change, and TBO made to share the task when they were asked to watch it. Three questions
+were put to them, each with a recommendation first; they took every recommendation and ticked all
+four of the details to ask for. `praxis-ai.md` §1.3 holds the decisions as written for the build:
+
+28. **One question at a time, with choices to tap** (asked: one question with tap choices, all at
+    once, or the card first with blanks marked). The tap is the person's next question, so nothing
+    new is stored but the question's choices.
+29. **What is always asked**: a task's title, due day and priority; a meeting's subject, day and
+    start, length and who comes; which person when a name matches several (asked as a multiple
+    choice: the due day, the meeting's length, its attendees and the task's priority were all
+    ticked). The server's `asks` back the model up, once each in a run of questions, so a forgetful
+    model cannot draw an incomplete card or ask in a loop.
+30. **Watching gives sight** (asked: watching lets them see it, only people who can see it, or no
+    watchers from the chat). It amends `workspace.md` §6's rule of 23/10/2026.
+31. **A card names what it holds and edits every field** (the fix for what was seen, no question
+    needed): `names` beside `records`, the verb counting only records acted on, Edit's pickers, the
+    card's `fields`, and the share rule in the action's description.
 
 ---
 
@@ -708,6 +729,18 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
 
 ---
 
+### 6.6 After PR5 · Seamless tasks and meetings (decisions 28 to 31; started 01/11/2026, branch `claude/determined-dirac-b4ivrd`, praxisjbs/mycity-app#57)
+
+- [x] 01/11/2026 · The decisions in `praxis-ai.md` §1.3 and here (§2), `workspace.md` §6's watcher rule
+- [x] 01/11/2026 · The contract: `TaskCreate.watcher_ids` and `watcher_department_id`; `AiAnswerDraft.ask`, `AiAnswer.choices`; `AiCardField.picks`, `AiActionCard.names`; gen:contract
+- [x] 01/11/2026 · Tasks: watchers at creation (people or a department's active people, at most 25), told they are watching; a watcher sees the panel and the comments and finds the task in ⌘K, never on their board, and cannot work it (`readable` beside `visible`); Add Watcher takes any colleague; notices reach every watcher with a login
+- [x] 01/11/2026 · The engine: manifests take `fields`, `picks`, `names` and `asks`; `checkAction` names; migration `10360` (`ai_action_draft.names`); the server's must-ask guard (`answer.askFirst`), the asks kept on the answer (`metadata.ask`) and replayed; prompt version 7; `colleagues.list` (Staff Community's directory) so anyone can be named
+- [x] 01/11/2026 · `tasks.create` and `calendar.create`: their fields, pickers, names and asks; records only what a press acts on (the event's attendees are named, not counted)
+- [x] 01/11/2026 · The screens: choices under an answer (`AnswerBubble` `choices`), a tap asked as the next question; `ActionCard` Edit with the app's pickers and names; New Task's Watchers and Watching Department; the panel read only for a watcher; the mock
+- [x] 01/11/2026 · Tests: unit (manifest, cards, the guard, the system turn), integration on the real migrations (names, watchers, the guard's run of questions with the model scripted), screens; the evaluation set's follow-up cases; the catalogue snapshot
+- [x] 01/11/2026 · Documents: `praxis-ai.md` (§2, §4, §5, §6, §10, §11, §14), `workspace.md` (§3, §5, §6, §7, §9, §10, §11, §14), `community.md` §9, the User Guide chapters (Praxis AI, My Workspace) with their pictures, PROGRESS, README, DATABASE_SCHEMA
+- [x] 02/11/2026 · `npm run ci` green, run group by group in a cloud session (a command there stops at 10 minutes): checks, frontend (the app's tests in three shards), screens (each gate on its own) and backend (Jest in six shards, the database on); two tests that failed on main too, by the date, fixed in their own commit; pushed as `71d7935` and `e851aaa`
+
 ## 7 · Gates this work adds
 
 | Gate | Script | Refuses |
@@ -807,3 +840,14 @@ Tick with the date. A PR's row in §4 moves to its number when opened and "merge
   guide's Change log line (`attendance.md`, `workspace.md`, `performance.md`); the same five fail
   on main today. A cloud session's image lacks Node 20 under /opt and pgvector; both installed by
   hand, and worth adding to the image (`.claude/hooks/session-start.sh` notes the first).
+- 01/11/2026 · JP · After PR5, seamless tasks and meetings (§2 decisions 28 to 31, §6.6), on
+  `claude/determined-dirac-b4ivrd`: a change missing what its action must have is asked for one
+  question at a time with answers to tap, the server's `asks` backing the model; a card carries its
+  form's fields, names what they hold apart from its records and is edited with the screens' own
+  pickers; watching a task gives sight of it, and New Task and the task card name watchers;
+  `colleagues.list` lets anyone name a colleague. Found on the way: a watcher who stopped watching
+  was answered 404 by the panel's reload (now the panel once more, then it closes); the colleague
+  list leaves its reader out, which would have broken the matrix's subset rule, so the read lists
+  everyone; `CardPicker` already named a form component, so the card's slot type is
+  `ActionCardPicker`. A cloud session's image again lacked Node 20, pgvector and `node_modules`
+  (installed by hand: nvm's Node 20 linked at `/opt/node20`, `postgresql-16-pgvector`, `npm ci`).
