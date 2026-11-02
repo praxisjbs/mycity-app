@@ -88,7 +88,8 @@ module.exports = defineManifest({
     },
     {
       key: "attendance.register",
-      description: "List who is present, late, absent, on leave or not in on a day, with their clock times",
+      description:
+        "List who is present, late, absent, on leave, off or not in on a day, with clock times. Not in: expected, not clocked in yet, the day still open; absent: the day closed with no clock-in",
       params: c.attendance.RegisterQuery,
       permission: ["people", "view"],
       run: (_client, params, actor) => service.register(params, actor.scope),

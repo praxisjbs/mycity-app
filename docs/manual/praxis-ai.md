@@ -57,8 +57,11 @@ conversations, and one opens full screen when you press it.
 - The answer starts with a few sentences.
 - A long conversation opens on its newest 25 questions. Press **Show Earlier** at the top to see the
   25 before them.
-- A list of records shows as a table on a computer and as cards on a phone. When there are more
-  than 25, it says how many, for example *Showing 25 of 312*.
+- A list of records shows as a table on a computer and as cards on a phone. Each row starts with
+  who or what it is, for example the person's name, and a status reads in words, for example
+  *Not In*. When there are more than 25, it says how many, for example *Showing 25 of 312*.
+- Ask who is absent and the answer counts everyone who has not clocked in yet, by name. Nobody is
+  marked *Absent* until the day closes.
 - {needs="praxis_ai create"} Press **Show Next 25** under the newest answer for the next 25. It asks
   "Show the next 25." for you, as a new question. The next answer reads *Showing 26 to 50 of 312*,
   and so on.
@@ -77,8 +80,9 @@ conversations, and one opens full screen when you press it.
 
 ![The pane beside an answer](shot:praxis-pane)
 
-1. On a computer, the pane on the right fills with the newest answer. On a phone, press
-   **Open Figures** under an answer. The pane opens as a sheet, **Figures**.
+1. On a computer, the pane on the right fills with the newest answer, also when you open a
+   conversation from **Recent** or History. On a phone, press **Open Figures** under an answer with
+   a table or figures. The pane opens as a sheet, **Figures**.
 2. **Overview** shows figures and a chart when an answer counted or summed something. Until an
    answer has figures, it is greyed out.
 3. **Table** lists every row the answer was read from, 25 to a page. Press **Next** and
@@ -90,7 +94,8 @@ conversations, and one opens full screen when you press it.
    whether it was read or not available to you. **Masked** names the fields you may not see. Press
    **Open Table** to see its rows.
 6. Press a chip under **From** on any answer to show those records in the pane. Press
-   **Open Figures** under an earlier answer to bring its pane back.
+   **Open Figures** under an earlier answer with a table or figures to bring its pane back. An
+   answer of words alone has no **Open Figures**; its chips still open the pane.
 7. On a phone, press **Close** or swipe the sheet down to return to the conversation.
 
 ![The pane on a phone](shot:praxis-figures)
@@ -170,9 +175,10 @@ form: press that screen's own button to save.
 ![A question with answers to tap](shot:praxis-question)
 
 1. Ask for a change, for example "Assign a task to Cynthia".
-2. Praxis AI asks for what is missing, one question at a time, for example *When is it due?*.
+2. Praxis AI asks for what is missing, one question at a time, for example *When is it due?*. A
+   question shows its answers to tap and nothing else.
 3. Press one of the answers under the question, for example **Friday**, or type your own answer and
-   press **Send**.
+   press **Send**. Ask why it needs something and it says, then asks again with the same answers.
 4. It asks the next thing it needs, for example *How urgent is it?*, until it has everything.
 5. Then it draws the card. Check it and press its button.
 
@@ -244,8 +250,8 @@ conversation you are in, and an old subject can confuse a new question.
 1. On a phone, press the round button with a plus at the bottom right, **Quick Actions**.
 2. Press **Praxis AI**. Praxis AI opens full screen, and it knows which screen you came from:
    "these" and "here" mean that screen's records.
-3. Ask as on [Praxis AI · Ask](/praxis-ai?tab=ask). Press **Open Figures** under an answer to see
-   its table and sources. Pressing an answer's button or a record goes there.
+3. Ask as on [Praxis AI · Ask](/praxis-ai?tab=ask). Press **Open Figures** under an answer with a
+   table or figures to see them. Pressing an answer's button or a record goes there.
 4. Press **Back** at the top left, or use your phone's Back gesture. The screen you came from opens
    as you left it, with its filters and its place in the list.
 5. To carry on a conversation later, open it from [Praxis AI · History](/praxis-ai?tab=history) or

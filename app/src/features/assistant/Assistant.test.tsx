@@ -433,7 +433,7 @@ describe("The full screen: Back, the context and the pane", () => {
     expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
   });
 
-  it("an earlier answer's chip brings its pane back, and Open Figures on another moves it there", async () => {
+  it("a conversation opened shows its latest answer's pane; an earlier answer's chip brings its own back, and Open Figures moves it again", async () => {
     const A1 = "00000000-0000-4000-8000-0000000000a1";
     const A2 = "00000000-0000-4000-8000-0000000000a2";
     const first = answer({
@@ -447,16 +447,39 @@ describe("The full screen: Back, the context and the pane", () => {
     m.turns[CONV] = [second, first];
     m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
     ui("ask", CONV);
-    expect(screen.getByRole("heading", { name: "No Answer Yet" })).toBeTruthy();
+    // Opened from Recent or History, the pane shows the latest answer at once, never No Answer Yet (§10.1).
+    const articles = screen.getAllByRole("article", { name: "Answer" });
+    await waitFor(() => expect(articles[1].getAttribute("aria-current")).toBe("true"));
+    expect(screen.queryByRole("heading", { name: "No Answer Yet" })).toBeNull();
+    expect(within(articles[1]).queryByRole("button", { name: "Open Figures" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "leave request, 2 records" }));
     const pane = screen.getByRole("region", { name: "Pane" });
     expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
-    const articles = screen.getAllByRole("article", { name: "Answer" });
     expect(articles[0].getAttribute("aria-current")).toBe("true");
     expect(articles[1].getAttribute("aria-current")).toBeNull();
     await userEvent.click(within(articles[1]).getByRole("button", { name: "Open Figures" }));
     expect(articles[1].getAttribute("aria-current")).toBe("true");
     expect(articles[0].getAttribute("aria-current")).toBeNull();
+  });
+
+  it("Open Figures sits only under an answer with a table or figures; a question shows its words and its answers alone (§10.1)", async () => {
+    const id = (n: number) => `00000000-0000-4000-8000-0000000000b${n}`;
+    const older = answer({ ai_message_id: id(1), question: "Whose leave waits on me?" });
+    const words = answer({ ai_message_id: id(2), question: "Which department is Bashir in?", content: "Bashir is in Implementation.", table: null, link: null });
+    const question = answer({ ai_message_id: id(3), question: "Assign a task to Bode.", content: "How urgent is it?", table: null, link: null, choices: ["Low", "Normal", "High", "Urgent"] });
+    const latest = answer({ ai_message_id: id(4), question: "And the one after?" });
+    m.turns[CONV] = [latest, question, words, older];
+    m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
+    ui("ask", CONV);
+    const [withTable, wordsOnly, asking] = screen.getAllByRole("article", { name: "Answer" });
+    expect(within(withTable).getByRole("button", { name: "Open Figures" })).toBeTruthy();
+    // Words alone: no Open Figures, though its chips still open the pane.
+    expect(within(wordsOnly).queryByRole("button", { name: "Open Figures" })).toBeNull();
+    expect(within(wordsOnly).getByRole("button", { name: "employee, 8 records" })).toBeTruthy();
+    // A question: no From, no Open Figures.
+    expect(within(asking).queryByRole("button", { name: "Open Figures" })).toBeNull();
+    expect(within(asking).queryByRole("button", { name: "employee, 8 records" })).toBeNull();
+    expect(within(asking).queryByText("From")).toBeNull();
   });
 
   it("while the question runs, the line says what is being read for this question, and goes when the answer lands", async () => {

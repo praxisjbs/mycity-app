@@ -129,6 +129,7 @@ function AskDesktop({ id, from }: { id: string | null; from: string | null }) {
           onOpened={(next) => setParams({ id: next }, { replace: true })}
           onGone={fresh}
           onAnswered={answered}
+          onLatest={pane.showFirst}
           onPane={show}
           paneFor={pane.shown?.answer.ai_message_id ?? null}
         />

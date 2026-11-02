@@ -101,6 +101,19 @@ describe("the grade", () => {
     }
   });
 
+  test("a question for a card has its answers to tap, and a table of people names every row (§6.4)", () => {
+    const k = { id: "x", ask: { action: "tasks.create", field: "priority" }, choices: true };
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: { action: "tasks.create", field: "priority", choices: ["Low", "Normal"] } }).pass).toBe(true);
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: { action: "tasks.create", field: "priority", choices: [] } }).problems).toEqual(["asked for priority with no answers to tap"]);
+    const t = { id: "y", table: "names" };
+    const table = (rows) => ({ columns: ["Employee", "Status"], rows, numeric: [], links: [], read: 1 });
+    expect(grade(t, { reads: [], shown: shown({ table: table([["Lovellyn Ade", "Not In"]]) }) }).pass).toBe(true);
+    expect(grade(t, { reads: [], shown: shown({ table: table([["", "Not In"]]) }) }).problems).toEqual(["its first column, Employee, does not name every row"]);
+    expect(grade(t, { reads: [], shown: shown({ table: null }) }).problems).toEqual(["drew no table"]);
+    // The absent question is asked as it was on staging, and graded on names.
+    expect(CASES.find((c) => c.id === "attendance.absent")).toMatchObject({ reads: ["attendance.register"], table: "names" });
+  });
+
   test("a change is a screen offered with declined change, never a claim", () => {
     const k = { id: "x", route: "workspace.tasks" };
     expect(grade(k, { reads: [], shown: shown({ declined: "change", link: { path: "/workspace?tab=tasks&new=1&title=Report" } }) }).pass).toBe(true);

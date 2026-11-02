@@ -36,24 +36,25 @@ const firstReadN = (a: AiAnswer): number | null => a.table?.read ?? a.reads.find
 
 const defaultTab = (a: AiAnswer, readN: number | null): PaneTab => (a.overview ? "overview" : readN ? "table" : "sources");
 
+/** What the pane shows for an answer, keeping the view already open on that same answer. */
+function shownFor(s: PaneShown | null, answer: AiAnswer, pick: PanePick): PaneShown {
+  const same = s && s.answer.ai_message_id === answer.ai_message_id ? s : null;
+  const readN = pick.readN ?? (same ? same.readN : firstReadN(answer));
+  const record = pick.record ?? (same ? same.record : null);
+  const tab = pick.tab ?? (same ? same.tab : defaultTab(answer, readN));
+  return { answer, tab, readN, record };
+}
+
 export function usePane() {
   const [shown, setShown] = useState<PaneShown | null>(null);
-  const show = useCallback(
-    (answer: AiAnswer, pick: PanePick = {}) =>
-      setShown((s) => {
-        const same = s && s.answer.ai_message_id === answer.ai_message_id ? s : null;
-        const readN = pick.readN ?? (same ? same.readN : firstReadN(answer));
-        const record = pick.record ?? (same ? same.record : null);
-        const tab = pick.tab ?? (same ? same.tab : defaultTab(answer, readN));
-        return { answer, tab, readN, record };
-      }),
-    [],
-  );
+  const show = useCallback((answer: AiAnswer, pick: PanePick = {}) => setShown((s) => shownFor(s, answer, pick)), []);
+  /** A conversation opened: its latest answer, unless a chip or Open Figures already filled the pane. */
+  const showFirst = useCallback((answer: AiAnswer) => setShown((s) => s ?? shownFor(null, answer, {})), []);
   const setTab = useCallback((tab: PaneTab) => setShown((s) => (s ? { ...s, tab } : s)), []);
   const openRecord = useCallback((record: PaneRecord) => setShown((s) => (s ? { ...s, record, tab: "record" } : s)), []);
   const openTable = useCallback((n: number) => setShown((s) => (s ? { ...s, readN: n, tab: "table" } : s)), []);
   const clear = useCallback(() => setShown(null), []);
-  return { shown, show, setTab, openRecord, openTable, clear };
+  return { shown, show, showFirst, setTab, openRecord, openTable, clear };
 }
 
 export type Pane = ReturnType<typeof usePane>;

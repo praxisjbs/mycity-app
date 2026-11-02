@@ -284,7 +284,7 @@ describe("what the screen shows", () => {
   };
   const SCREENS = [{ module: "workspace", tab: "calendar", label: "Calendar", path: "/workspace?tab=calendar" }];
 
-  test("a table's cells are the read's rows, formatted for a person; a field the rows lack or a list is left out", () => {
+  test("a table's cells are the read's rows, formatted for a person; a field the rows lack is left out, a list is one cell", () => {
     const shown = answer.build({
       draft: { text: "Two.", table: { read: 1, fields: ["employee", "starts_on", "days", "amount", "tags", "nope"], labels: ["Employee", "Starts", "Days", "Amount", "Tags", "Nope"] }, route: null, prefill: null, more: true },
       reads: [READ],
@@ -292,10 +292,10 @@ describe("what the screen shows", () => {
       screens: [],
     });
     expect(shown.table).toEqual({
-      columns: ["Employee", "Starts", "Days", "Amount"],
+      columns: ["Employee", "Starts", "Days", "Amount", "Tags"],
       rows: [
-        ["Ayo Bello", "27/10/2026", "3", "₦125,000.00"],
-        ["Ngozi Eze", "02/11/2026", "1", "₦0.00"],
+        ["Ayo Bello", "27/10/2026", "3", "₦125,000.00", "a"],
+        ["Ngozi Eze", "02/11/2026", "1", "₦0.00", ""],
       ],
       numeric: [2, 3],
       // Each row opens its record; a row with no record opens nothing.
@@ -350,6 +350,46 @@ describe("what the screen shows", () => {
     const shown = answer.build({ draft: { text: "x", table: { read: 2, fields: ["employee"], labels: ["Employee"] }, route: null, prefill: null, more: false }, reads: [READ, { n: 2, key: "tasks.list", ok: false, declined: true, rows: [], citations: [] }], routes: [], screens: [] });
     expect(shown.table).toBeNull();
   });
+
+  // A register's rows as attendance.register returns them: the person a PersonRef, codes as the database writes them.
+  const person = (n, name) => ({ employee_id: `00000000-0000-4000-8000-00000000010${n}`, display_name: name, job_title: "Analyst", department: "Implementation", photo_url: null });
+  const REGISTER = [
+    { employee: person(1, "Lovellyn Ade"), work_pattern: "remote", date: "2026-11-02", status: "not_in", attendance_day_id: null, clock_in_at: null, location_verdict: null },
+    { employee: person(2, "JBS Praxis Team"), work_pattern: "hybrid", date: "2026-11-02", status: "late", attendance_day_id: "00000000-0000-4000-8000-000000000201", clock_in_at: "2026-11-02T08:41:00+01:00", location_verdict: "outside" },
+  ];
+
+  test("a table names its records: the row's person goes first when no column says who, and codes read as words (JBS Praxis, 02/11/2026)", () => {
+    // As on staging: the model named the pattern and the status alone.
+    const t = answer.drawTable(REGISTER, [], ["work_pattern", "status"], ["Work Pattern", "Today's Status"]);
+    expect(t.columns).toEqual(["Employee", "Work Pattern", "Today's Status"]);
+    expect(t.fields).toEqual(["employee", "work_pattern", "status"]);
+    expect(t.rows).toEqual([
+      ["Lovellyn Ade", "Remote", "Not In"],
+      ["JBS Praxis Team", "Hybrid", "Late"],
+    ]);
+    // A field reaches into the row; a name reached into the person names the rows, so it is not put first twice.
+    const nested = answer.drawTable(REGISTER, [], ["employee.display_name", "employee.department", "employee.job_title", "status", "location_verdict"], []);
+    expect(nested.columns).toEqual(["Employee", "Department", "Job Title", "Status", "Location Verdict"]);
+    expect(nested.rows[1]).toEqual(["JBS Praxis Team", "Implementation", "Analyst", "Late", "Outside"]);
+    // The person named whole reads as their name; an id is never a cell, and the person still goes first.
+    expect(answer.drawTable(REGISTER, [], ["employee", "status"], ["Name", "Status"]).rows[0]).toEqual(["Lovellyn Ade", "Not In"]);
+    const ids = answer.drawTable(REGISTER, [], ["employee.employee_id", "attendance_day_id", "status"], []);
+    expect(ids.columns).toEqual(["Employee", "Status"]);
+    // A list of records reads as their names in one cell; rows that name nothing (a person's own days) get no name column.
+    expect(answer.cell("people", [{ display_name: "Ada" }, { display_name: "Tunde" }])).toEqual({ text: "Ada, Tunde", numeric: false });
+    expect(answer.cell("member_ids", ["00000000-0000-4000-8000-000000000101"])).toBeNull();
+    expect(answer.drawTable([{ attendance_date: "2026-11-02", status: "present", hours: 8 }], [], ["attendance_date", "status"], []).columns).toEqual(["Attendance Date", "Status"]);
+    // A request's person comes before its number; a task's title is its own name, and its number names it too.
+    expect(answer.drawTable([{ number: "LV-0003", employee: { display_name: "Ada Obi" }, status: "pending" }], [], ["number", "status"], []).columns).toEqual(["Employee", "Number", "Status"]);
+    expect(answer.drawTable([{ number: "TSK-0001", title: "Send the report", priority: "high" }], [], ["number", "priority"], []).rows[0]).toEqual(["TSK-0001", "High"]);
+  });
+
+  test("the Table pane's replay draws by the same rules: a table kept without names gains them; a read nobody named columns for leads with who", () => {
+    expect(answer.defaultFields(REGISTER).slice(0, 4)).toEqual(["employee", "work_pattern", "date", "status"]);
+    expect(answer.drawTable(REGISTER, [], answer.defaultFields(REGISTER)).rows[0].slice(0, 4)).toEqual(["Lovellyn Ade", "Remote", "02/11/2026", "Not In"]);
+    // A table kept before names were put first: its fields and labels as stored, the person added in front.
+    expect(answer.drawTable(REGISTER, [], ["status"], ["Status"]).columns).toEqual(["Employee", "Status"]);
+  });
 });
 
 describe("a change gathered by questions (praxis-ai.md §1.3 decisions 28 and 29)", () => {
@@ -380,6 +420,21 @@ describe("a change gathered by questions (praxis-ai.md §1.3 decisions 28 and 29
     const suggested = draft({}, { action: { key: "tasks.create", values: {}, suggested: true } });
     expect(answer.askFirst({ draft: suggested, actions: [action], shows: ["cards"] })).toBe(suggested);
     expect(answer.askFirst({ draft: draft({}), actions: [], shows: ["cards"] }).action.key).toBe("tasks.create");
+  });
+
+  test("a question the model asks for an action's field has that field's answers to tap when it gave none; its own choices stand (§6.4)", () => {
+    const asking = (over) => ({ text: "How urgent is it?", table: null, route: null, prefill: null, more: false, action: null, overview: null, ask: { action: "tasks.create", field: "due_on", choices: [], ...over } });
+    expect(answer.askFirst({ draft: asking({}), actions: [action], shows: ["cards"] }).ask.choices).toEqual(["Today", "No Due Day"]);
+    // Asked with no card screen as well: the answers to tap are shown wherever the question is.
+    expect(answer.askFirst({ draft: asking({}), actions: [action], shows: [] }).ask.choices).toEqual(["Today", "No Due Day"]);
+    expect(answer.askFirst({ draft: asking({ choices: ["Friday"] }), actions: [action], shows: ["cards"] }).ask.choices).toEqual(["Friday"]);
+    // A field the action does not ask for, or an action not offered, is left as the model wrote it.
+    expect(answer.askFirst({ draft: asking({ field: "primary_assignee_id" }), actions: [action], shows: ["cards"] }).ask.choices).toEqual([]);
+    expect(answer.askFirst({ draft: asking({}), actions: [], shows: ["cards"] }).ask.choices).toEqual([]);
+    // The task's own asks work its due days out from today.
+    const tasks = require("../../../src/modules/tasks/tasks.ai.js").actions.find((a) => a.key === "tasks.create");
+    expect(answer.withChoices(asking({ field: "priority" }), [tasks], new Date("2026-11-02T10:00:00+01:00")).ask.choices).toEqual(["Low", "Normal", "High", "Urgent"]);
+    expect(answer.withChoices(asking({}), [tasks], new Date("2026-11-02T10:00:00+01:00")).ask.choices).toContain("No Due Day");
   });
 
   test("the system turn lists an action's card fields alone and what to ask first; a replayed question says what it asked for", () => {
