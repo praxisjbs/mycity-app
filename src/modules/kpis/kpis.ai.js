@@ -9,6 +9,10 @@ const service = require("./kpis.service");
 
 module.exports = defineManifest({
   module: "performance",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    KpiCreate: "a KPI is defined on Performance, KPIs by its function's head, with its measure and target in view",
+  },
   reads: [
     {
       key: "kpis.list",

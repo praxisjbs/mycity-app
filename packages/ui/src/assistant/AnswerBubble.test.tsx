@@ -19,6 +19,23 @@ describe("AnswerBubble", () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
+  it("a question's answers are taps: one is asked, the others wait until it lands, and none show without onChoose", async () => {
+    let land: () => void = () => undefined;
+    const onChoose = vi.fn(() => new Promise<void>((resolve) => (land = resolve)));
+    const { rerender } = render(<AnswerBubble text="When is it due?" choices={["Today", "Tomorrow", "Friday", "No Due Day"]} onChoose={onChoose} />);
+    const group = screen.getByRole("group", { name: "Answers" });
+    expect(group).toHaveAttribute("data-copy", "content");
+    await userEvent.click(screen.getByRole("button", { name: "Friday" }));
+    expect(onChoose).toHaveBeenCalledWith("Friday");
+    // One press, one request (F26): while it runs, a second tap on any choice is refused.
+    await userEvent.click(screen.getByRole("button", { name: "Today" }));
+    expect(onChoose).toHaveBeenCalledTimes(1);
+    land();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Today" })).not.toHaveAttribute("aria-busy", "true"));
+    rerender(<AnswerBubble text="When is it due?" choices={["Today"]} />);
+    expect(screen.queryByRole("group", { name: "Answers" })).toBeNull();
+  });
+
   it("Open Figures opens the pane, and goes away once this answer's pane is the one shown", async () => {
     const onPane = vi.fn();
     const { rerender } = render(<AnswerBubble text="Seven late arrivals." onPane={onPane} />);

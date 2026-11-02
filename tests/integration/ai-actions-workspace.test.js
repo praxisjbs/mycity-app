@@ -69,6 +69,80 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
     fresh();
   });
 
+  test("tasks.create is gathered one question at a time with answers to tap, then drawn naming everyone, and pressed (decisions 28, 29, 31)", async () => {
+    const staff = h.people.staff.employee_id;
+    const shows = ["cards", "pane"];
+    // The model drafts too early, with only whom it is for: the server asks for the title first, with no card.
+    let sent = script(callRead("colleagues__list", { q: "Tunde" }), say({ text: "Here is the task for Tunde.", action: { key: "tasks.create", values: { primary_assignee_id: staff }, suggested: false } }));
+    const first = await h.ask("ops", { question: "Assign a task to Tunde.", shows });
+    expect(first.status).toBe(200);
+    expect(c.assistant.AiAnswer.safeParse(first.body).success).toBe(true);
+    expect(first.body).toMatchObject({ content: "What is the task?", card: null, choices: [], link: null, table: null });
+    expect(sent[0].messages[0].content).toMatch(/- tasks\.create: [^\n]*ask first, one at a time[^\n]*title \("What is the task\?"\)/);
+    // colleagues.list finds anyone with a login by name, for anyone (praxis-ai.md §6.9).
+    expect(first.body.reads[0]).toMatchObject({ key: "colleagues.list", outcome: "read" });
+    expect(await one("SELECT metadata->'ask' AS ask FROM ai_message WHERE ai_message_id = $1", [first.body.ai_message_id])).toEqual({ ask: { action: "tasks.create", field: "title", choices: [] } });
+    const conv = first.body.ai_conversation_id;
+
+    // The title given, the due day is asked, with today's answers to tap; the model is told what was asked.
+    sent = script(say({ text: "Here is the task.", action: { key: "tasks.create", values: { primary_assignee_id: staff, title: "Send the weekly report" }, suggested: false } }));
+    const second = await h.ask("ops", { question: "Send the weekly report.", ai_conversation_id: conv, shows });
+    expect(second.body).toMatchObject({ content: "When is it due?", card: null });
+    expect(second.body.choices).toEqual(["Today", "Tomorrow", expect.stringMatching(/^(Next )?Friday$/), "No Due Day"]);
+    expect(sent[0].messages.map((m) => m.content).join("\n")).toMatch(/\[Asked for: tasks\.create title\]/);
+
+    // No due day is an answer (null); the priority is asked next.
+    script(say({ text: "Here is the task.", action: { key: "tasks.create", values: { primary_assignee_id: staff, title: "Send the weekly report", due_on: null }, suggested: false } }));
+    const third = await h.ask("ops", { question: "No Due Day", ai_conversation_id: conv, shows });
+    expect(third.body).toMatchObject({ content: "How urgent is it?", card: null, choices: ["Low", "Normal", "High", "Urgent"] });
+
+    // Everything given: the card is drawn, naming whom it is for, and counting nothing on its verb.
+    script(say({ text: "Here is the task to create for Tunde.", action: { key: "tasks.create", values: { primary_assignee_id: staff, title: "Send the weekly report", due_on: null, priority: "normal" }, suggested: false } }));
+    const fourth = await h.ask("ops", { question: "Normal", ai_conversation_id: conv, shows });
+    expect(fourth.body.choices).toEqual([]);
+    expect(fourth.body.card).toMatchObject({ action_key: "tasks.create", records: [], problems: {} });
+    expect(fourth.body.card.names).toEqual([{ type: "employee", id: staff, label: "Tunde Ade", link: expect.any(String) }]);
+    expect(fourth.body.card.fields.find((f) => f.name === "primary_assignee_id")).toMatchObject({ label: "For", picks: "task_assignee" });
+    const pressed = await h.press("ops", fourth.body.card.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    expect(await one("SELECT title, priority, due_at, primary_assignee_id FROM task WHERE task_id = $1", [pressed.body.lines[0].id])).toEqual({ title: "Send the weekly report", priority: "normal", due_at: null, primary_assignee_id: staff });
+
+    // The model's own question passes through with its answers to tap; a suggested card is never held back.
+    script(say({ text: "Which Tunde?", ask: { action: "tasks.create", field: "primary_assignee_id", choices: ["Tunde Ade, Field Officer", "Tunde Bello, Driver"] } }));
+    const which = await h.ask("ops", { question: "Give Tunde a task.", shows });
+    expect(which.body).toMatchObject({ content: "Which Tunde?", card: null, choices: ["Tunde Ade, Field Officer", "Tunde Bello, Driver"] });
+    script(say({ text: "Shall I set a follow-up task?", action: { key: "tasks.create", values: { title: "Follow up on the report" }, suggested: true } }));
+    const suggested = await h.ask("ops", { question: "What is on my board?", shows });
+    expect(suggested.body.card).toMatchObject({ action_key: "tasks.create", suggested: true });
+  });
+
+  test("a task card names the people and departments it holds; sharing with both is a problem Edit clears; its watchers may open the task (decisions 30 and 31)", async () => {
+    const staff = h.people.staff.employee_id;
+    const department = (await one("SELECT department_id FROM employee WHERE employee_id = $1", [h.people.ops.employee_id])).department_id;
+    const values = { title: "Review milestone 3", priority: "normal", due_on: null, member_ids: [staff], department_id: department, watcher_department_id: department };
+    script(say({ text: "Here is the task.", action: { key: "tasks.create", values, suggested: false } }));
+    const asked = await h.ask("ops", { question: "Create a task to review milestone 3 with Tunde and the department watching.", shows: ["cards"] });
+    const card = asked.body.card;
+    expect(card.problems).toEqual({ department_id: ["People or a department"] });
+    expect(card.names).toEqual(expect.arrayContaining([expect.objectContaining({ type: "employee", id: staff, label: "Tunde Ade" }), expect.objectContaining({ type: "department", id: department, label: "HR & Operations" })]));
+    expect(card.records).toEqual([]);
+    // Edit leaves the department out: the problem goes, the names follow.
+    const { department_id: _dropped, ...people } = values;
+    const edited = await h.as("ops").put(`/ai/cards/${card.ai_action_draft_id}`).send({ values: people });
+    expect(edited.status).toBe(200);
+    expect(edited.body.problems).toEqual({});
+
+    // Ops sets a task for themselves, watched by Tunde, who could not see it before; watching gives him sight of it.
+    script(say({ text: "Here is the task.", action: { key: "tasks.create", values: { title: "Pick the caterer", priority: "high", due_on: null, watcher_ids: [staff] }, suggested: false } }));
+    const watched = await h.ask("ops", { question: "Create a task for me to pick the caterer, high priority, no due day; Tunde watches it.", shows: ["cards"] });
+    expect(watched.body.card.names).toEqual([expect.objectContaining({ id: staff, label: "Tunde Ade" })]);
+    const made = await h.press("ops", watched.body.card.ai_action_draft_id);
+    expect(made.status).toBe(200);
+    const panel = await h.as("staff").get(`/tasks/${made.body.lines[0].id}`);
+    expect(panel.status).toBe(200);
+    expect(panel.body).toMatchObject({ watching: true, can_edit: false });
+  });
+
   test("tasks.complete: several tasks done in one press through the board's own move; a cancelled one is its own line", async () => {
     const ids = [tasks.one.task_id, tasks.two.task_id, tasks.gone.task_id];
     script(callRead("tasks__list", {}), say({ text: "Here are the three to mark done.", action: { key: "tasks.complete", values: { task_ids: ids }, suggested: false } }));
@@ -140,8 +214,11 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
     const asked = await h.ask("ops", { question: "Book a venue visit with Tunde on Thursday at 10.", shows: ["cards"] });
     expect(asked.status).toBe(200);
     expect(asked.body.card).toMatchObject({ action_key: "calendar.create", label: "Create Event", schema: "calendar.CalendarEventCreate", values: expect.objectContaining({ title: "Venue visit", all_day: false, visibility: "attendees" }), problems: {} });
-    expect(asked.body.card.records).toEqual([expect.objectContaining({ type: "employee", id: h.people.staff.employee_id, label: "Tunde Ade" })]);
+    // One event is made: the people invited are named on the card, never counted as records (decision 31).
+    expect(asked.body.card.records).toEqual([]);
+    expect(asked.body.card.names).toEqual([expect.objectContaining({ type: "employee", id: h.people.staff.employee_id, label: "Tunde Ade" })]);
     expect(asked.body.card.fields.find((f) => f.name === "starts_at")).toMatchObject({ label: "Starts", kind: "datetime" });
+    expect(asked.body.card.fields.find((f) => f.name === "attendee_ids")).toMatchObject({ label: "Attendees", picks: "colleague" });
     const pressed = await h.press("ops", asked.body.card.ai_action_draft_id);
     expect(pressed.status).toBe(200);
     expect(pressed.body.lines).toEqual([{ type: "calendar_event", id: expect.any(String), label: "Venue visit", ok: true, message: "booked", link: expect.stringMatching(/^\/workspace\?tab=calendar&id=/) }]);
@@ -151,7 +228,8 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
 
     script(say({ text: "Here is the meeting.", action: { key: "calendar.create", values: { ...values, attendee_ids: ["00000000-0000-4000-8000-00000000009f"] }, suggested: false } }));
     const stranger = await h.ask("ops", { question: "Book it with someone else.", shows: ["cards"] });
-    expect(stranger.body.card.records).toEqual([expect.objectContaining({ id: "00000000-0000-4000-8000-00000000009f", label: "employee" })]);
+    // Nobody by that id: nothing names it, so the card shows the id and the press refuses it.
+    expect(stranger.body.card.names).toEqual([]);
     const refused = await h.press("ops", stranger.body.card.ai_action_draft_id);
     expect(refused.status).toBe(422);
     expect(refused.body.error.fields).toEqual({ attendee_ids: ["Not on the staff"] });

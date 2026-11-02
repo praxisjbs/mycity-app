@@ -90,9 +90,11 @@ async function ask(body, actor, askKey = null) {
   const shows = Array.isArray(body.shows) ? body.shows : [];
   const past = conversation ? await history.replay(conversation.ai_conversation_id, actor.user_id) : [];
   const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past, context, shows, onRead: progressFor(actor, askKey) });
-  const shown = answer.build({ draft: out.draft, reads: out.reads, routes: out.routes, screens: out.screens, shows });
+  // A card the action cannot be drawn without asks for what it lacks first (§1.3 decision 29).
+  const asked = answer.askFirst({ draft: out.draft, actions: out.actions, history: past, shows });
+  const shown = answer.build({ draft: asked, reads: out.reads, routes: out.routes, screens: out.screens, shows });
   // The card (§6.11 step 2): only for a screen that draws one, checked against the person's rights now.
-  const card = shows.includes("cards") ? await answer.draftCard({ draft: out.draft, actions: out.actions, actor, context, db: pool }) : null;
+  const card = shows.includes("cards") ? await answer.draftCard({ draft: asked, actions: out.actions, actor, context, db: pool }) : null;
 
   const saved = await tx(async (client) => {
     // Deleted in another tab meanwhile: the question opens a new conversation.
@@ -160,6 +162,7 @@ async function ask(body, actor, askKey = null) {
     declined: shown.declined,
     more: shown.more,
     card: saved.draft ? cardsService().present(saved.draft, null) : null,
+    choices: shown.choices,
     overview: shown.overview,
     context,
     feedback: null,

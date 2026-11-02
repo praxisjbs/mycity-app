@@ -46,7 +46,7 @@
     ]
   },
   "praxis-panel": {
-    "spec": "b33982f99312b2b9",
+    "spec": "4b58979f5625a208",
     "source": "eb227c20d7d58d74",
     "devices": [
       "phone"
@@ -56,6 +56,14 @@
     "spec": "101c42fac51f233b",
     "source": "e3b0c44298fc1c14",
     "devices": [
+      "phone"
+    ]
+  },
+  "praxis-question": {
+    "spec": "5c351f1207faec1a",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
       "phone"
     ]
   }

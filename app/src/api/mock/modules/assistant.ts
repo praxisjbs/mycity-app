@@ -20,8 +20,8 @@ const personCite = (key: string): AiCitation | null => {
   return p ? { entity_type: "employee", entity_id: p.employee_id, label: p.display_name, link: `/people?tab=employees&id=${p.employee_id}`, read_key: "employees.list" } : null;
 };
 
-type Draft = Pick<AiAnswer, "content" | "table" | "link" | "citations" | "reads" | "declined" | "more" | "card" | "overview" | "context">;
-const said = (content: string, over: Partial<Draft> = {}): Draft => ({ content, table: null, link: null, citations: [], reads: [], declined: null, more: false, card: null, overview: null, context: null, ...over });
+type Draft = Pick<AiAnswer, "content" | "table" | "link" | "citations" | "reads" | "declined" | "more" | "card" | "overview" | "context" | "choices">;
+const said = (content: string, over: Partial<Draft> = {}): Draft => ({ content, table: null, link: null, citations: [], reads: [], declined: null, more: false, card: null, overview: null, context: null, choices: [], ...over });
 /** A read as the server records it (AiReadMade): which of the question's reads, with the parameters it ran with. */
 const read = (key: string, rows: number, total: number | null, first: number | null, n = 1): AiAnswer["reads"][number] => ({
   n,
@@ -70,12 +70,51 @@ const CARDS: KeptCard[] = [];
 const cardOf = (user: string, id: string) => CARDS.find((k) => k.owner === user && k.card.ai_action_draft_id === id);
 const nowIso = () => new Date().toISOString();
 const inHalfAnHour = () => new Date(Date.now() + 30 * 60_000).toISOString();
-const field = (name: string, label: string, kind: AiActionCard["fields"][number]["kind"], over: Partial<AiActionCard["fields"][number]> = {}): AiActionCard["fields"][number] => ({ name, label, kind, required: false, options: null, long: false, ...over });
+const field = (name: string, label: string, kind: AiActionCard["fields"][number]["kind"], over: Partial<AiActionCard["fields"][number]> = {}): AiActionCard["fields"][number] => ({ name, label, kind, required: false, options: null, long: false, picks: null, ...over });
+
+/** New Task's own fields, as the server's tasks.create carries them (decision 31), each id field with its picker. */
+const TASK_FIELDS: AiActionCard["fields"] = [
+  field("title", "Title", "text", { required: true }),
+  field("description", "Notes", "text", { long: true }),
+  field("primary_assignee_id", "For", "id", { picks: "task_assignee" }),
+  field("member_ids", "Shared With", "list", { picks: "task_member" }),
+  field("department_id", "Department", "id", { picks: "department" }),
+  field("watcher_ids", "Watchers", "list", { picks: "colleague" }),
+  field("watcher_department_id", "Watching Department", "id", { picks: "department" }),
+  field("due_on", "Due Day", "date"),
+  field("priority", "Priority", "choice", { options: ["low", "normal", "high", "urgent"] }),
+  field("cadence", "Cadence", "choice", { options: ["daily", "weekly"] }),
+  field("project_id", "Project", "id", { picks: "project" }),
+];
+
+/** The answers to the questions a task is gathered with (decisions 28 and 29), in the server's words. */
+const DUE_CHOICES = ["Today", "Tomorrow", "Friday", "No Due Day"];
+const PRIORITY_CHOICES = ["Low", "Normal", "High", "Urgent"];
 
 /** The card a change question draws, for a screen that draws cards; null when the question asks for no change the mock offers. */
 function cardFor(question: string, messageId: string): AiActionCard | null {
   const l = question.toLowerCase();
-  const base = { ai_action_draft_id: sid(`card:${messageId}`), ai_message_id: messageId, problems: {}, suggested: false, status: "shown" as const, expires_at: inHalfAnHour(), result: null, created_at: nowIso() };
+  const base = { ai_action_draft_id: sid(`card:${messageId}`), ai_message_id: messageId, problems: {}, names: [], suggested: false, status: "shown" as const, expires_at: inHalfAnHour(), result: null, created_at: nowIso() };
+  // The last answer of a task gathered by questions (its priority): the task for a colleague, with two watchers, every id by name.
+  if (PRIORITY_CHOICES.some((w) => w.toLowerCase() === l.trim())) {
+    const [lead, w1, w2] = ["cynthia", "tobi", "bashir"].map(byKey);
+    const people = [lead, w1, w2].filter((p): p is NonNullable<typeof p> => Boolean(p));
+    return {
+      ...base,
+      action_key: "tasks.create",
+      module_key: "workspace",
+      label: "Create Task",
+      description: "Set a task: title, notes, due day, priority, lead; share it with people or a department, never both; watchers see it and hear when it moves",
+      schema: "tasks.TaskCreate",
+      risk: "standard",
+      confirm: "press",
+      bulk: 1,
+      values: { title: "Send the weekly report", priority: l.trim(), due_on: dayFromNow(4), is_commitment: false, ...(lead && { primary_assignee_id: lead.employee_id }), watcher_ids: [w1, w2].filter(Boolean).map((p) => p!.employee_id) },
+      records: [],
+      names: people.map((p) => ({ type: "employee", id: p.employee_id, label: p.display_name, link: null })),
+      fields: TASK_FIELDS,
+    };
+  }
   if (/\bapprove\b/.test(l) && /\bleave\b/.test(l)) {
     const people = ["tobi", "bashir", "emeka", "hauwa"].map(byKey).filter((p): p is NonNullable<typeof p> => Boolean(p));
     return {
@@ -139,7 +178,7 @@ function cardFor(question: string, messageId: string): AiActionCard | null {
       bulk: 1,
       values: { title: "Send the weekly report", priority: "high", due_on: dayFromNow(2), is_commitment: false },
       records: [],
-      fields: [field("title", "Title", "text", { required: true }), field("description", "Notes", "text", { long: true }), field("priority", "Priority", "choice", { options: ["low", "normal", "high"] }), field("cadence", "Cadence", "choice", { options: ["daily", "weekly", "monthly"] }), field("due_on", "Due Day", "date"), field("primary_assignee_id", "For", "id"), field("is_commitment", "Commitment", "boolean")],
+      fields: TASK_FIELDS,
     };
   }
   return null;
@@ -197,6 +236,10 @@ route("POST /api/v1/ai/cards/:id/cancel", (req) => {
 
 function answerFor(question: string, view: string): Draft {
   const l = question.toLowerCase();
+  // A task asked for without its due day is gathered one question at a time, with answers to tap (decisions 28, 29).
+  if (/\bassign\b.*\btask\b|\btask\b.*\bto\s+\w+$/.test(l) && !/\b(today|tomorrow|friday|due|by)\b/.test(l)) return said("When is it due?", { choices: DUE_CHOICES });
+  if (DUE_CHOICES.some((w) => w.toLowerCase() === l.trim())) return said("How urgent is it?", { choices: PRIORITY_CHOICES });
+  if (PRIORITY_CHOICES.some((w) => w.toLowerCase() === l.trim())) return said("Here is the task to create for Cynthia, with Tobi and Bashir watching.", { declined: "change", link: changeLink("task") });
   if (/\b(create|add|delete|approve|send|update|raise|book|tell|message|email|mail)\b/.test(l))
     return said("Here it is as a card. Check the fields and press it, or make the change on its screen.", { declined: "change", link: changeLink(l) });
   if (l.includes("partner") || l.includes("inactive") || l.includes("quiet")) {

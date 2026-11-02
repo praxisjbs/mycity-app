@@ -10,6 +10,10 @@ const service = require("./projects.service");
 
 module.exports = defineManifest({
   module: "workspace",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    ProjectCreate: "a project is started on Workspace, Projects; the route opens New Project filled",
+  },
   reads: [
     {
       key: "projects.list",

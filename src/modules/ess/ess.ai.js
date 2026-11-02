@@ -19,6 +19,24 @@ const profile = require("./ess.profile");
 
 const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
 
+/**
+ * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): every read here is the asker's own,
+ * whatever their grant says, so their own record and request are returned and an outsider's never.
+ */
+const profileProbe = {
+  inside: (ctx) => ({ type: "employee", id: ctx.actor.employee_id }),
+  outside: (ctx) => ({ type: "employee", id: ctx.outsider.employee_id }),
+};
+async function requestFor(ctx, who) {
+  const day = ctx.freshDay();
+  const r = await leave.request(who.user, who.employee_id, { leave_type_id: ctx.leaveTypeId, starts_on: day, ends_on: day, reason: `A matrix day for ${ctx.role}` });
+  return { type: "leave_request", id: r.leave_request_id };
+}
+const leaveProbe = {
+  inside: (ctx) => requestFor(ctx, { user: ctx.actor, employee_id: ctx.actor.employee_id }),
+  outside: (ctx) => requestFor(ctx, ctx.outsider),
+};
+
 module.exports = defineManifest({
   module: "ess",
   actions: [
@@ -47,6 +65,7 @@ module.exports = defineManifest({
       permission: ["ess", "view"],
       run: (_client, _params, actor) => (actor.employee_id ? profile.get(actor) : null),
       cite: (row) => ({ type: "employee", id: row.employee_id, label: row.display_name }),
+      matrix: profileProbe,
     },
     {
       key: "my_documents.list",
@@ -76,6 +95,7 @@ module.exports = defineManifest({
         id: row.leave_request_id,
         label: `${row.leave_type_name}, ${row.days} days`,
       }),
+      matrix: leaveProbe,
     },
     {
       key: "my_leave.balances",

@@ -12,8 +12,9 @@ else can read your questions, People and the CEO included.
 
 Praxis AI never changes anything by itself. Ask it to do something, such as add a task, approve the
 leave waiting on you or tell a colleague something, and it draws the change as a card for you to
-check and press. Nothing happens until you press the card's button. A change it has no card for
-opens the screen where you do it, already filled in with what you said.
+check and press. If something is missing, it asks first, one question at a time. Nothing happens
+until you press the card's button. A change it has no card for opens the screen where you do it,
+already filled in with what you said.
 
 ## Ask {#praxis-ask screen=praxis_ai/ask icon=spark}
 
@@ -131,15 +132,18 @@ conversations, and one opens full screen when you press it.
 
 1. Ask for what you want, for example "add a task to send the weekly report by Friday", "approve
    the leave requests waiting on me" or "tell Ada the report is ready".
-2. Praxis AI answers with a card: the change as it will be made, every field filled in from what
-   you said, and the records it touches. Nothing has happened yet.
-3. Check every field. To change the words, a day or a choice, press **Edit**, change the field and
-   press **Save Changes**. A field with a problem says so beside it, for example *Say why*.
-4. Press the card's button to make the change, for example **Create Task** or **Approve Leave**. A
-   card that touches several records says how many, for example *Approve Leave ×4*.
-5. Under the card, **Done** lists each record and what happened to it. Press **Open** on a line to
+2. If something is missing, Praxis AI asks for it first. Answer each question, see
+   [Answer its questions](#praxis-ask-questions).
+3. Praxis AI answers with a card: the change as it will be made, every field filled in from what
+   you said, people by name, and the records it touches. Nothing has happened yet.
+4. Check every field. To change the words, a day, a choice or a person, press **Edit**, change the
+   field and press **Save Changes**. People are picked as on the screen's own form. A field with a
+   problem says so beside it, for example *Say why*.
+5. Press the card's button to make the change, for example **Create Task** or **Approve Leave**. A
+   card that acts on several records says how many, for example *Approve Leave ×4*.
+6. Under the card, **Done** lists each record and what happened to it. Press **Open** on a line to
    see the record.
-6. To do nothing, press **Cancel**.
+7. To do nothing, press **Cancel**.
 
 - A card you did not ask for reads as a question, for example *Send Message?*. Press its button to
   send it, or **Not Now**.
@@ -155,6 +159,29 @@ Praxis AI draws a card for a task, marking tasks done, a comment, a meeting, you
 request, the leave and other requests waiting on you, a message to a colleague, a post in a channel
 and a mail from your mailbox. For other changes, such as a new role, it opens the screen or a filled
 form: press that screen's own button to save.
+
+- A task card can name people to watch the task, or a whole department. They can open it and hear
+  how it goes; see [Watch a task](#workspace-watch) in My Workspace.
+- A task is shared with people or with a department, never both. A card naming both says
+  **People or a department**; press **Edit** and clear one.
+
+### Answer its questions {#praxis-ask-questions needs="praxis_ai create"}
+
+![A question with answers to tap](shot:praxis-question)
+
+1. Ask for a change, for example "Assign a task to Cynthia".
+2. Praxis AI asks for what is missing, one question at a time, for example *When is it due?*.
+3. Press one of the answers under the question, for example **Friday**, or type your own answer and
+   press **Send**.
+4. It asks the next thing it needs, for example *How urgent is it?*, until it has everything.
+5. Then it draws the card. Check it and press its button.
+
+- For a task it asks what the task is, when it is due and how urgent it is. Press **No Due Day**
+  for a task with no due day.
+- For a meeting it asks what it is about, when it starts, how long it is and who should come. Press
+  **Just Me** for a meeting with nobody else.
+- When a name matches more than one person, it asks which one. Press the right person.
+- Only the newest answer's buttons work. Ask something else at any time to stop.
 
 > **Important:** A card only ever does what your own screens let you do. A request you may not
 > decide, or a task that is not on your board, is refused when you press.
@@ -212,17 +239,18 @@ conversation you are in, and an old subject can confuse a new question.
 
 ### Ask from any screen on a phone {#praxis-ask-anywhere needs="praxis_ai create"}
 
-![Praxis AI over a screen, on a phone](shot:praxis-panel)
+![Praxis AI opened from a screen, on a phone](shot:praxis-panel)
 
 1. On a phone, press the round button with a plus at the bottom right, **Quick Actions**.
-2. Press **Praxis AI**. The conversation opens over the screen you are on, and Praxis AI knows
-   which screen that is.
+2. Press **Praxis AI**. Praxis AI opens full screen, and it knows which screen you came from:
+   "these" and "here" mean that screen's records.
 3. Ask as on [Praxis AI · Ask](/praxis-ai?tab=ask). Press **Open Figures** under an answer to see
-   its table and sources. Pressing an answer's button or a record goes there and closes Praxis AI.
-4. Press **Back** at the top left, swipe right, or use your phone's Back gesture. It closes and
-   your screen is as you left it.
-5. Press **Praxis AI** again to come back to the same conversation. Press **Conversations** to
-   switch to another, or **New Conversation**, the plus at the top right, to start one.
+   its table and sources. Pressing an answer's button or a record goes there.
+4. Press **Back** at the top left, or use your phone's Back gesture. The screen you came from opens
+   as you left it, with its filters and its place in the list.
+5. To carry on a conversation later, open it from [Praxis AI · History](/praxis-ai?tab=history) or
+   [Search](#start-search). On a computer, **Praxis AI** at the top right of any screen does the
+   same as the round button.
 
 ## History {#praxis-history screen=praxis_ai/history icon=history}
 
@@ -304,6 +332,18 @@ marks:
   3: button "Cancel" | Do nothing
 ```
 
+```shot praxis-question
+open: /praxis-ai?tab=ask&from=%2Fworkspace%3Ftab%3Dtasks
+as: staff
+do:
+  - fill: label "Ask a Question" = Assign a task to Cynthia
+  - click: button "Send"
+  - wait: text "When is it due?"
+marks:
+  1: text "When is it due?" | What it still needs
+  2: button "Friday" | Tap an answer
+```
+
 ```shot praxis-answer
 open: /praxis-ai?tab=ask
 as: operations
@@ -359,8 +399,9 @@ do:
   - click: button "Praxis AI"
   - wait: text "Try Asking"
 marks:
-  1: text "Try Asking" | Questions you can ask
-  2: label "Ask a Question" | Type your question
+  1: button "Back" | Back to your screen
+  2: text "Try Asking" | Questions you can ask
+  3: label "Ask a Question" | Type your question
 ```
 
 ```shot praxis-phone

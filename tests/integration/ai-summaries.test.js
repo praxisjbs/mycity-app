@@ -230,9 +230,8 @@ describeDb("Praxis AI summaries, the read timeout and Download Excel against the
     const scope = await scopeFor(ceo, "workspace", "create");
     const set = (to, body) => tasks.create(ceo, scope, c.tasks.TaskCreate.parse({ ...body, primary_assignee_id: to }));
     await set(people.staff.employee_id, { title: "Send the weekly report", due_on: lagos.addDays(today, -2), priority: "high" });
-    // Two weeks out, so the due summary bands it Later whatever weekday the suite runs on: this week ends on Sunday, and a date
-    // five days on is still in it from a Monday or a Tuesday.
-    await set(people.staff.employee_id, { title: "Prepare the social calendar", due_on: lagos.addDays(today, 14) });
+    // A week on, so it is due after this week whatever today's weekday: "Later" (five days on fell inside the week from a Monday).
+    await set(people.staff.employee_id, { title: "Prepare the social calendar", due_on: lagos.addDays(today, 7) });
     await set(people.other.employee_id, { title: "Design the pitch deck" });
 
     registry.load({ extra: [{ folder: "sample", manifest: EXTRA }] });

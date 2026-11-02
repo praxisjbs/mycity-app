@@ -1068,19 +1068,6 @@ async function waitingTaskIds(db, taskId) {
   return rows.map((r) => r.task_id);
 }
 
-/** The active logins of these employees, as employee id → user id. */
-async function usersOf(db, employeeIds) {
-  // pagination:complete a task's watchers, or one person named as one, at most PLAN_MAX
-  const { rows } = await completeQuery(
-    db,
-    `SELECT employee_id, user_id FROM app_user
-      WHERE employee_id = ANY($1::uuid[]) AND status = 'active' ORDER BY employee_id`,
-    [employeeIds],
-    { label: "the logins of a task's watchers", ceiling: PLAN_MAX },
-  );
-  return new Map(rows.map((r) => [r.employee_id, r.user_id]));
-}
-
 /** A task's watchers as people. */
 async function watchers(db, taskId) {
   // pagination:complete one task's watchers, at most PLAN_MAX (the service refuses more)
@@ -1107,6 +1094,39 @@ async function watcherIds(db, taskId) {
     { label: "a task's watchers", ceiling: PLAN_MAX },
   );
   return rows.map((r) => r.employee_id);
+}
+
+/** Is this employee watching the task? Watching gives sight of it (workspace.md §6). */
+async function isWatcher(db, taskId, employeeId) {
+  if (!employeeId) return false;
+  const { rows } = await db.query("SELECT 1 FROM task_watcher WHERE task_id = $1 AND employee_id = $2", [taskId, employeeId]);
+  return rows.length > 0;
+}
+
+/**
+ * The names a task card's fields hold (docs/guides/praxis-ai.md §6.11): people and departments by
+ * name, a project by number and name. An id that names nothing is left out; the service refuses it.
+ * @param {{employeeIds?: string[], departmentIds?: string[], projectIds?: string[]}} ids  at most a card's fields' worth
+ * @returns {Promise<Array<{type: string, id: string, label: string}>>}
+ */
+async function cardNames(db, { employeeIds = [], departmentIds = [], projectIds = [] }) {
+  const out = [];
+  if (employeeIds.length) {
+    const { rows } = await db.query(
+      "SELECT employee_id AS id, btrim(first_name || ' ' || last_name) AS label FROM employee WHERE employee_id = ANY($1::uuid[])",
+      [employeeIds],
+    );
+    out.push(...rows.map((r) => ({ type: "employee", id: r.id, label: r.label })));
+  }
+  if (departmentIds.length) {
+    const { rows } = await db.query("SELECT department_id AS id, name AS label FROM department WHERE department_id = ANY($1::uuid[])", [departmentIds]);
+    out.push(...rows.map((r) => ({ type: "department", id: r.id, label: r.label })));
+  }
+  if (projectIds.length) {
+    const { rows } = await db.query("SELECT project_id AS id, number::text || ' ' || name AS label FROM project WHERE project_id = ANY($1::uuid[])", [projectIds]);
+    out.push(...rows.map((r) => ({ type: "project", id: r.id, label: r.label })));
+  }
+  return out;
 }
 
 async function addWatcher(client, { task_id, employee_id, created_by }) {
@@ -1220,7 +1240,6 @@ module.exports = {
   overrideDependency,
   firstUnsatisfied,
   waitingTaskIds,
-  usersOf,
   lateReasons,
   lateReason,
   lateReasonOn,
@@ -1229,6 +1248,8 @@ module.exports = {
   setLateReasonActive,
   watchers,
   watcherIds,
+  isWatcher,
+  cardNames,
   addWatcher,
   removeWatcher,
   openBlockage,

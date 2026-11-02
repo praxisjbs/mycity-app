@@ -1,12 +1,15 @@
 import { useCallback, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { refresh } from "@/api/hooks";
+import type { PersonRef } from "@/api/types/common";
+import { useMe } from "@/auth/AuthProvider";
 import { useFreshSignIn, type ConfirmedWay } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
-import { schemas, type AiActionCard, type AiActionResult } from "@mycity/contract/contract.gen.ts";
+import { schemas, type AiActionCard, type AiActionResult, type Department } from "@mycity/contract/contract.gen.ts";
+import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, type ProjectChoice } from "@/features/shared/pickers";
 import { hrefFor } from "@/lib/routes";
 import { useRouter } from "@/lib/router";
-import { ActionCard, toast, type ContractSchema } from "@mycity/ui";
+import { ActionCard, toast, type CardField, type ActionCardPicker, type CardRecord, type ContractSchema } from "@mycity/ui";
 
 /**
  * An answer's action card, wired to the API (docs/guides/praxis-ai.md §6.11): the card as the API
@@ -76,12 +79,51 @@ async function setPasskey() {
   }
 }
 
+/** A card's ids as the pickers take them: one, or the list. */
+const idsIn = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x !== "") : typeof v === "string" && v ? [v] : []);
+
+/**
+ * Edit's picker for one id field of a card (docs/guides/praxis-ai.md decision 31), bound as the
+ * screen's own form binds it: whom a task may be set for or shared with (New Task's), anyone with a
+ * login (New Event's and Add Watcher's), a department (for a reader who may view People, as New Task
+ * offers it), an active project. What is already picked reads by the name the card carries; a pick
+ * made here keeps its own, until Save Changes has the server name it again.
+ */
+function CardPick({ field, value, onChange, names }: { field: CardField; value: unknown; onChange: (value: unknown) => void; names: CardRecord[] }) {
+  const many = field.kind === "list";
+  const ids = idsIn(value);
+  const nameOf = (id: string) => names.find((n) => n.id === id)?.label ?? id;
+  const [people, setPeople] = useState<PersonRef[]>(() => ids.map((id) => ({ employee_id: id, display_name: nameOf(id) })));
+  const [departments, setDepartments] = useState<Department[]>(() => ids.map((id) => ({ department_id: id, name: nameOf(id) }) as unknown as Department));
+  const [projects, setProjects] = useState<ProjectChoice[]>(() => ids.map((id) => ({ project_id: id, number: "", name: nameOf(id) })));
+  const set = (picked: string[]) => onChange(many ? picked : (picked[0] ?? null));
+  const pickPeople = (p: PersonRef[]) => (setPeople(p), set(p.map((x) => x.employee_id)));
+  switch (field.picks) {
+    case "task_assignee":
+      return <TaskPeoplePicker value={people} onChange={pickPeople} />;
+    case "task_member":
+      return <TaskPeoplePicker shared value={people} onChange={pickPeople} multiple />;
+    case "colleague":
+      return <ColleaguePicker value={people} onChange={pickPeople} multiple={many} placeholder="Search staff" />;
+    case "department":
+      return <DepartmentPicker value={departments} onChange={(d) => (setDepartments(d), set(d.map((x) => x.department_id)))} />;
+    case "project":
+      return <ProjectPicker value={projects} onChange={(p) => (setProjects(p), set(p.map((x) => x.project_id)))} />;
+    default:
+      return null;
+  }
+}
+
 export function AnswerCard({ card: drawn, onRedraw }: { card: AiActionCard; onRedraw?: () => Promise<unknown> | undefined }) {
   const { navigate } = useRouter();
   const [card, setCard] = useState<AiActionCard>(drawn);
   const [problem, setProblem] = useState<{ message: string; code: string } | null>(null);
   const fresh = useFreshSignIn({ onConfirmed: (way) => void offerPasskey(way) });
   const id = card.ai_action_draft_id;
+  const peopleView = Boolean(useMe().grants.people?.includes("view"));
+  // A department is picked by a reader who may view People, as on New Task; for anyone else it stays as drawn.
+  const picker: ActionCardPicker = ({ field, value, onChange, names }) =>
+    !field.picks || (field.picks === "department" && !peopleView) ? null : <CardPick key={field.name} field={field} value={value} onChange={onChange} names={names} />;
 
   const refused = useCallback(
     (e: unknown) => {
@@ -134,6 +176,8 @@ export function AnswerCard({ card: drawn, onRedraw }: { card: AiActionCard; onRe
       values={card.values}
       problems={card.problems}
       records={card.records}
+      names={card.names}
+      picker={picker}
       status={card.status}
       confirm={card.confirm}
       suggested={card.suggested}

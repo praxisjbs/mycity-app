@@ -576,6 +576,7 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · `queries.ai.js` and `sanctions.ai.js` account for their Create schemas in `not_offered` (a query is raised on Queries along the chain with the record in view, a response is the person's own words on Self-Service, a step on the chain is Settings), as gate 23 asks of every module since the Praxis AI Engine's PR5 (`praxis-ai.md` §6.15). The queries reads carry no matrix probe: their records need a raised query the matrix does not build (§6.17).
 - 28/10/2026 · JP · A rule's Letter and a consequence step's Letter read the letters 25 at a time and load the next page as the menu nears its end (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18); they look as before.
 - 27/10/2026 · GE · Letters as MyCity's own (handoff §9, S3; §6.7): the date and addressee open
   them, "Yours faithfully" and FOR: the organisation close them; the preview is the real PDF with

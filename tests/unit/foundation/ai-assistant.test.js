@@ -351,3 +351,40 @@ describe("what the screen shows", () => {
     expect(shown.table).toBeNull();
   });
 });
+
+describe("a change gathered by questions (praxis-ai.md §1.3 decisions 28 and 29)", () => {
+  const action = { key: "tasks.create", asks: [{ field: "title", question: "What is the task?", choices: [], none: false }, { field: "due_on", question: "When is it due?", choices: ["Today", "No Due Day"], none: true }] };
+  const draft = (values, extra = {}) => ({ text: "Here is the task.", table: { read: 1, fields: ["title"], labels: ["Task"] }, route: "create a task", prefill: { title: "x" }, more: true, action: { key: "tasks.create", values, suggested: false }, overview: null, ask: null, ...extra });
+
+  test("askOf keeps up to six trimmed answers once each, and what is asked for; nothing asked is null", () => {
+    expect(answer.askOf({ action: "tasks.create", field: "due_on", choices: [" Today ", "Today", "", "x".repeat(61), "Friday"] })).toEqual({ action: "tasks.create", field: "due_on", choices: ["Today", "Friday"] });
+    expect(answer.askOf({ action: null, field: null, choices: [] })).toBeNull();
+    expect(answer.askOf(null)).toBeNull();
+  });
+
+  test("askedRun is the questions asked in a row just before, newest first, back to the last answer that asked nothing", () => {
+    const history = [{ ask: { action: "tasks.create", field: "title" } }, { ask: null }, { ask: { action: "tasks.create", field: "title" } }, { ask: { action: "tasks.create", field: "due_on" } }];
+    expect(answer.askedRun(history)).toEqual([{ action: "tasks.create", field: "due_on" }, { action: "tasks.create", field: "title" }]);
+    expect(answer.askedRun([])).toEqual([]);
+  });
+
+  test("askFirst turns a card missing what its action must have into that question, with nothing else; otherwise the draft stands", () => {
+    const asked = answer.askFirst({ draft: draft({}), actions: [action], shows: ["cards"] });
+    expect(asked).toMatchObject({ text: "What is the task?", action: null, ask: { action: "tasks.create", field: "title", choices: [] }, table: null, route: null, prefill: null, more: false, overview: null });
+    expect(answer.askFirst({ draft: draft({ title: "Report" }), actions: [action], shows: ["cards"] }).ask).toEqual({ action: "tasks.create", field: "due_on", choices: ["Today", "No Due Day"] });
+    // Asked once already in this run: the card is drawn and its gap shows on it.
+    const whole = draft({ title: "Report" });
+    expect(answer.askFirst({ draft: whole, actions: [action], history: [{ ask: { action: "tasks.create", field: "due_on" } }], shows: ["cards"] })).toBe(whole);
+    // A screen that draws no card, a suggested card and an action not offered are left as they are.
+    expect(answer.askFirst({ draft: draft({}), actions: [action], shows: ["pane"] }).action.key).toBe("tasks.create");
+    const suggested = draft({}, { action: { key: "tasks.create", values: {}, suggested: true } });
+    expect(answer.askFirst({ draft: suggested, actions: [action], shows: ["cards"] })).toBe(suggested);
+    expect(answer.askFirst({ draft: draft({}), actions: [], shows: ["cards"] }).action.key).toBe("tasks.create");
+  });
+
+  test("the system turn lists an action's card fields alone and what to ask first; a replayed question says what it asked for", () => {
+    const turn = orchestrator.historyTurns([{ question: "Assign a task to Tunde.", answer: "What is the task?", reads: [], ask: { action: "tasks.create", field: "title" } }]);
+    expect(turn[1].content).toBe("What is the task?\n[Asked for: tasks.create title]");
+    expect(orchestrator.schemaFields(c.tasks.TaskCreate, { only: ["title", "watcher_ids"] })).toEqual(["title", "watcher_ids (a list)"]);
+  });
+});

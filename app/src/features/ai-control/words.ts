@@ -1,4 +1,4 @@
-import type { AiJob, AiProvider, LinkState, ModelCapability } from "@mycity/contract/contract.gen.ts";
+import type { AiAttackRun, AiJob, AiProvider, LinkState, ModelCapability } from "@mycity/contract/contract.gen.ts";
 import type { StatusTone } from "@mycity/ui";
 import { JOB } from "@/features/settings/integrations/words";
 
@@ -66,6 +66,9 @@ export const HELP = {
   ownChain: "This action has a chain of its own; Use Job Chain puts it back on its job's.",
   setChain: "This action's chain was chosen for it, not its job's. Restore Chain puts that choice back after an edit.",
   notListed: "Models the provider's pricing page did not price. Find Prices asks about them again after 7 days.",
+  readsRefused: "Reads Praxis AI was asked for this month that the asker's own grants did not reach. The answer said so and read nothing.",
+  pressesRefused: "Cards pressed this month and refused before anything ran: the grant gone, a record outside the person's scope, or their own request.",
+  nightly: "Every night on staging, the attack questions are asked of the real model as each role. A leak is told to AI Control's holders at once.",
 };
 
 /** Why a Find Prices run stopped short, as its pill reads (§6.4). */
@@ -97,3 +100,11 @@ export function usd(price: string | null): string | null {
   const cut = frac.replace(/0+$/, "");
   return `$${whole}.${cut.length < 2 ? cut.padEnd(2, "0") : cut}`;
 }
+
+/** The nightly attack run's last result, as its tile reads (praxis-ai.md §6.17). */
+export const NIGHTLY: Record<AiAttackRun["status"], { text: string; tone: StatusTone }> = {
+  passed: { text: "Passed", tone: "ok" },
+  leaked: { text: "Leaked", tone: "err" },
+  cannot_run: { text: "Could Not Run", tone: "warn" },
+  failed: { text: "Failed", tone: "warn" },
+};

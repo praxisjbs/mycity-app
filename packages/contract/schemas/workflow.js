@@ -279,7 +279,7 @@ const ReasonBody = z.object({ reason: text(1000) }).strict();
 const CardDecision = z.enum(["approve", "reject", "request_changes"]);
 const ApprovalDecide = z
   .object({
-    workflow_instance_ids: z.array(uuid).min(1, "Pick a request").max(25),
+    workflow_instance_ids: z.array(uuid).min(1, "Pick a request").max(25, "At most 25"),
     decision: CardDecision,
     reason: optionalText(1000),
   })

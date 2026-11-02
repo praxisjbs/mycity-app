@@ -14,6 +14,10 @@ const withoutCoordinates = ({ latitude: _lat, longitude: _lng, ...row }) => row;
 
 module.exports = defineManifest({
   module: "people",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    WorksiteCreate: "a worksite's address is picked on a map, never typed, on People, Worksites",
+  },
   reads: [
     {
       key: "worksites.list",

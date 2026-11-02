@@ -25,6 +25,10 @@ const byCategory = c.alerts.HOME_ALERT_CATEGORIES.map((category) => ({
 
 module.exports = defineManifest({
   module: "home",
+  // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  not_offered: {
+    HomeAlertRuleCreate: "an alert rule is set on Home, Alerts with its threshold and who it reaches in view",
+  },
   reads: [
     {
       key: "alerts.mine",

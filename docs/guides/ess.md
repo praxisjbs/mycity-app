@@ -416,6 +416,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.17): `my_profile.get` and `my_leave.list` carry matrix probes (the asker's own record and request returned, an outsider's never), and the leave manifest's `leave.requests`, `leave.approve` and `leave.reject` theirs (a report's request in a line manager's reach, an outsider's never, a card naming it refused); `LeaveApprove` and `LeaveReject` say At most 25 on a card.
 - 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): the assistant's leave cards, `my_leave.request` (the person's own, Request Leave's service) and, for People, `leave.approve` and `leave.reject` (the requests waiting on them, up to 25 a press, each through the approval's own decide after Confirm It's You; never their own; `leave.service.cardRecords`, `assertCardRequests`, `decideMany`); §9. Nothing on the ESS or People · Leave screens changes.
 
 - 01/11/2026 · JP · §9: `leave.summary`, People's leave counted for the assistant by status, type, person, department or month, with the days taken, booked and waiting (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.

@@ -36,6 +36,7 @@ const EVENTS = defineEvents("praxis_ai", {
   "assistant.card_drafted": { summary: "An answer of the assistant drew an action card for the person to confirm" },
   "assistant.action_confirmed": { summary: "A person pressed an assistant's card and its action ran with their rights" },
   "assistant.action_failed": { summary: "A person pressed an assistant's card and its action refused or failed" },
+  "assistant.action_refused": { summary: "A person pressed an assistant's card and the press was refused before anything ran: the grant gone, a record outside their scope, their own request" },
   "assistant.card_cancelled": { summary: "A person declined an assistant's card" },
 });
 
