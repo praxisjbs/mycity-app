@@ -62,6 +62,10 @@ all of it.
 Before any objective is set for the quarter, Goals reads **No Objectives Yet**. Before the first
 quarter is set up, only **Manage Quarters** is offered.
 
+The **Plan Approval** card shows where the function's plan stands. Whoever sets the function's goals
+sees it in every state. Everyone else sees it once the plan reads **Awaiting Approval** or
+**Binding**. They never see it while it reads **Draft**, **Returned** or **Unbound**.
+
 | You are | You read on Goals |
 |---|---|
 | A member of a department | Your department's objectives and key results, any key result you own wherever it sits, and what has been shared with you |
