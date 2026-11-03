@@ -61,6 +61,8 @@
  *  - an action's risk is one of the five classes, its bulk 1 to 25, its run a function, its
  *    check, records, readback and names functions when given; its fields, picks and asks name
  *    fields its input takes (praxis-ai.md §1.3 decisions 29 and 31), each ask one short question;
+ *    its capability, when given, one of the catalogue's (held on top of the grant, as a route's
+ *    requireCapability holds it);
  *  - a route names a real screen (shared/route-map SCREENS) as "<module>.<tab>";
  *  - a route's prefill is the form's own fields (packages/contract `<Thing>Prefill`), never a
  *    restricted field nor one of the address's own words (tab, id, action, new, its params);
@@ -112,10 +114,11 @@ const ACTION_KEYS = new Set([
   "names",
   "asks",
   "resolve",
+  "capability",
 ]);
 const ROUTE_KEYS = new Set(["intent", "screen", "params", "prefill"]);
 /** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decisions 31 and 32). */
-const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type"]);
+const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task"]);
 const ASK_KEYS = new Set(["field", "question", "choices", "options", "none"]);
 /** The answers to tap under a question, at most (AiAnswer.choices). */
 const CHOICES_MAX = 6;
@@ -244,6 +247,9 @@ function checkAction(where, a, seen) {
   checkDescription(at, a.description);
   checkSchemaParam(at, a.input, "input");
   checkPermission(at, a.permission, ACTION_GRANTS, "an action");
+  // An authority held on top of the grant, as the screen's route holds it with requireCapability (praxis-ai.md §6.11).
+  if (a.capability !== undefined && (typeof a.capability !== "string" || !catalog.isCapability(a.capability)))
+    throw new Error(`${at}: capability is a code in shared/access/access.catalog.js CAPABILITY_CATALOG`);
   if (!RISKS.includes(a.risk)) throw new Error(`${at}: risk is one of ${RISKS.join(", ")}`);
   const bulk = a.bulk === undefined ? 1 : a.bulk;
   if (!Number.isInteger(bulk) || bulk < 1 || bulk > BULK_MAX) throw new Error(`${at}: bulk is 1 to ${BULK_MAX}`);
@@ -278,10 +284,10 @@ function checkAction(where, a, seen) {
   if (a.names !== undefined && typeof a.names !== "function") throw new Error(`${at}: names is (values, actor, db) => [{ type, id, label }]`);
   // A field the model may write by name, matched to the person's own record on the server (decision 32).
   if (a.resolve !== undefined) {
-    if (!a.resolve || typeof a.resolve !== "object" || Array.isArray(a.resolve)) throw new Error(`${at}: resolve is { field: (value, actor, db) => id }`);
+    if (!a.resolve || typeof a.resolve !== "object" || Array.isArray(a.resolve)) throw new Error(`${at}: resolve is { field: (value, actor, db, values) => id }`);
     for (const [k, fn] of Object.entries(a.resolve)) {
       if (!takes(k) || !carried(k)) throw new Error(`${at}: resolve names "${k}", which the card does not carry`);
-      if (typeof fn !== "function") throw new Error(`${at}: resolve.${k} is (value, actor, db) => id`);
+      if (typeof fn !== "function") throw new Error(`${at}: resolve.${k} is (value, actor, db, values) => id`);
     }
   }
   const asks = checkAsks(at, a.asks, takes, carried);
@@ -301,6 +307,7 @@ function checkAction(where, a, seen) {
     names: a.names || null,
     asks,
     resolve: Object.freeze({ ...(a.resolve || {}) }),
+    capability: a.capability || null,
   });
 }
 

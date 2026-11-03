@@ -235,9 +235,10 @@ const AiCardRecord = z
 /**
  * What an id field of a card points at, so Edit picks it with the screen's own picker (§1.3 decision
  * 31, §1.4 decision 32): anyone with a login, who a task may be set for, who it may be shared with,
- * a department, a project, a leave type Request Leave offers.
+ * a department, a project, a leave type Request Leave offers, a task the person can see (Wait On
+ * Task's list).
  */
-const AiCardPicks = z.enum(["colleague", "task_assignee", "task_member", "department", "project", "leave_type"]);
+const AiCardPicks = z.enum(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task"]);
 
 /** One field of a card, as the action's schema takes it; the screen draws it with the form system. */
 const AiCardField = z

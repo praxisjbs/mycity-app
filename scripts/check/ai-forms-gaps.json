@@ -8,7 +8,6 @@
     "announcements.AnnouncementUpdate": "Staff Community · Announcements · Edit Announcement",
     "attendance.OvertimePreApprovalCreate": "People · Attendance · New Overtime Pre Approval",
     "attendance.TemporarySiteCreate": "People · Attendance · New Temporary Site",
-    "calendar.CalendarEventEdit": "My Workspace · Calendar · Edit Calendar Event",
     "community.ChannelCreate": "Staff Community · New Channel",
     "community.ChannelUpdate": "Staff Community · Edit Channel",
     "community.RecognitionCreate": "Staff Community · New Recognition",
@@ -48,8 +47,6 @@
     "organisation.OrgSeatUpdate": "People · Edit Org Seat",
     "policies.PolicyCreate": "Knowledge Hub · Policies · New Policy",
     "policies.PolicyDraftSave": "Knowledge Hub · Policies · Save Policy Draft",
-    "projects.ProjectCreate": "My Workspace · Projects · New Project",
-    "projects.ProjectEdit": "My Workspace · Projects · Edit Project",
     "queries.LetterSignatureSave": "Queries & Sanctions · Save Letter Signature",
     "queries.QueryCreate": "Queries & Sanctions · New Query",
     "queries.QueryResponseCreate": "Queries & Sanctions · New Query Response",
@@ -76,19 +73,12 @@
     "targets.ScorecardCreate": "Performance · Scorecards · New Scorecard",
     "targets.ScorecardLinesSave": "Performance · Scorecards · Save Scorecard Lines",
     "targets.ScorecardEdit": "Performance · Scorecards · Edit Scorecard",
-    "tasks.LateReasonCreate": "My Workspace · Tasks · New Late Reason",
-    "tasks.LateReasonEdit": "My Workspace · Tasks · Edit Late Reason",
-    "tasks.TaskEdit": "My Workspace · Tasks · Edit Task",
-    "tasks.TaskStepCreate": "My Workspace · Tasks · New Task Step",
-    "tasks.TaskStepEdit": "My Workspace · Tasks · Edit Task Step",
-    "tasks.TaskDependencyCreate": "My Workspace · Tasks · New Task Dependency",
     "templates.LetterTemplateCreate": "Queries & Sanctions · Letters · New Letter Template",
     "templates.LetterTemplateBodySave": "Queries & Sanctions · Letters · Save Letter Template Body",
     "templates.LetterTemplateUpdate": "Queries & Sanctions · Letters · Edit Letter Template",
     "workflow.ApprovalStepsUpdate": "Settings · Approvals · Edit Approval Steps",
     "workflow.ApprovalFlowCreate": "Settings · Approvals · New Approval Flow",
     "worksites.WorksiteCreate": "People · Worksites · New Worksite",
-    "worksites.WorksiteUpdate": "People · Worksites · Edit Worksite",
-    "workspace.WeekSave": "My Workspace · Week · Save Week"
+    "worksites.WorksiteUpdate": "People · Worksites · Edit Worksite"
   }
 }

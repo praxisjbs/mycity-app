@@ -301,7 +301,9 @@ People's or a manager's. The workbook opens for the person it is about and the C
   day, a note; run `leave.service.request` for the person's own employee, so the type, the days,
   the clash and the year's allowance are its checks; the request read back with its link on My
   Leave; the card names the leave type, Edit picks it with Request Leave's own list, a type the model
-  writes by name is matched among the active types, and asked for leave without a type it asks
+  writes by name is matched among the active types (`src/shared/ai/named.js`, the matcher steps and
+  late reasons share: the whole name, then the one name it begins, then the one name holding the
+  word, "pay" for Leave Without Pay; never one of several), and asked for leave without a type it asks
   "Which leave type?" with the person's types and the days left of each, `praxis-ai.md` decision 32). For People: `leave.approve` and `leave.reject` (`leave.ai.js`; `people` approve, risk
   approval, so Confirm It's You within five minutes; up to 25 requests a press; inputs
   `LeaveApprove` and `LeaveReject`, a reason required to reject; the requests named who, type and
@@ -418,6 +420,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · `my_leave.request`'s type matcher is the shared one (`src/shared/ai/named.js`), which also matches the one type whose name holds the word said ("pay" for Leave Without Pay; `praxis-ai.md` §6.11). No screen of ESS changed.
 - 03/11/2026 · JP · `ess.ai.js`: My Profile's own edit (`EssProfileUpdate`) is never in the chat, `personal` (`praxis-ai.md` decision 33). No behaviour changed.
 - 03/11/2026 · JP · `my_leave.request` matches a type written with or without the word Leave ("Annual Leave" for the type named Annual), which staging showed it missing (`praxis-ai.md` decision 32). No screen of ESS changed.
 - 03/11/2026 · JP · `my_leave.request`'s card names its leave type and picks it with Request Leave's own list; a type written by name is matched to an active type; asked for leave without a type, Praxis AI asks which, with the person's types and the days left of each (`praxis-ai.md` §1.4 decision 32). No screen of ESS changed.

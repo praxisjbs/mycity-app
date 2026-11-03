@@ -21,6 +21,9 @@
  *   watch(), unwatch(), ping(), setReminders()
  *   sweep()    the recurrence job: the next occurrence of each repeating task, and the
  *              due-today and due-tomorrow reminders.
+ *   cardRecords(), cardNames(), assertCardTasks(), stepIdOf(), cardStep(), assertCardStep()
+ *              what Praxis AI's cards name and re-check (docs/guides/praxis-ai.md §6.11): the
+ *              tasks on the person's board, a step by its words; nothing here writes.
  *
  * Every change writes a task_activity row and emits one event, in the same transaction.
  * A task may count towards a scorecard line or a key result of its assignee (Counts Towards,
@@ -33,8 +36,10 @@
  * module sends, approves and rescopes it, through the helpers at the foot of this file, in its
  * own transaction.
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
+const { oneNamed } = require("../../shared/ai/named");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const numbering = require("../../shared/numbering/numbering");
@@ -889,6 +894,41 @@ async function assertCardTasks(db, ids, scope) {
   }
 }
 
+/** A task on the person's board, or null: the card names nothing it cannot see. */
+async function seenOrNull(db, id, scope) {
+  if (!c.common.uuid.safeParse(id).success) return null;
+  try {
+    return await visible(db, id, scope);
+  } catch (err) {
+    if (!(err instanceof AppError) || err.status !== 404) throw err;
+    return null;
+  }
+}
+
+/**
+ * A step a card names by its words (praxis-ai.md §6.11, `resolve`): matched among the steps of the
+ * card's own task, when that task is on the person's board (shared/ai/named.js); null otherwise, and
+ * the card says No such step.
+ */
+async function stepIdOf(db, taskId, words, scope) {
+  if (!(await seenOrNull(db, taskId, scope))) return null;
+  const step = oneNamed(await repo.steps(db, taskId), words, (st) => [st.title]);
+  return step ? step.task_step_id : null;
+}
+
+/** The step a card changes, by its words, when it is a step of the card's task on the person's board. */
+async function cardStep(db, taskId, stepId, scope) {
+  if (!c.common.uuid.safeParse(stepId).success || !(await seenOrNull(db, taskId, scope))) return [];
+  const st = await repo.step(db, taskId, stepId);
+  return st ? [{ type: "task_step", id: stepId, label: st.title }] : [];
+}
+
+/** The card's re-check for a step: its task on the person's board, and the step one of that task's. */
+async function assertCardStep(db, taskId, stepId, scope) {
+  await assertCardTasks(db, [taskId], scope);
+  if (!(await repo.step(db, taskId, stepId))) throw new AppError("NOT_FOUND", "That step does not exist", 404, { task_step_id: ["No such step"] });
+}
+
 /**
  * A task is done: the people on each open task waiting on it hear, about their own task, so the
  * notice names nothing they may not open.
@@ -1501,6 +1541,9 @@ module.exports = {
   move,
   completeMany,
   cardRecords,
+  stepIdOf,
+  cardStep,
+  assertCardStep,
   cardNames,
   assertCardTasks,
   block,

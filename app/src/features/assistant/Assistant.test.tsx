@@ -656,6 +656,45 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
     expect(within(group).queryByText("Pick one")).toBeNull();
   });
 
+  it("Add Link's card names its task and the one it waits on, never an id; Edit picks another from Wait On Task's own list (decision 33)", async () => {
+    const REPORT = "00000000-0000-4000-8000-0000000000b1";
+    const FIGURES = "00000000-0000-4000-8000-0000000000b2";
+    const BUDGET = "00000000-0000-4000-8000-0000000000b3";
+    const linkCard = (over: Partial<AiActionCard> = {}) =>
+      card({
+        action_key: "tasks.wait_on",
+        label: "Add Link",
+        schema: "tasks.TaskWaitOn",
+        values: { task_id: REPORT, depends_on_task_id: FIGURES },
+        records: [{ type: "task", id: REPORT, label: "T-120 Write the launch report", link: `/workspace?tab=tasks&id=${REPORT}` }],
+        names: [{ type: "task", id: FIGURES, label: "T-121 Gather the launch figures", link: null }],
+        fields: [
+          { name: "task_id", label: "Task", kind: "id", required: true, options: null, long: false, picks: null },
+          { name: "depends_on_task_id", label: "Waits On", kind: "id", required: true, options: null, long: false, picks: "task" },
+        ],
+        ...over,
+      });
+    m.turns[CONV] = [answer({ card: linkCard() })];
+    m.rows["GET /api/v1/tasks"] = [
+      { task_id: FIGURES, number: "T-121", title: "Gather the launch figures", assignee: null },
+      { task_id: BUDGET, number: "T-122", title: "Review the budget", assignee: { employee_id: "e2", display_name: "Ada Obi" } },
+    ];
+    m.call.mockImplementation(async (key: unknown, opts: unknown) =>
+      key === "PUT /api/v1/ai/cards/:id" ? linkCard({ values: (opts as { body: { values: Record<string, unknown> } }).body.values, names: [{ type: "task", id: BUDGET, label: "T-122 Review the budget", link: null }] }) : {},
+    );
+    ui("ask", CONV);
+    const group = screen.getByRole("group", { name: "Add Link" });
+    expect(within(group).getByText("T-121 Gather the launch figures")).toBeTruthy();
+    expect(within(group).queryByText(FIGURES)).toBeNull();
+    await userEvent.click(within(group).getByRole("button", { name: "Edit" }));
+    // Picked already, the list closes behind its chip; typing opens it again (Wait On Task's own picker).
+    await userEvent.type(within(group).getByRole("searchbox"), "budget");
+    await userEvent.click(await within(group).findByRole("option", { name: /T-122 Review the budget/ }));
+    await userEvent.click(within(group).getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("PUT /api/v1/ai/cards/:id", { params: { id: CARD }, body: { values: { task_id: REPORT, depends_on_task_id: BUDGET } } }));
+    expect(await within(group).findByText("T-122 Review the budget")).toBeTruthy();
+  });
+
   it("a refusal on the fields lands on the card and stays open; Edit saves the values through the API", async () => {
     m.turns[CONV] = [answer({ card: card() })];
     m.call.mockImplementation(async (key: unknown, opts: unknown) => {

@@ -5,7 +5,11 @@
  * one its own line, the rest done), a comment on a task, an event with its attendees through
  * Create Event's own service, a task outside the person's board refused at the press, a
  * stranger among the attendees refused on the field, and a comment with a gap left to fill held
- * on its field before anyone presses.
+ * on its field before anyone presses. Every other form of My Workspace in the chat (decision 33):
+ * Save Task, Add Step, Save Step (a step by its words), Add Link, Late Reasons for their keepers
+ * alone (the capability), Create and Save Project, Save Event and Save Support Needed (a week by
+ * its words), each through the screen's own service, an edit naming its record and refused where
+ * the screen refuses it.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/ai-actions-workspace
  */
@@ -236,5 +240,216 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
     expect(refused.status).toBe(422);
     expect(refused.body.error.fields).toEqual({ attendee_ids: ["Pick one"] });
     expect(await one("SELECT status, problems FROM ai_action_draft WHERE ai_action_draft_id = $1", [stranger.body.card.ai_action_draft_id])).toEqual({ status: "shown", problems: { attendee_ids: ["Pick one"] } });
+  });
+
+  /** A task Ops sets for themselves through the board's own route. */
+  const opsTask = async (title) => {
+    const res = await h.as("ops").post("/tasks").send({ title });
+    expect(res.status).toBe(201);
+    return res.body;
+  };
+  /** The card the model drafts for a question, as the answer carries it. */
+  const drawn = async (who, key, values, question = "Do it.") => {
+    script(say({ text: "Here it is.", action: { key, values, suggested: false } }));
+    const asked = await h.ask(who, { question, shows: ["cards"] });
+    expect(asked.status).toBe(200);
+    expect(c.assistant.AiAnswer.safeParse(asked.body).success).toBe(true);
+    return asked.body.card;
+  };
+
+  test("tasks.edit: Save Task names the task and only what changes, runs Edit Task's own service, and is refused off the person's board", async () => {
+    const t = await opsTask("Draft the budget");
+    const staff = h.people.staff.employee_id;
+    const card = await drawn("ops", "tasks.edit", { task_id: t.task_id, due_on: "2026-11-20", priority: "high", primary_assignee_id: staff }, "Give the budget draft to Tunde, high priority, due on the 20th.");
+    expect(card).toMatchObject({ action_key: "tasks.edit", label: "Save Task", schema: "tasks.TaskChange", problems: {} });
+    expect(card.records).toEqual([expect.objectContaining({ type: "task", id: t.task_id, label: `${t.number} Draft the budget` })]);
+    expect(card.names).toEqual([expect.objectContaining({ type: "employee", id: staff, label: "Tunde Ade" })]);
+    expect(card.fields.map((f) => f.name)).toEqual(["task_id", "title", "description", "due_on", "priority", "cadence", "primary_assignee_id", "member_ids", "department_id", "project_id"]);
+    expect(card.fields[0]).toMatchObject({ name: "task_id", label: "Task", picks: null });
+    expect(card.fields.find((f) => f.name === "primary_assignee_id")).toMatchObject({ label: "For", picks: "task_assignee" });
+    // A commitment, a repeat and Counts Towards stay on the panel: never carried, whatever the model wrote.
+    const carried = await drawn("ops", "tasks.edit", { task_id: t.task_id, priority: "low", is_commitment: true, recurrence: { freq: "daily" } });
+    expect(carried.values).toEqual({ task_id: t.task_id, priority: "low" });
+    const pressed = await h.press("ops", card.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    expect(pressed.body.lines).toEqual([{ type: "task", id: t.task_id, label: `${t.number} Draft the budget`, ok: true, message: "saved", link: expect.stringMatching(/^\/workspace\?tab=tasks&id=/) }]);
+    const after = await one("SELECT priority, primary_assignee_id, to_char(due_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM-DD') AS due FROM task WHERE task_id = $1", [t.task_id]);
+    expect(after).toEqual({ priority: "high", primary_assignee_id: staff, due: "2026-11-20" });
+    expect((await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'task.edited' AND entity_id = $1", [t.task_id])).n).toBe(1);
+
+    // Nothing to change: the problem sits on the task's own field, and the press runs nothing.
+    const empty = await drawn("ops", "tasks.edit", { task_id: t.task_id });
+    expect(empty.problems).toEqual({ task_id: ["Nothing to change"] });
+    // Someone else's task is refused at the press by the board's own check.
+    const theirs = await opsTask("Ops' own plan");
+    const refusedCard = await drawn("staff", "tasks.edit", { task_id: theirs.task_id, title: "Mine now" });
+    const refused = await h.press("staff", refusedCard.ai_action_draft_id);
+    expect(refused.status).toBe(404);
+    expect(refused.body.error.code).toBe("TASK_NOT_YOURS");
+    expect(await one("SELECT title FROM task WHERE task_id = $1", [theirs.task_id])).toEqual({ title: "Ops' own plan" });
+  });
+
+  test("tasks.add_step and tasks.edit_step: a step added through the panel's own service, then ticked by its words; a step no task holds says so", async () => {
+    const t = await opsTask("Plan the launch");
+    // Asked for without its words, the step is asked for first.
+    script(say({ text: "Here is the step.", action: { key: "tasks.add_step", values: { task_id: t.task_id }, suggested: false } }));
+    const ask = await h.ask("ops", { question: "Add a step to the launch plan.", shows: ["cards"] });
+    expect(ask.body).toMatchObject({ content: "What is the step?", card: null });
+
+    const add = await drawn("ops", "tasks.add_step", { task_id: t.task_id, title: "Order the banners", due_on: "2026-11-18" });
+    expect(add).toMatchObject({ action_key: "tasks.add_step", label: "Add Step", schema: "tasks.TaskStepAdd", problems: {} });
+    expect(add.records).toEqual([expect.objectContaining({ type: "task", id: t.task_id, label: `${t.number} Plan the launch` })]);
+    const added = await h.press("ops", add.ai_action_draft_id);
+    expect(added.status).toBe(200);
+    expect(added.body.lines).toEqual([expect.objectContaining({ type: "task", id: t.task_id, label: "Order the banners", ok: true, message: "step added" })]);
+    const step = await one("SELECT task_step_id, done_at FROM task_step WHERE task_id = $1 AND title = 'Order the banners'", [t.task_id]);
+    expect(step.done_at).toBeNull();
+
+    // Ticked by its words: matched among the task's own steps, named on the card, never shown as an id.
+    const tick = await drawn("ops", "tasks.edit_step", { task_id: t.task_id, task_step_id: "banners", done: true }, "Tick the banners step.");
+    expect(tick).toMatchObject({ action_key: "tasks.edit_step", label: "Save Step", schema: "tasks.TaskStepChange", problems: {} });
+    expect(tick.values).toEqual({ task_id: t.task_id, task_step_id: step.task_step_id, done: true });
+    expect(tick.names).toEqual([expect.objectContaining({ type: "task_step", id: step.task_step_id, label: "Order the banners" })]);
+    const ticked = await h.press("ops", tick.ai_action_draft_id);
+    expect(ticked.status).toBe(200);
+    expect(ticked.body.lines).toEqual([expect.objectContaining({ label: "Order the banners", ok: true, message: "ticked" })]);
+    expect((await one("SELECT done_at FROM task_step WHERE task_step_id = $1", [step.task_step_id])).done_at).not.toBeNull();
+
+    // Words no step of the task has stay unmatched: the card says No such step on the field.
+    const none = await drawn("ops", "tasks.edit_step", { task_id: t.task_id, task_step_id: "book the venue", done: true });
+    expect(none.problems).toEqual({ task_step_id: ["No such step"] });
+    expect(none.names).toEqual([]);
+  });
+
+  test("tasks.wait_on: Add Link names the task it waits on and runs Wait On Task's own service; never itself", async () => {
+    const report = await opsTask("Write the launch report");
+    const figures = await opsTask("Gather the launch figures");
+    const card = await drawn("ops", "tasks.wait_on", { task_id: report.task_id, depends_on_task_id: figures.task_id }, "The report waits on the figures.");
+    expect(card).toMatchObject({ action_key: "tasks.wait_on", label: "Add Link", schema: "tasks.TaskWaitOn", problems: {} });
+    expect(card.records).toEqual([expect.objectContaining({ id: report.task_id, label: `${report.number} Write the launch report` })]);
+    expect(card.names).toEqual([expect.objectContaining({ type: "task", id: figures.task_id, label: `${figures.number} Gather the launch figures` })]);
+    expect(card.fields.find((f) => f.name === "depends_on_task_id")).toMatchObject({ label: "Waits On", picks: "task" });
+    const pressed = await h.press("ops", card.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    expect(pressed.body.lines).toEqual([expect.objectContaining({ id: report.task_id, ok: true, message: "waiting" })]);
+    expect(await one("SELECT count(*)::int AS n FROM task_dependency WHERE task_id = $1 AND depends_on_task_id = $2", [report.task_id, figures.task_id])).toEqual({ n: 1 });
+
+    const self = await drawn("ops", "tasks.wait_on", { task_id: report.task_id, depends_on_task_id: report.task_id });
+    expect(self.problems).toEqual({ depends_on_task_id: ["Pick another task"] });
+    // A task the person cannot see is never named: Tunde's errand may not wait on Ops' report, which is off his board.
+    const errand = await h.as("staff").post("/tasks").send({ title: "Tunde's errand" });
+    const unseen = await drawn("staff", "tasks.wait_on", { task_id: errand.body.task_id, depends_on_task_id: report.task_id });
+    expect(unseen.problems).toEqual({ depends_on_task_id: ["Pick one"] });
+    expect(unseen.names).toEqual([]);
+  });
+
+  test("late_reasons.add and late_reasons.switch: offered to a keeper of Late Reasons alone, as their routes are; a reason switched by its words", async () => {
+    const authorise = require("../../src/shared/ai/authorise");
+    const grantsCache = require("../../src/shared/rbac/grants-cache");
+    const userOf = (who) => grantsCache.getAuthUser(pool, h.people[who].user_id);
+    const offered = async (who) => (await authorise.allowedActions(await userOf(who))).map((a) => a.key);
+    expect(await offered("ops")).toEqual(expect.arrayContaining(["late_reasons.add", "late_reasons.switch"]));
+    expect(await offered("staff")).not.toEqual(expect.arrayContaining(["late_reasons.add"]));
+    expect(await offered("staff")).not.toEqual(expect.arrayContaining(["late_reasons.switch"]));
+    await expect(authorise.checkAction(await userOf("staff"), "late_reasons.add", { label: "Waiting on Supplier" })).rejects.toMatchObject({ code: "AI_ACTION_FORBIDDEN" });
+    // The model naming it for someone without the capability draws no card.
+    const notTheirs = await drawn("staff", "late_reasons.add", { label: "Waiting on Supplier" });
+    expect(notTheirs).toBeNull();
+
+    const add = await drawn("ops", "late_reasons.add", { label: "Waiting on Supplier" }, "Add a late reason: Waiting on Supplier.");
+    expect(add).toMatchObject({ action_key: "late_reasons.add", label: "Add Reason", schema: "tasks.LateReasonCreate", records: [], problems: {} });
+    const added = await h.press("ops", add.ai_action_draft_id);
+    expect(added.status).toBe(200);
+    expect(added.body.lines).toEqual([expect.objectContaining({ type: "task_late_reason", label: "Waiting on Supplier", ok: true, message: "added" })]);
+    const row = await one("SELECT task_late_reason_id, code, active FROM task_late_reason WHERE label = 'Waiting on Supplier'");
+    expect(row).toMatchObject({ code: "waiting_on_supplier", active: true });
+
+    const off = await drawn("ops", "late_reasons.switch", { task_late_reason_id: "waiting on supplier", active: false }, "Switch off Waiting on Supplier.");
+    expect(off).toMatchObject({ action_key: "late_reasons.switch", label: "Switch Reason", schema: "tasks.LateReasonSwitch", problems: {} });
+    expect(off.values).toEqual({ task_late_reason_id: row.task_late_reason_id, active: false });
+    expect(off.records).toEqual([expect.objectContaining({ type: "task_late_reason", id: row.task_late_reason_id, label: "Waiting on Supplier" })]);
+    const switched = await h.press("ops", off.ai_action_draft_id);
+    expect(switched.status).toBe(200);
+    expect(switched.body.lines).toEqual([expect.objectContaining({ label: "Waiting on Supplier", ok: true, message: "switched off" })]);
+    expect(await one("SELECT active FROM task_late_reason WHERE task_late_reason_id = $1", [row.task_late_reason_id])).toEqual({ active: false });
+  });
+
+  test("projects.create and projects.edit: a project started and completed through the page's own service; another's project refused at the press", async () => {
+    script(say({ text: "Here is the project.", action: { key: "projects.create", values: { due_on: "2026-12-18" }, suggested: false } }));
+    const ask = await h.ask("staff", { question: "Start a project due on the 18th of December.", shows: ["cards"] });
+    expect(ask.body).toMatchObject({ content: "What is the project called?", card: null });
+
+    const start = await drawn("staff", "projects.create", { name: "Lekki Launch", due_on: "2026-12-18" }, "Start a project called Lekki Launch.");
+    expect(start).toMatchObject({ action_key: "projects.create", label: "Create Project", schema: "projects.ProjectCreate", records: [], problems: {} });
+    const started = await h.press("staff", start.ai_action_draft_id);
+    expect(started.status).toBe(200);
+    expect(started.body.lines).toEqual([expect.objectContaining({ type: "project", label: expect.stringMatching(/ Lekki Launch$/), ok: true, message: "started", link: expect.stringMatching(/^\/workspace\?tab=projects&id=/) })]);
+    const project = await one("SELECT project_id, number::text AS number, status, owner_employee_id FROM project WHERE name = 'Lekki Launch'");
+    expect(project).toMatchObject({ status: "active", owner_employee_id: h.people.staff.employee_id });
+
+    const done = await drawn("staff", "projects.edit", { project_id: project.project_id, status: "completed" }, "Mark Lekki Launch completed.");
+    expect(done).toMatchObject({ action_key: "projects.edit", label: "Save Project", schema: "projects.ProjectChange", problems: {} });
+    expect(done.records).toEqual([expect.objectContaining({ type: "project", id: project.project_id, label: `${project.number} Lekki Launch` })]);
+    const completed = await h.press("staff", done.ai_action_draft_id);
+    expect(completed.status).toBe(200);
+    expect(await one("SELECT status, completed_at IS NOT NULL AS stamped FROM project WHERE project_id = $1", [project.project_id])).toEqual({ status: "completed", stamped: true });
+    expect((await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'project.completed' AND entity_id = $1", [project.project_id])).n).toBe(1);
+
+    // Ops' own project: on Tunde's list, never his to change.
+    const theirs = await h.as("ops").post("/projects").send({ name: "Ops Review" });
+    expect(theirs.status).toBe(201);
+    const card = await drawn("staff", "projects.edit", { project_id: theirs.body.project_id, name: "Tunde's Review" });
+    const refused = await h.press("staff", card.ai_action_draft_id);
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.fields).toEqual({ project_id: ["Not yours to change"] });
+    expect(await one("SELECT name FROM project WHERE project_id = $1", [theirs.body.project_id])).toEqual({ name: "Ops Review" });
+  });
+
+  test("calendar.edit: Save Event moves an event its maker made through Edit Event's own service, naming who comes; an attendee may not change it", async () => {
+    const made = await h.as("ops").post("/calendar").send({ title: "Budget review", event_type: "meeting", starts_at: "2026-11-24T10:00:00+01:00", ends_at: "2026-11-24T11:00:00+01:00" });
+    expect(made.status).toBe(201);
+    const id = made.body.calendar_event_id;
+    const staff = h.people.staff.employee_id;
+    const card = await drawn("ops", "calendar.edit", { calendar_event_id: id, starts_at: "2026-11-24T11:00:00+01:00", ends_at: "2026-11-24T12:00:00+01:00", attendee_ids: [staff] }, "Move the budget review to 11 and invite Tunde.");
+    expect(card).toMatchObject({ action_key: "calendar.edit", label: "Save Event", schema: "calendar.CalendarEventChange", problems: {} });
+    expect(card.records).toEqual([expect.objectContaining({ type: "calendar_event", id, label: "Budget review" })]);
+    expect(card.names).toEqual([expect.objectContaining({ type: "employee", id: staff, label: "Tunde Ade" })]);
+    expect(card.fields.find((f) => f.name === "attendee_ids")).toMatchObject({ label: "Attendees", picks: "colleague" });
+    const pressed = await h.press("ops", card.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    expect(pressed.body.lines).toEqual([expect.objectContaining({ type: "calendar_event", id, label: "Budget review", ok: true, message: "saved" })]);
+    const event = await h.as("ops").get(`/calendar/${id}`);
+    expect(event.body.starts_at).toBe("2026-11-24T10:00:00.000Z");
+    expect(event.body.attendees.map((a) => a.employee.employee_id)).toEqual([staff]);
+
+    // An end before its start is the form's own problem, on its field.
+    const backwards = await drawn("ops", "calendar.edit", { calendar_event_id: id, starts_at: "2026-11-24T12:00:00+01:00", ends_at: "2026-11-24T11:00:00+01:00" });
+    expect(backwards.problems).toEqual({ ends_at: ["Ends before it starts"] });
+    // Tunde is invited and sees it; only its maker changes it.
+    const theirs = await drawn("staff", "calendar.edit", { calendar_event_id: id, title: "Tunde's review" });
+    const refused = await h.press("staff", theirs.ai_action_draft_id);
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.fields).toEqual({ calendar_event_id: ["Not yours to change"] });
+  });
+
+  test("week.support: Save Support Needed writes the person's own line for the week they name, through Write Support Needed's own service", async () => {
+    const monday = require("../../src/modules/workspace/workspace.week").thisMonday();
+    const card = await drawn("staff", "week.support", { week_starts_on: "this week", support_needed: "Help from Finance with the budget figures", summary_text: "Not mine to write" }, "This week I need help from Finance with the budget figures.");
+    expect(card).toMatchObject({ action_key: "week.support", label: "Save Support Needed", schema: "workspace.WeekSave", records: [], problems: {} });
+    // The week by its words is its Monday; Tidy With AI's summary is never carried.
+    expect(card.values).toEqual({ week_starts_on: monday, support_needed: "Help from Finance with the budget figures" });
+    expect(card.fields.map((f) => f.name)).toEqual(["week_starts_on", "support_needed"]);
+    const pressed = await h.press("staff", card.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    expect(pressed.body.lines).toEqual([{ type: "week", id: monday, label: `Week of ${monday.split("-").reverse().join("/")}`, ok: true, message: "saved", link: "/workspace?tab=today" }]);
+    expect(await one("SELECT support_needed, summary_text FROM weekly_summary WHERE employee_id = $1 AND week_starts_on = $2", [h.people.staff.employee_id, monday])).toEqual({ support_needed: "Help from Finance with the budget figures", summary_text: null });
+
+    // Any day of a week names it.
+    const midweek = await drawn("staff", "week.support", { week_starts_on: "2026-11-25", support_needed: "A second laptop" });
+    expect(midweek.values.week_starts_on).toBe("2026-11-23");
+    // Without the line, it is asked for first.
+    script(say({ text: "Here is the line.", action: { key: "week.support", values: { week_starts_on: monday }, suggested: false } }));
+    const ask = await h.ask("staff", { question: "Write my support needed for this week.", shows: ["cards"] });
+    expect(ask.body).toMatchObject({ content: "What support do you need?", card: null });
   });
 });

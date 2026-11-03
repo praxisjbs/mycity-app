@@ -65,6 +65,17 @@ const CASES = Object.freeze([
   { id: "card.task-done", as: "employee", question: "Mark my task about the weekly report as done.", shows: ["cards"], action: "tasks.complete" },
   { id: "card.task-comment", as: "employee", question: "Add a comment on my weekly report task: the draft is with Ada for review.", shows: ["cards"], action: "tasks.comment" },
   { id: "card.meeting", as: "operations_people", question: "Book a meeting with {person} tomorrow at 10 for an hour about the venue visit.", shows: ["cards"], action: "calendar.create" },
+  // Every form of My Workspace in the chat (praxis-ai.md decision 33): an edit names its record and only what changes.
+  { id: "card.task-edit", as: "employee", question: "Move my weekly report task's due day to next Friday and make it high priority.", shows: ["cards"], action: "tasks.edit" },
+  { id: "card.task-step", as: "employee", question: "Add a step to my weekly report task: collect the sales figures.", shows: ["cards"], action: "tasks.add_step" },
+  { id: "card.task-step-tick", as: "employee", question: "Tick the first step on my weekly report task.", shows: ["cards"], action: "tasks.edit_step" },
+  { id: "card.task-wait", as: "employee", question: "My weekly report task has to wait for my budget review task.", shows: ["cards"], action: "tasks.wait_on" },
+  { id: "card.reason-add", as: "operations_people", question: "Add a late reason: Waiting on Supplier.", shows: ["cards"], action: "late_reasons.add" },
+  { id: "card.reason-switch", as: "operations_people", question: "Switch off the late reason Underestimated.", shows: ["cards"], action: "late_reasons.switch" },
+  { id: "card.project", as: "employee", question: "Start a project called Lekki Launch, due at the end of next month.", shows: ["cards"], action: "projects.create" },
+  { id: "card.project-edit", as: "employee", question: "Mark my Lekki Launch project as completed.", shows: ["cards"], action: "projects.edit" },
+  { id: "card.meeting-move", as: "operations_people", question: "Move my venue visit meeting to 11 the same day.", shows: ["cards"], action: "calendar.edit" },
+  { id: "card.week-support", as: "employee", question: "For this week I need Finance to help with the budget figures.", shows: ["cards"], action: "week.support" },
   // A change missing what its action must have is asked for first, one question at a time (decisions 28 and 29).
   { id: "ask.task-title", as: "operations_people", question: "Assign a task to {person}.", shows: ["cards"], ask: { action: "tasks.create", field: "title" } },
   { id: "ask.task-due", as: "employee", question: "Create a task for me to send the weekly report.", shows: ["cards"], ask: { action: "tasks.create", field: "due_on" } },
@@ -81,6 +92,8 @@ const CASES = Object.freeze([
   { id: "card.mail", as: "operations_people", question: "Email ada@partner.test to confirm the venue visit on Thursday at 10.", shows: ["cards"], action: "mail.send" },
   // A change this person may not make is not available, never a card (decision 16).
   { id: "card.not-mine", as: "employee", question: "Approve all the leave requests waiting for a decision.", shows: ["cards"], no_action: ["leave.approve", "approvals.decide"] },
+  // Late Reasons are kept by holders of workspace.late_reasons: anyone else is never drawn the card.
+  { id: "card.reason-not-mine", as: "employee", question: "Add a late reason: Waiting on Supplier.", shows: ["cards"], no_action: ["late_reasons.add"] },
   { id: "change.leave", as: "employee", question: "Book two days of annual leave for me from next Monday.", route: "ess.my-leave" },
   { id: "change.meeting", as: "operations_people", question: "Book a meeting with my team tomorrow at 10.", route: "workspace.calendar" },
   { id: "targets.expenses", as: "ceo", question: "Which expenses are awaiting approval?", needs: "expenses" },

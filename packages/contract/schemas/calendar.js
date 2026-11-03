@@ -14,6 +14,9 @@ const {
   optionalText,
   isoDateTime,
   listQuery,
+  recordId,
+  changesBeside,
+  nothingOn,
   Paged,
 } = require("./common");
 const { PersonRef } = require("./organisation");
@@ -151,7 +154,7 @@ const CalendarInviteEmailVars = z
   .strict();
 
 /** PATCH /calendar/:id: the owner changes it; attendees are told. */
-const CalendarEventEdit = z
+const CalendarEventEditFields = z
   .object({
     title: text(200).optional(),
     description: z.string().trim().max(2000).nullable().optional(),
@@ -165,8 +168,16 @@ const CalendarEventEdit = z
     attendee_ids: z.array(uuid).max(50).optional(),
     reminder_minutes: ReminderMinutes.optional(),
   })
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, "Change at least one field")
+  .strict();
+const CalendarEventEdit = CalendarEventEditFields.refine((v) => Object.keys(v).length > 0, "Change at least one field").refine(endsAfterStart, ENDS_BEFORE);
+
+/**
+ * Edit Event as Praxis AI's card (docs/guides/praxis-ai.md §6.11): the event beside the form's
+ * fields, which the open event's own form never names; its start and end as instants, as New
+ * Event's card takes them.
+ */
+const CalendarEventChange = CalendarEventEditFields.extend({ calendar_event_id: recordId("event") })
+  .refine(changesBeside(["calendar_event_id"]), nothingOn("calendar_event_id"))
   .refine(endsAfterStart, ENDS_BEFORE);
 
 /** POST /calendar/:id/respond: an attendee answers. */
@@ -216,6 +227,13 @@ const TABLES = {
       reminder_minutes: "replaces the event's reminders in the shared reminder engine",
     },
   },
+  CalendarEventChange: {
+    table: "calendar_event",
+    virtual: {
+      attendee_ids: "replaces the calendar_event_attendee rows",
+      reminder_minutes: "replaces the event's reminders in the shared reminder engine",
+    },
+  },
   CalendarRespond: { table: "calendar_event_attendee" },
 };
 
@@ -237,5 +255,6 @@ module.exports = {
   CalendarEventCreate,
   CalendarEventPrefill,
   CalendarEventEdit,
+  CalendarEventChange,
   CalendarRespond,
 };

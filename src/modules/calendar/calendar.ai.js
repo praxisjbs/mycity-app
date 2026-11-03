@@ -1,10 +1,11 @@
 "use strict";
 /**
  * What the assistant may read of the asker's calendar: their own month (events,
- * invitations, task deadlines, approved leave), one page of 25 at a time; and, as a card the
- * person confirms (docs/guides/praxis-ai.md §6.11), an event with its attendees, created through
- * the same service function New Event's Create Event calls. Answering an invitation and changing
- * an event stay on the calendar.
+ * invitations, task deadlines, approved leave), one page of 25 at a time; and, as cards the
+ * person confirms (docs/guides/praxis-ai.md §6.11, decision 33), an event with its attendees,
+ * created through the same service function New Event's Create Event calls, and a change to an
+ * event the person made, through Edit Event's own. Answering an invitation and calling an event off
+ * stay on the calendar.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -42,20 +43,24 @@ function slotOf(dayIso, hour) {
 
 /**
  * The matrix's scope probes (docs/guides/praxis-ai.md §6.17): the month is the asker's own calendar,
- * so an event they made is on it and one the outsider made for themselves alone never is.
+ * so an event they made is on it and one the outsider made for themselves alone never is; a card
+ * changing the outsider's event is refused by Edit Event's own rule.
  */
+const meeting = async (who, title, at) => (await service.create(who, { title, event_type: "meeting", starts_at: at.starts_at, ends_at: at.ends_at, all_day: false, visibility: "attendees", attendee_ids: [], reminder_minutes: [] })).calendar_event_id;
 const probe = {
   inside: async (ctx) => {
     const at = slotOf(ctx.freshDay(), 9);
-    const e = await service.create(ctx.actor, { title: `Matrix meeting for ${ctx.role}`, event_type: "meeting", starts_at: at.starts_at, ends_at: at.ends_at, all_day: false, visibility: "attendees", attendee_ids: [], reminder_minutes: [] });
-    return { type: "calendar_event", id: e.calendar_event_id, params: { month: at.month } };
+    const id = await meeting(ctx.actor, `Matrix meeting for ${ctx.role}`, at);
+    return { type: "calendar_event", id, params: { month: at.month }, values: { calendar_event_id: id, location: "Room 2" } };
   },
   outside: async (ctx) => {
     const at = slotOf(ctx.freshDay(), 11);
-    const e = await service.create(ctx.outsider.user, { title: `Outsider's meeting, seen by ${ctx.role}`, event_type: "meeting", starts_at: at.starts_at, ends_at: at.ends_at, all_day: false, visibility: "attendees", attendee_ids: [], reminder_minutes: [] });
-    return { type: "calendar_event", id: e.calendar_event_id, params: { month: at.month } };
+    const id = await meeting(ctx.outsider.user, `Outsider's meeting, seen by ${ctx.role}`, at);
+    return { type: "calendar_event", id, params: { month: at.month }, values: { calendar_event_id: id, location: "Room 2" } };
   },
 };
+
+const eventLink = (id) => (routeMap.linkFor("calendar_event", id) || {}).path || null;
 
 module.exports = defineManifest({
   module: "workspace",
@@ -81,10 +86,37 @@ module.exports = defineManifest({
       ],
       // The same function Create Event calls; someone invited who is not on the staff is refused on the field (§6).
       run: (values, actor) => service.create(actor, values),
-      readback: (event) => [{ type: "calendar_event", id: event.calendar_event_id, label: event.title, status: "booked", link: (routeMap.linkFor("calendar_event", event.calendar_event_id) || {}).path || null }],
+      readback: (event) => [{ type: "calendar_event", id: event.calendar_event_id, label: event.title, status: "booked", link: eventLink(event.calendar_event_id) }],
       labels: { title: "Title", description: "Notes", event_type: "Kind", starts_at: "Starts", ends_at: "Ends", all_day: "All Day", location: "Location", visibility: "Visibility", attendee_ids: "Attendees", reminder_minutes: "Reminders" },
     },
+    {
+      key: "calendar.edit",
+      label: "Save Event",
+      matrix: probe,
+      description: "Change an event I made: move it, retitle it, change who comes, where or its reminders; only what changes; attendee_ids replaces who is invited",
+      input: c.calendar.CalendarEventChange,
+      permission: ["workspace", "edit"],
+      risk: "standard",
+      form: "none: Edit Event's form takes a day and two clock times, joined into starts_at and ends_at as it sends, and changes the event open; the card names it",
+      fields: ["calendar_event_id", "title", "starts_at", "ends_at", "all_day", "attendee_ids", "event_type", "location", "visibility", "description", "reminder_minutes"],
+      picks: { attendee_ids: "colleague" },
+      // The event is what the press changes; the people invited are named, never counted.
+      names: (values, _actor, db) => attendeeNames(db, values.attendee_ids),
+      records: (values, actor, db) => (db ? service.cardRecords(db, values.calendar_event_id, actor.employee_id) : values.calendar_event_id ? [{ type: "calendar_event", id: values.calendar_event_id }] : []),
+      check: (client, values, actor) => service.assertCardEvent(client, values.calendar_event_id, actor.employee_id),
+      // The same function Save Event calls; someone invited who is not on the staff is refused on the field (§6).
+      run: (values, actor) => {
+        const { calendar_event_id: id, ...changes } = values;
+        return service.edit(actor, id, changes);
+      },
+      readback: (event) => [{ type: "calendar_event", id: event.calendar_event_id, label: event.title, status: "saved", link: eventLink(event.calendar_event_id) }],
+      labels: { calendar_event_id: "Event", title: "Title", description: "Notes", event_type: "Kind", starts_at: "Starts", ends_at: "Ends", all_day: "All Day", location: "Location", visibility: "Visibility", attendee_ids: "Attendees", reminder_minutes: "Reminders" },
+    },
   ],
+  // Edit Event's own form, reached through the card that names its event (gate 23, praxis-ai.md decision 33).
+  not_offered: {
+    CalendarEventEdit: "via calendar.edit: Edit Event's own form, which never names its event; the card is CalendarEventChange",
+  },
   reads: [
     {
       key: "calendar.month",

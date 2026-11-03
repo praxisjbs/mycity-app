@@ -1,8 +1,8 @@
 "use strict";
 /**
  * My Workspace: the HTTP edge for Today, Analytics and the week (docs/guides/workspace.md §5).
+ * What the assistant may do here is workspace.ai.js's: the week's Support Needed line.
  */
-// ai:none Today, Analytics and the week are views over tasks and events, which tasks.ai.js and calendar.ai.js read
 // search:none Today, Analytics and the week are views over tasks and events, which tasks.search.js and calendar.search.js find
 const { ok, accepted } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");

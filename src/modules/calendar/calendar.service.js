@@ -6,8 +6,10 @@
  * The month is the reader's own: their events and invitations, events shared with
  * everyone, their open tasks' deadlines, their approved leave and their performance dates
  * (docs/guides/performance.md §6.18). Only the owner
- * changes or calls off an event; an attendee answers it.
+ * changes or calls off an event; an attendee answers it. cardRecords() and assertCardEvent() are
+ * what a Praxis AI card that changes an event names and re-checks (docs/guides/praxis-ai.md §6.11).
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
@@ -326,4 +328,20 @@ async function respond(actor, id, { response }) {
   });
 }
 
-module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, edit, cancel, respond, reminderCheck };
+/** The event a card changes, by its title, when the person may see it; nothing otherwise. */
+async function cardRecords(db, id, employeeId) {
+  if (!c.common.uuid.safeParse(id).success || !employeeId) return [];
+  const row = await repo.getFor(db, id, employeeId);
+  return row ? [{ type: "calendar_event", id, label: row.title }] : [];
+}
+
+/** The card's re-check (§6.11 step 5): an event the person made, not called off, as Edit Event's own rule. */
+async function assertCardEvent(db, id, employeeId) {
+  const row = c.common.uuid.safeParse(id).success && employeeId ? await repo.getFor(db, id, employeeId) : null;
+  if (!row) throw new AppError("NOT_FOUND", "That event does not exist", 404, { calendar_event_id: ["No such event"] });
+  if (row.owner_employee_id !== employeeId)
+    throw new AppError("FORBIDDEN", "Only the person who made this event can change it", 403, { calendar_event_id: ["Not yours to change"] });
+  if (row.cancelled_at) throw new AppError("EVENT_CANCELLED", "This event was called off", 409, { calendar_event_id: ["Called off"] });
+}
+
+module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, edit, cancel, respond, reminderCheck, cardRecords, assertCardEvent };

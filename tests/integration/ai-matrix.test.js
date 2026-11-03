@@ -176,12 +176,19 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
     await drainOutbox();
     registry.load();
     const tools = [...registry.reads(), ...registry.summaries(), ...registry.actions()];
-    const may = (role, module, action) => {
+    // The screen's rule: the grant, and for an action held to a capability, that capability too (its route's requireCapability).
+    const may = (role, module, action, tool) => {
       const u = people.get(role);
-      return Boolean(u) && (u.is_ceo === true || grantsOf.get(`${role}:${module}:${action}`) === true);
+      if (!u) return false;
+      if (u.is_ceo === true) return true;
+      return grantsOf.get(`${role}:${module}:${action}`) === true && (!tool || !tool.capability || (capabilitiesOf.get(role) || []).includes(tool.capability));
     };
     const grantsOf = new Map();
-    for (const [role, u] of people) for (const t of tools) grantsOf.set(`${role}:${t.permission[0]}:${t.permission[1]}`, Boolean(await scopeFor(u, t.permission[0], t.permission[1])));
+    const capabilitiesOf = new Map();
+    for (const [role, u] of people) {
+      capabilitiesOf.set(role, u.is_ceo === true ? [] : await grantsCache.getCapabilities(pool, u.user_id));
+      for (const t of tools) grantsOf.set(`${role}:${t.permission[0]}:${t.permission[1]}`, Boolean(await scopeFor(u, t.permission[0], t.permission[1])));
+    }
     cases = engine.matrix.casesFor({ tools, roles: [...people.keys()], may });
   }, 180_000);
 

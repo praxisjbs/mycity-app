@@ -13,7 +13,7 @@
  *   completed   the work is over; keeps its tasks, takes no new one until reopened
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 
 const ProjectStatus = z.enum(["active", "completed"]);
@@ -73,15 +73,21 @@ const ProjectPrefill = z
   .strict();
 
 /** PATCH /projects/:id: its owner, or a reader whose grant is `all`. `completed` completes it, `active` reopens it. */
-const ProjectEdit = z
+const ProjectEditFields = z
   .object({
     name: text(120).optional(),
     description: z.string().trim().max(2000).nullable().optional(),
     due_on: isoDate.nullable().optional(),
     status: ProjectStatus.optional(),
   })
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, "Change at least one field");
+  .strict();
+const ProjectEdit = ProjectEditFields.refine((v) => Object.keys(v).length > 0, "Change at least one field");
+
+/**
+ * Edit Project as Praxis AI's card (docs/guides/praxis-ai.md §6.11): the project beside the form's
+ * fields, which the page's own form never names; `status` as Complete Project and Reopen Project.
+ */
+const ProjectChange = ProjectEditFields.extend({ project_id: recordId("project") }).refine(changesBeside(["project_id"]), nothingOn("project_id"));
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
@@ -100,6 +106,7 @@ const TABLES = {
   ProjectCreate: { table: "project" },
   ProjectPrefill: { table: "project" },
   ProjectEdit: { table: "project" },
+  ProjectChange: { table: "project" },
 };
 
 module.exports = {
@@ -112,4 +119,5 @@ module.exports = {
   ProjectCreate,
   ProjectPrefill,
   ProjectEdit,
+  ProjectChange,
 };
