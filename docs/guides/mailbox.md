@@ -576,6 +576,7 @@ interface copy; the copy rules apply to the chrome around them.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · `mailbox.ai.js`: a draft (`MailDraftSave`) is reached `via mail.send` (`praxis-ai.md` decision 33); the signatures are on the list of forms to bring into the chat (`scripts/check/ai-forms-gaps.json`). No behaviour changed.
 - 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11, decision 19): the mailbox gains `mailbox.ai.js`, which declares no read and one action, `mail.send` (a mail the assistant wrote from the person's words, saved as a draft and queued through `send` with the signature baked, `mailbox.service.sendNew`; refused without a connected mailbox); the controller's `ai:none` goes with it; §9. Nothing on the Mailbox screens changes.
 
 - 26/10/2026 · GE · The ready-to-send guard (`placeholdersIn`, the gaps it refuses) moved to `services/ai/drafts.js`, shared with Queries & Sanctions' Write With AI (queries.md §9); Write With AI, Tidy Up and Summarise Thread behave as before.

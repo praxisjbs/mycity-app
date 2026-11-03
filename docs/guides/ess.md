@@ -418,6 +418,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · `ess.ai.js`: My Profile's own edit (`EssProfileUpdate`) is never in the chat, `personal` (`praxis-ai.md` decision 33). No behaviour changed.
 - 03/11/2026 · JP · `my_leave.request` matches a type written with or without the word Leave ("Annual Leave" for the type named Annual), which staging showed it missing (`praxis-ai.md` decision 32). No screen of ESS changed.
 - 03/11/2026 · JP · `my_leave.request`'s card names its leave type and picks it with Request Leave's own list; a type written by name is matched to an active type; asked for leave without a type, Praxis AI asks which, with the person's types and the days left of each (`praxis-ai.md` §1.4 decision 32). No screen of ESS changed.
 - 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.17): `my_profile.get` and `my_leave.list` carry matrix probes (the asker's own record and request returned, an outsider's never), and the leave manifest's `leave.requests`, `leave.approve` and `leave.reject` theirs (a report's request in a line manager's reach, an outsider's never, a card naming it refused); `LeaveApprove` and `LeaveReject` say At most 25 on a card.

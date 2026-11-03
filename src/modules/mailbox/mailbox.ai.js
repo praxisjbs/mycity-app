@@ -15,6 +15,10 @@ const service = require("./mailbox.service");
 
 module.exports = defineManifest({
   module: "mailbox",
+  // A create or edit form not drafted here, and why (gate 23 rule 6, praxis-ai.md decision 33).
+  not_offered: {
+    MailDraftSave: "via mail.send: a draft is the composer's own; the card sends the words (MailCompose)",
+  },
   actions: [
     {
       key: "mail.send",

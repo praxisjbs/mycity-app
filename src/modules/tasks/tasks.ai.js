@@ -100,7 +100,7 @@ module.exports = defineManifest({
   // Every other Create schema of this module's contract, and why the assistant does not offer it (gate 23).
   not_offered: {
     TaskStepCreate: "a step belongs to a task's own panel, where the person sees the task",
-    TaskCommentCreate: "the panel's own comment form, which never names its task; the card is TaskCommentAdd",
+    TaskCommentCreate: "via tasks.comment: the panel's own comment form, which never names its task; the card is TaskCommentAdd",
     TaskDependencyCreate: "a dependency is set on the task's panel with both tasks in view",
     LateReasonCreate: "late reasons are Settings, set by Operations & People on the Tasks screen",
   },

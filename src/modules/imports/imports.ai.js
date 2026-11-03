@@ -13,7 +13,7 @@ module.exports = defineManifest({
   module: "settings",
   // Every Create schema of this module's contract, and why the assistant does not offer it (gate 23).
   not_offered: {
-    ImportCreate: "an import starts on Settings, Imports with the spreadsheet uploaded and its preview in view",
+    ImportCreate: "file: an import starts on Settings, Imports with the spreadsheet uploaded and its preview in view",
   },
   reads: [
     {

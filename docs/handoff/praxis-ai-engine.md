@@ -769,6 +769,19 @@ id nothing named.
 - [x] 03/11/2026 · Finished after staging: a type written "Annual Leave" matches the type named Annual (with or without the word Leave, a name either side begins); a card with a problem keeps what was matched; an id field reads only as a name the card knows; the pane follows the latest answer that read records or has figures, never blank after a card
 - [ ] Run the evaluation set on staging with the real model: `node scripts/ai/eval-assistant.js --only=ask`, `--only=card`
 
+### 6.9 Every form in the chat: the gate (decision 33, JBS Praxis, 03/11/2026; branch `claude/determined-dirac-b4ivrd-forms-gate`)
+
+Asked for on 02/11/2026 after the list of the hub's forms showed five of about 76 create and edit
+forms reachable from the chat; the gate's shape was approved on 03/11/2026 ("go ahead with the forms
+gate"). This PR adds the gate and the list; the forms themselves follow, module by module.
+
+- [x] 03/11/2026 · `praxis-ai.md` first: §1.5 decision 33, §6.15 rule 6, §14
+- [x] 03/11/2026 · Gate 23 rule 6 (`scripts/check/ai-awareness.js`, `formsAccountedFor`): each create and edit schema of a built module is an action, `via <action>:`, a never word (`secret`, `device`, `personal`, `file`, `ai`) or on `scripts/check/ai-forms-gaps.json`, which only shrinks; `not_offered` may name an edit schema; `--list` prints every form and how it is accounted for
+- [x] 03/11/2026 · The never and via reasons: a punch and a check-in `device`, a home location and `EssProfileUpdate` `personal`, an import and the documents module `file`, the integrations module and `SecurityPolicyPatch` `secret`, the assistant module (a card's own edit) `ai`; `MessageCreate` and `DirectCreate` via `community.message`, `TaskCommentCreate` via `tasks.comment`, `MailDraftSave` via `mail.send`
+- [x] 03/11/2026 · Today's gaps: 89 forms listed, each with where it lives (3 in the chat, 4 through another action, 20 never, of 116)
+- [x] 03/11/2026 · Tests: the rule's cases (a new form, a gap added, a gap closed or stale, a via naming no action) and the list's shape (`ai-engine.test.js`)
+- [ ] The forms, module by module, each PR taking its gaps off the list: Workspace and Calendar, then People, Performance, Community, Queries and Policies, Home and Settings
+
 ## 7 · Gates this work adds
 
 | Gate | Script | Refuses |
@@ -899,3 +912,6 @@ id nothing named.
   match now takes a type with or without the word Leave, a card keeps what was matched while another
   field is fixed, an id field never shows the model's own words, and the pane no longer goes blank
   after a card drawn from what was said.
+- 03/11/2026 · JP · The forms gate (§6.9, decision 33): gate 23 rule 6 holds every create and edit
+  form of a built module to an action, a via, a never word or the list of today's gaps (89 of 116),
+  which only shrinks. Next: the forms themselves, Workspace and Calendar first.
