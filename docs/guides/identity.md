@@ -473,6 +473,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · `access.ai.js`: Save Role is `design` (`praxis-ai.md` decision 35): a role's grants are designed on Roles and Permissions with the whole matrix in view, so who may do what never changes from the chat. No screen changed.
 - 01/11/2026 · JP · Confirm It's You starts on the strongest way the person has: a passkey when they have one, else the PIN, else the password (`useFreshSignIn`, `app/src/auth/FreshSignIn.tsx`; its choices in that order), for a Praxis AI card of a sensitive class as for My Security (`docs/guides/praxis-ai.md` §6.11, decision 11); the hook tells its caller which way was used (`onConfirmed`), so Praxis AI can offer Set Passkey once to a person who used the PIN or the password and has none. §10's My Security row: Confirm With now reads Passkey, PIN or Password.
 
 - 01/11/2026 · JP · `identity.service.provedAgo(db, actor)`: seconds since the session signed in or last confirmed it is the person (the same proof `confirmedFor` reads), for a Praxis AI card of a sensitive class, which is pressed only within five minutes of Confirm It's You (`docs/guides/praxis-ai.md` §6.11 step 4, decision 11). No screen or route of this guide changes.

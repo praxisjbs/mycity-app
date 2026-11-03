@@ -41,6 +41,10 @@ const activityProbe = {
 
 module.exports = defineManifest({
   module: "home",
+  // Which cards each role's Home shows and locks is designed on its own screen (praxis-ai.md decision 35).
+  not_offered: {
+    HomeRoleKpisSave: "design: the cards a role's Home opens on and locks are arranged on Home with every card of the role in view",
+  },
   reads: [
     {
       key: "cards.mine",

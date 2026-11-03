@@ -2,6 +2,30 @@
   "about": "The AI manifests as the build declares them (docs/guides/praxis-ai.md §6.15). Rewrite with npm run gen:ai-catalogue; never by hand.",
   "entries": [
     {
+      "key": "alert_rules.create",
+      "kind": "action",
+      "module_key": "home",
+      "permission": "home.view",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "alerts.HomeAlertRuleCreate",
+      "schema_sha": "b571995a2f32e7bf",
+      "screen": null,
+      "capability": "alerts.manage"
+    },
+    {
+      "key": "alert_rules.edit",
+      "kind": "action",
+      "module_key": "home",
+      "permission": "home.view",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "alerts.HomeAlertRuleChange",
+      "schema_sha": "b9a9c08573f46597",
+      "screen": null,
+      "capability": "alerts.manage"
+    },
+    {
       "key": "approvals.decide",
       "kind": "action",
       "module_key": "settings",
@@ -54,6 +78,61 @@
       "bulk": 1,
       "schema": "community.ChannelPost",
       "schema_sha": "c7f2cf806e53f4f0",
+      "screen": null
+    },
+    {
+      "key": "faults.edit",
+      "kind": "action",
+      "module_key": "system_health",
+      "permission": "system_health.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "system_health.FaultChange",
+      "schema_sha": "823cd577316025a4",
+      "screen": null
+    },
+    {
+      "key": "faults.note",
+      "kind": "action",
+      "module_key": "system_health",
+      "permission": "system_health.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "system_health.FaultNoteAdd",
+      "schema_sha": "d17b5b605f900be6",
+      "screen": null
+    },
+    {
+      "key": "health_targets.edit",
+      "kind": "action",
+      "module_key": "system_health",
+      "permission": "system_health.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "system_health.PerformanceTargetsChange",
+      "schema_sha": "5c59851fc3f3869c",
+      "screen": null
+    },
+    {
+      "key": "holidays.add",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "settings.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "settings.HolidaySave",
+      "schema_sha": "02edbc9e32ba7e4f",
+      "screen": null
+    },
+    {
+      "key": "holidays.edit",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "settings.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "settings.HolidayChange",
+      "schema_sha": "8d01472f35f20851",
       "screen": null
     },
     {
@@ -125,6 +204,83 @@
       "screen": null
     },
     {
+      "key": "notice_reminders.edit",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "settings.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "notifications.NotificationRemindersChange",
+      "schema_sha": "02b25cc4869f4822",
+      "screen": null
+    },
+    {
+      "key": "notice_rules.edit",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "settings.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "notifications.NotificationRuleChange",
+      "schema_sha": "25cc8be91ab83b30",
+      "screen": null
+    },
+    {
+      "key": "notices.digest",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "ess.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "notifications.DigestUpdate",
+      "schema_sha": "d6e683fcb1699571",
+      "screen": null
+    },
+    {
+      "key": "notices.preference",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "ess.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "notifications.NotificationPreferenceUpdate",
+      "schema_sha": "79c76b2df45410fb",
+      "screen": null
+    },
+    {
+      "key": "notices.quiet_hours",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "ess.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "notifications.QuietHoursChange",
+      "schema_sha": "c3fe0ee3121ec642",
+      "screen": null
+    },
+    {
+      "key": "numbering.edit",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "settings.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "settings.NumberingSchemeChange",
+      "schema_sha": "f907ade858a7390c",
+      "screen": null
+    },
+    {
+      "key": "organisation.edit",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "settings.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "settings.OrganisationPatch",
+      "schema_sha": "9aaf4d4d733c3947",
+      "screen": null
+    },
+    {
       "key": "projects.create",
       "kind": "action",
       "module_key": "workspace",
@@ -145,6 +301,42 @@
       "schema": "projects.ProjectChange",
       "schema_sha": "d303b1595834209f",
       "screen": null
+    },
+    {
+      "key": "reports.create",
+      "kind": "action",
+      "module_key": "home",
+      "permission": "home.view",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "reports.HomeReportCreate",
+      "schema_sha": "8e19a487e906e095",
+      "screen": null,
+      "capability": "home.reports"
+    },
+    {
+      "key": "reports.edit",
+      "kind": "action",
+      "module_key": "home",
+      "permission": "home.view",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "reports.HomeReportChange",
+      "schema_sha": "bfaa5128be28655d",
+      "screen": null,
+      "capability": "home.reports"
+    },
+    {
+      "key": "reports.schedule",
+      "kind": "action",
+      "module_key": "home",
+      "permission": "home.view",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "reports.HomeReportScheduleChange",
+      "schema_sha": "df44226c82c0f273",
+      "screen": null,
+      "capability": "home.reports"
     },
     {
       "key": "tasks.add_step",
@@ -232,6 +424,17 @@
       "bulk": 1,
       "schema": "workspace.WeekSave",
       "schema_sha": "db62c8cf91372dec",
+      "screen": null
+    },
+    {
+      "key": "working_week.day",
+      "kind": "action",
+      "module_key": "settings",
+      "permission": "settings.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "settings.WorkingDayChange",
+      "schema_sha": "cfaa2d96f2d257f9",
       "screen": null
     },
     {

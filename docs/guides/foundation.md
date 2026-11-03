@@ -1019,6 +1019,13 @@ the log's filters say) by action, by person, by module or record type, and by da
 words (`audit.repo.aiSummary`). `documents` carries `ai:none`: a document is a
 file, and what it says about a person is read through that person's own module.
 
+Settings' own forms are Praxis AI cards too (`settings.ai.js`, `docs/guides/praxis-ai.md` §6.11,
+decision 33), each the screen's own service function under the Settings grant: Save Organisation
+(never the address, picked on the map), Add Holiday and Save Holiday, Save Working Day (one day, the
+other six kept, held to `WorkingWeekSave`) and Save Numbering (only what changes, held to
+`NumberingSchemeSave`). A role's grants (Save Role) and an approval flow and its steps are `design`
+(decision 35): designed with the whole of them in view, never in the chat.
+
 Since PR4 of the Praxis AI Engine, My Approvals has a card (`approvals.decide`, `workflow.ai.js`,
 `docs/guides/praxis-ai.md` §6.11): approve, reject or request changes on up to 25 of the requests
 waiting on the person, after Confirm It's You (risk approval), with a reason required but to
@@ -1159,6 +1166,7 @@ screen.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Settings' forms in the chat (`praxis-ai.md` decisions 33 and 35): Save Organisation, Add and Save Holiday, Save Working Day and Save Numbering as Praxis AI cards (`settings.ai.js`, `settings.service.holiday`); Save Role, New Approval Flow and Edit Approval Steps are `design`, never in the chat (§9). No screen changed.
 - 03/11/2026 · JP · My Approvals' card (`approvals.decide`) asks what it needs before it is drawn (`praxis-ai.md` decision 34): which requests (those waiting on the person, as a card names them, `workflow.service.cardChoices`; matched by their words, `instanceIdOf`), the decision, and the reason unless it is an approval. No Approvals screen changed.
 - 03/11/2026 · JP · Decision 33's words on three foundation modules (`praxis-ai.md` §1.5): an import is `file` (`imports.ai.js`), the documents module opted out as `file`, the security policy is `secret` (`settings.ai.js`); the other Settings forms are on the list of forms to bring into the chat (`scripts/check/ai-forms-gaps.json`). No behaviour changed.
 - 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.15, §6.17): `approvals.mine` and `approvals.decide` carry matrix probes (a report's request waiting on the asker who holds approve, an outsider's never, a card naming it refused unless the asker reads every request); `ApprovalDecide` says At most 25 on a card; `imports.ai.js` and `organisation.ai.js` account for their Create schemas in `not_offered` (an import starts on Settings, Imports with its preview in view; Add Employee carries restricted fields, a department and a seat are set with the structure in view), as gate 23 asks of every module.

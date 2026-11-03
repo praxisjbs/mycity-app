@@ -25,7 +25,8 @@
  *     `<Thing>Create`, `Edit`, `Update`, `Patch` or `Save` schema of a built module's contract is
  *     an action's input; or its module's `not_offered` reason starts `via <action key>:` (reached
  *     through that action's card) or with a never word (`secret:`, `device:`, `personal:`,
- *     `file:`, `ai:`), as does the `// ai:none` reason of a module opted out whole; or it is on the
+ *     `file:`, `ai:`, `design:` by decision 35), as does the `// ai:none` reason of a module opted
+ *     out whole; or it is on the
  *     list of today's gaps, scripts/check/ai-forms-gaps.json. That list only shrinks: an entry now
  *     accounted for, or naming no such schema, fails until it is taken off, and one the change's
  *     base did not hold fails, so a new form comes with its action or its reason.
@@ -57,7 +58,7 @@ const coverage = require("./ai-manifest-coverage");
 /** A create or edit form's request, by its schema's name (decision 33). */
 const FORM_SCHEMA = /(Create|Edit|Update|Patch|Save)$/;
 /** Why a form is never in the chat (decision 33): the five words a reason may start with. */
-const NEVER = Object.freeze(["secret", "device", "personal", "file", "ai"]);
+const NEVER = Object.freeze(["secret", "device", "personal", "file", "ai", "design"]);
 
 /** What a not_offered or ai:none reason says of its form: reached via an action, never for a word, or neither. */
 function reasonOf(reason) {

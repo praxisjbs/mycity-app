@@ -361,8 +361,13 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 ## 9 · AI and search
 
 - **AI reads** (`system_health.ai.js`): none. A fault is engineering detail; the assistant answering
-  "is the system down" from a stack trace would be worse than useless to a member of staff, and A23
-  keeps the assistant read-only anyway.
+  "is the system down" from a stack trace would be worse than useless to a member of staff.
+- **AI actions** (`system_health.ai.js`, `docs/guides/praxis-ai.md` §6.11, decision 33): cards the
+  person confirms, under `system_health` edit: Save Targets (`health_targets.edit`,
+  `PerformanceTargetsChange`: only the levels named, the rest kept, held to `PerformanceTargetsUpdate`;
+  `targets.save`), Save Fault (`faults.edit`, `FaultChange`: the fault by its title, its status and a
+  note; who holds it stays on the fault's sheet; `patch`) and Add Note (`faults.note`, `FaultNoteAdd`;
+  `addNote`). "Which fault?" offers the open faults by title (decision 34).
 - **AI routes**: none.
 - **Search** (`system_health.search.js`): the screen itself is reachable from ⌘K through the route
   map, for those who hold the permission. Individual faults are `search:none`: they are found on the
@@ -459,6 +464,7 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · System Health's forms in the chat (`praxis-ai.md` decision 33): Save Targets, Save Fault and Add Note as Praxis AI cards under `system_health` edit, each the screen's own service function; the controller's `ai:none` gives way to the manifest, which still reads nothing (§9). No screen changed.
 - 27/10/2026 · JP · From the 27/10 staging faults brief (JBS Praxis's answers): a refusal no screen can foresee, a password found in a breach, is answered as before and never recorded as a fault (`err.recorded = false`, §6); a person choosing a breached password is the rule working, and three of them cost a fix session to rule out. Waits On's and Open Round's rules, which shared `VALIDATION_FAILED`, each have their own code, so a brief names the rule a person met (workspace.md, performance.md).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Checks reads Show All when every check is up and Show Fewer once all show; Download Brief, the bulk changes and a fault's status buttons say why they failed; more than 25 (a brief) or 50 (a status) ticked asks first, as §11 says; Take It On sends `assigned_to`, so Held By names the reader (§2, §10.1); Add Note saves a note with no status change (`POST /faults/:id/notes`); the fault's labels are Title Case (First Seen, Last Seen, How Often, Held By); Status keeps its title when it cannot load; a reader with view only gets no ticks. §10 updated.
 - 25/10/2026 · JP · Settings · Performance: the p95 column keeps its help term and sorts from the glyph beside it (`DataView` `sortLabel`), since a help term inside the sort button was a control inside a control (the accessibility gate's nested-interactive).

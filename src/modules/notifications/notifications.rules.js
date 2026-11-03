@@ -12,6 +12,7 @@ const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
+const { oneNamed } = require("../../shared/ai/named");
 const categories = require("../../shared/notifications/categories");
 const fanout = require("../../shared/notifications/fanout");
 const { EVENTS } = require("./notifications.events");
@@ -95,6 +96,25 @@ async function presentOne(db, notice) {
     repo.copiedPeople(db, [rule.notification_rule_id]),
   ]);
   return present(notice, rule, roles, people.map((p) => p.person));
+}
+
+/** One notice with its rule, as Settings shows it: what a card changing it starts from (praxis-ai.md §6.11). */
+function one(key) {
+  return presentOne(pool, noticeOf(key));
+}
+
+/**
+ * The notice a card names by its words (praxis-ai.md decision 34): its name or its key, among every
+ * notice the code declares (shared/ai/named.js); null when none or several match.
+ */
+function keyOf(words) {
+  const found = oneNamed(notices(), words, (n) => [n.name, n.event_key]);
+  return found ? found.event_key : null;
+}
+
+/** "Which notice?" answers: the first notices as Settings lists them. */
+async function names() {
+  return (await list({ page: 1 })).data.map((n) => n.name);
 }
 
 /** A page of notices with their rules, in category order. */
@@ -234,4 +254,4 @@ async function saveReminders(actor, body, now = new Date()) {
   });
 }
 
-module.exports = { notices, list, save, reset, remindersOf, saveReminders };
+module.exports = { notices, list, one, keyOf, names, save, reset, remindersOf, saveReminders };

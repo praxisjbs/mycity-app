@@ -71,7 +71,8 @@ module.exports = defineManifest({
   ],
   // Every other Create schema of this module's contract, and why the assistant does not offer it (gate 23).
   not_offered: {
-    ApprovalFlowCreate: "an approval flow is Settings, designed stage by stage on Settings, Approvals",
+    ApprovalFlowCreate: "design: an approval flow is designed stage by stage on Settings, Approvals, with its approvers, conditions and time limits in view",
+    ApprovalStepsUpdate: "design: a flow's stages are redesigned together on Settings, Approvals and saved as a new version",
   },
   summaries: [
     {

@@ -13,7 +13,7 @@
  * Notifications, the company's rule per notice and its reminders.
  */
 const { z } = require("zod");
-const { uuid, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, isoDateTime, listQuery, Paged, changesBeside, nothingOn } = require("./common");
 const { ModuleKey } = require("./identity");
 const { PersonRef } = require("./organisation");
 
@@ -344,6 +344,45 @@ const NotificationReminders = z
 /** PUT /notifications/reminders: all three at once. */
 const NotificationRemindersUpdate = NotificationReminders;
 
+/*
+ * Praxis AI's cards for Notifications (docs/guides/praxis-ai.md §6.11, decision 33): only what
+ * changes, the rest kept as it stands; the service then saves the whole as the screen's form does.
+ */
+
+/** The person's own quiet hours changed from the chat: on or off, or either time. */
+const QuietHoursChange = z
+  .object({ quiet_enabled: z.boolean().optional(), quiet_from: ClockTime.optional(), quiet_to: ClockTime.optional() })
+  .strict()
+  .refine(changesBeside([]), nothingOn("quiet_enabled"));
+
+/** The company's rule for one notice changed from the chat: the notice, and what changes on it. */
+const NotificationRuleChange = z
+  .object({
+    event_key: NotificationRuleParams.shape.key,
+    enabled: z.boolean().optional(),
+    urgency: NotificationUrgency.nullable().optional(),
+    in_app: z.boolean().optional(),
+    email: z.boolean().optional(),
+    push: z.boolean().optional(),
+    role_codes: z.array(z.string().trim().min(1).max(60)).max(25).optional(),
+    employee_ids: z.array(uuid).max(25).optional(),
+  })
+  .strict()
+  .refine(changesBeside(["event_key"]), nothingOn("event_key"));
+
+/** The company's three reminders changed from the chat, each setting by its own name; the rest kept. */
+const NotificationRemindersChange = z
+  .object({
+    approvals_enabled: z.boolean().optional(),
+    approvals_every_hours: z.number().int().min(1).max(168).optional(),
+    probation_enabled: z.boolean().optional(),
+    probation_days_ahead: z.number().int().min(1).max(90).optional(),
+    digest_enabled: z.boolean().optional(),
+    digest_at_time: ClockTime.optional(),
+  })
+  .strict()
+  .refine(changesBeside([]), nothingOn("approvals_enabled"));
+
 /* ------------------------------------------------------------------ *
  * Web push
  * ------------------------------------------------------------------ */
@@ -527,6 +566,18 @@ const TABLES = {
     table: null,
     reason: "the three company reminders, each saved as a notification_reminder_rule row",
   },
+  QuietHoursChange: { table: "notification_setting" },
+  NotificationRuleChange: {
+    table: "notification_rule",
+    virtual: {
+      role_codes: "notification_rule_recipient rows, one per role",
+      employee_ids: "notification_rule_recipient rows, one per person",
+    },
+  },
+  NotificationRemindersChange: {
+    table: null,
+    reason: "the three company reminders, each setting by its own name, merged and saved as notification_reminder_rule rows",
+  },
   PushConfig: { table: null, reason: "the environment's VAPID public key and whether push is on" },
   PushSubscriptionCreate: {
     table: "push_subscription",
@@ -591,6 +642,9 @@ module.exports = {
   NotificationRuleUpdate,
   NotificationReminders,
   NotificationRemindersUpdate,
+  QuietHoursChange,
+  NotificationRuleChange,
+  NotificationRemindersChange,
   PushConfig,
   PushSubscriptionCreate,
   PushDevice,

@@ -246,7 +246,8 @@ function checkAction(where, a, seen) {
   const at = `${where} action ${a.key}`;
   checkDescription(at, a.description);
   checkSchemaParam(at, a.input, "input");
-  checkPermission(at, a.permission, ACTION_GRANTS, "an action");
+  // A route that asks only view and a capability (Home's alert rules, reports): the capability is the authority.
+  checkPermission(at, a.permission, a.capability !== undefined ? new Set([...ACTION_GRANTS, "view"]) : ACTION_GRANTS, "an action");
   // An authority held on top of the grant, as the screen's route holds it with requireCapability (praxis-ai.md §6.11).
   if (a.capability !== undefined && (typeof a.capability !== "string" || !catalog.isCapability(a.capability)))
     throw new Error(`${at}: capability is a code in shared/access/access.catalog.js CAPABILITY_CATALOG`);

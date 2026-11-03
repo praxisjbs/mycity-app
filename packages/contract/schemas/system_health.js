@@ -18,7 +18,7 @@
  * brief, so it travels as route, stack, release and counts only.
  */
 const { z } = require("zod");
-const { uuid, text, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 
 /** How bad, as the error reporter writes it. `notice` is a 422: counted, never alerted. */
 const Severity = z.enum(["fatal", "error", "warning", "notice"]);
@@ -612,6 +612,27 @@ const FaultPatch = z
 
 const FaultNoteCreate = z.object({ body: text(2000) }).strict();
 
+/*
+ * Praxis AI's cards for System Health (docs/guides/praxis-ai.md §6.11, decision 33): the targets
+ * by what changes, the rest kept as they stand; a fault's status, holder or note beside the fault.
+ */
+const PerformanceTargetsChange = z
+  .object(Object.fromEntries(Object.entries(targetFields).map(([k, v]) => [k, v.optional()])))
+  .strict()
+  .refine(changesBeside([]), nothingOn("availability_pct"));
+
+const FaultChange = z
+  .object({
+    error_group_id: recordId("fault"),
+    status: FaultStatus.optional(),
+    assigned_to: uuid.nullable().optional(),
+    note: text(2000).optional(),
+  })
+  .strict()
+  .refine((v) => v.status !== undefined || v.assigned_to !== undefined, { message: "Change a status or an owner", path: ["status"] });
+
+const FaultNoteAdd = z.object({ error_group_id: recordId("fault"), body: text(2000) }).strict();
+
 /** POST /system-health/faults/bulk */
 const FaultBulkStatus = z
   .object({
@@ -759,6 +780,9 @@ const TABLES = {
   FaultPage: { table: null, reason: "a page of faults" },
   FaultPatch: { table: null, reason: "a status and an owner for one fault, with an optional note that becomes an error_group_note" },
   FaultNoteCreate: { table: "error_group_note" },
+  PerformanceTargetsChange: { table: "performance_target" },
+  FaultChange: { table: null, reason: "a status and an owner for one fault, named, with an optional note that becomes an error_group_note" },
+  FaultNoteAdd: { table: "error_group_note" },
   FaultBulkStatus: { table: null, reason: "one status for several faults at once" },
   FaultBulkResult: { table: null, reason: "how many faults the bulk change moved" },
   BriefRequest: { table: null, reason: "the ticked faults, carried to the worker that writes the brief" },
@@ -819,6 +843,9 @@ module.exports = {
   FaultDetail,
   FaultPatch,
   FaultNoteCreate,
+  PerformanceTargetsChange,
+  FaultChange,
+  FaultNoteAdd,
   FaultBulkStatus,
   FaultBulkResult,
   BriefRequest,

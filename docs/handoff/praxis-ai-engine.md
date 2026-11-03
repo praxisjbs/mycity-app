@@ -781,7 +781,8 @@ gate"). This PR adds the gate and the list; the forms themselves follow, module 
 - [x] 03/11/2026 · Today's gaps: 89 forms listed, each with where it lives (3 in the chat, 4 through another action, 20 never, of 116)
 - [x] 03/11/2026 · Tests: the rule's cases (a new form, a gap added, a gap closed or stale, a via naming no action) and the list's shape (`ai-engine.test.js`)
 - [x] 03/11/2026 · Workspace and Calendar (branch `claude/determined-dirac-b4ivrd-workspace-chat`): ten cards, Save Task, Add Step, Save Step, Add Link, Add Reason, Switch Reason, Create Project, Save Project, Save Event, Save Support Needed; an edit form's card names its record (`<Thing>Change`, `TaskStepAdd`, `TaskWaitOn`, `LateReasonSwitch`) and the form's own schema is reached `via` it; actions may name a `capability`; `resolve` is handed the card's values; the `task` pick; `tasks.get`; ten gaps closed (79 left)
-- [ ] The rest, module by module, each PR taking its gaps off the list: People, Performance, Community, Queries and Policies, Home and Settings
+- [x] 03/11/2026 · Home and Settings (branch `claude/determined-dirac-b4ivrd-home-settings`): eighteen cards; decision 35 (`design`) for a role's grants, an approval flow and its steps, a role's Home cards; the push subscription `device`; `shared/ai/change.js`; `view` with a capability; 22 gaps closed (57 left)
+- [ ] The rest, module by module, each PR taking its gaps off the list: People, Performance, Community, Queries and Policies (two parallel chats)
 
 ### 6.10 A card is drawn whole (decision 34, JBS Praxis, 03/11/2026; branch `claude/determined-dirac-b4ivrd-ask-first`)
 
@@ -934,3 +935,7 @@ lead ("It should always ask for required fields, so we never see an error. We ca
 - 03/11/2026 · JP · A card is drawn whole (§6.10, decision 34): every required field is asked before
   a card is drawn, gate 23 rule 7 holding it; a lead is asked when a task is shared with a department;
   a record is asked with the person's own to tap and matched by its words. Next: Home and Settings.
+- 03/11/2026 · JP · Home and Settings' forms in the chat (§6.9, decisions 33 and 35): eighteen cards
+  through the screens' own services; four structure forms `design` (owner's choice), the push
+  subscription `device`; a card changing part of a whole holds it to the form's own schema; `view`
+  with a capability for Home's alert rules and reports. 57 gaps left, all in the parallel chats' areas.
