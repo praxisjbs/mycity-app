@@ -193,7 +193,7 @@ module.exports = defineManifest({
       key: "community.wish",
       label: "Send Wishes",
       matrix: wishProbe,
-      description: "Send wishes on a colleague's birthday or work anniversary card of the last two weeks, the card named by whose it is",
+      description: "Send wishes on a colleague's birthday or work anniversary card of the last two weeks, named by whose it is, in the person's words: wish her a happy birthday is Happy birthday!",
       input: c.community.WishSend,
       permission: ["community", "create"],
       risk: "standard",

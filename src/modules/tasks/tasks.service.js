@@ -41,7 +41,7 @@
 const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
-const { oneNamed } = require("../../shared/ai/named");
+const { oneNamed, plainWords } = require("../../shared/ai/named");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const numbering = require("../../shared/numbering/numbering");
@@ -876,7 +876,8 @@ async function cardRecords(db, ids, scope) {
  * a code on the card. Read through this module's repo; nothing here decides who may be named.
  */
 async function cardNames(db, values = {}) {
-  const idsIn = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter((x) => typeof x === "string" && x);
+  // Ids only: a value still in words (a name the matcher left as written) names nothing here.
+  const idsIn = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter((x) => c.common.uuid.safeParse(x).success);
   return repo.cardNames(db, {
     employeeIds: [...new Set([...idsIn(values.primary_assignee_id), ...idsIn(values.member_ids), ...idsIn(values.watcher_ids)])].slice(0, 60),
     departmentIds: [...new Set([...idsIn(values.department_id), ...idsIn(values.watcher_department_id)])],
@@ -933,9 +934,22 @@ async function leadChoices(scope, departmentId) {
   return page.data.map((p) => p.display_name);
 }
 
-/** A lead written by name (decision 34): matched among those leadChoices offers, searched by the name first. */
+/** What a person calls themself when a task is for them ("for me"). */
+const SELF_WORDS = new Set(["me", "myself", "i", "mine"]);
+
+/**
+ * A lead written by name (decision 34): matched among those leadChoices offers, searched by the
+ * name first; the person themself by "me" or by their whole own name, as a task is theirs unless set
+ * for someone else (New Task's picker leaves them out because they are its default).
+ */
 async function leadIdOf(scope, words, departmentId) {
   const within = departmentId && c.common.uuid.safeParse(departmentId).success ? { department_id: departmentId } : {};
+  if (scope.employee_id && !within.department_id) {
+    if (SELF_WORDS.has(plainWords(words))) return scope.employee_id;
+    // Their whole name only: "Aaron" may as well be a colleague called Aaron, matched below.
+    const [me] = await repo.cardNames(pool, { employeeIds: [scope.employee_id] });
+    if (me && plainWords(me.label) === plainWords(words)) return scope.employee_id;
+  }
   for (const q of [words, null]) {
     const page = await people({ page: 1, ...within, ...(q ? { q } : {}) }, scope);
     const found = oneNamed(page.data, words, (p) => [p.display_name]);

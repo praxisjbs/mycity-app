@@ -454,6 +454,20 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
     expect(ask.body).toMatchObject({ content: "What support do you need?", card: null });
   });
 
+  test("a task for me, its lead written as the person's own name or as me, is theirs: no Pick one, and a name nothing matches never breaks the card's names", async () => {
+    const own = h.people.staff.employee_id;
+    for (const lead of ["Tunde Ade", "me"]) {
+      script(say({ text: "Here is the task.", action: { key: "tasks.create", values: { title: "Send the weekly report", due_on: "2026-11-20", priority: "normal", primary_assignee_id: lead }, suggested: false } }));
+      const card = (await h.ask("staff", { question: "Create a task for me to send the weekly report on the 20th, normal priority.", shows: ["cards"] })).body.card;
+      expect([lead, card]).toEqual([lead, expect.objectContaining({ action_key: "tasks.create", problems: {}, values: expect.objectContaining({ primary_assignee_id: own }) })]);
+      expect(card.names).toEqual(expect.arrayContaining([expect.objectContaining({ id: own, label: "Tunde Ade" })]));
+    }
+    // A name nothing matches stays as written, marked Pick one, and the card's names still read (no id lookup on words).
+    script(say({ text: "Here is the task.", action: { key: "tasks.create", values: { title: "Send the weekly report", due_on: "2026-11-20", priority: "normal", primary_assignee_id: "Somebody Unknown" }, suggested: false } }));
+    const unknown = (await h.ask("staff", { question: "Create a task for Somebody Unknown.", shows: ["cards"] })).body.card;
+    expect(unknown.problems).toEqual({ primary_assignee_id: ["Pick one"] });
+  });
+
   test("a task shared with a department asks who leads it first, with that department's people to tap; the lead written by name is matched, so the card is never drawn with Pick a lead (decision 34)", async () => {
     const department = (await one("SELECT department_id FROM employee WHERE employee_id = $1", [h.people.ops.employee_id])).department_id;
     const values = { title: "Research transaction fees", due_on: "2026-11-20", priority: "urgent", department_id: department };

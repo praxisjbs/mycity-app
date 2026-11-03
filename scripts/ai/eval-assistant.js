@@ -20,6 +20,15 @@
  *              of people says who (praxis-ai.md §6.4, a table names its records)
  *   needs      the module (its catalogue key) the answer must read from; skipped until that
  *              module's manifest declares a read, then graded on reading from it
+ *   picks      with `action`: fields the card may leave for the person to pick (Pick one), as a
+ *              typed address is when our search does not find exactly one place (decision 37)
+ *   given      records the question needs without naming them, as its placeholders do
+ *
+ * A question names staging's own records, as the person asking holds them: `{person}` is someone
+ * in their reach, `{<action>#<field>}` the first answer that card's own question offers them (its
+ * second with `#2`), and the other names are FILLS below. A question staging has nothing to fill is
+ * skipped and says what staging lacks, never failed. Each role is asked as the holder with the most
+ * open tasks, so the questions find their records.
  *
  * Run it by hand on staging, with a provider set up in AI Control, before a change to the prompt
  * (services/ai/prompts/data-answers.md) or the loop ships. Not in CI, which has no key. Each
@@ -62,57 +71,57 @@ const CASES = Object.freeze([
   // Everything its asks name is given, so the card is drawn at once (decision 29).
   { id: "card.task", as: "employee", question: "Create a task for me to send the weekly report on Friday, normal priority.", shows: ["cards"], action: "tasks.create" },
   // One case per action (PR4 of the engine): the change asked for comes back as that card with the right values.
-  { id: "card.task-done", as: "employee", question: "Mark my task about the weekly report as done.", shows: ["cards"], action: "tasks.complete" },
-  { id: "card.task-comment", as: "employee", question: "Add a comment on my weekly report task: the draft is with Ada for review.", shows: ["cards"], action: "tasks.comment" },
+  { id: "card.task-done", as: "employee", question: "Mark my task {tasks.complete#task_ids} as done.", shows: ["cards"], action: "tasks.complete" },
+  { id: "card.task-comment", as: "employee", question: "Add a comment on my task {tasks.comment#task_id}: the draft is with Ada for review.", shows: ["cards"], action: "tasks.comment" },
   { id: "card.meeting", as: "operations_people", question: "Book a meeting with {person} tomorrow at 10 for an hour about the venue visit.", shows: ["cards"], action: "calendar.create" },
   // Every form of My Workspace in the chat (praxis-ai.md decision 33): an edit names its record and only what changes.
-  { id: "card.task-edit", as: "employee", question: "Move my weekly report task's due day to next Friday and make it high priority.", shows: ["cards"], action: "tasks.edit" },
-  { id: "card.task-step", as: "employee", question: "Add a step to my weekly report task: collect the sales figures.", shows: ["cards"], action: "tasks.add_step" },
-  { id: "card.task-step-tick", as: "employee", question: "Tick the first step on my weekly report task.", shows: ["cards"], action: "tasks.edit_step" },
-  { id: "card.task-wait", as: "employee", question: "My weekly report task has to wait for my budget review task.", shows: ["cards"], action: "tasks.wait_on" },
+  { id: "card.task-edit", as: "employee", question: "Move my task {tasks.edit#task_id} to next Friday and make it high priority.", shows: ["cards"], action: "tasks.edit" },
+  { id: "card.task-step", as: "employee", question: "Add a step to my task {tasks.add_step#task_id}: collect the sales figures.", shows: ["cards"], action: "tasks.add_step" },
+  { id: "card.task-step-tick", as: "employee", question: "Tick the first step still to do on my task {stepped_task}.", shows: ["cards"], action: "tasks.edit_step" },
+  { id: "card.task-wait", as: "employee", question: "My task {tasks.wait_on#task_id} has to wait for my task {tasks.wait_on#depends_on_task_id#2}.", shows: ["cards"], action: "tasks.wait_on" },
   { id: "card.reason-add", as: "operations_people", question: "Add a late reason: Waiting on Supplier.", shows: ["cards"], action: "late_reasons.add" },
   { id: "card.reason-switch", as: "operations_people", question: "Switch off the late reason Underestimated.", shows: ["cards"], action: "late_reasons.switch" },
   { id: "card.project", as: "employee", question: "Start a project called Lekki Launch, due at the end of next month.", shows: ["cards"], action: "projects.create" },
-  { id: "card.project-edit", as: "employee", question: "Mark my Lekki Launch project as completed.", shows: ["cards"], action: "projects.edit" },
-  { id: "card.meeting-move", as: "operations_people", question: "Move my venue visit meeting to 11 the same day.", shows: ["cards"], action: "calendar.edit" },
+  { id: "card.project-edit", as: "employee", question: "Mark my project {own_project} as completed.", shows: ["cards"], action: "projects.edit" },
+  { id: "card.meeting-move", as: "operations_people", question: "Move my meeting {calendar.edit#calendar_event_id} to 11 the same day.", shows: ["cards"], action: "calendar.edit" },
   // Home and Settings in the chat (praxis-ai.md decisions 33 to 35): each card the screen's own, held to its grant and capability.
   { id: "card.organisation", as: "operations_people", question: "Change our trading name to MyCity Lagos.", shows: ["cards"], action: "organisation.edit" },
   { id: "card.holiday-add", as: "operations_people", question: "Add a public holiday on 31 December called End of Year Break.", shows: ["cards"], action: "holidays.add" },
-  { id: "card.holiday-edit", as: "operations_people", question: "Rename the End of Year Break holiday to Year End Break.", shows: ["cards"], action: "holidays.edit" },
+  { id: "card.holiday-edit", as: "operations_people", question: "Rename the {holidays.edit#public_holiday_id} holiday to Year End Break.", shows: ["cards"], action: "holidays.edit" },
   { id: "card.working-day", as: "operations_people", question: "Make Saturday a working day, 9 to 1.", shows: ["cards"], action: "working_week.day" },
   { id: "card.numbering", as: "operations_people", question: "Start task numbers with TK.", shows: ["cards"], action: "numbering.edit" },
   { id: "card.notice-setting", as: "employee", question: "Stop emailing me about leave.", shows: ["cards"], action: "notices.preference" },
   { id: "card.quiet-hours", as: "employee", question: "Turn on my quiet hours.", shows: ["cards"], action: "notices.quiet_hours" },
   { id: "card.digest", as: "employee", question: "Turn off my daily digest.", shows: ["cards"], action: "notices.digest" },
-  { id: "card.notice-rule", as: "operations_people", question: "Stop sending the leave request notice by email.", shows: ["cards"], action: "notice_rules.edit" },
+  { id: "card.notice-rule", as: "operations_people", question: "For everyone, stop sending the leave request notice by email.", shows: ["cards"], action: "notice_rules.edit" },
   { id: "card.reminders", as: "operations_people", question: "Send the daily digest at 7:30.", shows: ["cards"], action: "notice_reminders.edit" },
   { id: "card.targets", as: "implementation", question: "Warn when the CPU goes over 80 percent.", shows: ["cards"], action: "health_targets.edit" },
-  { id: "card.fault", as: "implementation", question: "Mark the payslip export fault as being handled.", shows: ["cards"], action: "faults.edit" },
-  { id: "card.fault-note", as: "implementation", question: "Note on the payslip export fault that the time limit was raised.", shows: ["cards"], action: "faults.note" },
-  { id: "card.alert-rule", as: "operations_people", question: "Alert me when approvals wait more than 5 days, high severity.", shows: ["cards"], action: "alert_rules.create" },
-  { id: "card.alert-rule-edit", as: "operations_people", question: "Switch off the approvals waiting rule.", shows: ["cards"], action: "alert_rules.edit" },
+  { id: "card.fault", as: "implementation", question: "Mark the {faults.edit#error_group_id} fault as being handled.", shows: ["cards"], action: "faults.edit" },
+  { id: "card.fault-note", as: "implementation", question: "Note on the {faults.note#error_group_id} fault that the time limit was raised.", shows: ["cards"], action: "faults.note" },
+  { id: "card.alert-rule", as: "operations_people", question: "Add an alert rule called Slow Approvals: alert me when approvals wait more than 5 days, high severity.", shows: ["cards"], action: "alert_rules.create" },
+  { id: "card.alert-rule-edit", as: "operations_people", question: "Switch off the {alert_rules.edit#home_alert_rule_id} alert rule.", shows: ["cards"], action: "alert_rules.edit" },
   { id: "card.report", as: "operations_people", question: "Build a headcount report called Monday Headcount.", shows: ["cards"], action: "reports.create" },
-  { id: "card.report-edit", as: "operations_people", question: "Rename my Monday Headcount report to Weekly Headcount.", shows: ["cards"], action: "reports.edit" },
-  { id: "card.report-schedule", as: "operations_people", question: "Send me the Weekly Headcount report every Monday at 8 as a PDF.", shows: ["cards"], action: "reports.schedule" },
+  { id: "card.report-edit", as: "operations_people", question: "Rename my {reports.edit#saved_report_id} report to Weekly Figures.", shows: ["cards"], action: "reports.edit" },
+  { id: "card.report-schedule", as: "operations_people", question: "Send me the {reports.schedule#saved_report_id} report every Monday at 8 as a PDF.", shows: ["cards"], action: "reports.schedule" },
   { id: "card.week-support", as: "employee", question: "For this week I need Finance to help with the budget figures.", shows: ["cards"], action: "week.support" },
   // Every form of People, Queries & Sanctions and Policies in the chat (praxis-ai.md decision 33): an edit names its record.
   { id: "card.overtime", as: "operations_people", question: "Approve 90 minutes of overtime for {person} next Tuesday for the stock count.", shows: ["cards"], action: "overtime.approve" },
-  { id: "card.work-site", as: "employee", question: "Add a work site for me at the Eko Hotel, Victoria Island next Monday to Wednesday for the partner training.", shows: ["cards"], action: "temporary_sites.add" },
+  { id: "card.work-site", as: "employee", question: "Add a work site for me at the Eko Hotel, Victoria Island, next Monday to Wednesday, for training I am attending.", shows: ["cards"], action: "temporary_sites.add", picks: ["address"] },
   { id: "card.leave-type", as: "operations_people", question: "Add a leave type called Study Leave with 5 days a year.", shows: ["cards"], action: "leave_types.add" },
   { id: "card.leave-type-edit", as: "operations_people", question: "Give Compassionate Leave 7 days a year.", shows: ["cards"], action: "leave_types.edit" },
   { id: "card.leave-record", as: "operations_people", question: "Record two days of annual leave for {person} next Thursday and Friday.", shows: ["cards"], action: "leave.record" },
-  { id: "card.employee-add", as: "operations_people", question: "Add Ada Obi as a Sales Executive in Sales, ada.obi@mycityapp.io, 08031234567, starting next Monday, full time and remote.", shows: ["cards"], action: "employees.add" },
+  { id: "card.employee-add", as: "operations_people", question: "Add Ada Obi as a Sales Executive in {departments.edit#department_id}, ada.obi@mycityapp.io, 08031234567, starting next Monday, full time and remote.", shows: ["cards"], action: "employees.add" },
   { id: "card.employee-edit", as: "operations_people", question: "Change {person}'s job title to Senior Field Officer.", shows: ["cards"], action: "employees.edit" },
-  { id: "card.reporting", as: "operations_people", question: "{person} now reports to the CEO.", shows: ["cards"], action: "employees.reporting" },
+  { id: "card.reporting", as: "operations_people", question: "{colleague} now reports to me.", shows: ["cards"], action: "employees.reporting" },
   { id: "card.department", as: "operations_people", question: "Add a department called Partnerships with the code PRT.", shows: ["cards"], action: "departments.create" },
   { id: "card.department-edit", as: "operations_people", question: "Rename the Partnerships department to Partnerships and Growth.", shows: ["cards"], action: "departments.edit" },
-  { id: "card.role", as: "operations_people", question: "Add an open role of Head of Sales in the Sales department.", shows: ["cards"], action: "seats.create" },
-  { id: "card.role-edit", as: "operations_people", question: "Close the open role of Head of Sales.", shows: ["cards"], action: "seats.edit" },
-  { id: "card.worksite", as: "operations_people", question: "Add a worksite called Ikeja Hub at the Ikeja City Mall with a 150 metre fence.", shows: ["cards"], action: "worksites.create" },
-  { id: "card.worksite-edit", as: "operations_people", question: "Make the Lekki Office fence 200 metres wide.", shows: ["cards"], action: "worksites.edit" },
+  { id: "card.role", as: "operations_people", question: "Add an open role of Head of Sales in {departments.edit#department_id}.", shows: ["cards"], action: "seats.create" },
+  { id: "card.role-edit", as: "operations_people", question: "Close the open role of {open_role}.", shows: ["cards"], action: "seats.edit" },
+  { id: "card.worksite", as: "operations_people", question: "Add a worksite called Ikeja Hub at the Ikeja City Mall with a 150 metre fence.", shows: ["cards"], action: "worksites.create", picks: ["address"] },
+  { id: "card.worksite-edit", as: "operations_people", question: "Make the {worksites.edit#worksite_id} fence 200 metres wide.", shows: ["cards"], action: "worksites.edit" },
   { id: "card.query", as: "operations_people", question: "Raise a query on {person} for missing the client visit on Monday without telling anyone.", shows: ["cards"], action: "queries.raise" },
-  { id: "card.query-respond", as: "employee", question: "Respond to my open query: I was late because the bridge was closed and I called my manager at 8.", shows: ["cards"], action: "my_queries.respond" },
-  { id: "card.rule", as: "operations_people", question: "Add a query rule: three overdue tasks in 30 days raises a query.", shows: ["cards"], action: "query_rules.create" },
+  { id: "card.query-respond", as: "employee", question: "Respond to my query {my_queries.respond#employee_query_id}: I was late because the bridge was closed and I called my manager at 8.", shows: ["cards"], action: "my_queries.respond" },
+  { id: "card.rule", as: "operations_people", question: "Add a query rule called Missed Deadlines: three overdue tasks in 30 days raises a query.", shows: ["cards"], action: "query_rules.create" },
   { id: "card.rule-edit", as: "operations_people", question: "Change the overdue tasks rule to four times in 30 days.", shows: ["cards"], action: "query_rules.edit" },
   { id: "card.chain-step", as: "operations_people", question: "Add a Final Warning step to the consequence chain after the Second Warning.", shows: ["cards"], action: "chain.add_step" },
   { id: "card.chain-step-edit", as: "operations_people", question: "Retire the Caution step of the consequence chain.", shows: ["cards"], action: "chain.edit_step" },
@@ -126,35 +135,35 @@ const CASES = Object.freeze([
   { id: "change.signature", as: "operations_people", question: "Save my signature for letters.", route: "queries.letter-templates" },
   // Every form of Performance, Staff Community and Mailbox in the chat (praxis-ai.md decisions 33 and 40): a record by its words.
   { id: "card.quarter", as: "operations_people", question: "Set up the quarter starting 1 January 2027.", shows: ["cards"], action: "quarters.create" },
-  { id: "card.quarter-edit", as: "operations_people", question: "Make Q1 2027 the active quarter.", shows: ["cards"], action: "quarters.edit" },
+  { id: "card.quarter-edit", as: "operations_people", question: "Rename {quarters.edit#performance_period_id} to The Big Push.", shows: ["cards"], action: "quarters.edit" },
   { id: "card.goal", as: "operations_people", question: "Record an organisational goal for 2027: double our weekly active residents.", shows: ["cards"], action: "goals.create" },
   { id: "card.goal-edit", as: "operations_people", question: "Set this quarter's target for ORG-2026-01 to 64,000 users.", shows: ["cards"], action: "goals.edit" },
   { id: "card.goal-share", as: "operations_people", question: "Share ORG-2026-01 with all staff.", shows: ["cards"], action: "goals.share" },
   { id: "card.objective-share", as: "management", question: "Share the company objective CO-O1 with all staff.", shows: ["cards"], action: "objectives.share" },
-  { id: "card.objective", as: "head_of_department", question: "Set an objective for my function this quarter: be the app residents open first.", shows: ["cards"], action: "objectives.create" },
-  { id: "card.objective-edit", as: "head_of_department", question: "Reword my function's first objective: be the app residents open first, every day.", shows: ["cards"], action: "objectives.edit" },
-  { id: "card.key-result", as: "head_of_department", question: "Add a key result to my first objective: publish 36 city stories, owned by me.", shows: ["cards"], action: "key_results.create" },
-  { id: "card.key-result-edit", as: "head_of_department", question: "Change my first key result's target in words to 36 stories.", shows: ["cards"], action: "key_results.edit" },
+  { id: "card.objective", as: "head_of_department", question: "Set an objective for my function this quarter: be the app residents open first.", shows: ["cards"], action: "objectives.create", given: ["objectives.edit#okr_objective_id"] },
+  { id: "card.objective-edit", as: "head_of_department", question: "Reword {objectives.edit#okr_objective_id}: be the app residents open first, every day.", shows: ["cards"], action: "objectives.edit" },
+  { id: "card.key-result", as: "head_of_department", question: "Add a key result to {key_results.create#okr_objective_id}: publish 36 city stories, owned by me.", shows: ["cards"], action: "key_results.create" },
+  { id: "card.key-result-edit", as: "head_of_department", question: "Change the target in words of {key_results.edit#okr_key_result_id} to 36 stories.", shows: ["cards"], action: "key_results.edit" },
   { id: "card.unbind", as: "head_of_department", question: "Ask the CEO to unbind my function's plan: a new campaign changes the quarter.", shows: ["cards"], action: "plans.unbind" },
-  { id: "card.target-change", as: "head_of_department", question: "Ask to change my first key result's target to 40 for September: the September push.", shows: ["cards"], action: "target_changes.request" },
-  { id: "card.kpi", as: "head_of_department", question: "Set a KPI for my function: assets on time, target 95% on time.", shows: ["cards"], action: "kpis.create" },
+  { id: "card.target-change", as: "head_of_department", question: "Ask to change my first key result's target to 40 starting next month: the push for the launch.", shows: ["cards"], action: "target_changes.request" },
+  { id: "card.kpi", as: "head_of_department", question: "Set a KPI for my function: partner replies within a day, target 90% within a day.", shows: ["cards"], action: "kpis.create" },
   { id: "card.kpi-edit", as: "head_of_department", question: "Change the formula of my function's first KPI to assets on time over assets due.", shows: ["cards"], action: "kpis.edit" },
-  { id: "card.round", as: "operations_people", question: "Open this quarter's review round for last month.", shows: ["cards"], action: "rounds.open" },
-  { id: "card.review-score", as: "head_of_department", question: "Score the stories line on {person}'s review 0.8: two stories were late.", shows: ["cards"], action: "reviews.score" },
-  { id: "card.check-in", as: "employee", question: "On my check-in, my stories line: nine published, two moved to next month.", shows: ["cards"], action: "check_ins.save" },
-  { id: "card.pip", as: "operations_people", question: "Start an improvement plan for {person} on Monday, for thirty days.", shows: ["cards"], action: "pips.start" },
-  { id: "card.pip-edit", as: "operations_people", question: "Move the review date of {person}'s improvement plan to 4 December.", shows: ["cards"], action: "pips.edit" },
-  { id: "card.scorecard", as: "head_of_department", question: "Draft {person}'s scorecard for this quarter, copying last quarter's lines.", shows: ["cards"], action: "scorecards.create" },
-  { id: "card.scorecard-line", as: "head_of_department", question: "Add a results line to {person}'s scorecard: stories published, a numeric target of 10, weight 60.", shows: ["cards"], action: "scorecards.add_line" },
-  { id: "card.scorecard-line-edit", as: "head_of_department", question: "Make the stories line on {person}'s scorecard target 12.", shows: ["cards"], action: "scorecards.edit_line" },
-  { id: "card.reviewer", as: "operations_people", question: "Make me the reviewer on {person}'s scorecard: their manager is on leave.", shows: ["cards"], action: "scorecards.edit" },
+  { id: "card.round", as: "operations_people", question: "Open the review round for {free_month} in {free_month_quarter}.", shows: ["cards"], action: "rounds.open" },
+  { id: "card.review-score", as: "head_of_department", question: "Score the {reviews.score#performance_review_item_id} line 0.8 on the review of {reviews.score#performance_review_id}: two items were late.", shows: ["cards"], action: "reviews.score" },
+  { id: "card.check-in", as: "employee", question: "On my check-in, my {check_ins.save#performance_review_item_id} line: 9 done, 2 moved to next month.", shows: ["cards"], action: "check_ins.save" },
+  { id: "card.pip", as: "operations_people", question: "Start an improvement plan on the review of {pips.start#performance_review_id}, starting Monday, for thirty days.", shows: ["cards"], action: "pips.start" },
+  { id: "card.pip-edit", as: "operations_people", question: "Move the review date of {pips.edit#improvement_plan_id} to 4 December.", shows: ["cards"], action: "pips.edit" },
+  { id: "card.scorecard", as: "head_of_department", question: "Draft {scorecards.create#employee_id}'s scorecard for this quarter, copying last quarter's lines.", shows: ["cards"], action: "scorecards.create" },
+  { id: "card.scorecard-line", as: "head_of_department", question: "Add a results line to the scorecard {scorecards.add_line#scorecard_id}: stories published, a numeric target of 10, weight 60.", shows: ["cards"], action: "scorecards.add_line" },
+  { id: "card.scorecard-line-edit", as: "head_of_department", question: "Make the {scorecards.edit_line#employee_target_id} line on the scorecard {scorecards.edit_line#scorecard_id} target 12.", shows: ["cards"], action: "scorecards.edit_line" },
+  { id: "card.reviewer", as: "operations_people", question: "Make me the reviewer on the scorecard {scorecards.edit#scorecard_id}: their manager is on leave.", shows: ["cards"], action: "scorecards.edit" },
   { id: "card.announcement", as: "operations_people", question: "Announce to all staff that the office is closed on Friday for maintenance.", shows: ["cards"], action: "announcements.publish" },
-  { id: "card.announcement-edit", as: "operations_people", question: "Move the town hall announcement to go out on Monday at 9.", shows: ["cards"], action: "announcements.edit" },
+  { id: "card.announcement-edit", as: "operations_people", question: "Move the {announcements.edit#announcement_id} announcement to go out on Monday at 9.", shows: ["cards"], action: "announcements.edit" },
   { id: "card.channel", as: "employee", question: "Create a channel called lagos-visits for planning the Lagos visits.", shows: ["cards"], action: "channels.create" },
-  { id: "card.channel-edit", as: "employee", question: "Rename my lagos-visits channel to lagos-trips.", shows: ["cards"], action: "channels.edit" },
+  { id: "card.channel-edit", as: "employee", question: "Rename my {channels.edit#community_channel_id} channel to lagos-trips.", shows: ["cards"], action: "channels.edit" },
   { id: "card.recognise", as: "employee", question: "Recognise {person} for helping with the venue.", shows: ["cards"], action: "community.recognise" },
-  { id: "card.wish", as: "employee", question: "Wish {person} a happy birthday on their card.", shows: ["cards"], action: "community.wish" },
-  { id: "card.message-edit", as: "employee", question: "Change my last message in #general to say the visit is on Friday at 10.", shows: ["cards"], action: "community.edit_message" },
+  { id: "card.wish", as: "employee", question: "Send my wishes on {community.wish#community_message_id}: many happy returns!", shows: ["cards"], action: "community.wish" },
+  { id: "card.message-edit", as: "employee", question: "Change my last message in {message_channel} to say the visit is on Friday at 10.", shows: ["cards"], action: "community.edit_message" },
   { id: "card.signature", as: "employee", question: "Hide my mobile number on my email signature.", shows: ["cards"], action: "signatures.save" },
   { id: "card.signature-config", as: "implementation", question: "Add https://linkedin.com/company/mycity as the LinkedIn link on the company signature.", shows: ["cards"], action: "signatures.configure" },
   // A change missing what its action must have is asked for first, one question at a time (decisions 28 and 29).
@@ -164,15 +173,15 @@ const CASES = Object.freeze([
   { id: "ask.meeting-length", as: "operations_people", question: "Book a meeting with {person} tomorrow at 10 about the venue visit.", shows: ["cards"], ask: { action: "calendar.create", field: "ends_at" } },
   // Every field a card needs is asked before it is drawn (decision 34): the lead of a task shared with a department, and which record.
   { id: "ask.task-lead", as: "operations_people", question: "Create an urgent task for the whole Operations department to research transaction fees by Friday.", shows: ["cards"], ask: { action: "tasks.create", field: "primary_assignee_id" }, choices: true },
-  { id: "ask.which-task", as: "employee", question: "Add a comment on my task: the printer confirmed Friday.", shows: ["cards"], ask: { action: "tasks.comment", field: "task_id" }, choices: true },
-  // Performance's cards ask for their record and what a line needs (decisions 34 and 40): the quarters to tap, a line's section.
-  { id: "ask.which-quarter", as: "operations_people", question: "Rename the quarter to The Big Push.", shows: ["cards"], ask: { action: "quarters.edit", field: "performance_period_id" }, choices: true },
-  { id: "ask.line-section", as: "head_of_department", question: "Add a line to {person}'s scorecard: stories published, target 10, weight 60.", shows: ["cards"], ask: { action: "scorecards.add_line", field: "section" }, choices: true },
+  { id: "ask.which-task", as: "operations_people", question: "Add a comment on my task: the printer confirmed Friday.", shows: ["cards"], ask: { action: "tasks.comment", field: "task_id" }, choices: true, given: ["tasks.comment#task_id#2"] },
+  // Performance's cards ask for what they need (decisions 34 and 40): a KPI's target, and the month a target change starts, to tap.
+  { id: "ask.kpi-target", as: "head_of_department", question: "Set a KPI for my function: partner replies within a day.", shows: ["cards"], ask: { action: "kpis.create", field: "target_text" } },
+  { id: "ask.target-month", as: "head_of_department", question: "Ask to change my first key result's target to 40: the push for the launch.", shows: ["cards"], ask: { action: "target_changes.request", field: "from_month" }, choices: true },
   { id: "card.leave", as: "employee", question: "Request two days of annual leave for me from next Monday.", shows: ["cards"], action: "my_leave.request" },
   // Leave without its type: asked which, with the person's own types and the days left of each (decision 32).
   { id: "ask.leave-type", as: "employee", question: "I need next Friday off.", shows: ["cards"], ask: { action: "my_leave.request", field: "leave_type_id" }, choices: true },
-  { id: "card.leave-approve", as: "operations_people", question: "Approve the leave requests waiting on me.", shows: ["cards"], action: "leave.approve" },
-  { id: "card.leave-reject", as: "operations_people", question: "Reject the leave requests waiting on me: the team is short that week.", shows: ["cards"], action: "leave.reject" },
+  { id: "card.leave-approve", as: "operations_people", question: "Approve the leave requests waiting on me.", shows: ["cards"], action: "leave.approve", given: ["waiting_leave"] },
+  { id: "card.leave-reject", as: "operations_people", question: "Reject the leave requests waiting on me: the team is short that week.", shows: ["cards"], action: "leave.reject", given: ["waiting_leave"] },
   { id: "card.approvals", as: "ceo", question: "Approve every request waiting on me.", shows: ["cards"], action: "approvals.decide" },
   { id: "card.message", as: "employee", question: "Tell {person} that the weekly report is ready for them.", shows: ["cards"], action: "community.message" },
   { id: "card.post", as: "employee", question: "Post in general that the office closes at 3 on Friday.", shows: ["cards"], action: "community.post" },
@@ -199,6 +208,159 @@ function screenOf(path) {
   return `${u.pathname.replace(/^\//, "").replace(/-/g, "_")}.${u.searchParams.get("tab") || ""}`;
 }
 
+/** A question's placeholder: a FILLS name, or a card's question by its action and field, "#2" for its second answer. */
+const PLACEHOLDER = /\{([a-z_]+(?:\.[a-z_]+#[a-z_]+(?:#\d)?)?)\}/g;
+
+/** The placeholders a case needs filled: those in its question, then its `given`, each once. */
+function placeholdersOf(kase) {
+  const named = [...String(kase.question || "").matchAll(PLACEHOLDER)].map((m) => m[1]);
+  return [...new Set([...named, ...(kase.given || [])])];
+}
+
+/** A card placeholder's action, field and which answer (1, or 2 with "#2"); null for a FILLS name. */
+function cardPlaceholder(name) {
+  const m = /^([a-z_]+\.[a-z_]+)#([a-z_]+)(?:#(\d))?$/.exec(name);
+  return m ? { key: m[1], field: m[2], n: m[3] ? Number(m[3]) : 1 } : null;
+}
+
+const one = async (pool, sql, params) => ((await pool.query(sql, params)).rows[0] || {}).words || null;
+/** The last two months, as their first days and as a person reads them. */
+const recentMonths = (today) => [1, 2].map((n) => {
+  const first = require("../../src/shared/time/lagos").addMonths(`${today.slice(0, 7)}-01`, -n);
+  return { first, words: require("../../src/shared/time/day-first").formatMonth(first) };
+});
+/** The first recent month with no review round, and its quarter's name. */
+async function freeMonth(pool) {
+  const lagos = require("../../src/shared/time/lagos");
+  for (const m of recentMonths(lagos.today())) {
+    const taken = await pool.query("SELECT 1 FROM performance_cycle WHERE starts_on = $1::date LIMIT 1", [m.first]);
+    if (taken.rows.length) continue;
+    const quarter = await one(pool, "SELECT name AS words FROM performance_period WHERE starts_on <= $1::date AND ends_on >= $1::date LIMIT 1", [m.first]);
+    if (quarter) return { month: m.words, quarter };
+  }
+  return null;
+}
+
+/**
+ * What a question names that no card's own question offers, read from staging as the person asking
+ * holds it; `what` says what staging lacks when it has none.
+ */
+const FILLS = Object.freeze({
+  person: {
+    what: "colleague",
+    // Someone in their reach: their own report, else their department, else the first by name.
+    find: (pool, actor) =>
+      one(
+        pool,
+        `SELECT btrim(e.first_name || ' ' || e.last_name) AS words FROM employee e
+          WHERE e.status = 'active' AND e.employee_id IS DISTINCT FROM $1
+          ORDER BY (e.line_manager_id = $1) DESC NULLS LAST,
+                   (e.department_id = (SELECT department_id FROM employee WHERE employee_id = $1)) DESC NULLS LAST,
+                   e.last_name, e.first_name
+          LIMIT 1`,
+        [actor.employee_id],
+      ),
+  },
+  colleague: {
+    what: "colleague who does not report to them",
+    find: (pool, actor) =>
+      one(
+        pool,
+        `SELECT btrim(first_name || ' ' || last_name) AS words FROM employee
+          WHERE status = 'active' AND employee_id IS DISTINCT FROM $1 AND line_manager_id IS DISTINCT FROM $1
+          ORDER BY last_name, first_name LIMIT 1`,
+        [actor.employee_id],
+      ),
+  },
+  own_project: {
+    what: "open project they own",
+    find: (pool, actor) => one(pool, "SELECT name AS words FROM project WHERE owner_employee_id = $1 AND status = 'active' ORDER BY updated_at DESC LIMIT 1", [actor.employee_id]),
+  },
+  stepped_task: {
+    what: "open task of theirs with a step to do",
+    find: (pool, actor) =>
+      one(
+        pool,
+        `SELECT btrim(COALESCE(t.number::text, '') || ' ' || t.title) AS words FROM task t
+          WHERE t.primary_assignee_id = $1 AND t.status NOT IN ('done', 'cancelled') AND t.archived_at IS NULL
+            AND EXISTS (SELECT 1 FROM task_step st WHERE st.task_id = t.task_id AND st.done_at IS NULL)
+          ORDER BY t.updated_at DESC LIMIT 1`,
+        [actor.employee_id],
+      ),
+  },
+  open_role: {
+    what: "open role",
+    find: (pool) => one(pool, "SELECT title AS words FROM org_seat WHERE status = 'vacant' ORDER BY created_at LIMIT 1", []),
+  },
+  message_channel: {
+    what: "channel with a message of theirs",
+    find: (pool, actor) =>
+      one(
+        pool,
+        `SELECT '#' || c.name AS words FROM community_message x
+           JOIN community_channel c ON c.community_channel_id = x.community_channel_id
+          WHERE x.sender_user_id = $1 AND x.deleted_at IS NULL AND x.message_type IN ('text', 'poll')
+            AND c.channel_type <> 'direct' AND c.archived_at IS NULL
+          ORDER BY x.sent_at DESC LIMIT 1`,
+        [actor.user_id],
+      ),
+  },
+  free_month: { what: "recent month with no review round", find: async (pool) => ((await freeMonth(pool)) || {}).month || null },
+  free_month_quarter: { what: "quarter for a recent month with no review round", find: async (pool) => ((await freeMonth(pool)) || {}).quarter || null },
+  waiting_leave: {
+    what: "leave request waiting on them",
+    find: async (_pool, actor) => {
+      const waiting = await require("../../src/modules/workflow/workflow.service").mine(actor, { page: 1 });
+      return waiting.data.some((r) => r.definition_key === "leave.approval") ? "yes" : null;
+    },
+  },
+});
+
+/** The answer a card's own question offers this person for a field (decision 34): the nth, as they would tap it. */
+async function cardAnswer(pool, actor, { key, field, n }, values) {
+  const registry = require("../../src/shared/ai/registry");
+  const authorise = require("../../src/shared/ai/authorise");
+  const lagos = require("../../src/shared/time/lagos");
+  const action = registry.action(key);
+  const entry = action && (action.asks || []).find((q) => q.field === field);
+  if (!entry) return null;
+  const who = await authorise.scopedFor(actor, action);
+  if (!who) return null;
+  const today = lagos.today();
+  const listed = entry.read
+    ? await require("../../src/services/ai/assistant/answer").recordChoices(pool, actor, entry)
+    : typeof entry.options === "function"
+      ? await entry.options({ actor: who, db: pool, today, values })
+      : typeof entry.choices === "function"
+        ? entry.choices({ today })
+        : entry.choices || [];
+  const answers = [...new Set((listed || []).map((x) => String(x).trim()).filter(Boolean))];
+  return answers[n - 1] || null;
+}
+
+/**
+ * A case's question with its placeholders filled for the person asking, or what staging lacks. A
+ * card's answers are found in its asks' order, each handed the answers before it (a review's line).
+ */
+async function fill(pool, kase, actor) {
+  const registry = require("../../src/shared/ai/registry");
+  const rank = (name) => {
+    const card = cardPlaceholder(name);
+    const action = card && registry.action(card.key);
+    return action ? action.asks.findIndex((q) => q.field === card.field) : -1;
+  };
+  const words = {};
+  const values = {};
+  for (const name of [...placeholdersOf(kase)].sort((x, y) => rank(x) - rank(y))) {
+    const card = cardPlaceholder(name);
+    const got = card ? await cardAnswer(pool, actor, card, values[card.key] || {}) : FILLS[name] ? await FILLS[name].find(pool, actor) : null;
+    if (!got) return { missing: card ? `answer to ${card.key}'s ${card.field} question${card.n > 1 ? ` (${card.n} of them)` : ""}` : FILLS[name] ? FILLS[name].what : name };
+    if (card) (values[card.key] ||= {})[card.field] = got;
+    words[name] = got;
+  }
+  return { question: String(kase.question).replace(PLACEHOLDER, (all, name) => words[name] ?? all) };
+}
+
 /**
  * One question's grade.
  * @param {object} kase  a CASES entry
@@ -223,7 +385,12 @@ function grade(kase, got) {
     const card = got.card || null;
     if (!card) problems.push(`drew no card; expected ${kase.action}`);
     else if (card.row.action_key !== kase.action) problems.push(`drew ${card.row.action_key}, not ${kase.action}`);
-    else if (Object.keys(card.row.problems || {}).length) problems.push(`the card has problems on ${Object.keys(card.row.problems).join(", ")}`);
+    else {
+      // A field the case lets the person pick (a typed address, decision 37) may wait on Pick one alone.
+      const left = Object.entries(card.row.problems || {}).filter(([field, said]) => !((kase.picks || []).includes(field) && (said || []).every((m) => m === "Pick one")));
+      const written = (field) => (card.row.values && card.row.values[field] !== undefined ? [`written ${JSON.stringify(card.row.values[field])}`] : []);
+      if (left.length) problems.push(`the card has problems on ${left.map(([field, said]) => `${field} (${[...(said || []), ...written(field)].join("; ")})`).join(", ")}`);
+    }
   }
   if (kase.no_action && got.card && kase.no_action.includes(got.card.row.action_key)) problems.push(`drew ${got.card.row.action_key} for someone who may not make that change`);
   if (kase.ask) {
@@ -283,7 +450,9 @@ async function main(argv) {
                       SELECT 1 FROM user_role o JOIN role ro ON ro.role_id = o.role_id
                        WHERE o.user_id = u.user_id AND ro.code <> 'employee'
                          AND (o.effective_to IS NULL OR o.effective_to > CURRENT_DATE)))
-              ORDER BY u.email
+              -- The holder with the most open work, so the questions about their tasks find some.
+              ORDER BY (SELECT count(*) FROM task t WHERE t.primary_assignee_id = u.employee_id
+                          AND t.status NOT IN ('done', 'cancelled') AND t.archived_at IS NULL) DESC, u.email
               LIMIT 1`,
             [role],
           );
@@ -291,19 +460,6 @@ async function main(argv) {
     const actor = user && { user_id: user.user_id, employee_id: user.employee_id, email: user.email, display_name: user.display_name, role_ids: user.role_ids || [], is_ceo: user.is_ceo === true };
     people.set(role, actor);
     return actor;
-  }
-
-  /** A colleague to ask about: the first active employee by name who is not the asker. */
-  async function colleagueOf(actor) {
-    const { rows } = await pool.query(
-      `SELECT btrim(e.first_name || ' ' || e.last_name) AS name
-         FROM employee e
-        WHERE e.status = 'active' AND e.employee_id IS DISTINCT FROM $1
-        ORDER BY e.last_name, e.first_name
-        LIMIT 1`,
-      [actor.employee_id],
-    );
-    return rows[0] ? rows[0].name : "a colleague";
   }
 
   let failed = 0;
@@ -320,7 +476,13 @@ async function main(argv) {
         exit = 2;
         continue;
       }
-      const question = kase.question.includes("{person}") ? kase.question.replace("{person}", await colleagueOf(actor)) : kase.question;
+      // The question about their own records; one staging has nothing for is skipped, saying what it lacks.
+      const filled = await fill(pool, kase, actor);
+      if (filled.missing) {
+        report({ id: kase.id, result: "skip", why: `staging offers no ${filled.missing} for ${kase.as}` });
+        continue;
+      }
+      const question = filled.question;
       let out;
       try {
         out = await orchestrator.answer({ db: pool, actor, question, shows: kase.shows || [] });
@@ -378,4 +540,4 @@ if (require.main === module) {
   );
 }
 
-module.exports = { CASES, grade, screenOf, waiting };
+module.exports = { CASES, FILLS, grade, screenOf, waiting, placeholdersOf, cardPlaceholder, fill };

@@ -7,7 +7,7 @@
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const registry = require("../../../src/shared/ai/registry");
-const { CASES, grade, screenOf, waiting } = require("../../../scripts/ai/eval-assistant");
+const { CASES, FILLS, grade, screenOf, waiting, placeholdersOf, cardPlaceholder } = require("../../../scripts/ai/eval-assistant");
 
 const SCRIPT = path.join(__dirname, "../../../scripts/ai/eval-assistant.js");
 
@@ -48,6 +48,28 @@ describe("the questions", () => {
     const graded = new Set(CASES.filter((k) => k.action).map((k) => k.action));
     for (const key of actions) expect([key, graded.has(key)]).toEqual([key, true]);
     expect(CASES.some((k) => k.no_action && k.no_action.length)).toBe(true);
+  });
+
+  test("a question names staging's records through its placeholders: each a fill, or a card's question that offers answers", () => {
+    expect(cardPlaceholder("tasks.wait_on#depends_on_task_id#2")).toEqual({ key: "tasks.wait_on", field: "depends_on_task_id", n: 2 });
+    expect(cardPlaceholder("person")).toBeNull();
+    expect(placeholdersOf({ question: "Move my task {tasks.edit#task_id} for {person}, then {person}.", given: ["waiting_leave"] })).toEqual(["tasks.edit#task_id", "person", "waiting_leave"]);
+    for (const k of CASES) {
+      for (const name of placeholdersOf(k)) {
+        const card = cardPlaceholder(name);
+        if (!card) {
+          expect([k.id, name, Boolean(FILLS[name])]).toEqual([k.id, name, true]);
+          continue;
+        }
+        const action = registry.action(card.key);
+        const ask = action && action.asks.find((q) => q.field === card.field);
+        // The card asks for the field, with answers to give: its own records (options or a read) or fixed choices.
+        expect([k.id, name, Boolean(ask && (ask.read || ask.options || (Array.isArray(ask.choices) ? ask.choices.length : ask.choices)))]).toEqual([k.id, name, true]);
+      }
+      // Nothing is left in braces that the run could not fill.
+      expect([k.id, String(k.question).replace(/\{[a-z_]+(\.[a-z_]+#[a-z_]+(#\d)?)?\}/g, "").includes("{")]).toEqual([k.id, false]);
+      for (const field of k.picks || []) expect([k.id, field, registry.action(k.action).picks[field]]).toEqual([k.id, field, "place"]);
+    }
   });
 
   test("Ifeoma's questions are asked, through Home's activity.list", () => {
@@ -112,6 +134,16 @@ describe("the grade", () => {
     expect(grade(t, { reads: [], shown: shown({ table: null }) }).problems).toEqual(["drew no table"]);
     // The absent question is asked as it was on staging, and graded on names.
     expect(CASES.find((c) => c.id === "attendance.absent")).toMatchObject({ reads: ["attendance.register"], table: "names" });
+  });
+
+  test("a card's problems say what was wrong and what was written; a field the case lets the person pick may wait on Pick one alone", () => {
+    const card = (problems, values = {}) => ({ row: { action_key: "worksites.create", problems, values } });
+    const k = { id: "x", action: "worksites.create", picks: ["address"] };
+    expect(grade(k, { reads: [], shown: shown(), card: card({ address: ["Pick one"] }, { address: "Ikeja City Mall" }) }).pass).toBe(true);
+    expect(grade({ ...k, picks: [] }, { reads: [], shown: shown(), card: card({ address: ["Pick one"] }, { address: "Ikeja City Mall" }) }).problems).toEqual([
+      'the card has problems on address (Pick one; written "Ikeja City Mall")',
+    ]);
+    expect(grade(k, { reads: [], shown: shown(), card: card({ radius_m: ["Too small"] }, {}) }).problems).toEqual(["the card has problems on radius_m (Too small)"]);
   });
 
   test("a change is a screen offered with declined change, never a claim", () => {

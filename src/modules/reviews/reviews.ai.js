@@ -14,6 +14,7 @@
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
+const { quantityOf } = require("../../shared/ai/named");
 const routeMap = require("../../shared/route-map");
 const lagos = require("../../shared/time/lagos");
 const { formatMonth } = require("../../shared/time/day-first");
@@ -113,7 +114,11 @@ module.exports = defineManifest({
       form: "none: My Performance's check-in holds every line at once and is the person's own; the card names one line, and a file and Submit Check-In stay on the screen",
       picks: { evidence_task_id: "task" },
       asks: [{ field: "performance_review_item_id", question: "Which line is it?", options: ({ actor, db }) => service.checkInItemChoices(db, actor) }],
-      resolve: { performance_review_item_id: (value, actor, db) => service.checkInItemIdOf(db, value, actor) },
+      resolve: {
+        performance_review_item_id: (value, actor, db) => service.checkInItemIdOf(db, value, actor),
+        // The actual as the person said it ("9 published"): its number, the words kept for Actual in Words.
+        actual_value: (value) => quantityOf(value),
+      },
       names: async (values, actor, db) => [...(await service.cardCheckInLine(db, values.performance_review_item_id, actor)), ...(await evidenceTask(db, values.evidence_task_id, actor))],
       records: (values, actor, db) => (db ? service.cardCheckIn(db, values.performance_review_item_id, actor) : []),
       check: (client, values, actor) => service.assertCardCheckIn(client, values.performance_review_item_id, actor),
