@@ -93,12 +93,33 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     expect(c.assistant.AiCardPicks.options).toContain("leave_type");
     expect(defineManifest({ module: "workspace", actions: [ACTION] }).actions[0].resolve).toEqual({});
     const refused = (over) => () => defineManifest({ module: "workspace", actions: [{ ...ACTION, ...over }] });
-    expect(refused({ resolve: [] })).toThrow(/resolve is \{ field: \(value, actor, db\) => id \}/);
+    expect(refused({ resolve: [] })).toThrow(/resolve is \{ field: \(value, actor, db, values\) => id \}/);
     expect(refused({ resolve: { nope: async () => null } })).toThrow(/resolve names "nope"/);
     expect(refused({ fields: ["title"], resolve: { primary_assignee_id: async () => null } })).toThrow(/resolve names "primary_assignee_id", which the card does not carry/);
-    expect(refused({ resolve: { primary_assignee_id: "by name" } })).toThrow(/resolve\.primary_assignee_id is \(value, actor, db\) => id/);
+    expect(refused({ resolve: { primary_assignee_id: "by name" } })).toThrow(/resolve\.primary_assignee_id is \(value, actor, db, values\) => id/);
     expect(refused({ asks: [{ field: "title", question: "What is it?", options: ["A"] }] })).toThrow(/options are \(\{ actor, db, today \}\) => a list/);
     expect(refused({ asks: [{ field: "title", question: "What is it?", options, choices: ["A"] }] })).toThrow(/choices or options, not both/);
+  });
+
+  test("an action held to a capability names one the catalogue has; the task pick is the contract's (decision 33)", () => {
+    const a = defineManifest({ module: "workspace", actions: [{ ...ACTION, capability: "workspace.late_reasons" }] }).actions[0];
+    expect(a.capability).toBe("workspace.late_reasons");
+    expect(defineManifest({ module: "workspace", actions: [ACTION] }).actions[0].capability).toBeNull();
+    const refused = (over) => () => defineManifest({ module: "workspace", actions: [{ ...ACTION, ...over }] });
+    expect(refused({ capability: "workspace.everything" })).toThrow(/capability is a code in shared\/access\/access\.catalog\.js/);
+    expect(refused({ capability: ["workspace.late_reasons"] })).toThrow(/capability is a code/);
+    expect(c.assistant.AiCardPicks.options).toContain("task");
+    expect(defineManifest({ module: "workspace", actions: [{ ...ACTION, picks: { project_id: "task" } }] }).actions[0].picks).toEqual({ project_id: "task" });
+  });
+
+  test("a record named by its words: the whole words, then the one they begin, then the one that holds them; never one of several", () => {
+    const { oneNamed } = require("../../../src/shared/ai/named");
+    const types = [{ name: "Annual", code: "annual" }, { name: "Compassionate Leave", code: "compassionate" }, { name: "Sick", code: "sick" }];
+    const type = (said) => (oneNamed(types, said, (t) => [t.name, t.code], { drop: ["leave"] }) || {}).name || null;
+    expect(["Annual Leave", "annual", "Compassionate", "SICK LEAVE", "leave", "Maternity", ""].map(type)).toEqual(["Annual", "Annual", "Compassionate Leave", "Sick", null, null, null]);
+    const steps = [{ title: "Order the banners" }, { title: "Book the venue" }, { title: "Order the flyers" }];
+    const step = (said) => (oneNamed(steps, said, (x) => [x.title]) || {}).title || null;
+    expect(["order the banners", "banners", "Order the", "venue", "the", "paint"].map(step)).toEqual(["Order the banners", "Order the banners", null, "Book the venue", null, null]);
   });
 
   test("gate 19 refuses SQL and a query call inside a manifest, and a write key, comments aside", () => {
@@ -391,6 +412,10 @@ describe("the matrix generator and the boundary gate", () => {
       "things.create staff refused",
     ]);
     expect(engine.matrix.summarise(cases)).toEqual({ total: 5, allowed: 3, refused: 1, scoped: 1 });
+    // The rule is handed the tool, so an action held to a capability is expected for its holders alone.
+    const held = [{ key: "reasons.add", kind: "action", module: "workspace", permission: ["workspace", "edit"], capability: "workspace.late_reasons" }];
+    const holds = (role, _module, _action, tool) => role === "ceo" || !tool.capability;
+    expect(engine.matrix.casesFor({ tools: held, roles: ["ceo", "staff"], may: holds }).map((k) => `${k.role} ${k.expect}`)).toEqual(["ceo allowed", "staff refused"]);
   });
 
   test("gate 24: a file in the engine requiring MyCity, or a file outside reaching past its index, fails", () => {

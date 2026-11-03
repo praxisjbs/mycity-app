@@ -162,10 +162,19 @@ conversations, and one opens full screen when you press it.
 - A card the hub cannot make as it stands says why under the card, for example
   **Connect your mailbox first** with **Open Mailbox**.
 
-Praxis AI draws a card for a task, marking tasks done, a comment, a meeting, your own leave
-request, the leave and other requests waiting on you, a message to a colleague, a post in a channel
-and a mail from your mailbox. For other changes, such as a new role, it opens the screen or a filled
-form: press that screen's own button to save.
+Praxis AI draws a card for a task, a change to a task, marking tasks done, a comment, a step on a
+task (adding one or ticking it), a task that waits on another, a project and a change to one, a
+meeting and a change to one you made, your week's Support Needed line, your own leave request, the
+leave and other requests waiting on you, a message to a colleague, a post in a channel and a mail
+from your mailbox. If you keep Late Reasons, it also adds a late reason or switches one off or on.
+For other changes, such as a new role, it opens the screen or a filled form: press that screen's
+own button to save.
+
+- A card that changes something, such as **Save Task**, **Save Project** or **Save Event**, names
+  it first and shows only what changes. Anything it leaves out stays as it is.
+- A step can be named by its words, for example "tick the banners step". To make a task wait on
+  another, press **Edit** on the **Add Link** card to pick a different task, as on the task's own
+  **Wait On Task**.
 
 - A task card can name people to watch the task, or a whole department. They can open it and hear
   how it goes; see [Watch a task](#workspace-watch) in My Workspace.
@@ -190,6 +199,8 @@ form: press that screen's own button to save.
   **Just Me** for a meeting with nobody else.
 - For your own leave it asks which type, with your leave types and the days you have left of each,
   for example **Annual Leave, 12 days left**. Press one, or say the type in your question.
+- For a step it asks what the step is, for a project what it is called, and for your week's Support
+  Needed what support you need.
 - When a name matches more than one person, it asks which one. Press the right person.
 - Only the newest answer's buttons work. Ask something else at any time to stop.
 

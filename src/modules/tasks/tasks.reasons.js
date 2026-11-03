@@ -7,12 +7,15 @@
  *   add()        a new reason at the foot, its code made from its words
  *   setActive()  switch one off or on; a reason is never deleted, so answers keep it
  *   assertOn()   the check Why Late's answers pass: a reason switched on
+ *   idOf(), cardRecords()   a reason a Praxis AI card names by its words, and how the card names
+ *                it (docs/guides/praxis-ai.md §6.11)
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const grantsCache = require("../../shared/rbac/grants-cache");
+const { oneNamed } = require("../../shared/ai/named");
 const c = require("@mycity/contract");
 const repo = require("./tasks.repo");
 const { EVENTS } = require("./tasks.events");
@@ -96,9 +99,26 @@ async function setActive(actor, id, { active }) {
   });
 }
 
+/**
+ * The reason a card names by its words or its code, switched on or off (shared/ai/named.js): one
+ * page holds every reason (LATE_REASONS_MAX). Null when none or several match.
+ */
+async function idOf(db, words) {
+  const page = await repo.lateReasons(db, { all: true }, { page: 1 });
+  const found = oneNamed(page.data, words, (r) => [r.label, r.code]);
+  return found ? found.task_late_reason_id : null;
+}
+
+/** The reason a card switches, by its words; nothing when the id names no reason. */
+async function cardRecords(db, id) {
+  if (!c.common.uuid.safeParse(id).success) return [];
+  const row = await repo.lateReason(db, id);
+  return row ? [{ type: "task_late_reason", id, label: row.label }] : [];
+}
+
 /** Why Late's answer must be a reason switched on (422 otherwise). */
 async function assertOn(db, code) {
   if (code && !(await repo.lateReasonOn(db, code))) throw invalid("late_reason", "Pick a reason");
 }
 
-module.exports = { CAPABILITY, keeps, codeOf, list, add, setActive, assertOn };
+module.exports = { CAPABILITY, keeps, codeOf, list, add, setActive, assertOn, idOf, cardRecords };

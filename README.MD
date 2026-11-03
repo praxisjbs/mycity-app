@@ -256,7 +256,8 @@ src/
 │   │                  authorise (a read, a summary or an action with the person's rights, inside a 3 second
 │   │                  statement timeout) · summary (the shape of a summary's figures, groups, series and
 │   │                  period, one way for every module) · summary-cache (a summary's figures in Redis for
-│   │                  a minute, never across people) · cite ·
+│   │                  a minute, never across people) · cite · named (a record a person names by its words,
+│   │                  among a few of their own: a leave type, a late reason, a step) ·
 │   │                  catalogue.snapshot.json (gate 23's committed snapshot of every read, summary, action and route)
 │   └── observability/ scrub · metrics · error-reporter · request-stats (a minute of traffic a
 │                      row and each route a quarter hour, with latency buckets, for Settings ·

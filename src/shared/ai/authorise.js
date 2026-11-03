@@ -53,6 +53,7 @@ const { citationsFor } = require("./cite");
 const c = require("@mycity/contract");
 
 const scopeFor = (...args) => require("../../middleware/rbac").scopeFor(...args);
+const holdsCapability = (...args) => require("../../middleware/rbac").holdsCapability(...args);
 
 /** How long one read or summary may run in the database (praxis-ai.md §6.3 step 8; decision 14). */
 const READ_TIMEOUT_MS = 3000;
@@ -103,10 +104,20 @@ async function guarded(db, fn) {
   }
 }
 
+/**
+ * May this person run it: the grant, and an action's capability when it names one (held on top of
+ * the grant, as the screen's route holds it). The scope the grant gives, or null.
+ */
+async function scopeOf(actor, tool) {
+  const scope = await scopeFor(actor, tool.permission[0], tool.permission[1]);
+  if (!scope || !tool.capability) return scope;
+  return (await holdsCapability(actor, tool.capability)) ? scope : null;
+}
+
 /** Which of a kind this person may run. */
 async function allowedOf(list, actor) {
   const out = [];
-  for (const r of list) if (await scopeFor(actor, r.permission[0], r.permission[1])) out.push(r);
+  for (const r of list) if (await scopeOf(actor, r)) out.push(r);
   return out;
 }
 
@@ -197,7 +208,8 @@ async function runSummary(client, actor, key, params = {}) {
 
 /**
  * Check an action for one person, at the draft and again at the press (praxis-ai.md §6.11): the
- * grant and the scope it gives, the values against the input schema, the records it touches
+ * grant and the scope it gives, the capability it names (refused without it, as its route would
+ * refuse), the values against the input schema, the records it touches
  * against its bulk limit. Nothing runs here. The action's `records(values, actor, db)` may read
  * the records' names through its module's own repo when given a pool or a client, so the card
  * names what it touches; without one it names them by id alone. A field the model may write by
@@ -212,7 +224,7 @@ async function runSummary(client, actor, key, params = {}) {
 async function checkAction(actor, key, values = {}, db = null) {
   const action = registry.action(key);
   if (!action) throw new AppError("AI_ACTION_UNKNOWN", `There is no "${key}" action`, 404);
-  const scope = await scopeFor(actor, action.permission[0], action.permission[1]);
+  const scope = await scopeOf(actor, action);
   if (!scope) throw refused(key, actor, "action");
   const who = { ...actor, scope };
   const given = await resolved(action, carried(action, values && typeof values === "object" ? values : {}), who, db);
@@ -241,7 +253,8 @@ const PICK_ONE = "Pick one";
 /**
  * The values with each field the model may write by name matched to the person's own record
  * (`resolve`, decision 32): a value already an id is left alone, a name the resolver cannot match
- * is left as written, for Pick one to mark.
+ * is left as written, for Pick one to mark. Each resolver is handed the card's values too, so a step
+ * is matched among the steps of the card's own task.
  */
 async function resolved(action, values, who, db) {
   const fields = Object.keys(action.resolve || {});
@@ -251,7 +264,7 @@ async function resolved(action, values, who, db) {
     const v = out[field];
     if (typeof v !== "string" || !v.trim() || UUID.test(v.trim())) continue;
     try {
-      const id = await action.resolve[field](v.trim(), who, db);
+      const id = await action.resolve[field](v.trim(), who, db, { ...out });
       if (typeof id === "string" && id) out[field] = id;
     } catch (err) {
       logger.warn({ err, ai_action: action.key, field }, "Praxis AI: an action's resolve() threw; the value stays as written");

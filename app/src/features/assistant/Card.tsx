@@ -7,7 +7,7 @@ import { useFreshSignIn, type ConfirmedWay } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
 import { schemas, type AiActionCard, type AiActionResult, type Department } from "@mycity/contract/contract.gen.ts";
 import { LeaveTypeSelect } from "@/features/people/Leave";
-import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, type ProjectChoice } from "@/features/shared/pickers";
+import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, type ProjectChoice, type TaskChoice } from "@/features/shared/pickers";
 import { hrefFor } from "@/lib/routes";
 import { useRouter } from "@/lib/router";
 import { ActionCard, toast, todayIso, type CardField, type ActionCardPicker, type CardRecord, type ContractSchema } from "@mycity/ui";
@@ -88,8 +88,9 @@ const idsIn = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
  * screen's own form binds it: whom a task may be set for or shared with (New Task's), anyone with a
  * login (New Event's and Add Watcher's), a department (for a reader who may view People, as New Task
  * offers it), an active project, a leave type with what is left of this year (Request Leave's own
- * list, decision 32). What is already picked reads by the name the card carries; a pick made here
- * keeps its own, until Save Changes has the server name it again.
+ * list, decision 32), a task the person can see (Wait On Task's own list). What is already picked
+ * reads by the name the card carries; a pick made here keeps its own, until Save Changes has the
+ * server name it again.
  */
 function CardPick({ field, value, onChange, names }: { field: CardField; value: unknown; onChange: (value: unknown) => void; names: CardRecord[] }) {
   const many = field.kind === "list";
@@ -98,6 +99,7 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
   const [people, setPeople] = useState<PersonRef[]>(() => ids.map((id) => ({ employee_id: id, display_name: nameOf(id) })));
   const [departments, setDepartments] = useState<Department[]>(() => ids.map((id) => ({ department_id: id, name: nameOf(id) }) as unknown as Department));
   const [projects, setProjects] = useState<ProjectChoice[]>(() => ids.map((id) => ({ project_id: id, number: "", name: nameOf(id) })));
+  const [tasks, setTasks] = useState<TaskChoice[]>(() => ids.map((id) => ({ task_id: id, number: "", title: nameOf(id) })));
   const set = (picked: string[]) => onChange(many ? picked : (picked[0] ?? null));
   const pickPeople = (p: PersonRef[]) => (setPeople(p), set(p.map((x) => x.employee_id)));
   switch (field.picks) {
@@ -113,6 +115,8 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
       return <ProjectPicker value={projects} onChange={(p) => (setProjects(p), set(p.map((x) => x.project_id)))} />;
     case "leave_type":
       return <LeaveTypeSelect year={Number(todayIso().slice(0, 4))} value={ids[0] ?? ""} onChange={(v) => set(v ? [v] : [])} />;
+    case "task":
+      return <TaskPicker value={tasks} onChange={(t) => (setTasks(t), set(t.map((x) => x.task_id)))} />;
     default:
       return null;
   }

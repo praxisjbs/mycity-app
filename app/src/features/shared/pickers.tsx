@@ -1,4 +1,4 @@
-import type { CitablePolicy, Department, EmployeeListQuery, Project, Worksite } from "@mycity/contract/contract.gen.ts";
+import type { CitablePolicy, Department, EmployeeListQuery, Project, Task, Worksite } from "@mycity/contract/contract.gen.ts";
 import { usePhotos } from "@/api/download";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
@@ -180,6 +180,24 @@ export function ProjectPicker({ value, onChange }: { value: ProjectChoice[]; onC
       title={(p) => p.name}
       sub={(p) => p.number}
       placeholder="Search projects"
+    />
+  );
+}
+
+export type TaskChoice = Pick<Task, "task_id" | "number" | "title">;
+
+/** The tasks the person can see, searched by number or title on the server (one): what a task waits on, as Wait On Task's list. */
+export function TaskPicker({ value, onChange }: { value: TaskChoice[]; onChange: (value: TaskChoice[]) => void }) {
+  const list = usePaged("GET /api/v1/tasks", { filters: { scope: "team" } });
+  return (
+    <RecordPicker
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value as Task[]}
+      onChange={(rows) => onChange(rows.map((r) => ({ task_id: r.task_id, number: r.number, title: r.title })))}
+      id={(t) => t.task_id}
+      title={(t) => `${t.number} ${t.title}`}
+      sub={(t) => t.assignee?.display_name ?? ""}
+      placeholder="Search tasks"
     />
   );
 }

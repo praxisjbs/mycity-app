@@ -5,7 +5,7 @@
  * expects, so a test can run it and a mismatch blocks the build. The generator knows nothing of
  * MyCity: the roles and the rule (`may`) arrive as arguments.
  *
- *   const cases = casesFor({ tools: registry entries, roles: ["ceo", "employee", ...], may: (role, module, action) => boolean });
+ *   const cases = casesFor({ tools: registry entries, roles: ["ceo", "employee", ...], may: (role, module, action, tool) => boolean });
  *   // → [{ kind: "read", key: "employees.list", role: "employee", module: "people", action: "view", expect: "refused" }, ...]
  *
  * A tool that carries a `matrix` probe ({ inside, outside }) also yields a scope case per role
@@ -13,15 +13,16 @@
  */
 
 /**
- * @param {{tools: Array<{key: string, kind: string, module: string, permission: [string, string], matrix?: object}>,
- *          roles: string[], may: (role: string, module: string, action: string) => boolean}} q
+ * @param {{tools: Array<{key: string, kind: string, module: string, permission: [string, string], capability?: string|null, matrix?: object}>,
+ *          roles: string[], may: (role: string, module: string, action: string, tool: object) => boolean}} q
+ *        `may` is handed the tool too, so an action held to a capability is expected only for its holders
  */
 function casesFor({ tools, roles, may }) {
   const out = [];
   for (const t of tools) {
     const [module, action] = t.permission;
     for (const role of roles) {
-      const allowed = Boolean(may(role, module, action));
+      const allowed = Boolean(may(role, module, action, t));
       out.push({ kind: t.kind, key: t.key, role, module, action, expect: allowed ? "allowed" : "refused" });
       if (allowed && t.matrix) out.push({ kind: t.kind, key: t.key, role, module, action, expect: "scoped", probe: t.matrix });
     }

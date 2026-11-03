@@ -12,6 +12,7 @@
 const c = require("@mycity/contract");
 const { AppError } = require("../../shared/errors");
 const { defineManifest } = require("../../shared/ai/manifest");
+const { oneNamed } = require("../../shared/ai/named");
 const routeMap = require("../../shared/route-map");
 const documents = require("../documents/documents.service");
 const leave = require("../leave/leave.service");
@@ -50,29 +51,15 @@ async function typesFor(actor) {
 /** A type as a choice to tap: "Annual Leave, 12 days left", or its name alone when it has no allowance. */
 const choiceOf = (t) => (t.remaining === null || t.remaining === undefined ? t.name : `${t.name}, ${t.remaining} ${t.remaining === 1 ? "day" : "days"} left`);
 
-/** A type's name or code as a person says it: lower case, the word "leave" and punctuation left out ("Annual Leave" → "annual"). */
-const plain = (s) =>
-  String(s)
-    .toLowerCase()
-    .replace(/\bleave\b/g, " ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-
 /**
- * The type a name names, among the person's own: its name or code with or without the word Leave
- * ("Annual Leave" for the type named Annual), a choice as tapped ("Annual, 12 days left"), or words
- * only one type's name begins or is begun by ("Compassionate" for "Compassionate Leave"); null when
- * none or several match.
+ * The type a name names, among the person's own (shared/ai/named.js): its name or code with or
+ * without the word Leave ("Annual Leave" for the type named Annual), a choice as tapped ("Annual, 12
+ * days left"), or words only one type's name begins or is begun by ("Compassionate" for
+ * "Compassionate Leave"); null when none or several match.
  */
 async function typeIdOf(actor, value) {
-  const types = await typesFor(actor);
-  const said = plain(String(value).split(/[,·]/)[0]);
-  if (!said) return null;
-  const words = (t) => [plain(t.name), plain(t.code)].filter(Boolean);
-  const exact = types.filter((t) => words(t).includes(said));
-  if (exact.length === 1) return exact[0].leave_type_id;
-  const near = types.filter((t) => words(t).some((w) => w.startsWith(said) || said.startsWith(`${w} `)));
-  return near.length === 1 ? near[0].leave_type_id : null;
+  const type = oneNamed(await typesFor(actor), String(value).split(/[,·]/)[0], (t) => [t.name, t.code], { drop: ["leave"] });
+  return type ? type.leave_type_id : null;
 }
 
 module.exports = defineManifest({

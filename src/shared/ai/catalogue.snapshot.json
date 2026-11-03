@@ -24,6 +24,17 @@
       "screen": null
     },
     {
+      "key": "calendar.edit",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "calendar.CalendarEventChange",
+      "schema_sha": "b7dd14dc6346a129",
+      "screen": null
+    },
+    {
       "key": "community.message",
       "kind": "action",
       "module_key": "community",
@@ -44,6 +55,30 @@
       "schema": "community.ChannelPost",
       "schema_sha": "c7f2cf806e53f4f0",
       "screen": null
+    },
+    {
+      "key": "late_reasons.add",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "tasks.LateReasonCreate",
+      "schema_sha": "17e57946d984bc55",
+      "screen": null,
+      "capability": "workspace.late_reasons"
+    },
+    {
+      "key": "late_reasons.switch",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "tasks.LateReasonSwitch",
+      "schema_sha": "6bdee254c260e062",
+      "screen": null,
+      "capability": "workspace.late_reasons"
     },
     {
       "key": "leave.approve",
@@ -90,6 +125,39 @@
       "screen": null
     },
     {
+      "key": "projects.create",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "projects.ProjectCreate",
+      "schema_sha": "85b29429e9515f5e",
+      "screen": null
+    },
+    {
+      "key": "projects.edit",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "projects.ProjectChange",
+      "schema_sha": "d303b1595834209f",
+      "screen": null
+    },
+    {
+      "key": "tasks.add_step",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "tasks.TaskStepAdd",
+      "schema_sha": "1be24a6a83f3d233",
+      "screen": null
+    },
+    {
       "key": "tasks.comment",
       "kind": "action",
       "module_key": "workspace",
@@ -120,6 +188,50 @@
       "bulk": 1,
       "schema": "tasks.TaskCreate",
       "schema_sha": "b3dbd57183abcb9e",
+      "screen": null
+    },
+    {
+      "key": "tasks.edit",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "tasks.TaskChange",
+      "schema_sha": "3d22d47b2634a7b2",
+      "screen": null
+    },
+    {
+      "key": "tasks.edit_step",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "tasks.TaskStepChange",
+      "schema_sha": "8cea3e1741ccea81",
+      "screen": null
+    },
+    {
+      "key": "tasks.wait_on",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "tasks.TaskWaitOn",
+      "schema_sha": "ce78e69cfcf8a42d",
+      "screen": null
+    },
+    {
+      "key": "week.support",
+      "kind": "action",
+      "module_key": "workspace",
+      "permission": "workspace.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "workspace.WeekSave",
+      "schema_sha": "db62c8cf91372dec",
       "screen": null
     },
     {
@@ -648,6 +760,17 @@
       "bulk": null,
       "schema": "organisation.OrgSeatListQuery",
       "schema_sha": "464d12461114e149",
+      "screen": null
+    },
+    {
+      "key": "tasks.get",
+      "kind": "read",
+      "module_key": "workspace",
+      "permission": "workspace.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
       "screen": null
     },
     {

@@ -8,7 +8,7 @@
 const lagos = require("../../shared/time/lagos");
 const { today } = require("./workspace.today");
 const { analytics, assertPeriod } = require("./workspace.analytics");
-const { week, save, teamWeeks, tidy } = require("./workspace.week");
+const { week, save, teamWeeks, tidy, weekOf } = require("./workspace.week");
 
 /** The source of Analytics' Export in the reports engine (HOME_REPORT_SOURCES). */
 const EXPORT_SOURCE = "workspace_analytics";
@@ -41,4 +41,4 @@ async function exportAnalytics(actor, body, now = new Date()) {
 /** GET /workspace/analytics/export/:id: one of the caller's own Analytics exports. */
 const analyticsExport = (user, id) => reports().getPersonalRun(user, id, EXPORT_SOURCE);
 
-module.exports = { today, analytics, exportAnalytics, analyticsExport, week, save, teamWeeks, tidy };
+module.exports = { today, analytics, exportAnalytics, analyticsExport, week, save, teamWeeks, tidy, weekOf };

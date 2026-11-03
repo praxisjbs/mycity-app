@@ -780,7 +780,8 @@ gate"). This PR adds the gate and the list; the forms themselves follow, module 
 - [x] 03/11/2026 · The never and via reasons: a punch and a check-in `device`, a home location and `EssProfileUpdate` `personal`, an import and the documents module `file`, the integrations module and `SecurityPolicyPatch` `secret`, the assistant module (a card's own edit) `ai`; `MessageCreate` and `DirectCreate` via `community.message`, `TaskCommentCreate` via `tasks.comment`, `MailDraftSave` via `mail.send`
 - [x] 03/11/2026 · Today's gaps: 89 forms listed, each with where it lives (3 in the chat, 4 through another action, 20 never, of 116)
 - [x] 03/11/2026 · Tests: the rule's cases (a new form, a gap added, a gap closed or stale, a via naming no action) and the list's shape (`ai-engine.test.js`)
-- [ ] The forms, module by module, each PR taking its gaps off the list: Workspace and Calendar, then People, Performance, Community, Queries and Policies, Home and Settings
+- [x] 03/11/2026 · Workspace and Calendar (branch `claude/determined-dirac-b4ivrd-workspace-chat`): ten cards, Save Task, Add Step, Save Step, Add Link, Add Reason, Switch Reason, Create Project, Save Project, Save Event, Save Support Needed; an edit form's card names its record (`<Thing>Change`, `TaskStepAdd`, `TaskWaitOn`, `LateReasonSwitch`) and the form's own schema is reached `via` it; actions may name a `capability`; `resolve` is handed the card's values; the `task` pick; `tasks.get`; ten gaps closed (79 left)
+- [ ] The rest, module by module, each PR taking its gaps off the list: People, Performance, Community, Queries and Policies, Home and Settings
 
 ## 7 · Gates this work adds
 
@@ -915,3 +916,8 @@ gate"). This PR adds the gate and the list; the forms themselves follow, module 
 - 03/11/2026 · JP · The forms gate (§6.9, decision 33): gate 23 rule 6 holds every create and edit
   form of a built module to an action, a via, a never word or the list of today's gaps (89 of 116),
   which only shrinks. Next: the forms themselves, Workspace and Calendar first.
+- 03/11/2026 · JP · Workspace and Calendar's forms in the chat (§6.9, decision 33): ten cards
+  through the screens' own services, each edit naming its record and showing only what changes;
+  Late Reasons held to their capability as their routes are (`capability` on an action, the
+  matrix's rule handed the tool); a step and a late reason matched by their words, a week by any
+  day in it; `tasks.get`. 79 gaps left. Next: People.

@@ -552,6 +552,11 @@ that module's guide changed):
   New Message and New Event list them; the asker listed too, so every reader sees the same people).
   It is how a task's watcher, a meeting's guest or a message's colleague is found for a person
   without the People grant, whose `employees.list` it is not (decision 29: "which one?").
+- **My Workspace** (built): `tasks.get` (`IdParams`), one task the asker can see as its panel shows
+  it: its steps (each with its id, words, due day and whether it is ticked), what it waits on and
+  holds up, its watchers, its open hold and what the asker may do to it, through the panel's own
+  service (`workspace.md` §6). "What is left on T-0012?" is one read, and a step is changed by the id
+  it returns or by its words (`tasks.edit_step`, §6.11).
 - **User Guide** (built): `guide.search` (`PageQuery`), how to do something in the hub: the
   sections and tasks of the guide the asker may read that answer `q`, ranked by the guide's own
   search, a page of 25, each row citing its section (`guide_section`, opening the guide at it)
@@ -597,6 +602,7 @@ actions: [{
   description: "Set a task for me or someone I manage",
   input: c.tasks.TaskCreate,                 // the card's fields: the form's own contract schema
   permission: ["workspace", "create"],       // the grant; the scope comes with it as requirePermission gives it
+  // capability: "workspace.late_reasons",   // held on top of the grant, where the screen's route asks requireCapability
   risk: "standard",                          // standard | approval | money | payroll | delete
   bulk: 1,                                   // records one press may touch, at most 25
   records: (values) => [],                   // the records it touches, for the card and the re-check
@@ -611,12 +617,15 @@ actions: [{
   // Request Leave's: answers read from the person's own records, and a type the model may write by name (decision 32)
   // asks: [{ field: "leave_type_id", question: "Which leave type?", options: ({ actor, db }) => typeChoices(actor, db) }],
   // resolve: { leave_type_id: (value, actor, db) => typeIdOf(value, db) },
+  // A step written by its words is matched within the card's own task (the card's values come fourth):
+  // resolve: { task_step_id: (value, actor, db, values) => stepIdOf(db, values.task_id, value) },
 }],
 not_offered: { TaskStepCreate: "a step belongs to a task's own panel" },   // every other <Thing>Create of the module, with a reason (gate 23)
 ```
 
 `defineManifest` checks every key at load: the input and the permission are the contract's and the
-catalogue's, `risk` is one of the five classes, `run` and `check` are functions, and no word that is
+catalogue's, a `capability` is one of the catalogue's capabilities, `risk` is one of the five
+classes, `run` and `check` are functions, and no word that is
 a write by another name (`write`, `executor`, `execute`, `mutations`, `sql`, `query`) appears; gate 19
 reads the file too and refuses SQL inside it. The engine never sees a repo. `records(values, actor,
 db)` may be async and read the records' names through the module's own repo when it is handed the
@@ -625,13 +634,27 @@ the person may not see keeps its id alone, and the action's `check` refuses the 
 whose input is not the schema its screen's form validates with says `form: "none: <reason>"` (a
 button with no form, a form whose record is the panel's own, a composer of its own).
 
+**An edit form's card names its record (decision 33).** A screen's edit form never names the record
+it changes, because the panel or page it sits on is that record; a card must. So an edit form's card
+takes the form's own schema with the record's id beside its fields (`TaskChange` is `TaskEdit` with
+`task_id`; `ProjectChange`, `CalendarEventChange`, `TaskStepChange`), its other rules unchanged, and
+says `form: "none: …"`; the form's own schema is then reached `via` that action in `not_offered`. A
+card schema is named for its verb (`Change`, `Add`, `Switch`, `WaitOn`), never `Create`, `Edit`,
+`Update`, `Patch` or `Save`, so it is no new form (§6.15 rule 6). The card lists only what changes,
+with the record named in its first field and as its chip; nothing left out of the values is
+cleared. **An action held to a capability** (`capability`), as its screen's route holds it on top of
+the grant (`requireCapability`: Late Reasons' `workspace.late_reasons`), is offered only to a person
+who holds it, the CEO holding every one, and `authorise.checkAction` refuses it to anyone else, at
+the draft and at the press, as the route would.
+
 **What a card carries and names (decision 31).** `fields` lists the input's fields the card carries,
 in the order it shows them; a value for any other field is dropped before the schema parses it
 (`authorise.checkAction`), so a commitment, a repeat or a record pointer never rides on a task card
 unseen, and the system turn lists only these. `picks` names, for each id field and list of ids, the
 picker Edit chooses it with (`colleague`, anyone with a login; `task_assignee` and `task_member`,
 whom the person may set a task for or share one with, as New Task's; `department`; `project`;
-`leave_type`, the types Request Leave's form offers).
+`leave_type`, the types Request Leave's form offers; `task`, the tasks the person can see, as Wait
+On Task's).
 `names(values, actor, db)` names the ids the fields hold through the module's own repo, kept apart
 from `records`: the records are what a press acts on (the verb's count, the chips, the re-check), the
 names only how an id reads, so a meeting's three guests never make "Create Event ×3". A rule the
@@ -641,10 +664,13 @@ is in the action's description, and the card still shows the schema's own proble
 Changes, marks a field with `picks` whose id, or any id of whose list, neither `names` nor `records`
 names with the problem Pick one, in place of the schema's own; the card never prints an id, so the
 field reads as its problem alone until Edit picks one. `resolve` takes, for a field the model may write
-by name, `(value, actor, db) => id`, run before the schema parses the values: a value that is already
+by name, `(value, actor, db, values) => id`, run before the schema parses the values: a value that is already
 an id is left alone, and a name or code is matched among the person's own records (Request Leave's
 leave types: by name or code, with or without the word Leave, "Annual Leave" for the type named
-Annual, or by the first words only one type's name has), else left as written for Pick one to mark.
+Annual, or by the first words only one type's name has; a late reason by its words; a step by its
+words among the steps of the card's own task, which `values` carries), else left as written for
+Pick one to mark. A week is matched the same way: any day in it, or "this week", "next week" and
+"last week", is that week's Monday.
 A card whose values have a problem keeps what was matched, so a type matched by name stays matched
 while another field is fixed; an id field's value reads only as the name `names` or `records` give
 it, never as the words the model wrote.
@@ -674,7 +700,17 @@ open with the reason.
 | `tasks.create` | `workspace` create, standard, may be suggested | `TaskCreate` (New Task's form): the title, notes, whom it is for, the people or department sharing it, its watchers (people or a department), due day, priority, cadence, project; asks the title, the due day (Today, Tomorrow, Friday, No Due Day) and the priority (Low, Normal, High, Urgent) | none: it makes one task; whom it is for, the people sharing and watching it, the departments and the project are named (`tasks.service.cardNames`) | the scope, and New Task's own rules on whom and with whom (`workspace.md` §6) | `tasks.service.create` |
 | `tasks.complete` | `workspace` edit, standard, up to 25 | `TaskComplete`: the tasks, a late reason | the tasks, by number and title | every task on the person's board; a cancelled or waiting one is its own line | `move()` to Done, one after another |
 | `tasks.comment` | `workspace` edit, standard | `TaskCommentAdd`: the task (filled from the screen asked from), the words | the task | on the person's board | `tasks.service.comment` |
+| `tasks.edit` (Save Task) | `workspace` edit, standard | `TaskChange` (Edit Task's `TaskEdit` with the task): the title, notes, due day, priority, cadence, whom it is for, the people or department sharing it, the project; only what changes | the task, by number and title; the people, department and project named | on the person's board; the setter's fields need the right to manage it, the notes and priority the people on it (`workspace.md` §6) | `tasks.service.edit` |
+| `tasks.add_step` (Add Step) | `workspace` edit, standard | `TaskStepAdd` (Add Step's `TaskStepCreate` with the task): the step, its due day; asks the step ("What is the step?") | the task | on the person's board; its lead or setter (the panel's own rule) | `tasks.service.addStep` |
+| `tasks.edit_step` (Save Step) | `workspace` edit, standard | `TaskStepChange` (`TaskStepEdit` with the task and the step, the step matched by its words): ticked or not, its words, its due day | the task; the step named | ticking for anyone who sees the task, its words and day for its lead or setter | `tasks.service.editStep` |
+| `tasks.wait_on` (Add Link) | `workspace` edit, standard | `TaskWaitOn` (Wait On Task's `TaskDependencyCreate` with the task): the task it waits on, picked with Wait On Task's own list | the task; the one it waits on named | both on the person's board; never itself, never a loop | `tasks.service.addWaiting` |
+| `late_reasons.add` (Add Reason) | `workspace` edit and the `workspace.late_reasons` capability, standard | `LateReasonCreate` (Late Reasons' form): the reason's words | none: it makes one reason | a holder of the capability; the words new, 25 at most | `tasks.reasons.add` |
+| `late_reasons.switch` (Switch Reason) | `workspace` edit and the `workspace.late_reasons` capability, standard | `LateReasonSwitch` (Late Reasons' toggle, `LateReasonEdit` with the reason, matched by its words): on or off | the reason, by its words | a holder of the capability | `tasks.reasons.setActive` |
+| `projects.create` (Create Project) | `workspace` create, standard | `ProjectCreate` (New Project's form): the name, notes, due day; asks the name ("What is the project called?") | none: it makes one project, the person's own | an employee | `projects.service.create` |
+| `projects.edit` (Save Project) | `workspace` edit, standard | `ProjectChange` (Edit Project's `ProjectEdit` with the project): the name, notes, due day, and Completed or Active (Complete Project, Reopen Project); only what changes | the project, by number and name | its owner, or a grant that reaches everyone | `projects.service.edit` |
 | `calendar.create` | `workspace` create, standard | `CalendarEventCreate` (joined from New Event's day and times); asks what it is about, when, how long (30 Minutes, 1 Hour, 2 Hours) and who comes (Just Me) | none: it makes one event; the attendees are named | someone not on the staff refused on the field | `calendar.service.create` |
+| `calendar.edit` (Save Event) | `workspace` edit, standard | `CalendarEventChange` (Edit Event's `CalendarEventEdit` with the event, its day and times joined as New Event's are): the title, start and end, attendees, kind, location, visibility, notes, reminders; only what changes | the event, by its title; the attendees named | the person made it, and it is not called off; someone not on the staff refused on the field | `calendar.service.edit` |
+| `week.support` (Save Support Needed) | `workspace` edit (the screen's route asks `workspace` view; an action's grant is never view), standard | `WeekSave` (Write Support Needed's form): the week (any day in it, or this, next or last week, as its Monday) and the line; Tidy With AI's summary stays on the screen; asks the line ("What support do you need?") | none: the person's own week | an employee | `workspace.service.save` |
 | `my_leave.request` | `ess` create, standard | `LeaveRequestCreate` (Request Leave's form): the leave type (named, picked with Request Leave's own list, matched by name when the model writes one), the first and last day, the note; asks which type ("Which leave type?") with the person's types and the days left of each | none: the person's own | an employee; the type, the days and the year's allowance are the service's | `leave.service.request` |
 | `leave.approve`, `leave.reject` | `people` approve, **approval**, up to 25 | `LeaveApprove`, `LeaveReject` (a reason, required to reject) | the requests: who, the type, the days | every request in the person's `people` scope; then each waiting and named on its stage, never their own, as a line | the approval's own `decide()` per request |
 | `approvals.decide` | `ess` create (the queue is the person's own), **approval**, up to 25 | `ApprovalDecide`: the requests, approve, reject or request changes, a reason (required but to approve) | the requests: the flow and who it is about | every request the person may read; then each pending, the stage naming them, `approve` held on its module, never their own; one decided on its record refused with that record's screen on its line | `workflow.service.decide` per request |
@@ -910,7 +946,8 @@ hands every probe a `ctx`: the actor with the tool's scope, the tool's key, thei
 outsider, the annual leave type, a fresh working day, their capabilities and `scopeOf()`. A read must
 return the inside record and never the outside one; a card naming the outside record must be
 refused by `authorise.checkAction` or the action's own `check`. Probed: Workspace (`tasks.list`,
-`tasks.complete`, `tasks.comment`, `calendar.month`), People (`employees.list`, `leave.requests`,
+`tasks.complete`, `tasks.comment`, `tasks.edit`, `tasks.add_step`, `tasks.edit_step`,
+`tasks.wait_on`, `projects.edit`, `calendar.month`, `calendar.edit`), People (`employees.list`, `leave.requests`,
 `leave.approve`, `leave.reject`, `attendance.register`), Home (`team.today`, `activity.list`), ESS
 (`my_profile.get`, `my_leave.list`), approvals (`approvals.mine`, `approvals.decide`) and Staff
 Community (`channels.list`, `community.post`, `community.message`). Performance and Queries carry
@@ -975,7 +1012,8 @@ Nobody is notified of anything.
 
 | Role | Sees | Can do |
 |---|---|---|
-| Every role with `praxis_ai` (all seven seeded roles) | Ask and History, their own conversations only | Ask, record a question, give feedback, delete their own conversations; press the cards their own grants reach (§6.11): a task, a comment, an event, their own leave request, a message, a post, a mail from their own mailbox; a request waiting on them in My Approvals |
+| Every role with `praxis_ai` (all seven seeded roles) | Ask and History, their own conversations only | Ask, record a question, give feedback, delete their own conversations; press the cards their own grants reach (§6.11): a task and its change, a comment, a step, a link between tasks, a project and its change, an event and its change, their week's Support Needed, their own leave request, a message, a post, a mail from their own mailbox; a request waiting on them in My Approvals |
+| A holder of `workspace.late_reasons` (Management, Operations & People, the Implementation Team) | The same | Add a late reason, or switch one off or on, from the chat as from Late Reasons |
 | A line manager (`people` approve, team), Operations & People and Management (`people` approve, all) | The same | Approve or reject the leave requests waiting on them, up to 25 a press, after Confirm It's You; never their own |
 | What each person learns | Exactly what their own grants, scope and field visibility show on screen | |
 | CEO | Everything, by the standing rule, through the same reads | The same |
@@ -1159,6 +1197,21 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · My Workspace's forms in the chat (decision 33; "go ahead with Workspace and
+  Calendar", JBS Praxis; `docs/handoff/praxis-ai-engine.md` §6.9): ten actions (§6.11's table),
+  each the screen's own service function: Save Task (`tasks.edit`), Add Step, Save Step, Add Link
+  (a task waits on another), Add Reason and Switch Reason (Late Reasons), Create Project, Save
+  Project (its Complete and Reopen too), Save Event (`calendar.edit`) and Save Support Needed
+  (`week.support`, My Week's manifest, `workspace.ai.js`). An edit form's card names its record
+  (`TaskChange`, `TaskStepAdd`, `TaskStepChange`, `TaskWaitOn`, `LateReasonSwitch`, `ProjectChange`,
+  `CalendarEventChange`: the form's own schema with the record's id, named for its verb so it is no
+  new form) and lists only what changes; the forms' own schemas are reached `via` their actions.
+  An action may name a `capability` held on top of its grant, as its route's `requireCapability`
+  does: offered only to its holders, refused to anyone else (§8). `resolve` is handed the card's
+  values, so a step is matched by its words within its task; a late reason by its words; a week
+  by any day in it or this, next or last week. The `task` pick (Wait On Task's list). `tasks.get`
+  (§6.9) reads one task as its panel shows it. Ten forms off `scripts/check/ai-forms-gaps.json`
+  (79 left). §6.9, §6.11, §6.17, §8.
 - 03/11/2026 · JP · Every form in the chat (§1.5 decision 33, JBS Praxis; `docs/handoff/praxis-ai-engine.md`
   §6.9): gate 23 rule 6 (§6.15) holds each create and edit schema of a built module to an action, a
   `via` another action's card, a never word (`secret`, `device`, `personal`, `file`, `ai`), or the
