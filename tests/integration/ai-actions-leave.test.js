@@ -127,6 +127,17 @@ describeDb("Praxis AI's leave cards against the real migrations", () => {
     expect(byName.status).toBe(200);
     expect(byName.body.card).toMatchObject({ values: { leave_type_id: annual }, problems: {}, names: [{ type: "leave_type", id: annual, label: "Annual" }] });
     expect(byName.body.card.fields.find((f) => f.name === "leave_type_id")).toMatchObject({ kind: "id", picks: "leave_type" });
+    // As on staging: "Annual Leave" for the type named Annual, matched with or without the word Leave;
+    // and what was matched stays on a card whose other field has a problem (the last day before the first).
+    script(say({ text: "Here is the request.", action: { key: "my_leave.request", values: { leave_type_id: "Annual Leave", starts_on: wed, ends_on: thu }, suggested: false } }));
+    const withLeave = await h.ask("one", { question: "Set this to annual leave then.", shows: ["cards"] });
+    expect(withLeave.body.card).toMatchObject({ values: { leave_type_id: annual }, problems: {}, names: [{ type: "leave_type", id: annual, label: "Annual" }] });
+    script(say({ text: "Here is the request.", action: { key: "my_leave.request", values: { leave_type_id: "annual leave", starts_on: thu, ends_on: wed }, suggested: false } }));
+    const backwards = await h.ask("one", { question: "Thursday back to Wednesday.", shows: ["cards"] });
+    expect(backwards.body.card.values.leave_type_id).toBe(annual);
+    expect(backwards.body.card.names).toEqual([{ type: "leave_type", id: annual, label: "Annual", link: null }]);
+    expect(backwards.body.card.problems.leave_type_id).toBeUndefined();
+    expect(Object.keys(backwards.body.card.problems).length).toBeGreaterThan(0);
     // An id the model made up, as on staging: never named, marked Pick one, and the press refused with nothing sent.
     const madeUp = "0d663c19-94bc-4ce9-93ef-95db8c56fa76";
     script(say({ text: "Here is the request.", action: { key: "my_leave.request", values: { leave_type_id: madeUp, starts_on: wed, ends_on: thu }, suggested: false } }));

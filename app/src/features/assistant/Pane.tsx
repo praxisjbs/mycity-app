@@ -36,6 +36,9 @@ const firstReadN = (a: AiAnswer): number | null => a.table?.read ?? a.reads.find
 
 const defaultTab = (a: AiAnswer, readN: number | null): PaneTab => (a.overview ? "overview" : readN ? "table" : "sources");
 
+/** Whether an answer has anything for the pane: figures, a table, or reads to list; a card drawn from what was said has none and leaves the pane as it was (§10.1). */
+export const paneHas = (a: AiAnswer): boolean => Boolean(a.overview || a.table?.rows.length || a.reads.length);
+
 /** What the pane shows for an answer, keeping the view already open on that same answer. */
 function shownFor(s: PaneShown | null, answer: AiAnswer, pick: PanePick): PaneShown {
   const same = s && s.answer.ai_message_id === answer.ai_message_id ? s : null;

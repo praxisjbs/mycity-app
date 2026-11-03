@@ -766,6 +766,7 @@ id nothing named.
 - [x] 03/11/2026 · `my_leave.request`: fields, the `leave_type` pick, names, "Which leave type?" with the person's types and days left, a type matched by name
 - [x] 03/11/2026 · The screens: `ActionCard` never prints an id and Edit holds Save only on a field it can change; the card's Leave Type picker is `LeaveTypeSelect`, Request Leave's own
 - [x] 03/11/2026 · Tests: unit, integration (leave by name, a made-up id refused, the type asked; a task card's unknown person), screens; `ask.leave-type` in the evaluation set; the leave cards' test days are working days, a holiday week skipped (it failed on 03/11/2026: Boxing Day observed on Monday 28/12)
+- [x] 03/11/2026 · Finished after staging: a type written "Annual Leave" matches the type named Annual (with or without the word Leave, a name either side begins); a card with a problem keeps what was matched; an id field reads only as a name the card knows; the pane follows the latest answer that read records or has figures, never blank after a card
 - [ ] Run the evaluation set on staging with the real model: `node scripts/ai/eval-assistant.js --only=ask`, `--only=card`
 
 ## 7 · Gates this work adds
@@ -893,3 +894,8 @@ id nothing named.
   picks its type and asks which one with the days left of each, a type the model writes by name is
   matched on the server, and a picked id nothing names is marked Pick one and never sent. The leave
   cards' test now books working days only. Left: the evaluation set on staging with the real model.
+- 03/11/2026 · JP · Decision 32 finished (§6.8): on staging a Request Leave card still read "Annual
+  Leave" with Pick one, because the model wrote "Annual Leave" and the type is named Annual. The
+  match now takes a type with or without the word Leave, a card keeps what was matched while another
+  field is fixed, an id field never shows the model's own words, and the pane no longer goes blank
+  after a card drawn from what was said.
