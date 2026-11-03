@@ -65,7 +65,7 @@ const ISO_DAY = "^\\d{4}-\\d{2}-\\d{2}$";
  * The fields a schema takes, each with the form its value is written in, for the lists the model
  * reads: a value in any other form (a day written day first) is dropped from a link or a card.
  */
-function schemaFields(schema, { required = false, only = null } = {}) {
+function schemaFields(schema, { required = false, only = null, byName = [] } = {}) {
   const js = jsonSchemaOf(schema) || {};
   const props = js.properties || {};
   const must = new Set(js.required || []);
@@ -73,7 +73,9 @@ function schemaFields(schema, { required = false, only = null } = {}) {
   return keep.map((k) => [k, props[k]]).map(([k, p]) => {
     const node = p && Array.isArray(p.anyOf) ? p.anyOf.find((x) => x && x.type !== "null") || p : p;
     let form = "";
-    if (node.enum) form = ` (one of ${node.enum.join(", ")})`;
+    // A field the server matches by name (decision 32): the model writes the name.
+    if (byName.includes(k)) form = " (its name)";
+    else if (node.enum) form = ` (one of ${node.enum.join(", ")})`;
     else if (node.format === "date-time") form = " (YYYY-MM-DDTHH:MM:SS+01:00)";
     else if (node.format === "uuid" || /_id$/.test(k)) form = " (an id a read returned)";
     else if (node.pattern === ISO_DAY) form = " (YYYY-MM-DD)";
@@ -92,7 +94,8 @@ const prefillFields = (schema) => schemaFields(schema);
  * its answers to tap and whether none is an answer.
  */
 function actionLine(a, today) {
-  const parts = [`- ${a.key}: ${a.description}; fields: ${schemaFields(a.input, { required: true, only: a.fields }).join(", ")}`];
+  const byName = Object.keys(a.resolve || {});
+  const parts = [`- ${a.key}: ${a.description}; fields: ${schemaFields(a.input, { required: true, only: a.fields, byName }).join(", ")}`];
   if (a.bulk > 1) parts.push(`at most ${a.bulk} records`);
   if (a.suggest) parts.push("may be offered unasked, marked suggested");
   if (a.asks && a.asks.length) {
@@ -102,6 +105,8 @@ function actionLine(a, today) {
     });
     parts.push(`ask first, one at a time, unless the person gave it: ${asks.join("; ")}`);
   }
+  // A field the server matches by name (decision 32): the model writes the name, never an id it did not read.
+  if (byName.length) parts.push(`by name: ${byName.join(", ")} (write its name as the person says it or a read gives it)`);
   return parts.join("; ");
 }
 

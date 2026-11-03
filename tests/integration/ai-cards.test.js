@@ -284,8 +284,10 @@ describeDb("Praxis AI action cards against the real migrations", () => {
   });
 
   test("a refusal the person can fix comes back on the fields and the card stays open; a service that falls over is recorded as failed", async () => {
-    // Everything its asks name is given (no due day, said so), so the card is drawn and the press finds the gap.
-    const { body } = await cardFor("staff", { title: "Shared task", due_on: null, priority: "normal", department_id: "00000000-0000-4000-8000-000000000099" });
+    // Everything its asks name is given (no due day, said so), so the card is drawn and the press finds the gap:
+    // a real department (one nothing names would be Pick one at the draft, decision 32) shared with no lead.
+    const { department_id: department } = await one("SELECT department_id FROM department WHERE name = 'HR & Operations'");
+    const { body } = await cardFor("staff", { title: "Shared task", due_on: null, priority: "normal", department_id: department });
     const id = body.card.ai_action_draft_id;
     const res = await press("staff", id);
     expect(res.status).toBe(422);
@@ -458,5 +460,20 @@ describeDb("Praxis AI action cards against the real migrations", () => {
     expect(page.status).toBe(200);
     expect(page.body.columns).toEqual(["Employee", "Work Pattern", "Today's Status"]);
     expect(page.body.rows.map((r) => r[0]).sort()).toEqual([...names].sort());
+  });
+
+  test("a task card never shows an id: a person the model made up is marked Pick one, never sent; a real one is named (decision 32)", async () => {
+    const madeUp = "6f1c2a8e-1111-4222-8333-944455556666";
+    script(say({ text: "Here is the task.", action: { key: "tasks.create", values: { title: "Review the system health", due_on: "2026-11-06", priority: "high", primary_assignee_id: madeUp, watcher_ids: [people.ops.employee_id, madeUp] }, suggested: false } }));
+    const res = await ask("ops", { question: "Assign a task to JBS Test to review the system health.", shows: ["cards"] });
+    expect(res.status).toBe(200);
+    expect(res.body.card.problems).toEqual({ primary_assignee_id: ["Pick one"], watcher_ids: ["Pick one"] });
+    // The person who is there is named; the one nobody is never is.
+    expect(res.body.card.names).toEqual([expect.objectContaining({ type: "employee", id: people.ops.employee_id, label: "Ada Obi" })]);
+    const before = (await one("SELECT count(*)::int AS n FROM task")).n;
+    const refused = await press("ops", res.body.card.ai_action_draft_id);
+    expect(refused.status).toBe(422);
+    expect(refused.body.error.fields).toMatchObject({ primary_assignee_id: ["Pick one"] });
+    expect((await one("SELECT count(*)::int AS n FROM task")).n).toBe(before);
   });
 });

@@ -6,10 +6,11 @@ import { useMe } from "@/auth/AuthProvider";
 import { useFreshSignIn, type ConfirmedWay } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
 import { schemas, type AiActionCard, type AiActionResult, type Department } from "@mycity/contract/contract.gen.ts";
+import { LeaveTypeSelect } from "@/features/people/Leave";
 import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, type ProjectChoice } from "@/features/shared/pickers";
 import { hrefFor } from "@/lib/routes";
 import { useRouter } from "@/lib/router";
-import { ActionCard, toast, type CardField, type ActionCardPicker, type CardRecord, type ContractSchema } from "@mycity/ui";
+import { ActionCard, toast, todayIso, type CardField, type ActionCardPicker, type CardRecord, type ContractSchema } from "@mycity/ui";
 
 /**
  * An answer's action card, wired to the API (docs/guides/praxis-ai.md §6.11): the card as the API
@@ -86,8 +87,9 @@ const idsIn = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
  * Edit's picker for one id field of a card (docs/guides/praxis-ai.md decision 31), bound as the
  * screen's own form binds it: whom a task may be set for or shared with (New Task's), anyone with a
  * login (New Event's and Add Watcher's), a department (for a reader who may view People, as New Task
- * offers it), an active project. What is already picked reads by the name the card carries; a pick
- * made here keeps its own, until Save Changes has the server name it again.
+ * offers it), an active project, a leave type with what is left of this year (Request Leave's own
+ * list, decision 32). What is already picked reads by the name the card carries; a pick made here
+ * keeps its own, until Save Changes has the server name it again.
  */
 function CardPick({ field, value, onChange, names }: { field: CardField; value: unknown; onChange: (value: unknown) => void; names: CardRecord[] }) {
   const many = field.kind === "list";
@@ -109,6 +111,8 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
       return <DepartmentPicker value={departments} onChange={(d) => (setDepartments(d), set(d.map((x) => x.department_id)))} />;
     case "project":
       return <ProjectPicker value={projects} onChange={(p) => (setProjects(p), set(p.map((x) => x.project_id)))} />;
+    case "leave_type":
+      return <LeaveTypeSelect year={Number(todayIso().slice(0, 4))} value={ids[0] ?? ""} onChange={(v) => set(v ? [v] : [])} />;
     default:
       return null;
   }

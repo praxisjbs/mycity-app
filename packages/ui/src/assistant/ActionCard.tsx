@@ -127,15 +127,21 @@ export function verbOf(label: string, fields: CardField[], values: Record<string
   return count > 1 ? `${base} ×${count}` : base;
 }
 
-/** A value as the person reads it, from the field's kind; the names and records name an id. */
+/** A record's id as the API carries it: a card never prints one (docs/guides/praxis-ai.md decision 32). */
+const RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A value as the person reads it, from the field's kind; the names and records name an id, and an id nothing names reads as nothing, its field's problem alone. */
 function shown(f: CardField, value: unknown, known: CardRecord[]): string | null {
   if (isBlank(value)) return null;
-  const nameOf = (id: unknown) => known.find((r) => r.id === String(id))?.label ?? asString(id);
+  const nameOf = (id: unknown): string | null => known.find((r) => r.id === String(id))?.label ?? (RECORD_ID.test(asString(id)) ? null : asString(id));
   switch (f.kind) {
     case "id":
       return nameOf(value);
-    case "list":
-      return Array.isArray(value) ? value.map((v) => (typeof v === "string" ? nameOf(v) : asString(v))).join(", ") : asString(value);
+    case "list": {
+      if (!Array.isArray(value)) return asString(value);
+      const read = value.map((v) => (typeof v === "string" ? nameOf(v) : asString(v))).filter((v): v is string => Boolean(v));
+      return read.length ? read.join(", ") : null;
+    }
     case "date":
       return formatDate(asString(value));
     case "datetime":
@@ -283,8 +289,15 @@ function EditFields({ fields, values, problems, known, picker, schema, onSave, o
   const f = useContractForm<Record<string, unknown>>({ ...values }, schema);
   const { setServerErrors } = f;
   useEffect(() => {
-    if (Object.keys(problems).length) setServerErrors(problems);
-    // The card's problems, once, as the fields open.
+    // The card's problems, once, as the fields open: only on a field Edit can change, so an id field the
+    // screen gives no picker for never holds Save Changes; the server marks it again if it still stands.
+    const open = Object.fromEntries(
+      Object.entries(problems).filter(([name]) => {
+        const field = fields.find((x) => x.name === name);
+        return !field || !idsOf(field) || Boolean(field.picks && picker?.({ field, value: values[name], onChange: () => undefined, names: known }));
+      }),
+    );
+    if (Object.keys(open).length) setServerErrors(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const save = async () => {

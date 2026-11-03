@@ -1,7 +1,7 @@
 {
   "qs-add-employee": {
     "spec": "ecaa81f3ffa184d4",
-    "source": "432db040187ecf21",
+    "source": "0aeab75fc48132d7",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "qs-approve-leave": {
     "spec": "f974e711363d9efc",
-    "source": "ca44817623673ab9",
+    "source": "6e002f1ceb11f05c",
     "devices": [
       "desktop",
       "phone"
@@ -97,7 +97,7 @@
   },
   "qs-department-head": {
     "spec": "068ea5be43f180ff",
-    "source": "432db040187ecf21",
+    "source": "0aeab75fc48132d7",
     "devices": [
       "desktop",
       "phone"
@@ -113,7 +113,7 @@
   },
   "qs-import": {
     "spec": "402734ecb1661d71",
-    "source": "432db040187ecf21",
+    "source": "0aeab75fc48132d7",
     "devices": [
       "desktop",
       "phone"
@@ -193,7 +193,7 @@
   },
   "qs-request-leave": {
     "spec": "0db81a71cb5f5bc5",
-    "source": "314be84f71fdea5d",
+    "source": "70f2c60ca1906d5e",
     "devices": [
       "desktop",
       "phone"

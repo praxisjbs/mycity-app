@@ -300,7 +300,9 @@ People's or a manager's. The workbook opens for the person it is about and the C
   standard risk; input `LeaveRequestCreate`, Request Leave's own form: the type, the first and last
   day, a note; run `leave.service.request` for the person's own employee, so the type, the days,
   the clash and the year's allowance are its checks; the request read back with its link on My
-  Leave). For People: `leave.approve` and `leave.reject` (`leave.ai.js`; `people` approve, risk
+  Leave; the card names the leave type, Edit picks it with Request Leave's own list, a type the model
+  writes by name is matched among the active types, and asked for leave without a type it asks
+  "Which leave type?" with the person's types and the days left of each, `praxis-ai.md` decision 32). For People: `leave.approve` and `leave.reject` (`leave.ai.js`; `people` approve, risk
   approval, so Confirm It's You within five minutes; up to 25 requests a press; inputs
   `LeaveApprove` and `LeaveReject`, a reason required to reject; the requests named who, type and
   days through `leave.service.cardRecords`; at the press every request must be in the person's
@@ -416,6 +418,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · `my_leave.request`'s card names its leave type and picks it with Request Leave's own list; a type written by name is matched to an active type; asked for leave without a type, Praxis AI asks which, with the person's types and the days left of each (`praxis-ai.md` §1.4 decision 32). No screen of ESS changed.
 - 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.17): `my_profile.get` and `my_leave.list` carry matrix probes (the asker's own record and request returned, an outsider's never), and the leave manifest's `leave.requests`, `leave.approve` and `leave.reject` theirs (a report's request in a line manager's reach, an outsider's never, a card naming it refused); `LeaveApprove` and `LeaveReject` say At most 25 on a card.
 - 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): the assistant's leave cards, `my_leave.request` (the person's own, Request Leave's service) and, for People, `leave.approve` and `leave.reject` (the requests waiting on them, up to 25 a press, each through the approval's own decide after Confirm It's You; never their own; `leave.service.cardRecords`, `assertCardRequests`, `decideMany`); §9. Nothing on the ESS or People · Leave screens changes.
 

@@ -200,7 +200,9 @@ async function runSummary(client, actor, key, params = {}) {
  * grant and the scope it gives, the values against the input schema, the records it touches
  * against its bulk limit. Nothing runs here. The action's `records(values, actor, db)` may read
  * the records' names through its module's own repo when given a pool or a client, so the card
- * names what it touches; without one it names them by id alone.
+ * names what it touches; without one it names them by id alone. A field the model may write by
+ * name is matched first (`resolve`), and a picked field whose id nothing names is marked Pick one,
+ * so the card never shows an id and the press never sends one (decision 32).
  * @param {object} actor
  * @param {string} key
  * @param {object} values
@@ -212,11 +214,11 @@ async function checkAction(actor, key, values = {}, db = null) {
   if (!action) throw new AppError("AI_ACTION_UNKNOWN", `There is no "${key}" action`, 404);
   const scope = await scopeFor(actor, action.permission[0], action.permission[1]);
   if (!scope) throw refused(key, actor, "action");
-  const given = carried(action, values && typeof values === "object" ? values : {});
+  const who = { ...actor, scope };
+  const given = await resolved(action, carried(action, values && typeof values === "object" ? values : {}), who, db);
   const parsed = action.input.safeParse(given);
   const problems = parsed.success ? {} : fieldsOf(parsed);
   const clean = parsed.success ? parsed.data : given;
-  const who = { ...actor, scope };
   let records = [];
   try {
     records = ((await action.records(clean, who, db)) || []).filter((r) => r && r.type && r.id !== undefined && r.id !== null && r.id !== "").map((r) => ({ type: String(r.type), id: String(r.id), label: r.label ? String(r.label) : null }));
@@ -225,7 +227,49 @@ async function checkAction(actor, key, values = {}, db = null) {
   }
   if (records.length > action.bulk)
     throw new AppError("TOO_MANY_RECORDS", `At most ${action.bulk} at a time`, 422, { records: [`At most ${action.bulk}`] });
-  return { action, scope, ok: parsed.success, values: clean, problems, records, names: await namesOf(action, clean, who, db) };
+  const names = await namesOf(action, clean, who, db);
+  // Pick one only where the names were read: without a database, or when names() failed, nothing is marked.
+  const unnamed = names === null ? {} : unnamedIn(action, clean, [...names, ...records]);
+  return { action, scope, ok: parsed.success && !Object.keys(unnamed).length, values: clean, problems: { ...problems, ...unnamed }, records, names: names || [] };
+}
+
+/** A record's id as the model or a picker writes it. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The problem on a picked field whose id names nothing (decision 32), at most four words (gate 12). */
+const PICK_ONE = "Pick one";
+
+/**
+ * The values with each field the model may write by name matched to the person's own record
+ * (`resolve`, decision 32): a value already an id is left alone, a name the resolver cannot match
+ * is left as written, for Pick one to mark.
+ */
+async function resolved(action, values, who, db) {
+  const fields = Object.keys(action.resolve || {});
+  if (!fields.length || !db) return values;
+  const out = { ...values };
+  for (const field of fields) {
+    const v = out[field];
+    if (typeof v !== "string" || !v.trim() || UUID.test(v.trim())) continue;
+    try {
+      const id = await action.resolve[field](v.trim(), who, db);
+      if (typeof id === "string" && id) out[field] = id;
+    } catch (err) {
+      logger.warn({ err, ai_action: action.key, field }, "Praxis AI: an action's resolve() threw; the value stays as written");
+    }
+  }
+  return out;
+}
+
+/** Each picked field holding an id, or a list with an id, that neither the names nor the records name: Pick one. */
+function unnamedIn(action, values, known) {
+  const named = new Set(known.map((k) => String(k.id)));
+  const out = {};
+  for (const field of Object.keys(action.picks || {})) {
+    const v = values[field];
+    const ids = Array.isArray(v) ? v : v === null || v === undefined || v === "" ? [] : [v];
+    if (ids.some((id) => !named.has(String(id)))) out[field] = [PICK_ONE];
+  }
+  return out;
 }
 
 /** Only the fields the card carries (decision 31): a value for any other field never reaches the action. */
@@ -235,12 +279,13 @@ function carried(action, values) {
 }
 
 /**
- * The people, departments and projects a card's fields hold, by name (decision 31), through the
- * action's own module; never counted and never a reason to refuse. An id that names nothing is
- * left out, and the card shows the id.
+ * The people, departments, projects and leave types a card's fields hold, by name (decisions 31 and
+ * 32), through the action's own module; never counted. An id that names nothing is left out, and
+ * its field is marked Pick one. Null when they could not be read (no database, no names(), or it
+ * threw): then nothing is marked, and the card still never shows an id.
  */
 async function namesOf(action, values, who, db) {
-  if (!action.names || !db) return [];
+  if (!action.names || !db) return null;
   try {
     const named = (await action.names(values, who, db)) || [];
     return named
@@ -248,9 +293,9 @@ async function namesOf(action, values, who, db) {
       .slice(0, 80)
       .map((n) => ({ type: String(n.type), id: String(n.id), label: n.label.trim() }));
   } catch (err) {
-    logger.warn({ err, ai_action: action.key }, "Praxis AI: an action's names() threw; the card shows ids");
-    return [];
+    logger.warn({ err, ai_action: action.key }, "Praxis AI: an action's names() threw; the card's ids go unnamed");
+    return null;
   }
 }
 
-module.exports = { allowedReads, allowedSummaries, allowedActions, runRead, runSummary, checkAction, guarded, READ_TIMEOUT_MS, READ_DEADLINE_MS };
+module.exports = { allowedReads, allowedSummaries, allowedActions, runRead, runSummary, checkAction, guarded, PICK_ONE, READ_TIMEOUT_MS, READ_DEADLINE_MS };

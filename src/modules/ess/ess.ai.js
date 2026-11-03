@@ -37,6 +37,36 @@ const leaveProbe = {
   outside: (ctx) => requestFor(ctx, ctx.outsider),
 };
 
+/**
+ * The leave types a person may ask for this year, with the days left of each, as My Leave lists
+ * them (every active type): the card's names, its answers to "Which leave type?" and the match of a
+ * type the model writes by name (docs/guides/praxis-ai.md decision 32).
+ */
+async function typesFor(actor) {
+  if (!actor || !actor.employee_id) return [];
+  return (await leave.balancesFor(actor.employee_id)).balances;
+}
+
+/** A type as a choice to tap: "Annual Leave, 12 days left", or its name alone when it has no allowance. */
+const choiceOf = (t) => (t.remaining === null || t.remaining === undefined ? t.name : `${t.name}, ${t.remaining} ${t.remaining === 1 ? "day" : "days"} left`);
+
+const fold = (s) => String(s).trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * The type a name names, among the person's own: the name or code as written, a choice as tapped
+ * ("Annual Leave, 12 days left"), or the first words of one type's name ("Annual"); null when none
+ * or several match.
+ */
+async function typeIdOf(actor, value) {
+  const types = await typesFor(actor);
+  const said = fold(String(value).split(/[,·]/)[0]);
+  if (!said) return null;
+  const exact = types.filter((t) => fold(t.name) === said || fold(t.code) === said);
+  if (exact.length === 1) return exact[0].leave_type_id;
+  const starts = types.filter((t) => fold(t.name).startsWith(said));
+  return starts.length === 1 ? starts[0].leave_type_id : null;
+}
+
 module.exports = defineManifest({
   module: "ess",
   actions: [
@@ -55,6 +85,15 @@ module.exports = defineManifest({
       run: (values, actor) => leave.request(actor, actor.employee_id, values),
       readback: (r) => [{ type: "leave_request", id: r.leave_request_id, label: `${r.leave_type_name}, ${r.days} ${r.days === 1 ? "day" : "days"}`, status: "sent", link: (routeMap.linkFor("leave_request", r.leave_request_id, { self: true }) || {}).path || null }],
       labels: { leave_type_id: "Leave Type", starts_on: "First Day", ends_on: "Last Day", reason: "Note" },
+      // Request Leave's form, field for field; the type named, picked with the form's own list, and asked for first (decision 32).
+      fields: ["leave_type_id", "starts_on", "ends_on", "reason"],
+      picks: { leave_type_id: "leave_type" },
+      names: async (values, actor) => {
+        const type = (await typesFor(actor)).find((t) => t.leave_type_id === values.leave_type_id);
+        return type ? [{ type: "leave_type", id: type.leave_type_id, label: type.name }] : [];
+      },
+      asks: [{ field: "leave_type_id", question: "Which leave type?", options: async ({ actor }) => (await typesFor(actor)).filter((t) => t.remaining === null || t.remaining === undefined || t.remaining > 0).map(choiceOf) }],
+      resolve: { leave_type_id: (value, actor) => typeIdOf(actor, value) },
     },
   ],
   reads: [

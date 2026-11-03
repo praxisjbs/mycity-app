@@ -754,6 +754,20 @@ answers to tap, Open Figures under every answer and an empty pane on a reopened 
 - [x] 02/11/2026 · Documents: the User Guide's Praxis AI chapter, PROGRESS #67, this file
 - [ ] Run the evaluation set on staging with the real model: `node scripts/ai/eval-assistant.js --only=attendance`, `--only=ask`, `--only=card`
 
+### 6.8 After staging · A card never shows an id (decision 32, JBS Praxis, 03/11/2026; branch `claude/determined-dirac-b4ivrd-ids`)
+
+From JBS Praxis's question on staging, "Leave type shows UUID. I noticed that too on assigning a
+task. Is that deliberate?" It was not: Request Leave had no names or picker, and a card printed any
+id nothing named.
+
+- [x] 03/11/2026 · `praxis-ai.md` first: §1.4 decision 32, §6.11 (`resolve`, `options`, Pick one, the actions table), §10.1, §11, §14; `ess.md` §9 and §14
+- [x] 03/11/2026 · The contract: `AiCardPicks` gains `leave_type`; gen:contract
+- [x] 03/11/2026 · The engine: manifests take `resolve` and asks take `options`; `authorise.checkAction` resolves names first and marks a picked id nothing names Pick one (at the draft, Save Changes and the press); `answer.withOptions`; the system turn says "(its name)" and "by name"; prompt version 9
+- [x] 03/11/2026 · `my_leave.request`: fields, the `leave_type` pick, names, "Which leave type?" with the person's types and days left, a type matched by name
+- [x] 03/11/2026 · The screens: `ActionCard` never prints an id and Edit holds Save only on a field it can change; the card's Leave Type picker is `LeaveTypeSelect`, Request Leave's own
+- [x] 03/11/2026 · Tests: unit, integration (leave by name, a made-up id refused, the type asked; a task card's unknown person), screens; `ask.leave-type` in the evaluation set; the leave cards' test days are working days, a holiday week skipped (it failed on 03/11/2026: Boxing Day observed on Monday 28/12)
+- [ ] Run the evaluation set on staging with the real model: `node scripts/ai/eval-assistant.js --only=ask`, `--only=card`
+
 ## 7 · Gates this work adds
 
 | Gate | Script | Refuses |
@@ -874,3 +888,8 @@ answers to tap, Open Figures under every answer and an empty pane on a reopened 
   card always has its answers to tap, prompt version 8 answers "absent" in the person's sense, and
   Open Figures sits only under an answer with a table or figures. Left: the evaluation set on
   staging with the real model.
+- 03/11/2026 · JP · A card never shows an id (§6.8, decision 32), after JBS Praxis asked on staging
+  whether a Request Leave card's leave type shown as an id was deliberate: Request Leave names and
+  picks its type and asks which one with the days left of each, a type the model writes by name is
+  matched on the server, and a picked id nothing names is marked Pick one and never sent. The leave
+  cards' test now books working days only. Left: the evaluation set on staging with the real model.

@@ -437,6 +437,24 @@ describe("a change gathered by questions (praxis-ai.md §1.3 decisions 28 and 29
     expect(answer.withChoices(asking({}), [tasks], new Date("2026-11-02T10:00:00+01:00")).ask.choices).toContain("No Due Day");
   });
 
+  test("a question whose answers are the person's own records has them to tap: the service fills them from the ask's options (decision 32)", async () => {
+    const options = jest.fn(async () => ["Annual Leave, 12 days left", "Unpaid Leave", "Annual Leave, 12 days left", "x".repeat(61)]);
+    const leave = { key: "my_leave.request", asks: [{ field: "leave_type_id", question: "Which leave type?", choices: [], options, none: false }] };
+    const asking = { text: "Which leave type?", action: null, ask: { action: "my_leave.request", field: "leave_type_id", choices: [] } };
+    const actor = { user_id: "u1", employee_id: "e1" };
+    const filled = await answer.withOptions(asking, [leave], { actor, db: {} });
+    expect(filled.ask.choices).toEqual(["Annual Leave, 12 days left", "Unpaid Leave"]);
+    expect(options).toHaveBeenCalledWith(expect.objectContaining({ actor, db: {}, today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }));
+    // No person or database, another field, or options that fail: the question stands as it was.
+    expect(await answer.withOptions(asking, [leave], {})).toBe(asking);
+    const other = { ...asking, ask: { ...asking.ask, field: "reason" } };
+    expect(await answer.withOptions(other, [leave], { actor, db: {} })).toBe(other);
+    const failing = { ...leave, asks: [{ ...leave.asks[0], options: async () => Promise.reject(new Error("down")) }] };
+    expect(await answer.withOptions(asking, [failing], { actor, db: {} })).toBe(asking);
+    // The system turn tells the model to write such a field by its name, never an id it did not read.
+    expect(orchestrator.schemaFields(c.leave.LeaveRequestCreate, { required: true, only: ["leave_type_id", "starts_on"], byName: ["leave_type_id"] })).toEqual(["leave_type_id (its name), required", "starts_on (YYYY-MM-DD), required"]);
+  });
+
   test("the system turn lists an action's card fields alone and what to ask first; a replayed question says what it asked for", () => {
     const turn = orchestrator.historyTurns([{ question: "Assign a task to Tunde.", answer: "What is the task?", reads: [], ask: { action: "tasks.create", field: "title" } }]);
     expect(turn[1].content).toBe("What is the task?\n[Asked for: tasks.create title]");
