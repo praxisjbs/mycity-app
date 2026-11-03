@@ -30,11 +30,27 @@ const { q, one, drain, fresh, script, callRead, say, harness } = require("./help
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
-/** The Monday at least `weeksAhead` weeks from today, as YYYY-MM-DD, and the weekdays after it. */
+/** The working calendar, public holidays included, loaded once the schema is built. */
+let calendar = null;
+
+/**
+ * Monday to Friday of a week ahead, as YYYY-MM-DD, each a working day: `weeksAhead` 2 is the first
+ * week at least two weeks from today whose five days are all worked, 3 the next such week, and so
+ * on, so a public holiday (Boxing Day observed on a Monday) never lands a request on a day off and
+ * no two tests share a week, whatever day the suite runs.
+ */
 function week(weeksAhead) {
-  const d = new Date(Date.now() + weeksAhead * 7 * 86_400_000);
+  const d = new Date(Date.now() + 2 * 7 * 86_400_000);
   while (d.getUTCDay() !== 1) d.setUTCDate(d.getUTCDate() + 1);
-  return Array.from({ length: 5 }, (_, i) => new Date(d.getTime() + i * 86_400_000).toISOString().slice(0, 10));
+  let clean = 0;
+  for (;;) {
+    const days = Array.from({ length: 5 }, (_, i) => new Date(d.getTime() + i * 86_400_000).toISOString().slice(0, 10));
+    if (days.every((day) => workingWeek.isWorkingDay(day, calendar))) {
+      clean += 1;
+      if (clean === weeksAhead - 1) return days;
+    }
+    d.setUTCDate(d.getUTCDate() + 7);
+  }
 }
 
 describeDb("Praxis AI's leave cards against the real migrations", () => {
@@ -52,6 +68,7 @@ describeDb("Praxis AI's leave cards against the real migrations", () => {
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
     workingWeek.invalidateCalendar();
+    calendar = await workingWeek.loadCalendar(pool);
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));
     h = harness(app);
