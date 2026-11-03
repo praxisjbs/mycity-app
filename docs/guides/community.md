@@ -656,6 +656,7 @@ fields, never in a toast.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · From the evaluation set on staging: Send Wishes' card says "wish her a happy birthday" already gives the wish ("Happy birthday!"), so the card is drawn rather than asking for words the person said. Nothing on the Staff Community screens changes.
 - 03/11/2026 · JP · Every Staff Community form in the chat (`praxis-ai.md` decisions 33 and 40, §6.11):
   Create Channel, Save Channel, Post Recognition, Send Wishes and Save Message in `community.ai.js`,
   and Publish Announcement and Save Announcement in the announcements module's new manifest

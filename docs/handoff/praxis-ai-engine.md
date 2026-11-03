@@ -766,7 +766,7 @@ answers to tap, Open Figures under every answer and an empty pane on a reopened 
 - [x] 02/11/2026 · The screens: Open Figures only under an answer with a table or figures, a question without From, and `onLatest` with `usePane().showFirst` so a conversation opened from Recent or History shows its latest answer's pane
 - [x] 02/11/2026 · Tests: unit (`ai-assistant.test.js`, `ai-eval.test.js`), integration (the register through the engine and its replay, `ai-cards.test.js`), screens (`Assistant.test.tsx`); the evaluation set's `attendance.absent` and `ask.task-priority`
 - [x] 02/11/2026 · Documents: the User Guide's Praxis AI chapter, PROGRESS #67, this file
-- [ ] Run the evaluation set on staging with the real model: `node scripts/ai/eval-assistant.js --only=attendance`, `--only=ask`, `--only=card`
+- [x] 03/11/2026 · Run the evaluation set on staging with the real model: first run by TB on the server; what it found and the rerun are in §6.9
 
 ### 6.8 After staging · A card never shows an id (decision 32, JBS Praxis, 03/11/2026; branch `claude/determined-dirac-b4ivrd-ids`)
 
@@ -781,7 +781,7 @@ id nothing named.
 - [x] 03/11/2026 · The screens: `ActionCard` never prints an id and Edit holds Save only on a field it can change; the card's Leave Type picker is `LeaveTypeSelect`, Request Leave's own
 - [x] 03/11/2026 · Tests: unit, integration (leave by name, a made-up id refused, the type asked; a task card's unknown person), screens; `ask.leave-type` in the evaluation set; the leave cards' test days are working days, a holiday week skipped (it failed on 03/11/2026: Boxing Day observed on Monday 28/12)
 - [x] 03/11/2026 · Finished after staging: a type written "Annual Leave" matches the type named Annual (with or without the word Leave, a name either side begins); a card with a problem keeps what was matched; an id field reads only as a name the card knows; the pane follows the latest answer that read records or has figures, never blank after a card
-- [ ] Run the evaluation set on staging with the real model: `node scripts/ai/eval-assistant.js --only=ask`, `--only=card`
+- [x] 03/11/2026 · Run the evaluation set on staging with the real model: first run by TB on the server; what it found and the rerun are in §6.9
 
 ### 6.9 Every form in the chat: the gate (decision 33, JBS Praxis, 03/11/2026; branch `claude/determined-dirac-b4ivrd-forms-gate`)
 
@@ -801,6 +801,8 @@ gate"). This PR adds the gate and the list; the forms themselves follow, module 
 - [x] 03/11/2026 · Performance, Staff Community and Mailbox, built: the contract's card schemas; an action's `capabilities`, any one of a list (`requireAnyCapability`), beside `capability`; 32 actions through the screens' own services, a record named by its words (`oneNamedIn`), a form of many lines carried a line at a time; gate 23 reads a typed `useContractForm<Values>(` call; the gaps list 31 shorter (none left after Home and Settings and People, Queries and Policies); the integration suites (`ai-actions-performance`, `-community`, `-mailbox`), 34 evaluation cases, five matrix probes, the catalogue (32 added), the User Guide's five new tasks, PROGRESS, README
 - [x] 03/11/2026 · Performance, Staff Community and Mailbox, praxisjbs/mycity-app#68, rebased on decisions 34 to 39 (praxisjbs/mycity-app#67, praxisjbs/mycity-app#69 and praxisjbs/mycity-app#70; renumbered 40, `praxis-ai.md` §1.9): every one of the 32 asks what it needs first, gate 23 rule 7 green; two question tests (`ai-actions-performance`, `-community`), two evaluation question cases, `named.choiceWords`
 - [x] 03/11/2026 · Every built module's create and edit forms accounted for: the gaps list is empty, praxisjbs/mycity-app#68 the last of the four chats
+- [x] 03/11/2026 · The evaluation set on staging (TB ran `--only=card` and `--only=ask` from `/srv/mycity/stg/current` as `mycity-stg`, branch `claude/ecstatic-cori-rplleb`): three bugs fixed (an offered action called as a read answered "not available"; Create Task "for me" left as Pick one and its names failing on words; a figure such as "95%" refused), and the set asks as the role holder with the most open tasks about their own records, skipping what staging lacks (`praxis-ai.md` §6.10)
+- [ ] Rerun the evaluation set on staging after this change (`sudo -u mycity-stg /usr/bin/node --env-file=/srv/mycity/stg/shared/.env scripts/ai/eval-assistant.js --only=card`, then `--only=ask`), and act on what still fails
 
 ### 6.10 A card is drawn whole (decision 34, JBS Praxis, 03/11/2026; branch `claude/determined-dirac-b4ivrd-ask-first`)
 
@@ -998,3 +1000,15 @@ lead ("It should always ask for required fields, so we never see an error. We ca
   reviewer's reason). `named.choiceWords` (additive) fits a record's words in an answer; a review
   and a scorecard are matched by person and month or quarter too. Two evaluation cases reworded so
   they say what the card needs, two question cases added.
+- 03/11/2026 · JP · The evaluation set's first run on staging (TB, the real model; 100 card questions,
+  9 asking ones). Most failures were the questions: every question was asked as the first holder of
+  its role by email, about records staging does not hold (a "weekly report" task the asker did not
+  have, Lovellyn Ade as a head of department's report, records only another question would make
+  though the set writes nothing, a Sales department), or grading correct behaviour as failure (a
+  binding plan's objectives declined, a typed address left to pick). Three were the product: Save
+  Targets, called as though it were a read, came back "not available" to someone who may make it;
+  Create Task "for me" carried the person's own name, which the lead matcher never looked at, and the
+  card's names sent the words to a uuid query; Set KPI's "95%" was refused as a figure. All three are
+  fixed; the set now fills each question from the asker's own records (a card's own question's first
+  answer among them), skips what staging lacks and says what a failed card's fields held. Next: the
+  rerun on staging (§6.9).

@@ -22,6 +22,7 @@ const { defineManifest } = require("../../shared/ai/manifest");
 const routeMap = require("../../shared/route-map");
 const lagos = require("../../shared/time/lagos");
 const { formatMonth } = require("../../shared/time/day-first");
+const { quantityOf } = require("../../shared/ai/named");
 const okrs = require("./goals.okrs");
 const analytics = require("./goals.analytics");
 const service = require("./goals.service");
@@ -248,7 +249,7 @@ module.exports = defineManifest({
       risk: "standard",
       fields: ["okr_objective_id", ...KEY_RESULT_FIELDS],
       picks: { accountable_employee_id: "colleague", co_accountable_employee_id: "colleague" },
-      resolve: { okr_objective_id: (value, actor, db) => okrs.objectiveIdOf(db, value, actor) },
+      resolve: { okr_objective_id: (value, actor, db) => okrs.objectiveIdOf(db, value, actor), target_value: (value) => quantityOf(value) },
       asks: [
         { field: "statement", question: "What is the key result?" },
         { field: "okr_objective_id", question: "Which objective is it for?", options: ({ actor, db }) => okrs.objectiveChoices(db, actor, { editable: true }) },
@@ -268,8 +269,9 @@ module.exports = defineManifest({
       form: "none: Edit Key Result is opened on its key result's panel and never names it; the card names the key result",
       fields: ["okr_key_result_id", ...KEY_RESULT_FIELDS],
       picks: { accountable_employee_id: "colleague", co_accountable_employee_id: "colleague" },
-      asks: [{ field: "okr_key_result_id", question: "Which key result?", options: ({ actor, db }) => okrs.keyResultChoices(db, actor) }],
-      resolve: { okr_key_result_id: (value, actor, db) => okrs.keyResultIdOf(db, value, actor) },
+      // The key results of a plan still open to change: a binding one's target changes through Change Target.
+      asks: [{ field: "okr_key_result_id", question: "Which key result?", options: ({ actor, db }) => okrs.keyResultChoices(db, actor, { editable: true }) }],
+      resolve: { okr_key_result_id: (value, actor, db) => okrs.keyResultIdOf(db, value, actor), target_value: (value) => quantityOf(value) },
       names: (values, _actor, db) => owners(values, db),
       records: (values, actor, db) => (db ? okrs.cardKeyResult(db, values.okr_key_result_id, actor) : []),
       check: (client, values, actor) => okrs.assertCardKeyResult(client, values.okr_key_result_id, actor),
@@ -315,6 +317,8 @@ module.exports = defineManifest({
         employee_target_id: (value, actor, db) => require("../targets/targets.service").lineIdOf(db, value, actor, actor.scope),
         // A month named by its words ("next month", "December 2026") as its first day.
         from_month: (value) => require("../reviews/reviews.cycle").monthOf(value),
+        // The new target as the person said it ("40 stories"): its number.
+        to_value: (value) => quantityOf(value),
       },
       asks: [
         { field: "reason", question: "Why change the target?" },

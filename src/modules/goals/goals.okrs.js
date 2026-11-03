@@ -961,8 +961,8 @@ async function keyResultIdOf(db, words, actor) {
 
 /**
  * "Which objective?" and "Which key result?" answers (decision 34): this quarter's, among those the
- * person reads, by code and words as objectiveIdOf and keyResultIdOf match them; the objectives of
- * a plan still open to change (`editable`), or the company's alone (`company`).
+ * person reads, by code and words as objectiveIdOf and keyResultIdOf match them; those of a plan
+ * still open to change (`editable`), or the company's objectives alone (`company`).
  */
 async function objectiveChoices(db, actor, { editable = false, company = false } = {}) {
   const periodId = await currentPeriodId(db);
@@ -971,10 +971,11 @@ async function objectiveChoices(db, actor, { editable = false, company = false }
   return (await repo.listObjectives(db, query, await visibility.readerOf(db, actor))).data.map((o) => choiceWords(`${o.code} ${o.title}`));
 }
 
-async function keyResultChoices(db, actor) {
+async function keyResultChoices(db, actor, { editable = false } = {}) {
   const periodId = await currentPeriodId(db);
   if (!periodId) return [];
-  const page = await repo.listKeyResultRefs(db, { page: 1, period_id: periodId }, await visibility.readerOf(db, actor), false);
+  const query = { page: 1, period_id: periodId, ...(editable ? { plan_statuses: [...plans.EDITABLE] } : {}) };
+  const page = await repo.listKeyResultRefs(db, query, await visibility.readerOf(db, actor), false);
   return page.data.map((k) => choiceWords(`${k.code} ${k.statement}`));
 }
 

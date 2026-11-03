@@ -10,6 +10,7 @@
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
+const { quantityOf } = require("../../shared/ai/named");
 const routeMap = require("../../shared/route-map");
 const goals = require("../goals/goals.service");
 const okrs = require("../goals/goals.okrs");
@@ -39,6 +40,9 @@ const LINE_RESOLVE = {
   scorecard_id: (value, actor, db) => service.scorecardIdOf(db, value, actor, actor.scope),
   section: codeIn(SECTIONS),
   measure: codeIn(MEASURES),
+  // A target and a weight as the person said them ("10 stories", "60%"): their numbers.
+  target_value: (value) => quantityOf(value),
+  weight: (value) => quantityOf(value),
   okr_key_result_id: (value, actor, db) => okrs.keyResultIdOf(db, value, actor),
   kpi_definition_id: (value, actor, db) => require("../kpis/kpis.service").kpiIdOf(db, value, actor),
 };

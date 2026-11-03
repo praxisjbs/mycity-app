@@ -8,6 +8,7 @@
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
+const { quantityOf } = require("../../shared/ai/named");
 const routeMap = require("../../shared/route-map");
 const goals = require("../goals/goals.service");
 const service = require("./kpis.service");
@@ -32,6 +33,8 @@ module.exports = defineManifest({
       resolve: {
         department_id: (value, _actor, db) => goals.departmentIdOf(db, value),
         starts_period_id: (value, _actor, db) => goals.periodIdOf(db, value),
+        // The figure as the person said it ("95%"): its number, the unit kept on its own field.
+        target_value: (value) => quantityOf(value),
       },
       // What it needs, asked first when not said (praxis-ai.md decision 34): the functions the person sets KPIs for, to tap.
       asks: [

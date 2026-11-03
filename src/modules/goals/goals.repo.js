@@ -398,10 +398,11 @@ const KEY_RESULT_REF_SORTS = { code: "kr.code" };
 /**
  * A quarter's key results as a picker names them: the company's, the functions' or one function's. A
  * function's within the reader's reach; the company's, by code and statement alone, for whoever sets goals
- * (`pickCompany`), so a head can say which company key result theirs feeds (§6.23).
+ * (`pickCompany`), so a head can say which company key result theirs feeds (§6.23). `plan_statuses` keeps
+ * those whose plan is in one of them (a card that changes a key result offers the ones it can change).
  */
 function listKeyResultRefs(db, query, reach = visibility.EVERYTHING, pickCompany = true) {
-  const params = [query.period_id, query.level || null, query.department_id || null, query.q || null, pickCompany === true];
+  const params = [query.period_id, query.level || null, query.department_id || null, query.q || null, pickCompany === true, query.plan_statuses || null];
   const readable = visibility.keyResultReadable(reach, "kr", "o", params);
   return pageQuery(
     db,
@@ -412,6 +413,7 @@ function listKeyResultRefs(db, query, reach = visibility.EVERYTHING, pickCompany
         AND ($2::text IS NULL OR ($2 = 'company') = (o.department_id IS NULL))
         AND ($3::uuid IS NULL OR o.department_id = $3)
         AND ($4::text IS NULL OR search_fold(kr.code || ' ' || kr.statement) LIKE '%' || search_fold($4) || '%')
+        AND ($6::text[] IS NULL OR EXISTS (SELECT 1 FROM performance_plan pl WHERE pl.performance_plan_id = o.performance_plan_id AND pl.status = ANY($6::text[])))
         AND (${readable} OR (o.department_id IS NULL AND $5::boolean))
       ORDER BY ${orderBy(query, KEY_RESULT_REF_SORTS, "kr.okr_key_result_id")}`,
     params,

@@ -9,7 +9,8 @@
  *   oneNamed(types, "Annual Leave", (t) => [t.name, t.code], { drop: ["leave"] })   // the type named Annual
  *   oneNamed(steps, "banners", (s) => [s.title])                                     // "Order banners"
  *
- * choiceWords() is a record's words as an answer to tap, at most 60 characters, which oneNamed matches.
+ * choiceWords() is a record's words as an answer to tap, at most 60 characters, which oneNamed matches;
+ * quantityOf() is the one number in a figure written with its words or unit ("95%").
  */
 
 /** Words as a person says them: lower case, the dropped words and punctuation left out ("Annual Leave" → "annual"). */
@@ -79,4 +80,17 @@ function choiceWords(words) {
   return `${(at > CHOICE_MAX / 2 ? cut.slice(0, at) : cut).replace(/[\s,.;:·-]+$/, "")}…`;
 }
 
-module.exports = { oneNamed, oneNamedIn, plainWords, choiceWords };
+/**
+ * The one number a person wrote, as a figure field takes it: "95%", "≥ 95 %", "64,000 users" and
+ * "9 published" are "95", "95", "64000" and "9". Null when the words hold no number or more than
+ * one ("5 to 10"), so the field keeps what was written and the card marks it.
+ * @param {string} words
+ * @returns {string|null}
+ */
+function quantityOf(words) {
+  const s = String(words === null || words === undefined ? "" : words).replace(/(\d),(?=\d{3}(\D|$))/g, "$1");
+  const found = s.match(/-?\d+(?:\.\d+)?/g) || [];
+  return found.length === 1 ? found[0] : null;
+}
+
+module.exports = { oneNamed, oneNamedIn, plainWords, choiceWords, quantityOf };

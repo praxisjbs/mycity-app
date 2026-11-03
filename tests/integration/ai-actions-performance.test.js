@@ -344,6 +344,41 @@ describeDb("Praxis AI's Performance cards against the real migrations", () => {
     expect(await askedFor("ops", "scorecards.edit", { scorecard_id: ids.card, reviewer_employee_id: emp("musa") })).toMatchObject({ content: "Why change the reviewer?" });
   });
 
+  test("a figure written with its unit or words (95%, 40 stories, 60%) is read as its number; one with no number or two stays as written, marked", async () => {
+    const kpi = await drawn("head", "kpis.create", { department_id: ids.bm, name: "Briefs on time", target_text: "95% on time", target_value: "95%" });
+    expect(kpi).toMatchObject({ values: { target_value: "95" }, problems: {} });
+    const change = await drawn("head", "target_changes.request", { okr_key_result_id: "BM-KR1.1", to_value: "40 stories", from_month: "2026-09-01", reason: "The desk grew" });
+    expect(change.values).toMatchObject({ to_value: "40" });
+    const line = await drawn("head", "scorecards.add_line", { scorecard_id: ids.card, section: "results", title: "Guides written", measure: "numeric", target_value: "12 guides", weight: "10%" });
+    expect(line.values).toMatchObject({ target_value: "12", weight: "10" });
+    const unclear = await drawn("head", "kpis.create", { department_id: ids.bm, name: "Briefs on time", target_text: "95% on time", target_value: "between 90 and 95" });
+    expect(unclear.problems).toEqual({ target_value: ["Like 64000 or 0.95"] });
+  });
+
+  test("the evaluation fills its questions from the asker's own records on the real migrations, and says what staging lacks", async () => {
+    const evaluation = require("../../scripts/ai/eval-assistant");
+    const asker = async (who) => {
+      const u = await require("../../src/shared/rbac/grants-cache").getAuthUser(pool, h.people[who].user_id);
+      return { user_id: u.user_id, employee_id: u.employee_id, email: u.email, display_name: u.display_name, role_ids: u.role_ids || [], is_ceo: u.is_ceo === true };
+    };
+    const head = await asker("head");
+    const ops = await asker("ops");
+    // Every fill's query runs here as it would on staging, whatever it finds.
+    for (const [name, f] of Object.entries(evaluation.FILLS)) {
+      const got = await f.find(pool, head);
+      expect([name, got === null || typeof got === "string"]).toEqual([name, true]);
+    }
+    // The head's own report, never someone outside their team; a card's answer, as its question offers it.
+    expect(await evaluation.FILLS.person.find(pool, head)).toMatch(/^(Ada Nwosu|Musa Danjuma)$/);
+    const kase = (id) => evaluation.CASES.find((k) => k.id === id);
+    expect(await evaluation.fill(pool, kase("card.quarter-edit"), ops)).toEqual({ question: "Rename Q3 2026 to The Big Push." });
+    expect(await evaluation.fill(pool, kase("card.reviewer"), ops)).toEqual({ question: "Make me the reviewer on the scorecard Ada Nwosu, Q3 2026: their manager is on leave." });
+    expect(await evaluation.fill(pool, kase("card.pip-edit"), ops)).toEqual({ question: "Move the review date of Ada Nwosu's plan to 4 December." });
+    // A key result of a binding plan is not Save Key Result's to change: the question is skipped, saying why.
+    expect(await evaluation.fill(pool, kase("card.key-result-edit"), head)).toEqual({ missing: "answer to key_results.edit's okr_key_result_id question" });
+    expect(await evaluation.fill(pool, kase("card.message-edit"), head)).toEqual({ missing: "channel with a message of theirs" });
+  });
+
   test("a Performance card naming no record asks which first, with the person's own to tap; the answer tapped is matched by its words (decision 34)", async () => {
     // Save Quarter: the quarters not yet closed, by name.
     const quarter = await askedFor("ops", "quarters.edit", { name: "The third quarter" });

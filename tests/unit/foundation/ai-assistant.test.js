@@ -175,6 +175,28 @@ describe("one question", () => {
     expect(shown).toMatchObject({ declined: "not_available", citations: [], rows_read: 0, module_key: null });
   });
 
+  test("a change the person may make, called as though it were a read, goes back as one to draft, never as not available; one they may not make stays not available", async () => {
+    const { defineManifest } = require("../../../src/shared/ai/manifest");
+    const [action] = defineManifest({ module: "workspace", actions: [{ key: "things.create", description: "Set a thing for the person or someone they manage", input: c.tasks.TaskCreate, permission: ["workspace", "create"], risk: "standard", run: async () => ({}) }] }).actions;
+    const offered = { ...action, kind: "action", module: "workspace" };
+    jest.spyOn(registry, "tool").mockImplementation((k) => (k === "things.create" ? offered : null));
+    jest.spyOn(authorise, "runRead");
+    jest.spyOn(authorise, "allowedActions").mockResolvedValue([offered]);
+    const vendors = model([reply("", [call("things__create", { title: "Send the report" })]), reply(DRAFT({ text: "Here is the thing to set." }))]);
+    const out = await ask(vendors, { shows: ["cards"] });
+    expect(authorise.runRead).not.toHaveBeenCalled();
+    expect(JSON.parse(vendors.gemini.complete.mock.calls[1][0].messages.find((m) => m.role === "tool").content)).toMatchObject({ read: 1, key: "things.create", error: "is_an_action" });
+    // Refused as a read, as the record of the question keeps it; the answer is not declined.
+    expect(out.reads.map((r) => [r.key, r.outcome, r.declined])).toEqual([["things.create", "refused", false]]);
+    expect(answer.build({ draft: out.draft, reads: out.reads, routes: out.routes, screens: out.screens }).declined).not.toBe("not_available");
+
+    authorise.allowedActions.mockResolvedValue([]);
+    const refused = model([reply("", [call("things__create", { title: "Send the report" })]), reply(DRAFT({ text: "That is not available to you." }))]);
+    const other = await ask(refused, { shows: ["cards"] });
+    expect(JSON.parse(refused.gemini.complete.mock.calls[1][0].messages.find((m) => m.role === "tool").content)).toEqual({ read: 1, key: "things.create", error: "not_available" });
+    expect(answer.build({ draft: other.draft, reads: other.reads, routes: other.routes, screens: other.screens }).declined).toBe("not_available");
+  });
+
   test("the progress hook is told before each read, which of the five it is; its failure never fails the question (decision 23)", async () => {
     jest.spyOn(authorise, "runRead").mockResolvedValue(page([{ id: "l1", employee: "Ayo Bello" }]));
     const vendors = model([reply("", [call("leave__requests", {})]), reply("", [call("tasks__list", {})]), reply(DRAFT())]);

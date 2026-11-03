@@ -451,7 +451,11 @@ A refused read is not an error: it becomes an answer that says the information i
 `authorise.runRead(client, actor, key, params)` (BACKEND_STRUCTURE §14.3), every time:
 
 1. the read exists; its grant is held (else `AI_READ_FORBIDDEN`, which the model receives as "not
-   available to this person" and the answer is marked `declined: "not_available"`);
+   available to this person" and the answer is marked `declined: "not_available"`). An action the
+   person may make, called as though it were a read, is refused as a read (nothing runs) but the
+   model is told it is a change to draft as the answer's action (`is_an_action`), and the answer is
+   not marked declined, so it draws the card instead of telling the person a change they may make is
+   not theirs (found on staging, 03/11/2026: Save Targets);
 2. the parameters parse with the read's contract schema (a 422 goes back to the model once, so it
    can correct them);
 3. it runs with the person's scope (all, team or own);
@@ -642,8 +646,15 @@ one page, and People adds a date filter if the staff grows past the 125 people f
 ### 6.10 Checking answers
 
 `scripts/ai/eval-assistant.js` asks its questions (`CASES`) on staging with a real key, each as the
-person of the role it names (the CEO's login, or the first active login holding the role code),
-through the same engine Ask uses, and grades each answer:
+person of the role it names (the CEO's login, or the active holder of the role code with the most
+open tasks, so the questions find their records), through the same engine Ask uses, and grades each
+answer. A question names staging's own records as that person holds them: `{person}` is someone in
+their reach (their report, else their department), `{<action>#<field>}` the first answer that card's
+own question offers them (decision 34; `#2` its second), and the other names (`FILLS`) a record no
+question offers (their project, a task with a step to do, an open role, a channel they wrote in, a
+month with no round). `given` names records a question needs without naming them (a leave request
+waiting on them). A question staging has nothing to fill is skipped, saying what staging lacks,
+never failed. A failed card's problems say what was wrong and what the model wrote:
 
 | Grade | Passes when |
 |---|---|
@@ -653,6 +664,7 @@ through the same engine Ask uses, and grades each answer:
 | `needs` | a target question whose module declares no read yet is skipped, not failed |
 | `action` | the change asked for came back as this card, its values parsing, nothing written |
 | `ask` | the change asked for lacks what its action must have, so the answer is the one question for that field, with no card (decisions 28 and 29; the server's asks run as Ask runs them) |
+| `picks` | with `action`: a field the card may leave marked Pick one for the person, as a typed address our search does not find exactly once (decision 37) |
 
 The set holds Ifeoma's two ("what happened today", "what has a person done today"), the target
 questions as they become answerable, the privacy cases and three changes (a task, leave, a meeting).
@@ -661,7 +673,9 @@ It saves nothing to History and writes nothing; each question is one Data Answer
 fails, 2 when it cannot run (nobody holds a role, AI is off, only the stub answers). Refused on
 production. Run by hand before a change to the prompt or the loop ships; not in CI, which has no
 key. `tests/unit/foundation/ai-eval.test.js` checks without a key that every question names reads
-and screens a manifest declares, and that the grading passes and fails what it should.
+and screens a manifest declares, that each placeholder is a fill or a card's question with answers
+to give, and that the grading passes and fails what it should; `ai-actions-performance` runs the
+fills on the real migrations.
 
 ### 6.11 Actions and cards (decisions 10, 11, 16, 20, 21; PR1 the lifecycle, PR4 the actions)
 
@@ -908,8 +922,9 @@ name, or this, next or last quarter; a goal, an objective, a key result or a KPI
 words; a review, a plan, a scorecard or an improvement plan by its person; a line by its words among
 its own scorecard's or review's), as decision 32 matches a leave type. Each asks for what it needs
 first when it was not said (decision 34), the person's own records to tap: which quarter (those not
-closed), goal, objective (this quarter's, of a plan still open to change), key result, KPI (of the
-functions the person sets), plan (this quarter's binding ones), review (those waiting on them as
+closed), goal, objective (this quarter's, of a plan still open to change), KPI (of the
+functions the person sets), key result (of a plan still open to change, for Save Key Result; a
+binding one's target changes through Change Target), plan (this quarter's binding ones), review (those waiting on them as
 reviewer; for Start PIP, the closed ones rated Below), line, scorecard (by person and quarter; the
 drafts they may change for a line), improvement plan or colleague; Set KPI which function and its
 target, Add Line its section, measure (the ones that section takes) and weight, Share Goal and Share
@@ -920,7 +935,10 @@ channels the person runs), whose card (the last two weeks') and the wish, where 
 channels) and which (their newest message or poll) and its new words, whom to recognise (the
 directory), which announcement (those still waiting) and, for chosen departments, which. An answer
 naming a record is at most 60 characters, cut at a word (`named.choiceWords`), and the matcher
-reads it back. Praxis AI still reads no
+reads it back. A figure is read as the number in the words the person used (`named.quantityOf`:
+"95%", "40 stories" and "64,000 users" are 95, 40 and 64000; words holding none or two stay as
+written, marked): a KPI's target, a key result's, a line's target and weight, a target change's new
+target and a check-in's actual. Praxis AI still reads no
 mail, no message and none of a check-in's actions, a review's comments or a plan (decision 19,
 `performance.md` §8): what a card carries is the person's own words and the records the reads
 returned.
@@ -1423,6 +1441,19 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · The evaluation set run on staging with the real model (100 card questions, 9
+  asking ones) and what it found. Fixed: an action the person may make, called as though it were a
+  read, was answered "not available" and the model told the person so (Save Targets); it is now
+  answered as a change to draft (§6.3, `is_an_action`). Create Task "for me" names the person by
+  their own name or "me", and a task card's names read ids alone (`workspace.md` §9). A figure is
+  read as the number in the person's words (`named.quantityOf`, §6.11), and Save Key Result offers
+  only the key results it can change. Most failures were the questions, not the product: every
+  question was asked as the first holder of a role by email, about records staging does not hold
+  (a weekly report task, Lovellyn Ade in a head's team, records only another question would make,
+  though the set writes nothing). The set now asks as the holder with the most open tasks and fills
+  each question from that person's own records, a card's own question's answers among them, and
+  skips what staging cannot fill (§6.10); a failed card says what was wrong and what was written; a
+  typed address may wait on Pick one (decision 37).
 - 03/11/2026 · JP · Performance's, Staff Community's and Mailbox's forms in the chat (decisions 33
   and 40; `docs/handoff/praxis-ai-engine.md` §6.9): 32 actions (§6.11's table), each the screen's
   own service function. Performance: Set Up Quarter, Save Quarter, Record Goal, Save Goal, Share

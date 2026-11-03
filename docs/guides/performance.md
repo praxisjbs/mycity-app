@@ -1602,7 +1602,11 @@ the CEO. They never go to search, Home, Analytics (scores only) or the AI (§9).
   `scorecardLineChoices`, `draftChoices`), and asks too for a line's section, measure and weight,
   KPI's function and target, the month a target change or a round is for, a plan's first day, who
   sees a share, and a corrective action's words and due day or a new reviewer's reason when the
-  card holds the rest. `goals.ai.js`: `quarters.create`, Set Up Quarter (`PeriodCreate`; `performance.manage`; its rules
+  card holds the rest. Save Key Result offers only the key results of a plan still open to change
+  (`keyResultChoices` with `editable`, the repo's `plan_statuses`); a binding one's target changes
+  through Change Target. A figure is read as the number in the person's words (`named.quantityOf`:
+  "95%", "40 stories"): a KPI's target, a key result's, a line's target and weight, a target
+  change's new target, a check-in's actual. `goals.ai.js`: `quarters.create`, Set Up Quarter (`PeriodCreate`; `performance.manage`; its rules
   the last quarter's, changed on Goals) and `quarters.edit`, Save Quarter (`PeriodChange`: Edit
   Quarter's name and status, the quarter beside them); `goals.create`, Record Goal
   (`OrganisationalGoalCreate`), `goals.edit`, Save Goal (`OrganisationalGoalChange`: the goal, its
@@ -1889,6 +1893,7 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · From the evaluation set on staging: a figure is read as the number in the person's words, so Set KPI's "95%" is 95 (`named.quantityOf`, on every figure a card carries), and Save Key Result offers only the key results it can change (`listKeyResultRefs`' `plan_statuses`). Nothing on the Performance screens changes.
 - 03/11/2026 · JP · Every Performance form in the chat (`praxis-ai.md` decisions 33 and 40, §6.11): 23
   cards through the screens' own services (§9): the quarter, the organisational goal, the objective,
   the key result, sharing, Request To Unbind, Change Target, the KPI, Open Round, Save Score and

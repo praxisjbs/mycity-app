@@ -316,6 +316,15 @@ async function answer({ db, actor, question, history = [], context = null, shows
         reads.push(made);
         return { kind: "not_available", content: JSON.stringify({ read: n, key, error: "not_available" }) };
       };
+      // A change the person may make, called as though it were a read: refused as a read (nothing
+      // runs), and the model told it is drafted as this answer's action for them to confirm (§6.11).
+      // "Not available" here would have it tell them a card they may press is not theirs, so the
+      // answer is not marked declined.
+      if (t && t.kind === "action" && allowedActions.some((a) => a.key === key)) {
+        made.outcome = "refused";
+        reads.push(made);
+        return { kind: "no_result", content: JSON.stringify({ read: n, key, error: "is_an_action", message: `${key} is a change this person may make, not a read: draft it as this answer's action, for them to confirm` }) };
+      }
       if (!t || t.kind === "action") return notAvailable();
       if (onRead) {
         try {
