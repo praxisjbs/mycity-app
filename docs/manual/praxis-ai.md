@@ -142,8 +142,9 @@ conversations, and one opens full screen when you press it.
 3. Praxis AI answers with a card: the change as it will be made, every field filled in from what
    you said, people by name, and the records it touches. Nothing has happened yet.
 4. Check every field. To change the words, a day, a choice or a person, press **Edit**, change the
-   field and press **Save Changes**. People are picked as on the screen's own form. A field with a
-   problem says so beside it, for example *Say why*.
+   field and press **Save Changes**. People and leave types are picked as on the screen's own form.
+   A field with a problem says so beside it, for example *Say why*. A field Praxis AI could not match
+   to your records says *Pick one*: press **Edit** and pick it.
 5. Press the card's button to make the change, for example **Create Task** or **Approve Leave**. A
    card that acts on several records says how many, for example *Approve Leave ×4*.
 6. Under the card, **Done** lists each record and what happened to it. Press **Open** on a line to
@@ -186,6 +187,8 @@ form: press that screen's own button to save.
   for a task with no due day.
 - For a meeting it asks what it is about, when it starts, how long it is and who should come. Press
   **Just Me** for a meeting with nobody else.
+- For your own leave it asks which type, with your leave types and the days you have left of each,
+  for example **Annual Leave, 12 days left**. Press one, or say the type in your question.
 - When a name matches more than one person, it asks which one. Press the right person.
 - Only the newest answer's buttons work. Ask something else at any time to stop.
 

@@ -71,6 +71,8 @@ const CASES = Object.freeze([
   { id: "ask.task-priority", as: "employee", question: "Create a task for me to send the weekly report on Friday.", shows: ["cards"], ask: { action: "tasks.create", field: "priority" }, choices: true },
   { id: "ask.meeting-length", as: "operations_people", question: "Book a meeting with {person} tomorrow at 10 about the venue visit.", shows: ["cards"], ask: { action: "calendar.create", field: "ends_at" } },
   { id: "card.leave", as: "employee", question: "Request two days of annual leave for me from next Monday.", shows: ["cards"], action: "my_leave.request" },
+  // Leave without its type: asked which, with the person's own types and the days left of each (decision 32).
+  { id: "ask.leave-type", as: "employee", question: "I need next Friday off.", shows: ["cards"], ask: { action: "my_leave.request", field: "leave_type_id" }, choices: true },
   { id: "card.leave-approve", as: "operations_people", question: "Approve the leave requests waiting on me.", shows: ["cards"], action: "leave.approve" },
   { id: "card.leave-reject", as: "operations_people", question: "Reject the leave requests waiting on me: the team is short that week.", shows: ["cards"], action: "leave.reject" },
   { id: "card.approvals", as: "ceo", question: "Approve every request waiting on me.", shows: ["cards"], action: "approvals.decide" },
@@ -231,7 +233,7 @@ async function main(argv) {
         break;
       }
       // As Ask does it: a card its action cannot be drawn without becomes that question first (decision 29).
-      const draft = answer.askFirst({ draft: out.draft, actions: out.actions, history: [], shows: kase.shows || [] });
+      const draft = await answer.withOptions(answer.askFirst({ draft: out.draft, actions: out.actions, history: [], shows: kase.shows || [] }), out.actions, { actor, db: pool });
       const shown = answer.build({ draft, reads: out.reads, routes: out.routes, screens: out.screens, shows: kase.shows || [] });
       // A card is drafted and checked, never stored: nothing is written by an evaluation.
       const card = kase.action || kase.no_action || kase.ask ? await answer.draftCard({ draft, actions: out.actions, actor, db: pool }) : null;

@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import type { AiActionCard, AiActionResult, AiAnswer, AiHistorySummary, AiQuestion } from "@mycity/contract/contract.gen.ts";
 import { ModalProvider } from "@mycity/ui";
-import { installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
 
 /* Praxis AI's screens (docs/guides/praxis-ai.md §10) against stand-ins for the API: every person and record is invented. */
 
@@ -30,8 +30,9 @@ vi.mock("@/api/hooks", () => ({
     const rows = m.rows[key] ?? [];
     return { rows, page: { number: 1, size: 25, total: rows.length, pages: 1, has_next: false }, loading: false, error: null, q: "", setQ: () => undefined, setPage: () => undefined, sort: undefined, setSort: () => undefined, reload: async () => undefined };
   },
-  useInfinite: (_key: string, opts: { params: { id: string }; enabled?: boolean }) => {
-    const rows = opts.enabled === false ? [] : (m.turns[opts.params.id] ?? []);
+  // A conversation's turns by its id; any other list (Request Leave's types on a card) from rows.
+  useInfinite: (key: string, opts: { params?: { id: string }; enabled?: boolean } = {}) => {
+    const rows = opts.enabled === false ? [] : opts.params ? (m.turns[opts.params.id] ?? []) : (m.rows[key] ?? []);
     return { rows, page: { number: 1, size: 25, total: rows.length, pages: 1, has_next: false }, loading: false, error: opts.enabled === false ? null : m.turnsError, more: () => undefined, reload: async () => undefined };
   },
 }));
@@ -590,6 +591,46 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
     const [first, second] = pressed();
     expect(second.idempotencyKey).toBe(first.idempotencyKey);
     expect(within(group).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("Request Leave's card never shows an id: a type nothing names reads Pick one, and Edit picks it from Request Leave's own list (decision 32)", async () => {
+    const ANNUAL = "00000000-0000-4000-8000-00000000a001";
+    const MADE_UP = "0d663c19-94bc-4ce9-93ef-95db8c56fa76";
+    const leaveCard = (over: Partial<AiActionCard> = {}) =>
+      card({
+        action_key: "my_leave.request",
+        module_key: "ess",
+        label: "Request Leave",
+        schema: "leave.LeaveRequestCreate",
+        values: { leave_type_id: MADE_UP, starts_on: "2026-11-05", ends_on: "2026-11-06", reason: "Travelling for a family emergency." },
+        problems: { leave_type_id: ["Pick one"] },
+        fields: [
+          { name: "leave_type_id", label: "Leave Type", kind: "id", required: true, options: null, long: false, picks: "leave_type" },
+          { name: "starts_on", label: "First Day", kind: "date", required: true, options: null, long: false, picks: null },
+          { name: "ends_on", label: "Last Day", kind: "date", required: true, options: null, long: false, picks: null },
+          { name: "reason", label: "Note", kind: "text", required: false, options: null, long: true, picks: null },
+        ],
+        ...over,
+      });
+    m.turns[CONV] = [answer({ card: leaveCard() })];
+    m.rows["GET /api/v1/leave/types"] = [
+      { leave_type_id: ANNUAL, code: "annual", name: "Annual Leave", active: true },
+      { leave_type_id: "00000000-0000-4000-8000-00000000a002", code: "unpaid", name: "Unpaid Leave", active: true },
+    ];
+    m.data["GET /api/v1/ess/leave/balances"] = { year: 2026, balances: [{ leave_type_id: ANNUAL, code: "annual", name: "Annual Leave", entitled: 20, taken: 8, booked: 0, pending: 0, remaining: 12 }] };
+    m.call.mockImplementation(async (key: unknown, opts: unknown) =>
+      key === "PUT /api/v1/ai/cards/:id" ? leaveCard({ values: (opts as { body: { values: Record<string, unknown> } }).body.values, problems: {}, names: [{ type: "leave_type", id: ANNUAL, label: "Annual Leave", link: null }] }) : {},
+    );
+    ui("ask", CONV);
+    const group = screen.getByRole("group", { name: "Request Leave" });
+    expect(within(group).queryByText(MADE_UP)).toBeNull();
+    expect(within(group).getByText("Pick one")).toBeTruthy();
+    await userEvent.click(within(group).getByRole("button", { name: "Edit" }));
+    await chooseOption(within(group).getByRole("combobox", { name: "Leave Type" }), "Annual Leave · 12 days left");
+    await userEvent.click(within(group).getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("PUT /api/v1/ai/cards/:id", { params: { id: CARD }, body: { values: expect.objectContaining({ leave_type_id: ANNUAL }) } }));
+    expect(await within(group).findByText("Annual Leave")).toBeTruthy();
+    expect(within(group).queryByText("Pick one")).toBeNull();
   });
 
   it("a refusal on the fields lands on the card and stays open; Edit saves the values through the API", async () => {

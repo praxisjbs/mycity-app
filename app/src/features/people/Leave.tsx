@@ -45,6 +45,7 @@ import {
   useModal,
   useSideBySide,
   Who,
+  type SelectFieldProps,
 } from "@mycity/ui";
 
 /**
@@ -342,22 +343,31 @@ function LeaveCalendar() {
   );
 }
 
-/** Ask for leave (My Leave), or record it for someone (People). */
-export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: boolean }) {
-  const [who, setWho] = useState<PersonRef[]>([]);
-  const [whoError, setWhoError] = useState<string | null>(null);
+/**
+ * Request Leave's Leave Type: the active types, and on My Leave each with what is left of the year,
+ * so a request past it is seen before Send. Praxis AI's Request Leave card picks with it too
+ * (docs/guides/praxis-ai.md decision 32).
+ */
+export function LeaveTypeSelect({ year, own = true, ...field }: { year: number; own?: boolean } & Omit<SelectFieldProps, "options">) {
   const types = useInfinite("GET /api/v1/leave/types", { filters: { active: "true" } });
-  // My Leave opened by Praxis AI's Request Leave button carries the type, the days and the note.
-  const filled = useAddressPrefill(leave.LeaveRequestPrefill, !onBehalf);
-  const f = useContractForm({ leave_type_id: "", starts_on: "", ends_on: "", reason: "", ...filled }, leave.LeaveRequestCreate);
-  // My Leave: each type with what is left of the year the First Day falls in, so a request past it is seen before Send.
-  const year = Number((f.values.starts_on || todayIso()).slice(0, 4));
-  const balances = useApi("GET /api/v1/ess/leave/balances", { query: { year }, enabled: !onBehalf });
+  const balances = useApi("GET /api/v1/ess/leave/balances", { query: { year }, enabled: own });
   const left = new Map((balances.data?.balances ?? []).map((b) => [b.leave_type_id, b.remaining] as const));
   const typeLabel = (t: { leave_type_id: string; name: string }) => {
     const n = left.get(t.leave_type_id);
     return n == null ? t.name : `${t.name} · ${dayCount(Math.max(n, 0))} left`;
   };
+  return <SelectField placeholder={types.loading ? "Loading" : "Pick a type"} options={types.rows.map((t) => [t.leave_type_id, typeLabel(t)])} {...paging(types)} {...field} />;
+}
+
+/** Ask for leave (My Leave), or record it for someone (People). */
+export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: boolean }) {
+  const [who, setWho] = useState<PersonRef[]>([]);
+  const [whoError, setWhoError] = useState<string | null>(null);
+  // My Leave opened by Praxis AI's Request Leave button carries the type, the days and the note.
+  const filled = useAddressPrefill(leave.LeaveRequestPrefill, !onBehalf);
+  const f = useContractForm({ leave_type_id: "", starts_on: "", ends_on: "", reason: "", ...filled }, leave.LeaveRequestCreate);
+  // The year the First Day falls in: what is left of it shows beside each type on My Leave.
+  const year = Number((f.values.starts_on || todayIso()).slice(0, 4));
   const ask = useMutation("POST /api/v1/ess/leave");
   const recordIt = useMutation("POST /api/v1/leave/requests");
   const busy = ask.pending || recordIt.pending;
@@ -407,12 +417,7 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
         </Field>
       )}
       <Field label="Leave Type" {...f.field("leave_type_id")}>
-        <SelectField
-          placeholder={types.loading ? "Loading" : "Pick a type"}
-          options={types.rows.map((t) => [t.leave_type_id, typeLabel(t)])}
-          {...paging(types)}
-          {...f.field("leave_type_id")}
-        />
+        <LeaveTypeSelect year={year} own={!onBehalf} {...f.field("leave_type_id")} />
       </Field>
       <Field label="First Day" {...f.field("starts_on")}>
         <DateField {...f.field("starts_on")} min={onBehalf ? undefined : todayIso()} />

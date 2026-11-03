@@ -83,6 +83,24 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     expect(refused({ asks: [{ field: "title", question: "What is it?" }, { field: "title", question: "What is it?" }] })).toThrow(/twice/);
   });
 
+  test("a field written by name (resolve) and answers read from the person's records (options) are checked at load (decision 32)", () => {
+    const options = async () => ["Annual Leave, 12 days left"];
+    const resolve = { primary_assignee_id: async () => null };
+    const a = defineManifest({ module: "workspace", actions: [{ ...ACTION, picks: { primary_assignee_id: "task_assignee", project_id: "project" }, resolve, asks: [{ field: "primary_assignee_id", question: "Who is it for?", options }] }] }).actions[0];
+    expect(Object.keys(a.resolve)).toEqual(["primary_assignee_id"]);
+    expect(a.asks[0]).toMatchObject({ field: "primary_assignee_id", choices: [], options });
+    // The new picker kind is the contract's own.
+    expect(c.assistant.AiCardPicks.options).toContain("leave_type");
+    expect(defineManifest({ module: "workspace", actions: [ACTION] }).actions[0].resolve).toEqual({});
+    const refused = (over) => () => defineManifest({ module: "workspace", actions: [{ ...ACTION, ...over }] });
+    expect(refused({ resolve: [] })).toThrow(/resolve is \{ field: \(value, actor, db\) => id \}/);
+    expect(refused({ resolve: { nope: async () => null } })).toThrow(/resolve names "nope"/);
+    expect(refused({ fields: ["title"], resolve: { primary_assignee_id: async () => null } })).toThrow(/resolve names "primary_assignee_id", which the card does not carry/);
+    expect(refused({ resolve: { primary_assignee_id: "by name" } })).toThrow(/resolve\.primary_assignee_id is \(value, actor, db\) => id/);
+    expect(refused({ asks: [{ field: "title", question: "What is it?", options: ["A"] }] })).toThrow(/options are \(\{ actor, db, today \}\) => a list/);
+    expect(refused({ asks: [{ field: "title", question: "What is it?", options, choices: ["A"] }] })).toThrow(/choices or options, not both/);
+  });
+
   test("gate 19 refuses SQL and a query call inside a manifest, and a write key, comments aside", () => {
     const dir = tmp("mycity-gate19v2-");
     const src = (p) => JSON.stringify(path.resolve(__dirname, "../../..", p));

@@ -111,11 +111,12 @@ const ACTION_KEYS = new Set([
   "picks",
   "names",
   "asks",
+  "resolve",
 ]);
 const ROUTE_KEYS = new Set(["intent", "screen", "params", "prefill"]);
-/** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decision 31). */
-const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project"]);
-const ASK_KEYS = new Set(["field", "question", "choices", "none"]);
+/** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decisions 31 and 32). */
+const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type"]);
+const ASK_KEYS = new Set(["field", "question", "choices", "options", "none"]);
 /** The answers to tap under a question, at most (AiAnswer.choices). */
 const CHOICES_MAX = 6;
 const KEY_RE = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
@@ -275,6 +276,14 @@ function checkAction(where, a, seen) {
     }
   }
   if (a.names !== undefined && typeof a.names !== "function") throw new Error(`${at}: names is (values, actor, db) => [{ type, id, label }]`);
+  // A field the model may write by name, matched to the person's own record on the server (decision 32).
+  if (a.resolve !== undefined) {
+    if (!a.resolve || typeof a.resolve !== "object" || Array.isArray(a.resolve)) throw new Error(`${at}: resolve is { field: (value, actor, db) => id }`);
+    for (const [k, fn] of Object.entries(a.resolve)) {
+      if (!takes(k) || !carried(k)) throw new Error(`${at}: resolve names "${k}", which the card does not carry`);
+      if (typeof fn !== "function") throw new Error(`${at}: resolve.${k} is (value, actor, db) => id`);
+    }
+  }
   const asks = checkAsks(at, a.asks, takes, carried);
   checkMatrix(at, a.matrix);
   return Object.freeze({
@@ -291,6 +300,7 @@ function checkAction(where, a, seen) {
     picks: Object.freeze({ ...(a.picks || {}) }),
     names: a.names || null,
     asks,
+    resolve: Object.freeze({ ...(a.resolve || {}) }),
   });
 }
 
@@ -319,8 +329,11 @@ function checkAsks(at, asks, takes, carried) {
         throw new Error(`${at}: ask ${q.field}'s choices are a list, or ({ today }) => a list`);
       if (fixed && (q.choices.length > CHOICES_MAX || q.choices.some((c) => typeof c !== "string" || !c.trim() || c.length > 60)))
         throw new Error(`${at}: ask ${q.field} offers at most ${CHOICES_MAX} short choices`);
+      // Answers read from the person's own records (their leave types): filled by the service, never the engine (decision 32).
+      if (q.options !== undefined && typeof q.options !== "function") throw new Error(`${at}: ask ${q.field}'s options are ({ actor, db, today }) => a list`);
+      if (q.options !== undefined && q.choices !== undefined) throw new Error(`${at}: ask ${q.field} takes choices or options, not both`);
       if (q.none !== undefined && typeof q.none !== "boolean") throw new Error(`${at}: ask ${q.field}'s none is true or false`);
-      return Object.freeze({ field: q.field, question: words, choices: q.choices || [], none: q.none === true });
+      return Object.freeze({ field: q.field, question: words, choices: q.choices || [], options: q.options || null, none: q.none === true });
     }),
   );
 }

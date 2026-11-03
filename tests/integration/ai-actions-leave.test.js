@@ -30,11 +30,27 @@ const { q, one, drain, fresh, script, callRead, say, harness } = require("./help
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
-/** The Monday at least `weeksAhead` weeks from today, as YYYY-MM-DD, and the weekdays after it. */
+/** The working calendar, public holidays included, loaded once the schema is built. */
+let calendar = null;
+
+/**
+ * Monday to Friday of a week ahead, as YYYY-MM-DD, each a working day: `weeksAhead` 2 is the first
+ * week at least two weeks from today whose five days are all worked, 3 the next such week, and so
+ * on, so a public holiday (Boxing Day observed on a Monday) never lands a request on a day off and
+ * no two tests share a week, whatever day the suite runs.
+ */
 function week(weeksAhead) {
-  const d = new Date(Date.now() + weeksAhead * 7 * 86_400_000);
+  const d = new Date(Date.now() + 2 * 7 * 86_400_000);
   while (d.getUTCDay() !== 1) d.setUTCDate(d.getUTCDate() + 1);
-  return Array.from({ length: 5 }, (_, i) => new Date(d.getTime() + i * 86_400_000).toISOString().slice(0, 10));
+  let clean = 0;
+  for (;;) {
+    const days = Array.from({ length: 5 }, (_, i) => new Date(d.getTime() + i * 86_400_000).toISOString().slice(0, 10));
+    if (days.every((day) => workingWeek.isWorkingDay(day, calendar))) {
+      clean += 1;
+      if (clean === weeksAhead - 1) return days;
+    }
+    d.setUTCDate(d.getUTCDate() + 7);
+  }
 }
 
 describeDb("Praxis AI's leave cards against the real migrations", () => {
@@ -52,6 +68,7 @@ describeDb("Praxis AI's leave cards against the real migrations", () => {
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
     workingWeek.invalidateCalendar();
+    calendar = await workingWeek.loadCalendar(pool);
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));
     h = harness(app);
@@ -100,6 +117,44 @@ describeDb("Praxis AI's leave cards against the real migrations", () => {
     expect(mine.status).toBe(200);
     expect(mine.body).toMatchObject({ status: "submitted", days: 2, reason: "A family wedding", waiting_on: "Line Manager" });
     requests.wedding = mine.body;
+  });
+
+  test("my_leave.request names its leave type, matches one written by name, and marks an id nothing names Pick one, never sending it (decision 32)", async () => {
+    const [, , wed, thu] = week(3);
+    // Written by name, as the person said it: matched to the type on the server.
+    script(callRead("my_leave__balances", {}), say({ text: "Here is the request.", action: { key: "my_leave.request", values: { leave_type_id: "Annual", starts_on: wed, ends_on: thu, reason: "A family emergency" }, suggested: false } }));
+    const byName = await h.ask("one", { question: "I need Wednesday and Thursday off, annual leave.", shows: ["cards"] });
+    expect(byName.status).toBe(200);
+    expect(byName.body.card).toMatchObject({ values: { leave_type_id: annual }, problems: {}, names: [{ type: "leave_type", id: annual, label: "Annual" }] });
+    expect(byName.body.card.fields.find((f) => f.name === "leave_type_id")).toMatchObject({ kind: "id", picks: "leave_type" });
+    // An id the model made up, as on staging: never named, marked Pick one, and the press refused with nothing sent.
+    const madeUp = "0d663c19-94bc-4ce9-93ef-95db8c56fa76";
+    script(say({ text: "Here is the request.", action: { key: "my_leave.request", values: { leave_type_id: madeUp, starts_on: wed, ends_on: thu }, suggested: false } }));
+    const wrong = await h.ask("one", { question: "Draft it for Wednesday and Thursday.", shows: ["cards"] });
+    expect(wrong.body.card).toMatchObject({ problems: { leave_type_id: ["Pick one"] }, names: [] });
+    const before = await one("SELECT count(*)::int AS n FROM leave_request WHERE employee_id = $1", [h.people.one.employee_id]);
+    const refused = await h.press("one", wrong.body.card.ai_action_draft_id);
+    expect(refused.status).toBe(422);
+    expect(refused.body.error.fields).toEqual({ leave_type_id: ["Pick one"] });
+    expect((await one("SELECT count(*)::int AS n FROM leave_request WHERE employee_id = $1", [h.people.one.employee_id])).n).toBe(before.n);
+    // Edit picks the type: Save Changes names it and clears the mark.
+    const edited = await h.as("one").put(`/ai/cards/${wrong.body.card.ai_action_draft_id}`).send({ values: { ...wrong.body.card.values, leave_type_id: annual } });
+    expect(edited.status).toBe(200);
+    expect(edited.body).toMatchObject({ problems: {}, names: [{ type: "leave_type", id: annual, label: "Annual" }] });
+  });
+
+  test("asked for leave without its type, Praxis AI asks which, with the person's own types and the days left of each to tap (decision 32)", async () => {
+    const [, , , , fri] = week(4);
+    script(say({ text: "Here is the request.", action: { key: "my_leave.request", values: { starts_on: fri, ends_on: fri }, suggested: false } }));
+    const asked = await h.ask("two", { question: "I need Friday off.", shows: ["cards"] });
+    expect(asked.status).toBe(200);
+    expect(asked.body).toMatchObject({ content: "Which leave type?", card: null });
+    expect(asked.body.choices).toEqual(expect.arrayContaining([expect.stringMatching(/^Annual, \d+ days? left$/)]));
+    // The model asked it itself with no answers to tap: the server's are filled in.
+    script(say({ text: "Which kind of leave is it?", ask: { action: "my_leave.request", field: "leave_type_id", choices: [] } }));
+    const own = await h.ask("two", { question: "I need Friday off.", shows: ["cards"] });
+    expect(own.body.content).toBe("Which kind of leave is it?");
+    expect(own.body.choices).toEqual(asked.body.choices);
   });
 
   test("leave.approve: four requests approved from the chat by the line manager, after Confirm It's You with a passkey (decision 11)", async () => {

@@ -347,6 +347,31 @@ function withChoices(draft, actions, now) {
 }
 
 /**
+ * A question for one of an offered action's fields whose answers are read from the person's own
+ * records (an ask's `options`: Request Leave's types with the days left of each, decision 32), with
+ * those answers to tap. The service calls it after `askFirst`, with the asking person and a
+ * database; the engine never reads. A read that fails leaves the question as it was.
+ * @param {object} draft
+ * @param {Array<object>} actions  the actions offered this turn
+ * @param {{actor?: object, db?: {query: Function}|null, now?: Date}} [ctx]
+ */
+async function withOptions(draft, actions, { actor = null, db = null, now = new Date() } = {}) {
+  const ask = draft && draft.ask;
+  if (!ask || typeof ask !== "object" || !ask.action || !ask.field || !actor || !db) return draft;
+  const action = (actions || []).find((a) => a.key === ask.action);
+  const entry = action && Array.isArray(action.asks) ? action.asks.find((a) => a.field === ask.field) : null;
+  if (!entry || typeof entry.options !== "function") return draft;
+  try {
+    const listed = await entry.options({ actor, db, today: lagos.today(now) });
+    const choices = [...new Set((Array.isArray(listed) ? listed : []).map((c) => String(c).trim()).filter((c) => c && c.length <= 60))].slice(0, MAX_CHOICES);
+    return choices.length ? { ...draft, ask: { ...ask, choices } } : draft;
+  } catch (err) {
+    logger.warn({ err, ai_action: action.key, field: ask.field }, "Praxis AI: an ask's options could not be read; its question has none to tap");
+    return draft;
+  }
+}
+
+/**
  * The server's half of decision 29: a card the person asked for is drawn only once its action has
  * what its `asks` name. When the model drafted one with a field left out, the answer becomes that
  * question instead (its words, its choices, what it asks for), with no card, table or screen
@@ -439,4 +464,4 @@ async function draftCard({ draft, actions, actor, context = null, db = null, now
   };
 }
 
-module.exports = { build, draftCard, askFirst, withChoices, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, whoOf, valueAt, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };
+module.exports = { build, draftCard, askFirst, withChoices, withOptions, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, whoOf, valueAt, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };

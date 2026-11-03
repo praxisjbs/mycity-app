@@ -146,6 +146,20 @@ owner with a recommendation first; the reasons are in `docs/handoff/praxis-ai-en
     and a rule a schema cannot say to the model (a task is shared with people or a department, never
     both) is in the action's description.
 
+### 1.4 Decisions (JBS Praxis, 03/11/2026, binding): a card never shows an id
+
+Taken after a Request Leave card on staging showed its leave type as an id, marked Not offered, and
+a task card showed an id where a person should be. Put to the owner with a recommendation first.
+
+32. **A card never shows an id, and a leave request asks its type.** Every id a card holds reads by
+    name, through the action's own module (`names`); an id that names nothing (one the model wrote
+    from no read, or a record retired) is never printed: its field is marked Pick one and Edit picks
+    it with the screen's own picker. Request Leave names its leave type and picks it as Request
+    Leave's form does; asked for leave without a type, Praxis AI asks "Which leave type?" with the
+    person's own types and the days left of each as answers to tap. A field the model may write by
+    name (a leave type) is matched to the person's own records on the server (`resolve`), so a type
+    is never an id the model made up.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -577,6 +591,9 @@ actions: [{
   picks: { primary_assignee_id: "task_assignee", watcher_ids: "colleague" },     // what Edit picks an id field with (AiCardPicks)
   names: (values, actor, db) => service.cardNames(db, values),                  // the ids the fields hold, by name; never counted
   asks: [{ field: "due_on", question: "When is it due?", choices: dueChoices, none: true }],   // asked before the card (decision 29)
+  // Request Leave's: answers read from the person's own records, and a type the model may write by name (decision 32)
+  // asks: [{ field: "leave_type_id", question: "Which leave type?", options: ({ actor, db }) => typeChoices(actor, db) }],
+  // resolve: { leave_type_id: (value, actor, db) => typeIdOf(value, db) },
 }],
 not_offered: { TaskStepCreate: "a step belongs to a task's own panel" },   // every other <Thing>Create of the module, with a reason (gate 23)
 ```
@@ -596,17 +613,28 @@ in the order it shows them; a value for any other field is dropped before the sc
 (`authorise.checkAction`), so a commitment, a repeat or a record pointer never rides on a task card
 unseen, and the system turn lists only these. `picks` names, for each id field and list of ids, the
 picker Edit chooses it with (`colleague`, anyone with a login; `task_assignee` and `task_member`,
-whom the person may set a task for or share one with, as New Task's; `department`; `project`).
+whom the person may set a task for or share one with, as New Task's; `department`; `project`;
+`leave_type`, the types Request Leave's form offers).
 `names(values, actor, db)` names the ids the fields hold through the module's own repo, kept apart
 from `records`: the records are what a press acts on (the verb's count, the chips, the re-check), the
 names only how an id reads, so a meeting's three guests never make "Create Event ×3". A rule the
 schema holds but cannot say to the model (a task is shared with people or a department, never both)
 is in the action's description, and the card still shows the schema's own problem on its field.
+**A card never shows an id (decision 32):** `authorise.checkAction`, at the draft and at every Save
+Changes, marks a field with `picks` whose id, or any id of whose list, neither `names` nor `records`
+names with the problem Pick one, in place of the schema's own; the card never prints an id, so the
+field reads as its problem alone until Edit picks one. `resolve` takes, for a field the model may write
+by name, `(value, actor, db) => id`, run before the schema parses the values: a value that is already
+an id is left alone, and a name or code is matched among the person's own records (Request Leave's
+leave types: by name, by code, or by the first words of a name that only one type has), else left as
+written for Pick one to mark.
 
 **Asked before it is drawn (decisions 28 and 29).** `asks` lists what the action must have before
 its card is drawn, in order: the field, its one short question (at most 8 words), its answers to tap
-(a list, or `({ today }) => list` for answers that move with the day) and whether none is an answer
-(`none`: null, or an empty list, is then a value the person gave). The system turn gives the model
+(a list, or `({ today }) => list` for answers that move with the day; or `options`,
+`({ actor, db, today }) => list`, for answers read from the person's own records, such as their leave
+types with the days left, which the service fills once the question is chosen, `answer.withOptions`)
+and whether none is an answer (`none`: null, or an empty list, is then a value the person gave). The system turn gives the model
 each action's asks, and the prompt (version 7) has it ask one at a time, with `ask` naming the action
 and field, and never invent a value. The server holds the same list (`answer.askFirst`, the engine's
 `cards.nextAsk`): a card the person asked for (never a suggested one) whose model values leave out an
@@ -627,7 +655,7 @@ open with the reason.
 | `tasks.complete` | `workspace` edit, standard, up to 25 | `TaskComplete`: the tasks, a late reason | the tasks, by number and title | every task on the person's board; a cancelled or waiting one is its own line | `move()` to Done, one after another |
 | `tasks.comment` | `workspace` edit, standard | `TaskCommentAdd`: the task (filled from the screen asked from), the words | the task | on the person's board | `tasks.service.comment` |
 | `calendar.create` | `workspace` create, standard | `CalendarEventCreate` (joined from New Event's day and times); asks what it is about, when, how long (30 Minutes, 1 Hour, 2 Hours) and who comes (Just Me) | none: it makes one event; the attendees are named | someone not on the staff refused on the field | `calendar.service.create` |
-| `my_leave.request` | `ess` create, standard | `LeaveRequestCreate` (Request Leave's form) | none: the person's own | an employee; the type, the days and the year's allowance are the service's | `leave.service.request` |
+| `my_leave.request` | `ess` create, standard | `LeaveRequestCreate` (Request Leave's form): the leave type (named, picked with Request Leave's own list, matched by name when the model writes one), the first and last day, the note; asks which type ("Which leave type?") with the person's types and the days left of each | none: the person's own | an employee; the type, the days and the year's allowance are the service's | `leave.service.request` |
 | `leave.approve`, `leave.reject` | `people` approve, **approval**, up to 25 | `LeaveApprove`, `LeaveReject` (a reason, required to reject) | the requests: who, the type, the days | every request in the person's `people` scope; then each waiting and named on its stage, never their own, as a line | the approval's own `decide()` per request |
 | `approvals.decide` | `ess` create (the queue is the person's own), **approval**, up to 25 | `ApprovalDecide`: the requests, approve, reject or request changes, a reason (required but to approve) | the requests: the flow and who it is about | every request the person may read; then each pending, the stage naming them, `approve` held on its module, never their own; one decided on its record refused with that record's screen on its line | `workflow.service.decide` per request |
 | `community.message` | `community` create, standard, may be suggested | `DirectMessageSend`: the colleague, the words | the colleague, by name | on the staff with a login | the conversation opened if there is none, then `postMessage` |
@@ -691,12 +719,14 @@ conversation; the model's text never says something was done.
 **On screen** (`ActionCard` and `ResultLine` in the Assistant group; `app/src/features/assistant/Card.tsx`
 wires them): the action's label as the title (a suggested card's as a question, "Send Message?"),
 every field with a value, a problem or a requirement as a person reads it (a day day first, a
-choice in words, an id as the name `names` or `records` give it, an id nothing names as itself),
+choice in words, an id as the name `names` or `records` give it, never an id itself: one nothing names
+reads as its problem, Pick one, decision 32),
 the records as chips that open their screens, and the buttons: the verb (the decision's own word
 when the card carries one, "Approve ×3", and the count when it acts on several), Edit (the fields
 through the form system from the action's own contract schema, resolved by its name; an id field
 with `picks` through the screen's own picker, bound by the app: `TaskPeoplePicker`, `ColleaguePicker`,
-`DepartmentPicker` for a reader who may view People, `ProjectPicker`; one without stays as it is;
+`DepartmentPicker` for a reader who may view People, `ProjectPicker`, `LeaveTypeSelect` (Request
+Leave's own list, each type with the days left); one without stays as it is;
 Save Changes goes through `PUT /ai/cards/:id`, which names the new picks), Cancel (Not Now on a
 suggested card). A question asked before a card shows its answers as buttons under its words, on
 the newest answer only; a tap asks that answer as the person's next question, and every answer waits
@@ -950,7 +980,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Praxis AI · Ask (`ask`) | Praxis AI as the title; Back (on desktop the screen it returns to under the title, "From People · Leave"; opened from the menu, ⌘K or History it goes to History and the line is left out); Recent, a toggle that shows the person's conversations as a column beside the chat (titles and when last asked, newest first, 25 a page; empty, No Questions Yet); New Conversation once a conversation is open; on a phone opened from the menu, the conversations first (title, questions, when last asked; Search Conversations; No Conversations Yet, "Start one with New Conversation.") with New Conversation always, and the chat full screen over them with Back, Conversations and New Conversation; the conversation (on desktop about two fifths, on the left): empty, an illustration and Try Asking with up to 6 questions to tap; Show Earlier when older questions remain, each question as the person's bubble, each answer with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), its table's rows opening their records, Open Figures on an answer with a table or figures whose pane is not the one shown (none under an answer of words alone, whose chips still open the pane), From with the kinds of record read as chips ("partnership ×4", "employee ×2"; a chip shows those records in the pane; the one record, named, when the answer rests on one, shown on Record), Helpful and Not Helpful (pressed again, taken back); a question Praxis AI asks before a card ("What is the task?", "When is it due?", "Which Tunde?"; decisions 28 and 29), its words alone with no From and no Open Figures, with its answers as buttons under it on the newest answer (Today, Tomorrow, Friday, No Due Day; Low, Normal, High, Urgent; 30 Minutes, 1 Hour, 2 Hours; Just Me; each person by name and job title), a tap asking it; an answer's card (§6.11): the action's name (a suggested card's as a question, "Send Message?"), each field's label and value as a person reads it (people, departments and projects by name, "For: JBS Praxis Team", "Watchers: Tobiloba Dada, Bassey Ekpe"), a problem beside its value ("Say why", "Fill the gap"), the records as chips ("Ayo Bello, Annual, 3 days"), the buttons (the verb with the count, "Approve Leave ×4", a lock on one that asks Confirm It's You; Edit, with Save Changes and Cancel on its fields, people, departments and projects picked as on the screen's own form; Cancel, or Not Now on a suggested card), a refusal under the card in the server's words with Open Mailbox where the mailbox is not connected, then Done or Could Not Finish with a line per record and Open, or Expired with "This card has expired." and Draw It Again; Confirm It's You (`identity.md` §10) before a sensitive card, and the toast "Set a passkey for next time" with Set Passkey once; while waiting, Reading Your Records, then Reading leave requests · 2 of 5 as each read runs; a refused answer in plain words; a failed one with its reason and Try Again; the pane (on desktop about three fifths, on the right) for the latest answer (a conversation opened from Recent or History shows its own latest), or the one whose chip or Open Figures was pressed (drawn in the accent): tabs Overview, Table, Record and Sources, an empty one disabled; Overview: up to three figures and one chart when a summary read answered (§6.13); Table: the read's rows, 25 a page (Previous, Next, Page 1 of 13), Export (every row of the read as an Excel file, made for the person and saved on this device, §6.16; toast "Export downloaded"), a row opening the Record, past 200 rows "Showing the first 200 of 1,240 rows"; Record: the row's or the record's fields and Open Record; Sources: each read numbered and named ("1. Leave Requests"), Read, Not Available, Not Run, Failed or Too Much (the read covered more than the database allows at once, §6.3 step 8), "25 of 312 rows", its filters, Masked with the fields emptied, Open Table; before any answer, No Answer Yet, "Ask a question to fill this pane."; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, No words heard, Transcription is not set up, the server's reason, Could not transcribe); a 500's reference after its reason | Help term on From (the records this answer was read from, as you would see them; a chip opens them in the pane) | How reads, the context, permissions, redaction, the loop, the progress events and a card's re-check work: §1.1, §6 here and the manual |
+| Praxis AI · Ask (`ask`) | Praxis AI as the title; Back (on desktop the screen it returns to under the title, "From People · Leave"; opened from the menu, ⌘K or History it goes to History and the line is left out); Recent, a toggle that shows the person's conversations as a column beside the chat (titles and when last asked, newest first, 25 a page; empty, No Questions Yet); New Conversation once a conversation is open; on a phone opened from the menu, the conversations first (title, questions, when last asked; Search Conversations; No Conversations Yet, "Start one with New Conversation.") with New Conversation always, and the chat full screen over them with Back, Conversations and New Conversation; the conversation (on desktop about two fifths, on the left): empty, an illustration and Try Asking with up to 6 questions to tap; Show Earlier when older questions remain, each question as the person's bubble, each answer with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), its table's rows opening their records, Open Figures on an answer with a table or figures whose pane is not the one shown (none under an answer of words alone, whose chips still open the pane), From with the kinds of record read as chips ("partnership ×4", "employee ×2"; a chip shows those records in the pane; the one record, named, when the answer rests on one, shown on Record), Helpful and Not Helpful (pressed again, taken back); a question Praxis AI asks before a card ("What is the task?", "When is it due?", "Which Tunde?", "Which leave type?"; decisions 28, 29 and 32), its words alone with no From and no Open Figures, with its answers as buttons under it on the newest answer (Today, Tomorrow, Friday, No Due Day; Low, Normal, High, Urgent; 30 Minutes, 1 Hour, 2 Hours; Just Me; each person by name and job title; each leave type with the days left, "Annual Leave, 12 days left"), a tap asking it; an answer's card (§6.11): the action's name (a suggested card's as a question, "Send Message?"), each field's label and value as a person reads it (people, departments, projects and leave types by name, never an id, "For: JBS Praxis Team", "Watchers: Tobiloba Dada, Bassey Ekpe"), a problem beside its value ("Say why", "Fill the gap"; Pick one alone where an id names nothing), the records as chips ("Ayo Bello, Annual, 3 days"), the buttons (the verb with the count, "Approve Leave ×4", a lock on one that asks Confirm It's You; Edit, with Save Changes and Cancel on its fields, people, departments, projects and leave types picked as on the screen's own form; Cancel, or Not Now on a suggested card), a refusal under the card in the server's words with Open Mailbox where the mailbox is not connected, then Done or Could Not Finish with a line per record and Open, or Expired with "This card has expired." and Draw It Again; Confirm It's You (`identity.md` §10) before a sensitive card, and the toast "Set a passkey for next time" with Set Passkey once; while waiting, Reading Your Records, then Reading leave requests · 2 of 5 as each read runs; a refused answer in plain words; a failed one with its reason and Try Again; the pane (on desktop about three fifths, on the right) for the latest answer (a conversation opened from Recent or History shows its own latest), or the one whose chip or Open Figures was pressed (drawn in the accent): tabs Overview, Table, Record and Sources, an empty one disabled; Overview: up to three figures and one chart when a summary read answered (§6.13); Table: the read's rows, 25 a page (Previous, Next, Page 1 of 13), Export (every row of the read as an Excel file, made for the person and saved on this device, §6.16; toast "Export downloaded"), a row opening the Record, past 200 rows "Showing the first 200 of 1,240 rows"; Record: the row's or the record's fields and Open Record; Sources: each read numbered and named ("1. Leave Requests"), Read, Not Available, Not Run, Failed or Too Much (the read covered more than the database allows at once, §6.3 step 8), "25 of 312 rows", its filters, Masked with the fields emptied, Open Table; before any answer, No Answer Yet, "Ask a question to fill this pane."; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, No words heard, Transcription is not set up, the server's reason, Could not transcribe); a 500's reference after its reason | Help term on From (the records this answer was read from, as you would see them; a chip opens them in the pane) | How reads, the context, permissions, redaction, the loop, the progress events and a card's re-check work: §1.1, §6 here and the manual |
 | Praxis AI · History (`history`) | History as the title, Export and Clear History; for AI Control: Questions This Month (everyone's), Your Questions, Spend and Monthly Cap, each captioned with the month or All AI; for everyone else: Questions This Month, Your Questions (all time) and Your Spend; Your Questions, 25 a page: Question, Asked, Sources Read, Tokens, Cost, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog; Search Questions; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Spend per Month, Naira (six months; for AI Control, "Against a ₦25,000 monthly cap" when one is set); Questions by Module; toasts "Conversation deleted", "History cleared", the export's own | Help terms on Spend (what Praxis AI's questions cost this month, priced as AI Control prices them) and Monthly Cap (the most all AI may spend in a month, set in AI Control) | Where everyone's spend by action is (AI Control · Spend), what deleting keeps: §6.5 |
 
 ### 10.2 Phone layout
@@ -1034,6 +1064,12 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   kept before this drew its table without them, and its Table in the pane draws them (§6.12).
 - **The person replies to a question with a question** ("Do you need to know how urgent it
   is?"): the answer says why and asks again, with the same answers to tap.
+- **An id the model wrote that names nothing** (a leave type it made up, a person who is not there):
+  the field reads Pick one, never the id, and the press is not offered a value the service would
+  refuse; Edit picks it (decision 32).
+- **Leave asked for without a type** ("I need Thursday and Friday off"): "Which leave type?" with
+  the person's types and the days left of each; a tap, or the type's name typed, is matched to the
+  type on the server.
 - **"Who is absent today?" before the day closes**: nobody is marked Absent yet, so the answer
   counts and names the people Not In ("21 people have not clocked in today"), with those on leave
   or off left out.
@@ -1094,6 +1130,15 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · A card never shows an id (§1.4 decision 32, JBS Praxis; `docs/handoff/praxis-ai-engine.md`
+  §6.8), after a Request Leave card on staging showed its leave type as an id marked Not offered.
+  `authorise.checkAction` marks a field with `picks` whose id nothing names Pick one, at the draft and
+  at Save Changes, and the card never prints an id; manifests take `resolve` (a field the model may
+  write by name) and asks take `options` (answers read from the person's own records, filled by
+  `answer.withOptions`); `AiCardPicks` gains `leave_type`. Request Leave names its leave type, picks it
+  with Request Leave's own list (`LeaveTypeSelect`), matches a type the model writes by name, and asks
+  "Which leave type?" with the person's types and the days left of each (§6.11). Prompt version 9:
+  a leave type by its name.
 - 02/11/2026 · JP · Answers that read well, from JBS Praxis's questions on staging ("What are the
   names?", "Why is there always Open Figures?"; `docs/handoff/praxis-ai-engine.md` §6.7). A table
   names its records: a field may reach into a row (`employee.display_name`), a record reads as its

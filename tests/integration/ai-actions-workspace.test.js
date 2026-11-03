@@ -228,11 +228,13 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
 
     script(say({ text: "Here is the meeting.", action: { key: "calendar.create", values: { ...values, attendee_ids: ["00000000-0000-4000-8000-00000000009f"] }, suggested: false } }));
     const stranger = await h.ask("ops", { question: "Book it with someone else.", shows: ["cards"] });
-    // Nobody by that id: nothing names it, so the card shows the id and the press refuses it.
+    // Nobody by that id: nothing names it, so the card marks it Pick one at the draft, never shows it,
+    // and the press is refused before Create Event's service runs (decision 32).
     expect(stranger.body.card.names).toEqual([]);
+    expect(stranger.body.card.problems).toEqual({ attendee_ids: ["Pick one"] });
     const refused = await h.press("ops", stranger.body.card.ai_action_draft_id);
     expect(refused.status).toBe(422);
-    expect(refused.body.error.fields).toEqual({ attendee_ids: ["Not on the staff"] });
-    expect(await one("SELECT status, problems FROM ai_action_draft WHERE ai_action_draft_id = $1", [stranger.body.card.ai_action_draft_id])).toEqual({ status: "shown", problems: { attendee_ids: ["Not on the staff"] } });
+    expect(refused.body.error.fields).toEqual({ attendee_ids: ["Pick one"] });
+    expect(await one("SELECT status, problems FROM ai_action_draft WHERE ai_action_draft_id = $1", [stranger.body.card.ai_action_draft_id])).toEqual({ status: "shown", problems: { attendee_ids: ["Pick one"] } });
   });
 });

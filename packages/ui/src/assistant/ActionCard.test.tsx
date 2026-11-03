@@ -72,13 +72,15 @@ describe("ActionCard", () => {
     const picker = vi.fn(({ field, value, onChange }: { field: CardField; value: unknown; onChange: (v: unknown) => void }) =>
       field.name === "watcher_ids" ? <button type="button" onClick={() => onChange([...((value as string[]) ?? []), "e4"])}>Pick Someone</button> : null,
     );
+    const nobody = "00000000-0000-4000-8000-000000000009";
     render(
-      <ActionCard label="Create Task" fields={taskFields} values={{ title: "Review milestone 3", primary_assignee_id: "e1", watcher_ids: ["e2", "e3"], project_id: "p9" }} problems={{}} records={[]} names={names} picker={picker} status="shown" confirm="press" schema={schema} onConfirm={() => undefined} onSave={onSave} />,
+      <ActionCard label="Create Task" fields={taskFields} values={{ title: "Review milestone 3", primary_assignee_id: "e1", watcher_ids: ["e2", "e3"], project_id: nobody }} problems={{ project_id: ["Pick one"] }} records={[]} names={names} picker={picker} status="shown" confirm="press" schema={schema} onConfirm={() => undefined} onSave={onSave} />,
     );
     expect(screen.getByText("JBS Praxis Team")).toBeInTheDocument();
     expect(screen.getByText("Tobiloba Dada, Bassey Ekpe")).toBeInTheDocument();
-    // An id nothing names keeps the id; the verb counts no name.
-    expect(screen.getByText("p9")).toBeInTheDocument();
+    // An id nothing names is never printed (decision 32): its field reads as its problem alone; the verb counts no name.
+    expect(screen.queryByText(nobody)).toBeNull();
+    expect(screen.getByText("Pick one")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create Task" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
     await userEvent.click(screen.getByRole("button", { name: "Pick Someone" }));
@@ -86,6 +88,32 @@ describe("ActionCard", () => {
     expect(screen.getByRole("textbox", { name: "For" })).toHaveAttribute("disabled");
     await userEvent.click(screen.getByRole("button", { name: "Save Changes" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ watcher_ids: ["e2", "e3", "e4"] })));
+  });
+
+  it("never prints an id: a list reads only the names it has, and a word that is not an id still reads as written", () => {
+    const listFields: CardField[] = [
+      { name: "watcher_ids", label: "Watchers", kind: "list", required: false, options: null, long: false, picks: "colleague" },
+      { name: "attendee_ids", label: "Attendees", kind: "list", required: false, options: null, long: false, picks: "colleague" },
+      { name: "leave_type_id", label: "Leave Type", kind: "id", required: true, options: null, long: false, picks: "leave_type" },
+    ];
+    const madeUp = "0d663c19-94bc-4ce9-93ef-95db8c56fa76";
+    render(
+      <ActionCard
+        label="Create Task"
+        fields={listFields}
+        values={{ watcher_ids: ["e2", madeUp], attendee_ids: [madeUp], leave_type_id: "Annual Holiday" }}
+        problems={{ watcher_ids: ["Pick one"], attendee_ids: ["Pick one"], leave_type_id: ["Pick one"] }}
+        records={[]}
+        names={[{ type: "employee", id: "e2", label: "Tobiloba Dada", link: null }]}
+        status="shown"
+        confirm="press"
+        onConfirm={() => undefined}
+      />,
+    );
+    expect(screen.getByText("Tobiloba Dada")).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(madeUp))).toBeNull();
+    expect(screen.getByText("Annual Holiday")).toBeInTheDocument();
+    expect(screen.getAllByText("Pick one")).toHaveLength(3);
   });
 
   it("once pressed, the result line sits under it with no buttons; expired offers Draw It Again; a refusal is an alert with its screen", async () => {
