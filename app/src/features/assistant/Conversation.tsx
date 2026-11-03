@@ -7,7 +7,7 @@ import type { AiAnswer, AiFeedbackValue, AiScreenContext, AiShows, AiTranscript 
 import { useRouter } from "@/lib/router";
 import { AnswerBubble, Button, DataView, EmptyState, ErrorState, Form, Icon, IconButton, InlineInput, LoadingRows, ProgressLine, QuestionBubble, SourceChip, TapList, toast, VoiceField, type DataViewColumn } from "@mycity/ui";
 import { AnswerCard } from "./Card";
-import { pickForSource, type PanePick } from "./Pane";
+import { paneHas, pickForSource, type PanePick } from "./Pane";
 
 /** Praxis AI's conversation (docs/guides/praxis-ai.md §10): what is asked, what came back, and the box. */
 
@@ -49,7 +49,7 @@ export interface ConversationProps {
   onGone: () => void;
   /** An answer landed: the parent refreshes Recent and History, and shows the answer's pane. */
   onAnswered: (answer: AiAnswer) => void;
-  /** A saved conversation opened: its latest answer, once, so desktop's pane shows it (§10.1). */
+  /** A saved conversation opened: its latest answer with something for the pane, once, so desktop's pane shows it (§10.1). */
   onLatest?: (answer: AiAnswer) => void;
   /** Shows an answer's pane (Open Figures, a source chip): the right pane on desktop, the sheet on a phone. */
   onPane?: (answer: AiAnswer, pick?: PanePick) => void;
@@ -125,7 +125,8 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
   }, [gone]);
 
   // A saved conversation opened (Recent, History, a reload): its latest answer goes up once, for the pane.
-  const latestSaved = turns.rows[0];
+  // The newest saved answer with something for the pane: a card drawn from what was said has nothing (§10.1).
+  const latestSaved = turns.rows.find((a) => a.ai_conversation_id === id && paneHas(a));
   useEffect(() => {
     if (!id || !latestSaved || latestSaved.ai_conversation_id !== id || latestFor.current === id) return;
     latestFor.current = id;

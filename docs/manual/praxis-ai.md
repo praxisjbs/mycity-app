@@ -80,8 +80,9 @@ conversations, and one opens full screen when you press it.
 
 ![The pane beside an answer](shot:praxis-pane)
 
-1. On a computer, the pane on the right fills with the newest answer, also when you open a
-   conversation from **Recent** or History. On a phone, press **Open Figures** under an answer with
+1. On a computer, the pane on the right fills with the newest answer that read your records, also
+   when you open a conversation from **Recent** or History. An answer that only draws a card leaves
+   it as it was. On a phone, press **Open Figures** under an answer with
    a table or figures. The pane opens as a sheet, **Figures**.
 2. **Overview** shows figures and a chart when an answer counted or summed something. Until an
    answer has figures, it is greyed out.

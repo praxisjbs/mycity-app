@@ -463,6 +463,29 @@ describe("The full screen: Back, the context and the pane", () => {
     expect(articles[0].getAttribute("aria-current")).toBeNull();
   });
 
+  it("an answer with nothing for the pane (a card drawn from what was said) leaves it on the last answer that read records, never blank (§10.1)", async () => {
+    const id = (n: number) => `00000000-0000-4000-8000-0000000000e${n}`;
+    const read = answer({ ai_message_id: id(1) });
+    const said = { table: null, link: null, reads: [], citations: [], citations_total: 0, sources: [], overview: null };
+    const cardOnly = answer({ ai_message_id: id(2), question: "Set this to annual leave then.", content: "Here is your leave request.", ...said });
+    m.turns[CONV] = [cardOnly, read];
+    m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
+    m.call.mockImplementation(async () => answer({ ai_message_id: id(3), question: "And Friday too.", content: "Here it is, Friday too.", ...said }));
+    ui("ask", CONV);
+    const pane = screen.getByRole("region", { name: "Pane" });
+    // Opened from Recent: the pane shows the answer that read records, not the card after it.
+    await waitFor(() => expect(screen.getAllByRole("article", { name: "Answer" })[0].getAttribute("aria-current")).toBe("true"));
+    expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+    // A new card with nothing to show leaves the pane where it was.
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask a Question" }), "And Friday too.");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Here it is, Friday too.");
+    const articles = screen.getAllByRole("article", { name: "Answer" });
+    expect(articles[0].getAttribute("aria-current")).toBe("true");
+    expect(articles[2].getAttribute("aria-current")).toBeNull();
+    expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+  });
+
   it("Open Figures sits only under an answer with a table or figures; a question shows its words and its answers alone (§10.1)", async () => {
     const id = (n: number) => `00000000-0000-4000-8000-0000000000b${n}`;
     const older = answer({ ai_message_id: id(1), question: "Whose leave waits on me?" });

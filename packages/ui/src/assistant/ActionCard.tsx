@@ -127,19 +127,27 @@ export function verbOf(label: string, fields: CardField[], values: Record<string
   return count > 1 ? `${base} ×${count}` : base;
 }
 
+/** An id field, or a list of ids: read only by the names a card knows, and picked on Edit. */
+const idsOf = (f: CardField) => f.kind === "id" || (f.kind === "list" && /_ids?$/.test(f.name));
+
 /** A record's id as the API carries it: a card never prints one (docs/guides/praxis-ai.md decision 32). */
 const RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** A value as the person reads it, from the field's kind; the names and records name an id, and an id nothing names reads as nothing, its field's problem alone. */
+/**
+ * A value as the person reads it, from the field's kind. An id field reads only as the names and
+ * records name it: an id nothing names, or words the model wrote where an id belongs, read as
+ * nothing, the field's problem alone (decision 32).
+ */
 function shown(f: CardField, value: unknown, known: CardRecord[]): string | null {
   if (isBlank(value)) return null;
-  const nameOf = (id: unknown): string | null => known.find((r) => r.id === String(id))?.label ?? (RECORD_ID.test(asString(id)) ? null : asString(id));
+  const nameOf = (id: unknown): string | null => known.find((r) => r.id === String(id))?.label ?? null;
+  const plainOf = (v: unknown): string | null => (RECORD_ID.test(asString(v)) ? null : asString(v));
   switch (f.kind) {
     case "id":
       return nameOf(value);
     case "list": {
-      if (!Array.isArray(value)) return asString(value);
-      const read = value.map((v) => (typeof v === "string" ? nameOf(v) : asString(v))).filter((v): v is string => Boolean(v));
+      if (!Array.isArray(value)) return idsOf(f) ? null : plainOf(value);
+      const read = value.map((v) => (idsOf(f) ? nameOf(v) : (known.find((r) => r.id === String(v))?.label ?? plainOf(v)))).filter((v): v is string => Boolean(v));
       return read.length ? read.join(", ") : null;
     }
     case "date":
@@ -159,8 +167,6 @@ function shown(f: CardField, value: unknown, known: CardRecord[]): string | null
 
 /** Fields the card lists: those with a value, those with a problem, and the required ones. */
 const listed = (fields: CardField[], values: Record<string, unknown>, problems: Record<string, string[]>) => fields.filter((f) => !isBlank(values[f.name]) || problems[f.name]?.length || f.required);
-
-const idsOf = (f: CardField) => f.kind === "id" || (f.kind === "list" && /_ids?$/.test(f.name));
 
 export function ActionCard({ label, fields, values, problems, records, names = [], picker, status, confirm, suggested = false, result = null, schema, onConfirm, onCancel, onSave, onRedraw, onOpen, problem = null, problemAction = null, className }: ActionCardProps) {
   const [editing, setEditing] = useState(false);

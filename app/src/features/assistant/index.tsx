@@ -12,7 +12,7 @@ import { saveExport } from "@/api/exports";
 import { BarsCard } from "@/features/shared/sections";
 import { Conversation } from "./Conversation";
 import { contextOf, fromLabel, useBackTo } from "./context";
-import { AnswerPane, PhonePane, usePane } from "./Pane";
+import { AnswerPane, paneHas, PhonePane, usePane } from "./Pane";
 import { ChatList, ChatPage } from "./PhoneChat";
 import {
   AreaChart,
@@ -98,7 +98,8 @@ function AskDesktop({ id, from }: { id: string | null; from: string | null }) {
     (a: AiAnswer) => {
       void reloadRecent();
       void refresh("/api/v1/ai/history");
-      show(a);
+      // An answer with nothing for the pane (a card drawn from what was said) leaves it as it was, never blank.
+      if (paneHas(a)) show(a);
     },
     [reloadRecent, show],
   );

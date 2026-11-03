@@ -206,6 +206,9 @@ describe("cards (engine/cards.js)", () => {
     expect(bad.values).toEqual({ title: "" });
     expect(bad.problems).toEqual({ title: ["At least 1 character"] });
     expect(bad.suggested).toBe(true);
+    // What the check matched (a person written by name, now their id) stays while another field has a problem (decision 32).
+    const matched = cards.draft({ action, fieldNames, values: { title: "", primary_assignee_id: "Ada Obi", bogus: 1 }, checked: { ok: false, values: { title: "", primary_assignee_id: "e1", bogus: 1 }, problems: { title: ["At least 1 character"] }, records: [] }, now });
+    expect(matched.values).toEqual({ title: "", primary_assignee_id: "e1" });
   });
 
   test("the four sensitive classes need a fresh sign-in within five minutes; standard needs a press", () => {

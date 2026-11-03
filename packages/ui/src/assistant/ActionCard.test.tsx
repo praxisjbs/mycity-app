@@ -90,18 +90,19 @@ describe("ActionCard", () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ watcher_ids: ["e2", "e3", "e4"] })));
   });
 
-  it("never prints an id: a list reads only the names it has, and a word that is not an id still reads as written", () => {
+  it("never prints an id: a list of ids reads only the names it has, an id field never the model's own words; a list of addresses reads as written", () => {
     const listFields: CardField[] = [
       { name: "watcher_ids", label: "Watchers", kind: "list", required: false, options: null, long: false, picks: "colleague" },
       { name: "attendee_ids", label: "Attendees", kind: "list", required: false, options: null, long: false, picks: "colleague" },
       { name: "leave_type_id", label: "Leave Type", kind: "id", required: true, options: null, long: false, picks: "leave_type" },
+      { name: "to_addresses", label: "To", kind: "list", required: true, options: null, long: false },
     ];
     const madeUp = "0d663c19-94bc-4ce9-93ef-95db8c56fa76";
     render(
       <ActionCard
         label="Create Task"
         fields={listFields}
-        values={{ watcher_ids: ["e2", madeUp], attendee_ids: [madeUp], leave_type_id: "Annual Holiday" }}
+        values={{ watcher_ids: ["e2", madeUp], attendee_ids: [madeUp], leave_type_id: "Annual Leave", to_addresses: ["ada@partner.test"] }}
         problems={{ watcher_ids: ["Pick one"], attendee_ids: ["Pick one"], leave_type_id: ["Pick one"] }}
         records={[]}
         names={[{ type: "employee", id: "e2", label: "Tobiloba Dada", link: null }]}
@@ -112,8 +113,10 @@ describe("ActionCard", () => {
     );
     expect(screen.getByText("Tobiloba Dada")).toBeInTheDocument();
     expect(screen.queryByText(new RegExp(madeUp))).toBeNull();
-    expect(screen.getByText("Annual Holiday")).toBeInTheDocument();
+    // As on staging: words where an id belongs ("Annual Leave", never matched) read as nothing, never as if named.
+    expect(screen.queryByText("Annual Leave")).toBeNull();
     expect(screen.getAllByText("Pick one")).toHaveLength(3);
+    expect(screen.getByText("ada@partner.test")).toBeInTheDocument();
   });
 
   it("once pressed, the result line sits under it with no buttons; expired offers Draw It Again; a refusal is an alert with its screen", async () => {

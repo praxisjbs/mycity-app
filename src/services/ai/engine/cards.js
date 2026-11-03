@@ -147,7 +147,9 @@ function nextAsk(action, values, asked = [], { today = null } = {}) {
 function draft({ action, fieldNames, values, suggested = false, checked, now = Date.now() }) {
   const known = new Set(fieldNames);
   const kept = {};
-  for (const [k, v] of Object.entries(values && typeof values === "object" ? values : {})) if (known.has(k) && v !== undefined) kept[k] = v;
+  // What the check matched (a leave type written by name, now its id) is kept even when another field has a problem.
+  const source = checked && checked.values && typeof checked.values === "object" ? checked.values : values;
+  for (const [k, v] of Object.entries(source && typeof source === "object" ? source : {})) if (known.has(k) && v !== undefined) kept[k] = v;
   return {
     action_key: action.key,
     risk: action.risk,
