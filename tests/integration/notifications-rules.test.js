@@ -303,11 +303,14 @@ describeDb("Settings · Notifications, reminders, the digest and quiet hours", (
       const moved = await one("SELECT every_minutes FROM reminder WHERE entity_id = $1", [inst.workflow_instance_id]);
       expect(moved.every_minutes).toBe(240);
       const bola = { user_id: userOf("bola"), employee_id: employeeOf("bola"), is_ceo: false, role_ids: [] };
+      const firedBefore = (await one("SELECT fired_count FROM reminder WHERE entity_id = $1", [inst.workflow_instance_id])).fired_count;
       await tx((c) => engine.act(c, { instance_id: inst.workflow_instance_id, actor: bola, decision: "approve" }));
-      // The new interval counts from the real clock, so the next tick is the next working minute.
+      // The new interval counts from the real clock, so the next tick is the next working minute. Other
+      // reminders may be due by then (each person's commitments at 09:00 on a working day), so only this
+      // approval's own reminder is held to it: ended, and never fired again.
       const next = reminders.inWorkHours(new Date(Date.now() + 5 * 60 * 1000));
-      expect(await reminders.tick({ now: next })).toMatchObject({ fired: 0, finished: 1 });
-      expect(await one("SELECT state FROM reminder WHERE entity_id = $1", [inst.workflow_instance_id])).toEqual({ state: "done" });
+      expect((await reminders.tick({ now: next })).finished).toBeGreaterThanOrEqual(1);
+      expect(await one("SELECT state, fired_count FROM reminder WHERE entity_id = $1", [inst.workflow_instance_id])).toEqual({ state: "done", fired_count: firedBefore });
     });
 
     test("Probation Ending: at 09:00 once per date, to People; a new date reminds again; never once confirmed", async () => {
