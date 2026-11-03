@@ -29,6 +29,7 @@ const lagos = require("../../shared/time/lagos");
 const transcription = require("../../services/ai/transcription");
 
 const STUB_TRANSCRIPT = transcription.STUB_TEXT;
+const { oneNamed } = require("../../shared/ai/named");
 const repo = require("./community.repo");
 const { EVENTS } = require("./community.events");
 const { noteFor } = require("./community.recognition");
@@ -1250,6 +1251,27 @@ async function sendDirect(employeeId, body, user) {
   return postMessage(channelId, { message_type: "text", body }, user);
 }
 
+/**
+ * A colleague's login named by their words (praxis-ai.md decision 34): among the directory's people
+ * with a login, the caller too, searched by the words first; null when none or several match.
+ */
+async function loginNamed(userId, words) {
+  for (const q of [words, null]) {
+    const page = await repo.listColleagues(pool, { page: 1, q: q || null, with_self: true }, userId);
+    const found = oneNamed(page.data, words, (r) => [r.person.display_name]);
+    if (found) {
+      const p = await repo.profile(pool, found.person.employee_id);
+      return (p && p.user_id) || null;
+    }
+  }
+  return null;
+}
+
+/** Logins as a card names them: each user id with its person's name. */
+async function loginNames(db, userIds) {
+  return (await repo.loginNames(db, [...new Set(userIds || [])].slice(0, 50))).map((r) => ({ type: "user", id: r.user_id, label: r.name }));
+}
+
 /** The colleagues a card names, by name; an id that is nobody's keeps its id alone. */
 async function colleagueRecords(db, ids) {
   const people = await repo.people(db, [...new Set(ids || [])].slice(0, 25));
@@ -1542,6 +1564,8 @@ module.exports = {
   openDirect,
   sendDirect,
   colleagueRecords,
+  loginNamed,
+  loginNames,
   channelRecords,
   assertColleague,
   assertMayPost,

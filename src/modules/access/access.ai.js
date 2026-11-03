@@ -12,6 +12,10 @@ const service = require("./access.service");
 
 module.exports = defineManifest({
   module: "settings",
+  // A role's grants are designed with the whole matrix in view, never from the chat (praxis-ai.md decision 35).
+  not_offered: {
+    RoleSave: "design: a role's grants, visible fields and authorities are designed on Roles and Permissions with the whole matrix in view, so who may do what never changes from the chat",
+  },
   reads: [
     {
       key: "roles.list",

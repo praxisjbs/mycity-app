@@ -985,6 +985,18 @@ function listColleagues(db, query, userId) {
   );
 }
 
+/** Logins by their people's names, for a card that names who receives something (praxis-ai.md §6.11). */
+async function loginNames(db, userIds) {
+  if (!userIds || !userIds.length) return [];
+  const { rows } = await db.query(
+    `SELECT u.user_id, btrim(e.first_name || ' ' || e.last_name) AS name
+       FROM app_user u JOIN employee e ON e.employee_id = u.employee_id
+      WHERE u.user_id = ANY($1::uuid[])`,
+    [userIds],
+  );
+  return rows;
+}
+
 /** A colleague's public work details (no restricted field): the profile panel. */
 function profile(db, employeeId) {
   return one(
@@ -1152,6 +1164,7 @@ module.exports = {
   insertRecognition,
   touchPresence,
   listColleagues,
+  loginNames,
   profile,
   shared,
   channelsInCommon,

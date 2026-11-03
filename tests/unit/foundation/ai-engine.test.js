@@ -180,6 +180,9 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     const refused = (over) => () => defineManifest({ module: "workspace", actions: [{ ...ACTION, ...over }] });
     expect(refused({ capability: "workspace.everything" })).toThrow(/capability is a code in shared\/access\/access\.catalog\.js/);
     expect(refused({ capability: ["workspace.late_reasons"] })).toThrow(/capability is a code/);
+    // A route that asks only view and a capability (Home's alert rules): view stands with the capability, never alone.
+    expect(defineManifest({ module: "workspace", actions: [{ ...ACTION, permission: ["workspace", "view"], capability: "workspace.late_reasons" }] }).actions[0].permission).toEqual(["workspace", "view"]);
+    expect(refused({ permission: ["workspace", "view"] })).toThrow(/an action needs/);
     expect(c.assistant.AiCardPicks.options).toContain("task");
     expect(defineManifest({ module: "workspace", actions: [{ ...ACTION, picks: { project_id: "task" } }] }).actions[0].picks).toEqual({ project_id: "task" });
   });
@@ -235,7 +238,7 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     // A via naming no action, and a reason with no never word, account for nothing.
     expect(awareness.formsAccountedFor({ forms: [form("TaskMoveCreate", { reason: "via tasks.move: the board" })], actionKeys, gaps: {}, baseGaps: null }).problems).toEqual([expect.stringMatching(/via tasks\.move, which no manifest declares/)]);
     expect(awareness.formsAccountedFor({ forms: [form("TaskLinkCreate", { reason: "dangerous: links" })], actionKeys, gaps: {}, baseGaps: null }).problems[0]).toMatch(/not in the chat/);
-    expect(awareness.NEVER).toEqual(["secret", "device", "personal", "file", "ai"]);
+    expect(awareness.NEVER).toEqual(["secret", "device", "personal", "file", "ai", "design"]);
     expect(awareness.reasonOf("personal: a home location")).toEqual({ kind: "never", word: "personal" });
     expect(awareness.reasonOf("via mail.send: the composer's own")).toEqual({ kind: "via", key: "mail.send" });
     expect(awareness.FORM_SCHEMA.test("HolidaySave") && awareness.FORM_SCHEMA.test("OrganisationPatch") && !awareness.FORM_SCHEMA.test("TaskComplete")).toBe(true);

@@ -1,5 +1,4 @@
 "use strict";
-// ai:none a stack trace is engineering detail; the assistant answering a member of staff from one would mislead them
 // search:none faults are found on Settings · System Health with its filters, not by name: a fingerprint is not a word anybody types
 /**
  * System Health's HTTP edge. Everything here is behind `system_health`, which only the

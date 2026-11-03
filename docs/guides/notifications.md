@@ -396,7 +396,16 @@ No restricted fields. A notice whose record the reader may not open, on its scre
 
 ## 9 · AI and search
 
-- **AI reads**: none (`ai:none`): a person's notices are about other records, which their own modules answer.
+- **AI reads**: none: a person's notices are about other records, which their own modules answer.
+- **AI actions** (`notifications.ai.js`, `docs/guides/praxis-ai.md` §6.11, decision 33): cards the
+  person confirms, each the screen's own service function. A person's own, under `ess` edit as the
+  bell's Settings are anyone's: Save Notice Setting (`notices.preference`, a kind by its name, a
+  channel, on or off), Save Quiet Hours (`notices.quiet_hours`, `QuietHoursChange`, the rest kept) and
+  Save Digest (`notices.digest`). The company's, under `settings` edit: Save Notice Rule
+  (`notice_rules.edit`, `NotificationRuleChange`: the notice by its name, `rules.keyOf`, what changes,
+  the rest kept as `rules.one` reads it) and Save Reminders (`notice_reminders.edit`,
+  `NotificationRemindersChange`, each setting by its own name). A browser's push subscription is
+  `device` and never in the chat.
 - **AI routes**: none.
 - **Search**: no record type (`search:none` on the controller): a notice's rule is a setting, not a
   record. ⌘K actions: Notification Settings, Turn On Notifications, Send Test Notification, Mark All
@@ -528,6 +537,7 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Notifications' forms in the chat (`praxis-ai.md` decision 33): a person's own notice setting, quiet hours and digest, and the company's notice rules and reminders, as Praxis AI cards (`notifications.ai.js`; `rules.one`, `keyOf`, `names`); the controller's `ai:none` gives way to the manifest, which still reads nothing; the push subscription is `device` (§9). No screen changed.
 - 02/11/2026 · JP · §6, §11: the fan-out's `include_actor` may be a function `(event, db)`, true or false, besides a boolean. The engine's **Approval needed** (`workflow.opened`) uses it to tell the CEO of a request they opened themself, since the CEO is the one person who may decide their own (`approvers.canAct`) and the request is on their Waiting On You; before, it was dropped with every other notice about the person's own action, and a CEO's own request reached them only as the 3 day reminder (found in Performance's target changes, `docs/guides/performance.md` §6.7). Anyone else who opens something waiting on a role they hold is still not told. No migration, no screen change.
 
 - 26/10/2026 · JP · Where it waits, inside a tab (JBS Praxis, the QA register's Worksites 2 with neither Permanent nor Temporary marked): `GET /notifications/views` counts a screen's unread notices by the inner view each record sits in, as its module places it (`<module>.views.js`, `shared/notifications/views.js`); the screens' switches, chips and board columns carry their share and open where the news is (§2, §3 step 7, §5, §6, §10). The numbers stay unread notices, as on the tab.

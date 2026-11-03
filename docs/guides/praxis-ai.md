@@ -170,7 +170,7 @@ reachable from the chat; the gate's shape was put to the owner first and approve
     edit form of a built module, its contract's `<Thing>Create`, `Edit`, `Update`, `Patch` and
     `Save` schemas, is an action Praxis AI drafts as a card; or is reached through another action's
     card (`via <action>`: the chat box's message through `community.message`); or is never in the
-    chat, for one of five reasons: `secret` (passwords, PINs, passkeys, keys, connections and the
+    chat, for one of five reasons (six since decision 35, `design`): `secret` (passwords, PINs, passkeys, keys, connections and the
     security policy), `device` (made on the person's own device at the site), `personal` (personal
     data the assistant never writes), `file` (an upload) or `ai` (the AI's own controls). The forms
     not in the chat on 03/11/2026 are listed in `scripts/check/ai-forms-gaps.json`, and that list
@@ -190,6 +190,19 @@ fields, so we never see an error. We can add a gate for that.").
     answers and matched by their words. So a card is pressed as it is drawn: a problem left on it is
     one the person made by editing it, never one nobody asked about. Gate 23 holds it (§6.15
     rule 7): every required field of every action's input has an ask.
+
+### 1.7 Decisions (JBS Praxis, 03/11/2026, binding): a structure is designed on its screen
+
+Put to the owner with a recommendation first when Home and Settings came into the chat ("go ahead
+with Home and Settings"): four forms edit a whole structure, and none of decision 33's five reasons
+fit them.
+
+35. **A structure is designed on its own screen** (amends decision 33). A form that edits a whole
+    structure with all of it in view is never in the chat, for a sixth reason, `design`: a role's
+    grants (Save Role, so who may do what never changes from the chat), an approval chain's stages
+    and approvers (New Approval Flow, Edit Approval Steps) and the Home cards each role sees and
+    locks (Save Home Role KPIs). Praxis AI opens the screen, where the person saves it with its
+    own button. Gate 23 reads `design:` as it reads the other five words (§6.15 rule 6).
 
 ## 2 · Screens affected
 
@@ -659,7 +672,13 @@ with the record named in its first field and as its chip; nothing left out of th
 cleared. **An action held to a capability** (`capability`), as its screen's route holds it on top of
 the grant (`requireCapability`: Late Reasons' `workspace.late_reasons`), is offered only to a person
 who holds it, the CEO holding every one, and `authorise.checkAction` refuses it to anyone else, at
-the draft and at the press, as the route would.
+the draft and at the press, as the route would. An action's grant is never `view`, unless it names a
+capability: a route that asks only `view` and a capability (Home's alert rules, `alerts.manage`;
+Home's reports, `home.reports`) is mirrored exactly, the capability being the authority. **A card
+that changes part of something saved whole** (a numbering scheme, the working week, the company's
+reminders, System Health's targets, a notice's rule) lays what it gives over what is saved and holds
+the result to the screen form's own schema before the service saves it (`shared/ai/change.js`), so
+the service saves what that form would have sent and a problem comes back on its field.
 
 **What a card carries and names (decision 31).** `fields` lists the input's fields the card carries,
 in the order it shows them; a value for any other field is dropped before the schema parses it
@@ -734,6 +753,15 @@ open with the reason.
 | `calendar.create` | `workspace` create, standard | `CalendarEventCreate` (joined from New Event's day and times); asks what it is about, when, how long (30 Minutes, 1 Hour, 2 Hours) and who comes (Just Me) | none: it makes one event; the attendees are named | someone not on the staff refused on the field | `calendar.service.create` |
 | `calendar.edit` (Save Event) | `workspace` edit, standard | `CalendarEventChange` (Edit Event's `CalendarEventEdit` with the event, its day and times joined as New Event's are): the title, start and end, attendees, kind, location, visibility, notes, reminders; only what changes | the event, by its title; the attendees named | the person made it, and it is not called off; someone not on the staff refused on the field | `calendar.service.edit` |
 | `week.support` (Save Support Needed) | `workspace` edit (the screen's route asks `workspace` view; an action's grant is never view), standard | `WeekSave` (Write Support Needed's form): the week (any day in it, or this, next or last week, as its Monday) and the line; Tidy With AI's summary stays on the screen; asks the line ("What support do you need?") | none: the person's own week | an employee | `workspace.service.save` |
+| `organisation.edit` (Save Organisation) | `settings` edit, standard | `OrganisationPatch` (Organisation's form): the legal and trading names, registration number, tax id, phone, email, website; never the address, picked on the map (F27) | none | Settings' own rules | `settings.service.updateOrganisation` |
+| `holidays.add` (Add Holiday), `holidays.edit` (Save Holiday) | `settings` create, edit, standard | `HolidaySave` (Add Holiday's form); `HolidayChange`: the holiday (from `holidays.list`, by its name), its day or name, the rest kept | the holiday, by name and day | no two on one day | `addHoliday`, `updateHoliday` |
+| `working_week.day` (Save Working Day) | `settings` edit, standard | `WorkingDayChange`: the day by name, worked or not, its hours; the other six kept, then held to `WorkingWeekSave` | none | at least one day worked, ends after it starts | `settings.service.saveWeek` |
+| `numbering.edit` (Save Numbering) | `settings` edit, standard | `NumberingSchemeChange`: the document (from `numbering.list`, by its name), its prefix, digits, separator, restart, period; the rest kept, then held to `NumberingSchemeSave` | none | the scheme's own rules | `settings.service.saveScheme` |
+| `notices.preference` (Save Notice Setting), `notices.quiet_hours` (Save Quiet Hours), `notices.digest` (Save Digest) | `ess` edit (the person's own, as the bell's Settings), standard | `NotificationPreferenceUpdate` (a kind by its name, a channel, on or off); `QuietHoursChange` (the rest kept, held to `QuietHoursUpdate`); `DigestUpdate` | none | a locked kind stays on | `setPreference`, `setQuietHours`, `setDigest` |
+| `notice_rules.edit` (Save Notice Rule), `notice_reminders.edit` (Save Reminders) | `settings` edit, standard | `NotificationRuleChange` (the notice by its name, what changes, the rest kept); `NotificationRemindersChange` (each setting by its own name, the rest kept) | the notice | a security notice stays on; a notice for one person takes no copies | `notifications.rules.save`, `saveReminders` |
+| `health_targets.edit` (Save Targets), `faults.edit` (Save Fault), `faults.note` (Add Note) | `system_health` edit, standard | `PerformanceTargetsChange` (the rest kept, held to `PerformanceTargetsUpdate`); `FaultChange` (the fault by its title, its status and a note; who holds it stays on the fault's sheet); `FaultNoteAdd` | the fault, by its title | the levels in order | `targets.save`, `patch`, `addNote` |
+| `alert_rules.create` (Create Alert Rule), `alert_rules.edit` (Save Alert Rule) | `home` view and the `alerts.manage` capability, standard | `HomeAlertRuleCreate` (asks the name, the metric, the number, the severity, and who clears it, "Its Own Default" being the metric's); `HomeAlertRuleChange` (the rule by its name, what changes) | the rule | the metric's own rules | `alerts.service.createRule`, `updateRule` |
+| `reports.create` (Create Report), `reports.edit` (Save Report), `reports.schedule` (Schedule Report) | `home` view and the `home.reports` capability, standard | `HomeReportCreate` (its name, type and sharing; filters stay on the report's form); `HomeReportChange` (the report from `reports.mine`, by its name); `HomeReportScheduleChange` (how often, the days, the time, the formats, who receives it, "Just Me" or by name), held to `HomeReportScheduleSave` | the people receiving it named | recipients who may receive it | `reports.service.create`, `update` |
 | `my_leave.request` | `ess` create, standard | `LeaveRequestCreate` (Request Leave's form): the leave type (named, picked with Request Leave's own list, matched by name when the model writes one), the first and last day, the note; asks which type ("Which leave type?") with the person's types and the days left of each | none: the person's own | an employee; the type, the days and the year's allowance are the service's | `leave.service.request` |
 | `leave.approve`, `leave.reject` | `people` approve, **approval**, up to 25 | `LeaveApprove`, `LeaveReject` (a reason, required to reject) | the requests: who, the type, the days | every request in the person's `people` scope; then each waiting and named on its stage, never their own, as a line | the approval's own `decide()` per request |
 | `approvals.decide` | `ess` create (the queue is the person's own), **approval**, up to 25 | `ApprovalDecide`: the requests, approve, reject or request changes, a reason (required but to approve) | the requests: the flow and who it is about | every request the person may read; then each pending, the stage naming them, `approve` held on its module, never their own; one decided on its record refused with that record's screen on its line | `workflow.service.decide` per request |
@@ -915,7 +943,7 @@ PR there.
 6. a create or edit form is not in the chat (decision 33): a `<Thing>Create`, `Edit`, `Update`,
    `Patch` or `Save` schema of a built module's contract that is no action's input, whose module's
    `not_offered` reason does not start with `via <action key>:` (an action that exists) or one of
-   the never words `secret:`, `device:`, `personal:`, `file:`, `ai:` (or, for a module opted out
+   the never words `secret:`, `device:`, `personal:`, `file:`, `ai:`, `design:` (or, for a module opted out
    whole, whose `// ai:none` reason does not start with one), and that is not on the list of gaps,
    `scripts/check/ai-forms-gaps.json`. The list only shrinks: an entry now offered, reached or
    never, or naming no schema of a built module, fails until it is taken off, and an entry the
@@ -1225,6 +1253,17 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Home and Settings in the chat (decisions 33 and 35; "go ahead with Home and
+  Settings", JBS Praxis): eighteen cards (§6.11's table), each the screen's own service function: the
+  organisation's details (never its address), a holiday added and changed, one working day, a
+  numbering scheme; a person's own notice settings, quiet hours and digest; the company's notice rules
+  and reminders; System Health's targets, a fault's status and a note; Home's alert rules (made and
+  changed) and reports (built, renamed and scheduled). A card changing part of something saved whole
+  lays its change over what is saved and holds it to the form's own schema (`shared/ai/change.js`). An
+  action may take `view` with a capability, mirroring a route that asks only those (alert rules,
+  reports). Decision 35: a structure designed with the whole of it in view is never in the chat,
+  `design` (a role's grants, an approval flow and its steps, a role's Home cards); a browser's push
+  subscription is `device`. 22 forms off the gaps list (57 left). §1.7, §6.11.
 - 03/11/2026 · JP · A card is drawn whole (§1.6 decision 34, JBS Praxis, after a task shared with a
   department was drawn without its lead and refused with Pick a lead): every field an action's input
   requires is asked before its card is drawn, gate 23 rule 7 (§6.15) holding it; an ask takes

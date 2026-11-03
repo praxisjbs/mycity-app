@@ -167,8 +167,11 @@ task (adding one or ticking it), a task that waits on another, a project and a c
 meeting and a change to one you made, your week's Support Needed line, your own leave request, the
 leave and other requests waiting on you, a message to a colleague, a post in a channel and a mail
 from your mailbox. If you keep Late Reasons, it also adds a late reason or switches one off or on.
-For other changes, such as a new role, it opens the screen or a filled form: press that screen's
-own button to save.
+It also changes your own notice settings, quiet hours and daily digest. If your role allows, it
+changes Settings (the organisation's details, a holiday, a working day, a numbering), the
+company's notice rules and reminders, System Health's targets and faults, alert rules and reports.
+A role's permissions, an approval flow and the cards a role sees on Home are designed on their own
+screens: it opens the screen, and you save there with its own button.
 
 - A card that changes something, such as **Save Task**, **Save Project** or **Save Event**, names
   it first and shows only what changes. Anything it leaves out stays as it is.

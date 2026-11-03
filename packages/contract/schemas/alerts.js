@@ -14,7 +14,7 @@
  * from its metric and name, so nobody types one.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { ACTIONS } = require("./identity");
 
 const count = z.number().int().min(0);
@@ -275,6 +275,20 @@ const HomeAlertRuleUpdate = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
 
+/** An alert rule changed from the chat (docs/guides/praxis-ai.md §6.11): the rule beside Edit Rule's fields, only what changes. */
+const HomeAlertRuleChange = z
+  .object({
+    home_alert_rule_id: recordId("rule"),
+    name: text(80).optional(),
+    threshold: threshold.optional(),
+    window_days: windowDays.optional(),
+    severity: HomeAlertSeverity.optional(),
+    permission_key: PermissionKey.optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["home_alert_rule_id"]), nothingOn("home_alert_rule_id"));
+
 /**
  * GET /home/alert-rules/policy: the Attendance policy's five consequence rules, read only, as the
  * version in force today sets them. `figures` is the rule in words ("3 late arrivals in a month or 5
@@ -338,6 +352,7 @@ const TABLES = {
   HomeAlertRulePage: { table: null, reason: "a page of alert rules" },
   HomeAlertRuleCreate: { table: "home_alert_rule" },
   HomeAlertRuleUpdate: { table: "home_alert_rule" },
+  HomeAlertRuleChange: { table: "home_alert_rule" },
   HomeAlertPolicyRules: {
     table: null,
     reason: "the Attendance policy's consequence rules in force today, from its version, with their open alerts",
@@ -368,5 +383,6 @@ module.exports = {
   HomeAlertRulePage,
   HomeAlertRuleCreate,
   HomeAlertRuleUpdate,
+  HomeAlertRuleChange,
   HomeAlertPolicyRules,
 };

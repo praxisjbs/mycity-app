@@ -630,6 +630,7 @@ fields, never in a toast.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · `community.service.loginNamed` and `loginNames` (a colleague's login by name, and logins named) for Praxis AI's Schedule Report card, whose recipients are logins (`praxis-ai.md` §6.11). No screen of Staff Community changed.
 - 03/11/2026 · JP · Praxis AI's Send Message and Post Message cards ask what they need before they are drawn (`praxis-ai.md` decision 34): who it is for (the directory, `colleagues.list`, to tap; a name matched there), which channel (the person's own channels, `channels.list`) and the words. No screen of Staff Community changed.
 - 03/11/2026 · JP · `community.ai.js`: the chat box's own message and a new direct conversation are reached `via community.message` (`praxis-ai.md` decision 33); channels, recognitions, wishes and editing a message are on the list of forms to bring into the chat (`scripts/check/ai-forms-gaps.json`). No behaviour changed.
 - 01/11/2026 · JP · §9: `colleagues.list`, Staff Community's colleague directory for Praxis AI (anyone with a login by name, job title and department, through the module's own repo), so a watcher, a guest or a colleague is named for a person without the People grant (`praxis-ai.md` decision 29). Nothing on screen changes.

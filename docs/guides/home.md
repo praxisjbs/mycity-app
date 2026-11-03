@@ -661,8 +661,15 @@ never reaches Home.
   - `reports.ai.js` · `reports.mine` (`HomeReportQuery`): the reports the asker owns or receives;
     `runs.mine` (`HomeReportRunQuery`): the files the asker received, newest first; both empty
     without `home.reports`.
-  Nothing write-like: the assistant never clears an alert, edits a rule, runs a report or saves
-  cards (A23). Manifests declare reads and screen routes only.
+  Clearing an alert and running a report stay on their tabs.
+- **AI actions** (`docs/guides/praxis-ai.md` §6.11, decision 33): cards the person confirms, each the
+  screen's own service function, under Home view and the capability the route asks: Create Alert Rule
+  and Save Alert Rule (`alerts.ai.js`, `alerts.manage`; `HomeAlertRuleCreate`, who clears it the
+  metric's own when the person says so; `HomeAlertRuleChange`, the rule by its name), Create Report,
+  Save Report and Schedule Report (`reports.ai.js`, `home.reports`; a report's filters stay on its own
+  form; the schedule as a person says it, its recipients by name or "Just Me",
+  `community.service.loginNamed`). The cards each role's Home opens on and locks are `design`
+  (`praxis-ai.md` decision 35) and never in the chat.
 - **AI routes**: "see open alerts" → `home.alerts`, and "see attendance alerts" (one per category)
   → `home.alerts` with that category; "change the rules that raise alerts" → `home.alerts`; "open a report", "build, schedule or run a report" and "see the report files sent to me" →
   `home.reports`; "see who is in" → `people.attendance`; "see my team's attendance" →
@@ -845,6 +852,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Home's forms in the chat (`praxis-ai.md` decisions 33 and 35): alert rules made and changed, reports built, renamed and scheduled, as Praxis AI cards held to `alerts.manage` and `home.reports` as their routes are; a role's Home cards are `design`, never in the chat (§9). No screen changed.
 - 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.15, §6.17): `team.today` and `activity.list` carry matrix probes (a report of the asker's on the roster for a reader who may open the Team tab, their arrival on Activity Today for a reader with a `people` grant, an outsider never); `alerts.ai.js` and `reports.ai.js` account for their Create schemas in `not_offered` (a rule is set on Alerts with its threshold in view, a report is built on Reports with its sources and schedule in view).
 - 28/10/2026 · JP · Team's Department filter and a report's Department and Leave Type read their lists 25 at a time and load the next page as the menu nears its end (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18); they look as before.
 - 27/10/2026 · AJ · A policy breach's alert no longer reads Query Due and is raised only with Alert

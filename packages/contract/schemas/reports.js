@@ -17,7 +17,7 @@
  * own figures (docs/guides/workspace.md §6).
  */
 const { z } = require("zod");
-const { uuid, text, isoDate, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, isoDate, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { TimeOfDay } = require("./settings");
 const { LeaveStatus } = require("./leave");
 const { HomeRosterStatus } = require("./dashboard");
@@ -297,6 +297,39 @@ const HomeReportUpdate = z
   .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" })
   .superRefine((v, ctx) => rosterDayFits(v.filters, ctx));
 
+/*
+ * Praxis AI's cards for Reports (docs/guides/praxis-ai.md §6.11, decision 33): a report's name and
+ * sharing beside the report; and its schedule as a person says it (how often, which day, the time,
+ * the formats, who receives it), which the service writes as Edit Report's schedule. Filters stay
+ * on the report's own form, where each report type shows its own.
+ */
+const HomeReportChange = z
+  .object({ saved_report_id: recordId("report"), name: text(80).optional(), shared: z.boolean().optional() })
+  .strict()
+  .refine(changesBeside(["saved_report_id"]), nothingOn("saved_report_id"));
+
+const HomeReportScheduleChange = z
+  .object({
+    saved_report_id: recordId("report"),
+    freq: z.enum(["daily", "weekly", "monthly"]),
+    by_weekday: z.array(z.number().int().min(1).max(7)).min(1, "Pick a day").max(7).refine(distinct, "Each day once").optional(),
+    by_month_day: z.number().int().min(-1).max(31).refine((d) => d !== 0, "1 to 31, or last").optional(),
+    working_days_only: z.boolean().optional(),
+    starts_on: isoDate.optional(),
+    run_time: TimeOfDay,
+    formats: z.array(HomeReportFormat).min(1, "Pick a format").max(HOME_REPORT_FORMATS.length).refine(distinct, "Each format once"),
+    recipient_user_ids: z
+      .array(uuid)
+      .min(1, "Add a recipient")
+      .max(HOME_REPORT_MAX_RECIPIENTS, `Up to ${HOME_REPORT_MAX_RECIPIENTS} people`)
+      .refine(distinct, "Each person once"),
+  })
+  .strict()
+  .superRefine((r, ctx) => {
+    if (r.by_weekday !== undefined && r.freq !== "weekly") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["by_weekday"], message: "Weekly only" });
+    if (r.by_month_day !== undefined && r.freq !== "monthly") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["by_month_day"], message: "Monthly only" });
+  });
+
 /** PATCH /home/reports/:id/schedule: Pause or Resume. */
 const HomeReportScheduleState = z.object({ active: z.boolean() }).strict();
 
@@ -469,6 +502,17 @@ const TABLES = {
   HomeReportQuery: { table: null, reason: "list controls and the report list's filters" },
   HomeReportPage: { table: null, reason: "a page of reports" },
   HomeReportScheduleSave: { table: "report_schedule" },
+  HomeReportChange: { table: "saved_report" },
+  HomeReportScheduleChange: {
+    table: "report_schedule",
+    virtual: {
+      saved_report_id: "the report the schedule belongs to (report_schedule.saved_report_id)",
+      freq: "written to report_schedule.recurrence",
+      by_weekday: "written to report_schedule.recurrence",
+      by_month_day: "written to report_schedule.recurrence",
+      working_days_only: "written to report_schedule.recurrence",
+    },
+  },
   HomeReportCreate: {
     table: "saved_report",
     virtual: { filters: "written to saved_report.definition" },
@@ -526,6 +570,8 @@ module.exports = {
   HomeReportQuery,
   HomeReportPage,
   HomeReportScheduleSave,
+  HomeReportChange,
+  HomeReportScheduleChange,
   HomeReportCreate,
   HomeReportUpdate,
   HomeReportScheduleState,
