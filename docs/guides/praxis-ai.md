@@ -230,6 +230,24 @@ second, choosing that cards pick a place now.
     Type (a leave type's allowance) and Approve Overtime are risk `approval`; the other cards of these
     modules are one press.
 
+### 1.9 Decisions (JBS Praxis, 03/11/2026, binding): Performance, Staff Community and Mailbox
+
+Decision 33's next three modules. Four questions were put to the owner on 03/11/2026, each with a
+recommendation first; three recommendations were taken and the fourth chosen.
+
+40. **Performance, Staff Community and Mailbox in the chat.** The monthly check-in is a card per
+    line, Save Check-In: the line named by its words, saved to the draft through My Performance's
+    own save; a file and Submit Check-In stay on My Performance. A reviewer's scores (Save Score,
+    one line at a time) and improvement plans (Start PIP, Save PIP) are cards of risk `approval`,
+    so every press asks Confirm It's You (the owner's choice, over scores in the chat and PIPs
+    never); `performance.md` §8 still keeps a review's comments and a plan from every read the
+    assistant makes. An announcement publishes, or saves while it waits, with one press as the
+    screen's own button does, for holders of `announcements.post`, the card naming its audience,
+    its urgency and when it goes out. Both signatures are cards in full: My Signature's mobile is
+    written to the employee record as the Signature tab writes it, and Configure is for holders of
+    `mailbox.signature`. Neither signature form carries an image: the logo and the icons are the
+    company's brand files on Settings · Organisation.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -703,13 +721,23 @@ with the record named in its first field and as its chip; nothing left out of th
 cleared. **An action held to a capability** (`capability`), as its screen's route holds it on top of
 the grant (`requireCapability`: Late Reasons' `workspace.late_reasons`), is offered only to a person
 who holds it, the CEO holding every one, and `authorise.checkAction` refuses it to anyone else, at
-the draft and at the press, as the route would. An action's grant is never `view`, unless it names a
+the draft and at the press, as the route would. `capabilities`, a list of codes in its place, is
+held as `requireAnyCapability` holds it, by any one of them (New Objective's `goals.company` or
+`goals.function`). An action's grant is never `view`, unless it names a
 capability: a route that asks only `view` and a capability (Home's alert rules, `alerts.manage`;
 Home's reports, `home.reports`) is mirrored exactly, the capability being the authority. **A card
 that changes part of something saved whole** (a numbering scheme, the working week, the company's
 reminders, System Health's targets, a notice's rule) lays what it gives over what is saved and holds
 the result to the screen form's own schema before the service saves it (`shared/ai/change.js`), so
-the service saves what that form would have sent and a problem comes back on its field.
+the service saves what that form would have sent and a problem comes back on its field. A create
+form whose schema never names the record it sits on (Request To Unbind on a plan, Send Wishes on a
+celebration card) takes its card the same way as an edit form (`PlanUnbindRequest`, `WishSend`), and
+so does a form a card cannot draw as it stands: an audience held as an object (`AnnouncementPost`:
+All Staff or Departments), a Copy From that also takes a colleague's scorecard (`ScorecardDraft`), a
+form of many lines carried one line at a time (`CheckInLineChange`, `ReviewScoreChange`,
+`ScorecardLineAdd`, `ScorecardLineChange`, the run keeping every other line as it stands). A choice
+a person reads reads as words, so a card schema's own choices are written as they read
+(`all_staff`, All Staff) and the run turns them into the form's own values.
 
 **What a card carries and names (decision 31).** `fields` lists the input's fields the card carries,
 in the order it shows them; a value for any other field is dropped before the schema parses it
@@ -826,9 +854,41 @@ open with the reason.
 | `worksites.create` (Add Worksite) | `people` create, standard | `WorksiteAdd` (Add Worksite's form with its place picked, decision 37): the name, the address, the radius, the time zone; the centre is the place's point; asks the name, the address and the radius | none: it makes one worksite; the place named by its line | the time zone one the server knows (the service's) | `worksites.service.create` with `WorksiteCreate` |
 | `worksites.edit` (Save Worksite) | `people` edit, standard | `WorksiteChange` (Edit Worksite with the worksite, matched by its name): the name, a new address (its point the new centre), radius, time zone, in use or retired; only what changes; asks which worksite (`read`) | the worksite, by its name; the place named | the worksite exists | `worksites.service.update` with `WorksiteUpdate` |
 | `approvals.decide` | `ess` create (the queue is the person's own), **approval**, up to 25 | `ApprovalDecide`: the requests, approve, reject or request changes, a reason (required but to approve) | the requests: the flow and who it is about | every request the person may read; then each pending, the stage naming them, `approve` held on its module, never their own; one decided on its record refused with that record's screen on its line | `workflow.service.decide` per request |
+| `quarters.create` (Set Up Quarter) | `performance` create and `performance.manage`, standard | `PeriodCreate` (Set Up Quarter's form): the first day, the name, Planning or Active; the scoring rules are the last quarter's, changed on Goals | none: it makes one quarter | a holder of the capability; a quarter's first day, never one set up already | `goals.service.createPeriod` |
+| `quarters.edit` (Save Quarter) | `performance` edit and `performance.manage`, standard | `PeriodChange` (Edit Quarter's `PeriodEdit` with the quarter, by its name, or this, next or last quarter): the name, the status; only what changes | the quarter, by its name | not closed; the status moves forward only | `goals.service.updatePeriod` |
+| `goals.create` (Record Goal) | `performance` create and `goals.organisation`, standard | `OrganisationalGoalCreate` (New Goal's form): the goal, strategic theme, success measure, baseline, plan year (a year, or this or next year, as its 1 January); asks the goal ("What is the goal?") | none: it makes one goal, its ID given | a holder of the capability | `goals.service.createGoal` |
+| `goals.edit` (Save Goal) | `performance` edit and `goals.organisation`, standard | `OrganisationalGoalChange` (Edit Goal's `OrganisationalGoalEdit` with the goal, by its ID or its words): the goal, its description, one quarter's target in words; only what changes | the goal, by ID and title; the quarter named | the goal exists | `goals.service.updateGoal`, the other quarters' targets kept |
+| `goals.share` (Share Goal) | `performance` edit and `goals.organisation`, standard | `GoalShareChange` (Share Goal's `GoalShareSave` with the goal): All Staff or Chosen Departments, the departments | the goal; the departments named | the goal exists | `goals.share.saveGoal` |
+| `objectives.share` (Share Objective) | `performance` edit and `goals.company`, standard | `ObjectiveShareChange` (Share Objective's `GoalShareSave` with the objective, by its code or words) | the objective, by code and title; the departments named | a company objective | `goals.share.saveObjective` |
+| `objectives.create` (Set Objective) | `performance` create and `goals.company` or `goals.function`, standard | `ObjectiveCreate` (New Objective's form): the quarter, the function (none for the company's), the objective, the organisational goal it serves; asks the objective | none: it makes one; the quarter, the function and the goal named | whoever sets that function's goals, its plan open (the module's own rule) | `goals.okrs.createObjective` |
+| `objectives.edit` (Save Objective) | `performance` edit and `goals.company` or `goals.function`, standard | `ObjectiveChange` (Edit Objective's `ObjectiveEdit` with the objective, by its code or words): the objective, the goal it serves | the objective; the goal named | whoever sets its function's goals, its plan open | `goals.okrs.updateObjective` |
+| `key_results.create` (Set Key Result) | `performance` create and `goals.company` or `goals.function`, standard | `KeyResultCreate` (New Key Result's form): the objective (by its code), the key result, measure, target, unit, target in words, start, finish, type, owner, co-owner, direction, baseline, owner note; Feeds and Scored From stay on the form; asks the key result | none: it makes one; the objective and the owners named | as Set Objective; at most four to an objective | `goals.okrs.createKeyResult` |
+| `key_results.edit` (Save Key Result) | `performance` edit, standard (the route names no capability; the service's rule holds) | `KeyResultChange` (Edit Key Result's `KeyResultEdit` with the key result, by its code): as Set Key Result; only what changes | the key result, by code and words; the owners named | whoever sets its function's goals, its plan editable (a binding one changes by Change Target) | `goals.okrs.updateKeyResult` |
+| `plans.unbind` (Request To Unbind) | `performance` create and `goals.company` or `goals.function`, standard | `PlanUnbindRequest` (Request To Unbind's `PlanUnbindCreate` with the plan, by its function or the company, this quarter's): the reason; asks why ("Why should it be unbound?") | the plan: its function and quarter | binding, the quarter open, whoever sets its goals, no request waiting | `goals.service.requestUnbind` |
+| `target_changes.request` (Change Target) | `performance` edit, standard | `TargetChangeCreate` (Change Target's form): a key result (by its code) or a scorecard line (by its words, on the scorecards the person reviews or heads), the new target and its words, the month it applies from, the reason; asks the reason | the key result or the line | requestChange's own rules: a live plan or binding scorecard, its owner, head or reviewer (never one's own line), nothing waiting | `goals.service.requestChange` |
+| `kpis.create` (Set KPI) | `performance` create and `goals.function`, standard | `KpiCreate` (New KPI's form): the function, the KPI, formula, unit, direction, target wording and figure, frequency, data source, first quarter; asks the KPI ("What is the KPI called?") | none: it makes one; the function and the quarter named | the function's head (or `performance.manage`) | `kpis.service.create` |
+| `kpis.edit` (Save KPI) | `performance` edit and `goals.function`, standard | `KpiChange` (Edit KPI's `KpiEdit` with the KPI, by its code or name): the KPI, formula, unit, target wording, data source; only what changes | the KPI, by code and name | the function's head | `kpis.service.update` |
+| `rounds.open` (Open Round) | `performance` create and `performance.manage`, standard | `RoundCreate` (Open Round's form): the quarter, the month (by its name or any day in it) | none: it opens one round; the quarter named | an active quarter's month that has ended, no round yet | `reviews.cycle.createRound` |
+| `reviews.score` (Save Score) | `performance` edit (the route asks `performance` view), **approval** | `ReviewScoreChange` (one line of Score Review's `ReviewScoresSave`, with the review, by its person, and the line, by its words): the final score, the reason it differs, the comment, a corrective action with its owner and due day; only what changes | the review: its person and month; the line and the owner named | its reviewer, the check-in in and the review with them; the other lines and their actions kept | `reviews.service.saveScores` |
+| `check_ins.save` (Save Check-In) | `ess` create, standard | `CheckInLineChange` (one line of My Performance's `ReviewCheckInSave`, by its words): the actual, the day delivered, the action, my score and its reason, a link, a source or a task as evidence; only what changes | my check-in: its month; the line named | my open check-in, not sent; a file and Submit Check-In stay on My Performance | `reviews.service.saveCheckIn`, that line alone |
+| `pips.start` (Start PIP) | `performance` create and `performance.manage`, **approval** | `PipStart` (Start PIP's form with the review, by its person): the start, end and review days, the summary, the lines as words (left out, the lines scored under target, as Start PIP fills them) | the review: its person and month | a closed review rated Below in scope, never one's own, no plan open | `reviews.pip.create` |
+| `pips.edit` (Save PIP) | `performance` edit and `performance.manage`, **approval** | `PipChange` (`PipEdit` with the plan, by its person): the end and review days, the summary, the lines (they replace the plan's; a line kept by its words keeps its target); only what changes | the plan: its person | open or extended, in scope | `reviews.pip.edit` |
+| `scorecards.create` (Draft Scorecard) | `performance` create, standard | `ScorecardDraft` (New Scorecard's `ScorecardCreate`: the person, the quarter, Copy From Last Quarter or None; a colleague's scorecard to copy stays on the form) | none: it makes one; the person and the quarter named | a person in scope, never one's own | `targets.service.create` |
+| `scorecards.add_line` (Add Line) | `performance` edit, standard | `ScorecardLineAdd` (a new line of Edit Lines, with the scorecard, by its person): the section, goal, measure, target, due day, weight, key result (by its code) or KPI (by its code); asks the goal ("What is the goal?") | the scorecard: its person and quarter; the key result or KPI named | a draft the person may edit, never their own | `targets.service.saveLines`, every other line as it stands |
+| `scorecards.edit_line` (Save Line) | `performance` edit, standard | `ScorecardLineChange` (a line of Edit Lines, by its words): only what changes | the scorecard; the line, key result and KPI named | as Add Line | `targets.service.saveLines`, every other line as it stands |
+| `scorecards.edit` (Change Reviewer) | `performance` edit, standard | `ScorecardChange` (Change Reviewer's `ScorecardEdit` with the scorecard, by its person): the reviewer, the reason | the scorecard; the reviewer named | `performance.manage` (the service's rule); nobody reviews themself | `targets.service.update` |
 | `community.message` | `community` create, standard, may be suggested | `DirectMessageSend`: the colleague, the words | the colleague, by name | on the staff with a login | the conversation opened if there is none, then `postMessage` |
 | `community.post` | `community` create, standard | `ChannelPost`: the channel, the words | the channel, by name | a member who may post there (never #announcements) | `postMessage` |
+| `announcements.publish` (Publish Announcement) | `community` create and `announcements.post`, standard (one press, as the screen's) | `AnnouncementPost` (New Announcement's `AnnouncementCreate`, its audience as All Staff or Departments): the headline, the message, the audience and its departments, the urgency, when it goes out (left out, now); asks the headline and the message | none: it publishes or schedules one; the departments named | a holder of the capability; a time ahead | `announcements.service.create` |
+| `announcements.edit` (Save Announcement) | `community` create and `announcements.post`, standard | `AnnouncementChange` (Edit Announcement's `AnnouncementUpdate` with the announcement, by its headline): only what changes | the announcement, by its headline | scheduled and not gone out; a time ahead | `announcements.service.update`, the rest as it stands |
+| `channels.create` (Create Channel) | `community` create, standard | `ChannelCreate` (New Channel's form): the name, purpose, who can post, the people and departments | none: it makes one; the people and departments named | a name no channel has | `community.service.createChannel`, then the purpose posted in it as New Channel posts it |
+| `channels.edit` (Save Channel) | `community` create, standard | `ChannelChange` (Edit Channel's `ChannelUpdate` with the channel, by its name): the name, the purpose; only what changes | the channel | its admin; never #general or #announcements | `community.service.updateChannel` |
+| `community.recognise` (Post Recognition) | `community` create, standard | `RecognitionCreate` (Recognise's form): the colleague, the note (left blank, a thank you note is written) | none: it posts one in #general; the colleague named | a colleague, never oneself | `community.service.recognise` |
+| `community.wish` (Send Wishes) | `community` create, standard | `WishSend` (Send Wishes' `WishCreate` with the card, by whose birthday or anniversary it is) | the card: whose and which | a live card in a channel the person is in | `community.service.sendWish` |
+| `community.edit_message` (Save Message) | `community` create, standard | `MessageChange` (Edit Message's `MessageEdit` with the message: the person's newest still to be changed in the channel or conversation named): the words, a poll's options | the message, by where it is, never its words | its author; a text within 15 minutes, a poll before its first vote | `community.service.editMessage` |
 | `mail.send` | `mailbox` create, standard | `MailCompose`: to, cc, subject, the words as plain text | none | the person's mailbox connected (else `NO_MAILBOX`, and the screen offers Mailbox) | a new draft saved and queued as Send does, the signature baked (`sendNew`) |
+| `signatures.save` (Save My Signature) | `mailbox` edit, standard | `MySignatureSave` (Edit Numbers and the tab's switches): the mobile (the employee record's, changed as the tab changes it), the office line, Show Mobile, Show WhatsApp | none: the person's own | an employee record | `signature.service.saveMine` |
+| `signatures.configure` (Configure Signature) | `mailbox` edit (the route asks `mailbox` view) and `mailbox.signature`, standard | `SignatureConfigChange` (Configure's `SignatureConfigSave`, only what changes): the app and social links, the confidentiality note, WhatsApp Links, App Links, Social Links, Legal Line | none: the company's | a holder of the capability | `signature.service.saveConfig`, the rest as it stands |
 | `queries.raise` (Raise Query) | `queries` create, **approval** (it starts due process and sends a signed letter: decision 39) | `QueryRaise` (Raise a Query's form without its pad and letter choice): the person (People's register), the subject, what happened, the policy it breaches (a policy in force, by its title) and the clause; asks who (People's register, `read`), the subject and what happened | none: it makes one query; the person and policy named | someone at work now, never the raiser; a saved signature (else 409 `NO_SIGNATURE`: Praxis AI cannot draw one, and Draw Signature opens Edit Signature, decision 38) | `queries.service.raise` with `QueryCreate`, signed with My Signature (`queries.signature.signatureOf`) |
 | `my_queries.respond` (Send Response) | `ess` create, standard | `QueryRespond` (My Queries' response with its query, matched by its number or subject among the person's own open ones): the words as plain text, 20 to 4,000 characters, sent as the editor's HTML; asks which of their own open queries (to tap) and the response | the query, by number and subject | the person's own query, still waiting for its one response | `ess.queries.respond` (`queries.response.respond`) |
 | `query_rules.create` (Save Rule, New Rule) | `queries` create and `queries.configure`, standard | `QueryRuleCreate` (New Rule's request): the name, what it counts, the threshold and days, the letter (an active query letter, by its name), the policy and clause; asks the name, what it counts, the threshold and the days | none: it makes one draft rule; the policy named | a holder of the capability; the letter and policy as the service checks them | `query_rules.service.create` |
@@ -840,11 +900,30 @@ open with the reason.
 | `policies.start` (Start Policy) | `knowledge` create and `policies.manage`, standard | `PolicyStart` (New Policy's own form, which validates with it): the title; started for everyone, acknowledged within 7 days, no approval (`POLICY_START`, the sheet's own); asks the title | none: it makes one written policy | a holder of the capability | `policies.service.start` (`create`) |
 | `policies.draft` (Save Draft) | `knowledge` edit and `policies.manage`, standard | `PolicyDraftChange` (Save Draft's `PolicyDraftSave` with the policy, matched by its number or title): the title, who it applies to (everyone, departments, work patterns, people), acknowledgement, approval, a written policy's text as Markdown; only what changes, the rest kept from the draft, else from the newest version; asks which policy (`read`) | the policy, by number and title; departments and people named | a holder; the policy exists and is not archived; not while a version waits for approval (409, the service's) | `policies.service.changeDraft` (`saveDraft`) |
 
-The goals module declares no action: the monthly check-in is written line by line on My Performance
-and no card carries it whole; its Create schemas are each `not_offered` with the screen that owns
-them, as every other Create schema of these modules is (gate 23). Praxis AI still reads no mail and
-no message (decision 19): a mail or a message it drafts is written from the person's words and the
-records the reads returned.
+Performance's forms are all in the chat (decision 40): the monthly check-in a line at a time
+(`check_ins.save`), as the person fills it on My Performance, and a review's scores a line at a time
+(`reviews.score`), each saving that line alone through the screen's own save and keeping every other
+as it stands. A record a card names by its words is matched among the person's own (a quarter by its
+name, or this, next or last quarter; a goal, an objective, a key result or a KPI by its code or its
+words; a review, a plan, a scorecard or an improvement plan by its person; a line by its words among
+its own scorecard's or review's), as decision 32 matches a leave type. Each asks for what it needs
+first when it was not said (decision 34), the person's own records to tap: which quarter (those not
+closed), goal, objective (this quarter's, of a plan still open to change), key result, KPI (of the
+functions the person sets), plan (this quarter's binding ones), review (those waiting on them as
+reviewer; for Start PIP, the closed ones rated Below), line, scorecard (by person and quarter; the
+drafts they may change for a line), improvement plan or colleague; Set KPI which function and its
+target, Add Line its section, measure (the ones that section takes) and weight, Share Goal and Share
+Objective who sees it and, only for chosen departments, which; Change Target and Open Round the
+month, Start PIP its first day, Save Score a corrective action's words and due day once it has an
+owner or words, Change Reviewer who and why. Staff Community's ask the same way: which channel (the
+channels the person runs), whose card (the last two weeks') and the wish, where a message is (their
+channels) and which (their newest message or poll) and its new words, whom to recognise (the
+directory), which announcement (those still waiting) and, for chosen departments, which. An answer
+naming a record is at most 60 characters, cut at a word (`named.choiceWords`), and the matcher
+reads it back. Praxis AI still reads no
+mail, no message and none of a check-in's actions, a review's comments or a plan (decision 19,
+`performance.md` §8): what a card carries is the person's own words and the records the reads
+returned.
 
 **Held to ready to send.** At the draft, at an edit and at the press, every text a card carries
 goes through the same guard as the mailbox's Write With AI (`services/ai/drafts.js`
@@ -1082,11 +1161,14 @@ refused by `authorise.checkAction` or the action's own `check`. Probed: Workspac
 `tasks.wait_on`, `projects.edit`, `calendar.month`, `calendar.edit`), People (`employees.list`, `leave.requests`,
 `leave.approve`, `leave.reject`, `attendance.register`, `overtime.approve`, `leave.record`,
 `employees.edit`, `employees.reporting`: a report inside, the outsider refused by the card's own
-check), Home (`team.today`, `activity.list`), ESS
-(`my_profile.get`, `my_leave.list`), approvals (`approvals.mine`, `approvals.decide`) and Staff
-Community (`channels.list`, `community.post`, `community.message`). Performance and Queries carry
-no probe: their records need a plan, a round or a raised query the suite does not build, and their
-scope stands on their own suites and the subset rule. A manifest's probe calls services only; gate
+check), Home (`team.today`, `activity.list`), ESS (`my_profile.get`, `my_leave.list`), approvals
+(`approvals.mine`, `approvals.decide`), Performance (`scorecards.create`: a scorecard for one's
+report, never for the outsider) and Staff Community (`channels.list`, `community.post`,
+`community.message`, `channels.edit`, `community.recognise`, `community.wish`,
+`community.edit_message`). Performance's reads and its other cards, and Queries, carry no probe:
+their records need a quarter, a plan, a round or a raised query the suite does not build, and their
+scope stands on their own suites, the subset rule and the module's own rules re-checked at the
+press. A manifest's probe calls services only; gate
 19 refuses SQL in it like anything else.
 
 **The attack suite** (`scripts/ai/attack-assistant.js` names the attacks; `tests/integration/ai-attacks.test.js`
@@ -1154,6 +1236,10 @@ Nobody is notified of anything.
 | A holder of `queries.configure` (Operations & People, the Implementation Team) | The same | Save a rule, add or save a step of the chain, add or save a letter |
 | `queries` create (managers, heads, People) | The same | Raise a query, after Confirm It's You, signed with their saved signature |
 | A holder of `policies.manage` (Operations & People, the Implementation Team) | The same | Start a policy and save its draft |
+| Everyone with `performance` edit, `ess` create, `community` create and `mailbox` edit (every seeded role) | The same | A line of their own check-in; a change of target they may ask for; a score on a review they review, after Confirm It's You; a scorecard for someone in their scope, and its lines while it is a draft; a channel, its name and purpose as its admin, a recognition, wishes on a celebration card, their own message while it may still change; their own signature |
+| Whoever sets goals and KPIs (`goals.organisation`, `goals.company`, `goals.function`: `performance.md` §8) | The same | The organisational goals and their sharing; the company's or their function's objectives and key results while the plan is open, a company objective's sharing, Request To Unbind; their function's KPIs |
+| A holder of `performance.manage` (Operations & People, the Implementation Team) | The same | Set up and change a quarter, open a round, change a scorecard's reviewer, start and change an improvement plan (after Confirm It's You) |
+| A holder of `announcements.post` (Operations & People, Management, the Implementation Team) or `mailbox.signature` (System Administrator, the Implementation Team) | The same | Publish an announcement or change one waiting to go out; configure the company's signature |
 | A line manager (`people` approve, team), Operations & People and Management (`people` approve, all) | The same | Approve or reject the leave requests waiting on them, up to 25 a press, after Confirm It's You; never their own |
 | What each person learns | Exactly what their own grants, scope and field visibility show on screen | |
 | CEO | Everything, by the standing rule, through the same reads | The same |
@@ -1337,6 +1423,29 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Performance's, Staff Community's and Mailbox's forms in the chat (decisions 33
+  and 40; `docs/handoff/praxis-ai-engine.md` §6.9): 32 actions (§6.11's table), each the screen's
+  own service function. Performance: Set Up Quarter, Save Quarter, Record Goal, Save Goal, Share
+  Goal, Share Objective, Set Objective, Save Objective, Set Key Result, Save Key Result, Request To
+  Unbind, Change Target, Set KPI, Save KPI, Open Round, Save Score and Start PIP and Save PIP
+  (risk `approval`), Save Check-In (a line of the monthly check-in), Draft Scorecard, Add Line,
+  Save Line, Change Reviewer; Staff Community: Publish Announcement, Save Announcement (the new
+  `announcements.ai.js` replaces the module's `ai:none`), Create Channel, Save Channel, Post
+  Recognition, Send Wishes, Save Message; Mailbox: Save My Signature, Configure Signature. An edit
+  form's card names its record (`PeriodChange`, `OrganisationalGoalChange`, `GoalShareChange`,
+  `ObjectiveShareChange`, `ObjectiveChange`, `KeyResultChange`, `KpiChange`, `PipChange`,
+  `ScorecardChange`, `ScorecardLineChange`, `AnnouncementChange`, `ChannelChange`, `MessageChange`,
+  `SignatureConfigChange`), and so does a create form on its record's page (`PlanUnbindRequest`,
+  `WishSend`) or one a card cannot draw as it stands (`AnnouncementPost`, `ScorecardDraft`,
+  `CheckInLineChange`, `ReviewScoreChange`, `ScorecardLineAdd`, `PipStart`); a record is named by its
+  words among the person's own. An action may name `capabilities` beside `capability`, a list held
+  by any one of its codes, as `requireAnyCapability` holds a route (§6.11, §8). The goals module's
+  paragraph of "no action" goes. The matrix probes `scorecards.create` and Staff Community's four
+  new cards (§6.17). 31 forms off `scripts/check/ai-forms-gaps.json`. Every one of the 32 asks what
+  it needs before it is drawn (decision 34, gate 23 rule 7): its record, with the person's own to
+  tap (`options` from the module's service, `read` for colleagues, channels and departments), and
+  the fields a state needs (`when`); `named.choiceWords` fits a record's words in an answer. §1.9,
+  §6.11, §6.17, §8.
 - 03/11/2026 · JP · People, Queries & Sanctions and Knowledge Hub · Policies in the chat (decision 33;
   decisions 36 to 39, JBS Praxis, §1.8; `docs/handoff/praxis-ai-engine.md` §6.9): 25 actions
   (§6.11's table), each the screen's own function: Approve Overtime, Add Work Site, Add Type and

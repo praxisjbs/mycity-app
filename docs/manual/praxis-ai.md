@@ -178,6 +178,20 @@ changes a department, an open role or a worksite. If you raise queries, it raise
 the query rules, it saves a rule, adds or changes a step of the consequence chain, and adds or
 changes a letter. If you write policies, it starts one and saves its draft.
 
+It also fills in Performance, Staff Community and your email signature for you:
+
+- A line of your monthly check-in, for example "nine stories published on my stories line": press
+  **Save Check-In** and it is saved to your draft. Attach a file and press **Submit Check-In** on
+  [My Performance](/ess?tab=my-performance).
+- A target you may change, for example "change BM-KR1.1's target to 40 from September": press
+  **Change Target** and it goes to the CEO.
+- A channel, its new name or purpose, a recognition for a colleague, wishes on a colleague's
+  birthday or work anniversary card, and your own newest message while it can still be changed:
+  press **Create Channel**, **Save Channel**, **Post Recognition**, **Send Wishes** or
+  **Save Message**.
+- Your own signature, for example "hide my mobile on my signature": press **Save My Signature**.
+  A new mobile number also changes the one on your employee record.
+
 A role's permissions, an approval flow and the cards a role sees on Home are designed on their own
 screens: it opens the screen, and you save there with its own button.
 
@@ -200,6 +214,53 @@ screens: it opens the screen, and you save there with its own button.
 - A task is shared with people or with a department, never both. A card naming both says
   **People or a department**; press **Edit** and clear one.
 
+### Set goals and KPIs from the chat {#praxis-ask-goals needs="cap goals.function or cap goals.company"}
+
+1. Ask for the objective, key result or KPI you set, or the change to one, for example "add a key
+   result to BM-O2: publish 36 city stories". Name a record by its code or its words, and a quarter
+   by its name, for example "Q4 2026", or "this quarter".
+2. Check the card and press its button: **Set Objective**, **Save Objective**, **Set Key Result**,
+   **Save Key Result**, **Set KPI** or **Save KPI**. A plan that is binding takes no change: press
+   **Request To Unbind** to ask the CEO to open it.
+3. If you keep the organisational goals, record, change and share one the same way with
+   **Record Goal**, **Save Goal** and **Share Goal**, and share a company objective with
+   **Share Objective**.
+
+### Score a review or draft a scorecard from the chat {#praxis-ask-scorecards needs="manager"}
+
+1. Ask for the scorecard or the line, for example "draft Ada's scorecard for this quarter" or "make
+   the stories line on Ada's scorecard target 12". A scorecard is named by its person.
+2. Check the card and press **Draft Scorecard**, **Add Line** or **Save Line**. Lines change only
+   while the scorecard is a draft.
+3. To score a review you review, ask for one line at a time, for example "score the stories line on
+   Ada's review 0.8, two stories were late". Press **Save Score** and confirm it is you, see
+   [Confirm it is you for an approval](#praxis-ask-confirm).
+4. Press **Submit Review** on the [review](/performance?tab=reviews) itself when every line is
+   scored.
+
+### Run Performance from the chat {#praxis-ask-performance needs="performance create, cap performance.manage"}
+
+1. Ask for the change, for example "set up the quarter starting 1 January 2027", "open September's
+   review round" or "start an improvement plan for Ada on Monday".
+2. Check the card and press its button: **Set Up Quarter**, **Save Quarter**, **Open Round**,
+   **Change Reviewer**, **Start PIP** or **Save PIP**.
+3. **Start PIP** and **Save PIP** ask you to confirm it is you first. A plan's lines are written in
+   words; left out, they are the lines scored under target.
+
+### Post an announcement from the chat {#praxis-ask-announce needs="cap announcements.post"}
+
+1. Ask for the announcement, for example "announce to all staff that the office is closed on
+   Friday". Say a time to send it later, and the departments when it is not for everyone.
+2. Check the headline, the message, who it is for and when it goes out, then press
+   **Publish Announcement**.
+3. To change one still waiting to go out, name it by its headline and press **Save Announcement**.
+
+### Set the company signature from the chat {#praxis-ask-signature needs="cap mailbox.signature"}
+
+1. Ask for the link or the switch to change, for example "add our LinkedIn to the company
+   signature".
+2. Check the card and press **Configure Signature**. Anything you do not name stays as it is.
+
 ### Answer its questions {#praxis-ask-questions needs="praxis_ai create"}
 
 ![A question with answers to tap](shot:praxis-question)
@@ -220,10 +281,17 @@ screens: it opens the screen, and you save there with its own button.
   for example **Annual Leave, 12 days left**. Press one, or say the type in your question.
 - For a step it asks what the step is, for a project what it is called, and for your week's Support
   Needed what support you need.
+- For a goal, an objective, a key result, a KPI, a scorecard line or a channel it asks what it is,
+  for an announcement its headline and what it should say, and for a target change or an unbind
+  request why.
+- For a scorecard line it also asks the section, how it is measured and its weight. For a KPI it
+  asks which function, and for a round or a target change which month.
 - For a task shared with a department it asks **Who leads it?**, with that department's people to
   press.
 - When you do not say which task, event, project, channel or request, it asks which, with your own
   to press, for example the tasks on your board. Or type its name or number.
+- It asks the same for a quarter, goal, objective, KPI, review, scorecard, improvement plan or
+  announcement.
 - It asks for everything a card needs, so a card it draws can be pressed as it stands.
 - For a new employee it asks each detail the record needs: names, job title, department, work email,
   phone, start date, how they are engaged and where they work.
@@ -237,8 +305,9 @@ screens: it opens the screen, and you save there with its own button.
 ### Confirm it is you for an approval {#praxis-ask-confirm needs="praxis_ai create"}
 
 1. Approving or rejecting a request, approving overtime, recording leave, changing a leave type,
-   raising a query, and any change about money, payroll or deleting, asks **Confirm It's You** first
-   unless you confirmed within the last five minutes.
+   raising a query, saving a review's score, starting or changing an improvement plan, and any
+   change about money, payroll or deleting, asks **Confirm It's You** first unless you confirmed
+   within the last five minutes.
 2. Choose under **Confirm With**: **Passkey** if you have one, **PIN** or **Password**. Press
    **Use Passkey**, or enter it and press **Confirm**.
 3. The card is pressed for you once you have confirmed.

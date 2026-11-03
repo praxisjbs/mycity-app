@@ -26,6 +26,30 @@
       "capability": "alerts.manage"
     },
     {
+      "key": "announcements.edit",
+      "kind": "action",
+      "module_key": "community",
+      "permission": "community.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "announcements.AnnouncementChange",
+      "schema_sha": "ce604348e247baec",
+      "screen": null,
+      "capability": "announcements.post"
+    },
+    {
+      "key": "announcements.publish",
+      "kind": "action",
+      "module_key": "community",
+      "permission": "community.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "announcements.AnnouncementPost",
+      "schema_sha": "5e2cdc6ffb10b625",
+      "screen": null,
+      "capability": "announcements.post"
+    },
+    {
       "key": "approvals.decide",
       "kind": "action",
       "module_key": "settings",
@@ -83,6 +107,50 @@
       "capability": "queries.configure"
     },
     {
+      "key": "channels.create",
+      "kind": "action",
+      "module_key": "community",
+      "permission": "community.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "community.ChannelCreate",
+      "schema_sha": "77cbe3e1b877d39a",
+      "screen": null
+    },
+    {
+      "key": "channels.edit",
+      "kind": "action",
+      "module_key": "community",
+      "permission": "community.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "community.ChannelChange",
+      "schema_sha": "8fcd4de007945c67",
+      "screen": null
+    },
+    {
+      "key": "check_ins.save",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "ess.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "reviews.CheckInLineChange",
+      "schema_sha": "7ee42fc7807891e2",
+      "screen": null
+    },
+    {
+      "key": "community.edit_message",
+      "kind": "action",
+      "module_key": "community",
+      "permission": "community.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "community.MessageChange",
+      "schema_sha": "4e6c33908d5afbd6",
+      "screen": null
+    },
+    {
       "key": "community.message",
       "kind": "action",
       "module_key": "community",
@@ -102,6 +170,28 @@
       "bulk": 1,
       "schema": "community.ChannelPost",
       "schema_sha": "c7f2cf806e53f4f0",
+      "screen": null
+    },
+    {
+      "key": "community.recognise",
+      "kind": "action",
+      "module_key": "community",
+      "permission": "community.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "community.RecognitionCreate",
+      "schema_sha": "13318cf7ef5a3c69",
+      "screen": null
+    },
+    {
+      "key": "community.wish",
+      "kind": "action",
+      "module_key": "community",
+      "permission": "community.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "community.WishSend",
+      "schema_sha": "c0dd782e2b3f6a41",
       "screen": null
     },
     {
@@ -182,6 +272,42 @@
       "screen": null
     },
     {
+      "key": "goals.create",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.OrganisationalGoalCreate",
+      "schema_sha": "19a1ebfcf07c46af",
+      "screen": null,
+      "capability": "goals.organisation"
+    },
+    {
+      "key": "goals.edit",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.OrganisationalGoalChange",
+      "schema_sha": "8aebfc1813380d5c",
+      "screen": null,
+      "capability": "goals.organisation"
+    },
+    {
+      "key": "goals.share",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.GoalShareChange",
+      "schema_sha": "e1c77ef7a4b3ad2c",
+      "screen": null,
+      "capability": "goals.organisation"
+    },
+    {
       "key": "health_targets.edit",
       "kind": "action",
       "module_key": "system_health",
@@ -213,6 +339,56 @@
       "schema": "settings.HolidayChange",
       "schema_sha": "8d01472f35f20851",
       "screen": null
+    },
+    {
+      "key": "key_results.create",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.KeyResultCreate",
+      "schema_sha": "2a8398b8456c2e9b",
+      "screen": null,
+      "capabilities": [
+        "goals.company",
+        "goals.function"
+      ]
+    },
+    {
+      "key": "key_results.edit",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.KeyResultChange",
+      "schema_sha": "c283964810a3034f",
+      "screen": null
+    },
+    {
+      "key": "kpis.create",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "kpis.KpiCreate",
+      "schema_sha": "5372773d01b84fb9",
+      "screen": null,
+      "capability": "goals.function"
+    },
+    {
+      "key": "kpis.edit",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "kpis.KpiChange",
+      "schema_sha": "aadae748fedf7402",
+      "screen": null,
+      "capability": "goals.function"
     },
     {
       "key": "late_reasons.add",
@@ -417,6 +593,48 @@
       "screen": null
     },
     {
+      "key": "objectives.create",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.ObjectiveCreate",
+      "schema_sha": "85ec1f390bc8d0d9",
+      "screen": null,
+      "capabilities": [
+        "goals.company",
+        "goals.function"
+      ]
+    },
+    {
+      "key": "objectives.edit",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.ObjectiveChange",
+      "schema_sha": "4a03d4a3cb257fd8",
+      "screen": null,
+      "capabilities": [
+        "goals.company",
+        "goals.function"
+      ]
+    },
+    {
+      "key": "objectives.share",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.ObjectiveShareChange",
+      "schema_sha": "d8b526f1ed3478ad",
+      "screen": null,
+      "capability": "goals.company"
+    },
+    {
       "key": "organisation.edit",
       "kind": "action",
       "module_key": "settings",
@@ -437,6 +655,45 @@
       "schema": "attendance.OvertimePreApprovalCreate",
       "schema_sha": "3f38e2d89a1bf8fa",
       "screen": null
+    },
+    {
+      "key": "pips.edit",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "approval",
+      "bulk": 1,
+      "schema": "reviews.PipChange",
+      "schema_sha": "43d1e3eeb74c7030",
+      "screen": null,
+      "capability": "performance.manage"
+    },
+    {
+      "key": "pips.start",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.create",
+      "risk": "approval",
+      "bulk": 1,
+      "schema": "reviews.PipStart",
+      "schema_sha": "900a891d87fed54e",
+      "screen": null,
+      "capability": "performance.manage"
+    },
+    {
+      "key": "plans.unbind",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.PlanUnbindRequest",
+      "schema_sha": "a1bba0dd4e160fe0",
+      "screen": null,
+      "capabilities": [
+        "goals.company",
+        "goals.function"
+      ]
     },
     {
       "key": "policies.draft",
@@ -483,6 +740,30 @@
       "schema": "projects.ProjectChange",
       "schema_sha": "d303b1595834209f",
       "screen": null
+    },
+    {
+      "key": "quarters.create",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.PeriodCreate",
+      "schema_sha": "1375c0e9bedd6966",
+      "screen": null,
+      "capability": "performance.manage"
+    },
+    {
+      "key": "quarters.edit",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.PeriodChange",
+      "schema_sha": "991e5f6afd415494",
+      "screen": null,
+      "capability": "performance.manage"
     },
     {
       "key": "queries.raise",
@@ -556,6 +837,73 @@
       "capability": "home.reports"
     },
     {
+      "key": "reviews.score",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "approval",
+      "bulk": 1,
+      "schema": "reviews.ReviewScoreChange",
+      "schema_sha": "02bf47c63a1ba614",
+      "screen": null
+    },
+    {
+      "key": "rounds.open",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "reviews.RoundCreate",
+      "schema_sha": "8cfc13ea9ace8552",
+      "screen": null,
+      "capability": "performance.manage"
+    },
+    {
+      "key": "scorecards.add_line",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "targets.ScorecardLineAdd",
+      "schema_sha": "172e809f3fe324e9",
+      "screen": null
+    },
+    {
+      "key": "scorecards.create",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "targets.ScorecardDraft",
+      "schema_sha": "3c82c6198c24cc62",
+      "screen": null
+    },
+    {
+      "key": "scorecards.edit",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "targets.ScorecardChange",
+      "schema_sha": "9e4a1d48af0471d9",
+      "screen": null
+    },
+    {
+      "key": "scorecards.edit_line",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "targets.ScorecardLineChange",
+      "schema_sha": "08acf108f9683840",
+      "screen": null
+    },
+    {
       "key": "seats.create",
       "kind": "action",
       "module_key": "people",
@@ -575,6 +923,40 @@
       "bulk": 1,
       "schema": "organisation.OrgSeatChange",
       "schema_sha": "4f8d453717667327",
+      "screen": null
+    },
+    {
+      "key": "signatures.configure",
+      "kind": "action",
+      "module_key": "mailbox",
+      "permission": "mailbox.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "mailbox.SignatureConfigChange",
+      "schema_sha": "f879fb040b48310e",
+      "screen": null,
+      "capability": "mailbox.signature"
+    },
+    {
+      "key": "signatures.save",
+      "kind": "action",
+      "module_key": "mailbox",
+      "permission": "mailbox.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "mailbox.MySignatureSave",
+      "schema_sha": "81947cbcd8962b4b",
+      "screen": null
+    },
+    {
+      "key": "target_changes.request",
+      "kind": "action",
+      "module_key": "performance",
+      "permission": "performance.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "goals.TargetChangeCreate",
+      "schema_sha": "8a8df4484f1175e1",
       "screen": null
     },
     {

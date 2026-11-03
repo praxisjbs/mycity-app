@@ -401,7 +401,30 @@ async function reportReminder(client, row) {
   };
 }
 
+/** Month names as a person says them, for the month a card names (docs/guides/praxis-ai.md §6.11). */
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+/**
+ * The month a person names, as its first day: any day in it, a month's name with or without its year
+ * (the latest one begun when no year is said), or this, next or last month; null for anything else.
+ */
+function monthOf(words, now = new Date()) {
+  const said = String(words || "").trim().toLowerCase();
+  if (lagos.isDate(said.slice(0, 10))) return lagos.monthBounds(said.slice(0, 10)).first;
+  const today = lagos.today(now);
+  const shift = { "this month": 0, "next month": 1, "last month": -1, "previous month": -1 }[said.replace(/[^a-z ]+/g, " ").replace(/\s+/g, " ").trim()];
+  if (shift !== undefined) return lagos.monthBounds(lagos.addMonths(today.slice(0, 8) + "01", shift)).first;
+  const name = MONTHS.findIndex((m) => new RegExp(`\\b${m}\\b`).test(said) || new RegExp(`\\b${m.slice(0, 3)}\\b`).test(said));
+  if (name < 0) return null;
+  const year = /\b(20\d\d)\b/.exec(said);
+  const first = (y) => `${y}-${String(name + 1).padStart(2, "0")}-01`;
+  if (year) return first(year[1]);
+  const y = Number(today.slice(0, 4));
+  return first(first(y) <= today ? y : y - 1);
+}
+
 module.exports = {
+  monthOf,
   deadlines,
   monthsOf,
   rulesOf,

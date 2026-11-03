@@ -11,7 +11,7 @@
  * message of message_type "announcement" in #announcements.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { MediaRef } = require("./documents");
 const { NotificationUrgency } = require("./notifications");
@@ -101,6 +101,19 @@ const ChannelUpdate = z
   })
   .strict();
 
+/**
+ * Edit Channel as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the channel beside
+ * the form's name and purpose, only what changes; null clears the purpose.
+ */
+const ChannelChange = z
+  .object({
+    community_channel_id: recordId("channel"),
+    name: ChannelName.optional(),
+    description: z.string().trim().max(300).nullable().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["community_channel_id"]), nothingOn("community_channel_id"));
+
 /** A member of a channel. */
 const Member = z
   .object({
@@ -185,13 +198,22 @@ const Wish = z
   })
   .strict();
 
+/** A wish is written: an empty one is refused on its words. */
+const wishWritten = (b, ctx) => {
+  if (!b.body) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Write a wish" });
+};
+
 /** POST /community/messages/:id/wishes: a wish under a celebration card. */
 const WishCreate = z
   .object({ body: z.string().trim().max(WISH_MAX) })
   .strict()
-  .superRefine((b, ctx) => {
-    if (!b.body) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Write a wish" });
-  });
+  .superRefine(wishWritten);
+
+/** Send Wishes as Praxis AI's card (praxis-ai.md §6.11): the celebration card beside the wish, which the form never names. */
+const WishSend = z
+  .object({ community_message_id: recordId("card"), body: z.string().trim().max(WISH_MAX) })
+  .strict()
+  .superRefine(wishWritten);
 
 /** GET /community/messages/:id/wishes: a card's wishes, newest first. */
 const WishListQuery = listQuery();
@@ -353,6 +375,13 @@ const MessageEdit = z
   })
   .strict();
 
+/**
+ * Edit Message as Praxis AI's card (praxis-ai.md §6.11): the conversation and the person's own message
+ * in it beside the form's words, a poll's options too. The card names the message by where it is,
+ * never by its words: the assistant reads no message (decision 19).
+ */
+const MessageChange = MessageEdit.extend({ community_channel_id: recordId("channel"), community_message_id: recordId("message") });
+
 /** PUT /community/messages/:id/pin: how long it stays at the top (§3 step 16). */
 const PIN_PERIODS = ["24h", "7d", "30d"];
 const MessagePin = z.object({ period: z.enum(PIN_PERIODS) }).strict();
@@ -506,6 +535,7 @@ const TABLES = {
   ChannelListQuery: { table: null, reason: "list controls for the caller's channels" },
   ChannelPage: { table: null, reason: "a page of channels" },
   ChannelUpdate: { table: "community_channel" },
+  ChannelChange: { table: "community_channel" },
   ChannelCreate: {
     table: "community_channel",
     virtual: {
@@ -567,6 +597,10 @@ const TABLES = {
     table: "community_message",
     virtual: { options: "a poll's options, kept in metadata" },
   },
+  MessageChange: {
+    table: "community_message",
+    virtual: { options: "a poll's options, kept in metadata" },
+  },
   MessagePage: { table: null, reason: "a page of messages" },
   MessageCreate: {
     table: "community_message",
@@ -589,6 +623,7 @@ const TABLES = {
     },
   },
   WishCreate: { table: "community_wish" },
+  WishSend: { table: "community_wish" },
   WishListQuery: { table: null, reason: "list controls for a card's wishes" },
   WishPage: { table: null, reason: "a page of wishes" },
   PollVote: { table: "community_poll_vote" },
@@ -636,6 +671,7 @@ module.exports = {
   ChannelName,
   ChannelCreate,
   ChannelUpdate,
+  ChannelChange,
   Member,
   MemberListQuery,
   MemberPage,
@@ -659,9 +695,11 @@ module.exports = {
   WISH_MAX,
   Wish,
   WishCreate,
+  WishSend,
   WishListQuery,
   WishPage,
   MessageEdit,
+  MessageChange,
   PIN_PERIODS,
   MessagePin,
   PinListQuery,

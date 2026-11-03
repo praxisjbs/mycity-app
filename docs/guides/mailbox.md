@@ -427,7 +427,15 @@ in the file only (off for a local test server).
   `NO_MAILBOX` and the screen offers Mailbox); run `mailbox.service.sendNew`: a new draft saved and
   queued exactly as Send does, from the person's own address with their signature baked, the
   request's `Idempotency-Key` carried so a repeated press queues once). A reply inside a
-  conversation stays Write With AI in the composer.
+  conversation stays Write With AI in the composer. The signatures are cards too (`praxis-ai.md`
+  decision 40): `signatures.save`, Save My Signature (`mailbox` edit; input `MySignatureSave`, Edit
+  Numbers' own schema with the tab's two switches: the mobile, written to the employee record through
+  the organisation service as the tab writes it, the office line, Show Mobile and Show WhatsApp;
+  `signature.service.saveMine`) and `signatures.configure`, Configure Signature (`mailbox` edit and
+  `mailbox.signature`, as Configure's route holds it; input `SignatureConfigChange`: the wizard's
+  links, confidentiality note and four switches, only what changes, the rest kept as saved;
+  `signature.service.saveConfig`). Neither carries an image: the logo and the icons are the brand
+  files of Settings · Organisation.
 - **Feature AI**, each run only when its owner presses it, on their own mail (§1.1, §3 steps 12 to
   14, §6), registered in `services/ai/actions.js` with personal data, chosen by TB on 22/10/2026:
 
@@ -576,6 +584,10 @@ interface copy; the copy rules apply to the chrome around them.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · The signatures in the chat (`praxis-ai.md` decisions 33 and 40, §6.11): Save My
+  Signature (`MySignatureSave`, the mobile included, as the owner chose) and Configure Signature
+  (`SignatureConfigChange`, for `mailbox.signature`), each the Signature tab's own service function
+  (§9). Nothing on the Mailbox screens changes.
 - 03/11/2026 · JP · Praxis AI's Send Mail card asks who it is to, the subject and the words when they were not said (`praxis-ai.md` decision 34). No Mailbox screen changed.
 - 03/11/2026 · JP · `mailbox.ai.js`: a draft (`MailDraftSave`) is reached `via mail.send` (`praxis-ai.md` decision 33); the signatures are on the list of forms to bring into the chat (`scripts/check/ai-forms-gaps.json`). No behaviour changed.
 - 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11, decision 19): the mailbox gains `mailbox.ai.js`, which declares no read and one action, `mail.send` (a mail the assistant wrote from the person's words, saved as a draft and queued through `send` with the signature baked, `mailbox.service.sendNew`; refused without a connected mailbox); the controller's `ai:none` goes with it; §9. Nothing on the Mailbox screens changes.

@@ -139,6 +139,19 @@ async function itemOf(kind, id) {
   return row;
 }
 
+/**
+ * A sharing card's re-check (docs/guides/praxis-ai.md §6.11): what it shares exists, and an objective is
+ * a company one, as save() holds it; the refusal on the card's field.
+ */
+async function assertCardItem(db, kind, id) {
+  const field = kind === "goal" ? "organisational_goal_id" : "okr_objective_id";
+  const ok = require("@mycity/contract").common.uuid.safeParse(id).success;
+  const row = ok ? (kind === "goal" ? await repo.getGoal(db, id) : await repo.getObjective(db, id)) : null;
+  if (!row) throw new AppError("NOT_FOUND", KINDS[kind].missing, 404, { [field]: [kind === "goal" ? "No such goal" : "No such objective"] });
+  if (kind === "objective" && row.department_id)
+    throw new AppError("NOT_A_COMPANY_OBJECTIVE", "Only a company objective is shared", 409, { okr_objective_id: ["Not a company objective"] });
+}
+
 /** Refuse (422 on `department_ids`) a department that is not an active one. */
 async function assertDepartments(db, ids) {
   if (!ids.length) return;
@@ -234,6 +247,7 @@ module.exports = {
   newlyReached,
   save,
   remove,
+  assertCardItem,
   saveGoal: (actor, id, body) => save(actor, "goal", id, body),
   removeGoal: (actor, id) => remove(actor, "goal", id),
   saveObjective: (actor, id, body) => save(actor, "objective", id, body),

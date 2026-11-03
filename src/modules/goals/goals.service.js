@@ -6,8 +6,18 @@
  * A quarter carries its own scoring rules (ScoringRules): a new quarter copies the last one's,
  * the code's defaults for the first, so a rule changed next quarter never rewrites this one.
  * Its status runs planning → active → closed, one active at a time.
+ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decisions 33 and 40) are named and re-checked
+ * here, at the foot: the quarter, goal and plan a person names by their words (periodIdOf,
+ * goalIdOf, planIdOf, departmentIdOf, planYearOf), the answers its questions offer (periodChoices,
+ * goalChoices, planChoices, departmentChoices, functionChoices; decision 34), how a card names them (cardPeriod, cardGoal,
+ * cardPlan, cardNames), and the re-checks a press runs before the service function the screen's
+ * own button calls (assertCardPeriod, assertCardGoal, assertUnbindable, assertChangeable).
  */
 const { pool } = require("../../config/db");
+const contract = require("@mycity/contract");
+const { oneNamed, oneNamedIn, plainWords, choiceWords } = require("../../shared/ai/named");
+const lagos = require("../../shared/time/lagos");
 const authority = require("./goals.authority");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
@@ -535,15 +545,26 @@ function unbindView(u) {
  * with a reason, in a quarter still open; one request waits at a time. It goes to the CEO through
  * `performance.plan_change`; their approval makes the plan unbound (goals.approval.js).
  */
-async function requestUnbind(actor, id, body) {
-  const plan = await repo.getPlan(pool, id);
-  if (!plan) throw new AppError("NOT_FOUND", "That plan does not exist", 404);
-  await authority.assertSetsGoals(pool, actor, plan.department_id);
-  if ((await plansLib.periodOf(pool, plan.performance_period_id)).status === "closed")
+const unbindWaiting = () => new AppError("UNBIND_PENDING", "An unbind request is already waiting", 409);
+
+/**
+ * Request To Unbind's rules, before anything is written: the plan exists and is binding, the quarter
+ * is open, the actor sets its goals and no request waits. The plan; the card's re-check runs them too.
+ */
+async function assertUnbindable(db, actor, id) {
+  const plan = contract.common.uuid.safeParse(id).success ? await repo.getPlan(db, id) : null;
+  if (!plan) throw new AppError("NOT_FOUND", "That plan does not exist", 404, { performance_plan_id: ["No such plan"] });
+  await authority.assertSetsGoals(db, actor, plan.department_id);
+  if ((await plansLib.periodOf(db, plan.performance_period_id)).status === "closed")
     throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409);
   if (plan.status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Only a binding plan can be unbound", 409);
-  const waiting = () => new AppError("UNBIND_PENDING", "An unbind request is already waiting", 409);
-  if (await repo.unbindPending(pool, id)) throw waiting();
+  if (await repo.unbindPending(db, id)) throw unbindWaiting();
+  return plan;
+}
+
+async function requestUnbind(actor, id, body) {
+  const plan = await assertUnbindable(pool, actor, id);
+  const waiting = unbindWaiting;
   const workflow = require("../../shared/workflow/engine");
   let requestId;
   try {
@@ -663,34 +684,42 @@ async function approvals(query, actor) {
   };
 }
 
+/**
+ * Change Target's rules, before anything is written: a key result of a live plan, by its owner or
+ * whoever sets its function's goals, or a line of a binding scorecard, by its reviewer or the
+ * function's head and never its employee; nothing waiting on it. What it changes from and what the
+ * notices call it. The card's re-check runs them too.
+ */
+async function assertChangeable(db, actor, body) {
+  if (body.okr_key_result_id) {
+    const ctx = await repo.keyResultContext(db, body.okr_key_result_id);
+    if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404, { okr_key_result_id: ["No such key result"] });
+    if (!plansLib.isLive(ctx.plan_status)) throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
+    const owner = actor && actor.employee_id === ctx.accountable_employee_id;
+    if (!owner) await authority.assertSetsGoals(db, actor, ctx.department_id);
+    if (await repo.changePending(db, body)) throw changeWaiting();
+    return { from: { value: ctx.target_value, text: ctx.target_text }, subject: ctx.code };
+  }
+  const targetsRepo = require("../targets/targets.repo");
+  const line = body.employee_target_id ? await targetsRepo.lineWithCard(db, body.employee_target_id) : null;
+  if (!line) throw new AppError("NOT_FOUND", "That line does not exist", 404, { employee_target_id: ["No such line"] });
+  if (!["binding", "agreed"].includes(line.scorecard_status)) throw new AppError("SCORECARD_NOT_BINDING", "Edit a draft's lines directly", 409);
+  // A line's target is changed by its scorecard's reviewer or the function's head, never its employee (§3.5).
+  if (line.employee_id === (actor && actor.employee_id)) throw new AppError("PERMISSION_DENIED", "Your reviewer changes your targets", 403);
+  const card = await targetsRepo.get(db, line.scorecard_id);
+  if (!(await require("../targets/targets.service").mayChangeLineTarget(db, card, actor)))
+    throw new AppError("PERMISSION_DENIED", "The reviewer or the function's head changes this target", 403);
+  if (await repo.changePending(db, body)) throw changeWaiting();
+  return { from: { value: line.target_value, text: line.target_text }, subject: line.title };
+}
+
+const changeWaiting = () => new AppError("CHANGE_PENDING", "A change to this target is already waiting for a decision", 409);
+
 /** POST /performance/target-changes: a binding key result's or line's target, to the CEO. */
 async function requestChange(actor, scope, body) {
   const okrs = require("./goals.okrs");
-  let from;
-  let subject; // what the notices call the target: the key result's code or the line's title
-  if (body.okr_key_result_id) {
-    const ctx = await repo.keyResultContext(pool, body.okr_key_result_id);
-    if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404);
-    if (!plansLib.isLive(ctx.plan_status)) throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
-    const owner = actor && actor.employee_id === ctx.accountable_employee_id;
-    if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
-    from = { value: ctx.target_value, text: ctx.target_text };
-    subject = ctx.code;
-  } else {
-    const targetsRepo = require("../targets/targets.repo");
-    const line = await targetsRepo.lineWithCard(pool, body.employee_target_id);
-    if (!line) throw new AppError("NOT_FOUND", "That line does not exist", 404);
-    if (!["binding", "agreed"].includes(line.scorecard_status)) throw new AppError("SCORECARD_NOT_BINDING", "Edit a draft's lines directly", 409);
-    // A line's target is changed by its scorecard's reviewer or the function's head, never its employee (§3.5).
-    if (line.employee_id === (actor && actor.employee_id)) throw new AppError("PERMISSION_DENIED", "Your reviewer changes your targets", 403);
-    const card = await targetsRepo.get(pool, line.scorecard_id);
-    if (!(await require("../targets/targets.service").mayChangeLineTarget(pool, card, actor)))
-      throw new AppError("PERMISSION_DENIED", "The reviewer or the function's head changes this target", 403);
-    from = { value: line.target_value, text: line.target_text };
-    subject = line.title;
-  }
-  if (await repo.changePending(pool, body))
-    throw new AppError("CHANGE_PENDING", "A change to this target is already waiting for a decision", 409);
+  // What the notices call the target: the key result's code or the line's title.
+  const { from, subject } = await assertChangeable(pool, actor, body);
   const workflow = require("../../shared/workflow/engine");
   const id = await tx(async (client) => {
     const changeId = await repo.insertChange(client, {
@@ -725,6 +754,154 @@ async function requestChange(actor, scope, body) {
   return okrs.changeView(await repo.getChange(pool, id));
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decisions 33 and 40): what a person names by
+ * their words, matched among their own, never guessed (shared/ai/named.js), how a card names it, and
+ * the re-checks a press runs. Nothing here writes but changeGoal, which calls updateGoal.
+ * ------------------------------------------------------------------ */
+
+const isId = (v) => typeof v === "string" && contract.common.uuid.safeParse(v).success;
+const idsOf = (...values) => [...new Set(values.flatMap((v) => (Array.isArray(v) ? v : [v])).filter(isId))];
+
+/** The quarter a person names: its name ("Q4 2026"), a day in it, or this, next or last quarter; null for anything else. */
+async function periodIdOf(db, words, now = new Date()) {
+  const quarters = (await repo.listPeriods(db, { page: 1 })).data.map(periodView);
+  const holding = (d) => quarters.find((p) => p.starts_on <= d && d <= p.ends_on) || null;
+  const said = String(words || "").trim();
+  if (lagos.isDate(said.slice(0, 10))) return (holding(said.slice(0, 10)) || {}).performance_period_id || null;
+  const shift = { "this quarter": 0, "current quarter": 0, "next quarter": 3, "last quarter": -3, "previous quarter": -3 }[plainWords(said)];
+  if (shift !== undefined) return (holding(lagos.addMonths(lagos.today(now), shift)) || {}).performance_period_id || null;
+  const found = oneNamed(quarters, said, (p) => [p.name]);
+  return found ? found.performance_period_id : null;
+}
+
+/** A plan year as its 1 January: a year ("2026"), a day in it, or this, next or last year; null otherwise. */
+function planYearOf(words, now = new Date()) {
+  const said = String(words || "").trim();
+  const shift = { "this year": 0, "next year": 1, "last year": -1 }[plainWords(said)];
+  const year = /^\d{4}(\b|-)/.test(said) ? Number(said.slice(0, 4)) : shift !== undefined ? Number(lagos.today(now).slice(0, 4)) + shift : null;
+  return year && year >= 2020 && year <= 2100 ? `${year}-01-01` : null;
+}
+
+/** The function a person names: an active department by its name or code ("Branding & Marketing", "BM"). */
+async function departmentIdOf(db, words) {
+  const found = oneNamed((await repo.listDepartments(db, { page: 1 }, { scope: "all" })).data, words, (d) => [d.name, d.code], { drop: ["department", "function", "team"] });
+  return found ? found.department_id : null;
+}
+
+/** The organisational goal a person names: its ID (ORG-2026-03) or its words, among the goals they read. */
+async function goalIdOf(db, words, actor) {
+  const reach = await visibility.readerOf(db, actor);
+  const page = (q) => async () => (await repo.listGoals(db, { page: 1, ...(q ? { q } : {}) }, reach)).data;
+  const found = await oneNamedIn([page(words), page(null)], words, (g) => [g.code, g.title]);
+  return found ? found.organisational_goal_id : null;
+}
+
+/** The binding or open plan a person names by its function (or "company"), this quarter's, among those they read. */
+async function planIdOf(db, words, actor) {
+  const current = await repo.currentPeriod(db);
+  if (!current) return null;
+  const plans = (await repo.listPlans(db, { page: 1, period_id: current.performance_period_id }, await visibility.readerOf(db, actor))).data;
+  const found = oneNamed(plans, words, (p) => (p.department_id ? [p.department, p.department_code] : ["company", "the company"]), { drop: ["plan", "function", "department", "s"] });
+  return found ? found.performance_plan_id : null;
+}
+
+/**
+ * The answers a Performance card's question offers when the person did not say (decision 34), each
+ * as its matcher above reads it: the quarters by name (the closed ones left out when `open`), the
+ * goals the person reads by ID and title, this quarter's binding plans by function, the active
+ * departments, and the functions whose goals and KPIs the person sets.
+ */
+async function periodChoices(db, { open = false } = {}) {
+  const quarters = (await repo.listPeriods(db, { page: 1 })).data;
+  return quarters.filter((p) => !open || p.status !== "closed").map((p) => p.name);
+}
+
+async function goalChoices(db, actor) {
+  const reach = await visibility.readerOf(db, actor);
+  return (await repo.listGoals(db, { page: 1 }, reach)).data.map((g) => choiceWords(`${g.code || ""} ${g.title}`.trim()));
+}
+
+async function planChoices(db, actor) {
+  const current = await repo.currentPeriod(db);
+  if (!current) return [];
+  const plans = (await repo.listPlans(db, { page: 1, period_id: current.performance_period_id, status: "binding" }, await visibility.readerOf(db, actor))).data;
+  return plans.map((p) => p.department || "Company");
+}
+
+async function departmentChoices(db) {
+  return (await repo.listDepartments(db, { page: 1 }, { scope: "all" })).data.map((d) => d.name);
+}
+
+async function functionChoices(db, actor) {
+  const out = [];
+  for (const d of (await repo.listDepartments(db, { page: 1 }, { scope: "all" })).data) if (await authority.maySetGoals(db, actor, d.department_id)) out.push(d.name);
+  return out;
+}
+
+/** The people, departments and quarters a Performance card holds, by name (decision 31); never an id. */
+async function cardNames(db, { employees = [], departments = [], periods: quarters = [] } = {}) {
+  return repo.cardNames(db, { employeeIds: idsOf(employees), departmentIds: idsOf(departments), periodIds: idsOf(quarters) });
+}
+
+/** The quarter a card names, by its name; nothing when the id names no quarter. */
+async function cardPeriod(db, id) {
+  const row = isId(id) ? await repo.getPeriod(db, id) : null;
+  return row ? [{ type: "performance_period", id, label: row.name }] : [];
+}
+
+/** Save Quarter's re-check: the quarter exists and is not closed, as updatePeriod holds it. */
+async function assertCardPeriod(db, id) {
+  const row = isId(id) ? await repo.getPeriod(db, id) : null;
+  if (!row) throw new AppError("NOT_FOUND", "That quarter does not exist", 404, { performance_period_id: ["No such quarter"] });
+  if (row.status === "closed") throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409, { performance_period_id: ["Quarter is closed"] });
+}
+
+/** The goal a card names, by its ID and title, when the person reads it (§6.23); its id alone otherwise. */
+async function cardGoal(db, id, actor) {
+  const g = isId(id) ? await repo.getGoal(db, id) : null;
+  if (!g) return [];
+  const reads = await visibility.assertGoal(db, await visibility.readerOf(db, actor), id).then(() => true, () => false);
+  return [{ type: "organisational_goal", id, label: reads ? `${g.code || ""} ${g.title}`.trim() : null }];
+}
+
+/** Save Goal's and Share Goal's re-check: the goal exists, and a quarter's target is of the goal's own plan year. */
+async function assertCardGoal(db, id, periodId = null) {
+  const g = isId(id) ? await repo.getGoal(db, id) : null;
+  if (!g) throw new AppError("NOT_FOUND", "That goal does not exist", 404, { organisational_goal_id: ["No such goal"] });
+  if (!periodId) return;
+  const quarter = await repo.getPeriod(db, periodId);
+  if (!quarter || day(quarter.plan_year_starts_on) !== day(g.plan_year_starts_on))
+    throw new AppError("VALIDATION_FAILED", "Pick a quarter of the goal's year", 422, { performance_period_id: ["Not the goal's year"] });
+}
+
+/** Save Goal's card: its title and description, and one quarter's target in words, its figure kept; through updateGoal. */
+async function changeGoal(actor, values) {
+  const { organisational_goal_id: id, performance_period_id: periodId, target_text: words, ...fields } = values;
+  const patch = { ...fields };
+  if (periodId) {
+    const held = (await repo.goalTargets(pool, id)).find((t) => t.performance_period_id === periodId);
+    patch.targets = [{ performance_period_id: periodId, target_text: words ?? undefined, target_value: held ? held.target_value : undefined }];
+  }
+  return updateGoal(actor, id, patch);
+}
+
+/** The plan a card names: its function and quarter. */
+async function cardPlan(db, id) {
+  const plan = isId(id) ? await repo.getPlan(db, id) : null;
+  return plan ? [{ type: "performance_plan", id, label: `${plan.department || "Company"} · ${plan.period_name}` }] : [];
+}
+
+/** What Change Target's card names: the key result or the line, when the person may read it. */
+async function cardChangeRecords(db, values, actor, scope) {
+  if (isId(values.okr_key_result_id)) {
+    const okrs = require("./goals.okrs");
+    return okrs.cardKeyResult(db, values.okr_key_result_id, actor);
+  }
+  if (isId(values.employee_target_id)) return require("../targets/targets.service").cardLine(db, values.employee_target_id, actor, scope);
+  return [];
+}
+
 module.exports = {
   periodView,
   listPeriods,
@@ -750,4 +927,24 @@ module.exports = {
   changeDetail,
   approvals,
   requestChange,
+  assertUnbindable,
+  assertChangeable,
+  periodIdOf,
+  planYearOf,
+  departmentIdOf,
+  goalIdOf,
+  planIdOf,
+  periodChoices,
+  goalChoices,
+  planChoices,
+  departmentChoices,
+  functionChoices,
+  cardNames,
+  cardPeriod,
+  assertCardPeriod,
+  cardGoal,
+  assertCardGoal,
+  changeGoal,
+  cardPlan,
+  cardChangeRecords,
 };

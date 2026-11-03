@@ -174,13 +174,17 @@ function walk(dir, test, out = []) {
   return out;
 }
 
-/** The text of each `useContractForm(...)` call, braces balanced, so a schema named on a later line counts. */
+/**
+ * The text of each `useContractForm(...)` call, braces balanced, so a schema named on a later line
+ * counts; a call that names its values' type (`useContractForm<Values>(...)`) counts the same.
+ */
 function formCalls(code) {
   const out = [];
-  let from = code.indexOf("useContractForm(");
-  while (from >= 0) {
+  const start = /useContractForm(<[^()]*>)?\(/g;
+  let m;
+  while ((m = start.exec(code))) {
     let depth = 0;
-    let i = from + "useContractForm".length;
+    let i = m.index + m[0].length - 1;
     for (; i < code.length; i += 1) {
       if (code[i] === "(") depth += 1;
       else if (code[i] === ")") {
@@ -188,8 +192,8 @@ function formCalls(code) {
         if (depth === 0) break;
       }
     }
-    out.push(code.slice(from, i + 1));
-    from = code.indexOf("useContractForm(", i);
+    out.push(code.slice(m.index, i + 1));
+    start.lastIndex = i;
   }
   return out;
 }

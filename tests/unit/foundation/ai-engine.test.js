@@ -201,6 +201,17 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     expect(refused({ picks: { primary_assignee_id: "anyone" } })).toThrow(/picks\.primary_assignee_id is one of/);
   });
 
+  test("an action held to any one of several capabilities names two or more of the catalogue's, never beside one capability", () => {
+    const a = defineManifest({ module: "performance", actions: [{ ...ACTION, permission: ["performance", "create"], capabilities: ["goals.company", "goals.function"] }] }).actions[0];
+    expect([a.capability, a.capabilities]).toEqual([null, ["goals.company", "goals.function"]]);
+    expect(defineManifest({ module: "workspace", actions: [ACTION] }).actions[0].capabilities).toBeNull();
+    const refused = (over) => () => defineManifest({ module: "performance", actions: [{ ...ACTION, permission: ["performance", "create"], ...over }] });
+    expect(refused({ capabilities: ["goals.company"] })).toThrow(/capabilities is a list of two or more codes/);
+    expect(refused({ capabilities: ["goals.company", "goals.everything"] })).toThrow(/capabilities is a list of two or more codes/);
+    expect(refused({ capabilities: "goals.company" })).toThrow(/capabilities is a list/);
+    expect(refused({ capability: "goals.company", capabilities: ["goals.company", "goals.function"] })).toThrow(/capability or capabilities, not both/);
+  });
+
   test("a record named by its words: the whole words, then the one they begin, then the one that holds them; never one of several", () => {
     const { oneNamed } = require("../../../src/shared/ai/named");
     const types = [{ name: "Annual", code: "annual" }, { name: "Compassionate Leave", code: "compassionate" }, { name: "Sick", code: "sick" }];
@@ -209,6 +220,19 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     const steps = [{ title: "Order the banners" }, { title: "Book the venue" }, { title: "Order the flyers" }];
     const step = (said) => (oneNamed(steps, said, (x) => [x.title]) || {}).title || null;
     expect(["order the banners", "banners", "Order the", "venue", "the", "paint"].map(step)).toEqual(["Order the banners", "Order the banners", null, "Book the venue", null, null]);
+  });
+
+  test("a record's words as an answer to tap fit 60 characters, cut at a word and marked, and still name their record (decision 34)", () => {
+    const { choiceWords, oneNamed } = require("../../../src/shared/ai/named");
+    expect(choiceWords("BM-KR2.1 Grow followers")).toBe("BM-KR2.1 Grow followers");
+    const long = "BM-KR2.1 Grow the city stories audience on every channel we run, Lagos first";
+    const cut = choiceWords(long);
+    expect(cut.length).toBeLessThanOrEqual(60);
+    expect(cut).toBe("BM-KR2.1 Grow the city stories audience on every channel…");
+    const krs = [{ code: "BM-KR2.1", statement: long.slice(9) }, { code: "BM-KR2.10", statement: "Publish 36 city stories" }];
+    expect(oneNamed(krs, cut, (k) => [k.code, k.statement])).toBe(krs[0]);
+    expect(choiceWords(`${"x".repeat(70)}`)).toBe(`${"x".repeat(59)}…`);
+    expect(choiceWords(null)).toBe("");
   });
 
   test("gate 19 refuses SQL and a query call inside a manifest, and a write key, comments aside", () => {
@@ -220,6 +244,15 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     write(path.join(dir, "q", "q.ai.js"), `const { defineManifest } = require(${src("src/shared/ai/manifest.js")});\nconst run = (client) => client.query("SELECT 1");\nmodule.exports = defineManifest({ module: "workspace", reads: [] });`);
     const r = noWrites.check({ dir });
     expect(r.problems).toEqual([expect.stringMatching(/q\.ai\.js: calls \.query\(\)/), expect.stringMatching(/sql\.ai\.js: holds SQL/)]);
+  });
+
+  test("gate 23 rule 2 reads a form's call whole, its values' type named or not, a schema on a later line counting", () => {
+    const { formCalls } = require("../../../scripts/check/ai-awareness");
+    const code = 'const f = useContractForm<Values>(\n  { a: "" },\n  k ? bodySchema(g.KeyResultEdit, (v) => edit(v)) : bodySchema(g.KeyResultCreate),\n);\nconst h = useContractForm({ body: "" }, community.WishCreate);';
+    expect(formCalls(code)).toEqual([
+      'useContractForm<Values>(\n  { a: "" },\n  k ? bodySchema(g.KeyResultEdit, (v) => edit(v)) : bodySchema(g.KeyResultCreate),\n)',
+      'useContractForm({ body: "" }, community.WishCreate)',
+    ]);
   });
 
   test("gate 23 rule 6: every create and edit form is in the chat, reached via another action, never for a named reason, or a listed gap; the list only shrinks (decision 33)", () => {

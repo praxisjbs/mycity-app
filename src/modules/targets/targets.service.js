@@ -13,13 +13,20 @@
  * Someone who joins after their function's plan binds (§11) is drafted a scorecard all the same; Send
  * Scorecard opens a plan amendment, a `performance.plan` approval holding that scorecard alone, and
  * the CEO's approval binds it (goals.approval.js). While a plan is sent, no scorecard is drafted in it.
+ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decision 40) find a scorecard by its person and a
+ * line by its words (scorecardIdOf, scorecardLineIdOf, lineIdOf), offer them as answers to tap when
+ * not said (scorecardChoices, scorecardLineChoices, draftChoices; decision 34), name them (cardScorecard, cardLine),
+ * re-check them at the press (assertCardDraft, assertCardScorecard, assertCardEditable) and save one
+ * line through saveLines with every other line as it stands (addLine, changeLine).
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { assertInScope } = require("../../shared/rbac/scope");
-const { scoring } = require("@mycity/contract");
+const { scoring, common, targets: contract } = require("@mycity/contract");
+const { oneNamed, oneNamedIn, plainWords, choiceWords } = require("../../shared/ai/named");
 const workflow = require("../../shared/workflow/engine");
 const authority = require("../goals/goals.authority");
 const plans = require("../goals/goals.plans");
@@ -837,6 +844,210 @@ async function removeImportedLine(client, actor, id) {
   });
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decision 40)
+ * ------------------------------------------------------------------ */
+
+const isId = (v) => typeof v === "string" && common.uuid.safeParse(v).success;
+/** Words a person adds to a name that name nothing ("Ada's scorecard"). */
+const CARD_WORDS = ["scorecard", "card", "line", "the", "s"];
+const currentPeriodId = async (db) => ((await require("../goals/goals.repo").currentPeriod(db)) || {}).performance_period_id || null;
+
+/** A scorecard as a card and its question name it: its person and quarter ("Ada Obi, Q4 2026"). */
+const scorecardLabel = (card) => `${card.employee.display_name}, ${card.period_name}`;
+
+/**
+ * The scorecard a person names by its person, this quarter's first, among those they may read; named
+ * as its question offers it, its person and quarter ("Ada Obi, Q1 2027"), that one in any quarter.
+ */
+async function scorecardIdOf(db, words, actor, scope) {
+  const periodId = await currentPeriodId(db);
+  const said = plainWords(words, CARD_WORDS);
+  const page = (query) => async () => (await repo.list(db, { page: 1, ...query }, scope)).data;
+  const comma = String(words || "").lastIndexOf(",");
+  if (comma > 0) {
+    const whose = await page({ q: plainWords(String(words).slice(0, comma), CARD_WORDS) })();
+    const exact = whose.filter((card) => card.employee && plainWords(scorecardLabel(card)) === plainWords(words));
+    if (exact.length === 1) return exact[0].scorecard_id;
+  }
+  const lists = periodId ? [page({ period_id: periodId, q: said }), page({ period_id: periodId })] : [];
+  const found = await oneNamedIn([...lists, page({ q: said })], words, (card) => [card.employee && card.employee.display_name], { drop: CARD_WORDS });
+  return found ? found.scorecard_id : null;
+}
+
+/**
+ * "Whose scorecard?" answers (decision 34), by person and quarter as scorecardIdOf matches them: this
+ * quarter's the person may read, or with `drafts` the drafts of any quarter they may still change.
+ */
+async function scorecardChoices(db, actor, scope, { drafts = false } = {}) {
+  const periodId = drafts ? null : await currentPeriodId(db);
+  if (!drafts && !periodId) return [];
+  const cards = (await repo.list(db, { page: 1, ...(drafts ? { status: "draft" } : { period_id: periodId }) }, scope)).data.filter((card) => card.employee);
+  const out = [];
+  for (const card of cards) if (!drafts || (await editable(db, card, actor, scope))) out.push(scorecardLabel(card));
+  return out;
+}
+
+/** "Which line?" answers: the lines of the scorecard the card names (by id or by its person), by their words. */
+async function scorecardLineChoices(db, scorecard, actor, scope) {
+  const id = isId(scorecard) ? scorecard : scorecard ? await scorecardIdOf(db, scorecard, actor, scope) : null;
+  if (!id || !(await cardScorecard(db, id, actor, scope)).some((r) => r.label)) return [];
+  return (await repo.lines(db, id)).map((l) => choiceWords(l.title));
+}
+
+/** "Who is it for?" answers for Draft Scorecard: the people in the drafter's scope (their own reports first with every scope), never the drafter. */
+async function draftChoices(db, actor, scope) {
+  const organisation = require("../organisation/organisation.service");
+  const people = async (query) => (await organisation.list(db, { page: 1, status: "active", ...query }, scope)).data;
+  const reports = scope.scope === "all" && actor && actor.employee_id ? await people({ line_manager_id: actor.employee_id }) : [];
+  const rows = reports.length ? reports : await people({});
+  return rows.filter((p) => p.employee_id !== (actor && actor.employee_id)).map((p) => p.display_name);
+}
+
+/** Someone a person names to draft a scorecard for, by name, among those draftChoices offers; searched by the words first. */
+async function draftIdOf(db, words, actor, scope) {
+  const organisation = require("../organisation/organisation.service");
+  const page = (q) => async () => (await organisation.list(db, { page: 1, status: "active", ...(q ? { q } : {}) }, scope)).data.filter((p) => p.employee_id !== (actor && actor.employee_id));
+  const found = await oneNamedIn([page(words), page(null)], words, (p) => [p.display_name]);
+  return found ? found.employee_id : null;
+}
+
+/** The line a person names on a scorecard: its words among the scorecard's own lines. */
+async function scorecardLineIdOf(db, scorecardId, words) {
+  if (!isId(scorecardId)) return null;
+  const found = oneNamed(await repo.lines(db, scorecardId), words, (l) => [l.title], { drop: ["line"] });
+  return found ? found.employee_target_id : null;
+}
+
+/**
+ * A line for Change Target, named by its person and words ("Ada Obi: Stories published") or by words
+ * only one line of this quarter's scorecards the person may read has.
+ */
+async function lineIdOf(db, words, actor, scope) {
+  const said = String(words || "");
+  const colon = said.indexOf(":");
+  if (colon > 0) {
+    const cardId = await scorecardIdOf(db, said.slice(0, colon), actor, scope);
+    return cardId ? scorecardLineIdOf(db, cardId, said.slice(colon + 1)) : null;
+  }
+  const periodId = await currentPeriodId(db);
+  if (!periodId) return null;
+  const lines = [];
+  for (const card of (await repo.list(db, { page: 1, period_id: periodId }, scope)).data) lines.push(...(await repo.lines(db, card.scorecard_id)));
+  const found = oneNamed(lines, said, (l) => [l.title], { drop: ["line"] });
+  return found ? found.employee_target_id : null;
+}
+
+/** The scorecard a card names, by its person and quarter, when the person may read it; its id alone otherwise. */
+async function cardScorecard(db, id, actor, scope) {
+  const card = isId(id) ? await repo.get(db, id) : null;
+  if (!card) return [];
+  const readable = await mayRead(db, card, actor, scope);
+  return [{ type: "scorecard", id, label: readable ? `${card.employee.display_name}, ${card.period_name}` : null }];
+}
+
+/** A line a card names, with its person, when its scorecard is one the person may read. */
+async function cardLine(db, id, actor, scope) {
+  const line = isId(id) ? await repo.lineWithCard(db, id) : null;
+  if (!line) return [];
+  const card = await repo.get(db, line.scorecard_id);
+  const readable = Boolean(card) && (await mayRead(db, card, actor, scope));
+  return [{ type: "target", id, label: readable ? `${card.employee.display_name}: ${line.title}` : null }];
+}
+
+/** Draft Scorecard's re-check: a person in the drafter's scope, never their own (create's own first rules). */
+async function assertCardDraft(db, employeeId, actor, scope) {
+  if (actor && actor.employee_id && employeeId === actor.employee_id)
+    throw new AppError("SCORECARD_OWN", "Your manager drafts your scorecard", 403, { employee_id: ["Not your own"] });
+  try {
+    assertInScope(scope, employeeId);
+  } catch {
+    throw new AppError("NOT_FOUND", "They are not in your team", 404, { employee_id: ["Not in your team"] });
+  }
+}
+
+/** Change Reviewer's re-check: the scorecard exists and the person may open it. */
+async function assertCardScorecard(db, id, actor, scope) {
+  const card = isId(id) ? await repo.get(db, id) : null;
+  if (!card || !(await mayRead(db, card, actor, scope))) throw new AppError("NOT_FOUND", "That scorecard does not exist", 404, { scorecard_id: ["No such scorecard"] });
+  return card;
+}
+
+/** Add Line's and Save Line's re-check: a draft the person may edit, and the line one of its own. */
+async function assertCardEditable(db, id, actor, scope, lineId = null) {
+  const card = await assertCardScorecard(db, id, actor, scope);
+  if (!(await editable(db, card, actor, scope)))
+    throw new AppError("SCORECARD_LOCKED", "This scorecard is binding: change a target instead", 409, { scorecard_id: ["Not open to change"] });
+  if (lineId && !(await repo.lines(db, id)).some((l) => l.employee_target_id === lineId))
+    throw new AppError("NOT_FOUND", "That line is not on this scorecard", 404, { employee_target_id: ["No such line"] });
+}
+
+/** A line as Edit Lines saves it, from the line as it stands: what the form does not show is kept. */
+const inputOf = (l) =>
+  Object.fromEntries(
+    Object.entries({
+      employee_target_id: l.employee_target_id,
+      section: l.section,
+      title: l.title,
+      measure: l.measure,
+      direction: l.direction || "higher",
+      unit: l.unit,
+      target_value: l.target_value,
+      target_text: l.target_text,
+      milestone_due_on: day(l.milestone_due_on),
+      due_on: day(l.due_on),
+      frequency_text: l.frequency_text,
+      weight: String(Number(l.weight)),
+      source: l.source,
+      okr_key_result_id: l.okr_key_result_id,
+      kpi_definition_id: l.kpi_definition_id,
+      share_value: l.share_value,
+      team_key_result_ids: (l.team_key_results || []).map((k) => k.okr_key_result_id),
+    }).filter(([, v]) => v !== null && v !== undefined),
+  );
+
+/** A line's source as Edit Lines works it out: a key result or a KPI linked, else what it was unless a link went. */
+function sourceOf(line, held = null) {
+  if (line.okr_key_result_id) return "key_result";
+  if (line.kpi_definition_id) return "function_kpi";
+  if (held && ["key_result", "function_kpi"].includes(held.source)) return "own";
+  return held ? held.source : "own";
+}
+
+/** Every line through saveLines, a refusal on the card's line put on the card's own fields. */
+async function saveCardLines(actor, scope, id, lines, at) {
+  try {
+    return await saveLines(actor, scope, id, contract.ScorecardLinesSave.parse({ lines }));
+  } catch (err) {
+    if (!(err instanceof AppError) || !err.fields) throw err;
+    const own = Object.entries(err.fields)
+      .filter(([k]) => k.startsWith(`lines.${at}.`))
+      .map(([k, v]) => [k.slice(`lines.${at}.`.length), v]);
+    throw own.length ? new AppError(err.code, err.message, err.status, Object.fromEntries(own)) : err;
+  }
+}
+
+/** Add Line's card: the new line at the foot of its section's lines, every other line as it stands. */
+async function addLine(actor, scope, values) {
+  const { scorecard_id: id, ...line } = values;
+  const held = (await repo.lines(pool, id)).map(inputOf);
+  const fresh = Object.fromEntries(Object.entries({ ...line, source: sourceOf(line) }).filter(([, v]) => v !== undefined));
+  return saveCardLines(actor, scope, id, [...held, fresh], held.length);
+}
+
+/** Save Line's card: that line with what changes, every other line as it stands. */
+async function changeLine(actor, scope, values) {
+  const { scorecard_id: id, employee_target_id: lineId, ...change } = values;
+  const rows = await repo.lines(pool, id);
+  const at = rows.findIndex((l) => l.employee_target_id === lineId);
+  if (at < 0) throw new AppError("NOT_FOUND", "That line is not on this scorecard", 404, { employee_target_id: ["No such line"] });
+  const lines = rows.map(inputOf);
+  const next = { ...lines[at], ...Object.fromEntries(Object.entries(change).filter(([, v]) => v !== undefined)) };
+  if ("okr_key_result_id" in change || "kpi_definition_id" in change) next.source = sourceOf(next, rows[at]);
+  lines[at] = next;
+  return saveCardLines(actor, scope, id, lines, at);
+}
+
 module.exports = {
   bindDepartment,
   applyTargetChange,
@@ -862,4 +1073,18 @@ module.exports = {
   contributions,
   submit,
   settleAmendment,
+  scorecardIdOf,
+  scorecardChoices,
+  scorecardLineIdOf,
+  scorecardLineChoices,
+  draftChoices,
+  draftIdOf,
+  lineIdOf,
+  cardScorecard,
+  cardLine,
+  assertCardDraft,
+  assertCardScorecard,
+  assertCardEditable,
+  addLine,
+  changeLine,
 };

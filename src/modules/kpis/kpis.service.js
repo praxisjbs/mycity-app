@@ -7,6 +7,10 @@
  * one (TBO-K04, G1). The head (or acting head) sets them (`goals.function`); the CEO and whoever
  * runs the cycle may act for any function. One actual per KPI per month: Met, Not Met or N/A,
  * never 100% for N/A (no eligible cases).
+ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11) name a KPI by its code or its words among those
+ * the person reads (kpiIdOf), name it on the card (cardKpi) and re-check it at the press with
+ * update's own rule (assertCardKpi).
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -15,6 +19,8 @@ const { emit } = require("../../shared/events/emit");
 const { scopeFor } = require("../../middleware/rbac");
 const authority = require("../goals/goals.authority");
 const visibility = require("../goals/goals.visibility");
+const { common } = require("@mycity/contract");
+const { oneNamedIn, plainWords, choiceWords } = require("../../shared/ai/named");
 const repo = require("./kpis.repo");
 const { EVENTS } = require("./kpis.events");
 
@@ -270,4 +276,42 @@ async function removeImported(client, actor, id) {
   });
 }
 
-module.exports = { monthView, kpiView, list, summary, units, get, ofDepartment, nextCode, create, update, recordIn, recordActual, importKpi, removeImported };
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decision 40)
+ * ------------------------------------------------------------------ */
+
+const isId = (v) => typeof v === "string" && common.uuid.safeParse(v).success;
+
+/** The KPI a person names: its code (TBO-K01) or its words, among the active KPIs they read. */
+async function kpiIdOf(db, words, actor) {
+  const reach = await visibility.readerOf(db, actor);
+  const page = (q) => async () => (await repo.list(db, { page: 1, active: "true", ...(q ? { q } : {}) }, null, reach)).data;
+  const found = await oneNamedIn([page(words), page(plainWords(words, ["kpi"])), page(null)], words, (k) => [k.code, k.name], { drop: ["kpi"] });
+  return found ? found.kpi_definition_id : null;
+}
+
+/** "Which KPI?" answers (decision 34): the active KPIs of the functions whose KPIs the person sets, by code and name as kpiIdOf matches them. */
+async function kpiChoices(db, actor) {
+  const reach = await visibility.readerOf(db, actor);
+  const out = [];
+  for (const k of (await repo.list(db, { page: 1, active: "true" }, null, reach)).data) if (await authority.maySetGoals(db, actor, k.department_id)) out.push(choiceWords(`${k.code} ${k.name}`));
+  return out;
+}
+
+/** The KPI a card names, by its code and name, when the person reads it; its id alone otherwise. */
+async function cardKpi(db, id, actor) {
+  const k = isId(id) ? await repo.get(db, id) : null;
+  if (!k) return [];
+  const reach = await visibility.readerOf(db, actor);
+  const readable = (await repo.list(db, { page: 1, q: k.code }, null, reach)).data.some((r) => r.kpi_definition_id === id);
+  return [{ type: "kpi", id, label: readable ? `${k.code} ${k.name}` : null }];
+}
+
+/** Save KPI's re-check: the KPI exists and the person sets its function's KPIs, as update holds it. */
+async function assertCardKpi(db, id, actor) {
+  const k = isId(id) ? await repo.get(db, id) : null;
+  if (!k) throw new AppError("NOT_FOUND", "That KPI does not exist", 404, { kpi_definition_id: ["No such KPI"] });
+  await authority.assertSetsGoals(db, actor, k.department_id, "KPIs");
+}
+
+module.exports = { monthView, kpiView, list, summary, units, get, ofDepartment, nextCode, create, update, recordIn, recordActual, importKpi, removeImported, kpiIdOf, kpiChoices, cardKpi, assertCardKpi };

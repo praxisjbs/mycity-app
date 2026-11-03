@@ -8,7 +8,7 @@
  * Addresses are plain strings on the wire. A message's sender carries its display name.
  */
 const { z } = require("zod");
-const { uuid, email, phone, text, blank, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, email, phone, text, blank, isoDateTime, listQuery, Paged, changesBeside } = require("./common");
 const { DocumentRef } = require("./documents");
 
 /** The six canonical folders (mailbox.md §4). Server folders beyond them are not synced. */
@@ -420,6 +420,13 @@ const SignatureConfigSave = z
   })
   .strict();
 
+/**
+ * Configure as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 40): only what changes, the
+ * press keeping the rest of the company's signature as it is saved; nothing to change is said on the
+ * first switch, where the card shows it.
+ */
+const SignatureConfigChange = SignatureConfigSave.partial().refine(changesBeside([]), { message: "Nothing to change", path: ["show_whatsapp"] });
+
 const TABLES = {
   MailAddress: { table: null, reason: "an address and its display name, as a message carries it" },
   MailConnection: {
@@ -512,6 +519,7 @@ const TABLES = {
   SignaturePreview: { table: null, reason: "the signature a message with those recipients would carry" },
   SignatureConfig: { table: "mail_signature_config" },
   SignatureConfigSave: { table: "mail_signature_config" },
+  SignatureConfigChange: { table: "mail_signature_config" },
   MailAssistRequest: { table: null, reason: "what the composer holds and what the person asked the AI for; nothing is kept" },
   MailAssist: { table: null, reason: "a draft or questions from the AI, shown before anything changes; nothing is kept" },
   MailAssistOutput: { table: null, reason: "the model's answer, checked for placeholders before anyone sees it" },
@@ -559,6 +567,7 @@ module.exports = {
   SignaturePreview,
   SignatureConfig,
   SignatureConfigSave,
+  SignatureConfigChange,
   ASSIST_MODES,
   ASSIST_KINDS,
   AssistMode,

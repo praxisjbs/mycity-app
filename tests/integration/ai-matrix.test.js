@@ -176,12 +176,15 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
     await drainOutbox();
     registry.load();
     const tools = [...registry.reads(), ...registry.summaries(), ...registry.actions()];
-    // The screen's rule: the grant, and for an action held to a capability, that capability too (its route's requireCapability).
+    // The screen's rule: the grant, and for an action held to a capability, that capability too (its route's requireCapability),
+    // or any one of its capabilities (requireAnyCapability).
     const may = (role, module, action, tool) => {
       const u = people.get(role);
       if (!u) return false;
       if (u.is_ceo === true) return true;
-      return grantsOf.get(`${role}:${module}:${action}`) === true && (!tool || !tool.capability || (capabilitiesOf.get(role) || []).includes(tool.capability));
+      const held = capabilitiesOf.get(role) || [];
+      const capable = !tool || ((!tool.capability || held.includes(tool.capability)) && (!tool.capabilities || tool.capabilities.some((c) => held.includes(c))));
+      return grantsOf.get(`${role}:${module}:${action}`) === true && capable;
     };
     const grantsOf = new Map();
     const capabilitiesOf = new Map();

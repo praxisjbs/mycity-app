@@ -495,8 +495,34 @@ Nobody, including People and the CEO, can read a direct message they are not par
   and `community.post` (`community` create; input `ChannelPost`: the channel and the words; the
   channel named for a member; at the press a member who may post there (`assertMayPost`, so never
   #announcements); run `postMessage`). The words are the person's and the records the reads
-  returned: the assistant still reads no message. `ChannelCreate`, `WishCreate`, `MessageCreate`,
-  `RecognitionCreate` and `DirectCreate` are `not_offered`.
+  returned: the assistant still reads no message. Every other form is a card too (`praxis-ai.md`
+  decisions 33 and 40), each the screen's own service function: `channels.create`, Create Channel
+  (`ChannelCreate`: the name, purpose, who can post, the people and departments, each named; the
+  purpose then posted in it as New Channel posts it); `channels.edit`, Save Channel (`ChannelChange`:
+  Edit Channel's name and purpose beside the channel, matched by its name among the person's; its
+  admin alone, never #general or #announcements, `assertAdmin`); `community.recognise`, Post
+  Recognition (`RecognitionCreate`: the colleague, named, and the note; `recognise`, in #general);
+  `community.wish`, Send Wishes (`WishSend`: Send Wishes' `WishCreate` beside the card, found by whose
+  birthday or anniversary it is among the live cards of the person's channels; `sendWish`); and
+  `community.edit_message`, Save Message (`MessageChange`: the person's newest message still to be
+  changed in the channel or conversation named, a text within 15 minutes or a poll before its first
+  vote, named by where it is and never by its words; `editMessage`). `announcements.ai.js` (the
+  announcements module's manifest, replacing its `ai:none`): `announcements.publish`, Publish
+  Announcement (`AnnouncementPost`: New Announcement's form with its audience as All Staff or
+  Departments, the urgency and when it goes out, now when left out) and `announcements.edit`, Save
+  Announcement (`AnnouncementChange`: Edit Announcement's fields beside the announcement, matched by
+  its headline among those waiting; only what changes, the rest as it stands, `update`), both held
+  to `announcements.post` as their routes are, one press as the screen's own button (decision 40).
+  Each asks for what it needs first when it was not said (`praxis-ai.md` decision 34), the
+  person's own to tap: which channel (those they run, `adminChannelChoices`), whom to recognise (the
+  directory), whose card (the last two weeks', `celebrationChoices`) and the wish, where a message is
+  (their channels), which (their newest message or poll) and its new words, which announcement (those
+  waiting, `scheduledChoices`) and, for chosen departments, which (`departments.list`).
+  `MessageCreate` and `DirectCreate` are reached `via community.message`, `ChannelUpdate`,
+  `WishCreate` and `MessageEdit` `via` their cards, `AnnouncementCreate` and `AnnouncementUpdate`
+  `via` the announcement cards. The four new cards of the community module carry matrix probes (a
+  channel the person made against an outsider's private one, a colleague against an id that is
+  nobody's, a card and a message in #general against the outsider's channel; `praxis-ai.md` §6.17).
 - **AI routes**: "post an announcement" → Announcements · New Announcement; "message someone" →
   Direct Messages · New Message, prefilled with the person.
 - **Search** (`community.search.js`, ⌘K): published announcements by headline and text. Words
@@ -630,6 +656,16 @@ fields, never in a toast.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Every Staff Community form in the chat (`praxis-ai.md` decisions 33 and 40, §6.11):
+  Create Channel, Save Channel, Post Recognition, Send Wishes and Save Message in `community.ai.js`,
+  and Publish Announcement and Save Announcement in the announcements module's new manifest
+  (`announcements.ai.js`, its controller's `ai:none` gone), each the screen's own service function,
+  an announcement with one press as the screen's own button (§9). The service gains what the cards
+  name and re-check (`channelIdOf`, `celebrationIdOf`, `messageIdOf`, `cardMessage`, and the
+  announcements service's `idOf`, `cardRecords`, `assertScheduled`); nothing writes but the
+  functions the screens call. Each asks what it needs before it is drawn (decision 34): which
+  channel, card, message or announcement, with the person's own to tap, and the words. Nothing on
+  the Staff Community screens changes.
 - 03/11/2026 · JP · `community.service.loginNamed` and `loginNames` (a colleague's login by name, and logins named) for Praxis AI's Schedule Report card, whose recipients are logins (`praxis-ai.md` §6.11). No screen of Staff Community changed.
 - 03/11/2026 · JP · Praxis AI's Send Message and Post Message cards ask what they need before they are drawn (`praxis-ai.md` decision 34): who it is for (the directory, `colleagues.list`, to tap; a name matched there), which channel (the person's own channels, `channels.list`) and the words. No screen of Staff Community changed.
 - 03/11/2026 · JP · `community.ai.js`: the chat box's own message and a new direct conversation are reached `via community.message` (`praxis-ai.md` decision 33); channels, recognitions, wishes and editing a message are on the list of forms to bring into the chat (`scripts/check/ai-forms-gaps.json`). No behaviour changed.

@@ -9,7 +9,7 @@
  * set by the function's head (`goals.function`).
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { Quantity, Direction } = require("./scoring");
 
@@ -143,12 +143,12 @@ const KpiCreate = z
     target_value: blank(Quantity),
     frequency: KpiFrequency.default("monthly"),
     data_source: optionalText(500),
-    starts_period_id: blank(uuid),
+    starts_period_id: blank(recordId("quarter")),
   })
   .strict();
 
 /** PATCH /performance/kpis/:id. The target's wording can be changed, never cleared. */
-const KpiEdit = z
+const KpiEditFields = z
   .object({
     name: text(200),
     description: z.string().trim().max(2000).nullable(),
@@ -162,8 +162,11 @@ const KpiEdit = z
     active: z.boolean(),
   })
   .partial()
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+  .strict();
+const KpiEdit = KpiEditFields.refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+
+/** Edit KPI as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the KPI beside the form's fields. */
+const KpiChange = KpiEditFields.extend({ kpi_definition_id: recordId("KPI") }).refine(changesBeside(["kpi_definition_id"]), nothingOn("kpi_definition_id"));
 
 /** POST /performance/kpis/:id/actuals: one month's figure; Met and Not Met need it, N/A does not. */
 const KpiActual = z
@@ -232,6 +235,7 @@ const TABLES = {
   },
   KpiCreate: { table: "kpi_definition" },
   KpiEdit: { table: "kpi_definition" },
+  KpiChange: { table: "kpi_definition" },
   KpiActual: { table: "kpi_month" },
   KpiImportRow: { table: null, reason: "a KPI of the OKR workbook as the importer reads it" },
 };
@@ -256,6 +260,7 @@ module.exports = {
   KpiDetail,
   KpiCreate,
   KpiEdit,
+  KpiChange,
   KpiActual,
   KpiImportRow,
 };
