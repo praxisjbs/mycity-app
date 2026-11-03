@@ -107,12 +107,18 @@ async function guarded(db, fn) {
 
 /**
  * May this person run it: the grant, and an action's capability when it names one (held on top of
- * the grant, as the screen's route holds it). The scope the grant gives, or null.
+ * the grant, as the screen's route holds it), or any one of its capabilities when it names several
+ * (as requireAnyCapability holds a route). The scope the grant gives, or null.
  */
 async function scopeOf(actor, tool) {
   const scope = await scopeFor(actor, tool.permission[0], tool.permission[1]);
-  if (!scope || !tool.capability) return scope;
-  return (await holdsCapability(actor, tool.capability)) ? scope : null;
+  if (!scope) return scope;
+  if (tool.capability && !(await holdsCapability(actor, tool.capability))) return null;
+  if (tool.capabilities && tool.capabilities.length) {
+    for (const code of tool.capabilities) if (await holdsCapability(actor, code)) return scope;
+    return null;
+  }
+  return scope;
 }
 
 /** The person with the scope an action's grant gives them, or null when they may not run it (its capability too). */

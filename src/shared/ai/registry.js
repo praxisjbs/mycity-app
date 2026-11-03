@@ -175,7 +175,7 @@ const sha = (v) => crypto.createHash("sha256").update(JSON.stringify(v)).digest(
 /**
  * What gate 23 holds the committed snapshot to (praxis-ai.md §6.15): every read, summary, action
  * and route with its module, permission, risk, bulk and the hash of its schema, and an action's
- * capability when it names one, sorted by key.
+ * capability or capabilities when it names them, sorted by key.
  * @returns {Array<{key: string, kind: string, module_key: string, permission: string|null, risk: string|null,
  *          bulk: number|null, schema: string|null, schema_sha: string|null, screen: string|null}>}
  */
@@ -192,6 +192,7 @@ function snapshot() {
     screen: r.screen,
     // An authority held on top of the grant is part of who may press it (praxis-ai.md §6.11).
     ...(r.kind === "action" && action(r.key).capability ? { capability: action(r.key).capability } : {}),
+    ...(r.kind === "action" && action(r.key).capabilities ? { capabilities: [...action(r.key).capabilities] } : {}),
   }));
   return rows.sort((a, b) => (a.kind === b.kind ? a.key.localeCompare(b.key) : a.kind.localeCompare(b.kind)));
 }

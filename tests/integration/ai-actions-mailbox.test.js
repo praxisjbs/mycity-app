@@ -5,6 +5,9 @@
  * mailbox's own send, from the person's connected mailbox with the company signature baked in;
  * a person with no mailbox connected is refused at the press; a body with a gap left to fill is
  * held on its field. The mail server is an in-memory stand-in behind the provider's own methods.
+ * The signatures (decision 40): Save My Signature through the Signature tab's own save, the mobile
+ * written to the employee record; Configure Signature for holders of mailbox.signature alone, only
+ * what it names changed.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/ai-actions-mailbox
  */
@@ -67,6 +70,7 @@ describeDb("Praxis AI's mail card against the real migrations", () => {
     await h.makePeople([
       { who: "ceo", first: "Amaka", last: "Eze", email: "ceo@mycity.test", job: "Chief Executive Officer", role: "management", ceo: true, password: "Chief#Officer26" },
       { who: "bola", first: "Bola", last: "Ade", email: "bola@mycity.test", job: "Operations & People Lead", role: "operations_people", password: "Opera!ions2026" },
+      { who: "admin", first: "Kemi", last: "Bello", email: "sysadmin@mycity.test", job: "Systems Administrator", role: "administrator", password: "Systems#Keeper2026" },
     ]);
     const connected = await h.as("bola").post("/mailbox/connection").send({ email: "bola@mycity.test", password: server.password });
     expect(connected.status).toBe(200);
@@ -128,5 +132,42 @@ describeDb("Praxis AI's mail card against the real migrations", () => {
     expect(refused.status).toBe(422);
     expect(refused.body.error.fields).toEqual({ body: ["Fill the gap"] });
     expect((await one("SELECT count(*)::int AS n FROM mail_send_queue")).n).toBe(1);
+  });
+
+  /** The card the model drafts for a question, as the answer carries it. */
+  const drawn = async (who, key, given, question = "Do it.") => {
+    script(say({ text: "Here it is.", action: { key, values: given, suggested: false } }));
+    const asked = await h.ask(who, { question, shows: ["cards"] });
+    expect(asked.status).toBe(200);
+    return asked.body.card;
+  };
+
+  test("signatures.save: Save My Signature through the tab's own save: the office line and a switch, then the mobile, written to the employee record", async () => {
+    const card = await drawn("bola", "signatures.save", { office_line: "0201 234 5678", show_whatsapp: false }, "Put my office line on my signature and hide WhatsApp.");
+    expect(card).toMatchObject({ action_key: "signatures.save", label: "Save My Signature", schema: "mailbox.MySignatureSave", records: [], problems: {} });
+    expect(card.fields.map((f) => f.name)).toEqual(["mobile", "office_line", "show_mobile", "show_whatsapp"]);
+    const pressed = await h.press("bola", card.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    expect(pressed.body.lines[0]).toMatchObject({ type: "mail_signature", label: "Bola Ade", ok: true, message: "saved", link: "/mailbox?tab=signature" });
+    const mine = (await h.as("bola").get("/mailbox/signature")).body;
+    expect(mine).toMatchObject({ office_line: "+2342012345678", show_whatsapp: false });
+
+    const mobile = await drawn("bola", "signatures.save", { mobile: "0803 123 4599" });
+    expect((await h.press("bola", mobile.ai_action_draft_id)).status).toBe(200);
+    expect(await one("SELECT phone FROM employee WHERE employee_id = $1", [h.people.bola.employee_id])).toEqual({ phone: "+2348031234599" });
+  });
+
+  test("signatures.configure: Configure Signature for holders of mailbox.signature alone, only the links named changed, the rest as saved", async () => {
+    expect(await drawn("bola", "signatures.configure", { linkedin_url: "https://linkedin.com/company/mycity" })).toBeNull();
+    const before = (await h.as("admin").get("/mailbox/signature/config")).body;
+    const card = await drawn("admin", "signatures.configure", { linkedin_url: "https://linkedin.com/company/mycity", show_social_links: true }, "Add our LinkedIn to the company signature.");
+    expect(card).toMatchObject({ label: "Configure Signature", schema: "mailbox.SignatureConfigChange", problems: {} });
+    const pressed = await h.press("admin", card.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    const after = (await h.as("admin").get("/mailbox/signature/config")).body;
+    expect(after).toMatchObject({ linkedin_url: "https://linkedin.com/company/mycity", show_social_links: true });
+    for (const k of ["app_store_url", "google_play_url", "instagram_url", "x_url", "confidentiality_note", "show_whatsapp", "show_app_links", "show_legal"]) expect([k, after[k]]).toEqual([k, before[k]]);
+    expect((await drawn("admin", "signatures.configure", { x_url: "x.com/mycity" })).problems).toEqual({ x_url: ["Not a web address"] });
+    expect((await drawn("admin", "signatures.configure", {})).problems).toEqual({ show_whatsapp: ["Nothing to change"] });
   });
 });

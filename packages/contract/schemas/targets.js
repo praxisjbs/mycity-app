@@ -16,7 +16,7 @@
  * commitments for the month (`commitment_set`).
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { Link, CommitmentState, CommitmentSetStatus, CommitmentRecoveryRef } = require("./tasks");
 const { ScoreValue, Quantity, Direction, Rating } = require("./scoring");
@@ -256,10 +256,47 @@ const ScorecardLineInput = z
 const ScorecardLinesSave = z.object({ lines: z.array(ScorecardLineInput).max(40) }).strict();
 
 /**
+ * New Scorecard as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the person, the
+ * quarter, and Copy From as a person reads it, Last Quarter or None; a colleague's scorecard to copy
+ * from stays on the form, where its scorecard is picked.
+ */
+const ScorecardDraft = z
+  .object({
+    employee_id: recordId("colleague"),
+    performance_period_id: recordId("quarter"),
+    copy_from: z.enum(["last_quarter", "none"]).default("last_quarter"),
+  })
+  .strict();
+
+/** What a card writes on one line of Edit Lines: the form's own fields for a line, Team Key Results left to the form. */
+const lineFields = {
+  section: Section,
+  title: text(300),
+  measure: LineMeasure,
+  target_value: blank(Quantity),
+  target_text: optionalText(1000),
+  milestone_due_on: blank(isoDate),
+  weight: LineWeight,
+  okr_key_result_id: blank(recordId("key result")),
+  kpi_definition_id: blank(recordId("KPI")),
+};
+
+/** A new line of Edit Lines as a card: the scorecard beside the line; the press keeps every other line as it stands. */
+const ScorecardLineAdd = z.object({ scorecard_id: recordId("scorecard"), ...lineFields }).strict();
+
+/** A line of Edit Lines changed as a card: the scorecard and the line (by its id, or its words) beside what changes. */
+const ScorecardLineChange = z
+  .object({ scorecard_id: recordId("scorecard"), employee_target_id: recordId("line"), ...lineFields })
+  .partial()
+  .required({ scorecard_id: true, employee_target_id: true })
+  .strict()
+  .refine(changesBeside(["scorecard_id", "employee_target_id"]), nothingOn("employee_target_id"));
+
+/**
  * PATCH /performance/scorecards/:id. The reviewer, as a person or a role, needs a reason and
  * `performance.manage`.
  */
-const ScorecardEdit = z
+const ScorecardEditFields = z
   .object({
     scope_text: z.string().trim().max(2000).nullable(),
     reviewer_employee_id: uuid.nullable(),
@@ -268,16 +305,24 @@ const ScorecardEdit = z
     dotted_employee_id: uuid.nullable(),
   })
   .partial()
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" })
-  .refine((v) => !(v.reviewer_employee_id && v.reviewer_role_code), {
-    message: "A person or a role, not both",
-    path: ["reviewer_role_code"],
-  })
-  .refine((v) => !("reviewer_employee_id" in v || "reviewer_role_code" in v) || Boolean(v.reviewer_reason), {
-    message: "Give a reason",
-    path: ["reviewer_reason"],
-  });
+  .strict();
+/** A reviewer is a person or a role, and changing one needs a reason. */
+const reviewerRules = (schema) =>
+  schema
+    .refine((v) => !(v.reviewer_employee_id && v.reviewer_role_code), {
+      message: "A person or a role, not both",
+      path: ["reviewer_role_code"],
+    })
+    .refine((v) => !("reviewer_employee_id" in v || "reviewer_role_code" in v) || Boolean(v.reviewer_reason), {
+      message: "Give a reason",
+      path: ["reviewer_reason"],
+    });
+const ScorecardEdit = reviewerRules(ScorecardEditFields.refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" }));
+
+/** Change Reviewer as Praxis AI's card (praxis-ai.md §6.11): the scorecard beside ScorecardEdit's fields. */
+const ScorecardChange = reviewerRules(
+  ScorecardEditFields.extend({ scorecard_id: recordId("scorecard") }).refine(changesBeside(["scorecard_id"]), nothingOn("scorecard_id")),
+);
 
 /** POST /performance/scorecards/:id/disagree */
 const DisagreeBody = z.object({ disagree_reason: text(1000) }).strict();
@@ -500,6 +545,13 @@ const TABLES = {
   },
   ScorecardLinesSave: { table: null, reason: "every line of a scorecard, in order", nested: {} },
   ScorecardEdit: { table: "scorecard" },
+  ScorecardDraft: {
+    table: "scorecard",
+    virtual: { copy_from: "where the first lines are copied from; not stored" },
+  },
+  ScorecardLineAdd: { table: "employee_target" },
+  ScorecardLineChange: { table: "employee_target" },
+  ScorecardChange: { table: "scorecard" },
   DisagreeBody: { table: "scorecard" },
   Commitment: {
     table: "task",
@@ -564,9 +616,13 @@ module.exports = {
   ScorecardDetail,
   CopyFrom,
   ScorecardCreate,
+  ScorecardDraft,
   ScorecardLineInput,
   ScorecardLinesSave,
+  ScorecardLineAdd,
+  ScorecardLineChange,
   ScorecardEdit,
+  ScorecardChange,
   DisagreeBody,
   CommitmentState,
   CommitmentSetStatus,

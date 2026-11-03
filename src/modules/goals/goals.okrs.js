@@ -11,6 +11,12 @@
  * and date. A company key result Scored From a function key result takes its month, so nothing is
  * entered twice. The CEO confirms each month's score; the confirmed score counts, else the
  * proposed one shows.
+ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11) name an objective or a key result by its code or
+ * its words among those the person reads (objectiveIdOf, keyResultIdOf), offer this quarter's as
+ * answers to tap when it was not said (objectiveChoices, keyResultChoices), name it on the card
+ * (cardObjective, cardKeyResult) and re-check it at the press with the rules below (assertCardObjective,
+ * assertCardKeyResult) before the same function the screen's own button calls.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -18,7 +24,8 @@ const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const lagos = require("../../shared/time/lagos");
 const dayFirst = require("../../shared/time/day-first");
-const { scoring } = require("@mycity/contract");
+const { scoring, common } = require("@mycity/contract");
+const { oneNamedIn, choiceWords } = require("../../shared/ai/named");
 const { scopeFor } = require("../../middleware/rbac");
 const authority = require("./goals.authority");
 const share = require("./goals.share");
@@ -923,6 +930,87 @@ async function removeImported(client, actor, id) {
   });
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decision 40)
+ * ------------------------------------------------------------------ */
+
+const isId = (v) => typeof v === "string" && common.uuid.safeParse(v).success;
+
+/** The quarter the words are matched in first: the active one, else the one being planned. */
+const currentPeriodId = async (db) => ((await repo.currentPeriod(db)) || {}).performance_period_id || null;
+
+/** The objective a person names: its code (BM-O2) or its words, this quarter's first, among those they read. */
+async function objectiveIdOf(db, words, actor) {
+  const reach = await visibility.readerOf(db, actor);
+  const periodId = await currentPeriodId(db);
+  const page = (query) => async () => (await repo.listObjectives(db, { page: 1, ...query }, reach)).data;
+  const lists = periodId ? [page({ period_id: periodId, q: words }), page({ period_id: periodId })] : [];
+  const found = await oneNamedIn([...lists, page({ q: words })], words, (o) => [o.code, o.title]);
+  return found ? found.okr_objective_id : null;
+}
+
+/** The key result a person names: its code (BM-KR2.1) or its words, this quarter's, among those they read. */
+async function keyResultIdOf(db, words, actor) {
+  const periodId = await currentPeriodId(db);
+  if (!periodId) return null;
+  const reach = await visibility.readerOf(db, actor);
+  const page = (q) => async () => (await repo.listKeyResultRefs(db, { page: 1, period_id: periodId, ...(q ? { q } : {}) }, reach, false)).data;
+  const found = await oneNamedIn([page(words), page(null)], words, (k) => [k.code, k.statement]);
+  return found ? found.okr_key_result_id : null;
+}
+
+/**
+ * "Which objective?" and "Which key result?" answers (decision 34): this quarter's, among those the
+ * person reads, by code and words as objectiveIdOf and keyResultIdOf match them; the objectives of
+ * a plan still open to change (`editable`), or the company's alone (`company`).
+ */
+async function objectiveChoices(db, actor, { editable = false, company = false } = {}) {
+  const periodId = await currentPeriodId(db);
+  if (!periodId) return [];
+  const query = { page: 1, period_id: periodId, ...(editable ? { status: "editable" } : {}), ...(company ? { department_id: "company" } : {}) };
+  return (await repo.listObjectives(db, query, await visibility.readerOf(db, actor))).data.map((o) => choiceWords(`${o.code} ${o.title}`));
+}
+
+async function keyResultChoices(db, actor) {
+  const periodId = await currentPeriodId(db);
+  if (!periodId) return [];
+  const page = await repo.listKeyResultRefs(db, { page: 1, period_id: periodId }, await visibility.readerOf(db, actor), false);
+  return page.data.map((k) => choiceWords(`${k.code} ${k.statement}`));
+}
+
+/** The objective a card names, by its code and title, when the person reads it; its id alone otherwise. */
+async function cardObjective(db, id, actor) {
+  const o = isId(id) ? await repo.getObjective(db, id) : null;
+  if (!o) return [];
+  const access = await visibility.objectiveAccess(db, await visibility.readerOf(db, actor), id);
+  return [{ type: "objective", id, label: access && access.readable ? `${o.code} ${o.title}` : null }];
+}
+
+/** The key result a card names, by its code and words, when the person reads it; its id alone otherwise. */
+async function cardKeyResult(db, id, actor) {
+  const k = isId(id) ? await repo.getKeyResult(db, id) : null;
+  if (!k) return [];
+  const readable = await visibility.assertKeyResult(db, await visibility.readerOf(db, actor), id).then(() => true, () => false);
+  return [{ type: "key_result", id, label: readable ? `${k.code} ${k.statement}` : null }];
+}
+
+/** Save Objective's re-check: the objective exists, the person sets its function's goals, its plan is open. */
+async function assertCardObjective(db, id, actor) {
+  const o = isId(id) ? await repo.getObjective(db, id) : null;
+  if (!o) throw new AppError("NOT_FOUND", "That objective does not exist", 404, { okr_objective_id: ["No such objective"] });
+  await authority.assertSetsGoals(db, actor, o.department_id);
+  assertOpen({ status: o.plan_status }, "okr_objective_id");
+}
+
+/** Save Key Result's re-check: the key result exists, its plan is editable, the person sets its function's goals. */
+async function assertCardKeyResult(db, id, actor) {
+  const ctx = isId(id) ? await repo.keyResultContext(db, id) : null;
+  if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404, { okr_key_result_id: ["No such key result"] });
+  if (!plans.isEditable(ctx.plan_status))
+    throw new AppError("KEY_RESULT_BINDING", "This key result is binding: change its target instead", 409, { okr_key_result_id: ["Use Change Target"] });
+  await authority.assertSetsGoals(db, actor, ctx.department_id);
+}
+
 module.exports = {
   importKeyResult,
   importScoredFrom,
@@ -948,4 +1036,12 @@ module.exports = {
   reportMonth,
   confirmScore,
   trace,
+  objectiveIdOf,
+  objectiveChoices,
+  keyResultChoices,
+  keyResultIdOf,
+  cardObjective,
+  cardKeyResult,
+  assertCardObjective,
+  assertCardKeyResult,
 };

@@ -12,7 +12,7 @@
  * no proposed score, and it leaves the score to date's denominator.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { Link } = require("./tasks");
 const { ScoreValue, Quantity, Rating } = require("./scoring");
@@ -64,7 +64,7 @@ const RoundListQuery = listQuery({ period_id: uuid.optional(), status: RoundStat
 /** POST /performance/rounds: open a month's round late, by hand. */
 const RoundCreate = z
   .object({
-    performance_period_id: uuid,
+    performance_period_id: recordId("quarter"),
     month: MonthStart,
   })
   .strict();
@@ -322,6 +322,30 @@ const ReviewScoresSave = z
   })
   .strict();
 
+/**
+ * One line of Score Review as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 40): the
+ * review and its line beside the line's own fields, the final score, the reason it differs, the
+ * comment and the corrective action with its owner and due day. Only what changes is given; the
+ * press saves that line through Save Scores with every other line and action as it stands.
+ */
+const ReviewScoreChange = z
+  .object({
+    performance_review_id: recordId("review"),
+    performance_review_item_id: recordId("line"),
+    score: ScoreValue.nullable().optional(),
+    override_reason: optionalText(1000),
+    comment: optionalText(4000),
+    corrective_title: optionalText(300),
+    corrective_owner_id: recordId("colleague").optional(),
+    corrective_due_on: isoDate.optional(),
+  })
+  .strict()
+  .refine(changesBeside(["performance_review_id", "performance_review_item_id"]), nothingOn("performance_review_item_id"))
+  .refine((v) => v.corrective_title !== undefined || (v.corrective_owner_id === undefined && v.corrective_due_on === undefined), {
+    message: "Add an action",
+    path: ["corrective_title"],
+  });
+
 /** POST /performance/reviews/:id/input: the dotted manager's input. */
 const ReviewInput = z.object({ dotted_input: text(4000) }).strict();
 
@@ -404,6 +428,31 @@ const EvidenceUpload = z.object({ purpose: UploadPurpose.optional(), performance
 
 /** PUT /ess/performance/check-in: Save Draft. */
 const ReviewCheckInSave = z.object({ items: z.array(ReviewCheckInItemSave).max(60) }).strict();
+
+/**
+ * One line of the check-in as Praxis AI's card (praxis-ai.md §6.11, decision 40): the line beside what
+ * the person fills on it, its evidence a link, a source named or a task (a file stays on My
+ * Performance). Only what changes is given; the press saves that line alone to the draft.
+ */
+const CheckInLineChange = z
+  .object({
+    performance_review_item_id: recordId("line"),
+    actual_value: Quantity.nullable().optional(),
+    actual_text: z.string().trim().max(2000).nullable().optional(),
+    achieved_on: isoDate.nullable().optional(),
+    action_text: z.string().trim().max(4000).nullable().optional(),
+    self_score: ScoreValue.nullable().optional(),
+    self_reason: z.string().trim().max(2000).nullable().optional(),
+    evidence_url: z.string().trim().url("Not a web address").max(2000).optional(),
+    evidence_note: z.string().trim().min(1).max(2000).optional(),
+    evidence_task_id: recordId("task").optional(),
+  })
+  .strict()
+  .refine(changesBeside(["performance_review_item_id"]), nothingOn("performance_review_item_id"))
+  .refine((v) => [v.evidence_url, v.evidence_note, v.evidence_task_id].filter((x) => x !== undefined).length <= 1, {
+    message: "One kind of evidence",
+    path: ["evidence_url"],
+  });
 
 /* ------------------------------------------------------------------ *
  * Dictation and Tidy (§6.17)
@@ -517,6 +566,37 @@ const PipEdit = z
   .partial()
   .strict()
   .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+
+/** A plan's lines on a card: their words, one a line (praxis-ai.md §6.11; a line's scorecard link and target are kept by the press). */
+const PipLineWords = z.array(text(1000)).min(1).max(20);
+
+/**
+ * Start PIP as Praxis AI's card (praxis-ai.md §6.11, decision 40): the review, its days and summary,
+ * and its lines as words; left out, the press takes the review's lines scored under their target, as
+ * Start PIP fills them.
+ */
+const PipStart = z
+  .object({
+    performance_review_id: recordId("review"),
+    starts_on: isoDate,
+    ends_on: blank(isoDate),
+    review_on: blank(isoDate),
+    summary: optionalText(4000),
+    lines: PipLineWords.optional(),
+  })
+  .strict();
+
+/** A plan's change as a card: the plan beside PipEdit's fields, its lines as words. */
+const PipChange = z
+  .object({
+    improvement_plan_id: recordId("plan"),
+    ends_on: isoDate.optional(),
+    review_on: isoDate.optional(),
+    summary: z.string().trim().max(4000).nullable().optional(),
+    lines: PipLineWords.optional(),
+  })
+  .strict()
+  .refine(changesBeside(["improvement_plan_id"]), nothingOn("improvement_plan_id"));
 
 /** POST /performance/pips/:id/close: Passed, Extended (new dates) or Not Met, with a note. */
 const PipClose = z
@@ -663,6 +743,11 @@ const TABLES = {
     virtual: { note: "recorded on the decision, with the confirmation" },
   },
   ReviewCheckInItemSave: { table: "performance_review_item" },
+  CheckInLineChange: {
+    table: "performance_review_item",
+    virtual: { evidence_task_id: "written as evidence_entity_type task and evidence_entity_id" },
+  },
+  ReviewScoreChange: { table: "performance_review_item" },
   ReviewCheckIn: {
     table: "performance_review",
     virtual: {
@@ -698,6 +783,14 @@ const TABLES = {
   PipEdit: {
     table: "improvement_plan",
     virtual: { lines: "replaces the improvement_plan_line rows" },
+  },
+  PipStart: {
+    table: "improvement_plan",
+    virtual: { lines: "written as improvement_plan_line rows, each its words" },
+  },
+  PipChange: {
+    table: "improvement_plan",
+    virtual: { lines: "replaces the improvement_plan_line rows, a line kept by its words keeping its target" },
   },
   PipClose: { table: "improvement_plan" },
   ReviewSummaryLine: { table: null, reason: "a line of the review's PDF, as printed" },
@@ -737,6 +830,7 @@ module.exports = {
   CorrectiveAction,
   ItemScore,
   ReviewScoresSave,
+  ReviewScoreChange,
   ReviewInput,
   ReturnCheckIn,
   ScoreWithoutCheckIn,
@@ -746,6 +840,7 @@ module.exports = {
   ReviewCheckInItemSave,
   ReviewCheckIn,
   ReviewCheckInSave,
+  CheckInLineChange,
   DictationRequest,
   Dictation,
   TidyRequest,
@@ -758,6 +853,8 @@ module.exports = {
   PipLineInput,
   PipCreate,
   PipEdit,
+  PipStart,
+  PipChange,
   PipClose,
   ReviewSummaryLine,
   ReviewSummaryVars,

@@ -1588,12 +1588,57 @@ the CEO. They never go to search, Home, Analytics (scores only) or the AI (§9).
   department's, what is shared with them, the key results they own; whoever reads the whole plan (§6.25) everything. A
   citation never opens a record the reader cannot. A shared goal or objective is found and cited like the
   rest.
-- **AI actions**: none (`docs/guides/praxis-ai.md` §6.11, PR4 of the engine). The monthly check-in
-  is written line by line on My Performance (an actual, evidence and an action per key result,
-  `reviews.service.saveCheckIn`, then Submit Check-In), which no card carries whole, and the goals
-  service has no check-in of its own; "do my check-in" stays a route to the form. Every Create
-  schema of the goals contract (a quarter, an organisational goal, an objective, a key result, a
-  plan unbind, a target change) is `not_offered` in `goals.ai.js` with the screen that owns it.
+- **AI actions** (`docs/guides/praxis-ai.md` §6.11, decisions 33 and 40): every form of Goals, KPIs,
+  Reviews, Scorecards and the check-in is a card the person confirms, each running the service
+  function the screen's own button calls, with the same grant and capability as its route. A record a
+  card names by its words is matched among the person's own, never guessed: a quarter by its name or
+  this, next or last quarter (`goals.service.periodIdOf`); a goal, an objective, a key result or a KPI
+  by its code or its words; a plan by its function, this quarter's; a review, a scorecard or a plan to
+  improve by its person; a line by its words among its own scorecard's or review's. A card asks for
+  each of these first when it was not said (`praxis-ai.md` decision 34), the person's own to tap,
+  from the matchers' own services (`periodChoices`, `goalChoices`, `planChoices`, `functionChoices`,
+  `departmentChoices`, `objectiveChoices`, `keyResultChoices`, `kpiChoices`, `reviewChoices`,
+  `reviewItemChoices`, `checkInItemChoices`, `planChoices` of `reviews.pip`, `scorecardChoices`,
+  `scorecardLineChoices`, `draftChoices`), and asks too for a line's section, measure and weight,
+  KPI's function and target, the month a target change or a round is for, a plan's first day, who
+  sees a share, and a corrective action's words and due day or a new reviewer's reason when the
+  card holds the rest. `goals.ai.js`: `quarters.create`, Set Up Quarter (`PeriodCreate`; `performance.manage`; its rules
+  the last quarter's, changed on Goals) and `quarters.edit`, Save Quarter (`PeriodChange`: Edit
+  Quarter's name and status, the quarter beside them); `goals.create`, Record Goal
+  (`OrganisationalGoalCreate`), `goals.edit`, Save Goal (`OrganisationalGoalChange`: the goal, its
+  description and one quarter's target in words, the other quarters' kept) and `goals.share`, Share
+  Goal (`GoalShareChange`), each `goals.organisation`; `objectives.share`, Share Objective
+  (`ObjectiveShareChange`, `goals.company`, a company objective only); `objectives.create`, Set
+  Objective (`ObjectiveCreate`), `objectives.edit`, Save Objective (`ObjectiveChange`),
+  `key_results.create`, Set Key Result (`KeyResultCreate`; Feeds and Scored From stay on the form)
+  and `plans.unbind`, Request To Unbind (`PlanUnbindRequest`: the plan, by its function, and the
+  reason), each held to `goals.company` or `goals.function` as their routes are, the authority rule
+  of §6.3 the service's; `key_results.edit`, Save Key Result (`KeyResultChange`, its route naming no
+  capability); `target_changes.request`, Change Target (`TargetChangeCreate`: a key result by its code
+  or a line by its words; `requestChange`'s own checks re-run at the press). `kpis.ai.js`:
+  `kpis.create`, Set KPI (`KpiCreate`) and `kpis.edit`, Save KPI (`KpiChange`), `goals.function`.
+  `reviews.ai.js`: `rounds.open`, Open Round (`RoundCreate`, `performance.manage`); `reviews.score`,
+  Save Score (`ReviewScoreChange`: one line of Score Review, its final score, the reason it differs,
+  its comment and its corrective action; the reviewer alone; every other line and action kept, as
+  `saveScores` takes them whole; risk `approval`, so Confirm It's You); `check_ins.save`, Save
+  Check-In (`CheckInLineChange`: one line of the person's open check-in, its actual, day delivered,
+  action, self score and reason, and a link, a source or a task as evidence, saved to the draft
+  through `saveCheckIn` with that line alone; a file and Submit Check-In stay on My Performance); and
+  `pips.start`, Start PIP (`PipStart`, from a closed review rated Below; its lines as words, else the
+  lines scored under target as the form fills them) and `pips.edit`, Save PIP (`PipChange`), both
+  `performance.manage` and risk `approval`. `targets.ai.js`: `scorecards.create`, Draft Scorecard
+  (`ScorecardDraft`: New Scorecard's person, quarter and Copy From Last Quarter or None; a colleague's
+  scorecard to copy stays on the form); `scorecards.add_line`, Add Line (`ScorecardLineAdd`) and
+  `scorecards.edit_line`, Save Line (`ScorecardLineChange`), each saving every line through
+  `saveLines` with the others as they stand; `scorecards.edit`, Change Reviewer (`ScorecardChange`,
+  the reviewer and a reason, which the service holds to `performance.manage`). The forms' own
+  schemas (`PeriodEdit`, `OrganisationalGoalEdit`, `GoalShareSave`, `ObjectiveEdit`,
+  `KeyResultEdit`, `PlanUnbindCreate`, `KpiEdit`, `ReviewScoresSave`, `ReviewCheckInSave`,
+  `ReviewCheckInItemSave`, `PipCreate`, `PipEdit`, `ScorecardCreate`, `ScorecardLinesSave`,
+  `ScorecardEdit`) are reached `via` these actions in `not_offered`. The assistant still reads none of
+  a check-in's actions, evidence or transcripts, a review's comments or a plan (§8): a card carries the
+  person's own words. Scorecards' Draft Scorecard carries a matrix probe (a report's, never the
+  outsider's); the other cards' records need a quarter, a plan or a round the matrix does not build.
 - **AI routes**: "do my check-in" → `ess.my-performance` with `check_in=1`; "set my commitments" →
   `workspace.tasks` with `new=1&commitment=1` (New Task with Commitment ticked); "open Ada's scorecard" → `performance.targets` with the
   scorecard; "report the month" → `performance.goals` with `report=1`; "see performance analytics" →
@@ -1609,8 +1654,8 @@ the CEO. They never go to search, Home, Analytics (scores only) or the AI (§9).
   `tasks.search.js` finds them with the words commitment and commitments too. A commitment set is reached
   from its approval and the Commitments view (`search:none`; route map `commitment_set` →
   `performance.targets` with `?set=`). A quarter plan and a target change are reached from their approval
-  and from Goals (`search:none`); ⌘K's Waiting on You lists them and opens their sheets. The week is a view over tasks (`search:none`, `ai:none` as the
-  rest of the `workspace` module). A mid-quarter scorecard waiting on someone is in ⌘K's Waiting on
+  and from Goals (`search:none`); ⌘K's Waiting on You lists them and opens their sheets. The week is a view over tasks (`search:none`, as the rest of
+  the `workspace` module; `workspace.ai.js` holds its Support Needed card). A mid-quarter scorecard waiting on someone is in ⌘K's Waiting on
   You and opens its sheet through the route map's `scorecard` (`?id=`); Change Target on a line,
   Score Without Check-In and Withdraw Review sit on the scorecard and the review, which search finds
   (`search:none` with that reason beside each). ⌘K actions: New Goal, Set Up Quarter (`performance.goals`
@@ -1844,6 +1889,20 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Every Performance form in the chat (`praxis-ai.md` decisions 33 and 40, §6.11): 23
+  cards through the screens' own services (§9): the quarter, the organisational goal, the objective,
+  the key result, sharing, Request To Unbind, Change Target, the KPI, Open Round, Save Score and
+  Start PIP and Save PIP behind Confirm It's You, a line of the check-in, the scorecard and its lines,
+  Change Reviewer; `goals.ai.js` declares actions, and its "no action" note goes. The card's helpers
+  sit beside the services they call (`cardRecords`, the `assert…` re-checks, the words matched among
+  the person's own, `saveScore` and `saveCheckInLine` saving one line and keeping the rest;
+  `requestChange`'s checks become `assertChangeable`, which the card's re-check runs too). The
+  contract's own forms read No such quarter, goal, objective, key result or line in place of Zod's
+  words for an id that is none. Each card asks what it needs before it is drawn (`praxis-ai.md`
+  decision 34): its record, with the person's own to tap from the services' `…Choices` functions, a
+  line's section, measure and weight, the month, a plan's first day, and what a state needs; a
+  review and a scorecard are matched by person and month or quarter too, and `monthOf` reads next
+  month. Nothing on the Performance screens changes.
 - 02/11/2026 · JP · Target changes tell the people they concern (JBS Praxis, 02/11/2026, from staging: "when the CEO changes a target, no notification is shown about a target change"; §6.4, §6.7, §7), guide first. Found: the CEO's own request waits on the CEO, and the fan-out leaves out whoever acted, so the engine's *Approval needed* never reached them and the bell held only the 3 day reminder and the overdue notice; `scorecard.line_target_changed` declared no notice, so the employee whose target changed was never told; `target_change.decided` told only whoever asked, so a key result's owner was not told either; and nobody was told their request was sent. **Now:** the engine tells the CEO of a request they opened themself (the CEO is the one person who may decide their own, `approvers.canAct`); the person who asked is told **Target change sent** (not the CEO, who has the notice above); on approval a line's employee is told **Your target changed** and a key result's accountable and co-accountable people **Target change approved**; each notice names the key result or line, the new target and its month. A refusal tells only whoever asked. No migration, no contract change, no screen change. `goals.approval.js`, `goals.service.js`, `goals.events.js`, `goals.repo.js`, `targets.events.js`, `targets.service.js`; `goals.okrs.js` (`changeLabel`), `shared/notifications/fanout.js` (`include_actor` may be a function), notifications.md §6 and §11, foundation.md §7; `tests/integration/performance-plan.test.js`, `tests/integration/workflow.test.js`, `tests/unit/foundation/events-workflow.test.js`. Assumption: a CEO who asks for a change is told once, **Approval needed**, not also **Target change sent**. Left: a plan the CEO sends themself reads **Approval needed: Quarter Plan** the same way; every approval the CEO opens and decides themself now tells them.
 
 - 01/11/2026 · JP · §10.1: the Plan Approval card shows whoever sets the function's goals the plan in every state (Send Plan, Returned, Unbound), and every other reader only while it is Awaiting Approval or Binding, never Draft, Returned or Unbound (JBS Praxis, 01/11/2026, from staging: a staff member read the card on an Unbound plan). Screen only: `GET /performance/plans` and `/plans/:id` still answer any reader of the function.

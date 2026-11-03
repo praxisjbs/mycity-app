@@ -15,7 +15,7 @@
  * are given by the service (G1) and freeze when the plan is binding.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { ScoreValue, Quantity, Direction, KrBand, Rating, ScoringRules } = require("./scoring");
 const { MonthStart, Kpi, KpiMonth, KpiResult, hasActual, ACTUAL_REQUIRED } = require("./kpis");
@@ -84,7 +84,7 @@ const PeriodCreate = z
   .strict();
 
 /** PATCH /performance/periods/:id: the name, the first live day, the rules, the status. */
-const PeriodEdit = z
+const PeriodEditFields = z
   .object({
     name: text(40),
     live_from: isoDate.nullable(),
@@ -92,8 +92,17 @@ const PeriodEdit = z
     status: PeriodStatus,
   })
   .partial()
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+  .strict();
+const PeriodEdit = PeriodEditFields.refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+
+/**
+ * Edit Quarter as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the quarter beside
+ * the form's fields, which the wizard never names because it is opened on its quarter.
+ */
+const PeriodChange = PeriodEditFields.extend({ performance_period_id: recordId("quarter") }).refine(
+  changesBeside(["performance_period_id"]),
+  nothingOn("performance_period_id"),
+);
 
 /* ------------------------------------------------------------------ *
  * Organisational goals
@@ -137,18 +146,37 @@ const GoalShare = z
  * PUT /performance/goals/:id/share and /objectives/:id/share. `department_ids` are the departments a
  * `departments` share reaches (at least one, active); an `all` share names none.
  */
+/** A share names departments only when it is for chosen departments, and then at least one. */
+const shareRules = (all) => (v, ctx) => {
+  if (v.audience === "departments" && v.department_ids.length === 0)
+    ctx.addIssue({ code: "custom", path: ["department_ids"], message: "Pick a department" });
+  if (v.audience === all && v.department_ids.length > 0)
+    ctx.addIssue({ code: "custom", path: ["department_ids"], message: "All staff names none" });
+};
+
 const GoalShareSave = z
   .object({
     audience: ShareAudience,
     department_ids: z.array(uuid).max(50).default([]),
   })
   .strict()
-  .superRefine((v, ctx) => {
-    if (v.audience === "departments" && v.department_ids.length === 0)
-      ctx.addIssue({ code: "custom", path: ["department_ids"], message: "Pick a department" });
-    if (v.audience === "all" && v.department_ids.length > 0)
-      ctx.addIssue({ code: "custom", path: ["department_ids"], message: "All staff names none" });
-  });
+  .superRefine(shareRules("all"));
+
+/**
+ * Share Goal and Share Objective as Praxis AI's cards (praxis-ai.md §6.11, decision 33): the goal or
+ * the company objective beside the form's fields; the audience as a person reads it (All Staff),
+ * which the card's run sends as the form's `all`.
+ */
+const CardShareAudience = z.enum(["all_staff", "departments"]);
+const shareFields = { audience: CardShareAudience, department_ids: z.array(uuid).max(50).default([]) };
+const GoalShareChange = z
+  .object({ organisational_goal_id: recordId("goal"), ...shareFields })
+  .strict()
+  .superRefine(shareRules("all_staff"));
+const ObjectiveShareChange = z
+  .object({ okr_objective_id: recordId("objective"), ...shareFields })
+  .strict()
+  .superRefine(shareRules("all_staff"));
 
 const OrganisationalGoalStatus = z.enum(["active", "closed"]);
 
@@ -263,6 +291,26 @@ const OrganisationalGoalEdit = z
   .partial()
   .strict()
   .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+
+/**
+ * Edit Goal as Praxis AI's card (praxis-ai.md §6.11, decision 33): the goal beside the form's own
+ * fields, its title and description, and one quarter's target in words, as the form shows one field
+ * for each quarter of the plan year. The other quarters' targets stay as they are.
+ */
+const OrganisationalGoalChange = z
+  .object({
+    organisational_goal_id: recordId("goal"),
+    title: text(300).optional(),
+    detail: clearableText(4000).optional(),
+    performance_period_id: recordId("quarter").optional(),
+    target_text: clearableText(1000).optional(),
+  })
+  .strict()
+  .refine(changesBeside(["organisational_goal_id", "performance_period_id"]), nothingOn("organisational_goal_id"))
+  .refine((v) => (v.performance_period_id === undefined) === (v.target_text === undefined), {
+    message: "Name the quarter",
+    path: ["performance_period_id"],
+  });
 
 /* ------------------------------------------------------------------ *
  * Objectives and key results
@@ -413,24 +461,30 @@ const OkrSummary = z
 /** POST /performance/objectives. No department: a company objective. The code is given (G1). */
 const ObjectiveCreate = z
   .object({
-    performance_period_id: uuid,
+    performance_period_id: recordId("quarter"),
     department_id: blank(uuid),
     title: text(500),
-    organisational_goal_id: blank(uuid),
+    organisational_goal_id: blank(recordId("goal")),
     position: z.number().int().min(0).optional(),
   })
   .strict();
 
 /** PATCH /performance/objectives/:id: a draft or returned plan only. */
-const ObjectiveEdit = z
+const ObjectiveEditFields = z
   .object({
     title: text(500),
-    organisational_goal_id: clearable(uuid),
+    organisational_goal_id: clearable(recordId("goal")),
     position: z.number().int().min(0),
   })
   .partial()
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+  .strict();
+const ObjectiveEdit = ObjectiveEditFields.refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+
+/** Edit Objective as Praxis AI's card (praxis-ai.md §6.11): the objective beside the form's fields. */
+const ObjectiveChange = ObjectiveEditFields.extend({ okr_objective_id: recordId("objective") }).refine(
+  changesBeside(["okr_objective_id"]),
+  nothingOn("okr_objective_id"),
+);
 
 const KEY_RESULT_FIELDS = {
   statement: text(1000),
@@ -454,7 +508,7 @@ const KEY_RESULT_FIELDS = {
 
 /** POST /performance/key-results. The code is given (G1). */
 const KeyResultCreate = z
-  .object({ okr_objective_id: uuid, ...KEY_RESULT_FIELDS })
+  .object({ okr_objective_id: recordId("objective"), ...KEY_RESULT_FIELDS })
   .strict()
   .refine((v) => !v.starts_on || !v.finishes_on || v.finishes_on >= v.starts_on, {
     message: "Finishes before it starts",
@@ -466,7 +520,13 @@ const KeyResultCreate = z
  * one clears it), and unbound too, except a reported key result's target, measure, direction, unit
  * and parts (§6.22); once binding, a key result changes only through a target change (§6.7).
  */
-const KeyResultEdit = z
+/** A key result that finishes before it starts is refused on Finish. */
+const finishesAfterStart = [
+  (v) => !v.starts_on || !v.finishes_on || v.finishes_on >= v.starts_on,
+  { message: "Finishes before it starts", path: ["finishes_on"] },
+];
+
+const KeyResultEditFields = z
   .object({
     statement: text(1000),
     kr_type: clearable(KrType),
@@ -487,12 +547,13 @@ const KeyResultEdit = z
     position: z.number().int().min(0),
   })
   .partial()
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" })
-  .refine((v) => !v.starts_on || !v.finishes_on || v.finishes_on >= v.starts_on, {
-    message: "Finishes before it starts",
-    path: ["finishes_on"],
-  });
+  .strict();
+const KeyResultEdit = KeyResultEditFields.refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" }).refine(...finishesAfterStart);
+
+/** Edit Key Result as Praxis AI's card (praxis-ai.md §6.11): the key result beside the form's fields. */
+const KeyResultChange = KeyResultEditFields.extend({ okr_key_result_id: recordId("key result") })
+  .refine(changesBeside(["okr_key_result_id"]), nothingOn("okr_key_result_id"))
+  .refine(...finishesAfterStart);
 
 /**
  * GET /performance/key-results: a quarter's key results, 25 a page, for a picker. `level` keeps the
@@ -729,6 +790,9 @@ const PlanUnbind = z
 /** POST /performance/plans/:id/unbind: why the plan is to be unbound. */
 const PlanUnbindCreate = z.object({ reason: text(1000) }).strict();
 
+/** Request To Unbind as Praxis AI's card (praxis-ai.md §6.11): the plan beside the reason, which the form never names. */
+const PlanUnbindRequest = PlanUnbindCreate.extend({ performance_plan_id: recordId("plan") });
+
 /** GET /performance/unbinds/:id: one request, named in full, for its sheet. */
 const PlanUnbindDetail = PlanUnbind.extend({
   department_id: uuid.nullable(),
@@ -765,8 +829,8 @@ const PlanDetail = Plan.extend({
 /** POST /performance/target-changes: a binding key result's or line's target, from a month. */
 const TargetChangeCreate = z
   .object({
-    okr_key_result_id: blank(uuid),
-    employee_target_id: blank(uuid),
+    okr_key_result_id: blank(recordId("key result")),
+    employee_target_id: blank(recordId("line")),
     to_value: blank(Quantity),
     to_text: optionalText(1000),
     from_month: MonthStart,
@@ -1061,6 +1125,7 @@ const TABLES = {
   PeriodListQuery: { table: null, reason: "list controls and the status and plan year filters" },
   PeriodCreate: { table: "performance_period" },
   PeriodEdit: { table: "performance_period" },
+  PeriodChange: { table: "performance_period" },
   OrganisationalGoal: { table: "organisational_goal", virtual: GOAL_VIRTUAL },
   OrganisationalGoalPage: { table: null, reason: "a page of organisational goals" },
   GoalListQuery: { table: null, reason: "list controls and filters for the goals" },
@@ -1086,6 +1151,13 @@ const TABLES = {
   OrganisationalGoalEdit: {
     table: "organisational_goal",
     virtual: { targets: "replaces the organisational_goal_target rows given" },
+  },
+  OrganisationalGoalChange: {
+    table: "organisational_goal",
+    virtual: {
+      performance_period_id: "the quarter of the organisational_goal_target row it writes",
+      target_text: "written to that quarter's organisational_goal_target row",
+    },
   },
   KeyResultPart: { table: null, reason: "one part of okr_key_result.parts (jsonb)" },
   KeyResultMonth: {
@@ -1115,11 +1187,16 @@ const TABLES = {
   OkrSummary: { table: null, reason: "the Goals figures, counted over the quarter's key results" },
   ObjectiveCreate: { table: "okr_objective" },
   ObjectiveEdit: { table: "okr_objective" },
+  ObjectiveChange: { table: "okr_objective" },
   KeyResultCreate: {
     table: "okr_key_result",
     virtual: { linked_company_key_result_ids: "written as okr_key_result_link rows" },
   },
   KeyResultEdit: {
+    table: "okr_key_result",
+    virtual: { linked_company_key_result_ids: "replaces the okr_key_result_link rows" },
+  },
+  KeyResultChange: {
     table: "okr_key_result",
     virtual: { linked_company_key_result_ids: "replaces the okr_key_result_link rows" },
   },
@@ -1194,6 +1271,14 @@ const TABLES = {
     table: "goal_share",
     virtual: { department_ids: "written as goal_share_department rows" },
   },
+  GoalShareChange: {
+    table: "goal_share",
+    virtual: { department_ids: "written as goal_share_department rows" },
+  },
+  ObjectiveShareChange: {
+    table: "goal_share",
+    virtual: { department_ids: "written as goal_share_department rows" },
+  },
   PerformanceDepartmentPage: { table: null, reason: "a page of the departments a reader's Performance lists filter by" },
   PerformanceDepartmentListQuery: { table: null, reason: "list controls for the departments" },
   PlanProblem: { table: null, reason: "a reason the plan cannot be sent, worked out" },
@@ -1217,6 +1302,7 @@ const TABLES = {
     virtual: { requested_by: "the employee of plan_unbind.requested_by" },
   },
   PlanUnbindCreate: { table: "plan_unbind" },
+  PlanUnbindRequest: { table: "plan_unbind" },
   PlanUnbindDetail: {
     table: "plan_unbind",
     virtual: {
@@ -1281,6 +1367,7 @@ module.exports = {
   PeriodListQuery,
   PeriodCreate,
   PeriodEdit,
+  PeriodChange,
   OrganisationalGoalStatus,
   OrganisationalGoal,
   OrganisationalGoalPage,
@@ -1291,6 +1378,7 @@ module.exports = {
   OrganisationalGoalDetail,
   OrganisationalGoalCreate,
   OrganisationalGoalEdit,
+  OrganisationalGoalChange,
   KrType,
   KrMeasure,
   KrMonthStatus,
@@ -1305,8 +1393,10 @@ module.exports = {
   OkrSummary,
   ObjectiveCreate,
   ObjectiveEdit,
+  ObjectiveChange,
   KeyResultCreate,
   KeyResultEdit,
+  KeyResultChange,
   KeyResultListQuery,
   KeyResultRefPage,
   Initiative,
@@ -1331,12 +1421,15 @@ module.exports = {
   ShareAudience,
   GoalShare,
   GoalShareSave,
+  GoalShareChange,
+  ObjectiveShareChange,
   PerformanceDepartmentPage,
   PerformanceDepartmentListQuery,
   PlanProblem,
   PlanUnbindStatus,
   PlanUnbind,
   PlanUnbindCreate,
+  PlanUnbindRequest,
   PlanUnbindDetail,
   PlanApproval,
   PlanDetail,

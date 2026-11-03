@@ -239,6 +239,20 @@ four of the details to ask for. `praxis-ai.md` §1.3 holds the decisions as writ
     needed): `names` beside `records`, the verb counting only records acted on, Edit's pickers, the
     card's `fields`, and the share rule in the action's description.
 
+**Decided 03/11/2026 (JBS Praxis), for Performance's, Staff Community's and Mailbox's forms**
+(decision 33's next three modules, `praxis-ai.md` §1.9). Four questions were put to the owner, each
+with a recommendation first:
+
+40. **The check-in, scores, PIPs, announcements and signatures.** The monthly check-in: a card per
+    line, saved to the draft through My Performance's own save (asked: one line per card, or never
+    in the chat; the recommendation taken). A reviewer's scores and improvement plans: both cards,
+    each press behind Confirm It's You (asked: scores in the chat and PIPs never, recommended; both
+    behind Confirm It's You, chosen; scores alone behind it; both never). Announcements: one press, as
+    the screen's own button (asked: one press, recommended and taken; Confirm It's You first; never).
+    Signatures: both cards in full, the mobile included (asked: both without the mobile, recommended;
+    both in full, chosen; Configure only). Neither signature carries an image, so the `file` reason
+    does not apply.
+
 ---
 
 ## 3 · The design in one page
@@ -783,7 +797,10 @@ gate"). This PR adds the gate and the list; the forms themselves follow, module 
 - [x] 03/11/2026 · Workspace and Calendar (branch `claude/determined-dirac-b4ivrd-workspace-chat`): ten cards, Save Task, Add Step, Save Step, Add Link, Add Reason, Switch Reason, Create Project, Save Project, Save Event, Save Support Needed; an edit form's card names its record (`<Thing>Change`, `TaskStepAdd`, `TaskWaitOn`, `LateReasonSwitch`) and the form's own schema is reached `via` it; actions may name a `capability`; `resolve` is handed the card's values; the `task` pick; `tasks.get`; ten gaps closed (79 left)
 - [x] 03/11/2026 · Home and Settings (branch `claude/determined-dirac-b4ivrd-home-settings`): eighteen cards; decision 35 (`design`) for a role's grants, an approval flow and its steps, a role's Home cards; the push subscription `device`; `shared/ai/change.js`; `view` with a capability; 22 gaps closed (57 left)
 - [x] 03/11/2026 · People, Queries & Sanctions and Knowledge Hub · Policies (branch `claude/trusting-cerf-30yc7i`): 25 cards through the screens' own functions; decisions 36 to 39 asked first (`praxis-ai.md` §1.8: the work record alone, a place picked on a card, the saved signature signs, approval for pay, leave and discipline); the `place`, `employee`, `worksite`, `policy` and `site_member` picks; a picked field reads as an id; `allows` for a letter's {{ names }}; Draw Signature; `query_rules.ai.js`, `templates.ai.js`; Save Letter Signature never (`file:`); 26 gaps closed (31 left after #69). Engine files changed additively only: the picks appended (`AiCardPicks`, manifest `PICKS`, `ActionCard`'s type, `Card.tsx`'s cases and `SCREEN_FOR`), the manifest's `allows` key, `fieldsOf`'s picked field and `gapsIn`'s second argument (callers pass the action)
-- [ ] The rest, module by module, each PR taking its gaps off the list: Performance, Community and Mailbox (in their own chat)
+- [x] 03/11/2026 · Performance, Staff Community and Mailbox, decided (branch `claude/ecstatic-cori-rplleb`): the four questions put to the owner and their answers (§2 decision 40); `praxis-ai.md` first (§1.9, §6.11's 32 rows, §6.17, §8, §14), then `performance.md`, `community.md` and `mailbox.md` §9 and §14
+- [x] 03/11/2026 · Performance, Staff Community and Mailbox, built: the contract's card schemas; an action's `capabilities`, any one of a list (`requireAnyCapability`), beside `capability`; 32 actions through the screens' own services, a record named by its words (`oneNamedIn`), a form of many lines carried a line at a time; gate 23 reads a typed `useContractForm<Values>(` call; the gaps list 31 shorter (none left after Home and Settings and People, Queries and Policies); the integration suites (`ai-actions-performance`, `-community`, `-mailbox`), 34 evaluation cases, five matrix probes, the catalogue (32 added), the User Guide's five new tasks, PROGRESS, README
+- [x] 03/11/2026 · Performance, Staff Community and Mailbox, praxisjbs/mycity-app#68, rebased on decisions 34 to 39 (praxisjbs/mycity-app#67, praxisjbs/mycity-app#69 and praxisjbs/mycity-app#70; renumbered 40, `praxis-ai.md` §1.9): every one of the 32 asks what it needs first, gate 23 rule 7 green; two question tests (`ai-actions-performance`, `-community`), two evaluation question cases, `named.choiceWords`
+- [x] 03/11/2026 · Every built module's create and edit forms accounted for: the gaps list is empty, praxisjbs/mycity-app#68 the last of the four chats
 
 ### 6.10 A card is drawn whole (decision 34, JBS Praxis, 03/11/2026; branch `claude/determined-dirac-b4ivrd-ask-first`)
 
@@ -958,3 +975,26 @@ lead ("It should always ask for required fields, so we never see an error. We ca
   list reads, and which rule, step, letter, leave type or open query to tap (`options`). A cloud
   session's image again lacked Node 20, pgvector and `node_modules` (installed by hand: nvm's Node
   20, `postgresql-16-pgvector`, `npm ci`).
+- 03/11/2026 · JP · Performance, Staff Community and Mailbox's forms (§6.9, decision 40), on
+  `claude/ecstatic-cori-rplleb` beside two other chats (People, Queries & Sanctions and Knowledge
+  Hub; Home and Settings): the check-in, the scores and PIPs, announcements and the signatures put
+  to the owner; the guides written first. 31 forms become 32 actions (sharing a goal and an
+  objective are two cards, a scorecard's lines Add Line and Save Line).
+- 03/11/2026 · JP · Performance, Staff Community and Mailbox's forms built (§6.9, decision 40): 32
+  cards, each the screen's own service; Performance's records named by their codes, persons and
+  words; Save Score and the PIPs behind Confirm It's You; an action may hold any one of several
+  capabilities. Found on the way: New Key Result's form validates with `KeyResultCreate` through a
+  typed call that gate 23 did not read (fixed in the gate); Save Scores clears every corrective
+  action it is not sent, so the one-line card sends the others as they stand; New Channel posts its
+  purpose after it creates the channel, and the card does the same. No gaps left with Home and
+  Settings (praxisjbs/mycity-app#69) and People, Queries and Policies (praxisjbs/mycity-app#70).
+- 03/11/2026 · JP · Performance, Staff Community and Mailbox's forms rebased on the card drawn whole
+  (decision 34, praxisjbs/mycity-app#67), Home and Settings (decision 35, praxisjbs/mycity-app#69) and
+  People, Queries and Policies (decisions 36 to 39, praxisjbs/mycity-app#70), all merged first, in
+  praxisjbs/mycity-app#68: the decision renumbered 40 (`praxis-ai.md` §1.9), and gate 23 rule 7 met
+  by all 32: each asks for its record with the person's own to tap (`options` from the module's
+  service, `read` for colleagues, channels and departments), what a line or a KPI needs, the month,
+  and with `when` what a state needs (a share's departments, a corrective action's due day, a new
+  reviewer's reason). `named.choiceWords` (additive) fits a record's words in an answer; a review
+  and a scorecard are matched by person and month or quarter too. Two evaluation cases reworded so
+  they say what the card needs, two question cases added.

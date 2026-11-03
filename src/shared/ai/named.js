@@ -8,6 +8,8 @@
  *
  *   oneNamed(types, "Annual Leave", (t) => [t.name, t.code], { drop: ["leave"] })   // the type named Annual
  *   oneNamed(steps, "banners", (s) => [s.title])                                     // "Order banners"
+ *
+ * choiceWords() is a record's words as an answer to tap, at most 60 characters, which oneNamed matches.
  */
 
 /** Words as a person says them: lower case, the dropped words and punctuation left out ("Annual Leave" → "annual"). */
@@ -42,4 +44,39 @@ function oneNamed(items, said, namesOf, { drop = [] } = {}) {
   return null;
 }
 
-module.exports = { oneNamed, plainWords };
+/**
+ * The one item the words name across a few lists tried in turn (a search for the words, then the
+ * first page as it stands): the first list where exactly one matches wins; null when none does.
+ * @template T
+ * @param {Array<() => Promise<T[]>|T[]>} lists
+ * @param {string} said
+ * @param {(item: T) => Array<string|null|undefined>} namesOf
+ * @param {{drop?: string[]}} [opts]
+ * @returns {Promise<T|null>}
+ */
+async function oneNamedIn(lists, said, namesOf, opts) {
+  for (const list of lists) {
+    const found = oneNamed((await list()) || [], said, namesOf, opts);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** The answers' own limit on a tap (AiAnswer.choices; answer.withOptions keeps nothing longer). */
+const CHOICE_MAX = 60;
+
+/**
+ * A record's words as an answer to tap (decision 34): whole when they fit, else cut at a word and
+ * marked "…", which oneNamed reads as the words its record begins with.
+ * @param {string} words
+ * @returns {string}
+ */
+function choiceWords(words) {
+  const s = String(words === null || words === undefined ? "" : words).replace(/\s+/g, " ").trim();
+  if (s.length <= CHOICE_MAX) return s;
+  const cut = s.slice(0, CHOICE_MAX - 1);
+  const at = cut.lastIndexOf(" ");
+  return `${(at > CHOICE_MAX / 2 ? cut.slice(0, at) : cut).replace(/[\s,.;:·-]+$/, "")}…`;
+}
+
+module.exports = { oneNamed, oneNamedIn, plainWords, choiceWords };

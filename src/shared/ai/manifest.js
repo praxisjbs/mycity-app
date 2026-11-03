@@ -62,9 +62,10 @@
  *    check, records, readback and names functions when given; its fields, picks and asks name
  *    fields its input takes (praxis-ai.md §1.3 decisions 29 and 31), each ask one short question;
  *    its capability, when given, one of the catalogue's (held on top of the grant, as a route's
- *    requireCapability holds it); its allows, when given, a test per carried text field of the
- *    gaps its words may hold (a letter's own {{ names }}), so the card's ready-to-send guard
- *    passes them;
+ *    requireCapability holds it), or its capabilities a list of them held by any one (as a route's
+ *    requireAnyCapability holds it), never both; its allows, when given, a test per carried text
+ *    field of the gaps its words may hold (a letter's own {{ names }}), so the card's ready-to-send
+ *    guard passes them;
  *  - a route names a real screen (shared/route-map SCREENS) as "<module>.<tab>";
  *  - a route's prefill is the form's own fields (packages/contract `<Thing>Prefill`), never a
  *    restricted field nor one of the address's own words (tab, id, action, new, its params);
@@ -118,6 +119,7 @@ const ACTION_KEYS = new Set([
   "resolve",
   "capability",
   "allows",
+  "capabilities",
 ]);
 const ROUTE_KEYS = new Set(["intent", "screen", "params", "prefill"]);
 /** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decisions 31 and 32). */
@@ -254,6 +256,12 @@ function checkAction(where, a, seen) {
   // An authority held on top of the grant, as the screen's route holds it with requireCapability (praxis-ai.md §6.11).
   if (a.capability !== undefined && (typeof a.capability !== "string" || !catalog.isCapability(a.capability)))
     throw new Error(`${at}: capability is a code in shared/access/access.catalog.js CAPABILITY_CATALOG`);
+  // Any one of several, as the route's requireAnyCapability holds it (New Objective: goals.company or goals.function).
+  if (a.capabilities !== undefined) {
+    if (!Array.isArray(a.capabilities) || a.capabilities.length < 2 || a.capabilities.some((code) => typeof code !== "string" || !catalog.isCapability(code)))
+      throw new Error(`${at}: capabilities is a list of two or more codes in shared/access/access.catalog.js CAPABILITY_CATALOG`);
+    if (a.capability !== undefined) throw new Error(`${at}: capability or capabilities, not both`);
+  }
   if (!RISKS.includes(a.risk)) throw new Error(`${at}: risk is one of ${RISKS.join(", ")}`);
   const bulk = a.bulk === undefined ? 1 : a.bulk;
   if (!Number.isInteger(bulk) || bulk < 1 || bulk > BULK_MAX) throw new Error(`${at}: bulk is 1 to ${BULK_MAX}`);
@@ -321,6 +329,7 @@ function checkAction(where, a, seen) {
     resolve: Object.freeze({ ...(a.resolve || {}) }),
     capability: a.capability || null,
     allows: Object.freeze({ ...(a.allows || {}) }),
+    capabilities: a.capabilities ? Object.freeze([...a.capabilities]) : null,
   });
 }
 

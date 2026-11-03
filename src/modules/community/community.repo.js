@@ -774,7 +774,7 @@ function messageForCard(db, messageId) {
   return one(
     db,
     `SELECT community_message_id, community_channel_id, sender_user_id, message_type, body, metadata,
-            deleted_at, community_link_preview_id
+            deleted_at, community_link_preview_id, sent_at
        FROM community_message WHERE community_message_id = $1`,
     [messageId],
   );
@@ -1093,7 +1093,72 @@ function celebrationPosted(db, channelId, employeeId, occasion, date) {
   );
 }
 
+/**
+ * The people and departments a Praxis AI card of Staff Community holds, by name
+ * (docs/guides/praxis-ai.md §6.11, decision 31): one query a kind; an id that names nothing is left out.
+ */
+async function cardNames(db, { employeeIds = [], departmentIds = [] }) {
+  const out = [];
+  if (employeeIds.length) {
+    const { rows } = await db.query("SELECT employee_id AS id, btrim(first_name || ' ' || last_name) AS label FROM employee WHERE employee_id = ANY($1::uuid[])", [employeeIds]);
+    out.push(...rows.map((r) => ({ type: "employee", id: r.id, label: r.label })));
+  }
+  if (departmentIds.length) {
+    const { rows } = await db.query("SELECT department_id AS id, name AS label FROM department WHERE department_id = ANY($1::uuid[])", [departmentIds]);
+    out.push(...rows.map((r) => ({ type: "department", id: r.id, label: r.label })));
+  }
+  return out;
+}
+
+/**
+ * The live birthday and anniversary cards of the last two weeks in the user's conversations, newest
+ * first, with whose they are: what Praxis AI's Send Wishes finds a card among (praxis-ai.md §6.11).
+ */
+function celebrationCards(db, userId, query = {}) {
+  return pageQuery(
+    db,
+    `SELECT x.community_message_id, x.message_type, x.sent_at, btrim(e.first_name || ' ' || e.last_name) AS subject_name, ${TOTAL_COL}
+       FROM community_message x
+       JOIN community_member m ON m.community_channel_id = x.community_channel_id AND m.user_id = $1
+       LEFT JOIN employee e ON e.employee_id = (x.metadata ->> 'subject_employee_id')::uuid
+      WHERE x.message_type IN ('birthday', 'anniversary') AND x.deleted_at IS NULL AND x.sent_at > now() - interval '14 days'
+      ORDER BY x.sent_at DESC, x.community_message_id`,
+    [userId],
+    query,
+  );
+}
+
+/** One birthday or anniversary card in a conversation of the user's, with whose it is; null otherwise. */
+function celebrationCard(db, messageId, userId) {
+  return one(
+    db,
+    `SELECT x.community_message_id, x.message_type, x.deleted_at, btrim(e.first_name || ' ' || e.last_name) AS subject_name
+       FROM community_message x
+       JOIN community_member m ON m.community_channel_id = x.community_channel_id AND m.user_id = $2
+       LEFT JOIN employee e ON e.employee_id = (x.metadata ->> 'subject_employee_id')::uuid
+      WHERE x.community_message_id = $1 AND x.message_type IN ('birthday', 'anniversary')`,
+    [messageId, userId],
+  );
+}
+
+/** The user's newest message of these kinds in a conversation, not deleted: what Save Message's card changes. */
+function ownLatest(db, channelId, userId, types) {
+  return one(
+    db,
+    `SELECT x.community_message_id, x.community_channel_id, x.message_type, x.sent_at, x.metadata
+       FROM community_message x
+      WHERE x.community_channel_id = $1 AND x.sender_user_id = $2 AND x.deleted_at IS NULL AND x.message_type = ANY($3::text[])
+      ORDER BY x.sent_at DESC, x.community_message_id DESC
+      LIMIT 1`,
+    [channelId, userId, types],
+  );
+}
+
 module.exports = {
+  cardNames,
+  celebrationCards,
+  celebrationCard,
+  ownLatest,
   yearsServed,
   startDate,
   insertWish,

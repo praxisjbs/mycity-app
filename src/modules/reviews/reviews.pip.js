@@ -8,12 +8,19 @@
  * People and the reviewer 3 business days before the review date. Close PIP records Passed, Not
  * Met or Extended (with new dates, and the plan runs on), with a note. What follows a plan not met
  * is HR's, outside the system. A plan is reached from its review, never from search.
+ *
+ * Praxis AI's Start PIP and Save PIP (docs/guides/praxis-ai.md §6.11, decision 40) name a plan by its
+ * person (idOf, cardRecords; planChoices the running plans to tap, decision 34), re-check it
+ * (assertCardPip) and carry its lines as words, each line kept
+ * by its words keeping its scorecard line and target (startFromCard, changeFromCard).
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { assertInScope } = require("../../shared/rbac/scope");
+const { common, reviews: contract } = require("@mycity/contract");
+const { oneNamed, oneNamedIn, plainWords } = require("../../shared/ai/named");
 const { formatDate } = require("../../shared/time/day-first");
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
@@ -239,4 +246,72 @@ async function reviewReminder(client, row) {
   };
 }
 
-module.exports = { DEFAULT_DAYS, view, list, create, edit, close, reviewReminder };
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decision 40)
+ * ------------------------------------------------------------------ */
+
+const isId = (v) => typeof v === "string" && common.uuid.safeParse(v).success;
+const PLAN_WORDS = ["plan", "pip", "improvement", "the", "s"];
+/** A scorecard line's target as Start PIP writes it beside the line. */
+const targetOf = (line) => line.target_text || (line.target_value ? `${line.target_value}${line.unit ? ` ${line.unit}` : ""}` : null);
+
+/** The open plan a person names by its person, among the plans in their scope. */
+async function idOf(db, words, scope) {
+  const page = (q) => async () => (await repo.listPips(db, { page: 1, ...(q ? { q } : {}) }, scope)).data.filter((p) => ["open", "extended"].includes(p.status));
+  const found = await oneNamedIn([page(plainWords(words, PLAN_WORDS)), page(null)], words, (p) => [p.employee && p.employee.display_name], { drop: PLAN_WORDS });
+  return found ? found.improvement_plan_id : null;
+}
+
+/** "Whose plan?" answers (decision 34): the running plans in the person's scope, by person, as idOf matches them. */
+async function planChoices(db, scope) {
+  const plans = (await repo.listPips(db, { page: 1 }, scope)).data.filter((p) => p.employee && ["open", "extended"].includes(p.status));
+  return [...new Set(plans.map((p) => `${p.employee.display_name}'s plan`))];
+}
+
+/** The plan a card names, by its person, when it is in the person's scope. */
+async function cardRecords(db, id, scope) {
+  const p = isId(id) ? await repo.getPip(db, id) : null;
+  if (!p) return [];
+  let inScope = true;
+  try {
+    assertInScope(scope, p.employee_id);
+  } catch {
+    inScope = false;
+  }
+  return [{ type: "improvement_plan", id, label: inScope ? `${p.employee.display_name}'s plan` : null }];
+}
+
+/** Save PIP's re-check: the plan in scope and still running, as edit holds it. */
+async function assertCardPip(db, id, scope) {
+  if (!isId(id)) throw notFound();
+  const p = await load(db, id, scope);
+  if (!["open", "extended"].includes(p.status)) throw new AppError("PIP_CLOSED", "This plan is closed", 409, { improvement_plan_id: ["Plan is closed"] });
+}
+
+/** Lines as words matched to the lines they name: a line kept by its words keeps its scorecard line and target. */
+function linesOf(words, known) {
+  return words.map((text) => {
+    const held = oneNamed(known, text, (l) => [l.text]);
+    return held ? { employee_target_id: held.employee_target_id || undefined, text, target_text: held.target_text || undefined } : { text };
+  });
+}
+
+/** Start PIP's card: its lines as words, else the review's lines scored under their target, as the form fills them. */
+async function startFromCard(actor, scope, values) {
+  const reviews = require("./reviews.service");
+  const items = await repo.items(pool, values.performance_review_id);
+  const under = items.filter((i) => i.line && i.score !== null && Number(i.score) < 1);
+  const known = (under.length ? under : items.slice(0, 1)).map((i) => ({ employee_target_id: i.employee_target_id || undefined, text: reviews.titleOf(i), target_text: i.line ? targetOf(i.line) || undefined : undefined }));
+  const lines = values.lines ? linesOf(values.lines, known) : known;
+  return create(actor, scope, contract.PipCreate.parse({ ...values, lines }));
+}
+
+/** Save PIP's card: only what changes; its lines, when given, replace the plan's, each kept by its words keeping its target. */
+async function changeFromCard(actor, scope, values) {
+  const { improvement_plan_id: id, lines, ...change } = values;
+  const patch = Object.fromEntries(Object.entries(change).filter(([, v]) => v !== undefined));
+  if (lines) patch.lines = linesOf(lines, (await repo.getPip(pool, id)).lines || []);
+  return edit(actor, scope, id, contract.PipEdit.parse(patch));
+}
+
+module.exports = { DEFAULT_DAYS, view, list, create, edit, close, reviewReminder, idOf, planChoices, cardRecords, assertCardPip, startFromCard, changeFromCard };

@@ -1087,7 +1087,29 @@ const objectiveHolds = (db, id) =>
     [id],
   );
 
+/**
+ * The people, departments and quarters a Praxis AI card holds, by name (docs/guides/praxis-ai.md §6.11,
+ * decision 31): one query a kind, the ids given; an id that names nothing is left out.
+ */
+async function cardNames(db, { employeeIds = [], departmentIds = [], periodIds = [] }) {
+  const out = [];
+  if (employeeIds.length) {
+    const { rows } = await db.query("SELECT employee_id AS id, btrim(first_name || ' ' || last_name) AS label FROM employee WHERE employee_id = ANY($1::uuid[])", [employeeIds]);
+    out.push(...rows.map((r) => ({ type: "employee", id: r.id, label: r.label })));
+  }
+  if (departmentIds.length) {
+    const { rows } = await db.query("SELECT department_id AS id, name AS label FROM department WHERE department_id = ANY($1::uuid[])", [departmentIds]);
+    out.push(...rows.map((r) => ({ type: "department", id: r.id, label: r.label })));
+  }
+  if (periodIds.length) {
+    const { rows } = await db.query("SELECT performance_period_id AS id, name AS label FROM performance_period WHERE performance_period_id = ANY($1::uuid[])", [periodIds]);
+    out.push(...rows.map((r) => ({ type: "performance_period", id: r.id, label: r.label })));
+  }
+  return out;
+}
+
 module.exports = {
+  cardNames,
   importPeriodId,
   departmentByName,
   employeeByName,
