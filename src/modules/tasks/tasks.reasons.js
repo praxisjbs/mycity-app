@@ -7,8 +7,8 @@
  *   add()        a new reason at the foot, its code made from its words
  *   setActive()  switch one off or on; a reason is never deleted, so answers keep it
  *   assertOn()   the check Why Late's answers pass: a reason switched on
- *   idOf(), cardRecords()   a reason a Praxis AI card names by its words, and how the card names
- *                it (docs/guides/praxis-ai.md §6.11)
+ *   idOf(), labels(), cardRecords()   a reason a Praxis AI card names by its words, the answers
+ *                "Which reason?" offers, and how the card names it (docs/guides/praxis-ai.md §6.11)
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -109,6 +109,11 @@ async function idOf(db, words) {
   return found ? found.task_late_reason_id : null;
 }
 
+/** "Which reason?" answers (praxis-ai.md decision 34): every reason's words, switched on or off. */
+async function labels(db) {
+  return (await repo.lateReasons(db, { all: true }, { page: 1 })).data.map((r) => r.label);
+}
+
 /** The reason a card switches, by its words; nothing when the id names no reason. */
 async function cardRecords(db, id) {
   if (!c.common.uuid.safeParse(id).success) return [];
@@ -121,4 +126,4 @@ async function assertOn(db, code) {
   if (code && !(await repo.lateReasonOn(db, code))) throw invalid("late_reason", "Pick a reason");
 }
 
-module.exports = { CAPABILITY, keeps, codeOf, list, add, setActive, assertOn, idOf, cardRecords };
+module.exports = { CAPABILITY, keeps, codeOf, list, add, setActive, assertOn, idOf, labels, cardRecords };

@@ -32,6 +32,7 @@ const cond = require("../../shared/workflow/conditions");
 const definitions = require("../../shared/workflow/definitions");
 const approvers = require("../../shared/workflow/approvers");
 const c = require("@mycity/contract");
+const { oneNamed } = require("../../shared/ai/named");
 const repo = require("./workflow.repo");
 const { EVENTS } = require("./workflow.events");
 
@@ -571,6 +572,24 @@ const DECIDED_WORD = Object.freeze({ approve: "approved", reject: "rejected", re
 /** A request as a card names it: what it is, about whom. */
 const instanceLabel = (i) => `${i.definition_name || i.definition_key}${i.subject_name ? `, ${i.subject_name}` : ""}`;
 
+/** "Which requests?" answers on a card (praxis-ai.md decision 34): the first requests waiting on the person, as a card names them. */
+async function cardChoices(user) {
+  return (await mine(user, { page: 1 })).data.map(instanceLabel);
+}
+
+/**
+ * A request waiting on the person, named by its words (decision 34): its flow and who it is about,
+ * or either alone ("Ayo Bello"), searched by the words first; null when none or several match.
+ */
+async function instanceIdOf(user, words) {
+  for (const q of [words, null]) {
+    const page = await mine(user, { page: 1, ...(q ? { q } : {}) });
+    const found = oneNamed(page.data, words, (r) => [instanceLabel(r), r.subject_name, r.definition_name]);
+    if (found) return found.workflow_instance_id;
+  }
+  return null;
+}
+
 /**
  * The requests a card names, as the person may read them: the flow and who it is about for each
  * they may read; one they may not keeps its id alone, and the re-check refuses the card.
@@ -723,6 +742,8 @@ module.exports = {
   decideIn,
   decideMany,
   cardRecords,
+  cardChoices,
+  instanceIdOf,
   assertCardInstances,
   stageOf,
   mayAct,

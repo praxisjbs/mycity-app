@@ -214,11 +214,15 @@ describeDb("Praxis AI's leave cards against the real migrations", () => {
     expect((await q("SELECT reason FROM workflow_decision WHERE decision = 'reject' AND actor_id = $1", [h.people.manager.user_id])).rows.map((r) => r.reason)).toEqual(["The team is short that week", "The team is short that week"]);
   });
 
-  test("leave.reject without a reason is a problem on the field at the draft, and the press is refused until it is given", async () => {
+  test("leave.reject without a reason asks why first (decision 34); left out again, it is a problem on the field and the press is refused until it is given", async () => {
     const [day] = week(5);
     const id = (await request("three", day)).leave_request_id;
     script(say({ text: "Here it is.", action: { key: "leave.reject", values: { leave_request_ids: [id] }, suggested: false } }));
-    const asked = await h.ask("manager", { question: "Reject it.", shows: ["cards"] });
+    const why = await h.ask("manager", { question: "Reject it.", shows: ["cards"] });
+    expect(why.body).toMatchObject({ content: "Why are you rejecting it?", card: null });
+    // The question was asked; the model leaves the reason out again, so the card is drawn showing the gap.
+    script(say({ text: "Here it is.", action: { key: "leave.reject", values: { leave_request_ids: [id] }, suggested: false } }));
+    const asked = await h.ask("manager", { question: "I would rather not say.", ai_conversation_id: why.body.ai_conversation_id, shows: ["cards"] });
     expect(asked.body.card.problems).toEqual({ reason: [expect.any(String)] });
     await h.confirmPassword("manager");
     const refused = await h.press("manager", asked.body.card.ai_action_draft_id);

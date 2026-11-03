@@ -105,11 +105,19 @@ describeDb("Praxis AI's My Approvals card against the real migrations", () => {
     expect((await h.as("manager").get("/workflow/mine")).body.data).toEqual([]);
   });
 
-  test("a rejection without a reason is a problem on the field; given one, the request is returned with it", async () => {
+  test("a rejection without a reason asks why first (decision 34); left out again it is a problem on the field; given one, the request is returned with it", async () => {
     const [day] = week(3);
     const r = await waiting("one", day);
     script(say({ text: "Here it is.", action: { key: "approvals.decide", values: { workflow_instance_ids: [r.workflow_instance_id], decision: "request_changes" }, suggested: false } }));
-    const asked = await h.ask("manager", { question: "Send it back for changes.", shows: ["cards"] });
+    const why = await h.ask("manager", { question: "Send it back for changes.", shows: ["cards"] });
+    expect(why.body).toMatchObject({ content: "What reason should the requester see?", card: null });
+    // An approval needs no reason: drawn at once.
+    script(say({ text: "Here it is.", action: { key: "approvals.decide", values: { workflow_instance_ids: [r.workflow_instance_id], decision: "approve" }, suggested: false } }));
+    const approving = await h.ask("manager", { question: "Approve it.", shows: ["cards"] });
+    expect(approving.body.card).toMatchObject({ action_key: "approvals.decide", problems: {} });
+    // Asked once and left out again: the card is drawn showing the gap, and the press is refused until it is given.
+    script(say({ text: "Here it is.", action: { key: "approvals.decide", values: { workflow_instance_ids: [r.workflow_instance_id], decision: "request_changes" }, suggested: false } }));
+    const asked = await h.ask("manager", { question: "No reason.", ai_conversation_id: why.body.ai_conversation_id, shows: ["cards"] });
     expect(asked.body.card.problems).toEqual({ reason: ["Say why"] });
     await h.confirmPassword("manager");
     expect((await h.press("manager", asked.body.card.ai_action_draft_id)).status).toBe(422);

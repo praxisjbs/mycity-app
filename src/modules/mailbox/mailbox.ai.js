@@ -29,6 +29,12 @@ module.exports = defineManifest({
       risk: "standard",
       // The composer's form is the editor's own (addresses, a rich body, files); the card is the words alone.
       form: "none: the composer takes addresses, a rich body and files in its own editor; the card is the words alone",
+      // Who, the subject and the words, asked first when not said (praxis-ai.md decision 34).
+      asks: [
+        { field: "to_addresses", question: "Who is it to?" },
+        { field: "subject", question: "What is the subject?" },
+        { field: "body", question: "What should it say?" },
+      ],
       records: () => [],
       check: (client, _values, actor) => service.assertConnected(client, actor),
       run: (values, actor, ctx) => service.sendNew(values, actor, ctx && ctx.idempotency_key ? `ai:${ctx.idempotency_key}` : null),

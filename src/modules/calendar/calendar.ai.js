@@ -100,6 +100,9 @@ module.exports = defineManifest({
       form: "none: Edit Event's form takes a day and two clock times, joined into starts_at and ends_at as it sends, and changes the event open; the card names it",
       fields: ["calendar_event_id", "title", "starts_at", "ends_at", "all_day", "attendee_ids", "event_type", "location", "visibility", "description", "reminder_minutes"],
       picks: { attendee_ids: "colleague" },
+      // Which event, when the person did not say (praxis-ai.md decision 34): their events from today, matched by title.
+      asks: [{ field: "calendar_event_id", question: "Which event is it?", options: ({ actor }) => service.eventChoices(actor.employee_id) }],
+      resolve: { calendar_event_id: (value, actor) => service.eventIdOf(actor.employee_id, value) },
       // The event is what the press changes; the people invited are named, never counted.
       names: (values, _actor, db) => attendeeNames(db, values.attendee_ids),
       records: (values, actor, db) => (db ? service.cardRecords(db, values.calendar_event_id, actor.employee_id) : values.calendar_event_id ? [{ type: "calendar_event", id: values.calendar_event_id }] : []),

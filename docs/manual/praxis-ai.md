@@ -201,6 +201,11 @@ own button to save.
   for example **Annual Leave, 12 days left**. Press one, or say the type in your question.
 - For a step it asks what the step is, for a project what it is called, and for your week's Support
   Needed what support you need.
+- For a task shared with a department it asks **Who leads it?**, with that department's people to
+  press.
+- When you do not say which task, event, project, channel or request, it asks which, with your own
+  to press, for example the tasks on your board. Or type its name or number.
+- It asks for everything a card needs, so a card it draws can be pressed as it stands.
 - When a name matches more than one person, it asks which one. Press the right person.
 - Only the newest answer's buttons work. Ask something else at any time to stop.
 

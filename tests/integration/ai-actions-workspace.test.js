@@ -123,7 +123,8 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
   test("a task card names the people and departments it holds; sharing with both is a problem Edit clears; its watchers may open the task (decisions 30 and 31)", async () => {
     const staff = h.people.staff.employee_id;
     const department = (await one("SELECT department_id FROM employee WHERE employee_id = $1", [h.people.ops.employee_id])).department_id;
-    const values = { title: "Review milestone 3", priority: "normal", due_on: null, member_ids: [staff], department_id: department, watcher_department_id: department };
+    // Shared with a department, its lead is given (decision 34 asks for it otherwise): Ada leads it.
+    const values = { title: "Review milestone 3", priority: "normal", due_on: null, primary_assignee_id: h.people.ops.employee_id, member_ids: [staff], department_id: department, watcher_department_id: department };
     script(say({ text: "Here is the task.", action: { key: "tasks.create", values, suggested: false } }));
     const asked = await h.ask("ops", { question: "Create a task to review milestone 3 with Tunde and the department watching.", shows: ["cards"] });
     const card = asked.body.card;
@@ -451,5 +452,53 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
     script(say({ text: "Here is the line.", action: { key: "week.support", values: { week_starts_on: monday }, suggested: false } }));
     const ask = await h.ask("staff", { question: "Write my support needed for this week.", shows: ["cards"] });
     expect(ask.body).toMatchObject({ content: "What support do you need?", card: null });
+  });
+
+  test("a task shared with a department asks who leads it first, with that department's people to tap; the lead written by name is matched, so the card is never drawn with Pick a lead (decision 34)", async () => {
+    const department = (await one("SELECT department_id FROM employee WHERE employee_id = $1", [h.people.ops.employee_id])).department_id;
+    const values = { title: "Research transaction fees", due_on: "2026-11-20", priority: "urgent", department_id: department };
+    script(say({ text: "Here is the task.", action: { key: "tasks.create", values, suggested: false } }));
+    const lead = await h.ask("ops", { question: "Create an urgent task for HR & Operations to research transaction fees by the 20th.", shows: ["cards"] });
+    expect(lead.body).toMatchObject({ content: "Who leads it?", card: null });
+    expect(lead.body.choices).toEqual(expect.arrayContaining(["Tunde Ade", "Ada Obi"]));
+    // The person taps Tunde Ade; the model writes the lead by name, and the server matches it among the department's people.
+    script(say({ text: "Here is the task.", action: { key: "tasks.create", values: { ...values, primary_assignee_id: "Tunde Ade" }, suggested: false } }));
+    const whole = await h.ask("ops", { question: "Tunde Ade", ai_conversation_id: lead.body.ai_conversation_id, shows: ["cards"] });
+    expect(whole.body.card).toMatchObject({ action_key: "tasks.create", problems: {}, values: expect.objectContaining({ primary_assignee_id: h.people.staff.employee_id }) });
+    expect(whole.body.card.names).toEqual(expect.arrayContaining([expect.objectContaining({ id: h.people.staff.employee_id, label: "Tunde Ade" })]));
+    const pressed = await h.press("ops", whole.body.card.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    expect(await one("SELECT primary_assignee_id FROM task WHERE task_id = $1", [pressed.body.lines[0].id])).toEqual({ primary_assignee_id: h.people.staff.employee_id });
+    // Not shared with a department: no lead is asked, and the task is the person's own.
+    script(say({ text: "Here is the task.", action: { key: "tasks.create", values: { title: "File the receipts", due_on: null, priority: "low" }, suggested: false } }));
+    expect((await h.ask("ops", { question: "A low priority task to file the receipts, no due day.", shows: ["cards"] })).body.card).toMatchObject({ action_key: "tasks.create", problems: {} });
+  });
+
+  test("a card naming no record asks which, with the person's own records to tap; the one tapped is matched by its words (decision 34)", async () => {
+    const t = await opsTask("Order the conference badges");
+    script(say({ text: "Here is the comment.", action: { key: "tasks.comment", values: { body: "The printer confirmed Friday." }, suggested: false } }));
+    const which = await h.ask("ops", { question: "Comment that the printer confirmed Friday.", shows: ["cards"] });
+    expect(which.body).toMatchObject({ content: "Which task is it on?", card: null });
+    expect(which.body.choices.length).toBeGreaterThan(0);
+    expect(which.body.choices.length).toBeLessThanOrEqual(6);
+    expect(which.body.choices.every((label) => /^\S+ /.test(label))).toBe(true);
+    // The person names the task by its words; the model writes them as they were said.
+    script(say({ text: "Here is the comment.", action: { key: "tasks.comment", values: { task_id: "conference badges", body: "The printer confirmed Friday." }, suggested: false } }));
+    const named = await h.ask("ops", { question: "The conference badges one.", ai_conversation_id: which.body.ai_conversation_id, shows: ["cards"] });
+    expect(named.body.card).toMatchObject({ action_key: "tasks.comment", problems: {}, values: { task_id: t.task_id, body: "The printer confirmed Friday." } });
+    expect(named.body.card.records).toEqual([expect.objectContaining({ id: t.task_id, label: `${t.number} Order the conference badges` })]);
+    // A tapped answer reads as the record's citation, number and title, and is matched the same way.
+    script(say({ text: "Here is the step.", action: { key: "tasks.add_step", values: { task_id: `${t.number} Order the conference badges`, title: "Confirm the count" }, suggested: false } }));
+    const step = await h.ask("ops", { question: "Add a step to it: confirm the count.", shows: ["cards"] });
+    expect(step.body.card).toMatchObject({ action_key: "tasks.add_step", problems: {}, values: expect.objectContaining({ task_id: t.task_id }) });
+    // An event the person made, by its title.
+    const made = await h.as("ops").post("/calendar").send({ title: "Badge pickup", event_type: "meeting", starts_at: "2026-11-27T10:00:00+01:00", ends_at: "2026-11-27T10:30:00+01:00" });
+    script(say({ text: "Here it is.", action: { key: "calendar.edit", values: { location: "Front desk" }, suggested: false } }));
+    const event = await h.ask("ops", { question: "Move the badge pickup to the front desk.", shows: ["cards"] });
+    expect(event.body).toMatchObject({ content: "Which event is it?", card: null });
+    expect(event.body.choices).toContain("Badge pickup");
+    script(say({ text: "Here it is.", action: { key: "calendar.edit", values: { calendar_event_id: "Badge pickup", location: "Front desk" }, suggested: false } }));
+    const moved = await h.ask("ops", { question: "Badge pickup", ai_conversation_id: event.body.ai_conversation_id, shows: ["cards"] });
+    expect(moved.body.card).toMatchObject({ action_key: "calendar.edit", problems: {}, values: { calendar_event_id: made.body.calendar_event_id, location: "Front desk" } });
   });
 });

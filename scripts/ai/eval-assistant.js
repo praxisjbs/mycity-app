@@ -81,6 +81,9 @@ const CASES = Object.freeze([
   { id: "ask.task-due", as: "employee", question: "Create a task for me to send the weekly report.", shows: ["cards"], ask: { action: "tasks.create", field: "due_on" } },
   { id: "ask.task-priority", as: "employee", question: "Create a task for me to send the weekly report on Friday.", shows: ["cards"], ask: { action: "tasks.create", field: "priority" }, choices: true },
   { id: "ask.meeting-length", as: "operations_people", question: "Book a meeting with {person} tomorrow at 10 about the venue visit.", shows: ["cards"], ask: { action: "calendar.create", field: "ends_at" } },
+  // Every field a card needs is asked before it is drawn (decision 34): the lead of a task shared with a department, and which record.
+  { id: "ask.task-lead", as: "operations_people", question: "Create an urgent task for the whole Operations department to research transaction fees by Friday.", shows: ["cards"], ask: { action: "tasks.create", field: "primary_assignee_id" }, choices: true },
+  { id: "ask.which-task", as: "employee", question: "Add a comment on my task: the printer confirmed Friday.", shows: ["cards"], ask: { action: "tasks.comment", field: "task_id" }, choices: true },
   { id: "card.leave", as: "employee", question: "Request two days of annual leave for me from next Monday.", shows: ["cards"], action: "my_leave.request" },
   // Leave without its type: asked which, with the person's own types and the days left of each (decision 32).
   { id: "ask.leave-type", as: "employee", question: "I need next Friday off.", shows: ["cards"], ask: { action: "my_leave.request", field: "leave_type_id" }, choices: true },

@@ -11,6 +11,7 @@ const path = require("node:path");
 const c = require("@mycity/contract");
 const { defineManifest, RISKS, contractNameOf } = require("../../../src/shared/ai/manifest");
 const engine = require("../../../src/services/ai/engine");
+const registry = require("../../../src/shared/ai/registry");
 const boundary = require("../../../scripts/check/ai-engine-boundary");
 const noWrites = require("../../../scripts/check/ai-no-writes");
 const { jsonSchemaOf } = require("../../../src/services/ai/structured");
@@ -78,7 +79,7 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     expect(refused({ asks: [{ field: "due_on", question: "Due" }] })).toThrow(/one short question/);
     expect(refused({ asks: [{ field: "due_on", question: "When will this task you set for your colleague be due?" }] })).toThrow(/at most 8 words/);
     expect(refused({ asks: [{ field: "due_on", question: "When is it due?", choices: ["A", "B", "C", "D", "E", "F", "G"] }] })).toThrow(/at most 6 short choices/);
-    expect(refused({ asks: [{ field: "due_on", question: "When is it due?", when: "now" }] })).toThrow(/an ask takes no "when"/);
+    expect(refused({ asks: [{ field: "due_on", question: "When is it due?", after: "now" }] })).toThrow(/an ask takes no "after"/);
     expect(refused({ fields: ["title"], asks: [{ field: "due_on", question: "When is it due?" }] })).toThrow(/asks names "due_on", which the card does not carry/);
     expect(refused({ asks: [{ field: "title", question: "What is it?" }, { field: "title", question: "What is it?" }] })).toThrow(/twice/);
   });
@@ -97,8 +98,79 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     expect(refused({ resolve: { nope: async () => null } })).toThrow(/resolve names "nope"/);
     expect(refused({ fields: ["title"], resolve: { primary_assignee_id: async () => null } })).toThrow(/resolve names "primary_assignee_id", which the card does not carry/);
     expect(refused({ resolve: { primary_assignee_id: "by name" } })).toThrow(/resolve\.primary_assignee_id is \(value, actor, db, values\) => id/);
-    expect(refused({ asks: [{ field: "title", question: "What is it?", options: ["A"] }] })).toThrow(/options are \(\{ actor, db, today \}\) => a list/);
+    expect(refused({ asks: [{ field: "title", question: "What is it?", options: ["A"] }] })).toThrow(/options are \(\{ actor, db, today, values \}\) => a list/);
     expect(refused({ asks: [{ field: "title", question: "What is it?", options, choices: ["A"] }] })).toThrow(/choices or options, not both/);
+  });
+
+  test("a question asked only in some states (when) and one naming a record (read) are checked at load (decision 34)", () => {
+    const a = defineManifest({
+      module: "workspace",
+      actions: [
+        {
+          ...ACTION,
+          asks: [
+            { field: "primary_assignee_id", question: "Who leads it?", when: "project_id" },
+            { field: "project_id", question: "Which project?", read: "projects.list", params: { status: "active" }, type: "project" },
+            { field: "due_on", question: "When is it due?", when: { field: "priority", not: ["low"] } },
+          ],
+        },
+      ],
+    }).actions[0];
+    expect(a.asks.map((q) => [q.field, q.when, q.read, q.params, q.type])).toEqual([
+      ["primary_assignee_id", "project_id", null, {}, null],
+      ["project_id", null, "projects.list", { status: "active" }, "project"],
+      ["due_on", { field: "priority", not: ["low"] }, null, {}, null],
+    ]);
+    const refused = (ask) => () => defineManifest({ module: "workspace", actions: [{ ...ACTION, asks: [{ field: "project_id", question: "Which project?", ...ask }] }] });
+    expect(refused({ when: "project_id" })).toThrow(/when names another field the card carries/);
+    expect(refused({ when: "nope" })).toThrow(/when names another field/);
+    expect(refused({ when: { field: "priority" } })).toThrow(/when is a field, or \{ field, not: \[values\] \}/);
+    expect(refused({ when: { field: "priority", not: [], also: 1 } })).toThrow(/when is a field, or/);
+    expect(refused({ read: "Projects" })).toThrow(/read is a read's key/);
+    expect(refused({ read: "projects.list", choices: ["A"] })).toThrow(/takes read, options or choices, one of them/);
+    expect(refused({ params: { status: "active" } })).toThrow(/params are the read's own, beside read/);
+    expect(refused({ type: "project" })).toThrow(/type is a citation's type, beside read/);
+  });
+
+  test("the next question honours when: asked only while its field holds a value, or one outside its not list (decision 34)", () => {
+    const action = {
+      key: "things.decide",
+      asks: [
+        { field: "lead", question: "Who leads it?", choices: [], none: false, when: "department" },
+        { field: "reason", question: "Why?", choices: [], none: false, when: { field: "decision", not: ["approve"] } },
+      ],
+    };
+    expect(engine.cards.nextAsk(action, {})).toBeNull();
+    expect(engine.cards.nextAsk(action, { department: "d1" })).toMatchObject({ field: "lead" });
+    expect(engine.cards.nextAsk(action, { department: "d1", lead: "e1" })).toBeNull();
+    expect(engine.cards.nextAsk(action, { decision: "approve" })).toBeNull();
+    expect(engine.cards.nextAsk(action, { decision: "reject" })).toMatchObject({ field: "reason", question: "Why?" });
+    expect(engine.cards.nextAsk(action, { decision: "reject", reason: "Short that week" })).toBeNull();
+  });
+
+  test("gate 23 rule 7: every field an action's input requires is asked before its card is drawn; a default, a field the card leaves out or an unconditional ask accounts for it (decision 34)", () => {
+    const awareness = require("../../../scripts/check/ai-awareness");
+    const input = c.tasks.TaskCommentAdd;
+    const make = (asks, fields = null) => ({ key: "tasks.comment", input, fields, asks });
+    expect(awareness.requiredAsked([make([{ field: "task_id" }, { field: "body" }])], jsonSchemaOf)).toEqual([]);
+    const missing = awareness.requiredAsked([make([{ field: "body" }])], jsonSchemaOf);
+    expect(missing).toEqual([expect.stringMatching(/^tasks\.comment: its input requires task_id, which no ask asks before the card is drawn.*decision 34/)]);
+    // An ask asked only in some states does not stand for a field the input always requires.
+    expect(awareness.requiredAsked([make([{ field: "task_id", when: "body" }, { field: "body" }])], jsonSchemaOf)).toHaveLength(1);
+    // A field the card does not carry is never drawn, so never asked.
+    expect(awareness.requiredAsked([make([{ field: "body" }], ["body"])], jsonSchemaOf)).toEqual([]);
+    // A required field with a default (a calendar event's attendees) is filled, never asked.
+    expect(awareness.requiredAsked([{ key: "calendar.create", input: c.calendar.CalendarEventCreate, fields: null, asks: [{ field: "title" }, { field: "starts_at" }, { field: "ends_at" }] }], jsonSchemaOf)).toEqual([]);
+  });
+
+  test("a question naming a record answers from a list read that exists and takes its params, checked once every manifest is loaded (decision 34)", () => {
+    const ask = (over) => ({ ...ACTION, key: `things.${Object.keys(over).join("_") || "plain"}`, asks: [{ field: "project_id", question: "Which project?", read: "projects.list", ...over }] });
+    const loadWith = (action) => () => registry.load({ extra: [{ folder: "things", manifest: defineManifest({ module: "workspace", actions: [action] }) }] });
+    expect(loadWith(ask({ read: "nothings.list" }))).toThrow(/read "nothings\.list" is no read a manifest declares/);
+    expect(loadWith(ask({ read: "my_profile.get" }))).toThrow(/is not a list, so it has no rows to offer/);
+    expect(loadWith(ask({ params: { status: "lost" } }))).toThrow(/does not take params/);
+    expect(loadWith(ask({}))).not.toThrow();
+    registry.reset();
   });
 
   test("an action held to a capability names one the catalogue has; the task pick is the contract's (decision 33)", () => {

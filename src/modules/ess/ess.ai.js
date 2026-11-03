@@ -91,7 +91,12 @@ module.exports = defineManifest({
         const type = (await typesFor(actor)).find((t) => t.leave_type_id === values.leave_type_id);
         return type ? [{ type: "leave_type", id: type.leave_type_id, label: type.name }] : [];
       },
-      asks: [{ field: "leave_type_id", question: "Which leave type?", options: async ({ actor }) => (await typesFor(actor)).filter((t) => t.remaining === null || t.remaining === undefined || t.remaining > 0).map(choiceOf) }],
+      asks: [
+        { field: "leave_type_id", question: "Which leave type?", options: async ({ actor }) => (await typesFor(actor)).filter((t) => t.remaining === null || t.remaining === undefined || t.remaining > 0).map(choiceOf) },
+        // The first and last day (praxis-ai.md decision 34): the model reads the words against today's date.
+        { field: "starts_on", question: "What is your first day off?", choices: ["Tomorrow", "Next Monday"] },
+        { field: "ends_on", question: "What is your last day off?", choices: ["The Same Day"] },
+      ],
       resolve: { leave_type_id: (value, actor) => typeIdOf(actor, value) },
     },
   ],

@@ -90,9 +90,11 @@ async function ask(body, actor, askKey = null) {
   const shows = Array.isArray(body.shows) ? body.shows : [];
   const past = conversation ? await history.replay(conversation.ai_conversation_id, actor.user_id) : [];
   const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past, context, shows, onRead: progressFor(actor, askKey) });
-  // A card the action cannot be drawn without asks for what it lacks first (§1.3 decision 29), with
-  // answers read from the person's own records where the ask reads them (decision 32).
-  const asked = await answer.withOptions(answer.askFirst({ draft: out.draft, actions: out.actions, history: past, shows }), out.actions, { actor, db: pool });
+  // A card the action cannot be drawn without asks for what it lacks first (§1.3 decision 29; every
+  // field it needs, decision 34), the screen's own record filling its field, with answers read from
+  // the person's own records where the ask reads them (decisions 32 and 34).
+  const drafted = (out.draft && out.draft.action && out.draft.action.values) || {};
+  const asked = await answer.withOptions(answer.askFirst({ draft: out.draft, actions: out.actions, history: past, shows, context }), out.actions, { actor, db: pool, values: drafted });
   const shown = answer.build({ draft: asked, reads: out.reads, routes: out.routes, screens: out.screens, shows });
   // The card (§6.11 step 2): only for a screen that draws one, checked against the person's rights now.
   const card = shows.includes("cards") ? await answer.draftCard({ draft: asked, actions: out.actions, actor, context, db: pool }) : null;

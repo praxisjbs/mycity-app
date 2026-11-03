@@ -37,6 +37,12 @@ const probe = {
 };
 
 /** What the approve and reject cards share: the requests named, the re-check, the lines read back. */
+/**
+ * Which requests, when the person did not say (praxis-ai.md decision 34): the requests waiting for a
+ * decision in their reach, as the leave list names them ("Ayo Bello, Annual"), matched by those words.
+ */
+const whichRequests = { field: "leave_request_ids", question: "Which requests?", read: "leave.requests", params: { status: "submitted" } };
+
 const decision = (verb) => ({
   permission: ["people", "approve"],
   risk: "approval",
@@ -60,6 +66,7 @@ module.exports = defineManifest({
       description: "Approve leave requests waiting on me, with a note for the person if I like",
       input: c.leave.LeaveApprove,
       ...decision("approve"),
+      asks: [whichRequests],
     },
     {
       key: "leave.reject",
@@ -67,6 +74,7 @@ module.exports = defineManifest({
       description: "Reject leave requests waiting on me, saying why",
       input: c.leave.LeaveReject,
       ...decision("reject"),
+      asks: [whichRequests, { field: "reason", question: "Why are you rejecting it?" }],
     },
   ],
   // Every other Create schema of this module's contract, and why the assistant does not offer it (gate 23).

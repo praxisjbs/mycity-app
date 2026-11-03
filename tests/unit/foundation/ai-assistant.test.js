@@ -442,15 +442,21 @@ describe("a change gathered by questions (praxis-ai.md §1.3 decisions 28 and 29
     const leave = { key: "my_leave.request", asks: [{ field: "leave_type_id", question: "Which leave type?", choices: [], options, none: false }] };
     const asking = { text: "Which leave type?", action: null, ask: { action: "my_leave.request", field: "leave_type_id", choices: [] } };
     const actor = { user_id: "u1", employee_id: "e1" };
-    const filled = await answer.withOptions(asking, [leave], { actor, db: {} });
+    // The answers are read with the person's own reach under the action's grant (decision 34).
+    const scoped = jest.spyOn(authorise, "scopedFor").mockImplementation(async (who) => ({ ...who, scope: { scope: "own", scope_ids: [], employee_id: who.employee_id } }));
+    const filled = await answer.withOptions(asking, [leave], { actor, db: {}, values: { starts_on: "2026-11-09" } });
     expect(filled.ask.choices).toEqual(["Annual Leave, 12 days left", "Unpaid Leave"]);
-    expect(options).toHaveBeenCalledWith(expect.objectContaining({ actor, db: {}, today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }));
+    expect(options).toHaveBeenCalledWith(expect.objectContaining({ actor: expect.objectContaining({ ...actor, scope: expect.objectContaining({ scope: "own" }) }), db: {}, values: { starts_on: "2026-11-09" }, today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }));
     // No person or database, another field, or options that fail: the question stands as it was.
     expect(await answer.withOptions(asking, [leave], {})).toBe(asking);
     const other = { ...asking, ask: { ...asking.ask, field: "reason" } };
     expect(await answer.withOptions(other, [leave], { actor, db: {} })).toBe(other);
     const failing = { ...leave, asks: [{ ...leave.asks[0], options: async () => Promise.reject(new Error("down")) }] };
     expect(await answer.withOptions(asking, [failing], { actor, db: {} })).toBe(asking);
+    // A person the action's grant does not reach is offered nothing to tap.
+    scoped.mockResolvedValueOnce(null);
+    expect(await answer.withOptions(asking, [leave], { actor, db: {} })).toBe(asking);
+    scoped.mockRestore();
     // The system turn tells the model to write such a field by its name, never an id it did not read.
     expect(orchestrator.schemaFields(c.leave.LeaveRequestCreate, { required: true, only: ["leave_type_id", "starts_on"], byName: ["leave_type_id"] })).toEqual(["leave_type_id (its name), required", "starts_on (YYYY-MM-DD), required"]);
   });

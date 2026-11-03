@@ -83,8 +83,29 @@ function load({ dir = MODULES_DIR, extra = [] } = {}) {
     take(folder, rel, require(file));
   }
   for (const { folder, manifest } of extra) take(folder, `${folder}/${folder}.ai.js (test)`, manifest);
+  checkAskReads(keyMap);
   loaded = { dir, manifests, keys: keyMap, routes: routeList };
   return loaded;
+}
+
+/**
+ * An ask that names a record answers from a list read (praxis-ai.md decision 34): the read is
+ * declared by some manifest, is a list (its params take a page), and takes the ask's own params.
+ * Checked once every manifest has loaded, since the read is often another module's.
+ */
+function checkAskReads(keyMap) {
+  for (const a of keyMap.values()) {
+    if (a.kind !== "action") continue;
+    for (const q of a.asks || []) {
+      if (!q.read) continue;
+      const r = keyMap.get(q.read);
+      const at = `${a.file}: action ${a.key} ask ${q.field}`;
+      if (!r || r.kind !== "read") throw new Error(`${at}: read "${q.read}" is no read a manifest declares`);
+      if (!r.list) throw new Error(`${at}: read "${q.read}" is not a list, so it has no rows to offer`);
+      const parsed = r.params.safeParse({ ...q.params, page: 1 });
+      if (!parsed.success) throw new Error(`${at}: read "${q.read}" does not take params ${JSON.stringify(q.params)}`);
+    }
+  }
 }
 
 function current() {
