@@ -21,9 +21,11 @@
  *   watch(), unwatch(), ping(), setReminders()
  *   sweep()    the recurrence job: the next occurrence of each repeating task, and the
  *              due-today and due-tomorrow reminders.
- *   cardRecords(), cardNames(), assertCardTasks(), stepIdOf(), cardStep(), assertCardStep()
- *              what Praxis AI's cards name and re-check (docs/guides/praxis-ai.md §6.11): the
- *              tasks on the person's board, a step by its words; nothing here writes.
+ *   cardRecords(), cardNames(), assertCardTasks(), stepIdOf(), cardStep(), assertCardStep(),
+ *   stepChoices(), leadChoices(), leadIdOf()
+ *              what Praxis AI's cards name, ask and re-check (docs/guides/praxis-ai.md §6.11,
+ *              decision 34): the tasks on the person's board, a step by its words, a task's
+ *              lead by name; nothing here writes.
  *
  * Every change writes a task_activity row and emits one event, in the same transaction.
  * A task may count towards a scorecard line or a key result of its assignee (Counts Towards,
@@ -916,6 +918,32 @@ async function stepIdOf(db, taskId, words, scope) {
   return step ? step.task_step_id : null;
 }
 
+/** "Which step?" answers (praxis-ai.md decision 34): the steps of the card's task, when it is on the person's board. */
+async function stepChoices(db, taskId, scope) {
+  if (!(await seenOrNull(db, taskId, scope))) return [];
+  return (await repo.steps(db, taskId)).map((st) => st.title);
+}
+
+/**
+ * "Who leads it?" answers (decision 34): whom the person may set the task for, as New Task's own
+ * picker lists them; within the department when it is shared with one (who may lead it).
+ */
+async function leadChoices(scope, departmentId) {
+  const page = await people({ page: 1, ...(departmentId ? { department_id: departmentId } : {}) }, scope);
+  return page.data.map((p) => p.display_name);
+}
+
+/** A lead written by name (decision 34): matched among those leadChoices offers, searched by the name first. */
+async function leadIdOf(scope, words, departmentId) {
+  const within = departmentId && c.common.uuid.safeParse(departmentId).success ? { department_id: departmentId } : {};
+  for (const q of [words, null]) {
+    const page = await people({ page: 1, ...within, ...(q ? { q } : {}) }, scope);
+    const found = oneNamed(page.data, words, (p) => [p.display_name]);
+    if (found) return found.employee_id;
+  }
+  return null;
+}
+
 /** The step a card changes, by its words, when it is a step of the card's task on the person's board. */
 async function cardStep(db, taskId, stepId, scope) {
   if (!c.common.uuid.safeParse(stepId).success || !(await seenOrNull(db, taskId, scope))) return [];
@@ -1542,6 +1570,9 @@ module.exports = {
   completeMany,
   cardRecords,
   stepIdOf,
+  stepChoices,
+  leadChoices,
+  leadIdOf,
   cardStep,
   assertCardStep,
   cardNames,

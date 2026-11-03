@@ -130,6 +130,7 @@ describeDb("Praxis AI action cards against the real migrations", () => {
       get: (path) => auth(request(app).get(`/api/v1${path}`)),
       post: (path) => auth(request(app).post(`/api/v1${path}`)),
       put: (path) => auth(request(app).put(`/api/v1${path}`)),
+      patch: (path) => auth(request(app).patch(`/api/v1${path}`)),
     };
   };
   const fresh = () => {
@@ -284,15 +285,18 @@ describeDb("Praxis AI action cards against the real migrations", () => {
   });
 
   test("a refusal the person can fix comes back on the fields and the card stays open; a service that falls over is recorded as failed", async () => {
-    // Everything its asks name is given (no due day, said so), so the card is drawn and the press finds the gap:
-    // a real department (one nothing names would be Pick one at the draft, decision 32) shared with no lead.
-    const { department_id: department } = await one("SELECT department_id FROM department WHERE name = 'HR & Operations'");
-    const { body } = await cardFor("staff", { title: "Shared task", due_on: null, priority: "normal", department_id: department });
+    // Everything the card needs is asked first (decision 34), so the card is drawn whole; what the press finds is
+    // only what changed meanwhile: the project it joins was completed after the card was drawn.
+    const project = await as("staff").post("/projects").send({ name: "Launch Week" });
+    expect(project.status).toBe(201);
+    const { body } = await cardFor("staff", { title: "Book the venue", due_on: null, priority: "normal", project_id: project.body.project_id });
+    expect(body.card.problems).toEqual({});
     const id = body.card.ai_action_draft_id;
+    expect((await as("staff").patch(`/projects/${project.body.project_id}`).send({ status: "completed" })).status).toBe(200);
     const res = await press("staff", id);
     expect(res.status).toBe(422);
-    expect(res.body.error.fields).toEqual({ primary_assignee_id: ["Pick a lead"] });
-    expect(await one("SELECT status, problems FROM ai_action_draft WHERE ai_action_draft_id = $1", [id])).toEqual({ status: "shown", problems: { primary_assignee_id: ["Pick a lead"] } });
+    expect(res.body.error.fields).toEqual({ project_id: ["Project is closed"] });
+    expect(await one("SELECT status, problems FROM ai_action_draft WHERE ai_action_draft_id = $1", [id])).toEqual({ status: "shown", problems: { project_id: ["Project is closed"] } });
     expect(await one("SELECT status, error_code FROM ai_action_run WHERE ai_action_draft_id = $1", [id])).toMatchObject({ status: "failed" });
 
     const sent = script(say({ text: "A sample.", action: { key: "sample.explode", values: {}, suggested: false } }));

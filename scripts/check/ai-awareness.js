@@ -29,6 +29,9 @@
  *     list of today's gaps, scripts/check/ai-forms-gaps.json. That list only shrinks: an entry now
  *     accounted for, or naming no such schema, fails until it is taken off, and one the change's
  *     base did not hold fails, so a new form comes with its action or its reason.
+ *  7. Every field a card needs is asked before it is drawn (decision 34): each field an action's
+ *     input requires (its JSON Schema's `required`, among the fields the card carries, with no
+ *     default) has an ask without `when`.
  *
  * Usage: node scripts/check/ai-awareness.js [--list]     exit 0 ok, 1 problems
  *        --list prints the sweep: each Create schema, and each create and edit form, and how it
@@ -118,6 +121,29 @@ function formsAccountedFor({ forms, actionKeys, gaps, baseGaps }) {
     for (const id of Object.keys(gaps))
       if (!has(baseGaps, id)) problems.push(`scripts/check/ai-forms-gaps.json gained ${id}: the list only shrinks, so a form comes with its action or its reason (praxis-ai.md decision 33)`);
   return { problems, sweep, counts };
+}
+
+/**
+ * Rule 7 (decision 34): a card is drawn whole. Each field an action's input requires (its JSON
+ * Schema's `required`, among the fields the card carries, with no default) has an ask without
+ * `when`, so the person is asked for it before the card is drawn and never meets it as a problem.
+ * @param {Array<{key: string, input: object, fields: string[]|null, asks: Array<{field: string, when?: string|null}>}>} actions
+ * @param {(schema: object) => {properties?: object, required?: string[]}} schemaOf  the input as JSON Schema
+ * @returns {string[]} problems
+ */
+function requiredAsked(actions, schemaOf) {
+  const out = [];
+  for (const a of actions) {
+    const js = schemaOf(a.input) || {};
+    const props = js.properties || {};
+    const carried = (f) => !a.fields || a.fields.includes(f);
+    const required = (js.required || []).filter((f) => carried(f) && !(props[f] && props[f].default !== undefined));
+    const asked = new Set((a.asks || []).filter((q) => !q.when).map((q) => q.field));
+    for (const f of required)
+      if (!asked.has(f))
+        out.push(`${a.key}: its input requires ${f}, which no ask asks before the card is drawn; add an ask (its question, answers to tap, \`read\` when it names a record) (praxis-ai.md decision 34)`);
+  }
+  return out;
 }
 
 /** The gaps list, as this tree holds it and as the change's base held it (null when the base had none). */
@@ -273,6 +299,10 @@ function check() {
   const six = formsAccountedFor({ forms: formSchemas, actionKeys: new Set(actions.map((a) => a.key)), gaps: lists.now, baseGaps: lists.then });
   problems.push(...six.problems);
 
+  // 7. Every field a card needs is asked before it is drawn (decision 34).
+  const { jsonSchemaOf } = require(path.join(ROOT, "src", "services", "ai", "structured"));
+  problems.push(...requiredAsked(actions, jsonSchemaOf));
+
   return { problems, actions: actions.length, sweep, forms: six.sweep, counts: six.counts };
 }
 
@@ -303,4 +333,4 @@ if (require.main === module) {
   process.exit(1);
 }
 
-module.exports = { check, formCalls, built, formsAccountedFor, reasonOf, NEVER, FORM_SCHEMA };
+module.exports = { check, formCalls, built, formsAccountedFor, requiredAsked, reasonOf, NEVER, FORM_SCHEMA };

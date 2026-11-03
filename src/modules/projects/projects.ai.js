@@ -54,6 +54,8 @@ module.exports = defineManifest({
       permission: ["workspace", "edit"],
       risk: "standard",
       form: "none: Edit Project's form changes the project open on its page and never names it, and Complete Project and Reopen Project are buttons; the card names the project",
+      // Which project, when the person did not say (praxis-ai.md decision 34): the projects list's own rows to tap.
+      asks: [{ field: "project_id", question: "Which project is it?", read: "projects.list" }],
       records: (values, actor, db) => (db ? service.cardRecords(db, values.project_id, actor.scope) : values.project_id ? [{ type: "project", id: values.project_id }] : []),
       check: (client, values, actor) => service.assertCardProject(client, values.project_id, actor.scope),
       run: (values, actor) => {

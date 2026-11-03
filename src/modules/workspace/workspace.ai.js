@@ -25,7 +25,10 @@ module.exports = defineManifest({
       fields: ["week_starts_on", "support_needed"],
       // A week is named by any day in it, or this, next or last week: its Monday (praxis-ai.md §6.11).
       resolve: { week_starts_on: (value) => service.weekOf(value) },
-      asks: [{ field: "support_needed", question: "What support do you need?" }],
+      asks: [
+        { field: "support_needed", question: "What support do you need?" },
+        { field: "week_starts_on", question: "Which week is it for?", choices: ["This Week", "Next Week"] },
+      ],
       run: (values, actor) => service.save(actor, values),
       // My Week sits on Today: the line opens it there.
       readback: (week) => [{ type: "week", id: week.week_starts_on, label: `Week of ${week.week_starts_on.split("-").reverse().join("/")}`, status: "saved", link: routeMap.screenPath("workspace", "today") }],

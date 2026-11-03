@@ -53,6 +53,14 @@ module.exports = defineManifest({
       bulk: 25,
       // My Approvals' Approve is one press; Reject and Request Changes ask their reason in a sheet (workflow.ReasonBody).
       form: "none: Approve is one press on a request and Reject or Request Changes ask a reason in a sheet; the card decides several at once",
+      // What the card needs, asked first (praxis-ai.md decision 34): which requests (those waiting on the
+      // person, as the card names them), the decision, and why, unless it is an approval.
+      asks: [
+        { field: "workflow_instance_ids", question: "Which requests?", options: ({ actor }) => service.cardChoices(actor) },
+        { field: "decision", question: "Approve, reject or ask for changes?", choices: ["Approve", "Reject", "Request Changes"] },
+        { field: "reason", question: "What reason should the requester see?", when: { field: "decision", not: ["approve"] } },
+      ],
+      resolve: { workflow_instance_ids: (value, actor) => service.instanceIdOf(actor, value) },
       records: (values, actor, db) => (db ? service.cardRecords(db, values.workflow_instance_ids, actor) : (values.workflow_instance_ids || []).map((id) => ({ type: "workflow_instance", id }))),
       check: (client, values, actor) => service.assertCardInstances(client, values.workflow_instance_ids, actor),
       run: (values, actor) => service.decideMany(actor, values),

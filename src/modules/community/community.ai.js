@@ -63,6 +63,11 @@ module.exports = defineManifest({
       suggest: true,
       // The chat box is the conversation's own; the card names the colleague and carries the words.
       form: "none: the chat box is the conversation's own and never names its colleague; the card must",
+      // Who and what, asked first when not said (praxis-ai.md decision 34): a colleague by name from the directory.
+      asks: [
+        { field: "employee_id", question: "Who is it for?", read: "colleagues.list" },
+        { field: "body", question: "What should it say?" },
+      ],
       records: (values, _actor, db) => (values.employee_id ? (db ? service.colleagueRecords(db, [values.employee_id]) : [{ type: "employee", id: values.employee_id }]) : []),
       check: (client, values) => service.assertColleague(client, values.employee_id),
       run: (values, actor) => service.sendDirect(values.employee_id, values.body, actor),
@@ -78,6 +83,11 @@ module.exports = defineManifest({
       permission: ["community", "create"],
       risk: "standard",
       form: "none: the chat box is the channel's own and never names its channel; the card must",
+      // Which channel and what, asked first when not said (decision 34): the person's own channels to tap.
+      asks: [
+        { field: "community_channel_id", question: "Which channel?", read: "channels.list" },
+        { field: "body", question: "What should it say?" },
+      ],
       records: (values, actor, db) => (values.community_channel_id ? (db ? service.channelRecords(db, [values.community_channel_id], actor) : [{ type: "channel", id: values.community_channel_id }]) : []),
       check: (client, values, actor) => service.assertMayPost(client, values.community_channel_id, actor),
       run: (values, actor) => service.postMessage(values.community_channel_id, { message_type: "text", body: values.body }, actor),

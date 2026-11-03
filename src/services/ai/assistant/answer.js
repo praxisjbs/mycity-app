@@ -347,22 +347,40 @@ function withChoices(draft, actions, now) {
 }
 
 /**
+ * A record question's answers (decision 34): the first rows of the ask's list read, run with the
+ * person's own rights, as their citations read, of the ask's citation type when it names one.
+ */
+async function recordChoices(db, actor, entry) {
+  const r = await authorise.runRead(db, actor, entry.read, { ...entry.params, page: 1 });
+  return (r.citations || []).filter((cite) => cite && cite.label && (!entry.type || cite.type === entry.type)).map((cite) => cite.label);
+}
+
+/**
  * A question for one of an offered action's fields whose answers are read from the person's own
- * records (an ask's `options`: Request Leave's types with the days left of each, decision 32), with
- * those answers to tap. The service calls it after `askFirst`, with the asking person and a
- * database; the engine never reads. A read that fails leaves the question as it was.
+ * records (an ask's `options`: Request Leave's types with the days left of each, decision 32; an
+ * ask's `read`: which task, which request, decision 34), with those answers to tap. The service
+ * calls it after `askFirst`, with the asking person, a database and the values the model drafted;
+ * the engine never reads. A question the model gave its own answers keeps them; a read that fails
+ * leaves the question as it was.
  * @param {object} draft
  * @param {Array<object>} actions  the actions offered this turn
- * @param {{actor?: object, db?: {query: Function}|null, now?: Date}} [ctx]
+ * @param {{actor?: object, db?: {query: Function}|null, now?: Date, values?: object}} [ctx]
  */
-async function withOptions(draft, actions, { actor = null, db = null, now = new Date() } = {}) {
+async function withOptions(draft, actions, { actor = null, db = null, now = new Date(), values = {} } = {}) {
   const ask = draft && draft.ask;
   if (!ask || typeof ask !== "object" || !ask.action || !ask.field || !actor || !db) return draft;
+  // The model's own answers to tap stand ("Which Tunde?" with the two it found), as withChoices keeps them.
+  if (Array.isArray(ask.choices) && ask.choices.some((c) => String(c).trim())) return draft;
   const action = (actions || []).find((a) => a.key === ask.action);
   const entry = action && Array.isArray(action.asks) ? action.asks.find((a) => a.field === ask.field) : null;
-  if (!entry || typeof entry.options !== "function") return draft;
+  if (!entry || (typeof entry.options !== "function" && !entry.read)) return draft;
   try {
-    const listed = await entry.options({ actor, db, today: lagos.today(now) });
+    // The person's own records, as the action's grant reaches them (decision 34): never more than they may open.
+    const who = await authorise.scopedFor(actor, action);
+    if (!who) return draft;
+    const listed = entry.read
+      ? await recordChoices(db, actor, entry)
+      : await entry.options({ actor: who, db, today: lagos.today(now), values: values && typeof values === "object" ? values : {} });
     const choices = [...new Set((Array.isArray(listed) ? listed : []).map((c) => String(c).trim()).filter((c) => c && c.length <= 60))].slice(0, MAX_CHOICES);
     return choices.length ? { ...draft, ask: { ...ask, choices } } : draft;
   } catch (err) {
@@ -377,17 +395,20 @@ async function withOptions(draft, actions, { actor = null, db = null, now = new 
  * question instead (its words, its choices, what it asks for), with no card, table or screen
  * button; each field is asked once in a run of questions, and the run stops after six, so asking
  * never loops. A suggested card, an action not offered and a screen that draws no card are left
- * as they are.
- * @param {{draft: object, actions: Array<object>, history?: Array<object>, shows?: string[], now?: Date}} q
+ * as they are. The screen asked from fills its record's field before anything is found missing.
+ * @param {{draft: object, actions: Array<object>, history?: Array<object>, shows?: string[], now?: Date, context?: object|null}} q
  * @returns {object} the draft, or the question that replaces it
  */
-function askFirst({ draft, actions, history = [], shows = [], now = new Date() }) {
+function askFirst({ draft, actions, history = [], shows = [], now = new Date(), context = null }) {
   const given = withChoices(draft, actions, now);
   const want = given && given.action;
   if (!want || !want.key || want.suggested === true || !shows.includes("cards")) return given;
   const action = (actions || []).find((a) => a.key === want.key);
   if (!action) return given;
-  const q = engine.cards.nextAsk(action, want.values && typeof want.values === "object" ? want.values : {}, askedRun(history), { today: lagos.today(now) });
+  // The record open on the screen asked from fills its field first, as the card's draft does: never asked for.
+  const fieldNames = action.fields ? [...action.fields] : Object.keys(shapeOf(action.input) || {});
+  const values = engine.cards.fillFromContext(want.values && typeof want.values === "object" ? want.values : {}, fieldNames, context);
+  const q = engine.cards.nextAsk(action, values, askedRun(history), { today: lagos.today(now) });
   if (!q) return given;
   logger.info({ ai_action: action.key, field: q.field }, "Praxis AI: a card waited on a question first");
   return { ...given, text: q.question, action: null, ask: { action: q.action, field: q.field, choices: q.choices }, table: null, route: null, prefill: null, more: false, overview: null };
@@ -464,4 +485,4 @@ async function draftCard({ draft, actions, actor, context = null, db = null, now
   };
 }
 
-module.exports = { build, draftCard, askFirst, withChoices, withOptions, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, whoOf, valueAt, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };
+module.exports = { build, draftCard, askFirst, withChoices, withOptions, recordChoices, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, whoOf, valueAt, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };

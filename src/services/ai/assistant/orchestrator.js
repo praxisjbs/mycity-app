@@ -101,7 +101,10 @@ function actionLine(a, today) {
   if (a.asks && a.asks.length) {
     const asks = a.asks.map((q) => {
       const choices = typeof q.choices === "function" ? q.choices({ today }) : q.choices || [];
-      return `${q.field} ("${q.question}"${choices.length ? `, choices: ${choices.join(", ")}` : ""}${q.none ? `; null when the person says there is none` : ""})`;
+      // A field naming a record is one of the person's own, from that read; one required in some states is asked only then (decision 34).
+      const from = q.read ? `; one of the person's own from ${q.read}, by its words or id` : "";
+      const when = !q.when ? "" : typeof q.when === "object" ? `; only when ${q.when.field} is given and is not ${q.when.not.join(" or ")}` : `; only when ${q.when} is given`;
+      return `${q.field} ("${q.question}"${choices.length ? `, choices: ${choices.join(", ")}` : ""}${from}${when}${q.none ? `; null when the person says there is none` : ""})`;
     });
     parts.push(`ask first, one at a time, unless the person gave it: ${asks.join("; ")}`);
   }

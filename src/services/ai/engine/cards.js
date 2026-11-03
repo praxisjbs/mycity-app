@@ -105,13 +105,29 @@ function missing(ask, values) {
   return false;
 }
 
+/** Does a field hold a value: given, not blank, not an empty list. */
+const holds = (values, field) => {
+  const v = values ? values[field] : undefined;
+  if (v === undefined || v === null) return false;
+  if (typeof v === "string") return Boolean(v.trim());
+  return !(Array.isArray(v) && !v.length);
+};
+
+/** Is an ask's `when` met: its field holds a value, and for { field, not } one outside the list. */
+function applies(when, values) {
+  const field = typeof when === "object" ? when.field : when;
+  if (!holds(values, field)) return false;
+  return !(typeof when === "object" && Array.isArray(when.not) && when.not.includes(String(values[field])));
+}
+
 /**
- * The question to ask before a card is drawn (decision 29): the first of the action's asks whose
- * field the model's values leave out, unless the run of questions just before already asked it
- * (the person answered "none", or the model could not use the answer: the card shows the gap
- * instead), or the run is already ASK_RUN_MAX long. Pure: the adapter gives today's date for
- * answers that move with the day.
- * @param {{key: string, asks?: Array<{field: string, question: string, choices: string[]|Function, none: boolean}>}} action
+ * The question to ask before a card is drawn (decisions 29 and 34): the first of the action's asks
+ * whose field the model's values leave out, an ask with `when` only while that other field holds a
+ * value, unless the run of questions just before already asked it (the person answered "none", or
+ * the model could not use the answer: the card shows the gap instead), or the run is already
+ * ASK_RUN_MAX long. Pure: the adapter gives today's date for answers that move with the day, and
+ * fills answers read from the person's records afterwards.
+ * @param {{key: string, asks?: Array<{field: string, question: string, choices: string[]|Function, none: boolean, when?: string|{field: string, not: string[]}|null}>}} action
  * @param {object} values  what the model gave, before any default fills it
  * @param {Array<{action: string|null, field: string|null}>} asked  the questions asked in a row just before this answer
  * @param {{today?: string}} [at]
@@ -121,6 +137,7 @@ function nextAsk(action, values, asked = [], { today = null } = {}) {
   if (!action || !Array.isArray(action.asks) || !action.asks.length) return null;
   if (asked.length >= ASK_RUN_MAX) return null;
   for (const ask of action.asks) {
+    if (ask.when && !applies(ask.when, values)) continue;
     if (!missing(ask, values)) continue;
     if (asked.some((a) => a && a.action === action.key && a.field === ask.field)) continue;
     const choices = typeof ask.choices === "function" ? ask.choices({ today }) : ask.choices || [];

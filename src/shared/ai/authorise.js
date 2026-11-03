@@ -50,6 +50,7 @@ const { maskForUser, maskedKeysFor } = require("../rbac/field-mask");
 const metrics = require("../observability/metrics");
 const registry = require("./registry");
 const { citationsFor } = require("./cite");
+const { oneNamed } = require("./named");
 const c = require("@mycity/contract");
 
 const scopeFor = (...args) => require("../../middleware/rbac").scopeFor(...args);
@@ -112,6 +113,13 @@ async function scopeOf(actor, tool) {
   const scope = await scopeFor(actor, tool.permission[0], tool.permission[1]);
   if (!scope || !tool.capability) return scope;
   return (await holdsCapability(actor, tool.capability)) ? scope : null;
+}
+
+/** The person with the scope an action's grant gives them, or null when they may not run it (its capability too). */
+async function scopedFor(actor, action) {
+  if (!actor || !action) return null;
+  const scope = await scopeOf(actor, action);
+  return scope ? { ...actor, scope } : null;
 }
 
 /** Which of a kind this person may run. */
@@ -252,25 +260,59 @@ const PICK_ONE = "Pick one";
 
 /**
  * The values with each field the model may write by name matched to the person's own record
- * (`resolve`, decision 32): a value already an id is left alone, a name the resolver cannot match
- * is left as written, for Pick one to mark. Each resolver is handed the card's values too, so a step
- * is matched among the steps of the card's own task.
+ * (`resolve`, decision 32), and each field a record question asks for (an ask's `read`, decision 34)
+ * matched among the person's own records by its words: a value already an id is left alone, a name
+ * nothing matches is left as written, for Pick one (or the schema) to mark; a list is matched one by
+ * one. Each resolver is handed the card's values too, so a step is matched among the steps of the
+ * card's own task.
  */
 async function resolved(action, values, who, db) {
-  const fields = Object.keys(action.resolve || {});
-  if (!fields.length || !db) return values;
+  const custom = action.resolve || {};
+  const records = (action.asks || []).filter((q) => q.read && !custom[q.field]);
+  if ((!Object.keys(custom).length && !records.length) || !db) return values;
   const out = { ...values };
-  for (const field of fields) {
+  const byWords = (v) => typeof v === "string" && v.trim() && !UUID.test(v.trim());
+  const each = async (field, match) => {
     const v = out[field];
-    if (typeof v !== "string" || !v.trim() || UUID.test(v.trim())) continue;
     try {
-      const id = await action.resolve[field](v.trim(), who, db, { ...out });
-      if (typeof id === "string" && id) out[field] = id;
+      if (Array.isArray(v)) {
+        if (!v.some(byWords)) return;
+        const ids = [];
+        for (const one of v) ids.push(byWords(one) ? (await match(one.trim())) || one : one);
+        out[field] = ids;
+      } else if (byWords(v)) {
+        const id = await match(v.trim());
+        if (typeof id === "string" && id) out[field] = id;
+      }
     } catch (err) {
-      logger.warn({ err, ai_action: action.key, field }, "Praxis AI: an action's resolve() threw; the value stays as written");
+      logger.warn({ err, ai_action: action.key, field }, "Praxis AI: a value written by name could not be matched; it stays as written");
     }
-  }
+  };
+  // The records first: a resolver handed the values then sees them as ids (a step within its task).
+  for (const q of records) await each(q.field, (words) => recordIdOf(db, who, q, words));
+  for (const field of Object.keys(custom)) await each(field, (words) => custom[field](words, who, db, { ...out }));
   return out;
+}
+
+/**
+ * The record a value names by its words (decision 34): among the rows the ask's list read returns,
+ * with the person's own rights, for those words (its `q`), then among its first page (the answers
+ * the question offered); by the citation's words (shared/ai/named.js). Null when none or several match.
+ */
+async function recordIdOf(db, who, ask, words) {
+  const kept = (cites) => (cites || []).filter((cite) => cite && cite.label && (!ask.type || cite.type === ask.type));
+  for (const q of [words, null]) {
+    let read;
+    try {
+      read = await runRead(db, who, ask.read, { ...ask.params, page: 1, ...(q ? { q } : {}) });
+    } catch (err) {
+      if (err && (err.code === "AI_READ_INVALID" || err.code === "AI_READ_TIMEOUT")) continue;
+      throw err;
+    }
+    const found = oneNamed(kept(read.citations), words, (cite) => [cite.label]);
+    if (found) return String(found.id);
+  }
+  return null;
 }
 
 /** Each picked field holding an id, or a list with an id, that neither the names nor the records name: Pick one. */
@@ -311,4 +353,4 @@ async function namesOf(action, values, who, db) {
   }
 }
 
-module.exports = { allowedReads, allowedSummaries, allowedActions, runRead, runSummary, checkAction, guarded, PICK_ONE, READ_TIMEOUT_MS, READ_DEADLINE_MS };
+module.exports = { allowedReads, allowedSummaries, allowedActions, scopedFor, runRead, runSummary, checkAction, guarded, PICK_ONE, READ_TIMEOUT_MS, READ_DEADLINE_MS };

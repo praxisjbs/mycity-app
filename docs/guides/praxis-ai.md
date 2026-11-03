@@ -177,6 +177,20 @@ reachable from the chat; the gate's shape was put to the owner first and approve
     only shrinks: a new form, and every form of a module when its backend is built, comes with its
     action or its reason. Gate 23 holds it (§6.15 rule 6).
 
+### 1.6 Decisions (JBS Praxis, 03/11/2026, binding): a card is drawn whole
+
+Asked for on 03/11/2026 after a Create Task card on staging, shared with a department, was drawn
+without its lead and refused at the press with Pick a lead ("It should always ask for required
+fields, so we never see an error. We can add a gate for that.").
+
+34. **Every field a card needs is asked before it is drawn.** Each field an action's input requires,
+    and each field it requires only in some states (`when`: the lead of a task shared with a
+    department), is asked first, one question at a time with answers to tap; a field that names a
+    record (which task, which request, which channel) is asked with the person's own records as its
+    answers and matched by their words. So a card is pressed as it is drawn: a problem left on it is
+    one the person made by editing it, never one nobody asked about. Gate 23 holds it (§6.15
+    rule 7): every required field of every action's input has an ask.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -675,12 +689,21 @@ A card whose values have a problem keeps what was matched, so a type matched by 
 while another field is fixed; an id field's value reads only as the name `names` or `records` give
 it, never as the words the model wrote.
 
-**Asked before it is drawn (decisions 28 and 29).** `asks` lists what the action must have before
+**Asked before it is drawn (decisions 28, 29 and 34).** `asks` lists what the action must have before
 its card is drawn, in order: the field, its one short question (at most 8 words), its answers to tap
 (a list, or `({ today }) => list` for answers that move with the day; or `options`,
-`({ actor, db, today }) => list`, for answers read from the person's own records, such as their leave
-types with the days left, which the service fills once the question is chosen, `answer.withOptions`)
-and whether none is an answer (`none`: null, or an empty list, is then a value the person gave). The system turn gives the model
+`({ actor, db, today, values }) => list`, for answers read from the person's own records, such as
+their leave types with the days left, which the service fills once the question is chosen,
+`answer.withOptions`, the actor carrying the action's scope and `values` what the model drafted)
+and whether none is an answer (`none`: null, or an empty list, is then a value the person gave).
+Every field the input requires has an ask (decision 34, §6.15 rule 7). `when` names another field:
+the question is asked only while that field holds a value (the lead, `primary_assignee_id`, when a
+task is shared with a department, `department_id`). `read` names a list read that lists the
+person's own records (`tasks.list`, with `params` such as `{ scope: "mine" }`, and `type` to keep
+one kind of citation): the answers to tap are its first six rows as their citations read, and a
+value written by its words, or tapped, is matched among the rows the same read returns for those
+words (its `q`) and then its first page, by the citation's words (`shared/ai/named.js`), so "the
+weekly report task" is that task's id; a list of records is matched one by one. The system turn gives the model
 each action's asks, and the prompt (version 7) has it ask one at a time, with `ask` naming the action
 and field, and never invent a value. The server holds the same list (`answer.askFirst`, the engine's
 `cards.nextAsk`): a card the person asked for (never a suggested one) whose model values leave out an
@@ -898,6 +921,11 @@ PR there.
    never, or naming no schema of a built module, fails until it is taken off, and an entry the
    change's base did not hold fails, so a gap is closed, never added. `--list` prints every create
    and edit schema and how it is accounted for.
+7. a field a card needs is never asked (decision 34): a field an action's input requires (its JSON
+   Schema's `required`, among the fields the card carries, with no default) that no ask of the
+   action names without a `when`. A field required only in some states is the action's own to ask
+   with `when`; a field that names a record is asked with `read`, so its answers are the person's
+   own records.
 
 ### 6.16 Download Excel (decision 15; PR3)
 
@@ -1197,6 +1225,16 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · A card is drawn whole (§1.6 decision 34, JBS Praxis, after a task shared with a
+  department was drawn without its lead and refused with Pick a lead): every field an action's input
+  requires is asked before its card is drawn, gate 23 rule 7 (§6.15) holding it; an ask takes
+  `when` (asked only while another field holds a value: Create Task and Save Task ask "Who leads
+  it?" when shared with a department, with that department's people to tap, a lead written by name
+  matched among them) and `read` (a field naming a record: its answers are the person's own records
+  from that list read, and a value written by its words is matched among them); `options` is handed
+  the drafted values and the action's scope; `resolve` matches a list one by one. Every action asks
+  what it needs: which task, step, project, event, request, channel or reason, a message's words, a
+  mail's address and subject, leave's first and last day, a decision. §6.11, §6.15.
 - 03/11/2026 · JP · My Workspace's forms in the chat (decision 33; "go ahead with Workspace and
   Calendar", JBS Praxis; `docs/handoff/praxis-ai-engine.md` §6.9): ten actions (§6.11's table),
   each the screen's own service function: Save Task (`tasks.edit`), Add Step, Save Step, Add Link

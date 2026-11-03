@@ -119,7 +119,7 @@ const ACTION_KEYS = new Set([
 const ROUTE_KEYS = new Set(["intent", "screen", "params", "prefill"]);
 /** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decisions 31 and 32). */
 const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task"]);
-const ASK_KEYS = new Set(["field", "question", "choices", "options", "none"]);
+const ASK_KEYS = new Set(["field", "question", "choices", "options", "none", "when", "read", "params", "type"]);
 /** The answers to tap under a question, at most (AiAnswer.choices). */
 const CHOICES_MAX = 6;
 const KEY_RE = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
@@ -312,10 +312,13 @@ function checkAction(where, a, seen) {
 }
 
 /**
- * What an action must have before its card is drawn (praxis-ai.md §1.3 decision 29): each a field
- * the card carries, the short question that asks for it, the answers to tap (a list, or a function
- * of `{ today }` for answers that move with the day), and whether "none" is an answer (`none`: null,
- * or an empty list, is then a value the person gave).
+ * What an action must have before its card is drawn (praxis-ai.md §1.3 decision 29, §1.6 decision
+ * 34): each a field the card carries, the short question that asks for it, the answers to tap (a
+ * list, or a function of `{ today }` for answers that move with the day; `options` read from the
+ * person's own records; or `read`, a list read whose rows are the person's own records, with its
+ * `params` and the citation `type` kept), whether "none" is an answer (`none`: null, or an empty
+ * list, is then a value the person gave), and `when`, another field: asked only while it holds a
+ * value. A read's key is checked against the registry once every manifest has loaded.
  */
 function checkAsks(at, asks, takes, carried) {
   if (asks === undefined) return Object.freeze([]);
@@ -337,10 +340,33 @@ function checkAsks(at, asks, takes, carried) {
       if (fixed && (q.choices.length > CHOICES_MAX || q.choices.some((c) => typeof c !== "string" || !c.trim() || c.length > 60)))
         throw new Error(`${at}: ask ${q.field} offers at most ${CHOICES_MAX} short choices`);
       // Answers read from the person's own records (their leave types): filled by the service, never the engine (decision 32).
-      if (q.options !== undefined && typeof q.options !== "function") throw new Error(`${at}: ask ${q.field}'s options are ({ actor, db, today }) => a list`);
+      if (q.options !== undefined && typeof q.options !== "function") throw new Error(`${at}: ask ${q.field}'s options are ({ actor, db, today, values }) => a list`);
       if (q.options !== undefined && q.choices !== undefined) throw new Error(`${at}: ask ${q.field} takes choices or options, not both`);
       if (q.none !== undefined && typeof q.none !== "boolean") throw new Error(`${at}: ask ${q.field}'s none is true or false`);
-      return Object.freeze({ field: q.field, question: words, choices: q.choices || [], options: q.options || null, none: q.none === true });
+      // Asked only while another field holds a value: a field required in some states (praxis-ai.md decision 34).
+      // `when` is a field ("department_id": while it holds a value) or { field, not: [values] } (while it holds another value).
+      const whenField = q.when && typeof q.when === "object" ? q.when.field : q.when;
+      if (q.when !== undefined && (typeof whenField !== "string" || whenField === q.field || !takes(whenField) || !carried(whenField)))
+        throw new Error(`${at}: ask ${q.field}'s when names another field the card carries`);
+      if (q.when && typeof q.when === "object" && (Object.keys(q.when).some((k) => k !== "field" && k !== "not") || !Array.isArray(q.when.not) || !q.when.not.length || q.when.not.some((v) => typeof v !== "string")))
+        throw new Error(`${at}: ask ${q.field}'s when is a field, or { field, not: [values] }`);
+      // A field naming a record: its answers are the person's own records from a list read, matched by their words.
+      if (q.read !== undefined && (typeof q.read !== "string" || !KEY_RE.test(q.read))) throw new Error(`${at}: ask ${q.field}'s read is a read's key`);
+      if (q.read !== undefined && (q.options !== undefined || q.choices !== undefined)) throw new Error(`${at}: ask ${q.field} takes read, options or choices, one of them`);
+      if (q.params !== undefined && (q.read === undefined || !q.params || typeof q.params !== "object" || Array.isArray(q.params)))
+        throw new Error(`${at}: ask ${q.field}'s params are the read's own, beside read`);
+      if (q.type !== undefined && (q.read === undefined || typeof q.type !== "string" || !q.type)) throw new Error(`${at}: ask ${q.field}'s type is a citation's type, beside read`);
+      return Object.freeze({
+        field: q.field,
+        question: words,
+        choices: q.choices || [],
+        options: q.options || null,
+        none: q.none === true,
+        when: q.when && typeof q.when === "object" ? Object.freeze({ field: q.when.field, not: Object.freeze([...q.when.not]) }) : q.when || null,
+        read: q.read || null,
+        params: Object.freeze({ ...(q.params || {}) }),
+        type: q.type || null,
+      });
     }),
   );
 }

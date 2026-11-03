@@ -50,6 +50,16 @@ const probe = {
   outside: async (ctx) => forTask(ctx, await service.create(ctx.outsider.user, ctx.outsider.scope, { title: `Outsider's task, seen by ${ctx.role}` }), ctx.outsider.user, ctx.outsider.scope),
 };
 
+/**
+ * The questions a task card asks when the task is not given (praxis-ai.md decision 34): the
+ * person's own board as answers to tap, a task written by its number or words matched there.
+ */
+const whichTask = (question, field = "task_id") => ({ field, question, read: "tasks.list", params: { scope: "mine" } });
+/** Whom a task shared with a department is for: asked only then, that department's people to tap (decision 34). */
+const whoLeads = { field: "primary_assignee_id", question: "Who leads it?", when: "department_id", options: ({ actor, values }) => service.leadChoices(actor.scope, values.department_id) };
+/** A lead written by name, matched among whom the person may set it for (within the department when shared with one). */
+const leadByName = (value, actor, _db, values) => service.leadIdOf(actor.scope, value, values.department_id);
+
 /** The task a card acts on, named by number and title, as the person may see it. */
 const theTask = (values, actor, db) => (values.task_id ? (db ? service.cardRecords(db, [values.task_id], actor.scope) : [{ type: "task", id: values.task_id }]) : []);
 /** The task a card made or changed, read back as a line that opens it. */
@@ -72,9 +82,12 @@ module.exports = defineManifest({
       names: (values, _actor, db) => (db ? service.cardNames(db, values) : []),
       asks: [
         { field: "title", question: "What is the task?" },
+        whoLeads,
         { field: "due_on", question: "When is it due?", choices: dueChoices, none: true },
         { field: "priority", question: "How urgent is it?", choices: ["Low", "Normal", "High", "Urgent"] },
       ],
+      // The lead may be written by name (decision 34): New Task's own list of whom the person may set it for.
+      resolve: { primary_assignee_id: leadByName },
       // The same function the screen's Create Task calls, with the scope the grant gives (§6).
       run: (values, actor) => service.create(actor, actor.scope, values),
       readback: (task) => [{ type: "task", id: task.task_id, label: `${task.number} ${task.title}`, status: "created", link: taskLink(task.task_id) }],
@@ -91,6 +104,7 @@ module.exports = defineManifest({
       bulk: 25,
       // Mark Done is a button on the task's panel; its late reason is asked in a sheet. The card names the tasks and takes the reason.
       form: "none: Mark Done is a button on the task's panel, its late reason asked in a sheet; the card names the tasks",
+      asks: [whichTask("Which tasks are done?", "task_ids")],
       records: (values, _actor, db) => (db ? service.cardRecords(db, values.task_ids, _actor.scope) : (values.task_ids || []).map((id) => ({ type: "task", id }))),
       check: (client, values, actor) => service.assertCardTasks(client, values.task_ids, actor.scope),
       // Each task moved to Done through the board's own move, one after another (§6).
@@ -108,6 +122,7 @@ module.exports = defineManifest({
       risk: "standard",
       // The panel's comment box validates with TaskCommentCreate alone: the panel is the task. The card names it too.
       form: "none: a comment is typed on the task's panel, whose form never names the task; the card must",
+      asks: [whichTask("Which task is it on?"), { field: "body", question: "What should it say?" }],
       records: theTask,
       check: (client, values, actor) => service.assertCardTasks(client, [values.task_id], actor.scope),
       run: (values, actor) => service.comment(actor, actor.scope, values.task_id, { body: values.body }),
@@ -126,6 +141,8 @@ module.exports = defineManifest({
       // Edit Task's own fields (decision 31): a commitment, a repeat, Counts Towards and a record stay on the panel.
       fields: ["task_id", "title", "description", "due_on", "priority", "cadence", "primary_assignee_id", "member_ids", "department_id", "project_id"],
       picks: { primary_assignee_id: "task_assignee", member_ids: "task_member", department_id: "department", project_id: "project" },
+      asks: [whichTask("Which task is it?"), whoLeads],
+      resolve: { primary_assignee_id: leadByName },
       names: (values, _actor, db) => (db ? service.cardNames(db, values) : []),
       records: theTask,
       check: (client, values, actor) => service.assertCardTasks(client, [values.task_id], actor.scope),
@@ -147,7 +164,7 @@ module.exports = defineManifest({
       risk: "standard",
       form: "none: Add Step's form sits on the task's panel and never names the task; the card must",
       fields: ["task_id", "title", "due_on"],
-      asks: [{ field: "title", question: "What is the step?" }],
+      asks: [whichTask("Which task is it for?"), { field: "title", question: "What is the step?" }],
       records: theTask,
       check: (client, values, actor) => service.assertCardTasks(client, [values.task_id], actor.scope),
       run: (values, actor) => service.addStep(actor, actor.scope, values.task_id, { title: values.title, due_on: values.due_on }),
@@ -164,6 +181,7 @@ module.exports = defineManifest({
       risk: "standard",
       form: "none: a step is ticked, renamed or re-dated on the task's panel, which never names the task; the card must",
       fields: ["task_id", "task_step_id", "done", "title", "due_on"],
+      asks: [whichTask("Which task is it on?"), { field: "task_step_id", question: "Which step?", options: ({ actor, db, values }) => service.stepChoices(db, values.task_id, actor.scope) }],
       // The step may be written by its words: matched among the steps of the card's own task (decision 32).
       resolve: { task_step_id: (value, actor, db, values) => service.stepIdOf(db, values.task_id, value, actor.scope) },
       names: (values, actor, db) => (db ? service.cardStep(db, values.task_id, values.task_step_id, actor.scope) : []),
@@ -187,6 +205,7 @@ module.exports = defineManifest({
       form: "none: Wait On Task's form sits on the task's panel and never names the task; the card must",
       fields: ["task_id", "depends_on_task_id"],
       picks: { depends_on_task_id: "task" },
+      asks: [whichTask("Which task has to wait?"), whichTask("Which task does it wait on?", "depends_on_task_id")],
       // The task it waits on is named, never counted: the press changes the first task alone.
       names: async (values, actor, db) => (db && values.depends_on_task_id ? (await service.cardRecords(db, [values.depends_on_task_id], actor.scope)).filter((r) => r.label) : []),
       records: theTask,
@@ -220,6 +239,10 @@ module.exports = defineManifest({
       risk: "standard",
       form: "none: a reason is switched off or on with its toggle on Late Reasons; the card names the reason",
       fields: ["task_late_reason_id", "active"],
+      asks: [
+        { field: "task_late_reason_id", question: "Which reason?", options: ({ db }) => reasons.labels(db) },
+        { field: "active", question: "Switch it on or off?", choices: ["Switch On", "Switch Off"] },
+      ],
       resolve: { task_late_reason_id: (value, _actor, db) => reasons.idOf(db, value) },
       records: (values, _actor, db) => (db ? reasons.cardRecords(db, values.task_late_reason_id) : []),
       run: (values, actor) => reasons.setActive(actor, values.task_late_reason_id, { active: values.active }),

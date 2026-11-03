@@ -783,6 +783,16 @@ gate"). This PR adds the gate and the list; the forms themselves follow, module 
 - [x] 03/11/2026 · Workspace and Calendar (branch `claude/determined-dirac-b4ivrd-workspace-chat`): ten cards, Save Task, Add Step, Save Step, Add Link, Add Reason, Switch Reason, Create Project, Save Project, Save Event, Save Support Needed; an edit form's card names its record (`<Thing>Change`, `TaskStepAdd`, `TaskWaitOn`, `LateReasonSwitch`) and the form's own schema is reached `via` it; actions may name a `capability`; `resolve` is handed the card's values; the `task` pick; `tasks.get`; ten gaps closed (79 left)
 - [ ] The rest, module by module, each PR taking its gaps off the list: People, Performance, Community, Queries and Policies, Home and Settings
 
+### 6.10 A card is drawn whole (decision 34, JBS Praxis, 03/11/2026; branch `claude/determined-dirac-b4ivrd-ask-first`)
+
+Asked for on 03/11/2026 after a Create Task card shared with a department reached the press with no
+lead ("It should always ask for required fields, so we never see an error. We can add a gate for that.").
+
+- [x] 03/11/2026 · `praxis-ai.md` first: §1.6 decision 34, §6.11 (`when`, `read`, `options` with the values), §6.15 rule 7, §14
+- [x] 03/11/2026 · Engine: asks take `when` (a field, or `{ field, not }`) and `read` (with `params`, `type`), checked at load and, for the read, once every manifest is loaded (`registry.checkAskReads`); `nextAsk` honours `when`; `askFirst` fills the screen's record first; `withOptions` answers a record question from its read with the person's rights and keeps the model's own answers; `authorise.resolved` matches a record by its words, a list one by one; the system turn says which fields are records and which are asked only sometimes
+- [x] 03/11/2026 · Gate 23 rule 7 (`requiredAsked`): every required field of every action's input has an ask
+- [x] 03/11/2026 · Questions on every action (18 lacked one); the lead of a task shared with a department; tests; two evaluation cases
+
 ## 7 · Gates this work adds
 
 | Gate | Script | Refuses |
@@ -921,3 +931,6 @@ gate"). This PR adds the gate and the list; the forms themselves follow, module 
   Late Reasons held to their capability as their routes are (`capability` on an action, the
   matrix's rule handed the tool); a step and a late reason matched by their words, a week by any
   day in it; `tasks.get`. 79 gaps left. Next: People.
+- 03/11/2026 · JP · A card is drawn whole (§6.10, decision 34): every required field is asked before
+  a card is drawn, gate 23 rule 7 holding it; a lead is asked when a task is shared with a department;
+  a record is asked with the person's own to tap and matched by its words. Next: Home and Settings.
