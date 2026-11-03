@@ -261,6 +261,15 @@ describe("a card's words, held to ready to send (praxis-ai.md §6.11, decision 1
     expect(answer.gapsIn({ subject: "Insert subject here", body: "Signed, ______" })).toEqual({ subject: [answer.FILL_THE_GAP], body: [answer.FILL_THE_GAP] });
     expect(answer.gapsIn({ body: "The amount is KEPT001", to_addresses: ["[someone]"] })).toEqual({ body: [answer.FILL_THE_GAP] });
   });
+
+  test("given the action, a picked field is never words, and a field's allows passes the gaps its words may hold, a letter's own names, while any other gap is marked", () => {
+    const action = { picks: { address: "place" }, allows: { body: (gap) => /^\{\{\s*employee\.first_name\s*\}\}$/.test(gap) } };
+    expect(answer.gapsIn({ address: "p1.e30.XXX_XXX", body: "Dear {{ employee.first_name }},\n\nYour conduct must improve." }, action)).toEqual({});
+    expect(answer.gapsIn({ body: "Dear {{ employee.first_name }},\n\nAttend on [date]." }, action)).toEqual({ body: [answer.FILL_THE_GAP] });
+    expect(answer.gapsIn({ body: "Dear {{ manager }},\n\nSee you." }, action)).toEqual({ body: [answer.FILL_THE_GAP] });
+    // Without the action, as before: a letter's names are gaps like any other.
+    expect(answer.gapsIn({ body: "Dear {{ employee.first_name }}," })).toEqual({ body: [answer.FILL_THE_GAP] });
+  });
 });
 
 describe("what the screen shows", () => {

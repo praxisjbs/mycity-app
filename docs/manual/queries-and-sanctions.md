@@ -369,6 +369,10 @@ Draw your signature once, and your query letters and the sanctions you approve s
 
 A letter already sent keeps the signature it was signed with.
 
+- Praxis AI signs a query it raises for you with this signature, and never draws one. When you
+  have none, its card says so: press **Draw Signature** there to open **Edit Signature**. See
+  [Have it do something for you](#praxis-ask-change).
+
 ## My Queries {#queries-my screen=ess/my-queries icon=user}
 
 My Queries is your own record of queries and sanctions. It is a tab of Employee Self-Service.

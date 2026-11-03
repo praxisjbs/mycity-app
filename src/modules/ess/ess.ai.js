@@ -1,10 +1,12 @@
 "use strict";
 /**
  * What the assistant may read and do in Employee Self-Service: the caller's own
- * record, documents and leave, and where it sends them to add a document; and, as a card the
+ * record, documents and leave, and where it sends them to add a document; and, as cards the
  * person confirms (docs/guides/praxis-ai.md §6.11), a leave request of their own through the
- * same service function Request Leave's Send calls. Never another person's record; every read
- * is given the caller's own employee id and nothing else.
+ * same service function Request Leave's Send calls, and their response to one of their own open
+ * queries through My Queries' Send Response (decision 33): their own words, one response a query,
+ * never edited once sent. Never another person's record; every read is given the caller's own
+ * employee id and nothing else.
  *
  * The rest of ESS (the latest payslip, open queries, docs/guides/ess.md §9) joins
  * this manifest as each of those tabs lands.
@@ -14,9 +16,12 @@ const { AppError } = require("../../shared/errors");
 const { defineManifest } = require("../../shared/ai/manifest");
 const { oneNamed } = require("../../shared/ai/named");
 const routeMap = require("../../shared/route-map");
+const md = require("../../shared/documents/markdown");
 const documents = require("../documents/documents.service");
 const leave = require("../leave/leave.service");
+const queries = require("../queries/queries.service");
 const profile = require("./ess.profile");
+const essQueries = require("./ess.queries");
 
 const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
 
@@ -98,6 +103,29 @@ module.exports = defineManifest({
         { field: "ends_on", question: "What is your last day off?", choices: ["The Same Day"] },
       ],
       resolve: { leave_type_id: (value, actor) => typeIdOf(actor, value) },
+    },
+    {
+      key: "my_queries.respond",
+      label: "Send Response",
+      description: "Send my written response to one of my own open queries (its number): my account in my own words, 20 to 4,000 characters; one response a query, never edited once sent",
+      input: c.queries.QueryRespond,
+      permission: ["ess", "create"],
+      risk: "standard",
+      form: "none: Respond sits on the open query on My Queries and never names it; the card names the query and carries the words as plain text",
+      fields: ["employee_query_id", "body"],
+      // A query written by its number or subject is matched among the person's own open queries (decision 32).
+      resolve: { employee_query_id: (value, actor, db) => queries.myOpenIdOf(db, actor.employee_id, value) },
+      records: (values, actor, db) => queries.cardMine(db, actor.employee_id, values.employee_query_id),
+      asks: [
+        // Which of the person's own open queries, to tap (praxis-ai.md decision 34).
+        { field: "employee_query_id", question: "Which query is it?", options: ({ actor, db }) => queries.myOpenChoices(db, actor.employee_id) },
+        { field: "body", question: "What is your response?" },
+      ],
+      check: (client, values, actor) => queries.assertCardRespond(client, actor.employee_id, values.employee_query_id),
+      // My Queries' own Send Response, the words as the editor sends them (HTML from the plain text).
+      run: (values, actor) => essQueries.respond(actor, values.employee_query_id, { body_html: md.markdownToHtml(values.body) }),
+      readback: (q) => [{ type: "query", id: q.employee_query_id, label: `${q.number} ${q.subject}`, status: "response sent", link: (routeMap.linkFor("query", q.employee_query_id, { self: true }) || {}).path || null }],
+      labels: { employee_query_id: "Query", body: "Response" },
     },
   ],
   reads: [

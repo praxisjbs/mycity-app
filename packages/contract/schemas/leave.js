@@ -27,6 +27,9 @@ const {
   isoDateTime,
   listQuery,
   Paged,
+  recordId,
+  changesBeside,
+  nothingOn,
 } = require("./common");
 const { PersonRef } = require("./organisation");
 
@@ -73,14 +76,32 @@ const LeaveTypeCreate = z
   .strict();
 
 /** PATCH /leave/types/:id: rename it, change the allowance, retire it. */
-const LeaveTypeUpdate = z
+const LeaveTypeUpdateFields = z
   .object({
     name: text(80).optional(),
     days_per_year: daysPerYear.optional(),
     active: z.boolean().optional(),
   })
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, "Change at least one field");
+  .strict();
+const LeaveTypeUpdate = LeaveTypeUpdateFields.refine((v) => Object.keys(v).length > 0, "Change at least one field");
+
+/**
+ * Add Type as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the name and the
+ * allowance New Leave Type's sheet asks for. The code is made from the name as the sheet makes it
+ * ("Study Leave" is study_leave), on the server (leave.service.codeOf).
+ */
+const LeaveTypeAdd = z
+  .object({
+    name: text(80),
+    days_per_year: daysPerYear.default(null),
+  })
+  .strict();
+
+/** Save Type as a card: the type (its id, or its name matched among the types) beside LeaveTypeUpdate's fields. */
+const LeaveTypeChange = LeaveTypeUpdateFields.extend({ leave_type_id: recordId("leave type") }).refine(
+  changesBeside(["leave_type_id"]),
+  nothingOn("leave_type_id"),
+);
 
 /* ------------------------------------------------------------------ *
  * Requests
@@ -295,6 +316,14 @@ const TABLES = {
     table: "leave_type",
     virtual: { days_per_year: "written to leave_type.policy" },
   },
+  LeaveTypeAdd: {
+    table: "leave_type",
+    virtual: { days_per_year: "written to leave_type.policy" },
+  },
+  LeaveTypeChange: {
+    table: "leave_type",
+    virtual: { days_per_year: "written to leave_type.policy" },
+  },
   LeaveRequest: {
     table: "leave_request",
     virtual: {
@@ -352,6 +381,8 @@ module.exports = {
   LeaveTypePage,
   LeaveTypeCreate,
   LeaveTypeUpdate,
+  LeaveTypeAdd,
+  LeaveTypeChange,
   LeaveRequest,
   LeavePage,
   LeaveRequestCreate,

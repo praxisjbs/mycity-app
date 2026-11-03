@@ -62,7 +62,9 @@
  *    check, records, readback and names functions when given; its fields, picks and asks name
  *    fields its input takes (praxis-ai.md §1.3 decisions 29 and 31), each ask one short question;
  *    its capability, when given, one of the catalogue's (held on top of the grant, as a route's
- *    requireCapability holds it);
+ *    requireCapability holds it); its allows, when given, a test per carried text field of the
+ *    gaps its words may hold (a letter's own {{ names }}), so the card's ready-to-send guard
+ *    passes them;
  *  - a route names a real screen (shared/route-map SCREENS) as "<module>.<tab>";
  *  - a route's prefill is the form's own fields (packages/contract `<Thing>Prefill`), never a
  *    restricted field nor one of the address's own words (tab, id, action, new, its params);
@@ -115,10 +117,11 @@ const ACTION_KEYS = new Set([
   "asks",
   "resolve",
   "capability",
+  "allows",
 ]);
 const ROUTE_KEYS = new Set(["intent", "screen", "params", "prefill"]);
 /** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decisions 31 and 32). */
-const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task"]);
+const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task", "employee", "worksite", "policy", "place", "site_member"]);
 const ASK_KEYS = new Set(["field", "question", "choices", "options", "none", "when", "read", "params", "type"]);
 /** The answers to tap under a question, at most (AiAnswer.choices). */
 const CHOICES_MAX = 6;
@@ -291,6 +294,14 @@ function checkAction(where, a, seen) {
       if (typeof fn !== "function") throw new Error(`${at}: resolve.${k} is (value, actor, db, values) => id`);
     }
   }
+  // The gaps a field's words may hold, beside the card's ready-to-send guard: a letter's own {{ names }} (praxis-ai.md §6.11).
+  if (a.allows !== undefined) {
+    if (!a.allows || typeof a.allows !== "object" || Array.isArray(a.allows)) throw new Error(`${at}: allows is { field: (gap) => boolean }`);
+    for (const [k, fn] of Object.entries(a.allows)) {
+      if (!takes(k) || !carried(k)) throw new Error(`${at}: allows names "${k}", which the card does not carry`);
+      if (typeof fn !== "function") throw new Error(`${at}: allows.${k} is (gap) => boolean`);
+    }
+  }
   const asks = checkAsks(at, a.asks, takes, carried);
   checkMatrix(at, a.matrix);
   return Object.freeze({
@@ -309,6 +320,7 @@ function checkAction(where, a, seen) {
     asks,
     resolve: Object.freeze({ ...(a.resolve || {}) }),
     capability: a.capability || null,
+    allows: Object.freeze({ ...(a.allows || {}) }),
   });
 }
 

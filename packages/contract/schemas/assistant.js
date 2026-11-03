@@ -236,9 +236,12 @@ const AiCardRecord = z
  * What an id field of a card points at, so Edit picks it with the screen's own picker (§1.3 decision
  * 31, §1.4 decision 32): anyone with a login, who a task may be set for, who it may be shared with,
  * a department, a project, a leave type Request Leave offers, a task the person can see (Wait On
- * Task's list).
+ * Task's list); someone on People's register (`employee`), a worksite in use, a policy a query or
+ * rule may cite, a place our address search or a pin signed (`place`, AddressField: the card holds
+ * its token and reads it by its line), and who Add Work Site may put on a site, the person
+ * included (`site_member`).
  */
-const AiCardPicks = z.enum(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task"]);
+const AiCardPicks = z.enum(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task", "employee", "worksite", "policy", "place", "site_member"]);
 
 /** One field of a card, as the action's schema takes it; the screen draws it with the form system. */
 const AiCardField = z

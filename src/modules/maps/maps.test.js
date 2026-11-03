@@ -549,3 +549,34 @@ describe("naming what was saved while search was down", () => {
     expect(emit).not.toHaveBeenCalled();
   });
 });
+
+describe("a place on a Praxis AI card (docs/guides/praxis-ai.md §6.11, decision 33)", () => {
+  const maps = require("./maps.service");
+  const found = { place_id: "p1", formatted: "12 Testbed Road, Ikeja, Lagos", lat: 6.6018, lon: 3.3515, kind: "building", city: "Lagos", state: "Lagos State", country_code: "ng", timezone: "Africa/Lagos" };
+  afterEach(() => jest.restoreAllMocks());
+
+  test("onePlace signs the one place the words find; several, none or the search down leave the words for the person to pick; a token of ours is kept as it is", async () => {
+    const search = jest.spyOn(geoapify, "searchPlaces");
+    search.mockResolvedValueOnce([found]);
+    const signed = await maps.onePlace("12 Testbed Road");
+    expect(c.maps.readPlaceToken(signed)).toMatchObject({ source: "search", formatted: found.formatted, lat: 6.6018, lon: 3.3515 });
+    expect(token.verify(signed)).toBe(true);
+    search.mockResolvedValueOnce([found, { ...found, place_id: "p2", lat: 6.7 }]);
+    expect(await maps.onePlace("Testbed")).toBeNull();
+    search.mockResolvedValueOnce([]);
+    expect(await maps.onePlace("Nowhere at all")).toBeNull();
+    search.mockRejectedValueOnce(Object.assign(new Error("down"), { code: "MAPS_UNAVAILABLE" }));
+    expect(await maps.onePlace("Testbed")).toBeNull();
+    search.mockClear();
+    expect(await maps.onePlace(signed)).toBe(signed);
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  test("cardPlace names a token of ours by its line, never the token; words or a forged token name nothing", async () => {
+    const signed = token.sign({ ...PICK });
+    expect(maps.cardPlace(signed)).toEqual([{ type: "place", id: signed, label: PICK.formatted }]);
+    expect(maps.cardPlace("12 Testbed Road")).toEqual([]);
+    expect(maps.cardPlace(`${signed.split(".").slice(0, 2).join(".")}.AAAAAAAAAAAAAAAAAAAAAA`)).toEqual([]);
+    expect(maps.cardPlace(null)).toEqual([]);
+  });
+});

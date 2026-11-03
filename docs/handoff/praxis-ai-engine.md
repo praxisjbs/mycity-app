@@ -782,7 +782,8 @@ gate"). This PR adds the gate and the list; the forms themselves follow, module 
 - [x] 03/11/2026 · Tests: the rule's cases (a new form, a gap added, a gap closed or stale, a via naming no action) and the list's shape (`ai-engine.test.js`)
 - [x] 03/11/2026 · Workspace and Calendar (branch `claude/determined-dirac-b4ivrd-workspace-chat`): ten cards, Save Task, Add Step, Save Step, Add Link, Add Reason, Switch Reason, Create Project, Save Project, Save Event, Save Support Needed; an edit form's card names its record (`<Thing>Change`, `TaskStepAdd`, `TaskWaitOn`, `LateReasonSwitch`) and the form's own schema is reached `via` it; actions may name a `capability`; `resolve` is handed the card's values; the `task` pick; `tasks.get`; ten gaps closed (79 left)
 - [x] 03/11/2026 · Home and Settings (branch `claude/determined-dirac-b4ivrd-home-settings`): eighteen cards; decision 35 (`design`) for a role's grants, an approval flow and its steps, a role's Home cards; the push subscription `device`; `shared/ai/change.js`; `view` with a capability; 22 gaps closed (57 left)
-- [ ] The rest, module by module, each PR taking its gaps off the list: People, Performance, Community, Queries and Policies (two parallel chats)
+- [x] 03/11/2026 · People, Queries & Sanctions and Knowledge Hub · Policies (branch `claude/trusting-cerf-30yc7i`): 25 cards through the screens' own functions; decisions 36 to 39 asked first (`praxis-ai.md` §1.8: the work record alone, a place picked on a card, the saved signature signs, approval for pay, leave and discipline); the `place`, `employee`, `worksite`, `policy` and `site_member` picks; a picked field reads as an id; `allows` for a letter's {{ names }}; Draw Signature; `query_rules.ai.js`, `templates.ai.js`; Save Letter Signature never (`file:`); 26 gaps closed (31 left after #69). Engine files changed additively only: the picks appended (`AiCardPicks`, manifest `PICKS`, `ActionCard`'s type, `Card.tsx`'s cases and `SCREEN_FOR`), the manifest's `allows` key, `fieldsOf`'s picked field and `gapsIn`'s second argument (callers pass the action)
+- [ ] The rest, module by module, each PR taking its gaps off the list: Performance, Community and Mailbox (in their own chat)
 
 ### 6.10 A card is drawn whole (decision 34, JBS Praxis, 03/11/2026; branch `claude/determined-dirac-b4ivrd-ask-first`)
 
@@ -939,3 +940,21 @@ lead ("It should always ask for required fields, so we never see an error. We ca
   through the screens' own services; four structure forms `design` (owner's choice), the push
   subscription `device`; a card changing part of a whole holds it to the form's own schema; `view`
   with a capability for Home's alert rules and reports. 57 gaps left, all in the parallel chats' areas.
+- 03/11/2026 · JP · People, Queries & Sanctions and Policies in the chat (§6.9, decision 33), beside
+  two other chats (Performance, Community and Mailbox; Home and Settings). Four questions put to
+  JBS Praxis first, their answers decisions 36 to 39 (`praxis-ai.md` §1.8): an employee's card
+  carries the work record alone and asks for every field it needs; a place on a card is picked now
+  (our search signs only one match, else Pick one and AddressField on Edit), rather than leaving
+  the address forms as gaps; the saved signature signs a query, and the chat says plainly it cannot
+  draw one (Draw Signature opens Edit Signature); Confirm It's You for Raise Query, Record Leave,
+  Save Type and Approve Overtime. 25 cards, 26 forms off the list, 31 left after Home and Settings. Found on the way: an
+  action with `picks` but no `names` never marks Pick one (Approve Overtime names its person now);
+  the matrix caught record probes that left out the person's id; a resolver that throws is
+  swallowed by the engine (the maps service's wrong logger import passed the integration suite and
+  only its unit test found it); a policy version's column is `status`, not `state`. Rebased onto
+  #67 (decision 34, a card drawn whole) and #69 (decision 35, `design`), which took those numbers,
+  so these are 36 to 39 (§1.8), and gate 23 rule 7 asked a question for each record a card names: whose, from People's
+  register (`read: employees.list`), which department, open role, worksite or policy from their
+  list reads, and which rule, step, letter, leave type or open query to tap (`options`). A cloud
+  session's image again lacked Node 20, pgvector and `node_modules` (installed by hand: nvm's Node
+  20, `postgresql-16-pgvector`, `npm ci`).

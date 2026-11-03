@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | Praxis AI · Ask and History (#67, #68) |
 | Status | Built |
-| Last changed | 01/11/2026 |
+| Last changed | 03/11/2026 |
 
 Sources: MILESTONES §15 (M10's assistant, its definition of done) and A23 (it reads; since
 01/11/2026 it acts only through a declared action a person confirms, §1.2), BACKEND_STRUCTURE §14
@@ -203,6 +203,32 @@ fit them.
     and approvers (New Approval Flow, Edit Approval Steps) and the Home cards each role sees and
     locks (Save Home Role KPIs). Praxis AI opens the screen, where the person saves it with its
     own button. Gate 23 reads `design:` as it reads the other five words (§6.15 rule 6).
+
+### 1.8 Decisions (JBS Praxis, 03/11/2026, binding): People, Queries and Policies in the chat
+
+Put to the owner before People's, Queries & Sanctions' and Knowledge Hub · Policies' forms came into
+the chat (decision 33), each with a recommendation first; the owner took each recommendation but the
+second, choosing that cards pick a place now.
+
+36. **An employee's card carries the work record alone, and asks for what the record needs.** Add
+    Employee and Save Record carry names, work email and phone, job, department, line manager,
+    worksite, engagement, work pattern and the engagement's dates; birth date, gender, next of kin,
+    home, personal email, bank and pay are never on a card and stay on the record's own screen. Add
+    Employee asks for every field the record requires before its card is drawn ("required fields
+    must be filled", as decision 34 asks of every card), and a card missing one is never pressed.
+37. **A place on a card is picked, never typed (F27).** The model writes an address in words; our
+    address search signs it only when exactly one place matches; several, none or the search down
+    leave the field marked Pick one, and Edit picks the place with the screen's own AddressField (the
+    `place` pick). So Add Worksite, Save Worksite and Add Work Site are cards; a worksite's centre is
+    its place's point, and a card never makes a Temporary Home (a home is personal data).
+38. **A letter is signed with the signature the person saved; the chat never draws one.** Raise
+    Query signs its letter with My Signature, as the screen's pad opens with it; without one the
+    press says plainly that Praxis AI cannot draw a signature, and Draw Signature opens Edit
+    Signature. Save Letter Signature is never in the chat (`file:`), and asked to save a signature the
+    assistant says it cannot and opens Edit Signature, so it never reads as a gap.
+39. **Confirm It's You for what decides pay, leave or discipline.** Raise Query, Record Leave, Save
+    Type (a leave type's allowance) and Approve Overtime are risk `approval`; the other cards of these
+    modules are one press.
 
 ## 2 · Screens affected
 
@@ -646,13 +672,18 @@ actions: [{
   // resolve: { leave_type_id: (value, actor, db) => typeIdOf(value, db) },
   // A step written by its words is matched within the card's own task (the card's values come fourth):
   // resolve: { task_step_id: (value, actor, db, values) => stepIdOf(db, values.task_id, value) },
+  // A place written in words is the one place our search finds, signed; else Pick one (decision 37):
+  // picks: { address: "place" }, resolve: { address: (value) => maps.onePlace(value) },
+  // The gaps a field's words may hold beside the ready-to-send guard: a letter's own {{ names }}:
+  // allows: { body: letterName },
 }],
 not_offered: { TaskStepCreate: "a step belongs to a task's own panel" },   // every other <Thing>Create of the module, with a reason (gate 23)
 ```
 
 `defineManifest` checks every key at load: the input and the permission are the contract's and the
 catalogue's, a `capability` is one of the catalogue's capabilities, `risk` is one of the five
-classes, `run` and `check` are functions, and no word that is
+classes, `run` and `check` are functions, `allows` names carried fields each with a test of its
+gaps, and no word that is
 a write by another name (`write`, `executor`, `execute`, `mutations`, `sql`, `query`) appears; gate 19
 reads the file too and refuses SQL inside it. The engine never sees a repo. `records(values, actor,
 db)` may be async and read the records' names through the module's own repo when it is handed the
@@ -687,7 +718,11 @@ unseen, and the system turn lists only these. `picks` names, for each id field a
 picker Edit chooses it with (`colleague`, anyone with a login; `task_assignee` and `task_member`,
 whom the person may set a task for or share one with, as New Task's; `department`; `project`;
 `leave_type`, the types Request Leave's form offers; `task`, the tasks the person can see, as Wait
-On Task's).
+On Task's; `employee`, someone on People's register, as People's forms pick them; `worksite`, a
+worksite in use; `policy`, a policy with a version in force, as Raise a Query's; `place`, a place
+picked as every address is, with AddressField; `site_member`, the people Add Work Site may put on a
+site, the person included). A picked field that is not a list reads as an id whatever its type
+(`fieldsOf`), so a place's token is read by its line and never printed.
 `names(values, actor, db)` names the ids the fields hold through the module's own repo, kept apart
 from `records`: the records are what a press acts on (the verb's count, the chips, the re-check), the
 names only how an id reads, so a meeting's three guests never make "Create Event ×3". A rule the
@@ -707,6 +742,18 @@ Pick one to mark. A week is matched the same way: any day in it, or "this week",
 A card whose values have a problem keeps what was matched, so a type matched by name stays matched
 while another field is fixed; an id field's value reads only as the name `names` or `records` give
 it, never as the words the model wrote.
+
+**A place on a card (decision 37, F27).** A card's place is a `PlaceToken` (`maps.js`): the token our
+address search or a pin signed, alone, sent on to the owner's own request as `{ token }`
+(`PlaceInput`), so the API still takes only a signed place. The model writes the address in words;
+`resolve` asks our search (`maps.service.onePlace`) and signs the one place it finds; several, none,
+or the search down leave the words, which name nothing, so the field reads Pick one and Edit picks
+it with the screen's own AddressField. `names` reads a token of ours by its line
+(`maps.service.cardPlace`); a forged one names nothing. A worksite's centre is its place's point, as
+the form fills it from the pick; Add Work Site's card takes one address of the sheet's eight and
+never a Temporary Home (a home is personal data). A run sends the form's own request through the
+route's own parsing (`shared/http/validate.parseBody`), so a token becomes the place and every
+default and rule applies as on the screen.
 
 **Asked before it is drawn (decisions 28, 29 and 34).** `asks` lists what the action must have before
 its card is drawn, in order: the field, its one short question (at most 8 words), its answers to tap
@@ -764,10 +811,34 @@ open with the reason.
 | `reports.create` (Create Report), `reports.edit` (Save Report), `reports.schedule` (Schedule Report) | `home` view and the `home.reports` capability, standard | `HomeReportCreate` (its name, type and sharing; filters stay on the report's form); `HomeReportChange` (the report from `reports.mine`, by its name); `HomeReportScheduleChange` (how often, the days, the time, the formats, who receives it, "Just Me" or by name), held to `HomeReportScheduleSave` | the people receiving it named | recipients who may receive it | `reports.service.create`, `update` |
 | `my_leave.request` | `ess` create, standard | `LeaveRequestCreate` (Request Leave's form): the leave type (named, picked with Request Leave's own list, matched by name when the model writes one), the first and last day, the note; asks which type ("Which leave type?") with the person's types and the days left of each | none: the person's own | an employee; the type, the days and the year's allowance are the service's | `leave.service.request` |
 | `leave.approve`, `leave.reject` | `people` approve, **approval**, up to 25 | `LeaveApprove`, `LeaveReject` (a reason, required to reject) | the requests: who, the type, the days | every request in the person's `people` scope; then each waiting and named on its stage, never their own, as a line | the approval's own `decide()` per request |
+| `leave.record` (Record Leave) | `people` create, **approval** (approved at once, it spends the person's year: decision 39) | `LeaveRecordCreate` (Record Leave's own request): the person (picked from People's register), the leave type (by name, Request Leave's list), the first and last day, a note; asks who (People's register, `read`), the type and the days | none; the person and the type named | the person in the reader's `people` scope, at work now | `leave.service.record` |
+| `leave_types.add` (Add Type) | `people` create, standard | `LeaveTypeAdd` (New Leave Type's sheet): the name and the working days a year; the code made from the name on the server, as the sheet makes it; asks the name | none: it makes one type | at most 25 offered at once, the code new (the service's) | `leave.service.addType` (`createType`) |
+| `leave_types.edit` (Save Type) | `people` edit, **approval** (an allowance moves everyone's year: decision 39) | `LeaveTypeChange` (Edit Leave Type's `LeaveTypeUpdate` with the type, matched by its name): the name, the days a year, offered or retired; only what changes; asks which type, the types to tap | the type, by its name | the type exists | `leave.service.updateType` |
+| `overtime.approve` (Approve Overtime) | `people` approve, **approval** (it decides pay: decision 39) | `OvertimePreApprovalCreate` (Approve Overtime's sheet, which never names its person): the person (People's register), the day, the minutes, why; asks whose (People's register in reach, `read`), the day, the minutes and why | the person, by name, when in the reader's reach (else Pick one) | someone in the reader's `people` scope, at work now, never themselves; the day from today to 90 days ahead (the service's) | `attendance.pay.approveOvertime` |
+| `temporary_sites.add` (Add Work Site) | `ess` create, standard | `TemporarySiteAdd` (Add Work Site's sheet with one address): the purpose (never a Temporary Home), a name, what the work is, the first and last day, the hours, the address (a place, decision 37) with its label and radius, who goes (the person included); asks the purpose, a name, the address, the days, who goes and the work | none: it makes one site for approval; the place and the people named | the sheet's own checks: the days, everyone at work, one site a day | `attendance.sites.submit` with `TemporarySiteCreate` |
+| `employees.add` (Add Employee) | `people` create, standard | `EmployeeAdd` with the work record alone (decision 36): names, work email and phone, job, department, line manager, worksite, start date, engagement, work pattern, contract end, confirmation due; asks every field the record needs | none: it makes one record; the department, worksite and line manager named | no field the reader's role hides (field-mask); On Site and Hybrid name a worksite (the form's own rule) | `organisation.service.createEmployee`, in its own transaction (`organisation.cards.addEmployee`) |
+| `employees.edit` (Save Record) | `people` edit, standard | `EmployeeChange` (Edit Record's `EmployeeUpdate`, its work record alone, with the person): names, work contact, job, department, worksite, engagement, pattern and the engagement's dates; only what changes; asks whose (`read`) | the person, by name | the record in the reader's `people` scope (else 404), as Edit Record opens it | `organisation.service.updateEmployee`, a new department moving the person as People · Departments does |
+| `employees.reporting` (Save Line) | `people` edit, standard | `EmployeeReportingChange` (Reporting Line's `EmployeeReportingUpdate` with the person): the line manager and the dotted line, each a person (null clears one; a vacant seat is picked on the Organogram), the reason; asks whose (`read`) | the person; the managers named | the record in scope; never themselves, never a loop (the service's) | `organisation.service.setReportingLine` |
+| `departments.create` (Add Department) | `people` create, standard | `DepartmentCreate` (Add Department's request): the name, a code of 2 to 10 letters, what it does, its head (a person); asks the name | none: it makes one department; the head named | the `people` grant over everyone, as the route's controller asks | `organisation.service.createDepartment` |
+| `departments.edit` (Save Department) | `people` edit, standard | `DepartmentChange` (Edit Department, Set Head, Retire and Restore with the department, matched by its name): the name, code, description, head (a person), in use or retired; only what changes; asks which (`read`, `departments.list`) | the department, by its name | the grant over everyone; the department exists; retired only once empty (the service's) | `organisation.service.updateDepartment` |
+| `seats.create` (Add Role) | `people` create, standard | `OrgSeatCreate` (Add Open Role's request): the title, department, the person it reports to; asks the title and the department | none: it makes one open role; the department and manager named | the department exists (the service's) | `organisation.service.createSeat` |
+| `seats.edit` (Save Role) | `people` edit, standard | `OrgSeatChange` (Edit Open Role with the role, matched by its title): the title, department, the person it reports to, closed; only what changes; asks which open role (`read`, `seats.list`) | the role, by its title and department | the role exists; a filled one changes with its person (the service's) | `organisation.service.updateSeat` |
+| `worksites.create` (Add Worksite) | `people` create, standard | `WorksiteAdd` (Add Worksite's form with its place picked, decision 37): the name, the address, the radius, the time zone; the centre is the place's point; asks the name, the address and the radius | none: it makes one worksite; the place named by its line | the time zone one the server knows (the service's) | `worksites.service.create` with `WorksiteCreate` |
+| `worksites.edit` (Save Worksite) | `people` edit, standard | `WorksiteChange` (Edit Worksite with the worksite, matched by its name): the name, a new address (its point the new centre), radius, time zone, in use or retired; only what changes; asks which worksite (`read`) | the worksite, by its name; the place named | the worksite exists | `worksites.service.update` with `WorksiteUpdate` |
 | `approvals.decide` | `ess` create (the queue is the person's own), **approval**, up to 25 | `ApprovalDecide`: the requests, approve, reject or request changes, a reason (required but to approve) | the requests: the flow and who it is about | every request the person may read; then each pending, the stage naming them, `approve` held on its module, never their own; one decided on its record refused with that record's screen on its line | `workflow.service.decide` per request |
 | `community.message` | `community` create, standard, may be suggested | `DirectMessageSend`: the colleague, the words | the colleague, by name | on the staff with a login | the conversation opened if there is none, then `postMessage` |
 | `community.post` | `community` create, standard | `ChannelPost`: the channel, the words | the channel, by name | a member who may post there (never #announcements) | `postMessage` |
 | `mail.send` | `mailbox` create, standard | `MailCompose`: to, cc, subject, the words as plain text | none | the person's mailbox connected (else `NO_MAILBOX`, and the screen offers Mailbox) | a new draft saved and queued as Send does, the signature baked (`sendNew`) |
+| `queries.raise` (Raise Query) | `queries` create, **approval** (it starts due process and sends a signed letter: decision 39) | `QueryRaise` (Raise a Query's form without its pad and letter choice): the person (People's register), the subject, what happened, the policy it breaches (a policy in force, by its title) and the clause; asks who (People's register, `read`), the subject and what happened | none: it makes one query; the person and policy named | someone at work now, never the raiser; a saved signature (else 409 `NO_SIGNATURE`: Praxis AI cannot draw one, and Draw Signature opens Edit Signature, decision 38) | `queries.service.raise` with `QueryCreate`, signed with My Signature (`queries.signature.signatureOf`) |
+| `my_queries.respond` (Send Response) | `ess` create, standard | `QueryRespond` (My Queries' response with its query, matched by its number or subject among the person's own open ones): the words as plain text, 20 to 4,000 characters, sent as the editor's HTML; asks which of their own open queries (to tap) and the response | the query, by number and subject | the person's own query, still waiting for its one response | `ess.queries.respond` (`queries.response.respond`) |
+| `query_rules.create` (Save Rule, New Rule) | `queries` create and `queries.configure`, standard | `QueryRuleCreate` (New Rule's request): the name, what it counts, the threshold and days, the letter (an active query letter, by its name), the policy and clause; asks the name, what it counts, the threshold and the days | none: it makes one draft rule; the policy named | a holder of the capability; the letter and policy as the service checks them | `query_rules.service.create` |
+| `query_rules.edit` (Save Rule, Edit Rule) | `queries` edit and `queries.configure`, standard | `QueryRuleChange` (Edit Rule's `QueryRuleUpdate` with the rule, matched by its name or code); only what changes; asks which rule, the rules to tap | the rule, by its name | a holder; the trigger fixed once it has fired (409 `RULE_HAS_FIRED`) | `query_rules.service.update` |
+| `chain.add_step` (Add Step) | `queries` create and `queries.configure`, standard | `ConsequenceStepCreate` (Add Step's request): the name, position, letter (an active sanction letter, by its name), financial effect, days, how long in force, evidence required; asks the name | none: it makes one step | a holder of the capability | `sanctions.chain.create` |
+| `chain.edit_step` (Save Step) | `queries` edit and `queries.configure`, standard | `ConsequenceStepChange` (a step's Move Up, Move Down, Retire and Restore, and its words, with the step matched by its name); only what changes; asks which step, the ladder to tap | the step, by its name | a holder; the step exists | `sanctions.chain.update` |
+| `letters.create` (Add Letter) | `queries` create and `queries.configure`, standard | `LetterTemplateCreate` (New Template's request): the name, what it is used for, a title, the wording as Markdown with the letter's own {{ names }} (`allows`), a draft or active; asks the name, the use and the wording | none: it makes one letter | a holder of the capability | `templates.service.create` |
+| `letters.edit` (Save Letter) | `queries` edit and `queries.configure`, standard | `LetterTemplateChange` (Edit Template's Save Letter with the letter, matched by its name or key): the name, what it is used for, a title and new wording, saved as the next version; only what changes; asks which letter, the letters to tap | the letter, by its name | a holder; not retired; the use kept while something sends it (the service's) | `templates.service.saveLetter` (`update`, then `saveBody`, as Save Letter does) |
+| `policies.start` (Start Policy) | `knowledge` create and `policies.manage`, standard | `PolicyStart` (New Policy's own form, which validates with it): the title; started for everyone, acknowledged within 7 days, no approval (`POLICY_START`, the sheet's own); asks the title | none: it makes one written policy | a holder of the capability | `policies.service.start` (`create`) |
+| `policies.draft` (Save Draft) | `knowledge` edit and `policies.manage`, standard | `PolicyDraftChange` (Save Draft's `PolicyDraftSave` with the policy, matched by its number or title): the title, who it applies to (everyone, departments, work patterns, people), acknowledgement, approval, a written policy's text as Markdown; only what changes, the rest kept from the draft, else from the newest version; asks which policy (`read`) | the policy, by number and title; departments and people named | a holder; the policy exists and is not archived; not while a version waits for approval (409, the service's) | `policies.service.changeDraft` (`saveDraft`) |
 
 The goals module declares no action: the monthly check-in is written line by line on My Performance
 and no card carries it whole; its Create schemas are each `not_offered` with the screen that owns
@@ -779,7 +850,9 @@ records the reads returned.
 goes through the same guard as the mailbox's Write With AI (`services/ai/drafts.js`
 `placeholdersIn`): a gap left to fill (a bracket, "insert here", XXX, a blank line) or a redaction
 token that stands for nothing is a problem on its field ("Fill the gap"), so a mail or a message
-never leaves with a hole in it. The prompt (version 6) says to write the whole text, nothing
+never leaves with a hole in it. A picked field is no text (an id, a place's token), and a field's
+`allows` passes the gaps its words may hold, as the letter editor's Write With AI passes them: a
+letter's own {{ names }} (`templates.assist.letterName`); any other gap is still marked. The prompt (version 6) says to write the whole text, nothing
 invented and no sign-off (the mailbox adds the signature), to name only requests a read returned as
 waiting on the person, and to put a suggested card in the text as a question.
 
@@ -833,13 +906,16 @@ when the card carries one, "Approve ×3", and the count when it acts on several)
 through the form system from the action's own contract schema, resolved by its name; an id field
 with `picks` through the screen's own picker, bound by the app: `TaskPeoplePicker`, `ColleaguePicker`,
 `DepartmentPicker` for a reader who may view People, `ProjectPicker`, `LeaveTypeSelect` (Request
-Leave's own list, each type with the days left); one without stays as it is;
+Leave's own list, each type with the days left), `EmployeePicker` (People's register), `WorksitePicker`,
+`PolicyPicker`, `AddressField` for a place, and `ColleaguePicker` with the person for Add Work Site's
+people; one without stays as it is;
 Save Changes goes through `PUT /ai/cards/:id`, which names the new picks), Cancel (Not Now on a
 suggested card). A question asked before a card shows its answers as buttons under its words, on
 the newest answer only; a tap asks that answer as the person's next question, and every answer waits
 until it lands (F26). The press is busy until the API
 answers and the buttons beside it wait (F26); a refusal lands on the fields and under the card, in
-the server's words, with the screen that answers it where one does (Open Mailbox for `NO_MAILBOX`);
+the server's words, with the screen that answers it where one does (Open Mailbox for `NO_MAILBOX`,
+Draw Signature for `NO_SIGNATURE`, which opens Edit Signature on Letter Templates);
 done or failed, the result line replaces the buttons with Done or Could Not Finish and a line per
 record, Open beside one with a screen, and the screen underneath refreshes in place (F28).
 
@@ -1004,7 +1080,9 @@ return the inside record and never the outside one; a card naming the outside re
 refused by `authorise.checkAction` or the action's own `check`. Probed: Workspace (`tasks.list`,
 `tasks.complete`, `tasks.comment`, `tasks.edit`, `tasks.add_step`, `tasks.edit_step`,
 `tasks.wait_on`, `projects.edit`, `calendar.month`, `calendar.edit`), People (`employees.list`, `leave.requests`,
-`leave.approve`, `leave.reject`, `attendance.register`), Home (`team.today`, `activity.list`), ESS
+`leave.approve`, `leave.reject`, `attendance.register`, `overtime.approve`, `leave.record`,
+`employees.edit`, `employees.reporting`: a report inside, the outsider refused by the card's own
+check), Home (`team.today`, `activity.list`), ESS
 (`my_profile.get`, `my_leave.list`), approvals (`approvals.mine`, `approvals.decide`) and Staff
 Community (`channels.list`, `community.post`, `community.message`). Performance and Queries carry
 no probe: their records need a plan, a round or a raised query the suite does not build, and their
@@ -1070,6 +1148,12 @@ Nobody is notified of anything.
 |---|---|---|
 | Every role with `praxis_ai` (all seven seeded roles) | Ask and History, their own conversations only | Ask, record a question, give feedback, delete their own conversations; press the cards their own grants reach (§6.11): a task and its change, a comment, a step, a link between tasks, a project and its change, an event and its change, their week's Support Needed, their own leave request, a message, a post, a mail from their own mailbox; a request waiting on them in My Approvals |
 | A holder of `workspace.late_reasons` (Management, Operations & People, the Implementation Team) | The same | Add a late reason, or switch one off or on, from the chat as from Late Reasons |
+| Every member of staff | The same | Add a work site for themselves and colleagues, for approval; send the response to a query of their own |
+| A line manager, a head of department (`people` approve, team) | The same | Approve overtime beforehand for their reports, after Confirm It's You |
+| Operations & People, the Implementation Team (`people` all); Management (`people` all, create and edit) | The same | People's cards: record leave and change a leave type's allowance (Confirm It's You), add a leave type, add an employee and save a record or a line (the work record alone), add and save a department, an open role and a worksite |
+| A holder of `queries.configure` (Operations & People, the Implementation Team) | The same | Save a rule, add or save a step of the chain, add or save a letter |
+| `queries` create (managers, heads, People) | The same | Raise a query, after Confirm It's You, signed with their saved signature |
+| A holder of `policies.manage` (Operations & People, the Implementation Team) | The same | Start a policy and save its draft |
 | A line manager (`people` approve, team), Operations & People and Management (`people` approve, all) | The same | Approve or reject the leave requests waiting on them, up to 25 a press, after Confirm It's You; never their own |
 | What each person learns | Exactly what their own grants, scope and field visibility show on screen | |
 | CEO | Everything, by the standing rule, through the same reads | The same |
@@ -1253,6 +1337,22 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · People, Queries & Sanctions and Knowledge Hub · Policies in the chat (decision 33;
+  decisions 36 to 39, JBS Praxis, §1.8; `docs/handoff/praxis-ai-engine.md` §6.9): 25 actions
+  (§6.11's table), each the screen's own function: Approve Overtime, Add Work Site, Add Type and
+  Save Type, Record Leave, Add Employee and Save Record (the work record alone), Save Line, Add
+  Department and Save Department, Add Role and Save Role, Add Worksite and Save Worksite, Raise
+  Query (signed with the saved signature), Send Response, Save Rule (New and Edit), Add Step and
+  Save Step, Add Letter and Save Letter, Start Policy and Save Draft. A place on a card is picked
+  (`PlaceToken`, the `place` pick, AddressField; our search signs only one match); the `employee`,
+  `worksite`, `policy` and `site_member` picks; a picked field reads as an id whatever its type;
+  `allows` passes a letter's own {{ names }} beside the ready-to-send guard, which never reads a
+  picked field as words; Draw Signature answers `NO_SIGNATURE`; Letter Templates opens Edit
+  Signature from `?action=signature`. Save Letter Signature is never in the chat (`file:`). The
+  matrix probes four more (§6.17). Every card asks what it needs first (decision 34): whose record
+  from People's register, which department, open role, worksite or policy from its list read, which
+  rule, step, letter, leave type or open query of one's own to tap. 26 forms off
+  `scripts/check/ai-forms-gaps.json` (31 left). §1.8, §6.11, §6.17, §8.
 - 03/11/2026 · JP · Home and Settings in the chat (decisions 33 and 35; "go ahead with Home and
   Settings", JBS Praxis): eighteen cards (§6.11's table), each the screen's own service function: the
   organisation's details (never its address), a holiday added and changed, one working day, a

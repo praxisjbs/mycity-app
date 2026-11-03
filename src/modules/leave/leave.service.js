@@ -29,6 +29,7 @@ const { emit } = require("../../shared/events/emit");
 const { scopeFor } = require("../../middleware/rbac");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const { assertInScope } = require("../../shared/rbac/scope");
+const { oneNamed } = require("../../shared/ai/named");
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
 const engine = require("../../shared/workflow/engine");
@@ -547,6 +548,67 @@ async function deleteType(actor, id) {
   });
 }
 
+/*
+ * Praxis AI's leave cards for People (docs/guides/praxis-ai.md §6.11, decision 33): Add Type and
+ * Save Type (New Leave Type's sheet), and Record Leave. What a card names and re-checks; the
+ * writes are createType, updateType and record above. Nothing here writes.
+ */
+
+/**
+ * The code a type is stored under, from its name, as New Leave Type's sheet makes it ("Study
+ * Leave" is study_leave): a name too short for a code of two characters, or not starting with a
+ * letter, gets `type_` before it.
+ */
+function codeOf(name) {
+  const slug = String(name)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  return /^[a-z][a-z0-9_]/.test(slug) ? slug : `type_${slug}`.slice(0, 40);
+}
+
+/** Add Type: the sheet's name and allowance, the code made from the name as the sheet makes it. */
+const addType = (actor, values) => createType(actor, { code: codeOf(values.name), name: values.name, days_per_year: values.days_per_year === undefined ? null : values.days_per_year });
+
+/**
+ * A type a card names by its words (shared/ai/named.js): its name or code, with or without the
+ * word Leave, among every type, offered or retired (Save Type restores one); null when none or
+ * several match.
+ */
+async function typeIdOf(db, words) {
+  const page = await repo.listTypes(db, { page: 1 });
+  const found = oneNamed(page.data || [], words, (t) => [t.name, t.code], { drop: ["leave"] });
+  return found ? found.leave_type_id : null;
+}
+
+/** Every type's name, offered first, to tap when a card asks which type (praxis-ai.md decision 34). */
+async function typeNames(db) {
+  const page = await repo.listTypes(db, { page: 1 });
+  return (page.data || []).sort((a, b) => Number(b.active) - Number(a.active)).map((t) => t.name);
+}
+
+/** The type a card names, by its name. */
+async function cardType(db, id) {
+  if (!db || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ""))) return [];
+  const type = await repo.getType(db, id);
+  return type ? [{ type: "leave_type", id, label: type.name }] : [];
+}
+
+/** Save Type's re-check: the type is there. */
+async function assertCardType(db, id) {
+  if (!(await cardType(db, id)).length) throw new AppError("NOT_FOUND", "That leave type does not exist", 404, { leave_type_id: ["No such type"] });
+}
+
+/** Record Leave's re-check (§6.11 step 5): someone in the reader's `people` scope who works here now, as record() asks. */
+async function assertCardRecord(db, { employee_id: employeeId }, actor) {
+  const person = /^[0-9a-f-]{36}$/i.test(String(employeeId || "")) ? await repo.employeeOf(db, employeeId) : null;
+  const inScope = actor.scope.scope === "all" || (actor.scope.scope_ids || []).includes(employeeId);
+  if (!person || !inScope) throw new AppError("NOT_FOUND", "That employee does not exist", 404, { employee_id: ["No such person"] });
+  if (person.status !== "active") throw new AppError("EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", 422, { employee_id: ["Not active"] });
+}
+
 module.exports = {
   aiSummary,
   MAX_ACTIVE_TYPES,
@@ -573,4 +635,11 @@ module.exports = {
   createType,
   updateType,
   deleteType,
+  codeOf,
+  addType,
+  typeIdOf,
+  typeNames,
+  cardType,
+  assertCardType,
+  assertCardRecord,
 };

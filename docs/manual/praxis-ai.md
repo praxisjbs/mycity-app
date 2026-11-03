@@ -167,9 +167,17 @@ task (adding one or ticking it), a task that waits on another, a project and a c
 meeting and a change to one you made, your week's Support Needed line, your own leave request, the
 leave and other requests waiting on you, a message to a colleague, a post in a channel and a mail
 from your mailbox. If you keep Late Reasons, it also adds a late reason or switches one off or on.
-It also changes your own notice settings, quiet hours and daily digest. If your role allows, it
-changes Settings (the organisation's details, a holiday, a working day, a numbering), the
-company's notice rules and reminders, System Health's targets and faults, alert rules and reports.
+It also changes your own notice settings, quiet hours and daily digest, adds a work site for you
+and colleagues, and sends your response to a query of your own. If your role allows, it changes
+Settings (the organisation's details, a holiday, a working day, a numbering), the company's notice
+rules and reminders, System Health's targets and faults, alert rules and reports.
+
+As your role allows, it also approves overtime beforehand, records leave for someone, adds a leave
+type or changes one, adds an employee or changes a record, sets who someone reports to, and adds or
+changes a department, an open role or a worksite. If you raise queries, it raises one. If you keep
+the query rules, it saves a rule, adds or changes a step of the consequence chain, and adds or
+changes a letter. If you write policies, it starts one and saves its draft.
+
 A role's permissions, an approval flow and the cards a role sees on Home are designed on their own
 screens: it opens the screen, and you save there with its own button.
 
@@ -178,6 +186,14 @@ screens: it opens the screen, and you save there with its own button.
 - A step can be named by its words, for example "tick the banners step". To make a task wait on
   another, press **Edit** on the **Add Link** card to pick a different task, as on the task's own
   **Wait On Task**.
+- An address is picked, never typed. When Praxis AI finds one place for your words, the card shows
+  it. When it finds several or none, the field says *Pick one*: press **Edit** and pick the address
+  as on the screen's own form.
+- Praxis AI never writes anyone's personal details, bank or pay. A card that adds an employee or
+  changes a record carries the work record only; add the rest on the person's record.
+- A query's letter is signed with the signature you saved on Letter Templates. Praxis AI cannot draw
+  a signature, so a card without one says so with **Draw Signature**. Draw yours once, then press
+  **Raise Query** again. Asked to save your signature, it opens **Edit Signature** for you.
 
 - A task card can name people to watch the task, or a whole department. They can open it and hear
   how it goes; see [Watch a task](#workspace-watch) in My Workspace.
@@ -209,6 +225,9 @@ screens: it opens the screen, and you save there with its own button.
 - When you do not say which task, event, project, channel or request, it asks which, with your own
   to press, for example the tasks on your board. Or type its name or number.
 - It asks for everything a card needs, so a card it draws can be pressed as it stands.
+- For a new employee it asks each detail the record needs: names, job title, department, work email,
+  phone, start date, how they are engaged and where they work.
+- For a work site it asks where it is, the first and last day, who goes and what the work is.
 - When a name matches more than one person, it asks which one. Press the right person.
 - Only the newest answer's buttons work. Ask something else at any time to stop.
 
@@ -217,8 +236,9 @@ screens: it opens the screen, and you save there with its own button.
 
 ### Confirm it is you for an approval {#praxis-ask-confirm needs="praxis_ai create"}
 
-1. Approving or rejecting a request, and any change about money, payroll or deleting, asks
-   **Confirm It's You** first unless you confirmed within the last five minutes.
+1. Approving or rejecting a request, approving overtime, recording leave, changing a leave type,
+   raising a query, and any change about money, payroll or deleting, asks **Confirm It's You** first
+   unless you confirmed within the last five minutes.
 2. Choose under **Confirm With**: **Passkey** if you have one, **PIN** or **Password**. Press
    **Use Passkey**, or enter it and press **Confirm**.
 3. The card is pressed for you once you have confirmed.

@@ -13,7 +13,7 @@
  * `body_html` for the editor to load.
  */
 const { z } = require("zod");
-const { uuid, text, isoDate, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, isoDate, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef, WorkPattern } = require("./organisation");
 const { AttendanceRules, AttendanceRulesDraft } = require("./attendance");
 
@@ -236,6 +236,21 @@ const draftSettings = {
 /** POST /policies: a written policy, with an empty draft. */
 const PolicyCreate = z.object(draftSettings).strict();
 
+/**
+ * What New Policy's sheet starts a written policy with, beside the title it asks for: everyone,
+ * acknowledged within 7 days, no approval. Save Draft changes them; the sheet and Praxis AI's
+ * Start Policy card send the same.
+ */
+const POLICY_START = Object.freeze({
+  applies_to: Object.freeze({ everyone: true, department_ids: [], work_patterns: [], employee_ids: [] }),
+  needs_acknowledgement: true,
+  acknowledge_within_days: 7,
+  needs_approval: false,
+});
+
+/** Start Policy as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the title, as the sheet asks. */
+const PolicyStart = PolicyCreate.pick({ title: true });
+
 /** PUT /policies/:id/draft. A document sends `body_html`; a rules policy sends `rules`. */
 const PolicyDraftSave = z
   .object({
@@ -244,6 +259,28 @@ const PolicyDraftSave = z
     rules: AttendanceRulesDraft.nullable().optional(),
   })
   .strict();
+
+/**
+ * Save Draft as Praxis AI's card (decision 33): the policy (its id, or its number or title) beside
+ * the draft's settings, Applies To laid out as its four parts (everyone, departments, work patterns,
+ * people), and a written policy's text as Markdown; only what changes, the rest kept from the draft,
+ * else from the version it would replace. A rules policy's rules are set on its page.
+ */
+const PolicyDraftChange = z
+  .object({
+    policy_id: recordId("policy"),
+    title: draftSettings.title.optional(),
+    everyone: z.boolean().optional(),
+    department_ids: z.array(uuid).max(50).optional(),
+    work_patterns: z.array(WorkPattern).max(3).optional(),
+    employee_ids: z.array(uuid).max(200).optional(),
+    needs_acknowledgement: z.boolean().optional(),
+    acknowledge_within_days: draftSettings.acknowledge_within_days.optional(),
+    needs_approval: z.boolean().optional(),
+    body: z.string().trim().min(1, "Write the policy").max(100_000, "Too long").optional(),
+  })
+  .strict()
+  .refine(changesBeside(["policy_id"]), nothingOn("policy_id"));
 
 /** POST /policies/tidy: a suggestion only; nothing is saved. */
 const PolicyTidy = z.object({ body_html: z.string().min(1).max(200_000, "Too long") }).strict();
@@ -468,6 +505,17 @@ const TABLES = {
       body_html: "turned into body_markdown",
     },
   },
+  PolicyStart: { table: "policy_version" },
+  PolicyDraftChange: {
+    table: "policy_version",
+    virtual: {
+      everyone: "applies_to_everyone",
+      department_ids: "policy_audience rows of departments",
+      work_patterns: "policy_audience rows of work patterns",
+      employee_ids: "policy_audience rows of people",
+      body: "Markdown, kept as body_markdown",
+    },
+  },
   PolicyTidy: { table: null, reason: "text sent for a tidied suggestion; nothing is saved" },
   PolicyTidyResult: { table: null, reason: "the tidied suggestion; nothing is saved" },
   PolicyPublish: {
@@ -543,7 +591,10 @@ module.exports = {
   PolicyPage,
   PolicyListQuery,
   PolicyCreate,
+  POLICY_START,
+  PolicyStart,
   PolicyDraftSave,
+  PolicyDraftChange,
   PolicyTidy,
   PolicyTidyResult,
   PolicyPublish,

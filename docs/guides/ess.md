@@ -312,7 +312,16 @@ People's or a manager's. The workbook opens for the person it is about and the C
   `people` scope (`assertCardRequests`), then each is decided through the approval's own
   `workflow.service.decide` as People · Leave's Approve and Reject are, one after another, a request
   already decided, not waiting on them or their own its own line; `leave.service.decideMany`).
-  `LeaveTypeCreate` and `LeaveRecordCreate` are `not_offered`.
+  People · Leave's forms are cards too (decision 33): **Record Leave** (`leave.record`, `people`
+  create, risk approval, since it is approved at once and spends the person's year: the person in the
+  reader's scope, the type matched by name, the days; `leave.service.record`), **Add Type**
+  (`leave_types.add`: the name and the days a year, the code made from the name as New Leave Type
+  makes it, `leave.service.codeOf`) and **Save Type** (`leave_types.edit`, risk approval, since a
+  changed allowance moves everyone's year: the type by its name, renamed, re-allowanced, retired or
+  offered again; `updateType`). And the person's own **Send Response** (`my_queries.respond`,
+  `ess.ai.js`, `ess` create): the response to one of their own open queries, named by its number,
+  in their own words, sent once through My Queries' own `ess.queries.respond`
+  (`docs/guides/queries.md` §3 step 3).
 - **AI routes**: "my payslip" → My Payslips; "request leave" → My Leave with `new=1`, Request
   Leave open and filled with the type, the days and the note the person gave
   (`leave.LeaveRequestPrefill`, `docs/guides/praxis-ai.md` §6.4); "change my password" → My
@@ -421,6 +430,9 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Record Leave, Add Type, Save Type and Send Response are Praxis AI cards (§9;
+  `praxis-ai.md` decisions 33 and 39): Record Leave and Save Type after Confirm It's You;
+  `LeaveTypeUpdate`'s fields are shared with the card's `LeaveTypeChange`. No screen changed.
 - 03/11/2026 · JP · `my_leave.request` asks the first and the last day off when they were not said, after the type (`praxis-ai.md` decision 34), so a leave card is drawn whole. No screen of ESS changed.
 - 03/11/2026 · JP · `my_leave.request`'s type matcher is the shared one (`src/shared/ai/named.js`), which also matches the one type whose name holds the word said ("pay" for Leave Without Pay; `praxis-ai.md` §6.11). No screen of ESS changed.
 - 03/11/2026 · JP · `ess.ai.js`: My Profile's own edit (`EssProfileUpdate`) is never in the chat, `personal` (`praxis-ai.md` decision 33). No behaviour changed.

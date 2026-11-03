@@ -69,7 +69,8 @@ const LONG_TEXT = 300;
 /**
  * The card's fields from the action's input schema (JSON Schema, structured.jsonSchemaOf): every
  * field, or only those the action carries (`fields`, in that order, decision 31), each with the
- * picker an id field is chosen with on Edit (`picks`).
+ * picker an id field is chosen with on Edit (`picks`). A picked field that is not a list reads as
+ * an id whatever its type (a place's token): by the names the card knows, never as written.
  * @param {object} jsonSchema
  * @param {Record<string, string>} [labels]
  * @param {{fields?: string[]|null, picks?: Record<string, string>}} [shape]
@@ -82,7 +83,8 @@ function fieldsOf(jsonSchema, labels = {}, { fields = null, picks = {} } = {}) {
   return names.slice(0, 40).map((name) => {
     const p = props[name];
     const node = nodeOf(p);
-    const kind = kindOf(name, p);
+    const own = kindOf(name, p);
+    const kind = picks && picks[name] && own !== "list" ? "id" : own;
     return {
       name,
       label: labels[name] || humanise(name),

@@ -7,9 +7,13 @@
  *
  *   mine(user)         GET /queries/my-signature: the PNG as a data URL, or null
  *   save(user, body)   PUT /queries/my-signature: kept through the vault, replacing the last
+ *   signatureOf(db, user)   the saved PNG a Praxis AI card signs a query's letter with
+ *                      (docs/guides/praxis-ai.md §6.11); the chat cannot draw one, so without
+ *                      it the card is refused, and Draw Signature opens Edit Signature
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
+const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const vault = require("../../shared/documents/vault");
 const storage = require("../../services/storage/storage.service");
@@ -51,4 +55,15 @@ async function save(user, body) {
   return mine(user);
 }
 
-module.exports = { mine, save, dataUrlOf };
+/**
+ * The signature a card signs a letter with: the one the person saved, as the pad opens with it.
+ * Only the person draws a signature, so without one the card says so and where to draw it.
+ * @returns {Promise<string>} the PNG data URL
+ */
+async function signatureOf(db, user) {
+  const saved = user && user.user_id ? await dataUrlOf(db, user.user_id) : null;
+  if (!saved) throw new AppError("NO_SIGNATURE", "Praxis AI signs with the signature you saved and cannot draw one. Draw yours on Letter Templates, then press again.", 409);
+  return saved.signature;
+}
+
+module.exports = { mine, save, dataUrlOf, signatureOf };
