@@ -13,6 +13,10 @@ const service = require("./settings.service");
 
 module.exports = defineManifest({
   module: "settings",
+  // A create or edit form never drafted here, and why (gate 23 rule 6, praxis-ai.md decision 33).
+  not_offered: {
+    SecurityPolicyPatch: "secret: the security policy (passwords, sign-in and two-step rules) is set on Settings, Security by those who hold it",
+  },
   reads: [
     {
       key: "holidays.list",

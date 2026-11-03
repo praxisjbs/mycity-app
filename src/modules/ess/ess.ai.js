@@ -77,6 +77,10 @@ async function typeIdOf(actor, value) {
 
 module.exports = defineManifest({
   module: "ess",
+  // A create or edit form never drafted here, and why (gate 23 rule 6, praxis-ai.md decision 33).
+  not_offered: {
+    EssProfileUpdate: "personal: a person's own phone, address, next of kin and bank are personal data the assistant never writes; My Profile edits them",
+  },
   actions: [
     {
       key: "my_leave.request",

@@ -90,9 +90,9 @@ module.exports = defineManifest({
   not_offered: {
     ChannelCreate: "a channel is made on Channels with its members and who may post, in view",
     WishCreate: "a wish is written on a celebration's own card",
-    MessageCreate: "the chat box's own shape, a file or a poll included; the cards carry words alone (DirectMessageSend, ChannelPost)",
+    MessageCreate: "via community.message: the chat box's own shape, a file or a poll included; the cards carry words alone (DirectMessageSend, ChannelPost)",
     RecognitionCreate: "a recognition is given on Channels with the colleague's card in view",
-    DirectCreate: "opening a conversation is the first message's own step (community.message)",
+    DirectCreate: "via community.message: opening a conversation is the first message's own step",
   },
   reads: [
     {

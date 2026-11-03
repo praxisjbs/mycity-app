@@ -1,5 +1,5 @@
 "use strict";
-// ai:none keys and connections are configuration; an assistant that could read them would be one more way for them to leak
+// ai:none secret: keys and connections are configuration; an assistant that could read them would be one more way for them to leak
 // search:none ten connections and their model lists, each found as the Integrations screen by its name (shared/search/screens.js)
 /**
  * Integrations: the HTTP edge for Settings · Integrations (docs/guides/integrations.md §5).

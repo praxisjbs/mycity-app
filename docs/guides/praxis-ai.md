@@ -160,6 +160,23 @@ a task card showed an id where a person should be. Put to the owner with a recom
     name (a leave type) is matched to the person's own records on the server (`resolve`), so a type
     is never an id the model made up.
 
+### 1.5 Decisions (JBS Praxis, 03/11/2026, binding): every form in the chat
+
+Asked for on 02/11/2026 ("any new forms (create and edit) there should be a gate to ensure that we
+have them") after the list of the hub's forms showed five of about 76 create and edit forms
+reachable from the chat; the gate's shape was put to the owner first and approved on 03/11/2026.
+
+33. **Every create and edit form is in the chat, or never for a named reason.** Each create and
+    edit form of a built module, its contract's `<Thing>Create`, `Edit`, `Update`, `Patch` and
+    `Save` schemas, is an action Praxis AI drafts as a card; or is reached through another action's
+    card (`via <action>`: the chat box's message through `community.message`); or is never in the
+    chat, for one of five reasons: `secret` (passwords, PINs, passkeys, keys, connections and the
+    security policy), `device` (made on the person's own device at the site), `personal` (personal
+    data the assistant never writes), `file` (an upload) or `ai` (the AI's own controls). The forms
+    not in the chat on 03/11/2026 are listed in `scripts/check/ai-forms-gaps.json`, and that list
+    only shrinks: a new form, and every form of a module when its backend is built, comes with its
+    action or its reason. Gate 23 holds it (§6.15 rule 6).
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -835,7 +852,16 @@ PR there.
    `scripts/ai/eval-assistant.js`;
 4. a module that declares `actions` leaves a `<Thing>Create` schema of its contract neither offered
    nor in `not_offered` with a reason (PR5 makes this universal: every module with such a schema);
-5. a Try Asking line names a read that does not exist.
+5. a Try Asking line names a read that does not exist;
+6. a create or edit form is not in the chat (decision 33): a `<Thing>Create`, `Edit`, `Update`,
+   `Patch` or `Save` schema of a built module's contract that is no action's input, whose module's
+   `not_offered` reason does not start with `via <action key>:` (an action that exists) or one of
+   the never words `secret:`, `device:`, `personal:`, `file:`, `ai:` (or, for a module opted out
+   whole, whose `// ai:none` reason does not start with one), and that is not on the list of gaps,
+   `scripts/check/ai-forms-gaps.json`. The list only shrinks: an entry now offered, reached or
+   never, or naming no schema of a built module, fails until it is taken off, and an entry the
+   change's base did not hold fails, so a gap is closed, never added. `--list` prints every create
+   and edit schema and how it is accounted for.
 
 ### 6.16 Download Excel (decision 15; PR3)
 
@@ -1133,6 +1159,14 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Every form in the chat (§1.5 decision 33, JBS Praxis; `docs/handoff/praxis-ai-engine.md`
+  §6.9): gate 23 rule 6 (§6.15) holds each create and edit schema of a built module to an action, a
+  `via` another action's card, a never word (`secret`, `device`, `personal`, `file`, `ai`), or the
+  list of today's gaps (`scripts/check/ai-forms-gaps.json`), which only shrinks. The never forms say
+  so: a punch and a check-in (`device`), a home location and a person's own profile (`personal`), an
+  import and a document request (`file`), the integrations' keys and the security policy (`secret`),
+  a card's own edit (`ai`); the chat box's message, a new direct conversation, a task's panel comment
+  and a mail draft are reached `via` their actions. No action was added.
 - 03/11/2026 · JP · Decision 32 finished (`docs/handoff/praxis-ai-engine.md` §6.8), after a Request
   Leave card on staging read "Annual Leave" with Pick one: the model wrote "Annual Leave" and the
   type is named Annual, which the match missed. A type now matches with or without the word Leave and

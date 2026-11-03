@@ -111,6 +111,48 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     const r = noWrites.check({ dir });
     expect(r.problems).toEqual([expect.stringMatching(/q\.ai\.js: calls \.query\(\)/), expect.stringMatching(/sql\.ai\.js: holds SQL/)]);
   });
+
+  test("gate 23 rule 6: every create and edit form is in the chat, reached via another action, never for a named reason, or a listed gap; the list only shrinks (decision 33)", () => {
+    const awareness = require("../../../scripts/check/ai-awareness");
+    const actionKeys = new Set(["tasks.create", "tasks.comment"]);
+    const form = (name, over = {}) => ({ module: "tasks", name, offeredAs: null, reason: null, moduleReason: null, ...over });
+    const fine = awareness.formsAccountedFor({
+      forms: [
+        form("TaskCreate", { offeredAs: "tasks.create" }),
+        form("TaskCommentCreate", { reason: "via tasks.comment: the panel's own comment form" }),
+        form("PunchCreate", { reason: "device: made on the device at the site" }),
+        form("KeySave", { moduleReason: "secret: keys and connections are configuration" }),
+        form("TaskEdit", { reason: "a task is edited on its panel" }),
+      ],
+      actionKeys,
+      gaps: { "tasks.TaskEdit": "My Workspace · Tasks · Edit Task" },
+      // A gap the base held and this change closed is fine: the list shrank.
+      baseGaps: { "tasks.TaskEdit": "My Workspace · Tasks · Edit Task", "tasks.TaskStepEdit": "My Workspace · Tasks · Edit Task Step" },
+    });
+    expect(fine.problems).toEqual([]);
+    expect(fine.counts).toEqual({ offered: 1, via: 1, never: 2, gaps: 1 });
+    // A new form that is none of these fails, and cannot be added to the list.
+    expect(awareness.formsAccountedFor({ forms: [form("TaskArchiveCreate")], actionKeys, gaps: {}, baseGaps: {} }).problems).toEqual([expect.stringMatching(/^tasks\.TaskArchiveCreate: a create or edit form not in the chat/)]);
+    expect(awareness.formsAccountedFor({ forms: [form("TaskArchiveCreate")], actionKeys, gaps: { "tasks.TaskArchiveCreate": "x" }, baseGaps: {} }).problems).toEqual([expect.stringMatching(/gained tasks\.TaskArchiveCreate: the list only shrinks/)]);
+    // A gap now in the chat, or naming no form, comes off.
+    expect(awareness.formsAccountedFor({ forms: [form("TaskEdit", { offeredAs: "tasks.edit" })], actionKeys, gaps: { "tasks.TaskEdit": "x", "tasks.TaskGone": "y" }, baseGaps: null }).problems).toEqual([
+      expect.stringMatching(/^tasks\.TaskEdit is offered as tasks\.edit: take it off/),
+      expect.stringMatching(/names tasks\.TaskGone, which is no create or edit schema of a built module/),
+    ]);
+    // A via naming no action, and a reason with no never word, account for nothing.
+    expect(awareness.formsAccountedFor({ forms: [form("TaskMoveCreate", { reason: "via tasks.move: the board" })], actionKeys, gaps: {}, baseGaps: null }).problems).toEqual([expect.stringMatching(/via tasks\.move, which no manifest declares/)]);
+    expect(awareness.formsAccountedFor({ forms: [form("TaskLinkCreate", { reason: "dangerous: links" })], actionKeys, gaps: {}, baseGaps: null }).problems[0]).toMatch(/not in the chat/);
+    expect(awareness.NEVER).toEqual(["secret", "device", "personal", "file", "ai"]);
+    expect(awareness.reasonOf("personal: a home location")).toEqual({ kind: "never", word: "personal" });
+    expect(awareness.reasonOf("via mail.send: the composer's own")).toEqual({ kind: "via", key: "mail.send" });
+    expect(awareness.FORM_SCHEMA.test("HolidaySave") && awareness.FORM_SCHEMA.test("OrganisationPatch") && !awareness.FORM_SCHEMA.test("TaskComplete")).toBe(true);
+  });
+
+  test("the gaps list ships as module.Schema ids, each with where its form lives", () => {
+    const { gaps, about } = require("../../../scripts/check/ai-forms-gaps.json");
+    expect(about).toMatch(/only shrinks/);
+    for (const [id, note] of Object.entries(gaps)) expect([id, /^[a-z_]+\.[A-Z][A-Za-z0-9]*(Create|Edit|Update|Patch|Save)$/.test(id), typeof note === "string" && note.length > 3]).toEqual([id, true, true]);
+  });
 });
 
 describe("the turn loop (engine/turn.js)", () => {

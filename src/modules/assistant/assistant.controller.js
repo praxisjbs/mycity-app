@@ -1,5 +1,5 @@
 "use strict";
-// ai:none a person's questions are their own, and the assistant never reads its own history as data (docs/guides/praxis-ai.md §9)
+// ai:none ai: a person's questions are their own, and the assistant never reads its own history as data (docs/guides/praxis-ai.md §9)
 /**
  * Praxis AI: the HTTP edge (docs/guides/praxis-ai.md §5). Everything is the caller's own; the
  * service pins every query to their user.

@@ -2,7 +2,7 @@
 "use strict";
 /**
  * Gate 23: the Praxis AI Engine is told when a form, a payload or a schema changes
- * (docs/guides/praxis-ai.md §6.15; decision 22). Five rules:
+ * (docs/guides/praxis-ai.md §6.15; decision 22). Six rules:
  *
  *  1. The committed snapshot src/shared/ai/catalogue.snapshot.json equals what the manifests
  *     declare now (every read, summary, action and route with its module, permission, risk and
@@ -21,9 +21,18 @@
  *     reason covers its Create schemas. A module not built yet (no filled controller) is not asked.
  *  5. Every Try Asking line (src/modules/assistant/assistant.suggestions.js) names a read that
  *     exists.
+ *  6. Every create and edit form is in the chat, or never for a named reason (decision 33): each
+ *     `<Thing>Create`, `Edit`, `Update`, `Patch` or `Save` schema of a built module's contract is
+ *     an action's input; or its module's `not_offered` reason starts `via <action key>:` (reached
+ *     through that action's card) or with a never word (`secret:`, `device:`, `personal:`,
+ *     `file:`, `ai:`), as does the `// ai:none` reason of a module opted out whole; or it is on the
+ *     list of today's gaps, scripts/check/ai-forms-gaps.json. That list only shrinks: an entry now
+ *     accounted for, or naming no such schema, fails until it is taken off, and one the change's
+ *     base did not hold fails, so a new form comes with its action or its reason.
  *
  * Usage: node scripts/check/ai-awareness.js [--list]     exit 0 ok, 1 problems
- *        --list prints the sweep: each Create schema and how it is accounted for
+ *        --list prints the sweep: each Create schema, and each create and edit form, and how it
+ *        is accounted for
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -39,7 +48,93 @@ const EVAL = path.join(ROOT, "scripts", "ai", "eval-assistant.js");
 const SUGGESTIONS = path.join(ROOT, "src", "modules", "assistant", "assistant.suggestions.js");
 const SCHEMAS = path.join(ROOT, "packages", "contract", "schemas");
 const MODULES = path.join(ROOT, "src", "modules");
+const GAPS = path.join(ROOT, "scripts", "check", "ai-forms-gaps.json");
 const coverage = require("./ai-manifest-coverage");
+
+/** A create or edit form's request, by its schema's name (decision 33). */
+const FORM_SCHEMA = /(Create|Edit|Update|Patch|Save)$/;
+/** Why a form is never in the chat (decision 33): the five words a reason may start with. */
+const NEVER = Object.freeze(["secret", "device", "personal", "file", "ai"]);
+
+/** What a not_offered or ai:none reason says of its form: reached via an action, never for a word, or neither. */
+function reasonOf(reason) {
+  const r = String(reason || "").trim();
+  const via = r.match(/^via ([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*):\s*\S/);
+  if (via) return { kind: "via", key: via[1] };
+  const never = r.match(/^([a-z]+):\s*\S/);
+  if (never && NEVER.includes(never[1])) return { kind: "never", word: never[1] };
+  return null;
+}
+
+/**
+ * Rule 6 (decision 33): how each create and edit form of a built module is accounted for, and
+ * the gaps list held to only shrinking.
+ * @param {{forms: Array<{module: string, name: string, offeredAs: string|null, reason: string|null, moduleReason: string|null}>,
+ *          actionKeys: Set<string>, gaps: Record<string, string>, baseGaps: Record<string, string>|null}} q
+ *        `baseGaps` is the list as the change's base held it; null when the base had none
+ * @returns {{problems: string[], sweep: string[], counts: {offered: number, via: number, never: number, gaps: number}}}
+ */
+function formsAccountedFor({ forms, actionKeys, gaps, baseGaps }) {
+  const problems = [];
+  const sweep = [];
+  const counts = { offered: 0, via: 0, never: 0, gaps: 0 };
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const seen = new Set();
+  for (const f of forms) {
+    const id = `${f.module}.${f.name}`;
+    seen.add(id);
+    let state = null;
+    if (f.offeredAs) {
+      state = `offered as ${f.offeredAs}`;
+      counts.offered += 1;
+    } else {
+      const how = reasonOf(f.reason) || reasonOf(f.moduleReason);
+      if (how && how.kind === "via" && !actionKeys.has(how.key)) {
+        problems.push(`${id}: its reason says via ${how.key}, which no manifest declares`);
+        continue;
+      }
+      if (how && how.kind === "via") {
+        state = `reached via ${how.key}`;
+        counts.via += 1;
+      } else if (how) {
+        state = `never (${how.word})`;
+        counts.never += 1;
+      }
+    }
+    if (state) {
+      sweep.push(`${id}: ${state}`);
+      if (has(gaps, id)) problems.push(`${id} is ${state}: take it off scripts/check/ai-forms-gaps.json (the list only shrinks)`);
+    } else if (has(gaps, id)) {
+      sweep.push(`${id}: not in the chat yet (${gaps[id]})`);
+      counts.gaps += 1;
+    } else {
+      problems.push(
+        `${id}: a create or edit form not in the chat. Offer it as an action, or start its not_offered reason (the // ai:none reason for a module opted out whole) with "via <action key>:" or a never word: ${NEVER.map((w) => `${w}:`).join(", ")} (praxis-ai.md decision 33)`,
+      );
+    }
+  }
+  for (const id of Object.keys(gaps)) if (!seen.has(id)) problems.push(`scripts/check/ai-forms-gaps.json names ${id}, which is no create or edit schema of a built module: take it off`);
+  if (baseGaps)
+    for (const id of Object.keys(gaps))
+      if (!has(baseGaps, id)) problems.push(`scripts/check/ai-forms-gaps.json gained ${id}: the list only shrinks, so a form comes with its action or its reason (praxis-ai.md decision 33)`);
+  return { problems, sweep, counts };
+}
+
+/** The gaps list, as this tree holds it and as the change's base held it (null when the base had none). */
+function gapsLists() {
+  const now = JSON.parse(fs.readFileSync(GAPS, "utf8")).gaps || {};
+  const then = (() => {
+    try {
+      const changes = require("./lib/changes");
+      const b = changes.base();
+      const text = b ? changes.git(["show", `${b}:scripts/check/ai-forms-gaps.json`], { allowFail: true }) : null;
+      return text ? JSON.parse(text).gaps || {} : null;
+    } catch {
+      return null;
+    }
+  })();
+  return { now, then };
+}
 
 function walk(dir, test, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -139,8 +234,10 @@ function check() {
       else if (manifest.not_offered[name]) sweep.push(`${folder}.${name}: not offered (${manifest.not_offered[name]})`);
       else problems.push(`${folder}.ai.js: ${name} is neither an action's input nor in not_offered; say whether the assistant may draft it, and why not if not`);
     }
+    // not_offered may name any create or edit schema of the contract (rule 6 reads its never words).
+    const formNames = Object.keys(require(path.join(SCHEMAS, file))).filter((k) => FORM_SCHEMA.test(k));
     for (const name of Object.keys(manifest.not_offered))
-      if (!creates.some(([k]) => k === name)) problems.push(`${folder}.ai.js: not_offered names ${name}, which packages/contract/schemas/${folder}.js does not export as a Create schema`);
+      if (!formNames.includes(name)) problems.push(`${folder}.ai.js: not_offered names ${name}, which packages/contract/schemas/${folder}.js does not export as a create or edit schema`);
   }
   // A manifest's not_offered with no contract file of its module's name explains nothing.
   for (const { folder, manifest } of registry.manifests())
@@ -155,7 +252,28 @@ function check() {
     problems.push(`assistant.suggestions.js could not be read: ${err.message}`);
   }
 
-  return { problems, actions: actions.length, sweep };
+  // 6. Every create and edit form of a built module is in the chat, or never for a named reason (decision 33).
+  const formSchemas = [];
+  for (const file of fs.readdirSync(SCHEMAS).filter((f) => f.endsWith(".js")).sort()) {
+    const folder = file.replace(/\.js$/, "");
+    if (!built(folder)) continue;
+    const manifest = byFolder.get(folder);
+    for (const [name, schema] of Object.entries(require(path.join(SCHEMAS, file)))) {
+      if (!FORM_SCHEMA.test(name) || !schema || typeof schema.safeParse !== "function") continue;
+      formSchemas.push({
+        module: folder,
+        name,
+        offeredAs: offered.get(schema) || null,
+        reason: manifest ? manifest.not_offered[name] || null : null,
+        moduleReason: !manifest && optedOut.has(folder) ? optedOut.get(folder) : null,
+      });
+    }
+  }
+  const lists = gapsLists();
+  const six = formsAccountedFor({ forms: formSchemas, actionKeys: new Set(actions.map((a) => a.key)), gaps: lists.now, baseGaps: lists.then });
+  problems.push(...six.problems);
+
+  return { problems, actions: actions.length, sweep, forms: six.sweep, counts: six.counts };
 }
 
 /** A module counts once its controller has content, as gate 9 counts it; the map makes every module's files empty first. */
@@ -167,9 +285,17 @@ function built(folder) {
 
 if (require.main === module) {
   const r = check();
-  if (process.argv.includes("--list")) for (const line of r.sweep) console.log(`  ${line}`);
+  if (process.argv.includes("--list")) {
+    for (const line of r.sweep) console.log(`  ${line}`);
+    console.log("\n  Create and edit forms (decision 33):");
+    for (const line of r.forms) console.log(`  ${line}`);
+  }
   if (r.problems.length === 0) {
-    console.log(`ai-awareness: ok (${r.actions} action(s); the snapshot, forms, tests and evaluation set agree with the manifests; ${r.sweep.length} Create schema(s) accounted for)`);
+    const c = r.counts;
+    console.log(
+      `ai-awareness: ok (${r.actions} action(s); the snapshot, forms, tests and evaluation set agree with the manifests; ${r.sweep.length} Create schema(s) accounted for; ` +
+        `create and edit forms: ${c.offered} in the chat, ${c.via} through another action, ${c.never} never, ${c.gaps} gap(s) to close in scripts/check/ai-forms-gaps.json)`,
+    );
     process.exit(0);
   }
   console.error("ai-awareness: the engine must be told what changed (praxis-ai.md §6.15)\n");
@@ -177,4 +303,4 @@ if (require.main === module) {
   process.exit(1);
 }
 
-module.exports = { check, formCalls, built };
+module.exports = { check, formCalls, built, formsAccountedFor, reasonOf, NEVER, FORM_SCHEMA };

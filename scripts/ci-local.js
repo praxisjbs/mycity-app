@@ -126,7 +126,7 @@ const GATES = [
   { id: "money", label: "20 Money", script: "scripts/check/money.js" },
   { id: "native-ui", label: "21 Nothing the browser styles itself", script: "scripts/check/native-ui.js", group: "screens" },
   { id: "addresses", label: "22 Addresses picked, never typed", script: "scripts/check/addresses.js" },
-  { id: "ai-awareness", label: "23 AI awareness (the catalogue snapshot, forms, tests, the evaluation set)", script: "scripts/check/ai-awareness.js" },
+  { id: "ai-awareness", label: "23 AI awareness (the catalogue snapshot, forms, tests, the evaluation set, every form in the chat)", script: "scripts/check/ai-awareness.js" },
   { id: "ai-engine-boundary", label: "24 AI engine boundary", script: "scripts/check/ai-engine-boundary.js" },
   // Pipeline guards
   { id: "contract", label: "Contract is generated and current", script: "scripts/gen/contract.js", args: ["--check"] },
