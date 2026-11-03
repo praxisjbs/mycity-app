@@ -749,6 +749,67 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
     expect(m.navigate).toHaveBeenCalledWith("/mailbox?tab=inbox");
   });
 
+  it("Save Worksite's place reads by its line, never its token; Edit holds it in the address field, picked as every address is (decision 37)", async () => {
+    const SITE = "00000000-0000-4000-8000-0000000000c1";
+    const line = "Admiralty Way, Lekki Phase 1, Lagos";
+    // A place as our search signs it: its payload readable in the browser, its signature the server's to check.
+    const payload = btoa(JSON.stringify({ s: "search", f: line, la: 6.4474, lo: 3.4723, k: "street", cc: "ng", v: true, p: false })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const token = `p1.${payload}.c2lnbmF0dXJlLW9mLXRoZS1zZXJ2ZXI`;
+    m.turns[CONV] = [
+      answer({
+        card: card({
+          action_key: "worksites.edit",
+          module_key: "people",
+          label: "Save Worksite",
+          schema: "worksites.WorksiteChange",
+          values: { worksite_id: SITE, address: token, radius_m: 200 },
+          records: [{ type: "worksite", id: SITE, label: "Lekki Office", link: `/people?tab=worksites&id=${SITE}` }],
+          names: [{ type: "place", id: token, label: line, link: null }],
+          fields: [
+            { name: "worksite_id", label: "Worksite", kind: "id", required: true, options: null, long: false, picks: null },
+            { name: "address", label: "Address", kind: "id", required: false, options: null, long: false, picks: "place" },
+            { name: "radius_m", label: "Radius", kind: "number", required: false, options: null, long: false, picks: null },
+          ],
+        }),
+      }),
+    ];
+    ui("ask", CONV);
+    const group = screen.getByRole("group", { name: "Save Worksite" });
+    expect(within(group).getByText(line)).toBeTruthy();
+    expect(within(group).queryByText(token)).toBeNull();
+    await userEvent.click(within(group).getByRole("button", { name: "Edit" }));
+    // The address field holds the place, with Change to pick another, as on Edit Worksite.
+    expect(within(group).getByText(line)).toBeTruthy();
+    expect(within(group).getByRole("button", { name: /Change$/ })).toBeTruthy();
+  });
+
+  it("a query refused for want of a saved signature says so and offers Draw Signature, which opens Edit Signature (decision 38)", async () => {
+    m.turns[CONV] = [
+      answer({
+        card: card({
+          action_key: "queries.raise",
+          module_key: "queries",
+          label: "Raise Query",
+          schema: "queries.QueryRaise",
+          risk: "approval",
+          confirm: "fresh_sign_in",
+          values: { subject: "Missed client visit", details: "Missed the client visit on Monday without telling anyone." },
+          fields: [
+            { name: "subject", label: "Subject", kind: "text", required: true, options: null, long: false, picks: null },
+            { name: "details", label: "What Happened", kind: "text", required: true, options: null, long: true, picks: null },
+          ],
+        }),
+      }),
+    ];
+    m.call.mockRejectedValueOnce(new ApiError(409, { error: { code: "NO_SIGNATURE", message: "Praxis AI signs with the signature you saved and cannot draw one." } }));
+    ui("ask", CONV);
+    const group = screen.getByRole("group", { name: "Raise Query" });
+    await userEvent.click(within(group).getByRole("button", { name: "Raise Query" }));
+    expect((await within(group).findByRole("alert")).textContent).toContain("cannot draw one");
+    await userEvent.click(within(group).getByRole("button", { name: "Draw Signature" }));
+    expect(m.navigate).toHaveBeenCalledWith("/queries?tab=letter-templates&action=signature");
+  });
+
   it("on a phone the card sits inside the chat with the verb full width", () => {
     setViewport(390);
     m.params = new URLSearchParams({ from: "/people?tab=leave" });

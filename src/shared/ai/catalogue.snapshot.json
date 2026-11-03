@@ -59,6 +59,30 @@
       "screen": null
     },
     {
+      "key": "chain.add_step",
+      "kind": "action",
+      "module_key": "queries",
+      "permission": "queries.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "sanctions.ConsequenceStepCreate",
+      "schema_sha": "7cfe648cb276d94a",
+      "screen": null,
+      "capability": "queries.configure"
+    },
+    {
+      "key": "chain.edit_step",
+      "kind": "action",
+      "module_key": "queries",
+      "permission": "queries.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "sanctions.ConsequenceStepChange",
+      "schema_sha": "936713fd4d1abe27",
+      "screen": null,
+      "capability": "queries.configure"
+    },
+    {
       "key": "community.message",
       "kind": "action",
       "module_key": "community",
@@ -78,6 +102,61 @@
       "bulk": 1,
       "schema": "community.ChannelPost",
       "schema_sha": "c7f2cf806e53f4f0",
+      "screen": null
+    },
+    {
+      "key": "departments.create",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "organisation.DepartmentCreate",
+      "schema_sha": "d8635d2baade2c5f",
+      "screen": null
+    },
+    {
+      "key": "departments.edit",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "organisation.DepartmentChange",
+      "schema_sha": "73e6808b0f863eb3",
+      "screen": null
+    },
+    {
+      "key": "employees.add",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "organisation.EmployeeAdd",
+      "schema_sha": "853c489827c51770",
+      "screen": null
+    },
+    {
+      "key": "employees.edit",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "organisation.EmployeeChange",
+      "schema_sha": "2eaafb218035ca66",
+      "screen": null
+    },
+    {
+      "key": "employees.reporting",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "organisation.EmployeeReportingChange",
+      "schema_sha": "da7867c5b321fee6",
       "screen": null
     },
     {
@@ -160,6 +239,28 @@
       "capability": "workspace.late_reasons"
     },
     {
+      "key": "leave_types.add",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "leave.LeaveTypeAdd",
+      "schema_sha": "38fe4cc3735c03c5",
+      "screen": null
+    },
+    {
+      "key": "leave_types.edit",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.edit",
+      "risk": "approval",
+      "bulk": 1,
+      "schema": "leave.LeaveTypeChange",
+      "schema_sha": "e8034eb6465f65bc",
+      "screen": null
+    },
+    {
       "key": "leave.approve",
       "kind": "action",
       "module_key": "people",
@@ -168,6 +269,17 @@
       "bulk": 25,
       "schema": "leave.LeaveApprove",
       "schema_sha": "251c3692d03c783a",
+      "screen": null
+    },
+    {
+      "key": "leave.record",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.create",
+      "risk": "approval",
+      "bulk": 1,
+      "schema": "leave.LeaveRecordCreate",
+      "schema_sha": "79f0fa99d2ab17ae",
       "screen": null
     },
     {
@@ -180,6 +292,30 @@
       "schema": "leave.LeaveReject",
       "schema_sha": "0c450676f04d4ec9",
       "screen": null
+    },
+    {
+      "key": "letters.create",
+      "kind": "action",
+      "module_key": "queries",
+      "permission": "queries.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "templates.LetterTemplateCreate",
+      "schema_sha": "2057d9b8e817d2df",
+      "screen": null,
+      "capability": "queries.configure"
+    },
+    {
+      "key": "letters.edit",
+      "kind": "action",
+      "module_key": "queries",
+      "permission": "queries.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "templates.LetterTemplateChange",
+      "schema_sha": "7b7542b05697a4c5",
+      "screen": null,
+      "capability": "queries.configure"
     },
     {
       "key": "mail.send",
@@ -201,6 +337,17 @@
       "bulk": 1,
       "schema": "leave.LeaveRequestCreate",
       "schema_sha": "73c8bbf479a2db68",
+      "screen": null
+    },
+    {
+      "key": "my_queries.respond",
+      "kind": "action",
+      "module_key": "ess",
+      "permission": "ess.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "queries.QueryRespond",
+      "schema_sha": "bf85e7666c399277",
       "screen": null
     },
     {
@@ -281,6 +428,41 @@
       "screen": null
     },
     {
+      "key": "overtime.approve",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.approve",
+      "risk": "approval",
+      "bulk": 1,
+      "schema": "attendance.OvertimePreApprovalCreate",
+      "schema_sha": "3f38e2d89a1bf8fa",
+      "screen": null
+    },
+    {
+      "key": "policies.draft",
+      "kind": "action",
+      "module_key": "knowledge",
+      "permission": "knowledge.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "policies.PolicyDraftChange",
+      "schema_sha": "a0873ecc380c80e0",
+      "screen": null,
+      "capability": "policies.manage"
+    },
+    {
+      "key": "policies.start",
+      "kind": "action",
+      "module_key": "knowledge",
+      "permission": "knowledge.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "policies.PolicyStart",
+      "schema_sha": "9afcbdb5f59c78ee",
+      "screen": null,
+      "capability": "policies.manage"
+    },
+    {
       "key": "projects.create",
       "kind": "action",
       "module_key": "workspace",
@@ -301,6 +483,41 @@
       "schema": "projects.ProjectChange",
       "schema_sha": "d303b1595834209f",
       "screen": null
+    },
+    {
+      "key": "queries.raise",
+      "kind": "action",
+      "module_key": "queries",
+      "permission": "queries.create",
+      "risk": "approval",
+      "bulk": 1,
+      "schema": "queries.QueryRaise",
+      "schema_sha": "35dcc6740007d6bd",
+      "screen": null
+    },
+    {
+      "key": "query_rules.create",
+      "kind": "action",
+      "module_key": "queries",
+      "permission": "queries.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "query_rules.QueryRuleCreate",
+      "schema_sha": "d9bea3552bc5c370",
+      "screen": null,
+      "capability": "queries.configure"
+    },
+    {
+      "key": "query_rules.edit",
+      "kind": "action",
+      "module_key": "queries",
+      "permission": "queries.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "query_rules.QueryRuleChange",
+      "schema_sha": "34a76377d3c2a2d3",
+      "screen": null,
+      "capability": "queries.configure"
     },
     {
       "key": "reports.create",
@@ -337,6 +554,28 @@
       "schema_sha": "df44226c82c0f273",
       "screen": null,
       "capability": "home.reports"
+    },
+    {
+      "key": "seats.create",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "organisation.OrgSeatCreate",
+      "schema_sha": "804520f264534459",
+      "screen": null
+    },
+    {
+      "key": "seats.edit",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "organisation.OrgSeatChange",
+      "schema_sha": "4f8d453717667327",
+      "screen": null
     },
     {
       "key": "tasks.add_step",
@@ -416,6 +655,17 @@
       "screen": null
     },
     {
+      "key": "temporary_sites.add",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "ess.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "attendance.TemporarySiteAdd",
+      "schema_sha": "489ced499409bd6e",
+      "screen": null
+    },
+    {
       "key": "week.support",
       "kind": "action",
       "module_key": "workspace",
@@ -435,6 +685,28 @@
       "bulk": 1,
       "schema": "settings.WorkingDayChange",
       "schema_sha": "cfaa2d96f2d257f9",
+      "screen": null
+    },
+    {
+      "key": "worksites.create",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "worksites.WorksiteAdd",
+      "schema_sha": "b312b27c13015a20",
+      "screen": null
+    },
+    {
+      "key": "worksites.edit",
+      "kind": "action",
+      "module_key": "people",
+      "permission": "people.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "worksites.WorksiteChange",
+      "schema_sha": "351b4024bb1d7c80",
       "screen": null
     },
     {
@@ -1725,6 +1997,17 @@
       "screen": "queries.queries"
     },
     {
+      "key": "queries.route.draw_or_change_my_signature_for_letters_which_only_i_can_draw",
+      "kind": "route",
+      "module_key": "queries",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "queries.letter-templates"
+    },
+    {
       "key": "queries.route.issue_a_sanction",
       "kind": "route",
       "module_key": "queries",
@@ -1736,6 +2019,17 @@
       "screen": "queries.queries"
     },
     {
+      "key": "queries.route.preview_a_letter_as_the_employee_receives_it",
+      "kind": "route",
+      "module_key": "queries",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "queries.letter-templates"
+    },
+    {
       "key": "queries.route.raise_a_query",
       "kind": "route",
       "module_key": "queries",
@@ -1745,6 +2039,17 @@
       "schema": null,
       "schema_sha": "1d151493d207615c",
       "screen": "queries.queries"
+    },
+    {
+      "key": "queries.route.switch_a_query_rule_on_or_pause_it",
+      "kind": "route",
+      "module_key": "queries",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "queries.rules"
     },
     {
       "key": "settings.route.add_a_public_holiday",

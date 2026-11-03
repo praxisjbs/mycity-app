@@ -7,7 +7,10 @@
  * never rows, docs/guides/praxis-ai.md §6.13); and, as cards the person confirms after
  * Confirm It's You (§6.11, risk approval), approving or rejecting the requests waiting on
  * them, up to 25 a press, each through the same approval call People · Leave's Approve and
- * Reject make, never their own. Recording leave for someone stays on the screen.
+ * Reject make, never their own. And People · Leave's forms as cards (decision 33): Record Leave
+ * for someone in the person's scope (approved at once, so risk approval: it spends their year),
+ * Add Type and Save Type (a changed allowance moves everyone's year, so Save Type is approval too),
+ * each through the service function the screen's own button calls.
  *
  * Someone asking about their own leave is answered by ESS (ess.ai.js), which offers the
  * request itself (my_leave.request).
@@ -15,6 +18,7 @@
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const routeMap = require("../../shared/route-map");
+const people = require("../organisation/organisation.cards");
 const service = require("./leave.service");
 
 const requestLink = (id) => (routeMap.linkFor("leave_request", id) || {}).path || null;
@@ -57,9 +61,88 @@ const decision = (verb) => ({
   matrix: probe,
 });
 
+/**
+ * The matrix's probes for Record Leave (praxis-ai.md §6.17): a report of the asker's is in their
+ * reach, the outsider never; a card naming the outsider is refused by its own check.
+ */
+const recordFor = (ctx, who) => {
+  const day = ctx.freshDay();
+  return { type: "employee", id: who.employee_id, values: { employee_id: who.employee_id, leave_type_id: ctx.leaveTypeId, starts_on: day, ends_on: day, reason: "Recorded by the matrix" } };
+};
+const recordProbe = {
+  inside: (ctx) => (ctx.report ? recordFor(ctx, ctx.report) : null),
+  outside: (ctx) => recordFor(ctx, ctx.outsider),
+};
+
+const typeLine = (status) => (t) => [{ type: "leave_type", id: t.leave_type_id, label: t.name, status, link: routeMap.screenPath("people", "leave") }];
+const TYPE_LABELS = { name: "Name", days_per_year: "Days a Year" };
+
 module.exports = defineManifest({
   module: "people",
   actions: [
+    {
+      key: "leave.record",
+      label: "Record Leave",
+      matrix: recordProbe,
+      description: "Record leave for someone in my scope, approved at once with no flow: the person, the leave type (by name), the first and last day and a note",
+      input: c.leave.LeaveRecordCreate,
+      permission: ["people", "create"],
+      // Approved at once, it spends the person's year: Confirm It's You first (JBS Praxis, 03/11/2026).
+      risk: "approval",
+      form: "none: Record Leave is Request Leave's own form with the person picked beside it; the card carries LeaveRecordCreate",
+      fields: ["employee_id", "leave_type_id", "starts_on", "ends_on", "reason"],
+      picks: { employee_id: "employee", leave_type_id: "leave_type" },
+      // A type written by name is matched among the types, as Request Leave's card matches it (decision 32).
+      resolve: { leave_type_id: (value, _actor, db) => service.typeIdOf(db, value) },
+      names: async (values, actor, db) => [...(await people.cardEmployee(db, values.employee_id, actor.scope)), ...(await service.cardType(db, values.leave_type_id))],
+      asks: [
+        // Who, from People's register in the reader's scope (praxis-ai.md decision 34).
+        { field: "employee_id", question: "Who is the leave for?", read: "employees.list", params: { status: "active" } },
+        { field: "leave_type_id", question: "Which leave type?" },
+        { field: "starts_on", question: "What is the first day?" },
+        { field: "ends_on", question: "What is the last day?" },
+      ],
+      check: (client, values, actor) => service.assertCardRecord(client, values, actor),
+      // The same function Record Leave calls: the type, the days and the year's allowance are its checks.
+      run: (values, actor) => service.record(actor, actor.scope, values),
+      readback: (r) => [{ type: "leave_request", id: r.leave_request_id, label: `${r.employee.display_name}, ${r.leave_type_name}, ${r.days} ${r.days === 1 ? "day" : "days"}`, status: "recorded", link: requestLink(r.leave_request_id) }],
+      labels: { employee_id: "Person", leave_type_id: "Leave Type", starts_on: "First Day", ends_on: "Last Day", reason: "Note" },
+    },
+    {
+      key: "leave_types.add",
+      label: "Add Type",
+      description: "Add a leave type staff may ask for: its name and the working days a year it allows (none for no set allowance)",
+      input: c.leave.LeaveTypeAdd,
+      permission: ["people", "create"],
+      risk: "standard",
+      form: "none: New Leave Type's sheet makes the code from the name as it sends; the card takes the name and the allowance (LeaveTypeAdd)",
+      asks: [{ field: "name", question: "What is the leave type called?" }],
+      // The same function Add Type calls, the code made from the name as the sheet makes it.
+      run: (values, actor) => service.addType(actor, values),
+      readback: typeLine("added"),
+      labels: TYPE_LABELS,
+    },
+    {
+      key: "leave_types.edit",
+      label: "Save Type",
+      description: "Change a leave type: rename it, change the working days a year it allows, or retire it (active false) or offer it again (true); only what changes",
+      input: c.leave.LeaveTypeChange,
+      permission: ["people", "edit"],
+      // A changed allowance moves everyone's year: Confirm It's You first (JBS Praxis, 03/11/2026).
+      risk: "approval",
+      form: "none: Edit Leave Type's sheet changes the type open on People, Leave and never names it; the card does",
+      fields: ["leave_type_id", "name", "days_per_year", "active"],
+      asks: [{ field: "leave_type_id", question: "Which leave type?", options: ({ db }) => service.typeNames(db) }],
+      resolve: { leave_type_id: (value, _actor, db) => service.typeIdOf(db, value) },
+      records: (values, _actor, db) => service.cardType(db, values.leave_type_id),
+      check: (client, values) => service.assertCardType(client, values.leave_type_id),
+      run: (values, actor) => {
+        const { leave_type_id: id, ...changes } = values;
+        return service.updateType(actor, id, changes);
+      },
+      readback: typeLine("saved"),
+      labels: { leave_type_id: "Leave Type", ...TYPE_LABELS, active: "Offered" },
+    },
     {
       key: "leave.approve",
       label: "Approve Leave",
@@ -77,10 +160,10 @@ module.exports = defineManifest({
       asks: [whichRequests, { field: "reason", question: "Why are you rejecting it?" }],
     },
   ],
-  // Every other Create schema of this module's contract, and why the assistant does not offer it (gate 23).
+  // The sheets' own requests, reached through the cards that carry them (gate 23, praxis-ai.md decision 33).
   not_offered: {
-    LeaveTypeCreate: "a leave type is Settings, set by Operations & People on the Leave screen",
-    LeaveRecordCreate: "leave recorded for someone is approved at once with no flow; People record it on the screen with the person in view",
+    LeaveTypeCreate: "via leave_types.add: New Leave Type's own request, whose code the sheet makes from the name; the card is LeaveTypeAdd",
+    LeaveTypeUpdate: "via leave_types.edit: Edit Leave Type's own request, which never names its type; the card is LeaveTypeChange",
   },
   summaries: [
     {

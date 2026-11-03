@@ -7,10 +7,11 @@ import { useFreshSignIn, type ConfirmedWay } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
 import { schemas, type AiActionCard, type AiActionResult, type Department } from "@mycity/contract/contract.gen.ts";
 import { LeaveTypeSelect } from "@/features/people/Leave";
-import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, type ProjectChoice, type TaskChoice } from "@/features/shared/pickers";
+import { ColleaguePicker, DepartmentPicker, EmployeePicker, PolicyPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, WorksitePicker, type PolicyChoice, type ProjectChoice, type TaskChoice, type WorksiteChoice } from "@/features/shared/pickers";
+import { places } from "@/features/shared/places";
 import { hrefFor } from "@/lib/routes";
 import { useRouter } from "@/lib/router";
-import { ActionCard, toast, todayIso, type CardField, type ActionCardPicker, type CardRecord, type ContractSchema } from "@mycity/ui";
+import { ActionCard, AddressField, toast, todayIso, type CardField, type ActionCardPicker, type CardRecord, type ContractSchema } from "@mycity/ui";
 
 /**
  * An answer's action card, wired to the API (docs/guides/praxis-ai.md §6.11): the card as the API
@@ -29,6 +30,8 @@ export const PASSKEY_OFFERED = "praxis-ai:passkey-offered";
 const SCREEN_FOR: Record<string, { label: string; href: string }> = {
   NO_MAILBOX: { label: "Open Mailbox", href: hrefFor("mailbox", "inbox") },
   MAIL_AUTH_FAILED: { label: "Open Mailbox", href: hrefFor("mailbox", "inbox") },
+  // A query's letter is signed with the signature the person draws by hand: Letter Templates opens Edit Signature.
+  NO_SIGNATURE: { label: "Draw Signature", href: hrefFor("queries", "letter-templates", { action: "signature" }) },
 };
 
 /** The action's contract schema, by the name the card carries ("tasks.TaskCreate"); undefined when the build lacks it. */
@@ -88,7 +91,10 @@ const idsIn = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
  * screen's own form binds it: whom a task may be set for or shared with (New Task's), anyone with a
  * login (New Event's and Add Watcher's), a department (for a reader who may view People, as New Task
  * offers it), an active project, a leave type with what is left of this year (Request Leave's own
- * list, decision 32), a task the person can see (Wait On Task's own list). What is already picked
+ * list, decision 32), a task the person can see (Wait On Task's own list), someone on People's
+ * register (the employee pickers of People's forms), a worksite in use, a policy a query or rule may
+ * cite, a place picked as every address is (AddressField, F27: the card holds the place's token),
+ * and the people Add Work Site may put on a site, the person included. What is already picked
  * reads by the name the card carries; a pick made here keeps its own, until Save Changes has the
  * server name it again.
  */
@@ -100,6 +106,8 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
   const [departments, setDepartments] = useState<Department[]>(() => ids.map((id) => ({ department_id: id, name: nameOf(id) }) as unknown as Department));
   const [projects, setProjects] = useState<ProjectChoice[]>(() => ids.map((id) => ({ project_id: id, number: "", name: nameOf(id) })));
   const [tasks, setTasks] = useState<TaskChoice[]>(() => ids.map((id) => ({ task_id: id, number: "", title: nameOf(id) })));
+  const [worksites, setWorksites] = useState<WorksiteChoice[]>(() => ids.map((id) => ({ worksite_id: id, name: nameOf(id), code: "" })));
+  const [policies, setPolicies] = useState<PolicyChoice[]>(() => ids.map((id) => ({ policy_id: id, number: "", title: nameOf(id) })));
   const set = (picked: string[]) => onChange(many ? picked : (picked[0] ?? null));
   const pickPeople = (p: PersonRef[]) => (setPeople(p), set(p.map((x) => x.employee_id)));
   switch (field.picks) {
@@ -117,6 +125,17 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
       return <LeaveTypeSelect year={Number(todayIso().slice(0, 4))} value={ids[0] ?? ""} onChange={(v) => set(v ? [v] : [])} />;
     case "task":
       return <TaskPicker value={tasks} onChange={(t) => (setTasks(t), set(t.map((x) => x.task_id)))} />;
+    case "employee":
+      return <EmployeePicker value={people} onChange={pickPeople} multiple={many} filters={{ status: "active" }} placeholder="Search staff" />;
+    case "site_member":
+      return <ColleaguePicker value={people} onChange={pickPeople} multiple withSelf placeholder="Search people" />;
+    case "worksite":
+      return <WorksitePicker value={worksites} onChange={(w) => (setWorksites(w), set(w.map((x) => x.worksite_id)))} />;
+    case "policy":
+      return <PolicyPicker value={policies} onChange={(p) => (setPolicies(p), set(p.map((x) => x.policy_id)))} />;
+    case "place":
+      // The card holds the place's token alone; a device location while search is down holds none, so the field asks again.
+      return <AddressField value={ids[0] ? { token: ids[0] } : null} onChange={(v) => set(v?.token ? [v.token] : [])} places={places} />;
     default:
       return null;
   }

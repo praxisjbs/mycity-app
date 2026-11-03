@@ -135,7 +135,7 @@ async function edit(id, body, actor) {
 
 /** A card's words held to ready to send, at an edit and at the press as at the draft (answer.gapsIn): a gap left to fill is a problem on its field. */
 function held(checked) {
-  const gaps = gapsIn(checked.values);
+  const gaps = gapsIn(checked.values, checked.action);
   return Object.keys(gaps).length ? { ...checked, ok: false, problems: { ...checked.problems, ...gaps } } : checked;
 }
 

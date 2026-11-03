@@ -85,17 +85,20 @@ function PolicyList() {
 
 function NewPolicyForm({ close, onCreated }: { close: () => void; onCreated: (id: string) => void }) {
   const create = useMutation("POST /api/v1/policies");
-  const f = useContractForm({ title: "" }, { safeParse: (v: unknown) => policies.PolicyCreate.pick({ title: true }).safeParse(v) });
+  // Start Policy asks only the title: the same schema as Praxis AI's Start Policy card.
+  const f = useContractForm({ title: "" }, policies.PolicyStart);
   const send = async () => {
     if (!f.check()) return;
     try {
+      // The settings a policy starts with, as Praxis AI's Start Policy card sends them; Save Draft changes them.
+      const start = policies.POLICY_START;
       const p = await create.run({
         body: {
           title: f.values.title.trim(),
-          applies_to: { everyone: true, department_ids: [], work_patterns: [], employee_ids: [] },
-          needs_acknowledgement: true,
-          acknowledge_within_days: 7,
-          needs_approval: false,
+          applies_to: { ...start.applies_to, department_ids: [], work_patterns: [], employee_ids: [] },
+          needs_acknowledgement: start.needs_acknowledgement,
+          acknowledge_within_days: start.acknowledge_within_days,
+          needs_approval: start.needs_approval,
         },
       });
       invalidate("/api/v1/policies");

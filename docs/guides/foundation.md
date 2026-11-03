@@ -1166,6 +1166,14 @@ screen.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · People's records are Praxis AI cards (`organisation.ai.js` with
+  `organisation.cards.js`; `organogram.md` §9; `praxis-ai.md` decisions 33 and 36): Add Employee
+  and Save Record with the work record alone (personal details, bank and pay never on a card),
+  Save Line, Add Department and Save Department (the grant over everyone), Add Role and Save Role,
+  each through this module's own function in its own transaction, under the controller's rules.
+  `EmployeeUpdate`, `EmployeeReportingUpdate`, `DepartmentUpdate` and `OrgSeatUpdate` share their
+  fields with the cards' schemas (`EmployeeChange`, `EmployeeReportingChange`, `DepartmentChange`,
+  `OrgSeatChange`; `WORK_RECORD`). No screen changed.
 - 03/11/2026 · JP · Settings' forms in the chat (`praxis-ai.md` decisions 33 and 35): Save Organisation, Add and Save Holiday, Save Working Day and Save Numbering as Praxis AI cards (`settings.ai.js`, `settings.service.holiday`); Save Role, New Approval Flow and Edit Approval Steps are `design`, never in the chat (§9). No screen changed.
 - 03/11/2026 · JP · My Approvals' card (`approvals.decide`) asks what it needs before it is drawn (`praxis-ai.md` decision 34): which requests (those waiting on the person, as a card names them, `workflow.service.cardChoices`; matched by their words, `instanceIdOf`), the decision, and the reason unless it is an approval. No Approvals screen changed.
 - 03/11/2026 · JP · Decision 33's words on three foundation modules (`praxis-ai.md` §1.5): an import is `file` (`imports.ai.js`), the documents module opted out as `file`, the security policy is `secret` (`settings.ai.js`); the other Settings forms are on the list of forms to bring into the chat (`scripts/check/ai-forms-gaps.json`). No behaviour changed.

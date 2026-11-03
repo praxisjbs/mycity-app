@@ -17,7 +17,7 @@
  * Every write needs the `queries.configure` capability (guide §8).
  */
 const { z } = require("zod");
-const { uuid, text, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { QueryStatus } = require("./queries");
 
@@ -96,7 +96,7 @@ const QueryRuleCreate = z
  * (its queries were counted that way); the threshold, window and letter may change
  * and apply from the next event.
  */
-const QueryRuleUpdate = z
+const QueryRuleUpdateFields = z
   .object({
     name: text(80).optional(),
     source_event: OfferedRuleSource.optional(),
@@ -106,8 +106,18 @@ const QueryRuleUpdate = z
     policy_id: uuid.nullable().optional(),
     policy_clause: z.string().trim().max(300, "At most 300 characters").nullable().optional(),
   })
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, "Change at least one field");
+  .strict();
+const QueryRuleUpdate = QueryRuleUpdateFields.refine((v) => Object.keys(v).length > 0, "Change at least one field");
+
+/**
+ * Edit Rule as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the rule (its id, or
+ * its name) beside the form's fields; only what changes. Its trigger is fixed once it has fired,
+ * as on the screen (the service's 409).
+ */
+const QueryRuleChange = QueryRuleUpdateFields.extend({ query_rule_id: recordId("rule") }).refine(
+  changesBeside(["query_rule_id"]),
+  nothingOn("query_rule_id"),
+);
 
 /** GET /query-rules/summary */
 const QueryRulesSummary = z
@@ -152,6 +162,7 @@ const TABLES = {
   QueryRuleListQuery: { table: null, reason: "list controls and filters for Rules" },
   QueryRuleCreate: { table: "query_rule" },
   QueryRuleUpdate: { table: "query_rule" },
+  QueryRuleChange: { table: "query_rule" },
   QueryRulesSummary: { table: null, reason: "counts over query_rule and the queries rules raised" },
   QueryRuleFiring: {
     table: "employee_query",
@@ -175,6 +186,7 @@ module.exports = {
   QueryRuleListQuery,
   QueryRuleCreate,
   QueryRuleUpdate,
+  QueryRuleChange,
   QueryRulesSummary,
   QueryRuleFiring,
   QueryRuleFiringPage,

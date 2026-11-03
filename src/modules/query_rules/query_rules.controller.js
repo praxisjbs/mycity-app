@@ -1,5 +1,4 @@
 "use strict";
-// ai:none rules are configuration; the queries they raise are read through queries.ai.js
 // search:none a handful of rules, listed whole on Rules, which ⌘K finds by name
 /**
  * Query rules: the HTTP edge for Queries & Sanctions · Rules (docs/guides/queries.md §5).

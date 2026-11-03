@@ -187,6 +187,20 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     expect(defineManifest({ module: "workspace", actions: [{ ...ACTION, picks: { project_id: "task" } }] }).actions[0].picks).toEqual({ project_id: "task" });
   });
 
+  test("the People, Queries and Policies picks are the contract's, and allows names a carried text field with a test of its gaps (decision 33)", () => {
+    for (const pick of ["employee", "worksite", "policy", "place", "site_member"]) expect(c.assistant.AiCardPicks.options).toContain(pick);
+    const letterName = (gap) => gap === "{{ subject }}";
+    const a = defineManifest({ module: "workspace", actions: [{ ...ACTION, picks: { primary_assignee_id: "employee" }, allows: { title: letterName } }] }).actions[0];
+    expect(a.picks).toEqual({ primary_assignee_id: "employee" });
+    expect(a.allows.title).toBe(letterName);
+    expect(defineManifest({ module: "workspace", actions: [ACTION] }).actions[0].allows).toEqual({});
+    const refused = (over) => () => defineManifest({ module: "workspace", actions: [{ ...ACTION, ...over }] });
+    expect(refused({ allows: { nope: letterName } })).toThrow(/allows names "nope", which the card does not carry/);
+    expect(refused({ allows: { title: "{{ subject }}" } })).toThrow(/allows\.title is \(gap\) => boolean/);
+    expect(refused({ fields: ["description"], allows: { title: letterName } })).toThrow(/allows names "title"/);
+    expect(refused({ picks: { primary_assignee_id: "anyone" } })).toThrow(/picks\.primary_assignee_id is one of/);
+  });
+
   test("a record named by its words: the whole words, then the one they begin, then the one that holds them; never one of several", () => {
     const { oneNamed } = require("../../../src/shared/ai/named");
     const types = [{ name: "Annual", code: "annual" }, { name: "Compassionate Leave", code: "compassionate" }, { name: "Sick", code: "sick" }];
@@ -392,6 +406,15 @@ describe("cards (engine/cards.js)", () => {
     const drawn = cards.draft({ action: { key: "tasks.create", risk: "standard", bulk: 1 }, fieldNames: ["title"], values: { title: "x" }, checked: { ok: true, values: { title: "x" }, problems: {}, records: [], names: [{ type: "employee", id: "e1", label: "Ada Obi" }] } });
     expect(drawn.records).toEqual([]);
     expect(drawn.names).toEqual([{ type: "employee", id: "e1", label: "Ada Obi" }]);
+  });
+
+  test("a picked field that is not a list reads as an id whatever its type, so a place's token is read by its line, never printed (decision 33)", () => {
+    const fields = cards.fieldsOf(jsonSchemaOf(c.worksites.WorksiteAdd), {}, { picks: { address: "place" } });
+    expect(fields.find((f) => f.name === "address")).toMatchObject({ kind: "id", picks: "place" });
+    expect(fields.find((f) => f.name === "name")).toMatchObject({ kind: "text", picks: null });
+    const site = cards.fieldsOf(jsonSchemaOf(c.attendance.TemporarySiteAdd), {}, { picks: { address: "place", employee_ids: "site_member" } });
+    expect(site.find((f) => f.name === "employee_ids")).toMatchObject({ kind: "list", picks: "site_member" });
+    expect(site.find((f) => f.name === "purpose").options).not.toContain("temporary_home");
   });
 
   test("nextAsk: the first field an action asks for that the values leave out, once in a run, never more than six in a row (decision 29)", () => {

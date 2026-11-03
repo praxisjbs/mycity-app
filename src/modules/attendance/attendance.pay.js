@@ -593,6 +593,37 @@ async function approveOvertime(actor, scope, body) {
   };
 }
 
+/*
+ * Praxis AI's Approve Overtime card (docs/guides/praxis-ai.md §6.11, decision 33): the person it
+ * names and its re-check, Approve Overtime's own rules before the press runs approveOvertime.
+ * Nothing here writes.
+ */
+
+/** Is this person in the reader's `people` scope? */
+const inReach = (scope, employeeId) => {
+  try {
+    assertInScope(scope, employeeId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** The person a card approves overtime for, by name, when they are in the reader's reach; nothing otherwise. */
+async function cardPerson(db, employeeId, scope) {
+  if (!db || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(employeeId || "")) || !inReach(scope, employeeId)) return [];
+  const person = await repo.person(db, employeeId);
+  return person ? [{ type: "employee", id: employeeId, label: person.ref.display_name }] : [];
+}
+
+/** The card's re-check (§6.11 step 5): someone in the reader's reach who works here now, never themselves. */
+async function assertCardOvertime(db, { employee_id: employeeId }, actor) {
+  const person = (await cardPerson(db, employeeId, actor.scope)).length ? await repo.person(db, employeeId) : null;
+  if (!person) throw new AppError("NOT_FOUND", "That employee does not exist", 404, { employee_id: ["No such person"] });
+  if (employeeId === actor.employee_id) throw new AppError("OWN_RECORD", "Someone else approves your own overtime", 403, { employee_id: ["Not yourself"] });
+  if (person.status !== "active") throw new AppError("NOT_EMPLOYED", "Only people who work here now are approved overtime.", 422, { employee_id: ["Not active"] });
+}
+
 module.exports = {
   DEDUCTIONS,
   KINDS,
@@ -617,4 +648,6 @@ module.exports = {
   waive,
   decideOvertime,
   approveOvertime,
+  cardPerson,
+  assertCardOvertime,
 };

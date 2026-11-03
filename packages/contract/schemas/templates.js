@@ -19,7 +19,7 @@
  * `queries.configure` capability.
  */
 const { z } = require("zod");
-const { uuid, text, isoDate, isoDateTime, money, listQuery, Paged, textOfHtml } = require("./common");
+const { uuid, text, isoDate, isoDateTime, money, listQuery, Paged, textOfHtml, recordId, changesBeside, nothingOn } = require("./common");
 
 /** query: a query's letter; sanction: a rung's; fine: the Salary Deduction letter a fine sends (guide §6.6). */
 const LetterPurpose = z.enum(["query", "sanction", "fine"]);
@@ -113,6 +113,23 @@ const LetterTemplateBodySave = z
   })
   .strict()
   .refine(oneBody, ONE_BODY);
+
+/**
+ * Save Letter as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the letter (its
+ * id, or its name) beside what Edit Template's Save Letter changes: its name, what it is used for
+ * while nothing sends it, and its wording (a title, and the text as Markdown with the letter's own
+ * {{ names }}), saved as the next version. Only what changes.
+ */
+const LetterTemplateChange = z
+  .object({
+    letter_template_id: recordId("letter"),
+    name: text(80).optional(),
+    purpose: z.enum(["query", "sanction"]).optional(),
+    title: text(150).optional(),
+    body: body.optional(),
+  })
+  .strict()
+  .refine(changesBeside(["letter_template_id"]), nothingOn("letter_template_id"));
 
 /** GET /letter-templates/summary */
 const LetterTemplatesSummary = z
@@ -249,6 +266,13 @@ const TABLES = {
     table: null,
     reason: "the next template_version of the template's key",
   },
+  LetterTemplateChange: {
+    table: "letter_template",
+    virtual: {
+      title: "the next template_version's title, when the wording changes",
+      body: "the next template_version's Markdown, when the wording changes",
+    },
+  },
   LetterTemplatesSummary: { table: null, reason: "counts over letter_template and the letters sent" },
   LetterPreview: { table: null, reason: "a render with sample values; nothing is stored" },
   LetterDraftRequest: { table: null, reason: "the letter being written and what to say; nothing is kept" },
@@ -274,6 +298,7 @@ module.exports = {
   LetterTemplateCreate,
   LetterTemplateBodySave,
   LetterTemplateUpdate,
+  LetterTemplateChange,
   LetterTemplatesSummary,
   LetterPreview,
   ConsequenceLetterVars,

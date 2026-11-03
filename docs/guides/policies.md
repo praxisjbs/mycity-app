@@ -313,9 +313,19 @@ nobody else sees who has or has not acknowledged.
   state and due date, own), `policies.read` (one policy's version in force as text or sentences, for
   anyone it applies to; cites the version), `policies.list` (`policies.manage`: every policy with
   its acknowledgement counts). Paged at 25.
+- **AI actions** (`policies.ai.js`, `docs/guides/praxis-ai.md` §6.11, decision 33): for holders of
+  `policies.manage`, as the routes hold it, two cards the person confirms, one press each. **Start
+  Policy** (`policies.start`): the title, as New Policy's sheet asks it (the sheet and the card share
+  `PolicyStart` and the start settings `POLICY_START`: everyone, acknowledged within 7 days, no
+  approval), through `create`. **Save Draft** (`policies.draft`): the policy by its number or
+  title, and only what changes of its draft (the title, who it applies to, acknowledgement and its
+  days, approval, a written policy's text as Markdown), the rest kept from the draft, else from the
+  newest version, through `saveDraft` (`policies.service.changeDraft`); a rules policy's rules stay
+  on its page. Publishing, submitting and approving are signed on the screen, and acknowledging is
+  the person's own: the AI never does them (A23).
 - **AI routes**: read or acknowledge a policy → ESS · Policy Updates; write, publish or change a
   policy → Knowledge Hub · Policies; change the attendance rules → Knowledge Hub · Policies
-  (`?policy=attendance`). The AI never writes, publishes or acknowledges (A23).
+  (`?policy=attendance`).
 - **Tidy With AI** is the AI action `policy-tidy` (prompt `services/ai/prompts/policy-tidy.md`) on the
   **Default** job (`ai-control.md` §6.2), and it carries personal data, so DeepSeek is never in its
   chain: chosen by TB, 20/10/2026. It joins AI Control's action registry when that is built
@@ -389,6 +399,9 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Start Policy and Save Draft are Praxis AI cards for holders of `policies.manage`
+  (§9; `praxis-ai.md` decision 33). New Policy's sheet validates with the contract's `PolicyStart` and
+  sends `POLICY_START`, the same as the card; nothing a person sees changed.
 - 01/11/2026 · JP · `policies.read` returned its one version inside a list envelope, which the assistant's read guard refuses for a read with an id and no page, so every "read this policy" question had failed since the read shipped; it now returns the version itself (§9). Found by the Praxis AI Engine's attack suite (`praxis-ai.md` §6.17).
 - 29/10/2026 · GE · Staging's demonstration data gains two written policies, Code of Conduct and Use of Company Devices (`seeds/staging/48_policies.js`), created, written and published through this service by Operations & People, in force from the day the seed runs, for the Implementation department only and to be acknowledged in 7 days, so only the JBS Praxis team is told. Queries & Sanctions' staging queries cite them (queries.md §13). Nothing on these screens changes.
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): ESS · Policy Updates' To Acknowledge, All Policies and Waiting On You, and Knowledge Hub · Policies' State chips, carry the unread notices about the versions and policies they hold for the reader, and Policy Updates opens where they wait (`policies.views.js`; the list's `MINE` and `POLICY_STATE` are shared by each list and its placing, so they never disagree).

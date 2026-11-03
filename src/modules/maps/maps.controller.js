@@ -9,35 +9,10 @@
  */
 const { ok } = require("../../shared/http/respond");
 const geoapify = require("../../services/maps/geoapify.service");
-const token = require("../../shared/places/token");
+const { signed } = require("./maps.service");
 
 /** A tile is the same for everyone and for a long time; only this person's browser keeps it. */
 const TILE_CACHE = "private, max-age=604800";
-
-/** A place as the contract's Place: its line, point and kind, and our signature over all of it. */
-function signed(found, source) {
-  return {
-    place_id: found.place_id,
-    formatted: found.formatted,
-    lat: found.lat,
-    lon: found.lon,
-    kind: found.kind,
-    token: token.sign({
-      source,
-      formatted: found.formatted,
-      lat: found.lat,
-      lon: found.lon,
-      provider_id: found.provider_id === undefined ? found.place_id : found.provider_id,
-      kind: found.kind,
-      city: found.city,
-      state: found.state,
-      country_code: found.country_code,
-      timezone: found.timezone || null,
-      verified: true,
-      pending: false,
-    }),
-  };
-}
 
 module.exports = {
   search: async (req, res) => {

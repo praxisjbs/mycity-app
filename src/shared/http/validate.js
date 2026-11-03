@@ -108,4 +108,18 @@ function idParamNames(path) {
     .filter((n) => n === "id" || n.endsWith("_id"));
 }
 
-module.exports = { validator, uuidParams, idParamNames, fieldsOf, UUID_RE };
+/**
+ * A body parsed as a route's edge parses it, for code that is not a route: a Praxis AI card's run
+ * sending the form's own request (docs/guides/praxis-ai.md §6.11), so a place's token becomes the
+ * place and every default and rule applies as on the screen. The parsed body, or the same 422
+ * VALIDATION_FAILED with the same per-field messages.
+ * @param {import("zod").ZodTypeAny} schema
+ * @param {unknown} value
+ */
+function parseBody(schema, value) {
+  const parsed = schema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  throw new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, fieldsOf(parsed.error));
+}
+
+module.exports = { validator, uuidParams, idParamNames, fieldsOf, parseBody, UUID_RE };

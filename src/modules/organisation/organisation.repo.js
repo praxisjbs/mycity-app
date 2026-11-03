@@ -1293,8 +1293,23 @@ async function highestStaffNumberSeq(db, pattern) {
   return row ? Number(row.seq) : 0;
 }
 
+/**
+ * The names of the people a Praxis AI card holds (docs/guides/praxis-ai.md §6.11), whatever their
+ * status: id to the name a list shows, with whether they work here now.
+ * @returns {Promise<Map<string, {display_name: string, status: string}>>}
+ */
+async function namesOf(db, ids) {
+  if (!ids.length) return new Map();
+  const { rows } = await db.query(
+    "SELECT employee_id, btrim(first_name || ' ' || last_name) AS display_name, status FROM employee WHERE employee_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return new Map(rows.map((r) => [r.employee_id, { display_name: r.display_name, status: r.status }]));
+}
+
 module.exports = {
   EMPLOYEE_COLUMNS,
+  namesOf,
   setBirthday,
   photoDocumentOf,
   setPhotoDocument,

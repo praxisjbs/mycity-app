@@ -7,8 +7,8 @@
  * coordinates from the address search (`maps.js`, F21); they arrive here as numbers.
  */
 const { z } = require("zod");
-const { uuid, text, isoDateTime, listQuery, Paged } = require("./common");
-const { PlaceInput, PlaceView } = require("./maps");
+const { uuid, text, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
+const { PlaceInput, PlaceToken, PlaceView } = require("./maps");
 const { WorkPattern } = require("./organisation");
 
 /** An IANA timezone name; the service checks the zone is one the server knows. */
@@ -77,6 +77,37 @@ const WorksiteUpdate = z
   .strict()
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "Change something" });
 
+/**
+ * Add Worksite as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the name, the
+ * address picked as every address is (its token, PlaceToken: the card reads it by its line, and
+ * Edit picks it with AddressField), the radius and the time zone. The centre is the place's point,
+ * as the form fills it from the pick; the run sends WorksiteCreate.
+ */
+const WorksiteAdd = z
+  .object({
+    name: text(120),
+    address: PlaceToken,
+    radius_m: radius,
+    timezone: timezone.default("Africa/Lagos"),
+  })
+  .strict();
+
+/**
+ * Save Worksite as a card: the worksite (its id, or its name) beside Edit Worksite's fields, a new
+ * place moving its centre to the place's point; retired with `active` false and restored with true.
+ */
+const WorksiteChange = z
+  .object({
+    worksite_id: recordId("worksite"),
+    name: text(120).optional(),
+    address: PlaceToken.optional(),
+    radius_m: radius.optional(),
+    timezone: timezone.optional(),
+    active: z.boolean().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["worksite_id"]), nothingOn("worksite_id"));
+
 /** Someone assigned to a worksite. */
 const WorksiteEmployee = z
   .object({
@@ -108,6 +139,8 @@ const TABLES = {
   WorksiteListQuery: { table: null, reason: "list controls for the worksites" },
   WorksiteCreate: { table: "worksite" },
   WorksiteUpdate: { table: "worksite" },
+  WorksiteAdd: { table: "worksite" },
+  WorksiteChange: { table: "worksite" },
   WorksiteEmployee: {
     table: "employee",
     virtual: {
@@ -127,6 +160,8 @@ module.exports = {
   WorksiteListQuery,
   WorksiteCreate,
   WorksiteUpdate,
+  WorksiteAdd,
+  WorksiteChange,
   WorksiteEmployee,
   WorksiteEmployeePage,
   WorksiteAssign,

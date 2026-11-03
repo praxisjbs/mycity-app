@@ -421,15 +421,20 @@ const FILL_THE_GAP = "Fill the gap";
  * The words a card carries, held to "ready to send" as the mailbox's Write With AI holds a draft
  * (services/ai/drafts.js; decision 19): a gap left to fill (a bracket, "insert here", XXX, a
  * blank line) or a redaction token that stands for nothing is a problem on its field, so a mail
- * or a message with a placeholder never leaves on one press.
+ * or a message with a placeholder never leaves on one press. Given the action, a picked field is
+ * not words (an id, a place's token) and is passed, and a field's `allows` passes the gaps its
+ * words may hold (a letter's own {{ names }}).
  * @param {object} values
+ * @param {{picks?: object, allows?: object}|null} [action]
  * @returns {Record<string, string[]>}
  */
-function gapsIn(values) {
+function gapsIn(values, action = null) {
   const out = {};
+  const picks = (action && action.picks) || {};
+  const allows = (action && action.allows) || {};
   for (const [k, v] of Object.entries(values || {})) {
-    if (typeof v !== "string") continue;
-    if (placeholdersIn(v).length) out[k] = [FILL_THE_GAP];
+    if (typeof v !== "string" || picks[k]) continue;
+    if (placeholdersIn(v, undefined, allows[k] ? { allowed: allows[k] } : undefined).length) out[k] = [FILL_THE_GAP];
   }
   return out;
 }
@@ -462,7 +467,7 @@ async function draftCard({ draft, actions, actor, context = null, db = null, now
     }
     throw err;
   }
-  const gaps = gapsIn(checked.values);
+  const gaps = gapsIn(checked.values, action);
   if (Object.keys(gaps).length) checked = { ...checked, ok: false, problems: { ...checked.problems, ...gaps } };
   const card = engine.cards.draft({ action, fieldNames, values, suggested: want.suggested === true, checked, now });
   return {

@@ -12,6 +12,7 @@
  * A worksite's code is made from its name ("Lagos Office" is LAGOS-OFFICE), with a
  * number after it when another worksite has that code.
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
@@ -21,6 +22,7 @@ const { isTimeZone } = require("../attendance/attendance.rules");
 const organisation = require("../organisation/organisation.service");
 const repo = require("./worksites.repo");
 const places = require("../../shared/places/places");
+const { oneNamed } = require("../../shared/ai/named");
 
 /** The worksite's address field (shared/places/owners.js). */
 const ADDRESS = "worksite.address";
@@ -152,4 +154,29 @@ async function assign(actor, scope, id, body) {
   return out;
 }
 
-module.exports = { list, get, fenceFor, create, update, employees, assign, codeOf };
+/*
+ * Praxis AI's worksite cards (docs/guides/praxis-ai.md §6.11, decision 33): the worksite a card
+ * names, by its name, and a name matched to one. Nothing here writes.
+ */
+
+/** A worksite a card names (Save Worksite's record, an employee's worksite), by its name. */
+async function cardWorksite(db, id) {
+  if (!db || !c.common.uuid.safeParse(id).success) return [];
+  const row = await repo.get(db, id);
+  return row ? [{ type: "worksite", id, label: row.name }] : [];
+}
+
+/** A worksite by its name or code, in use or retired (those the words find, then the first page); null when none or several. */
+async function idOf(db, words) {
+  const pages = await Promise.all([repo.list(db, { page: 1, q: String(words).slice(0, 120) }), repo.list(db, { page: 1 })]);
+  const byId = new Map(pages.flatMap((p) => p.data || []).map((w) => [w.worksite_id, w]));
+  const found = oneNamed([...byId.values()], words, (w) => [w.name, w.code]);
+  return found ? found.worksite_id : null;
+}
+
+/** The card's re-check: the worksite is there. */
+async function assertCardWorksite(db, id) {
+  if (!(await cardWorksite(db, id)).length) throw new AppError("NOT_FOUND", "That worksite does not exist", 404, { worksite_id: ["No such worksite"] });
+}
+
+module.exports = { list, get, fenceFor, create, update, employees, assign, codeOf, cardWorksite, idOf, assertCardWorksite };

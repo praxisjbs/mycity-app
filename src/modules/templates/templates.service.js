@@ -24,6 +24,7 @@ const lagos = require("../../shared/time/lagos");
 const { formatLongDate } = require("../../shared/time/day-first");
 const { render } = require("../../shared/documents/render");
 const md = require("../../shared/documents/markdown");
+const { oneNamed } = require("../../shared/ai/named");
 const { markdownToHtml } = md;
 const repo = require("./templates.repo");
 const { EVENTS, SHIPPED, FINE_LETTER_KEY, declare, QUERY_LETTER, SANCTION_LETTER } = require("./templates.events");
@@ -402,6 +403,58 @@ async function usable(db, key, purpose, { field = "letter_template", fallback = 
   return chosen;
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's letter cards (docs/guides/praxis-ai.md §6.11, decision 33)
+ * ------------------------------------------------------------------ */
+
+/** Every letter, a handful listed whole as Letter Templates lists them (two pages of 25 at most). */
+async function letters(db) {
+  const first = await repo.list(db, { page: 1 }, shippedWithWording());
+  if (!first.page.has_next) return first.data;
+  return [...first.data, ...(await repo.list(db, { page: 2 }, shippedWithWording())).data];
+}
+
+/** A letter a card names by its name or key (shared/ai/named.js); null when none or several. */
+async function idOf(db, words) {
+  const found = oneNamed(await letters(db), words, (t) => [t.name, t.key]);
+  return found ? found.letter_template_id : null;
+}
+
+/** The key of the active letter of `purpose` a rule or a step names by its name or key; null when none or several. */
+async function keyOf(db, words, purpose) {
+  const found = oneNamed((await letters(db)).filter((t) => t.purpose === purpose && t.status === "active"), words, (t) => [t.name, t.key]);
+  return found ? found.key : null;
+}
+
+/** The letters' names, as answers to tap when a card asks which letter (praxis-ai.md decision 34). */
+const letterNames = async (db) => (await letters(db)).filter((t) => t.status !== "retired").map((t) => t.name);
+
+/** The letter a card changes, by its name. */
+async function cardLetter(db, id) {
+  if (!db || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ""))) return [];
+  const row = await repo.get(db, id, shippedWithWording());
+  return row ? [{ type: "letter_template", id, label: row.name }] : [];
+}
+
+/** Save Letter's re-check: the letter is there and not retired. */
+async function assertCardLetter(db, id) {
+  const row = (await cardLetter(db, id)).length ? await repo.get(db, id, shippedWithWording()) : null;
+  if (!row) throw new AppError("NOT_FOUND", "That letter does not exist", 404, { letter_template_id: ["No such letter"] });
+  if (row.status === "retired") throw new AppError("TEMPLATE_RETIRED", "A retired letter is not edited", 409, { letter_template_id: ["Retired"] });
+}
+
+/**
+ * Save Letter as Edit Template's own button saves it: the name and what it is used for (update),
+ * then new wording as the next version (saveBody), the title kept when only the text changes.
+ */
+async function saveLetter(actor, id, { name, purpose, title, body }) {
+  if (name !== undefined || purpose !== undefined) await update(actor, id, { ...(name !== undefined && { name }), ...(purpose !== undefined && { purpose }) });
+  if (title === undefined && body === undefined) return get(id);
+  const now = await get(id);
+  const kept = title !== undefined ? title : now.title || undefined;
+  return saveBody(actor, id, { ...(kept ? { title: kept } : {}), body: body !== undefined ? body : now.body });
+}
+
 module.exports = {
   keyFrom,
   paragraphsOf,
@@ -417,5 +470,11 @@ module.exports = {
   update,
   isReady,
   usable,
+  idOf,
+  keyOf,
+  letterNames,
+  cardLetter,
+  assertCardLetter,
+  saveLetter,
   VARIABLE_NAMES,
 };

@@ -13,6 +13,7 @@ const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
+const { oneNamed } = require("../../shared/ai/named");
 const templates = require("../templates/templates.service");
 const repo = require("./sanctions.repo");
 const { EVENTS } = require("./sanctions.events");
@@ -125,4 +126,30 @@ async function update(actor, id, body) {
   return withLetter(pool, await repo.getStep(pool, id));
 }
 
-module.exports = { codeFrom, list, create, update, withLetter };
+/*
+ * Praxis AI's chain cards (docs/guides/praxis-ai.md §6.11, decision 33): the step a card names, by
+ * its name, and a name matched to one. Nothing here writes.
+ */
+
+/** A step a card names by its name or code (shared/ai/named.js), retired ones included; null when none or several. */
+async function idOf(db, words) {
+  const found = oneNamed(await repo.allSteps(db), words, (s) => [s.name, s.code]);
+  return found ? found.consequence_step_id : null;
+}
+
+/** The chain's steps, in ladder order, as answers to tap when a card asks which step (praxis-ai.md decision 34). */
+const stepNames = async (db) => (await repo.allSteps(db)).map((s) => s.name);
+
+/** The step a card changes, by its name. */
+async function cardStep(db, id) {
+  if (!db || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ""))) return [];
+  const step = await repo.getStep(db, id);
+  return step ? [{ type: "consequence_step", id, label: step.name }] : [];
+}
+
+/** Chain Settings' re-check: the step is there. */
+async function assertCardStep(db, id) {
+  if (!(await cardStep(db, id)).length) throw new AppError("NOT_FOUND", "That step does not exist", 404, { consequence_step_id: ["No such step"] });
+}
+
+module.exports = { codeFrom, list, create, update, withLetter, idOf, stepNames, cardStep, assertCardStep };

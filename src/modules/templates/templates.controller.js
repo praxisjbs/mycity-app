@@ -1,6 +1,5 @@
 "use strict";
 // search:none a handful of letters, listed whole on Letter Templates, which ⌘K finds by name
-// ai:none letter wording is configuration; questions about a query or sanction are answered by queries.ai.js and sanctions.ai.js
 /**
  * Letter Templates: the HTTP edge (docs/guides/queries.md §5). Every route needs the
  * `queries` grant; writes also need `queries.configure` (templates.routes.js).
