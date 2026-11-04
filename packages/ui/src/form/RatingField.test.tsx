@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { Field } from "./Field";
@@ -51,7 +51,7 @@ describe("RatingField", () => {
     expect(onChange).toHaveBeenCalledWith(10);
   });
 
-  it("moves and rates with the arrow keys, and stops at either end", async () => {
+  it("moves and rates with the arrow keys, and stops at the top", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Held initial={9} onChange={onChange} />);
@@ -68,15 +68,96 @@ describe("RatingField", () => {
     await user.keyboard("{/ArrowLeft}");
   });
 
-  it("previews a rating under the mouse without choosing it", async () => {
+  it("stops at the bottom too", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Held initial={1} onChange={onChange} />);
+    await user.tab();
+    await user.keyboard("{ArrowLeft>}");
+    expect(screen.getByRole("radio", { name: "1 of 10" })).toHaveFocus();
+    await user.keyboard("{/ArrowLeft}");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("previews a rating under the mouse without choosing it, the readout still the chosen one", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const { container } = render(<RatingField label="Future Growth Potential" value={2} onChange={onChange} />);
     await user.hover(screen.getByRole("radio", { name: "6 of 10" }));
-    expect(container.querySelectorAll("svg.fill-primary-tint")).toHaveLength(6);
+    expect(lit(container)).toBe(6);
+    expect(screen.getByText("2/10")).toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
     await user.unhover(screen.getByRole("radiogroup"));
     expect(lit(container)).toBe(2);
+  });
+
+  it("shows the chosen rating at once after a click, with the mouse still resting on it", async () => {
+    const user = userEvent.setup();
+    render(<Held initial={2} onChange={() => undefined} />);
+    await user.click(screen.getByRole("radio", { name: "7 of 10" }));
+    expect(screen.getByText("7/10")).toBeInTheDocument();
+    expect(document.querySelectorAll("svg.fill-primary")).toHaveLength(7);
+    await user.keyboard("{ArrowLeft>}");
+    await user.keyboard("{/ArrowLeft}");
+    expect(document.querySelectorAll("svg.fill-primary")).toHaveLength(6);
+  });
+
+  it("gives no preview to a touch or a pen, only the tap", () => {
+    const { container } = render(<RatingField label="Level of Confidence" value={3} onChange={() => undefined} />);
+    fireEvent.pointerEnter(screen.getByRole("radio", { name: "9 of 10" }), { pointerType: "touch" });
+    expect(lit(container)).toBe(3);
+    fireEvent.pointerEnter(screen.getByRole("radio", { name: "9 of 10" }), { pointerType: "pen" });
+    expect(lit(container)).toBe(3);
+  });
+
+  it("chooses with Home, End, Up and Down as well as Left and Right", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Held initial={3} onChange={onChange} />);
+    await user.tab();
+    await user.keyboard("{End}");
+    expect(onChange).toHaveBeenLastCalledWith(10);
+    expect(screen.getByRole("radio", { name: "10 of 10" })).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(onChange).toHaveBeenLastCalledWith(9);
+    expect(screen.getByRole("radio", { name: "9 of 10" })).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(onChange).toHaveBeenLastCalledWith(1);
+    await user.keyboard("{ArrowDown}");
+    expect(onChange).toHaveBeenLastCalledWith(1);
+    await user.keyboard("{ArrowUp}");
+    expect(onChange).toHaveBeenLastCalledWith(2);
+    expect(screen.getByRole("radio", { name: "2 of 10" })).toHaveFocus();
+  });
+
+  it("disabled, it shows the rating in place and takes no change from a tap or a key", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { container } = render(<RatingField label="Level of Confidence" value={8} onChange={onChange} disabled />);
+    expect(screen.getByRole("radio", { name: "8 of 10" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "3 of 10" })).toBeDisabled();
+    await user.click(screen.getByRole("radio", { name: "3 of 10" }));
+    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "Home" });
+    fireEvent.pointerEnter(screen.getByRole("radio", { name: "10 of 10" }), { pointerType: "mouse" });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(lit(container)).toBe(8);
+  });
+
+  it("shows a value off the scale as not rated, never a star count that contradicts the readout", () => {
+    const { container, rerender } = render(<RatingField label="Level of Confidence" value={12} onChange={() => undefined} />);
+    expect(lit(container)).toBe(0);
+    expect(checked()).toHaveLength(0);
+    expect(screen.queryByText(/\/10/)).toBeNull();
+    rerender(<RatingField label="Level of Confidence" value={0} onChange={() => undefined} />);
+    expect(screen.queryByText(/\/10/)).toBeNull();
+    rerender(<RatingField label="Level of Confidence" value={7.5} onChange={() => undefined} />);
+    expect(checked()).toHaveLength(0);
+    expect(lit(container)).toBe(0);
+  });
+
+  it("keeps a top of 10 when the scale it is given is not a number", () => {
+    render(<RatingField label="Overall Rating" max={Number.NaN} value={null} onChange={() => undefined} />);
+    expect(screen.getAllByRole("radio")).toHaveLength(10);
   });
 
   it("has nothing checked and no readout while no rating is given", () => {
@@ -129,6 +210,25 @@ describe("RatingField", () => {
     expect(screen.getByRole("img", { name: "Appearance and Grooming: 7.4 of 10" })).toBeInTheDocument();
     expect(lit(container)).toBe(7);
     expect(screen.getByText("7.4")).toBeInTheDocument();
+  });
+
+  it("read only inside a Field, it is named by the Field's label and its rating", () => {
+    render(
+      <Field label="Level of Confidence">
+        <RatingField value={7} readOnly />
+      </Field>,
+    );
+    expect(screen.getByRole("img", { name: "Level of Confidence 7 of 10" })).toBeInTheDocument();
+  });
+
+  it("read only, decimals make a column of means read alike, and a value off the scale is held to it", () => {
+    const { rerender } = render(<RatingField label="Accuracy in Language" value={7} readOnly decimals={1} />);
+    expect(screen.getByText("7.0")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Accuracy in Language: 7.0 of 10" })).toBeInTheDocument();
+    rerender(<RatingField label="Accuracy in Language" value={12} readOnly />);
+    expect(screen.getByRole("img", { name: "Accuracy in Language: 10 of 10" })).toBeInTheDocument();
+    rerender(<RatingField label="Accuracy in Language" value={Number.NaN} readOnly />);
+    expect(screen.getByRole("img", { name: "Accuracy in Language: Not rated, out of 10" })).toBeInTheDocument();
   });
 
   it("read only and not rated, it says so", () => {

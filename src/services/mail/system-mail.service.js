@@ -61,8 +61,7 @@ const nodemailer = require("nodemailer");
 const { config } = require("../../config/env");
 const { logger } = require("../../config/logger");
 const { pool: defaultPool } = require("../../config/db");
-const { render } = require("../../shared/documents/render");
-const { markdownToHtml } = require("../../shared/documents/markdown");
+const { render, renderMarkdown } = require("../../shared/documents/render");
 const templates = require("../../shared/templates/template-store");
 const variables = require("../../shared/templates/variables");
 const storage = require("../storage/storage.service");
@@ -252,6 +251,16 @@ function addressList(value) {
 }
 
 /** Plain text from the rendered HTML: links kept as "text (url)", tags dropped. */
+/** HTML entities back to the characters they stand for (&amp; last, so "&amp;lt;" stays "&lt;"). */
+function plainText(s) {
+  return String(s)
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 function textOf(html) {
   return String(html)
     .replace(/<(style|head)[\s\S]*?<\/\1>/gi, "")
@@ -260,11 +269,12 @@ function textOf(html) {
     .replace(/<\/(p|div|tr|h[1-6]|li)>/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/^[ \t]+/gm, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -308,11 +318,12 @@ async function renderEmail(
     staging,
     today: require("../../shared/time/lagos").today(),
   };
-  const subject = render(t.subject || t.title || "MyCity App", values)
+  // A subject is a header, not HTML: rendered (which escapes), then read back to its plain text,
+  // so "Sales & Revenue" arrives as typed. The layout's <title> escapes it once again for the page.
+  const subject = plainText(render(t.subject || t.title || "MyCity App", values))
     .replace(/\s+/g, " ")
     .trim();
-  const inner = render(t.body, values);
-  const body = t.format === "markdown" ? markdownToHtml(inner) : inner;
+  const body = t.format === "markdown" ? renderMarkdown(t.body, values) : render(t.body, values);
   const html = render(
     templates.layout("email").body,
     { ...values, subject },

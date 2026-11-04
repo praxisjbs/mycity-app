@@ -52,10 +52,18 @@ function Overall() {
 function Closed() {
   return (
     <div className="flex flex-col gap-3">
-      <RatingField label="Appearance and Grooming" value={8} readOnly />
-      <RatingField label="Level of Confidence" value={7.3} readOnly />
-      <RatingField label="Accuracy in Language" value={null} readOnly />
+      <RatingField label="Appearance and Grooming" value={8} readOnly decimals={1} />
+      <RatingField label="Level of Confidence" value={7.3} readOnly decimals={1} />
+      <RatingField label="Accuracy in Language" value={null} readOnly decimals={1} />
     </div>
+  );
+}
+
+function Submitted() {
+  return (
+    <Field label="Oral Communication Skills">
+      <RatingField value={7} disabled />
+    </Field>
   );
 }
 
@@ -66,6 +74,7 @@ export default {
     "Not Rated": () => <Trait trait="Future Growth Potential in Career" initial={null} />,
     "Field Error": () => <Missing />,
     "Five Stars": () => <Overall />,
-    "Round Closed": () => <Closed />,
+    "Card Submitted": () => <Submitted />,
+    "Panel Means": () => <Closed />,
   },
 } satisfies GalleryEntry;

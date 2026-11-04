@@ -410,7 +410,7 @@ const AssessmentInviteEmailVars = z
     vacancy_title: z.string(),
     assessment_name: z.string(),
     /** Minutes for a timed test; null for an untimed brief, which has due_days instead. */
-    duration_minutes: z.number().int().min(1).nullable(),
+    duration_minutes: z.number().int().min(5).max(240).nullable(),
     due_days: z.number().int().min(1).max(14).nullable(),
     start_by: isoDate,
     assess_url: z.string(),

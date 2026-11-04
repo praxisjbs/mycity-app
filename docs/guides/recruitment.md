@@ -400,8 +400,10 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   get; for a choice, its highest option. (GE, 04/11/2026.)
 - An assessment needs at least one question to be activated and to be sent. Its questions cannot be
   changed once it has been sent to anyone; deactivate it and make another.
-- Send: the candidate gets one sitting of an assessment per application. The link lives until the
-  start-by day (1 to 14 days, default 3) at 23:59 Lagos. Marks and option points are numbers; an empty
+- Send: the candidate gets one sitting of an assessment per application. Before Start the link
+  lives until the start-by day (1 to 14 days, default 3) at 23:59 Lagos; once started it lives until the
+  sitting ends at `due_at`, so a test started at 23:30 on its start-by day, or a brief due days later,
+  keeps its link (GE · (Ose), 04/11/2026). Ending the sitting spends it. Marks and option points are numbers; an empty
   one is refused, never read as 0. Send to Candidates sends one assessment to
   every active candidate of a vacancy at a stage (default Assessment) without a live sitting of it, and
   says how many were sent and how many already had one.
@@ -426,7 +428,10 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 ### 6.8 Mail to candidates
 
 Five candidate emails, each a shipped default in `templates/email/` that Operations & People can edit
-on Vacancies · Candidate Emails (saved as versions in `template_version`, Markdown only):
+on Vacancies · Candidate Emails (saved as versions in `template_version`, Markdown only). The shipped
+defaults are themselves Markdown (front matter `format: markdown`), so an edit starts from the exact
+shipped words and Restore Default saves them back unchanged; a link is a Markdown link, never a styled
+button (GE · (Ose), 04/11/2026). The emails:
 `application-received`, `apply-invite`, `assessment-invite`, `interview-invite` (with the `.ics`), and
 `candidate-not-progressed`. They go through system mail from the outbox, paced like all system mail;
 while mail is paused they wait. Staging sends real mail marked `[STAGING]` (A4); its seed applies only
@@ -461,7 +466,7 @@ with test addresses.
 | `assessment.sent` | after Send | outbox: `assessment-invite` |
 | `assessment.submitted`, `assessment.timed_out` | at the end of a sitting | auto-scoring; notice to the hiring manager when it waits for marking (`recruitment.assessment_to_mark`) |
 | `assessment.scored` | when the last mark is given | audit; scorecard refreshes |
-| `interview.scheduled`, `interview.rescheduled`, `interview.cancelled` | after save | outbox: the calendar entry and its invites to panelists; `interview-invite` with `.ics` to the candidate (a cancel sends the `.ics` cancel); reminders scheduled or cancelled |
+| `interview.scheduled`, `interview.rescheduled`, `interview.cancelled` | after save | outbox: the calendar entry and its invites to panelists; `interview-invite` with `.ics` to the candidate (a cancel sends the `.ics` cancel; a change of panel alone sends the candidate nothing); reminders scheduled or cancelled |
 | `interview.feedback_submitted` | after Submit Card | audit |
 | `interview.round_closed` | the last submit, or Close Round | notice to the hiring manager (`recruitment.round_closed`) |
 | `interview.reported` | after the report is saved | outbox: the Interview Assessment Form PDF (`documents.generate`) |
@@ -541,7 +546,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 | Recruitment · Vacancies (`vacancies`) | Two KPI cards a row, then vacancy cards (role, status pill, applicants, closes) | The funnel chart; Department and Published columns | New Vacancy in the floating button; a vacancy opens in a sheet with its actions full width at the foot | Bottom bar; the Recruitment tabs along the top |
 | Recruitment · Candidates (`candidates`) | Vacancy filter, then one stage at a time as a segmented control with the stage's cards | Drag between columns (Move To in the sheet instead); the score distribution | A tapped card opens its sheet; Move to <Stage> full width at its foot | Bottom bar; the Recruitment tabs |
 | Recruitment · Assessments (`assessments`) | Assessments and Sittings as a segmented control; cards | The average-by-assessment chart | New Assessment in the floating button; Mark Answers in a sitting's sheet | Bottom bar; the Recruitment tabs |
-| Recruitment · Interviews (`interviews`) | Upcoming first as cards (candidate, when, panel n of m) | Past behind the segmented control; the activity trail | A tapped interview opens its sheet; My Card full width, opening as its own full sheet, one trait a row with ten 44 px stars | Bottom bar; the Recruitment tabs |
+| Recruitment · Interviews (`interviews`) | Upcoming first as cards (candidate, when, panel n of m) | Past behind the segmented control; the activity trail | A tapped interview opens its sheet; My Card full width, opening as its own full sheet, one trait a row with ten 44 px stars, in two rows of five (ten do not fit 390 px) | Bottom bar; the Recruitment tabs |
 | Recruitment · Talent Pool (`talent-pool`) | Two KPI cards a row, then pool cards (name, applied for, score, kept until) | Added and Reason columns (in the sheet) | A tapped card opens its sheet with Invite to Apply full width | Bottom bar; the Recruitment tabs |
 | Careers, Vacancy, Apply, Assessment | One column, full width buttons, 44 px targets | Nothing | Apply, Submit, Next Question | The public site's own header |
 
@@ -597,6 +602,11 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 04/11/2026 · GE · (Ose) From the audit of P7 and P8: an assessment link lives until `due_at` once the
+  sitting has started (§6.7); the five candidate emails ship as Markdown so Restore Default and edits
+  keep their words and links (§6.8); a panelist's ten stars sit in two rows of five on a phone (§10.2).
+  The interview invite's variables carry the interview's type as three flags with the place's address, and
+  a change of panel alone is not sent to the candidate (§7); not-progressed links the careers page.
 - 04/11/2026 · GE · (Ose) P7 and P8. The `assessment-invite` email carries an untimed sitting: the contract's
   `AssessmentInviteEmailVars` takes `duration_minutes` for a timed test or `due_days` for a take-home
   brief, one of the two (§6.7). `interview-invite` takes `rescheduled`, so a moved interview says so in

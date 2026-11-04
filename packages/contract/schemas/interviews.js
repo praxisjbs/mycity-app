@@ -289,18 +289,28 @@ const NotesTidy = z
   .strict();
 
 /** The model's answer for `interview-notes-cleanup`. */
-const NotesTidyOutput = z.object({ text: z.string().trim().min(1).max(6000) }).strict();
+/** At most what FeedbackSave keeps as comments, so a tidied text can always be saved. */
+const NotesTidyOutput = z.object({ text: z.string().trim().min(1).max(5000) }).strict();
 
-/** interview-invite: the candidate's invitation; the `.ics` rides as an attachment. */
+/**
+ * interview-invite: the candidate's invitation; the `.ics` rides as an attachment. A template
+ * cannot compare values, so the interview's type arrives as three flags, exactly one true: the
+ * email says where from them and never guesses from which of `place` or `meeting_url` is set.
+ */
 const InterviewInviteEmailVars = z
   .object({
     vacancy_title: z.string(),
-    interview_type: InterviewType,
+    in_person: z.boolean(),
+    by_video: z.boolean(),
+    by_phone: z.boolean(),
     scheduled_start: isoDateTime,
     scheduled_end: isoDateTime,
+    /** In person: the worksite's name, and its address line for a stranger to find it. */
     place: z.string().nullable(),
+    place_address: z.string().nullable(),
+    /** By video: the link to join. */
     meeting_url: z.string().nullable(),
-    /** A new time, place or panel for an interview already sent (PATCH /recruitment/interviews/:id). */
+    /** A new time or place for an interview already sent. A change of panel alone is not sent to the candidate. */
     rescheduled: z.boolean(),
     cancelled: z.boolean(),
   })

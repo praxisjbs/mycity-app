@@ -347,8 +347,8 @@ const ApplyInviteEmailVars = z
   .object({ vacancy_title: z.string(), apply_url: z.string(), expires_at: isoDateTime })
   .strict();
 
-/** candidate-not-progressed: Not Progressing. The reason is kept on the record, not sent. */
-const CandidateNotProgressedEmailVars = z.object({ vacancy_title: z.string() }).strict();
+/** candidate-not-progressed: Not Progressing. The reason is kept on the record, not sent. `careers_url`: the public /jobs page. */
+const CandidateNotProgressedEmailVars = z.object({ vacancy_title: z.string(), careers_url: z.string() }).strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {

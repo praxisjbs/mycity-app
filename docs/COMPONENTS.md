@@ -107,7 +107,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
 | Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
 | Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
-| Forms | [RatingField](#ratingfield) | `RatingField` | A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; readOnly draws a rating already given. | beta |
+| Forms | [RatingField](#ratingfield) | `RatingField` | A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; disabled locks a given rating in place, readOnly draws one already given or a panel's mean. | beta |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
 | Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row. | stable |
@@ -849,10 +849,10 @@ The time left until an end the server set, counted on the server's clock: a time
 
 | | |
 |---|---|
-| Use | A deadline the server holds and enforces, given as its end and the server's own now: a timed assessment on the public site. |
-| Avoid | A date to show (use formatDate); a day something is due (say the day); progress through steps (use ProgressBar). |
+| Use | A deadline the server holds and enforces, given as its end and the server's own now from the same answer: a timed assessment on the public site. |
+| Avoid | A date to show (use formatDate); a day something is due, such as an untimed take-home brief (say the day; with endsAt null nothing is drawn); progress through steps (use ProgressBar). |
 | Phone | The same clock at the same size; it sits at the top of the page, right of the question count, and never wraps. |
-| Accessibility | A timer named by its label and the time left; it is silent each second and says once, politely, when the warning time, the last minute and the end arrive. |
+| Accessibility | A timer named by its label and the time left; silent each second, it says once, politely, the time really left when the warning time and the last minute arrive, and Time is up at the end. Nothing is said when it first shows. |
 | Status | beta |
 | Exports | `Countdown` |
 | Import | `import { Countdown } from "@mycity/ui";` |
@@ -864,10 +864,11 @@ The time left until an end the server set, counted on the server's clock: a time
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `endsAt` | `string` | yes | When the time runs out, ISO, as the server sent it. |
-| `serverNow` | `string` | yes | The server's time when it answered, ISO; the clock counts from it, so a wrong device clock changes nothing. |
-| `onEnd` | `() => void` |  | Called once when the time runs out. |
+| `endsAt` | `string \| null` | yes | When the time runs out, ISO, as the server sent it; null (an untimed sitting) draws nothing. |
+| `serverNow` | `string` | yes | The server's time in the same answer, ISO. The clock counts from when this answer first arrived, so a wrong device clock or a remount changes nothing. |
+| `onEnd` | `() => unknown` |  | Called when the time runs out, and again every `retryEvery` seconds while it stays run out (the server may take a moment to close it). |
 | `warnAt` | `number` |  | Seconds left at which the clock turns amber and says so; 300 unless set. The last minute is always red. |
+| `retryEvery` | `number` |  | Seconds between calls to onEnd once the time has run out; 10 unless set. |
 | `label` | `string` |  | What the clock counts, Title Case; "Time Left" unless set. |
 | `className` | `string` |  | Layout classes only. |
 
@@ -3319,14 +3320,14 @@ Pick one of two to five options shown as stacked rows, each with an optional gly
 
 ### RatingField
 
-A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; readOnly draws a rating already given.
+A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; disabled locks a given rating in place, readOnly draws one already given or a panel's mean.
 
 | | |
 |---|---|
-| Use | A score a person gives by eye against a scale: a trait on the interview card, an overall rating. readOnly for ratings shown back once a panel's round closes. |
+| Use | A score a person gives by eye against a scale: a trait on the interview card, an overall rating. disabled for a card already submitted; readOnly for ratings and averages shown back once a panel's round closes. |
 | Avoid | A number that is counted or typed (use NumberField); a choice between named options (use ChoiceField or RadioCards); a rating that saves the moment it is tapped outside a form (pair it with the form's own save). |
-| Phone | Every star is a 44 px target; ten stars sit in two rows of five so the row never runs off a 390 px screen. No hover preview: the tap is the choice. |
-| Accessibility | A radio group: each star is a radio named "7 of 10", the arrow keys move and choose, and the readout beside it is hidden so the value is never read twice. Inside a Field its label names the group and the error is linked; alone, pass label. readOnly is one image named "7 of 10". |
+| Phone | Every star is a 44 px target; ten stars sit in two rows of five so the row never runs off a 390 px screen. No hover preview: the tap is the choice. On desktop the stars follow the density (36 px Compact, 40 px Comfortable). |
+| Accessibility | A radio group: each star is a radio named "7 of 10"; Left and Right, Up and Down, Home and End move and choose, and the readout beside it is hidden so the value is never read twice. Inside a Field its label names the group (and the readOnly image) and the error is linked; alone, pass label. readOnly is one image named "Level of Confidence: 7 of 10". |
 | Status | beta |
 | Exports | `RatingField` |
 | Import | `import { RatingField } from "@mycity/ui";` |
@@ -3338,19 +3339,21 @@ A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on 
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `value` | `number \| null` | yes | The rating given, 1 to max; null while none is given. readOnly also takes a mean (7.4), shown to one decimal with the stars rounded. |
-| `onChange` | `(value: number) => void` |  | Called with the rating tapped or chosen with the keys. Not needed when readOnly. |
+| `value` | `number \| null` | yes | The rating given, 1 to max; null while none is given. A value off the scale shows as not rated. readOnly also takes a mean (7.4), its stars rounded. |
+| `onChange` | `(value: number) => void` |  | Called with the rating tapped or chosen with the keys. Not needed when readOnly or disabled. |
 | `onBlur` | `() => void` |  | Called when focus leaves the stars. |
 | `max` | `number` |  | The top of the scale, 3 to 10; 10 unless set. |
 | `label` | `string` |  | Names the stars when no Field label sits above them. |
-| `readOnly` | `boolean` |  | Draws the rating without letting it change: a panelist's rating once the round is closed. |
+| `disabled` | `boolean` |  | Shows the rating in place but takes no change: a card already submitted. |
+| `readOnly` | `boolean` |  | Draws the rating as a picture without letting it change: a panelist's rating, or a trait's mean, once the round is closed. |
+| `decimals` | `number` |  | readOnly only: decimal places in the readout, so a column of means reads alike (1 shows 7 as 7.0). A whole number and one decimal otherwise. |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it). |
 | `className` | `string` |  | Layout classes only. |
 
 ```tsx
 <Field label="Level of Confidence" {...form.status("confidence")}><RatingField {...form.field("confidence")} /></Field>
-<RatingField label="Oral Communication Skills" value={7} readOnly />
+<RatingField label="Oral Communication Skills" value={7.3} readOnly decimals={1} />
 ```
 
 ### RecordPicker

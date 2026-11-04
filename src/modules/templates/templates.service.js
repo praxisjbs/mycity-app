@@ -22,10 +22,9 @@ const variables = require("../../shared/templates/variables");
 const documents = require("../../shared/documents/generate");
 const lagos = require("../../shared/time/lagos");
 const { formatLongDate } = require("../../shared/time/day-first");
-const { render } = require("../../shared/documents/render");
+const { render, renderMarkdown } = require("../../shared/documents/render");
 const md = require("../../shared/documents/markdown");
 const { oneNamed } = require("../../shared/ai/named");
-const { markdownToHtml } = md;
 const repo = require("./templates.repo");
 const { EVENTS, SHIPPED, FINE_LETTER_KEY, declare, QUERY_LETTER, SANCTION_LETTER } = require("./templates.events");
 
@@ -186,8 +185,7 @@ async function preview(id) {
   const data = variables.parseData("document", row.key, sampleData(row.purpose));
   const today = lagos.today();
   const values = { ...marked(data), org: await documents.orgProfile(pool), number: "LTR-0000", today, doc: { title: row.name } };
-  const body = render(t.body, values);
-  const html = t.format === "markdown" ? markdownToHtml(body) : body;
+  const html = t.format === "markdown" ? renderMarkdown(t.body, values) : render(t.body, values);
   const title = (t.title ? render(t.title, data) : row.name).trim() || row.name;
   return {
     reference: "LTR-0000",

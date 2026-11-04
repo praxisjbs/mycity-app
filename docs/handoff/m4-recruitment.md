@@ -108,6 +108,16 @@ day in Lagos; the staging seed uses `@example.test` candidates only.
   imports `EmploymentType`, which `contract.gen.ts` no longer exports, and the INTERIM recruitment endpoints give
   `GET /api/v1/recruitment/vacancies` a page size of `number` where the contract says `25`. P9's files; P9 clears it
   when it moves the screens onto the contract.
+- GE (Ose), 04/11/2026, from the audit of P7 and P8, for GE: Not Progressing revokes Apply and assessment links
+  (guide §6.3) but leaves a scheduled interview standing, so the candidate keeps an invitation and a link.
+  The `candidate-not-progressed` email no longer claims otherwise. Proposed: Not Progressing also cancels the
+  application's scheduled interviews and sends the `.ics` cancel (P4 with P6).
+- GE (Ose), 04/11/2026, for P3: Suggest With AI makes every Apply question `text`, so a suggested yes or no
+  check never counts in the estimate (§6.4), and it does not tell the model how many of the 20 traits are left.
+- GE (Ose), 04/11/2026, for P3 and GE: three tests fail on the branch before P7's fixes too, so `npm run ci` is
+  red for everyone: `src/modules/maps/maps.test.js` expects the address registry without `vacancy.location`
+  (P3 added it), `src/modules/alerts/alerts.test.js` expects the Recruitment SLA metric by TB (the audit made it
+  GE), and `packages/ui/src/illustrations/CityShowcase.test.tsx` fails on its city clocks (not recruitment).
 
 ---
 
@@ -239,3 +249,31 @@ packages that need none can start. Tick a package only when its own checks pass 
   `interview-notes-cleanup` (P6): `text`, output `NotesTidyOutput`. All through `redact.shield`.
   Components: `RatingField` (Forms) and `Countdown` (Display) in `packages/ui`, with tests and gallery pages;
   `docs/COMPONENTS.md` regenerated. Their actions in `src/services/ai/actions.js` are still P4 to P6's to add.
+- 04/11/2026 · GE · (Ose) P7 and P8 audited by three independent reviewers and fixed. Design first, in the
+  guide: an assessment link lives until `due_at` once started (§6.7); the candidate emails ship as Markdown
+  (`format: markdown` in the front matter) so an edit and Restore Default keep their words and links (§6.8);
+  ten stars sit in two rows of five on a phone (§10.2). Shared code: a subject is plain text ("Sales & Revenue",
+  not `&amp;`); a Markdown template escapes each value once and holds its Markdown signs, so a name a stranger
+  typed never becomes a link (`renderMarkdown`, in mail, documents and the Settings preview); the plain-text
+  part has no layout indentation; the AI's no-gap check reads nested lists (`drafts.textsOf`); a `+` figure
+  is masked as a phone only with nine digits or more ("+1500%" now reaches the CV reader). Emails: the
+  interview invite says where from `in_person`, `by_video`, `by_phone` (replacing `interview_type`) with
+  `place_address`; `rescheduled` reads "changed"; `duration_minutes` 5 to 240; nothing prints when an
+  assessment has neither minutes nor days; not-progressed links the careers page (`careers_url`). Prompts:
+  `cv-screen` 2 (no cap for a CV without text, a condition about a protected trait is not applied, `company`),
+  `assessment-questions` 2 (psychometric 0 to 4, technical choice 2 points with hand-marked about a third, a
+  case study's questions each stand alone, `company` and `duration_minutes`), `interview-notes-cleanup` 2
+  (the writer's order kept, unclear marks kept), `jd-draft` and `screening-questions` 3; one list of
+  protected traits in all five; KEPT tokens are contact details and numbers, not names. `NotesTidyOutput`
+  at most 5000. Components: `Countdown` counts from when the answer arrived (a remount keeps the time), says
+  the time really left, calls `onEnd` again every `retryEvery` seconds while ended, draws nothing for
+  `endsAt` null, shows 00:00 on time; `RatingField` takes `disabled` and `decimals`, Home, End, Up and Down,
+  is named by its Field when read only, holds values to the scale, and follows the density on desktop.
+  What P4 to P6 now pass: P4, `cv-screen` gets `company` too, `cv_text` cut to a sensible length (the PDF
+  text reader is still to build), `careers_url` in the not-progressed vars, a must-meet condition may be
+  refused at the API when it names a protected trait; P5, `assessment-questions` gets `company` and
+  `duration_minutes`, a suggestion's `null` options and max score are omitted before `AssessmentQuestionsSave`,
+  `vacancy_id` is scope-checked before its role is read, Start extends the link to `due_at`; P6, the invite's
+  three flags and `place_address`, no candidate email for a change of panel alone, the tidy not held to the
+  no-gap check (a panelist's "[inaudible]" is theirs). The three actions still to register in `actions.js`:
+  `cv-screen` Deep Reasoning, `assessment-questions` and `interview-notes-cleanup` Default.
