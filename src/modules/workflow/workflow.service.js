@@ -32,6 +32,7 @@ const cond = require("../../shared/workflow/conditions");
 const definitions = require("../../shared/workflow/definitions");
 const approvers = require("../../shared/workflow/approvers");
 const c = require("@mycity/contract");
+const { oneNamed } = require("../../shared/ai/named");
 const repo = require("./workflow.repo");
 const { EVENTS } = require("./workflow.events");
 
@@ -324,6 +325,48 @@ async function mine(user, query, client = pool) {
   };
 }
 
+/** The age bands as the assistant's summary reads them. */
+const AGE_WORDS = Object.freeze({
+  "1_under_a_day": "Under a day",
+  "2_one_to_three_days": "1 to 3 days",
+  "3_four_to_seven_days": "4 to 7 days",
+  "4_over_a_week": "Over a week",
+});
+
+/**
+ * The assistant's approvals summary (docs/guides/praxis-ai.md §6.13; foundation.md §9): what waits on
+ * the asker, counted by flow, age and stage or module; figures, never a row. Runs on the client the
+ * assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   ApprovalSummaryQuery, parsed
+ * @param {object} user     the asker
+ */
+async function aiSummary(client, params, user) {
+  const { figure, group } = require("../../shared/ai/summary");
+  const roleCodes = await approvers.roleCodesOf(client, user.role_ids || []);
+  const modules = await approveModules(user);
+  const r = await repo.waitingSummary(client, user, roleCodes, modules, params, deliveryPlan.closedTypes());
+  const f = r.figures || {};
+  const moduleLabel = (key) => (catalog.MODULE_META[key] ? catalog.MODULE_META[key].label : key);
+  const third = params.by === "stage" ? group("stage", "Waiting by stage", r.by_third) : group("module", "Waiting by module", r.by_third.map((x) => ({ ...x, label: moduleLabel(x.label) })));
+  return {
+    figures: [
+      figure("waiting", "Waiting on me", f.waiting),
+      figure("overdue", "Past their time", f.overdue),
+      figure("due_within_a_day", "Due within a day", f.due_within_a_day),
+      figure("oldest_days", "Oldest, in days", f.oldest_days, "days"),
+      figure("flows", "Flows", f.flows),
+    ],
+    groups: [
+      group("flow", "Waiting by flow", r.by_flow),
+      group("age", "Waiting by age", r.by_age.map((x) => ({ ...x, label: AGE_WORDS[x.label] || x.label }))),
+      third,
+    ],
+    series: [],
+    total: f.waiting || 0,
+  };
+}
+
 async function mineCount(user) {
   const [roleCodes, modules] = await Promise.all([
     approvers.roleCodesOf(pool, user.role_ids || []),
@@ -519,6 +562,97 @@ async function decide(user, id, decision, reason = null) {
   });
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's card on My Approvals (docs/guides/praxis-ai.md §6.11): the requests waiting on
+ * the person decided together, each through decide(), the same call the screen's buttons make.
+ * ------------------------------------------------------------------ */
+
+const DECIDED_WORD = Object.freeze({ approve: "approved", reject: "rejected", request_changes: "returned for changes" });
+
+/** A request as a card names it: what it is, about whom. */
+const instanceLabel = (i) => `${i.definition_name || i.definition_key}${i.subject_name ? `, ${i.subject_name}` : ""}`;
+
+/** "Which requests?" answers on a card (praxis-ai.md decision 34): the first requests waiting on the person, as a card names them. */
+async function cardChoices(user) {
+  return (await mine(user, { page: 1 })).data.map(instanceLabel);
+}
+
+/**
+ * A request waiting on the person, named by its words (decision 34): its flow and who it is about,
+ * or either alone ("Ayo Bello"), searched by the words first; null when none or several match.
+ */
+async function instanceIdOf(user, words) {
+  for (const q of [words, null]) {
+    const page = await mine(user, { page: 1, ...(q ? { q } : {}) });
+    const found = oneNamed(page.data, words, (r) => [instanceLabel(r), r.subject_name, r.definition_name]);
+    if (found) return found.workflow_instance_id;
+  }
+  return null;
+}
+
+/**
+ * The requests a card names, as the person may read them: the flow and who it is about for each
+ * they may read; one they may not keeps its id alone, and the re-check refuses the card.
+ */
+async function cardRecords(db, ids, user) {
+  const out = [];
+  for (const id of [...new Set(ids || [])].slice(0, 25)) {
+    const found = await engine.getInstance(db, id);
+    const mayReadIt = found && (await mayRead(db, found, user));
+    let label = null;
+    if (mayReadIt) {
+      const def = await definitions.findById(db, found.workflow_definition_id);
+      const name = found.subject_employee_id ? (await repo.employeeNames(db, [found.subject_employee_id])).get(found.subject_employee_id) || null : null;
+      label = instanceLabel({ ...found, definition_name: def ? def.name : null, subject_name: name });
+    }
+    out.push({ type: "workflow_instance", id, label });
+  }
+  return out;
+}
+
+/** The card's re-check (§6.11 step 5): every request is one the person may read; the stage, the state and the chain are each request's own line at the press. */
+async function assertCardInstances(db, ids, user) {
+  for (const id of [...new Set(ids || [])]) {
+    const found = await engine.getInstance(db, id);
+    if (!found || !(await mayRead(db, found, user)))
+      throw new AppError("APPROVAL_NOT_YOURS", "One of these requests is not yours to read", 404, { workflow_instance_ids: ["Not yours to read"] });
+  }
+}
+
+/**
+ * Decide the requests a card names, one after another, each through decide(): one already
+ * decided, not waiting on this person, their own, or decided on its record is a line of its own
+ * (the last with the record's screen) and the rest still go. Nothing decided is a refusal, so
+ * the card stays open with the reason.
+ * @param {object} user
+ * @param {{workflow_instance_ids: string[], decision: "approve"|"reject"|"request_changes", reason?: string}} values
+ * @returns {Promise<{lines: Array<{type: string, id: string, label: string, ok: boolean, message: string|null, link: string|null}>}>}
+ */
+async function decideMany(user, { workflow_instance_ids: ids, decision, reason = null }) {
+  const lines = [];
+  let firstRefusal = null;
+  for (const id of [...new Set(ids || [])]) {
+    const found = await engine.getInstance(pool, id);
+    const record = found ? (await cardRecords(pool, [id], user))[0] : null;
+    const label = record && record.label ? record.label : id;
+    const link = found ? linkOf(found, user) : null;
+    try {
+      if (!found) throw notFound();
+      if (user.employee_id && found.subject_employee_id === user.employee_id && user.is_ceo !== true)
+        throw new AppError("SELF_APPROVAL", "Nobody decides their own request", 403);
+      if (found.state !== "pending") throw new AppError("WORKFLOW_CLOSED", "This request was already decided", 409);
+      await decide(user, id, decision, reason);
+      lines.push({ type: "workflow_instance", id, label, ok: true, message: DECIDED_WORD[decision] || decision, link });
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status >= 500) throw err;
+      firstRefusal = firstRefusal || err;
+      lines.push({ type: "workflow_instance", id, label, ok: false, message: err.message, link });
+    }
+  }
+  if (lines.length && !lines.some((l) => l.ok)) throw firstRefusal;
+  return { lines };
+}
+
 /** The requester takes a pending request back. */
 async function withdraw(user, id, reason = null) {
   return tx(async (client) => {
@@ -602,9 +736,15 @@ module.exports = {
   plainly,
   mine,
   mineCount,
+  aiSummary,
   getInstance,
   decide,
   decideIn,
+  decideMany,
+  cardRecords,
+  cardChoices,
+  instanceIdOf,
+  assertCardInstances,
   stageOf,
   mayAct,
   pendingStage,

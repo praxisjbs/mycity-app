@@ -16,7 +16,7 @@ import { EmployeePicker, PolicyPicker, type PolicyChoice } from "@/features/shar
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import { paging } from "@/features/shared/wire";
 import { hasCapability } from "@/shell/access";
-import { useScreenAction } from "@/shell/screen-action";
+import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
@@ -918,6 +918,9 @@ function Templates() {
   };
   // The letter's own actions sit on its preview, beside Download PDF.
   const edit = () => shown && modal.open({ title: shown.name, wide: true, body: (close) => <EditTemplate id={shown.letter_template_id} close={close} /> });
+  // Edit Signature, also opened from the address (?action=signature): Praxis AI sends a person here to draw one.
+  const sign = () => modal.open({ title: "My Signature", body: (close) => <EditSignature close={close} /> });
+  useUrlAction("signature", sign);
   const manage = configure && shown ? (
     <Menu
       label="Letter Actions"
@@ -941,7 +944,7 @@ function Templates() {
         sub="The system fills name, date and reason"
         actions={
           <>
-            <Button icon="signature" onClick={() => modal.open({ title: "My Signature", body: (close) => <EditSignature close={close} /> })}>Edit Signature</Button>
+            <Button icon="signature" onClick={sign}>Edit Signature</Button>
             {configure && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>}
           </>
         }

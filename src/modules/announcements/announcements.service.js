@@ -16,6 +16,12 @@
  * read only once each person presses Acknowledge, on its card or on the urgent bar; either
  * way the reads row and the person's notices close together. An important one reminds the
  * unread once, 4 hours after it went out.
+ *
+ * Praxis AI's Publish Announcement and Save Announcement (docs/guides/praxis-ai.md §6.11, decision 40)
+ * find a waiting announcement by its headline (idOf; scheduledChoices those to tap, decision 34),
+ * name it (cardRecords), re-check that it still
+ * waits (assertScheduled) and turn the card's audience into the form's (publishFromCard,
+ * changeFromCard), through create and update, the functions the screen's own buttons call.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -24,6 +30,8 @@ const { AppError } = require("../../shared/errors");
 const lagos = require("../../shared/time/lagos");
 const communityRepo = require("../community/community.repo");
 const notifications = require("../notifications/notifications.service");
+const { common, announcements: contract } = require("@mycity/contract");
+const { oneNamedIn, plainWords, choiceWords } = require("../../shared/ai/named");
 const repo = require("./announcements.repo");
 const { EVENTS } = require("./announcements.events");
 
@@ -363,6 +371,61 @@ function markReadByMessages(userId, messageIds) {
   return repo.markReadByMessages(pool, userId, messageIds);
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decision 40)
+ * ------------------------------------------------------------------ */
+
+const isId = (v) => typeof v === "string" && common.uuid.safeParse(v).success;
+/** The card's audience (All Staff, or Departments with their ids) as the form's Audience. */
+const audienceOf = (kind, departmentIds) => (kind === "all_staff" ? { kind: "all", department_ids: [] } : { kind: "departments", department_ids: departmentIds || [] });
+
+/** A scheduled announcement a person names by its headline's words, among those still waiting to go out. */
+async function idOf(db, words) {
+  const page = (q) => async () => (await repo.list(db, { page: 1, ...(q ? { q } : {}) })).data.filter((a) => a.status === "scheduled");
+  const found = await oneNamedIn([page(plainWords(words, ["announcement"])), page(null)], words, (a) => [a.title], { drop: ["announcement"] });
+  return found ? found.announcement_id : null;
+}
+
+/** "Which announcement?" answers (decision 34): those still waiting to go out, by headline as idOf matches them. */
+async function scheduledChoices(db) {
+  return (await repo.list(db, { page: 1 })).data.filter((a) => a.status === "scheduled").map((a) => choiceWords(a.title));
+}
+
+/** The announcement a card names, by its headline. */
+async function cardRecords(db, id) {
+  const row = isId(id) ? await repo.get(db, id) : null;
+  return row ? [{ type: "announcement", id, label: row.title }] : [];
+}
+
+/** Save Announcement's re-check: it exists and still waits to go out, as update holds it. */
+async function assertScheduled(db, id) {
+  const row = isId(id) ? await repo.get(db, id) : null;
+  if (!row || row.status === "cancelled") throw new AppError("NOT_FOUND", "There is no such announcement", 404, { announcement_id: ["No such announcement"] });
+  if (row.status !== "scheduled") throw new AppError("ALREADY_POSTED", "It has already gone out", 409, { announcement_id: ["Already gone out"] });
+}
+
+/** Publish Announcement's card through create: now, or at its time. */
+function publishFromCard(values, user) {
+  const { audience, department_ids: departmentIds, ...rest } = values;
+  return create({ ...rest, audience: audienceOf(audience, departmentIds) }, user);
+}
+
+/** Save Announcement's card through update: what it leaves out as the announcement stands. */
+async function changeFromCard(values, user) {
+  const { announcement_id: id, audience, department_ids: departmentIds, ...change } = values;
+  const held = view(await repo.get(pool, id));
+  const kind = audience || (departmentIds && departmentIds.length ? "departments" : held.audience.kind === "all" ? "all_staff" : "departments");
+  const ids = departmentIds || (kind === "departments" ? held.audience.department_ids : []);
+  const body = { title: held.title, body: held.body, urgency: held.urgency, publish_at: held.publish_at, ...Object.fromEntries(Object.entries(change).filter(([, v]) => v !== undefined)), audience: audienceOf(kind, ids) };
+  const parsed = contract.AnnouncementUpdate.safeParse(body);
+  if (!parsed.success) {
+    const fields = {};
+    for (const i of parsed.error.issues) (fields[i.path[0] === "audience" ? "department_ids" : String(i.path[0] || "announcement_id")] ||= []).push(i.message);
+    throw new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, fields);
+  }
+  return update(id, parsed.data, user);
+}
+
 module.exports = {
   view,
   list,
@@ -381,4 +444,10 @@ module.exports = {
   acknowledge,
   acknowledgeFromNotice,
   markReadByMessages,
+  idOf,
+  scheduledChoices,
+  cardRecords,
+  assertScheduled,
+  publishFromCard,
+  changeFromCard,
 };

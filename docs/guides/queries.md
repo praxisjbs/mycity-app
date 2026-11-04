@@ -10,7 +10,7 @@
 | Capabilities | `queries.configure` (write query rules, the consequence chain and letter templates: the writes on Rules, Sanctions · Chain Settings and Letter Templates) |
 | Screens (PROGRESS.md rows) | #34 Queries, #35 Rules, #36 Sanctions, #37 Letter Templates; reads shared with #13 ESS · My Queries (AJ) and the employee 360 |
 | Status | Draft |
-| Last changed | 28/10/2026 |
+| Last changed | 03/11/2026 |
 
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
@@ -398,6 +398,9 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
   pad's image, stored with the query or sanction as before (§6.2, §6.4), so a letter already sent
   never changes when the saved signature does.
 - The letter preview on Letter Templates signs with the reader's saved signature (§6.7).
+- Praxis AI's Raise Query card signs with it too (§9), since the chat never draws one; without it
+  the press is refused (409 `NO_SIGNATURE`) and Draw Signature opens Letter Templates on Edit
+  Signature (`?action=signature`). Saving a signature is never in the chat: it is drawn by hand.
 
 ## 7 · Events, jobs and notifications
 
@@ -445,8 +448,23 @@ counts, never coordinates or device identifiers.
 
 - **AI reads** (`queries.ai.js`, `sanctions.ai.js`): `queries.list` and `queries.get` (open and
   closed queries the reader may see, §6.1), `sanctions.list`, `sanctions.standing` (a person's rungs
-  in force and the next one; scope all only). `queries` view, paged at 25, cited by number. `query_rules` and
-  `templates` carry `// ai:none` (configuration, nothing a question needs).
+  in force and the next one; scope all only). `queries` view, paged at 25, cited by number.
+- **AI actions** (`docs/guides/praxis-ai.md` §6.11, decisions 33, 38 and 39): every form of this
+  module as a card the person confirms, each through the screen's own function. **Raise Query**
+  (`queries.raise`, `queries` create, risk approval: Confirm It's You, since it starts due process
+  and sends a signed letter): `QueryRaise`, the form's fields without its pad and letter choice (the
+  Query Letter is sent), the person picked from People's register, a policy in force by its title;
+  signed with the raiser's saved signature (§6.9), refused without one with Draw Signature, and
+  through `raise()` as the form's own (§6.2). **Send Response** (`my_queries.respond`, `ess.ai.js`):
+  the queried person's own words on their own open query, matched by its number, once (§3 step 3).
+  For holders of `queries.configure`, as the routes hold it: **Save Rule** on New Rule and Edit Rule
+  (`query_rules.ai.js`: a draft; the trigger fixed once it has fired; a letter written by its name
+  is the active query letter's key), **Add Step** and **Save Step** on Chain Settings
+  (`sanctions.ai.js`: Move Up, Move Down, Retire and Restore among a step's changes), **Add Letter**
+  and **Save Letter** (`templates.ai.js`: the wording as Markdown with the letter's own {{ names }},
+  which pass the card's gap guard as Write With AI's do; Save Letter renames and saves the next
+  version as Edit Template does). Save Letter Signature is never in the chat (`file:`): asked to save
+  one, Praxis AI says it cannot draw a signature and opens Edit Signature.
 - **Write With AI** (meeting 26/10; built like the mailbox's, `mailbox.assist.js`): on Raise a Query
   (`POST /queries/assist`, prompt `query-draft`, job Default) the Subject and What Happened from the
   raiser's own words, the employee's first name, job title and department, the raiser's name and
@@ -467,7 +485,8 @@ counts, never coordinates or device identifiers.
   ("query", "QRY"); sanctions by number, employee and rung ("sanction", "warning", "suspension").
   Both use §6.1, so a manager finds only their own: the provider pins results to the raiser
   (`owner: { column: "q.raised_by", exceptAll: true }`), lifted for scope all. `query_rules` and `templates` carry
-  `// search:none` with their screens registered in the route map.
+  `// search:none` with their screens registered in the route map; their manifests now hold their
+  cards (they carried `// ai:none` until 03/11/2026).
 
 ## 10 · On screen and mobile
 
@@ -576,6 +595,14 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Every form of Queries & Sanctions is a Praxis AI card, or never for a named
+  reason (§9; `praxis-ai.md` decisions 33, 38 and 39): Raise Query after Confirm It's You, signed
+  with the saved signature (§6.9; Draw Signature when there is none, Letter Templates opening Edit
+  Signature from `?action=signature`); Send Response; Save Rule, Add Step, Save Step, Add Letter and
+  Save Letter for holders of `queries.configure`. `query_rules` and `templates` gain manifests and
+  lose `// ai:none`; Save Letter Signature is never in the chat (`file:`). The Letter Templates screen
+  changes only in that its Edit Signature also opens from the address.
+- 01/11/2026 · JP · `queries.ai.js` and `sanctions.ai.js` account for their Create schemas in `not_offered` (a query is raised on Queries along the chain with the record in view, a response is the person's own words on Self-Service, a step on the chain is Settings), as gate 23 asks of every module since the Praxis AI Engine's PR5 (`praxis-ai.md` §6.15). The queries reads carry no matrix probe: their records need a raised query the matrix does not build (§6.17).
 - 28/10/2026 · JP · A rule's Letter and a consequence step's Letter read the letters 25 at a time and load the next page as the menu nears its end (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18); they look as before.
 - 27/10/2026 · GE · Letters as MyCity's own (handoff §9, S3; §6.7): the date and addressee open
   them, "Yours faithfully" and FOR: the organisation close them; the preview is the real PDF with

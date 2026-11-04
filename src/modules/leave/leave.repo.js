@@ -158,6 +158,88 @@ function clashes(db, of, query, scope) {
   );
 }
 
+/** The dimensions the assistant's summary groups by, as SQL over ROWS (never the caller's words). */
+const SUMMARY_BY = Object.freeze({
+  status: { key: "v.status", label: "v.status", series: false },
+  type: { key: "v.leave_type_id::text", label: "v.leave_type_name", series: false },
+  person: { key: "v.employee_id::text", label: "v.employee ->> 'display_name'", series: false },
+  department: { key: "COALESCE(v.department_id::text, 'none')", label: "COALESCE(v.employee ->> 'department', 'No department')", series: false },
+  month: { key: "to_char(v.starts_on, 'YYYY-MM')", label: "to_char(v.starts_on, 'YYYY-MM')", series: true },
+});
+
+/**
+ * The assistant's leave summary (docs/guides/praxis-ai.md §6.13; ess.md §9): one SQL over the requests
+ * in the reader's scope, with the list's filters: requests by status and by type always, and by the
+ * dimension asked (person, department) or as a series by month. Days are working days (`amount`), as
+ * the list shows them. Figures, never a row.
+ * @param {{query: Function}} db
+ * @param {{status?, leave_type_id?, employee_id?, department_id?, from?, to?, year?, by, today: string}} q
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(db, q, scope) {
+  const dim = SUMMARY_BY[q.by] || SUMMARY_BY.status;
+  const params = [
+    q.status || null,
+    q.leave_type_id || null,
+    q.employee_id || null,
+    q.department_id || null,
+    q.from || null,
+    q.to || null,
+    q.year || null,
+    q.today,
+  ];
+  const s = scopeClause(scope, { column: "v.employee_id" }, params);
+  const { rows } = await db.query(
+    `WITH r AS (
+       SELECT v.leave_request_id, v.employee_id, v.status, v.days, v.starts_on, v.ends_on,
+              v.leave_type_id, v.leave_type_name, ${dim.key} AS dim_key, ${dim.label} AS dim_label
+         FROM (${ROWS}) v
+        WHERE ($1::text IS NULL OR v.status = $1)
+          AND ($2::uuid IS NULL OR v.leave_type_id = $2)
+          AND ($3::uuid IS NULL OR v.employee_id = $3)
+          AND ($4::uuid IS NULL OR v.department_id = $4)
+          AND ($5::date IS NULL OR v.ends_on >= $5)
+          AND ($6::date IS NULL OR v.starts_on <= $6)
+          AND ($7::int IS NULL OR date_part('year', v.starts_on)::int = $7)
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS requests,
+              count(*) FILTER (WHERE status = 'submitted')::int AS waiting,
+              count(*) FILTER (WHERE status = 'approved')::int AS approved,
+              count(*) FILTER (WHERE status = 'rejected')::int AS rejected,
+              count(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
+              COALESCE(sum(days) FILTER (WHERE status = 'approved'), 0)::int AS days_approved,
+              COALESCE(sum(days) FILTER (WHERE status = 'approved' AND starts_on <= $8::date), 0)::int AS days_taken,
+              COALESCE(sum(days) FILTER (WHERE status = 'approved' AND starts_on > $8::date), 0)::int AS days_booked,
+              COALESCE(sum(days) FILTER (WHERE status = 'submitted'), 0)::int AS days_waiting,
+              count(DISTINCT employee_id) FILTER (WHERE status = 'approved')::int AS people,
+              count(*) FILTER (WHERE status = 'approved' AND starts_on <= $8::date AND ends_on >= $8::date)::int AS on_leave_today
+         FROM r
+     ), by_dim AS (
+       SELECT dim_key AS key, min(dim_label) AS label,
+              COALESCE(sum(days) FILTER (WHERE status = 'approved'), 0)::int AS days_approved,
+              count(*)::int AS requests,
+              row_number() OVER (ORDER BY COALESCE(sum(days) FILTER (WHERE status = 'approved'), 0) DESC, count(*) DESC, min(dim_label), dim_key) AS rank,
+              row_number() OVER (ORDER BY dim_key DESC) AS newest
+         FROM r GROUP BY dim_key
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'label', status, 'value', n, 'count', d) ORDER BY status)
+               FROM (SELECT status, count(*)::int AS n, COALESCE(sum(days), 0)::int AS d FROM r GROUP BY status) x) AS by_status,
+            (SELECT json_agg(json_build_object('key', leave_type_id, 'label', name, 'value', d, 'count', n) ORDER BY d DESC, name)
+               FROM (SELECT leave_type_id, min(leave_type_name) AS name, count(*)::int AS n,
+                            COALESCE(sum(days) FILTER (WHERE status = 'approved'), 0)::int AS d
+                       FROM r GROUP BY leave_type_id) x) AS by_type,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', days_approved, 'count', requests) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', label, 'days', days_approved, 'requests', requests) ORDER BY key)
+               FROM by_dim WHERE newest <= 60) AS points`,
+    params,
+  );
+  const r = rows[0];
+  return { series: dim.series, figures: r.figures, by_status: r.by_status || [], by_type: r.by_type || [], by_dim: r.by_dim || [], points: r.points || [] };
+}
+
 /** The figures above People · Leave, within the caller's scope. */
 async function summary(db, today, scope) {
   const params = [today];
@@ -438,6 +520,7 @@ async function statusesOf(db, ids) {
 module.exports = {
   statusesOf,
   list,
+  aiSummary,
   get,
   publicRow,
   clashes,

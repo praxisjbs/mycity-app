@@ -29,7 +29,7 @@ const {
   money,
 } = require("./common");
 const { PersonRef, WorkPattern } = require("./organisation");
-const { PlaceInput } = require("./maps");
+const { PlaceInput, PlaceToken } = require("./maps");
 
 const EventType = z.enum(["clock_in", "clock_out"]);
 const PunchState = z.enum(["accepted", "review", "rejected"]);
@@ -180,48 +180,81 @@ const TemporarySiteLocationInput = z
   })
   .strict();
 
+/** What a site is, beside where it is and who is on it: its hours, purpose, name, words and days. */
+const siteFields = {
+  hours: TemporarySiteHours.default("usual"),
+  starts_at: clockTime.nullable().optional(),
+  ends_at: clockTime.nullable().optional(),
+  purpose: TemporarySitePurpose,
+  name: text(120).refine((v) => v.length >= 3, "At least 3 characters"),
+  description: text(1000).refine((v) => v.length >= 30, "At least 30 characters"),
+  starts_on: isoDate,
+  ends_on: isoDate,
+  employee_ids: z
+    .array(uuid)
+    .min(1, "Pick someone")
+    .max(25, "At most 25 people")
+    .refine((ids) => new Set(ids).size === ids.length, "Each person once"),
+};
+
+/**
+ * What a site's days and hours hold to, on Add Work Site's request and the chat's card alike.
+ * @template {z.ZodTypeAny} T
+ * @param {T} schema
+ */
+const siteRules = (schema) =>
+  schema
+    .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] })
+    .refine((v) => v.ends_on < v.starts_on || daysSpanned(v.starts_on, v.ends_on) <= SITE_MAX_DAYS, {
+      message: "At most 90 days",
+      path: ["ends_on"],
+    })
+    .refine((v) => v.hours !== "site" || Boolean(v.starts_at), { message: "Pick a start", path: ["starts_at"] })
+    .refine((v) => v.hours !== "site" || Boolean(v.ends_at), { message: "Pick an end", path: ["ends_at"] })
+    .refine((v) => v.hours !== "site" || !v.starts_at || !v.ends_at || v.ends_at > v.starts_at, {
+      message: "Ends before it starts",
+      path: ["ends_at"],
+    })
+    .refine((v) => v.hours !== "usual" || (!v.starts_at && !v.ends_at), {
+      message: "Only for Site Hours",
+      path: ["starts_at"],
+    });
+
 /**
  * POST /attendance/me/temporary-sites (Add Work Site) and POST /attendance/temporary-sites (People's
  * own). Site Hours take a start and an end on the same day; the Usual Shift takes neither. The
  * dates against today, who may be on it and the one-a-day rule are the service's (guide §6.11).
  */
-const TemporarySiteCreate = z
-  .object({
-    hours: TemporarySiteHours.default("usual"),
-    starts_at: clockTime.nullable().optional(),
-    ends_at: clockTime.nullable().optional(),
-    purpose: TemporarySitePurpose,
-    name: text(120).refine((v) => v.length >= 3, "At least 3 characters"),
-    description: text(1000).refine((v) => v.length >= 30, "At least 30 characters"),
-    starts_on: isoDate,
-    ends_on: isoDate,
-    locations: z.array(TemporarySiteLocationInput).min(1, "Add an address").max(8, "At most eight addresses"),
-    employee_ids: z
-      .array(uuid)
-      .min(1, "Pick someone")
-      .max(25, "At most 25 people")
-      .refine((ids) => new Set(ids).size === ids.length, "Each person once"),
-  })
-  .strict()
-  .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] })
-  .refine((v) => v.ends_on < v.starts_on || daysSpanned(v.starts_on, v.ends_on) <= SITE_MAX_DAYS, {
-    message: "At most 90 days",
-    path: ["ends_on"],
-  })
-  .refine((v) => v.purpose !== "temporary_home" || v.locations.length === 1, {
-    message: "One address only",
-    path: ["locations"],
-  })
-  .refine((v) => v.hours !== "site" || Boolean(v.starts_at), { message: "Pick a start", path: ["starts_at"] })
-  .refine((v) => v.hours !== "site" || Boolean(v.ends_at), { message: "Pick an end", path: ["ends_at"] })
-  .refine((v) => v.hours !== "site" || !v.starts_at || !v.ends_at || v.ends_at > v.starts_at, {
-    message: "Ends before it starts",
-    path: ["ends_at"],
-  })
-  .refine((v) => v.hours !== "usual" || (!v.starts_at && !v.ends_at), {
-    message: "Only for Site Hours",
-    path: ["starts_at"],
-  });
+const TemporarySiteCreate = siteRules(
+  z
+    .object({
+      ...siteFields,
+      locations: z.array(TemporarySiteLocationInput).min(1, "Add an address").max(8, "At most eight addresses"),
+    })
+    .strict()
+    .refine((v) => v.purpose !== "temporary_home" || v.locations.length === 1, {
+      message: "One address only",
+      path: ["locations"],
+    }),
+);
+
+/**
+ * Add Work Site as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the sheet's
+ * fields with one address, picked as every address is (its token, PlaceToken, with its optional
+ * label and its radius), sent as TemporarySiteCreate's only location. A Temporary Home is a home,
+ * personal data the assistant never writes, so a card never takes it.
+ */
+const TemporarySiteAdd = siteRules(
+  z
+    .object({
+      ...siteFields,
+      purpose: TemporarySitePurpose.exclude(["temporary_home"], { message: "Pick a purpose" }),
+      address: PlaceToken,
+      location_name: optionalText(60),
+      radius_m: z.number().int().min(150, "At least 150 m").max(500, "At most 500 m").default(150),
+    })
+    .strict(),
+);
 
 /** GET /attendance/temporary-sites: within the reader's `people` scope, waiting first. */
 const TemporarySiteListQuery = listQuery(
@@ -651,6 +684,24 @@ const RegisterRow = z
 const RegisterPage = Paged(RegisterRow);
 
 const RegisterSummaryQuery = z.object({ date: isoDate.optional() }).strict();
+
+/**
+ * The assistant's attendance summary (docs/guides/praxis-ai.md §6.13; attendance.md §9): days, lateness
+ * counts and minutes, absences and exceptions over a period, grouped by person, department or site, or
+ * as a series by day, week or month. Figures, never rows; no page. The period is `from` and `to`, or a
+ * `month`, else this month in Lagos.
+ */
+const AttendanceSummaryBy = z.enum(["day", "week", "month", "person", "department", "site"]);
+const AttendanceSummaryQuery = z
+  .object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    month: month.optional(),
+    department_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    by: AttendanceSummaryBy.default("department"),
+  })
+  .strict();
 const RegisterSummary = z
   .object({
     date: isoDate,
@@ -1587,6 +1638,7 @@ const TABLES = {
     },
   },
   RegisterQuery: { table: null, reason: "list controls for the register" },
+  AttendanceSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's attendance summary; figures, never a row" },
   RegisterRow: {
     table: null,
     reason: "one person on one day, from employee, attendance_day and the day's latest punch",
@@ -1675,6 +1727,15 @@ const TABLES = {
       employee_ids: "written as attendance_temporary_site_member rows",
     },
   },
+  TemporarySiteAdd: {
+    table: "attendance_temporary_site",
+    virtual: {
+      address: "the one attendance_temporary_site_location row's place, its token sent on as PlaceInput",
+      location_name: "that location's attendance_temporary_site_location.name",
+      radius_m: "that location's attendance_temporary_site_location.radius_m",
+      employee_ids: "written as attendance_temporary_site_member rows",
+    },
+  },
   TemporarySiteListQuery: { table: null, reason: "list controls for People's temporary sites" },
   MyTemporarySiteListQuery: { table: null, reason: "list controls for the person's own temporary sites" },
   TemporarySiteCancel: {
@@ -1742,6 +1803,7 @@ module.exports = {
   RealTimeGiven,
   ExceptionDecision,
   RegisterQuery,
+  AttendanceSummaryQuery,
   RegisterRow,
   RegisterPage,
   RegisterSummaryQuery,
@@ -1825,6 +1887,7 @@ module.exports = {
   TemporarySitePage,
   TemporarySiteLocationInput,
   TemporarySiteCreate,
+  TemporarySiteAdd,
   TemporarySiteListQuery,
   MyTemporarySiteListQuery,
   TemporarySiteCancel,

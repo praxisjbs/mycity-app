@@ -62,6 +62,10 @@ all of it.
 Before any objective is set for the quarter, Goals reads **No Objectives Yet**. Before the first
 quarter is set up, only **Manage Quarters** is offered.
 
+The **Plan Approval** card shows where the function's plan stands. Whoever sets the function's goals
+sees it in every state. Everyone else sees it once the plan reads **Awaiting Approval** or
+**Binding**. They never see it while it reads **Draft**, **Returned** or **Unbound**.
+
 | You are | You read on Goals |
 |---|---|
 | A member of a department | Your department's objectives and key results, any key result you own wherever it sits, and what has been shared with you |
@@ -368,7 +372,9 @@ What waits for you sits in **Waiting On You** near the top of
 6. {needs="ceo"} A **Target Change** shows the **Old Target**, **New Target**, **From Month** and
    **Reason**. Press **Approve Change**: the hub says **Change approved**. Or press
    **Refuse Change**, type the **Reason** and press **Refuse Change**: the hub says
-   **Change refused**.
+   **Change refused**. A change you asked for yourself waits on you as well: the bell tells you
+   *Approval needed: Target Change*, and **Target change approved** or **Target change refused**
+   once you decide it.
 7. {needs="ceo"} An **Unbind Request** shows the **Function**, **Quarter**, **Reason**, **Asked By**
    and **Asked On**. Press **Approve Request**: the hub says **Request approved**, and the plan is
    unbound for its head to change. Or press **Refuse Request**, type the **Reason** and press
@@ -436,6 +442,9 @@ and scores already given do not change. A key result with no target yet is given
    Type the **Reason**.
 3. Press **Send Change**. The hub says **Sent to the CEO**, and the key result shows **Change
    Waiting** until the CEO decides.
+4. The bell tells you **Target change sent**, then **Target change approved** or **Target change
+   refused**. Once the CEO approves, the owner and co-owner of the key result are told
+   **Target change approved** too.
 
 | The form says | What it means | What to do |
 |---|---|---|
@@ -644,6 +653,8 @@ whose scorecard it is cannot.
    quarter, such as *November 2026*. Type the **Reason**.
 3. Press **Send Change**. The hub says **Sent to the CEO**. The line shows **Change Waiting** until
    the CEO decides.
+4. The bell tells you **Target change sent**, then **Target change approved** or **Target change
+   refused**. Once the CEO approves, the person whose scorecard it is is told **Your target changed**.
 
 | The form says | What it means | What to do |
 |---|---|---|

@@ -64,10 +64,18 @@ async function start() {
   );
   // AI manifests and search providers are checked now: one that declares a write, or
   // is malformed, stops the boot rather than reaching a question (A23, gates 9, 10, 19).
-  const ai = require("./shared/ai/registry").load();
+  // Counted through the registry's own accessors, never the shape load() returns: reading a
+  // field that load() had stopped returning crashed every boot after it was reshaped.
+  const ai = require("./shared/ai/registry");
+  ai.load();
   const search = require("./shared/search/registry").load();
   logger.info(
-    { ai_reads: ai.reads.size, search_providers: search.length },
+    {
+      ai_reads: ai.reads().length,
+      ai_summaries: ai.summaries().length,
+      ai_actions: ai.actions().length,
+      search_providers: search.length,
+    },
     "AI manifests and search providers loaded",
   );
 

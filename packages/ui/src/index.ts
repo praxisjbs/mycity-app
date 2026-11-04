@@ -21,3 +21,4 @@ export * from "./documents";
 export * from "./maps";
 export * from "./illustrations";
 export * from "./shell";
+export * from "./assistant";

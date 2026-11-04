@@ -20,6 +20,7 @@
  * title and the first day, never the text.
  */
 const crypto = require("node:crypto");
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
@@ -32,6 +33,8 @@ const documents = require("../../shared/documents/generate");
 const exportFiles = require("../../shared/documents/exports");
 const canonical = require("../../shared/documents/canonical");
 const md = require("../../shared/documents/markdown");
+const { oneNamed } = require("../../shared/ai/named");
+const { parseBody } = require("../../shared/http/validate");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const storage = require("../../services/storage/storage.service");
 const notifications = require("../notifications/notifications.service");
@@ -1202,6 +1205,67 @@ const citationOfVersion = (db, versionId) => repo.citationOfVersion(db, versionI
 /** Policies by id, as `{ policy_id, number, title }`, for the records that name them. */
 const namesOf = (db, ids) => repo.namesOf(db, [...new Set(ids.filter(Boolean))]);
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's policy cards (docs/guides/praxis-ai.md §6.11, decision 33)
+ * ------------------------------------------------------------------ */
+
+/** Start Policy: the title New Policy's sheet asks for, with the settings it starts a policy with. */
+const start = (user, values) => {
+  const s = c.policies.POLICY_START;
+  return create(user, parseBody(c.policies.PolicyCreate, { title: values.title, applies_to: { ...s.applies_to, department_ids: [], work_patterns: [], employee_ids: [] }, needs_acknowledgement: s.needs_acknowledgement, acknowledge_within_days: s.acknowledge_within_days, needs_approval: s.needs_approval }));
+};
+
+/**
+ * Save Draft from a card: only what the card changes, the rest kept from the draft, else from the
+ * newest published version (where the screen's first save starts from), through saveDraft. A
+ * written policy's text arrives as Markdown; a rules policy keeps its rules, set on its page.
+ */
+async function changeDraft(user, id, changes) {
+  const policy = await policyOf(pool, id);
+  const rules = Boolean(types.typeOf(policy.kind));
+  if (rules && changes.body !== undefined) throw new AppError("NO_TEXT_ON_RULES", "A rules policy has no text of its own", 422, { body: ["Not here"] });
+  const land = await landscape(pool, policy, lagos.today());
+  const base = land.draft || land.newest;
+  const now = base ? contentOf(base, await repo.audienceOf(pool, [base.policy_version_id])) : null;
+  const was = now ? now.applies_to : c.policies.POLICY_START.applies_to;
+  const pick = (k, fallback) => (changes[k] !== undefined ? changes[k] : fallback);
+  const body = {
+    title: pick("title", now ? now.title : policy.title),
+    applies_to: {
+      everyone: pick("everyone", was.everyone),
+      department_ids: pick("department_ids", [...was.department_ids]),
+      work_patterns: pick("work_patterns", [...was.work_patterns]),
+      employee_ids: pick("employee_ids", [...was.employee_ids]),
+    },
+    needs_acknowledgement: pick("needs_acknowledgement", base ? base.needs_acknowledgement : c.policies.POLICY_START.needs_acknowledgement),
+    acknowledge_within_days: pick("acknowledge_within_days", base ? Number(base.acknowledge_within_days) : c.policies.POLICY_START.acknowledge_within_days),
+    needs_approval: pick("needs_approval", base ? base.needs_approval : c.policies.POLICY_START.needs_approval),
+    ...(rules ? { rules: now ? now.raw_rules : null } : { body_html: md.markdownToHtml(changes.body !== undefined ? changes.body : (now && now.body_markdown) || "") }),
+  };
+  return saveDraft(user, id, parseBody(c.policies.PolicyDraftSave, body));
+}
+
+/** A policy a card names by its number or title, among those Knowledge Hub · Policies lists; null when none or several. */
+async function idOf(db, words) {
+  const page = await repo.listPolicies(db, { page: 1, q: String(words).slice(0, 150) }, lagos.today());
+  const found = oneNamed(page.data || [], words, (p) => [p.title, p.number]);
+  return found ? found.policy_id : null;
+}
+
+/** The policy a card changes, by its number and title. */
+async function cardPolicy(db, id) {
+  if (!db || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ""))) return [];
+  const policy = await repo.getPolicy(db, id);
+  return policy ? [{ type: "policy", id, label: `${policy.number} ${policy.title}` }] : [];
+}
+
+/** Save Draft's re-check: the policy is there and not archived. */
+async function assertCardPolicy(db, id) {
+  const policy = (await cardPolicy(db, id)).length ? await repo.getPolicy(db, id) : null;
+  if (!policy) throw new AppError("NOT_FOUND", "That policy does not exist", 404, { policy_id: ["No such policy"] });
+  if (policy.status !== "active") throw new AppError("POLICY_ARCHIVED", "This policy is archived", 409, { policy_id: ["Archived"] });
+}
+
 module.exports = {
   AHEAD_DAYS,
   REMIND_AFTER_DAYS,
@@ -1240,4 +1304,9 @@ module.exports = {
   citation,
   citationOfVersion,
   namesOf,
+  start,
+  changeDraft,
+  idOf,
+  cardPolicy,
+  assertCardPolicy,
 };

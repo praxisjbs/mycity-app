@@ -1,5 +1,5 @@
 /** The forms a task opens: New and Edit Task, and the small ones its panel and the board ask. */
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import tasks from "@mycity/contract/schemas/tasks.js";
 import type { Department, Task, TaskDetail } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
@@ -9,7 +9,7 @@ import { useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, type ProjectChoice } from "@/features/shared/pickers";
 import { useAddressPrefill } from "@/shell/screen-action";
 import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
-import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, LoadingRows, Pill, RecordPicker, SelectField, shortMessage, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
+import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatMonth, Grid, LoadingRows, Pill, RecordPicker, SelectField, shortMessage, TextAreaField, TextField, TimeField, toast, todayIso, useContractForm } from "@mycity/ui";
 import { LABEL, refresh, refreshed, say, STATUS_TONE, useLateOptions, useSetsForOthers, type BoardStatus, type LateReason, type Status } from "./shared";
 
 /** A 422's field marks on the form; anything else as a toast. */
@@ -32,6 +32,8 @@ const choiceOf = (t?: TaskDetail): CountsChoice[] =>
     : [];
 
 export const LEAD_HELP = "Answers for the task, and it counts on their scorecard.";
+/** What watching gives (workspace.md §6, JBS Praxis 01/11/2026): sight and notices, never the work. */
+export const WATCHERS_HELP = "Watchers can open the task, comment and hear when it is done, blocked or cancelled. It never lands on their board.";
 
 type Kind = "individual" | "shared";
 type ShareBy = "people" | "department";
@@ -112,6 +114,10 @@ export function TaskForm({
   const [picked, setPicked] = useState<Department[]>([]);
   const department = picked[0]?.department_id ?? "";
   const [deptLead, setDeptLead] = useState<PersonRef[]>([]);
+  // Who watches a new task: people, or a whole department's (Edit Task leaves watchers to the panel).
+  const [watchers, setWatchers] = useState<PersonRef[]>([]);
+  const [watchDept, setWatchDept] = useState<Department[]>([]);
+  const [watchMark, setWatchMark] = useState<string | null>(null);
   const [shareMark, setShareMark] = useState<string | null>(null);
   const [leadMark, setLeadMark] = useState<string | null>(null);
   const shared = kind === "shared";
@@ -246,6 +252,8 @@ export function TaskForm({
             ...(project[0] && { project_id: project[0].project_id }),
             ...leading(),
             ...sharing(),
+            ...(watchers.length > 0 && { watcher_ids: watchers.map((p) => p.employee_id) }),
+            ...(watchDept[0] && { watcher_department_id: watchDept[0].department_id }),
             ...(c?.kind === "line" && c.employee_target_id && { employee_target_id: c.employee_target_id }),
             ...(c?.kind === "key_result" && c.okr_key_result_id && { entity_type: "key_result" as const, entity_id: c.okr_key_result_id }),
             ...(isCommitment && { is_commitment: true, acceptance_criteria: v.acceptance_criteria, commitment_month: v.commitment_month }),
@@ -259,14 +267,17 @@ export function TaskForm({
       const raw = e instanceof ApiError ? (e.fields.member_ids ?? e.fields.department_id)?.[0] : undefined;
       const mark = raw ? shortMessage({ type: "custom", message: raw }) : undefined;
       const onLead = e instanceof ApiError ? e.fields.primary_assignee_id?.[0] : undefined;
+      const onWatch = e instanceof ApiError ? (e.fields.watcher_ids ?? e.fields.watcher_department_id)?.[0] : undefined;
+      setWatchMark(onWatch ? (shortMessage({ type: "custom", message: onWatch }) ?? onWatch) : null);
       // Counts Towards and Project are pickers outside the form: their refusal is said here.
       const loose = e instanceof ApiError ? Object.entries(e.fields).find(([k]) => k in LOOSE) : undefined;
+      // A refusal of the watchers is marked on Watchers itself (above), never said twice.
       if (mark || onLead) {
         setShareMark(mark ?? null);
         setLeadMark(onLead ?? null);
-      } else if (loose) toast.error(`${LOOSE[loose[0]]}: ${loose[1][0]}`);
-      else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else say(e);
+      } else if (loose && !onWatch) toast.error(`${LOOSE[loose[0]]}: ${loose[1][0]}`);
+      else if (e instanceof ApiError && Object.keys(e.fields).length && !onWatch) f.setServerErrors(e.fields);
+      else if (!onWatch) say(e);
     }
   };
   const assigneeId = !shared ? (who[0]?.employee_id ?? (task ? me.employee_id : null)) : by === "department" ? (deptLead[0]?.employee_id ?? null) : lead;
@@ -348,6 +359,32 @@ export function TaskForm({
             onChange={(p) => {
               setDeptLead(p);
               setLeadMark(null);
+            }}
+          />
+        </Field>
+      )}
+      {!task && (
+        <Field label="Watchers" optional help={WATCHERS_HELP} state={watchMark ? "bad" : undefined} message={watchMark ?? undefined}>
+          <ColleaguePicker
+            multiple
+            placeholder="Search staff"
+            value={watchers}
+            onChange={(p) => {
+              // A task has at most 25 watchers (tasks.service): the picker stops there.
+              if (p.length > MAX_MEMBERS) return setWatchMark(`At most ${MAX_MEMBERS} people`);
+              setWatchers(p);
+              setWatchMark(null);
+            }}
+          />
+        </Field>
+      )}
+      {!task && peopleView && (
+        <Field label="Watching Department" optional>
+          <DepartmentPicker
+            value={watchDept}
+            onChange={(d) => {
+              setWatchDept(d);
+              setWatchMark(null);
             }}
           />
         </Field>
@@ -864,37 +901,88 @@ export function RepeatForm({ task, close, onDone }: { task: TaskDetail; close: (
   );
 }
 
-const LEAD: Array<[string, string]> = [["", "None"], ["0", "At Due Time"], ["15", "15 Minutes Before"], ["60", "1 Hour Before"], ["1440", "1 Day Before"], ["2880", "2 Days Before"]];
+const LEAD: Array<[string, string]> = [["", "None"], ["0", "At Due Time"], ["15", "15 Minutes Before"], ["60", "1 Hour Before"], ["1440", "1 Day Before"], ["2880", "2 Days Before"], ["custom", "Custom Time"]];
+const SLOTS = [["one", "First Reminder"], ["two", "Second Reminder"], ["three", "Third Reminder"]] as const;
+type Slot = (typeof SLOTS)[number][0];
 
-/** Up to three reminders to the assignee, each a lead time before the due time; a fixed one stays as it was. */
+/** The Lagos day and wall clock of an instant, and back. */
+const lagosDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+const lagosClock = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit", hour12: false });
+const lagosInstant = (day: string, hm: string) => new Date(`${day}T${hm}:00+01:00`).toISOString();
+
+/**
+ * Up to three reminders to the assignee, each a lead time before the due time or a Custom Time:
+ * a day and time of the person's own, at or before the due time (TB, 28/10/2026).
+ */
 export function RemindersForm({ task, close, onDone }: { task: TaskDetail; close: () => void; onDone: () => void }) {
-  const slot = (i: number) => {
+  const due = task.due_at;
+  const initial: Record<string, string> = {};
+  SLOTS.forEach(([k], i) => {
     const r = task.reminders[i];
-    if (!r) return "";
-    return r.minutes_before === null ? `at:${r.remind_at}` : String(r.minutes_before);
+    const at = r && r.minutes_before === null ? r.remind_at : null;
+    initial[k] = !r ? "" : at ? "custom" : String(r.minutes_before);
+    initial[`${k}_day`] = at ? lagosDay(at) : due ? lagosDay(due) : todayIso();
+    initial[`${k}_time`] = at ? lagosClock(at) : due ? lagosClock(due) : "09:00";
+  });
+  const dayRule = (k: Slot) => (v: string, all: Record<string, unknown>) => {
+    if (all[k] !== "custom") return null;
+    if (!v || !all[`${k}_time`]) return "Pick a date";
+    const at = Date.parse(lagosInstant(v, String(all[`${k}_time`])));
+    if (at <= Date.now()) return "That time has passed";
+    if (due && at > Date.parse(due)) return "After the due time";
+    return null;
   };
-  const f = useContractForm({ one: slot(0), two: slot(1), three: slot(2) }, {});
+  const f = useContractForm(initial, { one_day: dayRule("one"), two_day: dayRule("two"), three_day: dayRule("three") });
   const save = useMutation("PUT /api/v1/tasks/:id/reminders");
-  const options = (v: string): Array<[string, string]> => (v.startsWith("at:") ? [...LEAD, [v, formatDateTime(v.slice(3))]] : LEAD);
   const submit = async () => {
-    const picked = [f.values.one, f.values.two, f.values.three].filter(Boolean);
+    if (!f.check()) return;
+    const v = f.values;
+    // Each slot as the API takes it, the same reminder once; `from` says which slot a refusal names.
+    const seen = new Set<string>();
+    const picked: Array<{ from: Slot; body: { minutes_before: number } | { remind_at: string } }> = [];
+    for (const [k] of SLOTS) {
+      if (!v[k]) continue;
+      const body = v[k] === "custom" ? { remind_at: lagosInstant(v[`${k}_day`]!, v[`${k}_time`]!) } : { minutes_before: Number(v[k]) };
+      const key = JSON.stringify(body);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      picked.push({ from: k, body });
+    }
     try {
-      await save.run({
-        params: { id: task.task_id },
-        body: { reminders: [...new Set(picked)].map((v) => (v.startsWith("at:") ? { remind_at: v.slice(3) } : { minutes_before: Number(v) })) },
-      });
+      await save.run({ params: { id: task.task_id }, body: { reminders: picked.map((p) => p.body) } });
       onDone();
       close();
       toast(picked.length ? "Reminders set" : "Reminders cleared");
     } catch (e) {
-      say(e);
+      if (!(e instanceof ApiError) || !Object.keys(e.fields).length) {
+        say(e);
+        return;
+      }
+      // `reminders.1.remind_at` is the second reminder sent: its day when it is a Custom Time, else its slot.
+      const marks: Record<string, string[]> = {};
+      const rest: string[] = [];
+      for (const [field, messages] of Object.entries(e.fields)) {
+        const p = picked[Number(field.split(".")[1])];
+        if (!p) rest.push(...messages);
+        else marks[v[p.from] === "custom" ? `${p.from}_day` : p.from] = messages;
+      }
+      f.setServerErrors(marks);
+      if (rest.length) toast(rest[0]!);
     }
   };
   return (
     <>
-      <Field label="First Reminder"><SelectField options={options(f.values.one)} {...f.field("one")} /></Field>
-      <Field label="Second Reminder" optional><SelectField options={options(f.values.two)} {...f.field("two")} /></Field>
-      <Field label="Third Reminder" optional><SelectField options={options(f.values.three)} {...f.field("three")} /></Field>
+      {SLOTS.map(([k, label], i) => (
+        <Fragment key={k}>
+          <Field label={label} optional={i > 0} {...f.field(k)}><SelectField options={LEAD} {...f.field(k)} /></Field>
+          {f.values[k] === "custom" && (
+            <Grid cols={2}>
+              <Field label="Remind On" {...f.field(`${k}_day`)}><DateField {...f.field(`${k}_day`)} /></Field>
+              <Field label="Remind At"><TimeField {...f.field(`${k}_time`)} /></Field>
+            </Grid>
+          )}
+        </Fragment>
+      ))}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Set Reminders</Button>

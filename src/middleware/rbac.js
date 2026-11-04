@@ -220,13 +220,24 @@ function requireCapability(code) {
 
   const mw = async function capabilityCheck(req, _res, next) {
     requireUser(req);
-    if (req.user.is_ceo === true) return next();
-    const held = await grantsCache.getCapabilities(pool, req.user.user_id);
-    if (!held.includes(code)) throw missingCapability(req, code);
+    if (!(await holdsCapability(req.user, code))) throw missingCapability(req, code);
     return next();
   };
   mw.capability = code;
   return mw;
+}
+
+/**
+ * Does this person hold the capability, through a role or given to them directly? The CEO holds
+ * every one. The same answer requireCapability gives a route, for code that is not a route (the
+ * assistant's actions, praxis-ai.md §6.11).
+ * @param {{user_id: string, is_ceo?: boolean}|null} user  req.user
+ * @param {string} code  a code in CAPABILITY_CATALOG
+ */
+async function holdsCapability(user, code) {
+  if (!user) return false;
+  if (user.is_ceo === true) return true;
+  return (await grantsCache.getCapabilities(pool, user.user_id)).includes(code);
 }
 
 /**
@@ -329,6 +340,7 @@ module.exports = {
   requireAnyPermission,
   requireCapability,
   requireAnyCapability,
+  holdsCapability,
   requireCeo,
   readPermissions,
   scopeFromGrants,

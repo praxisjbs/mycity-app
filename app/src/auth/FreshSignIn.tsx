@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Confirm } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
@@ -12,21 +12,27 @@ type Way = "password" | "pin" | "passkey";
 
 const refusedForAge = (e: unknown) => e instanceof ApiError && e.code === "REAUTH_REQUIRED";
 
+/** How the person confirmed it is them, for a caller that acts on it (a passkey offered to one who used the PIN). */
+export type ConfirmedWay = Way;
+
 /**
  * A fresh sign-in before adding or removing a way to sign in (docs/guides/identity.md
- * §6). Within the window after signing in the change goes ahead; past it the API
- * answers 403 REAUTH_REQUIRED, and the person confirms it is them (the password,
- * the PIN or a passkey) in the one modal before it runs again.
+ * §6), and before a Praxis AI card of a sensitive class runs (docs/guides/praxis-ai.md §6.11,
+ * decision 11). Within the window after signing in the change goes ahead; past it the API
+ * answers 403 REAUTH_REQUIRED, and the person confirms it is them in the one modal before it
+ * runs again: a passkey first when they have one, else the PIN, else the password.
  *
  *   const fresh = useFreshSignIn();
  *   await fresh.guard(() => remove.run({ params, body: {} }));   // a one-press change
  *   if (await fresh.ensure()) modal.open(...);                    // before a form that ends in one
  *
  * The modal replaces any open one (there is only one), so a form asks before it
- * opens rather than at its save.
+ * opens rather than at its save. `onConfirmed` is told which way the person used.
  */
-export function useFreshSignIn() {
+export function useFreshSignIn({ onConfirmed }: { onConfirmed?: (way: ConfirmedWay) => void } = {}) {
   const modal = useModal();
+  const told = useRef(onConfirmed);
+  told.current = onConfirmed;
 
   /** Ask the person to confirm it is them. True once they have. */
   const confirm = useCallback(
@@ -38,9 +44,10 @@ export function useFreshSignIn() {
           body: (close) => (
             <ConfirmForm
               close={close}
-              onConfirmed={() => {
+              onConfirmed={(way) => {
                 confirmed = true;
                 close();
+                told.current?.(way);
               }}
             />
           ),
@@ -73,7 +80,16 @@ export function useFreshSignIn() {
   return { guard, ensure };
 }
 
-function ConfirmForm({ close, onConfirmed }: { close: () => void; onConfirmed: () => void }) {
+/** The strongest way the person has, first: a passkey, else the PIN, else the password. */
+function waysOf(m: { pin: { on: boolean }; passkeys: number } | null | undefined): Array<{ value: Way; label: string }> {
+  return [
+    ...(m && m.passkeys > 0 && passkeysWork() ? [{ value: "passkey" as const, label: "Passkey" }] : []),
+    ...(m?.pin.on ? [{ value: "pin" as const, label: "PIN" }] : []),
+    { value: "password" as const, label: "Password" },
+  ];
+}
+
+function ConfirmForm({ close, onConfirmed }: { close: () => void; onConfirmed: (way: Way) => void }) {
   const methods = useApi("GET /api/v1/security");
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -86,15 +102,17 @@ function ConfirmForm({ close, onConfirmed }: { close: () => void; onConfirmed: (
   );
   const way = f.values.way;
   const m = methods.data;
-  const ways: Array<{ value: Way; label: string }> = [
-    { value: "password", label: "Password" },
-    ...(m?.pin.on ? [{ value: "pin" as const, label: "PIN" }] : []),
-    ...(m && m.passkeys > 0 && passkeysWork() ? [{ value: "passkey" as const, label: "Passkey" }] : []),
-  ];
+  const ways = waysOf(m);
+  // Once the ways are known, start on the strongest the person has (decision 11: a passkey first).
+  const { set } = f;
+  const first = ways[0]?.value;
+  useEffect(() => {
+    if (m && first && first !== "password") set("way", first);
+  }, [m, first, set]);
 
   const send = async (body: Confirm) => {
     await api.call("POST /api/v1/security/confirm", { body });
-    onConfirmed();
+    onConfirmed(body.method);
   };
 
   const go = async (typedPin?: string) => {

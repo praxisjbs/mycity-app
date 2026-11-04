@@ -1,5 +1,5 @@
 "use strict";
-// ai:none a document is a file, and the assistant never opens one; what a document says about a person is read through that person's own module
+// ai:none file: a document is a file, and the assistant never opens one; what a document says about a person is read through that person's own module
 // search:none a document is found from the record it belongs to; who may open one is decided per document by the vault (shared/documents/vault.js canRead), which no single search query can express
 /**
  * Documents: the HTTP edge. The bytes are streamed by the service through the

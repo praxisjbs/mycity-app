@@ -27,6 +27,9 @@ const {
   isoDateTime,
   listQuery,
   Paged,
+  recordId,
+  changesBeside,
+  nothingOn,
 } = require("./common");
 const { PersonRef } = require("./organisation");
 
@@ -73,14 +76,32 @@ const LeaveTypeCreate = z
   .strict();
 
 /** PATCH /leave/types/:id: rename it, change the allowance, retire it. */
-const LeaveTypeUpdate = z
+const LeaveTypeUpdateFields = z
   .object({
     name: text(80).optional(),
     days_per_year: daysPerYear.optional(),
     active: z.boolean().optional(),
   })
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, "Change at least one field");
+  .strict();
+const LeaveTypeUpdate = LeaveTypeUpdateFields.refine((v) => Object.keys(v).length > 0, "Change at least one field");
+
+/**
+ * Add Type as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the name and the
+ * allowance New Leave Type's sheet asks for. The code is made from the name as the sheet makes it
+ * ("Study Leave" is study_leave), on the server (leave.service.codeOf).
+ */
+const LeaveTypeAdd = z
+  .object({
+    name: text(80),
+    days_per_year: daysPerYear.default(null),
+  })
+  .strict();
+
+/** Save Type as a card: the type (its id, or its name matched among the types) beside LeaveTypeUpdate's fields. */
+const LeaveTypeChange = LeaveTypeUpdateFields.extend({ leave_type_id: recordId("leave type") }).refine(
+  changesBeside(["leave_type_id"]),
+  nothingOn("leave_type_id"),
+);
 
 /* ------------------------------------------------------------------ *
  * Requests
@@ -152,6 +173,25 @@ const LeaveRecordCreate = z
   .refine(endsAfterStart, ENDS_BEFORE)
   .refine(oneYear, OTHER_YEAR);
 
+/**
+ * Praxis AI's cards on People · Leave (docs/guides/praxis-ai.md §6.11): the requests waiting on
+ * the person, decided together, up to 25 a press; a rejection always says why, as the screen's
+ * own form does (workflow.ReasonBody). Each request is decided on its approval's current stage.
+ */
+const LeaveApprove = z
+  .object({
+    leave_request_ids: z.array(uuid).min(1, "Pick a request").max(25, "At most 25"),
+    reason: optionalText(1000),
+  })
+  .strict();
+
+const LeaveReject = z
+  .object({
+    leave_request_ids: z.array(uuid).min(1, "Pick a request").max(25, "At most 25"),
+    reason: text(1000),
+  })
+  .strict();
+
 /** POST /ess/leave/:id/cancel and POST /leave/requests/:id/cancel */
 const LeaveCancel = z.object({ reason: optionalText(500) }).strict();
 
@@ -174,6 +214,26 @@ const LeaveListQuery = listQuery(
 
 /** GET /leave/requests/:id/clashes: who else in the department is away on those days. */
 const LeaveClashQuery = listQuery({}, ["starts_on"]);
+
+/**
+ * The assistant's leave summary (docs/guides/praxis-ai.md §6.13; ess.md §9): requests by status, type,
+ * person or department, days taken, booked and waiting, or a series by month. Figures, never rows; no
+ * page. `from` and `to` keep the requests that overlap those days; `year` the requests starting in it;
+ * with neither, this year in Lagos.
+ */
+const LeaveSummaryBy = z.enum(["status", "type", "month", "person", "department"]);
+const LeaveSummaryQuery = z
+  .object({
+    status: LeaveStatus.optional(),
+    leave_type_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    department_id: uuid.optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+    by: LeaveSummaryBy.default("status"),
+  })
+  .strict();
 
 /* ------------------------------------------------------------------ *
  * What is left of a year
@@ -256,6 +316,14 @@ const TABLES = {
     table: "leave_type",
     virtual: { days_per_year: "written to leave_type.policy" },
   },
+  LeaveTypeAdd: {
+    table: "leave_type",
+    virtual: { days_per_year: "written to leave_type.policy" },
+  },
+  LeaveTypeChange: {
+    table: "leave_type",
+    virtual: { days_per_year: "written to leave_type.policy" },
+  },
   LeaveRequest: {
     table: "leave_request",
     virtual: {
@@ -275,6 +343,15 @@ const TABLES = {
     table: null,
     reason: "why a request is withdrawn; kept with the approval and the audit row",
   },
+  LeaveApprove: {
+    table: "workflow_decision",
+    virtual: { leave_request_ids: "each request's approval, decided on its current stage" },
+  },
+  LeaveReject: {
+    table: "workflow_decision",
+    virtual: { leave_request_ids: "each request's approval, decided on its current stage" },
+  },
+  LeaveSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's leave summary; figures, never a row" },
   LeaveListQuery: {
     table: null,
     reason: "list controls and filters for People's leave list",
@@ -304,13 +381,18 @@ module.exports = {
   LeaveTypePage,
   LeaveTypeCreate,
   LeaveTypeUpdate,
+  LeaveTypeAdd,
+  LeaveTypeChange,
   LeaveRequest,
   LeavePage,
   LeaveRequestCreate,
   LeaveRequestPrefill,
   LeaveRecordCreate,
   LeaveCancel,
+  LeaveApprove,
+  LeaveReject,
   LeaveListQuery,
+  LeaveSummaryQuery,
   LeaveClashQuery,
   LeaveBalance,
   LeaveBalances,

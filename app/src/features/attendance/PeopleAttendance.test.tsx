@@ -7,6 +7,7 @@ import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/tes
 import { clear, invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
 import { byKey } from "@/api/mock/data/people";
+import { searchableDays } from "@/api/mock/modules/attendance";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
 import { PeopleAttendance } from "./PeopleAttendance";
@@ -68,9 +69,17 @@ describe("All Days of a person", () => {
     await openAt(`/people?tab=attendance&person=${bashir.employee_id}`);
     const sheet = await screen.findByRole("dialog", { name: "Bashir Lawal" }, { timeout: 8000 });
     await within(sheet).findAllByText("All Days", undefined, { timeout: 5000 });
+    // The month of the person's newest day the mock holds: its days end yesterday, with today's once its clock-in time has
+    // passed, so early in a month whose first days were not working days this month has none yet, and the month before is shown.
+    const newest = searchableDays()
+      .filter((d) => d.person.user_key === "bashir" && d.status)
+      .map((d) => d.attendance_date)
+      .sort()
+      .at(-1)!;
+    const month = newest.slice(0, 7);
+    if (month !== todayIso().slice(0, 7)) fireEvent.click(within(sheet).getByRole("button", { name: "Previous Month" }));
     const rows = (await within(sheet).findAllByRole("row", undefined, { timeout: 5000 })).slice(1);
     expect(rows.length).toBeGreaterThan(0);
-    const month = todayIso().slice(0, 7);
     const dates = rows.map((r) => within(r).getAllByRole("cell")[0]!.textContent ?? "");
     // This month's days, newest first, as people read dates.
     for (const d of dates) expect(d).toMatch(new RegExp(`^\\d\\d/${month.slice(5, 7)}/${month.slice(0, 4)}$`));
@@ -82,7 +91,7 @@ describe("All Days of a person", () => {
     // The day opens over the panel (the panel leaves the accessibility tree while it is covered).
     await waitFor(() => expect(screen.getAllByRole("dialog").some((d) => within(d).queryAllByText("Punches").length > 0)).toBe(true), { timeout: 5000 });
     const day = screen.getAllByRole("dialog").find((d) => within(d).queryAllByText("Punches").length > 0)!;
-    expect(within(day).getByText(formatDate(iso[0]!))).toBeTruthy();
+    expect(within(day).getAllByText(formatDate(iso[0]!)).length).toBeGreaterThan(0);
     fireEvent.click(within(day).getByRole("button", { name: "Close" }));
     // Closed, the person's days are still open beneath it.
     await waitFor(() => expect(screen.getAllByRole("dialog").some((d) => within(d).queryAllByText("All Days").length > 0)).toBe(true), { timeout: 5000 });

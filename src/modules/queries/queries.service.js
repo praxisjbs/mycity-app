@@ -28,6 +28,7 @@ const { scopeFor } = require("../../middleware/rbac");
 const templates = require("../templates/templates.service");
 const { QUERY_LETTER } = require("../templates/templates.events");
 const md = require("../../shared/documents/markdown");
+const { oneNamed } = require("../../shared/ai/named");
 const repo = require("./queries.repo");
 const visibility = require("./queries.visibility");
 const { EVENTS, SIGNATURE_DOC_TYPE } = require("./queries.events");
@@ -478,6 +479,55 @@ async function emailLetter(documentId) {
   );
 }
 
+/*
+ * Praxis AI's Raise Query and Send Response cards (docs/guides/praxis-ai.md §6.11, decision 33):
+ * their re-checks, and the person's own query a response card names. Nothing here writes; the
+ * writes are raise() and respond() above.
+ */
+
+const isId = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || ""));
+
+/**
+ * Raise Query's re-check (§6.11 step 5): someone who works here now, never the raiser, and a
+ * signature saved to sign the letter with (queries.signature.js: the chat cannot draw one).
+ */
+async function assertCardRaise(db, { employee_id: employeeId }, actor) {
+  if (actor.employee_id && actor.employee_id === employeeId)
+    throw new AppError("QUERY_SELF", "You cannot raise a query on yourself", 422, { employee_id: ["Not yourself"] });
+  if (!isId(employeeId)) throw new AppError("EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", 422, { employee_id: ["Not active"] });
+  await activePerson(db, employeeId);
+  await require("./queries.signature").signatureOf(db, actor);
+}
+
+/** One of the person's own queries, as a response card names it: its number and subject. */
+async function cardMine(db, employeeId, id) {
+  if (!db || !employeeId || !isId(id)) return [];
+  const row = await repo.getMine(db, employeeId, id);
+  return row ? [{ type: "query", id, label: `${row.number} ${row.subject}` }] : [];
+}
+
+/** The person's own open query a card names by its number or subject (shared/ai/named.js); null when none or several. */
+async function myOpenIdOf(db, employeeId, words) {
+  if (!employeeId) return null;
+  const page = await repo.listMine(db, employeeId, { status: "open", page: 1 });
+  const found = oneNamed((page.data || []).filter((q) => q.can_respond), words, (q) => [q.number, q.subject]);
+  return found ? found.employee_query_id : null;
+}
+
+/** The person's own open queries, as answers to tap: "QRY-0001 Missed client visit" (praxis-ai.md decision 34). */
+async function myOpenChoices(db, employeeId) {
+  if (!employeeId) return [];
+  const page = await repo.listMine(db, employeeId, { status: "open", page: 1 });
+  return (page.data || []).filter((q) => q.can_respond).map((q) => `${q.number} ${q.subject}`);
+}
+
+/** Send Response's re-check: the person's own query, still waiting for their one response. */
+async function assertCardRespond(db, employeeId, id) {
+  const row = employeeId && isId(id) ? await repo.getMine(db, employeeId, id) : null;
+  if (!row) throw new AppError("NOT_FOUND", "That query does not exist", 404, { employee_query_id: ["No such query"] });
+  if (!row.can_respond) throw new AppError("QUERY_NOT_OPEN", "This query no longer takes a response", 409, { employee_query_id: ["Already answered"] });
+}
+
 module.exports = {
   RESPONSE_HOURS,
   list,
@@ -499,4 +549,9 @@ module.exports = {
   storeSignature,
   decidable,
   remindable,
+  assertCardRaise,
+  cardMine,
+  myOpenIdOf,
+  myOpenChoices,
+  assertCardRespond,
 };

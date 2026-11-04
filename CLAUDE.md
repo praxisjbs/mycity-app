@@ -76,7 +76,11 @@ silently.
   page-size parameter in the contract or the frontend. The AI reads in pages of 25 too. A select
   filled from a server list loads its next 25 as its menu nears its end (`useInfinite` with
   `paging`, F32), never one page cut short.
-- **AI reads, never writes** (A23). Manifests declare reads and screen routes only.
+- **AI reads; it acts only through a declared action a person confirms** (A23 as amended
+  01/11/2026, `docs/guides/praxis-ai.md` §1.2). Manifests declare reads, summaries, actions and
+  screen routes; an action's `run` is the module's own service function, never SQL; the model
+  proposes, the server decides, the person presses. Gate 19 refuses anything else, gate 23 keeps
+  the engine told of every schema change (`docs/handoff/praxis-ai-engine.md` §7).
 - **Every AI feature names its job** (`docs/guides/ai-control.md` §6.2: Default, Fast, Deep
   Reasoning, Image Reading, Transcription, Embeddings, Top Tier). Before building one, ask the person
   which job it uses, your recommendation first, and register the action with who chose it. Top Tier

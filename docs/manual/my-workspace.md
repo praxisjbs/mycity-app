@@ -148,13 +148,16 @@ A card shows the task's title, small pills and the round initials of the person 
    people, read [Share a task](#workspace-share).
 5. {needs="team"} To set the task for someone you set work for, search for them in **Assign To** and
    pick them. Leave it empty to keep the task for yourself.
-6. To put it in a project, pick it in **Project**.
-7. Choose a **Cadence** if it helps: **Daily** is due by the end of the day, **Weekly** by the end
+6. To have colleagues follow the task, pick them in **Watchers**. They can open it and hear how it
+   goes, but it is not their work (see [Watch a task](#workspace-watch)).
+7. {needs="people view"} To have a whole department follow it, pick it in **Watching Department**.
+8. To put it in a project, pick it in **Project**.
+9. Choose a **Cadence** if it helps: **Daily** is due by the end of the day, **Weekly** by the end
    of the week.
-8. Choose the **Due** date, and the **Priority**: **Urgent**, **High**, **Normal** or **Low**.
-9. If it is work for one of your scorecard lines, pick it in **Counts Towards** (see
-   [Counts Towards](#workspace-counts-towards)).
-10. Add anything else in **Notes**, and press **Create Task**.
+10. Choose the **Due** date, and the **Priority**: **Urgent**, **High**, **Normal** or **Low**.
+11. If it is work for one of your scorecard lines, pick it in **Counts Towards** (see
+    [Counts Towards](#workspace-counts-towards)).
+12. Add anything else in **Notes**, and press **Create Task**.
 
 The hub gives the task its number, such as TSK-0412, and says so. A task you set for someone else
 says *TSK-0412 set for* and their name, and they are told.
@@ -164,6 +167,8 @@ says *TSK-0412 set for* and their name, and they are told.
 | **Task** | What needs doing, in a few words | Yes |
 | **Type** | **Individual** or **Shared** | Yes |
 | **Assign To** | Someone you set work for, or nobody for yourself | No |
+| **Watchers** | Colleagues who follow the task, up to 25 | No |
+| **Watching Department** | A department whose people all follow it | No |
 | **Project** | One of the active projects | No |
 | **Cadence** | **None**, **Daily** or **Weekly** | No |
 | **Due** | The day it is due, today or later | No, but a commitment needs one |
@@ -284,9 +289,18 @@ see it may tick a step.
    **Stopped watching**.
 3. {needs="workspace edit"} If you plan the task, you can add someone else: press the plus beside
    **Watchers**, search **Watcher** for them, and press **Add Watcher**. The hub says their name and
-   *is watching*. Only people who can already see the task can watch it.
+   *is watching*. Anyone on the staff can watch.
 4. {needs="workspace edit"} To take someone off, press the cross beside their name under
    **Watchers**. The hub says **Watcher removed**.
+
+When someone adds you as a watcher, you are told, and you can open the task even if it is not in
+your team:
+
+- Open it from the notice, or find it with search.
+- Read its details, steps and history, and add a comment.
+- It is not on your board, and only **Close** shows at the foot of its panel: the work stays with
+  the people doing it.
+- Press **Stop Watching** to leave it. You can no longer open it after that.
 
 | The hub says | What it means | What to do |
 |---|---|---|
@@ -323,9 +337,11 @@ Open the task and press **More Actions**, the three dots at the foot of the pane
    **Nudge sent**.
 2. **Set Reminders** sets up to three reminders before the due time. Choose **First Reminder**, and
    **Second Reminder** and **Third Reminder** if you like: **At Due Time**, **15 Minutes Before**,
-   **1 Hour Before**, **1 Day Before** or **2 Days Before**. Press **Set Reminders**. The hub says
-   **Reminders set**. A task needs a due date for this. To clear them, set each to **None** and
-   press **Set Reminders**: the hub says **Reminders cleared**.
+   **1 Hour Before**, **1 Day Before**, **2 Days Before** or **Custom Time**. For **Custom Time**,
+   pick the day in **Remind On** and type the time in **Remind At**, such as `09:30`. It begins at the
+   due time and can be any time up to it. Press **Set Reminders**. The hub says **Reminders set**. A
+   task needs a due date for this. To clear them, set each to **None** and press **Set Reminders**:
+   the hub says **Reminders cleared**.
 3. **Set Repeat** makes the task come back. In **Repeat**, choose **Every Working Day**, **Weekly**
    or **Monthly**. For **Weekly**, tick the days under **On**. For **Monthly**, pick the day in
    **On Day**. Press **Save Repeat**. The hub says **Repeat set**. Details then shows **Repeats**.
@@ -341,6 +357,7 @@ A repeat needs a due date to count from. Without one, **Repeat** says **Needs a 
 |---|---|---|
 | **Nobody else to tell** | Only you would get the nudge | Add a watcher first, or nudge a task someone else leads |
 | **That time has passed** | A reminder would fall before now | Pick a later reminder, or move the due date |
+| **After the due time** (on **Remind On**) | The custom time comes after the task is due | Pick a time at or before the due time |
 | **Pick a day** | **Weekly** has no day ticked | Tick at least one day under **On** |
 | **Pick a reason** | **Why Late** is empty, or the reason was just switched off | Pick a reason from the list |
 
@@ -493,7 +510,8 @@ The hub says what went wrong in a short message at the foot of the screen, or on
 | *Project: Project is closed* | The project is complete | Pick another, or ask its owner to reopen it |
 | **Needs a due date** | A repeat with no due date | Set **Due** first |
 | **Give the task a due date** | A reminder with no due date | Set **Due** first |
-| **Cannot see this task** | That watcher cannot open the task | Pick someone who can |
+| **Nobody to add** under **Watchers** | The department has nobody but the people already on the task | Pick people instead |
+| At most 25 watchers | More than 25 people would watch the task | Pick fewer people, or a smaller department |
 | *At most 200 characters*, or another number | The text is longer than the field takes | Shorten it |
 | **Pick people** | **Shared** is chosen with nobody in **People** | Pick at least one person, or choose **Individual** |
 | **Pick a department** | **Department** is chosen but empty | Pick the department |
@@ -608,7 +626,9 @@ Review**; press one to open its record.
 6. Choose **Who Can See**. **Attendees** is you and the people invited. **Everyone** puts it on
    every calendar. **Only Me** keeps it private.
 7. Choose a **Reminder**: **None**, **At Start**, **15 Minutes Before** (the default),
-   **1 Hour Before** or **1 Day Before**.
+   **1 Hour Before**, **1 Day Before** or **Custom Time**. For **Custom Time**, pick the day in
+   **Remind On** and type the time in **Remind At**: any time up to the start, at most 14 days
+   before it. A custom reminder moves with the event if you change its start.
 8. Press **Add Event**. The hub says **Added to the calendar**.
 
 Everyone you invite is told in the hub. Those with a work email also get the invitation by email,
@@ -619,6 +639,9 @@ which adds it to Outlook, Gmail or their phone's calendar.
 | **Name the event** | Type the event's name |
 | **Pick a date** | Pick its date |
 | **Ends before it starts** | Set an end time after the start |
+| **After the start** (on **Remind On**) | Pick a reminder time at or before the start |
+| **That time has passed** (on **Remind On**) | Pick a reminder time still to come |
+| **At most 14 days** (on **Remind On**) | Pick a reminder time nearer the start |
 | **Not on the staff** (on **Attendees**) | Someone invited has left MyCity: take them off **Attendees** and save again |
 
 ### Add to an empty day {#workspace-calendar-day needs="workspace create"}

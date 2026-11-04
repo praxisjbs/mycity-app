@@ -387,16 +387,16 @@ describe("AI manifests", () => {
   test("anything like a write is refused (A23)", () => {
     expect(() =>
       defineManifest({ module: "people", reads: [], writes: [] }),
-    ).toThrow(/reads, never writes \(A23\)/);
-    expect(() => defineManifest({ module: "people", actions: [] })).toThrow(
-      /A23/,
-    );
+    ).toThrow(/a write by another name/);
+    // Since 01/11/2026 a manifest may declare actions a person confirms (praxis-ai.md §6.11); a write by another name is still refused.
+    expect(defineManifest({ module: "people", actions: [] }).actions).toEqual([]);
+    expect(() => defineManifest({ module: "people", executor: () => {} })).toThrow(/a write by another name/);
     expect(() =>
       defineManifest({
         module: "people",
         reads: [{ ...listRead, execute: () => {} }],
       }),
-    ).toThrow(/A23/);
+    ).toThrow(/"execute" in a read/);
   });
 
   test("a malformed read or route fails when the file loads", () => {
@@ -404,7 +404,7 @@ describe("AI manifests", () => {
       defineManifest({ module: "people", reads: [{ ...listRead, ...read }] });
     expect(bad({ key: "Employees" })).toThrow(/<thing>\.<verb>/);
     expect(bad({ permission: ["people", "edit"] })).toThrow(
-      /needs the "view" grant/,
+      /a read needs "view"/,
     );
     expect(bad({ permission: ["hr", "view"] })).toThrow(/not a module key/);
     expect(bad({ params: z.object({ page: z.number() }) })).toThrow(

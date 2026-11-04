@@ -17,6 +17,7 @@ const lagos = require("../../shared/time/lagos");
 const attendance = require("../attendance/attendance.auto-query");
 const tasks = require("../tasks/tasks.auto-query");
 const reviews = require("../reviews/reviews.auto-query");
+const { oneNamed } = require("../../shared/ai/named");
 const repo = require("./query_rules.repo");
 const { EVENTS } = require("./query_rules.events");
 
@@ -176,4 +177,35 @@ async function remove(actor, id) {
   });
 }
 
-module.exports = { codeFrom, countable, list, summary, firings, get, create, update, activate, pause, remove };
+/*
+ * Praxis AI's rule cards (docs/guides/praxis-ai.md §6.11, decision 33): the rule a card names, by its
+ * name, and a name matched to one. Nothing here writes.
+ */
+
+const isId = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || ""));
+
+/** A rule a card names by its name or code (shared/ai/named.js), among the rules on Rules; null when none or several. */
+async function idOf(db, words) {
+  const page = await repo.list(db, { page: 1 }, monthStart());
+  const found = oneNamed(page.data || [], words, (r) => [r.name, r.code]);
+  return found ? found.query_rule_id : null;
+}
+
+/** The rules' names, as answers to tap when a card asks which rule (praxis-ai.md decision 34). */
+async function ruleNames(db) {
+  return ((await repo.list(db, { page: 1 }, monthStart())).data || []).map((r) => r.name);
+}
+
+/** The rule a card changes, by its name. */
+async function cardRule(db, id) {
+  if (!db || !isId(id)) return [];
+  const row = await repo.get(db, id, monthStart());
+  return row ? [{ type: "query_rule", id, label: row.name }] : [];
+}
+
+/** Edit Rule's re-check: the rule is there. */
+async function assertCardRule(db, id) {
+  if (!(await cardRule(db, id)).length) throw new AppError("NOT_FOUND", "That rule does not exist", 404, { query_rule_id: ["No such rule"] });
+}
+
+module.exports = { codeFrom, countable, list, summary, firings, get, create, update, activate, pause, remove, idOf, ruleNames, cardRule, assertCardRule };

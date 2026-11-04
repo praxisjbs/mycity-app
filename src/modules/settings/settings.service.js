@@ -219,6 +219,8 @@ async function saveWeek(body, actor) {
 
 /** GET /settings/holidays */
 const holidays = (query) => repo.holidayPage(pool, query);
+/** One public holiday as saved, or null: what a card changing it starts from (praxis-ai.md §6.11). */
+const holiday = (id) => repo.findHoliday(pool, id);
 
 const dateTaken = (h) =>
   new AppError("HOLIDAY_EXISTS", `${h.name} is already on that date.`, 409, { holiday_date: ["Already a holiday"] });
@@ -500,6 +502,7 @@ module.exports = {
   week,
   saveWeek,
   holidays,
+  holiday,
   addHoliday,
   updateHoliday,
   removeHoliday,

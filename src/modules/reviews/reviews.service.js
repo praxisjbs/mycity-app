@@ -39,7 +39,8 @@ const workingWeek = require("../../shared/time/working-week");
 const workflow = require("../../shared/workflow/engine");
 const approvers = require("../../shared/workflow/approvers");
 const vault = require("../../shared/documents/vault");
-const { scoring } = require("@mycity/contract");
+const { scoring, common, reviews: contract } = require("@mycity/contract");
+const { oneNamed, oneNamedIn, plainWords, choiceWords } = require("../../shared/ai/named");
 const reminders = require("../notifications/notifications.reminders");
 const targetsRepo = require("../targets/targets.repo");
 const progress = require("../targets/targets.progress");
@@ -270,6 +271,43 @@ async function detail(db, r, actor, roles) {
 const roleCodes = (actor) => repo.roleCodesOfUser(pool, actor && actor.user_id);
 
 /** GET /performance/reviews */
+/** The stages and ratings as Reviews names them, for the assistant's summary. */
+const STAGE_WORDS = Object.freeze({ check_in: "Check-In", with_reviewer: "With Reviewer", second_level: "Second Level", with_hr: "With HR", closed: "Closed", withdrawn: "Withdrawn" });
+const RATING_WORDS = Object.freeze({ exceeds: "Exceeds", meets: "Meets", partly_meets: "Partly Meets", below: "Below" });
+
+/**
+ * The assistant's review summary (docs/guides/praxis-ai.md §6.13; performance.md §9): the reviews the
+ * asker may list, counted by stage, rating and department or round; never a check-in's words, evidence
+ * or comments. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   ReviewSummaryQuery, parsed
+ * @param {object} actor
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, actor, scope) {
+  const { figure, group } = require("../../shared/ai/summary");
+  const r = await repo.aiSummary(client, params, scope, actor || {}, await roleCodes(actor));
+  const f = r.figures || {};
+  const by = params.by || "stage";
+  const groups = [
+    group("stage", "Reviews by stage", r.by_stage.map((x) => ({ ...x, label: STAGE_WORDS[x.label] || x.label }))),
+    group("rating", "Closed reviews by rating", r.by_rating.map((x) => ({ ...x, label: RATING_WORDS[x.label] || x.label }))),
+    group(by === "round" ? "round" : "department", by === "round" ? "Reviews by round" : "Reviews by department", r.by_third),
+  ];
+  const figures = [
+    figure("reviews", "Reviews", f.reviews),
+    figure("check_in", "At check-in", f.check_in),
+    figure("with_reviewer", "With reviewers", f.with_reviewer),
+    figure("second_level", "At second level", f.second_level),
+    figure("with_hr", "With HR", f.with_hr),
+    figure("closed", "Closed", f.closed),
+    figure("withdrawn", "Withdrawn", f.withdrawn),
+    figure("waiting_on_me", "Waiting on me", f.waiting_on_me),
+  ];
+  if (f.average_score !== null && f.average_score !== undefined) figures.push(figure("average_score", "Average score to date, closed", String(f.average_score), "score"));
+  return { figures, groups, series: [], total: f.reviews || 0 };
+}
+
 async function list(actor, query, scope) {
   const page = await repo.list(pool, query, scope, actor || {}, await roleCodes(actor));
   return { ...page, data: page.data.map(reviewView) };
@@ -1276,7 +1314,198 @@ async function myReviews(actor, query) {
   };
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decision 40): a review named by its person, a
+ * line by its words, and the same offered as answers to tap when not said (decision 34); how a card
+ * names them; the re-checks a press runs; and Save Score and Save
+ * Check-In, each saving one line through the function the screen's own button calls, every other line
+ * as it stands. Nothing here reads a check-in's actions, a comment or a plan into a card.
+ * ------------------------------------------------------------------ */
+
+const isId = (v) => typeof v === "string" && common.uuid.safeParse(v).success;
+/** Words a person adds to a name that name nothing ("Ada's review"). */
+const REVIEW_WORDS = ["review", "check", "in", "the", "s"];
+/** A review's line as a person names it: its scorecard line's title, else its criterion. */
+const titleOf = (i) => (i.line && i.line.title) || (i.criterion ? i.criterion[0].toUpperCase() + i.criterion.slice(1) : null);
+
+/** A review as a card and its question name it: its person and month ("Ada Obi, October 2026"). */
+const reviewLabel = (r) => `${r.employee.display_name}, ${r.round_name || "Probation"}`;
+
+/**
+ * The review a person names by its person, or its person and month as its question offers it, among
+ * the reviews with them as reviewer (`status` with_reviewer), else any they list.
+ */
+async function reviewIdOf(db, words, actor, scope, { status = "with_reviewer", rating = null } = {}) {
+  const codes = await roleCodes(actor);
+  const said = plainWords(words, REVIEW_WORDS);
+  const page = (query) => async () =>
+    (await repo.list(db, { page: 1, ...query }, scope, actor || {}, codes)).data.filter((r) => !rating || r.rating === rating);
+  const namesOf = (r) => (r.employee ? [r.employee.display_name, reviewLabel(r)] : []);
+  const found = await oneNamedIn([page({ status, q: said }), page({ status })], words, namesOf, { drop: REVIEW_WORDS });
+  return found ? found.performance_review_id : null;
+}
+
+/**
+ * "Whose review?" answers (decision 34): the reviews reviewIdOf matches among, with the person as
+ * reviewer (or, for Start PIP, closed and rated Below), by person and month.
+ */
+async function reviewChoices(db, actor, scope, { status = "with_reviewer", rating = null } = {}) {
+  const codes = await roleCodes(actor);
+  const rows = (await repo.list(db, { page: 1, status }, scope, actor || {}, codes)).data.filter((r) => r.employee && (!rating || r.rating === rating));
+  return [...new Set(rows.map(reviewLabel))];
+}
+
+/** "Which line?" answers: the lines of the review the card names, by id or by its words, when the person may open it. */
+async function reviewItemChoices(db, review, actor, scope) {
+  const id = isId(review) ? review : review ? await reviewIdOf(db, review, actor, scope) : null;
+  if (!id || !(await cardReview(db, id, actor, scope)).some((r) => r.label)) return [];
+  return (await repo.items(db, id)).map(titleOf).filter(Boolean).map(choiceWords);
+}
+
+/** A line of a review a person names by its words, among the review's own lines. */
+async function reviewItemIdOf(db, reviewId, words) {
+  if (!isId(reviewId)) return null;
+  const found = oneNamed(await repo.items(db, reviewId), words, (i) => [titleOf(i)], { drop: ["line"] });
+  return found ? found.performance_review_item_id : null;
+}
+
+/** The review a card names, by its person and month, when the person may open it; its id alone otherwise. */
+async function cardReview(db, id, actor, scope) {
+  if (!isId(id)) return [];
+  try {
+    const { r } = await loadFor(db, id, actor, scope);
+    return [{ type: "review", id, label: reviewLabel(r) }];
+  } catch (err) {
+    if (!(err instanceof AppError) || err.status >= 500) throw err;
+    return (await repo.get(db, id, actor, [])) ? [{ type: "review", id, label: null }] : [];
+  }
+}
+
+/** A review's line, by its words, when the review is one the person may open. */
+async function cardItem(db, reviewId, itemId, actor, scope) {
+  if (!isId(reviewId) || !isId(itemId) || !(await cardReview(db, reviewId, actor, scope)).some((r) => r.label)) return [];
+  const item = (await repo.items(db, reviewId)).find((i) => i.performance_review_item_id === itemId);
+  return item ? [{ type: "performance_review_item", id: itemId, label: titleOf(item) }] : [];
+}
+
+/** Save Score's re-check: the person reviews it, the check-in is in, it is with them, and the line is the review's. */
+async function assertCardScore(db, values, actor, scope) {
+  if (!isId(values.performance_review_id)) throw new AppError("NOT_FOUND", "That review does not exist", 404, { performance_review_id: ["No such review"] });
+  const { r, roles } = await loadFor(db, values.performance_review_id, actor, scope);
+  if (!roles.reviewer) throw new AppError("PERMISSION_DENIED", "Only the reviewer can do that", 403, { performance_review_id: ["Not yours to score"] });
+  if (r.status === "check_in") throw sequence.checkInFirst();
+  if (!sequence.WITH_REVIEWER.includes(r.status)) throw new AppError("REVIEW_NOT_WITH_REVIEWER", "This review is not with its reviewer", 409);
+  if (!(await repo.items(db, r.performance_review_id)).some((i) => i.performance_review_item_id === values.performance_review_item_id))
+    throw new AppError("NOT_FOUND", "That line is not on this review", 404, { performance_review_item_id: ["No such line"] });
+}
+
+/** A refusal on `items.0` or this line's action put on the card's own fields. */
+function onCardFields(err, rename) {
+  if (!(err instanceof AppError) || !err.fields) return err;
+  const own = Object.entries(err.fields).flatMap(([k, v]) => {
+    const to = rename(k);
+    return to ? [[to, v]] : [];
+  });
+  return own.length ? new AppError(err.code, err.message, err.status, Object.fromEntries(own)) : err;
+}
+
+/**
+ * Save Score's card: one line's final score, reason, comment and corrective action through Save
+ * Scores (saveScores), which takes the review's actions whole: every other line's are sent as they
+ * stand, and what the card leaves out of its own line is kept.
+ */
+async function saveScore(actor, scope, values) {
+  const { performance_review_id: id, performance_review_item_id: itemId } = values;
+  const items = await repo.items(pool, id);
+  const item = items.find((i) => i.performance_review_item_id === itemId);
+  if (!item) throw invalid({ performance_review_item_id: ["No such line"] });
+  const given = (k) => values[k] !== undefined;
+  const line = {
+    performance_review_item_id: itemId,
+    score: given("score") ? values.score : (item.score ?? item.proposed_score ?? null),
+    override_reason: given("override_reason") ? values.override_reason : item.override_reason || undefined,
+    comment: given("comment") ? values.comment : item.comment || undefined,
+  };
+  const heldAction = (i) => ({ performance_review_item_id: i.performance_review_item_id, title: i.corrective_title, owner_employee_id: i.corrective_owner_id, due_on: day(i.corrective_due_on) });
+  const actions = items.filter((i) => i.performance_review_item_id !== itemId && i.corrective_title && !i.corrective_task_id).map(heldAction);
+  if (given("corrective_title") || (item.corrective_title && !item.corrective_task_id)) {
+    const r = await repo.get(pool, id, actor, []);
+    const mine = { ...heldAction(item), title: values.corrective_title ?? item.corrective_title };
+    if (given("corrective_owner_id")) mine.owner_employee_id = values.corrective_owner_id;
+    if (given("corrective_due_on")) mine.due_on = values.corrective_due_on;
+    if (!mine.owner_employee_id) mine.owner_employee_id = r.employee_id;
+    if (!mine.due_on) throw invalid({ corrective_due_on: ["Pick a date"] });
+    actions.push(mine);
+  }
+  const body = contract.ReviewScoresSave.parse({ items: [line], actions });
+  const at = actions.findIndex((a) => a.performance_review_item_id === itemId);
+  try {
+    return await saveScores(actor, scope, id, body);
+  } catch (err) {
+    throw onCardFields(err, (k) => {
+      if (k.startsWith("items.0.")) return k.slice("items.0.".length);
+      if (at >= 0 && k.startsWith(`actions.${at}.`)) return `corrective_${k.slice(`actions.${at}.`.length).replace(/^owner_employee_id$/, "owner_id")}`;
+      return null;
+    });
+  }
+}
+
+/** A line of the person's own open check-in, by its words; an automatic line is never theirs to fill. */
+async function checkInItemIdOf(db, words, actor) {
+  const r = actor && actor.employee_id ? await repo.openOfEmployee(db, actor.employee_id) : null;
+  if (!r) return null;
+  const own = (await repo.items(db, r.performance_review_id)).filter((i) => !i.auto);
+  const found = oneNamed(own, words, (i) => [titleOf(i)], { drop: ["line"] });
+  return found ? found.performance_review_item_id : null;
+}
+
+/** "Which line?" answers for Save Check-In: the lines of the person's own open check-in they fill, by their words. */
+async function checkInItemChoices(db, actor) {
+  const r = actor && actor.employee_id ? await repo.openOfEmployee(db, actor.employee_id) : null;
+  if (!r) return [];
+  return (await repo.items(db, r.performance_review_id)).filter((i) => !i.auto).map(titleOf).filter(Boolean).map(choiceWords);
+}
+
+/** The person's own check-in, as a card names it, and the line it fills. */
+async function cardCheckIn(db, itemId, actor) {
+  const r = actor && actor.employee_id ? await repo.openOfEmployee(db, actor.employee_id) : null;
+  if (!r) return [];
+  const link = (routeMap.linkFor("review", r.performance_review_id, { self: true }) || {}).path || null;
+  return [{ type: "review", id: r.performance_review_id, label: `My check-in, ${r.round_name || "Probation"}`, link }];
+}
+
+/** The line a check-in card fills, by its words, when it is a line of the person's own open check-in. */
+async function cardCheckInLine(db, itemId, actor) {
+  const r = actor && actor.employee_id && isId(itemId) ? await repo.openOfEmployee(db, actor.employee_id) : null;
+  const item = r ? (await repo.items(db, r.performance_review_id)).find((i) => i.performance_review_item_id === itemId) : null;
+  return item ? [{ type: "performance_review_item", id: itemId, label: titleOf(item) }] : [];
+}
+
+/** Save Check-In's re-check: the person's open check-in, not sent, and the line one of theirs to fill. */
+async function assertCardCheckIn(db, itemId, actor) {
+  const r = await myOpen(db, actor);
+  if (r.status !== "check_in") throw new AppError("CHECK_IN_SENT", "Your check-in is already sent", 409);
+  const item = (await repo.items(db, r.performance_review_id)).find((i) => i.performance_review_item_id === itemId);
+  if (!item || item.auto) throw new AppError("NOT_FOUND", "That line is not on your check-in", 404, { performance_review_item_id: ["No such line"] });
+}
+
+/** Save Check-In's card: one line, its evidence a link, a source or a task, through Save Draft (saveCheckIn). */
+async function saveCheckInLine(actor, values) {
+  const { evidence_url: url, evidence_note: note, evidence_task_id: taskId, ...line } = values;
+  const item = Object.fromEntries(Object.entries(line).filter(([, v]) => v !== undefined));
+  if (url !== undefined) Object.assign(item, { evidence_kind: "link", evidence_url: url });
+  if (note !== undefined) Object.assign(item, { evidence_kind: "note", evidence_note: note });
+  if (taskId !== undefined) Object.assign(item, { evidence_kind: "record", evidence_entity_type: "task", evidence_entity_id: taskId });
+  try {
+    return await saveCheckIn(actor, contract.ReviewCheckInSave.parse({ items: [item] }));
+  } catch (err) {
+    const RENAME = { evidence_entity_id: "evidence_task_id", evidence_entity_type: "evidence_task_id" };
+    throw onCardFields(err, (k) => (k.startsWith("items.0.") ? RENAME[k.slice(8)] || k.slice(8) : null));
+  }
+}
+
 module.exports = {
+  aiSummary,
   reviewView,
   itemView,
   chainOf,
@@ -1313,4 +1542,19 @@ module.exports = {
   openProbation,
   myPerformance,
   myReviews,
+  titleOf,
+  reviewIdOf,
+  reviewChoices,
+  reviewItemIdOf,
+  reviewItemChoices,
+  cardReview,
+  cardItem,
+  assertCardScore,
+  saveScore,
+  checkInItemIdOf,
+  checkInItemChoices,
+  cardCheckIn,
+  cardCheckInLine,
+  assertCardCheckIn,
+  saveCheckInLine,
 };

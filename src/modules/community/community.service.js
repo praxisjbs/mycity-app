@@ -15,6 +15,13 @@
  *
  * Every write runs in one transaction with emit(); realtime pushes and notifications are
  * outbox handlers in community.events.js.
+ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decisions 19, 33 and 40) find a channel, a
+ * celebration card or the person's own newest message by its words (channelIdOf, celebrationIdOf,
+ * messageIdOf), offer the person's own as answers to tap when it was not said (adminChannelChoices,
+ * celebrationChoices; decision 34), name it on the card without its words (cardNames, cardChannel,
+ * cardCelebration, cardMessage), re-check it at the press (assertCardCelebration, assertCardMessage,
+ * assertAdmin) and run the functions the screens' own buttons call (createChannelFromCard, changeChannel).
  */
 const crypto = require("node:crypto");
 const { FORWARDABLE: FORWARDABLE_TYPES, repeatedChoices } = require("@mycity/contract").community;
@@ -34,6 +41,8 @@ const { EVENTS } = require("./community.events");
 const { noteFor } = require("./community.recognition");
 const links = require("./community.links");
 const { wishFor } = require("./community.celebrations");
+const { common: shapes } = require("@mycity/contract");
+const { oneNamed, oneNamedIn, plainWords } = require("../../shared/ai/named");
 
 /** Mailbox's own service, asked for a mail attachment's file (loaded on use, so the two modules load apart). */
 const mailbox = () => require("../mailbox/mailbox.service");
@@ -1239,6 +1248,72 @@ async function openDirect(employeeId, user) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11; decision 19): a message to a colleague,
+ * in the conversation with them, and a post in a channel, each sent as the chat box sends it.
+ * The assistant reads no conversation (community.md §9); it only carries the person's words.
+ * ------------------------------------------------------------------ */
+
+/** A text message to one colleague: their conversation opened when there is none, then posted. */
+async function sendDirect(employeeId, body, user) {
+  const channelId = await tx((client) => directWith(client, employeeId, user));
+  return postMessage(channelId, { message_type: "text", body }, user);
+}
+
+/**
+ * A colleague's login named by their words (praxis-ai.md decision 34): among the directory's people
+ * with a login, the caller too, searched by the words first; null when none or several match.
+ */
+async function loginNamed(userId, words) {
+  for (const q of [words, null]) {
+    const page = await repo.listColleagues(pool, { page: 1, q: q || null, with_self: true }, userId);
+    const found = oneNamed(page.data, words, (r) => [r.person.display_name]);
+    if (found) {
+      const p = await repo.profile(pool, found.person.employee_id);
+      return (p && p.user_id) || null;
+    }
+  }
+  return null;
+}
+
+/** Logins as a card names them: each user id with its person's name. */
+async function loginNames(db, userIds) {
+  return (await repo.loginNames(db, [...new Set(userIds || [])].slice(0, 50))).map((r) => ({ type: "user", id: r.user_id, label: r.name }));
+}
+
+/** The colleagues a card names, by name; an id that is nobody's keeps its id alone. */
+async function colleagueRecords(db, ids) {
+  const people = await repo.people(db, [...new Set(ids || [])].slice(0, 25));
+  return [...new Set(ids || [])].slice(0, 25).map((id) => {
+    const p = people.get(id);
+    return { type: "employee", id, label: p && p.display_name ? p.display_name : null };
+  });
+}
+
+/** The channels a card names, by name, for the person who is a member; another keeps its id alone. */
+async function channelRecords(db, ids, user) {
+  const out = [];
+  for (const id of [...new Set(ids || [])].slice(0, 25)) {
+    const ch = await repo.membership(db, id, user.user_id);
+    out.push({ type: "channel", id, label: ch && ch.name ? `#${ch.name}` : null });
+  }
+  return out;
+}
+
+/** The card's re-check for a message: the colleague works here and can sign in. */
+async function assertColleague(db, employeeId) {
+  const people = await repo.people(db, [employeeId]);
+  if (!people.has(employeeId)) throw new AppError("NOT_A_COLLEAGUE", "That person is not on the staff", 422, { employee_id: ["Not a colleague"] });
+  if (!(await repo.userOfEmployee(db, employeeId))) throw new AppError("NO_LOGIN", "That colleague has no login yet", 422, { employee_id: ["No login yet"] });
+}
+
+/** The card's re-check for a post: a member of the channel who may post in it. */
+async function assertMayPost(db, channelId, user) {
+  const m = await repo.membership(db, channelId, user.user_id);
+  if (!m) throw new AppError("NOT_A_MEMBER", "You are not in that channel", 404, { community_channel_id: ["Not a member"] });
+  if (!mayPost(m)) throw new AppError("CANNOT_POST", "You cannot post in this channel", 403, { community_channel_id: ["Cannot post here"] });
+}
+
+/* ------------------------------------------------------------------ *
  * Forwarding (§3 step 19)
  * ------------------------------------------------------------------ */
 
@@ -1455,7 +1530,142 @@ function touchPresence(userId) {
   return repo.touchPresence(pool, userId);
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decisions 19, 33 and 40): nothing here reads a
+ * message's words into a card.
+ * ------------------------------------------------------------------ */
+
+const isCardId = (v) => typeof v === "string" && shapes.uuid.safeParse(v).success;
+const CHANNEL_WORDS = ["channel", "the", "chat", "conversation", "with", "my"];
+const OCCASION = { birthday: "birthday", anniversary: "work anniversary" };
+
+/** The people and departments a Staff Community card holds, by name (decision 31). */
+function cardNames(db, { employees = [], departments = [] } = {}) {
+  const ids = (v) => [...new Set((Array.isArray(v) ? v : [v]).filter(isCardId))];
+  return repo.cardNames(db, { employeeIds: ids(employees), departmentIds: ids(departments) });
+}
+
+/**
+ * A conversation a person names: one of their channels by its name ("#sales"), or with `direct` a
+ * conversation with a colleague by the colleague's name.
+ */
+async function channelIdOf(db, words, user, { direct = false } = {}) {
+  const said = plainWords(String(words || "").replace(/^#/, ""), CHANNEL_WORDS);
+  const channels = (q) => async () => (await repo.listChannels(db, user.user_id, { page: 1, ...(q ? { q } : {}) })).data;
+  const found = await oneNamedIn([channels(said), channels(null)], said, (ch) => [ch.name], { drop: CHANNEL_WORDS });
+  if (found) return found.community_channel_id;
+  if (!direct) return null;
+  const chats = (await repo.listConversations(db, user.user_id, { page: 1, q: said })).data;
+  const chat = oneNamed(chats, said, (x) => [x.person && x.person.display_name], { drop: CHANNEL_WORDS });
+  return chat ? chat.community_channel_id : null;
+}
+
+/**
+ * "Which channel?" answers for Save Channel (decision 34): the person's own channels they are an
+ * admin of, as Edit Channel is offered, never #general or #announcements; by name as channelIdOf matches it.
+ */
+async function adminChannelChoices(db, user) {
+  const page = await repo.listChannels(db, user.user_id, { page: 1 });
+  return page.data.filter((ch) => ch.member_role === "admin" && !ch.system_key).map((ch) => `#${ch.name}`);
+}
+
+/** A conversation as a card names it: "#sales", or the colleague a direct one is with. */
+async function cardChannel(db, id, user) {
+  const ch = isCardId(id) ? await repo.membership(db, id, user.user_id) : null;
+  if (!ch) return [];
+  if (ch.channel_type !== "direct") return [{ type: "channel", id, label: `#${ch.name}` }];
+  const chat = await repo.conversationFor(db, id, user.user_id);
+  return [{ type: "direct_thread", id, label: chat && chat.person ? chat.person.display_name : "Direct message" }];
+}
+
+/** New Channel's card: the channel, then its purpose posted in it, as New Channel's own form does. */
+async function createChannelFromCard(values, user) {
+  const made = await createChannel(values, user);
+  if (values.description) await postMessage(made.community_channel_id, { message_type: "text", body: `Created #${made.name}: ${values.description}` }, user);
+  return made;
+}
+
+/** Edit Channel's card: its name and purpose, what it leaves out as the channel stands; null clears the purpose. */
+async function changeChannel(values, user) {
+  const held = await getChannel(values.community_channel_id, user);
+  return updateChannel(
+    values.community_channel_id,
+    { name: values.name ?? held.name, description: values.description === undefined ? held.description : values.description },
+    user,
+  );
+}
+
+/** A live birthday or anniversary card of the last two weeks, named by whose it is, in the person's conversations. */
+async function celebrationIdOf(db, words, user) {
+  const cards = (await repo.celebrationCards(db, user.user_id, { page: 1 })).data;
+  const found = oneNamed(cards, words, (x) => [x.subject_name], { drop: ["birthday", "anniversary", "work", "card", "celebration", "the", "s"] });
+  return found ? found.community_message_id : null;
+}
+
+/** "Whose card?" answers for Send Wishes (decision 34): the live cards of the last two weeks, as celebrationIdOf matches them. */
+async function celebrationChoices(db, user) {
+  const cards = (await repo.celebrationCards(db, user.user_id, { page: 1 })).data;
+  return cards.filter((x) => x.subject_name).map((x) => `${x.subject_name}'s ${OCCASION[x.message_type]}`);
+}
+
+/** The card a wish goes under, by whose it is and what it celebrates. */
+async function cardCelebration(db, id, user) {
+  const row = isCardId(id) ? await repo.celebrationCard(db, id, user.user_id) : null;
+  return row ? [{ type: "channel_message", id, label: `${row.subject_name || "A colleague"}'s ${OCCASION[row.message_type]}` }] : [];
+}
+
+/** Send Wishes' re-check: a live card in a conversation the person is in (cardFor's rule), on the card's field. */
+async function assertCardCelebration(db, id, user) {
+  const row = isCardId(id) ? await repo.celebrationCard(db, id, user.user_id) : null;
+  if (!row || row.deleted_at) throw new AppError("NOT_FOUND", "That card is not there any more", 404, { community_message_id: ["No such card"] });
+}
+
+/** The person's own newest message in a conversation: their newest poll when they say poll, else their newest text or poll. */
+async function messageIdOf(db, channelId, words, user) {
+  if (!isCardId(channelId)) return null;
+  const types = /\bpoll\b/i.test(String(words || "")) ? ["poll"] : ["text", "poll"];
+  const row = await repo.ownLatest(db, channelId, user.user_id, types);
+  return row ? row.community_message_id : null;
+}
+
+/** A message as a card names it: by where it is, never by its words (decision 19). */
+async function cardMessage(db, values, user) {
+  const row = isCardId(values.community_message_id) ? await repo.messageForCard(db, values.community_message_id) : null;
+  if (!row || row.sender_user_id !== user.user_id) return [];
+  const where = (await cardChannel(db, row.community_channel_id, user))[0];
+  const what = row.message_type === "poll" ? "Your poll" : "Your message";
+  const label = where ? (where.type === "channel" ? `${what} in ${where.label}` : `${what} to ${where.label}`) : what;
+  return [{ type: "channel_message", id: row.community_message_id, label }];
+}
+
+/** Save Message's re-check: the person's own message in the conversation named, still open to change (editMessage's rules). */
+async function assertCardMessage(db, values, user) {
+  const row = isCardId(values.community_message_id) ? await repo.messageForCard(db, values.community_message_id) : null;
+  if (!row || row.deleted_at || row.community_channel_id !== values.community_channel_id || !(await repo.membership(db, row.community_channel_id, user.user_id)))
+    throw new AppError("NOT_FOUND", "That message is not there any more", 404, { community_message_id: ["No such message"] });
+  if (row.sender_user_id !== user.user_id) throw new AppError("NOT_YOURS", "Only its author edits a message", 403, { community_message_id: ["Not yours"] });
+  if (row.message_type === "text" && Date.now() - new Date(row.sent_at).getTime() >= EDIT_WINDOW_MS)
+    throw new AppError("EDIT_WINDOW_PASSED", "Too late to edit this message", 409, { body: ["Too late to edit"] });
+  if (row.message_type === "poll" && ((row.metadata || {}).closed || (await repo.voteCount(db, row.community_message_id)) > 0))
+    throw new AppError("POLL_HAS_VOTES", "People have voted on this poll", 409, { body: ["Already has votes"] });
+  if (!["text", "poll"].includes(row.message_type)) throw new AppError("NOT_EDITABLE", "This kind of message is not edited", 422, { community_message_id: ["Not editable"] });
+}
+
 module.exports = {
+  assertAdmin,
+  cardNames,
+  channelIdOf,
+  adminChannelChoices,
+  cardChannel,
+  createChannelFromCard,
+  changeChannel,
+  celebrationIdOf,
+  celebrationChoices,
+  cardCelebration,
+  assertCardCelebration,
+  messageIdOf,
+  cardMessage,
+  assertCardMessage,
   joinLogin,
   joinEveryone,
   setPinned,
@@ -1495,6 +1705,13 @@ module.exports = {
   transcript,
   listConversations,
   openDirect,
+  sendDirect,
+  colleagueRecords,
+  loginNamed,
+  loginNames,
+  channelRecords,
+  assertColleague,
+  assertMayPost,
   listColleagues,
   listForwardTargets,
   forward,

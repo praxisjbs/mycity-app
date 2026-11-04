@@ -8,7 +8,7 @@
  * is its urgency (TB, 19/10/2026): an urgent one counts as read only once acknowledged.
  */
 const { z } = require("zod");
-const { uuid, text, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { NotificationUrgency } = require("./notifications");
 
@@ -77,6 +77,46 @@ const AnnouncementUpdate = z
   })
   .strict();
 
+/*
+ * Praxis AI's cards for New Announcement and Edit Announcement (docs/guides/praxis-ai.md §6.11,
+ * decision 40): the audience as a person reads it, All Staff or Departments, beside its departments,
+ * which the press sends as the form's Audience. Left without a time, it is published at once.
+ */
+const CardAudience = z.enum(["all_staff", "departments"]);
+const audienceRules = (v, ctx) => {
+  if (v.audience === "departments" && !(v.department_ids || []).length)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["department_ids"], message: "Choose a department" });
+  if (v.audience === "all_staff" && (v.department_ids || []).length)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["department_ids"], message: "All staff names none" });
+};
+
+const AnnouncementPost = z
+  .object({
+    title: text(120),
+    body: text(4000),
+    audience: CardAudience.default("all_staff"),
+    department_ids: z.array(uuid).max(50).default([]),
+    urgency: NotificationUrgency.default("normal"),
+    publish_at: isoDateTime.optional(),
+  })
+  .strict()
+  .superRefine(audienceRules);
+
+/** A scheduled announcement changed as a card: the announcement beside only what changes. */
+const AnnouncementChange = z
+  .object({
+    announcement_id: recordId("announcement"),
+    title: text(120).optional(),
+    body: text(4000).optional(),
+    audience: CardAudience.optional(),
+    department_ids: z.array(uuid).max(50).optional(),
+    urgency: NotificationUrgency.optional(),
+    publish_at: isoDateTime.optional(),
+  })
+  .strict()
+  .refine(changesBeside(["announcement_id"]), nothingOn("announcement_id"))
+  .superRefine((v, ctx) => (v.audience ? audienceRules(v, ctx) : undefined));
+
 /** GET /community/announcements/:id/reads: one person in the audience. */
 const AnnouncementReader = z
   .object({
@@ -115,6 +155,14 @@ const TABLES = {
   AnnouncementPage: { table: null, reason: "a page of announcements" },
   AnnouncementCreate: { table: "announcement" },
   AnnouncementUpdate: { table: "announcement" },
+  AnnouncementPost: {
+    table: "announcement",
+    virtual: { department_ids: "the departments of announcement.audience (jsonb) when it is for departments" },
+  },
+  AnnouncementChange: {
+    table: "announcement",
+    virtual: { department_ids: "the departments of announcement.audience (jsonb) when it is for departments" },
+  },
   AnnouncementReader: {
     table: "announcement_read",
     virtual: { person: "the reader's employee, as a PersonRef with their photo_url" },
@@ -136,6 +184,8 @@ module.exports = {
   AnnouncementPage,
   AnnouncementCreate,
   AnnouncementUpdate,
+  AnnouncementPost,
+  AnnouncementChange,
   AnnouncementReader,
   AnnouncementReadQuery,
   AnnouncementReadPage,

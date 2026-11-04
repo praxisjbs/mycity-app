@@ -94,7 +94,9 @@ mycity-app/
 │   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
 │   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test)
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md;
-│   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30)
+│   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30);
+│   │                         ai-catalogue.js writes src/shared/ai/catalogue.snapshot.json, the AI manifests as
+│   │                         the build declares them (npm run gen:ai-catalogue; gate 23 holds it current)
 │   ├── new-component.js      npm run new:component: a shared component with header, test and gallery page
 │   ├── new-screen.js         npm run new:screen: a staff-app screen in its module, the route map, PROGRESS and the gates
 │   ├── check/                the CI gates (§8); frontend: components (palette, contrast and more in PR 1)
@@ -124,7 +126,9 @@ mycity-app/
 │   ├── guide/                the User Guide's pictures: shoot.js (npm run guide:shots) takes each chapter's
 │   │                         pictures on the demo build, desktop and phone, with numbered marks; lib.js,
 │   │                         shared with check/user-guide.js: the chapters on disk and each picture's hashes
-│   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging
+│   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging;
+│   │                         attack-assistant.js: its attack suite, asked of the real model on staging
+│   │                         nightly through deploy-gate attack (docs/guides/praxis-ai.md §6.17)
 │   │                         with a real key before a change to its prompt or loop ships (not in CI)
 │   ├── ops/                  health-brief.js: the Status brief made on the server (npm run health:brief),
 │   │                         and with --watch the health watch that mails it when something is down
@@ -172,7 +176,7 @@ mycity-app/
 │                             fonts) and build.js (the standalone page in dist/; --check fits each
 │                             page to A4, at most 17, and prints the PDF)
 ├── .github/
-│   ├── workflows/            ci.yml (`npm run ci` as four parallel jobs, backend, frontend, screens and checks, and the `ci` check over them; none on a draft PR), release.yml, rollback.yml, uptime.yml
+│   ├── workflows/            ci.yml (`npm run ci` as four parallel jobs, backend, frontend, screens and checks, and the `ci` check over them; none on a draft PR), release.yml, rollback.yml, uptime.yml, ai-nightly.yml (Praxis AI's attack suite on staging every night, docs/guides/praxis-ai.md §6.17)
 │   │                         (the uptime probe every 10 minutes)
 │   ├── CODEOWNERS            who must approve each path (checked by check/codeowners.js)
 │   └── pull_request_template.md
@@ -248,7 +252,14 @@ src/
 │   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms;
 │   │                  screens.test: which tabs a reader sees) · actions (⌘K actions: each screen's
 │   │                  New action, Clock In, Request Leave)
-│   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
+│   ├── ai/            manifest (reads, summaries, actions and routes, checked at load) · registry · catalogue-sync ·
+│   │                  authorise (a read, a summary or an action with the person's rights, inside a 3 second
+│   │                  statement timeout) · summary (the shape of a summary's figures, groups, series and
+│   │                  period, one way for every module) · summary-cache (a summary's figures in Redis for
+│   │                  a minute, never across people) · cite · named (a record a person names by its words,
+│   │                  among a few of their own: a leave type, a late reason, a step) · change (a card's
+│   │                  change laid over what is saved, held to the form's own schema) ·
+│   │                  catalogue.snapshot.json (gate 23's committed snapshot of every read, summary, action and route)
 │   └── observability/ scrub · metrics · error-reporter · request-stats (a minute of traffic a
 │                      row and each route a quarter hour, with latency buckets, for Settings ·
 │                      Performance) · process-beat (each API and worker process's own row a
@@ -271,8 +282,14 @@ src/
 │   │                  its job) · jobs (each action's chain and each model's state, AI Control) ·
 │   │                  prices (what a step is charged at, in naira) · skips (a provider skipped until
 │   │                  its quota resets) · vendors/{http, gemini, groq, openai, anthropic, deepseek,
-│   │                  stub} · prompts/*.md · assistant/{orchestrator (one question: the reads
-│   │                  as tools, the loop, the answer), answer (what the screen shows)} (M10)
+│   │                  stub} · prompts/*.md · engine/{index (createEngine), turn (the rounds with the
+│   │                  model, the read cap, the forced answer, the correction and the rescue), cards (a
+│   │                  card's rules: fields, confirm classes, expiry, states), pane (Sources and Overview
+│   │                  from a turn), content (what of a read goes back to the model), matrix (the test
+│   │                  cases a registry implies), errors}: the Praxis AI Engine, pure, gate 24
+│   │                  (docs/guides/praxis-ai.md §6.14) · assistant/{orchestrator (the adapter: one
+│   │                  question, the reads and summaries as tools, the actions offered, the screen
+│   │                  context), answer (what the screen shows; the card drafted)} (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── maps/          geoapify.service (the address search, a pinned point's nearest address and the
@@ -394,7 +411,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `security` | `.mfa` (TOTP codes, recovery codes), `.passkeys` (WebAuthn), `.pin`, `.challenge` (single-use tickets), `.signin` (what `identity`'s sign-in calls) | Each person's two-step sign-in, passkeys and PIN, the fresh-sign-in check, Reset Two-Step (`docs/guides/identity.md`); came forward from M9 (TB, 16/10/2026) |
 | `access` | | Roles created, edited and deleted with their grants, record scope, field visibility and capabilities; the matrix; two-step required by role (`docs/guides/foundation.md` §6.3) |
 | `audit` | `audit.events.js` (the Excel export, made in the worker and downloaded where it was asked for) | Audit ledger read at 25 with filters, the summary, masked per reader |
-| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template, in the request; the pdf-render job draws it and the screen downloads it) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF. People · Departments (`app/src/features/people/Departments.tsx`, tested by `Departments.test.tsx`): set heads, moves, merge, retire and delete, with lines and the head's role following the head (migration `2600_department_management.sql`; `docs/guides/organogram.md` §6.1), tested by `tests/integration/departments.test.js` |
+| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template, in the request; the pdf-render job draws it and the screen downloads it), `organisation.cards.js` (what Praxis AI's People cards name, re-check and run: Add Employee, Save Record, Save Line, departments and open roles, through this service in a transaction of their own, `docs/guides/praxis-ai.md` §6.11) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF. People · Departments (`app/src/features/people/Departments.tsx`, tested by `Departments.test.tsx`): set heads, moves, merge, retire and delete, with lines and the head's role following the head (migration `2600_department_management.sql`; `docs/guides/organogram.md` §6.1), tested by `tests/integration/departments.test.js` |
 | `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
 | `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (the reminder engine, Approvals Waiting, Probation Ending and the daily digest), `notifications.rules.js` (Settings · Notifications: the company's rule per notice and its reminders) | Caller's own inbox, preferences, quiet hours, digest and devices; Settings · Notifications (`docs/guides/notifications.md`) |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
@@ -418,8 +435,8 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `leave` | AJ | `.balance` (the dates and allowance rules), `.clash` (who else in the department is away); requests open the `leave.approval` flow, decided in `workflow` |
 | `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave`, `.queries` (M3, GE) (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, downloaded where it was asked for, removed a day later) |
 | `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20), `.links` (link cards: fetched once per address and kept for a week, their pictures in the vault) |
-| `announcements` | GE | |
-| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test`; `.assist` (Write With AI, Tidy Up, Dictate and Summarise Thread, M10's mail AI brought forward: the conversation read, contact details shielded, every answer held to ready to send, summaries kept; docs/guides/mailbox.md §1.1), the prompts `services/ai/prompts/mail-{draft,tidy,summary,dictation}.md`, `migrations/10300_mail_thread_summary.sql`; on screen `app/src/features/mailbox/Assist.tsx` (the AI step inside the composer and the Summary card) |
+| `announcements` | GE | `.ai` (Praxis AI's Publish Announcement and Save Announcement cards; its read is `community.ai.js`'s) |
+| `mailbox` | GE | `.ai` (no read, one action: `mail.send`, a mail the assistant wrote and the person sends, docs/guides/praxis-ai.md §6.11), `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test`; `.assist` (Write With AI, Tidy Up, Dictate and Summarise Thread, M10's mail AI brought forward: the conversation read, contact details shielded, every answer held to ready to send, summaries kept; docs/guides/mailbox.md §1.1), the prompts `services/ai/prompts/mail-{draft,tidy,summary,dictation}.md`, `migrations/10300_mail_thread_summary.sql`; on screen `app/src/features/mailbox/Assist.tsx` (the AI step inside the composer and the Summary card) |
 
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
 `services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `services/media/pdf-pipeline`
@@ -478,9 +495,9 @@ and `performance-commitments-seed.test.js` (the staging seed).
 | Module | Files beyond the template |
 |---|---|
 | `queries` | `.visibility` (a manager sees only queries they raised), `.response`, `.escalate`, `.assist` (Write With AI on Raise a Query, prompt `services/ai/prompts/query-draft.md`; on screen `app/src/features/queries/WriteWithAi.tsx`, shared with the letter editor), `.signature` (My Signature: drawn once on Letter Templates, kept through the vault in `letter_signature`, migration `3050`) |
-| `query_rules` | `.evaluator` (outbox subscriber: N events in a window) |
+| `query_rules` | `.evaluator` (outbox subscriber: N events in a window), `.ai` (Save Rule as a Praxis AI card for holders of `queries.configure`) |
 | `sanctions` | `.chain` (workflow definition), `.fines` (pending deduction for M6), `.letters` |
-| `templates` | Editable letter templates (M3), mail templates (M5); `.assist` (Write With AI on the letter editor, prompt `services/ai/prompts/letter-draft.md`) |
+| `templates` | Editable letter templates (M3), mail templates (M5); `.assist` (Write With AI on the letter editor, prompt `services/ai/prompts/letter-draft.md`), `.ai` (Add Letter and Save Letter as Praxis AI cards, a letter's own {{ names }} passing the card's guard) |
 
 Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
 `shared/templates`. Templates: `query-letter`, `caution-letter`, `warning-letter`,
@@ -572,10 +589,12 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 | Module | Files beyond the template |
 |---|---|
 | `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
-| `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read), `.search` (the caller's own conversations), `.events` (audit only, and the `ai_voice_question` document type). Engine in `services/ai/assistant/{orchestrator, answer}.js`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read (`docs/guides/praxis-ai.md`) |
+| `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read), `.search` (the caller's own conversations), `.events` (audit only, the card events, and the `ai_voice_question`, `ai_history_export` and `ai_answer_export` document types), `.cards` (a card's life: read, edited, pressed with the five-minute confirm for a sensitive class, cancelled; `docs/guides/praxis-ai.md` §6.11), `.reads` (a read of an answer run again, 25 a page, §6.12; the replay the export walks), `.export` (History's Export, and Download Excel on an answer's read through the one export path with About This File, §6.16); the service pushes `ai:progress` to the asker's realtime room before each read (§6.1.8). The adapter in `services/ai/assistant/{orchestrator, answer}.js` over the engine `services/ai/engine/`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read; the screens' views are the Assistant group of `packages/ui`, with `app/src/features/assistant/Card.tsx` wiring an answer's card (Edit, the press through Confirm It's You, Cancel, Draw It Again; `docs/guides/praxis-ai.md` §6.11); tested on the real migrations by `tests/integration/{ai-cards, ai-matrix, ai-summaries, ai-actions-workspace, ai-actions-leave, ai-actions-approvals, ai-actions-community, ai-actions-mailbox, ai-actions-people, ai-actions-queries, ai-actions-policies, ai-actions-performance, ai-attacks}.test.js` (the matrix with each scoped module's probes, the attack suite with the model scripted; `docs/guides/praxis-ai.md` §6.17), the action suites sharing `tests/integration/helpers/ai-actions.js` (people, scripted Gemini, the three ways to confirm); `tests/unit/foundation/ai-attacks.test.js` checks the attack suite's grading without a key |
 | `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
-The assistant **reads only** (A23). It answers from the manifests every module has carried since M1.
+The assistant answers from the manifests every module has carried since M1, and acts only through
+a declared action a person confirms (A23 as amended 01/11/2026; `docs/guides/praxis-ai.md` §1.2,
+§6.11): the module's own service function runs it, with the person's rights re-checked at the press.
 
 ### 5.14 M11 · Handover & Training · TB, all · 14 to 18 Dec
 
@@ -787,10 +806,12 @@ group builds its own demo app and gallery under `node_modules/.cache/mycity/`, a
 | 16 No native dialogs | M1 | `check/native-dialogs.js` (and its aliases) and the lint rule in `packages/ui/eslint.shared.js` |
 | 17 No dashes | M1 | `check/dashes.js` (demo, both apps, `src/` strings, templates, the manual) |
 | 18 Upload engine | M1 | `check/upload.js` (no raw file input outside `packages/ui/src/form`) and the lint rule |
-| 19 AI read manifest only | M4 | `check/ai-no-writes.js` |
+| 19 AI manifests: reads, summaries, declared actions and routes only | M4 | `check/ai-no-writes.js`: no write by another name, no SQL and no `.query()` inside a manifest, every manifest loads (`docs/guides/praxis-ai.md` §6.11) |
 | 20 Money | M6 | `check/money.js` |
 | 21 Nothing the browser styles itself | M0 | `check/native-ui.js`: no native select, picker, spinner, checkbox, `title` tooltip, validation bubble or unbranded toast, in source and on every gallery page and app screen in Chromium (F25), no exemptions |
 | 22 Addresses picked, never typed | M0 | `check/addresses.js`: every request body field named like an address is the contract's `PlaceInput` and kept by a registered owner, every owner registers its rename, and every address field on a screen is an `AddressField` or a `PlacesField` (F27, `docs/guides/addresses.md` §6.10); a deliberate exception carries `address:none <reason>` |
+| 23 AI awareness | M10 | `check/ai-awareness.js`: the committed catalogue snapshot equals the manifests (`npm run gen:ai-catalogue`), an action's input is the schema its module's form validates with, every action has an integration test and an evaluation case, every module whose contract exports a `<Thing>Create` schema offers it, lists it in `not_offered` with a reason or opted out whole with one (`--list` prints the sweep), Try Asking names reads that exist, and every create and edit form of a built module is an action, reached `via` another, never for a named reason (`secret`, `device`, `personal`, `file`, `ai`) or on `scripts/check/ai-forms-gaps.json`, today's gaps, a list that only shrinks (decision 33; `docs/guides/praxis-ai.md` §6.15) |
+| 24 AI engine boundary | M10 | `check/ai-engine-boundary.js`: `services/ai/engine/` requires only Node's builtins and its siblings; nothing outside reaches past its index (`docs/guides/praxis-ai.md` §6.14) |
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/capabilities.js` (from M1: every capability catalogued once and seeded, §5.2), `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,

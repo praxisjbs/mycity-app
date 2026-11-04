@@ -57,6 +57,15 @@ const AuditEntry = z
 
 /** GET /audit: newest first unless sorted otherwise. */
 const AuditListQuery = listQuery(filters, ["occurred_at"]);
+
+/**
+ * The assistant's Audit Log summary (docs/guides/praxis-ai.md §6.13; foundation.md §9): entries by action,
+ * by actor and by day over a period (the last 30 days unless `from` or `to` says otherwise), with the
+ * log's own filters, and a third grouping by module or record type. Figures, never rows; no page. Only for
+ * a reader of the whole log (Settings view over everything, and the CEO).
+ */
+const AuditSummaryBy = z.enum(["module", "entity_type"]);
+const AuditSummaryQuery = z.object({ ...filters, by: AuditSummaryBy.default("module") }).strict();
 const AuditPage = Paged(AuditEntry);
 
 /** GET /audit/summary */
@@ -92,6 +101,7 @@ const TABLES = {
     },
   },
   AuditListQuery: { table: null, reason: "list controls and the Audit Log's filters" },
+  AuditSummaryQuery: { table: null, reason: "the Audit Log's filters and the grouping of the assistant's summary; figures, never a row" },
   AuditPage: { table: null, reason: "a page of ledger entries" },
   AuditSummary: { table: null, reason: "counts over audit_ledger, and the module list of the access catalogue" },
   AuditExportRequest: { table: null, reason: "the Audit Log's filters, carried to the worker that builds the export" },
@@ -103,6 +113,7 @@ module.exports = {
   ActionKey,
   AuditEntry,
   AuditListQuery,
+  AuditSummaryQuery,
   AuditPage,
   AuditSummary,
   AuditExportRequest,

@@ -8,6 +8,7 @@
  *                summary. The reader's own, or for a manager someone's in their `workspace` scope.
  *   save()       the reader's own Support Needed line and a summary they accepted (weekly_summary).
  *   teamWeeks()  Team This Week: one row per person in the reader's scope but themselves.
+ *   weekOf()     the Monday of a week a person names (a day in it, or this, next or last week).
  *   tidy()       Tidy With AI: the week's lists and the line made into a short summary, only when
  *                pressed (action `week-summary`, Default, personal data). Nothing is saved: the
  *                person keeps it (save() with its run) or discards it.
@@ -36,6 +37,19 @@ const thisMonday = (now = new Date()) => {
   const today = lagos.today(now);
   return lagos.addDays(today, 1 - lagos.weekday(today));
 };
+
+/**
+ * The week a person names (docs/guides/praxis-ai.md §6.11, `resolve` on the week's card): any day
+ * in it, as a date, or this week, next week or last week, as that week's Monday; null for anything
+ * else, which the card then marks.
+ */
+function weekOf(said, now = new Date()) {
+  const words = String(said || "").trim().toLowerCase();
+  const day = words.slice(0, 10);
+  if (lagos.isDate(day)) return lagos.addDays(day, 1 - lagos.weekday(day));
+  const shift = { "this week": 0, "next week": 7, "last week": -7 }[words.replace(/[^a-z]+/g, " ").trim()];
+  return shift === undefined ? null : lagos.addDays(thisMonday(now), shift);
+}
 
 /** The week from its Monday: [from, to) for done, [to, next) for planned. */
 function windowOf(monday) {
@@ -216,4 +230,4 @@ async function tidy(actor, body) {
   }
 }
 
-module.exports = { week, save, teamWeeks, tidy, thisMonday };
+module.exports = { week, save, teamWeeks, tidy, thisMonday, weekOf };

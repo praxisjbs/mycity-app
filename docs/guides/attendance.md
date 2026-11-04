@@ -1330,13 +1330,39 @@ never leave identity, and no log line carries them.
 
 ## 9 · AI and search
 
+- **AI summary** (`attendance.ai.js`, `docs/guides/praxis-ai.md` §6.13): `attendance.summary`
+  (`people` view, the caller's scope; `AttendanceSummaryQuery`: a period, a department, a person,
+  and `by` person, department, site, day, week or month): days, people, present, late, absent, on
+  leave, minutes late and per late day, minutes worked, exceptions and open ones; by person,
+  department or site the late days (20), most minutes late (10) and absent days (20); by day, week
+  or month the same as series of the newest 60 buckets. One SQL over `attendance_day`
+  (`attendance.repo.summary`), figures never rows, inside the assistant's 3 second read timeout.
 - **AI reads** (`attendance.ai.js`): `attendance.my_days` (ess view, own), `attendance.register`
-  and `attendance.exceptions` (`people` view, the caller's scope); the rules in force are read through
+  and `attendance.exceptions` (`people` view, the caller's scope; the register's description tells
+  the model that Not In is a working day still open with no clock-in and Absent a closed one, so
+  "who is absent today" counts the people Not In, `praxis-ai.md` §6.2); the rules in force are read through
   `policies.text` (`policies.md` §9; `attendance.policy` is removed in PR 1);
   `attendance.my_pay_items` (ess view, own) and `attendance.pay_items` (`people` view, the caller's
   scope, `pay_amount` masked as the salary is, the assistant's own reads included); from PR 4 `attendance.temporary_sites` (the reader's scope, no addresses); `devices.ai.js`: `devices.mine`,
   `devices.list`; `worksites.ai.js`: `worksites.list`. Every list is a page of 25, through the same
   service and scope as the screen; no coordinates, no device identifier, no evidence blob.
+- **AI actions** (`attendance.ai.js`, `docs/guides/praxis-ai.md` §6.11, decisions 33 to 39): two
+  forms as cards the person confirms, each through the screen's own function. **Approve Overtime**
+  (`overtime.approve`, `people` approve, risk approval: Confirm It's You, since it decides pay):
+  `OvertimePreApprovalCreate`, the person picked from People's register and named only when in the
+  reader's reach (else Pick one), the day, the minutes and why; at the press someone in scope, at
+  work now, never one's own (`attendance.pay.assertCardOvertime`), then `approveOvertime` as the
+  sheet calls it (§6.17). **Add Work Site** (`temporary_sites.add`, `ess` create, standard):
+  `TemporarySiteAdd`, the sheet's fields with one address, picked as every address is (the model's
+  words are searched and the one place found is signed; several or none read Pick one, and Edit picks
+  it with AddressField, `addresses.md` §9), its label and radius, and who goes (the person
+  included); never a Temporary Home, a home being personal data; sent as `TemporarySiteCreate` to
+  `sites.submit`, for approval as the sheet sends it (§6.11). The sheet's other seven addresses, a
+  Temporary Home and People's own Save Site stay on the screens. **Add Worksite** and **Save
+  Worksite** (`worksites.ai.js`, `people` create and edit, standard): `WorksiteAdd` and
+  `WorksiteChange`, the name, the address picked the same way, the radius and time zone, retire or
+  restore; the centre is the place's point, as the form fills it from the pick; sent as
+  `WorksiteCreate` and `WorksiteUpdate` to `worksites.service` (§6.5).
 - **AI routes**: clock in or see my attendance → ESS · My Attendance; review attendance → People ·
   Attendance; register a device → ESS · My Devices; add a worksite → People · Worksites; set my
   home location → ESS · My Attendance; approve home locations → People · Attendance (these two only
@@ -1344,7 +1370,7 @@ never leave identity, and no log line carries them.
   §1.3); approve work location requests → People · Worksites;
   read or acknowledge the attendance policy → ESS · Policy Updates; change the attendance policy →
   Knowledge Hub · Policies (`?policy=attendance`); work somewhere else → ESS · Work Location Requests,
-  where Add Work Site is (PR 4; a manifest names no action, A23); approve a temporary site → People · Worksites
+  where Add Work Site is (PR 4; also the card above); approve a temporary site → People · Worksites
   (PR 4); my temporary sites → ESS · Work Location Requests; my deductions or overtime → ESS · My
   Attendance; waive deductions or confirm overtime → People · Attendance; set someone's work
   schedule → People · Employees (the record's Work Schedule tab); my work week → ESS · My Profile.
@@ -1636,6 +1662,19 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   sites use them (PR 4).
 
 ## 14 · Change log
+
+- 03/11/2026 · JP · Approve Overtime and Add Work Site are Praxis AI cards (`attendance.ai.js`, §9;
+  `praxis-ai.md` decisions 33 to 39): Approve Overtime after Confirm It's You, for someone in the
+  reader's reach, through `approveOvertime`; Add Work Site with one address picked as every address
+  is and never a Temporary Home, through `sites.submit`. `TemporarySiteCreate` and the card's
+  `TemporarySiteAdd` share the site's day and hour rules (`siteRules`). Worksites' Add Worksite and
+  Save Worksite are cards too (`worksites.ai.js`, §9). No screen changed.
+- 03/11/2026 · JP · `attendance.ai.js`'s never forms say why in decision 33's words (`praxis-ai.md` §1.5): a punch and a check-in `device`, a home location `personal`; overtime pre-approval and a temporary site are on the list of forms to bring into the chat (`scripts/check/ai-forms-gaps.json`). No behaviour changed.
+- 02/11/2026 · JP · `attendance.register`'s AI description says what Not In and Absent mean (a working day still open with no clock-in; a closed one), after Praxis AI told JBS Praxis on staging that nobody was absent while 21 people had not clocked in (`praxis-ai.md` §6.2, §14). No read, scope or screen changed.
+- 02/11/2026 · JP · A screen test made independent of the day (no screen changed): All Days of a person opens on the month of the newest day the mock holds, read from the mock itself, so on a month's first days whose 1st was not a working day, before that day's clock-in time, it turns to the month before rather than finding November empty (`PeopleAttendance.test.tsx`; it failed on Monday 02/11/2026).
+- 01/11/2026 · JP · `attendance.ai.js` and `worksites.ai.js` account for their Create schemas in `not_offered` (a punch and a check-in are made on the device, a home location and a temporary site are picked on a map, overtime is pre-approved on the screen, a worksite is picked on a map), as gate 23 asks of every module since the Praxis AI Engine's PR5 (`praxis-ai.md` §6.15); `attendance.register` carries a matrix probe (a report of the asker's on today's register, an outsider never; `praxis-ai.md` §6.17).
+- 01/11/2026 · JP · §9: `attendance.summary`, the assistant's figures over a period by person, department, site, day, week or month (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
+- 01/11/2026 · JP · Tests only, at the month boundary (the Praxis AI Engine's first full run fell on 01/11/2026): the pay-items tests step My Attendance back as many months as the item needs, since the mock's days run six weeks back from yesterday; All Days of a person reads the month that holds days (the month before, on a month's first day) and accepts the day's date shown more than once in its sheet. No screen or rule changes.
 
 - 27/10/2026 · AJ · Queries & Sanctions raises the query for a breach with Raise Query on (§3 step 11,
   §6.16): `queries.raise_from_breach`, linked back through `attachQuery`; migration 3040 adds the key

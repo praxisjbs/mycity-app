@@ -947,6 +947,16 @@ async function confirmedFor(db, actor) {
   return Math.max(0, Math.floor(policy.confirmWindowSeconds() - Number(s.proved_ago)));
 }
 
+/**
+ * Seconds since the session signed in or last confirmed it is the person, or null when the
+ * session is gone. A sensitive Praxis AI card is pressed only within its own, shorter window
+ * (docs/guides/praxis-ai.md §6.11 step 4).
+ */
+async function provedAgo(db, actor) {
+  const s = await repo.sessionProof(db, actor.session_id, actor.user_id);
+  return s ? Math.max(0, Math.floor(Number(s.proved_ago))) : null;
+}
+
 /** The session proved who it is again (in the caller's transaction). */
 async function markReauthenticated(client, actor) {
   if (!(await repo.markReauthenticated(client, actor.session_id, actor.user_id)))
@@ -1231,6 +1241,7 @@ module.exports = {
   passkeyOptions,
   passkeySignIn,
   confirmedFor,
+  provedAgo,
   markReauthenticated,
   sessionDevice,
   clearDeviceTrust,

@@ -1,33 +1,41 @@
 "use strict";
 /**
- * Praxis AI's engine (docs/guides/praxis-ai.md §6.1 to §6.3): one question answered from the
- * modules' reads, with the asking person's own grant, scope and field masking.
+ * Praxis AI's engine adapter (docs/guides/praxis-ai.md §6.1 to §6.3, §6.11, §6.13, §6.14): one
+ * question answered from the modules' reads and summaries, with the asking person's own grant,
+ * scope and field masking, the loop itself run by services/ai/engine (turn.js), which knows
+ * nothing of MyCity.
  *
- *   const out = await orchestrator.answer({ db, actor: req.user, question, history });
- *   // → { draft, reads, run_id, stub, routes, screens }
+ *   const out = await orchestrator.answer({ db, actor: req.user, question, history, context, shows });
+ *   // → { draft, reads, run_id, stub, routes, screens, actions, context }
  *
  * One question is one run of the Data Answers action (`ai.converse`), and goes:
  *
- *   context  who is asking, today in Lagos, the screens they may open (as ⌘K offers them) and
- *            the routes to the screens where a change is made
- *   tools    one per read the person may run (authorise.allowedReads); a read they may not run
- *            is never offered
- *   loop     the model calls reads or answers. Each call runs through authorise.runRead, so the
- *            grant, the scope, the page of 25 and the field mask are code's, never the model's.
- *            At most 5 reads; a repeated read, the fifth read or the eighth round makes the next
- *            round an answer with no tools
+ *   context  who is asking, today in Lagos, the screen they asked from (decision 12), the
+ *            screens they may open, the routes to the screens where a change is made, and the
+ *            actions they may draft as a card (only when the asking screen draws cards)
+ *   tools    one per read and per summary the person may run (authorise.allowedReads,
+ *            allowedSummaries); a read they may not run is never offered
+ *   loop     the engine's: the model calls reads or answers. Each call runs through authorise
+ *            here (runTool), so the grant, the scope, the page of 25 and the field mask are
+ *            code's, never the model's. At most 5 reads; a repeated read, the fifth read or the
+ *            eighth round makes the next round an answer with no tools. A read the database cut
+ *            at its timeout (AI_READ_TIMEOUT, §6.3 step 8) is kept as timed_out and the model is
+ *            told to narrow the question
  *   answer   one JSON object (AiAnswerDraft). One that does not parse is sent back once with its
  *            problems; a second failure is answered in plain words from the reads already made,
  *            with no tools; if that fails too, AI_BAD_OUTPUT
  *   budget   60 seconds for the whole question; past it the model is not asked again
  *
- * The answer is turned into what the screen shows by answer.js; saving it is the assistant
- * module's (one transaction with emit()).
+ * The system turn is built once, in a fixed order, so a vendor that caches a prefix (Anthropic's
+ * cache mark, Gemini's implicit cache) sees the same prefix every round (decision 24). The answer
+ * is turned into what the screen shows by answer.js; saving it is the assistant module's (one
+ * transaction with emit()).
  */
 const { logger } = require("../../../config/logger");
 const { AppError } = require("../../../shared/errors");
 const authorise = require("../../../shared/ai/authorise");
 const registry = require("../../../shared/ai/registry");
+const { refsFor } = require("../../../shared/ai/cite");
 const routeMap = require("../../../shared/route-map");
 const lagos = require("../../../shared/time/lagos");
 const { formatDate } = require("../../../shared/time/day-first");
@@ -38,54 +46,71 @@ const ai = require("../llm.service");
 const { redactValue } = require("../redact");
 const fieldMask = require("../../../shared/rbac/field-mask");
 const { jsonSchemaOf, parseStructured } = require("../structured");
+const { createEngine, isEngineError, turn } = require("../engine");
 
 const MAX_READS = 5;
 const MAX_ROUNDS = 8;
 const HISTORY_TURNS = 10;
 const DEADLINE_MS = 60_000;
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-/** How much of one read's page goes back to the model, cut on a row's boundary. */
+/** How much of one read's page goes back to the model, cut on a row's boundary (engine/content.js). */
 const RESULT_MAX_CHARS = 12_000;
 
-/** A read's key as a tool's name: providers take letters, digits, `_` and `-` only. */
-const toolName = (key) => key.replace(".", "__");
-const keyOf = (name) => String(name || "").replace("__", ".");
-
-/** Parameters in one order, so the same read asked twice is seen as the same. */
-function stable(v) {
-  if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
-  if (v && typeof v === "object")
-    return `{${Object.keys(v)
-      .sort()
-      .map((k) => `${JSON.stringify(k)}:${stable(v[k])}`)
-      .join(",")}}`;
-  return JSON.stringify(v);
-}
-
-function argsOf(call) {
-  try {
-    const v = JSON.parse(call.function.arguments || "{}");
-    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
-  } catch {
-    return {};
-  }
-}
+const engine = createEngine({ limits: { maxReads: MAX_READS, maxRounds: MAX_ROUNDS, deadlineMs: DEADLINE_MS } });
+const { toolName, keyOf, stable } = turn;
 
 const ISO_DAY = "^\\d{4}-\\d{2}-\\d{2}$";
 
 /**
- * The fields a prefill schema takes, each with the form its value is written in, for the route list
- * the model reads: a value in any other form (a day written day first) is dropped from the link.
+ * The fields a schema takes, each with the form its value is written in, for the lists the model
+ * reads: a value in any other form (a day written day first) is dropped from a link or a card.
  */
-function prefillFields(schema) {
-  const props = (jsonSchemaOf(schema) || {}).properties || {};
-  return Object.entries(props).map(([k, p]) => {
-    if (p.enum) return `${k} (one of ${p.enum.join(", ")})`;
-    if (p.format === "date-time") return `${k} (YYYY-MM-DDTHH:MM:SS+01:00)`;
-    if (p.format === "uuid") return `${k} (an id a read returned)`;
-    if (p.pattern === ISO_DAY) return `${k} (YYYY-MM-DD)`;
-    return k;
+function schemaFields(schema, { required = false, only = null, byName = [] } = {}) {
+  const js = jsonSchemaOf(schema) || {};
+  const props = js.properties || {};
+  const must = new Set(js.required || []);
+  const keep = Array.isArray(only) && only.length ? only.filter((k) => Object.prototype.hasOwnProperty.call(props, k)) : Object.keys(props);
+  return keep.map((k) => [k, props[k]]).map(([k, p]) => {
+    const node = p && Array.isArray(p.anyOf) ? p.anyOf.find((x) => x && x.type !== "null") || p : p;
+    let form = "";
+    // A field the server matches by name (decision 32): the model writes the name.
+    if (byName.includes(k)) form = " (its name)";
+    else if (node.enum) form = ` (one of ${node.enum.join(", ")})`;
+    else if (node.format === "date-time") form = " (YYYY-MM-DDTHH:MM:SS+01:00)";
+    else if (node.format === "uuid" || /_id$/.test(k)) form = " (an id a read returned)";
+    else if (node.pattern === ISO_DAY) form = " (YYYY-MM-DD)";
+    else if (node.type === "array") form = " (a list)";
+    else if (node.type === "boolean") form = " (true or false)";
+    return `${k}${form}${required && must.has(k) ? ", required" : ""}`;
   });
+}
+
+/** The route list's prefill fields, as before. */
+const prefillFields = (schema) => schemaFields(schema);
+
+/**
+ * An action as the model reads it (§6.11, decisions 29 and 31): its key and description, the
+ * fields its card carries with the form of each, and what to ask before drafting it, each with
+ * its answers to tap and whether none is an answer.
+ */
+function actionLine(a, today) {
+  const byName = Object.keys(a.resolve || {});
+  const parts = [`- ${a.key}: ${a.description}; fields: ${schemaFields(a.input, { required: true, only: a.fields, byName }).join(", ")}`];
+  if (a.bulk > 1) parts.push(`at most ${a.bulk} records`);
+  if (a.suggest) parts.push("may be offered unasked, marked suggested");
+  if (a.asks && a.asks.length) {
+    const asks = a.asks.map((q) => {
+      const choices = typeof q.choices === "function" ? q.choices({ today }) : q.choices || [];
+      // A field naming a record is one of the person's own, from that read; one required in some states is asked only then (decision 34).
+      const from = q.read ? `; one of the person's own from ${q.read}, by its words or id` : "";
+      const when = !q.when ? "" : typeof q.when === "object" ? `; only when ${q.when.field} is given and is not ${q.when.not.join(" or ")}` : `; only when ${q.when} is given`;
+      return `${q.field} ("${q.question}"${choices.length ? `, choices: ${choices.join(", ")}` : ""}${from}${when}${q.none ? `; null when the person says there is none` : ""})`;
+    });
+    parts.push(`ask first, one at a time, unless the person gave it: ${asks.join("; ")}`);
+  }
+  // A field the server matches by name (decision 32): the model writes the name, never an id it did not read.
+  if (byName.length) parts.push(`by name: ${byName.join(", ")} (write its name as the person says it or a read gives it)`);
+  return parts.join("; ");
 }
 
 /**
@@ -125,8 +150,24 @@ async function contextOf(db, actor) {
   };
 }
 
-/** The system turn: the prompt, then the facts of this question. */
-function systemTurn(prompt, ctx, now) {
+/** The screen the question was asked from, in words the model reads (decision 12). */
+function askedFromLines(ctx, context) {
+  if (!context) return [];
+  const screen = ctx.screens.find((s) => s.module === context.module && s.tab === context.tab);
+  const label = screen ? screen.label : `${context.module}.${context.tab}`;
+  const parts = [`Asked from the screen: ${label} (${context.module}.${context.tab})`];
+  if (context.id) parts.push(`the record open there has id ${context.id}`);
+  if (context.q) parts.push(`its search box holds "${context.q}"`);
+  const filters = Object.entries(context.filters || {});
+  if (filters.length) parts.push(`its filters: ${filters.map(([k, v]) => `${k}=${v}`).join(", ")}`);
+  return [`${parts.join("; ")}. "These", "this one" or "here" means that screen's records.`, ""];
+}
+
+/**
+ * The system turn: the prompt, then the facts of this question, in a fixed order every round
+ * (decision 24: a stable prefix).
+ */
+function systemTurn(prompt, ctx, now, { context = null, actions = [], pane = false } = {}) {
   const today = lagos.today(now);
   const labelOf = (module, tab) => (ctx.screens.find((s) => s.module === module && s.tab === tab) || {}).label || `${module}.${tab}`;
   const who = [
@@ -144,6 +185,7 @@ function systemTurn(prompt, ctx, now) {
     `Today: ${WEEKDAYS[lagos.weekday(today) - 1]} ${formatDate(today)} (${today}), ${lagos.timeOf(now)} in Lagos.`,
     `Asking: ${who}.`,
     "",
+    ...askedFromLines(ctx, context),
     "Screens this person can open:",
     ...ctx.screens.map((s) => `- ${s.label} (${s.module}.${s.tab})`),
     "",
@@ -155,12 +197,25 @@ function systemTurn(prompt, ctx, now) {
         })
       : ["- none"]),
     "",
+    "Actions you may draft as a card for the person to confirm (name one by its key in \"action\"; the person presses it; you never say it was done):",
+    ...(actions.length ? actions.map((a) => actionLine(a, today)) : ["- none: offer a route instead"]),
+    "",
+    ...(pane
+      ? [
+          "The pane's Overview: when a summary read answered, name it in \"overview\" with up to three of its figure keys and one chart over one of its groups (group: its \"by\") or series (series: their keys). The chart's title is a short sentence; a number in it must be one of the summary's own figures or values, or the title is dropped.",
+          "",
+        ]
+      : []),
     `The answer's JSON Schema: ${JSON.stringify(jsonSchemaOf(c.assistant.AiAnswerDraft))}`,
   ];
   return { role: "system", content: lines.join("\n") };
 }
 
-/** Earlier turns as the model reads them: the question, the answer, and what it read. */
+/**
+ * Earlier turns as the model reads them: the question, the answer, what it read, and, for a
+ * question it asked before a card, which action's field it asked for (decision 29), so the next
+ * answer carries on gathering that card.
+ */
 function historyTurns(history) {
   const out = [];
   for (const t of (history || []).slice(-HISTORY_TURNS)) {
@@ -168,31 +223,45 @@ function historyTurns(history) {
     const reads = (t.reads || [])
       .map((r) => `${r.key} ${stable(r.params || {})}: ${r.rows} row(s)${r.total !== null && r.total !== undefined ? ` of ${r.total}` : ""}`)
       .join("; ");
-    out.push({ role: "assistant", content: reads ? `${t.answer}\n[Read: ${reads}]` : t.answer });
+    const notes = [reads && `[Read: ${reads}]`, t.ask && t.ask.action && `[Asked for: ${t.ask.action} ${t.ask.field || ""}`.trim() + "]"].filter(Boolean);
+    out.push({ role: "assistant", content: notes.length ? `${t.answer}\n${notes.join("\n")}` : t.answer });
   }
   return out;
 }
 
 /**
- * A read's page as the model receives it: the rows that fit, the page and the total. The rows pass
- * through redactValue on the reasoning egress first (§6.3.5): the fields this person sees are kept
- * (`keep`), payment and identity numbers in them are masked.
+ * A read's page as the model receives it (engine/content.js): the rows pass through redactValue
+ * on the reasoning egress first (§6.3.5): the fields this person sees are kept (`keep`), payment
+ * and identity numbers in them are masked.
  */
 function resultContent(n, made, keep = []) {
-  const head = { read: n, key: made.key, total: made.total, page: made.page ? made.page.number : null, has_next: Boolean(made.page && made.page.has_next) };
-  const rows = [];
-  let size = JSON.stringify({ ...head, rows: [] }).length;
-  let cut = false;
-  for (const row of redactValue(made.rows, { egress: "reasoning", keep })) {
-    const s = JSON.stringify(row).length + 1;
-    if (size + s > RESULT_MAX_CHARS) {
-      cut = true;
-      break;
-    }
-    rows.push(row);
-    size += s;
-  }
-  return JSON.stringify(cut ? { ...head, rows, note: `only the first ${rows.length} rows fit` } : { ...head, rows });
+  return engine.content.readContent(n, made, (rows) => redactValue(rows, { egress: "reasoning", keep }), RESULT_MAX_CHARS);
+}
+
+/** A read, summary or action by its key, reads first (what the tool list offered). */
+const toolOf = (key) => registry.read(key) || registry.summary(key) || registry.tool(key);
+
+/** One read or summary as the question records it, before it ran. */
+function madeOf(n, key, params) {
+  const t = toolOf(key);
+  return {
+    n,
+    key,
+    kind: t && t.kind === "summary" ? "summary" : "read",
+    params,
+    ok: false,
+    declined: false,
+    outcome: "failed",
+    rows: [],
+    refs: [],
+    total: null,
+    page: null,
+    citations: [],
+    module: t ? t.module : null,
+    masked: [],
+    result: null,
+    list: t ? t.list : false,
+  };
 }
 
 /**
@@ -202,132 +271,140 @@ function resultContent(n, made, keep = []) {
  * @param {object} req.actor     req.user
  * @param {string} req.question
  * @param {Array<{question: string, answer: string, reads?: Array<{key: string, params?: object, rows: number, total: number|null}>}>} [req.history]
+ * @param {object|null} [req.context]   the screen asked from (AiScreenContext)
+ * @param {string[]} [req.shows]        what the asking screen draws: "cards", "pane"
+ * @param {(read: {n: number, key: string, kind: string, of: number}) => void} [req.onRead]  told before each read or summary runs (the screen's progress line, decision 23); its failure never fails the question
  * @param {Date} [req.now]
  * @param {object} [req.vendors]   tests
  * @param {number} [req.deadlineMs]
- * @returns {Promise<{draft: object, reads: Array<object>, run_id: string, stub: boolean, routes: Array<object>, screens: Array<object>}>}
+ * @returns {Promise<{draft: object, reads: Array<object>, run_id: string, stub: boolean, routes: Array<object>, screens: Array<object>, actions: Array<object>, context: object|null}>}
  */
-async function answer({ db, actor, question, history = [], now = new Date(), vendors, deadlineMs = DEADLINE_MS }) {
-  const started = Date.now();
-  // No model call starts past this, and each is given only what is left of it (§6.1.6).
-  const deadline = started + deadlineMs;
+async function answer({ db, actor, question, history = [], context = null, shows = [], now = new Date(), vendors, deadlineMs = DEADLINE_MS, onRead = null }) {
   const talk = await ai.converse({ purpose: "data-answers", module: "praxis_ai", actor, egress: "reasoning", db, vendors });
   const AiAnswerDraft = c.assistant.AiAnswerDraft;
   const reads = [];
+  const wants = new Set(Array.isArray(shows) ? shows : []);
   try {
-    const [ctx, allowed, hidden] = await Promise.all([contextOf(db, actor), authorise.allowedReads(actor), fieldMask.maskedKeysFor(db, actor)]);
+    const [ctx, allowedReads, allowedSummaries, allowedActions, hidden] = await Promise.all([
+      contextOf(db, actor),
+      authorise.allowedReads(actor),
+      authorise.allowedSummaries(actor),
+      wants.has("cards") ? authorise.allowedActions(actor) : [],
+      fieldMask.maskedKeysFor(db, actor),
+    ]);
     /** The restricted fields this person sees on screen, which reach the model for them alone. */
     const keep = Object.keys(fieldMask.FIELDS).filter((k) => !hidden.includes(k));
-    const tools = allowed.map((r) => ({
+    const tools = [...allowedReads, ...allowedSummaries].map((r) => ({
       type: "function",
       function: { name: toolName(r.key), description: r.description, parameters: jsonSchemaOf(r.params) },
     }));
     const messages = [
-      systemTurn(talk.prompt, ctx, now),
+      systemTurn(talk.prompt, ctx, now, { context, actions: allowedActions, pane: wants.has("pane") }),
       ...historyTurns(history),
       { role: "user", content: question },
     ];
+    const invalidSeen = new Set();
 
-    const seen = new Set();
-    const invalidOnce = new Set();
-    let attempts = 0;
-    let forced = talk.stub || tools.length === 0;
-    let corrected = false;
-    let draft = null;
-
-    /** One tool call: run the read with the person's rights and say what came back. */
-    const handle = async (call) => {
-      const key = keyOf(call.function && call.function.name);
-      const params = argsOf(call);
-      if (attempts >= MAX_READS) return JSON.stringify({ error: "read_limit", message: "No more reads for this question. Answer with what you have." });
-      attempts += 1;
+    /** One tool call, with the person's rights: a read or a summary through authorise (§6.3). */
+    const runTool = async (key, params) => {
       const n = reads.length + 1;
-      const sig = `${key} ${stable(params)}`;
-      if (seen.has(sig)) {
-        forced = true;
-        return JSON.stringify({ error: "already_read", message: "You read this already; use that result." });
+      const made = madeOf(n, key, params);
+      const t = toolOf(key);
+      const notAvailable = () => {
+        made.declined = true;
+        made.outcome = "refused";
+        reads.push(made);
+        return { kind: "not_available", content: JSON.stringify({ read: n, key, error: "not_available" }) };
+      };
+      // A change the person may make, called as though it were a read: refused as a read (nothing
+      // runs), and the model told it is drafted as this answer's action for them to confirm (§6.11).
+      // "Not available" here would have it tell them a card they may press is not theirs, so the
+      // answer is not marked declined.
+      if (t && t.kind === "action" && allowedActions.some((a) => a.key === key)) {
+        made.outcome = "refused";
+        reads.push(made);
+        return { kind: "no_result", content: JSON.stringify({ read: n, key, error: "is_an_action", message: `${key} is a change this person may make, not a read: draft it as this answer's action, for them to confirm` }) };
       }
-      seen.add(sig);
-      const made = { n, key, params, ok: false, declined: false, rows: [], total: null, page: null, citations: [], module: null };
+      if (!t || t.kind === "action") return notAvailable();
+      if (onRead) {
+        try {
+          onRead({ n, key, kind: made.kind, of: MAX_READS });
+        } catch (err) {
+          logger.warn({ err, ai_read: key }, "Praxis AI: the progress hook failed; the read runs regardless");
+        }
+      }
       try {
+        if (t.kind === "summary") {
+          const res = await authorise.runSummary(db, actor, key, params);
+          made.ok = true;
+          made.outcome = "read";
+          made.result = res.result;
+          made.total = res.result.total;
+          made.masked = res.masked;
+          reads.push(made);
+          return { kind: "ok", content: engine.content.summaryContent(n, made) };
+        }
         const res = await authorise.runRead(db, actor, key, params);
-        const rd = registry.read(key);
         made.ok = true;
-        made.module = rd ? rd.module : null;
+        made.outcome = "read";
         made.list = res.list;
         made.rows = res.list ? res.data : res.data ? [res.data] : [];
         made.page = res.page;
         made.total = res.list ? res.page.total : made.rows.length;
         made.citations = res.citations;
+        made.masked = res.masked;
+        // Each row's record, in order, so a table drawn from this read opens its rows' records.
+        made.refs = refsFor(t, made.rows);
         reads.push(made);
-        return resultContent(n, made, keep);
+        return { kind: "ok", content: resultContent(n, made, keep) };
       } catch (err) {
         const code = err && err.code;
-        if (code === "AI_READ_FORBIDDEN" || code === "AI_READ_UNKNOWN") {
-          made.declined = true;
+        if (code === "AI_READ_FORBIDDEN" || code === "AI_READ_UNKNOWN") return notAvailable();
+        if (code === "AI_READ_TIMEOUT") {
+          // The database cut the read at its timeout: the question covers too much at once (§6.3 step 8).
+          made.outcome = "timed_out";
           reads.push(made);
-          return JSON.stringify({ read: n, key, error: "not_available" });
+          return {
+            kind: "no_result",
+            content: JSON.stringify({ read: n, key, error: "too_much", message: "That read covers too much at once. Ask about a shorter period, one department or one person, or use a summary read." }),
+          };
         }
-        if (code === "AI_READ_INVALID" && !invalidOnce.has(key)) {
-          invalidOnce.add(key);
-          seen.delete(sig);
-          attempts -= 1;
-          return JSON.stringify({ key, error: "invalid_parameters", fields: err.fields || {} });
+        if (code === "AI_READ_INVALID") {
+          // Sent back once to be corrected, uncounted (the engine's rule); the second time is recorded.
+          if (!invalidSeen.has(key)) {
+            invalidSeen.add(key);
+            return { kind: "invalid", fields: err.fields || {} };
+          }
+          made.outcome = "invalid";
+          reads.push(made);
+          return { kind: "no_result", content: JSON.stringify({ read: n, key, error: "no_result" }) };
         }
         logger.warn({ err, ai_read: key }, "Praxis AI: a read failed; the model is told it returned nothing");
         reads.push(made);
-        return JSON.stringify({ read: n, key, error: "no_result" });
+        return { kind: "no_result", content: JSON.stringify({ read: n, key, error: "no_result" }) };
       }
     };
 
-    for (let round = 1; !draft; round += 1) {
-      if (Date.now() - started > deadlineMs)
-        throw await talk.fail("AI_UNAVAILABLE", "The AI service is not answering. Try again in a few minutes.", 503, `the question took longer than ${deadlineMs} ms`);
-      if (round > MAX_ROUNDS || attempts >= MAX_READS) forced = true;
-      const r = await talk.round({
-        messages,
-        // The tools stay offered on a forced round, with none to call: Claude needs them defined
-        // for the calls already in the conversation (llm.service ask()).
-        tools: tools.length ? tools : null,
-        toolChoice: forced ? "none" : "auto",
-        output: forced ? AiAnswerDraft : null,
-        kind: corrected && forced ? "retry" : "completion",
-        deadline,
-      });
-
-      if (!forced && r.toolCalls.length) {
-        messages.push(r.turn);
-        for (const call of r.toolCalls) messages.push({ role: "tool", tool_call_id: call.id, content: await handle(call) });
-        if (forced || attempts >= MAX_READS) {
-          forced = true;
-          messages.push({ role: "user", content: "Answer now with what you have read, as the JSON object." });
-        }
-        continue;
-      }
-
-      const parsed = parseStructured(r.text, AiAnswerDraft);
-      if (parsed.ok) {
-        draft = parsed.value;
-        break;
-      }
-      if (!corrected) {
-        corrected = true;
-        forced = true;
-        messages.push(r.turn);
-        messages.push({
-          role: "user",
-          content: `That reply could not be used:\n- ${parsed.issues.join("\n- ")}\nReply again with only the JSON object${r.finish_reason === "length" ? ", and shorter" : ""}.`,
-        });
-        continue;
-      }
-      draft = await rescue(talk, question, reads, deadline);
-    }
+    const { draft } = await engine.runTurn({
+      talk,
+      messages,
+      tools,
+      output: AiAnswerDraft,
+      runTool,
+      parse: (text, schema) => parseStructured(text, schema),
+      rescue: (t, deadline) => rescue(t, question, reads, deadline),
+      limits: { deadlineMs },
+    });
     await talk.finish();
-    return { draft, reads, run_id: talk.run_id, stub: talk.stub, routes: ctx.routes, screens: ctx.screens };
+    return { draft, reads, run_id: talk.run_id, stub: talk.stub, routes: ctx.routes, screens: ctx.screens, actions: allowedActions, context };
   } catch (err) {
     if (err instanceof AppError) {
       await talk.fail(err.code, err.message, err.status);
       throw err;
+    }
+    if (isEngineError(err)) {
+      await talk.fail(err.code, err.message, err.status);
+      throw new AppError(err.code, err.message, err.status, err.fields || undefined);
     }
     await talk.fail("AI_FAILED", "The assistant could not answer. Try again.", 500, err && err.message);
     // The screen is told what the run records (§5), not the generic 500; the cause stays in the log.
@@ -345,7 +422,7 @@ async function answer({ db, actor, question, history = [], now = new Date(), ven
 async function rescue(talk, question, reads, deadline = null) {
   const data = reads
     .filter((r) => r.ok)
-    .map((r) => ({ read: r.key, total: r.total, rows: r.rows }));
+    .map((r) => (r.kind === "summary" ? { read: r.key, summary: r.result } : { read: r.key, total: r.total, rows: r.rows }));
   const r = await talk.round({
     kind: "retry",
     deadline,
@@ -360,7 +437,7 @@ async function rescue(talk, question, reads, deadline = null) {
   });
   const text = String(r.text || "").trim();
   if (!text) throw new AppError("AI_BAD_OUTPUT", "The AI answer could not be used. Try asking another way.", 502);
-  return { text: text.slice(0, 4000), table: null, route: null, prefill: null, more: false };
+  return { text: text.slice(0, 4000), table: null, route: null, prefill: null, more: false, action: null, overview: null };
 }
 
-module.exports = { answer, MAX_READS, MAX_ROUNDS, HISTORY_TURNS, DEADLINE_MS, toolName, keyOf, resultContent, historyTurns };
+module.exports = { answer, MAX_READS, MAX_ROUNDS, HISTORY_TURNS, DEADLINE_MS, toolName, keyOf, resultContent, historyTurns, systemTurn, schemaFields };

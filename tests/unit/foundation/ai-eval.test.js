@@ -7,19 +7,30 @@
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const registry = require("../../../src/shared/ai/registry");
-const { CASES, grade, screenOf, waiting } = require("../../../scripts/ai/eval-assistant");
+const { CASES, FILLS, grade, screenOf, waiting, placeholdersOf, cardPlaceholder } = require("../../../scripts/ai/eval-assistant");
 
 const SCRIPT = path.join(__dirname, "../../../scripts/ai/eval-assistant.js");
 
 describe("the questions", () => {
-  const reads = new Set(registry.reads().map((r) => r.key));
+  const reads = new Set([...registry.reads(), ...registry.summaries()].map((r) => r.key));
   const screens = new Set(registry.routes().map((r) => r.screen));
+  const actions = new Set(registry.actions().map((a) => a.key));
 
   test("each has its own id, a role to ask as, and something to grade", () => {
     expect(new Set(CASES.map((k) => k.id)).size).toBe(CASES.length);
     for (const k of CASES) {
       expect([k.id, typeof k.as]).toEqual([k.id, "string"]);
-      expect([k.id, Boolean(k.reads || k.never || k.route || k.needs)]).toEqual([k.id, true]);
+      expect([k.id, Boolean(k.reads || k.never || k.route || k.needs || k.action || k.no_action || k.ask)]).toEqual([k.id, true]);
+    }
+  });
+
+  test("the summary questions name summaries that exist, and ask from a screen with a pane", () => {
+    const summaries = new Set(registry.summaries().map((s) => s.key));
+    const cases = CASES.filter((k) => k.id.startsWith("summary."));
+    expect(cases.length).toBeGreaterThanOrEqual(3);
+    for (const k of cases) {
+      expect([k.id, k.reads.every((key) => summaries.has(key))]).toEqual([k.id, true]);
+      expect([k.id, (k.shows || []).includes("pane")]).toEqual([k.id, true]);
     }
   });
 
@@ -27,6 +38,37 @@ describe("the questions", () => {
     for (const k of CASES.filter((x) => !x.needs)) {
       for (const key of [...(k.reads || []), ...(k.never || [])]) expect([k.id, key, reads.has(key)]).toEqual([k.id, key, true]);
       if (k.route) expect([k.id, k.route, screens.has(k.route)]).toEqual([k.id, k.route, true]);
+      // A card case names a declared action and asks from a screen that draws cards (praxis-ai.md §6.11).
+      if (k.action) expect([k.id, k.action, actions.has(k.action), (k.shows || []).includes("cards")]).toEqual([k.id, k.action, true, true]);
+      for (const key of k.no_action || []) expect([k.id, key, actions.has(key), (k.shows || []).includes("cards")]).toEqual([k.id, key, true, true]);
+    }
+  });
+
+  test("every declared action has a card case (gate 23), and a change the person may not make has a case that refuses it", () => {
+    const graded = new Set(CASES.filter((k) => k.action).map((k) => k.action));
+    for (const key of actions) expect([key, graded.has(key)]).toEqual([key, true]);
+    expect(CASES.some((k) => k.no_action && k.no_action.length)).toBe(true);
+  });
+
+  test("a question names staging's records through its placeholders: each a fill, or a card's question that offers answers", () => {
+    expect(cardPlaceholder("tasks.wait_on#depends_on_task_id#2")).toEqual({ key: "tasks.wait_on", field: "depends_on_task_id", n: 2 });
+    expect(cardPlaceholder("person")).toBeNull();
+    expect(placeholdersOf({ question: "Move my task {tasks.edit#task_id} for {person}, then {person}.", given: ["waiting_leave"] })).toEqual(["tasks.edit#task_id", "person", "waiting_leave"]);
+    for (const k of CASES) {
+      for (const name of placeholdersOf(k)) {
+        const card = cardPlaceholder(name);
+        if (!card) {
+          expect([k.id, name, Boolean(FILLS[name])]).toEqual([k.id, name, true]);
+          continue;
+        }
+        const action = registry.action(card.key);
+        const ask = action && action.asks.find((q) => q.field === card.field);
+        // The card asks for the field, with answers to give: its own records (options or a read) or fixed choices.
+        expect([k.id, name, Boolean(ask && (ask.read || ask.options || (Array.isArray(ask.choices) ? ask.choices.length : ask.choices)))]).toEqual([k.id, name, true]);
+      }
+      // Nothing is left in braces that the run could not fill.
+      expect([k.id, String(k.question).replace(/\{[a-z_]+(\.[a-z_]+#[a-z_]+(#\d)?)?\}/g, "").includes("{")]).toEqual([k.id, false]);
+      for (const field of k.picks || []) expect([k.id, field, registry.action(k.action).picks[field]]).toEqual([k.id, field, "place"]);
     }
   });
 
@@ -66,6 +108,42 @@ describe("the grade", () => {
     const k = { id: "x", needs: "partnerships" };
     expect(grade(k, { reads: [{ ...read("partners.list"), module: "partnerships" }], shown: shown() }).pass).toBe(true);
     expect(grade(k, { reads: [{ ...read("employees.list"), module: "people" }], shown: shown() }).problems[0]).toMatch(/read nothing from partnerships/);
+  });
+
+  test("a change missing what its action must have is asked for, the one field named, with no card (decisions 28 and 29)", () => {
+    const k = { id: "x", ask: { action: "tasks.create", field: "due_on" } };
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: { action: "tasks.create", field: "due_on", choices: ["Today"] } }).pass).toBe(true);
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: null }).problems).toEqual(["asked nothing; expected tasks.create due_on"]);
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: { action: "tasks.create", field: "priority", choices: [] } }).problems).toEqual(["asked for tasks.create priority; expected tasks.create due_on"]);
+    expect(grade(k, { reads: [], shown: shown(), card: { row: { action_key: "tasks.create", problems: {} } }, ask: null }).problems).toEqual(["drew tasks.create instead of asking for due_on"]);
+    // Each ask case names an action and a field its manifest asks for.
+    for (const c of CASES.filter((x) => x.ask)) {
+      const action = registry.action(c.ask.action);
+      expect([c.id, action && action.asks.some((q) => q.field === c.ask.field)]).toEqual([c.id, true]);
+    }
+  });
+
+  test("a question for a card has its answers to tap, and a table of people names every row (§6.4)", () => {
+    const k = { id: "x", ask: { action: "tasks.create", field: "priority" }, choices: true };
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: { action: "tasks.create", field: "priority", choices: ["Low", "Normal"] } }).pass).toBe(true);
+    expect(grade(k, { reads: [], shown: shown(), card: null, ask: { action: "tasks.create", field: "priority", choices: [] } }).problems).toEqual(["asked for priority with no answers to tap"]);
+    const t = { id: "y", table: "names" };
+    const table = (rows) => ({ columns: ["Employee", "Status"], rows, numeric: [], links: [], read: 1 });
+    expect(grade(t, { reads: [], shown: shown({ table: table([["Lovellyn Ade", "Not In"]]) }) }).pass).toBe(true);
+    expect(grade(t, { reads: [], shown: shown({ table: table([["", "Not In"]]) }) }).problems).toEqual(["its first column, Employee, does not name every row"]);
+    expect(grade(t, { reads: [], shown: shown({ table: null }) }).problems).toEqual(["drew no table"]);
+    // The absent question is asked as it was on staging, and graded on names.
+    expect(CASES.find((c) => c.id === "attendance.absent")).toMatchObject({ reads: ["attendance.register"], table: "names" });
+  });
+
+  test("a card's problems say what was wrong and what was written; a field the case lets the person pick may wait on Pick one alone", () => {
+    const card = (problems, values = {}) => ({ row: { action_key: "worksites.create", problems, values } });
+    const k = { id: "x", action: "worksites.create", picks: ["address"] };
+    expect(grade(k, { reads: [], shown: shown(), card: card({ address: ["Pick one"] }, { address: "Ikeja City Mall" }) }).pass).toBe(true);
+    expect(grade({ ...k, picks: [] }, { reads: [], shown: shown(), card: card({ address: ["Pick one"] }, { address: "Ikeja City Mall" }) }).problems).toEqual([
+      'the card has problems on address (Pick one; written "Ikeja City Mall")',
+    ]);
+    expect(grade(k, { reads: [], shown: shown(), card: card({ radius_m: ["Too small"] }, {}) }).problems).toEqual(["the card has problems on radius_m (Too small)"]);
   });
 
   test("a change is a screen offered with declined change, never a claim", () => {

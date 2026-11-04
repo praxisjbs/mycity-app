@@ -24,6 +24,7 @@ const {
   listQuery,
   Paged,
   textOfHtml,
+  recordId,
 } = require("./common");
 const { PersonRef } = require("./organisation");
 const { RichTextBlock, SignaturePng } = require("./policies");
@@ -170,6 +171,15 @@ const QueryCreate = z
   .strict();
 
 /**
+ * Raise Query as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33; JBS Praxis,
+ * 03/11/2026): the form's own fields but its pad and its letter. The card is signed with the
+ * signature the person saved (My Signature, guide §6.9), as the pad opens with it; the chat cannot
+ * draw one, so without it the press is refused with Draw Signature. The Query Letter is sent, as the
+ * form sends it when no other letter is picked.
+ */
+const QueryRaise = QueryCreate.omit({ signature: true, letter_template: true });
+
+/**
  * POST /queries/:id/decision. `no_action` closes the query. `sanction` proposes a
  * rung of the chain: it is written as pending and its approval opens
  * (queries.consequence); the query resolves when that approval does.
@@ -268,6 +278,19 @@ const QueryResponseCreate = z
       .max(40_000, "Too long")
       .refine((v) => wordsOf(v).length >= 20, "Write your response")
       .refine((v) => wordsOf(v).length <= 4000, "At most 4000 characters"),
+  })
+  .strict();
+
+/**
+ * Send Response as Praxis AI's card (decision 33): the person's own open query (its id, or its
+ * number) and their words as plain text, the same 20 to 4,000 characters; sent as My Queries'
+ * QueryResponseCreate. The response is their own account: the card holds it whole, never edited
+ * after it is sent.
+ */
+const QueryRespond = z
+  .object({
+    employee_query_id: recordId("query"),
+    body: z.string().trim().min(20, "Write your response").max(4000, "At most 4000 characters"),
   })
   .strict();
 
@@ -380,6 +403,10 @@ const TABLES = {
       signature: "the drawn PNG, stored through the vault as signature_document_id",
     },
   },
+  QueryRaise: {
+    table: "employee_query",
+    virtual: { policy_id: "the policy cited; its version in force is kept as policy_version_id" },
+  },
   QueryDecision: {
     table: null,
     reason: "a decision: resolves the query, or writes a sanction and opens its approval",
@@ -401,6 +428,7 @@ const TABLES = {
     table: "query_response",
     virtual: { body_html: "the editor's HTML, kept as body (Markdown) by shared/documents/markdown" },
   },
+  QueryRespond: { table: "query_response" },
   QueryRaisedEmailVars: { table: null, reason: "the variables of templates/email/query-raised.html, not a row" },
   PolicyCitation: { table: null, reason: "a policy_version as a query cites it, read through the policies service" },
   CitablePolicy: { table: null, reason: "a policy_version in force, read through the policies service" },
@@ -435,6 +463,7 @@ module.exports = {
   QueryDetail,
   QueryListQuery,
   QueryCreate,
+  QueryRaise,
   QueryDecision,
   QueriesSummary,
   EssQueryListQuery,
@@ -442,5 +471,6 @@ module.exports = {
   MyQueryPage,
   MyQueriesSummary,
   QueryResponseCreate,
+  QueryRespond,
   QueryRaisedEmailVars,
 };

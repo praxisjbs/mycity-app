@@ -1,6 +1,6 @@
 "use strict";
 // search:none announcements are found through community.search.js
-// ai:none the announcements reads are declared in community.ai.js
+// What the assistant may do here is announcements.ai.js's (Publish and Save Announcement); its read is community.ai.js's.
 const { ok, created, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { withActor } = require("../../shared/events/emit");

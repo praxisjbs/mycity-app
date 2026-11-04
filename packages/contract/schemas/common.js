@@ -118,6 +118,21 @@ const blank = (schema) =>
     .nullish()
     .transform((v) => (v === "" || v === null ? undefined : v));
 
+/*
+ * Praxis AI's cards that change a record (docs/guides/praxis-ai.md §6.11, decision 33): the edit
+ * form's own fields beside the record's id, which the panel's form never names because the panel
+ * is the record. Something besides the ids must change, and the problem sits on the record's field.
+ *
+ *   TaskChange = TaskEditFields.extend({ task_id: recordId("task") })
+ *     .refine(changesBeside(["task_id"]), nothingOn("task_id"));
+ */
+/** A record a card names, by its id; anything else reads "No such task". @param {string} what */
+const recordId = (what) => z.string().uuid(`No such ${what}`);
+/** Something besides these ids is given. @param {string[]} ids */
+const changesBeside = (ids) => (v) => Object.keys(v).some((k) => !ids.includes(k) && v[k] !== undefined);
+/** The problem when nothing would change, on the record's field. @param {string} field */
+const nothingOn = (field) => ({ message: "Nothing to change", path: [field] });
+
 /* ------------------------------------------------------------------ *
  * Pagination: the one rule for every list in the system
  * ------------------------------------------------------------------ *
@@ -290,6 +305,9 @@ module.exports = {
   isoDateTime,
   money,
   blank,
+  recordId,
+  changesBeside,
+  nothingOn,
   PAGE_SIZE,
   LIST_CONTROLS,
   RESERVED_CONTROLS,

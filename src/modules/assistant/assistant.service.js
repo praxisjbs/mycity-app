@@ -8,6 +8,11 @@
  * Voice (§6.6): the recording is held in the vault only while it is transcribed, then removed;
  * its document type is transient, so one whose removal never ran goes with the vault's sweep
  * (vault.purgeTransient).
+ *
+ * Progress (§1.2 decision 23): the answer arrives whole, never streamed; while the question runs,
+ * each read is announced on the person's realtime room (`ai:progress`) before it runs, best
+ * effort, so the screen can say "Reading leave requests" and "Reading 2 of 5". The event carries
+ * the question's Idempotency-Key, so a screen showing another conversation ignores it.
  */
 const { pool } = require("../../config/db");
 const { logger } = require("../../config/logger");
@@ -17,13 +22,14 @@ const { AppError } = require("../../shared/errors");
 const authorise = require("../../shared/ai/authorise");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const vault = require("../../shared/documents/vault");
+const realtime = require("../../services/realtime/emitter");
 const orchestrator = require("../../services/ai/assistant/orchestrator");
 const answer = require("../../services/ai/assistant/answer");
 const transcription = require("../../services/ai/transcription");
 const repo = require("./assistant.repo");
 const history = require("./assistant.history");
 const suggestions = require("./assistant.suggestions");
-const { EVENTS, VOICE_QUESTION } = require("./assistant.events");
+const { EVENTS, VOICE_QUESTION, PROGRESS_EVENT } = require("./assistant.events");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -43,29 +49,65 @@ function titleOf(question) {
   return (space > 60 ? cut.slice(0, space) : cut).trim();
 }
 
+/** The words of a read for the progress line ("leave requests", "employees"): its key as words, "list" dropped. */
+function readWords(key) {
+  const words = String(key || "")
+    .split(".")
+    .map((s) => s.replace(/_/g, " ").trim())
+    .filter((s) => s && s !== "list" && s !== "get");
+  return words.join(" ") || String(key || "");
+}
+
+/**
+ * Progress over realtime (decision 23): told before each read, it pushes `ai:progress` to the
+ * asking person's room. Best effort: nothing waits on it and a failure changes nothing.
+ * @param {object} actor
+ * @param {string|null} askKey  the question's Idempotency-Key, which the screen sent and matches on
+ */
+function progressFor(actor, askKey) {
+  return ({ n, key, kind, of }) => {
+    try {
+      realtime.toUser(actor.user_id, PROGRESS_EVENT, { ask_key: askKey || null, n, of, read_key: key, kind, words: readWords(key) });
+    } catch (err) {
+      logger.debug({ err, ai_read: key }, "Praxis AI: progress not pushed");
+    }
+  };
+}
+
 /**
  * POST /ai/ask.
- * @param {{question: string, ai_conversation_id?: string}} body
+ * @param {{question: string, ai_conversation_id?: string, context?: object, shows?: string[]}} body
  * @param {object} actor  req.user (withActor)
+ * @param {string|null} [askKey]  the request's Idempotency-Key, carried on the progress events
  */
-async function ask(body, actor) {
+async function ask(body, actor, askKey = null) {
   let conversation = null;
   if (body.ai_conversation_id) {
     conversation = await repo.conversationOf(pool, body.ai_conversation_id, actor.user_id);
     if (!conversation) throw new AppError("NOT_FOUND", "Not found", 404);
   }
+  const context = body.context || null;
+  const shows = Array.isArray(body.shows) ? body.shows : [];
   const past = conversation ? await history.replay(conversation.ai_conversation_id, actor.user_id) : [];
-  const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past });
-  const shown = answer.build({ draft: out.draft, reads: out.reads, routes: out.routes, screens: out.screens });
+  const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past, context, shows, onRead: progressFor(actor, askKey) });
+  // A card the action cannot be drawn without asks for what it lacks first (§1.3 decision 29; every
+  // field it needs, decision 34), the screen's own record filling its field, with answers read from
+  // the person's own records where the ask reads them (decisions 32 and 34).
+  const drafted = (out.draft && out.draft.action && out.draft.action.values) || {};
+  const asked = await answer.withOptions(answer.askFirst({ draft: out.draft, actions: out.actions, history: past, shows, context }), out.actions, { actor, db: pool, values: drafted });
+  const shown = answer.build({ draft: asked, reads: out.reads, routes: out.routes, screens: out.screens, shows });
+  // The card (§6.11 step 2): only for a screen that draws one, checked against the person's rights now.
+  const card = shows.includes("cards") ? await answer.draftCard({ draft: asked, actions: out.actions, actor, context, db: pool }) : null;
 
   const saved = await tx(async (client) => {
     // Deleted in another tab meanwhile: the question opens a new conversation.
     let conv = conversation ? await repo.touchConversation(client, conversation.ai_conversation_id, actor.user_id) : null;
-    if (!conv) conv = await repo.insertConversation(client, { userId: actor.user_id, title: titleOf(body.question) });
+    if (!conv) conv = await repo.insertConversation(client, { userId: actor.user_id, title: titleOf(body.question), openedFrom: context });
     const q = await repo.insertMessage(client, {
       ai_conversation_id: conv.ai_conversation_id,
       role: "user",
       content: body.question,
+      context,
     });
     const a = await repo.insertMessage(client, {
       ai_conversation_id: conv.ai_conversation_id,
@@ -76,12 +118,24 @@ async function ask(body, actor) {
       rows_read: shown.rows_read,
       module_key: shown.module_key,
       metadata: shown.metadata,
+      context,
     });
     await repo.insertCitations(
       client,
       a.ai_message_id,
       shown.stored_citations.map((c) => ({ entity_type: c.entity_type, entity_id: c.entity_id, read_key: c.read_key, label: c.label })),
     );
+    await repo.insertReads(client, a.ai_message_id, shown.stored_reads);
+    let draft = null;
+    if (card) {
+      draft = await repo.insertDraft(client, { ...card.row, ai_message_id: a.ai_message_id, user_id: actor.user_id });
+      await emit(client, {
+        key: EVENTS.ASSISTANT_CARD_DRAFTED,
+        entity: { type: "ai_action_draft", id: draft.ai_action_draft_id },
+        actor,
+        payload: { ai_message_id: a.ai_message_id, action_key: card.row.action_key, risk: card.row.risk, suggested: card.row.suggested, records: card.row.records.map((r) => ({ type: r.type, id: r.id })) },
+      });
+    }
     await emit(client, {
       key: EVENTS.ASSISTANT_ANSWERED,
       entity: { type: "ai_message", id: a.ai_message_id },
@@ -91,28 +145,37 @@ async function ask(body, actor) {
         ai_run_id: out.run_id,
         reads: shown.reads.map((r) => r.key),
         declined: shown.declined,
+        card: draft ? draft.action_key : null,
       },
     });
-    return a;
+    return { a, draft };
   });
 
   return {
-    ai_message_id: saved.ai_message_id,
-    ai_conversation_id: saved.ai_conversation_id,
+    ai_message_id: saved.a.ai_message_id,
+    ai_conversation_id: saved.a.ai_conversation_id,
     question: body.question,
     content: shown.content,
     table: shown.table,
     link: shown.link,
     citations: shown.citations,
     citations_total: shown.citations_total,
+    sources: shown.sources,
     reads: shown.reads,
     declined: shown.declined,
     more: shown.more,
+    card: saved.draft ? cardsService().present(saved.draft, null) : null,
+    choices: shown.choices,
+    overview: shown.overview,
+    context,
     feedback: null,
-    created_at: new Date(saved.created_at).toISOString(),
+    created_at: new Date(saved.a.created_at).toISOString(),
     provisional: true,
   };
 }
+
+/** The cards service, required late: it requires this module's events, which require the export, which requires nothing here. */
+const cardsService = () => require("./assistant.cards");
 
 /** GET /ai/suggestions. */
 async function suggestionsFor(actor) {
@@ -172,4 +235,4 @@ async function transcribe(file, actor) {
   }
 }
 
-module.exports = { ask, suggestionsFor, feedback, transcribe, titleOf };
+module.exports = { ask, suggestionsFor, feedback, transcribe, titleOf, readWords, progressFor };

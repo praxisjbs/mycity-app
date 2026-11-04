@@ -398,10 +398,11 @@ const KEY_RESULT_REF_SORTS = { code: "kr.code" };
 /**
  * A quarter's key results as a picker names them: the company's, the functions' or one function's. A
  * function's within the reader's reach; the company's, by code and statement alone, for whoever sets goals
- * (`pickCompany`), so a head can say which company key result theirs feeds (§6.23).
+ * (`pickCompany`), so a head can say which company key result theirs feeds (§6.23). `plan_statuses` keeps
+ * those whose plan is in one of them (a card that changes a key result offers the ones it can change).
  */
 function listKeyResultRefs(db, query, reach = visibility.EVERYTHING, pickCompany = true) {
-  const params = [query.period_id, query.level || null, query.department_id || null, query.q || null, pickCompany === true];
+  const params = [query.period_id, query.level || null, query.department_id || null, query.q || null, pickCompany === true, query.plan_statuses || null];
   const readable = visibility.keyResultReadable(reach, "kr", "o", params);
   return pageQuery(
     db,
@@ -412,6 +413,7 @@ function listKeyResultRefs(db, query, reach = visibility.EVERYTHING, pickCompany
         AND ($2::text IS NULL OR ($2 = 'company') = (o.department_id IS NULL))
         AND ($3::uuid IS NULL OR o.department_id = $3)
         AND ($4::text IS NULL OR search_fold(kr.code || ' ' || kr.statement) LIKE '%' || search_fold($4) || '%')
+        AND ($6::text[] IS NULL OR EXISTS (SELECT 1 FROM performance_plan pl WHERE pl.performance_plan_id = o.performance_plan_id AND pl.status = ANY($6::text[])))
         AND (${readable} OR (o.department_id IS NULL AND $5::boolean))
       ORDER BY ${orderBy(query, KEY_RESULT_REF_SORTS, "kr.okr_key_result_id")}`,
     params,
@@ -492,6 +494,15 @@ const keyResultContext = (db, id) =>
        JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id
        JOIN performance_period p ON p.performance_period_id = o.performance_period_id
       WHERE kr.okr_key_result_id = $1`,
+    [id],
+  );
+
+/** A key result's code and the people who answer for it, for telling them its target changed. */
+const keyResultOwners = (db, id) =>
+  one(
+    db,
+    `SELECT kr.code::text AS code, kr.accountable_employee_id, kr.co_accountable_employee_id
+       FROM okr_key_result kr WHERE kr.okr_key_result_id = $1`,
     [id],
   );
 
@@ -1078,7 +1089,29 @@ const objectiveHolds = (db, id) =>
     [id],
   );
 
+/**
+ * The people, departments and quarters a Praxis AI card holds, by name (docs/guides/praxis-ai.md §6.11,
+ * decision 31): one query a kind, the ids given; an id that names nothing is left out.
+ */
+async function cardNames(db, { employeeIds = [], departmentIds = [], periodIds = [] }) {
+  const out = [];
+  if (employeeIds.length) {
+    const { rows } = await db.query("SELECT employee_id AS id, btrim(first_name || ' ' || last_name) AS label FROM employee WHERE employee_id = ANY($1::uuid[])", [employeeIds]);
+    out.push(...rows.map((r) => ({ type: "employee", id: r.id, label: r.label })));
+  }
+  if (departmentIds.length) {
+    const { rows } = await db.query("SELECT department_id AS id, name AS label FROM department WHERE department_id = ANY($1::uuid[])", [departmentIds]);
+    out.push(...rows.map((r) => ({ type: "department", id: r.id, label: r.label })));
+  }
+  if (periodIds.length) {
+    const { rows } = await db.query("SELECT performance_period_id AS id, name AS label FROM performance_period WHERE performance_period_id = ANY($1::uuid[])", [periodIds]);
+    out.push(...rows.map((r) => ({ type: "performance_period", id: r.id, label: r.label })));
+  }
+  return out;
+}
+
 module.exports = {
+  cardNames,
   importPeriodId,
   departmentByName,
   employeeByName,
@@ -1117,6 +1150,7 @@ module.exports = {
   keyResultsOf,
   getKeyResult,
   keyResultContext,
+  keyResultOwners,
   latestMonths,
   monthsOf,
   monthOf,

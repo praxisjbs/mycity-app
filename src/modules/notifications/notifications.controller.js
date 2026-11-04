@@ -1,5 +1,4 @@
 "use strict";
-// ai:none a person's own notices about other records; the assistant answers from those records' modules
 // search:none the bell is read where it opens; its records are found through their own modules
 /**
  * The bell, preferences, quiet hours and devices: the HTTP edge. Those routes are the

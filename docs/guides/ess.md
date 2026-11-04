@@ -288,9 +288,40 @@ People's or a manager's. The workbook opens for the person it is about and the C
 ## 9 · AI and search
 
 - **AI reads** (`ess.ai.js`): built: the caller's own documents, leave requests (`my_leave.list`) and
-  year (`my_leave.balances`); `leave.ai.js` reads leave requests within the asker's `people` scope.
+  year (`my_leave.balances`); `leave.ai.js` reads leave requests within the asker's `people` scope,
+  and counts them (`leave.summary`, `docs/guides/praxis-ai.md` §6.13; `LeaveSummaryQuery`: the
+  list's filters, a department, a year or a period, `by` status, type, person, department or month):
+  requests by status, days approved, taken, booked ahead and waiting, people, on leave today; by
+  status and type always, then by person or department (20) or by month as series. One SQL over the
+  requests (`leave.repo.aiSummary`), figures never rows.
   Still to come: the caller's own profile summary, latest payslip
   summary, open queries count. Never another person's record. Paged at 25.
+- **AI actions** (`docs/guides/praxis-ai.md` §6.11): `my_leave.request` (`ess.ai.js`; `ess` create,
+  standard risk; input `LeaveRequestCreate`, Request Leave's own form: the type, the first and last
+  day, a note; run `leave.service.request` for the person's own employee, so the type, the days,
+  the clash and the year's allowance are its checks; the request read back with its link on My
+  Leave; the card names the leave type, Edit picks it with Request Leave's own list, a type the model
+  writes by name is matched among the active types (`src/shared/ai/named.js`, the matcher steps and
+  late reasons share: the whole name, then the one name it begins, then the one name holding the
+  word, "pay" for Leave Without Pay; never one of several), and asked for leave without a type it asks
+  "Which leave type?" with the person's types and the days left of each, `praxis-ai.md` decision 32;
+  then the first and last day off when they were not said, decision 34). For People: `leave.approve` and `leave.reject` (`leave.ai.js`; `people` approve, risk
+  approval, so Confirm It's You within five minutes; up to 25 requests a press; inputs
+  `LeaveApprove` and `LeaveReject`, a reason required to reject; the requests named who, type and
+  days through `leave.service.cardRecords`; at the press every request must be in the person's
+  `people` scope (`assertCardRequests`), then each is decided through the approval's own
+  `workflow.service.decide` as People · Leave's Approve and Reject are, one after another, a request
+  already decided, not waiting on them or their own its own line; `leave.service.decideMany`).
+  People · Leave's forms are cards too (decision 33): **Record Leave** (`leave.record`, `people`
+  create, risk approval, since it is approved at once and spends the person's year: the person in the
+  reader's scope, the type matched by name, the days; `leave.service.record`), **Add Type**
+  (`leave_types.add`: the name and the days a year, the code made from the name as New Leave Type
+  makes it, `leave.service.codeOf`) and **Save Type** (`leave_types.edit`, risk approval, since a
+  changed allowance moves everyone's year: the type by its name, renamed, re-allowanced, retired or
+  offered again; `updateType`). And the person's own **Send Response** (`my_queries.respond`,
+  `ess.ai.js`, `ess` create): the response to one of their own open queries, named by its number,
+  in their own words, sent once through My Queries' own `ess.queries.respond`
+  (`docs/guides/queries.md` §3 step 3).
 - **AI routes**: "my payslip" → My Payslips; "request leave" → My Leave with `new=1`, Request
   Leave open and filled with the type, the days and the note the person gave
   (`leave.LeaveRequestPrefill`, `docs/guides/praxis-ai.md` §6.4); "change my password" → My
@@ -399,6 +430,18 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · Record Leave, Add Type, Save Type and Send Response are Praxis AI cards (§9;
+  `praxis-ai.md` decisions 33 and 39): Record Leave and Save Type after Confirm It's You;
+  `LeaveTypeUpdate`'s fields are shared with the card's `LeaveTypeChange`. No screen changed.
+- 03/11/2026 · JP · `my_leave.request` asks the first and the last day off when they were not said, after the type (`praxis-ai.md` decision 34), so a leave card is drawn whole. No screen of ESS changed.
+- 03/11/2026 · JP · `my_leave.request`'s type matcher is the shared one (`src/shared/ai/named.js`), which also matches the one type whose name holds the word said ("pay" for Leave Without Pay; `praxis-ai.md` §6.11). No screen of ESS changed.
+- 03/11/2026 · JP · `ess.ai.js`: My Profile's own edit (`EssProfileUpdate`) is never in the chat, `personal` (`praxis-ai.md` decision 33). No behaviour changed.
+- 03/11/2026 · JP · `my_leave.request` matches a type written with or without the word Leave ("Annual Leave" for the type named Annual), which staging showed it missing (`praxis-ai.md` decision 32). No screen of ESS changed.
+- 03/11/2026 · JP · `my_leave.request`'s card names its leave type and picks it with Request Leave's own list; a type written by name is matched to an active type; asked for leave without a type, Praxis AI asks which, with the person's types and the days left of each (`praxis-ai.md` §1.4 decision 32). No screen of ESS changed.
+- 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.17): `my_profile.get` and `my_leave.list` carry matrix probes (the asker's own record and request returned, an outsider's never), and the leave manifest's `leave.requests`, `leave.approve` and `leave.reject` theirs (a report's request in a line manager's reach, an outsider's never, a card naming it refused); `LeaveApprove` and `LeaveReject` say At most 25 on a card.
+- 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): the assistant's leave cards, `my_leave.request` (the person's own, Request Leave's service) and, for People, `leave.approve` and `leave.reject` (the requests waiting on them, up to 25 a press, each through the approval's own decide after Confirm It's You; never their own; `leave.service.cardRecords`, `assertCardRequests`, `decideMany`); §9. Nothing on the ESS or People · Leave screens changes.
+
+- 01/11/2026 · JP · §9: `leave.summary`, People's leave counted for the assistant by status, type, person, department or month, with the days taken, booked and waiting (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 27/10/2026 · GE · My Queries' window is 24 hours (§10.1), lateness raises its query through the
   Attendance policy (§3), and who sees a query (§8) matches `queries.md` §6.1.
 - 27/10/2026 · AJ · A query's response window is 24 hours, as MyCity's handbook sets it (queries.md §6.2).

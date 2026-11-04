@@ -979,7 +979,7 @@ About thirty selects across the hub read their options that way. JBS Praxis's an
 | `settings.changed` (organisation, working week, holidays, numbering, appearance) | C | Audit only; the working week and holidays clear the calendar cache; an appearance change reaches each hub through `/auth/me` (§6.15) |
 | `audit.export_requested` | C | `audit.build_export` makes the workbook of the whole filtered log (at most 10,000 entries, masked for the person who asked) into the file the request reserved, which the Audit Log downloads (§6.12); nothing is emailed |
 | `export-cleanup` (scheduler, every hour at twenty past) | B | Removes every export file 24 hours after it was made (`vault.remove`, `document.removed`; §6.12) |
-| The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
+| The engine's own events (`workflow.*`) | D | Approvers told when a stage starts (the CEO too when they opened it themself: they decide their own request, 02/11/2026); the requester when decided |
 | `workflow.definition_saved` | D | Audit only (the stages before and after) |
 | `workflow.definition_created` | D | Audit only (a flow made on screen: its key, module and stages) |
 | `workflow.reassigned` | D | The new approver is told; the stage's time limit starts again |
@@ -1008,9 +1008,35 @@ Each module ships a read manifest (`<module>.ai.js`) or `// ai:none <reason>`: e
 departments (A), import history and the caller's own documents (B, `imports.ai.js` and `ess.ai.js`),
 roles and settings (C, reads only: `access.ai.js` lists and opens roles; `settings.ai.js` reads
 public holidays, the working week and the organisation profile with `ess` view, and numbering with
-`settings` view), my approvals (D). `audit` carries `ai:none`: the ledger is for the people who hold
-Settings over everything, and the assistant does not answer from it. `documents` carries `ai:none`: a document is a
+`settings` view), my approvals (D), and since PR3 of the Praxis AI Engine the queue counted
+(`approvals.summary`, `workflow.ai.js`, `docs/guides/praxis-ai.md` §6.13; `ApprovalSummaryQuery`:
+a module and `by` flow, stage, age or module): waiting, past their time, due within a day, the
+oldest in days, by flow and age band always, then by stage or module, over the same WHERE as My
+Approvals (`workflow.repo.waitingSummary`). `audit` carries `audit.ai.js` (PR3): no read of an
+entry, and `audit.summary` for a reader of the whole log alone (`settings` view with scope `all`,
+and the CEO; anyone else is told it is not available): entries of a period (the last 30 days unless
+the log's filters say) by action, by person, by module or record type, and by day, never an entry's
+words (`audit.repo.aiSummary`). `documents` carries `ai:none`: a document is a
 file, and what it says about a person is read through that person's own module.
+
+Settings' own forms are Praxis AI cards too (`settings.ai.js`, `docs/guides/praxis-ai.md` §6.11,
+decision 33), each the screen's own service function under the Settings grant: Save Organisation
+(never the address, picked on the map), Add Holiday and Save Holiday, Save Working Day (one day, the
+other six kept, held to `WorkingWeekSave`) and Save Numbering (only what changes, held to
+`NumberingSchemeSave`). A role's grants (Save Role) and an approval flow and its steps are `design`
+(decision 35): designed with the whole of them in view, never in the chat.
+
+Since PR4 of the Praxis AI Engine, My Approvals has a card (`approvals.decide`, `workflow.ai.js`,
+`docs/guides/praxis-ai.md` §6.11): approve, reject or request changes on up to 25 of the requests
+waiting on the person, after Confirm It's You (risk approval), with a reason required but to
+approve (`ApprovalDecide`); the card names each request by its flow and who it is about
+(`workflow.service.cardRecords`); at the press every request must be one the person may read
+(`assertCardInstances`), then each goes through `decide()` as the screen's buttons do, one after
+another (`decideMany`): a request already decided, not waiting on them, their own, or decided on
+its own record (a sanction) is its own line, the last with the record's screen, and the rest still
+go. Its grant is `ess` create, as the queue's read is `ess` view: the queue is the person's own;
+whether they may decide each request is the service's (the stage names them, `approve` held on the
+request's module, never the requester). `ApprovalFlowCreate` is `not_offered`.
 
 Search providers: `organisation.search.js` (employees, departments; A), `imports.search.js` (a batch
 by its number or the file; B), `access.search.js` (roles by name or code) and `settings.search.js`
@@ -1140,6 +1166,21 @@ screen.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · People's records are Praxis AI cards (`organisation.ai.js` with
+  `organisation.cards.js`; `organogram.md` §9; `praxis-ai.md` decisions 33 and 36): Add Employee
+  and Save Record with the work record alone (personal details, bank and pay never on a card),
+  Save Line, Add Department and Save Department (the grant over everyone), Add Role and Save Role,
+  each through this module's own function in its own transaction, under the controller's rules.
+  `EmployeeUpdate`, `EmployeeReportingUpdate`, `DepartmentUpdate` and `OrgSeatUpdate` share their
+  fields with the cards' schemas (`EmployeeChange`, `EmployeeReportingChange`, `DepartmentChange`,
+  `OrgSeatChange`; `WORK_RECORD`). No screen changed.
+- 03/11/2026 · JP · Settings' forms in the chat (`praxis-ai.md` decisions 33 and 35): Save Organisation, Add and Save Holiday, Save Working Day and Save Numbering as Praxis AI cards (`settings.ai.js`, `settings.service.holiday`); Save Role, New Approval Flow and Edit Approval Steps are `design`, never in the chat (§9). No screen changed.
+- 03/11/2026 · JP · My Approvals' card (`approvals.decide`) asks what it needs before it is drawn (`praxis-ai.md` decision 34): which requests (those waiting on the person, as a card names them, `workflow.service.cardChoices`; matched by their words, `instanceIdOf`), the decision, and the reason unless it is an approval. No Approvals screen changed.
+- 03/11/2026 · JP · Decision 33's words on three foundation modules (`praxis-ai.md` §1.5): an import is `file` (`imports.ai.js`), the documents module opted out as `file`, the security policy is `secret` (`settings.ai.js`); the other Settings forms are on the list of forms to bring into the chat (`scripts/check/ai-forms-gaps.json`). No behaviour changed.
+- 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.15, §6.17): `approvals.mine` and `approvals.decide` carry matrix probes (a report's request waiting on the asker who holds approve, an outsider's never, a card naming it refused unless the asker reads every request); `ApprovalDecide` says At most 25 on a card; `imports.ai.js` and `organisation.ai.js` account for their Create schemas in `not_offered` (an import starts on Settings, Imports with its preview in view; Add Employee carries restricted fields, a department and a seat are set with the structure in view), as gate 23 asks of every module.
+- 01/11/2026 · JP · Praxis AI Engine PR4 (`docs/guides/praxis-ai.md` §6.11): My Approvals' card `approvals.decide` in `workflow.ai.js` (the requests waiting on the person decided from the chat through `decide()`, one after another, after Confirm It's You; `workflow.service.cardRecords`, `assertCardInstances`, `decideMany`); §9. Nothing on the Approvals screens changes.
+
+- 01/11/2026 · JP · §9: `approvals.summary` (D) and `audit.summary` (C), the requests waiting on a person and the Audit Log counted for the assistant; `audit` drops its `ai:none` for a manifest with the summary alone (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 28/10/2026 · JP · §6.18, a select's server list loads as it scrolls (JBS Praxis, from Goals' Function select, fed by People · Departments, which stopped at 25): every select filled from a server list reads it 25 at a time (`useInfinite`, `paging`) and loads the next page as its menu nears its end, on both shells; it looks as before. In the folders this guide maps: People · Employees' Department filter, Departments' Open Role (Set Head) and the reporting form's Open Role. FRONTEND_FOUNDATION F32.
 - 27/10/2026 · JP · Nothing in this guide changed. In the `organisation` module it maps, the reporting tree's read carries each node's department and the Head marks (`OrgNode.heads`, `repo.departmentHeads`), and Download PDF's cards carry them too (`docs/guides/organogram.md` §6).
 - 27/10/2026 · JP · §6.1: the deploy loader gives the departments, their codes and heads only to a database that has never had MyCity's names, and then leaves them to People · Departments (#103, `docs/guides/organogram.md` §6.1, JBS Praxis 27/10/2026), even when `nomenclature.json` changes; it finds a department renamed on screen by MyCity's code, the roster never makes its old name again, and each deploy gives every department head their Head of Department role. §10: People · Employees gains Move To Department on the rows picked (desktop).

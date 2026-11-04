@@ -26,6 +26,9 @@ const {
   blank,
   listQuery,
   Paged,
+  recordId,
+  changesBeside,
+  nothingOn,
 } = require("./common");
 const { PlaceInput } = require("./maps");
 
@@ -202,6 +205,23 @@ const EmployeeListQuery = listQuery(
   ["display_name", "staff_number", "job_title", "department", "start_date", "created_at"],
 );
 
+/**
+ * The assistant's headcount summary (docs/guides/praxis-ai.md §6.13; organogram.md §9): people by
+ * department, status, work arrangement, employment type, line manager or when their confirmation is
+ * due, with the register's own filters. Figures, never rows; no page.
+ */
+const EmployeeSummaryBy = z.enum(["department", "status", "work_pattern", "employment_type", "manager", "confirmation"]);
+const EmployeeSummaryQuery = z
+  .object({
+    department_id: uuid.optional(),
+    status: EmployeeStatus.optional(),
+    work_pattern: WorkPattern.optional(),
+    employment_type: EmploymentType.optional(),
+    line_manager_id: uuid.optional(),
+    by: EmployeeSummaryBy.default("department"),
+  })
+  .strict();
+
 /** One row of the register. */
 const EmployeeRow = z
   .object({
@@ -334,7 +354,7 @@ const ON_SITE_PATTERNS = ["on_site", "hybrid"];
  * emptying their worksite in the same edit is refused here; a move that leaves the stored
  * worksite empty is refused by the service, which knows it (JBS Praxis, 25/10/2026).
  */
-const EmployeeUpdate = z
+const EmployeeUpdateFields = z
   .object({
     first_name: text(100),
     middle_name: clearable(z.string().trim().max(100)),
@@ -365,13 +385,51 @@ const EmployeeUpdate = z
     gross_monthly: clearable(pay),
   })
   .partial()
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "change at least one field" })
+  .strict();
+
+/** Moving someone to On Site or Hybrid while emptying their worksite in the same change is refused. */
+const keepsWorksite = (v, ctx) => {
+  if (ON_SITE_PATTERNS.includes(v.work_pattern) && "worksite_id" in v && !v.worksite_id)
+    ctx.addIssue({ code: "custom", path: ["worksite_id"], message: "Pick a worksite" });
+};
+
+const EmployeeUpdate = EmployeeUpdateFields.refine((v) => Object.keys(v).length > 0, { message: "change at least one field" })
   .superRefine(employeeDates)
-  .superRefine((v, ctx) => {
-    if (ON_SITE_PATTERNS.includes(v.work_pattern) && "worksite_id" in v && !v.worksite_id)
-      ctx.addIssue({ code: "custom", path: ["worksite_id"], message: "Pick a worksite" });
-  });
+  .superRefine(keepsWorksite);
+
+/**
+ * The work record, as Praxis AI's cards carry it (docs/guides/praxis-ai.md §6.11, decision 33;
+ * JBS Praxis, 03/11/2026): names, work contact, job, department, line manager, worksite, the
+ * arrangement and the dates of the engagement. Personal details (birth date, gender, next of kin,
+ * home, personal email), bank and pay are never on a card: they stay on the record's own screen.
+ */
+const WORK_RECORD = Object.freeze([
+  "first_name",
+  "middle_name",
+  "last_name",
+  "preferred_name",
+  "work_email",
+  "phone",
+  "job_title",
+  "department_id",
+  "worksite_id",
+  "employment_type",
+  "work_pattern",
+  "start_date",
+  "contract_ends_on",
+  "confirmation_due_on",
+  "confirmed_on",
+]);
+
+/**
+ * Edit Record as a card (Save Record): the person (their id, or their name matched among the
+ * people the reader may see) beside the work record's fields; only what changes.
+ */
+const EmployeeChange = EmployeeUpdateFields.pick(Object.fromEntries(WORK_RECORD.map((k) => [k, true])))
+  .extend({ employee_id: recordId("employee") })
+  .refine(changesBeside(["employee_id"]), nothingOn("employee_id"))
+  .superRefine(employeeDates)
+  .superRefine(keepsWorksite);
 
 /**
  * POST /employees/:id/archive. `left_on` is their last day (today when not given), kept as
@@ -383,7 +441,7 @@ const EmployeeArchive = z.object({ archive_reason: text(200), left_on: isoDate.o
  * PATCH /employees/:id/line-manager: a person or a vacant seat, and the
  * dotted line beside it. null clears one. The reason is kept on the audit row.
  */
-const EmployeeReportingUpdate = z
+const EmployeeReportingFields = z
   .object({
     line_manager_id: uuid.nullable(),
     line_manager_seat_id: uuid.nullable(),
@@ -392,13 +450,24 @@ const EmployeeReportingUpdate = z
     reason: optionalText(200),
   })
   .partial()
-  .strict()
-  .refine(
-    (v) =>
-      !(v.line_manager_id && v.line_manager_seat_id) &&
-      !(v.dotted_manager_id && v.dotted_manager_seat_id),
-    { message: "a person reports to a person or to a seat, never both" },
-  );
+  .strict();
+const EmployeeReportingUpdate = EmployeeReportingFields.refine(
+  (v) =>
+    !(v.line_manager_id && v.line_manager_seat_id) &&
+    !(v.dotted_manager_id && v.dotted_manager_seat_id),
+  { message: "a person reports to a person or to a seat, never both" },
+);
+
+/**
+ * Save Line as a card: the person beside who they report to, a person on each line (null clears
+ * one), and the reason kept on the audit row. A vacant seat is picked on the Organogram, where the
+ * structure is in view.
+ */
+const EmployeeReportingChange = EmployeeReportingFields.pick({ line_manager_id: true, dotted_manager_id: true, reason: true })
+  .extend({ employee_id: recordId("employee") })
+  .refine(changesBeside(["employee_id", "reason"]), nothingOn("employee_id"))
+  .refine((v) => !v.line_manager_id || v.line_manager_id !== v.employee_id, { message: "Not themselves", path: ["line_manager_id"] })
+  .refine((v) => !v.dotted_manager_id || v.dotted_manager_id !== v.employee_id, { message: "Not themselves", path: ["dotted_manager_id"] });
 
 /**
  * Each field of an employee record as its screens name it (People's form, My Profile), for the
@@ -529,7 +598,7 @@ const DepartmentCreate = z
   .strict()
   .refine((v) => !(v.head_employee_id && v.head_seat_id), ONE_HEAD);
 
-const DepartmentUpdate = z
+const DepartmentUpdateFields = z
   .object({
     name: text(100),
     code: departmentCode,
@@ -539,9 +608,20 @@ const DepartmentUpdate = z
     head_seat_id: uuid.nullable(),
   })
   .partial()
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "change at least one field" })
-  .refine((v) => !(v.head_employee_id && v.head_seat_id), ONE_HEAD);
+  .strict();
+const DepartmentUpdate = DepartmentUpdateFields.refine((v) => Object.keys(v).length > 0, { message: "change at least one field" }).refine(
+  (v) => !(v.head_employee_id && v.head_seat_id),
+  ONE_HEAD,
+);
+
+/**
+ * Save Department as a card: the department (its id, or its name) beside Edit Department's fields;
+ * its head a person (null clears it), a vacant seat being picked on the screen. Retired (`active`
+ * false) and restored as the screen's Retire and Restore do.
+ */
+const DepartmentChange = DepartmentUpdateFields.omit({ head_seat_id: true })
+  .extend({ department_id: recordId("department") })
+  .refine(changesBeside(["department_id"]), nothingOn("department_id"));
 
 /**
  * Add People and Move To: the people to move into the department, at most a page a press.
@@ -593,7 +673,7 @@ const OrgSeatCreate = z
     message: "a seat reports to a person or to a seat, never both",
   });
 
-const OrgSeatUpdate = z
+const OrgSeatUpdateFields = z
   .object({
     title: text(150),
     department_id: uuid,
@@ -602,11 +682,19 @@ const OrgSeatUpdate = z
     status: z.enum(["vacant", "closed"]),
   })
   .partial()
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "change at least one field" })
-  .refine((v) => !(v.line_manager_id && v.line_manager_seat_id), {
-    message: "a seat reports to a person or to a seat, never both",
-  });
+  .strict();
+const OrgSeatUpdate = OrgSeatUpdateFields.refine((v) => Object.keys(v).length > 0, { message: "change at least one field" }).refine(
+  (v) => !(v.line_manager_id && v.line_manager_seat_id),
+  { message: "a seat reports to a person or to a seat, never both" },
+);
+
+/**
+ * Save Role as a card: the open role (its id, or its title matched among the open roles) beside
+ * Edit Open Role's fields, reporting to a person (null clears it); closed with `status` closed.
+ */
+const OrgSeatChange = OrgSeatUpdateFields.omit({ line_manager_seat_id: true })
+  .extend({ org_seat_id: recordId("role") })
+  .refine(changesBeside(["org_seat_id"]), nothingOn("org_seat_id"));
 
 /**
  * GET /org-chart. The whole company in one read: a node is a person or a
@@ -817,11 +905,17 @@ const TABLES = {
   EmployeeAdd: { table: "employee" },
   EmployeePrefill: { table: "employee" },
   EmployeeUpdate: { table: "employee" },
+  EmployeeChange: { table: "employee" },
   EmployeeArchive: { table: "employee" },
   EmployeeReportingUpdate: {
     table: "employee",
     virtual: { reason: "why the line changed: kept on the audit row, not on the record" },
   },
+  EmployeeReportingChange: {
+    table: "employee",
+    virtual: { reason: "why the line changed: kept on the audit row, not on the record" },
+  },
+  EmployeeSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's headcount summary; figures, never a row" },
   EmployeeListQuery: {
     table: null,
     reason: "list controls and the register's filters, not a row",
@@ -881,6 +975,7 @@ const TABLES = {
     virtual: {},
   },
   DepartmentUpdate: { table: "department" },
+  DepartmentChange: { table: "department" },
   DepartmentPeopleMove: { table: null, reason: "the people a move names: each one's employee.department_id changes" },
   DepartmentMerge: {
     table: "department",
@@ -907,6 +1002,7 @@ const TABLES = {
   OrgSeatPage: { table: null, reason: "a page of seats" },
   OrgSeatCreate: { table: "org_seat" },
   OrgSeatUpdate: { table: "org_seat" },
+  OrgSeatChange: { table: "org_seat" },
   OrgChartQuery: { table: null, reason: "which view of the tree is asked for" },
   OrgNode: {
     table: null,
@@ -960,9 +1056,13 @@ module.exports = {
   employeeDateProblems,
   EmployeePrefill,
   EmployeeUpdate,
+  WORK_RECORD,
+  EmployeeChange,
   EmployeeArchive,
   EmployeeReportingUpdate,
+  EmployeeReportingChange,
   EmployeeListQuery,
+  EmployeeSummaryQuery,
   EmployeeRow,
   EmployeePage,
   EmployeesSummary,
@@ -977,6 +1077,7 @@ module.exports = {
   DepartmentPage,
   DepartmentCreate,
   DepartmentUpdate,
+  DepartmentChange,
   DepartmentPeopleMove,
   DepartmentMerge,
   OrgSeat,
@@ -984,6 +1085,7 @@ module.exports = {
   OrgSeatPage,
   OrgSeatCreate,
   OrgSeatUpdate,
+  OrgSeatChange,
   OrgChartQuery,
   OrgNode,
   OrgChartTree,

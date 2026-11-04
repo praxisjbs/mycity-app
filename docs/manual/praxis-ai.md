@@ -10,32 +10,45 @@ Praxis AI answers questions about MyCity's work in plain words: "Who came in lat
 screens show you, so two colleagues asking the same question can get different answers. Nobody
 else can read your questions, People and the CEO included.
 
-Praxis AI never changes anything. Ask it to do something, such as add a task or request leave, and
-it offers the screen where you do it, already filled in with what you said. Nothing is saved until
-you press that screen's own button.
+Praxis AI never changes anything by itself. Ask it to do something, such as add a task, approve the
+leave waiting on you or tell a colleague something, and it draws the change as a card for you to
+check and press. If something is missing, it asks first, one question at a time. Nothing happens
+until you press the card's button. A change it has no card for opens the screen where you do it,
+already filled in with what you said.
 
 ## Ask {#praxis-ask screen=praxis_ai/ask icon=spark}
 
-Ask is a conversation: your questions on the right, Praxis AI's answers below them.
+Ask is a conversation: your questions on the right, Praxis AI's answers below them. On a computer
+a pane on the right shows the newest answer's figures, table, a record and what was read. Open it
+from any screen, and **Back** returns you there. On a phone opened from the menu, Ask opens on your
+conversations, and one opens full screen when you press it.
 
 ![Praxis AI, Ask](shot:praxis-ask)
 
 ### Ask a question {#praxis-ask-question needs="praxis_ai create"}
 
-1. Open [Praxis AI · Ask](/praxis-ai?tab=ask).
+1. On a computer, press **Praxis AI** at the top right of any screen, or open
+   [Praxis AI · Ask](/praxis-ai?tab=ask). On a phone, press **New Conversation** under the title,
+   or ask from the round button ([Ask from any screen on a phone](#praxis-ask-anywhere)).
 2. A new conversation shows **Try Asking** with up to six questions you can ask. Press one to ask
    it. With none to offer, it shows **Ask a Question** instead.
 3. Or type your own question in **Ask a Question** at the foot of the screen, up to 500
    characters. Press **Send**, or Enter.
-4. While Praxis AI reads your records, it says **Reading Your Records**. The answer appears under
-   your question. Wait for it: **Send** does nothing until it comes.
+4. While Praxis AI reads your records, it says **Reading Your Records**, then what it is reading,
+   for example *Reading leave requests · 2 of 5*. The answer appears under your question. Wait for
+   it: **Send** does nothing until it comes.
 5. Ask a follow-up in the same box. Praxis AI remembers the conversation, so "and last week?" is
    enough.
+6. Opened from a screen, Praxis AI knows which screen you were on. "These" and "here" mean that
+   screen's records, with its filters as you left them.
 
-> **Tip:** On a computer, **Recent** beside the conversation lists your conversations, newest first,
-> 25 to a page: **Conversation** and **Last Asked**. Press one to open it again. Drag the line
-> between them to widen **Recent**. Before your first question it says **No Questions Yet**. A phone
-> has no **Recent**: open [Praxis AI · History](/praxis-ai?tab=history).
+> **Tip:** On a computer, press **Recent** at the top right to show your conversations beside the
+> chat, newest first, 25 to a page: **Conversation** and **Last Asked**. Press one to open it
+> again. Press **Recent** again to hide them. Before your first question it says
+> **No Questions Yet**. On a phone opened from the menu, Ask opens on this list instead, with
+> **Search Conversations** above it. Before your first question it says **No Conversations Yet**.
+
+![Praxis AI, Ask on a phone](shot:praxis-phone)
 
 ### Read an answer {#praxis-ask-answer}
 
@@ -44,19 +57,57 @@ Ask is a conversation: your questions on the right, Praxis AI's answers below th
 - The answer starts with a few sentences.
 - A long conversation opens on its newest 25 questions. Press **Show Earlier** at the top to see the
   25 before them.
-- A list of records shows as a table on a computer and as cards on a phone. When there are more
-  than 25, it says how many, for example *Showing 25 of 312*.
+- A list of records shows as a table on a computer and as cards on a phone. Each row starts with
+  who or what it is, for example the person's name, and a status reads in words, for example
+  *Not In*. When there are more than 25, it says how many, for example *Showing 25 of 312*.
+- Ask who is absent and the answer counts everyone who has not clocked in yet, by name. Nobody is
+  marked *Absent* until the day closes.
 - {needs="praxis_ai create"} Press **Show Next 25** under the newest answer for the next 25. It asks
   "Show the next 25." for you, as a new question. The next answer reads *Showing 26 to 50 of 312*,
   and so on.
 - A button under the answer, such as *Open Attendance*, opens the screen where you would act on it.
-- **From** lists the records the answer was read from. Press one to open it. A record with no
-  screen of its own does not open.
-- When there are more than six, press *+12 More* to see the rest. An answer keeps its first 50
-  records; past them, *+N More* is only a count.
+- **From** lists the kinds of record the answer was read from, with how many, for example
+  *partnership ×4*. Press one to see those records in the pane.
+- When the answer rests on one record, **From** names it. Press it to see it on **Record**, then
+  **Open Record** to open it.
+- Press a row of the answer's table to open its record. A record with no screen of its own does
+  not open.
 
 > **Important:** An answer is a first reading of your records, not a decision. Check the figures
 > on their screen before you act on them.
+
+### Read the pane {#praxis-ask-pane}
+
+![The pane beside an answer](shot:praxis-pane)
+
+1. On a computer, the pane on the right fills with the newest answer that read your records, also
+   when you open a conversation from **Recent** or History. An answer that only draws a card leaves
+   it as it was. On a phone, press **Open Figures** under an answer with
+   a table or figures. The pane opens as a sheet, **Figures**.
+2. **Overview** shows figures and a chart when an answer counted or summed something. Until an
+   answer has figures, it is greyed out.
+3. **Table** lists every row the answer was read from, 25 to a page. Press **Next** and
+   **Previous** to page. Past 200 rows it says how many rows there are. Press **Export** to save
+   every row as an Excel file on this device; its second sheet, About This File, says who exported
+   it, when, the question and what was read.
+4. Press a row to see it on **Record**. Press **Open Record** to open it on its own screen.
+5. **Sources** lists each read: its name, what it was filtered by, how many rows it returned, and
+   whether it was read or not available to you. **Masked** names the fields you may not see. Press
+   **Open Table** to see its rows.
+6. Press a chip under **From** on any answer to show those records in the pane. Press
+   **Open Figures** under an earlier answer with a table or figures to bring its pane back. An
+   answer of words alone has no **Open Figures**; its chips still open the pane.
+7. On a phone, press **Close** or swipe the sheet down to return to the conversation.
+
+![The pane on a phone](shot:praxis-figures)
+
+### Go back to your screen {#praxis-ask-back}
+
+1. Press **Back** at the top left, or press Escape. The screen you came from opens as you left it,
+   with its filters and its place in the list.
+2. Opened from the menu, [Search](#start-search) or History, **Back** opens
+   [Praxis AI · History](/praxis-ai?tab=history).
+3. On a phone, your phone's own Back gesture does the same.
 
 ### Say how good an answer was {#praxis-ask-feedback needs="praxis_ai create"}
 
@@ -83,27 +134,205 @@ Ask is a conversation: your questions on the right, Praxis AI's answers below th
 
 ### Have it do something for you {#praxis-ask-change needs="praxis_ai create"}
 
-1. Ask for what you want, for example "add a task to send the weekly report by Friday" or "book a
-   team meeting tomorrow at 10".
-2. Praxis AI answers with a button for the screen where you do it, such as *Open Tasks* or
-   *Open Calendar*.
-3. Press it. The screen opens, and for a new task, event, project, leave request or employee, its
-   form is filled in with what you said.
-4. Check every field, change what is wrong, and press the form's own button to save.
+![A card inside an answer](shot:praxis-card)
 
-Praxis AI can fill in a new task, a new event, a new project, a leave request and, for those who
-may add people, a new employee. For other changes, such as a new role, it opens the screen or an
-empty form: fill it in yourself.
+1. Ask for what you want, for example "add a task to send the weekly report by Friday", "approve
+   the leave requests waiting on me" or "tell Ada the report is ready".
+2. If something is missing, Praxis AI asks for it first. Answer each question, see
+   [Answer its questions](#praxis-ask-questions).
+3. Praxis AI answers with a card: the change as it will be made, every field filled in from what
+   you said, people by name, and the records it touches. Nothing has happened yet.
+4. Check every field. To change the words, a day, a choice or a person, press **Edit**, change the
+   field and press **Save Changes**. People and leave types are picked as on the screen's own form.
+   A field with a problem says so beside it, for example *Say why*. A field Praxis AI could not match
+   to your records says *Pick one*: press **Edit** and pick it.
+5. Press the card's button to make the change, for example **Create Task** or **Approve Leave**. A
+   card that acts on several records says how many, for example *Approve Leave ×4*.
+6. Under the card, **Done** lists each record and what happened to it. Press **Open** on a line to
+   see the record.
+7. To do nothing, press **Cancel**.
+
+- A card you did not ask for reads as a question, for example *Send Message?*. Press its button to
+  send it, or **Not Now**.
+- A card left for half an hour says **This card has expired.** Press **Draw It Again** to ask the
+  question again.
+- A mail or a message is written from your words and the records Praxis AI read for the answer.
+  Read it before you press **Send Mail** or **Send Message**: it goes as it stands, with your own
+  signature on a mail.
+- A card the hub cannot make as it stands says why under the card, for example
+  **Connect your mailbox first** with **Open Mailbox**.
+
+Praxis AI draws a card for a task, a change to a task, marking tasks done, a comment, a step on a
+task (adding one or ticking it), a task that waits on another, a project and a change to one, a
+meeting and a change to one you made, your week's Support Needed line, your own leave request, the
+leave and other requests waiting on you, a message to a colleague, a post in a channel and a mail
+from your mailbox. If you keep Late Reasons, it also adds a late reason or switches one off or on.
+It also changes your own notice settings, quiet hours and daily digest, adds a work site for you
+and colleagues, and sends your response to a query of your own. If your role allows, it changes
+Settings (the organisation's details, a holiday, a working day, a numbering), the company's notice
+rules and reminders, System Health's targets and faults, alert rules and reports.
+
+As your role allows, it also approves overtime beforehand, records leave for someone, adds a leave
+type or changes one, adds an employee or changes a record, sets who someone reports to, and adds or
+changes a department, an open role or a worksite. If you raise queries, it raises one. If you keep
+the query rules, it saves a rule, adds or changes a step of the consequence chain, and adds or
+changes a letter. If you write policies, it starts one and saves its draft.
+
+It also fills in Performance, Staff Community and your email signature for you:
+
+- A line of your monthly check-in, for example "nine stories published on my stories line": press
+  **Save Check-In** and it is saved to your draft. Attach a file and press **Submit Check-In** on
+  [My Performance](/ess?tab=my-performance).
+- A target you may change, for example "change BM-KR1.1's target to 40 from September": press
+  **Change Target** and it goes to the CEO.
+- A channel, its new name or purpose, a recognition for a colleague, wishes on a colleague's
+  birthday or work anniversary card, and your own newest message while it can still be changed:
+  press **Create Channel**, **Save Channel**, **Post Recognition**, **Send Wishes** or
+  **Save Message**.
+- Your own signature, for example "hide my mobile on my signature": press **Save My Signature**.
+  A new mobile number also changes the one on your employee record.
+
+A role's permissions, an approval flow and the cards a role sees on Home are designed on their own
+screens: it opens the screen, and you save there with its own button.
+
+- A card that changes something, such as **Save Task**, **Save Project** or **Save Event**, names
+  it first and shows only what changes. Anything it leaves out stays as it is.
+- A step can be named by its words, for example "tick the banners step". To make a task wait on
+  another, press **Edit** on the **Add Link** card to pick a different task, as on the task's own
+  **Wait On Task**.
+- An address is picked, never typed. When Praxis AI finds one place for your words, the card shows
+  it. When it finds several or none, the field says *Pick one*: press **Edit** and pick the address
+  as on the screen's own form.
+- Praxis AI never writes anyone's personal details, bank or pay. A card that adds an employee or
+  changes a record carries the work record only; add the rest on the person's record.
+- A query's letter is signed with the signature you saved on Letter Templates. Praxis AI cannot draw
+  a signature, so a card without one says so with **Draw Signature**. Draw yours once, then press
+  **Raise Query** again. Asked to save your signature, it opens **Edit Signature** for you.
+
+- A task card can name people to watch the task, or a whole department. They can open it and hear
+  how it goes; see [Watch a task](#workspace-watch) in My Workspace.
+- A task is shared with people or with a department, never both. A card naming both says
+  **People or a department**; press **Edit** and clear one.
+
+### Set goals and KPIs from the chat {#praxis-ask-goals needs="cap goals.function or cap goals.company"}
+
+1. Ask for the objective, key result or KPI you set, or the change to one, for example "add a key
+   result to BM-O2: publish 36 city stories". Name a record by its code or its words, and a quarter
+   by its name, for example "Q4 2026", or "this quarter".
+2. Check the card and press its button: **Set Objective**, **Save Objective**, **Set Key Result**,
+   **Save Key Result**, **Set KPI** or **Save KPI**. A plan that is binding takes no change: press
+   **Request To Unbind** to ask the CEO to open it.
+3. If you keep the organisational goals, record, change and share one the same way with
+   **Record Goal**, **Save Goal** and **Share Goal**, and share a company objective with
+   **Share Objective**.
+
+### Score a review or draft a scorecard from the chat {#praxis-ask-scorecards needs="manager"}
+
+1. Ask for the scorecard or the line, for example "draft Ada's scorecard for this quarter" or "make
+   the stories line on Ada's scorecard target 12". A scorecard is named by its person.
+2. Check the card and press **Draft Scorecard**, **Add Line** or **Save Line**. Lines change only
+   while the scorecard is a draft.
+3. To score a review you review, ask for one line at a time, for example "score the stories line on
+   Ada's review 0.8, two stories were late". Press **Save Score** and confirm it is you, see
+   [Confirm it is you for an approval](#praxis-ask-confirm).
+4. Press **Submit Review** on the [review](/performance?tab=reviews) itself when every line is
+   scored.
+
+### Run Performance from the chat {#praxis-ask-performance needs="performance create, cap performance.manage"}
+
+1. Ask for the change, for example "set up the quarter starting 1 January 2027", "open September's
+   review round" or "start an improvement plan for Ada on Monday".
+2. Check the card and press its button: **Set Up Quarter**, **Save Quarter**, **Open Round**,
+   **Change Reviewer**, **Start PIP** or **Save PIP**.
+3. **Start PIP** and **Save PIP** ask you to confirm it is you first. A plan's lines are written in
+   words; left out, they are the lines scored under target.
+
+### Post an announcement from the chat {#praxis-ask-announce needs="cap announcements.post"}
+
+1. Ask for the announcement, for example "announce to all staff that the office is closed on
+   Friday". Say a time to send it later, and the departments when it is not for everyone.
+2. Check the headline, the message, who it is for and when it goes out, then press
+   **Publish Announcement**.
+3. To change one still waiting to go out, name it by its headline and press **Save Announcement**.
+
+### Set the company signature from the chat {#praxis-ask-signature needs="cap mailbox.signature"}
+
+1. Ask for the link or the switch to change, for example "add our LinkedIn to the company
+   signature".
+2. Check the card and press **Configure Signature**. Anything you do not name stays as it is.
+
+### Answer its questions {#praxis-ask-questions needs="praxis_ai create"}
+
+![A question with answers to tap](shot:praxis-question)
+
+1. Ask for a change, for example "Assign a task to Cynthia".
+2. Praxis AI asks for what is missing, one question at a time, for example *When is it due?*. A
+   question shows its answers to tap and nothing else.
+3. Press one of the answers under the question, for example **Friday**, or type your own answer and
+   press **Send**. Ask why it needs something and it says, then asks again with the same answers.
+4. It asks the next thing it needs, for example *How urgent is it?*, until it has everything.
+5. Then it draws the card. Check it and press its button.
+
+- For a task it asks what the task is, when it is due and how urgent it is. Press **No Due Day**
+  for a task with no due day.
+- For a meeting it asks what it is about, when it starts, how long it is and who should come. Press
+  **Just Me** for a meeting with nobody else.
+- For your own leave it asks which type, with your leave types and the days you have left of each,
+  for example **Annual Leave, 12 days left**. Press one, or say the type in your question.
+- For a step it asks what the step is, for a project what it is called, and for your week's Support
+  Needed what support you need.
+- For a goal, an objective, a key result, a KPI, a scorecard line or a channel it asks what it is,
+  for an announcement its headline and what it should say, and for a target change or an unbind
+  request why.
+- For a scorecard line it also asks the section, how it is measured and its weight. For a KPI it
+  asks which function, and for a round or a target change which month.
+- For a task shared with a department it asks **Who leads it?**, with that department's people to
+  press.
+- When you do not say which task, event, project, channel or request, it asks which, with your own
+  to press, for example the tasks on your board. Or type its name or number.
+- It asks the same for a quarter, goal, objective, KPI, review, scorecard, improvement plan or
+  announcement.
+- It asks for everything a card needs, so a card it draws can be pressed as it stands.
+- For a new employee it asks each detail the record needs: names, job title, department, work email,
+  phone, start date, how they are engaged and where they work.
+- For a work site it asks where it is, the first and last day, who goes and what the work is.
+- When a name matches more than one person, it asks which one. Press the right person.
+- Only the newest answer's buttons work. Ask something else at any time to stop.
+
+> **Important:** A card only ever does what your own screens let you do. A request you may not
+> decide, or a task that is not on your board, is refused when you press.
+
+### Confirm it is you for an approval {#praxis-ask-confirm needs="praxis_ai create"}
+
+1. Approving or rejecting a request, approving overtime, recording leave, changing a leave type,
+   raising a query, saving a review's score, starting or changing an improvement plan, and any
+   change about money, payroll or deleting, asks **Confirm It's You** first unless you confirmed
+   within the last five minutes.
+2. Choose under **Confirm With**: **Passkey** if you have one, **PIN** or **Password**. Press
+   **Use Passkey**, or enter it and press **Confirm**.
+3. The card is pressed for you once you have confirmed.
+4. If you have no passkey, a message offers **Set Passkey**, once. Press it to add one with your
+   fingerprint, face or screen lock, so the next confirmation is one touch.
 
 ### Start a new conversation {#praxis-ask-new needs="praxis_ai create"}
 
-1. Press **New Conversation** at the top of the screen. It shows once a conversation is open.
+1. Press **New Conversation** at the top of the screen. On a computer it shows once a conversation
+   is open. On a phone it is under the title of your conversations, and inside a conversation it is
+   the plus at the top right.
 2. Ask your question. A new conversation starts with it, titled by your first question.
 
 You can also open [Search](#start-search) and press **New Conversation**.
 
 A new conversation is best for a new subject: Praxis AI reads the last few questions of the
 conversation you are in, and an old subject can confuse a new question.
+
+### Switch conversations on a phone {#praxis-ask-switch needs="praxis_ai create"}
+
+1. Inside a conversation, press **Conversations**, the lines at the top right.
+2. A sheet lists your conversations, newest first. The one you are in is ticked.
+3. Press one to open it, or press **New Conversation** at the top of the sheet to start another.
+4. To see all your conversations again, press **Back** at the top left or use your phone's Back
+   gesture.
 
 ### When an answer does not come {#praxis-ask-problems}
 
@@ -128,46 +357,60 @@ conversation you are in, and an old subject can confuse a new question.
 
 ### Ask from any screen on a phone {#praxis-ask-anywhere needs="praxis_ai create"}
 
-![Praxis AI over a screen, on a phone](shot:praxis-panel)
+![Praxis AI opened from a screen, on a phone](shot:praxis-panel)
 
 1. On a phone, press the round button with a plus at the bottom right, **Quick Actions**.
-2. Press **Praxis AI**. The conversation opens over the screen you are on.
-3. Ask as on [Praxis AI · Ask](/praxis-ai?tab=ask). Pressing an answer's button or a record goes
-   there and closes Praxis AI.
-4. Press **Back** at the top left, swipe right, or use your phone's Back gesture. It closes and
-   your screen is as you left it.
-5. Press **Praxis AI** again to come back to the same conversation. To start another, press
-   **New Conversation**, the plus at the top right.
+2. Press **Praxis AI**. Praxis AI opens full screen, and it knows which screen you came from:
+   "these" and "here" mean that screen's records.
+3. Ask as on [Praxis AI · Ask](/praxis-ai?tab=ask). Press **Open Figures** under an answer with a
+   table or figures to see them. Pressing an answer's button or a record goes there.
+4. Press **Back** at the top left, or use your phone's Back gesture. The screen you came from opens
+   as you left it, with its filters and its place in the list.
+5. To carry on a conversation later, open it from [Praxis AI · History](/praxis-ai?tab=history) or
+   [Search](#start-search). On a computer, **Praxis AI** at the top right of any screen does the
+   same as the round button.
 
 ## History {#praxis-history screen=praxis_ai/history icon=history}
 
-History lists your own conversations. Nobody else sees them.
+History lists your own questions and what they cost. Nobody else sees them.
 
 ![Praxis AI, History](shot:praxis-history)
 
 ### Read your history {#praxis-history-read}
 
 1. Open [Praxis AI · History](/praxis-ai?tab=history).
-2. The tiles count this month's **Questions**, **Conversations** and **Records Read** (how many
-   records your answers were read from).
-3. **Conversations** lists them, 25 to a page: **Title** (your first question), **Last Asked**,
-   **Questions** and, on a computer, **Records Read**.
-4. Press **Title** or **Last Asked** at the top of a column to sort by it. On a phone, press
-   **Sort**.
-5. Type in **Search Conversations** to find one by its title.
-6. Press a conversation to open it again on [Praxis AI · Ask](/praxis-ai?tab=ask) and carry on.
-7. Or open [Search](#start-search) from anywhere, type words from the question, and press it under
+2. The tiles show **Questions This Month**, **Your Questions** (all time) and **Your Spend**, what
+   your questions and recordings cost this month.
+3. {needs="ai_control view"} With AI Control, the tiles are the company's: **Questions This Month**
+   counts everyone's, **Spend** is what Praxis AI cost this month, and **Monthly Cap** is the most
+   all AI may spend in a month.
+4. **Your Questions** lists them, 25 to a page: **Question**, **Asked**, **Cost** and, on a
+   computer, **Sources Read** and **Tokens**.
+5. Press **Asked** at the top of its column to sort by it. On a phone, press **Sort**.
+6. Type in **Search Questions** to find one by its words.
+7. Press a question to open its conversation on [Praxis AI · Ask](/praxis-ai?tab=ask) and carry on.
+8. Or open [Search](#start-search) from anywhere, type words from the question, and press it under
    **Conversations**.
 
 Before your first question the list says **No Questions Yet**.
 
-On a computer, **Questions by Module** shows which parts of the hub your questions were about.
-**Other** counts the questions whose answers read no records.
+On a computer, **Spend per Month, Naira** shows the last six months, and **Questions by Module**
+shows which parts of the hub your questions were about. **Other** counts the questions whose
+answers read no records.
+
+### Export your questions {#praxis-history-export}
+
+1. Press **Export** at the top right. On a phone it is in the menu at the top right,
+   **History Actions**.
+2. The file downloads when it is ready, and a message says **Export downloaded**.
+
+The file lists your newest questions, up to 2,500, with the same columns as the list.
 
 ### Delete a conversation, or all of them {#praxis-history-delete}
 
-1. To delete one, press the three dots at the end of its row (on a phone, on its card),
-   **Conversation Actions**, then **Delete Conversation**.
+1. To delete one, press the three dots at the end of a question's row (on a phone, on its card),
+   **Question Actions**, then **Delete Conversation**. The whole conversation goes, every question
+   in it.
 2. Confirm with **Delete Conversation**. A message says **Conversation deleted**.
 3. To delete every conversation, press **Clear History** at the top right. On a phone it is in the
    menu at the top right, **History Actions**.
@@ -185,6 +428,7 @@ Deleting removes the questions and answers for good. It does not change what AI 
 open: /praxis-ai?tab=ask
 as: staff
 do:
+  - phone click: button "New Conversation"
   - wait: text "Try Asking"
 marks:
   1: text "Try Asking" | Questions you can ask
@@ -193,10 +437,36 @@ marks:
   4: button "Send" | Send it
 ```
 
+```shot praxis-card
+open: /praxis-ai?tab=ask&from=%2Fworkspace%3Ftab%3Dtasks
+as: staff
+do:
+  - fill: label "Ask a Question" = Create a task to send the weekly report on Friday
+  - click: button "Send"
+  - wait: button "Create Task"
+marks:
+  1: button "Create Task" | Make the change
+  2: button "Edit" | Change a field first
+  3: button "Cancel" | Do nothing
+```
+
+```shot praxis-question
+open: /praxis-ai?tab=ask&from=%2Fworkspace%3Ftab%3Dtasks
+as: staff
+do:
+  - fill: label "Ask a Question" = Assign a task to Cynthia
+  - click: button "Send"
+  - wait: text "When is it due?"
+marks:
+  1: text "When is it due?" | What it still needs
+  2: button "Friday" | Tap an answer
+```
+
 ```shot praxis-answer
 open: /praxis-ai?tab=ask
 as: operations
 do:
+  - phone click: button "New Conversation"
   - fill: label "Ask a Question" = Who works with us?
   - click: button "Send"
   - wait: button "Helpful"
@@ -205,6 +475,37 @@ marks:
   2: text "From" | The records it read
   3: button "Helpful" | Say how good it was
   4: button "New Conversation" | Start again
+```
+
+```shot praxis-pane
+open: /praxis-ai?tab=ask&from=%2Fpeople%3Ftab%3Demployees
+as: operations
+device: desktop
+do:
+  - fill: label "Ask a Question" = Who works with us?
+  - click: button "Send"
+  - wait: button "Helpful"
+marks:
+  1: button "Back" | Back to your screen
+  2: tab "Table" | Every row, 25 to a page
+  3: tab "Sources" | What was read
+  4: button "Recent" | Your conversations
+```
+
+```shot praxis-figures
+open: /praxis-ai?tab=ask&from=%2Fhome%3Ftab%3Doverview
+as: operations
+device: phone
+do:
+  - fill: label "Ask a Question" = Who works with us?
+  - click: button "Send"
+  - wait: button "Open Figures"
+  - click: button "Open Figures"
+  - wait: tab "Sources"
+crop: modal
+marks:
+  1: tab "Table" | Every row, 25 to a page
+  2: tab "Sources" | What was read
 ```
 
 ```shot praxis-panel
@@ -216,14 +517,24 @@ do:
   - click: button "Praxis AI"
   - wait: text "Try Asking"
 marks:
-  1: text "Try Asking" | Questions you can ask
-  2: label "Ask a Question" | Type your question
+  1: button "Back" | Back to your screen
+  2: text "Try Asking" | Questions you can ask
+  3: label "Ask a Question" | Type your question
+```
+
+```shot praxis-phone
+open: /praxis-ai?tab=ask
+as: operations
+device: phone
+marks:
+  1: button "New Conversation" | Start a conversation
+  2: searchbox | Find a conversation
 ```
 
 ```shot praxis-history
 open: /praxis-ai?tab=history
 as: operations
 marks:
-  1: text "Questions" | This month's questions
-  2: searchbox | Find a conversation
+  1: text "Questions This Month" | This month's questions
+  2: searchbox | Find a question
 ```

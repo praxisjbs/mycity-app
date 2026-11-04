@@ -89,10 +89,15 @@ async function signedInAs(email: string, screenUnderTest: ReactNode) {
 /** People's list, as Cynthia (Operations, everyone) reads it. */
 const peopleItems = async (query: Record<string, string>): Promise<PayItem[]> => attendance.PayItemPage.parse(await api.call("GET /api/v1/attendance/pay-items", { query })).data;
 const emailOf = (x: PayItem) => `${byId(x.employee.employee_id)!.user_key}@mycityapp.io`;
-/** Steps My Attendance's month back to the item's month (the newest item may fall in the last one). */
+/** Months from today's month back to the date's: 0 in the same month, 2 on a month's first day for a day six weeks back. */
+const monthsBack = (date: string) => {
+  const [ty, tm] = todayIso().split("-").map(Number);
+  const [y, m] = date.split("-").map(Number);
+  return Math.max(0, (ty! - y!) * 12 + (tm! - m!));
+};
+/** Steps My Attendance's month back to the item's month: the mock's days run six weeks back from yesterday, so on a month's first days an item may sit two months back. */
 async function toMonthOf(date: string) {
-  if (date.slice(0, 7) === todayIso().slice(0, 7)) return;
-  fireEvent.click(await screen.findByRole("button", { name: "Previous Month" }));
+  for (let i = 0; i < monthsBack(date); i += 1) fireEvent.click(await screen.findByRole("button", { name: "Previous Month" }));
 }
 const rowWith = (table: HTMLElement, text: string) => within(table).getAllByText(text)[0].closest("tr")!;
 

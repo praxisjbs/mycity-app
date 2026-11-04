@@ -125,6 +125,54 @@ function list(db, query, scope, reader, roleCodes) {
   );
 }
 
+/**
+ * The assistant's review summary (docs/guides/praxis-ai.md §6.13; performance.md §9): the reviews the
+ * reader may list (readable), counted in one SQL by stage and by rating, and by department or round as
+ * asked, with how many wait on the reader. Figures, never a row.
+ * @param {{round_id?, kind?, department_id?, by: string}} query
+ */
+async function aiSummary(db, query, scope, reader, roleCodes) {
+  const params = [query.round_id || null, query.kind || null, query.department_id || null];
+  const waiting = waitingClause(reader, roleCodes, params);
+  const who = readable(scope, reader, roleCodes, params);
+  const third = query.by === "round" ? { key: "pr.performance_cycle_id::text", label: "COALESCE(c.name, 'Probation')" } : { key: "COALESCE(s.department_id, e.department_id)::text", label: "COALESCE((SELECT dx.name FROM department dx WHERE dx.department_id = COALESCE(s.department_id, e.department_id)), 'No department')" };
+  const { rows } = await db.query(
+    `WITH r AS (
+       SELECT pr.performance_review_id, pr.status, pr.rating, pr.score_to_date, (${waiting}) AS waiting_on_me,
+              ${third.key} AS third_key, ${third.label} AS third_label
+         ${FROM} ${WI}
+        WHERE ($1::uuid IS NULL OR pr.performance_cycle_id = $1)
+          AND ($2::text IS NULL OR pr.review_kind = $2)
+          AND ($3::uuid IS NULL OR COALESCE(s.department_id, e.department_id) = $3)
+          ${who}
+     ), figures AS (
+       SELECT count(*)::int AS reviews,
+              count(*) FILTER (WHERE status = 'check_in')::int AS check_in,
+              count(*) FILTER (WHERE status IN ('with_reviewer', 'returned'))::int AS with_reviewer,
+              count(*) FILTER (WHERE status = 'second_level')::int AS second_level,
+              count(*) FILTER (WHERE status = 'with_hr')::int AS with_hr,
+              count(*) FILTER (WHERE status = 'closed')::int AS closed,
+              count(*) FILTER (WHERE status = 'withdrawn')::int AS withdrawn,
+              count(*) FILTER (WHERE waiting_on_me)::int AS waiting_on_me,
+              trim_scale(round(avg(score_to_date) FILTER (WHERE status = 'closed'), 2))::text AS average_score
+         FROM r
+     ), by_third AS (
+       SELECT third_key AS key, min(third_label) AS label, count(*)::int AS n, count(*) FILTER (WHERE status = 'closed')::int AS c,
+              row_number() OVER (ORDER BY count(*) DESC, min(third_label), third_key) AS rank
+         FROM r GROUP BY third_key
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', st, 'label', st, 'value', n, 'count', NULL) ORDER BY st)
+               FROM (SELECT CASE WHEN status = 'returned' THEN 'with_reviewer' ELSE status END AS st, count(*)::int AS n FROM r GROUP BY 1) x) AS by_stage,
+            (SELECT json_agg(json_build_object('key', rating, 'label', rating, 'value', n, 'count', NULL) ORDER BY rating)
+               FROM (SELECT rating, count(*)::int AS n FROM r WHERE status = 'closed' AND rating IS NOT NULL GROUP BY rating) x) AS by_rating,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', n, 'count', c) ORDER BY rank) FROM by_third WHERE rank <= 20) AS by_third`,
+    params,
+  );
+  const r = rows[0];
+  return { figures: r.figures, by_stage: r.by_stage || [], by_rating: r.by_rating || [], by_third: r.by_third || [] };
+}
+
 /** One review, with whether it waits on the reader when one is given. */
 async function get(db, id, reader = null, roleCodes = []) {
   if (!reader) return one(db, `SELECT ${ROW}, false AS waiting_on_me ${FROM} WHERE pr.performance_review_id = $1`, [id]);
@@ -630,6 +678,7 @@ module.exports = {
   ROW,
   FROM,
   list,
+  aiSummary,
   get,
   lock,
   ofScorecardInRound,

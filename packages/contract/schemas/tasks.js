@@ -32,6 +32,9 @@ const {
   isoDate,
   isoDateTime,
   blank,
+  recordId,
+  changesBeside,
+  nothingOn,
   listQuery,
   Paged,
 } = require("./common");
@@ -81,6 +84,9 @@ const LateReasonCreate = z.object({ label: text(60) }).strict();
 
 /** PATCH /tasks/late-reasons/:id: switch it off or on. */
 const LateReasonEdit = z.object({ active: z.boolean() }).strict();
+
+/** Late Reasons' toggle as a card (praxis-ai.md §6.11): the reason, by its id or its words, beside LateReasonEdit. */
+const LateReasonSwitch = LateReasonEdit.extend({ task_late_reason_id: recordId("reason") });
 /** Who a ping reaches: the assignee, the watchers, or both. */
 const PingAudience = z.enum(["assignee", "watchers", "everyone"]);
 
@@ -345,6 +351,25 @@ const TaskListQuery = listQuery(
 
 /** GET /tasks/summary: the four figures above the board. */
 const TaskSummaryQuery = z.object({ scope: TaskScope.default("mine") }).strict();
+
+/**
+ * The assistant's task counts (docs/guides/praxis-ai.md §6.13; workspace.md §9): how many tasks match the
+ * board's own filters, open, overdue and done, grouped by status, assignee, priority, due window or
+ * cadence. Figures, never rows; no page.
+ */
+const TaskCountsBy = z.enum(["status", "assignee", "priority", "due", "cadence"]);
+const TaskCountsQuery = z
+  .object({
+    scope: TaskScope.default("mine"),
+    status: TaskStatus.optional(),
+    assignee_id: uuid.optional(),
+    cadence: TaskCadence.optional(),
+    priority: TaskPriority.optional(),
+    due: z.enum(["overdue", "today", "week"]).optional(),
+    project_id: uuid.optional(),
+    by: TaskCountsBy.default("status"),
+  })
+  .strict();
 const TaskSummary = z
   .object({
     open: z.number().int().min(0),
@@ -357,6 +382,8 @@ const TaskSummary = z
 
 /** The people a Shared task is shared with, beside its lead: named, or a whole department. */
 const MEMBERS_MAX = 25;
+/** Watchers named on a new task, people or a whole department's (workspace.md §6); a task holds at most 25. */
+const WATCHERS_MAX = 25;
 const oneShare = (v) => !(v.member_ids !== undefined && v.department_id !== undefined);
 const ONE_SHARE = { message: "People or a department", path: ["department_id"] };
 
@@ -382,7 +409,9 @@ function commitmentProblems(v, ctx) {
 
 /**
  * POST /tasks. No assignee: the caller's own task. `member_ids` or `department_id` makes it
- * Shared, with `primary_assignee_id` its lead (workspace.md §6).
+ * Shared, with `primary_assignee_id` its lead (workspace.md §6). `watcher_ids` and
+ * `watcher_department_id` name who watches it: they may open it and hear when it moves, and it is
+ * never on their board (JBS Praxis, 01/11/2026).
  */
 const TaskCreate = z
   .object({
@@ -394,6 +423,8 @@ const TaskCreate = z
     primary_assignee_id: blank(uuid),
     member_ids: z.array(uuid).max(MEMBERS_MAX).optional(),
     department_id: blank(uuid),
+    watcher_ids: z.array(uuid).max(WATCHERS_MAX).optional(),
+    watcher_department_id: blank(uuid),
     employee_target_id: blank(uuid),
     entity_type: blank(TaskEntityType),
     entity_id: blank(uuid),
@@ -430,7 +461,8 @@ const TaskPrefill = z
  * the title, due day, cadence, assignee, who shares it, KPI and record belong to the setter (§6).
  * `null` clears an optional link; `member_ids: []` makes a shared task Individual again.
  */
-const TaskEdit = z
+/** Edit Task's fields: what a PATCH may change. */
+const TaskEditFields = z
   .object({
     title: text(200).optional(),
     description: z.string().trim().max(5000).nullable().optional(),
@@ -450,14 +482,19 @@ const TaskEdit = z
     acceptance_criteria: z.string().trim().max(1000).nullable().optional(),
     commitment_month: MonthStart.nullable().optional(),
   })
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, "Change at least one field")
-  .refine((v) => !("entity_type" in v || "entity_id" in v) || pointerPair(v), POINTER)
-  .refine(oneShare, ONE_SHARE)
-  .superRefine((v, ctx) => {
-    // The service checks the rest against the task as it stands: a body that marks it says it all.
-    if (v.is_commitment === true && "due_on" in v && "commitment_month" in v) commitmentProblems(v, ctx);
-  });
+  .strict();
+
+/** What an edit of a task holds to beside its fields, on Edit Task's body and the chat's card alike. */
+const taskEditRules = (schema) =>
+  schema
+    .refine((v) => !("entity_type" in v || "entity_id" in v) || pointerPair(v), POINTER)
+    .refine(oneShare, ONE_SHARE)
+    .superRefine((v, ctx) => {
+      // The service checks the rest against the task as it stands: a body that marks it says it all.
+      if (v.is_commitment === true && "due_on" in v && "commitment_month" in v) commitmentProblems(v, ctx);
+    });
+
+const TaskEdit = taskEditRules(TaskEditFields.refine((v) => Object.keys(v).length > 0, "Change at least one field"));
 
 /**
  * GET /tasks/people: the active people the caller may put on a task, never themselves. Without
@@ -477,6 +514,30 @@ const TaskMove = z
     late_reason: blank(LateReason),
   })
   .strict();
+
+/**
+ * Praxis AI's cards for a task (docs/guides/praxis-ai.md §6.11): Mark Done on several tasks at
+ * once, with the late reason the board asks for an overdue one (tasks.complete); and a comment that
+ * names its task, which the panel's own form never has to because the panel is the task
+ * (tasks.comment). Each press runs the same service function the screen's button calls.
+ */
+const TaskComplete = z
+  .object({
+    task_ids: z.array(uuid).min(1, "Pick a task").max(25, "At most 25"),
+    late_reason: blank(LateReason),
+  })
+  .strict();
+
+const TaskCommentAdd = z.object({ task_id: uuid, body: text(2000) }).strict();
+
+/**
+ * Praxis AI's cards for Edit Task and the panel's plan (docs/guides/praxis-ai.md §6.11, decision
+ * 33): each the panel's own body with the task it changes, and a step by its id (or its words,
+ * matched among the task's steps before this parses). Only what changes is given.
+ */
+const TaskChange = taskEditRules(
+  TaskEditFields.extend({ task_id: recordId("task") }).refine(changesBeside(["task_id"]), nothingOn("task_id")),
+);
 
 /** POST /tasks/:id/block: a hold, with the day it is expected to clear. */
 const TaskBlock = z
@@ -517,6 +578,27 @@ const TaskStepEdit = z
 
 /** POST /tasks/:id/waiting-on: this task waits on another. */
 const TaskDependencyCreate = z.object({ depends_on_task_id: uuid }).strict();
+
+/** Add Step as a card: the task beside the step (TaskStepCreate). */
+const TaskStepAdd = TaskStepCreate.extend({ task_id: recordId("task") });
+
+/** A step ticked, unticked, renamed or re-dated as a card: the task and the step beside TaskStepEdit's fields. */
+const TaskStepChange = z
+  .object({
+    task_id: recordId("task"),
+    task_step_id: recordId("step"),
+    title: text(300).optional(),
+    due_on: isoDate.nullable().optional(),
+    done: z.boolean().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["task_id", "task_step_id"]), nothingOn("task_step_id"));
+
+/** Wait On Task as a card: the task beside the one it waits on (TaskDependencyCreate). */
+const TaskWaitOn = TaskDependencyCreate.extend({ task_id: recordId("task") }).refine((v) => v.task_id !== v.depends_on_task_id, {
+  message: "Pick another task",
+  path: ["depends_on_task_id"],
+});
 
 /** POST /tasks/:id/waiting-on/:child_id/override: go ahead without it. */
 const TaskDependencyOverride = z.object({ override_reason: optionalText(500) }).strict();
@@ -661,6 +743,7 @@ const TABLES = {
   LateReasonListQuery: { table: null, reason: "list controls for the late reasons" },
   LateReasonCreate: { table: "task_late_reason" },
   LateReasonEdit: { table: "task_late_reason" },
+  LateReasonSwitch: { table: "task_late_reason" },
   TaskRef: { table: null, reason: "another task as a panel line names it" },
   TaskStep: {
     table: "task_step",
@@ -692,6 +775,9 @@ const TABLES = {
   TaskStepCreate: { table: "task_step" },
   TaskStepEdit: { table: "task_step", virtual: { done: "sets or clears task_step.done_at" } },
   TaskDependencyCreate: { table: "task_dependency" },
+  TaskStepAdd: { table: "task_step" },
+  TaskStepChange: { table: "task_step", virtual: { done: "sets or clears task_step.done_at" } },
+  TaskWaitOn: { table: "task_dependency" },
   TaskDependencyOverride: { table: "task_dependency" },
   TaskWatcherAdd: { table: "task_watcher" },
   TaskPing: { table: null, reason: "a notification and a task_activity line" },
@@ -699,6 +785,7 @@ const TABLES = {
   TaskReminderSet: { table: null, reason: "the task's reminders in the shared reminder engine" },
   TaskPage: { table: null, reason: "a page of tasks" },
   TaskListQuery: { table: null, reason: "list controls and filters for the board" },
+  TaskCountsQuery: { table: null, reason: "the filters and grouping of the assistant's task counts; figures, never a row" },
   TaskSummaryQuery: { table: null, reason: "whose figures: mine or my team" },
   TaskSummary: { table: null, reason: "counts over task" },
   TaskCreate: {
@@ -707,6 +794,8 @@ const TABLES = {
       due_on: "written to task.due_at: the end of that working day, Africa/Lagos",
       member_ids: "written to task_assignee, one row each",
       department_id: "the department's active people, written to task_assignee",
+      watcher_ids: "written to task_watcher, one row each",
+      watcher_department_id: "the department's active people, written to task_watcher",
     },
   },
   TaskPrefill: {
@@ -726,6 +815,19 @@ const TABLES = {
   TaskMove: {
     table: "task",
     virtual: { before_task_id: "the card it now sits above; decides task.sort_order" },
+  },
+  TaskComplete: {
+    table: "task",
+    virtual: { task_ids: "the tasks the card moves to Done, each a task row" },
+  },
+  TaskCommentAdd: { table: "task_comment" },
+  TaskChange: {
+    table: "task",
+    virtual: {
+      due_on: "written to task.due_at: the end of that working day, Africa/Lagos",
+      member_ids: "replaces the task's task_assignee rows",
+      department_id: "the department's active people replace the task's task_assignee rows",
+    },
   },
   TaskBlock: {
     table: "task",
@@ -772,6 +874,7 @@ module.exports = {
   LateReasonListQuery,
   LateReasonCreate,
   LateReasonEdit,
+  LateReasonSwitch,
   PingAudience,
   Recurrence,
   Link,
@@ -795,6 +898,7 @@ module.exports = {
   TaskDetail,
   TaskPage,
   TaskListQuery,
+  TaskCountsQuery,
   TaskSummaryQuery,
   TaskSummary,
   TaskCreate,
@@ -803,12 +907,18 @@ module.exports = {
   TaskPeopleQuery,
   TaskPersonPage,
   TaskMove,
+  TaskComplete,
+  TaskCommentAdd,
+  TaskChange,
   TaskBlock,
   TaskUnblock,
   TaskChildParams,
   TaskStepCreate,
   TaskStepEdit,
   TaskDependencyCreate,
+  TaskStepAdd,
+  TaskStepChange,
+  TaskWaitOn,
   TaskDependencyOverride,
   TaskWatcherAdd,
   TaskPing,

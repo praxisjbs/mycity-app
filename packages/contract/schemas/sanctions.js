@@ -27,6 +27,9 @@ const {
   money,
   listQuery,
   Paged,
+  recordId,
+  changesBeside,
+  nothingOn,
 } = require("./common");
 const { PersonRef } = require("./organisation");
 const { EvidenceItem } = require("./queries");
@@ -86,7 +89,7 @@ const ConsequenceStepCreate = z
   .strict();
 
 /** PATCH /sanctions/chain/:id: move, rename, change, retire (`active: false`). */
-const ConsequenceStepUpdate = z
+const ConsequenceStepUpdateFields = z
   .object({
     name: text(80).optional(),
     position: z.number().int().min(1).max(100).optional(),
@@ -97,8 +100,18 @@ const ConsequenceStepUpdate = z
     evidence_required: z.boolean().optional(),
     active: z.boolean().optional(),
   })
-  .strict()
-  .refine((v) => Object.keys(v).length > 0, "Change at least one field");
+  .strict();
+const ConsequenceStepUpdate = ConsequenceStepUpdateFields.refine((v) => Object.keys(v).length > 0, "Change at least one field");
+
+/**
+ * Chain Settings' step as Praxis AI's card (docs/guides/praxis-ai.md §6.11, decision 33): the step
+ * (its id, or its name) beside what Move Up, Move Down, Retire and Restore change, and its name,
+ * letter, financial effect and days; only what changes.
+ */
+const ConsequenceStepChange = ConsequenceStepUpdateFields.extend({ consequence_step_id: recordId("step") }).refine(
+  changesBeside(["consequence_step_id"]),
+  nothingOn("consequence_step_id"),
+);
 
 /* ------------------------------------------------------------------ *
  * Sanctions
@@ -250,6 +263,7 @@ const TABLES = {
   ConsequenceStepListQuery: { table: null, reason: "list controls for the chain" },
   ConsequenceStepCreate: { table: "consequence_step" },
   ConsequenceStepUpdate: { table: "consequence_step" },
+  ConsequenceStepChange: { table: "consequence_step" },
   SanctionFine: { table: "sanction_fine" },
   Sanction: {
     table: "sanction",
@@ -308,6 +322,7 @@ module.exports = {
   ConsequenceStepListQuery,
   ConsequenceStepCreate,
   ConsequenceStepUpdate,
+  ConsequenceStepChange,
   SanctionFine,
   Sanction,
   SanctionPage,

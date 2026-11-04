@@ -121,7 +121,10 @@ async function complete({ apiKey, model, system, messages, tools = null, toolCho
   if (!apiKey) throw new VendorError("anthropic: no API key", "config");
   if (!ALLOWED.test(String(model || ""))) throw new VendorError(`anthropic: ${model} is not a Sonnet or Haiku model`, "config");
   const body = { model, max_tokens: maxTokens, messages: toAnthropic(messages) };
-  if (system) body.system = system;
+  // The system turn is a stable prefix (the prompt, the person's screens, routes and actions): marked
+  // cacheable, so the rounds of one question and the questions of one person reuse it
+  // (docs/guides/praxis-ai.md §1.2 decision 24). Below the API's minimum it is simply not cached.
+  if (system) body.system = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
   if (effort) body.output_config = { effort };
   if (tools && tools.length) {
     body.tools = tools.map((t) => ({

@@ -6,14 +6,18 @@
  * The month is the reader's own: their events and invitations, events shared with
  * everyone, their open tasks' deadlines, their approved leave and their performance dates
  * (docs/guides/performance.md §6.18). Only the owner
- * changes or calls off an event; an attendee answers it.
+ * changes or calls off an event; an attendee answers it. cardRecords(), assertCardEvent(),
+ * eventChoices() and eventIdOf() are what a Praxis AI card that changes an event names, re-checks
+ * and asks (docs/guides/praxis-ai.md §6.11, decision 34).
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { linkFor } = require("../../shared/route-map");
 const lagos = require("../../shared/time/lagos");
+const { oneNamed } = require("../../shared/ai/named");
 const repo = require("./calendar.repo");
 const reminders = require("../notifications/notifications.reminders");
 const { EVENTS, REMINDER_KEY } = require("./calendar.events");
@@ -108,6 +112,29 @@ async function days(employeeId, first, last, query) {
 function month(employeeId, query) {
   const first = `${query.month}-01`;
   return days(employeeId, first, lagos.addDays(lagos.addMonths(first, 1), -1), query);
+}
+
+/** "Which event?" answers (praxis-ai.md decision 34): the person's events from today to the end of next month, soonest first. */
+async function eventChoices(employeeId) {
+  if (!employeeId) return [];
+  const today = lagos.today();
+  const page = await days(employeeId, today, lagos.addDays(lagos.addMonths(`${today.slice(0, 7)}-01`, 2), -1), { page: 1, item_kind: "event" });
+  return page.data.map((i) => i.title);
+}
+
+/**
+ * An event a card names by its words (decision 34): among the person's events from a month back to
+ * two months ahead, searched by the words first; null when none or several match.
+ */
+async function eventIdOf(employeeId, words) {
+  if (!employeeId) return null;
+  const today = lagos.today();
+  for (const q of [words, null]) {
+    const page = await days(employeeId, lagos.addMonths(today, -1), lagos.addMonths(today, 2), { page: 1, item_kind: "event", ...(q ? { q } : {}) });
+    const found = oneNamed(page.data, words, (i) => [i.title]);
+    if (found) return found.item_id;
+  }
+  return null;
 }
 
 /** A person's one day, YYYY-MM-DD: Today's diary. */
@@ -326,4 +353,20 @@ async function respond(actor, id, { response }) {
   });
 }
 
-module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, edit, cancel, respond, reminderCheck };
+/** The event a card changes, by its title, when the person may see it; nothing otherwise. */
+async function cardRecords(db, id, employeeId) {
+  if (!c.common.uuid.safeParse(id).success || !employeeId) return [];
+  const row = await repo.getFor(db, id, employeeId);
+  return row ? [{ type: "calendar_event", id, label: row.title }] : [];
+}
+
+/** The card's re-check (§6.11 step 5): an event the person made, not called off, as Edit Event's own rule. */
+async function assertCardEvent(db, id, employeeId) {
+  const row = c.common.uuid.safeParse(id).success && employeeId ? await repo.getFor(db, id, employeeId) : null;
+  if (!row) throw new AppError("NOT_FOUND", "That event does not exist", 404, { calendar_event_id: ["No such event"] });
+  if (row.owner_employee_id !== employeeId)
+    throw new AppError("FORBIDDEN", "Only the person who made this event can change it", 403, { calendar_event_id: ["Not yours to change"] });
+  if (row.cancelled_at) throw new AppError("EVENT_CANCELLED", "This event was called off", 409, { calendar_event_id: ["Called off"] });
+}
+
+module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, edit, cancel, respond, reminderCheck, cardRecords, assertCardEvent, eventChoices, eventIdOf };

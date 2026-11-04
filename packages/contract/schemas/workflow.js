@@ -187,6 +187,19 @@ const ApprovalWaiting = z
 
 /** GET /workflow/mine: oldest waiting first; `module_key` keeps one module's requests. */
 const ApprovalMineQuery = listQuery({ module_key: ModuleKey.optional() });
+
+/**
+ * The assistant's approvals summary (docs/guides/praxis-ai.md §6.13; foundation.md §9): the requests
+ * waiting on the asker, how many are overdue and how old the oldest is, grouped by flow, stage, age
+ * band or module. Figures, never rows; no page.
+ */
+const ApprovalSummaryBy = z.enum(["flow", "stage", "age", "module"]);
+const ApprovalSummaryQuery = z
+  .object({
+    module_key: ModuleKey.optional(),
+    by: ApprovalSummaryBy.default("flow"),
+  })
+  .strict();
 const ApprovalWaitingPage = Paged(ApprovalWaiting);
 
 /** GET /workflow/mine/count: Home's Waiting on You. */
@@ -258,6 +271,23 @@ const ApproveBody = z.object({ reason: optionalText(1000) }).strict();
 /** POST …/reject and …/request-changes: the requester is always told why. */
 const ReasonBody = z.object({ reason: text(1000) }).strict();
 
+/**
+ * Praxis AI's card on My Approvals (docs/guides/praxis-ai.md §6.11): approve, reject or request
+ * changes on the requests waiting on the person, up to 25 a press, each on its current stage. A
+ * rejection or a request for changes says why, as the screen's own forms do.
+ */
+const CardDecision = z.enum(["approve", "reject", "request_changes"]);
+const ApprovalDecide = z
+  .object({
+    workflow_instance_ids: z.array(uuid).min(1, "Pick a request").max(25, "At most 25"),
+    decision: CardDecision,
+    reason: optionalText(1000),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.decision !== "approve" && !v.reason) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["reason"], message: "Say why" });
+  });
+
 /** POST …/withdraw: the requester takes it back, saying why if they like. */
 const WithdrawBody = z.object({ reason: optionalText(1000) }).strict();
 
@@ -302,6 +332,7 @@ const TABLES = {
     },
   },
   ApprovalMineQuery: { table: null, reason: "list controls for My Approvals" },
+  ApprovalSummaryQuery: { table: null, reason: "the filter and grouping of the assistant's approvals summary; figures, never a row" },
   ApprovalWaitingPage: { table: null, reason: "a page of requests waiting on the caller" },
   ApprovalCount: { table: null, reason: "counts of requests waiting on the caller" },
   RouteStage: { table: null, reason: "a stage of the instance's version with where the request stands on it" },
@@ -331,6 +362,10 @@ const TABLES = {
   ApproveBody: { table: "workflow_decision" },
   ReasonBody: { table: "workflow_decision" },
   WithdrawBody: { table: "workflow_decision" },
+  ApprovalDecide: {
+    table: "workflow_decision",
+    virtual: { workflow_instance_ids: "the requests, each decided on its current stage" },
+  },
   ReassignBody: {
     table: "workflow_decision",
     virtual: { user_id: "the login the current stage goes to; stored in workflow_instance.stage_approvers" },
@@ -357,6 +392,7 @@ module.exports = {
   ApprovalsSummary,
   ApprovalWaiting,
   ApprovalMineQuery,
+  ApprovalSummaryQuery,
   ApprovalWaitingPage,
   ApprovalCount,
   RouteStage,
@@ -365,5 +401,6 @@ module.exports = {
   ApproveBody,
   ReasonBody,
   WithdrawBody,
+  ApprovalDecide,
   ReassignBody,
 };

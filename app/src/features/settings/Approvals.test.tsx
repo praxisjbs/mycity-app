@@ -61,19 +61,26 @@ async function open() {
 const press = (scope: HTMLElement | Screen, name: string) => fireEvent.click(within(scope as HTMLElement).getByRole("button", { name }));
 const dialog = () => screen.findByRole("dialog", { name: "New Flow" });
 const fill = (scope: HTMLElement, label: string, value: string) => fireEvent.change(within(scope).getByLabelText(label), { target: { value } });
-/** Picks an option by its words; a list still loading (the modules) closes and is tried again. */
+/**
+ * Picks an option by its words, and waits until the field shows it. A list still loading (the
+ * modules) closes and is tried again; a press that landed on a list as it re-rendered leaves the
+ * field empty, so the pick is tried again until the field holds it (a slow CI runner).
+ */
 async function choose(scope: HTMLElement, field: string, option: string) {
   const trigger = within(scope).getByRole("combobox", { name: field });
   await waitFor(
     async () => {
-      try {
-        await chooseOption(trigger, option);
-      } catch (e) {
-        fireEvent.keyDown(screen.queryByRole("listbox") ?? trigger, { key: "Escape" });
-        throw e;
+      if (!trigger.textContent?.includes(option)) {
+        try {
+          await chooseOption(trigger, option);
+        } catch (e) {
+          fireEvent.keyDown(screen.queryByRole("listbox") ?? trigger, { key: "Escape" });
+          throw e;
+        }
       }
+      expect(trigger.textContent).toContain(option);
     },
-    { timeout: 5000 },
+    { timeout: 10000 },
   );
 }
 

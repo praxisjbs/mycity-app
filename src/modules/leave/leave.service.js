@@ -29,6 +29,7 @@ const { emit } = require("../../shared/events/emit");
 const { scopeFor } = require("../../middleware/rbac");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const { assertInScope } = require("../../shared/rbac/scope");
+const { oneNamed } = require("../../shared/ai/named");
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
 const engine = require("../../shared/workflow/engine");
@@ -72,6 +73,55 @@ const payloadOf = (row, type) => ({
 const list = ({ live, ...query }, scope) => repo.list(pool, { ...query, ...(live && { statuses: ["approved", "submitted"] }) }, scope);
 
 /** One request People may see. */
+/** Statuses as the list reads them, for the assistant's summary. */
+const STATUS_WORDS = Object.freeze({ submitted: "Waiting", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled", draft: "Draft" });
+
+/**
+ * The assistant's leave summary (docs/guides/praxis-ai.md §6.13; ess.md §9): this year in Lagos unless a
+ * period or a year is asked, within the reader's `people` scope; figures, never a row. Runs on the
+ * client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   LeaveSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series } = require("../../shared/ai/summary");
+  const today = lagos.today(now);
+  const year = !params.from && !params.to && !params.year ? Number(today.slice(0, 4)) : params.year || null;
+  const r = await repo.aiSummary(client, { ...params, year, today }, scope);
+  const f = r.figures || {};
+  const by = params.by || "status";
+  const figures = [
+    figure("requests", "Requests", f.requests),
+    figure("waiting", "Waiting", f.waiting),
+    figure("approved", "Approved", f.approved),
+    figure("rejected", "Rejected", f.rejected),
+    figure("cancelled", "Cancelled", f.cancelled),
+    figure("days_approved", "Days approved", f.days_approved, "days"),
+    figure("days_taken", "Days taken", f.days_taken, "days"),
+    figure("days_booked", "Days booked ahead", f.days_booked, "days"),
+    figure("days_waiting", "Days waiting", f.days_waiting, "days"),
+    figure("people", "People with approved leave", f.people),
+    figure("on_leave_today", "On leave today", f.on_leave_today),
+  ];
+  const groups = [
+    group("status", "Requests by status", r.by_status.map((x) => ({ ...x, label: STATUS_WORDS[x.label] || x.label }))),
+    group("type", "Days approved by type", r.by_type),
+  ];
+  if (r.series)
+    return {
+      figures,
+      groups,
+      series: [
+        series("days_approved", "Days approved by month", r.points.map((p) => ({ at: p.at, value: p.days }))),
+        series("requests", "Requests by month", r.points.map((p) => ({ at: p.at, value: p.requests }))),
+      ],
+      total: f.requests || 0,
+    };
+  if (by === "person" || by === "department") groups.push(group(by, `Days approved by ${by}`, r.by_dim));
+  return { figures, groups, series: [], total: f.requests || 0 };
+}
+
 async function getFor(id, scope) {
   const row = await repo.get(pool, id);
   if (!row) throw notFound();
@@ -328,6 +378,74 @@ async function cancelFor(actor, scope, id, body) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11): the requests waiting on the person
+ * approved or rejected together, each on its approval's current stage through the same call
+ * People · Leave's Approve and Reject make (workflow.service.decide), never one's own.
+ * ------------------------------------------------------------------ */
+
+/** The approvals service, required late: it requires this module's events through the engine. */
+const workflow = () => require("../workflow/workflow.service");
+
+const requestLabel = (row) => `${row.employee && row.employee.display_name ? row.employee.display_name : "Someone"}, ${row.leave_type_name}, ${Number(row.days)} ${Number(row.days) === 1 ? "day" : "days"}`;
+
+/**
+ * The requests a card names, as the person may see them: who, the type and the days for each in
+ * their scope; one outside it keeps its id alone, and the re-check refuses the card.
+ */
+async function cardRecords(db, ids, scope) {
+  const out = [];
+  for (const id of [...new Set(ids || [])].slice(0, 25)) {
+    const row = await repo.get(db, id);
+    const seen = row && (scope.scope === "all" || (scope.scope_ids || []).includes(row.employee_id));
+    out.push({ type: "leave_request", id, label: seen ? requestLabel(row) : null });
+  }
+  return out;
+}
+
+/**
+ * The card's re-check (§6.11 step 5): every request is one the person may see; the rest (waiting,
+ * named on its stage, not their own) is each request's own line at the press.
+ */
+async function assertCardRequests(db, ids, actor) {
+  for (const id of [...new Set(ids || [])]) {
+    const row = await repo.get(db, id);
+    if (!row || !(actor.scope.scope === "all" || (actor.scope.scope_ids || []).includes(row.employee_id)))
+      throw new AppError("LEAVE_NOT_YOURS", "One of these requests is not in your scope", 404, { leave_request_ids: ["Not in your scope"] });
+  }
+}
+
+/**
+ * Approve or reject the requests a card names, one after another, each through its approval;
+ * a request already decided, not waiting on this person, or their own is a line of its own and
+ * the rest still go. Nothing decided is a refusal, so the card stays open with the reason.
+ * @param {object} actor   the person, with the scope their `people` approve gives
+ * @param {{leave_request_ids: string[], reason?: string}} values
+ * @param {"approve"|"reject"} decision
+ * @returns {Promise<{lines: Array<{type: string, id: string, label: string, ok: boolean, message: string|null}>}>}
+ */
+async function decideMany(actor, values, decision) {
+  const lines = [];
+  let firstRefusal = null;
+  for (const id of [...new Set(values.leave_request_ids || [])]) {
+    const row = await repo.get(pool, id);
+    const label = row ? requestLabel(row) : id;
+    try {
+      if (!row) throw notFound();
+      if (row.employee_id && actor.employee_id === row.employee_id) throw new AppError("SELF_APPROVAL", "Nobody decides their own request", 403);
+      if (row.status !== "submitted" || !row.workflow_instance_id) throw new AppError("LEAVE_DECIDED", "This request was already decided", 409);
+      await workflow().decide(actor, row.workflow_instance_id, decision, values.reason || null);
+      lines.push({ type: "leave_request", id, label, ok: true, message: decision === "approve" ? "approved" : "rejected" });
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status >= 500) throw err;
+      firstRefusal = firstRefusal || err;
+      lines.push({ type: "leave_request", id, label, ok: false, message: err.message });
+    }
+  }
+  if (lines.length && !lines.some((l) => l.ok)) throw firstRefusal;
+  return { lines };
+}
+
+/* ------------------------------------------------------------------ *
  * After an approval ends
  * ------------------------------------------------------------------ */
 
@@ -430,7 +548,69 @@ async function deleteType(actor, id) {
   });
 }
 
+/*
+ * Praxis AI's leave cards for People (docs/guides/praxis-ai.md §6.11, decision 33): Add Type and
+ * Save Type (New Leave Type's sheet), and Record Leave. What a card names and re-checks; the
+ * writes are createType, updateType and record above. Nothing here writes.
+ */
+
+/**
+ * The code a type is stored under, from its name, as New Leave Type's sheet makes it ("Study
+ * Leave" is study_leave): a name too short for a code of two characters, or not starting with a
+ * letter, gets `type_` before it.
+ */
+function codeOf(name) {
+  const slug = String(name)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  return /^[a-z][a-z0-9_]/.test(slug) ? slug : `type_${slug}`.slice(0, 40);
+}
+
+/** Add Type: the sheet's name and allowance, the code made from the name as the sheet makes it. */
+const addType = (actor, values) => createType(actor, { code: codeOf(values.name), name: values.name, days_per_year: values.days_per_year === undefined ? null : values.days_per_year });
+
+/**
+ * A type a card names by its words (shared/ai/named.js): its name or code, with or without the
+ * word Leave, among every type, offered or retired (Save Type restores one); null when none or
+ * several match.
+ */
+async function typeIdOf(db, words) {
+  const page = await repo.listTypes(db, { page: 1 });
+  const found = oneNamed(page.data || [], words, (t) => [t.name, t.code], { drop: ["leave"] });
+  return found ? found.leave_type_id : null;
+}
+
+/** Every type's name, offered first, to tap when a card asks which type (praxis-ai.md decision 34). */
+async function typeNames(db) {
+  const page = await repo.listTypes(db, { page: 1 });
+  return (page.data || []).sort((a, b) => Number(b.active) - Number(a.active)).map((t) => t.name);
+}
+
+/** The type a card names, by its name. */
+async function cardType(db, id) {
+  if (!db || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ""))) return [];
+  const type = await repo.getType(db, id);
+  return type ? [{ type: "leave_type", id, label: type.name }] : [];
+}
+
+/** Save Type's re-check: the type is there. */
+async function assertCardType(db, id) {
+  if (!(await cardType(db, id)).length) throw new AppError("NOT_FOUND", "That leave type does not exist", 404, { leave_type_id: ["No such type"] });
+}
+
+/** Record Leave's re-check (§6.11 step 5): someone in the reader's `people` scope who works here now, as record() asks. */
+async function assertCardRecord(db, { employee_id: employeeId }, actor) {
+  const person = /^[0-9a-f-]{36}$/i.test(String(employeeId || "")) ? await repo.employeeOf(db, employeeId) : null;
+  const inScope = actor.scope.scope === "all" || (actor.scope.scope_ids || []).includes(employeeId);
+  if (!person || !inScope) throw new AppError("NOT_FOUND", "That employee does not exist", 404, { employee_id: ["No such person"] });
+  if (person.status !== "active") throw new AppError("EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", 422, { employee_id: ["Not active"] });
+}
+
 module.exports = {
+  aiSummary,
   MAX_ACTIVE_TYPES,
   list,
   getFor,
@@ -447,9 +627,19 @@ module.exports = {
   record,
   cancelOwn,
   cancelFor,
+  cardRecords,
+  assertCardRequests,
+  decideMany,
   settle,
   listTypes,
   createType,
   updateType,
   deleteType,
+  codeOf,
+  addType,
+  typeIdOf,
+  typeNames,
+  cardType,
+  assertCardType,
+  assertCardRecord,
 };

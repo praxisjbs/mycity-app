@@ -223,6 +223,19 @@ const PlaceInput = z
     return { ...readPlaceToken(v.token), details };
   });
 
+/**
+ * A place on a Praxis AI card (docs/guides/praxis-ai.md §6.11, decision 33): the token our search
+ * or a pin signed, alone, so the card reads it by its line and Edit picks it with AddressField.
+ * The owner's own request takes it as `{ token }` (PlaceInput); words typed where a place belongs
+ * never pass, here or there (F27).
+ */
+const PlaceToken = z
+  .string({ invalid_type_error: PICK, required_error: PICK })
+  .superRefine((v, ctx) => {
+    // As PlaceInput's token: the shape everywhere, the signature on the server.
+    if (!readPlaceToken(v) || (verifier ? !verifier(v) : !inBrowser())) ctx.addIssue({ code: "custom", message: PICK });
+  });
+
 /** An address as an edit form reads it: the place saved, with a fresh token to send it back. */
 const PlaceView = z
   .object({
@@ -268,6 +281,7 @@ module.exports = {
   PinQuery,
   DevicePoint,
   PlaceInput,
+  PlaceToken,
   PlaceView,
   installPlaceVerifier,
   readPlaceToken,

@@ -1,5 +1,4 @@
 "use strict";
-// ai:none the audit ledger is for the people who hold Settings over everything; the assistant does not answer from it
 // search:none ledger entries are found on the Audit Log with its filters, not looked up one by one
 /**
  * The Audit Log's HTTP edge: the filtered log at 25 a page, the counts above it, and

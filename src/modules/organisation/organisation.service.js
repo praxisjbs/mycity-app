@@ -1489,7 +1489,55 @@ async function recordNamesApplied(client, sha256, tally, actor) {
 /** Whether the names at this checksum were applied already. */
 const namesApplied = (client, sha256) => repo.namesApplied(client, sha256);
 
+/** The register's words for a status, arrangement, type or confirmation band, for the assistant's summary. */
+const HEADCOUNT_WORDS = Object.freeze({
+  active: "Active", suspended: "Suspended", left: "Left", archived: "Archived", invited: "Invited", onboarding: "Onboarding",
+  on_site: "On-site", hybrid: "Hybrid", remote: "Remote",
+  full_time: "Full-time", part_time: "Part-time", contract: "Contract", intern: "Intern", nysc: "NYSC", volunteer: "Volunteer",
+  "1_overdue": "Confirmation overdue", "2_within_30_days": "Due within 30 days", "3_within_90_days": "Due within 90 days",
+  "4_later": "Due later", "5_confirmed": "Confirmed", "6_not_active": "Not active", "7_no_date": "No confirmation date",
+});
+const headcountWords = (rows) => rows.map((r) => ({ ...r, label: HEADCOUNT_WORDS[r.label] || String(r.label || "").replace(/_/g, " ") }));
+
+/**
+ * The assistant's headcount summary (docs/guides/praxis-ai.md §6.13; organogram.md §9): people by
+ * department, status, arrangement, type, line manager or confirmation due, within the reader's `people`
+ * scope; figures, never a row. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   EmployeeSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group } = require("../../shared/ai/summary");
+  const r = await repo.aiSummary(client, params, scope, lagos.today(now));
+  const f = r.figures || {};
+  const by = params.by || "department";
+  const thirdBy = by === "department" || by === "status" ? "work_pattern" : by;
+  const thirdLabel = { work_pattern: "People by work arrangement", employment_type: "People by employment type", manager: "People by line manager", confirmation: "People by confirmation due" }[thirdBy];
+  return {
+    figures: [
+      figure("people", "People", f.people),
+      figure("active", "Active", f.active),
+      figure("confirmed", "Confirmed", f.confirmed),
+      figure("on_probation", "On probation", f.on_probation),
+      figure("confirmation_due_30", "Confirmation due within 30 days", f.confirmation_due_30),
+      figure("confirmation_overdue", "Confirmation overdue", f.confirmation_overdue),
+      figure("contracts_ending_30", "Contracts ending within 30 days", f.contracts_ending_30),
+      figure("no_manager", "No line manager", f.no_manager),
+      figure("departments", "Departments", f.departments),
+    ],
+    groups: [
+      group("department", "People by department", r.by_department),
+      group("status", "People by status", headcountWords(r.by_status)),
+      group(thirdBy, thirdLabel, thirdBy === "manager" ? r.by_dim : headcountWords(r.by_dim)),
+    ],
+    series: [],
+    total: f.people || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
   setBirthday,
   findDepartmentByName,
   findDepartmentByCode,

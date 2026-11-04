@@ -21,6 +21,11 @@
  *   watch(), unwatch(), ping(), setReminders()
  *   sweep()    the recurrence job: the next occurrence of each repeating task, and the
  *              due-today and due-tomorrow reminders.
+ *   cardRecords(), cardNames(), assertCardTasks(), stepIdOf(), cardStep(), assertCardStep(),
+ *   stepChoices(), leadChoices(), leadIdOf()
+ *              what Praxis AI's cards name, ask and re-check (docs/guides/praxis-ai.md §6.11,
+ *              decision 34): the tasks on the person's board, a step by its words, a task's
+ *              lead by name; nothing here writes.
  *
  * Every change writes a task_activity row and emits one event, in the same transaction.
  * A task may count towards a scorecard line or a key result of its assignee (Counts Towards,
@@ -33,8 +38,10 @@
  * module sends, approves and rescopes it, through the helpers at the foot of this file, in its
  * own transaction.
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
+const { oneNamed, plainWords } = require("../../shared/ai/named");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const numbering = require("../../shared/numbering/numbering");
@@ -43,8 +50,6 @@ const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
 const workflow = require("../../shared/workflow/engine");
 const approvers = require("../../shared/workflow/approvers");
-const grantsCache = require("../../shared/rbac/grants-cache");
-const { scopeFor } = require("../../middleware/rbac");
 const repo = require("./tasks.repo");
 const audience = require("./tasks.audience");
 const recurrence = require("./tasks.recurrence");
@@ -186,13 +191,75 @@ async function list(query, scope, only = {}, now = new Date()) {
 
 const summary = (query, scope) => repo.summary(pool, query.scope, scope, windows());
 
-/** A task the caller may see, as a repo row; 404 otherwise. `member`: the caller shares it. */
+/** The board's words for a status, priority, cadence or due window, as the assistant's counts name them. */
+const COUNT_WORDS = Object.freeze({
+  todo: "To Do", in_progress: "In Progress", in_review: "In Review", done: "Done", cancelled: "Cancelled",
+  low: "Low", normal: "Normal", high: "High", urgent: "Urgent",
+  daily: "Daily", weekly: "Weekly", none: "None",
+  overdue: "Overdue", today: "Due Today", this_week: "Due This Week", later: "Later", no_date: "No Due Date", closed: "Closed",
+});
+const worded = (rows) => rows.map((r) => ({ ...r, label: COUNT_WORDS[r.label] || r.label }));
+
+/**
+ * The assistant's task counts (docs/guides/praxis-ai.md §6.13; workspace.md §9): the board the reader
+ * sees, counted, never a row. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   TaskCountsQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null, employee_id: string}} scope
+ */
+async function aiCounts(client, params, scope, now = new Date()) {
+  const { figure, group } = require("../../shared/ai/summary");
+  const r = await repo.counts(client, params, scope, windows(now));
+  const f = r.figures || {};
+  const by = params.by || "status";
+  const thirdLabel = { assignee: "Tasks by assignee", due: "Tasks by due window", cadence: "Tasks by cadence" }[by] || "Tasks by due window";
+  return {
+    figures: [
+      figure("tasks", "Tasks", f.tasks),
+      figure("open", "Open", f.open),
+      figure("overdue", "Overdue", f.overdue),
+      figure("due_today", "Due today", f.due_today),
+      figure("due_this_week", "Due this week", f.due_this_week),
+      figure("done", "Done", f.done),
+      figure("done_this_week", "Done this week", f.done_this_week),
+      figure("blocked", "Blocked", f.blocked),
+      figure("people", "People with tasks", f.people),
+    ],
+    groups: [
+      group("status", "Tasks by status", worded(r.by_status)),
+      group("priority", "Tasks by priority", worded(r.by_priority)),
+      group(by === "status" || by === "priority" ? "due" : by, thirdLabel, by === "assignee" ? r.by_third : worded(r.by_third)),
+    ],
+    series: [],
+    total: f.tasks || 0,
+  };
+}
+
+/** A task the caller may see and work, as a repo row; 404 otherwise. `member`: the caller shares it. */
 async function visible(db, id, scope) {
   const row = await repo.get(db, id);
   if (!row) throw notFound();
   const shared = await repo.sharedWith(db, id, scope.employee_id);
   if (!audience.maySee(scope, row, shared)) throw notFound();
   return { ...row, member: shared };
+}
+
+/**
+ * A task the caller may open: one they may work (visible), or one they watch, since watching gives
+ * sight of it (JBS Praxis, 01/11/2026; workspace.md §6). `watcher_only` marks a task seen only by
+ * watching: its panel, its comments and its history, never its board or a change to it; every
+ * write but a comment and one's own watching keeps to visible().
+ */
+async function readable(db, id, scope) {
+  try {
+    return await visible(db, id, scope);
+  } catch (err) {
+    if (!(err instanceof AppError) || err.status !== 404 || !scope.employee_id) throw err;
+    if (!(await repo.isWatcher(db, id, scope.employee_id))) throw err;
+    const row = await repo.get(db, id);
+    if (!row) throw err;
+    return { ...row, member: false, watcher_only: true };
+  }
 }
 
 /**
@@ -227,30 +294,6 @@ function toRef(row, scope) {
     assignee: seen ? row.assignee : null,
     visible: seen,
   };
-}
-
-/**
- * Which of these employees may see the task by their own workspace grant: its lead, its setter,
- * the people sharing it, and anyone whose scope covers the lead (A24). A watcher is only someone
- * who already may, and watchers and nudges reach only them (workspace.md §6).
- * @param {{task_id: string, primary_assignee_id: string, set_by_employee_id: string|null}} task
- */
-async function whoMaySee(db, task, employeeIds) {
-  const ids = [...new Set(employeeIds.filter(Boolean))];
-  if (!ids.length) return [];
-  const members = new Set(await repo.memberIds(db, task.task_id));
-  const logins = await repo.usersOf(db, ids);
-  const seen = [];
-  for (const id of ids) {
-    if (id === task.primary_assignee_id || id === task.set_by_employee_id || members.has(id)) {
-      seen.push(id);
-      continue;
-    }
-    const user = logins.has(id) ? await grantsCache.getAuthUser(db, logins.get(id)) : null;
-    const theirs = user && user.status === "active" ? await scopeFor(user, "workspace", "view") : null;
-    if (theirs && audience.maySee(theirs, task, false)) seen.push(id);
-  }
-  return seen;
 }
 
 const toEdge = (row, scope) => ({
@@ -305,9 +348,14 @@ const actsFor = (scope, row) => row.primary_assignee_id === scope.employee_id ||
  * @param {object} scope  scopeOf(req)
  * @param {object} [actor] withActor(req): who decides a rescope
  */
-async function getFor(id, scope, actor = null) {
-  const row = await visible(pool, id, scope);
-  const manage = audience.mayManage(scope, row);
+async function getFor(id, scope, actor = null, { seen = null } = {}) {
+  // `seen`: the sight a write already checked in its own transaction, so a watcher who has just
+  // stopped watching is answered with the panel once more (watching off) rather than a 404.
+  const row = seen ? { ...(await repo.get(pool, id)), member: seen.member === true, watcher_only: seen.watcher_only === true } : await readable(pool, id, scope);
+  if (!row.task_id) throw notFound();
+  // Seen only by watching: the panel to read and comment on, nothing to change (workspace.md §6).
+  const works = row.watcher_only !== true;
+  const manage = works && audience.mayManage(scope, row);
   const approved = Boolean(row.is_commitment && row.original_due_at);
   const [stepRows, waits, held, watching, hold, pending, open] = await Promise.all([
     repo.steps(pool, id),
@@ -339,15 +387,15 @@ async function getFor(id, scope, actor = null) {
       }))
       .filter((r) => r.slot >= 1 && r.slot <= 3)
       .sort((a, b) => a.slot - b.slot),
-    can_edit: true,
+    can_edit: works,
     can_reassign: manage,
     can_cancel: manage && row.status !== "cancelled" && !approved,
-    can_plan: mayPlan(scope, row) && row.status !== "cancelled",
+    can_plan: works && mayPlan(scope, row) && row.status !== "cancelled",
     set_status: row.set_status || null,
     rescope,
     recovery: recovery ? { ...recovery, due_at: iso(recovery.due_at) } : null,
-    can_rescope: approved && !rescope && !row.rescoped_at && !["done", "cancelled"].includes(row.status) && actsFor(scope, row),
-    can_set_recovery: row.commitment_state === "missed" && !recovery && actsFor(scope, row),
+    can_rescope: works && approved && !rescope && !row.rescoped_at && !["done", "cancelled"].includes(row.status) && actsFor(scope, row),
+    can_set_recovery: works && row.commitment_state === "missed" && !recovery && actsFor(scope, row),
   };
 }
 
@@ -371,18 +419,18 @@ async function doneTowards(db, lineId, month) {
 }
 
 async function blockageHistory(id, query, scope) {
-  await visible(pool, id, scope);
+  await readable(pool, id, scope);
   const page = await repo.blockages(pool, id, query);
   return { ...page, data: page.data.map(toBlockage) };
 }
 
 async function comments(id, query, scope) {
-  await visible(pool, id, scope);
+  await readable(pool, id, scope);
   return repo.comments(pool, id, query);
 }
 
 async function activity(id, query, scope) {
-  await visible(pool, id, scope);
+  await readable(pool, id, scope);
   return repo.activity(pool, id, query);
 }
 
@@ -476,6 +524,34 @@ async function shareWith(db, scope, leadId, { member_ids: named, department_id: 
   return ids;
 }
 
+/**
+ * Who watches a new task (JBS Praxis, 01/11/2026; workspace.md §6): the people named and a whole
+ * department's active people, when the task is saved. Any colleague on the staff may watch, since
+ * watching gives sight of the task; never its lead, its setter or the people sharing it, who hear
+ * of it already. At most PLAN_MAX.
+ * @returns {Promise<string[]>} employee ids
+ */
+async function watchersFor(db, { watcher_ids: named, watcher_department_id: departmentId }, { leadId, setterId, members }) {
+  const skip = new Set([leadId, setterId, ...members].filter(Boolean));
+  const ids = [...new Set(named || [])];
+  if (ids.length) {
+    const facts = new Map((await repo.peopleFacts(db, ids)).map((r) => [r.employee_id, r]));
+    for (const id of ids) if (!facts.get(id) || facts.get(id).status !== "active") throw invalid("watcher_ids", "Not on the staff");
+  }
+  let fromDepartment = [];
+  if (departmentId) {
+    if (!(await repo.department(db, departmentId))) throw invalid("watcher_department_id", "Not a department");
+    const everyone = { all: true, ids: [], peerDepartmentId: null };
+    const { total, ids: staff } = await repo.departmentPeople(db, { departmentId, leadId, reach: everyone });
+    if (total > repo.MEMBERS_MAX) throw invalid("watcher_department_id", `More than ${repo.MEMBERS_MAX} people`);
+    fromDepartment = staff;
+  }
+  const watchers = [...new Set([...ids, ...fromDepartment])].filter((id) => !skip.has(id));
+  if (departmentId && !ids.length && !watchers.length) throw invalid("watcher_department_id", "Nobody to add");
+  if (watchers.length > repo.PLAN_MAX) throw invalid(ids.length ? "watcher_ids" : "watcher_department_id", `At most ${repo.PLAN_MAX} watchers`);
+  return watchers;
+}
+
 /* ------------------------------------------------------------------ *
  * Writing
  * ------------------------------------------------------------------ */
@@ -502,6 +578,7 @@ async function create(actor, scope, body, { client: within = null } = {}) {
     await checkTarget(client, body.employee_target_id, assigneeId);
     await checkRecord(client, body.entity_type, body.entity_id);
     await checkProject(client, body.project_id);
+    const watching = await watchersFor(client, body, { leadId: assigneeId, setterId: actor.employee_id, members });
     const cal = await workingWeek.loadCalendar(client);
     const dueAt = recurrence.dueFor(body, lagos.today(), cal);
     const commitment = body.is_commitment === true;
@@ -530,6 +607,7 @@ async function create(actor, scope, body, { client: within = null } = {}) {
       commitment_month: commitment ? body.commitment_month : null,
     });
     if (members.length) await repo.setMembers(client, id, members);
+    for (const employeeId of watching) await repo.addWatcher(client, { task_id: id, employee_id: employeeId, created_by: actor.user_id });
     await repo.addActivity(client, { task_id: id, actor_user_id: actor.user_id, kind: "created", to_status: "todo" });
     const row = await repo.get(client, id);
     await emit(client, {
@@ -539,6 +617,9 @@ async function create(actor, scope, body, { client: within = null } = {}) {
       after: toTask(row),
       payload: payloadOf(row),
     });
+    // Each watcher's history line and their notice, "You are watching", as Add Watcher gives them.
+    for (const employeeId of watching)
+      await noted(client, actor, row, { kind: "watcher_added", key: EVENTS.TASK_WATCHERS_CHANGED, extra: { watcher_employee_id: employeeId } });
     return toTask(row);
   });
 }
@@ -748,6 +829,149 @@ async function move(actor, scope, id, { status, before_task_id: beforeId, late_r
 }
 
 /**
+ * Praxis AI's Mark Done card (docs/guides/praxis-ai.md §6.11): each task moved to Done through
+ * move(), one after another, each in its own transaction as the board's own press is; a task
+ * that refuses (cancelled, waiting on another, moved meanwhile) is a line of its own and the rest
+ * still go. Nothing done is a refusal, so the card stays open with the reason.
+ * @returns {Promise<{lines: Array<{type: string, id: string, label: string, ok: boolean, message: string|null}>}>}
+ */
+async function completeMany(actor, scope, { task_ids: ids, late_reason: lateReason }) {
+  const lines = [];
+  let firstRefusal = null;
+  for (const id of [...new Set(ids || [])]) {
+    try {
+      const t = await move(actor, scope, id, { status: "done", before_task_id: null, late_reason: lateReason || undefined });
+      lines.push({ type: "task", id, label: `${t.number} ${t.title}`, ok: true, message: "done" });
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status >= 500) throw err;
+      firstRefusal = firstRefusal || err;
+      lines.push({ type: "task", id, label: id, ok: false, message: err.message });
+    }
+  }
+  if (lines.length && !lines.some((l) => l.ok)) throw firstRefusal;
+  return { lines };
+}
+
+/**
+ * The tasks a card names, as the person may see them (the card's records, §6.11): number and
+ * title for each task in their scope; one they cannot see keeps its id alone, and check() refuses it.
+ */
+async function cardRecords(db, ids, scope) {
+  const out = [];
+  for (const id of [...new Set(ids || [])].slice(0, 25)) {
+    try {
+      const t = await visible(db, id, scope);
+      out.push({ type: "task", id, label: `${t.number} ${t.title}` });
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status !== 404) throw err;
+      out.push({ type: "task", id, label: null });
+    }
+  }
+  return out;
+}
+
+/**
+ * What a new task's card names (docs/guides/praxis-ai.md §6.11, decision 31): whom it is for, the
+ * people sharing and watching it, the departments and the project, each by name, so no id reads as
+ * a code on the card. Read through this module's repo; nothing here decides who may be named.
+ */
+async function cardNames(db, values = {}) {
+  // Ids only: a value still in words (a name the matcher left as written) names nothing here.
+  const idsIn = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter((x) => c.common.uuid.safeParse(x).success);
+  return repo.cardNames(db, {
+    employeeIds: [...new Set([...idsIn(values.primary_assignee_id), ...idsIn(values.member_ids), ...idsIn(values.watcher_ids)])].slice(0, 60),
+    departmentIds: [...new Set([...idsIn(values.department_id), ...idsIn(values.watcher_department_id)])],
+    projectIds: idsIn(values.project_id),
+  });
+}
+
+/** The card's re-check (§6.11 step 5): every task on it is one the person may see and act on. */
+async function assertCardTasks(db, ids, scope) {
+  for (const id of [...new Set(ids || [])]) {
+    try {
+      await visible(db, id, scope);
+    } catch (err) {
+      if (!(err instanceof AppError) || err.status !== 404) throw err;
+      throw new AppError("TASK_NOT_YOURS", "One of these tasks is not on your board", 404, { task_ids: ["Not on your board"] });
+    }
+  }
+}
+
+/** A task on the person's board, or null: the card names nothing it cannot see. */
+async function seenOrNull(db, id, scope) {
+  if (!c.common.uuid.safeParse(id).success) return null;
+  try {
+    return await visible(db, id, scope);
+  } catch (err) {
+    if (!(err instanceof AppError) || err.status !== 404) throw err;
+    return null;
+  }
+}
+
+/**
+ * A step a card names by its words (praxis-ai.md §6.11, `resolve`): matched among the steps of the
+ * card's own task, when that task is on the person's board (shared/ai/named.js); null otherwise, and
+ * the card says No such step.
+ */
+async function stepIdOf(db, taskId, words, scope) {
+  if (!(await seenOrNull(db, taskId, scope))) return null;
+  const step = oneNamed(await repo.steps(db, taskId), words, (st) => [st.title]);
+  return step ? step.task_step_id : null;
+}
+
+/** "Which step?" answers (praxis-ai.md decision 34): the steps of the card's task, when it is on the person's board. */
+async function stepChoices(db, taskId, scope) {
+  if (!(await seenOrNull(db, taskId, scope))) return [];
+  return (await repo.steps(db, taskId)).map((st) => st.title);
+}
+
+/**
+ * "Who leads it?" answers (decision 34): whom the person may set the task for, as New Task's own
+ * picker lists them; within the department when it is shared with one (who may lead it).
+ */
+async function leadChoices(scope, departmentId) {
+  const page = await people({ page: 1, ...(departmentId ? { department_id: departmentId } : {}) }, scope);
+  return page.data.map((p) => p.display_name);
+}
+
+/** What a person calls themself when a task is for them ("for me"). */
+const SELF_WORDS = new Set(["me", "myself", "i", "mine"]);
+
+/**
+ * A lead written by name (decision 34): matched among those leadChoices offers, searched by the
+ * name first; the person themself by "me" or by their whole own name, as a task is theirs unless set
+ * for someone else (New Task's picker leaves them out because they are its default).
+ */
+async function leadIdOf(scope, words, departmentId) {
+  const within = departmentId && c.common.uuid.safeParse(departmentId).success ? { department_id: departmentId } : {};
+  if (scope.employee_id && !within.department_id) {
+    if (SELF_WORDS.has(plainWords(words))) return scope.employee_id;
+    // Their whole name only: "Aaron" may as well be a colleague called Aaron, matched below.
+    const [me] = await repo.cardNames(pool, { employeeIds: [scope.employee_id] });
+    if (me && plainWords(me.label) === plainWords(words)) return scope.employee_id;
+  }
+  for (const q of [words, null]) {
+    const page = await people({ page: 1, ...within, ...(q ? { q } : {}) }, scope);
+    const found = oneNamed(page.data, words, (p) => [p.display_name]);
+    if (found) return found.employee_id;
+  }
+  return null;
+}
+
+/** The step a card changes, by its words, when it is a step of the card's task on the person's board. */
+async function cardStep(db, taskId, stepId, scope) {
+  if (!c.common.uuid.safeParse(stepId).success || !(await seenOrNull(db, taskId, scope))) return [];
+  const st = await repo.step(db, taskId, stepId);
+  return st ? [{ type: "task_step", id: stepId, label: st.title }] : [];
+}
+
+/** The card's re-check for a step: its task on the person's board, and the step one of that task's. */
+async function assertCardStep(db, taskId, stepId, scope) {
+  await assertCardTasks(db, [taskId], scope);
+  if (!(await repo.step(db, taskId, stepId))) throw new AppError("NOT_FOUND", "That step does not exist", 404, { task_step_id: ["No such step"] });
+}
+
+/**
  * A task is done: the people on each open task waiting on it hear, about their own task, so the
  * notice names nothing they may not open.
  */
@@ -886,9 +1110,10 @@ async function cancelForRecord(client, actor, { entity_type: entityType, entity_
   }
 }
 
+/** A comment, by anyone who may open the task, its watchers included (workspace.md §6). */
 async function comment(actor, scope, id, { body }) {
   return tx(async (client) => {
-    const task = await visible(client, id, scope);
+    const task = await readable(client, id, scope);
     const commentId = await repo.addComment(client, { task_id: id, author_user_id: actor.user_id, body });
     await repo.addActivity(client, { task_id: id, actor_user_id: actor.user_id, kind: "commented" });
     await emit(client, {
@@ -1040,20 +1265,21 @@ async function overrideWaiting(actor, scope, id, dependencyId, { override_reason
 }
 
 /**
- * Watch a task. Anyone who can see it watches it themselves; naming someone else is for its
- * assignee or the person who set it, and that person must be on the staff and able to see it.
+ * Watch a task. Anyone who can open it watches it themselves; naming someone else is for its
+ * assignee or the person who set it, and that person must be on the staff. Watching gives them
+ * sight of it (JBS Praxis, 01/11/2026; workspace.md §6), so they need not see it already.
  */
 async function watch(actor, scope, id, { employee_id: who }) {
   const employeeId = who || actor.employee_id;
   if (!employeeId) throw new AppError("FORBIDDEN", "Only an employee can watch a task", 403);
+  const self = employeeId === actor.employee_id;
   await tx(async (client) => {
     if (!(await repo.lock(client, id))) throw notFound();
-    const row = await visible(client, id, scope);
-    if (employeeId !== actor.employee_id) {
+    const row = self ? await readable(client, id, scope) : await visible(client, id, scope);
+    if (!self) {
       if (!mayPlan(scope, row))
         throw new AppError("FORBIDDEN", "Only its assignee or the person who set it can add watchers", 403);
       if (!(await repo.employeeActive(client, employeeId))) throw invalid("employee_id", "Not on the staff");
-      if (!(await whoMaySee(client, row, [employeeId])).length) throw invalid("employee_id", "Cannot see this task");
     }
     if ((await repo.watcherIds(client, id)).length >= repo.PLAN_MAX)
       throw conflict("TOO_MANY_WATCHERS", `A task has at most ${repo.PLAN_MAX} watchers`);
@@ -1067,21 +1293,24 @@ async function watch(actor, scope, id, { employee_id: who }) {
   return getFor(id, scope, actor);
 }
 
-/** Stop watching: oneself always; someone else, for the assignee or the setter. */
+/** Stop watching: oneself always, a watcher included; someone else, for the assignee or the setter. */
 async function unwatch(actor, scope, id, employeeId) {
-  await tx(async (client) => {
+  const self = employeeId === actor.employee_id;
+  const row = await tx(async (client) => {
     if (!(await repo.lock(client, id))) throw notFound();
-    const row = await visible(client, id, scope);
-    if (employeeId !== actor.employee_id && !mayPlan(scope, row))
+    const found = self ? await readable(client, id, scope) : await visible(client, id, scope);
+    if (!self && !mayPlan(scope, found))
       throw new AppError("FORBIDDEN", "Only its assignee or the person who set it can remove watchers", 403);
     if (await repo.removeWatcher(client, id, employeeId))
-      await noted(client, actor, row, {
+      await noted(client, actor, found, {
         kind: "watcher_removed",
         key: EVENTS.TASK_WATCHERS_CHANGED,
         extra: { watcher_employee_id: employeeId },
       });
+    return found;
   });
-  return getFor(id, scope, actor);
+  // A watcher who saw it only by watching has just lost sight of it: the panel once more, watching off.
+  return getFor(id, scope, actor, row.watcher_only ? { seen: row } : undefined);
 }
 
 /** A nudge with a line of text, to the assignee, the watchers or both. Never to the sender. */
@@ -1089,7 +1318,8 @@ async function ping(actor, scope, id, { message, to }) {
   return tx(async (client) => {
     const row = await visible(client, id, scope);
     if (row.status === "cancelled") throw new AppError("TASK_CANCELLED", "This task was cancelled", 409);
-    const watchers = to === "assignee" ? [] : await whoMaySee(client, row, await repo.watcherIds(client, id));
+    // Every watcher may open the task, so every watcher may be nudged (workspace.md §6).
+    const watchers = to === "assignee" ? [] : await repo.watcherIds(client, id);
     const onIt = [row.primary_assignee_id, ...(row.members || []).map((p) => p.employee_id)];
     const told = [...(to === "watchers" ? [] : onIt), ...watchers]
       .filter((p) => p && p !== actor.employee_id);
@@ -1111,7 +1341,7 @@ function reminderAt(r, dueAt) {
   return new Date(new Date(dueAt).getTime() - r.minutes_before * 60_000);
 }
 
-/** Replace a task's reminders to its assignee (up to three). A lead time needs a due time. */
+/** Replace a task's reminders to its assignee (up to three). A lead time needs a due time; a set time comes before it. */
 async function setReminders(actor, scope, id, { reminders: wanted }) {
   await tx(async (client) => {
     const row = await planned(client, id, scope);
@@ -1121,6 +1351,8 @@ async function setReminders(actor, scope, id, { reminders: wanted }) {
       const at = reminderAt(r, row.due_at);
       if (!at) throw invalid(`reminders.${i}.minutes_before`, "Give the task a due date");
       if (at <= now) throw invalid(`reminders.${i}`, "That time has passed");
+      // A set time comes at or before the due time, never after it (TB, 28/10/2026).
+      if (r.remind_at && row.due_at && at > new Date(row.due_at)) throw invalid(`reminders.${i}.remind_at`, "After the due time");
       return { at, minutes: r.minutes_before ?? null };
     });
     await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id } });
@@ -1316,6 +1548,7 @@ async function settleRescope(client, actor, id, approved) {
 }
 
 module.exports = {
+  aiCounts,
   people,
   linkCommitments,
   fixOriginalDates,
@@ -1324,7 +1557,7 @@ module.exports = {
   cancelForRecord,
   toTask,
   toRef,
-  whoMaySee,
+  readable,
   windows,
   list,
   summary,
@@ -1348,6 +1581,16 @@ module.exports = {
   create,
   edit,
   move,
+  completeMany,
+  cardRecords,
+  stepIdOf,
+  stepChoices,
+  leadChoices,
+  leadIdOf,
+  cardStep,
+  assertCardStep,
+  cardNames,
+  assertCardTasks,
   block,
   unblock,
   cancel,

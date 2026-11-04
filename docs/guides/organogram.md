@@ -304,8 +304,32 @@ every capability and every field until handover, and training runs from it (TB, 
 ## 9 · AI and search
 
 - **AI reads** (`organisation.ai.js`): "who reports to whom", "who reports to X", "how many people
-  in <department>", "which roles are vacant". Read only (A23), reading the same tree, in pages of
-  25. No write.
+  in <department>", "which roles are vacant". Read only, reading the same tree, in pages of 25.
+- **AI actions** (`organisation.ai.js` with `organisation.cards.js`, `docs/guides/praxis-ai.md`
+  §6.11, decisions 33 and 36): the forms of People · Employees, Departments and the Organogram as
+  cards the person confirms, one press each, each through the function the screen's own button
+  reaches, in its own transaction as the controller runs it, under the route's own rules. **Add
+  Employee** (`employees.add`, `people` create): `EmployeeAdd` with the work record alone (names,
+  work email and phone, job, department, line manager, worksite, start date, engagement, pattern,
+  contract end, confirmation due), every field the record needs asked first; never birth date,
+  gender, next of kin, home, personal email, bank or pay, which stay on the record (JBS Praxis,
+  03/11/2026); no field the reader's role hides. **Save Record** (`employees.edit`, `people` edit):
+  `EmployeeChange`, Edit Record's work record with the person, only what changes, in the reader's
+  scope, a new department moving the person's line as §6.1 does. **Save Line**
+  (`employees.reporting`): `EmployeeReportingChange`, a person on each line (a vacant seat is
+  picked here, on the Organogram) and the reason. **Add Department** and **Save Department**
+  (`departments.create`, `departments.edit`): the name, code, description and head (a person),
+  retire and restore, with the grant over everyone as the controller asks. **Add Role** and **Save
+  Role** (`seats.create`, `seats.edit`): an open role's title, department and the person it reports
+  to, closed with `status`. A department, a worksite and a role written by name are matched among
+  those in use; people are picked from People's register.
+- **AI summary** (`organisation.ai.js`, `docs/guides/praxis-ai.md` §6.13): `employees.summary`
+  (`people` view, the caller's scope; `EmployeeSummaryQuery`: the register's filters and `by`
+  department, status, work pattern, employment type, manager or confirmation): people, active,
+  confirmed, on probation, confirmation due within 30 days or overdue, contracts ending within 30
+  days, no line manager, departments; by department and status always, then by the dimension asked
+  (managers 20, the confirmation bands). One SQL over the register (`organisation.repo.aiSummary`),
+  figures never rows.
 - **AI routes**: "show me the org chart" opens ESS · Org Chart (or People · Organogram for HR),
   optionally focused on a named person; "add an employee" opens People · Employees on
   `new=1` (`useNewLink`), Add Employee filled with the names and the job the person gave
@@ -470,6 +494,15 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · People's forms are Praxis AI cards (§9; `praxis-ai.md` decisions 33 and 36):
+  Add Employee and Save Record with the work record alone, Save Line, Add Department and Save
+  Department, Add Role and Save Role, each through this module's own function in its own
+  transaction (`organisation.cards.js`), under the controller's rules (scope, field masks, the
+  grant over everyone for departments). `EmployeeUpdate`, `EmployeeReportingUpdate`,
+  `DepartmentUpdate` and `OrgSeatUpdate` keep their rules, their fields shared with the cards'
+  schemas. No screen changed.
+- 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.15, §6.17): `employees.list` carries a matrix probe (a report of the asker's listed, an outsider never, for a team or own reader); `organisation.ai.js` accounts for `EmployeeCreate`, `DepartmentCreate` and `OrgSeatCreate` in `not_offered`, as gate 23 asks of every module.
+- 01/11/2026 · JP · §9: `employees.summary`, the register counted for the assistant by department, status, arrangement, type, manager or confirmation due (Praxis AI Engine PR3, `docs/guides/praxis-ai.md` §6.13). Nothing on screen changes.
 - 28/10/2026 · JP · People · Employees' Department filter, Set Head's Open Role and the reporting form's Open Role read their lists 25 at a time and load the next page as the menu nears its end; a vacant seat already chosen reads as its role until its page loads (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18). They look as before.
 - 27/10/2026 · JP · The Head mark (JBS Praxis, 27/10/2026; §4, §6, §10): each department in use marks its head's card, Head on the person or the open head role and Acting Head on the first person above an open one, its code added when the department is not the card's own (*Acting Head · PG*). `OrgNode.heads` carries them from the read (`repo.departmentHeads`, `organisation.headOf`), so the desktop cards, the phone's tiles and the PDF say the same words; a person's sheet gains Head Of.
 - 27/10/2026 · JP · §6.1 records two more answers of JBS Praxis: a head's reach is their reporting line, not the whole department, and Head of Department goes to heads and acting heads who need it, as built.

@@ -9,6 +9,8 @@
  * - Configure (`mailbox.signature`): the company's links and switches.
  * - The composer's preview and the send-time bake both ask signatureFor(), the one rule for
  *   whether a message carries the full signature or the slim line.
+ * - Praxis AI's Configure Signature card (docs/guides/praxis-ai.md §6.11) changes only what it
+ *   names: saveConfigChange() saves the rest as it is, through saveConfig().
  */
 const { pool } = require("../../../config/db");
 const { atomically } = require("../../../shared/db/tx");
@@ -223,6 +225,13 @@ async function saveConfig(body, user) {
   return configView(row);
 }
 
+/** Configure Signature's card: only what it names, the rest of the company's signature as it is saved. */
+async function saveConfigChange(change, user) {
+  const { updated_at: _at, ...held } = await config();
+  const given = Object.fromEntries(Object.entries(change).filter(([, v]) => v !== undefined));
+  return saveConfig(require("@mycity/contract").mailbox.SignatureConfigSave.parse({ ...held, ...given }), user);
+}
+
 /* ------------------------------------------------------------------ *
  * Sending
  * ------------------------------------------------------------------ */
@@ -246,4 +255,4 @@ async function bake(client, userId, message, from) {
   return { variant, ...full(model, inline.pics), parts: inline.parts };
 }
 
-module.exports = { signatureFor, domainOf, senderOf, mine, saveMine, preview, config, saveConfig, bake };
+module.exports = { signatureFor, domainOf, senderOf, mine, saveMine, preview, config, saveConfig, saveConfigChange, bake };

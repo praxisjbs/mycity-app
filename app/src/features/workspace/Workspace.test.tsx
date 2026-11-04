@@ -387,6 +387,34 @@ describe("my workspace", () => {
     expect(screen.queryByRole("menuitem", { name: "Set Reminders" })).toBeNull();
   }, 20000);
 
+  it("Set Reminders takes a Custom Time at or before the due time (TB, 28/10/2026)", async () => {
+    await board();
+    const due = isoDaysAhead(3);
+    await arrange({ title: "Print the badges", due_on: due });
+    const panel = await openCard("Print the badges");
+    await userEvent.click(within(panel).getByRole("button", { name: "More Actions" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Set Reminders" }));
+    const form = await screen.findByRole("dialog", { name: "Set Reminders" });
+    expect(within(form).queryByRole("textbox", { name: "Remind On" })).toBeNull();
+    await chooseOption(within(form).getByRole("combobox", { name: /First Reminder/ }), "Custom Time");
+    const on = within(form).getByRole("textbox", { name: "Remind On" });
+    // It opens on the due day and time.
+    expect((on as HTMLInputElement).value).toBe(typed(due));
+    expect((within(form).getByRole("textbox", { name: "Remind At" }) as HTMLInputElement).value).toBe("17:00");
+    await userEvent.clear(on);
+    await userEvent.type(on, typed(isoDaysAhead(4)));
+    fireEvent.click(within(form).getByRole("button", { name: "Set Reminders" }));
+    await within(form).findByText("After the due time", undefined, { timeout: 5000 });
+    await userEvent.clear(on);
+    await userEvent.type(on, typed(due));
+    const at = within(form).getByRole("textbox", { name: "Remind At" });
+    await userEvent.clear(at);
+    await userEvent.type(at, "0900");
+    fireEvent.click(within(form).getByRole("button", { name: "Set Reminders" }));
+    await closed("Set Reminders");
+    await within(panel).findByText("At a set time", undefined, { timeout: 5000 });
+  }, 30000);
+
   it("the panel sets a repeat, and says how the task repeats", async () => {
     await board();
     fireEvent.click(screen.getByRole("button", { name: /Approve 5 expense requests/ }));
@@ -419,10 +447,24 @@ describe("my workspace", () => {
     // The field follows the reader's team, which the form loads as it opens.
     expect(await within(form).findByText("Assign To")).toBeTruthy();
     named(form, "File the October minutes");
-    fireEvent.click(await within(form).findByRole("option", { name: /Bashir Lawal/ }));
+    // Assign To and Watchers both list people: the pick is Assign To's.
+    fireEvent.click(await within(within(form).getByRole("listbox", { name: /Assign To/ })).findByRole("option", { name: /Bashir Lawal/ }));
     fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
     await closed("New Task");
     await waitFor(() => expect(inStage("To Do", "File the October minutes")).toBeTruthy(), { timeout: 5000 });
+  }, 30000);
+
+  it("New Task names watchers, who are on the task's panel once it is made (JBS Praxis, 01/11/2026)", async () => {
+    await board();
+    const form = await newTask();
+    named(form, "Book the launch venue");
+    const watchers = await within(form).findByRole("listbox", { name: /Watchers/ });
+    fireEvent.click(await within(watchers).findByRole("option", { name: /Bashir Lawal/ }));
+    fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
+    await closed("New Task");
+    await waitFor(() => expect(inStage("To Do", "Book the launch venue")).toBeTruthy(), { timeout: 5000 });
+    fireEvent.click(inStage("To Do", "Book the launch venue")!);
+    expect(await screen.findByText("Bashir Lawal", undefined, { timeout: 5000 })).toBeTruthy();
   }, 30000);
 
   it("Shared with People: Lead offers You and each person picked, and goes back to You when its person is removed", async () => {
@@ -632,14 +674,26 @@ describe("my workspace", () => {
   }, 40000);
 
   it("an empty day on the month asks New Task or New Event, and New Task starts on that day", async () => {
-    await signedIn(<Workspace tab="calendar" id={null} />);
-    await screen.findByText("Coming Up", undefined, { timeout: 8000 });
-    const days = await screen.findAllByRole("button", { name: /^Add To Day, / });
-    fireEvent.click(days[days.length - 1]!);
-    const choose = await screen.findByRole("dialog");
-    fireEvent.click(within(choose).getByRole("button", { name: /New Task/ }));
-    const form = await screen.findByRole("dialog", { name: "New Task" });
-    expect(within(form).getByRole("button", { name: "Create Task" })).toBeTruthy();
+    // Add To Day is offered only from today on, so on a month's last day the month has none: late
+    // in a month the clock stands back at its 15th, so days are always left. Never forward: the
+    // session an earlier test signed in with would be past its token's time and the page would lock.
+    const now = new Date();
+    if (now.getDate() > 20) {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), 15, 9));
+    }
+    try {
+      await signedIn(<Workspace tab="calendar" id={null} />);
+      await screen.findByText("Coming Up", undefined, { timeout: 8000 });
+      const days = await screen.findAllByRole("button", { name: /^Add To Day, / });
+      fireEvent.click(days[days.length - 1]!);
+      const choose = await screen.findByRole("dialog");
+      fireEvent.click(within(choose).getByRole("button", { name: /New Task/ }));
+      const form = await screen.findByRole("dialog", { name: "New Task" });
+      expect(within(form).getByRole("button", { name: "Create Task" })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   }, 20000);
 
   it("New Event offers a reminder, 15 minutes before unless changed", async () => {
@@ -651,6 +705,31 @@ describe("my workspace", () => {
     expect(within(form).getByText("15 Minutes Before")).toBeTruthy();
   }, 20000);
 
+  it("New Event's Custom Time is a day and time at or before the start, sent as its lead time (TB, 28/10/2026)", async () => {
+    await signedIn(<Workspace tab="calendar" id={null} />);
+    await screen.findByText("Coming Up", undefined, { timeout: 8000 });
+    fireEvent.click(screen.getAllByRole("button", { name: /New Event/ })[0]!);
+    const form = await screen.findByRole("dialog", { name: "New Event" });
+    const day = isoDaysAhead(2);
+    fireEvent.change(within(form).getByRole("textbox", { name: /Event/ }), { target: { value: "Venue walk" } });
+    await userEvent.type(within(form).getByRole("textbox", { name: "Date" }), typed(day));
+    await chooseOption(within(form).getByRole("combobox", { name: /Reminder/ }), "Custom Time");
+    const on = within(form).getByRole("textbox", { name: "Remind On" });
+    await userEvent.clear(on);
+    await userEvent.type(on, typed(isoDaysAhead(3)));
+    fireEvent.click(within(form).getByRole("button", { name: "Add Event" }));
+    await within(form).findByText("After the start", undefined, { timeout: 5000 });
+    await userEvent.clear(on);
+    await userEvent.type(on, typed(day));
+    const at = within(form).getByRole("textbox", { name: "Remind At" });
+    await userEvent.clear(at);
+    await userEvent.type(at, "0920");
+    fireEvent.click(within(form).getByRole("button", { name: "Add Event" }));
+    await closed("New Event");
+    const sent = vi.mocked(dispatch).mock.calls.map(([r]) => r).filter((r) => r.method === "POST" && r.path === "/api/v1/calendar");
+    expect((sent[sent.length - 1]!.body as { reminder_minutes: number[] }).reminder_minutes).toEqual([40]);
+  }, 30000);
+
   it("the calendar's Week shows seven days, and a day opens Day", async () => {
     await signedIn(<Workspace tab="calendar" id={null} />);
     await screen.findByText("Coming Up", undefined, { timeout: 8000 });
@@ -660,7 +739,8 @@ describe("my workspace", () => {
     const name = days[2]!.textContent!;
     fireEvent.click(days[2]!);
     expect(screen.getByRole("radio", { name: "Day" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+    // The day may sit in the month before (the week that straddles a month's first days): its items load first.
+    expect((await screen.findAllByText(name, undefined, { timeout: 5000 })).length).toBeGreaterThan(0);
     expect(screen.queryByText("Africa/Lagos")).toBeNull();
   }, 20000);
 

@@ -8,11 +8,15 @@
  *   edit()             its owner, or a reader whose grant is `all`: words, due day, and
  *                      `status` (completed completes it, active reopens it)
  *   assertOpen()       what the tasks service asks before a task joins a project
+ *   cardRecords(), assertCardProject()   the project a Praxis AI card changes, named, and the
+ *                      card's re-check: its owner, or a grant that reaches everyone
+ *                      (docs/guides/praxis-ai.md §6.11)
  *
  * A project gives nobody a task: the board on its page is the tasks list filtered by
  * `project_id`, under the reader's own audience. Every change emits one event, in its
  * transaction.
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
@@ -120,6 +124,20 @@ async function edit(actor, scope, id, body) {
   });
 }
 
+/** The project a card changes, by number and name; one that does not exist keeps its id alone, and the check refuses it. */
+async function cardRecords(db, id, scope) {
+  if (!c.common.uuid.safeParse(id).success) return [];
+  const row = await repo.get(db, id, scope);
+  return [{ type: "project", id, label: row ? `${row.number} ${row.name}` : null }];
+}
+
+/** The card's re-check (§6.11 step 5): the project exists and the person may change it. */
+async function assertCardProject(db, id, scope) {
+  const row = c.common.uuid.safeParse(id).success ? await repo.get(db, id, scope) : null;
+  if (!row) throw new AppError("NOT_FOUND", "That project does not exist", 404, { project_id: ["No such project"] });
+  if (!mayEdit(scope, row)) throw new AppError("FORBIDDEN", "Only its owner can change this project", 403, { project_id: ["Not yours to change"] });
+}
+
 /** A task joins only an open project: 422 on `project_id` otherwise. */
 async function assertOpen(db, id) {
   const status = await repo.statusOf(db, id);
@@ -127,4 +145,4 @@ async function assertOpen(db, id) {
   if (status !== "active") throw invalid("project_id", "Project is closed");
 }
 
-module.exports = { list, getFor, create, edit, assertOpen, toProject };
+module.exports = { list, getFor, create, edit, assertOpen, toProject, cardRecords, assertCardProject };

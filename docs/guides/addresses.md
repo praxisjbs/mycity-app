@@ -167,8 +167,9 @@ Lekki Phase 1, Lagos`).
   provider named one, `tz`, optional, so a token signed before it still verifies), base64url JSON; the
   signature is HMAC-SHA256 over it, cut to 128 bits, with a key derived from `ENCRYPTION_KEY`
   (HKDF, info `place-token v1`). No new secret, and each environment's tokens are its own.
-- Made only by our API: a search answer, a pin, and a read for an edit form. A browser cannot make
-  one, so a typed or altered address cannot reach a service.
+- Made only by our API: a search answer, a pin, a read for an edit form, and the one place our
+  search finds for a Praxis AI card's words (§9). A browser cannot make one, so a typed or altered
+  address cannot reach a service.
 - Checked at the edge: `PlaceInput`'s refinement asks the verifier the server installs
   (`src/shared/places/token.js`, installed by `src/app.js`). Without one, a Node process refuses
   every token (fail closed); a browser checks the shape only.
@@ -274,6 +275,15 @@ owner (§6.7).
 
 - **AI reads**: none (`// ai:none` in `maps.controller.js`): an address is read through its
   owner's manifest, masked as there.
+- **AI cards** (`docs/guides/praxis-ai.md` §6.11, decision 37; JBS Praxis, 03/11/2026): an address
+  on a card is picked, never typed. The card holds the place's token alone (`PlaceToken`), read by
+  its line and never printed; the model writes the address in words, and `maps.service.onePlace`
+  signs the one place our search finds at the field's level; several, none or the search down leave
+  the field marked Pick one, and Edit picks the place with AddressField (the `place` pick). The
+  owner's request still takes `PlaceInput` (`{ token }`), saved with `places.save()` in its service.
+  Owners with cards: `worksite.address` (Add Worksite, Save Worksite) and
+  `attendance_temporary_site_location.address` (Add Work Site, one address, never a Temporary
+  Home).
 - **AI routes**: none.
 - **Search**: `place` is `search:none`: a place is found through the record that holds it.
 
@@ -340,6 +350,10 @@ None.
 
 ## 14 · Change log
 
+- 03/11/2026 · JP · An address on a Praxis AI card is picked as everywhere (§6.2, §9;
+  `praxis-ai.md` decision 37): the one place our search finds for the card's words is signed
+  (`maps.service.onePlace`, which with the search's answers now holds the signing the controller
+  did, `signed()`), anything else is Pick one and AddressField picks it on Edit. No field changed.
 - 27/10/2026 · JP · From the 27/10 staging faults brief (fault #3, `VALIDATION_FAILED: query.lat, query.lon` at `GET /api/v1/maps/pin`): a tap on the map carries Leaflet's full precision (6.452871234567891), and the hub sent it as written, which `PinQuery` refuses past ten places, so a pin named nothing. The hub's `places.pin` now sends six places (`degreesOf`), about 10 cm, what `place.lat` keeps (§3 step 4, §5). The contract is unchanged.
 - 22/10/2026 · TB · My Attendance's Home Location address is asked for only while the Attendance policy's Home Location is on (`attendance.md` §1.3); the residential Home Address on My Profile and the employee record is unchanged.
 - 20/10/2026 · TB · Written from TB's brief and four answers (§1.1): every address across the ERP

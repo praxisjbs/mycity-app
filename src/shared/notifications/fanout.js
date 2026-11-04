@@ -36,7 +36,9 @@
  *
  * Rules:
  *  - The person who acted is not told about their own action (include_actor: true to
- *    override, e.g. a confirmation).
+ *    override, e.g. a confirmation; or a function (event, db) => boolean for a notice that
+ *    tells them only in some cases, as the engine's "Approval needed" tells the CEO of a
+ *    request they opened themself, which waits on them).
  *  - Events marked `security` in the catalogue also reach the access watchers (the CEO
  *    and holders of `settings` edit with scope all), and their preferences cannot
  *    silence it (shared/notifications/categories.js).
@@ -151,7 +153,7 @@ function checkAudience(key, a) {
  * Declare who an event notifies. One declaration per event key.
  * @param {string} key  a declared event key
  * @param {{to: object[], title: string|Function, body?: string|Function, priority?: "normal"|"high",
- *          include_actor?: boolean}} spec
+ *          include_actor?: boolean|((event: object, db: object) => boolean|Promise<boolean>)}} spec
  */
 function defineNotification(key, spec) {
   const where = `defineNotification(${key})`;
@@ -169,6 +171,11 @@ function defineNotification(key, spec) {
     throw new Error(`${where}: body is a string or (event) => string`);
   if (spec.priority && !["normal", "high"].includes(spec.priority))
     throw new Error(`${where}: priority is normal or high`);
+  if (
+    spec.include_actor !== undefined &&
+    !["boolean", "function"].includes(typeof spec.include_actor)
+  )
+    throw new Error(`${where}: include_actor is a boolean or (event, db) => boolean`);
   if (
     spec.urgency !== undefined &&
     typeof spec.urgency !== "function" &&
@@ -480,8 +487,13 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
       for (const id of await audienceUsers(db, audience, event))
         messages.set(id, { title, body });
     }
-    if (!spec.include_actor && event.actor_user_id)
-      messages.delete(event.actor_user_id);
+    if (event.actor_user_id && messages.has(event.actor_user_id)) {
+      const told =
+        typeof spec.include_actor === "function"
+          ? await spec.include_actor(event, db)
+          : spec.include_actor;
+      if (!told) messages.delete(event.actor_user_id);
+    }
     if (spec.copy) {
       const own = spec.copy === true ? {} : spec.copy;
       const copy = {
@@ -667,10 +679,18 @@ const OUTCOME = {
   timeout_rejected: "Rejected",
 };
 
+/**
+ * Whoever opened an approval is not asked to decide it, except the CEO, who may decide any (and
+ * so their own: `approvers.canAct`), and sees it on Waiting On You. Only the CEO is told.
+ */
+const openedByTheCeo = async (e, client) =>
+  Boolean(e.actor_user_id) && (await ceoUsers(client)).includes(e.actor_user_id);
+
 defineNotification(WORKFLOW.WORKFLOW_OPENED, {
   to: [{ approvers: true }],
   title: (e) => `Approval needed: ${nameOf(e)}`,
   body: (e) => `${e.payload.stage_name || "A stage"} is waiting on you.`,
+  include_actor: openedByTheCeo,
   copy: { body: (e) => `${e.payload.stage_name || "A stage"} is waiting on its approvers.` },
 });
 

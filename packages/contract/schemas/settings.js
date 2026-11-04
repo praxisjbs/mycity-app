@@ -17,7 +17,7 @@
  * Times of day are "HH:MM" on the wire, 24-hour.
  */
 const { z } = require("zod");
-const { uuid, text, isoDate, isoDateTime, email, phone, listQuery, Paged } = require("./common");
+const { uuid, text, isoDate, isoDateTime, email, phone, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PlaceInput, PlaceView } = require("./maps");
 const { SignInMethod } = require("./identity");
 const { DocumentRef } = require("./documents");
@@ -246,6 +246,45 @@ const NumberingSchemeSave = z
 const NumberingParams = z.object({ doc_type: DocType }).strict();
 
 /* ------------------------------------------------------------------ *
+ * Praxis AI's cards for Settings (docs/guides/praxis-ai.md §6.11, decision 33): the form's own
+ * fields beside what the screen holds open, only what changes; the rest is kept as it stands.
+ * ------------------------------------------------------------------ */
+
+/** A public holiday changed from the chat: the holiday, its day or its name. */
+const HolidayChange = z
+  .object({ public_holiday_id: recordId("holiday"), holiday_date: isoDate.optional(), name: text(80).optional() })
+  .strict()
+  .refine(changesBeside(["public_holiday_id"]), nothingOn("public_holiday_id"));
+
+/** The days of the week by name, Monday first, as a card reads them (weekday 1 is Monday). */
+const WEEKDAY_NAMES = Object.freeze(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
+const WeekdayName = z.enum(WEEKDAY_NAMES);
+
+/** One day of the working week changed from the chat: whether it is worked, and its hours; the other six are kept. */
+const WorkingDayChange = z
+  .object({
+    weekday: WeekdayName,
+    is_working_day: z.boolean().optional(),
+    starts_at: TimeOfDay.nullable().optional(),
+    ends_at: TimeOfDay.nullable().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["weekday"]), nothingOn("weekday"));
+
+/** A document type's numbering changed from the chat: what changes; the rest of the scheme is kept. */
+const NumberingSchemeChange = z
+  .object({
+    doc_type: DocType,
+    prefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{0,8}$/, "Up to 8 letters").optional(),
+    padding: z.number().int().min(0, "0 to 10").max(10, "0 to 10").optional(),
+    separator: z.enum(["-", "/", ".", "_", ""]).optional(),
+    reset: NumberingReset.optional(),
+    include_period: z.boolean().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["doc_type"]), nothingOn("doc_type"));
+
+/* ------------------------------------------------------------------ *
  * Security rules
  * ------------------------------------------------------------------ */
 
@@ -362,6 +401,9 @@ const TABLES = {
   NumberingPage: { table: null, reason: "a page of numbering schemes" },
   NumberingSummary: { table: null, reason: "counts over numbering_scheme and numbering_counter" },
   NumberingSchemeSave: { table: "numbering_scheme" },
+  HolidayChange: { table: "public_holiday" },
+  WorkingDayChange: { table: "working_week" },
+  NumberingSchemeChange: { table: "numbering_scheme" },
   NumberingParams: { table: null, reason: "the :doc_type path parameter" },
   TwoStepRole: {
     table: "role",
@@ -421,6 +463,11 @@ module.exports = {
   NumberingSummary,
   NumberingSchemeSave,
   NumberingParams,
+  HolidayChange,
+  WEEKDAY_NAMES,
+  WeekdayName,
+  WorkingDayChange,
+  NumberingSchemeChange,
   TwoStepRole,
   SecurityPolicy,
   SecurityPolicyPatch,
