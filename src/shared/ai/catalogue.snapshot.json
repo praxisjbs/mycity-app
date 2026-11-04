@@ -1235,6 +1235,28 @@
       "screen": null
     },
     {
+      "key": "candidates.get",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "candidates.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "candidates.CandidateListQuery",
+      "schema_sha": "0d00a44c6d028998",
+      "screen": null
+    },
+    {
       "key": "cards.mine",
       "kind": "read",
       "module_key": "home",
@@ -2498,6 +2520,39 @@
       "schema": null,
       "schema_sha": null,
       "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.change_the_wording_of_a_candidate_email",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.invite_someone_to_apply_for_a_vacancy",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.candidates"
+    },
+    {
+      "key": "recruitment.route.screen_a_role_s_applications_with_ai",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.candidates"
     },
     {
       "key": "recruitment.route.write_a_new_vacancy",

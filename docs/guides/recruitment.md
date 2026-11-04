@@ -209,8 +209,8 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/candidates/score-all` | `ScoreAll` → `ScoreAllQueued` | `recruitment` edit · all/team | no | Screen With AI: the one to three must-meet conditions are kept on the vacancy (left out, the kept ones are used again), then every active, unscored application of it is read through the outbox |
 | `POST /recruitment/candidates/invitations` | `ApplyInvite` → `ApplyInviteSent` | `recruitment` create | no | Emails an Apply link |
 | `GET /recruitment/candidates/emails` | `CandidateEmailListQuery` → `CandidateEmailPage` | `recruitment` view | yes | The five candidate emails, each with its current version |
-| `GET /recruitment/candidates/emails/:key`, `PUT .../:key` | `CandidateEmailParams`; `CandidateEmail`, `CandidateEmailSave` | view; edit | no | Subject and Markdown body saved as the next version |
-| `POST /recruitment/candidates/emails/:key/restore` | `EmptyBody` → `CandidateEmail` | `recruitment` edit | no | Restore Default: the shipped wording saved as the next version |
+| `GET /recruitment/candidates/emails/:key`, `PUT .../:key` | `CandidateEmailParams`; `CandidateEmail`, `CandidateEmailSave` | view; edit · all | no | Subject and Markdown body saved as the next version, checked against the email's variables. Saved only with edit over every vacancy (scope all), as each goes to every candidate |
+| `POST /recruitment/candidates/emails/:key/restore` | `EmptyBody` → `CandidateEmail` | `recruitment` edit · all | no | Restore Default: the shipped wording saved as the next version |
 | `GET /recruitment/assessments/summary` | `AssessmentsSummary` | `recruitment` view | no | |
 | `GET /recruitment/assessments` | `AssessmentListQuery` → `AssessmentPage` | `recruitment` view | yes | Filters `type`, `active`, `q` |
 | `GET /recruitment/assessments/:id` | `AssessmentDetail` | `recruitment` view | no | Questions with their points |
@@ -247,7 +247,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `GET /api/public/v1/jobs/:slug` | `PublicJob` | public | no | Draft is 404; paused and closed say so; an open role past its closing time reads closed. Names how many have applied (`applicants`) |
 | `POST /api/public/v1/jobs/:slug/apply` | `EmptyBody` → `ApplyStarted` | public, rate limited | no | Mints the Apply token |
 | `GET /api/public/v1/apply/:token` | `ApplyLink` | `application.apply` token | no | The role, its questions, when the link lapses |
-| `POST /api/public/v1/apply/:token/cv` | multipart → `PublicUpload` | `application.apply` token | no | Purpose `cv`, quarantined |
+| `POST /api/public/v1/apply/:token/cv` | multipart → `DocumentRef` | `application.apply` token | no | Purpose `cv` (PDF or Word, 10 MB), quarantined and kept against the link until the application is made (`vault.adopt`) |
 | `POST /api/public/v1/apply/:token` | `ApplicationSubmit` → `ApplicationReceipt` | `application.apply` token, spent | no | Write only |
 | `GET /api/public/v1/assess/:token` | `AssessmentSession` | `assessment.take` token | no | `ends_at` and `server_now` for the timer |
 | `POST /api/public/v1/assess/:token/start` | `EmptyBody` → `AssessmentSession` | `assessment.take` token | no | |
@@ -317,8 +317,11 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   assessment parts is on, and Interview when the interview part is off. Offer and the stages after it are M5's; until M5 ships, Shortlist is
   the last column and Move to Offer is not offered (GE, 04/11/2026).
 - Not Progressing sets `status` `not_progressed` with a reason of at least 10 characters, records the
-  move in history (the stage stays where it was), revokes the candidate's live tokens (Apply and assessment) and emails
-  `candidate-not-progressed`. It is undone with Reopen, back to the stage it left.
+  move in history (the stage stays where it was), revokes the links made for the application and its
+  sittings (an Apply link belongs to a vacancy, and to nobody until it is used) and emails
+  `candidate-not-progressed`. The interviews module cancels the application's scheduled interviews
+  from the same event (`application.not_progressed`), sending each panelist and the candidate the
+  `.ics` cancel (P6). It is undone with Reopen, back to the stage it left.
 - Every move writes one `entity_state_history` row (`shared/state/state-history`) and sets
   `current_stage_entered_at`. Days at stage is whole days since then, in Lagos.
 
@@ -338,7 +341,9 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   scored without it, and the summary says so), the cover letter, the role, the must haves, the
   candidate's answers and the vacancy's must-meet conditions (one to three, each at most 200
   characters, set when Screen With AI is pressed and kept for later reads; pressed again with none
-  given, the kept ones are used), and returns a score
+  given, the kept ones are used; a condition that names a protected trait, such as an age, a sex, a
+  marital status, a religion, a tribe or a state of origin, is refused with 422 before it is kept, and
+  one that slips past is not applied by the model), and returns a score
   from 0 to 100 and a summary that says which conditions are met and what it could not verify. Contact details are shielded before the call (`redact.shield`).
   It writes `screening_score`, `screening_summary`, `screening_ai_run_id` and `screened_at`.
 - The screening score shown is `screening_score` when there is one, otherwise `provisional_score`
@@ -463,6 +468,8 @@ with test addresses.
 | `application.not_progressed` | after Not Progressing | outbox: `candidate-not-progressed` |
 | `application.score_requested` | Screen With AI, one per application | outbox: the AI read (§6.4), one at a time |
 | `application.scored` | after an AI read is kept | audit |
+| `application.reopened` | after Reopen | audit; the card refreshes |
+| `recruitment.candidate_email_saved` | a candidate email reworded, or its default restored | audit |
 | `assessment.sent` | after Send | outbox: `assessment-invite` |
 | `assessment.submitted`, `assessment.timed_out` | at the end of a sitting | auto-scoring; notice to the hiring manager when it waits for marking (`recruitment.assessment_to_mark`) |
 | `assessment.scored` | when the last mark is given | audit; scorecard refreshes |
@@ -601,6 +608,14 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 05/11/2026 · GE · P4 built: Apply (the link, the CV kept against it until the application is made,
+  the estimate, a second application answering the first's reference), the board ranked by the
+  weighted scorecard in SQL, moves, Not Progressing and Reopen, Score With AI and Screen With AI from
+  the outbox (`cv-screen`, Deep Reasoning; the CV's text read by `services/media/pdf-text.js`), a
+  condition naming a protected trait refused, Invite to Apply (the link made after commit), Candidate
+  Emails (scope all). Suggest With AI may suggest a yes or no Apply question and is told how many
+  traits are left. Not Progressing leaves the cancelling of interviews to P6, from its event.
 
 - 04/11/2026 · GE · (Ose) From the audit of P7 and P8: an assessment link lives until `due_at` once the
   sitting has started (§6.7); the five candidate emails ship as Markdown so Restore Default and edits

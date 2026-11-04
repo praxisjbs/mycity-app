@@ -85,6 +85,7 @@ async function suggest(user, row, traits, company = null) {
       company,
       role: { title: row.title, department: row.department, description: row.description, requirements: row.requirements },
       traits_already: traits,
+      traits_left: Math.max(0, 20 - traits.length),
     },
     c.vacancies.QuestionsDraftOutput,
     (input, output) =>
@@ -97,11 +98,11 @@ async function suggest(user, row, traits, company = null) {
     questions: [
       ...r.output.application.map((q) => ({
         purpose: "application",
-        question_type: "text",
+        question_type: q.question_type,
         prompt: fit(r.restore(q.prompt), 500),
         options: null,
       })),
-      ...r.output.interview.map((q) => ({
+      ...r.output.interview.slice(0, Math.max(0, 20 - traits.length)).map((q) => ({
         purpose: "interview",
         question_type: "rating",
         prompt: fit(r.restore(q.prompt), 500),

@@ -350,6 +350,10 @@ None.
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · A new owner, `vacancy.location` (Recruitment, level area, not personal): a vacancy's
+  city or area, picked on New Vacancy and on its Praxis AI card (`recruitment.md` §6.1). A remote role
+  has none, and switching a vacancy to remote removes its place. `maps.test.js` lists it.
+
 - 03/11/2026 · JP · An address on a Praxis AI card is picked as everywhere (§6.2, §9;
   `praxis-ai.md` decision 37): the one place our search finds for the card's words is signed
   (`maps.service.onePlace`, which with the search's answers now holds the signing the controller

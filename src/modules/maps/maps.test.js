@@ -454,6 +454,7 @@ describe("keeping a place", () => {
       "attendance_temporary_site_location.address",
       "employee.home_address",
       "organisation.address",
+      "vacancy.location",
       "worksite.address",
     ]);
     for (const o of owners.OWNERS) expect(c.maps.PlaceLevel.options).toContain(o.level);

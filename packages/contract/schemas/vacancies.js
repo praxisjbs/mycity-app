@@ -511,7 +511,10 @@ const QuestionsDraft = z
 /** The model's answer for `screening-questions`. */
 const QuestionsDraftOutput = z
   .object({
-    application: z.array(z.object({ prompt: z.string().trim().min(5).max(500) }).strict()).max(5),
+    /** yes_no when the must have is answered yes or no (it then counts in the estimate, guide §6.4); text otherwise. */
+    application: z
+      .array(z.object({ question_type: z.enum(["yes_no", "text"]), prompt: z.string().trim().min(5).max(500) }).strict())
+      .max(5),
     interview: z.array(z.object({ prompt: z.string().trim().min(5).max(500) }).strict()).max(8),
   })
   .strict();

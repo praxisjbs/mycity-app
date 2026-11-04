@@ -267,7 +267,8 @@ src/
 ├── services/
 │   ├── storage/       storage.service
 │   ├── media/         image-pipeline · av-pipeline · pdf-pipeline (a PDF's page count and first page) ·
-│   │                  pdf-page (the first page drawn by PDF.js in its own process) · scan · reconcile
+│   │                  pdf-page (the first page drawn by PDF.js in its own process) · pdf-text (a PDF's
+│   │                  text, for the CV reader, in its own process) · scan · reconcile
 │   ├── pdf/           chromium · pdf.service
 │   ├── mail/          system-mail.service · pace (the hourly sending limit) · smtp-errors (what a mail
 │   │                  server's refusal means) · tls-check (a server's TLS and certificate) ·
@@ -509,7 +510,7 @@ Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
 | Module | Files beyond the template |
 |---|---|
 | `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED; the board's stages and How We Hire), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards) |
-| `candidates` | `.public.routes` (apply, write only), `.pipeline`, `.screening` (provisional flag), `.scorecard` (A10 weights), `.sla` |
+| `candidates` | `.public.routes` (apply, write only) and `.apply` (its service, no staff auth), `.pipeline` (the moves, entity_state_history), `.screening` (the estimate, provisional flag), `.score` (Score With AI and Screen With AI, `cv-screen`, from the outbox), `.scorecard` (A10 weights), `.sla` (days at stage), `.mail` (the candidate emails it sends), `.emails` (Candidate Emails, the editor), `.ai`, `.search` |
 | `assessments` | `.public.routes` (take, token), `.authoring`, `.delivery`, `.timer` (server side), `.scoring` |
 | `interviews` | `.panel` (blind until the round closes), `.consolidate`, `.schedule` (ICS), `.notes` (AI cleanup) |
 | `talent_pool` | `.retention` (24 months then purge; moved from M5, decided by TB, owned by GE) |

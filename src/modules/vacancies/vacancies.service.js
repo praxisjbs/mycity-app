@@ -340,6 +340,20 @@ async function saveScorecard(actor, scope, id, body) {
 }
 
 /**
+ * A condition about a protected trait (guide §6.4; the same list the cv-screen prompt ignores): age,
+ * sex, marital or family status, pregnancy, religion, ethnicity or tribe, state or LGA of origin,
+ * nationality, disability, genotype or appearance. Refused before it is kept, so it is never read.
+ * A language ("speaks Yoruba") or work with children is a fair condition and passes; what slips
+ * past this list is still not applied by the model (prompts/cv-screen.md rule 5).
+ */
+const PROTECTED =
+  /\b(age|aged|years? old|under \d{2}|over \d{2}|gender|sex|male|female|married|unmarried|marital|spouse|pregnan\w*|religio\w*|christian|muslim|church|mosque|tribe|tribal|ethnic\w*|state of origin|lga of origin|indigene|nationality|disab\w*|genotype|hiv|appearance|attractive|good.looking)\b/i;
+
+/** The conditions that name a protected trait, by their index. */
+const protectedConditions = (conditions) =>
+  conditions.map((text, i) => (PROTECTED.test(text) ? i : -1)).filter((i) => i >= 0);
+
+/**
  * Keep the must-meet conditions Screen With AI asked for (guide §6.4), one to three; left out, the
  * vacancy's kept ones stand. Called by the candidates service inside its own transaction, before it
  * queues the reads. Returns the vacancy and the conditions to read against.
@@ -353,6 +367,14 @@ async function keepScreeningConditions(client, scope, id, conditions) {
     return { row, conditions: kept };
   }
   if (conditions.length < 1 || conditions.length > 3) throw field("screening_conditions", "One to three conditions");
+  const named = protectedConditions(conditions);
+  if (named.length)
+    throw new AppError(
+      "VALIDATION_FAILED",
+      "A condition names a protected trait",
+      422,
+      Object.fromEntries(named.map((i) => [`screening_conditions.${i}`, ["Not a fair condition"]])),
+    );
   await repo.setScreeningConditions(client, id, conditions);
   return { row, conditions };
 }
@@ -446,6 +468,7 @@ module.exports = {
   saveQuestions,
   saveScorecard,
   keepScreeningConditions,
+  protectedConditions,
   settings,
   saveSettings,
   assist,

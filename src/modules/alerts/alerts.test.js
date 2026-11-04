@@ -68,7 +68,7 @@ describe("the metric registry", () => {
     }
     expect(metrics.METRICS.partner_inactivity.owner).toEqual({ module: "partners", milestone: "M7", by: "GE" });
     expect(metrics.METRICS.budget_threshold.owner).toEqual({ module: "budgets", milestone: "M8", by: "AJ" });
-    expect(metrics.METRICS.recruitment_sla.owner).toEqual({ module: "vacancies", milestone: "M4", by: "TB" });
+    expect(metrics.METRICS.recruitment_sla.owner).toEqual({ module: "vacancies", milestone: "M4", by: "GE" });
   });
 
   test("attendance's metrics are gone: none reads one person, none counts over days (T1)", () => {

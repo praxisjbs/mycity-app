@@ -49,6 +49,8 @@ const ALLOW = Object.freeze({
   signature: [TYPES.png],
   brand: [TYPES.png, TYPES.webp],
   performance_evidence: [TYPES.pdf, ...IMAGES, TYPES.docx, TYPES.xlsx, TYPES.pptx, TYPES.csv],
+  // A CV sent on the Apply form by a stranger: PDF or Word only (docs/guides/recruitment.md §6.2).
+  cv: [TYPES.pdf, TYPES.docx],
 });
 
 const NEVER = new Set(["markup", "archive", "unknown"]);

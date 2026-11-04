@@ -224,6 +224,17 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-11-04",
     built: true,
   }),
+  // Score With AI and Screen With AI on Candidates (docs/guides/recruitment.md §6.4): a CV read
+  // against the role and its must-meet conditions; personal data, so never DeepSeek.
+  "cv-screen": Object.freeze({
+    label: "Score Application",
+    module: "recruitment",
+    job: "deep_reasoning",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
 });
 
 const KEYS = Object.freeze(Object.keys(ACTIONS));

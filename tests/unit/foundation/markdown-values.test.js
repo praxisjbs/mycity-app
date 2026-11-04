@@ -43,7 +43,7 @@ describe("drafts.readyToUse", () => {
   const shield = redact.shield({});
   test("refuses a gap or an invented token inside a nested list", () => {
     const schema = drafts.readyToUse(c.vacancies.QuestionsDraftOutput, shield);
-    const r = schema.safeParse({ application: [{ prompt: "Which [city] can you work in? Email KEPT009." }], interview: [] });
+    const r = schema.safeParse({ application: [{ question_type: "text", prompt: "Which [city] can you work in? Email KEPT009." }], interview: [] });
     expect(r.success).toBe(false);
     const paths = r.error.issues.map((i) => i.path.join("."));
     expect(paths).toContain("application.0.prompt");
@@ -51,7 +51,7 @@ describe("drafts.readyToUse", () => {
 
   test("passes clean nested text", () => {
     const schema = drafts.readyToUse(c.vacancies.QuestionsDraftOutput, shield);
-    expect(schema.safeParse({ application: [{ prompt: "Which city can you work in?" }], interview: [] }).success).toBe(true);
+    expect(schema.safeParse({ application: [{ question_type: "text", prompt: "Which city can you work in?" }], interview: [] }).success).toBe(true);
   });
 });
 

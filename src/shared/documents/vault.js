@@ -482,6 +482,29 @@ async function purgeTransient(now = new Date(), { db = require("../../config/db"
   return { removed };
 }
 
+/**
+ * Give a stranger's upload to the record it was sent for. A file sent on a public form before
+ * the record exists (a CV on the Apply form) is stored against the link it came on; the
+ * service that creates the record moves it there in the same transaction. Only a file still
+ * held by `from` moves, so an upload sent on another link is refused (null).
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @param {string} documentId
+ * @param {{from: {type: string, id: string}, to: {type: string, id: string}, doc_type: string}} move
+ * @returns {Promise<object|null>} the document row, or null when it is not held by `from`
+ */
+async function adopt(client, documentId, { from, to, doc_type: docType }) {
+  if (!inTransaction(client))
+    throw new Error("vault.adopt must run inside atomically()");
+  const { rows } = await client.query(
+    `UPDATE document SET entity_type = $4, entity_id = $5
+      WHERE document_id = $1 AND entity_type = $2 AND entity_id = $3 AND doc_type = $6
+        AND scan_status <> 'infected'
+      RETURNING ${COLUMNS}`,
+    [documentId, from.type, String(from.id), to.type, String(to.id), docType],
+  );
+  return rows[0] || null;
+}
+
 async function get(client, documentId) {
   const { rows } = await client.query(
     `SELECT ${COLUMNS} FROM document WHERE document_id = $1`,
@@ -793,6 +816,7 @@ module.exports = {
   removeFiles,
   TRANSIENT_MINUTES,
   purgeTransient,
+  adopt,
   get,
   getReadable,
   variantOf,

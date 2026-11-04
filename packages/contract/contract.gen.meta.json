@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "1da33062ba7ba24e1c044fc761567b3f8c681a3ef444c25724b07571d5e5d120",
+  "source_hash": "1ef48e7534f316ae9081457d9d9efab914bed59e2ffb6245697792d7fca13a70",
   "schemas": 1547,
-  "endpoints": 668,
+  "endpoints": 685,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -73,7 +73,7 @@
     "packages/contract/schemas/templates.js": "5c68262e21422e9f522f31ebeab2e9bc0b22faecccb972a28c9631f99738a301",
     "packages/contract/schemas/user_guide.js": "3a14914b7ff89d8ce50a1dbbe921a70370cf5e52d7f41f95f36752c54884b7d1",
     "packages/contract/schemas/users.js": "c62a6bfc703543682f6d190a19a68e86f34363c3f7846a46c54ba905e978064d",
-    "packages/contract/schemas/vacancies.js": "6352e8c2167b51c9438b9c72362d001bc4fec815dfb1890d0094dcbe4e520d72",
+    "packages/contract/schemas/vacancies.js": "858db72acfd53f2e968265867cd1ecf4051e6ea81734fa5d0445a62784f7b466",
     "packages/contract/schemas/workflow.js": "d070ad092b3a3b634ca1076856066d987734f21c1d8e102b4f2605d68fe0e8f8",
     "packages/contract/schemas/worksites.js": "96dd0eb1c22e1930b48f7ab77c85fee88382d38b1e897b6700ba8b999c5f1f76",
     "packages/contract/schemas/workspace.js": "85d46b8095025384afc99f99185149ea69be72ca519022075014e9dd9befa273",
@@ -85,6 +85,8 @@
     "src/modules/attendance/attendance.routes.js": "8a3efd6b3f404e6687beca7f57cc2c418f225768de8b6177adc1830acc32144c",
     "src/modules/audit/audit.routes.js": "fac4a29b34b9310e901c2514681d3f6ac22df927c00b44a6b3b2b231a2609025",
     "src/modules/calendar/calendar.routes.js": "0795f184d51a5bd6fe539851e224e5d68581a53d00b9c3c4016323b543544c21",
+    "src/modules/candidates/candidates.public.routes.js": "5c728caf6349b76c02cdc1014881711889282f511198d8dda8a078b8e1833fe9",
+    "src/modules/candidates/candidates.routes.js": "fa1d2e88ae2b89f2222147f1da12deceb9d0c7061f940a3f2c3315081984d559",
     "src/modules/community/community.routes.js": "9cf0819793b0a258f598710fec6f48c2e1d406b37aaebc014579479d104d9553",
     "src/modules/dashboard/dashboard.routes.js": "bc400ef66277933e51505bf611f4904857860368c1fa7c46e8d8f63dff687ac4",
     "src/modules/devices/devices.routes.js": "66275823baca42614b175e59a41f62ff7bf7c2816e65a6a795f2cbbb0d01459f",
