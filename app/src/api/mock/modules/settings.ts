@@ -446,7 +446,7 @@ const LABELS: Array<[NumberingScheme["doc_type"], string, string, number, string
   ["field_assignment", "Field Assignment", "FA", 4, "-", "never", 3],
   ["organisational_goal", "Organisational Goal", "ORG", 2, "-", "yearly", 3],
   ["query", "Query", "QRY", 4, "-", "never", 15], ["sanction", "Sanction", "SAN", 4, "-", "never", 4], ["letter", "Letter", "LTR", 4, "-", "never", 9],
-  ["vacancy", "Vacancy", "VAC", 4, "-", "never", 6], ["offer", "Offer Letter", "OFF", 4, "-", "never", 19], ["contract", "Employment Contract", "CON", 4, "-", "never", 16],
+  ["vacancy", "Vacancy", "VAC", 4, "-", "never", 6], ["application", "Application", "APP", 4, "-", "never", 14], ["offer", "Offer Letter", "OFF", 4, "-", "never", 19], ["contract", "Employment Contract", "CON", 4, "-", "never", 16],
   ["payroll_run", "Payroll Run", "PAY", 0, "-", "monthly", 1], ["payslip", "Payslip", "PAY", 4, "-", "monthly", 18], ["proposal", "Proposal", "PRO", 4, "-", "never", 30],
   ["mou", "MOU", "MOU", 4, "-", "never", 11], ["expense", "Expense Request", "EXP", 4, "-", "never", 122], ["requisition", "Requisition", "REQ", 4, "-", "never", 42], ["disbursement", "Disbursement", "DSB", 4, "-", "never", 37],
 ];

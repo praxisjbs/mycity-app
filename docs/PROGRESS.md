@@ -1217,6 +1217,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 04/11/2026 · GE · M4 on `m4/recruitment` (#72), packages P1 and P2 (`docs/handoff/m4-recruitment.md`): the contract for Vacancies, Candidates, Assessments and Interviews and the public Careers, Vacancy, Apply and Assessment pages (`packages/contract/schemas/{vacancies,candidates,assessments,interviews}.js`), and migrations 4010 to 4040 with seed 4199 (the application number APP-0001), round trip passed. No screen moved yet. Left: the four backends (P3 to P6), then the screens.
 - 25/10/2026 · JP · Candidates (#39), Interviews (#41), Offers (#42) and Onboarding (#43), on the mock: on a phone a tapped record opens in a sheet (F31: `ListDetail`, `DetailPane`), never under the list; Interviews' Consolidate moves into that sheet on a phone. A candidate's card on the board opened nothing (it passed a prop Kanban does not take); it opens the candidate now. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/recruitment/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/recruitment.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 

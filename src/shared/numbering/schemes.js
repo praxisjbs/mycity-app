@@ -135,6 +135,13 @@ const SCHEMES = Object.freeze({
     reset: "never",
     include_period: false,
   }, // M4
+  application: {
+    prefix: "APP",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M4: the reference a candidate is given
   offer: {
     prefix: "OFF",
     padding: 4,

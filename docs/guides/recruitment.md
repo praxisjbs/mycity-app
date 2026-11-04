@@ -127,7 +127,7 @@ never sign in.
 | `entity_state_history` | `entity_type` `application`, `from_state`, `to_state`, `actor_id`, `reason`, `changed_at` | 0070, shared. Time at each stage. 4000's `application_stage_history` was never written and is dropped by 4010 |
 | `assessment_definition` | `code`, `name`, `assessment_type` (psychometric, technical, case_study, practical), `instructions`, `duration_minutes`, `pass_score`, `active`, `created_by` | 4000; `created_by` added. `scoring_method` is derived and kept (auto, manual, mixed) |
 | `assessment_question` | `question_type` (choice, text, file), `prompt`, `options` (id, text), `answer_key_enc`, `max_score`, `display_order` | Each option's points are in `answer_key_enc` (encrypted, `aad` the question id), never in `options`, so no read can send them to the public site |
-| `application_assessment` | `application_id`, `assessment_definition_id`, `public_token_id`, `status` (sent, in_progress, submitted, timed_out, scored, expired, cancelled), `start_by`, `started_at`, `due_at`, `submitted_at`, `scored_at`, `score`, `current_question`, `sent_by` | A sitting. 4010 renames the 4000 meanings: `starts_at` becomes `started_at`, adds `start_by` and `current_question` |
+| `application_assessment` | `application_id`, `assessment_definition_id`, `public_token_id`, `status` (sent, in_progress, submitted, timed_out, scored, expired, cancelled), `start_by`, `started_at`, `due_at`, `submitted_at`, `scored_at`, `score`, `current_question`, `sent_by` | A sitting (4030). `started_at`, `start_by`, `current_question` and `sent_by` added; 4000's `starts_at` stays unused. One live sitting of an assessment per application (cancelled and expired ones do not count) |
 | `assessment_response` | `assessment_question_id`, `response` (choice id or text), `document_id` (a file answer), `awarded_score`, `reviewer_comment`, `marked_by`, `marked_at` | Unique per sitting and question |
 | `interview_round` | `application_id`, `round_number`, `title`, `status` (open, closed), `closed_at`, `closed_by`, `report`, `recommendation` (advance, hold, not_progress), `reported_by`, `reported_at`, `interview_score` | Round membership is its interview's panel |
 | `interview` | `interview_round_id`, `interview_type` (in_person, video, phone), `scheduled_start`, `scheduled_end`, `worksite_id`, `meeting_url`, `status` (scheduled, done, cancelled), `calendar_event_id`, `created_by` | One a round in M4. `location` text stays unused: in person means a worksite, never a typed address |
@@ -135,11 +135,11 @@ never sign in.
 | `interview_feedback` | `interview_panelist_id` (unique), `overall_rating` (1 to 5), `recommendation` (strong_yes, yes, no, strong_no), `comments`, `private_notes`, `cleaned_notes`, `ai_run_id`, `submitted_at` | `submitted_at` null while a draft (4010 relaxes it). `scorecard` jsonb stays unused |
 | `interview_rating` | `interview_feedback_id`, `vacancy_question_id`, `rating` (1 to 5), unique per feedback and question | New in 4010: one rating per panelist per question (A10 step 1) |
 
-Schema migration files: `migrations/4000_recruitment.sql` (merged), `migrations/4010_recruitment_vacancies.sql`,
+Schema migration files (4010 to 4040 built 04/11/2026): `migrations/4000_recruitment.sql` (merged), `migrations/4010_recruitment_vacancies.sql`,
 `migrations/4020_recruitment_applications.sql`, `migrations/4030_recruitment_assessments.sql`,
 `migrations/4040_recruitment_interviews.sql`. Reference data: `seeds/reference/4099_seed_recruitment.sql`
 (merged: the code lists) and `seeds/reference/4199_seed_recruitment_numbering.sql` (the `application`
-numbering scheme). 4010 to 4040 also add every CHECK the contract's enums need, an index on every foreign
+numbering scheme, and the stage code `rejected` retired: a candidate not progressed keeps their stage). 4010 to 4040 also add every CHECK the contract's enums need, an index on every foreign
 key and every sorted column, `ON DELETE` on each new foreign key, the `updated_at` triggers 4000 left out,
 and the two indexes Home asked for (`vacancy (status)`, `application (status, current_stage_entered_at)`).
 
@@ -169,11 +169,13 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `GET /recruitment/candidates/:id/cv` | file | `recruitment` view · all/team | no | Streamed by the vault; 409 while the scan is pending, never once infected |
 | `POST /recruitment/candidates/:id/move` | `CandidateMove` → `CandidateDetail` | `recruitment` edit · all/team | no | §6.3 |
 | `POST /recruitment/candidates/:id/not-progressed` | `CandidateNotProgressed` → `CandidateDetail` | `recruitment` edit · all/team | no | Reason required |
+| `POST /recruitment/candidates/:id/reopen` | `EmptyBody` → `CandidateDetail` | `recruitment` edit · all/team | no | Back to active, at the stage it left |
 | `POST /recruitment/candidates/:id/score` | `EmptyBody` → `CandidateDetail` | `recruitment` edit · all/team | no | `cv-screen`, Deep Reasoning |
 | `POST /recruitment/candidates/score-all` | `ScoreAll` → `ScoreAllQueued` | `recruitment` edit · all/team | no | Every active, unscored application of one vacancy, through the outbox |
 | `POST /recruitment/candidates/invitations` | `ApplyInvite` → `ApplyInviteSent` | `recruitment` create | no | Emails an Apply link |
-| `GET /recruitment/candidates/emails` | `CandidateEmailList` | `recruitment` view | no | The five candidate emails, each with its current version |
-| `GET /recruitment/candidates/emails/:key`, `PUT .../:key` | `CandidateEmail`, `CandidateEmailSave` | view; edit | no | Subject and Markdown body saved as the next version; Restore Default saves the default again |
+| `GET /recruitment/candidates/emails` | `CandidateEmailListQuery` → `CandidateEmailPage` | `recruitment` view | yes | The five candidate emails, each with its current version |
+| `GET /recruitment/candidates/emails/:key`, `PUT .../:key` | `CandidateEmailParams`; `CandidateEmail`, `CandidateEmailSave` | view; edit | no | Subject and Markdown body saved as the next version |
+| `POST /recruitment/candidates/emails/:key/restore` | `EmptyBody` → `CandidateEmail` | `recruitment` edit | no | Restore Default: the shipped wording saved as the next version |
 | `GET /recruitment/assessments/summary` | `AssessmentsSummary` | `recruitment` view | no | |
 | `GET /recruitment/assessments` | `AssessmentListQuery` → `AssessmentPage` | `recruitment` view | yes | Filters `type`, `active`, `q` |
 | `GET /recruitment/assessments/:id` | `AssessmentDetail` | `recruitment` view | no | Questions with their points |
@@ -202,7 +204,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `GET /api/public/v1/apply/:token` | `ApplyLink` | `application.apply` token | no | The role, its questions, when the link lapses |
 | `POST /api/public/v1/apply/:token/cv` | multipart → `PublicUpload` | `application.apply` token | no | Purpose `cv`, quarantined |
 | `POST /api/public/v1/apply/:token` | `ApplicationSubmit` → `ApplicationReceipt` | `application.apply` token, spent | no | Write only |
-| `GET /api/public/v1/assess/:token` | `AssessmentSession` | `assessment.take` token | no | |
+| `GET /api/public/v1/assess/:token` | `AssessmentSession` | `assessment.take` token | no | `ends_at` and `server_now` for the timer |
 | `POST /api/public/v1/assess/:token/start` | `EmptyBody` → `AssessmentSession` | `assessment.take` token | no | |
 | `PUT /api/public/v1/assess/:token/answers/:question_id` | `AnswerSave` → `AnswerSaved` | `assessment.take` token | no | 409 `TIME_UP` after `due_at` |
 | `POST /api/public/v1/assess/:token/answers/:question_id/file` | multipart → `AnswerSaved` | `assessment.take` token | no | Purpose `assessment_answer`, quarantined |
@@ -463,6 +465,10 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 04/11/2026 · GE · P1 and P2 built: the contract (`vacancies.js`, `candidates.js`, `assessments.js`,
+  `interviews.js`) and migrations 4010 to 4040 with seed 4199. §4 and §5 follow them: a sitting keeps
+  4000's `starts_at` unused beside the new `started_at`; Reopen and Restore Default have routes; one live
+  sitting per assessment and application.
 - 04/11/2026 · GE · First draft, from MILESTONES §9 and the decisions of 04/11/2026: listed roles by
   slug, Apply and Assess by token; M4 stages end at Shortlist; candidates mailed with an `.ics` from
   editable templates; AI jobs (CV read Deep Reasoning, the rest Default); panelists hold Recruitment;

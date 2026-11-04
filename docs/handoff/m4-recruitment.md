@@ -98,8 +98,8 @@ are ticked, only P7, P8 and P14's reading can start. Tick a package only when it
 
 | Pkg | What | Files (yours alone while you hold it) | Needs | Claimed | Done |
 |---|---|---|---|---|---|
-| P1 | **Contract**: every request and response shape of guide §5, `TABLES` for gate 6, the public shapes; `npm run gen:contract` | `packages/contract/schemas/{vacancies,candidates,assessments,interviews}.js` (the index exports each file by itself) | none | GE · 04/11/2026 | ☐ |
-| P2 | **Migrations** 4010 to 4040 and seed 4199 (application numbering): guide §4 columns, CHECKs equal to P1's enums, FK indexes, triggers, Home's indexes; drop `application_stage_history`; round trip | `migrations/4010..4040_*.sql`, `seeds/reference/4199_*.sql`, `src/shared/numbering/schemes.js` (one entry) | P1 | GE · 04/11/2026 | ☐ |
+| P1 | **Contract**: every request and response shape of guide §5, `TABLES` for gate 6, the public shapes; `npm run gen:contract` | `packages/contract/schemas/{vacancies,candidates,assessments,interviews}.js` (the index exports each file by itself) | none | GE · 04/11/2026 | ☑ 04/11/2026 |
+| P2 | **Migrations** 4010 to 4040 and seed 4199 (application numbering): guide §4 columns, CHECKs equal to P1's enums, FK indexes, triggers, Home's indexes; drop `application_stage_history`; round trip | `migrations/4010..4040_*.sql`, `seeds/reference/4199_*.sql`, `src/shared/numbering/schemes.js` (one entry) | P1 | GE · 04/11/2026 | ☑ 04/11/2026 |
 | P3 | **Vacancies backend**: repo, service (lifecycle, slug, questions, scorecard, suggested seats), routes, events, `.lifecycle`, `.slug`, `.questions`, Write With AI (`jd-draft`, `screening-questions`); public `/jobs`, `/jobs/:slug`, `POST /jobs/:slug/apply` (the token mint calls P4's service); the place owner `vacancy.location`; Home's adapter moved onto these tables with `owes` cleared; unit and integration tests | `src/modules/vacancies/*`, `src/modules/dashboard/sources/vacancies.source.js`, `tests/integration/recruitment-vacancies.test.js` | P1, P2 | | ☐ |
 | P4 | **Candidates backend**: public Apply (`GET/POST /apply/:token`, CV upload, purpose `cv`, write-only), the pipeline machine and moves, Not Progressing and Reopen, the estimate, `cv-screen` on press and Score All (outbox), the scorecard and SLA, Invite to Apply, the candidate emails and their editor; tests | `src/modules/candidates/*`, `tests/integration/recruitment-candidates.test.js` | P1, P2 | | ☐ |
 | P5 | **Assessments backend**: definitions and questions (points in `answer_key_enc`), Suggest With AI (`assessment-questions`), sittings (send, mark, cancel), public delivery (`/assess/:token`: start, answers, file answer, submit), `.timer`, `.scoring`, the `assessment-expire` scheduler; tests | `src/modules/assessments/*`, `src/jobs/...assessment-expire*`, `tests/integration/recruitment-assessments.test.js` | P1, P2 | | ☐ |
@@ -151,3 +151,11 @@ are ticked, only P7, P8 and P14's reading can start. Tick a package only when it
   eight decisions taken with GE; guide, handoff and MILESTONES §9 note written; draft PR #72 opened.
 - 04/11/2026 · GE · The handoff turned into a board of fifteen packages so several people can build
   the branch at once; P1 and P2 claimed by GE.
+- 04/11/2026 · GE · P1 and P2 done. Contract: `vacancies.js` (incl. the public jobs shapes and
+  `optionalWhole`, an optional whole number that reads "" as not given, never 0), `candidates.js`
+  (applications, the board, scores, candidate emails, the public Apply shapes), `assessments.js`
+  (definitions, sittings, marking, the public session), `interviews.js` (rounds, blind panel seats,
+  feedback, report). Migrations 4010 to 4040 and seed 4199 (APP numbering; stage `rejected` retired);
+  gates 3 to 6 pass, the round trip passes, migrate runs twice clean. Also: `application` in
+  `schemes.js`, settings `DOC_TYPES` and labels, the demo's numbering list, `settings.test.js` counts
+  25 types; `foundation.md` notes the scheme. P3 to P6 and P9 to P11 can be claimed.
