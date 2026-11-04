@@ -852,6 +852,25 @@ Seven points settle what the text above leaves open:
 - **Assessment questions** are choice (auto-scored, each option worth points, which covers
   psychometric scales), written and file (a spreadsheet for a case study), the last two marked by hand.
 
+**Decided at the internal Modules Review, 04/11/2026 (TB, GE, AJ), with MyCity's documents shared the
+same evening** (`docs/guides/recruitment.md` §6.1 to §6.9):
+
+- **The Talent Pool is M4's** (GE), not M5's; M5 is Offers and Onboarding (AJ).
+- **The interview card is MyCity's Interview Assessment Format**: ten traits, each rated 1 to 10 by
+  every panelist on their own device, and Others; Candidate Details (current employer, academics,
+  experience in months) filled once; the decision Select, On Hold or Reject. The round's score is the
+  panel's mean times 10, and the filled form is generated as a PDF. Panelists may open the CV. The
+  traits are MyCity's list, entered once on each environment (A26).
+- **Screen All With AI** runs per role in the background after asking one to three must-meet
+  conditions, reading CV, cover letter and answers against the job description.
+- **Each vacancy switches scorecard parts on or off**; a role may go from screening straight to
+  interview.
+- **Assessments**: Send to Candidates in bulk; untimed take-home briefs due by a day beside timed
+  tests; a file answer up to 25 MB (the system's limit) or a link to a larger one. Assessments JBS
+  Praxis researches go on staging only and reach production by export and import, never a seed.
+- **A vacancy follows MyCity's job description shape** (working days, About MyCityApp, KPIs), and New
+  Vacancy is also a Praxis AI card.
+
 ---
 
 ## 10 · M5 — Offers, Documentation & Onboarding · 11%
@@ -1424,8 +1443,8 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | Public | **Public site** | 6 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document | M4, M5 |
 
-Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews in M4 and
-Offers, Onboarding and Talent Pool in M5. The **public site** gets Careers, Vacancy, Apply and
+Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
+(the Talent Pool moved from M5 by TB, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Careers, Vacancy, Apply and
 Assessment in M4, and Sign Offer and Verify Document in M5. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
 M0 by TB on 19/10/2026).

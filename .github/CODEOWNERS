@@ -170,8 +170,8 @@
 /packages/contract/schemas/signatures.js           @LovedataX @swizfcodes @tomblakeasaah196
 /src/modules/statutory/                            @LovedataX @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/statutory.js            @LovedataX @swizfcodes @tomblakeasaah196
-/src/modules/talent_pool/                          @LovedataX @swizfcodes @tomblakeasaah196
-/packages/contract/schemas/talent_pool.js          @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/talent_pool/                          @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/talent_pool.js          @swizfcodes @tomblakeasaah196
 /src/modules/worksites/                            @LovedataX @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/worksites.js            @LovedataX @swizfcodes @tomblakeasaah196
 

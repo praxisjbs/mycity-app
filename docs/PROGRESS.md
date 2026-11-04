@@ -46,8 +46,8 @@ saying who agreed and when.
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 0 | 0 | 5 | 0 | 0 |
-| M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
-| M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
+| M4 Recruitment End to End | 9 | 9 | 0 | 0 | 0 | 0 |
+| M5 Offers, Documentation & Onboarding | 4 | 4 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
@@ -1213,10 +1213,11 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 41 | Interviews | `interviews` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
 | 42 | Offers | `offers` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
 | 43 | Onboarding | `onboarding` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 44 | Talent Pool | `talent-pool` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
+| 44 | Talent Pool | `talent-pool` | M4 | GE | ☐ | ☐ | ☐ | Not started | 04/11/2026 |
 
 **Notes**
 
+- 04/11/2026 · GE · Talent Pool (#44) moves from M5 (LA) to M4 (GE), from the internal Modules Review of 04/11/2026 (TB): MILESTONES §9 and §18. Also from that review and MyCity's interview form, assessment brief and job description: the interview card's ten traits rated 1 to 10, Screen All With AI with must-meet conditions, scorecard parts on or off, Send to Candidates, untimed assessments, file or link answers (`docs/guides/recruitment.md`). Left: migrations 4050 and 4060 and the contract for them, then P3 onwards.
 - 04/11/2026 · GE · M4 on `m4/recruitment` (#72), packages P1 and P2 (`docs/handoff/m4-recruitment.md`): the contract for Vacancies, Candidates, Assessments and Interviews and the public Careers, Vacancy, Apply and Assessment pages (`packages/contract/schemas/{vacancies,candidates,assessments,interviews}.js`), and migrations 4010 to 4040 with seed 4199 (the application number APP-0001), round trip passed. No screen moved yet. Left: the four backends (P3 to P6), then the screens.
 - 25/10/2026 · JP · Candidates (#39), Interviews (#41), Offers (#42) and Onboarding (#43), on the mock: on a phone a tapped record opens in a sheet (F31: `ListDetail`, `DetailPane`), never under the list; Interviews' Consolidate moves into that sheet on a phone. A candidate's card on the board opened nothing (it passed a prop Kanban does not take); it opens the candidate now. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/recruitment/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/recruitment.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
