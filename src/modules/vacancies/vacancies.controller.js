@@ -14,9 +14,9 @@ const id = (req) => req.validated.params.id;
 module.exports = {
   list: async (req, res) => sendPaged(res, await service.list(req.validated.query, scopeOf(req))),
   summary: async (req, res) => ok(res, await service.summary(scopeOf(req))),
-  suggested: async (req, res) => sendPaged(res, await service.suggested(req.validated.query)),
+  suggested: async (req, res) => sendPaged(res, await service.suggested(req.validated.query, scopeOf(req))),
   settings: async (_req, res) => ok(res, await service.settings()),
-  saveSettings: async (req, res) => ok(res, await service.saveSettings(withActor(req), req.validated.body)),
+  saveSettings: async (req, res) => ok(res, await service.saveSettings(withActor(req), scopeOf(req), req.validated.body)),
   assistStatus: async (_req, res) => ok(res, await require("./vacancies.draft").status()),
   assist: async (req, res) => ok(res, await service.assist(req.user, req.validated.body)),
   get: async (req, res) => ok(res, await service.get(id(req), req.user, scopeOf(req))),

@@ -38,8 +38,10 @@ CREATE INDEX IF NOT EXISTS talent_pool_entry_added_by_idx ON talent_pool_entry (
 CREATE INDEX IF NOT EXISTS talent_pool_entry_invited_vacancy_idx ON talent_pool_entry (invited_vacancy_id);
 CREATE INDEX IF NOT EXISTS talent_pool_entry_expires_idx ON talent_pool_entry (expires_at) WHERE removed_at IS NULL;
 CREATE INDEX IF NOT EXISTS talent_pool_entry_created_idx ON talent_pool_entry (created_at);
+CREATE INDEX IF NOT EXISTS talent_pool_entry_invited_idx ON talent_pool_entry (invited_at);
 
 -- DOWN
+DROP INDEX IF EXISTS talent_pool_entry_invited_idx;
 DROP INDEX IF EXISTS talent_pool_entry_created_idx;
 DROP INDEX IF EXISTS talent_pool_entry_expires_idx;
 DROP INDEX IF EXISTS talent_pool_entry_invited_vacancy_idx;

@@ -243,7 +243,7 @@ start and still land on 18 December.
 | 1 | Core Operations & Employee Management | 12% | 9–19 Oct | Mon 19 Oct | **TB** · LA · AJ · GE |
 | 2 | Productivity & Performance | 9% | 20–23 Oct | Fri 23 Oct | **AJ** · TB |
 | 3 | Queries & Consequence Management | 5% | 26–30 Oct | Fri 30 Oct | **GE** |
-| 4 | Recruitment End to End | 13% | 2–13 Nov | Fri 13 Nov | **TB** · LA · AJ |
+| 4 | Recruitment End to End | 13% | 2–13 Nov | Fri 13 Nov | **GE** |
 | 5 | Offers, Documentation & Onboarding | 11% | 16–20 Nov | Fri 20 Nov | **LA** · GE |
 | 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **LA** · AJ |
 | 7 | Partnerships, CRM & Trackers | 10% | 30 Nov–4 Dec | Fri 4 Dec | **GE** · LA |
@@ -765,7 +765,7 @@ An approved financial consequence reaches the payroll run as a pending deduction
 
 ## 9 · M4 — Recruitment End to End · 13%
 
-**Owner TB** with **LA** (assessment platform) and **AJ**. **2–13 Nov, two weeks.** **Demo Fri 13 Nov.**
+**Owner GE** (full ownership from 04/11/2026; first planned as TB with LA and AJ). **2–13 Nov, two weeks.** **Demo Fri 13 Nov.**
 Largest milestone, and the part with no donor is the part the client cares most about.
 
 ```
@@ -804,7 +804,7 @@ rater**, so one rating per question exists in total. Four precise changes:
 4. Recompute the applicant rating as the average across raters
 
 Then the consolidated report for the hiring manager, and private internal notes that stay private
-permanently. **The blindness Cynthia asked for three times is that one `WHERE` clause.**
+permanently. **The blindness Operations & People asked for three times is that one `WHERE` clause.**
 
 **Weighted scorecard** (A10, from C): Screening 15 + Psychometric 15 + Technical 25 + Case Study 20
 + Interview 25, weights configurable per vacancy, component scores feeding one ranking.
@@ -845,7 +845,7 @@ Seven points settle what the text above leaves open:
   carries an `.ics`. Panelists get the ordinary staff calendar invite.
 - **AI jobs:** the CV read is Deep Reasoning (`ai-control.md` §6.2); the JD draft, screening and
   assessment questions and interview-note cleanup are Default. The AI reads a CV only when a person
-  presses Score With AI or Score All; the free estimate is made at once and shown Provisional.
+  presses Score With AI or Screen With AI; the free estimate is made at once and shown Provisional.
 - **Panelists are people who hold Recruitment.** Blindness covers the hiring manager too until the
   round closes.
 - **No approval before a vacancy goes live.**
@@ -855,13 +855,13 @@ Seven points settle what the text above leaves open:
 **Decided at the internal Modules Review, 04/11/2026 (TB, GE, AJ), with MyCity's documents shared the
 same evening** (`docs/guides/recruitment.md` §6.1 to §6.9):
 
-- **The Talent Pool is M4's** (GE), not M5's; M5 is Offers and Onboarding (AJ).
+- **The Talent Pool is M4's** (decided by TB, owned by GE), not M5's; M5 is Offers and Onboarding (AJ).
 - **The interview card is MyCity's Interview Assessment Format**: ten traits, each rated 1 to 10 by
   every panelist on their own device, and Others; Candidate Details (current employer, academics,
   experience in months) filled once; the decision Select, On Hold or Reject. The round's score is the
   panel's mean times 10, and the filled form is generated as a PDF. Panelists may open the CV. The
   traits are MyCity's list, entered once on each environment (A26).
-- **Screen All With AI** runs per role in the background after asking one to three must-meet
+- **Screen With AI** runs per role in the background after asking one to three must-meet
   conditions, reading CV, cover letter and answers against the job description.
 - **Each vacancy switches scorecard parts on or off**; a role may go from screening straight to
   interview.
@@ -1444,7 +1444,7 @@ staff never navigates to it to do their job.
 | Public | **Public site** | 6 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document | M4, M5 |
 
 Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
-(the Talent Pool moved from M5 by TB, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Careers, Vacancy, Apply and
+(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Careers, Vacancy, Apply and
 Assessment in M4, and Sign Offer and Verify Document in M5. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
 M0 by TB on 19/10/2026).

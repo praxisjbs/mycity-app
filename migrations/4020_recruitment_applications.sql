@@ -8,9 +8,11 @@
 --                  provisional_score (4000) is the free estimate; provisional_ai_run_id (4000)
 --                  stays unused, since the estimate is arithmetic and has no run.
 --                The CHECKs are the contract's enums: stage is every code of the pipeline (M4 uses
---                the first five, M5 the rest), status and source as candidates.js. Scores are 0 to 100.
---                Indexes: every foreign key, stage, and (status, current_stage_entered_at) for Home's
---                Recruitment SLA sweep (Home's owes).
+--                the first five, M5 the rest), status as candidates.js. Scores are 0 to 100.
+--                source is careers, invited (Invite to Apply on a vacancy) or pool (Invite to Apply
+--                from the Talent Pool), default careers and never null.
+--                Indexes: every foreign key, stage, current_stage_entered_at (the board's sort), and
+--                (status, current_stage_entered_at) for Home's Recruitment SLA sweep (Home's owes).
 --   application_stage_history  dropped: it was never written; a move is a row of the shared
 --                entity_state_history (shared/state/state-history, entity_type application).
 -- UP
@@ -25,6 +27,9 @@ ALTER TABLE application
 -- No application was written before this file (the module was empty); any that were get a number.
 UPDATE application SET number = 'APP-' || upper(left(application_id::text, 8)) WHERE number IS NULL;
 ALTER TABLE application ALTER COLUMN number SET NOT NULL; -- DESTRUCTIVE: every row was numbered above
+UPDATE application SET source = 'careers' WHERE source IS NULL;
+ALTER TABLE application ALTER COLUMN source SET DEFAULT 'careers';
+ALTER TABLE application ALTER COLUMN source SET NOT NULL; -- DESTRUCTIVE: every row was given a source above
 CREATE UNIQUE INDEX IF NOT EXISTS application_number_key ON application (number);
 
 DO $$
@@ -40,7 +45,7 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'application_source_check') THEN
     ALTER TABLE application ADD CONSTRAINT application_source_check
-      CHECK (source IS NULL OR source IN ('careers', 'invited'));
+      CHECK (source IN ('careers', 'invited', 'pool'));
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'application_scores_check') THEN
     ALTER TABLE application ADD CONSTRAINT application_scores_check CHECK (
@@ -53,6 +58,8 @@ $$;
 
 CREATE INDEX IF NOT EXISTS application_status_stage_since_idx ON application (status, current_stage_entered_at);
 CREATE INDEX IF NOT EXISTS application_vacancy_stage_idx ON application (vacancy_id, stage);
+CREATE INDEX IF NOT EXISTS application_stage_idx ON application (stage);
+CREATE INDEX IF NOT EXISTS application_stage_since_idx ON application (current_stage_entered_at);
 CREATE INDEX IF NOT EXISTS application_candidate_id_idx ON application (candidate_id);
 CREATE INDEX IF NOT EXISTS application_applied_at_idx ON application (applied_at);
 CREATE INDEX IF NOT EXISTS application_cv_document_id_idx ON application (cv_document_id);
@@ -81,6 +88,8 @@ DROP INDEX IF EXISTS application_provisional_ai_run_id_idx;
 DROP INDEX IF EXISTS application_cv_document_id_idx;
 DROP INDEX IF EXISTS application_applied_at_idx;
 DROP INDEX IF EXISTS application_candidate_id_idx;
+DROP INDEX IF EXISTS application_stage_since_idx;
+DROP INDEX IF EXISTS application_stage_idx;
 DROP INDEX IF EXISTS application_vacancy_stage_idx;
 DROP INDEX IF EXISTS application_status_stage_since_idx;
 ALTER TABLE application DROP CONSTRAINT IF EXISTS application_scores_check;
@@ -88,6 +97,8 @@ ALTER TABLE application DROP CONSTRAINT IF EXISTS application_source_check;
 ALTER TABLE application DROP CONSTRAINT IF EXISTS application_status_check;
 ALTER TABLE application DROP CONSTRAINT IF EXISTS application_stage_check;
 DROP INDEX IF EXISTS application_number_key;
+ALTER TABLE application ALTER COLUMN source DROP NOT NULL;
+ALTER TABLE application ALTER COLUMN source DROP DEFAULT;
 ALTER TABLE application
   DROP COLUMN IF EXISTS screened_at, -- DESTRUCTIVE: rollback only; drops what UP added
   DROP COLUMN IF EXISTS screening_ai_run_id,

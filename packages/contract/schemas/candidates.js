@@ -8,7 +8,7 @@
  *
  * Screening has two tiers (guide §6.4): `provisional_score` is the free estimate made when the
  * application arrives; `screening_score` is the AI read of the CV, made only when a person presses
- * Score With AI or Score All. `score` is the one a screen shows, with `score_provisional` beside it:
+ * Score With AI or Screen With AI. `score` is the one a screen shows, with `score_provisional` beside it:
  * every surface that shows a screening score shows Provisional while it is the estimate.
  *
  * The public shapes (ApplyLink, ApplicationSubmit, ApplicationReceipt) are allow-lists. An
@@ -17,6 +17,8 @@
 const { z } = require("zod");
 const { uuid, text, email, phone, isoDateTime, listQuery, Paged } = require("./common");
 const { DocumentRef } = require("./documents");
+const { AssessmentType, SittingStatus } = require("./assessments");
+const { InterviewStatus, RoundStatus } = require("./interviews");
 const { ApplicationStage, ScorecardCode, VacancyRef, VacancyQuestionType, M4_STAGES } = require("./vacancies");
 
 /* ------------------------------------------------------------------ *
@@ -110,8 +112,8 @@ const CandidateSitting = z
   .object({
     application_assessment_id: uuid,
     name: z.string(),
-    assessment_type: z.string(),
-    status: z.string(),
+    assessment_type: AssessmentType,
+    status: SittingStatus,
     score: z.number().min(0).max(100).nullable(),
     submitted_at: isoDateTime.nullable(),
   })
@@ -122,8 +124,8 @@ const CandidateInterview = z
   .object({
     interview_id: uuid,
     scheduled_start: isoDateTime,
-    status: z.string(),
-    round_status: z.string(),
+    status: InterviewStatus,
+    round_status: RoundStatus,
     interview_score: z.number().min(0).max(100).nullable(),
   })
   .strict();
@@ -196,16 +198,18 @@ const CandidateNotProgressed = z
   .strict();
 
 /**
- * POST /recruitment/candidates/score-all (Screen All With AI): the must-meet conditions are kept on the
- * vacancy, then every active, unscored application of it is read in the background (guide §6.4).
+ * POST /recruitment/candidates/score-all (Screen With AI): the one to three must-meet conditions are
+ * kept on the vacancy, then every active, unscored application of it is read in the background
+ * (guide §6.4). Left out, the vacancy's kept conditions are used again.
  */
 const ScoreAll = z
   .object({
     vacancy_id: uuid,
     screening_conditions: z
       .array(z.string().trim().min(3, "Write the condition").max(200, "At most 200 characters"))
+      .min(1, "Give one condition")
       .max(3, "At most three conditions")
-      .default([]),
+      .optional(),
   })
   .strict();
 const ScoreAllQueued = z.object({ queued: z.number().int().min(0) }).strict();

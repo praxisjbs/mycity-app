@@ -39,16 +39,6 @@ async function list(query) {
   return { ...page, data: page.data.map(card) };
 }
 
-/** The steps a role uses, from its scorecard parts switched on (PublicJob.how_we_hire). */
-function howWeHire(activeParts) {
-  const on = new Set(activeParts || []);
-  const steps = ["apply"];
-  if (on.has("screening")) steps.push("screening");
-  if (on.has("psychometric") || on.has("technical") || on.has("case_study")) steps.push("assessment");
-  if (on.has("interview")) steps.push("interview");
-  return steps;
-}
-
 /** PublicJob, built field by field. A hidden salary band is left out, not sent as null. */
 async function get(slug) {
   if (!slugs.looksLikeSlug(slug)) throw notFound();
@@ -69,7 +59,7 @@ async function get(slug) {
     description: row.description,
     requirements: row.requirements,
     nice_to_have: row.nice_to_have,
-    how_we_hire: howWeHire(row.active_parts),
+    how_we_hire: lifecycle.howWeHire(row.active_parts),
     applicants: row.applicants,
     closes_at: row.closes_at,
     state: lifecycle.publicState(row),
@@ -101,4 +91,4 @@ async function startApplication(slug) {
   }
 }
 
-module.exports = { APPLY_TTL_HOURS, list, get, startApplication, howWeHire };
+module.exports = { APPLY_TTL_HOURS, list, get, startApplication, howWeHire: lifecycle.howWeHire };
