@@ -1248,6 +1248,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 04/11/2026 · JP · M7 PR 0: the engineering guide `docs/guides/partnerships.md` (Draft) and the build plan `docs/handoff/m7-partnerships.md` are written before any code, and MILESTONES A14 is amended (the import engine was built in M0; M7 adds the tracker importer). No ticks, no Status change. Found: `7000` has no leads table, no partner-type configuration and none of the tracker's region, objective, impact or next action; `7099` seeds business choices A26 forbids; every M7 module, contract, template and prompt file is still empty. Left: GE and LA read the guide and answer its §13, the tracker workbook is obtained, then PR 1 (contract and data).
 - 25/10/2026 · JP · Proposals (#53), on the mock: a tapped proposal opens as a full sheet on a phone (F31: `ListDetail`), never under the list; on desktop it stays beside it. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/partnerships/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/partnerships.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 

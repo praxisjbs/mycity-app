@@ -276,8 +276,8 @@ only), real SMTP delivery, web push (M6).
 
 ## 5 · Waiting on the user (carried from 12 October; check whether settled)
 
-1. A14: MILESTONES says the generic importer lands in M7; the engine was built in M0. One-line
-   amendment offered.
+1. ~~A14: MILESTONES says the generic importer lands in M7; the engine was built in M0. One-line
+   amendment offered.~~ Amended 04/11/2026 (JBS Praxis): MILESTONES A14 and §12 now say so.
 2. The 15 permission keys in README §5.2 were proposed, not confirmed.
 3. Settled 15 October: systemd, and nginx from the repository instead of a hosting panel.
 4. Numbering prefixes in BACKEND_STRUCTURE §7 are proposals for MyCity to confirm.

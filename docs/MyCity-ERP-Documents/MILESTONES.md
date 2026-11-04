@@ -45,7 +45,7 @@ Settled 9 October. These are binding. If the code disagrees with this table, the
 | A11 | **Pixie's workflow engine, ported.** `pixie-girl-hub/src/workflows/engine.js` + `conditions.js` + `default-definitions.js`, per `REUSE_MAP.md` §1.2. | M0 stands it up; M3, M5, M6, M8 consume it |
 | A12 | **Dual-hash signatures.** `content_hash` over canonical payload, `artifact_hash` over vaulted bytes. Two verdicts on the verification page. | M5 |
 | A13 | **AI manifest and search provider ship with every module, from M1.** | Gates 9 and 10 |
-| A14 | **Excel sheets read in M0; generic importer built in M7.** | Schema design this week is driven by their real columns |
+| A14 | **Excel sheets read in M0; generic importer built in M7.** | Schema design this week is driven by their real columns. **Amended 04/11/2026 (JBS Praxis):** the import engine and the staff importer were built in M0 (BACKEND_STRUCTURE §9.1; Settings · Imports, `docs/PROGRESS.md` #93). M7 adds the partnership tracker importer and the mapping polish on that engine, and does not build a second one |
 | A15 | **English only.** No `tr()`, no dictionary, no `title_fr`. | Title Case and no-dash gates still apply — they are copy quality, not translation |
 
 ### 1.3 Added 10 October, absorbed
@@ -1028,6 +1028,11 @@ upload → map columns → validate → detect duplicates → preview → import
 history, plus export back out. Reuse `master/_shared/dedup.service.js` for duplicate detection;
 `exceljs` is already a dependency. Generic, so MyCity can import their remaining trackers
 themselves after handover.
+
+**Amended 04/11/2026 (JBS Praxis, A14).** The engine and the staff importer were built in M0. M7's
+share is `partners.import.js`, the partnership tracker's importer on that engine (its two sheets, its
+column map, its duplicate report), and the polish of the column-mapping screen; the pipeline above is
+not built a second time. The M7 build plan is `docs/handoff/m7-partnerships.md`.
 
 **They are on Google Sheets, not Excel.** A sheet downloaded as `.xlsx` reads identically, so the
 importer needs no Google API integration. Cynthia also warned that templates may change after

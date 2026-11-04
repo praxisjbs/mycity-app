@@ -580,7 +580,7 @@ A14 and MILESTONES §12 put the generic importer in M7. The staff list cannot wa
 first real data the system holds, M1 cannot be demonstrated on real people without it, and every later
 milestone joins to `employee`. So the **engine and the staff importer are built in M0**; M7 adds the
 partnership importer and the column-mapping screen polish on the same engine. (MILESTONES A14 and §12
-should say so; one-line amendment.)
+say so since 04/11/2026.)
 
 ### 9.2 The pipeline
 

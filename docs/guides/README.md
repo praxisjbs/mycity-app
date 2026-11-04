@@ -43,6 +43,7 @@ section exists to stop.
 | `ai-control.md` | AI Control: which model answers each AI feature, its fallbacks, model prices and the monthly spend per provider (brought forward from M10, built in PR2) | TB | M10 | ☑ |
 | `user-guide.md` | User Guide: the Knowledge Hub tab that teaches the whole hub, Quick Start and Full Guide, cut on the server to each reader's grants down to the step, pictures of the real screens, Back to Guide, and the gate that keeps it true (brought forward from M11) | TB | M0 | ☑ |
 | `praxis-ai.md` | Praxis AI: Ask and History, questions answered from the modules' reads with the person's own permissions, up to 5 reads a question, routes for changes, voice in (brought forward from M10) | TB, GE | M10 | ☐ |
+| `partnerships.md` | Partnerships: Pipeline, Partners and the 360, Leads, Proposals, Contracts & MOUs, Analytics; the tracker importer, AI drafting of proposals and MOUs, the agreement lifecycle on the approval engine, mail threads bound to a partner, what Home reads | GE, LA | M7 | ☐ |
 
 Tick **Written** when the guide exists and has been read by the owner of every screen in its §2.
 Later milestones add their rows as they start.
