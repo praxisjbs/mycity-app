@@ -103,6 +103,10 @@ day in Lagos; the staging seed uses `@example.test` candidates only.
 - The psychometric and case-study question banks (Cynthia).
 - Candidate mail volume against production's 40 an hour (mail plan upgrade, Bode and Cynthia).
 - Data retention for candidates (NDPR): nothing is deleted in M4.
+- GE, 04/11/2026: `npm run fe:typecheck` fails in `app/` since P3's contract change: `app/src/api/types/organisation.ts`
+  imports `EmploymentType`, which `contract.gen.ts` no longer exports, and the INTERIM recruitment endpoints give
+  `GET /api/v1/recruitment/vacancies` a page size of `number` where the contract says `25`. P9's files; P9 clears it
+  when it moves the screens onto the contract.
 
 ---
 
@@ -123,8 +127,8 @@ are ticked, only P7, P8 and P14's reading can start. Tick a package only when it
 | P5 | **Assessments backend**: definitions and questions (points in `answer_key_enc`), Suggest With AI (`assessment-questions`), sittings (send, Send to Candidates in bulk, mark, cancel; timed and untimed), export and import of an assessment, public delivery (`/assess/:token`: start, answers, file answer up to 25 MB or a link, submit), `.timer`, `.scoring`, the `assessment-expire` scheduler; tests | `src/modules/assessments/*`, `src/jobs/...assessment-expire*`, `tests/integration/recruitment-assessments.test.js` | P1, P2, P2b | | ☐ |
 | P6 | **Interviews backend**: schedule, reschedule, cancel (calendar entry and invites; candidate `.ics` mail), Candidate Details, the blind card (ten traits 1 to 10, decision; the predicate of guide §6.6), the CV for the panel, submit and the closing rule, Close Round, the report and the Interview Assessment Form PDF, Tidy With AI (`interview-notes-cleanup`), the `interview-feedback-reminder`; tests | `src/modules/interviews/*`, `templates/documents/interview-assessment-form.html`, `tests/integration/recruitment-interviews.test.js` | P1, P2, P2b |
 | P6b | **Talent Pool backend**: Add to Pool, list and summary, Invite to Apply (source `pool`), Remove, Export, the `talent-pool-purge` scheduler (24 months); tests | `src/modules/talent_pool/*`, `src/jobs/...talent-pool-purge*`, `tests/integration/recruitment-pool.test.js` | P1, P2, P2b | | ☐ | | ☐ |
-| P7 | **Words**: the five candidate emails (`templates/email/application-received.html`, `apply-invite.html`, `assessment-invite.html`, `interview-invite.html`, `candidate-not-progressed.html`) and the five prompts (`src/services/ai/prompts/{jd-draft,cv-screen,screening-questions,assessment-questions,interview-notes-cleanup}.md`). Plain words for strangers; no dashes; Lagos dates. The variables each email may use are fixed with P4 to P6 | the ten files named | none (variables agreed with P4 to P6) | | ☐ |
-| P8 | **Components**: `RatingField` (1 to 10 stars, 44 px on a phone, keyboard and touch, Forms group) and anything else the screens lack, through `npm run new:component` with header, test and gallery page; `npm run gen:components` | `packages/ui/src/...` (the new components only), `docs/COMPONENTS.md` | none | | ☐ |
+| P7 | **Words**: the five candidate emails (`templates/email/application-received.html`, `apply-invite.html`, `assessment-invite.html`, `interview-invite.html`, `candidate-not-progressed.html`) and the five prompts (`src/services/ai/prompts/{jd-draft,cv-screen,screening-questions,assessment-questions,interview-notes-cleanup}.md`). Plain words for strangers; no dashes; Lagos dates. The variables each email may use are fixed with P4 to P6 | the ten files named | none (variables agreed with P4 to P6) | GE · 04/11/2026 | ☑ 04/11/2026 |
+| P8 | **Components**: `RatingField` (1 to 10 stars, 44 px on a phone, keyboard and touch, Forms group) and anything else the screens lack, through `npm run new:component` with header, test and gallery page; `npm run gen:components` | `packages/ui/src/...` (the new components only), `docs/COMPONENTS.md` | none | GE · 04/11/2026 | ☑ 04/11/2026 |
 | P9 | **Staff screens** on the contract: Vacancies (wizard, sheet, questions, scorecard, suggested seats, Candidate Emails), Candidates (board, sheet, scores with Provisional, scorecard, stage history), Assessments (definitions, questions editor, sittings, Mark Answers), Interviews (list, sheet, Candidate Details, My Card with ten-star traits, Close Round, report, Download Form), Talent Pool (list, sheet, Invite to Apply), Careers Settings. Desktop and phone (guide §10). INTERIM types in `app/src/api/types/recruitment.ts` replaced by the contract's; M5's tabs (Offers, Onboarding) left as they are | `app/src/features/recruitment/*`, `app/src/api/types/recruitment.ts` | P1 (P8 for feedback) | | ☐ |
 | P10 | **Staff mock**: `app/src/api/mock/modules/recruitment.ts` answering every M4 route in the contract's shapes, with the grants and data the pictures need | `app/src/api/mock/modules/recruitment.ts` | P1 | | ☐ |
 | P11 | **Public pages** on the contract: Careers, Vacancy (paused and closed states), Apply (the vacancy's questions, the privacy tick, `cover_letter`), Assessment (file answers); the public mock | `public-app/src/pages/{Careers,Vacancy,Apply,Assessment}.tsx`, `public-app/src/api/types/public.ts` (the M4 half), `public-app/src/api/mock/public.ts` (the M4 half) | P1 | | ☐ |
@@ -206,3 +210,18 @@ are ticked, only P7, P8 and P14's reading can start. Tick a package only when it
   ai-attacks, ai-cards, ai-summaries, assistant, server-boot, worker. For P4: start an application
   from the token `startApplication` mints (scope `application.apply`, subject the vacancy), and
   `vacancies.service.keepScreeningConditions(client, scope, id, conditions)` for Screen All With AI.
+- 04/11/2026 · GE · P7 and P8 done. Emails: the five candidate templates, rendered by
+  `tests/unit/recruitment-emails.test.js` with the contract's variables (timed and untimed, in person, video,
+  phone, moved, cancelled). `AssessmentInviteEmailVars` now takes `duration_minutes` or `due_days` (one of the
+  two) and `InterviewInviteEmailVars` `rescheduled`; guide change log. P4 to P6: declare each with
+  `defineVariables("email", <key>, c.<module>.<Name>EmailVars)` in your events file, and pass `recipient` with the
+  candidate's `first_name`. Prompts: `jd-draft` and `screening-questions` version 2 (P3's inputs unchanged);
+  new, with the input each module passes to `ai.complete`:
+  `cv-screen` (P4): `role` {title, department, description, requirements, nice_to_have, min_experience_years},
+  `conditions` (strings), `candidate` {years_experience, cover_letter, answers: [{question, answer}]},
+  `cv_text` (null when unreadable), output `CvScreenOutput`;
+  `assessment-questions` (P5): `assessment_type`, `instruction`, `count`, `role` {title, description,
+  requirements} or null, output `AssessmentDraftOutput`;
+  `interview-notes-cleanup` (P6): `text`, output `NotesTidyOutput`. All through `redact.shield`.
+  Components: `RatingField` (Forms) and `Countdown` (Display) in `packages/ui`, with tests and gallery pages;
+  `docs/COMPONENTS.md` regenerated. Their actions in `src/services/ai/actions.js` are still P4 to P6's to add.

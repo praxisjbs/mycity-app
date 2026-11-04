@@ -1,0 +1,9 @@
+---
+subject: "We have your application for {{ vacancy_title }}"
+title: Application Received
+---
+<p style="margin:0 0 16px;">{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}</p>
+<p style="margin:0 0 16px;">Thank you for applying for {{ vacancy_title }} at MyCity App. Your application is in.</p>
+<p style="margin:0 0 16px;">Your reference is <strong>{{ reference }}</strong>. Keep it, and quote it if you write to us about this application.</p>
+<p style="margin:0 0 16px;">Our team reads every application. If you move on to the next step, we will email you with what comes next.</p>
+<p style="margin:0;font-size:12px;color:#71717A;">You do not need to reply to this email.</p>

@@ -38,6 +38,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's picture: photographs of eight cities at dusk taking turns, drifting slowly under a film grain and rising points of light, each with its ticking clock, and the sign-in form in a panel of smoked glass. | beta |
 | Display | [Confetti](#confetti) | `Confetti` | A short burst of paper or stars from a celebration card, drawn on a canvas inside it, that settles and stops. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
+| Display | [Countdown](#countdown) | `Countdown` | The time left until an end the server set, counted on the server's clock: a timed assessment's clock. | beta |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
 | Display | [EmptyValue](#emptyvalue) | `EmptyValue` | The marker for a value that is not set: the only dash a screen shows, muted. | stable |
 | Display | [IconCards](#iconcards) | `IconCards`, `IconCard` | A grid of phone icon cards, two to a row; each IconCard is an icon, a title and a line, and opens a sheet with that section. | stable |
@@ -106,6 +107,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
 | Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
 | Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
+| Forms | [RatingField](#ratingfield) | `RatingField` | A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; readOnly draws a rating already given. | beta |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
 | Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row. | stable |
@@ -839,6 +841,38 @@ A small round number: how many unread, waiting or new things sit behind a tab, a
 ```tsx
 <CountBadge count={3} label="approvals waiting" />
 <CountBadge count={120} tone="err" />
+```
+
+### Countdown
+
+The time left until an end the server set, counted on the server's clock: a timed assessment's clock.
+
+| | |
+|---|---|
+| Use | A deadline the server holds and enforces, given as its end and the server's own now: a timed assessment on the public site. |
+| Avoid | A date to show (use formatDate); a day something is due (say the day); progress through steps (use ProgressBar). |
+| Phone | The same clock at the same size; it sits at the top of the page, right of the question count, and never wraps. |
+| Accessibility | A timer named by its label and the time left; it is silent each second and says once, politely, when the warning time, the last minute and the end arrive. |
+| Status | beta |
+| Exports | `Countdown` |
+| Import | `import { Countdown } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Countdown.tsx` |
+| Test | `packages/ui/src/display/Countdown.test.tsx` |
+| Gallery | `packages/ui/src/display/Countdown.gallery.tsx` (`npm run gallery`, `#/Countdown`) |
+
+**Countdown** props (`CountdownProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `endsAt` | `string` | yes | When the time runs out, ISO, as the server sent it. |
+| `serverNow` | `string` | yes | The server's time when it answered, ISO; the clock counts from it, so a wrong device clock changes nothing. |
+| `onEnd` | `() => void` |  | Called once when the time runs out. |
+| `warnAt` | `number` |  | Seconds left at which the clock turns amber and says so; 300 unless set. The last minute is always red. |
+| `label` | `string` |  | What the clock counts, Title Case; "Time Left" unless set. |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<Countdown endsAt={session.ends_at} serverNow={session.server_now} onEnd={reload} />
 ```
 
 ### EmptyState
@@ -3281,6 +3315,42 @@ Pick one of two to five options shown as stacked rows, each with an optional gly
 ```tsx
 <Field label="Payroll Access" {...form.status("payroll_access")}><RadioCards options={[{ value: "view", label: "View" }, { value: "edit", label: "Edit" }]} {...form.field("payroll_access")} /></Field>
 <RadioCards label="Payroll Access" value={level} onChange={setLevel} options={levels.map((l) => ({ value: l.code, label: l.name, leading: <LevelMeter value={l.rank} label={l.name} decorative /> }))} />
+```
+
+### RatingField
+
+A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; readOnly draws a rating already given.
+
+| | |
+|---|---|
+| Use | A score a person gives by eye against a scale: a trait on the interview card, an overall rating. readOnly for ratings shown back once a panel's round closes. |
+| Avoid | A number that is counted or typed (use NumberField); a choice between named options (use ChoiceField or RadioCards); a rating that saves the moment it is tapped outside a form (pair it with the form's own save). |
+| Phone | Every star is a 44 px target; ten stars sit in two rows of five so the row never runs off a 390 px screen. No hover preview: the tap is the choice. |
+| Accessibility | A radio group: each star is a radio named "7 of 10", the arrow keys move and choose, and the readout beside it is hidden so the value is never read twice. Inside a Field its label names the group and the error is linked; alone, pass label. readOnly is one image named "7 of 10". |
+| Status | beta |
+| Exports | `RatingField` |
+| Import | `import { RatingField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/RatingField.tsx` |
+| Test | `packages/ui/src/form/RatingField.test.tsx` |
+| Gallery | `packages/ui/src/form/RatingField.gallery.tsx` (`npm run gallery`, `#/RatingField`) |
+
+**RatingField** props (`RatingFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `number \| null` | yes | The rating given, 1 to max; null while none is given. readOnly also takes a mean (7.4), shown to one decimal with the stars rounded. |
+| `onChange` | `(value: number) => void` |  | Called with the rating tapped or chosen with the keys. Not needed when readOnly. |
+| `onBlur` | `() => void` |  | Called when focus leaves the stars. |
+| `max` | `number` |  | The top of the scale, 3 to 10; 10 unless set. |
+| `label` | `string` |  | Names the stars when no Field label sits above them. |
+| `readOnly` | `boolean` |  | Draws the rating without letting it change: a panelist's rating once the round is closed. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<Field label="Level of Confidence" {...form.status("confidence")}><RatingField {...form.field("confidence")} /></Field>
+<RatingField label="Oral Communication Skills" value={7} readOnly />
 ```
 
 ### RecordPicker

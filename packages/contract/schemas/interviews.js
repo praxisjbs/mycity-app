@@ -291,6 +291,8 @@ const InterviewInviteEmailVars = z
     scheduled_end: isoDateTime,
     place: z.string().nullable(),
     meeting_url: z.string().nullable(),
+    /** A new time, place or panel for an interview already sent (PATCH /recruitment/interviews/:id). */
+    rescheduled: z.boolean(),
     cancelled: z.boolean(),
   })
   .strict();

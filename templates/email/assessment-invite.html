@@ -1,0 +1,14 @@
+---
+subject: "Your assessment for {{ vacancy_title }}"
+title: Assessment
+---
+<p style="margin:0 0 16px;">{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}</p>
+<p style="margin:0 0 16px;">Thank you for your application for {{ vacancy_title }}. The next step is an assessment: {{ assessment_name }}.</p>
+{{#if duration_minutes}}<p style="margin:0 0 4px;"><strong>Time allowed:</strong> {{ duration_minutes }} minutes from when you press Start.</p>
+<p style="margin:0 0 20px;"><strong>Start by:</strong> the end of {{ longdate start_by }}.</p>
+<p style="margin:0 0 20px;">The clock keeps running if you close the page, so start when you have that time free and a steady connection. Every answer saves as you go, and the same link takes you back to where you stopped.</p>{{else}}<p style="margin:0 0 4px;"><strong>Days to finish:</strong> {{ due_days }}, counted from when you press Start.</p>
+<p style="margin:0 0 20px;"><strong>Start by:</strong> the end of {{ longdate start_by }}.</p>
+<p style="margin:0 0 20px;">This is a take-home task. Open the link as often as you need: your answers save as you go, and you send your work in when it is ready.</p>{{/if}}
+<p style="margin:0 0 20px;"><a href="{{ assess_url }}" style="display:inline-block;background:#01221D;color:#FFFFFF;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:8px;">Open the Assessment</a></p>
+<p style="margin:0 0 20px;font-size:13px;color:#52525B;">If the button does not open, copy this address into your browser:<br><span style="word-break:break-all;">{{ assess_url }}</span></p>
+<p style="margin:0;font-size:12px;color:#71717A;">The link is for you alone. Please do not share it.</p>

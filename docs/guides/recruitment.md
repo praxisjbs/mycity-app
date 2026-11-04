@@ -576,6 +576,11 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 04/11/2026 · GE · P7 and P8. The `assessment-invite` email carries an untimed sitting: the contract's
+  `AssessmentInviteEmailVars` takes `duration_minutes` for a timed test or `due_days` for a take-home
+  brief, one of the two (§6.7). `interview-invite` takes `rescheduled`, so a moved interview says so in
+  its subject and opening (§3 step 8, §7). The interview card's ten stars are `RatingField` and the
+  assessment's clock is `Countdown`, both from `@mycity/ui` (§10).
 - 04/11/2026 · GE · P3 built (`vacancies`): the lifecycle with its history in `entity_state_history`,
   the slug at first publish, questions and traits saved whole (a used one retired), scorecard parts,
   Careers Settings, Suggested From Organogram, Write With AI (`jd-draft`, `screening-questions`), the

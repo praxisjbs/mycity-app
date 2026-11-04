@@ -394,12 +394,17 @@ const AnswerSaved = z
   })
   .strict();
 
-/** assessment-invite: sent with the link. */
+/**
+ * assessment-invite: sent with the link. A timed test carries its minutes; an untimed take-home
+ * brief carries none and says how many days after Start it is due instead (guide §6.7). One of
+ * the two is set, never both. Kept a plain object: defineVariables reads its shape.
+ */
 const AssessmentInviteEmailVars = z
   .object({
     vacancy_title: z.string(),
     assessment_name: z.string(),
-    duration_minutes: z.number().int(),
+    duration_minutes: z.number().int().min(1).nullable(),
+    due_days: z.number().int().min(1).max(14).nullable(),
     start_by: isoDate,
     assess_url: z.string(),
   })
