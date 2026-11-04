@@ -3,18 +3,22 @@
  * Interviews: a round with one interview, its panel, each panelist's feedback, and the hiring
  * manager's consolidated report (docs/guides/recruitment.md §3 steps 8 to 10, §5, §6.6).
  *
- * BLIND (A10, guide §6.6): while a round is open, a feedback row is readable only by the person who
- * wrote it, the hiring manager and the CEO included. Everyone else reads who has submitted and
- * nothing more: `overall_rating`, `recommendation`, `comments` and `ratings` are null in a
- * PanelSeat that is not the reader's own until the round closes. Private notes are only ever the
+ * THE CARD is MyCity's Interview Assessment Format (guide §6.6; TB, 04/11/2026): each panelist rates
+ * every trait of the vacancy from 1 to 10 and decides Select, On Hold or Reject; comments are the
+ * form's Others. Candidate Details are filled once for the whole panel.
+ *
+ * BLIND (A10, guide §6.6): while a round is open, a card is readable only by the person who wrote it,
+ * the hiring manager and the CEO included. Everyone else reads who has submitted and nothing more:
+ * `score`, `overall_rating`, `decision`, `comments` and `ratings` are null in a PanelSeat that is not
+ * the reader's own, and `trait_averages` is empty, until the round closes. Private notes are only ever the
  * author's, in `my_feedback`, and never in `panel`.
  *
  * `:id` on every /recruitment/interviews route is an interview_id.
  */
 const { z } = require("zod");
-const { uuid, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, isoDateTime, blank, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
-const { VacancyRef } = require("./vacancies");
+const { VacancyRef, optionalWhole } = require("./vacancies");
 
 /* ------------------------------------------------------------------ *
  * Code lists
@@ -23,12 +27,12 @@ const { VacancyRef } = require("./vacancies");
 const InterviewType = z.enum(["in_person", "video", "phone"]);
 const InterviewStatus = z.enum(["scheduled", "done", "cancelled"]);
 const RoundStatus = z.enum(["open", "closed"]);
-/** A panelist's own call. */
-const PanelRecommendation = z.enum(["strong_yes", "yes", "no", "strong_no"]);
-/** The consolidated report's call. */
-const RoundRecommendation = z.enum(["advance", "hold", "not_progress"]);
+/** The card's final result: each panelist's own, and the consolidated report's. */
+const InterviewDecision = z.enum(["select", "on_hold", "reject"]);
+/** The card's Academics row. */
+const Academics = z.enum(["outstanding", "very_good", "good", "average", "poor"]);
 
-const rating = z.number().int().min(1, "1 to 5").max(5, "1 to 5");
+const rating = z.number().int().min(1, "1 to 10").max(10, "1 to 10");
 
 /* ------------------------------------------------------------------ *
  * Parts
@@ -48,8 +52,10 @@ const PanelSeat = z
     interview_panelist_id: uuid,
     panelist: PersonRef,
     submitted_at: isoDateTime.nullable(),
+    /** The mean of their trait ratings (or their overall rating), 1 to 10. */
+    score: z.number().min(1).max(10).nullable(),
     overall_rating: rating.nullable(),
-    recommendation: PanelRecommendation.nullable(),
+    decision: InterviewDecision.nullable(),
     comments: z.string().nullable(),
     ratings: z.array(QuestionRating).max(20).nullable(),
   })
@@ -59,7 +65,7 @@ const PanelSeat = z
 const MyFeedback = z
   .object({
     overall_rating: rating.nullable(),
-    recommendation: PanelRecommendation.nullable(),
+    decision: InterviewDecision.nullable(),
     comments: z.string().nullable(),
     private_notes: z.string().nullable(),
     ratings: z.array(QuestionRating).max(20),
@@ -77,9 +83,25 @@ const InterviewRound = z
     closed_at: isoDateTime.nullable(),
     interview_score: z.number().min(0).max(100).nullable(),
     report: z.string().nullable(),
-    recommendation: RoundRecommendation.nullable(),
+    decision: InterviewDecision.nullable(),
     reported_by_name: z.string().nullable(),
     reported_at: isoDateTime.nullable(),
+    /** Candidate Details, filled once for the panel. */
+    current_employer: z.string().nullable(),
+    academics: Academics.nullable(),
+    total_experience_months: z.number().int().min(0).nullable(),
+    relevant_experience_months: z.number().int().min(0).nullable(),
+    /** The Interview Assessment Form PDF, once the report is written. */
+    form_document_id: uuid.nullable(),
+  })
+  .strict();
+
+/** One trait's mean across the panel, once the round is closed. */
+const TraitAverage = z
+  .object({
+    vacancy_question_id: uuid,
+    prompt: z.string(),
+    average: z.number().min(1).max(10).nullable(),
   })
   .strict();
 
@@ -125,6 +147,9 @@ const InterviewDetail = Interview.extend({
   round: InterviewRound,
   panel: z.array(PanelSeat).max(8),
   questions: z.array(z.object({ vacancy_question_id: uuid, prompt: z.string() }).strict()).max(20),
+  trait_averages: z.array(TraitAverage).max(20),
+  /** The candidate's CV, which the panel may open. */
+  cv_document_id: uuid.nullable(),
   my_feedback: MyFeedback.nullable(),
   can_edit: z.boolean(),
   can_close: z.boolean(),
@@ -196,26 +221,44 @@ const InterviewCancel = z
   .strict();
 
 /**
- * PUT /recruitment/interviews/:id/feedback: the reader's own draft. Submit asks for an overall
- * rating and a recommendation; until then any of these may be empty.
+ * PUT /recruitment/interviews/:id/feedback: the reader's own card, as a draft. Submit asks for every
+ * trait rated (or the overall rating, for a vacancy with no traits) and a decision; until then any of
+ * these may be empty. `comments` is the form's Others.
  */
 const FeedbackSave = z
   .object({
     overall_rating: rating.nullable().optional(),
-    recommendation: PanelRecommendation.nullable().optional(),
+    decision: InterviewDecision.nullable().optional(),
     comments: z.string().trim().max(5000, "At most 5000 characters").optional(),
     private_notes: z.string().trim().max(5000, "At most 5000 characters").optional(),
     ratings: z.array(QuestionRating).max(20).optional(),
   })
   .strict();
 
-/** PUT /recruitment/interviews/:id/report: the consolidated report, once the round is closed. */
+/** PUT /recruitment/interviews/:id/report: the consolidated report and the decision, once closed. */
 const RoundReport = z
   .object({
     report: z.string().trim().min(40, "At least 40 characters").max(10000, "At most 10000 characters"),
-    recommendation: RoundRecommendation,
+    decision: InterviewDecision,
   })
   .strict();
+
+/** PUT /recruitment/interviews/:id/details: the card's Candidate Details, filled once for the panel. */
+const RoundDetailsSave = z
+  .object({
+    current_employer: blank(z.string().trim().max(160, "At most 160 characters")),
+    academics: Academics.optional(),
+    total_experience_months: optionalWhole(0, 720, "At most 720 months"),
+    relevant_experience_months: optionalWhole(0, 720, "At most 720 months"),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.total_experience_months === undefined ||
+      v.relevant_experience_months === undefined ||
+      v.relevant_experience_months <= v.total_experience_months,
+    { message: "More than the total", path: ["relevant_experience_months"] },
+  );
 
 /* ------------------------------------------------------------------ *
  * Tidy With AI (interview-notes-cleanup, Default): nothing here is kept
@@ -259,8 +302,9 @@ const TABLES = {
     table: "interview_panelist",
     virtual: {
       panelist: "the panelist, from employee and department",
+      score: "the mean of their trait ratings, or their overall rating, once the reader may see it",
       overall_rating: "interview_feedback.overall_rating, once the reader may see it",
-      recommendation: "interview_feedback.recommendation, once the reader may see it",
+      decision: "interview_feedback.decision, once the reader may see it",
       comments: "interview_feedback.comments, once the reader may see it",
       ratings: "the feedback's interview_rating rows, once the reader may see them",
     },
@@ -305,7 +349,9 @@ const TABLES = {
       worksite: "the worksite, for an interview in person",
       round: "the interview_round",
       panel: "its panelists, blind while the round is open (guide §6.6)",
-      questions: "the vacancy's active interview questions",
+      questions: "the vacancy's active traits",
+      trait_averages: "each trait's mean across the submitted cards, once the round is closed",
+      cv_document_id: "the application's CV, which the panel may open",
       my_feedback: "the reader's own interview_feedback, when they sit on the panel",
       can_edit: "the reader may reschedule or cancel it",
       can_close: "the round is open and the reader may edit it",
@@ -334,6 +380,8 @@ const TABLES = {
     virtual: { ratings: "the feedback's interview_rating rows, replaced" },
   },
   RoundReport: { table: "interview_round" },
+  RoundDetailsSave: { table: "interview_round" },
+  TraitAverage: { table: null, reason: "one trait's mean over interview_rating, once the round is closed" },
   NotesTidyRequest: { table: null, reason: "the comments as written; nothing is kept" },
   NotesTidy: { table: null, reason: "a tidied text shown before anything changes" },
   NotesTidyOutput: { table: null, reason: "the model's answer, checked before anyone sees it" },
@@ -345,8 +393,10 @@ module.exports = {
   InterviewType,
   InterviewStatus,
   RoundStatus,
-  PanelRecommendation,
-  RoundRecommendation,
+  InterviewDecision,
+  Academics,
+  TraitAverage,
+  RoundDetailsSave,
   QuestionRating,
   PanelSeat,
   MyFeedback,

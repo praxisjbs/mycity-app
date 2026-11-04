@@ -25,8 +25,8 @@ const { ApplicationStage, ScorecardCode, VacancyRef, VacancyQuestionType, M4_STA
 
 /** active: in the pipeline. not_progressed: stopped with a reason (Reopen undoes it). M5 sets hired. */
 const ApplicationStatus = z.enum(["active", "not_progressed", "withdrawn", "hired"]);
-/** careers: applied from the careers page. invited: from an Invite to Apply email. */
-const ApplicationSource = z.enum(["careers", "invited"]);
+/** careers: the careers page. invited: Invite to Apply from Candidates. pool: Invite to Apply from the Talent Pool. */
+const ApplicationSource = z.enum(["careers", "invited", "pool"]);
 /** Where the CV's virus check stands; staff open a CV only when it is clean. */
 const CvState = z.enum(["none", "checking", "clean", "infected"]);
 /** The board's columns in M4 (decided 04/11/2026). */
@@ -64,6 +64,7 @@ const Candidate = z
     score_provisional: z.boolean(),
     weighted_total: z.number().min(0).max(100).nullable(),
     parts_scored: z.number().int().min(0).max(5),
+    parts_active: z.number().int().min(1).max(5),
     cv_state: CvState,
   })
   .strict();
@@ -75,6 +76,7 @@ const ScorecardPart = z
   .object({
     code: ScorecardCode,
     name: z.string(),
+    active: z.boolean(),
     weight: z.number().int().min(0).max(100),
     score: z.number().min(0).max(100).nullable(),
     provisional: z.boolean(),
@@ -193,8 +195,19 @@ const CandidateNotProgressed = z
   })
   .strict();
 
-/** POST /recruitment/candidates/score-all: every active, unscored application of one vacancy. */
-const ScoreAll = z.object({ vacancy_id: uuid }).strict();
+/**
+ * POST /recruitment/candidates/score-all (Screen All With AI): the must-meet conditions are kept on the
+ * vacancy, then every active, unscored application of it is read in the background (guide §6.4).
+ */
+const ScoreAll = z
+  .object({
+    vacancy_id: uuid,
+    screening_conditions: z
+      .array(z.string().trim().min(3, "Write the condition").max(200, "At most 200 characters"))
+      .max(3, "At most three conditions")
+      .default([]),
+  })
+  .strict();
 const ScoreAllQueued = z.object({ queued: z.number().int().min(0) }).strict();
 
 /** POST /recruitment/candidates/invitations: email a person an Apply link for one vacancy. */
@@ -345,7 +358,8 @@ const TABLES = {
       score: "screening_score, or provisional_score while there is none",
       score_provisional: "true while score is provisional_score",
       weighted_total: "the scorecard over the parts scored (guide §6.5)",
-      parts_scored: "how many of the five parts have a score",
+      parts_scored: "how many of the parts switched on have a score",
+      parts_active: "how many of the vacancy's five parts are switched on",
       cv_state: "from the CV document's scan_status",
     },
   },
@@ -365,7 +379,8 @@ const TABLES = {
       score: "screening_score, or provisional_score while there is none",
       score_provisional: "true while score is provisional_score",
       weighted_total: "the scorecard over the parts scored (guide §6.5)",
-      parts_scored: "how many of the five parts have a score",
+      parts_scored: "how many of the parts switched on have a score",
+      parts_active: "how many of the vacancy's five parts are switched on",
       cv_state: "from the CV document's scan_status",
       first_name: "candidate.first_name",
       last_name: "candidate.last_name",
@@ -388,7 +403,10 @@ const TABLES = {
     virtual: { reason: "kept on the entity_state_history row of the move" },
   },
   CandidateNotProgressed: { table: "application" },
-  ScoreAll: { table: "application" },
+  ScoreAll: {
+    table: "application",
+    virtual: { screening_conditions: "kept on vacancy.screening_conditions before the reads are queued" },
+  },
   ScoreAllQueued: { table: null, reason: "how many AI reads were queued" },
   ApplyInvite: {
     table: "candidate",

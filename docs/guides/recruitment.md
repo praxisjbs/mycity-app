@@ -138,7 +138,7 @@ never sign in.
     up from there; until it ships, Shortlist is the board's last column. Not Progressing at any stage
     records a reason, revokes the candidate's live links and emails `candidate-not-progressed`.
 13. **The Talent Pool.** Add to Pool (a candidate's sheet, usually after Not Progressing or On Hold)
-    keeps the person with a reason for 24 months (`talent_pool_member`). Invite to Apply from the pool
+    keeps the person with a reason for 24 months (`talent_pool_entry`). Invite to Apply from the pool
     sends them an Apply link to an open vacancy (`apply-invite`, source `pool`). The `talent-pool-purge`
     job takes a member off the pool when their 24 months end.
 14. **Home reads it.** The Open Vacancies card counts `open` vacancies in scope; the Recruitment SLA
@@ -164,7 +164,7 @@ never sign in.
 | `interview_panelist` | `interview_id`, `employee_id`, `submitted_at` | Unique per interview and person |
 | `interview_feedback` | `interview_panelist_id` (unique), `overall_rating` (1 to 10, only when the vacancy has no traits), `decision` (select, on_hold, reject), `comments`, `private_notes`, `cleaned_notes`, `ai_run_id`, `submitted_at` | `submitted_at` null while a draft (4040). 4050 widens the rating to 1 to 10 and replaces `recommendation` with `decision`. `scorecard` jsonb stays unused |
 | `interview_rating` | `interview_feedback_id`, `vacancy_question_id`, `rating` (1 to 10), unique per feedback and question | New in 4040, 1 to 10 from 4050: one rating per panelist per trait (A10 step 1) |
-| `talent_pool_member` | `candidate_id`, `application_id` (the application they came from), `reason`, `added_by`, `expires_at` (24 months on), `invited_at`, `invited_vacancy_id`, `removed_at` | 5000's table, M4's from 04/11/2026; 4060 adds the columns and makes `talent_pool_id` optional (M4 keeps one pool; named pools stay unused) |
+| `talent_pool_entry` | `candidate_id`, `application_id` (the application they came from), `reason`, `added_by`, `expires_at` (24 months on), `invited_at`, `invited_vacancy_id`, `removed_at`, `removed_reason` | New in 4060; one live entry a candidate. 5000 (M5) made `talent_pool` and `talent_pool_member` for named pools; M4 numbers below 5000 and cannot build on them, so they stay unused |
 | `setting` | `recruitment.default_traits`: the traits New Vacancy starts from, as a list; `recruitment.about_company`: the About MyCityApp paragraph every public vacancy opens with | Entered on Vacancies · Careers Settings; never seeded on production (A26) |
 
 Schema migration files (4010 to 4040 built 04/11/2026): `migrations/4000_recruitment.sql` (merged), `migrations/4010_recruitment_vacancies.sql`,
@@ -218,6 +218,8 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `PUT /recruitment/assessments/:id/questions` | `AssessmentQuestionsSave` → `AssessmentDetail` | `recruitment` edit | no | Refused once it has been sent (409 `ASSESSMENT_IN_USE`) |
 | `POST /recruitment/assessments/:id/activate`, `/deactivate` | `EmptyBody` → `AssessmentDetail` | `recruitment` edit | no | Activate needs at least one question |
 | `POST /recruitment/assessments/assist` | `AssessmentDraftRequest` → `AssessmentDraft` | `recruitment` edit | no | `assessment-questions`; nothing kept |
+| `GET /recruitment/assessments/:id/export` | `AssessmentExport` | `recruitment` export | no | One assessment and its questions with points, as a file |
+| `POST /recruitment/assessments/import` | `AssessmentExport` → `AssessmentDetail` | `recruitment` create | no | A new, inactive assessment from such a file |
 | `GET /recruitment/assessments/sittings` | `SittingListQuery` → `SittingPage` | `recruitment` view · all/team | yes | Filters `status`, `application_id`, `marking` |
 | `GET /recruitment/assessments/sittings/:id` | `SittingDetail` | `recruitment` view · all/team | no | Answers, with points |
 | `POST /recruitment/assessments/sittings` | `SittingSend` → `SittingDetail` | `recruitment` edit · all/team | no | §6.7 |
@@ -237,9 +239,9 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `GET /recruitment/interviews/:id/cv` | file | `recruitment` view · panel or scope | no | The candidate's CV, for the panel |
 | `GET /recruitment/pool/summary` | `PoolSummary` | `recruitment` view · all/team | no | In the pool, invited back, hired from the pool, average score |
 | `GET /recruitment/pool` | `PoolListQuery` → `PoolPage` | `recruitment` view · all/team | yes | Filters `q`, `invited`; sort `created_at`, `score`, `expires_at` |
-| `POST /recruitment/pool` | `PoolAdd` → `PoolMember` | `recruitment` create · all/team | no | From an application, with a reason |
-| `POST /recruitment/pool/:id/invite` | `PoolInvite` → `PoolMember` | `recruitment` edit · all/team | no | An Apply link to an open vacancy |
-| `POST /recruitment/pool/:id/remove` | `PoolRemove` → `PoolMember` | `recruitment` delete · all/team | no | Taken off the pool before their time |
+| `POST /recruitment/pool` | `PoolAdd` → `PoolEntry` | `recruitment` create · all/team | no | From an application, with a reason |
+| `POST /recruitment/pool/:id/invite` | `PoolInvite` → `PoolEntry` | `recruitment` edit · all/team | no | An Apply link to an open vacancy |
+| `POST /recruitment/pool/:id/remove` | `PoolRemove` → `PoolEntry` | `recruitment` delete · all/team | no | Taken off the pool before their time |
 | `POST /recruitment/interviews/assist` | `NotesTidyRequest` → `NotesTidy` | `recruitment` view | no | `interview-notes-cleanup`; nothing kept |
 | `GET /api/public/v1/jobs` | `PublicJobListQuery` → `PublicJobPage` | public | yes | `open` and not past its closing time |
 | `GET /api/public/v1/jobs/:slug` | `PublicJob` | public | no | Draft is 404; paused and closed say so |
@@ -393,8 +395,9 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   every active candidate of a vacancy at a stage (default Assessment) without a live sitting of it, and
   says how many were sent and how many already had one.
 - Assessments researched by JBS Praxis for MyCity to approve are loaded on staging only. One MyCity
-  approves reaches production by Export on staging and Import on production (one JSON file through the
-  import engine, `assessments.import.js`), so production is never seeded (A26; GE, 04/11/2026).
+  approves reaches production by Export on staging and Import on production (one JSON file,
+  `AssessmentExport`, checked against the contract on the way in), so production is never seeded (A26;
+  GE, 04/11/2026).
 - An assessment is **timed** (a test, `duration_minutes` 5 to 240) or **untimed** (a take-home brief,
   no minutes: MyCity's Graphics and Motion Design assessment, two deliverables and a short note, shared
   04/11/2026). An untimed sitting is due at 23:59 Lagos on a day staff pick when sending (1 to 14 days

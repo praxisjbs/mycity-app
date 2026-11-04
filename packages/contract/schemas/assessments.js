@@ -103,7 +103,8 @@ const AssessmentsSummary = z
 const assessmentFields = {
   name: z.string().trim().min(3, "Name the assessment").max(120, "At most 120 characters"),
   assessment_type: AssessmentType,
-  duration_minutes: z.coerce.number().int("Whole minutes").min(5, "At least 5 minutes").max(240, "At most 240 minutes"),
+  /** Minutes for a timed test; left empty, it is an untimed take-home brief due by a day (guide §6.7). */
+  duration_minutes: optionalWhole(5, 240, "At most 240 minutes"),
   instructions: z.string().trim().min(10, "Tell candidates what to do").max(3000, "At most 3000 characters"),
   pass_score: optionalWhole(0, 100, "At most 100"),
 };
@@ -204,6 +205,7 @@ const AssessmentDraftOutput = z
 /** One row of Assessments · Sittings. `to_mark`: written and file answers still without a mark. */
 const Sitting = z
   .object({
+    due_days: z.number().int().min(1).max(14).nullable(),
     application_assessment_id: uuid,
     application_id: uuid,
     candidate_name: z.string(),
@@ -262,6 +264,47 @@ const SittingSend = z
     assessment_definition_id: uuid,
     /** Days the candidate has to start it; the link lapses at 23:59 Lagos time on the last. */
     start_within_days: z.coerce.number().int().min(1, "At least 1 day").max(14, "At most 14 days").default(3),
+    /** An untimed assessment only: days after Start it is due, at 23:59 Lagos time. */
+    due_days: optionalWhole(1, 14, "At most 14 days"),
+  })
+  .strict();
+
+/**
+ * POST /recruitment/assessments/sittings/bulk (Send to Candidates): one assessment to every active
+ * candidate of a vacancy at a stage who has no live sitting of it.
+ */
+const SittingSendBulk = z
+  .object({
+    vacancy_id: uuid,
+    assessment_definition_id: uuid,
+    stage: z.enum(["application", "screening", "assessment", "interview", "shortlist"]).default("assessment"),
+    start_within_days: z.coerce.number().int().min(1, "At least 1 day").max(14, "At most 14 days").default(3),
+    due_days: optionalWhole(1, 14, "At most 14 days"),
+  })
+  .strict();
+
+/** How many were sent, and how many already had a live sitting of it. */
+const SittingSendBulkResult = z
+  .object({
+    sent: z.number().int().min(0),
+    skipped: z.number().int().min(0),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
+ * Export and import (guide §6.7): an assessment approved on staging carried to production
+ * ------------------------------------------------------------------ */
+
+/** GET /recruitment/assessments/:id/export, and the body of POST /recruitment/assessments/import. */
+const AssessmentExport = z
+  .object({
+    format: z.literal("mycity-assessment-1"),
+    name: assessmentFields.name,
+    assessment_type: AssessmentType,
+    duration_minutes: z.number().int().min(5).max(240).nullable(),
+    instructions: assessmentFields.instructions,
+    pass_score: z.number().min(0).max(100).nullable(),
+    questions: z.array(AssessmentQuestionInput).min(1).max(60),
   })
   .strict();
 
@@ -314,12 +357,15 @@ const AssessmentSession = z
       .object({
         name: z.string(),
         assessment_type: AssessmentType,
-        duration_minutes: z.number().int().min(1),
+        /** Null for an untimed take-home brief, due by a day instead. */
+        duration_minutes: z.number().int().min(1).nullable(),
         question_count: z.number().int().min(0),
         instructions: z.string().nullable(),
       })
       .strict(),
     state: z.enum(["not_started", "in_progress", "submitted", "timed_out"]),
+    /** False for a take-home brief: `ends_at` is then the due day's 23:59, shown as a day, not a clock. */
+    timed: z.boolean(),
     start_by: isoDate,
     ends_at: isoDateTime.nullable(),
     server_now: isoDateTime,
@@ -431,6 +477,9 @@ const TABLES = {
     table: "application_assessment",
     virtual: { start_within_days: "kept as start_by, that many Lagos days from today" },
   },
+  SittingSendBulk: { table: null, reason: "one sitting for each matching application" },
+  SittingSendBulkResult: { table: null, reason: "how many sittings were sent and skipped" },
+  AssessmentExport: { table: null, reason: "an assessment and its questions as one file, for import elsewhere" },
   SittingMarks: { table: null, reason: "marks for several assessment_response rows" },
   PublicQuestion: { table: null, reason: "the allow-list of a question a candidate may read" },
   AssessmentSession: { table: null, reason: "the allow-list of a sitting a candidate may read" },
@@ -471,6 +520,9 @@ module.exports = {
   SittingListQuery,
   SittingSend,
   SittingMarks,
+  SittingSendBulk,
+  SittingSendBulkResult,
+  AssessmentExport,
   PublicQuestion,
   AssessmentSession,
   AnswerParams,

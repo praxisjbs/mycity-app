@@ -102,11 +102,12 @@ const VacancyQuestion = z
   })
   .strict();
 
-/** One part of the vacancy's scorecard. */
+/** One part of the vacancy's scorecard: switched on or off for this role (guide §6.1), and its weight. */
 const ScorecardWeight = z
   .object({
     code: ScorecardCode,
     name: z.string(),
+    active: z.boolean(),
     weight: z.number().int().min(0).max(100),
   })
   .strict();
@@ -169,6 +170,11 @@ const VacancyDetail = Vacancy.extend({
   target_start_on: isoDate.nullable(),
   paused_at: isoDateTime.nullable(),
   closed_at: isoDateTime.nullable(),
+  working_days: z.string().nullable(),
+  /** The must-meet conditions Screen All With AI last asked for (guide §6.4). */
+  screening_conditions: z.array(z.string()).max(3),
+  /** The board's columns for this role: the M4 stages, less those whose scorecard parts are off. */
+  board_stages: z.array(ApplicationStage).max(5),
   questions: z.array(VacancyQuestion).max(40),
   scorecard: z.array(ScorecardWeight).length(5),
   by_stage: z.array(StageCount).max(10),
@@ -237,6 +243,8 @@ const vacancyFields = {
   requirements: z.string().trim().min(20, "Say what is needed").max(4000, "At most 4000 characters"),
   nice_to_have: blank(z.string().trim().max(4000, "At most 4000 characters")),
   target_start_on: blank(isoDate),
+  /** "Monday to Saturday", as MyCity's job descriptions say it. */
+  working_days: blank(z.string().trim().max(60, "At most 60 characters")),
   /** The last day it takes applications; it closes at 23:59 Lagos time that day. */
   closes_on: isoDate,
 };
@@ -294,17 +302,63 @@ const VacancyQuestionsSave = z
   })
   .strict();
 
-/** PUT /recruitment/vacancies/:id/scorecard: a whole number for each part, adding up to 100. */
+/** One part as the Scorecard form sends it. */
+const ScorecardPartInput = z
+  .object({
+    active: z.boolean(),
+    weight: z.coerce.number().int("A whole number").min(0, "0 or more").max(100, "At most 100"),
+  })
+  .strict();
+
+/**
+ * PUT /recruitment/vacancies/:id/scorecard: each part on or off for this role, and a whole-number
+ * weight; a part off weighs 0, the parts on add up to 100, and screening or interview is on.
+ */
 const ScorecardSave = z
   .object({
-    weights: z
-      .object(Object.fromEntries(ScorecardCode.options.map((c) => [c, z.coerce.number().int().min(0).max(100)])))
-      .strict(),
+    parts: z.object(Object.fromEntries(ScorecardCode.options.map((c) => [c, ScorecardPartInput]))).strict(),
   })
   .strict()
-  .refine((v) => Object.values(v.weights).reduce((a, b) => a + b, 0) === 100, {
+  .refine((v) => Object.values(v.parts).every((p) => p.active || p.weight === 0), {
+    message: "A part switched off weighs 0",
+    path: ["parts"],
+  })
+  .refine((v) => Object.values(v.parts).reduce((a, p) => a + (p.active ? p.weight : 0), 0) === 100, {
     message: "The parts must add up to 100",
-    path: ["weights"],
+    path: ["parts"],
+  })
+  .refine((v) => v.parts.screening.active || v.parts.interview.active, {
+    message: "Keep screening or interview",
+    path: ["parts"],
+  });
+
+/* ------------------------------------------------------------------ *
+ * Careers Settings (guide §3 step 3, §6.1): setting rows, entered on each environment (A26)
+ * ------------------------------------------------------------------ */
+
+/** GET /recruitment/vacancies/settings: About MyCityApp, and the traits New Vacancy starts from. */
+const CareersSettings = z
+  .object({
+    about_company: z.string().nullable(),
+    default_traits: z.array(z.string()).max(20),
+    updated_at: isoDateTime.nullable(),
+  })
+  .strict();
+
+/** PUT /recruitment/vacancies/settings. */
+const CareersSettingsSave = z
+  .object({
+    about_company: z.string().trim().max(2000, "At most 2000 characters").optional(),
+    default_traits: z
+      .array(z.string().trim().min(3, "Name the trait").max(120, "At most 120 characters"))
+      .max(20, "At most 20 traits")
+      .refine((t) => new Set(t.map((x) => x.toLowerCase())).size === t.length, "A trait is listed twice")
+      .optional(),
+  })
+  .strict()
+  .refine((v) => v.about_company !== undefined || v.default_traits !== undefined, {
+    message: "Nothing to change",
+    path: ["about_company"],
   });
 
 /* ------------------------------------------------------------------ *
@@ -406,6 +460,9 @@ const PublicJob = PublicJobCard.extend({
   probation_months: z.number().int().min(0).nullable(),
   reports_to: z.string().nullable(),
   min_experience_years: z.number().int().min(0).nullable(),
+  working_days: z.string().nullable(),
+  /** About MyCityApp, from Careers Settings: the same paragraph on every role. */
+  about_company: z.string().nullable(),
   salary_min: money.optional(),
   salary_max: money.optional(),
   description: z.string(),
@@ -437,6 +494,12 @@ const TABLES = {
     table: "recruitment_scorecard_criterion",
     virtual: { weight: "the column's numeric(5,2), as a whole number" },
   },
+  ScorecardPartInput: { table: "recruitment_scorecard_criterion" },
+  CareersSettings: {
+    table: null,
+    reason: "setting rows recruitment.about_company and recruitment.default_traits (jsonb values)",
+  },
+  CareersSettingsSave: { table: null, reason: "the two setting rows of Careers Settings" },
   StageCount: { table: null, reason: "a count of active applications at one stage" },
   Vacancy: {
     table: "vacancy",
@@ -465,6 +528,7 @@ const TABLES = {
       questions: "the vacancy_question rows",
       scorecard: "the recruitment_scorecard_criterion rows",
       by_stage: "active applications counted by stage",
+      board_stages: "the M4 stages less those whose scorecard parts are off (guide §6.3)",
       can_edit: "the reader may edit it: in scope with recruitment edit, and not closed",
     },
   },
@@ -493,7 +557,7 @@ const TABLES = {
   VacancyClose: { table: "vacancy" },
   VacancyQuestionInput: { table: "vacancy_question" },
   VacancyQuestionsSave: { table: null, reason: "the whole set of a vacancy's questions" },
-  ScorecardSave: { table: null, reason: "the five weights, one recruitment_scorecard_criterion row each" },
+  ScorecardSave: { table: null, reason: "the five parts, one recruitment_scorecard_criterion row each" },
   JdDraftRequest: { table: null, reason: "what New Vacancy holds; nothing is kept" },
   JdDraft: { table: null, reason: "a draft shown before anything changes; nothing is kept" },
   JdDraftOutput: { table: null, reason: "the model's answer, checked before anyone sees it" },
@@ -503,7 +567,7 @@ const TABLES = {
   PublicJobListQuery: { table: null, reason: "list controls for the public careers page" },
   PublicJobCard: { table: null, reason: "the allow-list of a vacancy a stranger may read" },
   PublicJobPage: { table: null, reason: "a page of open roles" },
-  PublicJob: { table: null, reason: "the allow-list of a vacancy a stranger may read" },
+  PublicJob: { table: null, reason: "the allow-list of a vacancy a stranger may read, with About MyCityApp" },
   ApplyStarted: { table: null, reason: "the Apply link's token, shown once; only its hash is kept" },
   SlugParams: { table: null, reason: "the :slug path parameter" },
 };
@@ -538,6 +602,9 @@ module.exports = {
   VacancyQuestionInput,
   VacancyQuestionsSave,
   ScorecardSave,
+  ScorecardPartInput,
+  CareersSettings,
+  CareersSettingsSave,
   JdDraftRequest,
   JdDraft,
   JdDraftOutput,
