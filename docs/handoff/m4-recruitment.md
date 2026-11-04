@@ -39,7 +39,7 @@ Never re-open §2. A decision that must change goes to GE, and the guide changes
 
 The whole of MILESTONES §9, by Friday 06/11/2026 (GE's team target; the milestone's own window is 2 to
 13 November): vacancies with an AI-drafted description on a public careers page, applications with a
-CV and a provisional score, AI screening, timed assessments on the public site, blind panel interviews
+CV and a provisional score, AI screening, timed tests and untimed briefs on the public site, blind panel interviews
 with a consolidated report, the weighted scorecard, AI cleanup of interview notes, time at stage. GE
 asked for it to be built bit by bit so no detail is missed, by several people on this branch at once
 (04/11/2026).
@@ -54,15 +54,15 @@ with INTERIM types; every backend file of the four modules empty; no contract, g
 
 1. A listed vacancy is reached by its slug (`/jobs/<slug>`), made once at first publish and never
    changed; Apply and Assess by single-use or expiring tokens. Recorded in MILESTONES §9.
-2. M4's stages: application, screening, assessment, interview, shortlist (plus not progressed). Offer
-   onwards is M5's (Victor).
+2. M4's stages: application, screening, assessment, interview, shortlist; Not Progressing is a status
+   at any of them, not a stage. Offer onwards is M5's (the M5 owner).
 3. Candidates get email from five editable templates; the interview invite carries an `.ics`.
    Panelists get the staff calendar invite.
 4. AI jobs: `cv-screen` Deep Reasoning; `jd-draft`, `screening-questions`, `assessment-questions`,
    `interview-notes-cleanup` Default. All personal data (never DeepSeek).
 5. Panelists must hold `recruitment` view; the picker offers only them. A Head of Department sees any
    interview they sit on.
-6. The AI reads a CV only on Score With AI or Score All; the estimate is computed at submit.
+6. The AI reads a CV only on Score With AI or Screen With AI; the estimate is computed at submit.
 7. No approval before publishing a vacancy.
 8. Assessment questions: choice (auto, points per option), text and file (marked by hand).
 
@@ -75,7 +75,7 @@ Revenue job description; kept out of this public repository), all in the guide:
     Details filled once, decision Select, On Hold or Reject; round score = panel mean × 10; the form
     generated as a PDF; panelists may open the CV. The traits live in Careers Settings, never a
     production seed (A26).
-11. Screen All With AI per role, after one to three must-meet conditions kept on the vacancy.
+11. Screen With AI per role, after one to three must-meet conditions kept on the vacancy.
 12. Scorecard parts switched on or off per vacancy; the board skips stages that are off.
 13. Send to Candidates in bulk; untimed take-home assessments due by a day; file answers up to 25 MB
     (the system's limit, GE) or a https link. Researched assessments on staging only, carried to
@@ -84,8 +84,8 @@ Revenue job description; kept out of this public repository), all in the guide:
     Settings), KPIs inside the description; New Vacancy is also a Praxis AI card.
 
 Design choices taken while writing the guide (open to GE, not yet challenged): one interview per
-round; an overall rating out of 5 is required of every panelist and the interview score is its mean
-times 20; private notes never shown to anyone but their author; the weighted total renormalises over
+round; each panelist rates every trait from 1 to 10 (one overall rating from 1 to 10 when the vacancy
+has no traits) and the interview score is the panel's mean × 10; private notes never shown to anyone but their author; the weighted total renormalises over
 the components that have a score; the CV's text is read with PDF.js (Word files are scored without
 it); an Apply link lives 48 hours, 7 days when staff invite; `closes_at` is the end of the picked
 day in Lagos; the staging seed uses `@example.test` candidates only.
@@ -100,8 +100,9 @@ day in Lagos; the staging seed uses `@example.test` candidates only.
 
 ## 4 · Open points and blockers
 
-- The psychometric and case-study question banks (Cynthia).
-- Candidate mail volume against production's 40 an hour (mail plan upgrade, Bode and Cynthia).
+- The psychometric and case-study question banks (Operations & People to send).
+- Candidate mail volume against production's 40 an hour (mail plan upgrade, with MyCity's management
+  and Operations & People).
 - Data retention for candidates (NDPR): nothing is deleted in M4.
 
 ---
@@ -110,28 +111,28 @@ day in Lagos; the staging seed uses `@example.test` candidates only.
 
 ### 5.1 The board
 
-Claim one whose **Needs** are all ticked. **P1 and P2 come first and block most others**: until they
-are ticked, only P7, P8 and P14's reading can start. Tick a package only when its own checks pass (§6).
+Claim one whose **Needs** are all ticked. P1, P2, P2b and P3 are done, so P4 to P6b, P9 to P11 and the
+packages that need none can start. Tick a package only when its own checks pass (§6).
 
 | Pkg | What | Files (yours alone while you hold it) | Needs | Claimed | Done |
 |---|---|---|---|---|---|
 | P1 | **Contract**: every request and response shape of guide §5, `TABLES` for gate 6, the public shapes; `npm run gen:contract` | `packages/contract/schemas/{vacancies,candidates,assessments,interviews}.js` (the index exports each file by itself) | none | GE · 04/11/2026 | ☑ 04/11/2026 |
 | P2 | **Migrations** 4010 to 4040 and seed 4199 (application numbering): guide §4 columns, CHECKs equal to P1's enums, FK indexes, triggers, Home's indexes; drop `application_stage_history`; round trip | `migrations/4010..4040_*.sql`, `seeds/reference/4199_*.sql`, `src/shared/numbering/schemes.js` (one entry) | P1 | GE · 04/11/2026 | ☑ 04/11/2026 |
-| P2b | **The review's schema**: migrations 4050 (interview card 1 to 10, Candidate Details, decision, form document, conditions, working days, parts on or off, untimed sittings, source `pool`) and 4060 (`talent_pool_entry`; 5000's pool tables stay unused, as 4060 runs before them), and the contract changes for them and for the Talent Pool | `migrations/4050_*.sql`, `migrations/4060_*.sql`, `packages/contract/schemas/{vacancies,candidates,assessments,interviews,talent_pool}.js` | P1, P2 | GE · 04/11/2026 | ☑ 04/11/2026 |
+| P2b | **The review's schema**: the review's changes folded into 4010 to 4040 (interview card 1 to 10, Candidate Details, decision, form document, conditions, working days, parts on or off, untimed sittings, source `pool`) and 4060 (`talent_pool_entry`; 5000's pool tables stay unused, as 4060 runs before them), and the contract changes for them and for the Talent Pool | `migrations/4010..4040_*.sql`, `migrations/4060_*.sql`, `packages/contract/schemas/{vacancies,candidates,assessments,interviews,talent_pool}.js` | P1, P2 | GE · 04/11/2026 | ☑ 04/11/2026 |
 | P3 | **Vacancies backend**: repo, service (lifecycle, slug, questions and traits, scorecard parts on or off, suggested seats, Careers Settings), routes, events, `.lifecycle`, `.slug`, `.questions`, Write With AI (`jd-draft`, `screening-questions`); public `/jobs`, `/jobs/:slug`, `POST /jobs/:slug/apply` (the token mint calls P4's service); the place owner `vacancy.location`; Home's adapter moved onto these tables with `owes` cleared; unit and integration tests | `src/modules/vacancies/*`, `src/modules/dashboard/sources/vacancies.source.js`, `tests/integration/recruitment-vacancies.test.js` | P1, P2, P2b | GE · 04/11/2026 | ☑ 04/11/2026 |
-| P4 | **Candidates backend**: public Apply (`GET/POST /apply/:token`, CV upload, purpose `cv`, write-only), the pipeline machine and moves, Not Progressing and Reopen, the estimate, `cv-screen` on press and Screen All With AI with conditions (outbox), the scorecard and SLA, Invite to Apply, the candidate emails and their editor; tests | `src/modules/candidates/*`, `tests/integration/recruitment-candidates.test.js` | P1, P2, P2b | | ☐ |
+| P4 | **Candidates backend**: public Apply (`GET/POST /apply/:token`, CV upload, purpose `cv`, write-only), the pipeline machine and moves, Not Progressing and Reopen, the estimate, `cv-screen` on press and Screen With AI with conditions (outbox), the scorecard and SLA, Invite to Apply, the candidate emails and their editor; tests | `src/modules/candidates/*`, `tests/integration/recruitment-candidates.test.js` | P1, P2, P2b | | ☐ |
 | P5 | **Assessments backend**: definitions and questions (points in `answer_key_enc`), Suggest With AI (`assessment-questions`), sittings (send, Send to Candidates in bulk, mark, cancel; timed and untimed), export and import of an assessment, public delivery (`/assess/:token`: start, answers, file answer up to 25 MB or a link, submit), `.timer`, `.scoring`, the `assessment-expire` scheduler; tests | `src/modules/assessments/*`, `src/jobs/...assessment-expire*`, `tests/integration/recruitment-assessments.test.js` | P1, P2, P2b | | ☐ |
-| P6 | **Interviews backend**: schedule, reschedule, cancel (calendar entry and invites; candidate `.ics` mail), Candidate Details, the blind card (ten traits 1 to 10, decision; the predicate of guide §6.6), the CV for the panel, submit and the closing rule, Close Round, the report and the Interview Assessment Form PDF, Tidy With AI (`interview-notes-cleanup`), the `interview-feedback-reminder`; tests | `src/modules/interviews/*`, `templates/documents/interview-assessment-form.html`, `tests/integration/recruitment-interviews.test.js` | P1, P2, P2b |
-| P6b | **Talent Pool backend**: Add to Pool, list and summary, Invite to Apply (source `pool`), Remove, Export, the `talent-pool-purge` scheduler (24 months); tests | `src/modules/talent_pool/*`, `src/jobs/...talent-pool-purge*`, `tests/integration/recruitment-pool.test.js` | P1, P2, P2b | | ☐ | | ☐ |
-| P7 | **Words**: the five candidate emails (`templates/email/application-received.html`, `apply-invite.html`, `assessment-invite.html`, `interview-invite.html`, `candidate-not-progressed.html`) and the five prompts (`src/services/ai/prompts/{jd-draft,cv-screen,screening-questions,assessment-questions,interview-notes-cleanup}.md`). Plain words for strangers; no dashes; Lagos dates. The variables each email may use are fixed with P4 to P6 | the ten files named | none (variables agreed with P4 to P6) | | ☐ |
+| P6 | **Interviews backend**: schedule, reschedule, cancel (calendar entry and invites; candidate `.ics` mail), Candidate Details, the blind card (ten traits 1 to 10, decision; the predicate of guide §6.6), the CV for the panel, submit and the closing rule, Close Round, the report and the Interview Assessment Form PDF, Tidy With AI (`interview-notes-cleanup`), the `interview-feedback-reminder`; tests | `src/modules/interviews/*`, `templates/documents/interview-assessment-form.html`, `tests/integration/recruitment-interviews.test.js` | P1, P2, P2b | | ☐ |
+| P6b | **Talent Pool backend**: Add to Pool, list and summary, Invite to Apply (source `pool`), Remove, Export, the `talent-pool-purge` scheduler (24 months); tests | `src/modules/talent_pool/*`, `src/jobs/...talent-pool-purge*`, `tests/integration/recruitment-pool.test.js` | P1, P2, P2b | | ☐ |
+| P7 | **Words**: the five candidate emails (`templates/email/application-received.html`, `apply-invite.html`, `assessment-invite.html`, `interview-invite.html`, `candidate-not-progressed.html`) and the three prompts left (`src/services/ai/prompts/{cv-screen,assessment-questions,interview-notes-cleanup}.md`; `jd-draft` and `screening-questions` came with P3). Plain words for strangers; no dashes; Lagos dates. The variables each email may use are fixed with P4 to P6 | the eight files named | none (variables agreed with P4 to P6) | | ☐ |
 | P8 | **Components**: `RatingField` (1 to 10 stars, 44 px on a phone, keyboard and touch, Forms group) and anything else the screens lack, through `npm run new:component` with header, test and gallery page; `npm run gen:components` | `packages/ui/src/...` (the new components only), `docs/COMPONENTS.md` | none | | ☐ |
 | P9 | **Staff screens** on the contract: Vacancies (wizard, sheet, questions, scorecard, suggested seats, Candidate Emails), Candidates (board, sheet, scores with Provisional, scorecard, stage history), Assessments (definitions, questions editor, sittings, Mark Answers), Interviews (list, sheet, Candidate Details, My Card with ten-star traits, Close Round, report, Download Form), Talent Pool (list, sheet, Invite to Apply), Careers Settings. Desktop and phone (guide §10). INTERIM types in `app/src/api/types/recruitment.ts` replaced by the contract's; M5's tabs (Offers, Onboarding) left as they are | `app/src/features/recruitment/*`, `app/src/api/types/recruitment.ts` | P1 (P8 for feedback) | | ☐ |
 | P10 | **Staff mock**: `app/src/api/mock/modules/recruitment.ts` answering every M4 route in the contract's shapes, with the grants and data the pictures need | `app/src/api/mock/modules/recruitment.ts` | P1 | | ☐ |
 | P11 | **Public pages** on the contract: Careers, Vacancy (paused and closed states), Apply (the vacancy's questions, the privacy tick, `cover_letter`), Assessment (file answers); the public mock | `public-app/src/pages/{Careers,Vacancy,Apply,Assessment}.tsx`, `public-app/src/api/types/public.ts` (the M4 half), `public-app/src/api/mock/public.ts` (the M4 half) | P1 | | ☐ |
-| P12 | **Search and AI**: `.search.js` for the five modules, New Vacancy as a Praxis AI card, the route map's record types, ⌘K actions; `.ai.js` manifests (reads, summary, routes, `not_offered`); `npm run gen:ai-catalogue`; eval cases | `src/modules/*/*.search.js`, `src/modules/*/*.ai.js` (the four), `src/shared/search/actions.js` (M4 lines) | P3 to P6 | | ☐ |
+| P12 | **Search and AI**: `.search.js` and `.ai.js` for candidates, assessments, interviews and talent_pool (vacancies' came with P3, with the New Vacancy and Save Vacancy cards), the route map's record types, ⌘K actions; manifests (reads, routes, `not_offered`); `npm run gen:ai-catalogue`; eval cases; the matrix probes | `src/modules/*/*.search.js`, `src/modules/*/*.ai.js` (the four left), `src/shared/search/actions.js` (M4 lines) | P3 to P6 | | ☐ |
 | P13 | **Staging seed** `seeds/staging/55_recruitment.js` through the services: Careers Settings with MyCity's ten traits and About MyCityApp, vacancies (one shaped on the Head Sales & Revenue description), applications from `@example.test` candidates, the researched assessments and a take-home brief, sittings, a closed and an open round, pool members; its test; Home's staging vacancy rows removed | `seeds/staging/55_recruitment.js`, its test, `seeds/staging/60_home.js` and `lib/forward-rows.js` (the vacancy rows only) | P3 to P6 | | ☐ |
 | P14 | **User Guide** `docs/manual/recruitment.md` and `docs/manual/public-site.md` (the M4 pages), front matter `milestones: M4`, a section per screen, pictures via `npm run guide:shots -- --chapter recruitment` | `docs/manual/recruitment.md`, `docs/manual/public-site.md`, `docs/manual/img/recruitment/` | P9 to P11 (reading can start now) | | ☐ |
-| P15 | **Close-out** (GE): PROGRESS #38 to #41 and #80 to #83, README map, DATABASE_SCHEMA M4, guide Status, the whole `npm run ci`, PR ready for review | `docs/PROGRESS.md`, `README.MD`, `docs/DATABASE_SCHEMA.md` | all | | ☐ |
+| P15 | **Close-out** (GE): PROGRESS #38 to #41, #44 and #80 to #83, README map, DATABASE_SCHEMA M4, guide Status, the whole `npm run ci`, PR ready for review | `docs/PROGRESS.md`, `README.MD`, `docs/DATABASE_SCHEMA.md` | all | | ☐ |
 
 ### 5.2 Shared files: anyone edits, by these rules
 
@@ -144,7 +145,7 @@ are ticked, only P7, P8 and P14's reading can start. Tick a package only when it
 | `src/shared/documents/types.js`, `body-limits.js`, `mime-policy.js`, `packages/contract/schemas/documents.js` `UploadPurpose` | P4 adds `cv`, P5 adds `assessment_answer` |
 | `README.MD` | Add your new files to the map in the same commit (README §11); `npm run check:readme-map` |
 | `docs/guides/recruitment.md` | Anyone, design changes first, with a Change log line |
-| `docs/PROGRESS.md` | Notes only, under Recruitment, one line per package done; ticks are P15's |
+| `docs/PROGRESS.md` | A note under Recruitment, one line per package done. The package that builds a screen's API ticks its API column (and UI or Mobile for P9 and P11); Status, the summary counts and the final check are P15's |
 | this file | Your own row in §5, your lines in §4 and §7 |
 
 ---
@@ -185,7 +186,7 @@ are ticked, only P7, P8 and P14's reading can start. Tick a package only when it
   full (decisions 9 to 14). Guide, MILESTONES §9 and §18, PROGRESS (#44 to M4, GE; M4 9 screens, M5 4),
   README's jobs and CODEOWNERS updated. New packages P2b (GE, the review's schema and contract) and
   P6b (Talent Pool backend). P3 to P6 now need P2b too.
-- 04/11/2026 · GE · P2b done. 4050: the card rated 1 to 10 with `decision` on both the card and the
+- 04/11/2026 · GE · P2b done (4050, since folded into 4010 to 4040): the card rated 1 to 10 with `decision` on both the card and the
   round (4040's round `recommendation` dropped, never written), Candidate Details and
   `form_document_id` on the round, `screening_conditions` and `working_days` on the vacancy, `active`
   on each scorecard part, `due_days` for untimed sittings, source `pool`. 4060: `talent_pool_entry`, a
@@ -205,4 +206,17 @@ are ticked, only P7, P8 and P14's reading can start. Tick a package only when it
   Integration suites run green: recruitment-vacancies, home-*, search, ai-search, ai-matrix,
   ai-attacks, ai-cards, ai-summaries, assistant, server-boot, worker. For P4: start an application
   from the token `startApplication` mints (scope `application.apply`, subject the vacancy), and
-  `vacancies.service.keepScreeningConditions(client, scope, id, conditions)` for Screen All With AI.
+  `vacancies.service.keepScreeningConditions(client, scope, id, conditions)` for Screen With AI.
+- 04/11/2026 · GE · Audit of P1 to P3. **The M4 migrations were rewritten before merge: rebuild your
+  local database** (drop and recreate it, then `npm run db:migrate`). 4050 is gone, its changes folded
+  into 4010 to 4040 (round `decision`, no round `recommendation`; ratings 1 to 10; `due_days`; source
+  never null, default `careers`; a draft closes without a slug); 4060 gains an `invited_at` index.
+  Contract: `clearable` (an edit's empty field clears it) for VacancyEdit, VacancyChange, AssessmentEdit
+  and RoundDetailsSave; at most 20 traits; VacancyDetail lists only questions in use; weights, points
+  and marks are numbers; `ScoreAll.screening_conditions` optional (the kept ones reused); the invite
+  mail's `duration_minutes` nullable with `due_days`; enums in CandidateSitting and CandidateInterview.
+  Vacancies: remote drops the place, pay checked against what is kept, slug under a lock, one live
+  vacancy a seat, suggestions and AI cards in scope, Careers Settings saved with scope all, a reworded
+  answered question retired, About MyCityApp passed to the prompts; `boardStages` and `howWeHire` in
+  `vacancies.lifecycle.js`. Home's adapter owes the application lifecycle again until P4. For P4:
+  `keepScreeningConditions` now answers `{ row, conditions }`.

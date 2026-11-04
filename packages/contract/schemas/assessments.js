@@ -14,7 +14,7 @@
 const { z } = require("zod");
 const { uuid, isoDate, isoDateTime, listQuery, Paged } = require("./common");
 const { DocumentRef } = require("./documents");
-const { optionalWhole } = require("./vacancies");
+const { optionalWhole, clearable, M4_STAGES } = require("./vacancies");
 
 /* ------------------------------------------------------------------ *
  * Code lists
@@ -112,9 +112,15 @@ const assessmentFields = {
 /** POST /recruitment/assessments: a new assessment, inactive until it has questions. */
 const AssessmentCreate = z.object(assessmentFields).strict();
 
-/** PATCH /recruitment/assessments/:id. */
+/** PATCH /recruitment/assessments/:id. Duration or pass mark sent empty is cleared: untimed, or no pass mark. */
 const AssessmentEdit = z
-  .object(Object.fromEntries(Object.entries(assessmentFields).map(([k, s]) => [k, s.optional()])))
+  .object({
+    name: assessmentFields.name.optional(),
+    assessment_type: AssessmentType.optional(),
+    duration_minutes: clearable(assessmentFields.duration_minutes),
+    instructions: assessmentFields.instructions.optional(),
+    pass_score: clearable(assessmentFields.pass_score),
+  })
   .strict()
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "Nothing to change", path: ["name"] });
 
@@ -128,14 +134,14 @@ const AssessmentQuestionInput = z
         z
           .object({
             text: z.string().trim().min(1, "Write the option").max(300, "At most 300 characters"),
-            points: z.coerce.number().min(0, "0 or more").max(100, "At most 100"),
+            points: z.number({ invalid_type_error: "A number" }).min(0, "0 or more").max(100, "At most 100"),
           })
           .strict(),
       )
       .min(2, "At least two options")
       .max(8, "At most eight options")
       .optional(),
-    max_score: z.coerce.number().min(1, "At least 1").max(100, "At most 100").optional(),
+    max_score: z.number({ invalid_type_error: "A number" }).min(1, "At least 1").max(100, "At most 100").optional(),
   })
   .strict()
   .refine((q) => (q.question_type === "choice") === Boolean(q.options), {
@@ -277,7 +283,7 @@ const SittingSendBulk = z
   .object({
     vacancy_id: uuid,
     assessment_definition_id: uuid,
-    stage: z.enum(["application", "screening", "assessment", "interview", "shortlist"]).default("assessment"),
+    stage: z.enum(M4_STAGES).default("assessment"),
     start_within_days: z.coerce.number().int().min(1, "At least 1 day").max(14, "At most 14 days").default(3),
     due_days: optionalWhole(1, 14, "At most 14 days"),
   })
@@ -316,7 +322,7 @@ const SittingMarks = z
         z
           .object({
             assessment_question_id: uuid,
-            awarded_score: z.coerce.number().min(0, "0 or more").max(100, "At most 100"),
+            awarded_score: z.number({ invalid_type_error: "A number" }).min(0, "0 or more").max(100, "At most 100"),
             reviewer_comment: z.string().trim().max(1000, "At most 1000 characters").optional(),
           })
           .strict(),
@@ -399,7 +405,9 @@ const AssessmentInviteEmailVars = z
   .object({
     vacancy_title: z.string(),
     assessment_name: z.string(),
-    duration_minutes: z.number().int(),
+    /** Minutes for a timed test; null for an untimed brief, which has due_days instead. */
+    duration_minutes: z.number().int().nullable(),
+    due_days: z.number().int().nullable(),
     start_by: isoDate,
     assess_url: z.string(),
   })

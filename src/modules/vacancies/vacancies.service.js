@@ -22,6 +22,7 @@ const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const numbering = require("../../shared/numbering/numbering");
+const money = require("../../shared/money/money");
 const lagos = require("../../shared/time/lagos");
 const places = require("../../shared/places/places");
 const { transition } = require("../../shared/state/state-history");
@@ -84,16 +85,6 @@ function listed(row, now = new Date()) {
   };
 }
 
-/** The board's columns for a vacancy: the M4 stages less those whose parts are off (guide §6.3). */
-function boardStages(scorecard) {
-  const on = new Set(scorecard.filter((p) => p.active).map((p) => p.code));
-  return repo.M4_STAGES.filter((stage) => {
-    if (stage === "assessment") return on.has("psychometric") || on.has("technical") || on.has("case_study");
-    if (stage === "interview") return on.has("interview");
-    return true;
-  });
-}
-
 /** Whether the user holds recruitment edit over this vacancy's hiring manager. */
 async function canEdit(user, row) {
   if (row.status === "closed") return false;
@@ -113,7 +104,7 @@ async function list(query, scope) {
 }
 
 const summary = (scope) => repo.summary(pool, scope);
-const suggested = (query) => repo.suggested(pool, query);
+const suggested = (query, scope) => repo.suggested(pool, query, scope);
 
 /** The row behind a vacancy the reader may see, or 404. */
 async function visibleRow(db, id, scope, opts) {
@@ -152,10 +143,10 @@ async function detailOf(db, row, user) {
     closed_at: row.closed_at,
     working_days: row.working_days,
     screening_conditions: row.screening_conditions || [],
-    board_stages: boardStages(scorecard),
-    questions: qs.map((q) => ({ ...q, options: Array.isArray(q.options) ? q.options : null })),
+    board_stages: lifecycle.boardStages(scorecard),
+    questions: qs.filter((q) => q.active).map((q) => ({ ...q, options: Array.isArray(q.options) ? q.options : null })),
     scorecard,
-    by_stage: repo.M4_STAGES.map((stage) => ({ stage, count: by.get(stage) || 0 })),
+    by_stage: lifecycle.M4_STAGES.map((stage) => ({ stage, count: by.get(stage) || 0 })),
     can_edit: editable,
   };
 }
@@ -170,9 +161,10 @@ async function get(id, user, scope) {
 
 /**
  * Check the people and places a save names: the department exists, the hiring manager is an active
- * employee in the writer's scope, and a seat is still vacant.
+ * employee in the writer's scope, and a seat is still vacant with no other live vacancy for it (the
+ * seat is held until the save commits, so two saves cannot both take it).
  */
-async function checkRefs(client, scope, body) {
+async function checkRefs(client, scope, body, vacancyId = null) {
   if (body.department_id && !(await repo.departmentExists(client, body.department_id)))
     throw field("department_id", "Pick the department");
   if (body.hiring_manager_id) {
@@ -182,8 +174,9 @@ async function checkRefs(client, scope, body) {
       throw field("hiring_manager_id", "Pick someone in your team");
   }
   if (body.org_seat_id) {
-    const seat = await repo.seat(client, body.org_seat_id);
+    const seat = await repo.seat(client, body.org_seat_id, vacancyId);
     if (!seat || seat.status !== "vacant") throw field("org_seat_id", "That seat is no longer open");
+    if (seat.taken) throw field("org_seat_id", "That seat has a vacancy");
   }
 }
 
@@ -200,9 +193,10 @@ async function create(actor, scope, body) {
     await checkRefs(client, scope, body);
     const { number } = await numbering.allocate(client, "vacancy");
     const cols = columnsOf(body);
-    if (body.location) cols.location = places.lineOf(body.location);
+    const placed = body.location && body.work_pattern !== "remote";
+    if (placed) cols.location = places.lineOf(body.location);
     const id = await repo.insert(client, { ...cols, number, created_by: actor.user_id });
-    if (body.location) await places.save(client, LOCATION, id, body.location);
+    if (placed) await places.save(client, LOCATION, id, body.location);
     await repo.insertScorecard(client, id, c.vacancies.SCORECARD_DEFAULTS);
     const { default_traits: traits } = await repo.settings(client);
     if (traits.length) await questions.save(client, id, questions.fromTraits(traits));
@@ -222,14 +216,23 @@ async function update(actor, scope, id, body) {
   return tx(async (client) => {
     const before = await visibleRow(client, id, scope, { lock: true });
     if (before.status === "closed") throw new AppError("VACANCY_CLOSED", "A closed vacancy cannot be changed", 409);
-    await checkRefs(client, scope, body);
+    await checkRefs(client, scope, body, id);
     const cols = columnsOf(body);
     const pattern = body.work_pattern || before.work_pattern;
-    if (body.location) {
+    if (pattern === "remote") {
+      // A remote role has no place: one it had is removed, and a place sent with it is not kept.
+      if (before.location) {
+        await places.remove(client, LOCATION, id);
+        cols.location = null;
+      }
+    } else if (body.location) {
       cols.location = (await places.save(client, LOCATION, id, body.location)).line;
-    } else if (pattern !== "remote" && !before.location && before.status !== "draft") {
+    } else if (!before.location && before.status !== "draft") {
       throw field("location", "Pick the location");
     }
+    const min = body.salary_min !== undefined ? body.salary_min : before.salary_min;
+    const max = body.salary_max !== undefined ? body.salary_max : before.salary_max;
+    if (min && max && money.compare(max, min) < 0) throw field("salary_max", "Below the minimum");
     if (cols.closes_at && before.status !== "draft" && cols.closes_at <= new Date())
       throw field("closes_on", "Pick a day after today");
     await repo.update(client, id, cols);
@@ -244,17 +247,19 @@ async function update(actor, scope, id, body) {
   });
 }
 
-/** Read the city of the vacancy's picked place, for its slug. */
-async function cityOf(client, id) {
-  const { rows } = await client.query("SELECT city FROM place WHERE owner = $1 AND owner_key = $2", [LOCATION, String(id)]);
-  return rows[0] ? rows[0].city : null;
+/** The slug a vacancy is published under: its own, or a free one made from its title and city. */
+async function slugFor(client, row) {
+  if (row.slug) return row.slug;
+  const base = slugs.base(row.title, await repo.cityOf(client, LOCATION, row.vacancy_id));
+  await repo.lockSlug(client, base);
+  return slugs.unique(client, base);
 }
 
-/** Publish a draft inside the caller's transaction; `row` is locked. */
+/** Publish a draft, or resume a paused vacancy, inside the caller's transaction; `row` is locked. */
 async function publishIn(client, actor, row) {
   lifecycle.assertCanMove(row.status, "open");
   lifecycle.assertPublishable(row);
-  const slug = row.slug || (await slugs.unique(client, slugs.base(row.title, await cityOf(client, row.vacancy_id))));
+  const slug = await slugFor(client, row);
   await repo.setStatus(client, row.vacancy_id, { status: "open", slug });
   await transition(client, lifecycle.MACHINE, {
     entity_id: row.vacancy_id,
@@ -335,13 +340,21 @@ async function saveScorecard(actor, scope, id, body) {
 }
 
 /**
- * Keep the must-meet conditions Screen All With AI asked for (guide §6.4). Called by the candidates
- * service inside its own transaction, before it queues the reads.
+ * Keep the must-meet conditions Screen With AI asked for (guide §6.4), one to three; left out, the
+ * vacancy's kept ones stand. Called by the candidates service inside its own transaction, before it
+ * queues the reads. Returns the vacancy and the conditions to read against.
  */
 async function keepScreeningConditions(client, scope, id, conditions) {
   const row = await visibleRow(client, id, scope, { lock: true });
+  if (row.status === "closed") throw new AppError("VACANCY_CLOSED", "A closed vacancy cannot be changed", 409);
+  if (conditions === undefined) {
+    const kept = row.screening_conditions || [];
+    if (!kept.length) throw field("screening_conditions", "Give one condition");
+    return { row, conditions: kept };
+  }
+  if (conditions.length < 1 || conditions.length > 3) throw field("screening_conditions", "One to three conditions");
   await repo.setScreeningConditions(client, id, conditions);
-  return row;
+  return { row, conditions };
 }
 
 /* ------------------------------------------------------------------ *
@@ -350,7 +363,12 @@ async function keepScreeningConditions(client, scope, id, conditions) {
 
 const settings = () => repo.settings(pool);
 
-async function saveSettings(actor, body) {
+/**
+ * Careers Settings shape every vacancy, so only a recruiter whose edit grant reaches every vacancy
+ * (scope all) may save them; a hiring manager reads them.
+ */
+async function saveSettings(actor, scope, body) {
+  if (scope.scope !== "all") throw new AppError("PERMISSION_DENIED", "Only a recruiter for every vacancy can change this", 403);
   return tx(async (client) => {
     if (body.about_company !== undefined) await repo.putSetting(client, repo.SETTINGS.about, body.about_company, actor.user_id);
     if (body.default_traits !== undefined)
@@ -371,38 +389,46 @@ async function saveSettings(actor, body) {
 
 /** A description drafted from what New Vacancy holds; the department named, not its id. */
 async function assist(user, body) {
-  let department = null;
-  if (body.department_id) {
-    const { rows } = await pool.query("SELECT name FROM department WHERE department_id = $1", [body.department_id]);
-    department = rows[0] ? rows[0].name : null;
-  }
-  return require("./vacancies.draft").draft(user, body, department);
+  const department = body.department_id ? await repo.departmentName(pool, body.department_id) : null;
+  const { about_company: company } = await repo.settings(pool);
+  return require("./vacancies.draft").draft(user, body, department, company);
 }
 
 /** Questions and traits to consider for a vacancy in scope, beside the traits it has. */
 async function suggestQuestions(user, scope, id) {
   const row = await visibleRow(pool, id, scope);
   const traits = (await repo.questions(pool, id)).filter((q) => q.active && q.purpose === "interview").map((q) => q.prompt);
-  return require("./vacancies.draft").suggest(user, row, traits);
+  const { about_company: company } = await repo.settings(pool);
+  return require("./vacancies.draft").suggest(user, row, traits, company);
 }
 
 /* ------------------------------------------------------------------ *
  * Praxis AI cards (vacancies.ai.js)
  * ------------------------------------------------------------------ */
 
-/** A vacancy the person names by number or title, among those they may see; null when none or several. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Whether a vacancy exists and the reader's scope reaches it. */
+async function inScope(db, id, scope) {
+  const row = await repo.get(db, id);
+  if (!row) return null;
+  if (scope.scope !== "all" && !(row.hiring_manager_id && (scope.scope_ids || []).includes(row.hiring_manager_id))) return null;
+  return row;
+}
+
+/** A vacancy the person names by id, number or title, among those they may see; null when none or several. */
 async function idOf(db, words, scope) {
-  if (/^[0-9a-f-]{36}$/i.test(String(words))) return String(words);
+  if (UUID.test(String(words))) return (await inScope(db, String(words), scope)) ? String(words) : null;
   const page = await repo.list(db, { page: 1, q: String(words).slice(0, 100) }, scope);
   const { oneNamed } = require("../../shared/ai/named");
   const found = oneNamed(page.data || [], words, (v) => [v.number, v.title]);
   return found ? found.vacancy_id : null;
 }
 
-/** The vacancy a card changes, by name, for the card's header. */
-async function cardVacancy(db, id) {
-  if (!id) return [];
-  const row = await repo.get(db, id);
+/** The vacancy a card changes, by name, for the card's header; nothing outside the reader's scope. */
+async function cardVacancy(db, id, scope) {
+  if (!id || !UUID.test(String(id))) return [];
+  const row = await inScope(db, id, scope);
   return row ? [{ type: "vacancy", id, label: `${row.number}, ${row.title}` }] : [];
 }
 
@@ -426,7 +452,7 @@ module.exports = {
   suggestQuestions,
   idOf,
   cardVacancy,
-  boardStages,
+  boardStages: lifecycle.boardStages,
   daysOpen,
   endOfDay,
 };

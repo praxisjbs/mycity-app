@@ -31,6 +31,7 @@ const registry = require("../../src/shared/ai/registry");
 const token = require("../../src/shared/places/token");
 const geoapify = require("../../src/services/maps/geoapify.service");
 const { q, one, drain, fresh, script, say, harness } = require("./helpers/ai-actions");
+const service = require("../../src/modules/vacancies/vacancies.service");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -253,16 +254,36 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     const ops = await one("SELECT vacancy_id FROM vacancy WHERE number = 'VAC-0001'");
     expect((await h.as("hod").get(`/recruitment/vacancies/${ops.vacancy_id}`)).status).toBe(404);
     expect((await h.as("hod").post(`/recruitment/vacancies/${ops.vacancy_id}/pause`).send({})).status).toBe(404);
+    expect((await h.as("hod").patch(`/recruitment/vacancies/${ops.vacancy_id}`).send({ positions: 3 })).status).toBe(404);
     expect((await h.as("ops").get("/recruitment/vacancies")).body.page.total).toBe(2);
+    // The summary counts only their vacancies; Careers Settings shape every vacancy, so they read them only.
+    expect((await h.as("hod").get("/recruitment/vacancies/summary")).body.open).toBe(0);
+    expect((await h.as("ops").get("/recruitment/vacancies/summary")).body.open).toBe(1);
+    expect((await h.as("hod").get("/recruitment/vacancies/settings")).status).toBe(200);
+    expect((await h.as("hod").put("/recruitment/vacancies/settings").send({ default_traits: ["Level of Confidence"] })).status).toBe(403);
+    // A card never names a vacancy outside the asker's scope, by id or by number.
+    const hodScope = { scope: "team", scope_ids: [h.people.hod.employee_id, h.people.staff.employee_id] };
+    expect(await service.idOf(pool, ops.vacancy_id, hodScope)).toBe(null);
+    expect(await service.idOf(pool, "VAC-0001", hodScope)).toBe(null);
+    expect(await service.cardVacancy(pool, ops.vacancy_id, hodScope)).toEqual([]);
+    expect(await service.idOf(pool, theirs.body.vacancy_id, hodScope)).toBe(theirs.body.vacancy_id);
   });
 
   test("Suggested From Organogram lists vacant seats until a vacancy takes one", async () => {
     const seat = await one("INSERT INTO org_seat (title, department_id, status) VALUES ('Partnerships Associate', $1, 'vacant') RETURNING org_seat_id", [dept]);
     const before = await h.as("ops").get("/recruitment/vacancies/suggested");
     expect(before.body.data).toEqual([expect.objectContaining({ org_seat_id: seat.org_seat_id, title: "Partnerships Associate", department: "Operations" })]);
+    // A Head of Department sees only the seats of people they lead.
+    expect((await h.as("hod").get("/recruitment/vacancies/suggested")).body.data).toEqual([]);
     const made = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Partnerships Associate", org_seat_id: seat.org_seat_id }));
     expect(made.status).toBe(201);
     expect(made.body.org_seat_id).toBe(seat.org_seat_id);
+    // One live vacancy a seat.
+    const again = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Partnerships Associate II", org_seat_id: seat.org_seat_id }));
+    expect(again.status).toBe(422);
+    expect(again.body.error.fields).toHaveProperty("org_seat_id");
+    // Saving the vacancy that holds the seat keeps it.
+    expect((await h.as("ops").patch(`/recruitment/vacancies/${made.body.vacancy_id}`).send({ org_seat_id: seat.org_seat_id, positions: 2 })).status).toBe(200);
     expect((await h.as("ops").get("/recruitment/vacancies/suggested")).body.data).toEqual([]);
   });
 
@@ -321,5 +342,92 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     expect(edit.body.card.records).toEqual([expect.objectContaining({ type: "vacancy", id: made.vacancy_id })]);
     expect((await h.press("ops", edit.body.card.ai_action_draft_id)).status).toBe(200);
     expect(await one("SELECT positions FROM vacancy WHERE vacancy_id = $1", [made.vacancy_id])).toEqual({ positions: 2 });
+  });
+
+  test("an answered question is retired, never rewritten: reworded it is a new question, left out it stays on its answers", async () => {
+    const made = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Events Lead" }));
+    const id = made.body.vacancy_id;
+    const asked = await h.as("ops").put(`/recruitment/vacancies/${id}/questions`).send({
+      questions: [
+        { purpose: "application", question_type: "yes_no", prompt: "Can you work weekends in Lagos?" },
+        { purpose: "application", question_type: "text", prompt: "A link to an event you ran" },
+      ],
+    });
+    const [weekends, link] = asked.body.questions;
+    const person = await one("INSERT INTO candidate (first_name, last_name, email) VALUES ('Kemi', 'Bello', 'kemi.events@example.test') RETURNING candidate_id");
+    await q("INSERT INTO application (number, vacancy_id, candidate_id, answers) VALUES ('APP-9001', $1, $2, $3::jsonb)", [
+      id,
+      person.candidate_id,
+      JSON.stringify({ [weekends.vacancy_question_id]: "yes", [link.vacancy_question_id]: "https://example.test/event" }),
+    ]);
+    const saved = await h.as("ops").put(`/recruitment/vacancies/${id}/questions`).send({
+      questions: [{ vacancy_question_id: weekends.vacancy_question_id, purpose: "application", question_type: "yes_no", prompt: "Can you work weekends and evenings in Lagos?" }],
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.questions.map((x) => x.prompt)).toEqual(["Can you work weekends and evenings in Lagos?"]);
+    expect(saved.body.questions[0].vacancy_question_id).not.toBe(weekends.vacancy_question_id);
+    const kept = await q("SELECT prompt, active FROM vacancy_question WHERE vacancy_question_id = ANY($1::uuid[]) ORDER BY prompt", [[weekends.vacancy_question_id, link.vacancy_question_id]]);
+    expect(kept.rows).toEqual([
+      { prompt: "A link to an event you ran", active: false },
+      { prompt: "Can you work weekends in Lagos?", active: false },
+    ]);
+  });
+
+  test("Edit clears what it is sent empty, a remote role drops its place, and pay is checked against what is kept", async () => {
+    const made = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Community Manager" }));
+    const id = made.body.vacancy_id;
+    const cleared = await h.as("ops").patch(`/recruitment/vacancies/${id}`).send({ nice_to_have: "", working_days: null, min_experience_years: "" });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body).toMatchObject({ nice_to_have: null, working_days: null, min_experience_years: null });
+    const remote = await h.as("ops").patch(`/recruitment/vacancies/${id}`).send({ work_pattern: "remote" });
+    expect(remote.body).toMatchObject({ work_pattern: "remote", location: null, location_place: null });
+    expect(await one("SELECT count(*)::int AS n FROM place WHERE owner = 'vacancy.location' AND owner_key = $1", [id])).toEqual({ n: 0 });
+    const low = await h.as("ops").patch(`/recruitment/vacancies/${id}`).send({ salary_max: "500000.00" });
+    expect(low.status).toBe(422);
+    expect(low.body.error.fields).toHaveProperty("salary_max");
+    expect((await h.as("ops").patch(`/recruitment/vacancies/${id}`).send({})).status).toBe(422);
+  });
+
+  test("a draft can be closed; a role past its closing day reads closed and takes no one; resuming one says its day has passed", async () => {
+    const draft = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Draft To Drop" }));
+    const dropped = await h.as("ops").post(`/recruitment/vacancies/${draft.body.vacancy_id}/close`).send({ close_reason: "cancelled" });
+    expect(dropped.status).toBe(200);
+    expect(dropped.body).toMatchObject({ status: "closed", slug: null, public_url: null });
+
+    const made = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Brand Designer", publish: true }));
+    expect(made.body).toMatchObject({ status: "open", slug: "brand-designer-lagos" });
+    const id = made.body.vacancy_id;
+    await q("UPDATE vacancy SET closes_at = now() - interval '1 hour' WHERE vacancy_id = $1", [id]);
+    expect((await pub().get("/jobs/brand-designer-lagos")).body.state).toBe("closed");
+    expect((await pub().get("/jobs?q=brand")).body.page.total).toBe(0);
+    expect((await pub().post("/jobs/brand-designer-lagos/apply").send({})).status).toBe(404);
+    expect((await h.as("ops").get(`/recruitment/vacancies/${id}`)).body.past_closing).toBe(true);
+
+    await h.as("ops").post(`/recruitment/vacancies/${id}/pause`).send({});
+    const resumed = await h.as("ops").post(`/recruitment/vacancies/${id}/resume`).send({});
+    expect(resumed.status).toBe(422);
+    expect(resumed.body.error.fields.closes_on).toEqual(["Its closing day has passed"]);
+    const later = await h.as("ops").patch(`/recruitment/vacancies/${id}`).send({ closes_on: closesOn() });
+    expect(later.status).toBe(200);
+    expect((await h.as("ops").post(`/recruitment/vacancies/${id}/resume`).send({})).body.status).toBe("open");
+
+    const cancelled = await h.as("ops").post(`/recruitment/vacancies/${id}/close`).send({ close_reason: "cancelled" });
+    expect(cancelled.body.status).toBe("closed");
+    expect((await pub().get("/jobs/brand-designer-lagos")).body.state).toBe("closed");
+  });
+
+  test("the careers page pages in 25s; two roles of the same title and city get their own slugs", async () => {
+    for (let i = 0; i < 26; i += 1) {
+      const r = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Sales Associate", publish: true }));
+      expect(r.status).toBe(201);
+    }
+    const slugsMade = (await q("SELECT slug::text FROM vacancy WHERE title = 'Sales Associate' ORDER BY slug")).rows.map((r) => r.slug);
+    expect(new Set(slugsMade).size).toBe(26);
+    expect(slugsMade).toContain("sales-associate-lagos");
+    expect(slugsMade).toContain("sales-associate-lagos-26");
+    const first = await pub().get("/jobs?q=sales%20associate");
+    expect(first.body.data).toHaveLength(25);
+    expect(first.body.page.total).toBe(26);
+    expect((await pub().get("/jobs?q=sales%20associate&page=2")).body.data).toHaveLength(1);
   });
 });

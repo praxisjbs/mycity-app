@@ -13,9 +13,7 @@
 const { personJson } = require("../../shared/db/person");
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
-
-/** The M4 stages, in board order (vacancies.js M4_STAGES). */
-const M4_STAGES = ["application", "screening", "assessment", "interview", "shortlist"];
+const { M4_STAGES } = require("./vacancies.lifecycle");
 
 /** The setting rows this module keeps (Careers Settings, guide §6.1). */
 const SETTINGS = Object.freeze({ about: "recruitment.about_company", traits: "recruitment.default_traits" });
@@ -104,7 +102,6 @@ const WRITABLE = [
   "target_start_on",
   "working_days",
   "closes_at",
-  "description_ai_run_id",
 ];
 
 function pick(fields) {
@@ -161,7 +158,21 @@ async function setStatus(client, id, { status, slug = null, close_reason: reason
   );
 }
 
-/** Keep the must-meet conditions Screen All With AI asked for (guide §6.4). */
+/** The city of the vacancy's picked place, for its slug; null when it has none. */
+async function cityOf(db, owner, id) {
+  const { rows } = await db.query("SELECT city FROM place WHERE owner = $1 AND owner_key = $2", [owner, String(id)]);
+  return rows[0] ? rows[0].city : null;
+}
+
+/**
+ * Hold a slug's base for the rest of the transaction, so two vacancies published at once with the
+ * same title and city cannot both take the same free slug.
+ */
+async function lockSlug(client, base) {
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('vacancy.slug:' || $1))", [base]);
+}
+
+/** Keep the must-meet conditions Screen With AI asked for (guide §6.4). */
 async function setScreeningConditions(client, id, conditions) {
   await client.query("UPDATE vacancy SET screening_conditions = $2::text[] WHERE vacancy_id = $1", [id, conditions]);
 }
@@ -218,6 +229,11 @@ async function updateQuestion(client, vacancyId, id, q, order) {
     [vacancyId, id, q.purpose, q.question_type, q.prompt, q.options ? JSON.stringify(q.options) : null, q.required, order],
   );
   return rowCount === 1;
+}
+
+/** Retire one question: it stays, inactive, on the answers and ratings it was given. */
+async function retireQuestion(client, id) {
+  await client.query("UPDATE vacancy_question SET active = false WHERE vacancy_question_id = $1", [id]);
 }
 
 /** Retire the questions not kept: deleted when unused, made inactive when answered or rated. */
@@ -333,8 +349,13 @@ async function summary(db, scope) {
  * Suggested From Organogram
  * ------------------------------------------------------------------ */
 
-/** Vacant seats with no draft, open or paused vacancy, newest first. */
-function suggested(db, query) {
+/**
+ * Vacant seats with no draft, open or paused vacancy, newest first. A team-scoped reader sees the
+ * seats whose line manager is in their scope, as they would see the vacancy it becomes.
+ */
+function suggested(db, query, scope) {
+  const params = [query.q || null];
+  const s = scopeClause(scope, { column: "s.line_manager_id" }, params);
   return pageQuery(
     db,
     `SELECT s.org_seat_id, s.title, s.department_id, d.name AS department,
@@ -346,17 +367,27 @@ function suggested(db, query) {
       WHERE s.status = 'vacant'
         AND NOT EXISTS (SELECT 1 FROM vacancy v WHERE v.org_seat_id = s.org_seat_id AND v.status IN ('draft', 'open', 'paused'))
         AND ($1::text IS NULL OR search_fold(s.title || ' ' || d.name) LIKE '%' || search_fold($1) || '%')
+        ${s.and}
       ORDER BY s.created_at DESC, s.org_seat_id`,
-    [query.q || null],
+    params,
     query,
   );
 }
 
-/** A vacant seat, for New Vacancy started from it. */
-async function seat(db, id) {
-  const { rows } = await db.query(
-    "SELECT org_seat_id, title, department_id, status FROM org_seat WHERE org_seat_id = $1",
-    [id],
+/**
+ * A seat a vacancy names, held for the save, with whether another live (draft, open or paused)
+ * vacancy already fills it.
+ */
+async function seat(client, id, exceptVacancyId = null) {
+  const { rows } = await client.query(
+    `SELECT s.org_seat_id, s.title, s.department_id, s.status,
+            EXISTS (SELECT 1 FROM vacancy v
+                     WHERE v.org_seat_id = s.org_seat_id AND v.status IN ('draft', 'open', 'paused')
+                       AND ($2::uuid IS NULL OR v.vacancy_id <> $2)) AS taken
+       FROM org_seat s
+      WHERE s.org_seat_id = $1
+        FOR UPDATE OF s`,
+    [id, exceptVacancyId],
   );
   return rows[0] || null;
 }
@@ -377,6 +408,12 @@ async function activeEmployee(db, employeeId) {
 async function departmentExists(db, id) {
   const { rows } = await db.query("SELECT 1 FROM department WHERE department_id = $1", [id]);
   return rows.length === 1;
+}
+
+/** A department's name, for Write With AI; null when there is none. */
+async function departmentName(db, id) {
+  const { rows } = await db.query("SELECT name FROM department WHERE department_id = $1", [id]);
+  return rows[0] ? rows[0].name : null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -460,10 +497,13 @@ module.exports = {
   setLocationLine,
   setStatus,
   setScreeningConditions,
+  cityOf,
+  lockSlug,
   questions,
   questionsInUse,
   insertQuestion,
   updateQuestion,
+  retireQuestion,
   dropQuestions,
   insertScorecard,
   scorecard,
@@ -474,6 +514,7 @@ module.exports = {
   seat,
   activeEmployee,
   departmentExists,
+  departmentName,
   settings,
   putSetting,
   publicPage,

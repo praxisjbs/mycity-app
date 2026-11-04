@@ -22,7 +22,12 @@ const { PlaceInput, PlaceView, PlaceToken } = require("./maps");
  */
 const optionalWhole = (min, max, tooBig) =>
   z.preprocess(
-    (v) => (v === "" || v === null ? undefined : typeof v === "string" ? Number(v.trim()) : v),
+    (v) => {
+      if (v === null) return undefined;
+      if (typeof v !== "string") return v;
+      const t = v.trim();
+      return t === "" ? undefined : Number(t);
+    },
     z
       .number({ invalid_type_error: "A whole number" })
       .int("A whole number")
@@ -30,6 +35,14 @@ const optionalWhole = (min, max, tooBig) =>
       .max(max, tooBig)
       .optional(),
   );
+
+/**
+ * An optional field an edit may empty: "" (or only spaces) and null clear it and arrive as null,
+ * left out leaves it as it is, anything else is the field's own schema.
+ * @template {z.ZodTypeAny} T @param {T} schema
+ */
+const clearable = (schema) =>
+  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), schema.nullable().optional());
 
 /* ------------------------------------------------------------------ *
  * Code lists
@@ -44,7 +57,7 @@ const EmploymentType = z.enum(["full_time", "part_time", "contract", "internship
  * (guide §3 step 3).
  */
 const QuestionPurpose = z.enum(["application", "interview"]);
-/** text, yes_no and choice are Apply questions; rating is an interview question, rated 1 to 5. */
+/** text, yes_no and choice are Apply questions; rating is an interview question, rated 1 to 10. */
 const VacancyQuestionType = z.enum(["text", "yes_no", "choice", "rating"]);
 
 /** The five parts of the weighted scorecard (A10, guide §6.5), and their default weights. */
@@ -171,11 +184,12 @@ const VacancyDetail = Vacancy.extend({
   paused_at: isoDateTime.nullable(),
   closed_at: isoDateTime.nullable(),
   working_days: z.string().nullable(),
-  /** The must-meet conditions Screen All With AI last asked for (guide §6.4). */
+  /** The must-meet conditions Screen With AI last asked for (guide §6.4). */
   screening_conditions: z.array(z.string()).max(3),
   /** The board's columns for this role: the M4 stages, less those whose scorecard parts are off. */
   board_stages: z.array(ApplicationStage).max(5),
-  questions: z.array(VacancyQuestion).max(40),
+  /** The questions in use, in order; a retired one stays only on the answers it was given. */
+  questions: z.array(VacancyQuestion).max(30),
   scorecard: z.array(ScorecardWeight).length(5),
   by_stage: z.array(StageCount).max(10),
   can_edit: z.boolean(),
@@ -249,7 +263,9 @@ const vacancyFields = {
   closes_on: isoDate,
 };
 
-const salaryInOrder = (v) => !v.salary_min || !v.salary_max || Number(v.salary_max) >= Number(v.salary_min);
+/** Two amounts compared exactly, as whole kobo: money is a two-place decimal string, never a float. */
+const kobo = (amount) => BigInt(amount.replace(".", ""));
+const salaryInOrder = (v) => !v.salary_min || !v.salary_max || kobo(v.salary_max) >= kobo(v.salary_min);
 const placedUnlessRemote = (v) => v.work_pattern === undefined || v.work_pattern === "remote" || Boolean(v.location);
 
 /** POST /recruitment/vacancies. `publish` puts it live in the same save. */
@@ -259,9 +275,31 @@ const VacancyCreate = z
   .refine(salaryInOrder, { message: "Below the minimum", path: ["salary_max"] })
   .refine(placedUnlessRemote, { message: PICK_PLACE, path: ["location"] });
 
-/** PATCH /recruitment/vacancies/:id: any of New Vacancy's fields; a picked place replaces the old. */
+/** The fields New Vacancy may leave empty, which an edit may also empty again. */
+const CLEARABLE = [
+  "org_seat_id",
+  "work_pattern_note",
+  "probation_months",
+  "reports_to",
+  "min_experience_years",
+  "salary_min",
+  "salary_max",
+  "nice_to_have",
+  "target_start_on",
+  "working_days",
+];
+
+/**
+ * PATCH /recruitment/vacancies/:id: any of New Vacancy's fields; a picked place replaces the old, and
+ * an optional field sent empty is cleared (null). Whether the result still has a place unless remote,
+ * and its pay in order, is checked by the service against the stored vacancy.
+ */
 const VacancyEdit = z
-  .object(Object.fromEntries(Object.entries(vacancyFields).map(([k, s]) => [k, s.optional()])))
+  .object(
+    Object.fromEntries(
+      Object.entries(vacancyFields).map(([k, s]) => [k, CLEARABLE.includes(k) ? clearable(s) : s.optional()]),
+    ),
+  )
   .strict()
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "Nothing to change", path: ["title"] })
   .refine(salaryInOrder, { message: "Below the minimum", path: ["salary_max"] });
@@ -302,13 +340,13 @@ const VacancyChange = z
     positions: vacancyFields.positions.optional(),
     employment_type: EmploymentType.optional(),
     work_pattern: WorkPattern.optional(),
-    work_pattern_note: vacancyFields.work_pattern_note,
+    work_pattern_note: clearable(vacancyFields.work_pattern_note),
     location: PlaceToken.optional(),
-    working_days: vacancyFields.working_days,
-    min_experience_years: vacancyFields.min_experience_years,
+    working_days: clearable(vacancyFields.working_days),
+    min_experience_years: clearable(vacancyFields.min_experience_years),
     description: vacancyFields.description.optional(),
     requirements: vacancyFields.requirements.optional(),
-    nice_to_have: vacancyFields.nice_to_have,
+    nice_to_have: clearable(vacancyFields.nice_to_have),
     closes_on: vacancyFields.closes_on.optional(),
   })
   .strict()
@@ -346,7 +384,8 @@ const VacancyQuestionsSave = z
     questions: z
       .array(VacancyQuestionInput)
       .max(30, "At most 30 questions")
-      .refine((qs) => qs.filter((q) => q.purpose === "application").length <= 10, "At most 10 Apply questions"),
+      .refine((qs) => qs.filter((q) => q.purpose === "application").length <= 10, "At most 10 Apply questions")
+      .refine((qs) => qs.filter((q) => q.purpose === "interview").length <= 20, "At most 20 interview traits"),
   })
   .strict();
 
@@ -354,7 +393,7 @@ const VacancyQuestionsSave = z
 const ScorecardPartInput = z
   .object({
     active: z.boolean(),
-    weight: z.coerce.number().int("A whole number").min(0, "0 or more").max(100, "At most 100"),
+    weight: z.number({ invalid_type_error: "A whole number" }).int("A whole number").min(0, "0 or more").max(100, "At most 100"),
   })
   .strict();
 
@@ -635,6 +674,7 @@ const TABLES = {
 module.exports = {
   TABLES,
   optionalWhole,
+  clearable,
   VacancyStatus,
   VacancyCloseReason,
   EmploymentType,

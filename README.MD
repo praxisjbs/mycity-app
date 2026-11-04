@@ -504,18 +504,19 @@ Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
 `suspension-without-pay-letter`, `termination-letter`,
 `salary-deduction-letter` (the letter a fine sends, purpose `fine`).
 
-### 5.7 M4 · Recruitment End to End · TB, LA, AJ · 2 to 13 Nov
+### 5.7 M4 · Recruitment End to End · GE · 2 to 13 Nov
 
 | Module | Files beyond the template |
 |---|---|
-| `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards) |
+| `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED; the board's stages and How We Hire), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards) |
 | `candidates` | `.public.routes` (apply, write only), `.pipeline`, `.screening` (provisional flag), `.scorecard` (A10 weights), `.sla` |
 | `assessments` | `.public.routes` (take, token), `.authoring`, `.delivery`, `.timer` (server side), `.scoring` |
 | `interviews` | `.panel` (blind until the round closes), `.consolidate`, `.schedule` (ICS), `.notes` (AI cleanup) |
+| `talent_pool` | `.retention` (24 months then purge; moved from M5, decided by TB, owned by GE) |
 
 Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media/scan` (ClamAV),
 `shared/state/state-history`. Prompts: `jd-draft`, `cv-screen`, `screening-questions`,
-`interview-notes-cleanup`. Gate 19 switches on.
+`assessment-questions`, `interview-notes-cleanup`. Gate 19 switches on.
 
 ### 5.8 M5 · Offers, Documentation & Onboarding · LA, GE · 16 to 20 Nov
 
@@ -525,7 +526,6 @@ Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media
 | `signatures` | `.public.routes` (verify, two verdicts), `.certificate`, `.signed-pdf`, `.verify` |
 | `onboarding` | `.public.routes` (candidate document upload), `.checklist` (documentation before onboarding), `.plans`, `.sop` |
 | `employment_contracts` | `.lifecycle` |
-| `talent_pool` | `.retention` (24 months then purge) |
 
 Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Templates: `offer-letter`,
 `offer-packet`, `employment-contract`, `signature-certificate`, and the recruitment mails.

@@ -6,9 +6,13 @@
  *
  *   assertPublishable(row)   what Publish needs, as field errors (422)
  *   publicState(row, now)    what the careers page says about it: open, paused, closed or filled
+ *   boardStages(scorecard)   the board's columns; howWeHire(parts) the careers page's steps
  */
 const { defineMachine } = require("../../shared/state/state-history");
 const { AppError } = require("../../shared/errors");
+
+/** The M4 stages, in board order (contract vacancies.js M4_STAGES). */
+const M4_STAGES = Object.freeze(["application", "screening", "assessment", "interview", "shortlist"]);
 
 const MACHINE = defineMachine("vacancy", {
   draft: ["open", "closed"],
@@ -45,7 +49,8 @@ function assertPublishable(row, now = new Date()) {
   if (row.work_pattern !== "remote" && !row.location) fields.location = ["Pick the location"];
   if (!row.description || row.description.trim().length < 80) fields.description = ["At least 80 characters"];
   if (!row.requirements || row.requirements.trim().length < 20) fields.requirements = ["Say what is needed"];
-  if (!row.closes_at || new Date(row.closes_at) <= now) fields.closes_on = ["Pick a day after today"];
+  if (!row.closes_at || new Date(row.closes_at) <= now)
+    fields.closes_on = [row.status === "paused" ? "Its closing day has passed" : "Pick a day after today"];
   if (Object.keys(fields).length) {
     throw new AppError("VALIDATION_FAILED", "Finish the vacancy before publishing it", 422, fields);
   }
@@ -66,4 +71,26 @@ function publicState(row, now = new Date()) {
 /** Whether it takes applications now: open, and before its closing time. */
 const takesApplications = (row, now = new Date()) => publicState(row, now) === "open" && row.status === "open";
 
-module.exports = { MACHINE, assertCanMove, assertPublishable, publicState, takesApplications };
+const ASSESSED = ["psychometric", "technical", "case_study"];
+
+/** The board's columns for a vacancy: the M4 stages less those whose parts are off (guide §6.3). */
+function boardStages(scorecard) {
+  const on = new Set(scorecard.filter((p) => p.active).map((p) => p.code));
+  return M4_STAGES.filter((stage) => {
+    if (stage === "assessment") return ASSESSED.some((code) => on.has(code));
+    if (stage === "interview") return on.has("interview");
+    return true;
+  });
+}
+
+/** The steps a role uses, from its scorecard parts switched on (PublicJob.how_we_hire). */
+function howWeHire(activeParts) {
+  const on = new Set(activeParts || []);
+  const steps = ["apply"];
+  if (on.has("screening")) steps.push("screening");
+  if (ASSESSED.some((code) => on.has(code))) steps.push("assessment");
+  if (on.has("interview")) steps.push("interview");
+  return steps;
+}
+
+module.exports = { MACHINE, M4_STAGES, assertCanMove, assertPublishable, publicState, takesApplications, boardStages, howWeHire };

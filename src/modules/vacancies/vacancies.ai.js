@@ -102,7 +102,7 @@ module.exports = defineManifest({
       asks: [{ field: "vacancy_id", question: "Which vacancy?", read: "vacancies.list" }],
       resolve: { ...RESOLVE, vacancy_id: (value, actor, db) => service.idOf(db, value, actor.scope) },
       names: (values, _actor, db) => names(values, db),
-      records: (values, _actor, db) => service.cardVacancy(db, values.vacancy_id),
+      records: (values, actor, db) => service.cardVacancy(db, values.vacancy_id, actor.scope),
       run: (values, actor) => {
         const { vacancy_id: id, location, ...rest } = values;
         return service.update(actor, actor.scope, id, parseBody(c.vacancies.VacancyEdit, { ...rest, ...placed(location) }));

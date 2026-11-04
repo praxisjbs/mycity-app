@@ -25,6 +25,9 @@ const status = () => drafts.availability(pool, MODULE);
 const offDraft = (reason) => ({ available: false, reason, description: null, requirements: null, nice_to_have: null, ai_run_id: null });
 const offQuestions = (reason) => ({ available: false, reason, questions: [], ai_run_id: null });
 
+/** A restored text held to the form's limit: a name put back can be longer than its placeholder. */
+const fit = (text, max) => (text && text.length > max ? text.slice(0, max).trimEnd() : text);
+
 /**
  * Run one prompt, or say why it did not run (off, or the month's limit). `call` makes the request
  * with its action named as a literal (scripts/check/ai-actions.js), given the shielded input and
@@ -46,9 +49,10 @@ async function run(input, output, call) {
 }
 
 /** POST /recruitment/vacancies/assist: a description, must have and nice to have. */
-async function draft(user, body, department = null) {
+async function draft(user, body, department = null, company = null) {
   const r = await run(
     {
+      company,
       role: {
         title: body.title,
         department,
@@ -67,17 +71,18 @@ async function draft(user, body, department = null) {
   return {
     available: true,
     reason: null,
-    description: r.restore(r.output.description),
-    requirements: r.restore(r.output.requirements),
-    nice_to_have: r.output.nice_to_have ? r.restore(r.output.nice_to_have) : null,
+    description: fit(r.restore(r.output.description), 8000),
+    requirements: fit(r.restore(r.output.requirements), 4000),
+    nice_to_have: r.output.nice_to_have ? fit(r.restore(r.output.nice_to_have), 4000) : null,
     ai_run_id: r.run_id,
   };
 }
 
 /** POST /recruitment/vacancies/:id/assist/questions: Apply questions and interview traits to consider. */
-async function suggest(user, row, traits) {
+async function suggest(user, row, traits, company = null) {
   const r = await run(
     {
+      company,
       role: { title: row.title, department: row.department, description: row.description, requirements: row.requirements },
       traits_already: traits,
     },
@@ -93,13 +98,13 @@ async function suggest(user, row, traits) {
       ...r.output.application.map((q) => ({
         purpose: "application",
         question_type: "text",
-        prompt: r.restore(q.prompt),
+        prompt: fit(r.restore(q.prompt), 500),
         options: null,
       })),
       ...r.output.interview.map((q) => ({
         purpose: "interview",
         question_type: "rating",
-        prompt: r.restore(q.prompt),
+        prompt: fit(r.restore(q.prompt), 500),
         options: null,
       })),
     ],

@@ -39,13 +39,16 @@ const TABLES = Object.freeze({
 });
 
 /**
- * What M4 still owes these queries: nothing. Paid on m4/recruitment (GE, 04/11/2026): vacancy.status
- * is checked (draft, open, paused, closed; 4010) and indexed (vacancy_status_idx); application.status
- * is checked (active, not_progressed, withdrawn, hired; 4020), every pipeline move resets
- * current_stage_entered_at (candidates.pipeline), and (status, current_stage_entered_at) is indexed
- * (application_status_stage_since_idx).
+ * What M4 still owes these queries. Paid on m4/recruitment (GE, 04/11/2026): vacancy.status is
+ * checked (draft, open, paused, closed; 4010) and indexed (vacancy_status_idx); application.status is
+ * checked (active, not_progressed, withdrawn, hired; 4020) and (status, current_stage_entered_at) is
+ * indexed (application_status_stage_since_idx). Left for P4 (candidates.pipeline): the moves that
+ * reset current_stage_entered_at.
  */
-const OWES = Object.freeze([]);
+const OWES = Object.freeze([
+  "The application lifecycle (README candidates.pipeline, .sla): Home reads an application `active` and not withdrawn " +
+    "as in progress, and current_stage_entered_at as when it reached its stage.",
+]);
 
 /**
  * How many vacancies are open, within the scope.

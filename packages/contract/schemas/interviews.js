@@ -18,7 +18,7 @@
 const { z } = require("zod");
 const { uuid, isoDateTime, blank, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
-const { VacancyRef, optionalWhole } = require("./vacancies");
+const { VacancyRef, optionalWhole, clearable } = require("./vacancies");
 
 /* ------------------------------------------------------------------ *
  * Code lists
@@ -193,7 +193,9 @@ const scheduleFields = {
     .refine((ids) => new Set(ids).size === ids.length, "A person is on the panel twice"),
 };
 
-const endsAfterStart = (v) => !v.scheduled_start || !v.scheduled_end || v.scheduled_end > v.scheduled_start;
+/** Compared as instants: two offsets ("+01:00" and "Z") make a string comparison wrong. */
+const endsAfterStart = (v) =>
+  !v.scheduled_start || !v.scheduled_end || Date.parse(v.scheduled_end) > Date.parse(v.scheduled_start);
 const placeForType = (v) => v.interview_type !== "in_person" || Boolean(v.worksite_id);
 const linkForVideo = (v) => v.interview_type !== "video" || Boolean(v.meeting_url);
 
@@ -213,7 +215,9 @@ const InterviewReschedule = z
     message: "Nothing to change",
     path: ["scheduled_start"],
   })
-  .refine(endsAfterStart, { message: "Ends before it starts", path: ["scheduled_end"] });
+  .refine(endsAfterStart, { message: "Ends before it starts", path: ["scheduled_end"] })
+  .refine((v) => v.interview_type === undefined || placeForType(v), { message: "Pick the worksite", path: ["worksite_id"] })
+  .refine((v) => v.interview_type === undefined || linkForVideo(v), { message: "Add the meeting link", path: ["meeting_url"] });
 
 /** POST /recruitment/interviews/:id/cancel. */
 const InterviewCancel = z
@@ -243,19 +247,24 @@ const RoundReport = z
   })
   .strict();
 
-/** PUT /recruitment/interviews/:id/details: the card's Candidate Details, filled once for the panel. */
+/**
+ * PUT /recruitment/interviews/:id/details: the card's Candidate Details, filled once for the panel.
+ * A field sent empty is cleared; one left out stays. Relevant experience against a total already
+ * saved is checked by the service.
+ */
 const RoundDetailsSave = z
   .object({
-    current_employer: blank(z.string().trim().max(160, "At most 160 characters")),
-    academics: Academics.optional(),
-    total_experience_months: optionalWhole(0, 720, "At most 720 months"),
-    relevant_experience_months: optionalWhole(0, 720, "At most 720 months"),
+    current_employer: clearable(blank(z.string().trim().max(160, "At most 160 characters"))),
+    academics: clearable(Academics),
+    total_experience_months: clearable(optionalWhole(0, 720, "At most 720 months")),
+    relevant_experience_months: clearable(optionalWhole(0, 720, "At most 720 months")),
   })
   .strict()
+  .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "Nothing to change", path: ["current_employer"] })
   .refine(
     (v) =>
-      v.total_experience_months === undefined ||
-      v.relevant_experience_months === undefined ||
+      typeof v.total_experience_months !== "number" ||
+      typeof v.relevant_experience_months !== "number" ||
       v.relevant_experience_months <= v.total_experience_months,
     { message: "More than the total", path: ["relevant_experience_months"] },
   );

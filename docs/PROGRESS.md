@@ -1208,17 +1208,18 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 38 | Vacancies | `vacancies` | M4 | GE | ☑ | ☐ | ☐ | In progress | 04/11/2026 |
-| 39 | Candidates | `candidates` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 40 | Assessments | `assessments` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 41 | Interviews | `interviews` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
+| 39 | Candidates | `candidates` | M4 | GE | ☐ | ☐ | ☐ | Not started | |
+| 40 | Assessments | `assessments` | M4 | GE | ☐ | ☐ | ☐ | Not started | |
+| 41 | Interviews | `interviews` | M4 | GE | ☐ | ☐ | ☐ | Not started | |
 | 42 | Offers | `offers` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
 | 43 | Onboarding | `onboarding` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
 | 44 | Talent Pool | `talent-pool` | M4 | GE | ☐ | ☐ | ☐ | Not started | 04/11/2026 |
 
 **Notes**
 
+- 04/11/2026 · GE · Audit of P1 to P3: migrations folded (4050 removed, its changes in 4010 to 4040; local databases rebuilt), contract fixes (an edit clears a field sent empty, at most 20 traits, numbers never read from an empty field, Screen With AI reuses kept conditions) and Vacancies fixes (a draft can close, remote drops the place, one live vacancy a seat, suggestions, cards and Careers Settings held to scope, an answered question retired when reworded), with tests. Candidates, Assessments, Interviews, Talent Pool, Apply and Assessment (#39 to #41, #44, #82, #83) now owned by GE. Left: P4 onwards.
 - 04/11/2026 · GE · Vacancies (#38) API built on `m4/recruitment` (P3): list, sheet, New Vacancy and Edit, Publish, Pause, Resume, Close, questions and traits, scorecard parts, Careers Settings, Suggested From Organogram, Write With AI, the New Vacancy and Save Vacancy cards, ⌘K. The careers page's API too: Careers (#80) and Vacancy (#81), with the Apply link Vacancy's button mints. Left: the screens (P9, P11) and Apply itself (P4, #82).
-- 04/11/2026 · GE · Talent Pool (#44) moves from M5 (LA) to M4 (GE), from the internal Modules Review of 04/11/2026 (TB): MILESTONES §9 and §18. Also from that review and MyCity's interview form, assessment brief and job description: the interview card's ten traits rated 1 to 10, Screen All With AI with must-meet conditions, scorecard parts on or off, Send to Candidates, untimed assessments, file or link answers (`docs/guides/recruitment.md`). Left: migrations 4050 and 4060 and the contract for them, then P3 onwards.
+- 04/11/2026 · GE · Talent Pool (#44) moves from M5 (LA) to M4 (GE), from the internal Modules Review of 04/11/2026 (TB): MILESTONES §9 and §18. Also from that review and MyCity's interview form, assessment brief and job description: the interview card's ten traits rated 1 to 10, Screen With AI with must-meet conditions, scorecard parts on or off, Send to Candidates, untimed assessments, file or link answers (`docs/guides/recruitment.md`). Left: the review's migrations (4060, and the changes later folded into 4010 to 4040) and the contract for them, then P3 onwards.
 - 04/11/2026 · GE · M4 on `m4/recruitment` (#72), packages P1 and P2 (`docs/handoff/m4-recruitment.md`): the contract for Vacancies, Candidates, Assessments and Interviews and the public Careers, Vacancy, Apply and Assessment pages (`packages/contract/schemas/{vacancies,candidates,assessments,interviews}.js`), and migrations 4010 to 4040 with seed 4199 (the application number APP-0001), round trip passed. No screen moved yet. Left: the four backends (P3 to P6), then the screens.
 - 25/10/2026 · JP · Candidates (#39), Interviews (#41), Offers (#42) and Onboarding (#43), on the mock: on a phone a tapped record opens in a sheet (F31: `ListDetail`, `DetailPane`), never under the list; Interviews' Consolidate moves into that sheet on a phone. A candidate's card on the board opened nothing (it passed a prop Kanban does not take); it opens the candidate now. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/recruitment/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/recruitment.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
@@ -1610,8 +1611,8 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 |---|---|---|---|---|---|---|---|---|---|
 | 80 | Careers | `/jobs` | M4 | GE | ☑ | ☐ | ☐ | In progress | 04/11/2026 |
 | 81 | Vacancy | `/jobs/<slug>` | M4 | GE | ☑ | ☐ | ☐ | In progress | 04/11/2026 |
-| 82 | Apply | `/apply/<token>` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 83 | Assessment | `/assess/<token>` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
+| 82 | Apply | `/apply/<token>` | M4 | GE | ☐ | ☐ | ☐ | Not started | |
+| 83 | Assessment | `/assess/<token>` | M4 | GE | ☐ | ☐ | ☐ | Not started | |
 | 84 | Sign Offer | `/sign/<token>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
 | 85 | Verify Document | `/verify/<number>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
 
