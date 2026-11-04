@@ -126,16 +126,16 @@
 /packages/contract/schemas/ai_governance.js        @tomblakeasaah196 @swizfcodes
 /src/modules/alerts/                               @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/alerts.js               @tomblakeasaah196 @swizfcodes
-/src/modules/assessments/                          @tomblakeasaah196 @swizfcodes
-/packages/contract/schemas/assessments.js          @tomblakeasaah196 @swizfcodes
+/src/modules/assessments/                          @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/assessments.js          @swizfcodes @tomblakeasaah196
 /src/modules/assistant/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/assistant.js            @tomblakeasaah196 @swizfcodes
-/src/modules/candidates/                           @tomblakeasaah196 @swizfcodes
-/packages/contract/schemas/candidates.js           @tomblakeasaah196 @swizfcodes
+/src/modules/candidates/                           @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/candidates.js           @swizfcodes @tomblakeasaah196
 /src/modules/dashboard/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/dashboard.js            @tomblakeasaah196 @swizfcodes
-/src/modules/interviews/                           @tomblakeasaah196 @swizfcodes
-/packages/contract/schemas/interviews.js           @tomblakeasaah196 @swizfcodes
+/src/modules/interviews/                           @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/interviews.js           @swizfcodes @tomblakeasaah196
 /src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
 /src/modules/user_guide/                           @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/user_guide.js           @tomblakeasaah196 @swizfcodes
@@ -144,8 +144,8 @@
 /packages/contract/schemas/policies.js             @tomblakeasaah196 @swizfcodes
 /src/modules/reports/                              @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/reports.js              @tomblakeasaah196 @swizfcodes
-/src/modules/vacancies/                            @tomblakeasaah196 @swizfcodes
-/packages/contract/schemas/vacancies.js            @tomblakeasaah196 @swizfcodes
+/src/modules/vacancies/                            @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/vacancies.js            @swizfcodes @tomblakeasaah196
 
 # LA, backup GE
 /src/modules/attendance/                           @LovedataX @swizfcodes @tomblakeasaah196
@@ -232,3 +232,4 @@
 /docs/guides/praxis-ai.md                          @tomblakeasaah196 @swizfcodes
 /docs/guides/ai-control.md                         @tomblakeasaah196 @swizfcodes
 /docs/guides/queries.md                            @swizfcodes @tomblakeasaah196
+/docs/guides/recruitment.md                        @swizfcodes @tomblakeasaah196

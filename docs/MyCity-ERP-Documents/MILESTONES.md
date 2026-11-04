@@ -832,6 +832,26 @@ until the round closes**; the hiring manager then sees all three and produces a 
 The weighted scorecard ranks candidates. Interview notes are cleaned with AI. SLA shows time at
 stage.
 
+**Decided 04/11/2026 (GE, who owns M4 from that day; `docs/guides/recruitment.md` §6 and §14).**
+Seven points settle what the text above leaves open:
+
+- **A listed vacancy is reached by its slug, `/jobs/<slug>`, not a token.** The careers page lists
+  open roles anyway, so the slug carries no secret; it is made once at first publish and never
+  changes, so PAUSED still keeps the same public link. Apply and the assessment stay token-only
+  (`shared/tokens`), and the application stays write-only.
+- **M4's stages end at Shortlist**: application, screening, assessment, interview, shortlist (the
+  seed's codes). Offer and everything after it is M5's.
+- **Candidates are emailed** from five templates Operations & People can edit; the interview invite
+  carries an `.ics`. Panelists get the ordinary staff calendar invite.
+- **AI jobs:** the CV read is Deep Reasoning (`ai-control.md` §6.2); the JD draft, screening and
+  assessment questions and interview-note cleanup are Default. The AI reads a CV only when a person
+  presses Score With AI or Score All; the free estimate is made at once and shown Provisional.
+- **Panelists are people who hold Recruitment.** Blindness covers the hiring manager too until the
+  round closes.
+- **No approval before a vacancy goes live.**
+- **Assessment questions** are choice (auto-scored, each option worth points, which covers
+  psychometric scales), written and file (a spreadsheet for a case study), the last two marked by hand.
+
 ---
 
 ## 10 · M5 — Offers, Documentation & Onboarding · 11%
