@@ -589,7 +589,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "settings.NumberingSchemeChange",
-      "schema_sha": "f907ade858a7390c",
+      "schema_sha": "8c3d5e11703cf38e",
       "screen": null
     },
     {
@@ -1045,6 +1045,28 @@
       "bulk": 1,
       "schema": "attendance.TemporarySiteAdd",
       "schema_sha": "489ced499409bd6e",
+      "screen": null
+    },
+    {
+      "key": "vacancies.create",
+      "kind": "action",
+      "module_key": "recruitment",
+      "permission": "recruitment.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "vacancies.VacancyAdd",
+      "schema_sha": "02570aff673a402d",
+      "screen": null
+    },
+    {
+      "key": "vacancies.edit",
+      "kind": "action",
+      "module_key": "recruitment",
+      "permission": "recruitment.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "vacancies.VacancyChange",
+      "schema_sha": "ae16fbdfff28d806",
       "screen": null
     },
     {
@@ -1650,6 +1672,28 @@
       "bulk": null,
       "schema": "dashboard.HomeTeamQuery",
       "schema_sha": "2349da853e18a360",
+      "screen": null
+    },
+    {
+      "key": "vacancies.get",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "vacancies.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "vacancies.VacancyListQuery",
+      "schema_sha": "cdd9c3dfedb43ced",
       "screen": null
     },
     {
@@ -2432,6 +2476,39 @@
       "schema": null,
       "schema_sha": null,
       "screen": "queries.rules"
+    },
+    {
+      "key": "recruitment.route.change_a_vacancy_s_questions_interview_traits_or_scorecard",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.change_careers_settings_about_mycityapp_or_the_default_interview_traits",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.write_a_new_vacancy",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": "1687bb5133592b2b",
+      "screen": "recruitment.vacancies"
     },
     {
       "key": "settings.route.add_a_public_holiday",

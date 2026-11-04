@@ -204,6 +204,26 @@ const ACTIONS = Object.freeze({
     built: true,
     direct: true,
   }),
+  // M4 Recruitment (docs/guides/recruitment.md §9): Write With AI on New Vacancy, in MyCity's job
+  // description shape, and Suggest With AI on a vacancy's Apply questions and interview traits.
+  "jd-draft": Object.freeze({
+    label: "Draft Job Description",
+    module: "recruitment",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
+  "screening-questions": Object.freeze({
+    label: "Suggest Vacancy Questions",
+    module: "recruitment",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
 });
 
 const KEYS = Object.freeze(Object.keys(ACTIONS));

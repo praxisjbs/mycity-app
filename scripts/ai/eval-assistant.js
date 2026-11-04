@@ -119,6 +119,8 @@ const CASES = Object.freeze([
   { id: "card.role-edit", as: "operations_people", question: "Close the open role of {open_role}.", shows: ["cards"], action: "seats.edit" },
   { id: "card.worksite", as: "operations_people", question: "Add a worksite called Ikeja Hub at the Ikeja City Mall with a 150 metre fence.", shows: ["cards"], action: "worksites.create", picks: ["address"] },
   { id: "card.worksite-edit", as: "operations_people", question: "Make the {worksites.edit#worksite_id} fence 200 metres wide.", shows: ["cards"], action: "worksites.edit" },
+  { id: "card.vacancy", as: "operations_people", question: "Open a vacancy for a Head of Sales and Revenue in {departments.edit#department_id}, full time, hybrid in Lagos, reporting to the CEO, eight years in B2B sales, closing in a month.", shows: ["cards"], action: "vacancies.create", picks: ["location"] },
+  { id: "card.vacancy-edit", as: "operations_people", question: "Move the closing day of the {vacancies.edit#vacancy_id} vacancy to the end of next month.", shows: ["cards"], action: "vacancies.edit" },
   { id: "card.query", as: "operations_people", question: "Raise a query on {person} for missing the client visit on Monday without telling anyone.", shows: ["cards"], action: "queries.raise" },
   { id: "card.query-respond", as: "employee", question: "Respond to my query {my_queries.respond#employee_query_id}: I was late because the bridge was closed and I called my manager at 8.", shows: ["cards"], action: "my_queries.respond" },
   { id: "card.rule", as: "operations_people", question: "Add a query rule called Missed Deadlines: three overdue tasks in 30 days raises a query.", shows: ["cards"], action: "query_rules.create" },

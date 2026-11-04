@@ -852,6 +852,9 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 04/11/2026 · GE · The vacancies adapter (`dashboard/sources/vacancies.source.js`) owes nothing: M4's 4010 and
+  4020 check and index `vacancy.status` and `application (status, current_stage_entered_at)`; its owner is
+  GE with M4 (`recruitment.md`). Its queries are unchanged.
 - 03/11/2026 · JP · Home's forms in the chat (`praxis-ai.md` decisions 33 and 35): alert rules made and changed, reports built, renamed and scheduled, as Praxis AI cards held to `alerts.manage` and `home.reports` as their routes are; a role's Home cards are `design`, never in the chat (§9). No screen changed.
 - 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.15, §6.17): `team.today` and `activity.list` carry matrix probes (a report of the asker's on the roster for a reader who may open the Team tab, their arrival on Activity Today for a reader with a `people` grant, an outsider never); `alerts.ai.js` and `reports.ai.js` account for their Create schemas in `not_offered` (a rule is set on Alerts with its threshold in view, a report is built on Reports with its sources and schedule in view).
 - 28/10/2026 · JP · Team's Department filter and a report's Department and Leave Type read their lists 25 at a time and load the next page as the menu nears its end (FRONTEND_FOUNDATION F32, `docs/guides/foundation.md` §6.18); they look as before.

@@ -291,7 +291,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 
 - The Apply token is single use, lives 48 hours (7 days when staff invite), and is spent in the same
   transaction as the application. `POST /jobs/:slug/apply` is refused (the same 404) unless the vacancy
-  takes applications now. It is limited to 10 an hour per address on top of the public surface's limit.
+  takes applications now. It is held to the public surface's write limit per address.
 - The CV is a PDF or Word file of at most 10 MB, sent by the stranger and so quarantined until ClamAV
   passes it. It belongs to the token's vacancy; a CV uploaded on another token is refused.
 - The candidate is found by email (case-insensitive) or created. Their name and phone are updated
@@ -559,7 +559,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 | From | File | Change on the way in |
 |---|---|---|
 | praxis | `src/modules/hr/vacancy/vacancy.scoring.js` | `estimate()` kept in shape (crude and legible, blanks left out); dimensions changed to what our form asks (§6.4); `assess()` goes through `llm.complete` with the `cv-screen` prompt and our PDF text reader, no vision call |
-| praxis | `src/modules/hr/careers/careers.service.js` | The allow-list public shape and the write-only application kept; reached by slug for listed roles and by our `public_token` for Apply (decision above); no tenant lookup |
+| praxis | `src/modules/hr/careers/careers.service.js` | The allow-list public shape and the write-only application kept, as `vacancies.careers.js` (it loads no staff auth: the public-surface gate follows a public routes file's local requires); reached by slug for listed roles and by our `public_token` for Apply (decision above); no tenant lookup |
 | praxis | `src/modules/hr/vacancy/vacancy.service.js` | The lifecycle, with PAUSED keeping the link; the onboarding requires dropped (M5) |
 | praxis | `src/modules/hr/vacancy/vacancy.draft.js`, `vacancy.questions.js` | Prompts rewritten as `jd-draft.md` and `screening-questions.md` |
 | pixie | `src/modules/recruitment/recruitment.careers.*` | Not taken; the praxis surface is the model |
@@ -576,6 +576,13 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 04/11/2026 · GE · P3 built (`vacancies`): the lifecycle with its history in `entity_state_history`,
+  the slug at first publish, questions and traits saved whole (a used one retired), scorecard parts,
+  Careers Settings, Suggested From Organogram, Write With AI (`jd-draft`, `screening-questions`), the
+  careers page in `vacancies.careers.js`, and the New Vacancy and Save Vacancy cards (`VacancyAdd`,
+  `VacancyChange`, as every card picks its place). A malformed `/jobs/<slug>` answers the same 404 as
+  an unknown one (the contract no longer refuses it with a 422). Apply is held to the public surface's
+  write limit, not a second limiter.
 - 04/11/2026 · GE · From the internal Modules Review of 04/11/2026: the Talent Pool moves to M4 (#44,
   `talent_pool`, §6.9); the interview card is MyCity's Interview Assessment Format, traits rated 1 to
   10 from Default Traits, Candidate Details filled once, decision Select, On Hold or Reject, the form

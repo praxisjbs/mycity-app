@@ -508,7 +508,7 @@ Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
 
 | Module | Files beyond the template |
 |---|---|
-| `vacancies` | `.public.routes` (careers list, vacancy by slug), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED), `.slug`, `.draft` (AI JD), `.questions` |
+| `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards) |
 | `candidates` | `.public.routes` (apply, write only), `.pipeline`, `.screening` (provisional flag), `.scorecard` (A10 weights), `.sla` |
 | `assessments` | `.public.routes` (take, token), `.authoring`, `.delivery`, `.timer` (server side), `.scoring` |
 | `interviews` | `.panel` (blind until the round closes), `.consolidate`, `.schedule` (ICS), `.notes` (AI cleanup) |

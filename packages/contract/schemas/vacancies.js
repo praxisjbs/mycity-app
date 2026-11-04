@@ -11,9 +11,9 @@
  * may read, and nothing else ever reaches /api/public/v1/jobs.
  */
 const { z } = require("zod");
-const { uuid, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
+const { uuid, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef, WorkPattern } = require("./organisation");
-const { PlaceInput, PlaceView } = require("./maps");
+const { PlaceInput, PlaceView, PlaceToken } = require("./maps");
 
 /**
  * An optional whole number a form may leave empty. `blank(z.coerce.number())` would read "" as 0;
@@ -266,6 +266,54 @@ const VacancyEdit = z
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "Nothing to change", path: ["title"] })
   .refine(salaryInOrder, { message: "Below the minimum", path: ["salary_max"] });
 
+/**
+ * New Vacancy as a Praxis AI card (guide §9; TB, 04/11/2026): the form's own fields, the place as its
+ * token (decision 37; the form sends { token }), the department and hiring manager named by the
+ * person and matched. Pay and the seat it fills stay on the screen's form.
+ */
+const VacancyAdd = z
+  .object({
+    title: vacancyFields.title,
+    department_id: recordId("department"),
+    hiring_manager_id: recordId("employee"),
+    positions: vacancyFields.positions.default(1),
+    employment_type: EmploymentType,
+    work_pattern: WorkPattern,
+    work_pattern_note: vacancyFields.work_pattern_note,
+    location: PlaceToken.optional(),
+    working_days: vacancyFields.working_days,
+    min_experience_years: vacancyFields.min_experience_years,
+    description: vacancyFields.description,
+    requirements: vacancyFields.requirements,
+    nice_to_have: vacancyFields.nice_to_have,
+    closes_on: vacancyFields.closes_on,
+    publish: z.boolean().default(false),
+  })
+  .strict()
+  .refine(placedUnlessRemote, { message: PICK_PLACE, path: ["location"] });
+
+/** Save Vacancy as a card: the vacancy (its id, or its number or title) beside the card's fields, only what changes. */
+const VacancyChange = z
+  .object({
+    vacancy_id: recordId("vacancy"),
+    title: vacancyFields.title.optional(),
+    department_id: recordId("department").optional(),
+    hiring_manager_id: recordId("employee").optional(),
+    positions: vacancyFields.positions.optional(),
+    employment_type: EmploymentType.optional(),
+    work_pattern: WorkPattern.optional(),
+    work_pattern_note: vacancyFields.work_pattern_note,
+    location: PlaceToken.optional(),
+    working_days: vacancyFields.working_days,
+    min_experience_years: vacancyFields.min_experience_years,
+    description: vacancyFields.description.optional(),
+    requirements: vacancyFields.requirements.optional(),
+    nice_to_have: vacancyFields.nice_to_have,
+    closes_on: vacancyFields.closes_on.optional(),
+  })
+  .strict()
+  .refine(changesBeside(["vacancy_id"]), nothingOn("vacancy_id"));
+
 /** POST /recruitment/vacancies/:id/close. */
 const VacancyClose = z.object({ close_reason: VacancyCloseReason }).strict();
 
@@ -477,10 +525,11 @@ const PublicJob = PublicJobCard.extend({
 /** POST /api/public/v1/jobs/:slug/apply: the Apply link's token, shown once. */
 const ApplyStarted = z.object({ token: z.string() }).strict();
 
-/** Path of /jobs/:slug. */
-const SlugParams = z
-  .object({ slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Not a role's address") })
-  .strict();
+/**
+ * Path of /jobs/:slug. Any short string: a malformed address answers the same 404 as one that never
+ * existed (the careers file checks the shape), so the link says nothing about why it failed.
+ */
+const SlugParams = z.object({ slug: z.string().min(1).max(200) }).strict();
 
 /* ------------------------------------------------------------------ *
  * Gate 6
@@ -555,6 +604,17 @@ const TABLES = {
     virtual: { closes_on: "the day picked; stored as closes_at, 23:59:59 Lagos that day" },
   },
   VacancyClose: { table: "vacancy" },
+  VacancyAdd: {
+    table: "vacancy",
+    virtual: {
+      closes_on: "the day picked; stored as closes_at, 23:59:59 Lagos that day",
+      publish: "publish in the same save",
+    },
+  },
+  VacancyChange: {
+    table: "vacancy",
+    virtual: { closes_on: "the day picked; stored as closes_at, 23:59:59 Lagos that day" },
+  },
   VacancyQuestionInput: { table: "vacancy_question" },
   VacancyQuestionsSave: { table: null, reason: "the whole set of a vacancy's questions" },
   ScorecardSave: { table: null, reason: "the five parts, one recruitment_scorecard_criterion row each" },
@@ -598,6 +658,8 @@ module.exports = {
   SeatSuggestionListQuery,
   VacancyCreate,
   VacancyEdit,
+  VacancyAdd,
+  VacancyChange,
   VacancyClose,
   VacancyQuestionInput,
   VacancyQuestionsSave,

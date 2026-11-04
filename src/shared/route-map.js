@@ -340,7 +340,7 @@ const ENTITY_ROUTES = Object.freeze({
   letter_template: screen("queries", "letter-templates"), // search:none a handful of letters, listed whole on Letter Templates, which ⌘K finds by name
 
   // Recruitment
-  vacancy: screen("recruitment", "vacancies"), // search:none not built yet (src/modules/vacancies)
+  vacancy: screen("recruitment", "vacancies"),
   candidate: screen("recruitment", "candidates"), // search:none not built yet (src/modules/candidates)
   assessment: screen("recruitment", "assessments"), // search:none not built yet (src/modules/assessments)
   interview: screen("recruitment", "interviews"), // search:none not built yet (src/modules/interviews)
