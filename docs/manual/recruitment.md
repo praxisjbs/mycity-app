@@ -787,7 +787,7 @@ crop: modal
 open: /recruitment?tab=interviews&mine=true
 as: operations
 do:
-  - click: row 1
+  - click: text "Tobi Adeyemi"
   - wait: button "My Card"
   - click: button "My Card"
   - wait: button "Submit Card"
