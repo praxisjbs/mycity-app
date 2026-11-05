@@ -80,6 +80,11 @@ mycity-app/
 │                             raised to signed and issued, through the services, tested by
 │                             tests/integration/queries-staging-seed.test.js; lib/signature.js
 │                             draws the pad's signature;
+│                             55_recruitment.js: Careers Settings, six roles in their states,
+│                             eleven applications through Apply, sittings, interview rounds
+│                             and the Talent Pool, through the services, on the Implementation
+│                             Team as hiring managers and panelists, tested by tests/integration/
+│                             recruitment-staging-seed.test.js;
 │                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
