@@ -79,6 +79,7 @@ const SCREENS = Object.freeze({
   ],
   partnerships: [
     "pipeline",
+    "categories",
     "partners",
     "leads",
     "proposals",

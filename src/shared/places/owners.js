@@ -26,6 +26,13 @@ const OWNERS = Object.freeze([
   // A temporary site's addresses (attendance.md §6.11): a venue, or a Temporary Home's, which is personal.
   Object.freeze({ name: "attendance_temporary_site_location.address", module: "attendance", level: "address", personal: true }),
   Object.freeze({ name: "employee.home_address", module: "organisation", level: "address", personal: true }),
+  // Partnerships (docs/guides/partnerships.md §6.19): a partner's headquarters is an area; a lead's or
+  // partner's region is the cities picked (each a row, keyed by the record and the city's place in
+  // the list); a deal's venue is an address. None is personal. The records keep no copy of the line.
+  Object.freeze({ name: "partner.headquarters", module: "partners", level: "area", personal: false }),
+  Object.freeze({ name: "partner.cities", module: "partners", level: "city", personal: false }),
+  Object.freeze({ name: "lead.cities", module: "leads", level: "city", personal: false }),
+  Object.freeze({ name: "deal.venue", module: "partner_pipeline", level: "address", personal: false }),
 ]);
 
 const BY_NAME = new Map(OWNERS.map((o) => [o.name, o]));

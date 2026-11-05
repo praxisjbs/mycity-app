@@ -66,16 +66,16 @@ function personOf(staff, slot) {
  * The records
  * ------------------------------------------------------------------ */
 
-/** Partners and their pipeline (M7): four active, four prospects with an opportunity each. */
+/** Partners and their pipeline (M7): four active, four dormant with an open opportunity each. */
 const PARTNERS = [
-  { key: "mtn-nigeria", name: "MTN Nigeria", type: "corporate", status: "active", owner: "head", added: 240, industry: "Telecoms", site: "mtn.ng" },
-  { key: "providusbank", name: "ProvidusBank", type: "corporate", status: "active", owner: "head_team:1", added: 200, industry: "Banking", site: "providusbank.com" },
-  { key: "ikeja-city-mall", name: "Ikeja City Mall", type: "corporate", status: "active", owner: "head_team:2", added: 280, industry: "Retail", site: "ikejacitymall.com" },
-  { key: "access-bank", name: "Access Bank", type: "corporate", status: "active", owner: "head", added: 150, industry: "Banking", site: "accessbankplc.com" },
-  { key: "lagos-state-government", name: "Lagos State Government", type: "government", status: "prospect", owner: "head", added: 60, industry: "Government", site: "lagosstate.gov.ng" },
-  { key: "eko-hotels", name: "Eko Hotels", type: "corporate", status: "prospect", owner: "head_team:3", added: 50, industry: "Hospitality", site: "ekohotels.com" },
-  { key: "filmhouse-cinemas", name: "Filmhouse Cinemas", type: "corporate", status: "prospect", owner: "head_team:1", added: 40, industry: "Entertainment", site: "filmhouseng.com" },
-  { key: "kano-trade-council", name: "Kano Trade Council", type: "government", status: "prospect", owner: "head", added: 35, industry: "Government", site: "kanocc.org.ng" },
+  { key: "mtn-nigeria", name: "MTN Nigeria", status: "active", owner: "head", added: 240, industry: "Telecoms", site: "mtn.ng" },
+  { key: "providusbank", name: "ProvidusBank", status: "active", owner: "head_team:1", added: 200, industry: "Banking", site: "providusbank.com" },
+  { key: "ikeja-city-mall", name: "Ikeja City Mall", status: "active", owner: "head_team:2", added: 280, industry: "Retail", site: "ikejacitymall.com" },
+  { key: "access-bank", name: "Access Bank", status: "active", owner: "head", added: 150, industry: "Banking", site: "accessbankplc.com" },
+  { key: "lagos-state-government", name: "Lagos State Government", status: "dormant", owner: "head", added: 60, industry: "Government", site: "lagosstate.gov.ng" },
+  { key: "eko-hotels", name: "Eko Hotels", status: "dormant", owner: "head_team:3", added: 50, industry: "Hospitality", site: "ekohotels.com" },
+  { key: "filmhouse-cinemas", name: "Filmhouse Cinemas", status: "dormant", owner: "head_team:1", added: 40, industry: "Entertainment", site: "filmhouseng.com" },
+  { key: "kano-trade-council", name: "Kano Trade Council", status: "dormant", owner: "head", added: 35, industry: "Government", site: "kanocc.org.ng" },
 ];
 
 /** Contact recorded with a partner, days ago. Access Bank has none, so it counts from when it was added. */
@@ -249,7 +249,6 @@ const ROWS = Object.freeze([
     values: (x, [owner]) => ({
       number: stg("PAR", i + 1),
       name: p.name,
-      partner_type: p.type,
       status: p.status,
       industry: p.industry,
       country_code: "NG",

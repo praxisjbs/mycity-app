@@ -68,7 +68,8 @@ Every place an address is entered today. The level (§6.3) is what a pick may be
 | ESS · My Profile, Edit Profile (`my-profile`, #8) | Staff app, both shells | The person | **Home Address** (address, optional) | Pick, pin, add details |
 | People · Employees (`employees`, #24) | Staff app | `people` view; the address under the `employee.personal` mask | The home address on the record, read only. The add and edit forms do not ask for it; the person sets it on My Profile | Read it |
 | Recruitment · Vacancies (`vacancies`, #38, M4, on the mock) | Staff app | `recruitment` create | **Location** of a vacancy (level area: a district or a city) | Pick an area |
-| Partnerships · Partners (`partners`, #51, M7, on the mock) | Staff app | `partnerships` create | **Headquarters** of a partner (area) | Pick an area |
+| Partnerships · Partners (`partners`, #51, M7, on the mock) | Staff app | `partnerships` create | **Headquarters** of a partner (area); the **Cities** of its region (city, one or more) | Pick an area; pick each city |
+| Partnerships · Leads (`leads`, #52, M7, on the mock) and a deal's form | Staff app | `partnerships` create | The **Cities** of a lead's region (city, one or more); a deal's **Venue** (address) | Pick each city; pick the venue |
 | Partnerships · Proposals (`proposals`, #53, M7, on the mock) | Staff app | `partnerships` create | **Cities** a proposal runs in (level city, one or more) | Pick each city |
 | Every go page (Careers, Apply, Sign Offer, Verify) | Public site | Anyone | No address field today (decision 5) | Nothing to change |
 
@@ -242,6 +243,12 @@ naming job writes another module's row only through that module's code. A new ad
 new owner, a `PlaceInput` in its contract, `places.save()` in its service, and `AddressField` on
 its screen; gate 22 refuses any of the four missing.
 
+M7's owners (`partnerships.md` §6.19, registered in PR 1): `partner.headquarters` (area, `partners`),
+`partner.cities` and `lead.cities` (city, `partners` and `leads`; one row a city, keyed by the record
+and the city's place in its list, since a place is one row an owner and key) and `deal.venue`
+(address, `partner_pipeline`). None is personal, and none keeps a copy of its line: the lists and the
+360s read the place, so each rename has nothing else to rewrite.
+
 ### 6.10 The rule in CI (gate 22, `scripts/check/addresses.js`)
 
 - Every request body field named like an address (`address`, `home_address`, `location`, `hq`,
@@ -350,6 +357,7 @@ None.
 
 ## 14 · Change log
 
+- 05/11/2026 · JP · Four owners for Partnerships (§2, §6.9; `partnerships.md` §6.19, M7 PR 1): `partner.headquarters`, `partner.cities`, `lead.cities` and `deal.venue`, with their renames. Their forms come with M7 PR 3, through `PlaceInput` and `places.save()`; no screen changes yet.
 - 03/11/2026 · JP · An address on a Praxis AI card is picked as everywhere (§6.2, §9;
   `praxis-ai.md` decision 37): the one place our search finds for the card's words is signed
   (`maps.service.onePlace`, which with the search's answers now holds the signing the controller
