@@ -253,12 +253,14 @@ async function sentByStaff(db, publicTokenId) {
 
 /** Whether the person was last invited back to this vacancy from the Talent Pool. */
 async function invitedFromPool(db, candidateId, vacancyId) {
+  // Every invite from the pool is kept (talent_pool_invite), so a member invited to two roles, or
+  // taken off the pool while their link still works, keeps the source.
   const { rows } = await db.query(
-    `SELECT 1 FROM talent_pool_entry
-      WHERE candidate_id = $1 AND invited_vacancy_id = $2 AND removed_at IS NULL`,
+    `SELECT 1 FROM talent_pool_invite i JOIN talent_pool_entry t ON t.talent_pool_entry_id = i.talent_pool_entry_id
+      WHERE t.candidate_id = $1 AND i.vacancy_id = $2`,
     [candidateId, vacancyId],
   );
-  return rows.length === 1;
+  return rows.length > 0;
 }
 
 /* ------------------------------------------------------------------ *

@@ -91,9 +91,17 @@ async function add(actor, scope, body) {
     if (!app) throw new AppError("VALIDATION_FAILED", "Pick a candidate", 422, { application_id: ["Pick a candidate"] });
     assertInScope(scope, app.hiring_manager_id);
     const fields = { candidate_id: app.candidate_id, application_id: app.application_id, reason: body.reason, added_by: actor.user_id };
-    const existing = await repo.liveFor(client, app.candidate_id);
-    const id = existing || (await repo.insert(client, fields));
-    if (existing) await repo.renew(client, existing, fields);
+    // Two adds at once: the second's insert makes nothing, and it renews the entry the first made.
+    let existing = await repo.liveFor(client, app.candidate_id);
+    let id = existing ? existing.talent_pool_entry_id : await repo.insert(client, fields);
+    if (!id) {
+      existing = await repo.liveFor(client, app.candidate_id);
+      id = existing.talent_pool_entry_id;
+    }
+    // In the pool from another manager's role: theirs to renew, not taken over from outside their scope.
+    if (existing && scope.scope !== "all" && !(existing.hiring_manager_id && (scope.scope_ids || []).includes(existing.hiring_manager_id)))
+      throw new AppError("VALIDATION_FAILED", "Already in the pool", 422, { application_id: ["Already in the pool"] });
+    if (existing) await repo.renew(client, id, fields);
     await emit(client, {
       key: existing ? EVENTS.TALENT_POOL_RENEWED : EVENTS.TALENT_POOL_ADDED,
       entity: { type: "talent_pool_entry", id },
@@ -108,7 +116,7 @@ async function invite(actor, scope, id, body) {
   return tx(async (client) => {
     const row = await visible(client, id, scope);
     await candidates.inviteIn(client, actor, scope, row.candidate_id, body.vacancy_id, { source: "pool" });
-    await repo.setInvited(client, id, body.vacancy_id);
+    await repo.setInvited(client, id, body.vacancy_id, actor.user_id);
     await emit(client, {
       key: EVENTS.TALENT_POOL_INVITED,
       entity: { type: "talent_pool_entry", id },

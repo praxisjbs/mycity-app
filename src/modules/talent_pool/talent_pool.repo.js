@@ -31,7 +31,7 @@ const ROWS = `
     LEFT JOIN vacancy iv ON iv.vacancy_id = t.invited_vacancy_id
     LEFT JOIN app_user au ON au.user_id = t.added_by
     LEFT JOIN employee ae ON ae.employee_id = au.employee_id
-   WHERE t.removed_at IS NULL`;
+   WHERE t.removed_at IS NULL AND t.expires_at > now()`;
 
 const SORTS = { created_at: "x.created_at", score: "x.score", expires_at: "x.expires_at" };
 
@@ -62,10 +62,15 @@ async function get(db, id, { lock = false } = {}) {
 /** The person's live entry, held, if they are in the pool. */
 async function liveFor(client, candidateId) {
   const { rows } = await client.query(
-    "SELECT talent_pool_entry_id FROM talent_pool_entry WHERE candidate_id = $1 AND removed_at IS NULL FOR UPDATE",
+    `SELECT t.talent_pool_entry_id, v.hiring_manager_id
+       FROM talent_pool_entry t
+       LEFT JOIN application a ON a.application_id = t.application_id
+       LEFT JOIN vacancy v ON v.vacancy_id = a.vacancy_id
+      WHERE t.candidate_id = $1 AND t.removed_at IS NULL
+        FOR UPDATE OF t`,
     [candidateId],
   );
-  return rows[0] ? rows[0].talent_pool_entry_id : null;
+  return rows[0] || null;
 }
 
 /** Into the pool for 24 months from now. */
@@ -89,11 +94,17 @@ async function renew(client, id, { application_id: applicationId, reason, added_
   );
 }
 
-async function setInvited(client, id, vacancyId) {
+/** The latest invite on the entry (what the list shows), and the invite itself kept for Apply. */
+async function setInvited(client, id, vacancyId, by) {
   await client.query("UPDATE talent_pool_entry SET invited_at = now(), invited_vacancy_id = $2 WHERE talent_pool_entry_id = $1", [
     id,
     vacancyId,
   ]);
+  await client.query(
+    `INSERT INTO talent_pool_invite (talent_pool_entry_id, vacancy_id, invited_by) VALUES ($1, $2, $3)
+     ON CONFLICT (talent_pool_entry_id, vacancy_id) DO UPDATE SET invited_by = EXCLUDED.invited_by`,
+    [id, vacancyId, by],
+  );
 }
 
 async function remove(client, id, reason) {
@@ -119,6 +130,15 @@ async function summary(db, scope) {
   return rows[0];
 }
 
+/** One entry still in the pool, held, whatever its time: the purge reads it so (the list hides it once past). */
+async function lockLive(client, id) {
+  const { rows } = await client.query(
+    "SELECT talent_pool_entry_id, candidate_id, expires_at FROM talent_pool_entry WHERE talent_pool_entry_id = $1 AND removed_at IS NULL FOR UPDATE",
+    [id],
+  );
+  return rows[0] || null;
+}
+
 /** Entries past their 24 months, at most 200 a run (talent-pool-purge). */
 async function expired(db) {
   const { rows } = await db.query(
@@ -130,4 +150,4 @@ async function expired(db) {
   return rows;
 }
 
-module.exports = { list, get, liveFor, insert, renew, setInvited, remove, summary, expired };
+module.exports = { list, get, liveFor, insert, renew, setInvited, remove, summary, lockLive, expired };

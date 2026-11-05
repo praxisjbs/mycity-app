@@ -109,6 +109,13 @@ describeDb("Recruitment · Talent Pool against the real migrations", () => {
     // Scope is the hiring manager of the role applied for.
     expect((await h.as("hod").get("/recruitment/pool")).body.page.total).toBe(0);
     expect((await h.as("hod").post(`/recruitment/pool/${entryId}/invite`).send({ vacancy_id: second.vacancy_id })).status).toBe(404);
+    // Two adds at once for one person: one entry, renewed, never a 500.
+    const both = await Promise.all([
+      h.as("ops").post("/recruitment/pool").send({ application_id: applicationId, reason: "Pressed on one screen" }),
+      h.as("ops").post("/recruitment/pool").send({ application_id: applicationId, reason: "Pressed on another screen" }),
+    ]);
+    expect(both.map((r) => r.status)).toEqual([201, 201]);
+    expect(await one("SELECT count(*)::int AS n FROM talent_pool_entry WHERE removed_at IS NULL")).toEqual({ n: 1 });
   });
 
   test("Invite to Apply mails an Apply link for an open role; the application it leads to comes from the pool", async () => {
@@ -136,6 +143,7 @@ describeDb("Recruitment · Talent Pool against the real migrations", () => {
     });
     expect(applied.status).toBe(201);
     expect(await one("SELECT source FROM application WHERE number = $1", [applied.body.reference])).toEqual({ source: "pool" });
+    expect(await one("SELECT count(*)::int AS n FROM talent_pool_invite")).toEqual({ n: 1 });
     expect((await h.as("ops").get("/recruitment/pool?invited=true")).body.page.total).toBe(1);
   });
 
@@ -143,8 +151,10 @@ describeDb("Recruitment · Talent Pool against the real migrations", () => {
     const started = await h.as("ops").post("/recruitment/pool/exports").send({});
     expect(started.status).toBe(202);
     await drain();
-    const doc = await one("SELECT doc_type, render_status FROM document WHERE document_id = $1", [started.body.document_id]);
-    expect(doc.doc_type).toBe("talent_pool_export");
+    const doc = await one("SELECT doc_type, sensitivity FROM document WHERE document_id = $1", [started.body.document_id]);
+    expect(doc).toEqual({ doc_type: "talent_pool_export", sensitivity: "restricted" });
+    // The file is for the person who asked: another holder of Recruitment cannot open it.
+    expect((await h.as("hod").get(`/documents/${started.body.document_id}/content`)).status).not.toBe(200);
   });
 
   test("Remove takes a person off early; talent-pool-purge takes off those whose 24 months have ended", async () => {

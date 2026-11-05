@@ -326,3 +326,5 @@ packages that need none can start. Tick a package only when its own checks pass 
   in PROGRESS. Invite to Apply from the pool reuses `candidates.service.inviteIn` (new; Candidates' own invite calls
   it too). Export uses the shared export engine (`talent_pool_export`, personal, built in the worker). Next on the
   board: the screens (P9, P11) and the staff mock (P10), the seed (P13), the manual (P14), close-out (P15), owners (P16).
+- 05/11/2026 · GE · P6b audited and fixed (guide §14). Migration 4060 gained `talent_pool_invite`: **rebuild your
+  local database** again (drop, recreate, `npm run db:migrate`). `candidates.repo invitedFromPool` now reads it.

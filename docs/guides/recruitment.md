@@ -450,8 +450,9 @@ with test addresses.
 - A member is kept until `expires_at`, 24 months from when they were added; `talent-pool-purge` (daily)
   sets `removed_at` on those past it. Remove does the same early. Removed members are not listed.
 - Invite to Apply sends an `apply-invite` for an open vacancy and stamps `invited_at` and the vacancy; the
-  application it leads to has source `pool`. Hired From the Pool counts members with a later application
-  of source `pool` at stage hired.
+  application it leads to has source `pool`. Hired From the Pool counts members still in the pool with a later
+  application of source `pool` at stage hired; someone removed or past their 24 months leaves the figure
+  with them.
 - The score shown is the screening score of the application they were added from, with Provisional when
   it is the estimate.
 
@@ -611,6 +612,16 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 05/11/2026 · GE · Audit of P6b, fixed:
+  - two Add to Pool presses at once make one entry, renewed;
+  - a person in the pool from another manager's role is "Already in the pool" to someone whose scope
+    does not reach it;
+  - every Invite to Apply from the pool is kept (`talent_pool_invite`, migration 4060), so an application
+    keeps source pool when the person was invited to two roles or left the pool while their link worked;
+  - the export is restricted and opens only for the person who asked (and the CEO);
+  - a person past their 24 months leaves the list and cannot be invited before the purge runs;
+  - the purge goes on batch after batch until it has caught up, within five minutes.
 
 - 05/11/2026 · GE · P6b built. Add to Pool keeps a person for 24 months with why, and adding them again
   renews the reason and the 24 months, never a second entry. Invite to Apply goes through the candidates

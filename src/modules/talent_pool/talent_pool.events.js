@@ -12,6 +12,7 @@
 const { pool } = require("../../config/db");
 const { defineEvents } = require("../../shared/events/catalogue");
 const { defineDocumentType } = require("../../shared/documents/types");
+const vault = require("../../shared/documents/vault");
 const outbox = require("../../shared/events/outbox");
 
 const EVENTS = defineEvents("recruitment", {
@@ -24,7 +25,9 @@ const EVENTS = defineEvents("recruitment", {
 });
 
 const EXPORT_DOC_TYPE = "talent_pool_export";
-defineDocumentType(EXPORT_DOC_TYPE, { label: "Talent Pool export", module: "recruitment", sensitivity: "personal", export: true });
+defineDocumentType(EXPORT_DOC_TYPE, { label: "Talent Pool export", module: "recruitment", sensitivity: "restricted", export: true });
+/** The workbook (names, emails, reasons) is for the person who asked for it, and the CEO; the rule decides alone. */
+vault.defineAccess(EXPORT_DOC_TYPE, async (_client, user, doc) => user.is_ceo === true || (Boolean(user.user_id) && doc.uploaded_by === user.user_id));
 
 const COLUMNS = [
   { key: "name", header: "Candidate", width: 26 },
