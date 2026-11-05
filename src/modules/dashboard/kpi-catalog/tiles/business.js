@@ -81,7 +81,7 @@ const ENTRIES = [
             r.partner_id,
             {
               partner: cell.text(r.name),
-              type: cell.text(r.partner_type),
+              type: cell.text(r.category),
               owner: cell.person(r.owner),
               last_contact: cell.time(r.last_contact_at),
             },

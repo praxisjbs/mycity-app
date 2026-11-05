@@ -291,7 +291,22 @@ const CAPABILITY_CATALOG = [
     label: "Run Performance",
     description:
       "Run the cycle: quarters and their rules, rounds, reviewer changes, conduct, improvement plans, probation outcomes and imports.",
-  },  // M8 Expenses (docs/guides/expenses.md §8), seeded in 8100.
+  },
+  // M7 Partnerships (docs/guides/partnerships.md §8), seeded in 7190.
+  {
+    code: "partnerships.configure",
+    module: "partnerships",
+    label: "Configure Partnerships",
+    description:
+      "Set up the partnership categories with their agreement templates, delivery checklists and custom fields, the pipeline's stages and lists, the proof points and the saved proposal templates.",
+  },
+  {
+    code: "partnerships.money",
+    module: "partnerships",
+    label: "See Commission and Returns",
+    description: "See and enter commission, the merchant's take and returns, and import returns.",
+  },
+  // M8 Expenses (docs/guides/expenses.md §8), seeded in 8100.
   {
     code: "expenses.finance",
     module: "expenses",
@@ -302,11 +317,12 @@ const CAPABILITY_CATALOG = [
 ];
 
 /**
- * What everyone in General Management holds without a role (docs/guides/performance.md P27, §6.25): they read
- * the whole OKR plan and may share and edit it. General Management is the CEO's department, so the answer
- * follows the people in it (shared/rbac/grants-cache.js getCapabilities).
+ * What everyone in General Management holds without a role: they read the whole OKR plan and may share and
+ * edit it (docs/guides/performance.md P27, §6.25), and they see partnerships' commission and returns
+ * (docs/guides/partnerships.md §8). General Management is the CEO's department, so the answer follows the
+ * people in it (shared/rbac/grants-cache.js getCapabilities).
  */
-const GENERAL_MANAGEMENT_CAPABILITIES = Object.freeze(["goals.company", "goals.organisation", "goals.view_all"]);
+const GENERAL_MANAGEMENT_CAPABILITIES = Object.freeze(["goals.company", "goals.organisation", "goals.view_all", "partnerships.money"]);
 
 const CAPABILITIES = CAPABILITY_CATALOG.map((c) => c.code);
 const CAPABILITY_SET = new Set(CAPABILITIES);

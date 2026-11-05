@@ -1166,6 +1166,7 @@ screen.
 
 ## 14 · Change log
 
+- 05/11/2026 · JP · Settings · Documents & Numbering lists M7's document types as `docs/guides/partnerships.md` §4.3 settles them: Partner (PAR), Lead (LED), Deal (DEAL, yearly), Proposal (PRO) and Agreement (AGR, yearly) in place of the MOU, which is an agreement now (`schemes.js`, the contract's `DOC_TYPES`, seed `7190`). The screen is unchanged; it reads the types from the code.
 - 03/11/2026 · JP · People's records are Praxis AI cards (`organisation.ai.js` with
   `organisation.cards.js`; `organogram.md` §9; `praxis-ai.md` decisions 33 and 36): Add Employee
   and Save Record with the work record alone (personal details, bank and pay never on a card),

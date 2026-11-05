@@ -364,8 +364,8 @@ describeDb("Home · Overview against the real migrations", () => {
       // one in draft, one signed that starts in December; an open opportunity; an active
       // partner nobody has contacted.
       const { partner_id: partner } = await one(
-        `INSERT INTO partner (number, name, partner_type, status, owner_id, created_at)
-         VALUES ('PAR-0001', 'Lagos Arts Council', 'government', 'active', $1, $2) RETURNING partner_id`,
+        `INSERT INTO partner (number, name, status, owner_id, created_at)
+         VALUES ('PAR-0001', 'Lagos Arts Council', 'active', $1, $2) RETURNING partner_id`,
         [employeeOf("hod"), at("2026-06-01", "09:00")],
       );
       await q(

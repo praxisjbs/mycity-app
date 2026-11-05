@@ -251,14 +251,16 @@ text`; `objective text`; `source text` (a `lead_source` code); `owner_id uuid RE
 `status text CHECK IN ('new', 'contacted', 'qualified', 'lost', 'converted')`; `lost_reason text`;
 `converted_partner_id uuid REFERENCES partner`; `converted_at timestamptz`. Checks: `status = 'lost'`
 needs `lost_reason`; `status = 'converted'` needs `converted_partner_id`. Region cities are `place` rows
-with owner `lead.region`.
+with owner `lead.cities` (one a city, keyed by the lead and the city's place in the list).
 
 **`partner`** (7000 has `number`, `name`, `partner_type`, `status`, `website`, `industry`,
 `country_code`, `owner_id`, `metadata`): adds `legal_name`, `partner_category_id`, `region_scope`,
 `logo_document_id`, `since date`, `lead_id`, `custom jsonb`, `closed_at`, `close_reason`; `status`
-becomes `CHECK IN ('active', 'dormant', 'closed')` (default `dormant`); `partner_type` is copied into
-`partner_category_id` by the migration where rows exist, then dropped. Headquarters (an area) and region
-cities are `place` rows (`partner.headquarters`, `partner.region`).
+becomes `CHECK IN ('active', 'dormant', 'closed')` (default `dormant`; a `prospect` row becomes
+`dormant`); `partner_type` is copied into `partner_category_id` by the migration where rows exist (a
+category named by 7099's label) and stops being required; nothing reads it after PR 1, and a fix-forward
+drops it one release later, in PR 3 (docs/MIGRATIONS.md §8). Headquarters (an area) and region cities
+are `place` rows (`partner.headquarters`, `partner.cities`).
 
 **`partner_contact`** (7000): `partner_id` becomes nullable; adds `lead_id`; `CHECK (num_nonnulls
 (partner_id, lead_id) = 1)`; `phones text[]` beside `phone`; `signatory boolean`; unique email per
@@ -430,7 +432,7 @@ The schemas and their fields are catalogued in Appendix C.
 | `POST /agreements/:id/signed-copy` | `SignedCopyRecord` → `AgreementDetail` | edit · §6.1 | | Record Signed Copy |
 | `POST /agreements/:id/renew`, `/close`, `/resend` | `AgreementRenew`, `AgreementClose`, `EmptyBody` → `AgreementDetail` | edit · §6.1 | | |
 | `GET /analytics` | `AnalyticsQuery` → `PartnershipAnalytics` | view · §6.1; money with `partnerships.money` | no | §6.18 |
-| `POST /mailbox/threads/:id/partner`, `DELETE` | `ThreadPartnerBind` → `ThreadContext` | `mailbox` view and `partnerships` view | | In the mailbox contract (§6.15) |
+| `POST /mailbox/threads/:id/partner`, `DELETE` | `ThreadPartnerBind` → `ThreadContext` | `mailbox` view and `partnerships` view | | On the mailbox's routes, schemas in `interactions.js` (§6.15) |
 | Public `GET /public/proposals/:token`, `GET /public/proposals/:token/pdf` | → `PublicProposal`; → PDF | none, the token | no | Records a view (§6.10); public routes never import auth |
 | Public `GET /public/sign/:token`, `POST .../code`, `POST .../code/verify`, `POST .../sign`, `GET .../signed` | M5's signing contract, extended (§6.9) | none, the token | | |
 | Public `GET /public/verify/:ref`, `GET /public/verify/t/:token` | → `VerifyResult` | none | | By reference: no content; by QR token: the document (§6.9) |
@@ -896,7 +898,8 @@ Performance** (headers on row 3, four staff names, no figures).
 Money through `shared/money`, strings on the wire, NGN; Home sums NGN only. Dates ISO on the wire,
 day-first for people, Lagos days; never a native date input. Headquarters (area), region cities and a
 deal's venue are picked, never typed (F27, gate 22): `PlaceInput` in the contract, `places.save()` in the
-owning service, owners `partner.headquarters`, `partner.region`, `lead.region`, `deal.venue`;
+owning service, owners `partner.headquarters`, `partner.cities`, `lead.cities`, `deal.venue` (gate 22
+holds a `PlaceInput` key to its owner's name, and the contract's region key is `cities`);
 `docs/guides/addresses.md` lists them.
 
 ## 7 · Events, jobs and notifications
@@ -1162,6 +1165,19 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
 - The public Sign Offer page serves agreements too, its heading following the document; renaming it in
   the inventory is for whoever next touches M5.
 - A deal's calendar event is visible to its team (`attendees`), not to everyone.
+- **In PR 1 (05/11/2026, JP), each to keep the build's own rules:**
+  - The seven controllers stay empty until their PRs. Gate 23 (rule 6) asks a module with a filled
+    controller to put every one of its create and edit forms in the chat or give a never word, and
+    `scripts/check/ai-forms-gaps.json` may not grow; an `// ai:none not built yet` reason would fail it.
+    Each module's PR writes its manifest (or its reasons) with its controller.
+  - The Workspace link (`PartnerLink`) joins the Workspace forms in PR 5, not PR 1, so no request takes
+    a field nothing writes and Praxis AI's project, task and event cards do not change before then.
+  - `partner_type` is dropped one release after the code stopped reading it (MIGRATIONS §8), in PR 3.
+  - The region's place owners are `lead.cities` and `partner.cities`, named for the contract's key, as
+    gate 22 asks.
+  - A deal's validity is optional (New Lead's form has none); the category's default applies.
+  - `agreement_obligation`'s drop refuses to run if the table holds a row, so nothing is lost and the
+    schema is the same on every database (MIGRATIONS §11).
 
 ### 13.3 Still open
 
@@ -1218,9 +1234,11 @@ into one file per screen.
   §12's amendments from §13.1), PROGRESS's next two free rows (#104 and #105 while free; M8 may claim one first, in which case PR 1 uses the next and corrects every mention here) and the summary counts, `scripts/check/
   progress.js` `SCREENS`, `src/shared/route-map.js` (tab order Pipeline, Categories, Partners, Leads,
   Proposals, Contracts & MOUs, Analytics), `src/shared/search/screens.js`, the app's catalogue, the public
-  site's routes; module skeletons (routes mounted, permission checks, `// ai:none` and `// search:none`
-  reasons until their PR); `app/src/features/partnerships/` split into one file per screen on the mock;
-  Home's `partners.source.js` `TABLES` true to the schema.
+  site's routes; module skeletons (each module's router mounted on `/partnerships`, empty until its PR,
+  and `tests/unit/partnerships-skeleton.test.js` holding every route of the seven to the `partnerships`
+  key; the controllers stay empty, so `// ai:none` and `// search:none` are written by the PR that fills
+  each, §13.2); the place owners with their renames; `app/src/features/partnerships/` split into one file
+  per screen on the mock; Home's `partners.source.js` `TABLES` true to the schema.
 - **Docs:** this guide (Change log), DATABASE_SCHEMA M7 (Built and Owes rewritten), MIGRATIONS if a rule
   is touched, README §5.10 and the capability table, `docs/guides/addresses.md` (new place owners),
   `docs/guides/workspace.md` (the three columns, no screen change yet).
@@ -1252,7 +1270,8 @@ into one file per screen.
   conversion (§6.4), `partners.360`, `leads.360` (zero-data tests), the `StageSwitcher` component; the
   Pipeline (#50), Partners (#51) and Leads (#52) screens with both 360s on the real API, desktop and phone
   (the Work and Returns tabs show their empty states until PRs 4 and 5); Home's `partners.source.js`
-  moved to the modules' reads, `OWES` cleared, seed tests updated; the indexes.
+  moved to the modules' reads, `OWES` cleared, seed tests updated; the indexes (§4.3, made in PR 1); the
+  fix-forward dropping `partner.partner_type`, which PR 1 copied into categories and nothing reads.
 - **Docs:** this guide; `docs/guides/home.md` §4.1; COMPONENTS.md.
 - **Tests:** scope (all, team, own, members, no owner), money left out without the capability,
   conversion in one transaction and idempotent, stage rules (reasons, signed needs a copy), health needs
@@ -1398,7 +1417,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   - `FieldCreate` { `label`, `field_type`, `options?`, `applies_to`, `partner_category_id?`, `filterable?` }
   - `ListValueCreate` { `label`, `meaning?` (stages), `position?` }; `ListValueUpdate` { `label?`, `meaning?`, `position?`, `active?` }
   - `TrackerSetup` { `document_id` } → `TrackerSetupDraft` { `stages[]` with suggested meanings, `categories[]`, `impact[]` }; `TrackerSetupApply`
-  - `DealCreate` { `lead_id` or `partner_id`, `title`, `event_title?`, `event_starts_on?`, `event_ends_on?`, `venue?: PlaceInput`, `expected_attendance?`, `objective?`, `stage?`, `estimated_value?`, `commission_pct?`, `validity` ({ `days`: 30 or 60 } or { `until` }), `expected_close_on?`, `next_action?`, `next_action_on?`, `owner_id`, `member_ids?`, `options?: DealOptionInput[]` (at most 5), `impact?`, `impact_rating?`, `impact_note?`, `comments?`, `custom?` }
+  - `DealCreate` { `lead_id` or `partner_id`, `title`, `event_title?`, `event_starts_on?`, `event_ends_on?`, `venue?: PlaceInput`, `expected_attendance?`, `objective?`, `stage?`, `estimated_value?`, `commission_pct?`, `validity?` ({ `days`: 30 or 60 } or { `until` }; the category's default when left out), `expected_close_on?`, `next_action?`, `next_action_on?`, `owner_id`, `member_ids?`, `options?: DealOptionInput[]` (at most 5), `impact?`, `impact_rating?`, `impact_note?`, `comments?`, `custom?` }
   - `DealOptionInput` { `position`, `label`, `original_price?`, `discount_pct?`, `deal_price?`, `price_note?`, `commission_amount?`, `merchant_take?` }
   - `StageMove` { `stage`, `reason?`, `signed_copy_document_id?` }; `HealthSet` { `health`, `blockers?` }
   - `ReturnSave` { `units_sold?`, `gross_sales?`, `mycity_commission?`, `paid_to_partner?`, `downloads?`, `note?` }
@@ -1409,7 +1428,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 - **`proposals.js`**: `ProposalStart` { `deal_id`, `notes?`, `transcript_document_id?`, `asset_document_ids?`, `design_template_id?` }; `ProposalQuestion`; `QuestionAnswer` { `answer` }; `ProposalContent` { `sections`: `Section[]` } with `Section` a discriminated union on `layout` (one schema per layout of §6.11) carrying `key`, `hidden`, the layout's fields and `sources: FigureSource[]` { `figure`, `source` (`brief`, `answer`, `record`, `proof_point`), `ref` }; `ProposalContentEdit`; `SectionRewrite` { `instruction` }; `ProposalSend` { `to` (1 to 5 emails), `cc?` (up to 5), `subject`, `message`, `confirm: true` }; `ProposalDecline` { `reason` }; `ProposalTemplateSave` { `name` }; `ProofPointCreate`; `ProposalListQuery`; `ProposalsSummary`; `ProposalDetail`; `PublicProposal` { `title`, `partner_name`, `html`, `owner_contact`, `valid_until` }
 - **`agreements.js`**: `AgreementGenerate` { `deal_id`, `template_key?`, `asks?` }; `AgreementUpdate` { `body?`, `fields?`, `starts_on?`, `ends_on?`, `renewal_notice_days?` }; `AgreementSend` { `signers`: [{ `contact_id?`, `name`, `title?`, `email`, `side` (`partner`, `mycity`) }], `message?`, `confirm: true` }; `SignedCopyRecord` { `document_id`, `signed_on`, `signed_by_name`, `signed_by_title?` }; `AgreementRenew` { `starts_on`, `ends_on?`, `new_deal?` }; `AgreementClose` { `reason` }; `AgreementListQuery`; `AgreementsSummary`; `AgreementDetail`; `RenewalPage`; the signing contract (M5): `SignCodeVerify` { `code` }, `SignSubmit` { `full_name`, `title?`, `method` (`draw`, `type`), `signature_png?` (a PNG data URL), `typed?`, `consent: true` }; `VerifyResult` { `status`, `signers`, `verdicts` { `content`, `artifact` }, `document?` }
 - **`partnership_analytics.js`**: `AnalyticsQuery` { `period` (`month`, `quarter`, `year`, `custom`), `from?`, `to?`, `partner_category_id?` }; `PartnershipAnalytics` { `kpis`, `by_owner` (the eight measures), `signed_per_month`, `returns_per_month?`, `by_category`, `by_region`, `stage_conversion` }
-- **Workspace** (`projects.js`, `tasks.js`, `calendar.js`): create and update schemas gain `partner_id?`, `lead_id?`, `deal_id?`; list queries gain `partner_id?`
+- **Workspace** (`projects.js`, `tasks.js`, `calendar.js`): create and update schemas gain `partner_id?`, `lead_id?`, `deal_id?`; list queries gain `partner_id?`. Declared once in PR 1 as `partners.js` `PartnerLink` (a partner or a lead, not both; a deal only with one) and `PartnerLinkQuery`; PR 5 spreads them into `ProjectCreate`, `ProjectEditFields`, `TaskCreate`, `TaskEditFields`, `CalendarEventCreate`, `CalendarEventEditFields` and the three list queries, with the services that write them
 
 ## Appendix D · File map
 
@@ -1460,6 +1479,14 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 05/11/2026 · JP · PR 1, contract, data and scaffolding: the seven contract files with Appendix C's
+  schemas (the kit's twelve layouts one discriminated union; the mailbox's thread link in
+  `interactions.js`; the Workspace link as `PartnerLink`); migrations `7010` to `7040` and seed `7190`
+  as §4 has them; the capabilities, the `partnership.agreement` flow and the numbering; Categories and
+  Public · Proposal ratified (MILESTONES §12 and §18, PROGRESS #104 and #105); the routers mounted, the
+  place owners registered, the mock split one file a screen, Home's partners source on the new schema.
+  Corrected here: the region's owners (§4.2, §6.19), `partner_type`'s drop in PR 3, validity optional,
+  the skeleton's controllers (Appendix A), the Workspace link (Appendix C), each recorded in §13.2.
 - 05/11/2026 · JP · Before merging: prefixes settled (§13.1 item 27); the redacted Deal Merchant
   Agreement added to `docs/MyCity-ERP-Documents/partnership-samples/`; which PR needs which MyCity sample
   (§13.3, Appendix A PR 2 and PR 7); My Workspace's PROGRESS rows corrected (#4, #5, #6, #101);

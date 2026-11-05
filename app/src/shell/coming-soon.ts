@@ -84,12 +84,13 @@ export const COMING: Record<string, string[]> = {
   "payroll/statutory": ["PAYE, pension and NHF, calculated for Nigeria", "Remittance schedules for each authority", "Year-end figures for each employee"],
 
   /* Partnerships */
-  "partnerships/pipeline": ["Every partnership by stage, from first contact to signed", "Value and likelihood for each deal", "What has stalled, and for how long"],
-  "partnerships/partners": ["A 360 of each partner: contacts, deals, documents", "Deliverables and who owns them", "Every interaction, logged"],
-  "partnerships/leads": ["New leads, imported from your Excel trackers", "Assign and follow up", "Convert a lead to a deal in one step"],
-  "partnerships/proposals": ["Proposals drafted from templates", "Versions and approvals", "Track which were won"],
-  "partnerships/contracts-and-mous": ["Contracts and MOUs in the vault", "Renewal dates, with a reminder before they lapse", "Signed copies, hash verified"],
-  "partnerships/analytics": ["Pipeline value and win rate", "Revenue by partner and by month", "Which deliverables are at risk"],
+  "partnerships/pipeline": ["Every deal by stage, from first contact to signed", "Value signed this year, and what has stalled", "Filter by stage, category, region, owner and health"],
+  "partnerships/categories": ["Your partnership types, each with its own agreement templates", "Stages, impact and sources set up from your tracker", "A delivery checklist and custom fields for each type"],
+  "partnerships/partners": ["A 360 of each partner: deals, documents, returns and work", "Move a deal to its next stage with one press", "Every call, meeting and email, logged"],
+  "partnerships/leads": ["Capture a lead with its first deal", "Its status follows the deal's stage", "Signing the deal makes the lead a partner"],
+  "partnerships/proposals": ["Proposals drafted with AI from your meeting notes", "Designed layouts you can edit before anything is sent", "A PDF and a tracked link, sent when you confirm"],
+  "partnerships/contracts-and-mous": ["Agreements filled from your templates, then approved", "Signed on a phone with a one-time code, then sealed", "Checked by QR, with a reminder before renewal"],
+  "partnerships/analytics": ["Each lead owner's month, as your performance sheet has it", "Deals signed and returns by month", "By category, region and stage"],
 
   /* Expenses */
   "expenses/my-requests": ["Request money for work, with receipts attached", "See where your request is in the approval chain", "Get notified when it is paid"],

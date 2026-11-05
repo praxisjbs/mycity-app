@@ -1039,6 +1039,41 @@ importer needs no Google API integration. Cynthia also warned that templates may
 end-of-month feedback, which is the argument for column mapping at import time rather than a fixed
 parser.
 
+### Amended 05/11/2026 (JBS Praxis)
+
+The Partnerships Workflow Discovery meeting of 5 November (Edidiong Etudor for MyCity) and JBS
+Praxis's 27 answers of the same day settle how M7 meets this section; where they differ from it, they
+win, and `docs/guides/partnerships.md` (its §13.1) is the full record and M7's only source of truth.
+
+- **Leads, partners and deals.** A lead is its own record, captured with its first deal; its status
+  (new, contacted, qualified, lost, converted) is read from that deal's stage. Signing the deal turns
+  the lead into a partner in the same transaction. A partner has many deals (each edition, each offer).
+  The stages run on deals, and progress is a stage plus a health (On Track, Follow-up Required,
+  Stalled, which needs its blockers); the tracker's Current Stage is not kept. There is no board: a
+  deal moves with one press on its 360.
+- **Partnership types are categories** (A21), each with its agreement templates, a delivery checklist
+  that becomes Workspace tasks on signing, a default commission and validity, and custom fields, on a
+  new Categories tab (§18). The tracker has thirteen stages, Closed Lost and On Hold among them; the
+  stages, types, impact and sources are MyCity's, entered on Categories or read from the tracker's
+  dropdowns by Start From Tracker, never seeded (A26).
+- **The money.** A deal carries up to five priced options and a validity, as MyCity's Deal Merchant
+  Agreement does, and its monthly returns and downloads, entered or imported. Values are open to a
+  record's readers; commission, the merchant's take and returns need `partnerships.money`.
+- **Agreements.** Every agreement is approved before it is sent, Head of Department then CEO, through
+  the approval engine (`partnership.agreement`, editable on Settings · Approvals); the lifecycle above
+  is the agreement's status. Signing is a code emailed to the signer, a drawn or typed signature, the
+  dual hashes (A12) and a QR to verification, through the signatures service shared with M5 and built
+  by whichever milestone needs it first.
+- **Proposals.** The questionnaire becomes the Proposal Studio: Claude, on the Top Tier job (Anthropic
+  Sonnet, then Gemini Pro), reads notes or a meeting transcript and the record, asks question cards
+  that can be reshuffled, and writes the proposal into a designed kit of layouts a person edits. It is
+  sent as a PDF and a tracked private link (a public page, §18) only after a person confirms where it
+  goes; proposals need no approval.
+- **Work and analytics.** Projects, tasks and events connect to a partner (Connect to Partner) without
+  widening who sees them (A24); a signed deal's event days join its team's calendar. Analytics shows
+  the performance sheet's eight measures per lead owner, the rating from Performance.
+- **Numbering:** `PAR`, `LED`, `DEAL`, `PRO`, `AGR`.
+
 ### Definition of done
 
 The partnership tracker's real data imports through the generic importer with a column map, a
@@ -1407,9 +1442,21 @@ head (JBS Praxis's four answers of 27/10/2026). It reuses the `people` permissio
 table below, `scripts/check/progress.js`, `src/shared/route-map.js`, `src/shared/search/screens.js`
 and `docs/PROGRESS.md` (row #103). Its engineering shape is in `docs/guides/organogram.md` §6.1.
 
+**Ratified 05/11/2026 (JBS Praxis).** Two screens join the inventory, taking the admin surface to 96
+and the inventory to 103 (Knowledge Hub · Announcements was dropped on 29/10/2026): **Partnerships ·
+Categories** (`categories`), the second Partnerships tab, after Pipeline, where MyCity keeps its
+partnership types with their agreement templates, delivery checklists and custom fields, the
+pipeline's stages and lists, and the proof points proposals cite; and **Public · Proposal**
+(`go.mycityapp.io/proposal/<token>`), the seventh public page, a proposal as designed with its
+owner's contact and Download PDF, opaque, one proposal, not indexable. Both are M7. Categories reuses
+the `partnerships` permission key, its writes behind the new capability `partnerships.configure`.
+Applied to the tables below, `scripts/check/progress.js`, `src/shared/route-map.js`,
+`src/shared/search/screens.js`, the app's catalogue, the public site's routes and `docs/PROGRESS.md`
+(rows #104 and #105). Their engineering shape is in `docs/guides/partnerships.md`.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
-application, its own build, its own origin, listed below only because it carries six of the 92
-screens and those screens need names too. Nothing in the admin rail links to it, and a member of
+application, its own build, its own origin, listed below only because it carries seven of the
+screens (six of the 92 approved, and Proposal, ratified 05/11/2026) and those screens need names too. Nothing in the admin rail links to it, and a member of
 staff never navigates to it to do their job.
 
 | Area | Module | Tabs | Screens | Built in |
@@ -1424,7 +1471,7 @@ staff never navigates to it to do their job.
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
 | People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |
 | People | **Payroll** | 5 | Payroll Runs · Payslips · Salary Structure · Deductions · Statutory | M6 |
-| Business | **Partnerships** | 6 | Pipeline · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 |
+| Business | **Partnerships** | 7 | Pipeline · Categories · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 (Categories ratified 05/11/2026) |
 | Business | **Expenses** | 7 | My Requests (shown in ESS) · Requisitions · Approvals · Disbursements · Projects · Budgets · Categories | M8 (Projects added 04/11/2026, AJ; its tab and PROGRESS row in M8 PR 7) |
 | System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · User Guide | M1 (Policies), M10, M0 (User Guide) |
 | System | **Praxis AI** | 2 | Ask · History | M10 |
@@ -1434,11 +1481,11 @@ staff never navigates to it to do their job.
 
 | | Site | Pages | Screens | Built in |
 |---|---|---|---|---|
-| Public | **Public site** | 6 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document | M4, M5 |
+| Public | **Public site** | 7 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026) |
 
 Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews in M4 and
 Offers, Onboarding and Talent Pool in M5. The **public site** gets Careers, Vacancy, Apply and
-Assessment in M4, and Sign Offer and Verify Document in M5. **Settings → Notifications** is built
+Assessment in M4, Sign Offer and Verify Document in M5, and Proposal in M7. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
 M0 by TB on 19/10/2026).
 

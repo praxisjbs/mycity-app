@@ -5,13 +5,14 @@ import { parse, RouterProvider, useRouter } from "@/lib/router";
 import { Apply } from "@/pages/Apply";
 import { Assessment } from "@/pages/Assessment";
 import { Careers } from "@/pages/Careers";
+import { Proposal } from "@/pages/Proposal";
 import { SignOffer } from "@/pages/SignOffer";
 import { Vacancy } from "@/pages/Vacancy";
 import { Verify } from "@/pages/Verify";
 import { Page } from "@/shell/Page";
 import { PlannedPage, ViewBar } from "@/shell/Planned";
 
-/** The public site: six pages, no shell, no sign-in (A9). */
+/** The public site: seven pages, no shell, no sign-in (A9). */
 export function App() {
   return (
     <RouterProvider>
@@ -38,11 +39,12 @@ function Routes() {
     case "assess": return <Assessment key={r.token} token={r.token} />;
     case "sign": return <SignOffer key={r.token} token={r.token} />;
     case "verify": return <Verify key={r.number ?? ""} number={r.number} />;
+    case "proposal": return <Proposal key={r.token} />;
     default: return <NotFound />;
   }
 }
 
-const TITLE: Record<string, string> = { careers: "Careers", vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer", verify: "Verify a Document" };
+const TITLE: Record<string, string> = { careers: "Careers", vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer", verify: "Verify a Document", proposal: "Proposal" };
 
 /** The Prototype View switch, in mock mode only (lib/plan.ts). */
 function Preview() {
