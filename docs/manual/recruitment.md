@@ -189,14 +189,15 @@ not progressing.
 ### Careers Settings {#recruitment-vacancies-settings}
 
 Careers Settings holds two things every vacancy uses. **About MyCityApp** is the paragraph every
-vacancy opens with. **Default Traits** are the interview traits a new vacancy starts with.
+vacancy opens with. The default traits are the interview traits a new vacancy starts with.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Press **Careers Settings** at the top.
    ![Careers Settings](shot:recruitment-careers-settings)
 3. {needs="recruitment edit"} Change the **About MyCityApp** paragraph.
-4. {needs="recruitment edit"} Under **Default Traits**, add, reword or take out a trait.
-5. {needs="recruitment edit"} Save the settings. Vacancies already written keep their own traits.
+4. {needs="recruitment edit"} Reword any **Default Trait**; they are numbered in order. Press **Add Trait**
+   for another, or **Remove** beside one to take it out.
+5. {needs="recruitment edit"} Press **Save Settings**. Vacancies already written keep their own traits.
 
 > **Tip:** Only someone who may change every vacancy can save Careers Settings. Others can read
 > them.
@@ -447,7 +448,7 @@ Only active candidates are sent it, each once. Each gets an email with their own
 1. Open [Recruitment · Assessments](/recruitment?tab=assessments) and press **Sittings**.
    ![Sittings awaiting marking](shot:recruitment-sittings)
 2. Each sitting shows the candidate, the assessment, where it stands and the score.
-3. Press **Awaiting Marking** to see only those waiting for you.
+3. Press **To Mark** to see only those waiting for marks. **Awaiting Marking**, at the top, counts them.
 4. Press a sitting to read each answer. Open a file, or the link they gave.
 
 | Where it stands | What it means |
@@ -461,11 +462,11 @@ Only active candidates are sent it, each once. Each gets an email with their own
 
 ### Mark the answers {#recruitment-assessments-mark needs="recruitment edit"}
 
-1. Open a sitting under **Awaiting Marking**.
-2. Press **Mark Answers**.
+1. Under **Sittings**, press **To Mark**, then press a sitting.
+2. For each written or file answer, type its **Mark**, up to the question's most. A **Comment** is
+   optional.
    ![Mark Answers](shot:recruitment-mark-answers)
-3. For each written or file answer, type its mark, up to the question's most. A comment is optional.
-4. Save the marks.
+3. Press **Mark Answers**. Marks given so far are kept; a chosen answer is marked by itself.
 
 Once every answer has a mark, the sitting is scored and its percentage goes on the candidate. A
 question left unanswered scores 0. A mark left empty is refused, never read as 0.
@@ -683,9 +684,9 @@ do:
 open: /recruitment?tab=vacancies&panel=settings
 as: operations
 do:
-  - wait: text "Default Traits"
+  - wait: text "Default Trait 1"
 marks:
-  1: text "Default Traits" | The traits a new vacancy starts with
+  1: text "Default Trait 1" | The traits a new vacancy starts with
 ```
 
 ```shot recruitment-candidates
@@ -752,9 +753,9 @@ as: operations
 do:
   - click: row 1
   - wait: button "Mark Answers"
-  - click: button "Mark Answers"
-  - wait: css input
 crop: modal
+marks:
+  1: button "Mark Answers" | Save the marks
 ```
 
 ```shot recruitment-interviews
