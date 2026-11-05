@@ -209,12 +209,17 @@ async function submit(raw, body) {
   });
 }
 
-/** A second press of Submit on a spent link: the receipt of what the first press made, or the 404. */
+/**
+ * A second press of Submit on a spent link: the receipt of what the first press made, or the 404.
+ * The press is the same form sent again, so it carries the CV the first press attached; only an
+ * application holding that very CV answers. Any other email sent on a spent link (someone asking
+ * whether a person applied) meets the same 404 whether or not they did (guide §6.2).
+ */
 async function pressedAgain(client, token, body) {
   if (token.subject_type !== "vacancy") throw notFound();
   const known = await repo.candidateByEmail(client, body.email);
   const first = known ? await repo.applicationOf(client, token.subject_id, known.candidate_id) : null;
-  if (!first) throw notFound();
+  if (!first || !first.cv_document_id || first.cv_document_id !== body.cv_document_id) throw notFound();
   return { reference: first.number, submitted_at: new Date(first.applied_at).toISOString() };
 }
 

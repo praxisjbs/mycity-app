@@ -214,7 +214,7 @@ async function cvsOnLink(db, entityType, tokenId) {
 /** An application of this person to this vacancy, if they have one. */
 async function applicationOf(db, vacancyId, candidateId) {
   const { rows } = await db.query(
-    "SELECT application_id, number::text AS number, applied_at FROM application WHERE vacancy_id = $1 AND candidate_id = $2",
+    "SELECT application_id, number::text AS number, applied_at, cv_document_id FROM application WHERE vacancy_id = $1 AND candidate_id = $2",
     [vacancyId, candidateId],
   );
   return rows[0] || null;

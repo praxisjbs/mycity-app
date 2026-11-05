@@ -56,7 +56,8 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
 
   /** A fresh Apply link for the role, as Apply for This Role makes one. */
   const startApply = async () => (await pub().post("/jobs/content-producer-lagos/apply").send({})).body.token;
-  const sendCv = (tok) => pub().post(`/apply/${tok}/cv`).attach("file", PDF, { filename: "cv.pdf", contentType: "application/pdf" });
+  // As the page's one upload engine sends it: the file and the purpose it uploads under.
+  const sendCv = (tok) => pub().post(`/apply/${tok}/cv`).field("purpose", "cv").attach("file", PDF, { filename: "cv.pdf", contentType: "application/pdf" });
   const form = (over = {}) => ({
     full_name: "Kemi Bello",
     email: "kemi.bello@example.test",
@@ -123,6 +124,8 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
       ["text", false],
     ]);
 
+    // Another purpose beside the CV is refused; the route keeps `cv` whatever is sent.
+    expect((await pub().post(`/apply/${tok}/cv`).field("purpose", "avatar").attach("file", PDF, { filename: "cv.pdf", contentType: "application/pdf" })).status).toBe(422);
     const cv = await sendCv(tok);
     expect(cv.status).toBe(201);
     expect(cv.body).toMatchObject({ file_name: "cv.pdf", mime_type: "application/pdf" });
@@ -139,6 +142,12 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     expect(sent.body).toEqual({ reference: "APP-0001", submitted_at: expect.any(String) });
     // Spent: the same link is the same 404 as any bad one.
     expect((await pub().get(`/apply/${tok}`)).status).toBe(404);
+    // A second press of the same form (its answer lost on the way) gets the same receipt.
+    const pressedAgain = await pub()
+      .post(`/apply/${tok}`)
+      .send(form({ cv_document_id: cv.body.document_id, answers: { [weekendsId]: "Yes", [linkId]: "https://example.test/reel" } }));
+    expect(pressedAgain.status).toBe(201);
+    expect(pressedAgain.body.reference).toBe("APP-0001");
 
     const row = await one(
       "SELECT a.source, a.stage, a.status, a.provisional_score::float AS estimate, d.entity_type, d.scan_status FROM application a JOIN document d ON d.document_id = a.cv_document_id",
@@ -169,8 +178,10 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     // Answered as now, like any submission: the first application's date is not given away.
     expect(Date.now() - Date.parse(twice.body.submitted_at)).toBeLessThan(60_000);
     expect(await one("SELECT count(*)::int AS n FROM application")).toEqual({ n: 1 });
-    // A second press on the same spent link gets the receipt, not a 404; another email on it gets the 404.
-    expect((await pub().post(`/apply/${again}`).send(form({ email: "KEMI.BELLO@example.test", cv_document_id: own.body.document_id, answers: { [weekendsId]: "yes" } }))).status).toBe(201);
+    // A spent link never says whether an email applied (guide §6.2): only the form that spent it, sent
+    // again with the CV it attached, is answered. Kemi has applied, nobody has; both meet the same 404
+    // here, as this press did not attach Kemi's application's CV.
+    expect((await pub().post(`/apply/${again}`).send(form({ email: "KEMI.BELLO@example.test", cv_document_id: own.body.document_id, answers: { [weekendsId]: "yes" } }))).status).toBe(404);
     expect((await pub().post(`/apply/${again}`).send(form({ email: "nobody@example.test", cv_document_id: own.body.document_id, answers: { [weekendsId]: "yes" } }))).status).toBe(404);
   });
 
