@@ -66,7 +66,7 @@ describe("the metric registry", () => {
       expect([m.key, owners.has(m.owner.by)]).toEqual([m.key, true]);
       expect(contract.HOME_ALERT_CATEGORIES).toContain(m.category);
     }
-    expect(metrics.METRICS.partner_inactivity.owner).toEqual({ module: "partners", milestone: "M7", by: "GE" });
+    expect(metrics.METRICS.partner_inactivity.owner).toEqual({ module: "partners", milestone: "M7", by: "LA" });
     expect(metrics.METRICS.budget_threshold.owner).toEqual({ module: "budgets", milestone: "M8", by: "AJ" });
     expect(metrics.METRICS.recruitment_sla.owner).toEqual({ module: "vacancies", milestone: "M4", by: "GE" });
   });

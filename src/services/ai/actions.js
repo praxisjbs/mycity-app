@@ -224,14 +224,13 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-11-04",
     built: true,
   }),
-  // Score With AI and Screen With AI on Candidates (docs/guides/recruitment.md §6.4): a CV read
-  // against the role and its must-meet conditions; personal data, so never DeepSeek.
-  // Suggest With AI on an assessment's questions (docs/guides/recruitment.md §6.7, §9).
+  // Suggest With AI on an assessment's questions (docs/guides/recruitment.md §6.7, §9). Personal data
+  // as every Recruitment action is (decided 04/11/2026): it reads the role a candidate is hired for.
   "assessment-questions": Object.freeze({
     label: "Suggest Assessment Questions",
     module: "recruitment",
     job: "default",
-    personal_data: false,
+    personal_data: true,
     chosen_by: "GE",
     chosen_at: "2026-11-04",
     built: true,
@@ -246,6 +245,8 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-11-04",
     built: true,
   }),
+  // Score With AI and Screen With AI on Candidates (docs/guides/recruitment.md §6.4): a CV read
+  // against the role and its must-meet conditions; personal data, so never DeepSeek.
   "cv-screen": Object.freeze({
     label: "Score Application",
     module: "recruitment",
