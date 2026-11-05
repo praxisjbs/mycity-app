@@ -156,6 +156,10 @@ describeDb("Recruitment · Interviews against the real migrations", () => {
   });
 
   test("the last card closes the round: score × 10, every submitted card and each trait's average then shown, notes still private", async () => {
+    // A mis-tapped star is taken back off the draft, then the right one given.
+    await h.as("hod").put(`/recruitment/interviews/${interviewId}/feedback`).send({ ratings: [{ vacancy_question_id: traits[1], rating: 3 }] });
+    const cleared = await h.as("hod").put(`/recruitment/interviews/${interviewId}/feedback`).send({ ratings: [{ vacancy_question_id: traits[1], rating: null }] });
+    expect(cleared.body.my_feedback.ratings.map((r) => r.vacancy_question_id)).toEqual([traits[0]]);
     await h.as("hod").put(`/recruitment/interviews/${interviewId}/feedback`).send({ ratings: [{ vacancy_question_id: traits[1], rating: 7 }] });
     const first = await h.as("hod").post(`/recruitment/interviews/${interviewId}/feedback/submit`).send({});
     expect(first.body).toMatchObject({ round_status: "open", submitted_count: 1, my_submitted: true });

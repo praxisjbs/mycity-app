@@ -3327,7 +3327,7 @@ A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on 
 | Use | A score a person gives by eye against a scale: a trait on the interview card, an overall rating. disabled for a card already submitted; readOnly for ratings and averages shown back once a panel's round closes. |
 | Avoid | A number that is counted or typed (use NumberField); a choice between named options (use ChoiceField or RadioCards); a rating that saves the moment it is tapped outside a form (pair it with the form's own save). |
 | Phone | Every star is a 44 px target; ten stars sit in two rows of five so the row never runs off a 390 px screen. No hover preview: the tap is the choice. On desktop the stars follow the density (36 px Compact, 40 px Comfortable). |
-| Accessibility | A radio group: each star is a radio named "7 of 10"; Left and Right, Up and Down, Home and End move and choose, and the readout beside it is hidden so the value is never read twice. Inside a Field its label names the group (and the readOnly image) and the error is linked; alone, pass label. readOnly is one image named "Level of Confidence: 7 of 10". |
+| Accessibility | A radio group: each star is a radio named "7 of 10"; Left and Right, Up and Down, Home and End move and choose, and the readout beside it is hidden so the value is never read twice. With onClear, a tap on the star already chosen, or Delete or Backspace, takes the rating back to not rated. Inside a Field its label names the group (and the readOnly image) and the error is linked; alone, pass label. readOnly is one image named "Level of Confidence: 7 of 10". |
 | Status | beta |
 | Exports | `RatingField` |
 | Import | `import { RatingField } from "@mycity/ui";` |
@@ -3341,6 +3341,7 @@ A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on 
 |---|---|---|---|
 | `value` | `number \| null` | yes | The rating given, 1 to max; null while none is given. A value off the scale shows as not rated. readOnly also takes a mean (7.4), its stars rounded. |
 | `onChange` | `(value: number) => void` |  | Called with the rating tapped or chosen with the keys. Not needed when readOnly or disabled. |
+| `onClear` | `() => void` |  | Called when the rating is taken back: a tap on the star already chosen, or Delete or Backspace. A mis-tapped star on a draft can then go back to not rated instead of staying inside an average. Without it a chosen star stays chosen. |
 | `onBlur` | `() => void` |  | Called when focus leaves the stars. |
 | `max` | `number` |  | The top of the scale, 3 to 10; 10 unless set. |
 | `label` | `string` |  | Names the stars when no Field label sits above them. |
@@ -3354,6 +3355,7 @@ A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on 
 ```tsx
 <Field label="Level of Confidence" {...form.status("confidence")}><RatingField {...form.field("confidence")} /></Field>
 <RatingField label="Oral Communication Skills" value={7.3} readOnly decimals={1} />
+<RatingField label="Level of Confidence" value={card.rating} onChange={rate} onClear={unrate} />
 ```
 
 ### RecordPicker

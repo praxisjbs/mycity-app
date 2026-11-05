@@ -613,6 +613,13 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · My Card takes the donor's scorecard flow (REUSE_MAP §5.3, praxis-ls applicant-drawer):
+  the same numbered traits for every candidate of the role; each star saved as the panelist taps it, put
+  back with the error when the save fails; a tap on the star already chosen takes it back to not rated
+  (`RatingField onClear`; `FeedbackSave.ratings[].rating` may be null on a draft); and the panelist's own
+  score, the mean of what they have rated, shown as they go. Unlike the donor: 1 to 10, one card per
+  panelist, blind until the round closes, locked once submitted.
+
 - 05/11/2026 · GE · P12. ⌘K actions: New Vacancy, Invite to Apply, Screen With AI, New Assessment, Schedule
   Interview (`shared/search/actions.js`, each opening its tab with `?action=`). Six graded questions for the
   assistant, one a member of staff who must never read candidates. The access matrix probes the reads of

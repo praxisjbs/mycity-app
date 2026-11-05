@@ -235,7 +235,11 @@ const FeedbackSave = z
     decision: InterviewDecision.nullable().optional(),
     comments: z.string().trim().max(5000, "At most 5000 characters").optional(),
     private_notes: z.string().trim().max(5000, "At most 5000 characters").optional(),
-    ratings: z.array(QuestionRating).max(20).optional(),
+    /** Each trait's rating; null takes a rating back off a draft (a mis-tapped star cleared). */
+    ratings: z
+      .array(z.object({ vacancy_question_id: uuid, rating: rating.nullable() }).strict())
+      .max(20)
+      .optional(),
   })
   .strict();
 

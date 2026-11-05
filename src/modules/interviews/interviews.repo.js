@@ -266,6 +266,11 @@ async function saveRating(client, feedbackId, questionId, rating) {
   );
 }
 
+/** A rating taken back off a draft card. */
+async function clearRating(client, feedbackId, questionId) {
+  await client.query("DELETE FROM interview_rating WHERE interview_feedback_id = $1 AND vacancy_question_id = $2", [feedbackId, questionId]);
+}
+
 async function submitFeedback(client, panelistId) {
   await client.query("UPDATE interview_feedback SET submitted_at = now() WHERE interview_panelist_id = $1", [panelistId]);
   await client.query("UPDATE interview_panelist SET submitted_at = now() WHERE interview_panelist_id = $1", [panelistId]);
@@ -393,6 +398,7 @@ module.exports = {
   setPanel,
   saveFeedback,
   saveRating,
+  clearRating,
   submitFeedback,
   cardScores,
   traitAverages,

@@ -59,6 +59,16 @@ function Closed() {
   );
 }
 
+/** A draft card: a tap on the star already chosen takes the rating back. */
+function Clearable() {
+  const [v, setV] = useState<number | null>(6);
+  return (
+    <Field label="Clarity of Thought and Expression">
+      <RatingField value={v} onChange={setV} onClear={() => setV(null)} />
+    </Field>
+  );
+}
+
 function Submitted() {
   return (
     <Field label="Oral Communication Skills">
@@ -74,6 +84,7 @@ export default {
     "Not Rated": () => <Trait trait="Future Growth Potential in Career" initial={null} />,
     "Field Error": () => <Missing />,
     "Five Stars": () => <Overall />,
+    "Tap Again to Clear": () => <Clearable />,
     "Card Submitted": () => <Submitted />,
     "Panel Means": () => <Closed />,
   },

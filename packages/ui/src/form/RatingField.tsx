@@ -5,10 +5,11 @@
  * @use A score a person gives by eye against a scale: a trait on the interview card, an overall rating. disabled for a card already submitted; readOnly for ratings and averages shown back once a panel's round closes.
  * @avoid A number that is counted or typed (use NumberField); a choice between named options (use ChoiceField or RadioCards); a rating that saves the moment it is tapped outside a form (pair it with the form's own save).
  * @phone Every star is a 44 px target; ten stars sit in two rows of five so the row never runs off a 390 px screen. No hover preview: the tap is the choice. On desktop the stars follow the density (36 px Compact, 40 px Comfortable).
- * @a11y A radio group: each star is a radio named "7 of 10"; Left and Right, Up and Down, Home and End move and choose, and the readout beside it is hidden so the value is never read twice. Inside a Field its label names the group (and the readOnly image) and the error is linked; alone, pass label. readOnly is one image named "Level of Confidence: 7 of 10".
+ * @a11y A radio group: each star is a radio named "7 of 10"; Left and Right, Up and Down, Home and End move and choose, and the readout beside it is hidden so the value is never read twice. With onClear, a tap on the star already chosen, or Delete or Backspace, takes the rating back to not rated. Inside a Field its label names the group (and the readOnly image) and the error is linked; alone, pass label. readOnly is one image named "Level of Confidence: 7 of 10".
  * @status beta
  * @example <Field label="Level of Confidence" {...form.status("confidence")}><RatingField {...form.field("confidence")} /></Field>
  * @example <RatingField label="Oral Communication Skills" value={7.3} readOnly decimals={1} />
+ * @example <RatingField label="Level of Confidence" value={card.rating} onChange={rate} onClear={unrate} />
  */
 import { useId, useState, type FocusEvent, type KeyboardEvent } from "react";
 import * as RadioGroup from "@radix-ui/react-radio-group";
@@ -22,6 +23,12 @@ export interface RatingFieldProps {
   value: number | null;
   /** Called with the rating tapped or chosen with the keys. Not needed when readOnly or disabled. */
   onChange?: (value: number) => void;
+  /**
+   * Called when the rating is taken back: a tap on the star already chosen, or Delete or Backspace. A
+   * mis-tapped star on a draft can then go back to not rated instead of staying inside an average.
+   * Without it a chosen star stays chosen.
+   */
+  onClear?: () => void;
   /** Called when focus leaves the stars. */
   onBlur?: () => void;
   /** The top of the scale, 3 to 10; 10 unless set. */
@@ -60,6 +67,7 @@ function Star({ on, className }: { on: boolean; className?: string }) {
 export function RatingField({
   value,
   onChange,
+  onClear,
   onBlur,
   max = 10,
   label,
@@ -122,6 +130,11 @@ export function RatingField({
   const keys = (e: KeyboardEvent<HTMLDivElement>) => {
     setHover(null);
     if (disabled) return;
+    if ((e.key === "Delete" || e.key === "Backspace") && onClear && rated != null) {
+      e.preventDefault();
+      onClear();
+      return;
+    }
     const at = rated ?? 0;
     const next = e.key === "Home" ? 1 : e.key === "End" ? top : e.key === "ArrowUp" ? at + 1 : e.key === "ArrowDown" ? at - 1 : null;
     if (next === null) return;
@@ -163,7 +176,11 @@ export function RatingField({
             onPointerEnter={(e) => {
               if (e.pointerType === "mouse" && !disabled) setHover(n);
             }}
-            onClick={() => setHover(null)}
+            onClick={() => {
+              setHover(null);
+              /* The radio group does not report a tap on the star already chosen: that tap takes it back. */
+              if (onClear && !disabled && n === rated) onClear();
+            }}
             className="flex size-tap items-center justify-center rounded-ctl focus-visible:-outline-offset-2 disabled:cursor-default"
           >
             <Star on={n <= lit} className="size-5 phone:size-6" />

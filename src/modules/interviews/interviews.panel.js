@@ -63,7 +63,10 @@ async function save(actor, id, body) {
     if (body.overall_rating !== undefined && body.overall_rating !== null && traits.length)
       throw field("overall_rating", "Rate each trait instead");
     const feedbackId = await repo.saveFeedback(client, seat.interview_panelist_id, body);
-    for (const r of body.ratings || []) await repo.saveRating(client, feedbackId, r.vacancy_question_id, r.rating);
+    for (const r of body.ratings || []) {
+      if (r.rating === null) await repo.clearRating(client, feedbackId, r.vacancy_question_id);
+      else await repo.saveRating(client, feedbackId, r.vacancy_question_id, r.rating);
+    }
     return id;
   });
 }

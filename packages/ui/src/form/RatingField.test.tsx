@@ -51,6 +51,24 @@ describe("RatingField", () => {
     expect(onChange).toHaveBeenCalledWith(10);
   });
 
+  it("with onClear, a tap on the chosen star or Delete takes the rating back; without it the star stays", async () => {
+    const user = userEvent.setup();
+    const onClear = vi.fn();
+    const onChange = vi.fn();
+    const { rerender } = render(<RatingField label="Level of Confidence" value={7} onChange={onChange} onClear={onClear} />);
+    await user.click(screen.getByRole("radio", { name: "7 of 10" }));
+    expect(onClear).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("radio", { name: "4 of 10" }));
+    expect(onChange).toHaveBeenCalledWith(4);
+    screen.getByRole("radio", { name: "7 of 10" }).focus();
+    await user.keyboard("{Delete}");
+    expect(onClear).toHaveBeenCalledTimes(2);
+    rerender(<RatingField label="Level of Confidence" value={7} onChange={onChange} />);
+    await user.click(screen.getByRole("radio", { name: "7 of 10" }));
+    expect(onClear).toHaveBeenCalledTimes(2);
+  });
+
   it("moves and rates with the arrow keys, and stops at the top", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
