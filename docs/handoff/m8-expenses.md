@@ -1,0 +1,277 @@
+# M8 Expenses & Budget Control · Build Handoff
+
+**Start here if you are continuing this work.** This file is self-contained: what the 04/11/2026
+Modules Review asked for, the decisions AJ took (do not ask them again), the eight pull requests
+with their checklist, and a dated log. The design itself is `docs/guides/expenses.md`; this file is
+the build plan and its log.
+
+| | |
+|---|---|
+| Branch | `m8/expenses` (PR 1 to PR 3); later PRs on `m8/expenses-<part>` |
+| Pull request | not opened yet |
+| Owner | AJ (Adole Jerome); every M8 decision is AJ's (TB, 04/11/2026) |
+| Type | Full stack (CLAUDE.md step 1) |
+| Started | 04/11/2026 |
+
+---
+
+## 0 · How to continue
+
+1. `git fetch origin && git checkout m8/expenses && git rebase origin/main`.
+2. Read this file in full, then `docs/guides/expenses.md`, then what CLAUDE.md step 2 asks for
+   full-stack work, and `docs/MyCity-ERP-Documents/MILESTONES.md` §13 as amended.
+3. Take the first unticked item in §4. Build it, run its checks, tick it here with the date, add a
+   line to §6.
+4. Never re-open §2.
+
+---
+
+## 1 · What was asked
+
+From the Modules Review of 04/11/2026 (TB with AJ; the transcript is the meeting's Gemini notes):
+
+1. Requests route line manager, then Operations & People (straight to Operations & People when the
+   requester is a line manager), then the CEO, read from Settings · Approvals.
+2. A request keeps the approval flow it was created with (confirmed as correct).
+3. A request's detail opens in a pop-up modal on desktop and on a phone; the list takes the full
+   height of the screen.
+4. The KPI cards with records behind them open their list in a pop-up (the ESS rule).
+5. An invoice is uploaded on the request and opens as a PDF for the approvers; categories are set
+   up on the last tab; no thresholds.
+6. A request has several line items instead of one description.
+7. Requisitions stay: Operations & People batch approved requests into one for the CEO.
+8. Every request carries its payment details: Use My Company Account, or the bank, account name and
+   amount entered.
+9. A Projects tab, with a project picker over the Workspace projects, to track spend per project.
+10. Disbursements need the bank transaction ID, but without it the screen warns and saves on yes.
+11. The chart on Disbursements goes.
+12. Every form works in the AI chat, and the Playwright user-guide pictures are retaken: both are
+    release gates.
+
+TB shared `MyCityApp Expenditure Sheet` (tabs 2025, 2026, Projects, Sheet4) as the picture of how
+MyCity tracks spend today. It is a reference, not data to load (decision 11).
+
+---
+
+## 2 · AJ's decisions (04/11/2026, binding)
+
+1. **No approval threshold.** Every request takes the same chain whatever its amount. The category
+   carries no threshold; MILESTONES §13's per-line threshold flag is withdrawn.
+2. **The bank reference is asked for, not required.** Save Without Reference? on the screen; a
+   disbursement saved without one is flagged Reference Missing with Add Reference, and counted on a
+   KPI card. No database trigger.
+3. **Requisitions stay**, ordered first among the Expenses tabs. The CEO approves or rejects the
+   requisition as a whole and may remove a single request first, which returns to Operations &
+   People with its history.
+4. **Every stage can Reject or Send Back.** Reject ends the request; Send Back returns it to the
+   requester to edit and send again.
+5. **Each request is paid to its own payee**, with its own transaction reference. The requisition is
+   the CEO's approval batch only.
+6. **Payee types**: Staff (Use My Company Account), Vendor, Partner, Dedicated Task Team (DTT; confirmed
+   05/11/2026). Its code is `task_team`.
+7. **Department budgets stay**: set at the start of the year by category, editable, every change
+   logged. A request over its department's remaining budget is flagged before approval. A project
+   has an optional budget too.
+8. **Tabs**: Requisitions, Approvals, Disbursements, Projects, Budgets, Categories. My Requests is
+   an ESS tab.
+9. **F31 is amended for Expenses**: a request, a requisition and a disbursement open in the shared
+   Modal on desktop too (the centred dialog), a bottom sheet on a phone as before.
+10. **Categories under A26**: no reference seed. An Add Suggested Categories button on the empty
+    Categories tab creates the twelve defaults (guide §6.7) in one press; MyCity then adds, edits
+    and deactivates its own. The five 8099 seeded are taken out with M8's staging seed.
+11. **Nothing is imported** from the expenditure sheet: its rows have no transaction references, its
+    Category column is the payee type, departments are typed by hand, and 36% of the 2026 tab is
+    salaries (payroll, M6). The sheet stays MyCity's archive and shapes the staging demo rows.
+12. **One category and one project per request**, chosen on the request; lines carry description,
+    quantity and unit price. The request's total is the sum of its lines; one invoice covers it.
+13. **Cancelling**: the requester cancels until Operations & People approve; after that only an
+    `expenses.finance` holder withdraws it, until it is paid.
+14. **AI**: invoice reading on Image Reading, the duplicate check on Default, and a category
+    suggestion from the purpose and lines on Default, all three suggestions a person accepts (PR 6;
+    the category suggestion decided 05/11/2026).
+15. **The `expenses.finance` capability** decides who groups requisitions, records disbursements,
+    sets budgets and manages categories: Operations & People and the CEO by default.
+16. **Home's Budget Used counts spent and committed** (05/11/2026), as the Budgets tab's Remaining
+    does, so Home warns before the money leaves.
+
+---
+
+## 3 · The pull requests
+
+| PR | What | Depends on |
+|---|---|---|
+| 1 | Docs: this file, `docs/guides/expenses.md`, MILESTONES §13 and §18, F31's amendment, PROGRESS | nothing |
+| 2 | Schema and contract: `8010_expenses_chain.sql`, `8100_seed_expense_flows.sql`, the five contract schemas, `schemes.js`, the two workflow DEFAULTS, DATABASE_SCHEMA, Home's two sources | 1 |
+| 3 | Categories and requests backend: `expense_categories` and `expenses` modules, the capability, ESS routes, the approval and its settle handler, notifications, search, AI manifests and cards | 2 |
+| 4 | Requisitions and disbursements backend | 3 |
+| 5 | Budgets and projects backend, the recount, the budget-threshold job, the monthly report | 3 |
+| 6 | AI features: invoice reading, duplicate check, category suggestion | 3 |
+| 7 | Frontend on the real API, the Projects tab and its PROGRESS row (`npm run new:screen`), `ListDetail`'s modal layout for F31's amendment, the staging seed (taking out Home's forward rows and the five 8099 categories), the User Guide chapter and its pictures | 4, 5 |
+| 8 | Release check: every AI card end to end, the forms and screenshot gates, `npm run ci`, empty stubs deleted, PROGRESS ticked | 7 |
+
+---
+
+## 4 · Checklist
+
+- [x] PR 1 · guide, handoff, MILESTONES §13 and §18, F31 amended, PROGRESS (04/11/2026)
+- [x] PR 2 · 8010 schema (04/11/2026)
+- [x] PR 2 · 8100 seed: flows, statuses, numbering, `expenses.finance` (04/11/2026)
+- [x] PR 2 · contract schemas and `TABLES`, `gen:contract` (04/11/2026)
+- [x] PR 2 · `schemes.js` `budget`; DEFAULTS `expenses.request`, `expenses.requisition` (04/11/2026)
+- [x] PR 2 · DATABASE_SCHEMA M8, Home's `expenses.source.js` and `budgets.source.js` (04/11/2026)
+- [ ] PR 3 · `expense_categories` module, Add Suggested Categories
+- [ ] PR 3 · `expenses` module: mine, list, get, approvals, submit, cancel, withdraw, settle
+- [ ] PR 3 · notifications, search, AI reads and cards, tests
+- [ ] PR 4 · requisitions, CEO removal, disbursements with Reference Missing
+- [ ] PR 5 · budgets, history, projects, recount, threshold job, monthly report
+- [ ] PR 6 · AI features
+- [ ] PR 7 · frontend, staging seed, User Guide chapter and pictures
+- [ ] PR 8 · release check
+
+---
+
+## 5 · Notes
+
+- Running the whole suite locally needs PostgreSQL 16 with pgvector and Redis (BACKEND_GUIDE
+  §8.4); without them the integration files and gate 4's round trip are skipped, and CI runs them.
+- The two Home sources (`src/modules/dashboard/sources/expenses.source.js`, `budgets.source.js`)
+  change in the same PR as any column they read (their `OWES` lists).
+
+---
+
+## 6 · Log
+
+- 05/11/2026 · AJ · Decided: Home's Budget Used counts spent and committed (decision 16); PR 6 builds the category suggestion on Default (decision 14).
+- 05/11/2026 · AJ · DTT confirmed as Dedicated Task Team; the payee type's label in 8100, the guide and MILESTONES §13 say so.
+- 04/11/2026 · AJ · PR 2: 8010 (lines, payee, invoice, project, many requests to a requisition, approvals' instances, Reference Missing, category type, project budget, statuses, indexes) and 8100 (the two flows, statuses, payee types, `expenses.finance` for Operations & People and the Implementation Team, 8099's unused `expense_request` scheme out); the five contract schemas; `budget` in `schemes.js` and the settings contract; the flows in DEFAULTS; DATABASE_SCHEMA; Home's sources' `owes`. NGN only is the contract's and the service's rule, not a CHECK, because Home's tests and sums carry other currencies. Unit 1803 and integration 1331 green against the real migrations, with the UP, DOWN, UP round trip. Next: PR 3.
+- 04/11/2026 · AJ · PR 1: decisions §2 taken; guide written; MILESTONES §13 amended and §18 given the Projects tab; F31 amended for Expenses; PROGRESS note. The Projects row and tab come in PR 7 through `npm run new:screen`, after `app/src/features/expenses/index.tsx` becomes a `switch` (the script needs a `default:` case).
+
+---
+
+## 7 · Prompts for the remaining PRs
+
+Paste one into a new session opened on this repository. Each assumes the PRs before it are merged
+to `main` (or that the session works on top of their branch). Every prompt carries the same rules:
+CLAUDE.md steps 1 to 5, this handoff read first, §2 never re-opened, the guide updated before any
+behaviour it describes changes, and the checklist (§4) and log (§6) ticked as you go.
+
+Lessons from PR 1 and PR 2 that every session needs:
+
+- Integration tests need PostgreSQL 16 **with pgvector** and Redis; `.claude/hooks/session-start.sh`
+  starts them in a cloud session (install `postgresql-16-pgvector` if `vector` is missing).
+- Several tests hard-code each role's capabilities and the numbering totals
+  (`tests/integration/settings.test.js`, `home-schema.test.js`); a new capability or scheme updates
+  them.
+- `npm run gen:contract` and `npm run gen:ai-catalogue` after any contract change; never export one
+  schema under two names (the catalogue then names other modules' reads after yours).
+- `app/src/features/expenses/index.tsx` must become a `switch` with a `default:` before
+  `npm run new:screen` will add the Projects tab.
+- Known failures that are not M8's: `packages/ui` `CityShowcase` clock test fails on `main`; the
+  `shell` gate fails on Windows without bash. A Windows `npm run ci` with every group at once times
+  out frontend tests; use `-- --serial`.
+
+### PR 3 · Categories and requests backend
+
+> This is a backend change to M8 Expenses (branch `m8/expenses-requests`). Read
+> `docs/handoff/m8-expenses.md` in full, then `docs/guides/expenses.md`, then what CLAUDE.md step 2
+> asks for backend work (BACKEND_GUIDE in full; `src/modules/leave/` is the pattern for a request
+> with an approval). Build PR 3 of the handoff: the `expense_categories` module (list, create, edit,
+> deactivate; the twelve defaults of guide §6.7 as one constant; `POST /expense-categories/suggested`
+> only while there are none) and the `expenses` module (`/expenses/mine` list, summary, create with
+> `submit`, edit while draft or sent back, submit, cancel; `/expenses` list and get within scope;
+> `/expenses/approvals`; withdraw with `expenses.finance`). A request's lines are written by the
+> service (line amount = quantity × unit price via `shared/money`; request amount = their sum); Use
+> My Company Account copies the bank details from the employee record at sending; sending opens
+> `expenses.request` in the same transaction with context `{ amount, requester_manages_people }`;
+> `expenses.events.js` settles the approval's outcome onto the request (as `leave.events.js` does)
+> and turns the approval's Request Changes into `sent_back`. Check first how the engine's
+> `request_changes` returns an instance to its first stage and design Send Again to fit it; write
+> what you chose into guide §6.1. Bank fields are masked under `employee.bank`. Add
+> `expenses.search.js`, `expense_categories.search.js`, the AI manifests with reads and the New
+> Request and New Category cards (gate 23: `npm run gen:ai-catalogue`, an integration test and an
+> evaluation case per action), notifications per guide §7, `budget_line_id` and `over_budget` set on
+> sending (budget recount is PR 5; until then `over_budget` is false when no budget line exists).
+> Delete the stubs this PR leaves empty only if no later PR fills them. Unit and integration tests
+> for every endpoint. Finish with `npm run ci` green, PROGRESS API ticks for #56 and #61 only if every
+> endpoint they call exists, the guide's change log, the handoff ticked.
+
+### PR 4 · Requisitions and disbursements backend
+
+> This is a backend change to M8 Expenses (branch `m8/expenses-payouts`). Read
+> `docs/handoff/m8-expenses.md` in full, then `docs/guides/expenses.md` §3 steps 4 to 6, §6.4, §6.5,
+> §7, and CLAUDE.md step 2 for backend work. Build PR 4: the `requisitions` module (list and get with
+> `expenses.finance`, the CEO passing; create from 1 to 25 `approved` requests, locking them and
+> moving each to `in_requisition`, opening `expenses.requisition` with `{ total }`; the CEO's
+> remove-a-request with a reason, which returns it to `approved` and recomputes the total, cancelling
+> an emptied requisition; the approval's outcome settled onto every request in it: `authorised`, or
+> back to `approved` on reject) and the `disbursements` module (list with the `reference_missing`
+> filter; create for one `authorised` request, the payee copied from the request, 422
+> `REFERENCE_REQUIRED` on `payment_reference` unless a reference, a receipt or
+> `confirm_without_reference: true` is given; `PATCH` Add Reference; the request moves to
+> `disbursed`). Numbers from `numbering.allocate` (`requisition`, `disbursement`). Search providers,
+> AI reads and the Create Requisition, Record Disbursement and Add Reference cards (gate 23), the
+> notifications of guide §7, unit and integration tests. No database trigger on the reference
+> (decision 2). Finish as CLAUDE.md step 5 says; tick #58 and #59 API when complete.
+
+### PR 5 · Budgets and projects backend
+
+> This is a backend change to M8 Expenses (branch `m8/expenses-budgets`). Read
+> `docs/handoff/m8-expenses.md` in full, then `docs/guides/expenses.md` §3 step 7, §6.6, and
+> CLAUDE.md step 2 for backend work, plus `src/modules/dashboard/sources/budgets.source.js` (Home
+> reads these tables). Build PR 5: the `budgets` module (a department's budget for a calendar year
+> with lines by category, numbered `budget`; create and edit with `expenses.finance`, each save an
+> event with before and after amounts; `GET /budgets/:id/history` from the audit ledger, paged at
+> 25 with `common.PageQuery`), the recount (committed = requests `approved`, `in_requisition`,
+> `authorised`; spent = `disbursed`; recomputed from the requests in the transaction that moves one,
+> called from the expenses, requisitions and disbursements services), `over_budget` set before each
+> approval, Expenses · Projects (`GET /budgets/projects`, `PATCH /budgets/projects/:id` setting
+> `project.budget_amount` through the projects service, AJ owns M2), the `budget-threshold` job
+> (90% of a line, once per line per year, to the head and Operations & People), and the monthly
+> expenses report by department, project and category through Home's report runner if it fits,
+> otherwise say what you chose in the guide. Home's Budget Used counts spent and committed (decision 16):
+> change `budgets.source.js`, clear that `owes` item, update Home's tests and `docs/guides/home.md`. Search, AI reads, the New Budget and Edit Budget cards, tests.
+> Finish as CLAUDE.md step 5 says; tick #60 API when complete.
+
+### PR 6 · AI features
+
+> This is a backend change to M8 Expenses (branch `m8/expenses-ai`). Read
+> `docs/handoff/m8-expenses.md` (decision 14), `docs/guides/expenses.md` §9 and
+> `docs/guides/ai-control.md` §6.2. AJ chose the jobs: invoice reading on **Image Reading**, the
+> duplicate check on **Default**, and the category suggestion (from the purpose and lines) on
+> **Default**; register each AI action with `chosen_by: "AJ"`. Build
+> through `services/ai/llm.service.complete()` with prompts in `services/ai/prompts/`, in outbox
+> handlers or on the person's request, never in a transaction; results are suggestions a person
+> accepts (invoice reading fills amount, payee and category on the New Request form; the duplicate
+> check flags a request with the same payee and amount within 30 days, shown to approvers; the
+> category suggestion proposes one as the form is filled). No
+> personal data to DeepSeek. Tests with the model scripted. Finish as CLAUDE.md step 5 says.
+
+### PR 7 · Frontend, staging seed and User Guide
+
+> This is a full-stack change to M8 Expenses, mostly frontend (branch `m8/expenses-screens`). Read
+> `docs/handoff/m8-expenses.md` in full, `docs/guides/expenses.md` (all of it, §10 above all), then
+> what CLAUDE.md step 2 asks for frontend work (FRONTEND_GUIDE, FRONTEND_FOUNDATION with F31 as
+> amended for Expenses, COMPONENTS). Build PR 7: make `app/src/features/expenses/index.tsx` a
+> `switch`, add the Projects tab with `npm run new:screen` (it adds the PROGRESS row and counts);
+> move My Requests into ESS; order the Expenses tabs Requisitions, Approvals, Disbursements,
+> Projects, Budgets, Categories; replace the INTERIM types in `app/src/api/types/expenses.ts` and
+> the mock with `contract.gen.ts` and the real API; add a modal layout to `ListDetail` in
+> `packages/ui` (via its own test and gallery page) so Expenses records open in the centred dialog on
+> desktop and the sheet on a phone; the line-item form, payee type with Use My Company Account,
+> invoice upload, Save Without Reference?, Reference Missing and Add Reference, clickable KPI cards,
+> no Disbursements chart, Add Suggested Categories on the empty tab; every form through
+> `useContractForm`. Write `seeds/staging/80_expenses.js` through the services with realistic rows
+> modelled on MyCity's expenditure sheet, following the three steps in
+> `seeds/staging/lib/home-staging-rows.js`, and take out 8099's five categories after Home's rows
+> are gone (a seed with a guarded DELETE). Write `docs/manual/expenses.md` and take its pictures
+> (`npm run guide:shots`). The PR body's Native app feel section says what each shell does. Finish
+> as CLAUDE.md step 5 says; tick UI and Mobile on each screen built.
+
+### PR 8 · Release check
+
+> This is the M8 release check (branch `m8/expenses-release`). Read `docs/handoff/m8-expenses.md`
+> in full. Walk every AI card of guide §9 end to end as each role of guide §8 (the evaluation set
+> and the matrix), confirm the forms gate leaves no M8 form on `scripts/check/ai-forms-gaps.json`,
+> retake stale User Guide pictures, run `npm run ci` green, delete every M8 stub still empty and take
+> it off README.MD (README §11.5), set each M8 screen's Status in PROGRESS, close §4 and write the
+> last §6 line.

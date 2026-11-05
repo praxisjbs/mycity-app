@@ -13,7 +13,7 @@
  * the queries to `tables`.
  *
  * A request is its requester's: scope runs on er.employee_id. Awaiting approval is the
- * status `submitted` (reference data 8099). Money is Naira only (shared/money): the sum
+ * status `submitted` (migration 8010's status list: a request with its approval). Money is Naira only (shared/money): the sum
  * counts requests in `NGN` and leaves other currencies out, while the count and the list
  * hold every request (docs/guides/home.md §13).
  */
@@ -40,10 +40,7 @@ const TABLES = Object.freeze({
 
 /** What M8 still owes these queries. */
 const OWES = Object.freeze([
-  "Statuses as the M8 approval chain has them, and workflow_instance_id (DATABASE_SCHEMA M8): Home reads `submitted` " +
-    "as awaiting approval.",
   "The currency rule for sums: Naira only until the owner decides (home.md §13).",
-  "Index expense_request (status) and (employee_id), for the awaiting count (asked by Home).",
 ]);
 
 const AWAITING = "er.status = 'submitted'";

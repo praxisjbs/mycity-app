@@ -1264,6 +1264,8 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 04/11/2026 · AJ · PR 2 of `docs/handoff/m8-expenses.md`, schema and contract: migration 8010 (request lines, payee, invoice, project, many requests to a requisition, the approvals' instances, Reference Missing, category type, project budget, statuses, indexes), seed 8100 (the `expenses.request` and `expenses.requisition` flows, statuses, payee types, `expenses.finance`), the five contract schemas, `budget` numbering. No screen moves: no API yet. Left: PR 3 to PR 8.
+- 04/11/2026 · AJ · Planned from the Modules Review of 04/11/2026 (`docs/guides/expenses.md`, `docs/handoff/m8-expenses.md`): Projects agreed as a seventh Expenses tab (its row comes with `npm run new:screen` in PR 7, with the tab); My Requests (#56) shows in ESS; tabs in the order Requisitions, Approvals, Disbursements, Projects, Budgets, Categories; F31 amended so Expenses records open in the modal on desktop too. Nothing built yet. Left: PR 2 to PR 8 of the handoff.
 - 25/10/2026 · JP · My Requests (#56), Approvals (#57) and Requisitions (#58), on the mock: on a phone a tapped request or requisition opens in a sheet (F31: `DetailPane`), with its chain, history or Approve, never above or under the list; on desktop the summary's focus still shows where it did. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/expenses/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/expenses.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
