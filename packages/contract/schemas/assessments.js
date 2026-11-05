@@ -394,13 +394,20 @@ const AnswerSave = z
   })
   .strict();
 
-/** What saving an answer (or a file answer) says back. */
+/** What saving a written, chosen or linked answer says back. */
 const AnswerSaved = z
   .object({
     saved_at: isoDateTime,
     file_name: z.string().nullable(),
   })
   .strict();
+
+/**
+ * POST /api/public/v1/assess/:token/answers/:question_id/file: the file as the vault keeps it, as an
+ * Apply link's CV upload answers, and when it was saved. The page's one upload engine reads the
+ * document back, so the candidate sees the file arrive rather than a failure.
+ */
+const AnswerFileSaved = DocumentRef.extend({ saved_at: isoDateTime }).strict();
 
 /**
  * assessment-invite: sent with the link. A timed test carries its minutes; an untimed take-home
@@ -503,6 +510,7 @@ const TABLES = {
     reason: "one answer (assessment_response.response) and where to resume (application_assessment.current_question)",
   },
   AnswerSaved: { table: null, reason: "when an answer was saved" },
+  AnswerFileSaved: { table: null, reason: "the stored file of a file answer (documents.DocumentRef) and when it was saved" },
   AssessmentInviteEmailVars: { table: null, reason: "the variables of templates/email/assessment-invite.html" },
 };
 
@@ -542,5 +550,6 @@ module.exports = {
   AnswerParams,
   AnswerSave,
   AnswerSaved,
+  AnswerFileSaved,
   AssessmentInviteEmailVars,
 };

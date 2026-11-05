@@ -18,7 +18,7 @@ describe("Vacancy", () => {
     draw("head-sales-revenue-lagos");
     expect(await screen.findByRole("heading", { level: 1, name: "Head, Sales & Revenue" })).toBeTruthy();
     const chips = screen.getByRole("list", { name: "About the role" });
-    for (const fact of ["Lagos, Nigeria", "Hybrid, 2 days in office, 3 from home", "Full Time"]) expect(within(chips).getByText(fact)).toBeTruthy();
+    for (const fact of ["Lekki Phase 1, Lagos", "Hybrid, 2 days in office, 3 from home", "Full Time"]) expect(within(chips).getByText(fact)).toBeTruthy();
     /* The job description gives no band, so none shows. */
     expect(within(chips).queryByText(/₦/)).toBeNull();
     for (const h of ["About MyCityApp", "Role Overview", "Required Experience and Qualifications", "What We Are Looking For", "How We Hire"])
@@ -35,23 +35,27 @@ describe("Vacancy", () => {
   });
 
   it("Apply for This Role mints a link and opens the form on it", async () => {
-    draw("partnerships-associate-lagos");
+    draw("graphics-and-motion-designer-lagos");
     const [apply] = await screen.findAllByRole("button", { name: "Apply for This Role" });
     fireEvent.click(apply!);
     await waitFor(() => expect(window.location.pathname).toMatch(/^\/apply\/[A-Za-z0-9]{12}$/));
   });
 
   it("a paused role keeps its page, says so and takes no applications", async () => {
-    draw("studio-assistant-lagos");
+    draw("customer-support-lead-lagos");
     expect(await screen.findByText("This role is not taking applications right now. This link works again if it reopens.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Apply for This Role" })).toBeNull();
     expect(screen.getByRole("button", { name: "See Open Roles" })).toBeTruthy();
   });
 
-  it("a filled role says so; an unknown address is Role Not Found", async () => {
-    const { unmount } = draw("customer-support-lead");
+  it("a filled role says so, a role past its closing day reads closed, an unknown address is Role Not Found", async () => {
+    const filled = draw("partnerships-associate-lagos");
     expect(await screen.findByText("This role has been filled. Thank you to everyone who applied.")).toBeTruthy();
-    unmount();
+    filled.unmount();
+    const past = draw("content-producer-lagos");
+    expect(await screen.findByText("This role has closed. Our other open roles are on the careers page.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Apply for This Role" })).toBeNull();
+    past.unmount();
     draw("no-such-role");
     expect(await screen.findByRole("heading", { name: "Role Not Found" })).toBeTruthy();
   });

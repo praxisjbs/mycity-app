@@ -132,6 +132,7 @@ function Sitting({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
   const first = useRef(true);
   const q = questions[i]!;
   const qid = q.assessment_question_id;
+  const [fileQuestion] = useState(() => new Set(questions.filter((x) => x.question_type === "file").map((x) => x.assessment_question_id)));
 
   useEffect(() => {
     if (first.current) {
@@ -150,6 +151,8 @@ function Sitting({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
         setSave("saving");
         try {
           await api.call("PUT /api/public/v1/assess/:token/answers/:question_id", { params: { token, question_id: id }, body: { answer, current_question: current } });
+          /* The server keeps one answer a question: a link saved over a file replaces it. */
+          if (answer && fileQuestion.has(id)) setFiles((f) => (f[id] ? { ...f, [id]: null } : f));
           setSave("saved");
           return true;
         } catch (e) {
@@ -166,7 +169,7 @@ function Sitting({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
       });
       return chain.current;
     },
-    [token, reload],
+    [token, reload, fileQuestion],
   );
 
   /** Saves every answer changed since the last save. */

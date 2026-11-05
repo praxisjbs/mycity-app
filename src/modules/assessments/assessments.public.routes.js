@@ -33,7 +33,7 @@ publicRoute(router, "put", "/:token/answers/:question_id",
   link, async (req, res) => ok(res, await delivery.answer(req.params.token, req.validated.params.question_id, req.validated.body)));
 
 publicRoute(router, "post", "/:token/answers/:question_id/file",
-  { params: a.AnswerParams, body: c.common.EmptyBody, response: a.AnswerSaved, summary: "Send a file as an answer" },
+  { params: a.AnswerParams, body: c.common.EmptyBody, response: a.AnswerFileSaved, summary: "Send a file as an answer" },
   link, upload.single("file", { purpose: "assessment_answer" }),
   async (req, res) => ok(res, await delivery.answerFile(req.params.token, req.validated.params.question_id, upload.readUpload(req))));
 

@@ -6,8 +6,9 @@ import { RouterProvider } from "@/lib/router";
 import { Assessment } from "./Assessment";
 
 /**
- * Assessment on the in-browser mock: a timed case study not started, one in progress on its
- * second question, a take-home brief of file answers, one submitted and one whose time ran out.
+ * Assessment on the in-browser mock, as the staff mock holds the sittings: Chinedu's Sales Scenario
+ * Case Study not started, Funke's Work Style Profile running on its second question, Segun's take-home
+ * Graphics and Motion Design Brief (MyCity's own), Ngozi's brief submitted, and Emeka's case timed out.
  */
 const draw = (token: string) =>
   render(
@@ -21,36 +22,35 @@ const question = (n: number, of: number) => screen.findByRole("heading", { level
 describe("Assessment", () => {
   it("opens on its intro, and Start the Assessment puts the first question under the clock", async () => {
     draw("Px2mL9vQe4Ty");
-    expect(await screen.findByRole("heading", { level: 1, name: "Partnership Brief" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Sales Scenario Case Study" })).toBeTruthy();
+    expect(screen.getByText(/^Hello Chinedu\./)).toBeTruthy();
     const facts = screen.getByRole("list", { name: "About the Assessment" });
-    for (const t of ["Case Study", "45 minutes", "5"]) expect(within(facts).getByText(t)).toBeTruthy();
+    for (const t of ["Case Study", "60 minutes", "2"]) expect(within(facts).getByText(t)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Start the Assessment" }));
-    await question(1, 5);
+    await question(1, 2);
     expect(screen.getByRole("timer")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Your Answer"), { target: { value: "Weekday lunch guides for each branch, with a booking offer." } });
+    expect(await screen.findByText("Saved", {}, { timeout: 4000 })).toBeTruthy();
   });
 
-  it("resumes where it was, saves a choice as it is made, and moves between questions", async () => {
+  it("resumes where it was, saves a choice as it is made, and moves between questions to Submit", async () => {
     draw("Hb6tZ3qNw8Rk");
-    await question(2, 5);
-    fireEvent.click(screen.getByRole("radio", { name: "Look at what changed and share it with them, with a plan" }));
+    await question(2, 3);
+    fireEvent.click(screen.getByRole("radio", { name: "Disagree" }));
     expect(await screen.findByText("Saved")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    await question(1, 5);
+    await question(1, 3);
     /* The first answer was already saved, so it shows chosen. */
-    expect(screen.getByRole("radio", { name: "A revenue share on bookings made through the app" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Agree" }).getAttribute("aria-checked")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Next Question" }));
-    await question(2, 5);
+    await question(2, 3);
+    expect(screen.getByRole("radio", { name: "Disagree" }).getAttribute("aria-checked")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Next Question" }));
-    await question(3, 5);
-    fireEvent.change(screen.getByLabelText("Your Answer"), { target: { value: "A revenue share of 8 percent on bookings, with featured guides." } });
-    fireEvent.click(screen.getByRole("button", { name: "Next Question" }));
-    await question(4, 5);
-    fireEvent.click(screen.getByRole("button", { name: "Next Question" }));
-    await question(5, 5);
+    await question(3, 3);
 
     fireEvent.click(screen.getByRole("button", { name: "Finish" }));
     const dialog = await screen.findByRole("alertdialog", { name: "Submit Assessment" });
-    expect(within(dialog).getByText("You answered 3 of 5 questions. Answers cannot change after this.")).toBeTruthy();
+    expect(within(dialog).getByText("You answered 2 of 3 questions. Answers cannot change after this.")).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Submit Assessment" }));
     expect(await screen.findByRole("heading", { name: "Assessment Submitted" })).toBeTruthy();
     expect(screen.queryByText(/score/i)).toBeNull();
@@ -59,8 +59,10 @@ describe("Assessment", () => {
   it("a take-home brief has a due day, no clock, and takes a file or a link", async () => {
     draw("Tk8wD3fRm6Qa");
     expect(await screen.findByText("Your own pace")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Graphics and Motion Design Brief" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Start the Assessment" }));
     await question(1, 3);
+    expect(screen.getByText(/^Task 1: Static Graphic \(Awareness Flyer\)/)).toBeTruthy();
     expect(screen.queryByRole("timer")).toBeNull();
     expect(screen.getByText("Due")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Upload a File" })).toBeTruthy();

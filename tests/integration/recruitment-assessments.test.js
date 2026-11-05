@@ -35,6 +35,8 @@ const area = (formatted) =>
   token.sign({ source: "search", formatted, lat: 6.45, lon: 3.42, provider_id: `test:${formatted}`, kind: "area", city: "Lagos", state: "Lagos", country_code: "ng", timezone: "Africa/Lagos", verified: true, pending: false });
 
 /** The newest assessment link mailed, as the token in its address. */
+const PDF = Buffer.from("%PDF-1.4\n1 0 obj<< /Type /Catalog >>endobj\ntrailer<< /Root 1 0 R >>\n%%EOF\n");
+
 const lastLink = () => {
   const calls = queues.enqueue.mock.calls.filter((c) => c[0] === "email-send" && c[1] === "assessment-invite");
   return calls[calls.length - 1][2].data.assess_url.split("/assess/")[1];
@@ -175,6 +177,15 @@ describeDb("Recruitment · Assessments against the real migrations", () => {
     const svg = choice.options.find((o) => o.text === "SVG").id;
     expect((await pub().put(`/assess/${tok}/answers/${choice.assessment_question_id}`).send({ answer: svg, current_question: 1 })).status).toBe(200);
     await pub().put(`/assess/${tok}/answers/${text.assessment_question_id}`).send({ answer: "Start from the venue's lights, then pick two accents that read at night.", current_question: 2 });
+    // A file given as the answer comes back as the document, as an Apply link's CV does, so the page's
+    // upload engine sees it arrive.
+    const sentFile = await pub().post(`/assess/${tok}/answers/${file.assessment_question_id}/file`).attach("file", PDF, { filename: "poster.pdf", contentType: "application/pdf" });
+    expect(sentFile.status).toBe(200);
+    expect(sentFile.body).toMatchObject({ file_name: "poster.pdf", mime_type: "application/pdf", size_bytes: PDF.length });
+    expect(sentFile.body.document_id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(typeof sentFile.body.saved_at).toBe("string");
+    expect((await pub().post(`/assess/${tok}/answers/${text.assessment_question_id}/file`).attach("file", PDF, { filename: "x.pdf", contentType: "application/pdf" })).status).toBe(422);
+    // A link given after it replaces the file; words that are not a link are refused.
     expect((await pub().put(`/assess/${tok}/answers/${file.assessment_question_id}`).send({ answer: "a poster I made", current_question: 2 })).status).toBe(422);
     await pub().put(`/assess/${tok}/answers/${file.assessment_question_id}`).send({ answer: "https://example.test/poster", current_question: 2 });
     // Moving on with nothing new keeps the answer given.

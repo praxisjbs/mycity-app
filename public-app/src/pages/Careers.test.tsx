@@ -25,12 +25,11 @@ describe("Careers", () => {
     await waitFor(() => expect(cards()).toHaveLength(9));
     const role = screen.getByRole("link", { name: "Head, Sales & Revenue" });
     expect(role.getAttribute("href")).toBe("/jobs/head-sales-revenue-lagos");
-    expect(screen.queryByText("Studio Assistant")).toBeNull();
-    expect(screen.queryByText("Customer Support Lead")).toBeNull();
-    expect(screen.queryByText("Events Coordinator")).toBeNull();
+    /* Paused, filled, closed, past its closing day, or a draft: none of them is listed. */
+    for (const t of ["Customer Support Lead", "Partnerships Associate", "Events Coordinator", "Content Producer", "Backend Engineer"]) expect(screen.queryByText(t)).toBeNull();
     const card = role.closest("li")!;
-    expect(within(card).getByText("Sales & Marketing")).toBeTruthy();
-    expect(within(card).getByText("Lagos, Nigeria")).toBeTruthy();
+    expect(within(card).getByText("Marketing & Sales")).toBeTruthy();
+    expect(within(card).getByText("Lekki Phase 1, Lagos")).toBeTruthy();
     expect(within(card).getByText("Hybrid")).toBeTruthy();
   });
 
@@ -39,7 +38,7 @@ describe("Careers", () => {
     const box = await screen.findByRole("searchbox", { name: "Search Roles" });
     fireEvent.change(box, { target: { value: "Abuja" } });
     await waitFor(() => expect(cards()).toHaveLength(1));
-    expect(screen.getByRole("link", { name: "City Guide Editor" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "City Editor, Abuja" })).toBeTruthy();
     fireEvent.change(box, { target: { value: "astronaut" } });
     expect(await screen.findByText("No Matching Roles")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Clear Search" }));

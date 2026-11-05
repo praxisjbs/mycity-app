@@ -4,9 +4,10 @@ import type { OfferToSign, VerifyResult } from "@/api/types/public";
 import { fail, inDays, invalid, ok, paged, route, type Req } from "./core";
 
 /**
- * Fixtures for the public pages, in the contract's own shapes (P11). The roles and people are the
- * staff app's mock, so a demo can follow one candidate from the careers page to a signed, verified
- * offer. Every bad link is the same 404 the API sends, so a link never says why it failed.
+ * Fixtures for the public pages, in the contract's own shapes (P11). The six vacancies, the candidates
+ * and the assessments are the staff app's mock (app/src/api/mock/data/recruitment.ts), so a demo
+ * follows one candidate from the careers page to their assessment; a few more open roles live here
+ * only, so Careers shows its search. Every bad link is the same 404 the API sends.
  */
 
 /* ── Text as the API sends it: blocks from the one Markdown renderer ── */
@@ -57,8 +58,8 @@ const ROLES: Role[] = [
   role({
     slug: "head-sales-revenue-lagos",
     title: "Head, Sales & Revenue",
-    department: "Sales & Marketing",
-    location: "Lagos, Nigeria",
+    department: "Marketing & Sales",
+    location: "Lekki Phase 1, Lagos",
     work_pattern: "hybrid",
     work_pattern_note: "2 days in office, 3 from home",
     working_days: "Monday to Saturday",
@@ -67,7 +68,7 @@ const ROLES: Role[] = [
     probation_months: null,
     how_we_hire: ["apply", "screening", "assessment", "interview"],
     applicants: 23,
-    closes_at: lagosEnd(14),
+    closes_at: lagosEnd(18),
     description: [
       p("The Head, Sales & Revenue will lead MyCityApp & MyLagosApp's commercial growth by developing and executing the company's sales and revenue strategy."),
       p("The role will own revenue generation, sales targets, pipeline development, client and merchant acquisition, commercial partnerships and sales team performance, while building a structured and scalable sales function."),
@@ -171,64 +172,83 @@ const ROLES: Role[] = [
       q("11111111-1111-4111-8111-000000000003", "text", "Share a link to a proposal or campaign you led, if you can.", false),
     ],
   }),
+  /* MyCity's own Motion and Graphics brief is this role's take-home (VAC-0002 in the staff mock). */
   role({
-    slug: "partnerships-associate-lagos",
-    title: "Partnerships Associate",
-    department: "Sales & Marketing",
+    slug: "graphics-and-motion-designer-lagos",
+    title: "Graphics and Motion Designer",
+    department: "Studio",
     location: "Ikeja, Lagos",
-    work_pattern: "hybrid",
-    work_pattern_note: "4 days on site",
-    reports_to: "Head, Sales & Revenue",
-    min_experience_years: 4,
-    salary_min: "500000.00",
-    salary_max: "700000.00",
-    how_we_hire: ["apply", "screening", "assessment", "interview"],
-    applicants: 19,
+    work_pattern: "on_site",
+    min_experience_years: 3,
+    applicants: 12,
+    closes_at: lagosEnd(21),
     description: [
-      p("You will build and hold the relationships that put MyCityApp in front of millions of Nigerians: brands, government and venues across Lagos and beyond."),
+      p("The Graphics and Motion Designer turns MyCityApp, a city discovery and lifestyle platform, into engaging, culturally relevant visual content that drives awareness and adoption."),
       h(2, "Key Responsibilities"),
-      ul("Find and qualify new partners in hospitality, banking and telecoms", "Run partner meetings from first call to signed agreement", "Keep every partner's results and renewals on track"),
-      h(2, "Key Performance Indicators (KPIs)"),
-      ul("Partners signed each quarter", "Renewals kept"),
+      ul("Design the weekly campaign art for the app and social media.", "Edit and animate short promo videos for Instagram Reels and TikTok.", "Keep the brand consistent across every piece."),
     ],
-    requirements: [ul("A degree in management, marketing or business", "4 years in partnerships or business development", "Comfortable leading a room of senior people")],
-    nice_to_have: [p("Experience in telecoms, banking or hospitality partnerships, and a network in Lagos State government.")],
-    questions: [q("22222222-2222-4222-8222-000000000001", "yes_no", "Can you work from our Ikeja office four days a week?", true)],
+    requirements: [ul("Three years of brand and motion design.", "A portfolio of flyers, posts and short videos.", "Adobe After Effects and Illustrator, or the like.")],
+    questions: [q("33333333-3333-4333-8333-000000000001", "text", "A link to your portfolio", true)],
   }),
+  /* VAC-0003: open, but its closing day has passed, so it takes no one and reads closed. */
   role({
     slug: "content-producer-lagos",
     title: "Content Producer",
     department: "Content",
-    location: "Yaba, Lagos",
+    location: "Lekki Phase 1, Lagos",
     work_pattern: "hybrid",
-    work_pattern_note: "3 days on site",
-    reports_to: "Head of Content",
+    employment_type: "contract",
     min_experience_years: 2,
     applicants: 41,
-    how_we_hire: ["apply", "screening", "assessment", "interview"],
-    description: [
-      p("You will find the places, people and stories that make Lagos worth exploring, and turn them into guides, videos and posts people save and share."),
-      h(2, "Key Responsibilities"),
-      ul("Plan and produce a weekly calendar of city guides and short videos", "Visit, photograph and review new places", "Work with partners on sponsored features"),
-    ],
-    requirements: [ul("2 years writing or producing for a brand, publication or channel", "A portfolio of published work")],
-    questions: [q("33333333-3333-4333-8333-000000000001", "text", "A link to your portfolio", true)],
+    closes_at: lagosEnd(-2),
+    description: [p("The Content Producer plans, shoots and writes the guides and short videos that show MyCityApp users the best of their city, every week, with the Studio and the city editors.")],
+    requirements: [ul("Two years producing content for social media.", "A portfolio of guides or short videos.")],
   }),
-  role({ slug: "graphics-motion-designer-lagos", title: "Graphics and Motion Designer", department: "Design", location: "Yaba, Lagos", work_pattern: "hybrid", work_pattern_note: "2 days on site", applicants: 12, how_we_hire: ["apply", "assessment", "interview"], description: [p("You will turn MyCityApp, a city discovery and lifestyle platform, into engaging, culturally relevant visual content that drives awareness and adoption: flyers, social posts and short promo videos.")], requirements: [ul("A portfolio of static and motion work for social media", "Skill in layout, typography, colour, motion and editing")] }),
-  role({ slug: "backend-engineer", title: "Backend Engineer", department: "Engineering", location: null, work_pattern: "remote", employment_type: "full_time", working_days: "Monday to Friday", applicants: 57, how_we_hire: ["apply", "screening", "assessment", "interview"], description: [p("You will build the services behind the app: search, listings, bookings and the partner dashboard, in Node.js and PostgreSQL.")], requirements: [ul("4 years building APIs in Node.js", "PostgreSQL and its query plans")] }),
-  role({ slug: "city-guide-editor-abuja", title: "City Guide Editor", department: "Content", location: "Wuse, Abuja", work_pattern: "on_site", applicants: 8, description: [p("You will own MyCityApp's guide to Abuja: what is in it, how it reads and how fresh it stays.")] }),
-  role({ slug: "data-analyst-lagos", title: "Data Analyst", department: "Engineering", location: "Lekki, Lagos", work_pattern: "hybrid", applicants: 15, description: [p("You will turn what people search, save and book into the figures our teams decide with.")] }),
-  role({ slug: "social-media-manager-lagos", title: "Social Media Manager", department: "Sales & Marketing", location: "Yaba, Lagos", work_pattern: "hybrid", applicants: 33, description: [p("You will run MyCityApp's social channels and grow the community around them.")] }),
-  role({ slug: "operations-intern-lagos", title: "Operations Intern", department: "Operations & People", location: "Lekki, Lagos", work_pattern: "on_site", employment_type: "internship", probation_months: null, applicants: 64, closes_at: lagosEnd(5), description: [p("Six months with the team that keeps MyCityApp running: people, offices, suppliers and the day-to-day.")] }),
-  role({ slug: "studio-assistant-lagos", title: "Studio Assistant", department: "Content", location: "Yaba, Lagos", work_pattern: "on_site", employment_type: "contract", state: "paused", description: [p("You will keep our Yaba studio ready for every shoot.")] }),
-  role({ slug: "customer-support-lead", title: "Customer Support Lead", department: "Customer Experience", location: "Ikeja, Lagos", work_pattern: "on_site", state: "filled", closes_at: lagosEnd(-10), description: [p("You led the team that answers every message our users send.")] }),
-  role({ slug: "events-coordinator-lagos", title: "Events Coordinator", department: "Sales & Marketing", location: "Victoria Island, Lagos", work_pattern: "on_site", state: "closed", closes_at: lagosEnd(-3), description: [p("You will plan MyCityApp's city events.")] }),
+  /* VAC-0004, paused: the link keeps working and says so. */
+  role({
+    slug: "customer-support-lead-lagos",
+    title: "Customer Support Lead",
+    department: "Support",
+    location: "Ikeja, Lagos",
+    work_pattern: "on_site",
+    min_experience_years: 4,
+    state: "paused",
+    description: [p("The Customer Support Lead runs the team that answers MyCityApp's users and partners by chat, email and phone, and turns what they hear into fixes the product team can act on.")],
+    requirements: [ul("Four years in customer support, one leading a team.", "Calm, clear writing in English.")],
+  }),
+  /* VAC-0006, closed as filled. VAC-0005 (Backend Engineer) is a draft, so it is never on the public site. */
+  role({
+    slug: "partnerships-associate-lagos",
+    title: "Partnerships Associate",
+    department: "Marketing & Sales",
+    location: "Lekki Phase 1, Lagos",
+    work_pattern: "hybrid",
+    min_experience_years: 2,
+    state: "filled",
+    closes_at: lagosEnd(-30),
+    description: [p("The Partnerships Associate signs and looks after the venues and brands that list on MyCityApp, from the first call to the renewal a year on.")],
+    requirements: [ul("Two years in sales or partnerships.", "Comfortable on the phone and in person.")],
+  }),
+  /*
+   * Roles the public mock alone holds, so Careers has more than 8 open and shows its search, and a
+   * salary band and a closed role are seen. Departments are the app mock's own.
+   */
+  role({ slug: "data-analyst-lagos", title: "Data Analyst", department: "Engineering", location: "Lekki Phase 1, Lagos", work_pattern: "hybrid", applicants: 15, salary_min: "500000.00", salary_max: "700000.00", description: [p("The Data Analyst turns what people search, save and book into the figures MyCityApp's teams decide with.")] }),
+  role({ slug: "social-media-manager-lagos", title: "Social Media Manager", department: "Marketing & Sales", location: "Lekki Phase 1, Lagos", work_pattern: "hybrid", applicants: 33, description: [p("The Social Media Manager runs MyCityApp's social channels and grows the community around them.")] }),
+  role({ slug: "city-editor-abuja", title: "City Editor, Abuja", department: "Content", location: "Wuse, Abuja", work_pattern: "on_site", applicants: 8, description: [p("The City Editor owns MyCityApp's guide to Abuja: what is in it, how it reads and how fresh it stays.")] }),
+  role({ slug: "finance-officer-lagos", title: "Finance Officer", department: "Finance", location: "Lekki Phase 1, Lagos", work_pattern: "on_site", reports_to: "Head of Finance", applicants: 19, description: [p("The Finance Officer keeps MyCityApp's books, payments and month-end close in order.")] }),
+  role({ slug: "product-designer-lagos", title: "Product Designer", department: "Studio", location: "Ikeja, Lagos", work_pattern: "hybrid", applicants: 27, description: [p("The Product Designer shapes how people find and book what their city offers in the MyCityApp app.")] }),
+  role({ slug: "community-manager-lagos", title: "Community Manager", department: "Marketing & Sales", location: "Lekki Phase 1, Lagos", work_pattern: "hybrid", applicants: 11, description: [p("The Community Manager brings MyCityApp's users and partners together, online and at city events.")] }),
+  role({ slug: "operations-intern-lagos", title: "Operations Intern", department: "Operations & People", location: "Lekki Phase 1, Lagos", work_pattern: "on_site", employment_type: "internship", probation_months: null, applicants: 64, closes_at: lagosEnd(5), description: [p("Six months with the team that keeps MyCityApp running: people, offices, suppliers and the day to day.")] }),
+  role({ slug: "events-coordinator-lagos", title: "Events Coordinator", department: "Marketing & Sales", location: "Victoria Island, Lagos", work_pattern: "on_site", state: "closed", closes_at: lagosEnd(-3), description: [p("The Events Coordinator plans MyCityApp's city events.")] }),
 ];
 
 const cardOf = (r: Role): PublicJobCard => ({ slug: r.slug, title: r.title, department: r.department, location: r.location, work_pattern: r.work_pattern });
-const jobOf = ({ questions: _q, ...r }: Role): PublicJob => r;
+/** As the server's publicState: an open role past its closing time reads closed. */
+const stateOf = (r: Role): PublicJob["state"] => (r.state === "open" && r.closes_at && Date.parse(r.closes_at) <= Date.now() ? "closed" : r.state);
+const jobOf = ({ questions: _q, ...r }: Role): PublicJob => ({ ...r, state: stateOf(r as Role) });
 const notFound = () => fail(404, "NOT_FOUND", "This link is not valid or has expired");
-const takesApplications = (r: Role) => r.state === "open" && (!r.closes_at || Date.parse(r.closes_at) > Date.now());
+const takesApplications = (r: Role) => stateOf(r) === "open";
 
 route("GET /api/public/v1/jobs", (req) => paged(ROLES.filter(takesApplications).map(cardOf), req, (v) => [v.title, v.department, v.location]));
 route("GET /api/public/v1/jobs/:slug", (req) => {
@@ -241,7 +261,7 @@ type Link = { slug: string; expires_at: string; receipt: ApplicationReceipt | nu
 let nextApp = 42;
 const LINKS = new Map<string, Link>([
   ["k7Qm2TxV9pLa", { slug: "head-sales-revenue-lagos", expires_at: inDays(2), receipt: null, email: null }],
-  ["Bv3nQ8sLp2Wd", { slug: "content-producer-lagos", expires_at: inDays(2), receipt: null, email: null }],
+  ["Bv3nQ8sLp2Wd", { slug: "graphics-and-motion-designer-lagos", expires_at: inDays(2), receipt: null, email: null }],
   ["Wn4cR8yHj2Zs", { slug: "partnerships-associate-lagos", expires_at: inDays(-1), receipt: null, email: null }],
 ]);
 const opaque = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"[b % 56]).join("");
@@ -310,12 +330,17 @@ const cq = (n: number, prompt: string, opts: string[], answer: string | null = n
 });
 const fq = (n: number, prompt: string): PublicQuestion => ({ assessment_question_id: `aaaaaaaa-0000-4000-8000-${String(n).padStart(12, "0")}`, n, question_type: "file", prompt, options: null, answer: null, file_name: null });
 
+/* The staff mock's Sales Scenario Case Study (ASM-0002): 60 minutes, two written answers. */
 const CASE: PublicQuestion[] = [
-  cq(1, "A hotel group wants to list 40 properties on MyCityApp but will not pay a listing fee. Which first offer is strongest?", ["Waive the fee for good", "A revenue share on bookings made through the app", "A discount on the fee for the first year", "Ask them to list five properties first"]),
-  cq(2, "A partner's sponsored guide gets half the views it was promised. What do you do first?", ["Offer a refund", "Look at what changed and share it with them, with a plan", "Wait for the month to end", "Run the guide again for free"]),
-  tq(3, "Outline the partnership you would propose to the hotel group, and what MyCity gets from it. Use the figures you think matter."),
-  tq(4, "How would you measure whether the partnership worked after six months?"),
-  fq(5, "Upload a one-page plan of the first 90 days of the partnership (PDF, Word or a spreadsheet), or paste a link to it."),
+  tq(1, "A chain of five Lagos restaurants spends ₦2 million a month on billboards and wants more weekday diners. Write the plan you would pitch them for a three month MyCityApp campaign."),
+  tq(2, "The same chain says the price is too high after one month of weak results. How do you keep the account?"),
+];
+const LIKERT = ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"];
+/* The staff mock's Work Style Profile (ASM-0003): 20 minutes, how far the candidate agrees with each line. */
+const STYLE: PublicQuestion[] = [
+  cq(1, "I finish what I start, even when it gets dull.", LIKERT),
+  cq(2, "I prefer to wait for clear instructions before I begin.", LIKERT),
+  cq(3, "I enjoy meeting people I do not know.", LIKERT),
 ];
 /* MyCity's own Motion and Graphics design brief (docs/MyCity-ERP-Documents): two deliverables and a note. */
 const BRIEF: PublicQuestion[] = [
@@ -330,9 +355,8 @@ const BRIEF: PublicQuestion[] = [
   tq(3, "In two or three sentences, explain your creative approach."),
 ];
 
-const sitting = (s: Partial<Sitting> & Pick<Sitting, "assessment" | "questions">): Sitting => ({
-  candidate_first_name: "Adaeze",
-  vacancy_title: "Partnerships Associate",
+const sitting = (s: Partial<Sitting> & Pick<Sitting, "assessment" | "questions" | "candidate_first_name">): Sitting => ({
+  vacancy_title: "Head, Sales & Revenue",
   state: "not_started",
   timed: s.assessment.duration_minutes !== null,
   start_by: inDays(3).slice(0, 10),
@@ -343,29 +367,33 @@ const sitting = (s: Partial<Sitting> & Pick<Sitting, "assessment" | "questions">
   due_days: null,
   ...s,
 });
-const CASE_DEF = { name: "Partnership Brief", assessment_type: "case_study" as const, duration_minutes: 45, question_count: CASE.length, instructions: "Read each situation and answer as you would at work. There is no trick: we want to see how you think. Your answers save as you go." };
+const CASE_DEF = { name: "Sales Scenario Case Study", assessment_type: "case_study" as const, duration_minutes: 60, question_count: CASE.length, instructions: "Read the scenario in each question and answer in your own words. You have 60 minutes once you press Start." };
+const STYLE_DEF = { name: "Work Style Profile", assessment_type: "psychometric" as const, duration_minutes: 20, question_count: STYLE.length, instructions: "Say how far you agree with each statement. There are no right or wrong answers." };
+/* The staff mock's ASM-0001 by name; its brief is MyCity's own (docs/MyCity-ERP-Documents). Sent to Segun, as there. */
+const BRIEF_DEF = {
+  name: "Graphics and Motion Design Brief",
+  assessment_type: "practical" as const,
+  duration_minutes: null,
+  question_count: BRIEF.length,
+  instructions:
+    "Two tasks on MyCityApp as a city discovery and lifestyle platform: one static graphic and one short promo video. We are looking at real-world execution, creativity and fit with our brand.\n\nDownload and explore MyCityApp Nigeria first, for the product, its content and its feel. Your work should be your own.",
+};
 const SITTINGS = new Map<string, Sitting>([
-  ["Px2mL9vQe4Ty", sitting({ assessment: CASE_DEF, questions: CASE.map((x) => ({ ...x })) })],
-  ["Hb6tZ3qNw8Rk", sitting({ assessment: CASE_DEF, questions: CASE.map((x, i) => (i === 0 ? { ...x, answer: "b" } : { ...x })), state: "in_progress", ends_at: new Date(Date.now() + 31 * 60000).toISOString(), current_question: 1 })],
+  ["Px2mL9vQe4Ty", sitting({ candidate_first_name: "Chinedu", assessment: CASE_DEF, questions: CASE.map((x) => ({ ...x })) })],
   [
-    "Tk8wD3fRm6Qa",
+    "Hb6tZ3qNw8Rk",
     sitting({
-      vacancy_title: "Graphics and Motion Designer",
-      candidate_first_name: "Tobi",
-      assessment: {
-        name: "Motion and Graphics Design Brief",
-        assessment_type: "practical",
-        duration_minutes: null,
-        question_count: BRIEF.length,
-        instructions:
-          "Two tasks on MyCityApp as a city discovery and lifestyle platform: one static graphic and one short promo video. We are looking at real-world execution, creativity and fit with our brand.\n\nDownload and explore MyCityApp Nigeria first, for the product, its content and its feel. Your work should be your own.",
-      },
-      questions: BRIEF.map((x) => ({ ...x })),
-      due_days: 5,
+      candidate_first_name: "Funke",
+      assessment: STYLE_DEF,
+      questions: STYLE.map((x, i) => (i === 0 ? { ...x, answer: "d" } : { ...x })),
+      state: "in_progress",
+      ends_at: new Date(Date.now() + 14 * 60000).toISOString(),
+      current_question: 1,
     }),
   ],
-  ["Jd5sF7aWc3Xe", sitting({ assessment: CASE_DEF, questions: CASE.map((x) => ({ ...x })), state: "submitted", submitted_at: inDays(-1) })],
-  ["Mz4pK7tYb2Vn", sitting({ assessment: CASE_DEF, questions: CASE.map((x) => ({ ...x })), state: "timed_out", submitted_at: inDays(-2) })],
+  ["Tk8wD3fRm6Qa", sitting({ candidate_first_name: "Segun", vacancy_title: "Graphics and Motion Designer", assessment: BRIEF_DEF, questions: BRIEF.map((x) => ({ ...x })), due_days: 5 })],
+  ["Jd5sF7aWc3Xe", sitting({ candidate_first_name: "Ngozi", vacancy_title: "Graphics and Motion Designer", assessment: BRIEF_DEF, questions: BRIEF.map((x) => ({ ...x })), state: "submitted", submitted_at: inDays(-1) })],
+  ["Mz4pK7tYb2Vn", sitting({ candidate_first_name: "Emeka", assessment: CASE_DEF, questions: CASE.map((x) => ({ ...x })), state: "timed_out", submitted_at: inDays(-2) })],
 ]);
 
 /** What the page is sent: the server's own clock beside the end; no questions until it starts. */
@@ -427,7 +455,7 @@ route("POST /api/public/v1/assess/:token/answers/:question_id/file", (req) => {
   if (!qn) return notFound();
   qn.file_name = "answer.pdf";
   qn.answer = null;
-  return ok({ saved_at: new Date().toISOString(), file_name: qn.file_name });
+  return ok({ document_id: crypto.randomUUID(), file_name: qn.file_name, size_bytes: 1024, mime_type: "application/pdf", saved_at: new Date().toISOString() });
 });
 route("POST /api/public/v1/assess/:token/submit", (req) => {
   const s = sittingOf(req.params.token);

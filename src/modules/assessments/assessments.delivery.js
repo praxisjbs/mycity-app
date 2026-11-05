@@ -183,7 +183,14 @@ async function answerFile(raw, questionId, file) {
       actor: null,
     });
     await repo.saveResponse(client, row.application_assessment_id, q.assessment_question_id, { document_id: doc.document_id });
-    return { saved_at: new Date().toISOString(), file_name: doc.original_name };
+    // The document as the CV upload answers it (documents.DocumentRef): the page's upload engine reads it back.
+    return {
+      document_id: doc.document_id,
+      file_name: doc.original_name,
+      size_bytes: Number(doc.bytes),
+      mime_type: doc.mime,
+      saved_at: new Date().toISOString(),
+    };
   });
   if (outcome.ended) throw timeUp();
   return outcome;
