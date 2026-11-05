@@ -1,6 +1,6 @@
 import type { IsoDate, IsoDateTime, Money, Paged, PersonRef, Tone, Uuid } from "./common";
 
-/** INTERIM payroll shapes (owner LA, M6). Statutory rates come from current Nigerian law at M6. */
+/** INTERIM payroll shapes (owner TB, M6). Statutory rates come from current Nigerian law at M6. */
 type Pill = { tone: Tone; text: string };
 
 export interface PayslipRow {
@@ -57,7 +57,7 @@ export interface PayrollRun {
 
 type Q<T = object> = T & { page?: number; q?: string };
 
-/* ── Payroll module (owner LA, M6) ── */
+/* ── Payroll module (owner TB, M6) ── */
 type Status = Pill;
 type Step = { label: string; state: "done" | "now" | null };
 export interface RunRow {

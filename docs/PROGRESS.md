@@ -1211,12 +1211,13 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 39 | Candidates | `candidates` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
 | 40 | Assessments | `assessments` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
 | 41 | Interviews | `interviews` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
-| 42 | Offers | `offers` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 43 | Onboarding | `onboarding` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
+| 42 | Offers | `offers` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 43 | Onboarding | `onboarding` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 44 | Talent Pool | `talent-pool` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
 
 **Notes**
 
+- 05/11/2026 · GE · P16: the Owner column follows the team as it now stands (M5 AJ, M6 TB, M7 LA; M4 GE, M8 AJ, M10 TB as before). No status changed. Left: P14, P15.
 - 05/11/2026 · GE · P13, the Recruitment staging seed (`seeds/staging/55_recruitment.js`, tested by `tests/integration/recruitment-staging-seed.test.js`): every Recruitment screen (#38 to #41, #44) and the public pages have records on staging after the next `scripts/db/seed.js --staging`, through the services, on invented `@example.test` candidates, with the Implementation Team as hiring managers and panelists. Home's staging vacancies removed. No ticks: no screen changed. Left: P14, P15, P16.
 - 05/11/2026 · GE · P9 and P10: the staff screens of Vacancies, Candidates, Assessments, Interviews and Talent Pool (#38 to #41, #44) on the contract, one file per tab (`app/src/features/recruitment/`, `index.tsx` routes only; decision 15), built from MyCity's documents: the Head, Sales & Revenue job description shapes New Vacancy (a three-step wizard, Role, Details and Pay and Publish, with Write With AI; Questions with Apply questions and the interview traits; Scorecard; Careers Settings with MyCity's ten default traits; Candidate Emails), the Interview Assessment Format is My Card (each trait rated 1 to 10 with ten stars, saved as tapped, a second tap takes it back, the panelist's own score as they go; decision, comments, private notes; Submit Card) and the interview's sheet (Candidate Details, the panel blind until the round closes, each trait's average, the total, the report, Download Form), and the Graphics and Motion Design assessment is the practical brief Mark Answers opens (a file or a link per answer). The board of five stages with Move To, Not Progressing, Reopen, Add to Pool, Send Assessment, Schedule Interview, Invite to Apply and Screen With AI; the Talent Pool with Invite to Apply, Remove and Export. A form opened from a sheet returns to it. The mock (`app/src/api/mock/modules/recruitment.ts`, fixtures in `mock/data/recruitment.ts`) answers every M4 route of guide §5 in the contract's shapes and checks bodies with the contract's schemas; M5's Offers and Onboarding (#42, #43) moved to their own files unchanged. Tests: five screen tests (15 cases, axe and the copy rules), app suite 89 files and 686 tests, typecheck, lint, forms, palette, dashes, components, native-ui, search coverage, addresses, five-second and two-shells pass. Status stays In progress: Status and the summary counts are P15's (handoff §5). Left: P11 (the public pages, #80 to #83), P13 (staging seed), P14 (the manual chapter and its pictures).
 - 04/11/2026 · GE · (Ose) P7 and P8 audited and fixed (`docs/handoff/m4-recruitment.md` §7): the candidate emails ship as Markdown and render a title's & and a typed name as written; the interview invite says where from the interview's type; the five prompts tightened (no CV cap, protected conditions not applied, fair assessment points); `Countdown` keeps its time across a remount and announces the time really left; `RatingField` gains `disabled`, `decimals` and the full keyboard. Shared fixes in mail subjects, Markdown templates, the AI's no-gap check and phone masking. No ticks: no screen changed. Left: P4 to P6 as the handoff lists.
@@ -1236,11 +1237,11 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 45 | Payroll Runs | `payroll-runs` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 46 | Payslips | `payslips` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 47 | Salary Structure | `salary-structure` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 48 | Deductions | `deductions` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 49 | Statutory | `statutory` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
+| 45 | Payroll Runs | `payroll-runs` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
+| 46 | Payslips | `payslips` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
+| 47 | Salary Structure | `salary-structure` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
+| 48 | Deductions | `deductions` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
+| 49 | Statutory | `statutory` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
@@ -1251,12 +1252,12 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 50 | Pipeline | `pipeline` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 51 | Partners | `partners` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 52 | Leads | `leads` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 53 | Proposals | `proposals` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 54 | Contracts & MOUs | `contracts-and-mous` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 55 | Analytics | `analytics` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
+| 50 | Pipeline | `pipeline` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 51 | Partners | `partners` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 52 | Leads | `leads` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 53 | Proposals | `proposals` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 54 | Contracts & MOUs | `contracts-and-mous` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 55 | Analytics | `analytics` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
@@ -1621,8 +1622,8 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 81 | Vacancy | `/jobs/<slug>` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
 | 82 | Apply | `/apply/<token>` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
 | 83 | Assessment | `/assess/<token>` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
-| 84 | Sign Offer | `/sign/<token>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 85 | Verify Document | `/verify/<number>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
+| 84 | Sign Offer | `/sign/<token>` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 85 | Verify Document | `/verify/<number>` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 

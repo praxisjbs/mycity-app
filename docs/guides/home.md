@@ -185,8 +185,8 @@ column to the migrated schema, and the schema gate holds every query to them.
 | `reviews.source.js` | reviews · M2 · AJ | `performance_review`, `performance_cycle`: Reviews Due (a monthly review not yet through its reviewer: `check_in`, `with_reviewer` or `returned`, its round closing within 30 days or past) and My Reviews Due (those with the reader to score now); nothing owed since Performance PR 3 |
 | `calendar.source.js` | calendar · M2 · AJ | `calendar_event`: Your Week |
 | `vacancies.source.js` | vacancies and candidates · M4 · GE | `vacancy`: open vacancies; `application`, `candidate`: applications left at one stage too long (Recruitment SLA alerts) |
-| `payroll.source.js` | payroll · M6 · LA | nothing yet: Payroll In Progress is hidden and has no query until M6 creates its tables |
-| `partners.source.js` | partners and pipeline · M7 · GE | `partner`, `partner_interaction`, `partnership_opportunity`, `partnership_agreement`, `partnership_proposal`: pipeline, signed value, quiet partners (and Partner Inactivity alerts), proposals out |
+| `payroll.source.js` | payroll · M6 · TB | nothing yet: Payroll In Progress is hidden and has no query until M6 creates its tables |
+| `partners.source.js` | partners and pipeline · M7 · LA | `partner`, `partner_interaction`, `partnership_opportunity`, `partnership_agreement`, `partnership_proposal`: pipeline, signed value, quiet partners (and Partner Inactivity alerts), proposals out |
 | `expenses.source.js` | expenses · M8 · AJ | `expense_request` and `expense_category`: awaiting approval, with each request's category |
 | `budgets.source.js` | budgets · M8 · AJ | `budget`, `budget_line`: budget used, and the budgets past a share spent (Budget Threshold alerts) |
 

@@ -6,7 +6,7 @@
  * Overview.
  *
  * OWNED BY the `partners`, `partner_pipeline`, `interactions`, `proposals` and `agreements`
- * modules, M7 Partnerships, CRM & Trackers, GE (migration 7000).
+ * modules, M7 Partnerships, CRM & Trackers, LA (migration 7000).
  *
  * Home reads these tables before the modules that own them are built, so this file is the
  * one place Home names them. The M7 pull request that builds them MUST, in the same PR, move
@@ -362,7 +362,7 @@ function proposalsOutPage(client, scope, query) {
 module.exports = {
   module: "partners",
   milestone: "M7",
-  owner: "GE",
+  owner: "LA",
   tables: TABLES,
   owes: OWES,
   QUIET_DAYS,

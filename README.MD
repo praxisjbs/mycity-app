@@ -524,7 +524,7 @@ Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media
 `shared/state/state-history`. Prompts: `jd-draft`, `cv-screen`, `screening-questions`,
 `assessment-questions`, `interview-notes-cleanup`. Gate 19 switches on.
 
-### 5.8 M5 · Offers, Documentation & Onboarding · LA, GE · 16 to 20 Nov
+### 5.8 M5 · Offers, Documentation & Onboarding · AJ, GE · 16 to 20 Nov
 
 | Module | Files beyond the template |
 |---|---|
@@ -536,7 +536,7 @@ Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media
 Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Templates: `offer-letter`,
 `offer-packet`, `employment-contract`, `signature-certificate`, and the recruitment mails.
 
-### 5.9 M6 · Payroll & Notifications · LA, AJ · 23 to 27 Nov
+### 5.9 M6 · Payroll & Notifications · TB, AJ · 23 to 27 Nov
 
 | Module | Files beyond the template |
 |---|---|
@@ -551,7 +551,7 @@ screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2
 (`docs/guides/notifications.md`). The daily rate divides by the working days from
 `shared/time/working-week` (A22), never by a constant.
 
-### 5.10 M7 · Partnerships, CRM & Trackers · GE, LA · 30 Nov to 4 Dec
+### 5.10 M7 · Partnerships, CRM & Trackers · LA, GE · 30 Nov to 4 Dec
 
 | Module | Files beyond the template |
 |---|---|
@@ -935,9 +935,9 @@ On production, run it without `--sample` and enter the real person's details
 
 | Initials | Name | Owns |
 |---|---|---|
-| GE | Godwin-Okoh Elisha | Architecture, schema, M0, M3, M7, M9; community and mailbox in M1 |
-| TB | Tom-Blake Asaah | Dashboard (M1), M4, M10, M11 |
-| LA | Love Adeola | Migrations and data (M0), attendance (M1), M5, M6 |
-| AJ | Adole Jerome | Frontend foundation, ESS (M1), M2, M8 |
+| GE | Godwin-Okoh Elisha | Architecture, schema, M0, M3, M4, M9; community and mailbox in M1 |
+| TB | Tom-Blake Asaah | Dashboard (M1), M6, M10, M11 |
+| LA | Love Adeola | Migrations and data (M0), attendance (M1), M7 |
+| AJ | Adole Jerome | Frontend foundation, ESS (M1), M2, M5, M8 |
 
 Engineered by [JBS Praxis](https://jbspraxis.com).

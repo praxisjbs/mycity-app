@@ -202,6 +202,6 @@ A task is not finished until:
   block the person; say so when you start one. Slower in the foreground is fine; work lost with a
   session that ends is not.
 
-Team: GE Godwin-Okoh Elisha (architecture, M0, M3, M7, M9, community and mailbox) · TB Tom-Blake
-Asaah (Home, M4, M10, M11) · LA Love Adeola (migrations and data, attendance, M5, M6) · AJ Adole
-Jerome (frontend foundation, ESS, M2, M8).
+Team: GE Godwin-Okoh Elisha (architecture, M0, M3, M4, M9, community and mailbox) · TB Tom-Blake
+Asaah (Home, M6, M10, M11) · LA Love Adeola (migrations and data, attendance, M7) · AJ Adole
+Jerome (frontend foundation, ESS, M2, M5, M8).
