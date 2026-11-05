@@ -26,7 +26,7 @@ publicRoute(router, "get", "/:token",
   async (req, res) => ok(res, await apply.link(req.public_token)));
 
 publicRoute(router, "post", "/:token/cv",
-  { body: c.common.EmptyBody, response: c.documents.DocumentRef, summary: "Send a CV for an application" },
+  { body: k.CvUpload, response: c.documents.DocumentRef, summary: "Send a CV for an application" },
   requirePublicToken(apply.SCOPE),
   upload.single("file", { purpose: "cv" }),
   async (req, res) => created(res, await apply.uploadCv(req.public_token, upload.readUpload(req))));

@@ -413,6 +413,12 @@ const AnswerSaved = z
 const AnswerFileSaved = DocumentRef.extend({ saved_at: isoDateTime }).strict();
 
 /**
+ * The same route's text field beside the file in the multipart: the purpose the page's one upload
+ * engine sends. The route fixes `assessment_answer` whatever is sent, so only that is accepted.
+ */
+const AnswerFileUpload = z.object({ purpose: z.literal("assessment_answer").optional() }).strict();
+
+/**
  * assessment-invite: sent with the link. A timed test carries its minutes; an untimed take-home
  * brief carries none and says how many days after Start it is due instead (guide §6.7). One of
  * the two is set, never both. Kept a plain object: defineVariables reads its shape.
@@ -515,6 +521,7 @@ const TABLES = {
   },
   AnswerSaved: { table: null, reason: "when an answer was saved" },
   AnswerFileSaved: { table: null, reason: "the stored file of a file answer (documents.DocumentRef) and when it was saved" },
+  AnswerFileUpload: { table: null, reason: "the upload's purpose, beside the file answer" },
   AssessmentInviteEmailVars: { table: null, reason: "the variables of templates/email/assessment-invite.html" },
 };
 
@@ -556,5 +563,6 @@ module.exports = {
   AnswerSave,
   AnswerSaved,
   AnswerFileSaved,
+  AnswerFileUpload,
   AssessmentInviteEmailVars,
 };

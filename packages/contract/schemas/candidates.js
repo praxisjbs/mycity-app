@@ -327,6 +327,13 @@ const ApplicationSubmit = z
   })
   .strict();
 
+/**
+ * POST /api/public/v1/apply/:token/cv: the text field beside the CV in the multipart. The page's one
+ * upload engine sends the purpose it uploads under; the route fixes `cv` whatever is sent, so only
+ * that purpose is accepted, and leaving it out is fine.
+ */
+const CvUpload = z.object({ purpose: z.literal("cv").optional() }).strict();
+
 /** What applying answers: a reference to quote, never the row. */
 const ApplicationReceipt = z
   .object({
@@ -447,6 +454,7 @@ const TABLES = {
     },
   },
   ApplicationReceipt: { table: null, reason: "the reference a candidate is given; nothing else is read back" },
+  CvUpload: { table: null, reason: "the upload's purpose, beside the CV file" },
   ApplicationReceivedEmailVars: { table: null, reason: "the variables of templates/email/application-received.html" },
   ApplyInviteEmailVars: { table: null, reason: "the variables of templates/email/apply-invite.html" },
   CandidateNotProgressedEmailVars: { table: null, reason: "the variables of templates/email/candidate-not-progressed.html" },
@@ -486,6 +494,7 @@ module.exports = {
   ApplyLink,
   ApplicationSubmit,
   ApplicationReceipt,
+  CvUpload,
   ApplicationReceivedEmailVars,
   ApplyInviteEmailVars,
   CandidateNotProgressedEmailVars,

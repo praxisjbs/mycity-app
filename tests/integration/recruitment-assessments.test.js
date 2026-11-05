@@ -191,12 +191,16 @@ describeDb("Recruitment · Assessments against the real migrations", () => {
     expect((await pub().put(`/assess/${tok}/answers/${choice.assessment_question_id}`).send({ answer: svg, current_question: 1 })).status).toBe(200);
     await pub().put(`/assess/${tok}/answers/${text.assessment_question_id}`).send({ answer: "Start from the venue's lights, then pick two accents that read at night.", current_question: 2 });
     // A file given as the answer comes back as the document, as an Apply link's CV does, so the page's
-    // upload engine sees it arrive.
-    const sentFile = await pub().post(`/assess/${tok}/answers/${file.assessment_question_id}/file`).attach("file", PDF, { filename: "poster.pdf", contentType: "application/pdf" });
+    // upload engine sees it arrive. Sent as that engine sends it, with the purpose beside the file.
+    const sentFile = await pub().post(`/assess/${tok}/answers/${file.assessment_question_id}/file`).field("purpose", "assessment_answer").attach("file", PDF, { filename: "poster.pdf", contentType: "application/pdf" });
     expect(sentFile.status).toBe(200);
     expect(sentFile.body).toMatchObject({ file_name: "poster.pdf", mime_type: "application/pdf", size_bytes: PDF.length });
     expect(sentFile.body.document_id).toMatch(/^[0-9a-f-]{36}$/);
     expect(typeof sentFile.body.saved_at).toBe("string");
+    // The file answer opens for whoever may read the sitting (the vault's rule for a sitting), and for
+    // nobody else: Operations & People read every role; this role's manager is not in hod's team.
+    expect((await h.as("ops").get(`/documents/${sentFile.body.document_id}`)).status).toBe(200);
+    expect((await h.as("hod").get(`/documents/${sentFile.body.document_id}`)).status).toBe(404);
     expect((await pub().post(`/assess/${tok}/answers/${text.assessment_question_id}/file`).attach("file", PDF, { filename: "x.pdf", contentType: "application/pdf" })).status).toBe(422);
     // A link given after it replaces the file; words that are not a link are refused.
     expect((await pub().put(`/assess/${tok}/answers/${file.assessment_question_id}`).send({ answer: "a poster I made", current_question: 2 })).status).toBe(422);
