@@ -109,7 +109,7 @@ describeDb("Recruitment · Interviews against the real migrations", () => {
     const made = await h.as("ops").post("/recruitment/interviews").send({ ...base, panel_employee_ids: panelOf() });
     expect(made.status).toBe(201);
     interviewId = made.body.interview_id;
-    expect(made.body).toMatchObject({ status: "scheduled", round_status: "open", panel_size: 2, on_panel: true, can_close: true, can_report: false });
+    expect(made.body).toMatchObject({ status: "scheduled", round_status: "open", panel_size: 2, on_panel: true, can_close: false, can_report: false });
     expect(made.body.round).toMatchObject({ round_number: 1, title: "Interview 1" });
     expect(made.body.questions.map((x) => x.prompt)).toEqual(["Level of Confidence", "Job Knowledge and Experience"]);
     expect(await one("SELECT stage FROM application WHERE application_id = $1", [applicationId])).toEqual({ stage: "interview" });

@@ -195,11 +195,11 @@ export function ScorecardForm({ vacancy, close, onSaved }: { vacancy: VacancyDet
               <NumberField value={String(p.weight)} onChange={(w: string) => set(p.code, { weight: Math.max(0, Math.min(100, Number.parseInt(w || "0", 10) || 0)) })} />
             </Field>
           ) : (
-            <span className="pb-2 text-right text-sm text-text-3">Off</span>
+            <span className="pb-2 text-right text-sm text-subtle-foreground">Off</span>
           )}
         </div>
       ))}
-      <p className={total === 100 ? "text-sm" : "text-err-ink text-sm font-semibold"}>Total {total} of 100</p>
+      <p className={total === 100 ? "text-sm" : "text-destructive text-sm font-semibold"}>Total {total} of 100</p>
       <FormError>{problem}</FormError>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

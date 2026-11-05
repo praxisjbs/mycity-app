@@ -126,7 +126,7 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     });
     expect(saved.status).toBe(200);
     expect(saved.body.default_traits).toEqual(TRAITS);
-    expect((await h.as("ops").get("/recruitment/vacancies/settings")).body.about_company).toMatch(/^MyCityApp is a digital city/);
+    expect((await h.as("ops").get("/recruitment/vacancies/settings")).body).toMatchObject({ about_company: expect.stringMatching(/^MyCityApp is a digital city/), can_edit: true });
   });
 
   test("New Vacancy keeps a draft: VAC numbered, the place picked, the five parts on, MyCity's traits on its card", async () => {
@@ -268,7 +268,8 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     // The summary counts only their vacancies; Careers Settings shape every vacancy, so they read them only.
     expect((await h.as("hod").get("/recruitment/vacancies/summary")).body.open).toBe(0);
     expect((await h.as("ops").get("/recruitment/vacancies/summary")).body.open).toBe(1);
-    expect((await h.as("hod").get("/recruitment/vacancies/settings")).status).toBe(200);
+    // A hiring manager reads them but is not offered Save: the server says so with can_edit.
+    expect((await h.as("hod").get("/recruitment/vacancies/settings")).body.can_edit).toBe(false);
     expect((await h.as("hod").put("/recruitment/vacancies/settings").send({ default_traits: ["Level of Confidence"] })).status).toBe(403);
     // A card never names a vacancy outside the asker's scope, by id or by number.
     const hodScope = { scope: "team", scope_ids: [h.people.hod.employee_id, h.people.staff.employee_id] };

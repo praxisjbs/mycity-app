@@ -10,14 +10,16 @@ import { Button, ErrorState, Field, FormError, FormFooter, LoadingRows, TextArea
 import type { CareersSettings as Settings } from "@mycity/contract/contract.gen.ts";
 import { say } from "./shared";
 
-export function CareersSettings({ close, mayEdit }: { close: () => void; mayEdit: boolean }) {
+export function CareersSettings({ close }: { close: () => void }) {
   const read = useApi("GET /api/v1/recruitment/vacancies/settings");
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!read.data) return <LoadingRows count={5} />;
-  return <SettingsForm settings={read.data} close={close} mayEdit={mayEdit} />;
+  return <SettingsForm settings={read.data} close={close} />;
 }
 
-function SettingsForm({ settings, close, mayEdit }: { settings: Settings; close: () => void; mayEdit: boolean }) {
+function SettingsForm({ settings, close }: { settings: Settings; close: () => void }) {
+  // Only a recruiter for every role may save them; the server says who (can_edit).
+  const mayEdit = settings.can_edit;
   const [about, setAbout] = useState(settings.about_company ?? "");
   const [traits, setTraits] = useState<string[]>(settings.default_traits);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -25,7 +27,9 @@ function SettingsForm({ settings, close, mayEdit }: { settings: Settings; close:
   const save = useMutation("PUT /api/v1/recruitment/vacancies/settings");
   const submit = async () => {
     setProblem(null);
-    const kept = traits.map((t) => t.trim()).filter(Boolean);
+    // The rows sent, each with the row it came from, so a refusal lands on that row.
+    const rows = traits.map((t, i) => [t.trim(), i] as const).filter(([t]) => t);
+    const kept = rows.map(([t]) => t);
     try {
       await save.run({ body: { about_company: about, default_traits: kept } });
       invalidate("/api/v1/recruitment/vacancies/settings");
@@ -34,7 +38,10 @@ function SettingsForm({ settings, close, mayEdit }: { settings: Settings; close:
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) {
         const out: Record<string, string> = {};
-        for (const [k, m] of Object.entries(e.fields)) out[k] = m[0] ?? "Check this";
+        for (const [k, m] of Object.entries(e.fields)) {
+          const [field, n] = k.split(".");
+          out[field === "default_traits" && n !== undefined ? `default_traits.${rows[Number(n)]?.[1] ?? n}` : k] = m[0] ?? "Check this";
+        }
         setErrors(out);
         setProblem(out.default_traits ?? null);
       } else say(e);

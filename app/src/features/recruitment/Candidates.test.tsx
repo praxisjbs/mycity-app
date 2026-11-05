@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { APPLICATIONS } from "@/api/mock/data/recruitment";
 import { copyProblems, dialog, openAs, openRow, press, type } from "./testKit";
@@ -86,5 +87,13 @@ describe("Recruitment · Candidates", () => {
     expect(copyProblems()).toEqual([]);
     const sheet = await openRow("Chinedu Okafor");
     expect(within(sheet).getByRole("button", { name: "Not Progressing" })).toBeTruthy();
+  }, 60000);
+
+  it("Move To on the board offers only the moves the server allows: ahead, or one back", async () => {
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
+    const card = (await screen.findAllByText("Kunle Afolabi"))[0]!.closest("li")!;
+    await userEvent.click(within(card).getByRole("button", { name: /^Move / }));
+    const offered = (await screen.findAllByRole("menuitem")).map((m) => m.textContent);
+    expect(offered).toEqual(["Move to Interview"]);
   }, 60000);
 });

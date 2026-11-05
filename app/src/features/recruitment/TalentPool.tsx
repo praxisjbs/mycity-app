@@ -47,19 +47,21 @@ export function TalentPool() {
   const [invited, setInvited] = useState("");
   const summary = useApi("GET /api/v1/recruitment/pool/summary");
   const list = usePaged("GET /api/v1/recruitment/pool", { filters: invited ? { invited: invited as "true" } : {} });
-  const open = (p: PoolEntry) => modal.open({ title: p.name, body: (close) => <PoolSheet entry={p} close={close} mayEdit={can("recruitment", "edit")} /> });
+  const open = (p: PoolEntry) =>
+    modal.open({ title: p.name, body: (close) => <PoolSheet entry={p} close={close} mayInvite={can("recruitment", "edit")} mayRemove={can("recruitment", "delete")} /> });
 
   const [params, setParams] = useSearchParams();
   const linked = params.get("id");
   const opened = useRef<string | null>(null);
+  // A person found with ⌘K (`?id=`) opens once, read by their id: they may be past the first page.
   useEffect(() => {
-    if (!linked || opened.current === linked || !list.rows.length) return;
-    const p = list.rows.find((x) => x.talent_pool_entry_id === linked);
+    if (!linked) return void (opened.current = null);
+    if (opened.current === linked) return;
     opened.current = linked;
     setParams({ id: null }, { replace: true });
-    if (p) open(p);
+    api.call("GET /api/v1/recruitment/pool/:id", { params: { id: linked } }).then(open, say);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linked, list.rows]);
+  }, [linked]);
 
   const s = summary.data;
   const counted = (n: number | null | undefined) => (n === undefined || n === null ? "–" : String(n));
@@ -108,7 +110,7 @@ export function TalentPool() {
   );
 }
 
-function PoolSheet({ entry, close, mayEdit }: { entry: PoolEntry; close: () => void; mayEdit: boolean }) {
+function PoolSheet({ entry, close, mayInvite, mayRemove }: { entry: PoolEntry; close: () => void; mayInvite: boolean; mayRemove: boolean }) {
   const modal = useModal();
   const confirm = useConfirm();
   const remove = useMutation("POST /api/v1/recruitment/pool/:id/remove");
@@ -139,8 +141,8 @@ function PoolSheet({ entry, close, mayEdit }: { entry: PoolEntry; close: () => v
       />
       <FormFooter>
         <Button onClick={close}>Close</Button>
-        {mayEdit && <Button variant="danger" onClick={out}>Remove</Button>}
-        {mayEdit && <Button variant="primary" onClick={() => modal.open({ title: "Invite to Apply", body: (done) => <InviteForm entry={entry} close={() => (done(), close())} /> })}>Invite to Apply</Button>}
+        {mayRemove && <Button variant="danger" onClick={out}>Remove</Button>}
+        {mayInvite && <Button variant="primary" onClick={() => modal.open({ title: "Invite to Apply", body: (done) => <InviteForm entry={entry} close={() => (done(), close())} /> })}>Invite to Apply</Button>}
       </FormFooter>
     </>
   );

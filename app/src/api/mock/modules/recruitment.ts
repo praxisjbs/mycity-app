@@ -137,6 +137,7 @@ R("GET /api/v1/recruitment/vacancies/summary", "view", () => {
     applicants: live.length,
     in_interview: live.filter((a) => a.stage === "interview").length,
     past_closing: VACANCIES.filter((v) => v.status === "open" && v.closes_at && Date.parse(v.closes_at) < Date.now()).length,
+    careers_url: "https://go.mycityapp.io/jobs",
     funnel: STAGES.map((stage) => ({ stage, count: D.APPLICATIONS.filter((a) => reached(a, stage)).length })),
   });
 });
@@ -148,13 +149,13 @@ R("GET /api/v1/recruitment/vacancies/suggested", "view", (req) =>
   ),
 );
 
-R("GET /api/v1/recruitment/vacancies/settings", "view", () => ok(D.SETTINGS));
+R("GET /api/v1/recruitment/vacancies/settings", "view", (req) => ok({ ...D.SETTINGS, can_edit: can(req, "edit") }));
 R("PUT /api/v1/recruitment/vacancies/settings", "edit", (req) =>
   parse<{ about_company?: string; default_traits?: string[] }>(vacancySchemas.CareersSettingsSave, req.body, (b) => {
     if (b.about_company !== undefined) D.SETTINGS.about_company = b.about_company || null;
     if (b.default_traits !== undefined) D.SETTINGS.default_traits = b.default_traits;
     D.SETTINGS.updated_at = nowIso();
-    return ok(D.SETTINGS);
+    return ok({ ...D.SETTINGS, can_edit: true });
   }),
 );
 
@@ -437,19 +438,23 @@ function scorecardOf(a: D.MockApplication): ScorecardPart[] {
       const s = mean(closed.map(roundScore).filter((n): n is number => n !== null));
       score = s === null ? null : round1(s);
     } else {
-      const s = mean(
-        sittingsOf(a)
-          .filter((x) => x.status === "scored" && assessment(x.assessment_definition_id)?.assessment_type === p.code)
-          .map((x) => x.score!),
-      );
-      score = s === null ? null : round1(s);
+      // The latest scored sitting of the part; a practical brief counts as technical (candidates.repo PART_SCORES).
+      const typeOf = (x: D.MockSitting) => {
+        const t = assessment(x.assessment_definition_id)?.assessment_type;
+        return t === "practical" ? "technical" : t;
+      };
+      const latest = sittingsOf(a)
+        .filter((x) => x.status === "scored" && x.score !== null && typeOf(x) === p.code)
+        .sort((x, y) => (x.submitted_days ?? 0) - (y.submitted_days ?? 0))[0];
+      score = latest ? round1(latest.score!) : null;
     }
     return { code: p.code, name: p.name, active: p.active, weight: p.weight, score: p.active ? score : null, provisional };
   });
 }
 
+/** Over the parts on that have a score, a provisional screening score included (PART_SCORES). */
 function weighted(parts: ScorecardPart[]) {
-  const scored = parts.filter((p) => p.active && p.score !== null && !p.provisional);
+  const scored = parts.filter((p) => p.active && p.score !== null);
   const weight = scored.reduce((n, p) => n + p.weight, 0);
   return {
     weighted_total: weight ? round1(scored.reduce((n, p) => n + p.score! * p.weight, 0) / weight) : null,
@@ -477,13 +482,14 @@ function candidateRow(a: D.MockApplication): CandidatesCandidate {
     score_provisional: a.screening === null,
     ...weighted(scorecardOf(a)),
     cv_state: a.cv_state,
+    next_stages: nextStages(a),
   };
 }
 
 /** Where a card may move now: any column ahead, or the one just behind (candidates.pipeline). */
-function nextStages(a: D.MockApplication) {
-  if (a.status !== "active") return [];
-  const board = vacancyOfApp(a).board_stages;
+function nextStages(a: D.MockApplication): D.MockApplication["stage"][] {
+  if (a.status !== "active" || vacancyOfApp(a).status === "closed") return [];
+  const board = vacancyOfApp(a).board_stages as D.MockApplication["stage"][];
   const i = board.indexOf(a.stage);
   return i < 0 ? board.filter((s) => s !== a.stage) : board.filter((_, k) => k > i || k === i - 1);
 }
@@ -529,7 +535,7 @@ function candidateDetail(a: D.MockApplication, req: Req): CandidateDetail {
         days: next ? Math.max(0, h.days - next.days) : daysSince(when),
       };
     }),
-    next_stages: nextStages(a),
+    next_stages: can(req, "edit") ? nextStages(a) : [],
     can_edit: a.status === "active" && can(req, "edit"),
   };
 }
@@ -537,11 +543,10 @@ function candidateDetail(a: D.MockApplication, req: Req): CandidateDetail {
 R("GET /api/v1/recruitment/candidates/summary", "view", (req) => {
   const rows = APPS.filter((a) => a.status === "active" && (!req.query.vacancy_id || vacancyOfApp(a).vacancy_id === req.query.vacancy_id));
   const bands: Array<[string, number, number]> = [
+    ["Below 40", 0, 40],
+    ["40 to 59", 40, 60],
+    ["60 to 79", 60, 80],
     ["80 and Above", 80, 101],
-    ["70 to 79", 70, 80],
-    ["60 to 69", 60, 70],
-    ["50 to 59", 50, 60],
-    ["Below 50", 0, 50],
   ];
   return ok({
     candidates: rows.length,
@@ -572,17 +577,19 @@ R("GET /api/v1/recruitment/candidates", "view", (req) =>
 /* Candidate Emails: the five, as Markdown, with a version history of one step. */
 const EMAIL_DEFAULTS = new Map(D.EMAILS.map((e) => [e.key, { ...e }]));
 const email = (key: string) => D.EMAILS.find((e) => e.key === key);
-R("GET /api/v1/recruitment/candidates/emails", "view", (req) => paged(D.EMAILS, req));
+/** An email as the API answers it, with whether the reader may word it (every mock reader with edit reads every role). */
+const emailOut = (e: (typeof D.EMAILS)[number], req: Req): CandidateEmail => ({ ...e, can_edit: can(req, "edit") });
+R("GET /api/v1/recruitment/candidates/emails", "view", (req) => paged(D.EMAILS.map((e) => emailOut(e, req)), req));
 R("GET /api/v1/recruitment/candidates/emails/:key", "view", (req) => {
   const e = email(req.params.key);
-  return e ? ok(e) : notFound();
+  return e ? ok(emailOut(e, req)) : notFound();
 });
 R("PUT /api/v1/recruitment/candidates/emails/:key", "edit", (req) => {
   const e = email(req.params.key);
   if (!e) return notFound();
   return parse<{ subject: string; body: string }>(candidateSchemas.CandidateEmailSave, req.body, (b) => {
-    Object.assign(e, { subject: b.subject, body: b.body, version: e.version + 1, is_default: false, updated_at: nowIso() } satisfies Partial<CandidateEmail>);
-    return ok(e);
+    Object.assign(e, { subject: b.subject, body: b.body, version: e.version + 1, is_default: false, updated_at: nowIso() });
+    return ok(emailOut(e, req));
   });
 });
 R("POST /api/v1/recruitment/candidates/emails/:key/restore", "edit", (req) => {
@@ -590,7 +597,7 @@ R("POST /api/v1/recruitment/candidates/emails/:key/restore", "edit", (req) => {
   const d = EMAIL_DEFAULTS.get(req.params.key as CandidateEmail["key"]);
   if (!e || !d) return notFound();
   Object.assign(e, { subject: d.subject, body: d.body, version: e.version + 1, is_default: true, updated_at: nowIso() });
-  return ok(e);
+  return ok(emailOut(e, req));
 });
 
 /** The AI read of a CV, as the mock stands in for it: near the provisional score, with a summary. */
@@ -661,7 +668,7 @@ R("POST /api/v1/recruitment/candidates/:id/not-progressed", "edit", (req) =>
       a.history.push({ to: "not_progressed", days: 0, by: req.user ?? undefined, reason: b.rejection_reason });
       /* What was still open for them stops with it: a sitting not finished, an interview not held. */
       sittingsOf(a).filter((s) => s.status === "sent" || s.status === "in_progress").forEach((s) => (s.status = "cancelled"));
-      roundsOf(a).filter((x) => x.status === "scheduled").forEach((x) => (x.status = "cancelled"));
+      roundsOf(a).filter((x) => x.status === "scheduled").forEach(cancelRound);
       return ok(candidateDetail(a, req));
     }),
   ),
@@ -1081,13 +1088,20 @@ function cardScore(c: Card, inUse: Set<string>) {
   const values = Object.entries(c.ratings)
     .filter(([id]) => inUse.has(id))
     .map(([, n]) => n);
-  return values.length ? round1(mean(values)!) : c.overall_rating;
+  return values.length ? mean(values)! : c.overall_rating;
 }
 const inUseOf = (x: D.MockInterview) => new Set(traitsOf(vacancyOfApp(app(x.application_id)!)).map((t) => t.vacancy_question_id));
 
-/** The round's score: the mean of the submitted cards × 10, once closed. */
+/** The round's score as kept when it closed (consolidate.closeIn); null while open or when cancelled. */
+const SCORES = new Map<string, number | null>();
 function roundScore(x: D.MockInterview): number | null {
   if (x.round_status !== "closed") return null;
+  if (!SCORES.has(x.interview_id)) SCORES.set(x.interview_id, scoreNow(x));
+  return SCORES.get(x.interview_id)!;
+}
+
+/** The mean of the submitted cards × 10, one decimal; each card unrounded (interviews.repo cardScores). */
+function scoreNow(x: D.MockInterview): number | null {
   const inUse = inUseOf(x);
   const s = mean(
     cardsOf(x)
@@ -1185,7 +1199,7 @@ function interviewDetail(x: D.MockInterview, req: Req): InterviewDetail {
         }
       : null,
     can_edit: edit && live,
-    can_close: edit && live,
+    can_close: edit && live && Date.parse(x.start) <= Date.now(),
     can_report: closed && x.status !== "cancelled" && (edit || v.hiring_manager?.employee_id === byKey(req.user)?.employee_id),
   };
 }
@@ -1198,7 +1212,7 @@ R("GET /api/v1/recruitment/interviews", "view", (req) => {
     {
       search: (x) => [x.candidate_name, x.vacancy.title, x.vacancy.number],
       filters: {
-        when: (x, w) => (w === "upcoming" ? Date.parse(x.scheduled_end) >= now && x.status === "scheduled" : Date.parse(x.scheduled_end) < now || x.status !== "scheduled"),
+        when: (x, w) => (w === "upcoming" ? Date.parse(x.scheduled_end) >= now : Date.parse(x.scheduled_end) < now),
         mine: (x) => x.on_panel,
         application_id: (x, id) => x.application_id === id,
         status: (x, s) => x.status === s,
@@ -1235,10 +1249,12 @@ function applySchedule(x: D.MockInterview, b: ScheduleBody): RawResponse | null 
     const people = b.panel_employee_ids.map((id) => byId(id));
     if (people.some((p) => !p)) return field("panel_employee_ids", "Pick people on the staff list");
     const before = cardsOf(x);
-    /* A seat taken off the panel loses its draft; a submitted card stays. */
+    /* A seat taken off the panel loses its draft; a submitted card stays (interviews.repo setPanel). */
+    const kept = before.filter((c) => c.submitted_days !== null && !people.some((p) => p!.user_key === c.employee_key));
+    if (people.length + kept.length > 8) return field("panel_employee_ids", "At most 8 panelists");
     CARDS.set(
       x.interview_id,
-      people.map(
+      [...kept, ...people.map(
         (p) =>
           before.find((c) => c.employee_key === p!.user_key) ?? {
             employee_key: p!.user_key,
@@ -1250,7 +1266,7 @@ function applySchedule(x: D.MockInterview, b: ScheduleBody): RawResponse | null 
             private_notes: null,
             submitted_days: null,
           },
-      ),
+      )],
     );
   }
   if (b.title) x.title = b.title;
@@ -1266,8 +1282,8 @@ function applySchedule(x: D.MockInterview, b: ScheduleBody): RawResponse | null 
 R("POST /api/v1/recruitment/interviews", "edit", (req) =>
   parse<ScheduleBody & { application_id: string }>(interviewSchemas.InterviewSchedule, req.body, (b) => {
     const a = app(b.application_id);
-    if (!a || a.status !== "active") return field("application_id", "Pick a candidate");
-    if (vacancyOfApp(a).status === "closed") return fail(409, "VACANCY_CLOSED", "This vacancy is closed");
+    if (!a) return field("application_id", "Pick a candidate");
+    if (a.status !== "active") return field("application_id", "This candidate is not in progress");
     const n = roundsOf(a).length + 1;
     const id = sid(`int:new:${a.application_id}:${n}:${Date.now()}`);
     const x: D.MockInterview = {
@@ -1294,7 +1310,7 @@ R("POST /api/v1/recruitment/interviews", "edit", (req) =>
     if (refused) return refused;
     INTERVIEWS.unshift(x);
     if (STAGES.indexOf(a.stage) < STAGES.indexOf("interview") && vacancyOfApp(a).board_stages.includes("interview")) moveTo(a, "interview", req.user);
-    return ok(interviewDetail(x, req));
+    return created(interviewDetail(x, req));
   }),
 );
 
@@ -1325,7 +1341,7 @@ R("PATCH /api/v1/recruitment/interviews/:id", "edit", (req) =>
 R("POST /api/v1/recruitment/interviews/:id/cancel", "edit", (req) =>
   liveRound(req, (x) =>
     parse<{ reason: string }>(interviewSchemas.InterviewCancel, req.body, () => {
-      x.status = "cancelled";
+      cancelRound(x);
       return ok(interviewDetail(x, req));
     }),
   ),
@@ -1341,11 +1357,20 @@ function mySeat(req: Req, then: (x: D.MockInterview, c: Card) => RawResponse): R
   return then(x, c);
 }
 
+/** Cancel an interview: its round closes with no score (schedule.cancelIn). */
+function cancelRound(x: D.MockInterview) {
+  x.status = "cancelled";
+  x.round_status = "closed";
+  x.closed_days = 0;
+  SCORES.set(x.interview_id, null);
+}
+
+/** Close the round and keep its score; the form is made with the report, not here (consolidate.closeIn). */
 function closeRound(x: D.MockInterview) {
   x.round_status = "closed";
   x.closed_days = 0;
   x.status = "done";
-  x.form_document_id = sid(`doc:form:${x.interview_id}`);
+  SCORES.set(x.interview_id, scoreNow(x));
 }
 
 R("PUT /api/v1/recruitment/interviews/:id/feedback", "view", (req) =>
@@ -1365,8 +1390,8 @@ R("PUT /api/v1/recruitment/interviews/:id/feedback", "view", (req) =>
         if (b.overall_rating !== undefined && b.overall_rating !== null && inUse.size) return field("overall_rating", "Rate each trait instead");
         if (b.overall_rating !== undefined) c.overall_rating = b.overall_rating;
         if (b.decision !== undefined) c.decision = b.decision;
-        if (b.comments !== undefined) c.comments = b.comments || null;
-        if (b.private_notes !== undefined) c.private_notes = b.private_notes || null;
+        if (b.comments !== undefined) c.comments = b.comments;
+        if (b.private_notes !== undefined) c.private_notes = b.private_notes;
         for (const r of b.ratings ?? []) {
           if (r.rating === null) delete c.ratings[r.vacancy_question_id];
           else c.ratings[r.vacancy_question_id] = r.rating;
@@ -1397,8 +1422,7 @@ R("POST /api/v1/recruitment/interviews/:id/feedback/submit", "view", (req) =>
 R("POST /api/v1/recruitment/interviews/:id/close", "edit", (req) => {
   const x = interview(req.params.id);
   if (!x) return intNotFound();
-  if (x.status === "cancelled") return fail(409, "INTERVIEW_OVER", "This interview is cancelled");
-  if (x.round_status === "closed") return fail(409, "ROUND_CLOSED", "This round is already closed");
+  if (x.round_status !== "open" || x.status === "cancelled") return fail(409, "ROUND_CLOSED", "This round is already closed");
   if (Date.parse(x.start) > Date.now()) return fail(409, "NOT_STARTED", "Close the round once the interview has started, or cancel it");
   closeRound(x);
   return ok(interviewDetail(x, req));
@@ -1419,8 +1443,8 @@ R("PUT /api/v1/recruitment/interviews/:id/details", "edit", (req) => {
       if (b.academics !== undefined) x.details.academics = b.academics ?? null;
       x.details.total = total;
       x.details.relevant = relevant;
-      /* A closed round's form is made again with the new details. */
-      if (x.round_status === "closed") x.form_document_id = sid(`doc:form:${x.interview_id}:${Date.now()}`);
+      /* A round with its report has its form made again with the new details. */
+      if (x.report) x.form_document_id = sid(`doc:form:${x.interview_id}:${Date.now()}`);
       return ok(interviewDetail(x, req));
     },
   );
@@ -1429,9 +1453,10 @@ R("PUT /api/v1/recruitment/interviews/:id/details", "edit", (req) => {
 R("PUT /api/v1/recruitment/interviews/:id/report", "view", (req) => {
   const x = interview(req.params.id);
   if (!x) return intNotFound();
+  const manager = vacancyOfApp(app(x.application_id)!).hiring_manager?.employee_id;
+  if (!can(req, "edit") && manager !== byKey(req.user)?.employee_id) return fail(403, "PERMISSION_DENIED", "Only the hiring manager or a recruiter can write the report");
   if (x.status === "cancelled") return fail(409, "INTERVIEW_OVER", "This interview is cancelled");
   if (x.round_status !== "closed") return fail(409, "ROUND_OPEN", "Write the report once the round is closed");
-  if (!interviewDetail(x, req).can_report) return fail(403, "PERMISSION_DENIED", "Only the hiring manager or a recruiter can write the report");
   return parse<{ report: string; decision: "select" | "on_hold" | "reject" }>(interviewSchemas.RoundReport, req.body, (b) => {
     x.report = { text: b.report, decision: b.decision, by: req.user!, days: 0 };
     x.form_document_id = sid(`doc:form:${x.interview_id}:${Date.now()}`);
@@ -1458,6 +1483,11 @@ R("GET /api/v1/recruitment/pool/summary", "view", () => {
     hired_from_pool: POOL.filter((p) => p.hired_from_pool).length,
     average_score: avg === null ? null : Math.round(avg),
   });
+});
+
+R("GET /api/v1/recruitment/pool/:id", "view", (req) => {
+  const p = entry(req.params.id);
+  return p ? ok(p) : poolNotFound();
 });
 
 R("GET /api/v1/recruitment/pool", "view", (req) =>

@@ -14,6 +14,7 @@ const id = (req) => req.validated.params.id;
 module.exports = {
   list: async (req, res) => sendPaged(res, await service.list(req.validated.query, scopeOf(req))),
   summary: async (req, res) => ok(res, await service.summary(scopeOf(req))),
+  get: async (req, res) => ok(res, await service.get(id(req), scopeOf(req))),
   add: async (req, res) => created(res, await service.add(withActor(req), scopeOf(req), req.validated.body)),
   invite: async (req, res) => ok(res, await service.invite(withActor(req), scopeOf(req), id(req), req.validated.body)),
   remove: async (req, res) => ok(res, await service.remove(withActor(req), scopeOf(req), id(req), req.validated.body)),

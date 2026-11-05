@@ -83,7 +83,7 @@ export const provisionalTerm = <HelpTerm help={PROVISIONAL_HELP}>Provisional</He
 
 /** A score as a list shows it: the figure, and Provisional while only the form was read. */
 export function ScoreText({ score, provisional }: { score: number | null; provisional: boolean }) {
-  if (score === null) return <span className="text-text-3">Not Scored</span>;
+  if (score === null) return <span className="text-subtle-foreground">Not Scored</span>;
   return (
     <span className="inline-flex items-center gap-1.5">
       <b className="tabular-nums">{Math.round(score)}</b>

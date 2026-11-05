@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { cleanup, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { POOL } from "@/api/mock/data/recruitment";
+import { sid } from "@/api/mock/core";
 import { copyProblems, dialog, openAs, openRow, press } from "./testKit";
 
 /**
@@ -51,5 +52,10 @@ describe("Recruitment · Talent Pool", () => {
     await chooseOption(within(dialog()).getByLabelText("Vacancy"), /Graphics and Motion Designer/);
     await press(dialog(), "Send Invitation");
     expect(POOL.find((p) => p.name === "Femi Lawal")!.invited_vacancy?.title).toBe("Graphics and Motion Designer");
+  }, 60000);
+
+  it("a link to one person (?id=) opens them, read by their id", async () => {
+    await openAs("cynthia@mycityapp.io", `/recruitment?tab=talent-pool&id=${sid("pool:dayo")}`);
+    expect(within(dialog()).getByText("dayo.martins@example.test")).toBeTruthy();
   }, 60000);
 });

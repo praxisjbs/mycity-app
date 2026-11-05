@@ -184,7 +184,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /recruitment/vacancies/summary` | `VacanciesSummary` | `recruitment` view · all/team | no | Open, applicants, in interview, past closing date; funnel by stage |
+| `GET /recruitment/vacancies/summary` | `VacanciesSummary` | `recruitment` view · all/team | no | Open, applicants, in interview, past closing date; funnel by stage; `careers_url`, this environment's careers page (Careers Page) |
 | `GET /recruitment/vacancies` | `VacancyListQuery` → `VacancyPage` | `recruitment` view · all/team | yes | Filters `status`, `department_id`, `q`; sort `closes_at`, `title`, `created_at`, `published_at` |
 | `GET /recruitment/vacancies/suggested` | `SeatSuggestionListQuery` → `SeatSuggestionPage` | `recruitment` view · all/team | yes | Vacant seats with no draft, open or paused vacancy; a team reader sees the seats whose line manager is in their scope |
 | `GET /recruitment/vacancies/:id` | `VacancyDetail` | `recruitment` view · all/team | no | With its questions in use (a retired one is left out) and scorecard weights |
@@ -194,7 +194,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/vacancies/:id/close` | `VacancyClose` → `VacancyDetail` | `recruitment` edit · all/team | no | Reason: filled, cancelled, on hold |
 | `PUT /recruitment/vacancies/:id/questions` | `VacancyQuestionsSave` → `VacancyDetail` | `recruitment` edit · all/team | no | Replaces both lists; a question already answered or rated is kept and only retired from the form |
 | `PUT /recruitment/vacancies/:id/scorecard` | `ScorecardSave` → `VacancyDetail` | `recruitment` edit · all/team | no | Each part on or off; the weights of the parts on sum to 100 |
-| `GET /recruitment/vacancies/settings`, `PUT` | `CareersSettings`, `CareersSettingsSave` | view; edit · all | no | Careers Settings: About MyCityApp and the Default Traits New Vacancy starts its interview card from |
+| `GET /recruitment/vacancies/settings`, `PUT` | `CareersSettings`, `CareersSettingsSave` | view; edit · all | no | Careers Settings: About MyCityApp and the Default Traits New Vacancy starts its interview card from; `can_edit` says whether the reader may save them (edit · all) |
 | `GET /recruitment/vacancies/assist` | `AiAvailability` | `recruitment` edit | no | Whether Write With AI answers now |
 | `POST /recruitment/vacancies/assist` | `JdDraftRequest` → `JdDraft` | `recruitment` edit | no | `jd-draft`; nothing kept |
 | `POST /recruitment/vacancies/:id/assist/questions` | `EmptyBody` → `QuestionsDraft` | `recruitment` edit · all/team | no | `screening-questions`; nothing kept |
@@ -208,7 +208,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/candidates/:id/score` | `EmptyBody` → `CandidateDetail` | `recruitment` edit · all/team | no | `cv-screen`, Deep Reasoning |
 | `POST /recruitment/candidates/score-all` | `ScoreAll` → `ScoreAllQueued` | `recruitment` edit · all/team | no | Screen With AI: the one to three must-meet conditions are kept on the vacancy (left out, the kept ones are used again), then every active, unscored application of it is read through the outbox |
 | `POST /recruitment/candidates/invitations` | `ApplyInvite` → `ApplyInviteSent` | `recruitment` create | no | Emails an Apply link |
-| `GET /recruitment/candidates/emails` | `CandidateEmailListQuery` → `CandidateEmailPage` | `recruitment` view | yes | The five candidate emails, each with its current version |
+| `GET /recruitment/candidates/emails` | `CandidateEmailListQuery` → `CandidateEmailPage` | `recruitment` view | yes | The five candidate emails, each with its current version and `can_edit` (edit · all) |
 | `GET /recruitment/candidates/emails/:key`, `PUT .../:key` | `CandidateEmailParams`; `CandidateEmail`, `CandidateEmailSave` | view; edit · all | no | Subject and Markdown body saved as the next version, checked against the email's variables. Saved only with edit over every vacancy (scope all), as each goes to every candidate |
 | `POST /recruitment/candidates/emails/:key/restore` | `EmptyBody` → `CandidateEmail` | `recruitment` edit · all | no | Restore Default: the shipped wording saved as the next version |
 | `GET /recruitment/assessments/summary` | `AssessmentsSummary` | `recruitment` view | no | |
@@ -239,6 +239,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `GET /recruitment/interviews/:id/cv` | file | `recruitment` view · panel or scope | no | The candidate's CV, for the panel |
 | `GET /recruitment/pool/summary` | `PoolSummary` | `recruitment` view · all/team | no | In the pool, invited back, hired from the pool, average score |
 | `GET /recruitment/pool` | `PoolListQuery` → `PoolPage` | `recruitment` view · all/team | yes | Filters `q`, `invited`; sort `created_at`, `score`, `expires_at` |
+| `GET /recruitment/pool/:id` | `IdParams` → `PoolEntry` | `recruitment` view · all/team | no | One person, for a link to someone past the list's first page |
 | `POST /recruitment/pool` | `PoolAdd` → `PoolEntry` | `recruitment` create · all/team | no | From an application, with a reason |
 | `POST /recruitment/pool/:id/invite` | `PoolInvite` → `PoolEntry` | `recruitment` edit · all/team | no | An Apply link to an open vacancy |
 | `POST /recruitment/pool/:id/remove` | `PoolRemove` → `PoolEntry` | `recruitment` delete · all/team | no | Taken off the pool before their time |
@@ -614,6 +615,12 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 05/11/2026 · GE · Re-audit of P9 and P10 (three independent reviewers; each finding checked against the code, then fixed):
+  - API: the board's rows carry `next_stages` (the role's own board, empty on a closed role), and the board's Move To offers only those (`Kanban` cards take `moves`); Careers Settings and each Candidate Email carry `can_edit` (edit · all), so Save is offered only to who may save; the summary carries `careers_url`, so Careers Page opens this environment's careers page; `GET /recruitment/pool/:id` opens a person from a link; a sitting's link carries `?sitting=` (route map `param`); `can_close` is true only once the interview has started; the Interview Assessment Form opens for whoever may read the interview (vault rule on `interview`), not only a reader of every vacancy.
+  - Screens: a vacancy made from a seat keeps the seat; a missing hiring manager is caught on Role; an edit sends the closing date only when changed; the Nice to Have field reads What We Look For (MyCity's heading, What We Are Looking For, is one word over a field label's four, and stays on the careers page); My Card saves its stars in the order tapped, a failed save goes back to what was last kept, its errors clear as they are fixed, and Submit Card says what is left before asking to confirm; Cancel Sitting shows on a sitting not yet finished; Export, Add to Pool and Remove follow their own grants; Reopen shows only while the role is open; refusals land on their own row (Screen With AI's conditions, Default Traits, an assessment option); `?marking=true` and a link to the same record work while already on the tab; error text uses the real tokens.
+  - The mock now agrees with the API: the weighted total counts a provisional screening score and the latest sitting (a practical as technical); a round's score is the mean of unrounded cards, kept at close; the form comes with the report; Cancel closes the round; Upcoming and Past go by the end time; a panel change keeps submitted cards (eight at most); the API's refusals and the score bands.
+  - Kept as is: a record opens in a sheet on desktop too, as Queries, Sanctions and Performance do (29/10/2026); Import of an assessment stays off screen (it needs a local file read).
 
 - 05/11/2026 · GE · (Ose) P11: the public vacancy's four Markdown texts arrive as blocks for `RichText`
   (`PublicJob`, as Policies does; §6.1), and the Vacancy and Apply rows of §10.1 say what the pages show:

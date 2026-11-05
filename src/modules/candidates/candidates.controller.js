@@ -26,8 +26,8 @@ module.exports = {
   score: async (req, res) => ok(res, await service.requestScore(withActor(req), scopeOf(req), id(req))),
   scoreAll: async (req, res) => ok(res, await service.scoreAll(withActor(req), scopeOf(req), req.validated.body)),
   invite: async (req, res) => created(res, await service.invite(withActor(req), scopeOf(req), req.validated.body)),
-  emails: async (_req, res) => sendPaged(res, await service.emails()),
-  email: async (req, res) => ok(res, await service.email(key(req))),
+  emails: async (req, res) => sendPaged(res, await service.emails(req.user)),
+  email: async (req, res) => ok(res, await service.email(key(req), req.user)),
   saveEmail: async (req, res) => ok(res, await service.saveEmail(withActor(req), scopeOf(req), key(req), req.validated.body)),
   restoreEmail: async (req, res) => ok(res, await service.restoreEmail(withActor(req), scopeOf(req), key(req))),
 };

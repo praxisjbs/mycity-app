@@ -1,9 +1,10 @@
 /**
- * New Vacancy and Edit Vacancy (docs/guides/recruitment.md §6.1, §9): a wizard of four topics, the
- * role, where and when, what it is, and pay. The contract's VacancyCreate (or VacancyEdit) checks each
+ * New Vacancy and Edit Vacancy (docs/guides/recruitment.md §6.1, §9): a wizard of three steps, Role,
+ * Details (where, when and what the role is) and Pay and Publish. The contract's VacancyCreate (or VacancyEdit) checks each
  * field as it is filled. The location is picked, never typed (F27), and a remote role has none. Write
  * With AI drafts the description from a line about the role; nothing is kept until the person saves.
- * A seat from Suggested From Organogram fills the title, the department and who it reports to.
+ * A seat from Suggested From Organogram fills the title, the department and who it reports to, and
+ * the vacancy keeps the seat (`org_seat_id`), so the seat leaves the suggestions once it has one.
  */
 import { useState } from "react";
 import vacancySchemas from "@mycity/contract/schemas/vacancies.js";
@@ -68,18 +69,29 @@ const PATTERNS: Array<[string, string]> = [
 const inDays = (n: number) => todayIso(new Date(Date.now() + n * 86400000));
 const text = (n: number | null | undefined) => (n === null || n === undefined ? "" : String(n));
 
-/** The body the API takes from the form's values; on an edit, the location only when it changed. */
-function bodyOf(v: Values, edit: { location: PlaceValue | null } | null) {
+/** What an edit compares against: a field left as it was is not sent again. */
+type Before = { location: PlaceValue | null; closes_on: string };
+
+/**
+ * The body the API takes from the form's values. On an edit, the location and the closing date only
+ * when changed: an open role past its date may still have its words fixed (the API refuses a past
+ * date only when one is sent). On a create from a seat, the seat.
+ */
+function bodyOf(v: Values, edit: Before | null, seatId: string | null) {
   const remote = v.work_pattern === "remote";
   const moved = !edit || JSON.stringify(edit.location) !== JSON.stringify(v.location);
-  const { hiring_manager, location, publish, ...rest } = v;
+  const { hiring_manager, location, publish, closes_on, ...rest } = v;
   return {
     ...rest,
     hiring_manager_id: hiring_manager[0]?.employee_id ?? "",
     ...(!remote && location && moved ? { location } : {}),
-    ...(edit ? {} : { publish }),
+    ...(!edit || closes_on !== edit.closes_on ? { closes_on } : {}),
+    ...(edit ? {} : { publish, ...(seatId ? { org_seat_id: seatId } : {}) }),
   };
 }
+
+/** The API names the hiring manager by its id; the form holds the person. */
+const RENAME = { hiring_manager_id: "hiring_manager" };
 
 /** The contract's own fields, unwrapped from its refinements, for the address's prefill. */
 const shapeOf = (schema: unknown): PrefillSchema => {
@@ -89,7 +101,8 @@ const shapeOf = (schema: unknown): PrefillSchema => {
 };
 
 export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: VacancyDetail; seat?: SeatSuggestion; close: () => void; onSaved?: (v: VacancyDetail) => void }) {
-  const edit = vacancy ? { location: placeValue(vacancy.location_place) } : null;
+  const edit: Before | null = vacancy ? { location: placeValue(vacancy.location_place), closes_on: vacancy.closes_at?.slice(0, 10) ?? "" } : null;
+  const seatId = vacancy ? null : (seat?.org_seat_id ?? null);
   const filled = useAddressPrefill(shapeOf(vacancySchemas.VacancyCreate), !vacancy);
   const blank: Values = vacancy
     ? {
@@ -141,7 +154,7 @@ export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: Vacan
   const schema = vacancy ? vacancySchemas.VacancyEdit : vacancySchemas.VacancyCreate;
   const f = useContractForm<Values>(
     blank,
-    bodySchema<Values>(schema, (v) => bodyOf(v, edit)),
+    bodySchema<Values>(schema, (v) => bodyOf(v, edit, seatId), RENAME),
   );
   const departments = useInfinite("GET /api/v1/departments");
   const create = useMutation("POST /api/v1/recruitment/vacancies");
@@ -153,7 +166,7 @@ export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: Vacan
   const finish = async () => {
     setProblem(null);
     if (!f.check()) return;
-    const body = bodyOf(f.values, edit);
+    const body = bodyOf(f.values, edit, seatId);
     try {
       const saved = vacancy
         ? await patch.run({ params: { id: vacancy.vacancy_id }, body: body as never })
@@ -256,7 +269,7 @@ export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: Vacan
               <Field label="Required Experience and Qualifications" {...f.status("requirements")}>
                 <TextAreaField {...f.field("requirements")} rows={4} />
               </Field>
-              <Field label="Nice to Have" optional {...f.status("nice_to_have")}>
+              <Field label="What We Look For" help="The careers page heads it What We Are Looking For, as MyCity's job description does." optional {...f.status("nice_to_have")}>
                 <TextAreaField {...f.field("nice_to_have")} rows={3} />
               </Field>
             </>

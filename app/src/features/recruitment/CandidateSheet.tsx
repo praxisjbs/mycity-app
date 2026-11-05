@@ -47,8 +47,12 @@ const words = (s: string) => STAGE_LABEL[s as ApplicationStage] ?? (s === "not_p
 
 export function CandidateSheet({ id, close }: { id: string; close: () => void }) {
   const modal = useModal();
-  const mayEdit = useAuth().can("recruitment", "edit");
+  const { can } = useAuth();
+  const mayEdit = can("recruitment", "edit");
+  const mayAdd = can("recruitment", "create");
   const read = useApi("GET /api/v1/recruitment/candidates/:id", { params: { id } });
+  // Reopen needs the role still open (the API refuses a closed one); the sheet's own record does not say.
+  const role = useApi("GET /api/v1/recruitment/vacancies/:id", { params: { id: read.data?.vacancy.vacancy_id ?? "" }, enabled: Boolean(read.data && read.data.status === "not_progressed") });
   const ai = useApi("GET /api/v1/recruitment/vacancies/assist");
   const score = useMutation("POST /api/v1/recruitment/candidates/:id/score");
   const move = useMutation("POST /api/v1/recruitment/candidates/:id/move");
@@ -78,7 +82,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Pill dot={false}>{c.number}</Pill>
         <Pill tone={live ? "info" : "neutral"}>{live ? STAGE_LABEL[c.stage] : words(c.status)}</Pill>
-        <span className="text-sm text-text-3">{c.vacancy.title}</span>
+        <span className="text-sm text-subtle-foreground">{c.vacancy.title}</span>
       </div>
       <KeyValue
         items={[
@@ -122,7 +126,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
           {c.screening_summary && <p className="mt-2 text-sm" data-copy="content">{c.screening_summary}</p>}
         </Card>
         <Card>
-          <CardHeader title={<HelpTerm help={WEIGHTED_HELP}>Weighted Total</HelpTerm>} right={<span className="text-sm text-text-3">{`${c.parts_scored} of ${c.parts_active} parts`}</span>} />
+          <CardHeader title={<HelpTerm help={WEIGHTED_HELP}>Weighted Total</HelpTerm>} right={<span className="text-sm text-subtle-foreground">{`${c.parts_scored} of ${c.parts_active} parts`}</span>} />
           <p className="mb-2 text-2xl font-semibold tabular-nums">{c.weighted_total === null ? "–" : c.weighted_total.toFixed(1)}</p>
           <KeyValue
             items={c.scorecard
@@ -189,8 +193,8 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
             ))}
           </>
         )}
-        {mayEdit && <Button onClick={() => modal.open({ title: "Add to Pool", body: () => <PoolForm candidate={c} close={back} /> })}>Add to Pool</Button>}
-        {mayEdit && c.status === "not_progressed" && <Button variant="primary" onClick={act(() => reopen.run({ params: { id }, body: {} }), `${c.name} reopened`)}>Reopen</Button>}
+        {mayAdd && <Button onClick={() => modal.open({ title: "Add to Pool", body: () => <PoolForm candidate={c} close={back} /> })}>Add to Pool</Button>}
+        {mayEdit && c.status === "not_progressed" && role.data && role.data.status !== "closed" && <Button variant="primary" onClick={act(() => reopen.run({ params: { id }, body: {} }), `${c.name} reopened`)}>Reopen</Button>}
       </FormFooter>
     </>
   );

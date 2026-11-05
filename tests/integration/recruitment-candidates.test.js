@@ -178,7 +178,7 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     const board = await h.as("ops").get(`/recruitment/candidates?vacancy_id=${vacancyId}&sort=-weighted_total`);
     expect(board.status).toBe(200);
     expect(board.body.data).toEqual([
-      expect.objectContaining({ number: "APP-0001", name: "Kemi Bello", stage: "application", score: 100, score_provisional: true, weighted_total: 100, parts_scored: 1, parts_active: 5, cv_state: "checking" }),
+      expect.objectContaining({ number: "APP-0001", name: "Kemi Bello", stage: "application", score: 100, score_provisional: true, weighted_total: 100, parts_scored: 1, parts_active: 5, cv_state: "checking", next_stages: ["screening", "assessment", "interview", "shortlist"] }),
     ]);
     const id = board.body.data[0].application_id;
     const sheet = await h.as("ops").get(`/recruitment/candidates/${id}`);
@@ -276,6 +276,7 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
 
   test("Candidate Emails: five, each saved as the next version and checked against its variables; Restore Default keeps the history", async () => {
     const list = await h.as("ops").get("/recruitment/candidates/emails");
+    expect(list.body.data.every((e) => e.can_edit === true)).toBe(true);
     expect(list.body.data.map((e) => [e.key, e.version, e.is_default])).toEqual([
       ["application-received", 0, true],
       ["apply-invite", 0, true],

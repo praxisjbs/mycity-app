@@ -12,7 +12,7 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { useAuth } from "@/auth/AuthProvider";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
-import { useNewLink, useScreenAction, useUrlAction } from "@/shell/screen-action";
+import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
   Bars,
   Button,
@@ -53,7 +53,7 @@ const PAUSED_HELP = "Takes no applications. The link keeps working.";
 const SCORECARD_HELP = "Switch off a part this role skips. The parts left on add up to 100.";
 
 const closesOn = (v: Pick<Vacancy, "closes_at" | "past_closing">) =>
-  v.closes_at ? <span className={v.past_closing ? "text-err-ink font-semibold" : undefined}>{formatDate(v.closes_at.slice(0, 10))}</span> : "–";
+  v.closes_at ? <span className={v.past_closing ? "text-destructive font-semibold" : undefined}>{formatDate(v.closes_at.slice(0, 10))}</span> : "–";
 const statusOf = (v: Pick<Vacancy, "status">) => (v.status === "paused" ? <HelpTerm help={PAUSED_HELP}>{pill(VACANCY_STATUS.paused)}</HelpTerm> : pill(VACANCY_STATUS[v.status]));
 
 export function Vacancies() {
@@ -64,17 +64,15 @@ export function Vacancies() {
   const seats = usePaged("GET /api/v1/recruitment/vacancies/suggested");
   const { can } = useAuth();
   const mayCreate = can("recruitment", "create");
-  const mayEdit = can("recruitment", "edit");
 
   const newVacancy = (seat?: SeatSuggestion) =>
     modal.open({ title: "New Vacancy", wide: true, body: (close) => <VacancyForm close={close} seat={seat} onSaved={(v) => openVacancy(v.vacancy_id, v.title)} /> });
   const openVacancy = (id: string, title = "Vacancy") => modal.open({ title, wide: true, body: (close) => <VacancySheet id={id} close={close} /> });
-  const settings = () => modal.open({ title: "Careers Settings", wide: true, body: (close) => <CareersSettings close={close} mayEdit={mayEdit} /> });
-  const emails = () => modal.open({ title: "Candidate Emails", wide: true, body: (close) => <CandidateEmails close={close} mayEdit={mayEdit} /> });
+  const settings = () => modal.open({ title: "Careers Settings", wide: true, body: (close) => <CareersSettings close={close} /> });
+  const emails = () => modal.open({ title: "Candidate Emails", wide: true, body: (close) => <CandidateEmails close={close} /> });
 
   useScreenAction(mayCreate ? { label: "New Vacancy", onSelect: () => newVacancy() } : null);
   useNewLink(mayCreate ? () => newVacancy() : null);
-  useUrlAction("new", mayCreate ? () => newVacancy() : null);
 
   // A vacancy found with ⌘K (`?id=`), or a panel asked for (`?panel=`), opens once and leaves the address.
   const [params, setParams] = useSearchParams();
@@ -83,7 +81,9 @@ export function Vacancies() {
   const opened = useRef<string | null>(null);
   useEffect(() => {
     const ask = linked ? `id:${linked}` : panel ? `panel:${panel}` : null;
-    if (!ask || opened.current === ask) return;
+    // Cleared once handled, so the same record asked for again opens again.
+    if (!ask) return void (opened.current = null);
+    if (opened.current === ask) return;
     opened.current = ask;
     setParams({ id: null, panel: null }, { replace: true });
     if (linked) openVacancy(linked);
@@ -101,7 +101,7 @@ export function Vacancies() {
         sub={s ? `${s.open} open · ${s.applicants} applicants` : undefined}
         actions={
           <>
-            <Button icon="globe" onClick={() => window.open("https://go.mycityapp.io/jobs", "_blank", "noopener")}>Careers Page</Button>
+            <Button icon="globe" onClick={() => s && window.open(s.careers_url, "_blank", "noopener")}>Careers Page</Button>
             <Button icon="mail" onClick={emails}>Candidate Emails</Button>
             <Button icon="cog" onClick={settings}>Careers Settings</Button>
             {mayCreate && <Button variant="primary" icon="plus" onClick={() => newVacancy()}>New Vacancy</Button>}
@@ -254,7 +254,7 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
             ))}
           </ol>
         ) : (
-          <p className="text-sm text-text-3">One overall rating</p>
+          <p className="text-sm text-subtle-foreground">One overall rating</p>
         )}
         {asks.length > 0 && (
           <>
