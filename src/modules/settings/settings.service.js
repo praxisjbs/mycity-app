@@ -356,6 +356,14 @@ async function numberingList(query) {
   return { ...page, data: page.data.map((r) => schemeOut(r, period)) };
 }
 
+/** One document type's scheme as the list shows it, wherever it sits in the list; null for a type with no row. */
+async function numberingScheme(docType) {
+  if (!SCHEMES[docType]) return null;
+  const period = periodNow();
+  const row = await repo.findScheme(pool, docType, period);
+  return row ? schemeOut(row, period) : null;
+}
+
 /** GET /settings/numbering/summary */
 const numberingSummary = () => repo.numberingSummary(pool, [...DOC_TYPES]);
 
@@ -512,6 +520,7 @@ module.exports = {
   removeHoliday,
   DOC_LABELS,
   numberingList,
+  numberingScheme,
   numberingSummary,
   saveScheme,
   securityPolicy,
