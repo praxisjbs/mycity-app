@@ -13,7 +13,7 @@ import { saveFile } from "@/api/download";
 import { useAuth } from "@/auth/AuthProvider";
 import { PagedTable } from "@/features/shared/sections";
 import { useSearchParams } from "@/lib/router";
-import { useNewLink, useScreenAction, useUrlAction } from "@/shell/screen-action";
+import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
   Button,
   Card,
@@ -79,7 +79,6 @@ export function Interviews() {
   const schedule = () => modal.open({ title: "Schedule Interview", wide: true, body: (close) => <ScheduleForm close={close} onSaved={(x) => open(x.interview_id, x.candidate_name)} /> });
   useScreenAction(mayEdit ? { label: "Schedule Interview", onSelect: schedule } : null);
   useNewLink(mayEdit ? schedule : null);
-  useUrlAction("new", mayEdit ? schedule : null);
 
   const linked = params.get("id");
   const opened = useRef<string | null>(null);
@@ -167,7 +166,7 @@ export function InterviewSheet({ id, close }: { id: string; close: () => void })
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {roundState(x)}
         <Pill dot={false}>{x.round.title}</Pill>
-        <span className="text-sm text-text-3">{x.vacancy.title}</span>
+        <span className="text-sm text-subtle-foreground">{x.vacancy.title}</span>
       </div>
       <KeyValue
         items={[

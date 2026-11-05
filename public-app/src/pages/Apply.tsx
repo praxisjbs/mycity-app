@@ -247,7 +247,7 @@ function UploadCv({ token, onUploaded }: { token: string; onUploaded: (doc: Docu
       upload={upload}
       multiple={false}
       accept=".pdf,.doc,.docx"
-      kinds="PDF or Word, up to 10 MB"
+      kinds="PDF or Word"
       maxBytes={10 * 1024 * 1024}
       label="Choose Your CV"
       onUploaded={(docs) => docs[0] && onUploaded(docs[0] as DocumentRef)}

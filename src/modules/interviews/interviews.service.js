@@ -125,7 +125,8 @@ async function detailOf(db, row, user) {
         }
       : null,
     can_edit: edit && live,
-    can_close: edit && live,
+    // Close Round once the interview has started (consolidate.close refuses it before, NOT_STARTED).
+    can_close: edit && live && Date.parse(row.scheduled_start) <= Date.now(),
     can_report: closed && row.status !== "cancelled" && (edit || Boolean(user.employee_id && user.employee_id === row.hiring_manager_id)),
   };
 }
@@ -173,4 +174,5 @@ module.exports = {
   details: then(consolidate.details),
   tidy: (user, body) => notes.tidy(user, body),
   listed,
+  sees,
 };

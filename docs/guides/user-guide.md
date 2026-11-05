@@ -231,7 +231,8 @@ marks:
   (`both`, `desktop` or `phone`; both unless set), `do` (steps before the picture: `click`, `fill`,
   `press`, `wait`), `marks` (number: target `|` what it is), `crop` (`page`, `modal`, `viewport`
   or a selector), `prompt` (`keep`: a picture of a prompt that opens once per sign-in, taken in a
-  sign-in of its own), `sources` (extra code paths the picture depends on).
+  sign-in of its own), `site` (`public`: a public site page, taken signed out on the public app's demo
+  build, `open` its address such as `/jobs/<slug>`), `sources` (extra code paths the picture depends on).
 
 `needs` reads `"<module> <action>"`, a comma between several, `cap <code>` for a capability,
 `manager` for someone with people reporting to them, and `ceo`. Every key, action and capability is
@@ -267,7 +268,7 @@ role only groups it, its `needs` decide who receives it.
 ### 6.5 Pictures
 
 `npm run guide:shots` (`scripts/guide/shoot.js`) builds the hub's demo build, signs in as each
-shot's account, opens its address, runs its `do` steps, draws the numbered markers over the
+shot's account (a `site: public` shot: the public app's demo build, signed out), opens its address, runs its `do` steps, draws the numbered markers over the
 targets and saves `<shot>.desktop.png` (1440 × 900) and `<shot>.phone.png` (390 × 844). It writes
 `shots.json` beside them: the hash of the spec and the hash of the source the picture depends on (the
 screen's feature folder, plus `sources`). `-- --chapter people` retakes one chapter, `-- --shot
@@ -498,6 +499,7 @@ word limits do not count it, as they do not count an article.
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · (Ose) Pictures of the public site: a spec with `site: public` is taken signed out on the public app's demo build (`node_modules/.cache/mycity/demo-public`, `ensurePublicBuild`), its address a public one; it goes stale when its page file or the public shell changes. `public-site.md` has its eight.
 - 05/11/2026 · GE · (Ose) A bold name is also found in `public-app/src`, so the public site's chapter (`public-site.md`) is held to its own pages' words.
 - 26/10/2026 · JP · A picture enlarged on a phone is the phone's, as the text showed it, when the chapter has one (it was always the computer's).
 - 26/10/2026 · JP · Every chapter checked against its screens, string by string (a sweep of each

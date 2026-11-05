@@ -204,7 +204,8 @@ const stale = [];
 for (const { file, chapter } of chapters) {
   const shots = readShots(chapter.slug);
   for (const [id, spec] of Object.entries(chapter.shots)) {
-    const module = moduleOfOpen(spec.open);
+    // A public page (`site: public`) is the public site's own address, checked by its parser.
+    const module = spec.site === "public" ? null : moduleOfOpen(spec.open);
     if (module && !hasModule(module)) say(`${file}: picture ${id} opens ${spec.open}, which is not a module of the hub`);
     const missing = spec.devices.filter((d) => !fs.existsSync(path.join(IMG, chapter.slug, `${id}.${d}.png`)));
     if (missing.length) {

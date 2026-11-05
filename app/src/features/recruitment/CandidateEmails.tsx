@@ -10,10 +10,10 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { Button, DataView, ErrorState, Field, formatDateTime, FormError, FormFooter, LoadingRows, Pill, TextAreaField, TextField, toast, useConfirm, useContractForm, useModal } from "@mycity/ui";
 import { say, sayRefusal } from "./shared";
 
-export function CandidateEmails({ close, mayEdit }: { close: () => void; mayEdit: boolean }) {
+export function CandidateEmails({ close }: { close: () => void }) {
   const modal = useModal();
   const list = usePaged("GET /api/v1/recruitment/candidates/emails");
-  const open = (e: CandidateEmail) => modal.open({ title: e.name, wide: true, body: (done) => <EmailForm emailKey={e.key} close={done} mayEdit={mayEdit} /> });
+  const open = (e: CandidateEmail) => modal.open({ title: e.name, wide: true, body: (done) => <EmailForm emailKey={e.key} close={done} /> });
   return (
     <>
       <DataView<CandidateEmail>
@@ -36,14 +36,16 @@ export function CandidateEmails({ close, mayEdit }: { close: () => void; mayEdit
   );
 }
 
-function EmailForm({ emailKey, close, mayEdit }: { emailKey: CandidateEmail["key"]; close: () => void; mayEdit: boolean }) {
+function EmailForm({ emailKey, close }: { emailKey: CandidateEmail["key"]; close: () => void }) {
   const read = useApi("GET /api/v1/recruitment/candidates/emails/:key", { params: { key: emailKey } });
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!read.data) return <LoadingRows count={5} />;
-  return <EmailFields email={read.data} close={close} mayEdit={mayEdit} />;
+  return <EmailFields email={read.data} close={close} />;
 }
 
-function EmailFields({ email, close, mayEdit }: { email: CandidateEmail; close: () => void; mayEdit: boolean }) {
+function EmailFields({ email, close }: { email: CandidateEmail; close: () => void }) {
+  // An email goes to every candidate, so only a recruiter for every role words it; the server says who.
+  const mayEdit = email.can_edit;
   const f = useContractForm({ subject: email.subject, body: email.body }, candidateSchemas.CandidateEmailSave);
   const save = useMutation("PUT /api/v1/recruitment/candidates/emails/:key");
   const restore = useMutation("POST /api/v1/recruitment/candidates/emails/:key/restore");
@@ -87,7 +89,7 @@ function EmailFields({ email, close, mayEdit }: { email: CandidateEmail; close: 
           <Pill key={v} dot={false}>{`{{ ${v} }}`}</Pill>
         ))}
       </div>
-      <p className="text-xs text-text-3">{email.updated_at ? `Version ${email.version}, ${formatDateTime(email.updated_at)}` : "Default wording"}</p>
+      <p className="text-xs text-subtle-foreground">{email.updated_at ? `Version ${email.version}, ${formatDateTime(email.updated_at)}` : "Default wording"}</p>
       <FormError>{problem}</FormError>
       <FormFooter>
         <Button onClick={close}>{mayEdit ? "Cancel" : "Close"}</Button>

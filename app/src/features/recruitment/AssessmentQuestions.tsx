@@ -33,7 +33,7 @@ const fromDetail = (a: AssessmentDetail): Question[] =>
 const bodyOf = (qs: Question[]) => ({
   questions: qs.map((q) =>
     q.question_type === "choice"
-      ? { question_type: q.question_type, prompt: q.prompt, options: q.options.map((o) => ({ text: o.text, points: Number(o.points || 0) })) }
+      ? { question_type: q.question_type, prompt: q.prompt, options: q.options.map((o) => ({ text: o.text, points: o.points.trim() === "" ? undefined : Number(o.points) })) }
       : { question_type: q.question_type, prompt: q.prompt, ...(q.max_score ? { max_score: Number(q.max_score) } : {}) },
   ),
 });
@@ -48,7 +48,8 @@ export function AssessmentQuestions({ assessment, close, onSaved }: { assessment
   const place = (issues: Issue[]) => {
     const out: Record<string, string> = {};
     for (const i of issues) {
-      const key = i.path[0] === "questions" && i.path.length > 1 ? `${String(i.path[1])}.${String(i.path[2] ?? "prompt")}` : "all";
+      // `questions.<i>.<field>`, or `questions.<i>.options.<j>.<text|points>` for one option.
+      const key = i.path[0] === "questions" && i.path.length > 1 ? i.path.slice(1).map(String).join(".") || "all" : "all";
       out[key] ??= i.message;
     }
     return out;
@@ -123,15 +124,16 @@ export function AssessmentQuestions({ assessment, close, onSaved }: { assessment
             <>
               {q.options.map((o, j) => (
                 <div key={j} className="mb-2 flex items-end gap-2">
-                  <Field label={`Option ${j + 1}`} className="min-w-0 flex-1" {...mark(`${i}.options`)}>
+                  <Field label={`Option ${j + 1}`} className="min-w-0 flex-1" {...mark(`${i}.options.${j}.text`)}>
                     <TextField value={o.text} onChange={(text) => editOption(i, j, { text })} maxLength={300} />
                   </Field>
-                  <Field label={<HelpTerm help="What each option scores.">Points</HelpTerm>} className="w-24">
+                  <Field label={<HelpTerm help="What each option scores.">Points</HelpTerm>} className="w-24" {...mark(`${i}.options.${j}.points`)}>
                     <NumberField decimal value={o.points} onChange={(points: string) => editOption(i, j, { points })} />
                   </Field>
                   <Button size="sm" variant="ghost" icon="x" onClick={() => edit(i, { options: q.options.filter((_, k) => k !== j) })}>Remove</Button>
                 </div>
               ))}
+              {errors[`${i}.options`] && <p className="text-destructive mb-2 text-sm font-semibold">{errors[`${i}.options`]}</p>}
               {q.options.length < 8 && <Button size="sm" icon="plus" onClick={() => edit(i, { options: [...q.options, { text: "", points: "0" }] })}>Add Option</Button>}
             </>
           )}

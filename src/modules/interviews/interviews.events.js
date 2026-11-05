@@ -22,6 +22,8 @@ const { defineNotification } = require("../../shared/notifications/fanout");
 const { defineVariables } = require("../../shared/templates/variables");
 const { defineDocType } = require("../../shared/documents/generate");
 const outbox = require("../../shared/events/outbox");
+const vault = require("../../shared/documents/vault");
+const { scopeFor } = require("../../middleware/rbac");
 
 const EVENTS = defineEvents("recruitment", {
   "interview.scheduled": { summary: "An interview was scheduled" },
@@ -36,6 +38,19 @@ const EVENTS = defineEvents("recruitment", {
 
 /** The Interview Assessment Form (guide §6.6). */
 const FORM_DOC_TYPE = "interview_assessment_form";
+
+/**
+ * Who opens an interview's file (its Interview Assessment Form): whoever may read the interview
+ * itself, the panel and the role's hiring manager included, as the sheet's own read decides
+ * (interviews.service `sees`), and the CEO. Without this rule only a reader of every vacancy could.
+ */
+vault.defineAccess("interview", async (client, user, doc) => {
+  if (user.is_ceo === true) return true;
+  const row = await require("./interviews.repo").get(client, doc.entity_id, user.employee_id || null);
+  if (!row) return false;
+  const scope = await scopeFor(user, "recruitment", "view");
+  return Boolean(scope) && require("./interviews.service").sees(scope, row);
+});
 defineDocType(FORM_DOC_TYPE, {
   label: "Interview Assessment Form",
   module: "recruitment",

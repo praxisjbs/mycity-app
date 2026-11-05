@@ -7,7 +7,7 @@
  * decision, comments and private notes, and Submit Card, which locks it. Nobody else reads it until
  * the round closes; private notes stay the author's always.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { InterviewDecision, InterviewDetail } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
@@ -20,11 +20,16 @@ const PRIVATE_HELP = "Only you ever see these.";
 export function MyCard({ interview, close, onChanged }: { interview: InterviewDetail; close: () => void; onChanged: (x: InterviewDetail) => void }) {
   const mine = interview.my_feedback;
   const submitted = Boolean(mine?.submitted_at);
-  const saved = Object.fromEntries((mine?.ratings ?? []).map((r) => [r.vacancy_question_id, r.rating as number | null]));
+  // What the server last kept, by trait (and the overall rating and decision): where a failed save puts a star back.
+  const kept = useRef({
+    ratings: Object.fromEntries((mine?.ratings ?? []).map((r) => [r.vacancy_question_id, r.rating as number | null])) as Record<string, number | null>,
+    overall: mine?.overall_rating ?? null,
+    decision: (mine?.decision ?? "") as InterviewDecision | "",
+  });
   // Optimistic, by trait: a star that waits for the round trip before it fills reads as a missed tap.
-  const [local, setLocal] = useState<Record<string, number | null>>({});
-  const [overall, setOverall] = useState<number | null>(mine?.overall_rating ?? null);
-  const [decision, setDecision] = useState<InterviewDecision | "">(mine?.decision ?? "");
+  const [local, setLocal] = useState<Record<string, number | null>>(kept.current.ratings);
+  const [overall, setOverall] = useState<number | null>(kept.current.overall);
+  const [decision, setDecision] = useState<InterviewDecision | "">(kept.current.decision);
   const [comments, setComments] = useState(mine?.comments ?? "");
   const [notes, setNotes] = useState(mine?.private_notes ?? "");
   const [problem, setProblem] = useState<string | null>(null);
@@ -36,48 +41,66 @@ export function MyCard({ interview, close, onChanged }: { interview: InterviewDe
   const confirm = useConfirm();
   const id = interview.interview_id;
   const traits = interview.questions;
-  const ratingOf = (q: string) => (q in local ? local[q] : (saved[q] ?? null));
+  const ratingOf = (q: string) => local[q] ?? null;
   const rated = traits.map((t) => ratingOf(t.vacancy_question_id)).filter((n): n is number => n !== null);
   const myScore = traits.length ? (rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : null) : overall;
+  const unmark = (...keys: string[]) => setMarks((m) => (keys.some((k) => m[k]) ? Object.fromEntries(Object.entries(m).filter(([k]) => !keys.includes(k))) : m));
 
-  const put = (body: NonNullable<NonNullable<Parameters<typeof save.run>[0]>["body"]>) => save.run({ params: { id }, body });
+  // One save at a time, in the order tapped: a later star never lands before an earlier one.
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
+  const inOrder = <T,>(work: () => Promise<T>) => {
+    const next = chain.current.then(work, work);
+    chain.current = next.catch(() => undefined);
+    return next;
+  };
+  /** Saves `body` in turn and keeps what the server answered as the card's last kept state. */
+  const put = (body: NonNullable<NonNullable<Parameters<typeof save.run>[0]>["body"]>) =>
+    inOrder(async () => {
+      const after = await save.run({ params: { id }, body });
+      const f = after.my_feedback;
+      if (f) kept.current = { ratings: Object.fromEntries(f.ratings.map((r) => [r.vacancy_question_id, r.rating])), overall: f.overall_rating, decision: f.decision ?? "" };
+      onChanged(after);
+      return after;
+    });
 
-  /** One trait, saved as it is tapped; put back where it was when the save fails. */
+  /** One trait, saved as it is tapped; put back to what was last kept when the save fails. */
   const rate = async (q: string, rating: number | null) => {
     setLocal((s) => ({ ...s, [q]: rating }));
     setProblem(null);
+    unmark("ratings");
     try {
-      onChanged(await put({ ratings: [{ vacancy_question_id: q, rating }] }));
+      await put({ ratings: [{ vacancy_question_id: q, rating }] });
     } catch (e) {
-      setLocal((s) => ({ ...s, [q]: saved[q] ?? null }));
+      setLocal((s) => ({ ...s, [q]: kept.current.ratings[q] ?? null }));
       setProblem(e instanceof ApiError ? e.message : "That rating was not saved");
     }
   };
   const rateOverall = async (rating: number | null) => {
-    const before = overall;
     setOverall(rating);
     setProblem(null);
+    unmark("overall_rating");
     try {
-      onChanged(await put({ overall_rating: rating }));
+      await put({ overall_rating: rating });
     } catch (e) {
-      setOverall(before);
+      setOverall(kept.current.overall);
       setProblem(e instanceof ApiError ? e.message : "That rating was not saved");
     }
   };
   const decide = async (d: InterviewDecision) => {
-    const before = decision;
     setDecision(d);
+    unmark("decision");
     try {
-      onChanged(await put({ decision: d }));
+      await put({ decision: d });
     } catch (e) {
-      setDecision(before);
+      setDecision(kept.current.decision);
       say(e);
     }
   };
   const saveText = async () => {
     setProblem(null);
+    unmark("comments", "private_notes");
     try {
-      onChanged(await put({ comments, private_notes: notes }));
+      await put({ comments, private_notes: notes });
       return true;
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) setMarks(Object.fromEntries(Object.entries(e.fields).map(([k, m]) => [k, m[0] ?? ""])));
@@ -88,8 +111,22 @@ export function MyCard({ interview, close, onChanged }: { interview: InterviewDe
   const saveDraft = async () => {
     if (await saveText()) toast("Card saved");
   };
+  /** What Submit would be refused for, said before asking to confirm (the server checks it again). */
+  const unfinished = () => {
+    const out: Record<string, string> = {};
+    if (!decision) out.decision = "Give your decision";
+    const missing = traits.filter((t) => ratingOf(t.vacancy_question_id) === null).length;
+    if (traits.length && missing) out.ratings = `Rate ${missing === 1 ? "the last trait" : `${missing} more traits`}`;
+    if (!traits.length && !overall) out.overall_rating = "Give a rating";
+    return out;
+  };
   const submit = async () => {
     if (!(await saveText())) return;
+    const left = unfinished();
+    if (Object.keys(left).length) {
+      setMarks(left);
+      return setProblem("Finish your card first");
+    }
     const yes = await confirm({ title: "Submit Card", body: "Your card locks once it is submitted.", confirmLabel: "Submit Card" });
     if (!yes) return;
     try {
@@ -150,9 +187,9 @@ export function MyCard({ interview, close, onChanged }: { interview: InterviewDe
       )}
       <p className="my-3 text-sm" aria-live="polite">
         Your score <b className="tabular-nums">{myScore === null ? "–" : myScore.toFixed(1)}</b>
-        {traits.length > 0 && <span className="text-text-3">{` · ${rated.length} of ${traits.length} rated`}</span>}
+        {traits.length > 0 && <span className="text-subtle-foreground">{` · ${rated.length} of ${traits.length} rated`}</span>}
       </p>
-      {marks.ratings && <p className="text-err-ink mb-2 text-sm font-semibold">{marks.ratings}</p>}
+      {marks.ratings && <p className="text-destructive mb-2 text-sm font-semibold">{marks.ratings}</p>}
       <Field label="Decision" {...mark("decision")}>
         <ChoiceField options={DECISIONS} value={decision as InterviewDecision} onChange={decide} disabled={submitted ? DECISIONS.map(([d]) => d) : undefined} />
       </Field>

@@ -8,7 +8,7 @@
  *   publish(), pause(), resume(), close()   the lifecycle (vacancies.lifecycle.js), each a row of
  *                   entity_state_history; the slug is made at the first publish and never changes
  *   saveQuestions(), saveScorecard()        the Apply questions and traits, the parts on or off
- *   settings(), saveSettings()              Careers Settings: About MyCityApp and the Default Traits
+ *   settings(user), saveSettings()          Careers Settings: About MyCityApp and the Default Traits, with can_edit
  *
  * The careers page is vacancies.careers.js, which never loads staff auth (public-surface gate).
  *
@@ -103,7 +103,8 @@ async function list(query, scope) {
   return { ...page, data: page.data.map((r) => listed(r, now)) };
 }
 
-const summary = (scope) => repo.summary(pool, scope);
+/** The figures above Vacancies, and the careers page on this environment (Careers Page). */
+const summary = async (scope) => ({ ...(await repo.summary(pool, scope)), careers_url: `${String(config.PUBLIC_ORIGIN).replace(/\/+$/, "")}/jobs` });
 const suggested = (query, scope) => repo.suggested(pool, query, scope);
 
 /** The row behind a vacancy the reader may see, or 404. */
@@ -388,7 +389,14 @@ async function keepScreeningConditions(client, scope, id, conditions) {
  * Careers Settings
  * ------------------------------------------------------------------ */
 
-const settings = () => repo.settings(pool);
+/** Whether `user` may save what goes to every role (Careers Settings, Candidate Emails): recruitment edit over every vacancy. */
+async function wordsEveryRole(user) {
+  const s = user ? await scopeFor(user, "recruitment", "edit") : null;
+  return Boolean(s && s.scope === "all");
+}
+
+/** Careers Settings, with whether the reader may save them (so the screen offers Save only then). */
+const settings = async (user) => ({ ...(await repo.settings(pool)), can_edit: await wordsEveryRole(user) });
 
 /**
  * Careers Settings shape every vacancy, so only a recruiter whose edit grant reaches every vacancy
@@ -406,7 +414,7 @@ async function saveSettings(actor, scope, body) {
       actor,
       payload: { fields: Object.keys(body) },
     });
-    return repo.settings(client);
+    return { ...(await repo.settings(client)), can_edit: true };
   });
 }
 
@@ -462,6 +470,7 @@ async function cardVacancy(db, id, scope) {
 module.exports = {
   list,
   summary,
+  wordsEveryRole,
   suggested,
   get,
   create,

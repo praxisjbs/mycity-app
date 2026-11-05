@@ -68,6 +68,7 @@ const Candidate = z
     parts_scored: z.number().int().min(0).max(5),
     parts_active: z.number().int().min(1).max(5),
     cv_state: CvState,
+    next_stages: z.array(M4Stage).max(5),
   })
   .strict();
 
@@ -246,6 +247,7 @@ const CandidateEmail = z
     is_default: z.boolean(),
     variables: z.array(z.string()).max(20),
     updated_at: isoDateTime.nullable(),
+    can_edit: z.boolean(),
   })
   .strict();
 
@@ -365,6 +367,7 @@ const TABLES = {
       parts_scored: "how many of the parts switched on have a score",
       parts_active: "how many of the vacancy's five parts are switched on",
       cv_state: "from the CV document's scan_status",
+      next_stages: "the stages it may move to now on its role's board (guide §6.3)",
     },
   },
   CandidatePage: { table: null, reason: "a page of applications" },
@@ -424,6 +427,7 @@ const TABLES = {
       is_default: "version 0, the shipped file",
       variables: "the names the email may use, from its declared variables",
       updated_at: "template_version.created_at of the current version",
+      can_edit: "the reader may word it: recruitment edit over every vacancy",
     },
   },
   CandidateEmailPage: { table: null, reason: "the five candidate emails" },

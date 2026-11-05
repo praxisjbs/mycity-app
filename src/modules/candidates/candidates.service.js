@@ -81,7 +81,18 @@ function card(row, now = new Date()) {
     parts_scored: Math.min(5, Number(row.parts_scored) || 0),
     parts_active: Math.min(5, Math.max(1, Number(row.parts_active) || 1)),
     cv_state: cvState(row.cv_scan),
+    next_stages: nextOf(row),
   };
+}
+
+/**
+ * Where a card may move now (pipeline.nextStages on its role's own board): none for one not in
+ * progress, past M4's stages, or on a closed role. The sheet narrows it to readers who may edit.
+ */
+function nextOf(row) {
+  if (row.status !== "active" || row.vacancy_status === "closed" || !lifecycle.M4_STAGES.includes(row.stage)) return [];
+  const board = lifecycle.boardStages((row.active_parts || []).map((code) => ({ code, active: true })));
+  return pipeline.nextStages(row.stage, board);
 }
 
 const num = (v) => (v === null || v === undefined ? null : Number(v));
@@ -431,13 +442,14 @@ async function emailRow(db, key) {
 }
 
 /** The five, with their current wording: one page, as there are five. */
-async function emails() {
+async function emails(user) {
+  const may = await require("../vacancies/vacancies.service").wordsEveryRole(user);
   const data = [];
-  for (const key of emailsOf.KEYS) data.push(await emailRow(pool, key));
+  for (const key of emailsOf.KEYS) data.push({ ...(await emailRow(pool, key)), can_edit: may });
   return envelope(data, 1, data.length);
 }
 
-const email = (key) => emailRow(pool, key);
+const email = async (key, user) => ({ ...(await emailRow(pool, key)), can_edit: await require("../vacancies/vacancies.service").wordsEveryRole(user) });
 
 /** A candidate email goes to every candidate, so only a recruiter for every vacancy (scope all) words it. */
 function assertAllScope(scope) {
@@ -454,7 +466,7 @@ async function saveEmail(actor, scope, key, body) {
       actor,
       payload: { key, restored: false },
     });
-    return emailRow(client, key);
+    return { ...(await emailRow(client, key)), can_edit: true };
   });
 }
 
@@ -470,7 +482,7 @@ async function restoreEmail(actor, scope, key) {
       actor,
       payload: { key, restored: true },
     });
-    return emailRow(client, key);
+    return { ...(await emailRow(client, key)), can_edit: true };
   });
 }
 

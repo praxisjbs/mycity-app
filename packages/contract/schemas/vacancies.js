@@ -213,6 +213,7 @@ const VacanciesSummary = z
     in_interview: z.number().int().min(0),
     past_closing: z.number().int().min(0),
     funnel: z.array(StageCount).max(10),
+    careers_url: z.string(),
   })
   .strict();
 
@@ -430,6 +431,7 @@ const CareersSettings = z
     about_company: z.string().nullable(),
     default_traits: z.array(z.string()).max(20),
     updated_at: isoDateTime.nullable(),
+    can_edit: z.boolean(),
   })
   .strict();
 

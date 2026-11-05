@@ -64,6 +64,7 @@ const ROWS = `
          sit.psychometric, sit.technical, sit.case_study, iv.interview,
          wt.weighted_total, COALESCE(wt.parts_scored, 0) AS parts_scored,
          (SELECT count(*)::int FROM recruitment_scorecard_criterion c WHERE c.vacancy_id = a.vacancy_id AND c.active) AS parts_active,
+         ARRAY(SELECT c.code::text FROM recruitment_scorecard_criterion c WHERE c.vacancy_id = a.vacancy_id AND c.active) AS active_parts,
          search_fold(a.number || ' ' || k.first_name || ' ' || k.last_name || ' ' || k.email || ' ' || v.title) AS haystack
     FROM application a
     JOIN candidate k ON k.candidate_id = a.candidate_id
@@ -74,7 +75,8 @@ const ROWS = `
 /** The keys of Candidate (the board); the service adds days_at_stage and shapes the rest. */
 const LIST_OUT = `x.application_id, x.number, x.candidate_id, x.vacancy_id, x.vacancy_number, x.vacancy_title,
   x.name, x.email, x.stage, x.status, x.source, x.applied_at, x.current_stage_entered_at, x.score,
-  x.screening_score, x.provisional_score, x.weighted_total, x.parts_scored, x.parts_active, x.cv_scan`;
+  x.screening_score, x.provisional_score, x.weighted_total, x.parts_scored, x.parts_active, x.cv_scan,
+  x.vacancy_status, x.active_parts`;
 
 /** Oldest first unless asked; the board ranks with `sort=-weighted_total`. */
 const SORTS = {

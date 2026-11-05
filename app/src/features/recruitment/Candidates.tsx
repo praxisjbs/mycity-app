@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import candidateSchemas from "@mycity/contract/schemas/candidates.js";
 import type { ApplicationStage, CandidatesCandidate, CandidatesCandidateListQuery } from "@mycity/contract/contract.gen.ts";
+import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -102,7 +103,9 @@ export function Candidates() {
   const opened = useRef<string | null>(null);
   useEffect(() => {
     const ask = linked ? `id:${linked}` : asked === "1" && mayCreate ? "invite" : null;
-    if (!ask || opened.current === ask) return;
+    // Cleared once handled, so the same record asked for again opens again.
+    if (!ask) return void (opened.current = null);
+    if (opened.current === ask) return;
     opened.current = ask;
     setParams({ id: null, invite: null, vacancy: null }, { replace: true });
     if (linked) open(linked);
@@ -170,12 +173,14 @@ export function Candidates() {
             onMore: cols[stage as keyof typeof cols].page?.has_next ? cols[stage as keyof typeof cols].more : undefined,
             cards: cols[stage as keyof typeof cols].rows.map((c: CandidatesCandidate) => ({
               key: c.application_id,
+              // Only the moves the server allows: ahead, or one back, on the role's own board.
+              moves: c.next_stages,
               title: c.name,
               meta: (
                 <>
                   {!vacancy && <Pill dot={false}>{c.vacancy.title}</Pill>}
                   <ScoreText score={c.score} provisional={c.score_provisional} />
-                  <span className="text-xs text-text-3">{daysAt(c.days_at_stage)}</span>
+                  <span className="text-xs text-subtle-foreground">{daysAt(c.days_at_stage)}</span>
                 </>
               ),
             })),
@@ -247,18 +252,25 @@ function ScreenForm({ close, vacancyId }: { close: () => void; vacancyId: string
   const [conditions, setConditions] = useState<string[] | null>(null);
   const shown = conditions ?? (role.data?.screening_conditions.length ? role.data.screening_conditions : [""]);
   const [problem, setProblem] = useState<string | null>(null);
+  const [marks, setMarks] = useState<Record<number, string>>({});
   const run = useMutation("POST /api/v1/recruitment/candidates/score-all");
   const submit = async () => {
     setProblem(null);
+    setMarks({});
     if (!vacancy) return setProblem("Pick the role");
-    const kept = shown.map((c) => c.trim()).filter(Boolean);
+    // The rows sent, each with the row it came from, so a refusal lands on that row.
+    const rows = shown.map((c, i) => [c.trim(), i] as const).filter(([c]) => c);
+    const kept = rows.map(([c]) => c);
     try {
       const done = await run.run({ body: { vacancy_id: vacancy, ...(kept.length ? { screening_conditions: kept } : {}) } });
       invalidate("/api/v1/recruitment/candidates");
       close();
       toast(done.queued ? `${done.queued} applications being read` : "None waiting to be read");
     } catch (e) {
-      say(e);
+      // A refused condition is marked on its own field (screening_conditions.<n>).
+      const fields = e instanceof ApiError ? Object.entries(e.fields).filter(([k]) => k.startsWith("screening_conditions.")) : [];
+      if (fields.length) setMarks(Object.fromEntries(fields.map(([k, m]) => [rows[Number(k.split(".")[1])]?.[1] ?? 0, m[0] ?? ""])));
+      else say(e);
     }
   };
   return (
@@ -270,7 +282,7 @@ function ScreenForm({ close, vacancyId }: { close: () => void; vacancyId: string
         <LoadingRows count={2} />
       ) : (
         shown.map((c, i) => (
-          <Field key={i} label={`Must Meet ${i + 1}`} optional={i > 0}>
+          <Field key={i} label={`Must Meet ${i + 1}`} optional={i > 0} {...(marks[i] ? { state: "bad" as const, message: marks[i] } : {})}>
             <TextField value={c} onChange={(v) => setConditions(shown.map((x, k) => (k === i ? v : x)))} placeholder="Lives in Lagos" maxLength={200} />
           </Field>
         ))

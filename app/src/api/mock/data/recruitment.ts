@@ -39,7 +39,7 @@ export const TRAITS = [
   "Future Growth Potential in Career",
 ];
 
-export const SETTINGS: CareersSettings = {
+export const SETTINGS: Omit<CareersSettings, "can_edit"> = {
   about_company:
     "MyCityApp helps people discover and enjoy their city: places to eat, events to attend and things to do, with the businesses behind them. We are a growing team in Lagos building for cities across Nigeria.",
   default_traits: TRAITS,
@@ -904,7 +904,7 @@ export const POOL: PoolEntry[] = [
  * Candidate Emails (as the shipped Markdown defaults read)
  * ------------------------------------------------------------------ */
 
-export const EMAILS: CandidateEmail[] = [
+export const EMAILS: Array<Omit<CandidateEmail, "can_edit">> = [
   ["application-received", "Application Received", "We have your application for {{ vacancy_title }}", "Hello {{ recipient.first_name }},\n\nThank you for applying for {{ vacancy_title }} at MyCity App. Your reference is {{ reference }}.\n\nWe read every application and will be in touch.", ["vacancy_title", "reference"]],
   ["apply-invite", "Invitation to Apply", "Apply for {{ vacancy_title }} at MyCity App", "Hello {{ recipient.first_name }},\n\nWe would like you to apply for {{ vacancy_title }}.\n\n[Apply Now]({{ apply_url }})\n\nThe link works once, until {{ expires_at }}.", ["vacancy_title", "apply_url", "expires_at"]],
   ["assessment-invite", "Assessment Invitation", "Your assessment for {{ vacancy_title }}", "Hello {{ recipient.first_name }},\n\nThe next step for {{ vacancy_title }} is {{ assessment_name }}. Start it by {{ start_by }}.\n\n[Open the Assessment]({{ assess_url }})", ["vacancy_title", "assessment_name", "duration_minutes", "due_days", "start_by", "assess_url"]],

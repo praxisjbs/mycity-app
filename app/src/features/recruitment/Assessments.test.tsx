@@ -71,4 +71,13 @@ describe("Recruitment · Assessments", () => {
     expect(sitting.status).toBe("scored");
     expect(sitting.score).toBe(84);
   }, 60000);
+
+  it("a sitting's own link (?sitting=) opens it, and one not yet started can be cancelled", async () => {
+    await openAs("cynthia@mycityapp.io", `/recruitment?tab=assessments&sitting=${sid("sit:design:segun")}`);
+    const sheet = dialog();
+    expect(within(sheet).getByText(/Graphics and Motion Design Brief/)).toBeTruthy();
+    expect(within(sheet).queryByLabelText("Mark")).toBeNull();
+    await press(sheet, "Cancel Sitting");
+    expect(SITTINGS.find((s) => s.application_assessment_id === sid("sit:design:segun"))!.status).toBe("cancelled");
+  }, 60000);
 });

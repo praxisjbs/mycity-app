@@ -108,6 +108,9 @@ describeDb("Recruitment · Talent Pool against the real migrations", () => {
     expect(figures.body).toEqual({ in_pool: 1, invited_back: 0, hired_from_pool: 0, average_score: 64 });
     // Scope is the hiring manager of the role applied for.
     expect((await h.as("hod").get("/recruitment/pool")).body.page.total).toBe(0);
+    // One entry by its id (a ⌘K link past the first page), within the same scope.
+    expect((await h.as("ops").get(`/recruitment/pool/${entryId}`)).body).toMatchObject({ talent_pool_entry_id: entryId, name: "Funke Adebayo" });
+    expect((await h.as("hod").get(`/recruitment/pool/${entryId}`)).status).toBe(404);
     expect((await h.as("hod").post(`/recruitment/pool/${entryId}/invite`).send({ vacancy_id: second.vacancy_id })).status).toBe(404);
     // Two adds at once for one person: one entry, renewed, never a 500.
     const both = await Promise.all([

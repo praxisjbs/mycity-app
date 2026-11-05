@@ -1,0 +1,66 @@
+{
+  "public-apply": {
+    "spec": "b6f0b9175d8ca747",
+    "source": "da6aa693b5c13ea3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-apply-questions": {
+    "spec": "0c5521efda000ca1",
+    "source": "da6aa693b5c13ea3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-assessment-file": {
+    "spec": "b71d852a0f0e5354",
+    "source": "2cbd3cadb55cf375",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-assessment-question": {
+    "spec": "6f3bf9ed480627c7",
+    "source": "2cbd3cadb55cf375",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-assessment-start": {
+    "spec": "7f13a051832c0a7f",
+    "source": "2cbd3cadb55cf375",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-assessment-submit": {
+    "spec": "56aa16facc35faec",
+    "source": "2cbd3cadb55cf375",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-careers": {
+    "spec": "de839e2f56e1b8d0",
+    "source": "260c87527fc66c35",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-vacancy": {
+    "spec": "980d58e8600ef561",
+    "source": "39666c9f864ed351",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

@@ -272,9 +272,7 @@ function Sitting({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
       <ProgressBar className="mt-4" label={`${answered} of ${total} Answered`} value={answered} max={total} showValue={false} tone="ok" />
 
       <section key={qid} aria-labelledby={`prompt-${qid}`} className="mt-6 animate-rise border-t border-border pt-5">
-        <p id={`prompt-${qid}`} className="text-lg leading-normal font-strong whitespace-pre-line text-foreground" data-copy="content">
-          {q.prompt}
-        </p>
+        <Prompt id={`prompt-${qid}`} text={q.prompt} />
         <div className="mt-4">
           {q.question_type === "choice" ? (
             <ChoiceAnswer q={q} value={answers[qid] ?? ""} onChange={(v) => change(v, true)} />
@@ -336,6 +334,21 @@ function Sitting({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
         onCancel={() => setConfirm(false)}
       />
     </Page>
+  );
+}
+
+/**
+ * A question as its author wrote it: the first line is the question, read in bold; a brief's
+ * further lines (what to make, how to send it) follow as body text, so a long one is not a wall of bold.
+ */
+function Prompt({ id, text }: { id: string; text: string }) {
+  const [first = "", ...rest] = text.split("\n");
+  const more = rest.join("\n").trim();
+  return (
+    <div id={id} data-copy="content">
+      <p className="text-lg leading-normal font-strong text-foreground">{first}</p>
+      {more && <p className="mt-2 text-md leading-relaxed whitespace-pre-line text-muted-foreground">{more}</p>}
+    </div>
   );
 }
 
@@ -427,7 +440,7 @@ function FileAnswer({
             upload={upload}
             multiple={false}
             accept={ANSWER_FILES}
-            kinds="PDF, Office, image or video, up to 25 MB"
+            kinds="PDF, Office, image or video"
             label={fileName ? "Replace the File" : "Upload a File"}
             handOff
             onUploaded={(docs) => docs[0] && onFile(docs[0].file_name)}

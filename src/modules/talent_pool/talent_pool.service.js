@@ -77,6 +77,14 @@ async function summary(scope) {
   return { in_pool: r.in_pool, invited_back: r.invited_back, hired_from_pool: r.hired_from_pool, average_score: num(r.average_score) };
 }
 
+/** One live entry of the reader's scope (a ⌘K link to a person past the list's first page), or 404. */
+async function get(id, scope) {
+  const row = await repo.get(pool, id);
+  if (!row) throw notFound();
+  assertInScope(scope, row.hiring_manager_id);
+  return entry(row);
+}
+
 /** A live entry of the reader's scope, locked, or 404. */
 async function visible(client, id, scope) {
   const row = await repo.get(client, id, { lock: true });
@@ -192,4 +200,4 @@ async function gather(filters, scope) {
   return { rows: rows.slice(0, EXPORT_CEILING), total: page.page.total, capped: page.page.total > EXPORT_CEILING };
 }
 
-module.exports = { list, summary, add, invite, remove, requestExport, gather, entry };
+module.exports = { list, summary, get, add, invite, remove, requestExport, gather, entry };

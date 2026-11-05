@@ -72,11 +72,14 @@ describe("Recruitment · Interviews", () => {
     await settled();
     expect(within(dialog()).getByText(/2 of 10 rated/)).toBeTruthy();
 
-    // Submit with traits left to rate is refused and says how many.
+    // Submit with traits left to rate says how many, before asking anyone to confirm.
     await press(dialog(), "Submit Card");
-    const ask = screen.queryByRole("alertdialog") ?? null;
-    if (ask) await press(ask, "Submit Card");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(within(dialog()).getByText(/Rate 8 more traits/)).toBeTruthy();
+    // Rating one more takes that line back, until Submit is pressed again.
+    fireEvent.click(star(dialog(), /Accuracy in Language/, 7));
+    await settled();
+    expect(within(dialog()).queryByText(/Rate 8 more traits/)).toBeNull();
   }, 90000);
 
   it("a closed round shows each trait's average, the total and the report", async () => {

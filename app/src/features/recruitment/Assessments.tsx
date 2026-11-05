@@ -16,7 +16,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { useSearchParams } from "@/lib/router";
-import { useNewLink, useScreenAction, useUrlAction } from "@/shell/screen-action";
+import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
   Button,
   Card,
@@ -60,22 +60,37 @@ export function Assessments() {
   const library = usePaged("GET /api/v1/recruitment/assessments");
   const sittings = usePaged("GET /api/v1/recruitment/assessments/sittings", { filters: marking ? { marking: "true" } : {} });
   const openAssessment = (id: string, title = "Assessment") => modal.open({ title, wide: true, body: (close) => <AssessmentSheet id={id} close={close} /> });
-  const openSitting = (s: Sitting) => modal.open({ title: s.candidate_name, wide: true, body: (close) => <SittingSheet id={s.application_assessment_id} close={close} /> });
+  const openSittingId = (id: string, title = "Sitting") => modal.open({ title, wide: true, body: (close) => <SittingSheet id={id} close={close} /> });
+  const openSitting = (s: Sitting) => openSittingId(s.application_assessment_id, s.candidate_name);
   const create = () => modal.open({ title: "New Assessment", body: (close) => <AssessmentForm close={close} onSaved={(a) => openAssessment(a.assessment_definition_id, a.name)} /> });
+  // useScreenAction also answers `?action=new`.
   useScreenAction(mayCreate ? { label: "New Assessment", onSelect: create } : null);
   useNewLink(mayCreate ? create : null);
-  useUrlAction("new", mayCreate ? create : null);
 
+  // `?marking=true` (⌘K, the assistant) shows the sittings waiting to be marked, also when already here.
+  const askedMarking = params.get("marking") === "true";
+  useEffect(() => {
+    if (!askedMarking) return;
+    setView("sittings");
+    setMarking(true);
+    setParams({ marking: null }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askedMarking]);
+
+  // An assessment (`?id=`) or a sitting (`?sitting=`, the route map's link for one) opens once and leaves the address.
   const linked = params.get("id");
+  const sittingLinked = params.get("sitting");
   const opened = useRef<string | null>(null);
   useEffect(() => {
-    if (params.get("marking")) setParams({ marking: null }, { replace: true });
-    if (!linked || opened.current === linked) return;
-    opened.current = linked;
-    setParams({ id: null }, { replace: true });
-    openAssessment(linked);
+    const ask = linked ? `id:${linked}` : sittingLinked ? `sitting:${sittingLinked}` : null;
+    if (!ask) return void (opened.current = null);
+    if (opened.current === ask) return;
+    opened.current = ask;
+    setParams({ id: null, sitting: null }, { replace: true });
+    if (linked) openAssessment(linked);
+    else openSittingId(sittingLinked!);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linked]);
+  }, [linked, sittingLinked]);
 
   const s = summary.data;
   const counted = (n: number | null | undefined) => (n === undefined || n === null ? "–" : String(Math.round(n)));
@@ -139,7 +154,9 @@ export function Assessments() {
 /** An assessment: its settings, its questions with their points, and what the library does with it. */
 function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
   const modal = useModal();
-  const mayEdit = useAuth().can("recruitment", "edit");
+  const { can } = useAuth();
+  const mayEdit = can("recruitment", "edit");
+  const mayExport = can("recruitment", "export");
   const read = useApi("GET /api/v1/recruitment/assessments/:id", { params: { id } });
   const on = useMutation("POST /api/v1/recruitment/assessments/:id/activate");
   const off = useMutation("POST /api/v1/recruitment/assessments/:id/deactivate");
@@ -200,19 +217,19 @@ function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
               <li key={q.assessment_question_id}>
                 <span>{q.prompt}</span>
                 {q.options ? (
-                  <ul className="mt-1 list-disc pl-5 text-text-2">
+                  <ul className="mt-1 list-disc pl-5 text-muted-foreground">
                     {q.options.map((o) => (
                       <li key={o.id}>{`${o.text}, ${o.points} points`}</li>
                     ))}
                   </ul>
                 ) : (
-                  <span className="text-text-3">{` · ${q.question_type === "file" ? "a file or a link" : "written"}, up to ${q.max_score} points`}</span>
+                  <span className="text-subtle-foreground">{` · ${q.question_type === "file" ? "a file or a link" : "written"}, up to ${q.max_score} points`}</span>
                 )}
               </li>
             ))}
           </ol>
         ) : (
-          <p className="text-sm text-text-3">No questions yet</p>
+          <p className="text-sm text-subtle-foreground">No questions yet</p>
         )}
         {a.questions.some((q) => q.options) && <p className="mt-2 text-xs"><HelpTerm help={POINTS_HELP}>Points</HelpTerm></p>}
       </Card>
@@ -220,7 +237,7 @@ function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
         <Button onClick={close}>Close</Button>
         {mayEdit && <Button onClick={() => modal.open({ title: "Edit Assessment", body: () => <AssessmentForm assessment={a} close={back} onSaved={reload} /> })}>Edit</Button>}
         {mayEdit && !a.in_use && <Button onClick={() => modal.open({ title: "Questions", wide: true, body: () => <AssessmentQuestions assessment={a} close={back} onSaved={reload} /> })}>Questions</Button>}
-        {a.questions.length > 0 && <Button icon="download" onClick={exportIt}>Export</Button>}
+        {mayExport && a.questions.length > 0 && <Button icon="download" onClick={exportIt}>Export</Button>}
         {mayEdit && <Button onClick={flip}>{a.active ? "Deactivate" : "Activate"}</Button>}
         {mayEdit && a.active && <Button variant="primary" onClick={() => modal.open({ title: "Send to Candidates", body: () => <BulkSendForm assessment={a} close={back} /> })}>Send to Candidates</Button>}
       </FormFooter>
@@ -361,7 +378,7 @@ function SittingSheet({ id, close }: { id: string; close: () => void }) {
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {pill(SITTING_STATUS[s.status])}
-        <span className="text-sm text-text-3">{`${s.assessment_name} · ${s.vacancy_title}`}</span>
+        <span className="text-sm text-subtle-foreground">{`${s.assessment_name} · ${s.vacancy_title}`}</span>
       </div>
       <KeyValue
         items={[
@@ -372,7 +389,7 @@ function SittingSheet({ id, close }: { id: string; close: () => void }) {
           ["Score", s.score === null ? "–" : `${Math.round(s.score)} of 100`],
         ]}
       />
-      {s.answers.length > 0 ? (
+      {["submitted", "timed_out", "scored"].includes(s.status) ? (
         <Marking sitting={s} mayMark={mayEdit && s.can_mark} onSaved={reload} close={close} />
       ) : (
         <FormFooter>
@@ -394,6 +411,7 @@ function Marking({ sitting, mayMark, onSaved, close }: { sitting: SittingDetail;
   const save = useMutation("PUT /api/v1/recruitment/assessments/sittings/:id/marks");
   const submit = async () => {
     setProblem(null);
+    setErrors({});
     const given = byHand.filter((a) => marks[a.assessment_question_id]?.score !== "");
     if (!given.length) return setProblem("Give a mark");
     const body = { marks: given.map((a) => ({ assessment_question_id: a.assessment_question_id, awarded_score: Number(marks[a.assessment_question_id]!.score), ...(marks[a.assessment_question_id]!.comment.trim() ? { reviewer_comment: marks[a.assessment_question_id]!.comment.trim() } : {}) })) };
@@ -417,7 +435,7 @@ function Marking({ sitting, mayMark, onSaved, close }: { sitting: SittingDetail;
         {sitting.answers.map((a, i) => (
           <li key={a.assessment_question_id}>
             <Card>
-              <CardHeader title={`Question ${i + 1}`} right={<span className="text-sm text-text-3">{`Up to ${a.max_score}`}</span>} />
+              <CardHeader title={`Question ${i + 1}`} right={<span className="text-sm text-subtle-foreground">{`Up to ${a.max_score}`}</span>} />
               <p className="mb-2 text-sm" data-copy="content">{a.prompt}</p>
               {a.question_type === "choice" ? (
                 <p className="text-sm">{a.options?.find((o) => o.id === a.response)?.text ?? "Not answered"} <b>{` · ${a.awarded_score ?? 0} points`}</b></p>
@@ -429,7 +447,7 @@ function Marking({ sitting, mayMark, onSaved, close }: { sitting: SittingDetail;
                   ) : (
                     <p className="text-sm whitespace-pre-line" data-copy="content">{a.response}</p>
                   ))}
-                  {!a.document && !a.response && <p className="text-sm text-text-3">Not answered</p>}
+                  {!a.document && !a.response && <p className="text-sm text-subtle-foreground">Not answered</p>}
                   <Grid cols={2} className="mt-2">
                     <Field label="Mark" {...(errors[a.assessment_question_id] ? { state: "bad" as const, message: errors[a.assessment_question_id] } : {})}>
                       <NumberField decimal value={marks[a.assessment_question_id]!.score} onChange={(v: string) => setMarks((m) => ({ ...m, [a.assessment_question_id]: { ...m[a.assessment_question_id]!, score: v } }))} disabled={!mayMark} />
