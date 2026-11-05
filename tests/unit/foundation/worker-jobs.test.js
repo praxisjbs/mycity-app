@@ -69,6 +69,7 @@ describe("job registry", () => {
       "import-cleanup",
       "integrations-purge",
       "integrations-watch",
+      "interview-reminders",
       "mail-sync",
       "media-reconcile",
       "outbox-dispatch",

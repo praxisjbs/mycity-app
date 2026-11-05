@@ -178,6 +178,7 @@ const SCHEDULERS = Object.freeze([
   "exchange-rates",
   "places-name",
   "assessment-expiry",
+  "interview-reminders",
   "review-cycles",
   "query-rule-sweep",
   "user-guide-index",

@@ -603,6 +603,7 @@ describe("schedules and heartbeat", () => {
       "import-cleanup",
       "integrations-purge",
       "integrations-watch",
+      "interview-reminders",
       "mail-sync",
       "media-reconcile",
       "places-name",

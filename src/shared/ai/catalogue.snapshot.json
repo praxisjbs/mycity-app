@@ -1433,6 +1433,17 @@
       "screen": null
     },
     {
+      "key": "interviews.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "interviews.InterviewListQuery",
+      "schema_sha": "81c2f8ddcd90026a",
+      "screen": null
+    },
+    {
       "key": "kpis.list",
       "kind": "read",
       "module_key": "performance",
@@ -2555,6 +2566,17 @@
       "screen": "recruitment.vacancies"
     },
     {
+      "key": "recruitment.route.fill_in_my_interview_card",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.interviews"
+    },
+    {
       "key": "recruitment.route.invite_someone_to_apply_for_a_vacancy",
       "kind": "route",
       "module_key": "recruitment",
@@ -2575,6 +2597,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "recruitment.assessments"
+    },
+    {
+      "key": "recruitment.route.schedule_an_interview",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.interviews"
     },
     {
       "key": "recruitment.route.screen_a_role_s_applications_with_ai",

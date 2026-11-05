@@ -253,6 +253,27 @@ async function move(actor, scope, id, body) {
   });
 }
 
+/**
+ * Move an application forward to `stage` inside the caller's transaction, as another module's step
+ * implies it (an interview scheduled, guide §3 step 8). Only forward, only an active application, and
+ * only into a column of its board; anything else leaves it where it is. True when it moved.
+ */
+async function advanceIn(client, actor, applicationId, stage) {
+  const row = await repo.get(client, applicationId, { lock: true });
+  if (!row || row.status !== "active" || row.stage === stage) return false;
+  const board = lifecycle.boardStages(await vacancyRepo.scorecard(client, row.vacancy_id));
+  if (!board.includes(stage) || board.indexOf(stage) <= board.indexOf(row.stage)) return false;
+  await transition(client, pipeline.MACHINE, { entity_id: applicationId, from: row.stage, to: stage, actor_id: actor.user_id });
+  await repo.setStage(client, applicationId, stage);
+  await emit(client, {
+    key: EVENTS.APPLICATION_MOVED,
+    entity: { type: "application", id: applicationId },
+    actor,
+    payload: { application_id: applicationId, number: row.number, from: row.stage, to: stage },
+  });
+  return true;
+}
+
 async function notProgressed(actor, scope, id, body) {
   return tx(async (client) => {
     const row = await visibleRow(client, id, scope, { lock: true });
@@ -437,6 +458,7 @@ module.exports = {
   get,
   cv,
   move,
+  advanceIn,
   notProgressed,
   reopen,
   requestScore,

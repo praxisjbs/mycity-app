@@ -619,6 +619,13 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · The calendar's write path takes a transaction from another module: `createIn`,
+  `editIn` and `cancelIn` beside create, edit and cancel, which now call them. Recruitment uses them so an
+  interview and its calendar entry are saved together (`recruitment.md` §3 step 8): the entry is of type
+  interview, tied to the interview (`entity_type`), and its panelists are its attendees.
+  `asOwner` lets that module change the entry for whoever scheduled it, as it decides who may. Nothing a
+  person sees on Calendar changed.
+
 - 03/11/2026 · JP · From the evaluation set on staging: Create Task "for me", its lead written as the person's own name, was drawn with Pick one (`leadIdOf` looked only among the people New Task's picker lists, which leaves the person out as its default) and its card's names failed on the words (`cardNames` sent them to a uuid query). Now the person's own whole name, or "me", is the person, and `cardNames` reads ids alone (§9). Nothing on the Workspace screens changes.
 - 03/11/2026 · JP · Every Workspace card asks what it needs before it is drawn (`praxis-ai.md` decision 34, after a task shared with a department was drawn without its lead): which task (the person's own board, `tasks.list`, matched by number or words), which step, which project, which event (`calendar.service.eventChoices`, `eventIdOf`), which reason and on or off, which week; and, for a task shared with a department, "Who leads it?" with that department's people (`tasks.service.leadChoices`, a lead by name `leadIdOf`), so Pick a lead never reaches a card (§9). Nothing on the Workspace screens changes.
 - 03/11/2026 · JP · Every Workspace form in the chat (`praxis-ai.md` decision 33, §6.11; "go ahead with Workspace and Calendar", JBS Praxis): Save Task, Add Step, Save Step, Add Link, Add Reason, Switch Reason, Create Project, Save Project, Save Event and Save Support Needed as cards, each the screen's own service function; `tasks.get` reads one task as its panel shows it; the week's manifest `workspace.ai.js` replaces the module's `ai:none`. Nothing on the Workspace screens changes (§9).

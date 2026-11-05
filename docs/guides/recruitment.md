@@ -125,7 +125,7 @@ never sign in.
    star), their decision (Select, On Hold or Reject), comments (Tidy With AI, `interview-notes-cleanup`)
    and private notes. They save as they go and press Submit Card. While the round is open, a
    person reads only their own feedback, the hiring manager and the CEO included (§6.6). Panelists who
-   have not submitted are reminded once a day from the interview's end (`interview-feedback-reminder`).
+   have not submitted are reminded once a day from the interview's end (`interview-reminders`).
 10. **The round closes** when the last panelist submits, or when someone with `recruitment` edit presses
     Close Round. Then everyone who may see the interview sees every panelist's ratings, comments and
     decision (never another's private notes), each trait's average across the panel, and the round's
@@ -482,7 +482,7 @@ with test addresses.
 | `talent_pool.added`, `talent_pool.invited`, `talent_pool.removed` | after the write | audit; `apply-invite` on invite |
 | `talent-pool-purge` (scheduler, daily) | always | removes members past their 24 months |
 | `assessment-expiry` (scheduler, every minute) | always | ends sittings past `due_at`; expires unstarted sittings past `start_by` |
-| `interview-feedback-reminder` (reminder engine) | from the interview's end, daily, working hours | reminds each panelist who has not submitted, until the round closes |
+| `interview-reminders` (scheduler, daily at 09:17 Lagos) | from the interview's end | reminds each panelist who has not submitted, once a day, until the round closes (`interview.feedback_due`, naming the application and role, never the candidate) |
 
 ## 8 · Permissions and visibility by role
 
@@ -610,6 +610,15 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 05/11/2026 · GE · P6 built. One round, one interview: Schedule makes the round, its panel and a
+  calendar entry in one save (the calendar's `createIn`; the panelists hear as attendees), moves the
+  candidate forward to Interview, and mails the candidate `interview-invite` with the .ics after commit; a
+  change of panel alone is not sent to them. The blind rule is one SQL predicate (`interviews.repo.js`
+  BLIND). The last card closes the round; Close Round scores what is in, and a draft stays its author's.
+  The report, by edit in scope or the vacancy's hiring manager, makes a new Interview Assessment Form at
+  each save. Cancel, and Not Progressing (from its event), cancel the entry and close the round with no
+  score. The reminder job is `interview-reminders` (daily, once per seat a day).
 
 - 05/11/2026 · GE · P5 built. An assessment's code is ASM-0001, made under a lock (no numbering scheme:
   it is a library, not a document). Each option's points are sealed in `answer_key_enc` with the

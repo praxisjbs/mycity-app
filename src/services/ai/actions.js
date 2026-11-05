@@ -236,6 +236,16 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-11-04",
     built: true,
   }),
+  // Tidy With AI on a panelist's interview comments (docs/guides/recruitment.md §9): about a person.
+  "interview-notes-cleanup": Object.freeze({
+    label: "Tidy Interview Notes",
+    module: "recruitment",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
   "cv-screen": Object.freeze({
     label: "Score Application",
     module: "recruitment",

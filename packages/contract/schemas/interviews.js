@@ -316,8 +316,51 @@ const InterviewInviteEmailVars = z
   })
   .strict();
 
+/**
+ * interview-assessment-form: MyCity's Interview Assessment Format as a PDF (guide §6.6), made each time
+ * the report is saved. Every value is already in words a reader reads: dates day-first, ratings and
+ * averages as text, so the template only lays them out.
+ */
+const InterviewAssessmentFormVars = z
+  .object({
+    candidate_name: z.string(),
+    position: z.string(),
+    department: z.string().nullable(),
+    interview_date: z.string(),
+    round_title: z.string(),
+    current_employer: z.string().nullable(),
+    academics: z.string().nullable(),
+    total_experience: z.string().nullable(),
+    relevant_experience: z.string().nullable(),
+    panelists: z.array(z.object({ name: z.string() }).strict()).max(8),
+    traits: z
+      .array(
+        z
+          .object({
+            prompt: z.string(),
+            ratings: z.array(z.object({ value: z.string() }).strict()).max(8),
+            average: z.string(),
+          })
+          .strict(),
+      )
+      .max(21),
+    cards: z
+      .array(
+        z
+          .object({ name: z.string(), score: z.string(), decision: z.string(), comments: z.string().nullable() })
+          .strict(),
+      )
+      .max(8),
+    interview_score: z.string(),
+    report: z.string(),
+    decision: z.string(),
+    reported_by: z.string(),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
+  InterviewAssessmentFormVars: { table: null, reason: "the variables of templates/documents/interview-assessment-form.html" },
   QuestionRating: { table: "interview_rating" },
   PanelSeat: {
     table: "interview_panelist",
@@ -436,4 +479,5 @@ module.exports = {
   NotesTidy,
   NotesTidyOutput,
   InterviewInviteEmailVars,
+  InterviewAssessmentFormVars,
 };
