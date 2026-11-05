@@ -11,12 +11,16 @@ import { DemoLinks } from "./DemoLinks";
  * `brandInCard`: the page draws the mark inside its card, so the header leaves it out.
  * `layout`: open for a page a stranger browses (Careers, a vacancy), with a SkylineHero at its head;
  * the card (the default) for a page a person fills in or reads once.
+ * `pane`: the page's identity on a SkylineHero of size pane, beside the card on desktop and a band
+ * above it on a phone; the page's h1 is there. `bar`: a phone's action bar fixed at the foot.
  */
 export function Page({
   title,
   index = false,
   brandInCard = false,
   layout = "card",
+  pane,
+  bar,
   children,
   below,
 }: {
@@ -24,6 +28,8 @@ export function Page({
   index?: boolean;
   brandInCard?: boolean;
   layout?: "card" | "open";
+  pane?: ReactNode;
+  bar?: ReactNode;
   children: ReactNode;
   below?: ReactNode;
 }) {
@@ -40,6 +46,8 @@ export function Page({
   return (
     <PublicPage
       layout={layout}
+      pane={pane}
+      bar={bar}
       brand={
         brandInCard ? undefined : (
           <Link to="/jobs" aria-label="MyCityApp careers" className="no-underline">

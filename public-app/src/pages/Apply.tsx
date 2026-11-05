@@ -17,7 +17,8 @@ import {
   RadioCards,
   SelectField,
   Skeleton,
-  Sub,
+  SkylineHero,
+  StepBar,
   TextAreaField,
   TextField,
   UploadField,
@@ -39,6 +40,9 @@ type Values = Record<string, string | boolean>;
 const qKey = (id: string) => `q_${id}`;
 const ABOUT_YOU = ["full_name", "email", "phone", "years_experience"];
 const WHY = ["cover_letter", "consent"];
+/** The three steps, named once for the wizard and the pane beside it. */
+const STEPS = ["About You", "CV and Questions", "Why This Role"] as const;
+const EYEBROW = "Your Application";
 
 /** The form as the API takes it: years as a number, the answers given keyed by question. */
 function bodyOf(v: Values, questions: ApplyQuestion[]) {
@@ -93,7 +97,7 @@ export function Apply({ token }: { token: string }) {
   if (link.error) return <LinkProblem error={link.error} title="Apply" retry={link.reload} />;
   if (!link.data)
     return (
-      <Page title="Apply">
+      <Page title="Apply" pane={<SkylineHero size="pane" eyebrow={EYEBROW} title="Apply" />}>
         <Skeleton lines={7} />
       </Page>
     );
@@ -134,14 +138,19 @@ function ApplyForm({ token, link, onSent, onGone }: { token: string; link: Apply
   };
 
   return (
-    <Page title="Apply">
-      <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase">Your Application</p>
-      <h1 className="mt-1 font-heading text-2xl" data-copy="content">
-        {link.vacancy_title}
-      </h1>
-      <Sub as="p" className="mt-1 mb-5">
-        This link is yours until {formatDate(link.expires_at)}, {formatTime(link.expires_at)}.
-      </Sub>
+    <Page
+      title="Apply"
+      pane={
+        <SkylineHero
+          size="pane"
+          record
+          eyebrow={EYEBROW}
+          title={link.vacancy_title}
+          text={`This link is yours until ${formatDate(link.expires_at)}, ${formatTime(link.expires_at)}.`}
+          wide={<StepBar steps={STEPS} at={step} vertical decorative />}
+        />
+      }
+    >
       <Wizard
         level={2}
         step={step}
@@ -151,7 +160,7 @@ function ApplyForm({ token, link, onSent, onGone }: { token: string; link: Apply
         onFinish={f.submit((body) => send(body as unknown as ApplicationSubmit))}
         steps={[
           {
-            title: "About You",
+            title: STEPS[0],
             check: () => f.check(ABOUT_YOU),
             body: (
               <div className="flex flex-col gap-4">
@@ -171,7 +180,7 @@ function ApplyForm({ token, link, onSent, onGone }: { token: string; link: Apply
             ),
           },
           {
-            title: "CV and Questions",
+            title: STEPS[1],
             check: () => f.check(["cv_document_id", ...qKeys]),
             body: (
               <div className="flex flex-col gap-5">
@@ -210,7 +219,7 @@ function ApplyForm({ token, link, onSent, onGone }: { token: string; link: Apply
             ),
           },
           {
-            title: "Why This Role",
+            title: STEPS[2],
             check: () => f.check(WHY),
             body: (
               <div className="flex flex-col gap-5">

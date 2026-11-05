@@ -414,7 +414,7 @@ the vault; docs/guides/queries.md §6.9).
 - `sanction_fine.employee_accepted_at`, `employee_rejected_at`, `rejection_reason` are unused
   (queries.md §13): dropped in a later release unless M6 needs them.
 
-### M4 Recruitment · 4000 to 4999 · TB
+### M4 Recruitment · 4000 to 4999 · GE
 
 **Built:** `4000` vacancies and questions, candidates, applications and stage history, scorecard
 criteria (A10), assessments, interviews, rounds, panelists and blind feedback · `4099` seed.
@@ -437,7 +437,7 @@ criteria (A10), assessments, interviews, rounds, panelists and blind feedback ·
   them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
   (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
 
-### M5 Offers, Documentation & Onboarding · 5000 to 5999 · LA
+### M5 Offers, Documentation & Onboarding · 5000 to 5999 · AJ
 
 **Built:** `5000` offers, signature requests and signatures, document requirements, onboarding
 cases and checklist items, employment contracts, talent pool · `5099` seed.
@@ -447,7 +447,7 @@ cases and checklist items, employment contracts, talent pool · `5099` seed.
 - Offer approval: `workflow_instance_id` and its workflow definition.
 - The data-privacy acknowledgement, documentation verification status, onboarding plans and SOPs.
 
-### M6 Payroll & Notifications · 6000 to 6999 · LA
+### M6 Payroll & Notifications · 6000 to 6999 · TB
 
 **Built:** nothing in the block. Notifications are M0 (`0060`), web push and each person's
 preferences too (`0460`), and Settings · Notifications with the reminder settings (`0480`), all
@@ -464,7 +464,7 @@ The earlier note that payroll was "deliberately not modelled" was not a decision
 `payroll_run` adds the query there (runs not finished, in the reader's scope), declares its columns
 and makes the card live in the same PR.
 
-### M7 Partnerships, CRM & Trackers · 7000 to 7999 · GE
+### M7 Partnerships, CRM & Trackers · 7000 to 7999 · LA
 
 **Built:** `7000` partners, contacts, opportunities and stage history, interactions, proposals,
 agreements and obligations · `7099` seed.
@@ -530,7 +530,7 @@ and lines, disbursements · `8099` seed.
   them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
   (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
 
-### M9 Settings & Governance · 9000 to 9999 · GE
+### M9 Settings & Governance · 9000 to 9999 · TB
 
 **Built:** `9000` security events, access reviews and items, integrations, webhooks · `9090`
 reporting views · `9095` `updated_at` triggers (a one-time sweep of the tables that existed then;

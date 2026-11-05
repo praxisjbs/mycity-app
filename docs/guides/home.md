@@ -185,8 +185,8 @@ column to the migrated schema, and the schema gate holds every query to them.
 | `reviews.source.js` | reviews · M2 · AJ | `performance_review`, `performance_cycle`: Reviews Due (a monthly review not yet through its reviewer: `check_in`, `with_reviewer` or `returned`, its round closing within 30 days or past) and My Reviews Due (those with the reader to score now); nothing owed since Performance PR 3 |
 | `calendar.source.js` | calendar · M2 · AJ | `calendar_event`: Your Week |
 | `vacancies.source.js` | vacancies and candidates · M4 · GE | `vacancy`: open vacancies; `application`, `candidate`: applications left at one stage too long (Recruitment SLA alerts) |
-| `payroll.source.js` | payroll · M6 · LA | nothing yet: Payroll In Progress is hidden and has no query until M6 creates its tables |
-| `partners.source.js` | partners and pipeline · M7 · GE | `partner`, `partner_interaction`, `partnership_opportunity`, `partnership_agreement`, `partnership_proposal`: pipeline, signed value, quiet partners (and Partner Inactivity alerts), proposals out |
+| `payroll.source.js` | payroll · M6 · TB | nothing yet: Payroll In Progress is hidden and has no query until M6 creates its tables |
+| `partners.source.js` | partners and pipeline · M7 · LA | `partner`, `partner_interaction`, `partnership_opportunity`, `partnership_agreement`, `partnership_proposal`: pipeline, signed value, quiet partners (and Partner Inactivity alerts), proposals out |
 | `expenses.source.js` | expenses · M8 · AJ | `expense_request` and `expense_category`: awaiting approval, with each request's category |
 | `budgets.source.js` | budgets · M8 · AJ | `budget`, `budget_line`: budget used, and the budgets past a share spent (Budget Threshold alerts) |
 
@@ -753,8 +753,7 @@ and Move Down rather than bare arrows.
     `staging-home:<date>:<type>`; a day holding the person's own punch, or one the day-close already
     closed, is left alone. `attendance_event` is append-only, so these stay;
   - **rows in the forward modules' tables** (tasks, the calendar, goals and targets, a review cycle and
-    its reviews, partners and their pipeline, expenses and budgets, vacancies for the organogram's open
-    seats) by SQL with fixed UUIDv5 ids, the in-browser mock's records on the real staff
+    its reviews, partners and their pipeline, expenses and budgets) by SQL with fixed UUIDv5 ids, the in-browser mock's records on the real staff
     (`seeds/staging/lib/forward-rows.js`). Their numbers carry STG (`PAR-STG-01`), so none collides
     with a number the owning module gives. Every id is written out in one manifest,
     `HOME_STAGING_ROWS` (`seeds/staging/lib/home-staging-rows.js`, `{ table, id_column, ids }`,
@@ -777,12 +776,11 @@ and Move Down rather than bare arrows.
   forward rows' dates with the day. Run after the organisation changed (a seat filled, someone moved
   or left) the forward rows follow it: a listed row it no longer writes is deleted with the alerts
   about it, and a row given a unique value another of Home's rows held (a review passing to the next
-  person in a team) takes it from that row. A vacancy's slug follows its place, as its number does,
-  never the seat's title. It refuses production with the runner's own three checks, asked
+  person in a team) takes it from that row. Its vacancies were removed by Recruitment's own seed
+  (`55_recruitment.js`, 05/11/2026), as tasks and the calendar, goals and reviews were by theirs. It refuses production with the runner's own three checks, asked
   again inside the file. On staging the runs are built (a schedule's emailed) and the alerts notify their
   holders, as the real jobs would (A4: staging mail is marked). `tests/integration/home-staging-seed.test.js`
-  runs it twice on the real migrations and the real staff, again after a seat is filled and after
-  someone changes manager, and follows M7's and M8's removal to the end.
+  runs it twice on the real migrations and the real staff, again after someone changes manager, and follows M7's and M8's removal to the end.
 - **A hidden card** (Payroll In Progress, until M6) is never offered or computed; the Home view's fifth or sixth default takes its place, and with nothing else eligible
   the row shrinks.
 - **A reader who may not open Partnerships** gets a null pipeline and no pipeline card, rather
@@ -851,6 +849,8 @@ rows, and nothing in the code says where anything came from.
   other currencies out. Owner to decide whether such sums group by currency when M7 and M8 land.
 
 ## 14 · Change log
+
+- 05/11/2026 · GE · Home's staging vacancies are gone from `lib/forward-rows.js` (and the open seats it read for them): Recruitment's own seed, `seeds/staging/55_recruitment.js`, removes them with `removeHomeStagingRows` and makes its roles through its services. Their ids stay in `HOME_STAGING_ROWS`.
 
 - 04/11/2026 · GE · The vacancies adapter (`dashboard/sources/vacancies.source.js`) owes nothing: M4's 4010 and
   4020 check and index `vacancy.status` and `application (status, current_stage_entered_at)`; its owner is

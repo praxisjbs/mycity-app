@@ -915,7 +915,15 @@ is kept per person (`useDensity`, `mc-density`).
 (.93, 1, 1.08, 1.16). A phone keeps its 16 px fields and 44 px targets.
 
 **Motion (F6).** `--ease-out`, `--ease-spring`, `--dur-fast` (120 ms) and `--dur` (200 ms); all
-durations are 0 under `prefers-reduced-motion`.
+durations are 0 under `prefers-reduced-motion`. The public site has one arrival (`animate-enter`
+with `enter-delay-1` to `enter-delay-8`, and `enter-stagger` for a list's items), drawn by
+SkylineHero, PublicPage and the careers list; base.css's reduced-motion rule stops it.
+
+**The public ground** (05/11/2026). PublicPage lays every public page on `--canvas`, a faint City
+Green tint (`public-ground`); inside it (`data-canvas`) `muted-foreground` and `eyebrow` read one
+step deeper (`--canvas-muted-foreground`, `--canvas-eyebrow`) so text keeps AA on the tint; the
+token test holds every pair. Two columns of unequal height on desktop are `StickyColumns`: both
+stick, the shorter waits, a column taller than the screen scrolls until its foot is in view.
 
 ### 9.4 Shared components
 

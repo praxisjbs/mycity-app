@@ -11,6 +11,8 @@ import type { Assessment, AssessmentDetail, Sitting, SittingDetail } from "@myci
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { saveBlob, saveFile } from "@/api/download";
+import { upload } from "@/api/upload";
+import type { DocumentRef } from "@/api/types/common";
 import { api } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -41,6 +43,7 @@ import {
   toast,
   Toolbar,
   useContractForm,
+  UploadField,
   useModal,
 } from "@mycity/ui";
 import { AssessmentQuestions } from "./AssessmentQuestions";
@@ -62,6 +65,7 @@ export function Assessments() {
   const openAssessment = (id: string, title = "Assessment") => modal.open({ title, wide: true, body: (close) => <AssessmentSheet id={id} close={close} /> });
   const openSittingId = (id: string, title = "Sitting") => modal.open({ title, wide: true, body: (close) => <SittingSheet id={id} close={close} /> });
   const openSitting = (s: Sitting) => openSittingId(s.application_assessment_id, s.candidate_name);
+  const importOne = () => modal.open({ title: "Import Assessment", body: (close) => <ImportForm close={close} onImported={(a) => openAssessment(a.assessment_definition_id, a.name)} /> });
   const create = () => modal.open({ title: "New Assessment", body: (close) => <AssessmentForm close={close} onSaved={(a) => openAssessment(a.assessment_definition_id, a.name)} /> });
   // useScreenAction also answers `?action=new`.
   useScreenAction(mayCreate ? { label: "New Assessment", onSelect: create } : null);
@@ -96,7 +100,17 @@ export function Assessments() {
   const counted = (n: number | null | undefined) => (n === undefined || n === null ? "–" : String(Math.round(n)));
   return (
     <>
-      <PageHeader title="Assessments" actions={mayCreate ? <Button variant="primary" icon="plus" onClick={create}>New Assessment</Button> : undefined} />
+      <PageHeader
+        title="Assessments"
+        actions={
+          mayCreate ? (
+            <>
+              <Button icon="addbox" onClick={importOne}>Import</Button>
+              <Button variant="primary" icon="plus" onClick={create}>New Assessment</Button>
+            </>
+          ) : undefined
+        }
+      />
       <KpiTiles
         mobileCols={2}
         items={[
@@ -298,6 +312,38 @@ function AssessmentForm({ assessment, close, onSaved }: { assessment?: Assessmen
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>{assessment ? "Save Assessment" : "Make Assessment"}</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/**
+ * Import: an assessment exported from another MyCity hub (staging, where MyCity approved it), its
+ * file taken through the upload engine and read back by the server, made here switched off.
+ */
+function ImportForm({ close, onImported }: { close: () => void; onImported: (a: AssessmentDetail) => void }) {
+  const [problem, setProblem] = useState<string | null>(null);
+  const run = useMutation("POST /api/v1/recruitment/assessments/import/file");
+  const take = async (docs: DocumentRef[]) => {
+    const doc = docs[0];
+    if (!doc) return;
+    setProblem(null);
+    try {
+      const made = await run.run({ body: { document_id: doc.document_id } });
+      invalidate("/api/v1/recruitment/assessments");
+      close();
+      toast(`${made.code} imported, switched off`);
+      onImported(made);
+    } catch (e) {
+      setProblem(e instanceof ApiError ? (e.fields.document_id?.[0] ?? e.message) : "Not imported. Try again.");
+    }
+  };
+  return (
+    <>
+      <UploadField purpose="assessment_import" endpoint="/api/v1/documents" upload={upload} accept=".json" multiple={false} maxBytes={1024 * 1024} kinds="An exported assessment" onUploaded={take} />
+      <FormError>{problem}</FormError>
+      <FormFooter>
+        <Button onClick={close}>Close</Button>
       </FormFooter>
     </>
   );

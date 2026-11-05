@@ -144,6 +144,19 @@ describeDb("Recruitment · Assessments against the real migrations", () => {
     expect(copy.body).toMatchObject({ code: "ASM-0002", active: false, question_count: 3 });
     expect(copy.body.questions[0].options.map((o) => o.points)).toEqual([2, 0, 0]);
     expect((await h.as("ops").post("/recruitment/assessments/import").send({ ...file.body, format: "something-else" })).status).toBe(422);
+    // Import on screen: the file uploaded through the upload engine first, then read back by its document.
+    const json = Buffer.from(JSON.stringify({ ...file.body, name: "Design Fundamentals III" }));
+    const up = await h.as("ops").post("/documents").field("purpose", "assessment_import").attach("file", json, "design-fundamentals.json");
+    expect(up.status).toBe(201);
+    const fromFile = await h.as("ops").post("/recruitment/assessments/import/file").send({ document_id: up.body.document_id });
+    expect(fromFile.status).toBe(201);
+    expect(fromFile.body).toMatchObject({ name: "Design Fundamentals III", active: false, question_count: 3 });
+    // Only that kind of file, and only by who uploaded it.
+    const pdf = await h.as("ops").post("/documents").field("purpose", "assessment_import").attach("file", Buffer.from("%PDF-1.4\n%%EOF\n"), "a.pdf");
+    expect(pdf.status).toBe(415);
+    const notAnExport = await h.as("ops").post("/documents").field("purpose", "assessment_import").attach("file", Buffer.from('{"hello":1}'), "other.json");
+    expect((await h.as("ops").post("/recruitment/assessments/import/file").send({ document_id: notAnExport.body.document_id })).body.error.fields).toEqual({ document_id: ["Not an exported assessment"] });
+    expect((await h.as("hod").post("/recruitment/assessments/import/file").send({ document_id: up.body.document_id })).status).toBe(404);
   });
 
   test("Send makes one live sitting a candidate; the link is mailed after commit and the questions are then fixed", async () => {

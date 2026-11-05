@@ -317,6 +317,9 @@ const AssessmentExport = z
   .strict();
 
 /** PUT /recruitment/assessments/sittings/:id/marks: marks for written and file answers. */
+/** POST /recruitment/assessments/import/file: an exported file uploaded first (purpose assessment_import), read back here. */
+const AssessmentImportFile = z.object({ document_id: uuid }).strict();
+
 const SittingMarks = z
   .object({
     marks: z
@@ -501,6 +504,7 @@ const TABLES = {
   SittingSendBulk: { table: null, reason: "one sitting for each matching application" },
   SittingSendBulkResult: { table: null, reason: "how many sittings were sent and skipped" },
   AssessmentExport: { table: null, reason: "an assessment and its questions as one file, for import elsewhere" },
+  AssessmentImportFile: { table: null, reason: "the uploaded export file Import reads" },
   SittingMarks: { table: null, reason: "marks for several assessment_response rows" },
   PublicQuestion: { table: null, reason: "the allow-list of a question a candidate may read" },
   AssessmentSession: { table: null, reason: "the allow-list of a sitting a candidate may read" },
@@ -545,6 +549,7 @@ module.exports = {
   SittingSendBulk,
   SittingSendBulkResult,
   AssessmentExport,
+  AssessmentImportFile,
   PublicQuestion,
   AssessmentSession,
   AnswerParams,

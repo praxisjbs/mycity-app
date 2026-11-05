@@ -30,6 +30,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Layout | [PhoneOnly](#phoneonly) | `PhoneOnly`, `DesktopOnly` | Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen. | stable |
 | Layout | [SplitPanes](#splitpanes) | `SplitPanes` | A list beside the record it opens, with a divider the person can drag; on a phone the list fills the screen and the record covers it. | stable |
 | Layout | [Stack](#stack) | `Stack`, `Inline` | A vertical run of blocks with an even gap; Inline is the horizontal run that wraps. | stable |
+| Layout | [StickyColumns](#stickycolumns) | `StickyColumns` | Two columns side by side that both stick: the shorter waits while the longer scrolls, and both finish together at the foot of the row. | beta |
 | Display | [Accordion](#accordion) | `Accordion` | Questions and their answers, each closed until it is opened. | stable |
 | Display | [Avatar](#avatar) | `Avatar`, `Who` | A person's photo, or their initials in a round chip when there is none, with an optional presence dot; Who is the avatar with the name and a second line. | stable |
 | Display | [Banner](#banner) | `Banner` | One line across a page or a card in a status tone, with an icon and at most one action. | stable |
@@ -161,11 +162,11 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it. | stable |
 | Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
 | Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls and pulls to refresh, the floating button, and the bottom bar. | stable |
-| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide (or, open, the page's own sections up to 1120 px), and a short footer. | stable |
+| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page on its faint City Green ground: the mark and the theme switch on top; the page on one card (at most 704 px), beside a Deep Green context pane, or as open sections up to 1120 px; a Deep Green footer under a Lagos skyline edge. | stable |
 | Shell | [PullIndicator](#pullindicator) | `PullIndicator` | The pull to refresh's Pin Drop: the pin in a disc that drops from under the header as the page is pulled, its yellow ring closing at the release point, Deep Green with the reload mark past the second notch. | stable |
 | Shell | [Rail](#rail) | `Rail` | The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot. | stable |
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
-| Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's top panel: the page's heading on Deep Green over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark). | beta |
+| Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's Deep Green panel: the page's heading over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark). A hero across the top, or the context pane beside a form. | beta |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
@@ -573,6 +574,38 @@ A vertical run of blocks with an even gap; Inline is the horizontal run that wra
 ```tsx
 <Stack gap={3}><KeyValue items={rows} /><Banner tone="info">Payroll closes Friday</Banner></Stack>
 <Inline gap={2}><Pill tone="ok">Approved</Pill><Pill>Annual Leave</Pill></Inline>
+```
+
+### StickyColumns
+
+Two columns side by side that both stick: the shorter waits while the longer scrolls, and both finish together at the foot of the row.
+
+| | |
+|---|---|
+| Use | A page with two columns of unequal height on desktop: the public site's context pane beside its form (`pane`), a vacancy's text beside The Role card (`main-side`). |
+| Avoid | A list and the record it opens (use ListDetail); panes that scroll on their own at the height of the screen (use SplitPanes); a phone, where there are no columns. |
+| Phone | No columns and nothing sticks: the columns stack, `phoneFirst` coming first. |
+| Accessibility | Layout only: the reading order is the order the columns are given; nothing is hidden or moved for assistive technology. |
+| Status | beta |
+| Exports | `StickyColumns` |
+| Import | `import { StickyColumns } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/StickyColumns.tsx` |
+| Test | `packages/ui/src/layout/StickyColumns.test.tsx` |
+| Gallery | `packages/ui/src/layout/StickyColumns.gallery.tsx` (`npm run gallery`, `#/StickyColumns`) |
+
+**StickyColumns** props (`StickyColumnsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The columns, left to right: each child is one column. |
+| `layout` | `"pane" \| "main-side"` |  | `pane` (the default): a 400 px pane beside the rest, side by side from 1041 px. `main-side`: two thirds and one third, from 761 px. |
+| `phoneFirst` | `number` |  | The column, counted from 0, that comes first where the columns stack (a vacancy's Role card above its text on a phone). |
+| `gap` | `number` |  | The space kept above a column stuck at the top, and below one waiting at its foot, in px; 24 unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<StickyColumns layout="pane">{pane}{form}</StickyColumns>
+<StickyColumns layout="main-side" phoneFirst={1}>{article}{roleCard}</StickyColumns>
 ```
 
 ## Display
@@ -3651,11 +3684,14 @@ Where a person is in a few steps: one bar per step, filled up to the step in han
 | `steps` | `readonly string[]` | yes | The steps' titles in order, Title Case, at most 4 words each. |
 | `at` | `number` | yes | The step in hand, counted from 0. |
 | `titled` | `boolean` |  | Also name the step in hand after its number ("Step 2 of 4 · Access"). Off inside Wizard, which shows the title as its heading. |
+| `vertical` | `boolean` |  | A column of the steps by name, each with its number or a tick, for a pane beside the form (the public site's Apply). |
+| `decorative` | `boolean` |  | Hides the bar from assistive technology, when another bar on the screen already names the steps (the Wizard's own). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
 <StepBar steps={["Name", "Access", "Details", "Review"]} at={1} />
 <StepBar steps={["Name", "Access", "Details", "Review"]} at={1} titled />
+<StepBar steps={["About You", "CV and Questions", "Why This Role"]} at={1} vertical decorative />
 ```
 
 ### Switch
@@ -3881,7 +3917,7 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 | Use | More than six fields or more than one topic (FRONTEND_GUIDE §8.1): a vacancy, an employee, a policy. |
 | Avoid | Six fields or fewer (one modal form); steps that are not topics. |
 | Phone | Opens in a full-screen sheet; the indicator shows the step number and title; Next is full width at the bottom. |
-| Accessibility | The current step is announced; the indicator marks it with aria-current; focus moves to the step's heading when it changes. |
+| Accessibility | The current step is announced; the indicator marks it with aria-current; focus moves to the step's heading when it changes. A new step slides in from the side it was reached from, still under reduced motion. |
 | Status | stable |
 | Exports | `Wizard` |
 | Import | `import { Wizard } from "@mycity/ui";` |
@@ -5350,14 +5386,14 @@ The staff app's phone frame: the top bar and title rail, the page, which alone s
 
 ### PublicPage
 
-The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide (or, open, the page's own sections up to 1120 px), and a short footer.
+The public site's page on its faint City Green ground: the mark and the theme switch on top; the page on one card (at most 704 px), beside a Deep Green context pane, or as open sections up to 1120 px; a Deep Green footer under a Lagos skyline edge.
 
 | | |
 |---|---|
-| Use | Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). layout open for a page a stranger browses (Careers, a Vacancy), with a SkylineHero at its head; the card for a page a person fills in or reads once. |
+| Use | Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). layout open for a page a stranger browses (Careers, a Vacancy), with a SkylineHero at its head; the card for a page a person fills in or reads once, with a `pane` (SkylineHero size pane) carrying its identity where it has one. |
 | Avoid | The staff app (it has its own shells); a second card inside the card; a page of explanation (a PageMessage says one thing). |
-| Phone | The card runs edge to edge with no side border; open, the page's first block (its hero) runs edge to edge and its sections keep their own 16 px margin; the header and footer keep a 16 px margin; the theme switch is a 44 px target. |
-| Accessibility | A banner, a main and a contentinfo landmark; the theme switch is a named button. PageMessage's title is a heading (h2) and its icon is decorative. |
+| Phone | The card runs edge to edge with no side border; with a pane, the pane is a compact band at the top and the card rises over its foot as a sheet; open, the page's first block (its hero) runs edge to edge and its sections keep their own 16 px margin; the header keeps a 16 px margin; the theme switch and the footer's links are 44 px targets; a `bar` is fixed at the foot and the page keeps room for it. |
+| Accessibility | A banner, a main and a contentinfo landmark; the theme switch is a named button; the pane is inside the main, before the card, so the h1 it carries comes first. The skyline edge is decorative. PageMessage's title is a heading (h2) and its icon is decorative. |
 | Status | stable |
 | Exports | `PublicPage`, `PageMessage` |
 | Import | `import { PublicPage, PageMessage } from "@mycity/ui";` |
@@ -5371,12 +5407,14 @@ The public site's page: the mark and the theme switch on top, the page on one ca
 |---|---|---|---|
 | `brand` | `ReactNode` |  | The mark at the top left, usually a link home with Brand; left out when the page draws its own inside the card. |
 | `children` | `ReactNode` | yes | The page, drawn on the card. |
+| `pane` | `ReactNode` |  | The context pane: a SkylineHero of size pane with the page's heading and facts. On desktop (1041 px and wider) it stands at the left and the card at the right, both sticking; narrower, it is a band above the card. |
 | `below` | `ReactNode` |  | Anything under the card (a second action, a note from the system). |
+| `bar` | `ReactNode` |  | A phone's action bar, fixed at the foot of the screen (a vacancy's Apply); the page keeps room for it. Pass it inside PhoneOnly. |
 | `links` | `ReactNode` |  | The footer's links (Careers, Verify a Document). |
 | `company` | `string` |  | The company line at the foot; MyCity App Ltd · Lagos, Nigeria unless set. |
 | `foot` | `ReactNode` |  | More at the very foot (the mock's demo links, on a laptop only). |
 | `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
-| `layout` | `"card" \| "open"` |  | `card` (the default): the page on one card, 704 px. `open`: no card, up to 1120 px, the page lays out its own sections. |
+| `layout` | `"card" \| "open"` |  | `card` (the default): the page on one card, 704 px, or beside its pane. `open`: no card, up to 1120 px, the page lays out its own sections. |
 
 **PageMessage** props (`PageMessageProps`)
 
@@ -5390,6 +5428,7 @@ The public site's page: the mark and the theme switch on top, the page on one ca
 
 ```tsx
 <PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>} links={<a href="/verify">Verify a Document</a>}>...</PublicPage>
+<PublicPage pane={<SkylineHero size="pane" title="Partnerships Associate" record />}>...</PublicPage>
 <PageMessage icon="ok" tone="ok" title="Application Sent">We reply within five working days.</PageMessage>
 ```
 
@@ -5489,14 +5528,14 @@ A small dark card floating at the foot of the shell for something about the app 
 
 ### SkylineHero
 
-The public site's top panel: the page's heading on Deep Green over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark).
+The public site's Deep Green panel: the page's heading over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark). A hero across the top, or the context pane beside a form.
 
 | | |
 |---|---|
-| Use | The head of a public page that invites a stranger in: Careers (size l, with the search under the heading) and a Vacancy (size m, with the role's facts as chips). |
-| Avoid | The staff app; a page a person is working through (Apply, an Assessment: they keep their card); decoration under a page that has its own heading already; text more than a line. |
-| Phone | Edge to edge, the heading 24 px, the skyline shorter so the first screen still shows the list under it; the line under the heading is hidden (a page subtitle is desktop only). |
-| Accessibility | The heading is the page's h1 (data-ui page-title); the skyline is decorative (aria-hidden) and still under reduced motion. The heading sits on Deep Green whatever the hour, so it keeps AA over a pale midday sky. |
+| Use | The head of a public page that invites a stranger in: Careers (size l, with the search under the heading) and a Vacancy (size m, with the role's facts as chips). size pane is the context pane PublicPage stands beside a page a person works through (Apply, an Assessment): its identity, its facts, and for a running assessment the clock and the progress. |
+| Avoid | The staff app; decoration under a page that has its own heading already; text more than a line. |
+| Phone | Edge to edge, the heading 24 px, the skyline shorter so the first screen still shows the page under it; the line under the heading is hidden (a page subtitle is desktop only). The pane becomes a compact band above the card (from 1040 px down), its `wide` part left off. |
+| Accessibility | The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline and the street grid are decorative (aria-hidden) and still under reduced motion. The panel takes the dark theme's tokens, so what sits on it (a clock, a progress bar) keeps AA on Deep Green whatever the page's theme. |
 | Status | beta |
 | Exports | `SkylineHero` |
 | Import | `import { SkylineHero } from "@mycity/ui";` |
@@ -5508,18 +5547,22 @@ The public site's top panel: the page's heading on Deep Green over the drawn Lag
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `title` | `ReactNode` | yes | The page's heading: what the page is (Work With Us, the role's title). |
+| `title` | `ReactNode` | yes | The page's heading: what the page is (Work With Us, the role's title, Question 2 of 7). |
 | `eyebrow` | `ReactNode` |  | One short line over the heading: whose it is (Careers at MyCityApp, the role's department). |
-| `text` | `ReactNode` |  | One line under the heading, at most 8 words, desktop only. |
+| `text` | `ReactNode` |  | One line under the heading. On l and m at most 8 words, desktop only; on the pane, a line the person needs (the link's expiry, a greeting), shown everywhere. |
 | `facts` | `ReadonlyArray<{ icon: IconName; text: string }>` |  | The record's facts as chips on the panel, each a glyph and a few words (Lagos, Hybrid, Full Time). |
-| `children` | `ReactNode` |  | What sits under the heading: a search field. |
-| `size` | `"l" \| "m"` |  | `l` (the default) for a page's front door, `m` for a record's page (a role). |
+| `children` | `ReactNode` |  | What sits under the heading: a search field; on the pane, the clock and the progress. |
+| `wide` | `ReactNode` |  | The pane only: what it adds where it stands beside the page (1041 px and wider), such as the steps; left off the compact band. |
+| `size` | `"l" \| "m" \| "pane"` |  | `l` (the default) for a page's front door, `m` for a record's page (a role), `pane` for the context pane beside a form (PublicPage `pane`). |
+| `record` | `boolean` |  | The title names a record (a role, an assessment), so it is content, not interface copy: the copy gates skip it. |
+| `titleRef` | `Ref<HTMLHeadingElement>` |  | The heading, for a page that moves focus to it (an assessment's next question). It takes focus without a ring. |
 | `still` | `boolean` |  | Draws the skyline without motion even where motion is on (the gallery, a still picture). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
 <SkylineHero eyebrow="Careers at MyCityApp" title="Work With Us" text="Building the app that knows every Nigerian city." />
 <SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
+<SkylineHero size="pane" record eyebrow="Your Application" title="Partnerships Associate" text="This link is yours until 12/11/2026." />
 ```
 
 ### TopBar
@@ -6084,6 +6127,9 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `ControlIds` (type) | `lib/ids.ts` | The ids of one control and the parts that describe it. |
 | `useControlIds` | `lib/ids.ts` | The ids for one control, from a readable stem (the field name) and a page-unique suffix. |
 | `describedBy` | `lib/ids.ts` | A space-separated id list for aria-describedby, skipping the parts not shown; undefined when none are. |
+| `LAGOS_OFFSET` | `lib/lagos.ts` | Lagos keeps UTC+1 all year, so its hour comes straight from the clock. |
+| `lagosHour` | `lib/lagos.ts` | The hour in Lagos now, minutes as a fraction (0 to 24): what lights the drawn skyline. |
+| `useMinute` | `lib/lagos.ts` | The time now, read again each minute: the public site's sky and its footer clock move on with the city. |
 | `LINK_ENDINGS` | `lib/links.ts` | What counts as a link in a message (docs/guides/community.md §6). |
 | `FoundLink` (type) | `lib/links.ts` | One link found in text: where it is, as written, and where it goes. |
 | `findLinks` | `lib/links.ts` | Every link in a text, in order. |

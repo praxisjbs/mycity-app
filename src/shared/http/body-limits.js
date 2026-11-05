@@ -44,6 +44,7 @@ const UPLOAD_CAPS = Object.freeze({
   cv: 10 * MB,
   // A file answer to an assessment, at the system's limit (docs/guides/recruitment.md §6.7).
   assessment_answer: 25 * MB,
+  assessment_import: 1 * MB,
 });
 
 /** "15 MB", for messages people read. */

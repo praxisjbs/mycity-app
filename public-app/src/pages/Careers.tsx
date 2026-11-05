@@ -22,8 +22,8 @@ export function Careers() {
       <SkylineHero eyebrow="Careers at MyCityApp" title="Work With Us" text="Building the app that knows every Nigerian city.">
         {showSearch && <SearchInput label="Search Roles" placeholder="Role or City" value={list.q} onChange={list.setQ} className="max-w-md" />}
       </SkylineHero>
-      <section aria-labelledby="open-roles" className="mt-8 phone:mt-6 phone:px-4">
-        <h2 id="open-roles" className="mb-4 font-heading text-2xl">
+      <section aria-labelledby="open-roles" className="mt-10 phone:mt-6 phone:px-4">
+        <h2 id="open-roles" className="mb-5 animate-enter font-heading text-2xl enter-delay-3">
           Open Roles
         </h2>
         {list.error ? (
@@ -43,7 +43,7 @@ export function Careers() {
             <EmptyState icon="brief" title="No Open Roles" text="New roles are posted here first" />
           )
         ) : (
-          <ul className="grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2 lg:grid-cols-3">
+          <ul className="enter-stagger enter-after-head grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2 lg:grid-cols-3">
             {list.rows.map((r) => (
               <RoleCard key={r.slug} role={r} />
             ))}
@@ -59,7 +59,7 @@ export function Careers() {
 function RoleCard({ role }: { role: PublicJobCard }) {
   const facts = factsOf(role);
   return (
-    <li className="group relative flex min-h-44 flex-col gap-2 rounded-card border border-border bg-card p-5 shadow-1 transition duration-(--dur-fast) focus-within:border-ring hover:-translate-y-0.5 hover:border-secondary hover:shadow-2 motion-reduce:hover:translate-y-0 phone:min-h-0">
+    <li className="group relative flex min-h-44 flex-col gap-2 overflow-hidden rounded-card border border-border bg-card p-5 shadow-1 transition duration-(--dur) ease-out before:absolute before:inset-x-0 before:top-0 before:h-1 before:origin-left before:scale-x-0 before:bg-primary before:transition-transform before:duration-300 focus-within:border-ring focus-within:before:scale-x-100 hover:-translate-y-1 hover:border-secondary hover:shadow-3 hover:before:scale-x-100 motion-reduce:hover:translate-y-0 phone:min-h-0 dark:hover:border-accent-foreground">
       {role.department && <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase">{role.department}</p>}
       <h3 className="font-heading text-xl leading-snug">
         <Link to={`/jobs/${role.slug}`} className="stretch-link text-foreground no-underline outline-none">
@@ -76,9 +76,9 @@ function RoleCard({ role }: { role: PublicJobCard }) {
           ))}
         </ul>
       )}
-      <span aria-hidden="true" className="mt-auto inline-flex items-center gap-1 pt-2 text-sm font-strong text-secondary">
+      <span aria-hidden="true" className="mt-auto inline-flex items-center gap-1 pt-2 text-sm font-strong text-accent-foreground">
         View Role
-        <Icon name="right" className="transition-transform duration-(--dur-fast) group-hover:translate-x-0.5" />
+        <Icon name="right" className="transition-transform duration-(--dur) group-hover:translate-x-1" />
       </span>
     </li>
   );

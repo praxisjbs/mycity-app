@@ -54,6 +54,8 @@ const ALLOW = Object.freeze({
   // A candidate's file answer to an assessment: a spreadsheet, a document, an image or a short video
   // (docs/guides/recruitment.md §6.7); anything larger is given as a link.
   assessment_answer: [TYPES.pdf, ...IMAGES, TYPES.docx, TYPES.xlsx, TYPES.pptx, TYPES.csv, ...VIDEO],
+  // An assessment exported from another hub, read back by Import (docs/guides/recruitment.md §6.7).
+  assessment_import: [TYPES.json],
 });
 
 const NEVER = new Set(["markup", "archive", "unknown"]);

@@ -31,9 +31,29 @@ describe("SkylineHero", () => {
 
   it("keeps the skyline away from assistive technology", () => {
     const { container } = render(<SkylineHero title="Work With Us" still />);
-    const art = container.querySelector('[aria-hidden="true"]');
-    expect(art).not.toBeNull();
-    expect(art).toContainElement(container.querySelector(".from-deep"));
+    expect(container.querySelector(".map-grid")).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector(".from-deep")!.closest('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it("is a dark panel whatever the page's theme, so what sits on it takes the dark inks", () => {
+    const { container } = render(<SkylineHero title="Work With Us" still />);
+    expect(container.querySelector("section")).toHaveAttribute("data-theme", "dark");
+  });
+
+  it("as the pane, names a record as content, keeps its line on a phone and its wide part for desktop", () => {
+    const ref = { current: null as HTMLHeadingElement | null };
+    render(
+      <SkylineHero size="pane" record eyebrow="Your Application" title="Head, Sales & Revenue" text="This link is yours until 12/11/2026." wide={<p>Steps</p>} titleRef={ref} still />,
+    );
+    const h1 = screen.getByRole("heading", { level: 1, name: "Head, Sales & Revenue" });
+    expect(h1).toHaveAttribute("data-copy", "content");
+    expect(h1).not.toHaveAttribute("data-ui");
+    expect(ref.current).toBe(h1);
+    expect(h1).toHaveAttribute("tabindex", "-1");
+    const line = screen.getByText("This link is yours until 12/11/2026.");
+    expect(line.className).not.toContain("phone:hidden");
+    expect(line).not.toHaveAttribute("data-ui");
+    expect(screen.getByText("Steps").parentElement!.className).toContain("lg:block");
   });
 
   it("draws Lagos as it is lit at the hour: a skyline at night has its windows on", async () => {

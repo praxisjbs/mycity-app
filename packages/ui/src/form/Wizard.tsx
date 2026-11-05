@@ -5,12 +5,13 @@
  * @use More than six fields or more than one topic (FRONTEND_GUIDE §8.1): a vacancy, an employee, a policy.
  * @avoid Six fields or fewer (one modal form); steps that are not topics.
  * @phone Opens in a full-screen sheet; the indicator shows the step number and title; Next is full width at the bottom.
- * @a11y The current step is announced; the indicator marks it with aria-current; focus moves to the step's heading when it changes.
+ * @a11y The current step is announced; the indicator marks it with aria-current; focus moves to the step's heading when it changes. A new step slides in from the side it was reached from, still under reduced motion.
  * @status stable
  * @example <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../actions/Button";
+import { cn } from "../lib/cn";
 import { FormError } from "./Field";
 import { FormFooter } from "./Form";
 import { StepBar } from "./StepBar";
@@ -60,6 +61,10 @@ export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 
   const step = steps[at];
   const last = at === steps.length - 1;
   const Heading = level === 2 ? "h2" : "h3";
+  // Which way the last step change went, so the new step arrives from that side (forward from the
+  // right, back from the left); nothing moves on the first step shown.
+  const [moved, setMoved] = useState<{ at: number; dir: 0 | 1 | -1 }>({ at, dir: 0 });
+  if (moved.at !== at) setMoved({ at, dir: at > moved.at ? 1 : -1 });
 
   // Focus moves to the heading only when the step itself changes: a parent re-rendering (a new
   // onStepChange on every render) must never pull focus out of the field being typed in.
@@ -85,7 +90,9 @@ export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 
       <Heading ref={heading} tabIndex={-1} data-ui="title" className="mb-3 text-lg font-semibold outline-none">
         {step.title}
       </Heading>
-      <div>{step.body}</div>
+      <div key={at} className={cn(moved.dir === 1 && "animate-step-next", moved.dir === -1 && "animate-step-back")}>
+        {step.body}
+      </div>
       {error ? <div className="mt-3"><FormError>{error}</FormError></div> : null}
       <FormFooter>
         {at > 0 ? (

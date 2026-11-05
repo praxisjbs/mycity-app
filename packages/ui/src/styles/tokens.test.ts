@@ -65,6 +65,37 @@ describe("tokens.css contrast", () => {
     });
   }
 
+  /*
+   * The public site's ground (PublicPage, data-canvas): every ink keeps AA on the tint and on its
+   * glow, and the two inks the canvas deepens (muted-foreground, eyebrow) still hold every pair the
+   * originals are held to, since inside the canvas they stand in for them on every surface.
+   */
+  for (const [name, theme, values] of [
+    ["light", "light", light],
+    ["dark (chosen)", "dark", dark],
+    ["dark (device)", "dark", systemDark],
+  ] as const) {
+    it(`keeps the public canvas's text at AA in ${name}`, () => {
+      const swap: Record<string, string> = { "muted-foreground": "canvas-muted-foreground", eyebrow: "canvas-eyebrow" };
+      const onCanvas: Array<[string, string]> = ["canvas", "canvas-glow"].flatMap((s) =>
+        ["foreground", "canvas-muted-foreground", "subtle-foreground", "accent-foreground", "canvas-eyebrow"].map((t) => [t, s] as [string, string]),
+      );
+      const deepened = pairs(theme)
+        .filter(([t]) => swap[t])
+        .map(([t, s]) => [swap[t]!, s] as [string, string]);
+      const failing = [...onCanvas, ...deepened]
+        .map(([t, s]) => {
+          const fg = values[t];
+          const bg = values[s];
+          if (!fg || !bg) return `${t} on ${s}: missing`;
+          const r = ratio(fg, bg);
+          return r >= 4.5 ? null : `${t} ${fg} on ${s} ${bg}: ${r.toFixed(2)}`;
+        })
+        .filter(Boolean);
+      expect(failing).toEqual([]);
+    });
+  }
+
   it("writes the device dark block the same as the chosen one", () => {
     expect(systemDark).toEqual(dark);
     expect(declarations(/:root:not\(\[data-theme="light"\]\)\s*\{/)).toEqual(declarations(/\n\[data-theme="dark"\]\s*\{/));

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { PublicJob } from "@mycity/contract/contract.gen.ts";
-import { Banner, Button, Card, CardHeader, Chain, DesktopOnly, formatDate, formatMoney, Icon, KeyValue, PageMessage, PhoneOnly, RichText, Skeleton, SkylineHero, Sub, type IconName } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, Chain, DesktopOnly, formatDate, formatMoney, Icon, KeyValue, PageMessage, PhoneOnly, RichText, Skeleton, SkylineHero, StickyColumns, Sub, type IconName } from "@mycity/ui";
 import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import { Link, useRouter } from "@/lib/router";
@@ -83,8 +83,17 @@ export function Vacancy({ slug }: { slug: string }) {
     </Button>
   );
 
+  const bar = open ? (
+    <PhoneOnly className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-border bg-card/95 px-4 pt-3 pb-safe-3 backdrop-blur">
+      <Sub as="p" className="min-w-0 flex-1">
+        {applicantsLine(d.applicants)}
+      </Sub>
+      <div className="flex-none">{applyButton}</div>
+    </PhoneOnly>
+  ) : undefined;
+
   return (
-    <Page title={d.title} index={open} layout="open">
+    <Page title={d.title} index={open} layout="open" bar={bar}>
       <Link to="/jobs" className="mb-3 inline-flex min-h-tap items-center gap-1.5 text-sm font-strong text-muted-foreground no-underline hover:text-foreground phone:px-4">
         <Icon name="left" />
         All Roles
@@ -95,8 +104,8 @@ export function Vacancy({ slug }: { slug: string }) {
           {notOpen.text}
         </Banner>
       )}
-      <div className="mt-8 grid grid-cols-1 gap-10 md:grid-cols-3 phone:mt-5 phone:gap-6 phone:px-4 phone:pb-24">
-        <article className="flex min-w-0 flex-col gap-9 md:col-span-2 phone:gap-7">
+      <StickyColumns layout="main-side" phoneFirst={1} className="mt-8 animate-enter enter-delay-3 phone:mt-5 phone:px-4">
+        <article className="flex min-w-0 flex-col gap-9 phone:gap-7">
           <TextSection title="About MyCityApp" blocks={d.about_company} />
           <TextSection title="Role Overview" blocks={d.description} />
           <TextSection title="Required Experience and Qualifications" blocks={d.requirements} />
@@ -110,8 +119,8 @@ export function Vacancy({ slug }: { slug: string }) {
             </section>
           )}
         </article>
-        <aside className="phone:order-first">
-          <Card as="section" className="flex flex-col gap-4 md:sticky md:top-6">
+        <aside>
+          <Card as="section" className="flex flex-col gap-4">
             <CardHeader title="The Role" />
             {details.length > 0 && <KeyValue layout="stacked" items={details} />}
             {open && (
@@ -125,15 +134,7 @@ export function Vacancy({ slug }: { slug: string }) {
             {problem && <Banner tone="err">{problem}</Banner>}
           </Card>
         </aside>
-      </div>
-      {open && (
-        <PhoneOnly className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-border bg-background/95 px-4 pt-3 pb-safe-3 backdrop-blur">
-          <Sub as="p" className="min-w-0 flex-1">
-            {applicantsLine(d.applicants)}
-          </Sub>
-          <div className="flex-none">{applyButton}</div>
-        </PhoneOnly>
-      )}
+      </StickyColumns>
     </Page>
   );
 }

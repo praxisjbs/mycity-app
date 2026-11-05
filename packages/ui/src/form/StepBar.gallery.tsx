@@ -11,5 +11,6 @@ export default {
     "Third Step": () => <StepBar steps={steps} at={2} />,
     "Last Step": () => <StepBar steps={steps} at={3} />,
     Titled: () => <StepBar steps={steps} at={1} titled />,
+    Vertical: () => <StepBar steps={["About You", "CV and Questions", "Why This Role"]} at={1} vertical />,
   },
 } satisfies GalleryEntry;

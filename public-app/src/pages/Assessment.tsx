@@ -17,8 +17,8 @@ import {
   RadioCards,
   SelectField,
   Skeleton,
+  SkylineHero,
   StatStrip,
-  Sub,
   TextAreaField,
   TextField,
   UploadField,
@@ -54,7 +54,7 @@ export function Assessment({ token }: { token: string }) {
   const d = s.data;
   if (!d)
     return (
-      <Page title="Assessment">
+      <Page title="Assessment" pane={<SkylineHero size="pane" title="Assessment" />}>
         <Skeleton lines={6} />
       </Page>
     );
@@ -75,32 +75,29 @@ function Intro({ d, token, onStarted }: { d: AssessmentSession; token: string; o
     }
   };
   return (
-    <Page title="Assessment">
-      <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase" data-copy="content">
-        {d.vacancy_title}
-      </p>
-      <h1 className="mt-1 font-heading text-2xl" data-copy="content">
-        {a.name}
-      </h1>
-      <Sub as="p" className="mt-1">
-        Hello {d.candidate_first_name}. Start by {formatDate(d.start_by)}.
-      </Sub>
-      <StatStrip
-        label="About the Assessment"
-        className="mt-5"
-        items={[
-          { label: "Type", value: TYPE[a.assessment_type] },
-          { label: d.timed ? "Time" : "Take Home", value: d.timed && a.duration_minutes ? `${a.duration_minutes} minutes` : "Your own pace" },
-          { label: "Questions", value: a.question_count },
-        ]}
-      />
+    <Page
+      title="Assessment"
+      pane={
+        <SkylineHero size="pane" record eyebrow={d.vacancy_title} title={a.name} text={`Hello ${d.candidate_first_name}. Start by ${formatDate(d.start_by)}.`}>
+          <StatStrip
+            label="About the Assessment"
+            className="mb-0"
+            items={[
+              { label: "Type", value: TYPE[a.assessment_type] },
+              { label: d.timed ? "Time" : "Take Home", value: d.timed && a.duration_minutes ? `${a.duration_minutes} minutes` : "Your own pace" },
+              { label: "Questions", value: a.question_count },
+            ]}
+          />
+        </SkylineHero>
+      }
+    >
       {a.instructions && (
-        <p className="mt-5 text-md leading-relaxed whitespace-pre-line text-muted-foreground" data-copy="content">
+        <p className="text-md leading-relaxed whitespace-pre-line text-muted-foreground" data-copy="content">
           {a.instructions}
         </p>
       )}
       {problem && <Banner tone="err" className="mt-4">{problem}</Banner>}
-      <Button variant="primary" block className="mt-6" onClick={start}>
+      <Button variant="primary" block className={a.instructions ? "mt-6" : undefined} onClick={start}>
         Start the Assessment
       </Button>
     </Page>
@@ -237,41 +234,36 @@ function Sitting({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
   const last = i === total - 1;
 
   return (
-    <Page title="Assessment">
-      <div className="flex items-start gap-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase" data-copy="content">
-            {d.assessment.name}
-          </p>
-          <h1 ref={heading} tabIndex={-1} className="mt-1 font-heading text-2xl outline-none phone:text-xl">
-            Question {i + 1} of {total}
-          </h1>
-        </div>
-        <div className="flex flex-none flex-col items-end gap-1">
-          {d.timed ? (
-            <Countdown endsAt={d.ends_at} serverNow={d.server_now} onEnd={reload} />
-          ) : (
-            <div className="text-right">
-              <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase">Due</p>
-              <p className="text-md font-strong tabular-nums">{d.ends_at ? `${formatDate(d.ends_at)}, 23:59` : null}</p>
-            </div>
-          )}
-          <HelpTerm
-            className="text-xs"
-            align="end"
-            help={
-              d.timed
-                ? "Your answers save as you go. Open the same link again to carry on where you were; the clock keeps running."
-                : "Your answers save as you go. Open the same link again to carry on where you were."
-            }
-          >
-            Resume Later
-          </HelpTerm>
-        </div>
-      </div>
-      <ProgressBar className="mt-4" label={`${answered} of ${total} Answered`} value={answered} max={total} showValue={false} tone="ok" />
-
-      <section key={qid} aria-labelledby={`prompt-${qid}`} className="mt-6 animate-rise border-t border-border pt-5">
+    <Page
+      title="Assessment"
+      pane={
+        <SkylineHero size="pane" eyebrow={d.assessment.name} title={`Question ${i + 1} of ${total}`} titleRef={heading}>
+          <div className="flex items-end justify-between gap-4 lg:flex-col lg:items-start lg:gap-5">
+            {d.timed ? (
+              <Countdown endsAt={d.ends_at} serverNow={d.server_now} onEnd={reload} className="lg:items-start" />
+            ) : (
+              <div>
+                <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase">Due</p>
+                <p className="text-md font-strong tabular-nums">{d.ends_at ? `${formatDate(d.ends_at)}, 23:59` : null}</p>
+              </div>
+            )}
+            <HelpTerm
+              className="text-xs"
+              align="end"
+              help={
+                d.timed
+                  ? "Your answers save as you go. Open the same link again to carry on where you were; the clock keeps running."
+                  : "Your answers save as you go. Open the same link again to carry on where you were."
+              }
+            >
+              Resume Later
+            </HelpTerm>
+          </div>
+          <ProgressBar className="mt-4" label={`${answered} of ${total} Answered`} value={answered} max={total} showValue={false} tone="ok" />
+        </SkylineHero>
+      }
+    >
+      <section key={qid} aria-labelledby={`prompt-${qid}`} className="animate-rise">
         <Prompt id={`prompt-${qid}`} text={q.prompt} />
         <div className="mt-4">
           {q.question_type === "choice" ? (
@@ -363,10 +355,10 @@ function SaveLine({ state, onRetry }: { state: SaveState; onRetry: () => unknown
         </>
       )}
       {state === "saved" && (
-        <>
+        <span className="inline-flex animate-rise items-center gap-2">
           <Icon name="ok" className="text-success" />
           Saved
-        </>
+        </span>
       )}
       {state === "error" && (
         <>

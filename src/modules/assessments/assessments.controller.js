@@ -30,6 +30,7 @@ module.exports = {
     return ok(res, file);
   },
   importFrom: async (req, res) => created(res, await authoring.importFrom(withActor(req), req.validated.body)),
+  importFile: async (req, res) => created(res, await authoring.importFile(withActor(req), req.validated.body.document_id)),
   sittings: async (req, res) => sendPaged(res, await service.sittings(req.validated.query, scopeOf(req))),
   sitting: async (req, res) => ok(res, await service.sitting(id(req), req.user, scopeOf(req))),
   send: async (req, res) => created(res, await service.send(withActor(req), scopeOf(req), req.validated.body)),

@@ -1,4 +1,5 @@
 import type { GalleryEntry } from "../testing/gallery";
+import { ProgressBar } from "../display/ProgressBar";
 import { SkylineHero } from "./SkylineHero";
 
 export default {
@@ -19,6 +20,11 @@ export default {
         ]}
         still
       />
+    ),
+    "Context Pane": () => (
+      <SkylineHero size="pane" eyebrow="Graphics and Motion Design" title="Question 2 of 7" still>
+        <ProgressBar label="1 of 7 Answered" value={1} max={7} showValue={false} tone="ok" />
+      </SkylineHero>
     ),
   },
 } satisfies GalleryEntry;

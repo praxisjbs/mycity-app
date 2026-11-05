@@ -29,6 +29,7 @@ import * as D from "../data/recruitment";
 import { pickAnAddress, placeOf } from "./maps";
 import { WORKSITES as SITES } from "./worksites";
 import { exportFile } from "./shared";
+import { UPLOADS } from "../uploads";
 
 /**
  * Recruitment on the mock (docs/guides/recruitment.md §5), in the contract's shapes: Vacancies, Careers
@@ -804,6 +805,22 @@ R("POST /api/v1/recruitment/assessments/import", "create", (req) =>
     const d = newAssessment(b);
     setQuestions(d, b.questions);
     return ok(assessmentView(d));
+  }),
+);
+
+/*
+ * Import from an uploaded export file. The mock keeps an upload's name, not its bytes, so it makes
+ * a switched-off copy of the brief named from the file, as the API would from the file's own words.
+ */
+R("POST /api/v1/recruitment/assessments/import/file", "create", (req) =>
+  parse<{ document_id: string }>(assessmentSchemas.AssessmentImportFile, req.body, (b) => {
+    const doc = UPLOADS.get(b.document_id);
+    if (!doc || !/\.json$/i.test(doc.file_name)) return field("document_id", "Not an exported assessment");
+    const from = ASSESSMENTS[0]!;
+    const name = doc.file_name.replace(/\.json$/i, "").replace(/[-_]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()).trim();
+    const d = newAssessment({ name, assessment_type: from.assessment_type, instructions: from.instructions ?? "", duration_minutes: from.duration_minutes, pass_score: from.pass_score });
+    setQuestions(d, from.questions.map((q) => (q.options ? { question_type: q.question_type, prompt: q.prompt, options: q.options.map((o) => ({ text: o.text, points: o.points })) } : { question_type: q.question_type, prompt: q.prompt, max_score: q.max_score })));
+    return created(assessmentView(d));
   }),
 );
 

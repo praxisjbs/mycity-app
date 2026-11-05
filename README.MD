@@ -80,6 +80,11 @@ mycity-app/
 │                             raised to signed and issued, through the services, tested by
 │                             tests/integration/queries-staging-seed.test.js; lib/signature.js
 │                             draws the pad's signature;
+│                             55_recruitment.js: Careers Settings, six roles in their states,
+│                             eleven applications through Apply, sittings, interview rounds
+│                             and the Talent Pool, through the services, on the Implementation
+│                             Team as hiring managers and panelists, tested by tests/integration/
+│                             recruitment-staging-seed.test.js;
 │                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
@@ -519,7 +524,7 @@ Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media
 `shared/state/state-history`. Prompts: `jd-draft`, `cv-screen`, `screening-questions`,
 `assessment-questions`, `interview-notes-cleanup`. Gate 19 switches on.
 
-### 5.8 M5 · Offers, Documentation & Onboarding · LA, GE · 16 to 20 Nov
+### 5.8 M5 · Offers, Documentation & Onboarding · AJ, GE · 16 to 20 Nov
 
 | Module | Files beyond the template |
 |---|---|
@@ -531,7 +536,7 @@ Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media
 Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Templates: `offer-letter`,
 `offer-packet`, `employment-contract`, `signature-certificate`, and the recruitment mails.
 
-### 5.9 M6 · Payroll & Notifications · LA, AJ · 23 to 27 Nov
+### 5.9 M6 · Payroll & Notifications · TB, AJ · 23 to 27 Nov
 
 | Module | Files beyond the template |
 |---|---|
@@ -546,7 +551,7 @@ screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2
 (`docs/guides/notifications.md`). The daily rate divides by the working days from
 `shared/time/working-week` (A22), never by a constant.
 
-### 5.10 M7 · Partnerships, CRM & Trackers · GE, LA · 30 Nov to 4 Dec
+### 5.10 M7 · Partnerships, CRM & Trackers · LA, GE · 30 Nov to 4 Dec
 
 | Module | Files beyond the template |
 |---|---|
@@ -574,7 +579,7 @@ Shared first filled: `shared/dedup`. Prompts: `proposal-draft`, `mou-draft`. Tem
 Chain for every request: requester, line manager, Operations, requisition, CEO, disbursed
 (MILESTONES §13).
 
-### 5.12 M9 · Settings & Governance · GE · 7 to 11 Dec
+### 5.12 M9 · Settings & Governance · TB · 7 to 11 Dec
 
 | Module | Files beyond the template |
 |---|---|
@@ -931,9 +936,9 @@ On production, run it without `--sample` and enter the real person's details
 
 | Initials | Name | Owns |
 |---|---|---|
-| GE | Godwin-Okoh Elisha | Architecture, schema, M0, M3, M7, M9; community and mailbox in M1 |
-| TB | Tom-Blake Asaah | Dashboard (M1), M4, M10, M11 |
-| LA | Love Adeola | Migrations and data (M0), attendance (M1), M5, M6 |
-| AJ | Adole Jerome | Frontend foundation, ESS (M1), M2, M8 |
+| GE | Godwin-Okoh Elisha | Architecture, schema, M0, M3, M4; community and mailbox in M1 |
+| TB | Tom-Blake Asaah | Dashboard (M1), M6, M9, M10, M11 |
+| LA | Love Adeola | Migrations and data (M0), attendance (M1), M7 |
+| AJ | Adole Jerome | Frontend foundation, ESS (M1), M2, M5, M8 |
 
 Engineered by [JBS Praxis](https://jbspraxis.com).

@@ -244,11 +244,11 @@ start and still land on 18 December.
 | 2 | Productivity & Performance | 9% | 20–23 Oct | Fri 23 Oct | **AJ** · TB |
 | 3 | Queries & Consequence Management | 5% | 26–30 Oct | Fri 30 Oct | **GE** |
 | 4 | Recruitment End to End | 13% | 2–13 Nov | Fri 13 Nov | **GE** |
-| 5 | Offers, Documentation & Onboarding | 11% | 16–20 Nov | Fri 20 Nov | **LA** · GE |
-| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **LA** · AJ |
-| 7 | Partnerships, CRM & Trackers | 10% | 30 Nov–4 Dec | Fri 4 Dec | **GE** · LA |
+| 5 | Offers, Documentation & Onboarding | 11% | 16–20 Nov | Fri 20 Nov | **AJ** · GE |
+| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **TB** · AJ |
+| 7 | Partnerships, CRM & Trackers | 10% | 30 Nov–4 Dec | Fri 4 Dec | **LA** · GE |
 | 8 | Expenses & Budget Control | 8% | 7–11 Dec | Fri 11 Dec | **AJ** |
-| 9 | Settings & Governance | 7% | 7–11 Dec ∥ | Fri 11 Dec | **GE** |
+| 9 | Settings & Governance | 7% | 7–11 Dec ∥ | Fri 11 Dec | **TB** |
 | 10 | Staff Knowledge Hub & AI Assistance | 10% | 14–18 Dec | Fri 18 Dec | **TB** · GE |
 | 11 | Handover & Training | 4% | 14–18 Dec ∥ | Fri 18 Dec | **TB** · all |
 
@@ -875,7 +875,7 @@ same evening** (`docs/guides/recruitment.md` §6.1 to §6.9):
 
 ## 10 · M5 — Offers, Documentation & Onboarding · 11%
 
-**Owner LA** with **GE**. **16–20 Nov. Demo Fri 20 Nov.**
+**Owner AJ** with **GE** (from 05/11/2026; first planned as LA). **16–20 Nov. Demo Fri 20 Nov.**
 
 ```
 Offer → Acceptance → Documentation → Pre-Onboarding → Onboarding
@@ -924,7 +924,7 @@ completes.
 
 ## 11 · M6 — Payroll & Notifications · 11%
 
-**Owner LA** with **AJ**. **23–27 Nov. Demo Fri 27 Nov.**
+**Owner TB** with **AJ** (from 05/11/2026; first planned as LA). **23–27 Nov. Demo Fri 27 Nov.**
 
 ### Jurisdiction decides the donor
 
@@ -1000,7 +1000,7 @@ in each opens the same screen.
 
 ## 12 · M7 — Partnerships, CRM & Trackers · 10%
 
-**Owner GE** with **LA** (Excel import). **30 Nov–4 Dec. Demo Fri 4 Dec.**
+**Owner LA** with **GE** (from 05/11/2026; first planned as GE, with LA on the Excel import). **30 Nov–4 Dec. Demo Fri 4 Dec.**
 
 ### Partnership 360
 
@@ -1178,7 +1178,7 @@ remaining budget is flagged before approval, not after.
 
 ## 14 · M9 — Settings & Governance · 7%
 
-**Owner GE. 7–11 Dec, parallel with M8. Demo Fri 11 Dec.**
+**Owner TB** (who built it; first planned as GE). **7–11 Dec, parallel with M8. Demo Fri 11 Dec.**
 
 Built in M0, surfaced in M9. The permissions and audit foundation is laid at M1 by design, so this
 milestone is a console over mechanisms already load-bearing — which is what makes it safe to run
