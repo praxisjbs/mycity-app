@@ -9,10 +9,10 @@ import interviewSchemas from "@mycity/contract/schemas/interviews.js";
 import type { InterviewDetail } from "@mycity/contract/contract.gen.ts";
 import type { PersonRef } from "@/api/types/common";
 import { ApiError } from "@/api/client";
-import { invalidate, useInfinite, useMutation } from "@/api/hooks";
+import { invalidate, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { paging } from "@/features/shared/wire";
-import { Button, DateField, Field, FormError, FormFooter, Grid, SelectField, TextField, TimeField, toast, todayIso, useContractForm } from "@mycity/ui";
+import { Button, DateField, Field, FormError, FormFooter, Grid, RecordPicker, SelectField, TextField, TimeField, toast, todayIso, useContractForm } from "@mycity/ui";
 import { bodySchema, INTERVIEW_TYPE, renamed, sayRefusal } from "./shared";
 
 type Values = {
@@ -67,7 +67,9 @@ export function ScheduleForm({ applicationId, interview, close, onSaved }: { app
     },
     bodySchema<Values>(interview ? interviewSchemas.InterviewReschedule : interviewSchemas.InterviewSchedule, (v) => bodyOf(v, Boolean(interview)), RENAME),
   );
-  const candidates = useInfinite("GET /api/v1/recruitment/candidates", { filters: { status: "active" }, enabled: !applicationId && !interview });
+  // Searched on the server as the person types (25 at a time), so a candidate past the first page is found.
+  const candidates = usePaged("GET /api/v1/recruitment/candidates", { filters: { status: "active" }, enabled: !applicationId && !interview });
+  const [picked, setPicked] = useState<(typeof candidates.rows)[number][]>([]);
   const sites = useInfinite("GET /api/v1/worksites", { enabled: f.values.interview_type === "in_person" });
   const create = useMutation("POST /api/v1/recruitment/interviews");
   const patch = useMutation("PATCH /api/v1/recruitment/interviews/:id");
@@ -94,7 +96,18 @@ export function ScheduleForm({ applicationId, interview, close, onSaved }: { app
     <>
       {!applicationId && !interview && (
         <Field label="Candidate" {...f.status("application_id")}>
-          <SelectField options={candidates.rows.map((c) => [c.application_id, `${c.name} · ${c.vacancy.title}`] as [string, string])} placeholder="Pick a candidate" searchable {...paging(candidates)} {...f.field("application_id")} />
+          <RecordPicker
+            list={{ rows: candidates.rows, page: candidates.page, loading: candidates.loading, error: candidates.error, q: candidates.q, setQ: candidates.setQ }}
+            value={picked}
+            onChange={(rows) => {
+              setPicked(rows);
+              f.set("application_id", rows[0]?.application_id ?? "");
+            }}
+            id={(c) => c.application_id}
+            title={(c) => c.name}
+            sub={(c) => c.vacancy.title}
+            placeholder="Search candidates"
+          />
         </Field>
       )}
       <Grid cols={2}>

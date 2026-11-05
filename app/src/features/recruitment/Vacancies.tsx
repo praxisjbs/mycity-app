@@ -42,6 +42,9 @@ import { QuestionsForm, ScorecardForm } from "./VacancyQuestions";
 import { VacancyForm } from "./VacancyForm";
 import { EMPLOYMENT, PATTERN_LABEL, pill, say, STAGE_LABEL, VACANCY_STATUS } from "./shared";
 
+/** Each stage holds the candidates at it now (not a cumulative funnel), so bars scale to the largest stage. */
+const funnelTop = (funnel: ReadonlyArray<{ count: number }>) => Math.max(0, ...funnel.map((x) => x.count));
+
 const STATUSES: Array<[string, string]> = [
   ["", "All Statuses"],
   ["open", "Open"],
@@ -156,7 +159,7 @@ export function Vacancies() {
           <Card>
             <CardHeader title="Funnel, All Roles" />
             {s ? (
-              <Bars rows={s.funnel.map((x) => ({ label: STAGE_LABEL[x.stage], percent: s.funnel[0]?.count ? Math.round((x.count * 100) / s.funnel[0].count) : 0, value: String(x.count) }))} />
+              <Bars rows={s.funnel.map((x) => ({ label: STAGE_LABEL[x.stage], percent: funnelTop(s.funnel) ? Math.round((x.count * 100) / funnelTop(s.funnel)) : 0, value: String(x.count) }))} />
             ) : (
               <LoadingRows />
             )}

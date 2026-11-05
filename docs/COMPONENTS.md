@@ -3575,6 +3575,7 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `placeholder` | `string` |  | Shown on the button while nothing is chosen (Choose One). |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it). |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Unused here: a pick is always a whole value, so there is no half-typed problem to report. Taken so a form's `{...f.field()}` never reaches the button. |
 | `name` | `string` |  | Its name in a submitted form. |
 | `disabled` | `boolean` |  | Shown but not usable. |
 | `"aria-label"` | `string` |  | Names it when no Field label sits above it. |

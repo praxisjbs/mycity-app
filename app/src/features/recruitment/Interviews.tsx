@@ -42,6 +42,7 @@ import {
   useConfirm,
   useContractForm,
   useModal,
+  useUnsavedChanges,
 } from "@mycity/ui";
 import { MyCard } from "./MyCard";
 import { ScheduleForm } from "./ScheduleInterview";
@@ -81,15 +82,22 @@ export function Interviews() {
   useNewLink(mayEdit ? schedule : null);
 
   const linked = params.get("id");
+  const mineLinked = params.get("mine");
   const opened = useRef<string | null>(null);
+  // A link opens its interview whenever it arrives, also while already on the tab (a second notice for
+  // the same interview the next day); `?mine=true` switches to My Panels whenever it arrives.
   useEffect(() => {
-    if (params.get("mine")) setParams({ mine: null }, { replace: true });
-    if (!linked || opened.current === linked) return;
+    if (mineLinked) {
+      setView("mine");
+      setParams({ mine: null }, { replace: true });
+    }
+    if (!linked) return void (opened.current = null);
+    if (opened.current === linked) return;
     opened.current = linked;
     setParams({ id: null }, { replace: true });
     open(linked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linked]);
+  }, [linked, mineLinked]);
 
   return (
     <>
@@ -280,6 +288,7 @@ function CancelForm({ interview, close, onSaved }: { interview: InterviewDetail;
 
 function ReportForm({ interview, close, onSaved }: { interview: InterviewDetail; close: () => void; onSaved: () => void }) {
   const f = useContractForm({ report: interview.round.report ?? "", decision: interview.round.decision ?? "" }, interviewSchemas.RoundReport);
+  useUnsavedChanges(f.isDirty);
   const save = useMutation("PUT /api/v1/recruitment/interviews/:id/report");
   const [problem, setProblem] = useState<string | null>(null);
   const submit = async () => {

@@ -31,6 +31,7 @@ import {
   toast,
   todayIso,
   useContractForm,
+  useUnsavedChanges,
   Wizard,
   type PlaceValue,
 } from "@mycity/ui";
@@ -102,8 +103,9 @@ const shapeOf = (schema: unknown): PrefillSchema => {
 
 export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: VacancyDetail; seat?: SeatSuggestion; close: () => void; onSaved?: (v: VacancyDetail) => void }) {
   const edit: Before | null = vacancy ? { location: placeValue(vacancy.location_place), closes_on: vacancy.closes_at?.slice(0, 10) ?? "" } : null;
-  const seatId = vacancy ? null : (seat?.org_seat_id ?? null);
   const filled = useAddressPrefill(shapeOf(vacancySchemas.VacancyCreate), !vacancy);
+  // A seat comes from Suggested From Organogram (the row) or from the Organogram's Create Vacancy (the address).
+  const seatId = vacancy ? null : (seat?.org_seat_id ?? filled.org_seat_id ?? null);
   const blank: Values = vacancy
     ? {
         title: vacancy.title,
@@ -156,6 +158,8 @@ export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: Vacan
     blank,
     bodySchema<Values>(schema, (v) => bodyOf(v, edit, seatId), RENAME),
   );
+  // Closing a half-written vacancy asks before it is lost.
+  useUnsavedChanges(f.isDirty);
   const departments = useInfinite("GET /api/v1/departments");
   const create = useMutation("POST /api/v1/recruitment/vacancies");
   const patch = useMutation("PATCH /api/v1/recruitment/vacancies/:id");

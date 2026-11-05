@@ -40,6 +40,10 @@ import {
 import { ScheduleForm } from "./ScheduleInterview";
 import { ASSESSMENT_TYPE, pill, provisionalTerm, say, sayRefusal, SITTING_STATUS, STAGE_LABEL } from "./shared";
 
+/** The pipeline's order, and the first stage ahead of where the candidate is: the footer's one filled button. */
+const STAGE_ORDER = Object.keys(STAGE_LABEL);
+const nextAhead = (c: Pick<CandidateDetail, "stage" | "next_stages">) => c.next_stages.find((s) => STAGE_ORDER.indexOf(s) > STAGE_ORDER.indexOf(c.stage));
+
 const SOURCE: Record<string, string> = { careers: "Careers page", invited: "Invited", pool: "Talent Pool" };
 const CV_STATE: Record<string, string> = { none: "None sent", checking: "Being checked", clean: "Ready", infected: "Failed the virus check" };
 const WEIGHTED_HELP = "From the parts scored so far, with this role's weights.";
@@ -88,7 +92,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
         items={[
           ["Email", c.email],
           ["Phone", c.phone ?? "–"],
-          ["Applied", `${formatDate(c.applied_at.slice(0, 10))}, ${SOURCE[c.source] ?? c.source}`],
+          ["Applied", `${formatDate(c.applied_at)}, ${SOURCE[c.source] ?? c.source}`],
           ["Experience", c.years_experience === null ? "–" : `${c.years_experience} years`],
           [
             "CV",
@@ -188,8 +192,9 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
             <Button onClick={() => modal.open({ title: "Send Assessment", body: () => <SendForm candidate={c} close={back} onSent={reload} /> })}>Send Assessment</Button>
             <Button onClick={() => modal.open({ title: "Schedule Interview", wide: true, body: () => <ScheduleForm applicationId={c.application_id} close={back} onSaved={reload} /> })}>Schedule Interview</Button>
             <Button variant="danger" onClick={() => modal.open({ title: "Not Progressing", body: () => <NotProgressingForm candidate={c} close={back} onSaved={reload} /> })}>Not Progressing</Button>
+            {/* One filled button: the next stage ahead; the others (further on, or one back) stay outlined. */}
             {c.next_stages.map((s) => (
-              <Button key={s} variant="primary" onClick={act(() => move.run({ params: { id }, body: { stage: s as "application" } }), `Moved to ${words(s)}`)}>{`Move to ${words(s)}`}</Button>
+              <Button key={s} variant={s === nextAhead(c) ? "primary" : undefined} onClick={act(() => move.run({ params: { id }, body: { stage: s as "application" } }), `Moved to ${words(s)}`)}>{`Move to ${words(s)}`}</Button>
             ))}
           </>
         )}

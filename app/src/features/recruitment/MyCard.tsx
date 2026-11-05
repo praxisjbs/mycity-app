@@ -12,7 +12,7 @@ import type { InterviewDecision, InterviewDetail } from "@mycity/contract/contra
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { saveFile } from "@/api/download";
-import { Button, ChoiceField, Field, FormError, FormFooter, HelpTerm, RatingField, TextAreaField, toast, useConfirm } from "@mycity/ui";
+import { Button, ChoiceField, Field, FormError, FormFooter, HelpTerm, RatingField, TextAreaField, toast, useConfirm, useUnsavedChanges } from "@mycity/ui";
 import { DECISIONS, say } from "./shared";
 
 const PRIVATE_HELP = "Only you ever see these.";
@@ -32,6 +32,10 @@ export function MyCard({ interview, close, onChanged }: { interview: InterviewDe
   const [decision, setDecision] = useState<InterviewDecision | "">(kept.current.decision);
   const [comments, setComments] = useState(mine?.comments ?? "");
   const [notes, setNotes] = useState(mine?.private_notes ?? "");
+  // The stars and the decision save as tapped; the words only on Save Draft or Submit Card, so closing
+  // the card with words not yet saved asks first rather than losing a panelist's comments.
+  const [keptText, setKeptText] = useState({ comments: mine?.comments ?? "", notes: mine?.private_notes ?? "" });
+  useUnsavedChanges(!submitted && (comments !== keptText.comments || notes !== keptText.notes));
   const [problem, setProblem] = useState<string | null>(null);
   const [marks, setMarks] = useState<Record<string, string>>({});
   const ai = useApi("GET /api/v1/recruitment/vacancies/assist");
@@ -101,6 +105,7 @@ export function MyCard({ interview, close, onChanged }: { interview: InterviewDe
     unmark("comments", "private_notes");
     try {
       await put({ comments, private_notes: notes });
+      setKeptText({ comments, notes });
       return true;
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) setMarks(Object.fromEntries(Object.entries(e.fields).map(([k, m]) => [k, m[0] ?? ""])));

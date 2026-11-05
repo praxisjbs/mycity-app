@@ -100,9 +100,9 @@ export function TalentPool() {
           { key: "who", label: "Candidate", render: (p) => <span className="font-semibold">{p.name}</span> },
           { key: "for", label: "Applied For", render: (p) => p.applied_for?.title ?? "–" },
           { key: "score", label: "Score", render: (p) => <ScoreText score={p.score} provisional={p.score_provisional} /> },
-          { key: "added", label: "Added", render: (p) => formatDate(p.created_at.slice(0, 10)), desktop: true },
+          { key: "added", label: "Added", render: (p) => formatDate(p.created_at), desktop: true },
           { key: "reason", label: "Reason", render: (p) => p.reason, desktop: true },
-          { key: "kept", label: <HelpTerm help={KEPT_HELP}>Kept Until</HelpTerm>, render: (p) => formatDate(p.expires_at.slice(0, 10)) },
+          { key: "kept", label: <HelpTerm help={KEPT_HELP}>Kept Until</HelpTerm>, render: (p) => formatDate(p.expires_at) },
           { key: "invite", label: "Invited", render: (p) => (p.invited_at ? <Pill tone="info">Invited</Pill> : "–") },
         ]}
       />
@@ -134,9 +134,9 @@ function PoolSheet({ entry, close, mayInvite, mayRemove }: { entry: PoolEntry; c
           ["Applied For", entry.applied_for?.title ?? "–"],
           ["Score", <ScoreText key="s" score={entry.score} provisional={entry.score_provisional} />],
           ["Reason", entry.reason],
-          ["Added", `${formatDate(entry.created_at.slice(0, 10))}${entry.added_by_name ? `, ${entry.added_by_name}` : ""}`],
-          [<HelpTerm key="k" help={KEPT_HELP}>Kept Until</HelpTerm>, formatDate(entry.expires_at.slice(0, 10))],
-          ["Invited", entry.invited_at ? `${formatDate(entry.invited_at.slice(0, 10))}${entry.invited_vacancy ? `, ${entry.invited_vacancy.title}` : ""}` : "Not yet"],
+          ["Added", `${formatDate(entry.created_at)}${entry.added_by_name ? `, ${entry.added_by_name}` : ""}`],
+          [<HelpTerm key="k" help={KEPT_HELP}>Kept Until</HelpTerm>, formatDate(entry.expires_at)],
+          ["Invited", entry.invited_at ? `${formatDate(entry.invited_at)}${entry.invited_vacancy ? `, ${entry.invited_vacancy.title}` : ""}` : "Not yet"],
         ]}
       />
       <FormFooter>

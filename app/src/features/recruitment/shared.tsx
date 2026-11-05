@@ -93,7 +93,15 @@ export function ScoreText({ score, provisional }: { score: number | null; provis
 }
 
 /** A refusal with no field to sit on, said in a toast. */
-export const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
+/**
+ * A refusal where no form shows field marks (a sheet's Publish or Resume): the first field's own words
+ * ("Its closing day has passed"), never "Check the highlighted fields" with nothing highlighted.
+ */
+export const say = (e: unknown) => {
+  if (!(e instanceof ApiError)) return toast.error("Not saved. Try again.");
+  const first = Object.values(e.fields).find((m) => m && m.length);
+  toast.error(first ? first[0] : e.message);
+};
 
 /**
  * A refused save, said in the form that sent it (FRONTEND_GUIDE §8.3): each mark on the field the

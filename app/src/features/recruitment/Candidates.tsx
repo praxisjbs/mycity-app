@@ -190,7 +190,7 @@ export function Candidates() {
       <DesktopOnly unmount>
         <Grid cols={2} className="mt-3">
           <Card>
-            <CardHeader title={<HelpTerm help="Worked out from the form only. Press Score With AI to read the CV.">Screening Scores</HelpTerm>} />
+            <CardHeader title={<HelpTerm help="Each candidate's screening score: the AI read of the CV when there is one, otherwise the estimate from the form.">Screening Scores</HelpTerm>} />
             {s ? <Bars rows={s.distribution.map((b) => ({ label: b.label, percent: total ? Math.round((b.count * 100) / total) : 0, value: String(b.count) }))} /> : <LoadingRows />}
           </Card>
         </Grid>

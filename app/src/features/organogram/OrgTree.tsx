@@ -7,7 +7,7 @@ import type { Department, ManagerRef, OrgNode } from "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
 import { DepartmentPicker, EmployeePicker } from "@/features/shared/pickers";
 import { ReportingForm, type ReportingSubject } from "@/features/shared/ReportingForm";
-import { useMe } from "@/auth/AuthProvider";
+import { useAuth, useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
 import { visibleTabs } from "@/shell/access";
 import { moduleByKey } from "@/shell/catalogue";
@@ -83,6 +83,9 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   const shapes = builder && Boolean(me.grants.people?.includes("edit"));
   /* Adding a role is People's create grant (POST /org-seats); correcting one is edit. */
   const adds = builder && Boolean(me.grants.people?.includes("create"));
+  /* Create Vacancy opens New Vacancy on Recruitment, which needs Recruitment's create grant there. */
+  const { can } = useAuth();
+  const hires = builder && can("recruitment", "create");
   const modal = useModal();
   const { data, error, reload } = useApi("GET /api/v1/org-chart", { query: { view: mode } });
   /* The desktop chart shows every face at once; a phone's tiles each ask for their own (NodeTile). */
@@ -283,14 +286,16 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
           )}
           {shapes ? (
             <span className="mt-2 flex flex-wrap items-center justify-center gap-1">
-              <button
-                type="button"
-                onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: n.display_name }))}
-                className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-2xs font-strong text-primary-foreground"
-              >
-                <Icon name="plus" className="size-3" />
-                Create Vacancy
-              </button>
+              {hires && (
+                <button
+                  type="button"
+                  onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: n.display_name, org_seat_id: n.org_seat_id }))}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-2xs font-strong text-primary-foreground"
+                >
+                  <Icon name="plus" className="size-3" />
+                  Create Vacancy
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => editRole(n)}
@@ -442,6 +447,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
               onOpen={openPerson}
               onEditRole={editRole}
               builder={shapes}
+              hires={hires}
               atStart={!focus || focus === start}
               startLabel={mine ? "Show Me" : "Show Top"}
               onStart={() => setFocus(null)}
@@ -636,6 +642,7 @@ function Focus({
   onOpen,
   onEditRole,
   builder,
+  hires,
   atStart,
   startLabel,
   onStart,
@@ -652,6 +659,8 @@ function Focus({
   onOpen: (n: OrgNode) => void;
   onEditRole: (n: OrgNode) => void;
   builder: boolean;
+  /** May open New Vacancy on Recruitment (its create grant). */
+  hires: boolean;
   atStart: boolean;
   startLabel: string;
   onStart: () => void;
@@ -695,9 +704,11 @@ function Focus({
       </section>
       {focused.vacant && builder && (
         <>
-          <Button variant="primary" className="w-full" icon="plus" onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: focused.display_name }))}>
-            Create Vacancy
-          </Button>
+          {hires && (
+            <Button variant="primary" className="w-full" icon="plus" onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: focused.display_name, org_seat_id: focused.org_seat_id }))}>
+              Create Vacancy
+            </Button>
+          )}
           <Button className="w-full" icon="edit" onClick={() => onEditRole(focused)}>
             Edit Role
           </Button>
