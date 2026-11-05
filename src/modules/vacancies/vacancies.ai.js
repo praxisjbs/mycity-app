@@ -18,6 +18,7 @@ const routeMap = require("../../shared/route-map");
 const maps = require("../maps/maps.service");
 const cards = require("../organisation/organisation.cards");
 const service = require("./vacancies.service");
+const { probeFor } = require("./vacancies.matrix");
 
 const cite = (row) => ({ type: "vacancy", id: row.vacancy_id, label: `${row.number}, ${row.title}` });
 const link = (id) => (routeMap.linkFor("vacancy", id) || {}).path || null;
@@ -129,6 +130,8 @@ module.exports = defineManifest({
       permission: ["recruitment", "view"],
       run: (_client, params, actor) => service.list(params, actor.scope),
       cite,
+      // A vacancy the asker manages is listed; one the matrix's outsider manages never is.
+      matrix: probeFor(async (v) => ({ type: "vacancy", id: v.vacancy_id })),
     },
     {
       key: "vacancies.get",

@@ -10,6 +10,7 @@ const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const authoring = require("./assessments.authoring");
 const service = require("./assessments.service");
+const { probeFor, sittingFor } = require("../vacancies/vacancies.matrix");
 
 module.exports = defineManifest({
   module: "recruitment",
@@ -36,7 +37,13 @@ module.exports = defineManifest({
       params: c.assessments.SittingListQuery,
       permission: ["recruitment", "view"],
       run: (_client, params, actor) => service.sittings(params, actor.scope),
-      cite: (row) => ({ type: "assessment", id: row.assessment_definition_id, label: `${row.assessment_name}, ${row.candidate_name}` }),
+      // A sitting for a role the asker manages is listed; one for the outsider's role never is.
+      matrix: probeFor(async (v, ctx) => {
+        const { sitting, application } = await sittingFor(v, ctx);
+        return { type: "application_assessment", id: sitting.application_assessment_id, params: { application_id: application.application_id } };
+      }),
+      // The sitting itself: it opens on Assessments · Sittings (route map application_assessment).
+      cite: (row) => ({ type: "application_assessment", id: row.application_assessment_id, label: `${row.assessment_name}, ${row.candidate_name}` }),
     },
   ],
   routes: [

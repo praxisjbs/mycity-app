@@ -8,6 +8,7 @@
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const service = require("./talent_pool.service");
+const { probeFor, applicationFor } = require("../vacancies/vacancies.matrix");
 
 module.exports = defineManifest({
   module: "recruitment",
@@ -23,6 +24,12 @@ module.exports = defineManifest({
       permission: ["recruitment", "view"],
       run: (_client, params, actor) => service.list(params, actor.scope),
       cite: (row) => ({ type: "talent_pool_entry", id: row.talent_pool_entry_id, label: row.name }),
+      // Someone pooled from a role the asker manages is listed; someone from the outsider's role never is.
+      matrix: probeFor(async (v, ctx) => {
+        const a = await applicationFor(v, `Pool ${ctx.role}`);
+        const added = await service.add(ctx.actor, { scope: "all", scope_ids: null }, { application_id: a.application_id, reason: "Kept by the access matrix" });
+        return { type: "talent_pool_entry", id: added.talent_pool_entry_id };
+      }),
     },
   ],
   routes: [{ intent: "invite someone from the Talent Pool to apply", screen: "recruitment.talent-pool" }],

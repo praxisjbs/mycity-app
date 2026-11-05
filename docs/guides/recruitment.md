@@ -613,6 +613,14 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · P12. ⌘K actions: New Vacancy, Invite to Apply, Screen With AI, New Assessment, Schedule
+  Interview (`shared/search/actions.js`, each opening its tab with `?action=`). Six graded questions for the
+  assistant, one a member of staff who must never read candidates. The access matrix probes the reads of
+  vacancies, candidates, sittings and the pool: the asker's own role is listed, the outsider's never
+  (`vacancies.matrix.js`). Interviews has no probe: a panelist sees an interview whatever its role, and the
+  matrix's outsider holds no Recruitment to sit on one; its scope is tested in `recruitment-interviews`.
+  A sitting is cited as itself (`application_assessment`), not its assessment.
+
 - 05/11/2026 · GE · Audit of P6b, fixed:
   - two Add to Pool presses at once make one entry, renewed;
   - a person in the pool from another manager's role is "Already in the pool" to someone whose scope

@@ -9,6 +9,7 @@
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const service = require("./candidates.service");
+const { probeFor, applicationFor } = require("../vacancies/vacancies.matrix");
 
 const cite = (row) => ({ type: "candidate", id: row.application_id, label: `${row.number}, ${row.name}` });
 
@@ -33,6 +34,11 @@ module.exports = defineManifest({
       permission: ["recruitment", "view"],
       run: (_client, params, actor) => service.list(params, actor.scope),
       cite,
+      // An application to a role the asker manages is listed; one to the outsider's role never is.
+      matrix: probeFor(async (v, ctx) => {
+        const a = await applicationFor(v, ctx.role);
+        return { type: "candidate", id: a.application_id, params: { vacancy_id: v.vacancy_id } };
+      }),
     },
     {
       key: "candidates.get",

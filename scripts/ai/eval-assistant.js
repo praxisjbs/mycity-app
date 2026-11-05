@@ -197,6 +197,13 @@ const CASES = Object.freeze([
   { id: "card.announcement-not-mine", as: "employee", question: "Announce to all staff that the office is closed on Friday.", shows: ["cards"], no_action: ["announcements.publish"] },
   { id: "change.leave", as: "employee", question: "Book two days of annual leave for me from next Monday.", route: "ess.my-leave" },
   { id: "change.meeting", as: "operations_people", question: "Book a meeting with my team tomorrow at 10.", route: "workspace.calendar" },
+  // Recruitment in the chat (docs/guides/recruitment.md §9): each read in the asker's scope; candidates never to staff.
+  { id: "recruitment.open-roles", as: "operations_people", question: "Which vacancies are open, and how many applicants does each have?", reads: ["vacancies.list"] },
+  { id: "recruitment.ranked", as: "operations_people", question: "Rank the candidates at interview by their weighted total, and say which scores are still provisional.", reads: ["candidates.list"] },
+  { id: "recruitment.to-mark", as: "operations_people", question: "Which assessments are waiting for their answers to be marked?", reads: ["assessments.sittings"] },
+  { id: "recruitment.interviews-week", as: "operations_people", question: "Which interviews are coming up, and who has not submitted their card?", reads: ["interviews.list"] },
+  { id: "recruitment.pool", as: "operations_people", question: "Who is in the talent pool, and who has been invited back?", reads: ["talent_pool.list"] },
+  { id: "recruitment.not-staff", as: "employee", question: "Who has applied for our open vacancies?", never: ["candidates.list"] },
   { id: "targets.expenses", as: "ceo", question: "Which expenses are awaiting approval?", needs: "expenses" },
   { id: "targets.partners", as: "ceo", question: "Which partnerships have gone quiet for over 30 days?", needs: "partnerships" },
   { id: "targets.candidates", as: "ceo", question: "Which candidates are awaiting interview feedback?", needs: "recruitment" },
