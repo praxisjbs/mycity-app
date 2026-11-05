@@ -22,6 +22,7 @@ const { emit } = require("../../shared/events/emit");
 const { assertInScope } = require("../../shared/rbac/scope");
 const lagos = require("../../shared/time/lagos");
 const { scopeFor } = require("../../middleware/rbac");
+const vault = require("../../shared/documents/vault");
 const vacancyRepo = require("../vacancies/vacancies.repo");
 const candidates = require("../candidates/candidates.repo");
 const repo = require("./assessments.repo");
@@ -37,6 +38,21 @@ async function tx(fn) {
     client.release();
   }
 }
+
+/**
+ * Who opens a file answer: whoever may read the sitting, so a Head of Department who marks a role's
+ * sittings (scope team, by the vacancy's hiring manager) opens what the candidate sent, as one with
+ * scope all does (guide §8). The file names no employee, so the vault's own rule would refuse a team.
+ * Kept here, on the staff side: the public assessment page must not load staff auth.
+ */
+vault.defineAccess("application_assessment", async (client, user, doc) => {
+  if (user.is_ceo === true) return true;
+  const row = await repo.sitting(client, doc.entity_id);
+  if (!row) return false;
+  const s = await scopeFor(user, "recruitment", "view");
+  if (!s) return false;
+  return s.scope === "all" || Boolean(row.hiring_manager_id && (s.scope_ids || []).includes(row.hiring_manager_id));
+});
 
 const notFound = () => new AppError("NOT_FOUND", "That sitting does not exist", 404);
 const field = (name, message) => new AppError("VALIDATION_FAILED", message, 422, { [name]: [message] });
