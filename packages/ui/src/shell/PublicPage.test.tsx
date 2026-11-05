@@ -21,6 +21,18 @@ describe("PublicPage", () => {
     expect(screen.getByRole("link", { name: "Verify a Document" })).toBeInTheDocument();
   });
 
+  it("draws the page on its card by default, and open lays the page out wide with no card", () => {
+    const { container, rerender } = render(<PublicPage><p>Apply</p></PublicPage>);
+    expect(container.firstElementChild).toHaveAttribute("data-layout", "card");
+    expect(screen.getByText("Apply").parentElement?.className).toContain("rounded-card");
+    expect(screen.getByRole("main").className).toContain("max-w-176");
+    rerender(<PublicPage layout="open"><p>Careers</p></PublicPage>);
+    expect(container.firstElementChild).toHaveAttribute("data-layout", "open");
+    expect(screen.getByText("Careers").parentElement?.className).not.toContain("rounded-card");
+    expect(screen.getByRole("main").className).toContain("max-w-280");
+    expect(screen.getByRole("banner").className).toContain("max-w-280");
+  });
+
   it("switches the theme from its button", async () => {
     render(<PublicPage><p>Page</p></PublicPage>);
     await userEvent.click(screen.getByRole("button", { name: /Theme/ }));

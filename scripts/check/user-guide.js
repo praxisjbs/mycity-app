@@ -91,9 +91,9 @@ const ICONS = (() => {
   return new Set([...body.matchAll(/^\s+([a-z][a-z0-9]*):/gm)].map((m) => m[1]));
 })();
 
-/** Every text the hub carries: where a bold name must be found (6). */
+/** Every text the hub and the public site carry: where a bold name must be found (6). The public site's chapter names its pages' words. */
 const CORPUS = (() => {
-  const roots = ["app/src", "packages/ui/src", "src", "packages/contract/schemas", "seeds/reference", "templates"];
+  const roots = ["app/src", "public-app/src", "packages/ui/src", "src", "packages/contract/schemas", "seeds/reference", "templates"];
   const parts = [];
   const walk = (dir) => {
     if (!fs.existsSync(dir)) return;

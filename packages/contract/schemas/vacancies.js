@@ -14,6 +14,7 @@ const { z } = require("zod");
 const { uuid, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef, WorkPattern } = require("./organisation");
 const { PlaceInput, PlaceView, PlaceToken } = require("./maps");
+const { RichTextBlock } = require("./policies");
 
 /**
  * An optional whole number a form may leave empty. `blank(z.coerce.number())` would read "" as 0;
@@ -542,7 +543,9 @@ const PublicJobPage = Paged(PublicJobCard);
 /**
  * GET /api/public/v1/jobs/:slug. A hidden salary band is left out, not sent as null.
  * `state`: open takes applications; paused and closed say so; filled is closed as filled.
- * `how_we_hire` names the steps this role uses, from its scorecard.
+ * `how_we_hire` names the steps this role uses, from its scorecard. The four texts written in Markdown
+ * (About MyCityApp, the description, must have, nice to have) arrive as blocks from the server's one
+ * Markdown renderer (shared/documents/markdown), as a policy's do, so the page draws them as elements.
  */
 const PublicJob = PublicJobCard.extend({
   employment_type: EmploymentType.nullable(),
@@ -552,12 +555,12 @@ const PublicJob = PublicJobCard.extend({
   min_experience_years: z.number().int().min(0).nullable(),
   working_days: z.string().nullable(),
   /** About MyCityApp, from Careers Settings: the same paragraph on every role. */
-  about_company: z.string().nullable(),
+  about_company: z.array(RichTextBlock).nullable(),
   salary_min: money.optional(),
   salary_max: money.optional(),
-  description: z.string(),
-  requirements: z.string().nullable(),
-  nice_to_have: z.string().nullable(),
+  description: z.array(RichTextBlock),
+  requirements: z.array(RichTextBlock).nullable(),
+  nice_to_have: z.array(RichTextBlock).nullable(),
   how_we_hire: z.array(z.enum(["apply", "screening", "assessment", "interview"])).max(4),
   applicants: z.number().int().min(0),
   closes_at: isoDateTime.nullable(),

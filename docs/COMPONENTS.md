@@ -161,10 +161,11 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it. | stable |
 | Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
 | Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls and pulls to refresh, the floating button, and the bottom bar. | stable |
-| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer. | stable |
+| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide (or, open, the page's own sections up to 1120 px), and a short footer. | stable |
 | Shell | [PullIndicator](#pullindicator) | `PullIndicator` | The pull to refresh's Pin Drop: the pin in a disc that drops from under the header as the page is pulled, its yellow ring closing at the release point, Deep Green with the reload mark past the second notch. | stable |
 | Shell | [Rail](#rail) | `Rail` | The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot. | stable |
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
+| Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's top panel: the page's heading on Deep Green over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark). | beta |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
@@ -3901,6 +3902,7 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 | `onStepChange` | `(index: number) => void` |  | Called with the step index each time it changes, so a draft can remember it. |
 | `step` | `number` |  | The step in view, when the form decides it (a refusal on a field of step 1 takes the person back there). Set it with `onStepChange`; left unset, the wizard keeps its own step. |
 | `error` | `ReactNode` |  | The one general error, above the footer: a refusal that names no field (FRONTEND_GUIDE §8.3). |
+| `level` | `2 \| 3` |  | The step heading's level: h3 under a modal's title (the default), h2 straight under a page's own h1. |
 
 ```tsx
 <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
@@ -5348,13 +5350,13 @@ The staff app's phone frame: the top bar and title rail, the page, which alone s
 
 ### PublicPage
 
-The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer.
+The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide (or, open, the page's own sections up to 1120 px), and a short footer.
 
 | | |
 |---|---|
-| Use | Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). |
+| Use | Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). layout open for a page a stranger browses (Careers, a Vacancy), with a SkylineHero at its head; the card for a page a person fills in or reads once. |
 | Avoid | The staff app (it has its own shells); a second card inside the card; a page of explanation (a PageMessage says one thing). |
-| Phone | The card runs edge to edge with no side border; the header and footer keep a 16 px margin; the theme switch is a 44 px target. |
+| Phone | The card runs edge to edge with no side border; open, the page's first block (its hero) runs edge to edge and its sections keep their own 16 px margin; the header and footer keep a 16 px margin; the theme switch is a 44 px target. |
 | Accessibility | A banner, a main and a contentinfo landmark; the theme switch is a named button. PageMessage's title is a heading (h2) and its icon is decorative. |
 | Status | stable |
 | Exports | `PublicPage`, `PageMessage` |
@@ -5374,6 +5376,7 @@ The public site's page: the mark and the theme switch on top, the page on one ca
 | `company` | `string` |  | The company line at the foot; MyCity App Ltd · Lagos, Nigeria unless set. |
 | `foot` | `ReactNode` |  | More at the very foot (the mock's demo links, on a laptop only). |
 | `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
+| `layout` | `"card" \| "open"` |  | `card` (the default): the page on one card, 704 px. `open`: no card, up to 1120 px, the page lays out its own sections. |
 
 **PageMessage** props (`PageMessageProps`)
 
@@ -5482,6 +5485,41 @@ A small dark card floating at the foot of the shell for something about the app 
 
 ```tsx
 <ShellNotice icon="refresh" actions={<Button variant="primary" size="sm">Reload</Button>}>A new version is ready</ShellNotice>
+```
+
+### SkylineHero
+
+The public site's top panel: the page's heading on Deep Green over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark).
+
+| | |
+|---|---|
+| Use | The head of a public page that invites a stranger in: Careers (size l, with the search under the heading) and a Vacancy (size m, with the role's facts as chips). |
+| Avoid | The staff app; a page a person is working through (Apply, an Assessment: they keep their card); decoration under a page that has its own heading already; text more than a line. |
+| Phone | Edge to edge, the heading 24 px, the skyline shorter so the first screen still shows the list under it; the line under the heading is hidden (a page subtitle is desktop only). |
+| Accessibility | The heading is the page's h1 (data-ui page-title); the skyline is decorative (aria-hidden) and still under reduced motion. The heading sits on Deep Green whatever the hour, so it keeps AA over a pale midday sky. |
+| Status | beta |
+| Exports | `SkylineHero` |
+| Import | `import { SkylineHero } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/SkylineHero.tsx` |
+| Test | `packages/ui/src/shell/SkylineHero.test.tsx` |
+| Gallery | `packages/ui/src/shell/SkylineHero.gallery.tsx` (`npm run gallery`, `#/SkylineHero`) |
+
+**SkylineHero** props (`SkylineHeroProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The page's heading: what the page is (Work With Us, the role's title). |
+| `eyebrow` | `ReactNode` |  | One short line over the heading: whose it is (Careers at MyCityApp, the role's department). |
+| `text` | `ReactNode` |  | One line under the heading, at most 8 words, desktop only. |
+| `facts` | `ReadonlyArray<{ icon: IconName; text: string }>` |  | The record's facts as chips on the panel, each a glyph and a few words (Lagos, Hybrid, Full Time). |
+| `children` | `ReactNode` |  | What sits under the heading: a search field. |
+| `size` | `"l" \| "m"` |  | `l` (the default) for a page's front door, `m` for a record's page (a role). |
+| `still` | `boolean` |  | Draws the skyline without motion even where motion is on (the gallery, a still picture). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<SkylineHero eyebrow="Careers at MyCityApp" title="Work With Us" text="Building the app that knows every Nigerian city." />
+<SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
 ```
 
 ### TopBar

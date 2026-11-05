@@ -306,7 +306,7 @@ const ApplicationSubmit = z
       .string()
       .trim()
       .max(160, "At most 160 characters")
-      .refine((v) => v.split(/\s+/).filter(Boolean).length >= 2, "Your first and last name"),
+      .refine((v) => v.split(/\s+/).filter(Boolean).length >= 2, "First and last name"),
     email,
     phone,
     years_experience: z
@@ -318,7 +318,7 @@ const ApplicationSubmit = z
     cover_letter: z
       .string()
       .trim()
-      .min(20, "A sentence or two, at least 20 characters")
+      .min(20, "At least 20 characters")
       .max(3000, "At most 3000 characters"),
     answers: z.record(uuid, z.string().trim().max(2000, "At most 2000 characters")).default({}),
     consent: z.literal(true, { errorMap: () => ({ message: "Tick to agree" }) }),

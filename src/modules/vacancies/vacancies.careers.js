@@ -19,6 +19,7 @@ const publicToken = require("../../shared/tokens/public-token");
 const repo = require("./vacancies.repo");
 const lifecycle = require("./vacancies.lifecycle");
 const slugs = require("./vacancies.slug");
+const md = require("../../shared/documents/markdown");
 
 /** An Apply link lives 48 hours (guide §6.2). */
 const APPLY_TTL_HOURS = 48;
@@ -39,6 +40,9 @@ async function list(query) {
   return { ...page, data: page.data.map(card) };
 }
 
+/** A Markdown text as the page draws it: blocks from the one renderer, or null when there is none. */
+const blocksOf = (text) => (text && String(text).trim() ? md.markdownToBlocks(text) : null);
+
 /** PublicJob, built field by field. A hidden salary band is left out, not sent as null. */
 async function get(slug) {
   if (!slugs.looksLikeSlug(slug)) throw notFound();
@@ -53,12 +57,12 @@ async function get(slug) {
     reports_to: row.reports_to,
     min_experience_years: row.min_experience_years,
     working_days: row.working_days,
-    about_company: about,
+    about_company: blocksOf(about),
     ...(row.salary_visible && row.salary_min ? { salary_min: row.salary_min } : {}),
     ...(row.salary_visible && row.salary_max ? { salary_max: row.salary_max } : {}),
-    description: row.description,
-    requirements: row.requirements,
-    nice_to_have: row.nice_to_have,
+    description: blocksOf(row.description) || [],
+    requirements: blocksOf(row.requirements),
+    nice_to_have: blocksOf(row.nice_to_have),
     how_we_hire: lifecycle.howWeHire(row.active_parts),
     applicants: row.applicants,
     closes_at: row.closes_at,

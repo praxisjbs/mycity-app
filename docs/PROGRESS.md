@@ -1615,13 +1615,15 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Path | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 80 | Careers | `/jobs` | M4 | GE | ☑ | ☐ | ☐ | In progress | 04/11/2026 |
-| 81 | Vacancy | `/jobs/<slug>` | M4 | GE | ☑ | ☐ | ☐ | In progress | 04/11/2026 |
-| 82 | Apply | `/apply/<token>` | M4 | GE | ☑ | ☐ | ☐ | In progress | 05/11/2026 |
-| 83 | Assessment | `/assess/<token>` | M4 | GE | ☑ | ☐ | ☐ | In progress | 05/11/2026 |
+| 80 | Careers | `/jobs` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
+| 81 | Vacancy | `/jobs/<slug>` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
+| 82 | Apply | `/apply/<token>` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
+| 83 | Assessment | `/assess/<token>` | M4 | GE | ☑ | ☑ | ☑ | In progress | 05/11/2026 |
 | 84 | Sign Offer | `/sign/<token>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
 | 85 | Verify Document | `/verify/<number>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
+
+- 05/11/2026 · GE · (Ose) P11: Careers, Vacancy, Apply and Assessment on the contract (`contract.gen.ts`; `types/public.ts` keeps only M5's sign and verify). Careers and a vacancy open on SkylineHero, Lagos lit as it is at the hour, in PublicPage's new open layout; role cards, search above 8, the server's pages. A vacancy's four texts arrive as blocks and draw with RichText; The Role card with Apply for This Role beside the text on desktop, a bar at the foot on a phone; paused, closed and filled banners. Apply is a three-step Wizard on ApplicationSubmit (the vacancy's questions marked as the server marks them, the privacy tick), then the receipt. Assessment: intro, Countdown or the due day, autosave with Saved, file answers by upload or link, Finish then Submit Assessment, submitted and time up. Apply and Assessment load as their own chunks, so Zod stays off the careers pages. The M4 mock rewritten in the contract's shapes; 18 page tests. Left: P15's Status and counts; pictures for the public chapter once shoot.js can open public-app (P14).
 
 - 15/10/2026 · AJ · Built `public-app/` (A9) from the demo's Public Site pages: Careers, Vacancy, Apply, Assessment, Sign Offer and Verify Document, desktop and phone, light and dark with a visitor toggle, against an in-browser mock of `/api/public/v1`. Added the states the demo does not draw: application received, assessment start, finished and time up, offer signed, declined and expired, the three failed verify verdicts and a reference lookup, and every bad link (unknown, expired, used). No ticks: UI is ticked once the pages run on the real API. Left: the public routes in the contract. Only `GET /verify/:number` and `GET /<surface>/:token/document` are named in BACKEND_STRUCTURE §8; the rest are INTERIM in `public-app/src/api/types/public.ts` for TB (M4) and LA (M5) to agree, including `POST /jobs/:slug/apply` minting the apply token and `POST /apply/:token/cv` for the CV.

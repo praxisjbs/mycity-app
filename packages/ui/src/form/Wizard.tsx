@@ -47,9 +47,11 @@ export interface WizardProps {
   step?: number;
   /** The one general error, above the footer: a refusal that names no field (FRONTEND_GUIDE §8.3). */
   error?: ReactNode;
+  /** The step heading's level: h3 under a modal's title (the default), h2 straight under a page's own h1. */
+  level?: 2 | 3;
 }
 
-export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 0, onStepChange, step: controlled, error }: WizardProps) {
+export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 0, onStepChange, step: controlled, error, level = 3 }: WizardProps) {
   const clamp = (i: number) => Math.min(Math.max(i, 0), steps.length - 1);
   const [own, setOwn] = useState(clamp(initialStep));
   const at = controlled === undefined ? own : clamp(controlled);
@@ -57,6 +59,7 @@ export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 
   const shown = useRef(at);
   const step = steps[at];
   const last = at === steps.length - 1;
+  const Heading = level === 2 ? "h2" : "h3";
 
   // Focus moves to the heading only when the step itself changes: a parent re-rendering (a new
   // onStepChange on every render) must never pull focus out of the field being typed in.
@@ -79,9 +82,9 @@ export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 
   return (
     <div>
       <StepBar steps={steps.map((s) => s.title)} at={at} />
-      <h3 ref={heading} tabIndex={-1} data-ui="title" className="mb-3 text-lg font-semibold outline-none">
+      <Heading ref={heading} tabIndex={-1} data-ui="title" className="mb-3 text-lg font-semibold outline-none">
         {step.title}
-      </h3>
+      </Heading>
       <div>{step.body}</div>
       {error ? <div className="mt-3"><FormError>{error}</FormError></div> : null}
       <FormFooter>

@@ -716,20 +716,24 @@ imports nothing from `app/`; what both need comes from `@mycity/ui`.
 public-app/
   index.html                  theme before first paint (localStorage mc-public-theme)
   vite.config.ts              the shared Vite settings, page size from the contract, API mode,
-                              /api/public proxy; no PWA, no service worker
+                              /api/public proxy, tests on jsdom; no PWA, no service worker
   eslint.config.js            extends @mycity/ui/eslint
   src/
-    main.tsx  App.tsx         entry; the six routes and a not-found page
+    main.tsx  App.tsx         entry; the six routes and a not-found page; Apply and Assessment load on
+                              their own (Apply's contract schema brings Zod)
+    test-setup.ts             every test file: the 4 second wait, matchMedia and the rest jsdom lacks
     styles/index.css          Tailwind and the @mycity/ui styles
     lib/                      plan (the delivery plan bound to this site), router
     api/
       client.ts               fetch to /api/public/v1 only, made with createApiClient; no session, no cookie
-      hooks.ts  endpoints.ts  the shared hooks bound to this client; the typed endpoint map
-      types/public.ts         INTERIM shapes for every public route (TB for M4 pages, LA for M5)
+      hooks.ts  endpoints.ts  the shared hooks bound to this client; the endpoint map: the M4 routes picked
+                              from contract.gen.ts, the M5 ones from types/public.ts
+      types/public.ts         INTERIM shapes for the M5 routes (sign, verify) until their contract lands
       mock/                   the in-browser mock, laptops and CI only; demo-links.ts lists sample addresses
     shell/                    Page (PublicPage with the site's links and noindex), Planned (Coming Soon, the
                               Prototype View switch), DemoLinks (mock only)
-    pages/                    Careers, Vacancy, Apply, Assessment, SignOffer, Verify, LinkProblem
+    pages/                    Careers, Vacancy, Apply, Assessment (each with its test), SignOffer, Verify,
+                              LinkProblem; shared.tsx holds the careers labels and a role's facts
 ```
 
 Addresses are `/jobs`, `/jobs/<slug>`, `/apply/<token>`, `/assess/<token>`, `/sign/<token>` and

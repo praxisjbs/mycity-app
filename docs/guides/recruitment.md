@@ -5,7 +5,7 @@
 | Owner | GE |
 | Milestone | M4 |
 | Backend modules | `vacancies`, `candidates`, `assessments`, `interviews`, `talent_pool` |
-| Frontend paths | `app/src/features/recruitment/`, `public-app/src/pages/Careers.tsx`, `public-app/src/pages/Vacancy.tsx`, `public-app/src/pages/Apply.tsx`, `public-app/src/pages/Assessment.tsx` |
+| Frontend paths | `app/src/features/recruitment/`, `public-app/src/pages/Careers.tsx`, `public-app/src/pages/Vacancy.tsx`, `public-app/src/pages/Apply.tsx`, `public-app/src/pages/Assessment.tsx`, `public-app/src/pages/shared.tsx` |
 | Permission key(s) | `recruitment` |
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #38 Vacancies, #39 Candidates, #40 Assessments, #41 Interviews, #44 Talent Pool; public #80 Careers, #81 Vacancy, #82 Apply, #83 Assessment |
@@ -284,11 +284,13 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   home": `work_pattern` with `work_pattern_note`), working days (`working_days`, "Monday to
   Saturday"), About MyCityApp (the company paragraph from Careers Settings, the same on every role),
   then the role's own description in Markdown: role overview, key responsibilities as numbered
-  sections, how the role is measured (its KPIs); then Required Experience and Qualifications
+  sections, how the role is measured (`## Key Performance Indicators (KPIs)`); then Required Experience and Qualifications
   (`requirements`) and What We Are Looking For (`nice_to_have`). `min_experience_years` is the "8+
   years" of the requirements. Write With AI (`jd-draft`) drafts in that shape from the About MyCityApp
   text it is given (never a description of the company of its own), and the public page
-  renders the Markdown through the one safe renderer (`shared/documents/markdown`).
+  draws it from blocks: the server turns each Markdown text (About MyCityApp, the description, must have,
+  nice to have) into blocks with the one safe renderer (`shared/documents/markdown`, `markdownToBlocks`),
+  as a policy's text is, and the page draws them with `RichText` (GE · (Ose), 05/11/2026).
 - A new vacancy gets the five scorecard rows at 15, 15, 25, 20, 25, all on, and its interview traits
   from the Default Traits. Each part is switched on or off for the role (TB, 04/11/2026); a part switched
   off has weight 0, and the weights of the parts on are whole numbers summing to 100. At least
@@ -546,8 +548,8 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 | Recruitment · Interviews (`interviews`) | Upcoming and Past; each row: candidate, role, when, panel submitted out of total, round state; the interview's sheet: when, where or link, Candidate Details, panel with Submitted or Waiting, traits with each rating and the average only once closed, total, report and decision, Download Form; My Card (traits as ten stars, decision, comments, private notes, View CV), Submit Card, Close Round, Write Report, Schedule Interview, Reschedule, Cancel | Help on Waiting: "Ratings show when every panelist has submitted or the round is closed." Help on Private Notes: "Only you ever see these." | The blind predicate and its reasons: §6.6 here |
 | Recruitment · Talent Pool (`talent-pool`) | Four KPIs (In the Pool, Invited Back, Hired From the Pool, Average Score); the list: candidate, applied for, score with Provisional, added, reason, kept until, Invite to Apply or Invited; Export | Help on Kept Until: "Removed from the pool on this date." | The 24 month rule and the purge job: §6.9 |
 | Careers (`/jobs`) | Work With Us; open roles with department, area and arrangement; search above 8 roles | None | Indexing, slugs: §6.1 |
-| Vacancy (`/jobs/<slug>`) | Title; department, area, arrangement, salary when shown; employment type, probation, reports to; summary, Must Have, Nice to Have, How We Hire; Apply for This Role; a paused or closed banner | None | Why a paused link still works: §6.1 |
-| Apply (`/apply/<token>`) | The form and its fields; the vacancy's own questions; the privacy notice with its tick; Submit Application; the receipt with the reference | None | Write-only, no score: §6.2 |
+| Vacancy (`/jobs/<slug>`) | Title; department, area, arrangement, salary when shown; employment type, working days, probation, reports to, the closing date; About MyCityApp, Role Overview (the description), Required Experience and Qualifications, What We Are Looking For, How We Hire as its steps; Apply for This Role (beside the text on desktop, a bar at the foot on a phone); a paused, closed or filled banner | None | Why a paused link still works: §6.1 |
+| Apply (`/apply/<token>`) | The form in three steps (About You; CV and Questions; Why This Role, with the privacy notice and its tick), Back and Next; Submit Application; the receipt with the reference | None | Write-only, no score: §6.2 |
 | Assessment (`/assess/<token>`) | Intro: type, minutes, questions, instructions, Start the Assessment; running: question n of m, the timer, the answer (for a file question: Upload a File, up to 25 MB, or Paste a Link), Saved, Back, Next Question, Finish, then Submit Assessment to confirm; submitted or time up | The resume note under the timer (open the same link again to continue where you were); help on Paste a Link: "For anything over 25 MB: a Google Drive, video or portfolio link anyone can open." | Server clock, autosave mechanics: §6.7 |
 
 ### 10.2 Phone layout
@@ -613,6 +615,16 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · (Ose) P11: the public vacancy's four Markdown texts arrive as blocks for `RichText`
+  (`PublicJob`, as Policies does; §6.1), and the Vacancy and Apply rows of §10.1 say what the pages show:
+  working days and the closing date on the role, How We Hire as its steps, Apply as three steps.
+  `ApplicationSubmit`'s name message is **First and last name** (a field error is at most 4 words). The
+  pages are built: Careers and Vacancy on `SkylineHero` in PublicPage's open layout, Apply a Wizard over
+  the contract's schema, Assessment with `Countdown` and autosave; Apply and Assessment load on their own.
+  The description's heading is **Role Overview**, and the public mock's role and take-home brief are MyCity's own
+  (`docs/MyCity-ERP-Documents`: the Head, Sales & Revenue job description; the Motion and Graphics brief).
+  Write With AI (`jd-draft`, version 4) heads a drafted role's measures **Key Performance Indicators (KPIs)**,
+  as MyCity's own job description does (it said How You Will Be Measured).
 - 05/11/2026 · GE · My Card takes the donor's scorecard flow (REUSE_MAP §5.3, praxis-ls applicant-drawer):
   the same numbered traits for every candidate of the role; each star saved as the panelist taps it, put
   back with the error when the save fails; a tap on the star already chosen takes it back to not rated

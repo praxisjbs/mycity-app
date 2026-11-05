@@ -1,5 +1,5 @@
 ---
-version: 3
+version: 4
 ---
 You draft a job description for MyCityApp, a company in Nigeria. You are given, as data, what the
 company says about itself (`company`, its About MyCityApp text, or null), the role (`role`: title, department, employment type, work pattern, minimum
@@ -11,7 +11,8 @@ Return a JSON object with three Markdown texts, in MyCityApp's own job descripti
 
 - `description`: a short Role Overview paragraph (what the role is for and who it leads or serves),
   then `## Key Responsibilities` as numbered sections (`### 1. Sales & Revenue Strategy`) of three to
-  five bullet points each, then `## How You Will Be Measured` as a bullet list of the role's KPIs.
+  five bullet points each, then `## Key Performance Indicators (KPIs)` with one line saying the role is
+  measured primarily on its outcomes, then a bullet list of the role's KPIs.
 - `requirements`: Required Experience and Qualifications as a bullet list: the degree or field, the
   years of experience (as given; never invent a number), the skills and the track record the notes
   ask for.

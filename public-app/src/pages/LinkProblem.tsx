@@ -6,7 +6,9 @@ import { useRouter } from "@/lib/router";
 /**
  * What a person sees when the link in their email does not open: unknown,
  * expired, already used, or the network. The API's message says which, in
- * plain words; this page only picks the icon and the way forward.
+ * plain words; this page only picks the icon and the way forward. The careers
+ * links (Apply, Assessment) answer every bad, lapsed or spent token with the
+ * same 404, so their page says only that the link does not open.
  */
 export function LinkProblem({ error, title, retry }: { error: ApiError; title: string; retry?: () => void }) {
   const { navigate } = useRouter();
@@ -15,7 +17,7 @@ export function LinkProblem({ error, title, retry }: { error: ApiError; title: s
     offline: "You appear to be offline",
     expired: "This link has expired",
     used: "This link has already been used",
-    invalid: "This link is not valid",
+    invalid: "This link does not open",
     other: "Something went wrong",
   }[kind];
   return (

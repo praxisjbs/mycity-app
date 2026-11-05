@@ -1,6 +1,7 @@
 import type { GalleryEntry } from "../testing/gallery";
 import { Button } from "../actions/Button";
 import { Brand } from "./Brand";
+import { SkylineHero } from "./SkylineHero";
 import { PageMessage, PublicPage } from "./PublicPage";
 
 const links = (
@@ -22,6 +23,11 @@ export default {
         <h2 data-ui="title" className="text-xl font-strong">
           Open Roles
         </h2>
+      </PublicPage>
+    ),
+    "Open Page": () => (
+      <PublicPage layout="open" landmarks={false} brand={<a href="#/PublicPage" aria-label="MyCityApp careers"><Brand name="MyCityApp" /></a>} links={links}>
+        <SkylineHero eyebrow="Careers at MyCityApp" title="Work With Us" text="Building the app that knows every Nigerian city." still />
       </PublicPage>
     ),
     "Message Sent": () => (

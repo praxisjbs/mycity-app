@@ -1,10 +1,10 @@
 /**
  * @component PublicPage
  * @group Shell
- * @summary The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer.
- * @use Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found).
+ * @summary The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide (or, open, the page's own sections up to 1120 px), and a short footer.
+ * @use Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). layout open for a page a stranger browses (Careers, a Vacancy), with a SkylineHero at its head; the card for a page a person fills in or reads once.
  * @avoid The staff app (it has its own shells); a second card inside the card; a page of explanation (a PageMessage says one thing).
- * @phone The card runs edge to edge with no side border; the header and footer keep a 16 px margin; the theme switch is a 44 px target.
+ * @phone The card runs edge to edge with no side border; open, the page's first block (its hero) runs edge to edge and its sections keep their own 16 px margin; the header and footer keep a 16 px margin; the theme switch is a 44 px target.
  * @a11y A banner, a main and a contentinfo landmark; the theme switch is a named button. PageMessage's title is a heading (h2) and its icon is decorative.
  * @status stable
  * @exports PageMessage
@@ -32,24 +32,33 @@ export interface PublicPageProps {
   foot?: ReactNode;
   /** false draws the page without its main landmark, inside another page (the gallery). Default true. */
   landmarks?: boolean;
+  /** `card` (the default): the page on one card, 704 px. `open`: no card, up to 1120 px, the page lays out its own sections. */
+  layout?: "card" | "open";
 }
 
 const WIDTH = "mx-auto w-full max-w-176";
+const WIDE = "mx-auto w-full max-w-280";
 
-export function PublicPage({ brand, children, below, links, company = "MyCity App Ltd · Lagos, Nigeria", foot, landmarks = true }: PublicPageProps) {
+export function PublicPage({ brand, children, below, links, company = "MyCity App Ltd · Lagos, Nigeria", foot, landmarks = true, layout = "card" }: PublicPageProps) {
   const { theme, toggle } = useTheme();
   const Main = landmarks ? "main" : "div";
+  const open = layout === "open";
+  const width = open ? WIDE : WIDTH;
   return (
-    <div className="flex flex-1 flex-col">
-      <header className={cn(WIDTH, "flex items-center justify-between px-6 pt-5 pb-3 phone:px-4")}>
+    <div className="flex flex-1 flex-col" data-layout={layout}>
+      <header className={cn(width, "flex items-center justify-between px-6 pt-5 pb-3 phone:px-4")}>
         <span className="*:inline-flex *:min-h-tap *:items-center">{brand}</span>
         <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Light Theme" : "Dark Theme"} onClick={toggle} />
       </header>
-      <Main className={cn(WIDTH, "flex-1 px-6 pb-6 phone:px-0")}>
-        <div className="animate-rise rounded-card border border-border bg-background p-6 phone:rounded-none phone:border-x-0 phone:p-4">{children}</div>
+      <Main className={cn(width, "flex-1 px-6 pb-6 phone:px-0")}>
+        {open ? (
+          <div className="animate-rise">{children}</div>
+        ) : (
+          <div className="animate-rise rounded-card border border-border bg-background p-6 phone:rounded-none phone:border-x-0 phone:p-4">{children}</div>
+        )}
         {below}
       </Main>
-      <footer className={cn(WIDTH, "px-6 pb-6 text-xs text-subtle-foreground phone:px-4")}>
+      <footer className={cn(width, "px-6 pb-6 text-xs text-subtle-foreground phone:px-4")}>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3.5">
           <span>{company}</span>
           {links != null && <span className="flex flex-wrap gap-3.5 phone:*:inline-flex phone:*:min-h-tap phone:*:min-w-tap phone:*:items-center">{links}</span>}

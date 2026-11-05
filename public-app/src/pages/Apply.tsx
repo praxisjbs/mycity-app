@@ -1,136 +1,303 @@
-import { useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import type { ApplicationReceipt, ApplicationSubmit, ApplyLink, ApplyQuestion } from "@mycity/contract/contract.gen.ts";
+import candidates from "@mycity/contract/schemas/candidates.js";
+import {
+  Button,
+  CheckboxField,
+  ChoiceField,
+  Confetti,
+  Field,
+  FileCard,
+  formatDate,
+  formatTime,
+  Icon,
+  PageMessage,
+  NumberField,
+  PhoneField,
+  RadioCards,
+  SelectField,
+  Skeleton,
+  Sub,
+  TextAreaField,
+  TextField,
+  UploadField,
+  useContractForm,
+  Wizard,
+  type ContractSchema,
+} from "@mycity/ui";
 import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
-import "@/api/types/public";
-import type { ApplicationReceipt } from "@/api/types/public";
 import type { DocumentRef } from "@/api/types/common";
-import { Page } from "@/shell/Page";
-import { Banner, Button, Field, Form, formatDate, formatTime, PageMessage, Skeleton, Sub, TextAreaField, TextField, UploadField } from "@mycity/ui";
-import { useRouter } from "@/lib/router";
-import { LinkProblem } from "./LinkProblem";
 import { upload } from "@/api/upload";
+import { useRouter } from "@/lib/router";
+import { Page } from "@/shell/Page";
+import { LinkProblem } from "./LinkProblem";
 
-type Values = { full_name: string; email: string; phone: string; years: string; why: string };
-type Key = keyof Values | "cv";
+/** The form's values: the contract's fields as typed, and each of the vacancy's questions as `q_<id>`. */
+type Values = Record<string, string | boolean>;
 
-/** The checks a person sees while filling the form (gate 12). The API checks the same again. */
-const RULES: Record<Key, (v: Values, cv: DocumentRef | null) => string | null> = {
-  full_name: (v) => (v.full_name.trim().split(/\s+/).length >= 2 ? null : "Your first and last name"),
-  email: (v) => (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email.trim()) ? null : "An email address we can reach you at"),
-  phone: (v) => (v.phone.replace(/\D/g, "").length >= 10 ? null : "A phone number with at least 10 digits"),
-  years: (v) => (/^\d{1,2}$/.test(v.years.trim()) ? null : "A whole number of years, for example 5"),
-  cv: (_v, cv) => (cv ? null : "Attach your CV"),
-  why: (v) => (v.why.trim().length >= 20 ? null : "A sentence or two, at least 20 characters"),
-};
-const SERVER_KEY: Record<string, Key> = { full_name: "full_name", email: "email", phone: "phone", years_experience: "years", cv_document_id: "cv", why: "why" };
+const qKey = (id: string) => `q_${id}`;
+const ABOUT_YOU = ["full_name", "email", "phone", "years_experience"];
+const WHY = ["cover_letter", "consent"];
+
+/** The form as the API takes it: years as a number, the answers given keyed by question. */
+function bodyOf(v: Values, questions: ApplyQuestion[]) {
+  const years = String(v.years_experience ?? "");
+  const answers: Record<string, string> = {};
+  for (const q of questions) {
+    const a = String(v[qKey(q.vacancy_question_id)] ?? "").trim();
+    if (a) answers[q.vacancy_question_id] = a;
+  }
+  return {
+    full_name: String(v.full_name ?? ""),
+    email: String(v.email ?? ""),
+    phone: String(v.phone ?? ""),
+    years_experience: years === "" ? undefined : Number(years),
+    cv_document_id: String(v.cv_document_id ?? ""),
+    cover_letter: String(v.cover_letter ?? ""),
+    answers,
+    consent: v.consent === true,
+  };
+}
 
 /**
- * Apply (#82): reached by a one-time token. Write only: the candidate sends an
- * application and never reads one back, so there is no score, no status and no
- * other applicant here.
+ * The contract's ApplicationSubmit over the form: an answer's mark lands on its question, and a
+ * required question left empty is marked as the server would mark it (candidates.apply.js).
+ */
+function applySchema(questions: ApplyQuestion[]): ContractSchema {
+  return {
+    safeParse: (value: unknown) => {
+      const v = value as Values;
+      const r = candidates.ApplicationSubmit.safeParse(bodyOf(v, questions));
+      const issues = (r.success ? [] : r.error.issues).map((i: { path: PropertyKey[]; message: string; code?: string }) => {
+        if (i.path[0] === "answers") return { ...i, path: [qKey(String(i.path[1]))] };
+        if (i.path[0] === "cv_document_id" && !v.cv_document_id) return { ...i, code: "custom", message: "Attach your CV" };
+        return i;
+      });
+      for (const q of questions)
+        if (q.required && !String(v[qKey(q.vacancy_question_id)] ?? "").trim()) issues.push({ path: [qKey(q.vacancy_question_id)], message: "Answer this question", code: "custom" });
+      return issues.length ? { success: false, error: { issues } } : r;
+    },
+  };
+}
+
+/**
+ * Apply (#82): reached by a one-time token, from Apply for This Role or an invitation. Write only:
+ * the candidate sends an application and never reads one back, so there is no score and no stage.
+ * Three steps (About You; CV and Questions; Why This Role), then the receipt with the reference.
  */
 export function Apply({ token }: { token: string }) {
-  const { navigate } = useRouter();
   const link = useApi("GET /api/public/v1/apply/:token", { params: { token } });
-  const [v, setV] = useState<Values>({ full_name: "", email: "", phone: "", years: "", why: "" });
-  const [cv, setCv] = useState<DocumentRef | null>(null);
-  const [touched, setTouched] = useState<Partial<Record<Key, boolean>>>({});
-  const [server, setServer] = useState<Partial<Record<Key, string>>>({});
-  const [problem, setProblem] = useState<string | null>(null);
-  const [receipt, setReceipt] = useState<ApplicationReceipt | null>(null);
-
-  if (link.error && !receipt) return <LinkProblem error={link.error} title="Apply" retry={link.reload} />;
+  const [receipt, setReceipt] = useState<{ title: string; receipt: ApplicationReceipt } | null>(null);
+  if (receipt) return <Receipt title={receipt.title} receipt={receipt.receipt} />;
+  if (link.error) return <LinkProblem error={link.error} title="Apply" retry={link.reload} />;
   if (!link.data)
     return (
       <Page title="Apply">
         <Skeleton lines={7} />
       </Page>
     );
-  if (receipt)
-    return (
-      <Page title="Application Sent">
-        <PageMessage icon="ok" tone="ok" title="Application sent" action={<Button onClick={() => navigate("/jobs")}>See Other Roles</Button>}>
-          <p>Thank you for applying for {link.data.vacancy_title}. A person reads every application, and we will email you within five working days.</p>
-          <p className="mt-2">
-            Your reference is <b className="text-foreground">{receipt.reference}</b>. You can close this page.
-          </p>
-        </PageMessage>
-      </Page>
-    );
+  const data = link.data;
+  return <ApplyForm token={token} link={data} onSent={(r) => setReceipt({ title: data.vacancy_title, receipt: r })} onGone={link.reload} />;
+}
 
-  const err = (k: Key) => server[k] ?? (touched[k] ? RULES[k](v, cv) : null);
-  const state = (k: Key) => (err(k) ? ("bad" as const) : touched[k] && !RULES[k](v, cv) ? ("good" as const) : undefined);
-  const set = (k: keyof Values) => (val: string) => {
-    setV((x) => ({ ...x, [k]: val }));
-    setServer((s) => ({ ...s, [k]: undefined }));
+function ApplyForm({ token, link, onSent, onGone }: { token: string; link: ApplyLink; onSent: (r: ApplicationReceipt) => void; onGone: () => unknown }) {
+  const questions = link.questions;
+  const [schema] = useState(() => applySchema(questions));
+  const initial: Values = { full_name: "", email: "", phone: "", years_experience: "", cv_document_id: "", cover_letter: "", consent: false };
+  for (const q of questions) initial[qKey(q.vacancy_question_id)] = "";
+  const f = useContractForm<Values>(initial, schema);
+  const [step, setStep] = useState(0);
+  const [cv, setCv] = useState<DocumentRef | null>(null);
+  const [error, setError] = useState<ReactNode>(null);
+  const qKeys = questions.map((q) => qKey(q.vacancy_question_id));
+  const stepOf = (key: string) => (ABOUT_YOU.includes(key) ? 0 : WHY.includes(key) ? 2 : 1);
+
+  const text = (k: string) => {
+    const b = f.field(k);
+    return { ...b, value: String(b.value ?? ""), onChange: (v: string) => f.set(k, v) };
   };
-  const blur = (k: Key) => () => setTouched((t) => ({ ...t, [k]: true }));
-
-  const submit = async () => {
-    const all = Object.fromEntries((Object.keys(RULES) as Key[]).map((k) => [k, true]));
-    setTouched(all);
-    if ((Object.keys(RULES) as Key[]).some((k) => RULES[k](v, cv))) return;
-    setProblem(null);
+  const send = async (body: ApplicationSubmit) => {
+    setError(null);
     try {
-      setReceipt(
-        await api.call("POST /api/public/v1/apply/:token", {
-          params: { token },
-          body: { full_name: v.full_name.trim(), email: v.email.trim(), phone: v.phone.trim(), years_experience: Number(v.years.trim()), cv_document_id: cv!.document_id, why: v.why.trim() },
-        }),
-      );
+      onSent(await api.call("POST /api/public/v1/apply/:token", { params: { token }, body }));
     } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) {
-        setServer(Object.fromEntries(Object.entries(e.fields).map(([k, m]) => [SERVER_KEY[k] ?? k, m[0]])));
-      } else setProblem(e instanceof ApiError ? e.message : "The application did not send. Try again.");
+      if (!(e instanceof ApiError)) return setError("The application did not send. Try again.");
+      /* The link lapsed while the form was open: the page reads it again and says so. */
+      if (e.status === 404) return onGone();
+      const fields = Object.fromEntries(Object.entries(e.fields).map(([k, m]) => [k.startsWith("answers.") ? qKey(k.slice(8)) : k, m]));
+      const keys = Object.keys(fields);
+      if (!keys.length) return setError(e.message);
+      f.setServerErrors(fields);
+      setStep(Math.min(...keys.map(stepOf)));
     }
   };
 
   return (
-    <Page title={`Apply: ${link.data.vacancy_title}`}>
-      <h1 className="text-2xl">Apply: {link.data.vacancy_title}</h1>
-      <Sub className="mt-1">
-        This link is yours and works until {formatDate(link.data.expires_at)} at {formatTime(link.data.expires_at)}.
+    <Page title="Apply">
+      <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase">Your Application</p>
+      <h1 className="mt-1 font-heading text-2xl" data-copy="content">
+        {link.vacancy_title}
+      </h1>
+      <Sub as="p" className="mt-1 mb-5">
+        This link is yours until {formatDate(link.expires_at)}, {formatTime(link.expires_at)}.
       </Sub>
-      <Form className="mt-4.5 flex flex-col gap-3" onSubmit={() => submit()}>
-        <Field label="Full Name" htmlFor="full_name" state={state("full_name")} message={err("full_name")}>
-          <TextField id="full_name" autoComplete="name" value={v.full_name} onChange={set("full_name")} onBlur={blur("full_name")} state={state("full_name")} />
-        </Field>
-        <Field label="Email" htmlFor="email" state={state("email")} message={err("email")}>
-          <TextField id="email" type="email" autoComplete="email" inputMode="email" value={v.email} onChange={set("email")} onBlur={blur("email")} state={state("email")} />
-        </Field>
-        <Field label="Phone" htmlFor="phone" state={state("phone")} message={err("phone")}>
-          <TextField id="phone" type="tel" autoComplete="tel" inputMode="tel" placeholder="+234 802 000 0000" value={v.phone} onChange={set("phone")} onBlur={blur("phone")} state={state("phone")} />
-        </Field>
-        <Field label="Years of Experience" htmlFor="years" state={state("years")} message={err("years")}>
-          <TextField id="years" inputMode="numeric" value={v.years} onChange={set("years")} onBlur={blur("years")} state={state("years")} className="max-w-36" />
-        </Field>
-        <Field label="CV" state={err("cv") ? "bad" : undefined} message={err("cv")}>
-          <UploadField
-            endpoint={`/api/public/v1/apply/${encodeURIComponent(token)}/cv`}
-            purpose="cv"
-            upload={upload}
-            multiple={false}
-            accept=".pdf,.doc,.docx"
-            kinds="PDF or Word"
-            maxBytes={10 * 1024 * 1024}
-            label="Choose your CV"
-            onUploaded={(docs) => {
-              const doc = docs[0] ?? null;
-              setCv(doc);
-              setServer((s) => ({ ...s, cv: undefined }));
-              if (doc) setTouched((t) => ({ ...t, cv: true }));
-            }}
-          />
-        </Field>
-        <Field label="Why This Role?" htmlFor="why" state={state("why")} message={err("why")}>
-          <TextAreaField id="why" rows={3} value={v.why} onChange={set("why")} onBlur={blur("why")} state={state("why")} />
-        </Field>
-        {problem && <Banner tone="err">{problem}</Banner>}
-        <Button type="submit" variant="primary" block>
-          Submit Application
-        </Button>
-        <Sub className="text-center">We will email you within five working days.</Sub>
-      </Form>
+      <Wizard
+        level={2}
+        step={step}
+        onStepChange={setStep}
+        finish="Submit Application"
+        error={error}
+        onFinish={f.submit((body) => send(body as unknown as ApplicationSubmit))}
+        steps={[
+          {
+            title: "About You",
+            check: () => f.check(ABOUT_YOU),
+            body: (
+              <div className="flex flex-col gap-4">
+                <Field label="Full Name" {...f.status("full_name")}>
+                  <TextField autoComplete="name" {...text("full_name")} />
+                </Field>
+                <Field label="Email" {...f.status("email")}>
+                  <TextField type="email" autoComplete="email" inputMode="email" placeholder="ada@example.com" {...text("email")} />
+                </Field>
+                <Field label="Phone" {...f.status("phone")}>
+                  <PhoneField autoComplete="tel" placeholder="802 000 0000" {...text("phone")} />
+                </Field>
+                <Field label="Years of Experience" {...f.status("years_experience")}>
+                  <NumberField maxLength={2} className="max-w-28" {...text("years_experience")} />
+                </Field>
+              </div>
+            ),
+          },
+          {
+            title: "CV and Questions",
+            check: () => f.check(["cv_document_id", ...qKeys]),
+            body: (
+              <div className="flex flex-col gap-5">
+                <Field label="Your CV" {...f.status("cv_document_id")}>
+                  {cv ? (
+                    <div className="flex flex-col gap-2">
+                      <FileCard name={cv.file_name} mime={cv.mime_type} sizeBytes={cv.size_bytes} tone="plain" />
+                      <div>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setCv(null);
+                            f.set("cv_document_id", "");
+                          }}
+                        >
+                          Replace CV
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <UploadCv
+                      token={token}
+                      onUploaded={(doc) => {
+                        setCv(doc);
+                        f.set("cv_document_id", doc.document_id);
+                      }}
+                    />
+                  )}
+                </Field>
+                {questions.map((q) => (
+                  <Field key={q.vacancy_question_id} label={q.prompt} optional={!q.required} {...f.status(qKey(q.vacancy_question_id))}>
+                    <Answer q={q} {...text(qKey(q.vacancy_question_id))} />
+                  </Field>
+                ))}
+              </div>
+            ),
+          },
+          {
+            title: "Why This Role",
+            check: () => f.check(WHY),
+            body: (
+              <div className="flex flex-col gap-5">
+                <Field label="Why This Role" {...f.status("cover_letter")}>
+                  <TextAreaField rows={6} maxLength={3000} {...text("cover_letter")} />
+                </Field>
+                <section aria-labelledby="privacy" className="rounded-box border border-border bg-muted p-4">
+                  <h4 id="privacy" className="mb-1 inline-flex items-center gap-1.5 text-sm font-strong">
+                    <Icon name="shield" className="text-subtle-foreground" />
+                    Privacy Notice
+                  </h4>
+                  <p className="text-sm text-muted-foreground">We use what you send only to consider you for roles at MyCityApp. Ask us at any time to delete it.</p>
+                  <div className="mt-2">
+                    <Field label="Your Agreement" {...f.status("consent")}>
+                      <CheckboxField {...f.field("consent")} value={f.values.consent === true} onChange={(v) => f.set("consent", v)} label="I agree to the privacy notice" />
+                    </Field>
+                  </div>
+                </section>
+              </div>
+            ),
+          },
+        ]}
+      />
+    </Page>
+  );
+}
+
+/** The CV, sent on the strength of the link's own token: a PDF or Word file of up to 10 MB. */
+function UploadCv({ token, onUploaded }: { token: string; onUploaded: (doc: DocumentRef) => void }) {
+  return (
+    <UploadField
+      endpoint={`/api/public/v1/apply/${encodeURIComponent(token)}/cv`}
+      purpose="cv"
+      upload={upload}
+      multiple={false}
+      accept=".pdf,.doc,.docx"
+      kinds="PDF or Word, up to 10 MB"
+      maxBytes={10 * 1024 * 1024}
+      label="Choose Your CV"
+      onUploaded={(docs) => docs[0] && onUploaded(docs[0] as DocumentRef)}
+    />
+  );
+}
+
+/** One of the vacancy's questions, answered as its kind asks: yes or no, one of its options, or words. */
+function Answer({ q, value, onChange, onBlur, state }: { q: ApplyQuestion; value: string; onChange: (v: string) => void; onBlur?: () => void; state?: "good" | "bad" | undefined }) {
+  if (q.question_type === "yes_no")
+    return (
+      <ChoiceField
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        state={state}
+        options={[
+          { value: "yes", label: "Yes" },
+          { value: "no", label: "No" },
+        ]}
+      />
+    );
+  const options = q.options ?? [];
+  if (q.question_type === "choice" && options.length >= 2 && options.length <= 5)
+    return <RadioCards value={value || null} onChange={onChange} onBlur={onBlur} state={state} options={options.map((o) => ({ value: o, label: o }))} />;
+  if (q.question_type === "choice") return <SelectField value={value} onChange={onChange} onBlur={onBlur} state={state} options={options.map((o) => ({ value: o, label: o }))} />;
+  return <TextAreaField rows={3} maxLength={2000} value={value} onChange={onChange} onBlur={onBlur} state={state} />;
+}
+
+/** What applying answers: the reference to quote, and nothing about how the application will go. */
+function Receipt({ title, receipt }: { title: string; receipt: ApplicationReceipt }) {
+  const { navigate } = useRouter();
+  const mark = useRef<HTMLDivElement>(null);
+  return (
+    <Page title="Application Sent">
+      <div className="relative">
+        <Confetti burstOnView viewFrom={mark} />
+        <div ref={mark}>
+          <PageMessage icon="ok" tone="ok" title="Application Sent" action={<Button onClick={() => navigate("/jobs")}>See Other Roles</Button>}>
+            <p>
+              Thank you for applying for <b className="text-foreground">{title}</b>. We read every application and will email you within five working days.
+            </p>
+            <div className="mx-auto mt-4 w-fit rounded-box border border-border bg-muted px-5 py-3 text-center">
+              <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase">Your Reference</p>
+              <p className="mt-1 font-mono text-2xl font-strong tracking-wide text-foreground">{receipt.reference}</p>
+            </div>
+            <p className="mt-4">We have emailed it to you too. You can close this page.</p>
+          </PageMessage>
+        </div>
+      </div>
     </Page>
   );
 }

@@ -306,7 +306,7 @@ Every run:
 4. Every `needs` names a real module, action or capability.
 5. A task or step that names an action from ⌘K's actions (**Add Employee**, **Invite User**)
    declares that action's grant, or sits in a section that does.
-6. Every bold name is found in the app's source (`app/src`, `packages/ui/src`).
+6. Every bold name is found in the app's source (`app/src`, `public-app/src` for the public site's chapter, `packages/ui/src`).
 7. Every `shot:` picture has its spec, both files it declares, and a `shots.json` entry whose hashes
    equal today's: a picture whose screen changed after it was taken is stale. Every picture file has a
    spec (no orphans).
@@ -498,6 +498,7 @@ word limits do not count it, as they do not count an article.
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · (Ose) A bold name is also found in `public-app/src`, so the public site's chapter (`public-site.md`) is held to its own pages' words.
 - 26/10/2026 · JP · A picture enlarged on a phone is the phone's, as the text showed it, when the chapter has one (it was always the computer's).
 - 26/10/2026 · JP · Every chapter checked against its screens, string by string (a sweep of each
   screen's buttons, fields, columns, messages, server refusals and schema marks, then a reader per

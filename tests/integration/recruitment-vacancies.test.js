@@ -175,7 +175,16 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     const role = await pub().get("/jobs/head-sales-revenue-lagos");
     expect(role.status).toBe(200);
     expect(role.body).toMatchObject({ state: "open", how_we_hire: ["apply", "screening", "assessment", "interview"], working_days: "Monday to Saturday", applicants: 0 });
-    expect(role.body.about_company).toMatch(/^MyCityApp is a digital city/);
+    // The role's Markdown texts arrive as blocks from the one renderer, so the page draws elements, never HTML.
+    const text = (spans) => spans.map((x) => x.text).join("");
+    expect(role.body.about_company).toHaveLength(1);
+    expect(role.body.about_company[0].kind).toBe("paragraph");
+    expect(text(role.body.about_company[0].spans)).toMatch(/^MyCityApp is a digital city/);
+    expect(role.body.description.map((b) => b.kind)).toEqual(["paragraph", "heading", "heading", "bullets"]);
+    expect(role.body.description[1]).toMatchObject({ kind: "heading", level: 2 });
+    expect(text(role.body.description[1].spans)).toBe("Key Responsibilities");
+    expect(text(role.body.requirements[0].spans)).toMatch(/^A degree in Business Administration/);
+    expect(text(role.body.nice_to_have[0].spans)).toBe("A commercial leader, not simply a sales administrator.");
     // The band is not shown: left out, not null; and no internal id ever leaves.
     expect(role.body).not.toHaveProperty("salary_min");
     expect(role.body).not.toHaveProperty("vacancy_id");
