@@ -18,6 +18,8 @@
  *   tasks             the records behind Overdue Tasks
  *   partnerships      the records behind Active Partnerships
  *   expenses          the records behind Expenses Awaiting Approval
+ *   expenses_monthly  the month before the report's moment: spend by department, project and
+ *                     category (budgets.variance), in the reader's `expenses` scope
  *   recruitment       the records behind Open Vacancies
  *   overview          the reader's own Overview (dashboard.service overview), each part a
  *                     table: the Overview Export, never offered on the form
@@ -69,6 +71,7 @@ const alerts = require("../alerts/alerts.service");
 const dashboard = require("../dashboard/dashboard.service");
 const kpi = require("../dashboard/kpi-catalog");
 const workspace = require("../workspace/workspace.analytics");
+const variance = require("../budgets/budgets.variance");
 
 /** The most rows one table of a file holds: eighty pages of the screen's list. */
 const ROW_CEILING = 2000;
@@ -627,6 +630,41 @@ const workspaceAnalytics = {
 };
 
 /* ------------------------------------------------------------------ *
+ * Monthly Expenses
+ * ------------------------------------------------------------------ */
+
+const SPEND_COLUMNS = [
+  col("sent", "Requests", "number"),
+  col("sent_amount", "Requested", "money"),
+  col("paid", "Paid", "money"),
+  col("committed", "Committed", "money"),
+];
+
+/** Last month's spend as the reader's `expenses` scope reaches it. */
+function expensesMonthlySnapshot(db, reader, at) {
+  return variance.monthly(db, reader.scope, variance.monthBefore(lagos.dateOf(at)));
+}
+
+function expensesMonthlyTables(snap) {
+  const rows = (list) => list.map((r) => ({ ...r }));
+  return {
+    lines: [`Month: ${formatMonth(snap.month.from)}.`],
+    tables: [
+      table("By Department", [col("name", "Department"), ...SPEND_COLUMNS, col("allocated", "Budget", "money"), col("remaining", "Remaining", "money")], rows(snap.departments)),
+      table("By Project", [col("name", "Project"), ...SPEND_COLUMNS], rows(snap.projects)),
+      table("By Category", [col("name", "Category"), ...SPEND_COLUMNS], rows(snap.categories)),
+    ],
+  };
+}
+
+const expensesMonthly = {
+  label: "Monthly Expenses",
+  capabilities: null,
+  snapshot: expensesMonthlySnapshot,
+  tables: expensesMonthlyTables,
+};
+
+/* ------------------------------------------------------------------ *
  * The registry
  * ------------------------------------------------------------------ */
 
@@ -638,6 +676,7 @@ const BUILT = {
   tasks,
   partnerships,
   expenses,
+  expenses_monthly: expensesMonthly,
   recruitment,
   overview,
   workspace_analytics: workspaceAnalytics,

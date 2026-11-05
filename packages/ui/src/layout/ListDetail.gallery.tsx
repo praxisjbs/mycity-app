@@ -75,11 +75,31 @@ function Pane() {
   );
 }
 
+/** Expenses' layout: the list across the page, the picked record in the dialog (F31 as amended). */
+function InModal() {
+  const [ref, frame] = useGalleryFrame();
+  const [picked, setPicked] = useState<Request | null>(null);
+  return (
+    <div ref={ref}>
+      <ListDetail
+        layout="modal"
+        open={picked !== null}
+        onClose={() => setPicked(null)}
+        title="Leave Request"
+        container={frame}
+        list={<List picked={picked?.id ?? null} onPick={setPicked} />}
+        detail={picked && <Record r={picked} />}
+      />
+    </div>
+  );
+}
+
 export default {
   component: "ListDetail",
   states: {
     "Side By Side": () => <Requests />,
     "Nothing Picked": () => <Requests first={false} />,
     "Detail Pane": () => <Pane />,
+    "In A Modal": () => <InModal />,
   },
 } satisfies GalleryEntry;

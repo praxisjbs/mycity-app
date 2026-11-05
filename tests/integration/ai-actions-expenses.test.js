@@ -62,7 +62,9 @@ describeDb("Praxis AI's expense cards against the real migrations", () => {
     for (const who of ["one", "two"]) await q("UPDATE employee SET line_manager_id = $1 WHERE employee_id = $2", [h.people.manager.employee_id, h.people[who].employee_id]);
     await grantsCache.bumpTeamVersion();
     await drain();
-    events = (await one("SELECT expense_category_id FROM expense_category WHERE name = 'Travel'")).expense_category_id;
+    // No category is seeded (A26, 8101): Operations & People add the suggested twelve.
+    expect((await h.as("ops").post("/expense-categories/suggested").send({})).status).toBe(200);
+    events = (await one("SELECT expense_category_id FROM expense_category WHERE name = 'Travel and Transport'")).expense_category_id;
     registry.load();
     fresh();
   }, 120_000);
@@ -81,7 +83,7 @@ describeDb("Praxis AI's expense cards against the real migrations", () => {
   test("my_expenses.create: a request with its first line as a card, its category written by name, sent through New Request's own service", async () => {
     const drafted = await card("one", "my_expenses.create", {
       purpose: "Ikeja activation water",
-      expense_category_id: "Travel",
+      expense_category_id: "Travel and Transport",
       description: "Crates of water",
       quantity: "2",
       unit_price: "4500.00",
@@ -92,7 +94,7 @@ describeDb("Praxis AI's expense cards against the real migrations", () => {
       account_number: "0123456789",
     });
     expect(drafted).toMatchObject({ action_key: "my_expenses.create", label: "New Request", risk: "standard", values: { expense_category_id: events, submit: true }, problems: {} });
-    expect(drafted.names).toEqual([expect.objectContaining({ type: "expense_category", id: events, label: "Travel" })]);
+    expect(drafted.names).toEqual([expect.objectContaining({ type: "expense_category", id: events, label: "Travel and Transport" })]);
     const pressed = await h.press("one", drafted.ai_action_draft_id);
     expect(pressed.status).toBe(200);
     expect(pressed.body.lines).toEqual([expect.objectContaining({ type: "expense", label: expect.stringMatching(/^EXP-\d{4}, Ikeja activation water$/), ok: true, message: "sent" })]);
@@ -143,7 +145,36 @@ describeDb("Praxis AI's expense cards against the real migrations", () => {
     expect(notMine.body.card).toBeNull();
   });
 
-  test("requisitions.create, disbursements.create and disbursements.add_reference: approved requests grouped, the CEO approves, the transfer recorded after Confirm It's You and its reference added", async () => {
+  test("budgets.create, budgets.edit and budgets.set_project: Operations & People set a department's year, change it by its name and give a project a budget; staff are never offered them", async () => {
+    const department = (await one("SELECT department_id FROM employee WHERE employee_id = $1", [h.people.one.employee_id])).department_id;
+    const year = Number(require("../../src/shared/time/lagos").today().slice(0, 4)) + 1;
+    const set = await card("ops", "budgets.create", { department_id: department, year, lines: [{ expense_category_id: events, amount: "200000.00" }] });
+    expect(set).toMatchObject({ action_key: "budgets.create", label: "New Budget", problems: {} });
+    expect(set.names).toEqual(expect.arrayContaining([expect.objectContaining({ type: "department", id: department }), expect.objectContaining({ type: "expense_category", id: events, label: "Travel and Transport" })]));
+    const pressed = await h.press("ops", set.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    expect(pressed.body.lines).toEqual([expect.objectContaining({ type: "budget", label: expect.stringMatching(/^BUD-.*, Programmes \d{4}$/), message: "set", ok: true })]);
+    const b = await one("SELECT budget_id, name FROM budget WHERE department_id = $1 AND date_part('year', starts_on)::int = $2", [department, year]);
+
+    const edit = await card("ops", "budgets.edit", { budget_id: b.name, lines: [{ expense_category_id: events, amount: "250000.00" }] });
+    expect(edit).toMatchObject({ values: { budget_id: b.budget_id }, problems: {} });
+    expect(edit.records).toEqual([expect.objectContaining({ type: "budget", id: b.budget_id })]);
+    expect((await h.press("ops", edit.ai_action_draft_id)).status).toBe(200);
+    expect((await one("SELECT amount FROM budget_line WHERE budget_id = $1", [b.budget_id])).amount).toBe("250000.00");
+
+    const project = await one("INSERT INTO project (number, name, owner_employee_id, status) VALUES ('PRJ-0950', 'Lagos Walk', $1, 'active') RETURNING project_id", [h.people.manager.employee_id]);
+    const give = await card("ops", "budgets.set_project", { project_id: project.project_id, budget_amount: "90000.00" });
+    expect(give.problems).toEqual({});
+    const given = await h.press("ops", give.ai_action_draft_id);
+    expect(given.status).toBe(200);
+    expect(given.body.lines).toEqual([expect.objectContaining({ type: "project", message: "budget set", ok: true })]);
+    expect((await one("SELECT budget_amount FROM project WHERE project_id = $1", [project.project_id])).budget_amount).toBe("90000.00");
+
+    script(say({ text: "Here it is.", action: { key: "budgets.create", values: { department_id: department, year, lines: [] }, suggested: false } }));
+    expect((await h.ask("one", { question: "Set my department's budget.", shows: ["cards"] })).body.card).toBeNull();
+  });
+
+  test("requisitions.create, approvals.decide on the requisition as the CEO, disbursements.create and disbursements.add_reference: approved requests grouped, the CEO approves, the transfer recorded after Confirm It's You and its reference added", async () => {
     await decide("manager", (await one("SELECT workflow_instance_id FROM expense_request WHERE expense_request_id = $1", [made.sent])).workflow_instance_id);
     await decide("ops", (await one("SELECT workflow_instance_id FROM expense_request WHERE expense_request_id = $1", [made.sent])).workflow_instance_id);
 
@@ -153,7 +184,15 @@ describeDb("Praxis AI's expense cards against the real migrations", () => {
     expect(grouped.status).toBe(200);
     expect(grouped.body.lines).toEqual([expect.objectContaining({ type: "requisition", label: expect.stringMatching(/^REQ-\d{4}, 1 request$/), message: "sent to the CEO", ok: true })]);
     const req = await one("SELECT workflow_instance_id FROM requisition ORDER BY created_at DESC LIMIT 1");
-    await decide("ceo", req.workflow_instance_id);
+    // The CEO decides the requisition through the approvals' own card (audit F20), after Confirm It's You.
+    const ceo = await card("ceo", "approvals.decide", { workflow_instance_ids: [req.workflow_instance_id], decision: "approve" });
+    expect(ceo).toMatchObject({ action_key: "approvals.decide", risk: "approval", problems: {} });
+    expect(ceo.records).toEqual([expect.objectContaining({ type: "workflow_instance", id: req.workflow_instance_id })]);
+    await h.confirmPassword("ceo");
+    const decided = await h.press("ceo", ceo.ai_action_draft_id);
+    expect([decided.status, decided.body.error]).toEqual([200, undefined]);
+    expect(decided.body.lines).toEqual([expect.objectContaining({ id: req.workflow_instance_id, ok: true, message: "approved" })]);
+    await drain();
     expect((await one("SELECT status FROM expense_request WHERE expense_request_id = $1", [made.sent])).status).toBe("authorised");
 
     const pay = await card("ops", "disbursements.create", { expense_request_id: made.sent, paid_on: "2026-11-02", confirm_without_reference: true });

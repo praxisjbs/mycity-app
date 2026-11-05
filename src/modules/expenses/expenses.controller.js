@@ -11,6 +11,7 @@ const { scopeOf } = require("../../shared/rbac/scope");
 const { maskForUser } = require("../../shared/rbac/field-mask");
 const { withActor } = require("../../shared/events/emit");
 const service = require("./expenses.service");
+const assist = require("./expenses.receipt-ai");
 
 const id = (req) => req.validated.params.id;
 const body = (req) => req.validated.body || {};
@@ -39,6 +40,14 @@ module.exports = {
     const { own, request } = await service.getFor(req.user, scopeOf(req), id(req));
     return ok(res, own ? request : await maskForUser(pool, req.user, request));
   },
+
+  readInvoice: async (req, res) => ok(res, await assist.readInvoice(req.user, body(req))),
+
+  suggestCategory: async (req, res) => ok(res, await assist.suggestCategory(req.user, body(req))),
+
+  history: async (req, res) => sendPaged(res, await service.history(req.user, scopeOf(req), id(req), req.validated.query)),
+
+  checkDuplicate: async (req, res) => ok(res, await service.checkDuplicate(req.user, scopeOf(req), id(req))),
 
   withdraw: async (req, res) =>
     ok(res, await maskForUser(pool, req.user, await service.withdraw(withActor(req), scopeOf(req), id(req), body(req)))),

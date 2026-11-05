@@ -1,0 +1,66 @@
+{
+  "expenses-approvals": {
+    "spec": "f049bbc24e10d0e4",
+    "source": "04a43fe59eb63c9f",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "expenses-budgets": {
+    "spec": "edaa6f1467039762",
+    "source": "04a43fe59eb63c9f",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "expenses-categories": {
+    "spec": "740c5124f258a17a",
+    "source": "04a43fe59eb63c9f",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "expenses-disbursements": {
+    "spec": "f21b33e8b22d1812",
+    "source": "04a43fe59eb63c9f",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "expenses-my-requests": {
+    "spec": "b8097a54f4f67419",
+    "source": "4e1b0fc0e6e99924",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "expenses-new-request": {
+    "spec": "ab3d67169748512c",
+    "source": "4e1b0fc0e6e99924",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "expenses-projects": {
+    "spec": "0576b7858544c143",
+    "source": "04a43fe59eb63c9f",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "expenses-requisitions": {
+    "spec": "d61f3f642e715df3",
+    "source": "04a43fe59eb63c9f",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

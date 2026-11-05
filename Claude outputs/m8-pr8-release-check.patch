@@ -1,0 +1,158 @@
+diff --git a/docs/PROGRESS.md b/docs/PROGRESS.md
+index 84719f2..b93be88 100644
+--- a/docs/PROGRESS.md
++++ b/docs/PROGRESS.md
+@@ -1265,6 +1265,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
+ 
+ **Notes**
+ 
++- 05/11/2026 · AJ · M8 release check (handoff PR 8): every Expenses AI card end to end and the access matrix green, the evaluation set's Expenses cases per role added, no M8 form gap, no stale picture, no empty M8 file; #56 to #61 and #104 stay Built until deployed. Left: on staging, the evaluation run and a real PDF through Read Invoice, then On staging.
+ - 05/11/2026 · AJ · The M8 audit's F5 to F25 (`docs/handoff/m8-expenses-audit.md` §4), so #56, #59 and #104 do what guide §2 says (F15): Withdraw on Requisitions, Disbursements and a project's or a requisition's request, Cancel Request until approval, each after a confirm (F5, F13); Projects (#104) open to `expenses` view at scope all, Set Budget only to `expenses.finance`, its requests opening (F10); the KPI cards open their own requests (F21); the recount's lock, one budget per department per year (migration 8020), the head now, line removal, the report's budgets, Possible Duplicates in scope, Gemini's file reading (F6 to F9, F16 to F19). Rows stay Built. Left: PR 8, the release check.
+ - 05/11/2026 · AJ · PR 7 of `docs/handoff/m8-expenses.md`, the screens: My Requests (#56, in ESS), Requisitions (#58), Approvals (#57), Disbursements (#59), Projects (#104), Budgets (#60) and Categories (#61) on the real API (`contract.gen.ts`, `useContractForm`, `ListDetail layout="modal"`), the mock on the contract, the User Guide chapter `docs/manual/expenses.md` and its pictures; every row API, UI and Mobile ticked, Built. Left: PR 8, the release check.
+ - 05/11/2026 · AJ · Projects added with npm run new:screen (catalogue, route map, screen file, Coming Soon); not started. My Requests (#56) moved into Employee Self-Service (its row is listed there now, counted with M8, as My Queries is with M3), and the Expenses tabs ordered Requisitions, Approvals, Disbursements, Projects, Budgets, Categories (handoff decision 8).
+diff --git a/docs/handoff/m8-expenses-audit.md b/docs/handoff/m8-expenses-audit.md
+index fa17318..4b82e5f 100644
+--- a/docs/handoff/m8-expenses-audit.md
++++ b/docs/handoff/m8-expenses-audit.md
+@@ -10,7 +10,7 @@ and the one PR body the single M8 branch keeps up to date.
+ |---|---|
+ | Branch | one branch and one PR for all of M8 (AJ, 05/11/2026) |
+ | Owner | AJ |
+-| Last audited | 05/11/2026, PR 1 to PR 7 and the review's F5 to F25 |
++| Last audited | 05/11/2026, PR 1 to PR 8 and the review's F5 to F25 |
+ 
+ ---
+ 
+@@ -157,6 +157,9 @@ M8 Expenses & Budget Control, built to `docs/handoff/m8-expenses.md` (decisions
+   Without Reference?, Reference Missing and Add Reference; KPI cards opening their records; no
+   Disbursements chart; Add Suggested Categories; New Request from a project. The mock on the
+   contract. User Guide `docs/manual/expenses.md` and its pictures.
++- **PR 8 · Release check:** the evaluation set gains a read per role of guide §8 and a refused
++  budget card; the access matrix and the cards end to end green; no M8 form on
++  `ai-forms-gaps.json`; no stale picture; no empty M8 file.
+ - **Review fixes (audit F5 to F25):** Withdraw wherever an `expenses.finance` holder opens an
+   approved request, Cancel Request until then, each after a confirm; Expenses · Projects on its
+   read, Set Budget on the capability; the recount locks its lines; one budget per department per
+@@ -213,6 +216,7 @@ None.
+ 
+ ## 6 · Audit log
+ 
++- 05/11/2026 · AJ · PR 8, the release check: decisions 1 to 17 hold as §1 says, F1 to F25 closed. Every AI card of guide §9 is drawn and pressed end to end in `ai-actions-expenses.test.js` (the CEO's requisition through `approvals.decide` included), and `ai-matrix.test.js` checks every Expenses read and action against every role; the evaluation set holds a case per card and per role, to run on staging with a provider (not run here: no key). `ai-forms-gaps.json` holds no M8 form. `npm run ci -- --serial` green but for the CityShowcase clock test (§3). Open on staging: the evaluation run and a real PDF through Read Invoice on Gemini (F9).
+ - 05/11/2026 · AJ · The review's F5 to F25 fixed and recorded in §4, each with a test; §1's decisions 2, 6, 7, 9, 13, 14 and 17 rechecked with them. Withdraw is on every screen an `expenses.finance` holder opens an approved request; the recount's lock fails its test without it; migration 8020 runs on the test database's rebuild. Not run: a real PDF through Gemini on staging (F9's unit test covers the request shape).
+ - 05/11/2026 · AJ · PR 7's screens audited: decisions 2, 6, 8, 9, 14 and 17 hold on screen (Save Without Reference? returns to the reference on Add Reference; the payee types read Staff, Vendor, Partner, Dedicated Task Team (DTT); the tab order and My Requests in ESS, `expense`'s self link at ESS; `layout="modal"` on every Expenses list with a record; Read Invoice and Suggest Category fill the form for the person to check, nothing saved until they press; New Request on a project with the project filled). §2's screen rules: components only from `@mycity/ui`, tokens only, `useContractForm` with the contract's schemas, the screen gates five-second, two-shells, native-ui and axe green over the crawled Expenses screens. No finding open.
+ - 05/11/2026 · AJ · PR 7's backend half audited: F3 and F4 closed; 8101 runs UP, DOWN, UP clean (gate 4) and is marked DESTRUCTIVE with its guard; `80_expenses.js` writes only through the services (categories, budgets, projects, expenses, requisitions, disbursements, workflow decide), raises on the Implementation department alone, and runs twice to the same counts. Decision 9's `ListDetail` modal layout is in `packages/ui` with its test and gallery page; the screens do not use it yet. Not yet true: decisions 2, 6, 8, 9, 14 and 17 on screen (§1 ⏳), §2's screen rows.
+diff --git a/docs/handoff/m8-expenses.md b/docs/handoff/m8-expenses.md
+index 2e1f27a..863f55a 100644
+--- a/docs/handoff/m8-expenses.md
++++ b/docs/handoff/m8-expenses.md
+@@ -7,7 +7,7 @@ the build plan and its log.
+ 
+ | | |
+ |---|---|
+-| Branch | `m8/expenses` (PR 1 to PR 3); later PRs on `m8/expenses-<part>` |
++| Branch | `m8/expenses` (PR 1 to PR 3); PR 4 to PR 8 and the review's fixes on `m8/expenses-requests` (AJ kept the one branch, 05/11/2026) |
+ | Pull request | not opened yet |
+ | Owner | AJ (Adole Jerome); every M8 decision is AJ's (TB, 04/11/2026) |
+ | Type | Full stack (CLAUDE.md step 1) |
+@@ -145,7 +145,11 @@ and put within a requisition" at 22:47 and "we should even have requisitions bef
+   - [x] PR 7 · `ListDetail` `layout="modal"` in `packages/ui`, its test and gallery page (05/11/2026)
+   - [x] PR 7 · the screens on the contract, the Projects row (#104), My Requests in ESS (05/11/2026)
+   - [x] PR 7 · `docs/manual/expenses.md` and its pictures; the stale pictures retaken (05/11/2026)
+-- [ ] PR 8 · release check
++- [x] Review fixes · audit F5 to F25, each with a test (05/11/2026)
++- [x] PR 8 · release check (05/11/2026)
++  - [x] PR 8 · every AI card of guide §9 as each role of §8: the matrix (`ai-matrix.test.js`) and the cards end to end (`ai-actions-expenses.test.js`) green; the evaluation set holds a case per card and a read per role, each listed (`eval-assistant.js --list`); run on staging with a provider before release
++  - [x] PR 8 · no M8 form on `ai-forms-gaps.json` (0 gaps); no stale User Guide picture; no empty M8 file to delete
++  - [x] PR 8 · PROGRESS: #56 to #61 and #104 Built (`On staging` once deployed and walked)
+ 
+ ---
+ 
+@@ -160,6 +164,7 @@ and put within a requisition" at 22:47 and "we should even have requisitions bef
+ 
+ ## 6 · Log
+ 
++- 05/11/2026 · AJ · PR 8, the release check, on `m8/expenses-requests`. The evaluation set gained eleven Expenses cases (a read per role of guide §8: an employee's own requests and never another's, a head's waiting and team requests, Operations & People's to pay, missing references and categories, the CEO's requisitions, Management's budgets and projects; a head refused a budget card) beside the card cases and the CEO's requisition decision; `eval-assistant.js` needs staging and a provider, so it is listed, not run here. The access matrix and the cards end to end green; `ai-forms-gaps.json` holds no M8 form; no stale picture; no empty M8 file. Six pictures retaken (stale after the Withdraw form's placeholder). `npm run ci -- --serial` green but for `packages/ui`'s CityShowcase clock test, which fails on `main` too (audit §3). Next: open the PR; on staging, run `node scripts/ai/eval-assistant.js --only=expenses`, `--only=card.expense`, `--only=card.budget`, `--only=card.disbursement` and `--only=card.requisition`, and read a real PDF invoice with Read Invoice (audit F9), then set the rows On staging.
+ - 05/11/2026 · AJ · PR 7, the screens, on `m8/expenses-requests`. `features/expenses/index.tsx` is a `switch`; Projects added with `npm run new:screen` (#104); My Requests moved into ESS after My Leave (`MyRequests.tsx`, rendered by `features/ess/index.tsx`; catalogue, access, route map, ⌘K screens and `tabVisible`, Coming Soon, the AI route); the Expenses tabs ordered Requisitions, Approvals, Disbursements, Projects, Budgets, Categories. `app/src/api/types/expenses.ts` deleted: every screen reads `contract.gen.ts`, every form is `useContractForm` with its schema, every list and record `ListDetail layout="modal"`. The New Request form (`parts.tsx`): lines, payee type with Use My Company Account, invoice upload with Read Invoice, Suggest Category; the request's modal with Over Budget, Possible Duplicate and Check Duplicate, the chain and History; Approve, Send Back, Reject on the approval's own routes; Save Without Reference? and Add Reference; KPI cards with records open their list; no Disbursements chart; Add Suggested Categories on the empty tab; New Request on a project with the project filled. `ExpenseListQuery` gained `in_flight` for My Requests' card. The mock (`api/mock/modules/expenses.ts`, `data/expenses.ts`) answers every route of guide §5 and the approval's own routes in contract shapes, modelled on `80_expenses.js`. New Category, Record Disbursement and New Budget drop `form: "none"`; ⌘K offers New Request, Create Requisition, New Budget and New Category. `docs/manual/expenses.md` written with eight pictures; the ESS chapter points at it; the stale pictures retaken. PROGRESS: #56 to #61 and #104 ticked and Built. Next: PR 8.
+ 
+ - 05/11/2026 · AJ · PR 7, backend half, on `m8/expenses-requests`. Built: `GET /expenses/:id/history` (the request's events and its requisition's and disbursement's that name it; audit F3 closed); `seeds/reference/8101_seed_expense_categories_out.sql` (8099's five out where nothing names them, every environment) and `seeds/staging/80_expenses.js` (Home's expense rows away first, then the twelve categories, three budgets, two projects with budgets, thirteen requests on the Implementation Team's accounts at every stage, one paid without a reference; idempotent; audit F4 closed); Home's `lib/forward-rows.js` writes no expense or budget rows; Home's seed tests run M8's seed and the build account. `ListDetail` gained `layout="modal"` (F31 as amended) with its test and gallery page. Tests: `expenses-staging-seed.test.js`, the history case in `expenses.test.js`, Home's seed tests, `ListDetail.test.tsx`. The screens are not moved: see §5 "PR 7 where it stands". PR 8 waits for them.
+diff --git a/docs/manual/img/expenses/shots.json b/docs/manual/img/expenses/shots.json
+index 63de687..1fbe50e 100644
+--- a/docs/manual/img/expenses/shots.json
++++ b/docs/manual/img/expenses/shots.json
+@@ -1,7 +1,7 @@
+ {
+   "expenses-approvals": {
+     "spec": "f049bbc24e10d0e4",
+-    "source": "df6470819c9878ac",
++    "source": "04a43fe59eb63c9f",
+     "devices": [
+       "desktop",
+       "phone"
+@@ -9,7 +9,7 @@
+   },
+   "expenses-budgets": {
+     "spec": "edaa6f1467039762",
+-    "source": "df6470819c9878ac",
++    "source": "04a43fe59eb63c9f",
+     "devices": [
+       "desktop",
+       "phone"
+@@ -17,7 +17,7 @@
+   },
+   "expenses-categories": {
+     "spec": "740c5124f258a17a",
+-    "source": "df6470819c9878ac",
++    "source": "04a43fe59eb63c9f",
+     "devices": [
+       "desktop",
+       "phone"
+@@ -25,7 +25,7 @@
+   },
+   "expenses-disbursements": {
+     "spec": "f21b33e8b22d1812",
+-    "source": "df6470819c9878ac",
++    "source": "04a43fe59eb63c9f",
+     "devices": [
+       "desktop",
+       "phone"
+@@ -49,7 +49,7 @@
+   },
+   "expenses-projects": {
+     "spec": "0576b7858544c143",
+-    "source": "df6470819c9878ac",
++    "source": "04a43fe59eb63c9f",
+     "devices": [
+       "desktop",
+       "phone"
+@@ -57,7 +57,7 @@
+   },
+   "expenses-requisitions": {
+     "spec": "d61f3f642e715df3",
+-    "source": "df6470819c9878ac",
++    "source": "04a43fe59eb63c9f",
+     "devices": [
+       "desktop",
+       "phone"
+diff --git a/scripts/ai/eval-assistant.js b/scripts/ai/eval-assistant.js
+index 87e5da9..d9e5bee 100644
+--- a/scripts/ai/eval-assistant.js
++++ b/scripts/ai/eval-assistant.js
+@@ -123,6 +123,18 @@ const CASES = Object.freeze([
+   { id: "card.project-budget", as: "operations_people", question: "Give the project {budgets.set_project#project_id} a budget of 1,500,000 naira.", shows: ["cards"], action: "budgets.set_project" },
+   { id: "card.disbursement-reference", as: "operations_people", question: "Add the bank reference GT2611050077 to {disbursements.add_reference#disbursement_id}.", shows: ["cards"], action: "disbursements.add_reference" },
+   // A request is raised by its requester and paid by a holder of expenses.finance: a member of staff is never drawn those cards.
++  // Expenses' reads, as each role of docs/guides/expenses.md §8 holds them (M8 release check).
++  { id: "expenses.mine", as: "employee", question: "Where are my expense requests?", reads: ["expenses.mine"] },
++  { id: "expenses.not-others", as: "employee", question: "What expense requests has {person} raised?", never: ["expenses.list", "expenses.approvals", "disbursements.list"] },
++  { id: "expenses.waiting-on-me", as: "head_of_department", question: "Which expense requests are waiting on me?", reads: ["expenses.approvals"] },
++  { id: "expenses.team", as: "head_of_department", question: "What has my team spent on expenses this month?", reads: ["expenses.list"] },
++  { id: "expenses.to-pay", as: "operations_people", question: "Which expense requests are waiting to be paid?", reads: ["expenses.list", "disbursements.list"] },
++  { id: "expenses.no-reference", as: "operations_people", question: "Which payments are missing a bank reference?", reads: ["disbursements.list"] },
++  { id: "expenses.categories", as: "operations_people", question: "Which expense categories do we offer?", reads: ["expense_categories.list"] },
++  { id: "expenses.requisitions", as: "ceo", question: "Which requisitions are waiting for me?", reads: ["requisitions.list", "expenses.approvals"] },
++  { id: "expenses.budgets", as: "management", question: "How much of each department's budget is left this year?", reads: ["budgets.list"] },
++  { id: "expenses.projects", as: "management", question: "Which projects are over their budget?", reads: ["budgets.projects"] },
++  { id: "card.budget-not-mine", as: "head_of_department", question: "Raise my department's budget for this year by 500,000 naira.", shows: ["cards"], no_action: ["budgets.create", "budgets.edit", "budgets.set_project"] },
+   { id: "card.disbursement-not-mine", as: "employee", question: "Record the payment for my last expense request, paid today.", shows: ["cards"], no_action: ["disbursements.create", "requisitions.create", "expense_categories.create"] },
+   { id: "card.employee-add", as: "operations_people", question: "Add Ada Obi as a Sales Executive in {departments.edit#department_id}, ada.obi@mycityapp.io, 08031234567, starting next Monday, full time and remote.", shows: ["cards"], action: "employees.add" },
+   { id: "card.employee-edit", as: "operations_people", question: "Change {person}'s job title to Senior Field Officer.", shows: ["cards"], action: "employees.edit" },

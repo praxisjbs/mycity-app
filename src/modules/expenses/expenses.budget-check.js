@@ -6,8 +6,10 @@
  * category. It is Over Budget when its amount is more than that line has left (allocated less
  * committed and spent). A flag the approvers see before they decide, never a block.
  *
- * Until the budgets module recounts committed and spent (handoff PR 5), a request with no line for
- * its department, category and year is not flagged: there is nothing yet to be over.
+ * A request with no line for its department, category and year (or with no department) is flagged
+ * too: nothing was set aside for it. Committed and spent on the line are recounted by the budgets
+ * module whenever a request on it moves, and the flag of a request still deciding is worked out
+ * again with them (expenses.service countIn), so it is never older than the line.
  */
 const m = require("../../shared/money/money");
 
@@ -18,7 +20,7 @@ const m = require("../../shared/money/money");
  * @returns {Promise<{budget_line_id: string|null, over_budget: boolean}>}
  */
 async function check(db, request, sentOn) {
-  if (!request.department_id) return { budget_line_id: null, over_budget: false };
+  if (!request.department_id) return { budget_line_id: null, over_budget: true };
   const { rows } = await db.query(
     `SELECT bl.budget_line_id, (bl.amount - bl.committed_amount - bl.spent_amount)::numeric(18,2) AS remaining
        FROM budget b
@@ -29,7 +31,7 @@ async function check(db, request, sentOn) {
       LIMIT 1`,
     [request.department_id, request.expense_category_id, sentOn],
   );
-  if (!rows[0]) return { budget_line_id: null, over_budget: false };
+  if (!rows[0]) return { budget_line_id: null, over_budget: true };
   return { budget_line_id: rows[0].budget_line_id, over_budget: m.compare(request.amount, rows[0].remaining) > 0 };
 }
 

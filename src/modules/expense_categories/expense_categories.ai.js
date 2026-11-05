@@ -36,7 +36,6 @@ module.exports = defineManifest({
       permission: ["expenses", "create"],
       capability: "expenses.finance",
       risk: "standard",
-      form: "none: Expenses · Categories' form is on INTERIM rules until the screens move onto the contract (docs/handoff/m8-expenses.md PR 7); the card carries ExpenseCategoryCreate",
       asks: [{ field: "name", question: "What is the category called?" }],
       // The same function New Category calls: the name is checked against every category's.
       run: (values, actor) => service.create(actor, values),

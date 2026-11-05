@@ -18,10 +18,10 @@ describe("the budget line a request counts against", () => {
     expect(await budget.check(db([{ budget_line_id: "l", remaining: "50000.00" }]), request, "2026-11-05")).toEqual({ budget_line_id: "l", over_budget: false });
   });
 
-  test("no line, or no department, is no flag until the budgets are recounted (PR 5)", async () => {
-    expect(await budget.check(db([]), request, "2026-11-05")).toEqual({ budget_line_id: null, over_budget: false });
+  test("no line for its department, category and year, or no department, is flagged: nothing was set aside for it", async () => {
+    expect(await budget.check(db([]), request, "2026-11-05")).toEqual({ budget_line_id: null, over_budget: true });
     const none = db([]);
-    expect(await budget.check(none, { ...request, department_id: null }, "2026-11-05")).toEqual({ budget_line_id: null, over_budget: false });
+    expect(await budget.check(none, { ...request, department_id: null }, "2026-11-05")).toEqual({ budget_line_id: null, over_budget: true });
     expect(none.query).not.toHaveBeenCalled();
   });
 });
@@ -43,6 +43,8 @@ describe("the routes", () => {
       ["GET", "/mine", "self", null],
       ["GET", "/mine/summary", "self", null],
       ["POST", "/mine", { key: "expenses", action: "create" }, null],
+      ["POST", "/mine/invoice-reading", { key: "expenses", action: "create" }, null],
+      ["POST", "/mine/category-suggestion", { key: "expenses", action: "create" }, null],
       ["PATCH", "/mine/:id", { key: "expenses", action: "edit" }, null],
       ["POST", "/mine/:id/submit", { key: "expenses", action: "create" }, null],
       ["POST", "/mine/:id/cancel", { key: "expenses", action: "edit" }, null],
@@ -50,6 +52,8 @@ describe("the routes", () => {
       ["GET", "/approvals", { key: "expenses", action: "approve" }, null],
       ["GET", "/approvals/summary", { key: "expenses", action: "approve" }, null],
       ["GET", "/:id", { key: "expenses", action: "view" }, null],
+      ["GET", "/:id/history", { key: "expenses", action: "view" }, null],
+      ["POST", "/:id/duplicate-check", { key: "expenses", action: "view" }, null],
       ["POST", "/:id/withdraw", { key: "expenses", action: "edit" }, "expenses.finance"],
     ]);
   });

@@ -6,6 +6,7 @@ import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_IN
 import roster from "../data/roster.json";
 import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
+import { decideExpense, expenseInstance } from "./expenses";
 import { decidePlan, decideTargetChange, decideUnbind, performanceInstance, performanceWaitingOn } from "./performance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
 import { decideCommitment } from "./workspace";
@@ -995,6 +996,7 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
       decidePlan(req.user!, req.params.id, approve, reason) ??
       decideUnbind(req.user!, req.params.id, approve, reason) ??
       decideTargetChange(req.user!, req.params.id, approve, reason) ??
+      decideExpense(req.user!, req.params.id, approve, reason) ??
       notFound()
     );
   }
@@ -1043,7 +1045,7 @@ function leaveInstance(user: string, wid: string): ApprovalInstance | null {
   };
 }
 route("GET /api/v1/workflow/instances/:id", (req) => {
-  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id) ?? leaveInstance(req.user!, req.params.id);
+  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id) ?? expenseInstance(req.user!, req.params.id) ?? leaveInstance(req.user!, req.params.id);
   return found ? ok(found) : notFound();
 });
 route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));

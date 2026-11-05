@@ -48,6 +48,7 @@ const ROWS = `
          er.budget_line_id,
          CASE WHEN bl.budget_line_id IS NULL THEN NULL
               ELSE (bl.amount - bl.committed_amount - bl.spent_amount)::numeric(18,2) END AS budget_remaining,
+         dr.remaining AS department_remaining,
          er.approved_at, er.authorised_at, er.disbursed_at, er.rejected_at, er.cancelled_at, er.sent_back_at,
          er.created_at,
          search_fold(er.number || ' ' || er.purpose || ' ' || e.first_name || ' ' || e.last_name || ' ' || ec.name
@@ -62,7 +63,13 @@ const ROWS = `
     LEFT JOIN requisition r ON r.requisition_id = er.requisition_id
     LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = er.workflow_instance_id
     LEFT JOIN workflow_instance rwi ON rwi.workflow_instance_id = r.workflow_instance_id
-    LEFT JOIN budget_line bl ON bl.budget_line_id = er.budget_line_id`;
+    LEFT JOIN budget_line bl ON bl.budget_line_id = er.budget_line_id
+    LEFT JOIN LATERAL (
+      SELECT sum(x.amount - x.committed_amount - x.spent_amount)::numeric(18,2) AS remaining
+        FROM budget b2 JOIN budget_line x ON x.budget_id = b2.budget_id
+       WHERE b2.department_id = er.department_id AND b2.status <> 'closed'
+         AND (COALESCE(er.submitted_at, now()) AT TIME ZONE 'Africa/Lagos')::date BETWEEN b2.starts_on AND b2.ends_on
+    ) dr ON true`;
 
 /** Who a request waits on now, as the list's Stage reads it. */
 const WAITING_ON = `CASE v.status
@@ -81,7 +88,7 @@ const ROW_OUT = `v.expense_request_id, v.number, v.purpose, v.amount, v.status, 
 const FULL_OUT = `${ROW_OUT}, v.expense_category_id, v.project_id, v.department_id, v.department, v.currency,
   v.payee_name, v.bank_name, v.account_name, v.account_number, v.uses_profile_account, v.invoice,
   v.invoice_document_id, v.needed_on, v.requisition_id, v.requisition_number, v.workflow_instance_id,
-  v.approval_state, v.approval_opened_by, v.budget_line_id, v.budget_remaining, v.approved_at,
+  v.approval_state, v.approval_opened_by, v.budget_line_id, v.budget_remaining, v.department_remaining, v.approved_at,
   v.authorised_at, v.disbursed_at, v.rejected_at, v.cancelled_at, v.created_at, v.employee_id`;
 
 /** The SQL for each field ExpenseListQuery allow-lists; the first is the default order. */
@@ -96,6 +103,8 @@ function filters(query, params) {
   const parts = [];
   if (query.status) parts.push(`v.status = ${add(query.status)}`);
   if (query.statuses) parts.push(`v.status = ANY(${add(query.statuses)}::text[])`);
+  if (query.in_flight !== undefined)
+    parts.push(`(v.status = ANY(ARRAY['submitted', 'sent_back', 'approved', 'in_requisition', 'authorised'])) = ${add(query.in_flight)}::boolean`);
   if (query.expense_category_id) parts.push(`v.expense_category_id = ${add(query.expense_category_id)}::uuid`);
   if (query.project_id) parts.push(`v.project_id = ${add(query.project_id)}::uuid`);
   if (query.department_id) parts.push(`v.department_id = ${add(query.department_id)}::uuid`);
@@ -107,6 +116,13 @@ function filters(query, params) {
   // Somebody else's draft is theirs alone until it is sent.
   if (query.reader_employee_id !== undefined)
     parts.push(`(v.status <> 'draft' OR v.employee_id = ${add(query.reader_employee_id)}::uuid)`);
+  if (query.disbursed_from)
+    parts.push(`v.status = 'disbursed' AND (v.disbursed_at AT TIME ZONE 'Africa/Lagos')::date >= ${add(query.disbursed_from)}::date`);
+  if (query.approved_by_me_from)
+    parts.push(`EXISTS (SELECT 1 FROM workflow_decision dd JOIN workflow_instance di ON di.workflow_instance_id = dd.workflow_instance_id
+                 WHERE di.definition_key = 'expenses.request' AND di.entity_id = v.expense_request_id::text AND dd.decision = 'approve'
+                   AND dd.actor_id = ${add(query.reader_user_id || null)}::uuid
+                   AND (dd.decided_at AT TIME ZONE 'Africa/Lagos')::date >= ${add(query.approved_by_me_from)}::date)`);
   if (query.q) parts.push(`v.haystack LIKE '%' || search_fold(${add(query.q)}) || '%'`);
   return parts.length ? `AND ${parts.join(" AND ")}` : "";
 }
@@ -202,7 +218,61 @@ async function mineSummary(db, employeeId, yearStart) {
 async function get(db, id) {
   const { rows } = await db.query(`SELECT ${FULL_OUT} FROM (${ROWS}) v WHERE v.expense_request_id = $1`, [id]);
   if (!rows[0]) return null;
-  return { ...rows[0], lines: await lines(db, id) };
+  return { ...rows[0], lines: await lines(db, id), possible_duplicates: await duplicatesOf(db, id) };
+}
+
+/**
+ * One page of a request's history, newest first: what was done to the request itself (raised,
+ * sent, each decision of its approval, sent back, cancelled, withdrawn), and what was done to its
+ * requisition or its disbursement that names it (grouped, removed by the CEO, authorised or
+ * rejected, paid, reference added). Audit F3: a removal is an event on the requisition, so the
+ * history reads the event's own payload too.
+ */
+function historyOf(db, id, query) {
+  return pageQuery(
+    db,
+    `SELECT a.occurred_at AS at, a.action, a.actor_name AS by, NULLIF(btrim(ev.payload ->> 'reason'), '') AS reason, ${TOTAL_COL}
+       FROM audit_ledger a
+       JOIN event_log ev ON ev.event_id = a.event_id
+      WHERE (a.entity_type = 'expense' AND a.entity_id = $1)
+         OR (a.entity_type IN ('requisition', 'disbursement')
+             AND (ev.payload ->> 'expense_request_id' = $1 OR COALESCE(ev.payload -> 'expense_request_ids', '[]'::jsonb) ? $1))
+      ORDER BY a.occurred_at DESC, a.event_id`,
+    [id],
+    query,
+  );
+}
+
+/** STATUS for the other request `o`, its approval `owi` and its requisition's `orwi`. */
+const OTHER_STATUS = STATUS.replace(/\brwi\./g, "orwi.").replace(/\bwi\./g, "owi.").replace(/\ber\./g, "o.");
+
+/** How many possible duplicates a request shows: a warning, never a list a person pages. */
+const DUPLICATES_SHOWN = 5;
+
+/**
+ * Other requests sent within 30 days either side of this one, to the same payee (the same account
+ * number, or the same payee name with case and accents set aside) for the same amount (guide §6.8).
+ * A draft has none; a cancelled or rejected one is still shown, as a request sent again.
+ */
+async function duplicatesOf(db, id) {
+  const { rows } = await db.query(
+    `SELECT o.expense_request_id, o.number, o.purpose, o.amount, ${OTHER_STATUS} AS status, o.submitted_at,
+            o.employee_id, o.workflow_instance_id, owi.state AS approval_state
+       FROM expense_request er
+       JOIN expense_request o ON o.expense_request_id <> er.expense_request_id AND o.amount = er.amount
+            AND o.submitted_at IS NOT NULL
+            AND o.submitted_at BETWEEN COALESCE(er.submitted_at, now()) - interval '30 days' AND COALESCE(er.submitted_at, now()) + interval '30 days'
+            AND ((o.account_number IS NOT NULL AND o.account_number = er.account_number)
+                 OR (o.payee_name IS NOT NULL AND search_fold(o.payee_name) = search_fold(er.payee_name)))
+       LEFT JOIN workflow_instance owi ON owi.workflow_instance_id = o.workflow_instance_id
+       LEFT JOIN requisition orq ON orq.requisition_id = o.requisition_id
+       LEFT JOIN workflow_instance orwi ON orwi.workflow_instance_id = orq.workflow_instance_id
+      WHERE er.expense_request_id = $1 AND er.status <> 'draft'
+      ORDER BY o.submitted_at DESC, o.expense_request_id
+      LIMIT ${DUPLICATES_SHOWN} -- pagination:batch the few possible duplicates a request's modal warns of`,
+    [id],
+  );
+  return rows;
 }
 
 /** A request's lines, in order. At most 25 (the contract's limit), never a list a person pages. */
@@ -378,6 +448,51 @@ async function requisitionTotal(client, requisitionId) {
   return rows[0];
 }
 
+/**
+ * Over Budget worked out again for the requests still deciding on these lines (status
+ * `submitted`), against each line as it stands now, so the flag the approvers see is never older
+ * than the line's own figures (guide §6.6 rule 3). A request already approved counts in the line's
+ * committed and keeps the flag it was decided with.
+ */
+async function refreshOverBudget(client, lineIds) {
+  const ids = [...new Set((lineIds || []).filter(Boolean))];
+  if (!ids.length) return 0;
+  const { rowCount } = await client.query(
+    `UPDATE expense_request er
+        SET over_budget = er.amount > (bl.amount - bl.committed_amount - bl.spent_amount), updated_at = now()
+       FROM budget_line bl
+      WHERE bl.budget_line_id = er.budget_line_id AND er.budget_line_id = ANY($1::uuid[])
+        AND er.status = 'submitted'
+        AND er.over_budget IS DISTINCT FROM (er.amount > (bl.amount - bl.committed_amount - bl.spent_amount))`,
+    [ids],
+  );
+  return rowCount;
+}
+
+/**
+ * A budget set after requests were sent: each sent request of its department, in its year and in
+ * a category it now has a line for, counts against that line. Answers the lines that gained one.
+ */
+/** A budget line taken away: the requests that named it and no longer count let go of it. */
+async function detachLine(client, lineId) {
+  await client.query("UPDATE expense_request SET budget_line_id = NULL, updated_at = now() WHERE budget_line_id = $1", [lineId]);
+}
+
+async function attachToBudget(client, budgetId) {
+  const { rows } = await client.query(
+    `UPDATE expense_request er
+        SET budget_line_id = bl.budget_line_id, updated_at = now()
+       FROM budget_line bl JOIN budget b ON b.budget_id = bl.budget_id
+      WHERE b.budget_id = $1 AND er.budget_line_id IS NULL AND er.status <> 'draft'
+        AND er.department_id = b.department_id AND er.expense_category_id = bl.expense_category_id
+        AND er.submitted_at IS NOT NULL
+        AND (er.submitted_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN b.starts_on AND b.ends_on
+      RETURNING er.budget_line_id`,
+    [budgetId],
+  );
+  return [...new Set(rows.map((r) => r.budget_line_id))];
+}
+
 async function projectName(db, id) {
   const { rows } = await db.query("SELECT name FROM project WHERE project_id = $1", [id]);
   return rows[0] ? rows[0].name : null;
@@ -389,6 +504,11 @@ async function departmentName(db, id) {
 }
 
 module.exports = {
+  historyOf,
+  duplicatesOf,
+  refreshOverBudget,
+  attachToBudget,
+  detachLine,
   group,
   settleRequisition,
   requisitionTotal,

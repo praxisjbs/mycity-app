@@ -10,6 +10,11 @@
  * requests waiting for a requisition, through the service function the tab's own button calls.
  * The CEO approves or rejects a requisition through the approvals' own card (approvals.decide);
  * taking one request out is a press with a reason on the requisition and has no form.
+ *
+ * RequisitionRemove is offered no card on purpose (M8 audit F20): it is the CEO's press with a
+ * reason on the requisition's own modal, one request at a time, deciding what the CEO is about to
+ * approve, and is no create or edit form, so `not_offered` (which gate 23 keeps for those) cannot
+ * hold it. The CEO is pointed to Expenses · Requisitions, the route below.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");

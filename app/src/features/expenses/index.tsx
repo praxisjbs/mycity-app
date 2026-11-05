@@ -1,355 +1,283 @@
-import { useState } from "react";
+import budgets from "@mycity/contract/schemas/budgets.js";
+import categoriesSchema from "@mycity/contract/schemas/expense_categories.js";
+import disbursementsSchema from "@mycity/contract/schemas/disbursements.js";
+import requisitionsSchema from "@mycity/contract/schemas/requisitions.js";
+import type { Budget, Disbursement, ExpenseCategory, ExpenseRequest, ExpenseRow, Requisition } from "@mycity/contract/contract.gen.ts";
+import { useState, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
-import "@/api/types/expenses";
-import type { Category, Disbursement, ExpenseRow, Requisition } from "@/api/types/expenses";
-import type { DocumentRef } from "@/api/types/common";
-import { useAuth } from "@/auth/AuthProvider";
-import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportAction, PagedTable, TrailCard } from "@/features/shared/sections";
+import { useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
+import { upload } from "@/api/upload";
+import { PagedTable } from "@/features/shared/sections";
 import { paging } from "@/features/shared/wire";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AreaChart, Button, Card, CardHeader, Chain, cn, DataView, DateField, DetailPane, ErrorState, Field, formatBytes, formatDate, formatDateTime, formatMoneyShort, FormFooter, Grid, Icon, KeyValue, LoadingRows, Money, MoneyField, PageHeader, rules, SelectField, StatusPill, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useIsPhone, useModal, Who, Wizard } from "@mycity/ui";
-import { upload } from "@/api/upload";
+import { useScreenAction } from "@/shell/screen-action";
+import {
+  ActionGroup, Button, Card, CardHeader, DataView, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatMoneyShort, FormFooter, Grid, HelpTerm,
+  KeyValue, KpiCard, ListDetail, LoadingRows, Money, MoneyField, PageHeader, Pager, Pill, SelectField, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal, UploadField,
+} from "@mycity/ui";
+import { DecisionForm, OwnActions, refreshAll, RequestCard, say, stagePill, useFinance } from "./parts";
+import { Projects } from "./Projects";
 
+/**
+ * Expenses (docs/guides/expenses.md §2, §10): Requisitions, Approvals, Disbursements, Projects,
+ * Budgets and Categories. My Requests is an ESS tab (MyRequests.tsx). A request, a requisition and
+ * a disbursement open in the modal on desktop and on a phone (F31 as amended for Expenses).
+ */
 export default function Expenses({ tab, id }: ModuleScreenProps) {
-  if (tab === "approvals") return <Approvals id={id} />;
-  if (tab === "requisitions") return <Requisitions />;
-  if (tab === "disbursements") return <Disbursements />;
-  if (tab === "budgets") return <BudgetsTab />;
-  if (tab === "categories") return <Categories />;
-  return <MyRequests id={id} />;
+  switch (tab) {
+    case "approvals": return <Approvals id={id} />;
+    case "disbursements": return <Disbursements />;
+    case "projects": return <Projects />;
+    case "budgets": return <BudgetsTab />;
+    case "categories": return <Categories />;
+    default: return <Requisitions />;
+  }
 }
 
-const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : "Something went wrong");
-/** The beneficiary's bank, as the transfer will name it. */
-const BANKS = ["Access Bank", "First Bank", "GTBank", "Providus Bank", "Stanbic IBTC", "UBA", "Wema Bank", "Zenith Bank"].map((b) => [b, b] as [string, string]);
+type Column = { key: string; label: ReactNode; render: (r: ExpenseRow) => ReactNode; desktop?: boolean; align?: "n" };
+const requestColumns = (extra: Column[] = []): Column[] => [
+  { key: "n", label: "Reference", render: (r) => <span className="font-semibold">{r.number}</span> },
+  { key: "p", label: "Purpose", render: (r) => r.purpose },
+  { key: "r", label: "Requester", render: (r) => r.requester.display_name, desktop: true },
+  { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
+  ...extra,
+];
+const closed = (title: string, text: string) => (
+  <>
+    <PageHeader title={title} />
+    <EmptyState title="Not Open to You" text={text} />
+  </>
+);
 
-/* ───────────── My requests ───────────── */
+/* ───────────── Requisitions ───────────── */
 
-function MyRequests({ id }: { id: string | null }) {
-  const modal = useModal();
-  const s = useApi("GET /api/v1/expenses/mine/summary");
-  const list = usePaged("GET /api/v1/expenses/requests", { filters: { scope: "mine" } });
-  const phone = useIsPhone();
-  const [sel, setSel] = useState<string | null>(id);
-  // On desktop the summary's focus shows unasked; on a phone a request opens in a sheet when tapped (F31).
-  const focus = sel ?? (phone ? null : (s.data?.focus_id ?? null));
-  return (
-    <>
-      <PageHeader title="My Requests" sub="Your own expense requests" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", wide: true, body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
-      {s.data && <KpiTiles items={[{ label: "In Flight", value: String(s.data.in_flight), tone: s.data.in_flight ? "warn" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Turnaround", value: s.data.average_turnaround_days === null ? "None" : `${s.data.average_turnaround_days} days` }, { label: "Rejected", value: String(s.data.rejected), tone: s.data.rejected ? "err" : "ok" }]} />}
-      <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Expense Request">
-        {focus && (
-          <>
-            <FocusChain id={focus} />
-            {phone && <History id={focus} />}
-          </>
-        )}
-      </DetailPane>
-      <PagedTable<ExpenseRow>
-        title="My Requests"
-        list={list}
-        search="Search requests"
-        rowKey={(r) => r.request_id}
-        noun="request"
-        onRowClick={(r) => setSel(r.request_id)}
-        empty={{ title: "No Requests Yet", text: "Raise one with New Request. It goes to your line manager first." }}
-        columns={[
-          { key: "n", label: "Reference", render: (r) => <span className={cn(r.request_id === focus && "font-semibold")}>{r.number}</span> },
-          { key: "t", label: "Description", render: (r) => r.title },
-          { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
-          { key: "d", label: "Submitted", render: (r) => formatDate(r.submitted_at), desktop: true },
-          { key: "s", label: "Stage", render: (r) => <StatusPill s={r.stage_status} /> },
-        ]}
-      />
-      {!phone && (
-        <Grid cols={2} className="mt-3">
-          {focus ? <History id={focus} /> : <Card><LoadingRows /></Card>}
-        </Grid>
-      )}
-    </>
-  );
-}
-
-function FocusChain({ id }: { id: string }) {
-  const d = useApi("GET /api/v1/expenses/requests/:id", { params: { id } });
-  if (!d.data) return null;
-  return (
-    <Card className="mb-3">
-      <Chain steps={d.data.chain.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />
-      <p className="mt-2.5 text-2xs text-subtle-foreground">{d.data.number}, {d.data.title.toLowerCase()}. {d.data.chain_note}</p>
-    </Card>
-  );
-}
-
-function History({ id }: { id: string }) {
-  const d = useApi("GET /api/v1/expenses/requests/:id", { params: { id } });
-  if (!d.data) return <Card>{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
-  return <TrailCard title={`${d.data.number} History`} items={d.data.history.map((h) => ({ ...h, when: formatDateTime(h.when) }))} />;
-}
-
-function RequestForm({ close }: { close: () => void }) {
-  const cats = useInfinite("GET /api/v1/expenses/categories");
-  const { me } = useAuth();
-  const [invoice, setInvoice] = useState<DocumentRef | null>(null);
-  const [tried, setTried] = useState(false);
-  const f = useContractForm({ title: "", category_id: "", amount: "", project: "", beneficiary_name: me?.display_name ?? "", bank: "", account_number: "" }, {
-    title: (v) => (v.trim().length < 6 ? "Say what it is" : null),
-    category_id: (v) => (!v ? "Pick the category" : null),
-    amount: (v) => (!(Number(v) > 0) ? "Enter the amount" : null),
-    beneficiary_name: (v) => (!v.trim() ? "Who is paid" : null),
-    bank: (v) => (!v ? "Pick the bank" : null),
-    account_number: (v) => (!/^\d{10}$/.test(v) ? "Ten digits (NUBAN)" : null),
-  });
-  const save = useMutation("POST /api/v1/expenses/requests");
-  const submit = async () => {
-    setTried(true);
-    if (!f.check() || !invoice) return;
+function Requisitions() {
+  const finance = useFinance();
+  const ready = usePaged("GET /api/v1/expenses", { filters: { status: "approved" }, enabled: finance });
+  const list = usePaged("GET /api/v1/requisitions", { sort: "-submitted_at", enabled: finance });
+  const [ticked, setTicked] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [request, setRequest] = useState<string | null>(null);
+  const create = useMutation("POST /api/v1/requisitions");
+  const group = async () => {
+    if (!ticked.length) return void toast("Tick a request first");
     try {
-      const r = await save.run({ body: { ...f.values, invoice_document_id: invoice.document_id, ...(f.values.project ? {} : { project: undefined }) } });
-      invalidate("/api/v1/expenses");
-      close();
-      toast(`${r.number} sent to your line manager`);
-    } catch {
-      f.setServerErrors(save.fields);
+      const q = await create.run({ body: { expense_request_ids: ticked } });
+      setTicked([]);
+      refreshAll();
+      toast(`${q.number} sent to the CEO`);
+    } catch (e) {
+      say(e);
     }
   };
-  return (
-    <Wizard
-      finish="Send Request"
-      busy={save.pending}
-      onFinish={() => submit()}
-      onCancel={close}
-      steps={[
-        {
-          title: "Request",
-          check: () => f.check(["title", "category_id", "amount"]),
-          body: (
-            <>
-              <Field label="Description" {...f.field("title")}><TextField {...f.field("title")} placeholder="Courier to Enugu" /></Field>
-              <Field label="Category" {...f.field("category_id")}><SelectField placeholder="Pick one" options={cats.rows.map((c) => [c.category_id, c.name])} {...paging(cats)} {...f.field("category_id")} /></Field>
-              <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>
-              <Field label="Project" optional><TextField {...f.field("project")} placeholder="Campaign or city" /></Field>
-            </>
-          ),
-        },
-        {
-          title: "Payee",
-          check: () => f.check(["beneficiary_name", "bank", "account_number"]),
-          body: (
-            <>
-              <Field label="Beneficiary" {...f.field("beneficiary_name")}><TextField {...f.field("beneficiary_name")} /></Field>
-              <Field label="Bank" {...f.field("bank")}><SelectField placeholder="Pick the bank" options={BANKS} {...f.field("bank")} /></Field>
-              <Field label="Account Number" {...f.field("account_number")}><TextField {...f.field("account_number")} inputMode="numeric" onChange={(v) => f.set("account_number", v.replace(/\D/g, "").slice(0, 10))} placeholder="10 digits" /></Field>
-            </>
-          ),
-        },
-        {
-          title: "Invoice",
-          body: (
-          <Field label="Vendor Invoice" state={tried && !invoice ? "bad" : undefined} message={tried && !invoice ? "Attach the invoice" : undefined}>
-            {invoice ? (
-              <span className="flex items-center gap-2 rounded-ctl border border-border bg-muted px-3 py-2 text-xs"><Icon name="doc" />{invoice.file_name}<span className="text-subtle-foreground">{formatBytes(invoice.size_bytes)}</span><button type="button" className="ml-auto text-accent-foreground underline" onClick={() => setInvoice(null)}>Replace</button></span>
-            ) : (
-              <UploadField upload={upload} purpose="expense_invoice" accept=".pdf,image/*" multiple={false} compact onUploaded={(d) => setInvoice(d[0])} />
-            )}
-          </Field>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
-/* ───────────── Approvals ───────────── */
-
-function Approvals({ id }: { id: string | null }) {
-  const s = useApi("GET /api/v1/expenses/approvals/summary");
-  const list = usePaged("GET /api/v1/expenses/requests", { filters: { scope: "approvals" } });
-  const phone = useIsPhone();
-  const [sel, setSel] = useState<string | null>(id);
-  // On desktop the oldest request waiting shows unasked; on a phone one opens in a sheet when tapped (F31).
-  const focus = sel ?? (phone ? null : (s.data?.focus_id ?? null));
+  useScreenAction(finance ? { label: "Create Requisition", onSelect: group } : null);
+  if (!finance) return closed("Requisitions", "Operations & People group requests.");
   return (
     <>
-      <PageHeader title="Approvals" sub="Requests waiting on you" />
-      {s.data && <KpiTiles items={[{ label: "With You", value: String(s.data.with_you), tone: s.data.with_you ? "warn" : "ok" }, { label: "Total Value", value: formatMoneyShort(s.data.total_value) }, { label: "Oldest", value: `${s.data.oldest_days} days` }, { label: "Approved This Month", value: String(s.data.approved_this_month), tone: "ok" }]} />}
-      <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Expense Request">
-        {focus && <ApprovalCard id={focus} onDone={() => setSel(null)} />}
-      </DetailPane>
-      <PagedTable<ExpenseRow>
-        title="Queue"
-        list={list}
-        rowKey={(r) => r.request_id}
-        noun="request"
-        onRowClick={(r) => setSel(r.request_id)}
-        empty={{ title: "Nothing Waiting on You", text: "Requests reach you as line manager or as Operations." }}
-        columns={[
-          { key: "n", label: "Reference", render: (r) => <span className={cn(r.request_id === focus && "font-semibold")}>{r.number}</span> },
-          { key: "t", label: "Description", render: (r) => r.title },
-          { key: "r", label: "Requester", render: (r) => <Who name={r.requester.display_name} sub={r.requester.department ?? undefined} />, desktop: true },
-          { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
-          { key: "s", label: "Stage", render: () => <StatusPill s={{ tone: "warn", text: "With you" }} /> },
-        ]}
+      <PageHeader title="Requisitions" sub="Approved requests grouped for the CEO" actions={<Button variant="primary" icon="plus" onClick={group}>Create Requisition</Button>} />
+      <ListDetail
+        layout="modal"
+        open={request !== null}
+        onClose={() => setRequest(null)}
+        title="Expense Request"
+        list={
+          <>
+            <DataView
+              title="Approved Requests"
+              rows={ready.rows}
+              rowKey={(r) => r.expense_request_id}
+              loading={ready.loading}
+              selection={{ keys: ticked, onChange: setTicked, actions: <Button size="sm" variant="primary" onClick={group}>Create Requisition</Button> }}
+              onRowClick={(r) => setRequest(r.expense_request_id)}
+              empty={{ title: "Nothing to Group", text: "Approved requests wait here." }}
+              columns={requestColumns([{ key: "c", label: "Category", render: (r) => r.category, desktop: true }])}
+            />
+            <Pager page={ready.page} onPage={ready.setPage} noun="request" label="Approved Requests" />
+          </>
+        }
+        detail={request && <RequestCard id={request} actions={(r) => <OwnActions r={r} close={() => setRequest(null)} />} />}
+      />
+      <ListDetail
+        layout="modal"
+        className="mt-3"
+        open={picked !== null}
+        onClose={() => setPicked(null)}
+        title="Requisition"
+        list={
+          <PagedTable<Requisition>
+            title={<HelpTerm help="Approved requests grouped for the CEO.">Requisitions</HelpTerm>}
+            list={list}
+            rowKey={(q) => q.requisition_id}
+            noun="requisition"
+            onRowClick={(q) => setPicked(q.requisition_id)}
+            empty={{ title: "No Requisitions Yet", text: "Tick approved requests to group them." }}
+            columns={[
+              { key: "n", label: "Reference", render: (q) => <span className="font-semibold">{q.number}</span> },
+              { key: "c", label: "Requests", align: "n", render: (q) => q.requests },
+              { key: "t", label: "Total", align: "n", render: (q) => <Money value={q.total_amount} /> },
+              { key: "s", label: "Submitted", render: (q) => (q.submitted_at ? formatDate(q.submitted_at) : "Not sent"), desktop: true },
+              { key: "st", label: "Status", render: (q) => <Pill tone={q.status === "approved" ? "ok" : q.status === "submitted" ? "warn" : q.status === "rejected" ? "err" : "neutral"}>{q.status === "submitted" ? "With the CEO" : q.status === "approved" ? "Approved" : q.status === "rejected" ? "Rejected" : "Cancelled"}</Pill> },
+            ]}
+          />
+        }
+        detail={picked && <RequisitionCard id={picked} close={() => setPicked(null)} />}
       />
     </>
   );
 }
 
-function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
+function RequisitionCard({ id, close }: { id: string; close: () => void }) {
   const modal = useModal();
-  const d = useApi("GET /api/v1/expenses/requests/:id", { params: { id } });
-  const approve = useMutation("POST /api/v1/expenses/requests/:id/approve");
-  if (!d.data) return <Card className="mb-3">{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
-  const x = d.data;
+  const d = useApi("GET /api/v1/requisitions/:id", { params: { id } });
+  const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
+  if (!d.data) return <Card>{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
+  const q = d.data;
+  const done = (text: string) => () => {
+    refreshAll();
+    close();
+    toast(text);
+  };
+  const remove = (r: ExpenseRow) => modal.open({ title: `Remove ${r.number}`, body: (c) => <RemoveForm requisitionId={id} requestId={r.expense_request_id} close={c} /> });
+  const open = (r: ExpenseRow) => modal.open({ title: "Expense Request", wide: true, body: (c) => <RequestCard id={r.expense_request_id} actions={(x) => <OwnActions r={x} close={() => { c(); close(); }} />} /> });
   return (
-    <Card className="mb-3">
-      <CardHeader record title={`${x.number} · ${x.title}`} right={<StatusPill s={{ tone: "warn", text: formatMoneyShort(x.amount) }} />} />
-      <Chain steps={x.chain.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />
-      <p className="mt-2.5 text-2xs text-subtle-foreground">{x.chain_note} Vendor invoice attached, account details supplied.</p>
-      <div className="mt-3">
-        <KeyValue
-          items={[
-            ["Requested by", `${x.requester.display_name}, ${x.requester.job_title ?? x.requester.department ?? ""}`],
-            ["Category", x.category],
-            ["Beneficiary", `${x.beneficiary.name} · ${x.beneficiary.bank} · ••••${x.beneficiary.account_last4}`],
-            ["Invoice", x.invoice ? `${x.invoice.file_name} · ${formatBytes(x.invoice.size_bytes)}` : "None"],
-            ["Project", x.project ?? "None"],
-          ]}
-        />
-      </div>
-      {x.can_approve && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="primary" icon="ok" busy={approve.pending} onClick={async () => { try { await approve.run({ params: { id }, body: {} }); invalidate("/api/v1/expenses"); onDone(); toast(`${x.number} approved`); } catch (e) { fail(e); } }}>Approve as {x.approve_as}</Button>
-          <Button onClick={() => modal.open({ title: `Reject ${x.number}`, body: (close) => <Reject id={id} close={close} onDone={onDone} /> })}>Reject</Button>
-          {x.invoice && <Button icon="doc" onClick={() => toast(`${x.invoice!.file_name} opens from the vault once connected`)}>View Invoice</Button>}
+    <Card>
+      <CardHeader record title={q.number} right={<b><Money value={q.total_amount} /></b>} />
+      <DataView
+        rows={q.items}
+        rowKey={(r) => r.expense_request_id}
+        onRowClick={open}
+        columns={requestColumns(q.can_decide ? [{ key: "x", label: "Remove", render: (r) => (
+              // The row opens the request; Remove is its own press, so it stops here.
+              <span onClick={(e) => e.stopPropagation()}>
+                <Button size="sm" onClick={async () => remove(r)}>Remove</Button>
+              </span>
+            ) }] : [])}
+      />
+      {q.can_decide && q.workflow_instance_id && (
+        <div className="mt-3">
+          <ActionGroup>
+            <Button variant="primary" icon="ok" onClick={async () => { try { await approve.run({ params: { id: q.workflow_instance_id! }, body: {} }); done(`${q.number} approved`)(); } catch (e) { say(e); } }}>Approve</Button>
+            <Button onClick={async () => modal.open({ title: `Reject ${q.number}`, body: (c) => <DecisionForm instanceId={q.workflow_instance_id!} verb="reject" close={c} onDone={done(`${q.number} rejected`)} /> })}>Reject</Button>
+          </ActionGroup>
         </div>
       )}
     </Card>
   );
 }
 
-function Reject({ id, close, onDone }: { id: string; close: () => void; onDone: () => void }) {
-  const f = useContractForm({ reason: "" }, { reason: rules.min(6, "At least 6 characters") });
-  const reason = f.values.reason;
-  const reject = useMutation("POST /api/v1/expenses/requests/:id/reject");
+function RemoveForm({ requisitionId, requestId, close }: { requisitionId: string; requestId: string; close: () => void }) {
+  const f = useContractForm({ expense_request_id: requestId, reason: "" }, requisitionsSchema.RequisitionRemove);
+  const remove = useMutation("POST /api/v1/requisitions/:id/remove");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await remove.run({ params: { id: requisitionId }, body: f.values });
+      refreshAll();
+      close();
+      toast("Removed. It is approved again");
+    } catch (e) {
+      say(e);
+    }
+  };
   return (
     <>
-      <Field label="Reason" {...f.field("reason")} info="The requester sees this.">
-        <TextAreaField {...f.field("reason")} placeholder="Use approved vendors" />
-      </Field>
+      <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} placeholder="Next month" /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={reject.pending} onClick={async () => { if (!f.check()) return; try { await reject.run({ params: { id }, body: { reason } }); invalidate("/api/v1/expenses"); close(); onDone(); toast("Rejected. The requester is told why"); } catch (e) { fail(e); } }}>Reject</Button>
+        <Button variant="primary" onClick={submit}>Remove Request</Button>
       </FormFooter>
     </>
   );
 }
 
-/* ───────────── Requisitions ───────────── */
+/* ───────────── Approvals ───────────── */
 
-function Requisitions() {
+function Approvals({ id }: { id: string | null }) {
   const modal = useModal();
-  const s = useApi("GET /api/v1/expenses/requisitions/summary");
-  const list = usePaged("GET /api/v1/expenses/requisitions");
-  const phone = useIsPhone();
-  const [sel, setSel] = useState<string | null>(null);
-  // On desktop the summary's focus shows unasked under the list; on a phone one opens in a sheet when tapped (F31).
-  const focus = sel ?? (phone ? null : (s.data?.focus_id ?? null));
+  const s = useApi("GET /api/v1/expenses/approvals/summary");
+  const list = usePaged("GET /api/v1/expenses/approvals", { sort: "submitted_at" });
+  const [picked, setPicked] = useState<string | null>(id);
+  const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
+  const records = () => modal.open({ title: "With You", wide: true, body: () => <ApprovalRecords /> });
+  const approvedByMe = () => modal.open({ title: "Approved This Month", wide: true, body: () => <RequestRecords title="Approved by You" filters={{ approved_by_me_from: `${todayIso().slice(0, 7)}-01` }} /> });
   return (
     <>
-      <PageHeader title="Requisitions" sub="Approved requests grouped for the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Requisition", wide: true, body: (close) => <NewRequisition close={close} /> })}>New Requisition</Button>} />
-      {s.data && <KpiTiles items={[{ label: "With the CEO", value: String(s.data.with_ceo), tone: s.data.with_ceo ? "err" : "ok" }, { label: "Days Waiting", value: String(s.data.days_waiting), tone: s.data.days_waiting > 3 ? "err" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Size", value: s.data.average_size }]} />}
-      <PagedTable<Requisition>
-        title="Requisitions"
-        list={list}
-        rowKey={(r) => r.requisition_id}
-        noun="requisition"
-        onRowClick={(r) => setSel(r.requisition_id)}
-        columns={[
-          { key: "n", label: "Reference", render: (r) => <span className={cn(r.requisition_id === focus && "font-semibold")}>{r.number}</span> },
-          { key: "c", label: "Requests", align: "n", render: (r) => r.count },
-          { key: "t", label: "Total", align: "n", render: (r) => <Money value={r.total} /> },
-          { key: "s", label: "Submitted", render: (r) => formatDate(r.submitted_on), desktop: true },
-          { key: "a", label: "Approved", render: (r) => (r.approved_on ? formatDate(r.approved_on) : "Not yet"), desktop: true },
-          { key: "st", label: "Status", render: (r) => <StatusPill s={r.status} /> },
-        ]}
+      <PageHeader title="Approvals" sub="Requests waiting on you" />
+      {s.data && (
+        <Grid cols="4m2">
+          <KpiCard title="With You" value={String(s.data.with_you)} tone={s.data.with_you ? "warn" : "ok"} onOpen={records} />
+          <KpiCard title="Total Value" value={formatMoneyShort(s.data.total_value)} onOpen={records} />
+          <KpiCard title="Oldest" value={s.data.oldest_days === null ? "None" : `${s.data.oldest_days} days`} />
+          <KpiCard title="Approved This Month" value={String(s.data.approved_this_month)} tone="ok" onOpen={approvedByMe} />
+        </Grid>
+      )}
+      <ListDetail
+        layout="modal"
+        className="mt-3"
+        open={picked !== null}
+        onClose={() => setPicked(null)}
+        title="Expense Request"
+        list={<ApprovalTable list={list} onPick={(r) => setPicked(r.expense_request_id)} />}
+        detail={
+          picked && (
+            <RequestCard
+              id={picked}
+              actions={(r) => {
+                const done = (text: string) => () => {
+                  refreshAll();
+                  setPicked(null);
+                  toast(text);
+                };
+                if (r.status !== "submitted" || !r.workflow_instance_id) return null;
+                const wid = r.workflow_instance_id;
+                return (
+                  <ActionGroup>
+                    <Button variant="primary" icon="ok" onClick={async () => { try { await approve.run({ params: { id: wid }, body: {} }); done(`${r.number} approved`)(); } catch (e) { say(e); } }}>Approve</Button>
+                    <Button onClick={async () => modal.open({ title: `Send Back ${r.number}`, body: (c) => <DecisionForm instanceId={wid} verb="request-changes" close={c} onDone={done(`${r.number} sent back`)} /> })}>Send Back</Button>
+                    <Button onClick={async () => modal.open({ title: `Reject ${r.number}`, body: (c) => <DecisionForm instanceId={wid} verb="reject" close={c} onDone={done(`${r.number} rejected`)} /> })}>Reject</Button>
+                  </ActionGroup>
+                );
+              }}
+            />
+          )
+        }
       />
-      <Grid cols={2} className="mt-3">
-        <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Requisition">
-          {focus ? <RequisitionCard id={focus} /> : <Card><LoadingRows /></Card>}
-        </DetailPane>
-      </Grid>
     </>
   );
 }
 
-function RequisitionCard({ id }: { id: string }) {
-  const d = useApi("GET /api/v1/expenses/requisitions/:id", { params: { id } });
-  const approve = useMutation("POST /api/v1/expenses/requisitions/:id/approve");
-  const [removed, setRemoved] = useState<string[]>([]);
-  const [tried, setTried] = useState(false);
-  if (!d.data) return <Card>{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
-  const x = d.data;
-  const kept = x.items.filter((i) => !removed.includes(i.request_id));
-  const total = kept.reduce((a, i) => a + Math.round(Number(i.amount) * 100), 0);
-  const totalStr = `${Math.trunc(total / 100)}.${String(total % 100).padStart(2, "0")}`;
+/** A KPI card's own requests, 25 a page, in its modal. */
+function RequestRecords({ title, filters }: { title: string; filters: Record<string, string> }) {
   return (
-    <DataView
-      title={`Included in ${x.number}`}
-      right={<b className="text-sm"><Money value={totalStr} /></b>}
-      rows={x.items}
-      rowKey={(r) => r.request_id}
-      columns={[
-        { key: "t", label: "Request", render: (r) => <span className={cn(removed.includes(r.request_id) && "text-subtle-foreground line-through")}>{r.number} · {r.title}</span> },
-        { key: "r", label: "Requester", render: (r) => r.requester.display_name, desktop: true },
-        { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
-        ...(x.can_approve ? [{ key: "x", label: "", render: (r: ExpenseRow) => <Button size="sm" onClick={() => setRemoved((l) => (l.includes(r.request_id) ? l.filter((v) => v !== r.request_id) : [...l, r.request_id]))}>{removed.includes(r.request_id) ? "Keep" : "Remove"}</Button> }] : []),
-      ]}
-      footer={
-        x.can_approve && (
-          <div className="flex items-center justify-end gap-3 border-t border-border px-3.5 py-2.5">
-            {tried && !kept.length && <span role="alert" className="mr-auto text-xs text-destructive">Keep at least one</span>}
-            <Button variant="primary" icon="ok" busy={approve.pending} onClick={async () => { if (!kept.length) return setTried(true); try { await approve.run({ params: { id }, body: { remove_ids: removed } }); invalidate("/api/v1/expenses"); toast(`${x.number} approved${removed.length ? `, ${removed.length} returned to the queue` : ""}`); } catch (e) { fail(e); } }}>
-              Approve {kept.length} of {x.items.length}
-            </Button>
-          </div>
-        )
-      }
+    <PagedTable<ExpenseRow>
+      title={title}
+      list={usePaged("GET /api/v1/expenses", { filters })}
+      rowKey={(r) => r.expense_request_id}
+      noun="request"
+      empty={{ title: "None Yet", text: "Nothing this month." }}
+      columns={requestColumns([{ key: "s", label: "Stage", render: (r) => stagePill(r) }])}
     />
   );
 }
 
-function NewRequisition({ close }: { close: () => void }) {
-  const ready = usePaged("GET /api/v1/expenses/requests", { filters: { scope: "all", stage: "requisition" } });
-  const [ids, setIds] = useState<string[]>([]);
-  const [tried, setTried] = useState(false);
-  const save = useMutation("POST /api/v1/expenses/requisitions");
-  const total = ready.rows.filter((r) => ids.includes(r.request_id)).reduce((a, r) => a + Math.round(Number(r.amount) * 100), 0);
+function ApprovalRecords() {
+  return <ApprovalTable list={usePaged("GET /api/v1/expenses/approvals", { sort: "submitted_at" })} />;
+}
+
+function ApprovalTable({ list, onPick }: { list: ReturnType<typeof usePaged<"GET /api/v1/expenses/approvals">>; onPick?: (r: ExpenseRow) => void }) {
   return (
-    <>
-      <DataView
-        rows={ready.rows}
-        rowKey={(r) => r.request_id}
-        loading={ready.loading}
-        onRowClick={(r) => setIds((l) => (l.includes(r.request_id) ? l.filter((v) => v !== r.request_id) : [...l, r.request_id]))}
-        empty={{ title: "Nothing Ready", text: "Requests appear here once Operations approves them." }}
-        columns={[
-          { key: "c", label: "", render: (r) => <span className={cn("flex size-5 items-center justify-center rounded-full border", ids.includes(r.request_id) ? "border-secondary bg-secondary text-secondary-foreground" : "border-input")}>{ids.includes(r.request_id) && <Icon name="check" className="size-3" />}</span> },
-          { key: "n", label: "Request", render: (r) => `${r.number} · ${r.title}` },
-          { key: "r", label: "Requester", render: (r) => r.requester.display_name, desktop: true },
-          { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
-        ]}
-      />
-      <p className={cn("mt-3 text-xs", tried && !ids.length ? "text-destructive" : "text-muted-foreground")} role={tried && !ids.length ? "alert" : undefined}>
-        {tried && !ids.length ? "Pick at least one request" : <>{ids.length} selected · <b><Money value={`${Math.trunc(total / 100)}.${String(total % 100).padStart(2, "0")}`} /></b></>}
-      </p>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={async () => { if (!ids.length) return setTried(true); try { const q = await save.run({ body: { request_ids: ids } }); invalidate("/api/v1/expenses"); close(); toast(`${q.number} sent to the CEO`); } catch (e) { fail(e); } }}>Send to CEO</Button>
-      </FormFooter>
-    </>
+    <PagedTable<ExpenseRow>
+      title="Waiting on You"
+      list={list}
+      rowKey={(r) => r.expense_request_id}
+      noun="request"
+      onRowClick={onPick}
+      empty={{ title: "Nothing Waiting on You", text: "Requests reach you as their approver." }}
+      columns={requestColumns([
+        { key: "b", label: "Budget", render: (r) => (r.over_budget ? <Pill tone="err">Over Budget</Pill> : <Pill tone="ok">Within</Pill>), desktop: true },
+        { key: "s", label: "Stage", render: (r) => stagePill(r) },
+      ])}
+    />
   );
 }
 
@@ -357,68 +285,173 @@ function NewRequisition({ close }: { close: () => void }) {
 
 function Disbursements() {
   const modal = useModal();
-  const s = useApi("GET /api/v1/expenses/disbursements/summary");
-  const list = usePaged("GET /api/v1/expenses/disbursements");
+  const finance = useFinance();
+  const waiting = usePaged("GET /api/v1/expenses", { filters: { status: "authorised" }, enabled: finance });
+  const missing = usePaged("GET /api/v1/disbursements", { filters: { reference_missing: "true" }, enabled: finance });
+  const paid = usePaged("GET /api/v1/disbursements", { sort: "-paid_at", enabled: finance });
+  const [picked, setPicked] = useState<Disbursement | null>(null);
+  const [request, setRequest] = useState<string | null>(null);
+  if (!finance) return closed("Disbursements", "Operations & People record payments.");
+  const record = (r: ExpenseRow) => modal.open({ title: `Pay ${r.number}`, body: (c) => <RecordForm request={r} close={c} /> });
+  const actions = (r: ExpenseRequest) => (
+    <span className="flex flex-wrap gap-2">
+      {r.status === "authorised" && <Button variant="primary" onClick={async () => { setRequest(null); record(r); }}>Record Disbursement</Button>}
+      <OwnActions r={r} close={() => setRequest(null)} />
+    </span>
+  );
   return (
     <>
-      <PageHeader
-        title="Disbursements"
-        sub="Logged after the bank confirms"
-        actions={
-          <>
-            <ExportAction source="expenses.disbursements" />
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Log Disbursement", body: (close) => <LogDisbursement close={close} /> })}>Log Disbursement</Button>
-          </>
-        }
-      />
-      {s.data && <KpiTiles items={[{ label: "Settled This Month", value: formatMoneyShort(s.data.settled_this_month) }, { label: "Awaiting Disbursement", value: String(s.data.awaiting), tone: s.data.awaiting ? "warn" : "ok" }, { label: "Average to Pay", value: s.data.average_days }, { label: "Missing Reference", value: String(s.data.missing_reference), tone: "ok" }]} />}
-      <PagedTable<Disbursement>
-        title="Disbursements"
-        list={list}
-        search="Search reference or beneficiary"
-        rowKey={(d) => d.disbursement_id}
-        noun="disbursement"
-        wide
-        columns={[
-          { key: "n", label: "Reference", render: (d) => <span className="font-semibold">{d.number}</span> },
-          { key: "b", label: "Beneficiary", render: (d) => d.beneficiary },
-          { key: "k", label: "Bank", render: (d) => d.bank, desktop: true },
-          { key: "a", label: "Amount", align: "n", render: (d) => <Money value={d.amount} /> },
-          { key: "r", label: "Bank Reference", render: (d) => <span className="font-mono text-xs">{d.bank_reference}</span>, desktop: true },
-          { key: "d", label: "Date", render: (d) => formatDate(d.paid_on) },
-          { key: "s", label: "Status", render: (d) => <StatusPill s={d.status} /> },
-        ]}
-      />
-      <Grid cols={2} className="mt-3">
-        {s.data ? <AreaChart title="Disbursed per Month" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} /> : <Card><LoadingRows /></Card>}
+      <PageHeader title="Disbursements" sub="Transfers for authorised requests" />
+      <Grid cols="4m2">
+        <KpiCard title="Waiting to Pay" value={String(waiting.page?.total ?? 0)} tone={waiting.page?.total ? "warn" : "ok"} onOpen={() => modal.open({ title: "Waiting to Pay", wide: true, body: () => <RequestRecords title="Waiting to Pay" filters={{ status: "authorised" }} /> })} />
+        <KpiCard title="Reference Missing" value={String(missing.page?.total ?? 0)} tone={missing.page?.total ? "err" : "ok"} onOpen={() => modal.open({ title: "Reference Missing", wide: true, body: () => <MissingRecords /> })} />
       </Grid>
+      <ListDetail
+        layout="modal"
+        className="mt-3"
+        open={request !== null}
+        onClose={() => setRequest(null)}
+        title="Expense Request"
+        list={
+          <PagedTable<ExpenseRow>
+            title="Waiting to Pay"
+            list={waiting}
+            rowKey={(r) => r.expense_request_id}
+            noun="request"
+            onRowClick={(r) => setRequest(r.expense_request_id)}
+            empty={{ title: "Nothing to Pay", text: "Authorised requests wait here." }}
+            columns={requestColumns()}
+          />
+        }
+        detail={request && <RequestCard id={request} actions={actions} />}
+      />
+      <ListDetail
+        layout="modal"
+        className="mt-3"
+        open={picked !== null}
+        onClose={() => setPicked(null)}
+        title="Disbursement"
+        list={<PaidTable list={paid} onPick={setPicked} />}
+        detail={picked && <PaidCard d={picked} close={() => setPicked(null)} />}
+      />
     </>
   );
 }
 
-function LogDisbursement({ close }: { close: () => void }) {
-  const ready = useInfinite("GET /api/v1/expenses/requests", { filters: { scope: "all", stage: "approved" } });
-  const f = useContractForm({ request_id: "", bank_reference: "", paid_on: todayIso() }, { request_id: (v) => (!v ? "Pick the approved request" : null), bank_reference: (v) => (!/^[A-Z0-9]{8,24}$/.test(v) ? "The bank's transfer reference" : null), paid_on: (v) => (!v ? "Pick the bank date" : null) });
-  const save = useMutation("POST /api/v1/expenses/disbursements");
+function MissingRecords() {
+  return <PaidTable list={usePaged("GET /api/v1/disbursements", { filters: { reference_missing: "true" } })} />;
+}
+
+function PaidTable({ list, onPick }: { list: ReturnType<typeof usePaged<"GET /api/v1/disbursements">>; onPick?: (d: Disbursement) => void }) {
+  return (
+    <PagedTable<Disbursement>
+      title="Paid"
+      list={list}
+      search="Search references"
+      rowKey={(d) => d.disbursement_id}
+      noun="disbursement"
+      onRowClick={onPick}
+      empty={{ title: "Nothing Paid Yet", text: "Recorded transfers show here." }}
+      columns={[
+        { key: "n", label: "Reference", render: (d) => <span className="font-semibold">{d.number}</span> },
+        { key: "p", label: "Payee", render: (d) => d.recipient_name },
+        { key: "a", label: "Amount", align: "n", render: (d) => <Money value={d.amount} /> },
+        { key: "d", label: "Paid On", render: (d) => (d.paid_on ? formatDate(d.paid_on) : "Not set"), desktop: true },
+        { key: "r", label: <HelpTerm help="The bank's transaction ID for this transfer.">Bank Reference</HelpTerm>, render: (d) => (d.reference_missing ? <Pill tone="err">Reference Missing</Pill> : <span className="font-mono text-xs">{d.payment_reference}</span>) },
+      ]}
+    />
+  );
+}
+
+function PaidCard({ d, close }: { d: Disbursement; close: () => void }) {
+  const modal = useModal();
+  return (
+    <Card>
+      <CardHeader record title={`${d.number}, ${d.request_number}`} right={d.reference_missing ? <Pill tone="err">Reference Missing</Pill> : <Pill tone="ok">Paid</Pill>} />
+      <KeyValue
+        items={[
+          ["Purpose", d.purpose],
+          ["Payee", [d.recipient_name, d.bank_name, d.account_number].filter(Boolean).join(", ")],
+          ["Amount", <Money key="a" value={d.amount} />],
+          ["Bank Reference", d.payment_reference ?? "Missing"],
+          ["Paid On", d.paid_on ? formatDate(d.paid_on) : "Not set"],
+          ["Recorded By", d.processed_by ?? "Unknown"],
+        ]}
+      />
+      {d.reference_missing && (
+        <div className="mt-3">
+          <Button variant="primary" onClick={async () => { close(); modal.open({ title: "Add Reference", body: (c) => <ReferenceForm id={d.disbursement_id} close={c} /> }); }}>Add Reference</Button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function RecordForm({ request, close }: { request: ExpenseRow; close: () => void }) {
+  const confirm = useConfirm();
+  const [receipt, setReceipt] = useState("");
+  const f = useContractForm({ expense_request_id: request.expense_request_id, payment_reference: "", receipt_document_id: "", paid_on: todayIso(), confirm_without_reference: false }, disbursementsSchema.DisbursementCreate);
+  const save = useMutation("POST /api/v1/disbursements");
   const submit = async () => {
     if (!f.check()) return;
+    const body = { ...f.values, receipt_document_id: receipt };
     try {
-      const d = await save.run({ body: f.values });
-      invalidate("/api/v1/expenses");
+      if (!body.payment_reference && !receipt) {
+        const yes = await confirm({ title: "Save Without Reference?", body: "It shows as Reference Missing until added.", confirmLabel: "Save Anyway", cancelLabel: "Add Reference" });
+        if (!yes) {
+          // No puts the person on the field they were asked to fill (audit F12), once the dialog
+          // has handed focus back.
+          requestAnimationFrame(() => document.querySelector<HTMLInputElement>('input[name="payment_reference"]')?.focus());
+          return;
+        }
+        body.confirm_without_reference = true;
+      }
+      const d = await save.run({ body });
+      refreshAll();
       close();
-      toast(`${d.number} logged as settled`);
-    } catch {
-      f.setServerErrors(save.fields);
+      toast(`${d.number} recorded`);
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
     }
   };
   return (
     <>
-      <Field label="Request" {...f.field("request_id")}><SelectField placeholder={ready.rows.length ? "Pick an approved request" : "Nothing awaiting disbursement"} options={ready.rows.map((r) => [r.request_id, `${r.number} · ${r.title} · ₦${Number(r.amount).toLocaleString("en-NG")}`])} {...paging(ready)} {...f.field("request_id")} /></Field>
-      <Field label="Bank Reference" {...f.field("bank_reference")}><TextField {...f.field("bank_reference")} onChange={(v) => f.set("bank_reference", v.toUpperCase().replace(/\s/g, ""))} placeholder="FT26092812445" /></Field>
-      <Field label="Paid On" {...f.field("paid_on")}><DateField {...f.field("paid_on")} max={todayIso()} /></Field>
+      <Field label={<HelpTerm help="The bank's transaction ID for this transfer.">Bank Reference</HelpTerm>} optional {...f.status("payment_reference")}>
+        <TextField {...f.field("payment_reference")} onChange={(v) => f.set("payment_reference", v.toUpperCase().replace(/\s/g, ""))} placeholder="GT2611050042" />
+      </Field>
+      <Field label="Receipt" optional>
+        <UploadField upload={upload} purpose="document" accept=".pdf,image/*" multiple={false} compact onUploaded={(docs) => setReceipt(docs[0]?.document_id ?? "")} />
+      </Field>
+      <Field label="Paid On" {...f.status("paid_on")}><DateField {...f.field("paid_on")} max={todayIso()} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Log Disbursement</Button>
+        <Button variant="primary" onClick={submit}>Record Disbursement</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+function ReferenceForm({ id, close }: { id: string; close: () => void }) {
+  const f = useContractForm({ payment_reference: "", receipt_document_id: "" }, disbursementsSchema.DisbursementReference);
+  const save = useMutation("PATCH /api/v1/disbursements/:id");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id }, body: f.values });
+      refreshAll();
+      close();
+      toast("Reference added");
+    } catch (e) {
+      say(e);
+    }
+  };
+  return (
+    <>
+      <Field label="Bank Reference" {...f.status("payment_reference")}><TextField {...f.field("payment_reference")} placeholder="GT2611050042" /></Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" onClick={submit}>Add Reference</Button>
       </FormFooter>
     </>
   );
@@ -426,38 +459,156 @@ function LogDisbursement({ close }: { close: () => void }) {
 
 /* ───────────── Budgets ───────────── */
 
+const thisYear = () => Number(todayIso().slice(0, 4));
+const YEARS = [thisYear() - 1, thisYear(), thisYear() + 1].map((x) => [String(x), String(x)] as [string, string]);
+
 function BudgetsTab() {
-  const b = useApi("GET /api/v1/expenses/budgets");
-  const d = b.data;
+  const modal = useModal();
+  const finance = useFinance();
+  const [year, setYear] = useState(String(thisYear()));
+  const list = usePaged("GET /api/v1/budgets", { filters: { year: Number(year) }, sort: "name" });
+  const [picked, setPicked] = useState<string | null>(null);
+  const add = () => modal.open({ title: "New Budget", wide: true, body: (c) => <BudgetForm close={c} year={year} /> });
+  useScreenAction(finance ? { label: "New Budget", onSelect: add } : null);
   return (
     <>
-      <PageHeader title="Budgets" sub={d ? `${d.year} · ${d.illustrative ? "no budget lines set" : `${d.lines.length} lines`}` : " "} actions={<Button variant="primary" icon="plus" onClick={() => toast("Budget lines open in 2027")}>Add Budget Line</Button>} />
-      {d?.illustrative && (
-        <div className="mb-3 flex items-start gap-2.5 rounded-card bg-info-soft p-3.5 text-info">
-          <Icon name="alert" className="mt-0.5 flex-none" />
-          <div>
-            <h2 data-ui="title" className="text-sm font-semibold">Example Figures</h2>
-            <p className="mt-1 text-2xs">Budgets start in 2027.</p>
-          </div>
-        </div>
+      <PageHeader title="Budgets" sub="Each department's year by category" actions={finance ? <Button variant="primary" icon="plus" onClick={async () => add()}>New Budget</Button> : undefined} />
+      <Field label="Year"><SelectField options={YEARS} value={year} onChange={setYear} /></Field>
+      <ListDetail
+        layout="modal"
+        className="mt-3"
+        open={picked !== null}
+        onClose={() => setPicked(null)}
+        title="Budget"
+        list={
+          <PagedTable<Budget>
+            title="Departments"
+            list={list}
+            rowKey={(b) => b.budget_id}
+            noun="budget"
+            onRowClick={(b) => setPicked(b.budget_id)}
+            empty={{ title: "No Budget for the Year", text: finance ? "Set one with New Budget." : "Operations & People set budgets." }}
+            columns={[
+              { key: "d", label: "Department", render: (b) => <span className="font-semibold">{b.department ?? b.name}</span> },
+              { key: "a", label: "Allocated", align: "n", render: (b) => <Money value={b.allocated} /> },
+              { key: "c", label: <HelpTerm help="Approved but not yet paid.">Committed</HelpTerm>, align: "n", render: (b) => <Money value={b.committed} />, desktop: true },
+              { key: "s", label: "Spent", align: "n", render: (b) => <Money value={b.spent} />, desktop: true },
+              { key: "r", label: <HelpTerm help="Allocated less committed and spent.">Remaining</HelpTerm>, align: "n", render: (b) => <Money value={b.remaining} /> },
+            ]}
+          />
+        }
+        detail={picked && <BudgetCard id={picked} close={() => setPicked(null)} />}
+      />
+    </>
+  );
+}
+
+function BudgetCard({ id, close }: { id: string; close: () => void }) {
+  const modal = useModal();
+  const finance = useFinance();
+  const d = useApi("GET /api/v1/budgets/:id", { params: { id } });
+  if (!d.data) return <Card>{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
+  const b = d.data;
+  return (
+    <Card>
+      <CardHeader record title={b.name} right={<Money value={b.remaining} />} />
+      <DataView
+        rows={b.lines}
+        rowKey={(l) => l.budget_line_id}
+        columns={[
+          { key: "c", label: "Category", render: (l) => l.category },
+          { key: "a", label: "Allocated", align: "n", render: (l) => <Money value={l.amount} /> },
+          { key: "m", label: "Committed", align: "n", render: (l) => <Money value={l.committed_amount} />, desktop: true },
+          { key: "s", label: "Spent", align: "n", render: (l) => <Money value={l.spent_amount} />, desktop: true },
+          { key: "r", label: "Remaining", align: "n", render: (l) => <Money value={l.remaining} /> },
+        ]}
+      />
+      <div className="mt-3">
+        <ActionGroup>
+          {finance && <Button variant="primary" onClick={async () => { close(); modal.open({ title: "Edit Budget", wide: true, body: (c) => <BudgetForm close={c} budget={b} /> }); }}>Edit Budget</Button>}
+          <Button onClick={async () => modal.open({ title: "Budget History", wide: true, body: () => <BudgetHistory id={id} /> })}>Budget History</Button>
+        </ActionGroup>
+      </div>
+    </Card>
+  );
+}
+
+function BudgetHistory({ id }: { id: string }) {
+  const list = usePaged("GET /api/v1/budgets/:id/history", { params: { id } });
+  return (
+    <PagedTable
+      list={list}
+      rowKey={(c) => `${c.at}:${c.category}`}
+      noun="change"
+      columns={[
+        { key: "t", label: "When", render: (c) => formatDateTime(c.at) },
+        { key: "c", label: "Category", render: (c) => c.category ?? "Removed" },
+        { key: "b", label: "Before", align: "n", render: (c) => (c.before === null ? "None" : <Money value={c.before} />) },
+        { key: "a", label: "After", align: "n", render: (c) => (c.after === null ? "Removed" : <Money value={c.after} />) },
+        { key: "w", label: "By", render: (c) => c.by ?? "System", desktop: true },
+      ]}
+    />
+  );
+}
+
+type BudgetLineValue = { expense_category_id: string; amount: string };
+function BudgetForm({ close, year, budget }: { close: () => void; year?: string; budget?: Budget }) {
+  const cats = useInfinite("GET /api/v1/expense-categories", { filters: { active: "true" }, sort: "name" });
+  const depts = useInfinite("GET /api/v1/departments", { filters: { active: "true" } });
+  const start = {
+    department_id: budget?.department_id ?? "",
+    year: Number(budget ? budget.starts_on.slice(0, 4) : year),
+    lines: (budget?.lines.map((l) => ({ expense_category_id: l.expense_category_id, amount: l.amount })) ?? [{ expense_category_id: "", amount: "" }]) as BudgetLineValue[],
+  };
+  const f = useContractForm(start, budget ? budgets.BudgetUpdate : budgets.BudgetCreate);
+  const create = useMutation("POST /api/v1/budgets");
+  const edit = useMutation("PATCH /api/v1/budgets/:id");
+  const lines = f.values.lines as BudgetLineValue[];
+  const setLines = (next: BudgetLineValue[]) => f.set("lines", next);
+  const submit = async () => {
+    if (!f.check(budget ? ["lines"] : undefined)) return;
+    try {
+      if (budget) await edit.run({ params: { id: budget.budget_id }, body: { lines } });
+      else await create.run({ body: { department_id: f.values.department_id, year: f.values.year, lines } });
+      refreshAll();
+      close();
+      toast(budget ? "Budget saved" : "Budget set");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
+    }
+  };
+  const options = cats.rows.map((c) => [c.expense_category_id, c.name] as [string, string]);
+  return (
+    <>
+      {!budget && (
+        <Grid cols={2}>
+          <Field label="Department" {...f.status("department_id")}><SelectField placeholder="Pick One" options={depts.rows.map((d) => [d.department_id, d.name] as [string, string])} {...paging(depts)} {...f.field("department_id")} /></Field>
+          <Field label="Year" {...f.status("year")}><SelectField options={YEARS} value={String(f.values.year)} onChange={(v) => f.set("year", Number(v))} /></Field>
+        </Grid>
       )}
-      {d ? <BarsCard title="Budget vs Actual" rows={d.lines.map((l) => ({ label: l.department, pct: l.pct, value: `${formatMoneyShort(l.actual)} of ${formatMoneyShort(l.budget)}`, ...(l.pct >= 90 ? { emphasis: "warn" as const } : {}) }))} /> : <Card><LoadingRows /></Card>}
-      <Grid cols={2} className="mt-3">
-        <DataView
-          title="Example Only"
-          right={<StatusPill s={{ tone: "info", text: "Illustrative" }} />}
-          rows={d?.lines ?? []}
-          rowKey={(l) => l.department}
-          loading={b.loading}
-          columns={[
-            { key: "d", label: "Department", render: (l) => l.department },
-            { key: "b", label: "Budget", align: "n", render: (l) => <Money value={l.budget} /> },
-            { key: "a", label: "Actual", align: "n", render: (l) => <Money value={l.actual} />, desktop: true },
-            { key: "v", label: "Variance", align: "n", render: (l) => <Money value={l.variance} />, desktop: true },
-            { key: "s", label: "Status", render: (l) => <StatusPill s={l.status} /> },
-          ]}
-        />
-      </Grid>
+      <Field label="Lines" {...f.status("lines")}>
+        <div className="flex flex-col gap-2">
+          {lines.map((l, i) => (
+            <div key={i} className="grid grid-cols-5 items-end gap-2 max-md:grid-cols-2">
+              <span className="col-span-3 max-md:col-span-2">
+                <Field label={`Category ${i + 1}`}>
+                  <SelectField name={`line-${i}-category`} placeholder="Pick One" options={options} {...paging(cats)} value={l.expense_category_id} onChange={(v) => setLines(lines.map((x, j) => (j === i ? { ...x, expense_category_id: v } : x)))} />
+                </Field>
+              </span>
+              <Field label="Amount">
+                <MoneyField name={`line-${i}-amount`} value={l.amount} onChange={(v) => setLines(lines.map((x, j) => (j === i ? { ...x, amount: v } : x)))} />
+              </Field>
+              <span className="flex min-h-tap items-center">{lines.length > 1 && <Button size="sm" onClick={async () => setLines(lines.filter((_, j) => j !== i))}>Remove</Button>}</span>
+            </div>
+          ))}
+          {lines.length < 25 && <Button size="sm" icon="plus" onClick={async () => setLines([...lines, { expense_category_id: "", amount: "" }])}>Add Category</Button>}
+        </div>
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" onClick={submit}>{budget ? "Save Budget" : "Set Budget"}</Button>
+      </FormFooter>
     </>
   );
 }
@@ -466,57 +617,76 @@ function BudgetsTab() {
 
 function Categories() {
   const modal = useModal();
-  const s = useApi("GET /api/v1/expenses/categories/summary");
-  const list = usePaged("GET /api/v1/expenses/categories");
+  const finance = useFinance();
+  const list = usePaged("GET /api/v1/expense-categories", { sort: "name" });
+  const suggested = useMutation("POST /api/v1/expense-categories/suggested");
+  const add = () => modal.open({ title: "New Category", body: (c) => <CategoryForm close={c} /> });
+  useScreenAction(finance ? { label: "New Category", onSelect: add } : null);
+  const empty = !list.loading && list.page?.total === 0 && !list.q;
   return (
     <>
-      <PageHeader title="Categories" sub="Expense categories" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Category", body: (close) => <CategoryForm close={close} /> })}>New Category</Button>} />
-      {s.data && <KpiTiles items={[{ label: "Categories", value: String(s.data.categories) }, { label: "Spend This Month", value: formatMoneyShort(s.data.spend_this_month) }, { label: "Requests", value: String(s.data.requests) }, { label: "Capital", value: String(s.data.capital) }]} />}
-      <PagedTable<Category>
-        title="Categories"
-        list={list}
-        rowKey={(c) => c.category_id}
-        noun="category"
-        nounPlural="categories"
-        columns={[
-          { key: "n", label: "Category", render: (c) => <span className="font-semibold">{c.name}</span> },
-          { key: "k", label: "Type", render: (c) => c.kind },
-          { key: "f", label: "Flag Above", align: "n", render: (c) => <Money value={c.flag_above} />, desktop: true },
-          { key: "m", label: "This Month", align: "n", render: (c) => <Money value={c.this_month} /> },
-          { key: "r", label: "Requests", align: "n", render: (c) => c.requests },
-        ]}
-      />
-      <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Spend by Category" rows={s.data.by_category} /> : <Card><LoadingRows /></Card>}
-      </Grid>
+      <PageHeader title="Categories" sub="What expense money is for" actions={finance ? <Button variant="primary" icon="plus" onClick={async () => add()}>New Category</Button> : undefined} />
+      {empty && finance ? (
+        <Card>
+          <EmptyState title="No Categories Yet" text="Start from the suggested twelve." />
+          <div className="mt-3 flex justify-center">
+            <Button variant="primary" icon="spark" onClick={async () => { try { await suggested.run({ body: {} }); refreshAll(); toast("Twelve categories added"); } catch (e) { say(e); } }}>Add Suggested Categories</Button>
+          </div>
+        </Card>
+      ) : (
+        <PagedTable<ExpenseCategory>
+          title="Categories"
+          list={list}
+          search="Search categories"
+          rowKey={(c) => c.expense_category_id}
+          noun="category"
+          nounPlural="categories"
+          onRowClick={finance ? (c) => modal.open({ title: "Edit Category", body: (close) => <CategoryForm close={close} category={c} /> }) : undefined}
+          columns={[
+            { key: "n", label: "Category", render: (c) => <span className="font-semibold">{c.name}</span> },
+            { key: "t", label: <HelpTerm help="Capital is equipment kept for years.">Type</HelpTerm>, render: (c) => (c.type === "capital" ? "Capital" : "Operating") },
+            { key: "m", label: "This Month", align: "n", render: (c) => <Money value={c.spent_this_month} /> },
+            { key: "r", label: "Requests", align: "n", render: (c) => c.requests, desktop: true },
+            { key: "a", label: "Offered", render: (c) => (c.active ? <Pill tone="ok">Offered</Pill> : <Pill tone="neutral">Off</Pill>), desktop: true },
+          ]}
+        />
+      )}
     </>
   );
 }
 
-function CategoryForm({ close }: { close: () => void }) {
-  const f = useContractForm({ name: "", kind: "Operating", flag_above: "" }, { name: (v) => (!v.trim() ? "Name the category" : null), flag_above: (v) => (!(Number(v) > 0) ? "Enter the threshold" : null) });
-  const save = useMutation("POST /api/v1/expenses/categories");
-  const submit = async () => {
-    if (!f.check()) return;
+function CategoryForm({ close, category }: { close: () => void; category?: ExpenseCategory }) {
+  const f = useContractForm(
+    { name: category?.name ?? "", type: category?.type ?? ("operating" as ExpenseCategory["type"]), description: category?.description ?? "" },
+    category ? categoriesSchema.ExpenseCategoryUpdate : categoriesSchema.ExpenseCategoryCreate,
+  );
+  const create = useMutation("POST /api/v1/expense-categories");
+  const edit = useMutation("PATCH /api/v1/expense-categories/:id");
+  const confirm = useConfirm();
+  const submit = (active?: boolean) => async () => {
+    if (active === undefined && !f.check()) return;
+    if (active === false && category && !(await confirm({ title: "Deactivate Category", body: `New requests can no longer pick ${category.name}.`, confirmLabel: "Deactivate", cancelLabel: "Keep Category", destructive: true }))) return;
     try {
-      await save.run({ body: { ...f.values, kind: f.values.kind as Category["kind"] } });
-      invalidate("/api/v1/expenses/categories");
+      if (category) await edit.run({ params: { id: category.expense_category_id }, body: active === undefined ? f.values : { active } });
+      else await create.run({ body: f.values });
+      refreshAll();
       close();
-      toast("Category added");
-    } catch {
-      f.setServerErrors(save.fields);
+      toast(active === false ? "Category deactivated" : active ? "Category offered again" : category ? "Category saved" : "Category added");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
     }
   };
   return (
     <>
-      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. Training" /></Field>
-      <Field label="Type"><SelectField options={[["Operating", "Operating"], ["Capital", "Capital"]]} {...f.field("kind")} /></Field>
-      <Field label="Flag Above" {...f.field("flag_above")}><MoneyField {...f.field("flag_above")} /></Field>
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Field Logistics" /></Field>
+      <Field label="Type"><SelectField options={[["operating", "Operating"], ["capital", "Capital"]]} value={f.values.type} onChange={(v) => f.set("type", v as ExpenseCategory["type"])} /></Field>
+      <Field label="Description" optional><TextAreaField {...f.field("description")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Add Category</Button>
+        {category && <Button onClick={submit(!category.active)}>{category.active ? "Deactivate" : "Offer Again"}</Button>}
+        <Button variant="primary" onClick={submit()}>{category ? "Save Category" : "Add Category"}</Button>
       </FormFooter>
     </>
   );
 }
-

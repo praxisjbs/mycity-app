@@ -38,7 +38,6 @@ module.exports = defineManifest({
       permission: ["expenses", "create"],
       capability: "expenses.finance",
       risk: "money",
-      form: "none: Record Disbursement's form is on INTERIM rules until the screens move onto the contract (docs/handoff/m8-expenses.md PR 7); the card carries DisbursementCreate without its receipt",
       fields: ["expense_request_id", "payment_reference", "paid_on", "confirm_without_reference"],
       asks: [
         { field: "expense_request_id", question: "Which request was paid?", read: "expenses.list", params: { status: "authorised" } },

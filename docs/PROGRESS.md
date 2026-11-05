@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 101 screens (95 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 102 screens (96 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -50,13 +50,13 @@ saying who agreed and when.
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
-| M8 Expenses & Budget Control | 6 | 1 | 5 | 0 | 0 | 0 |
+| M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **101** | **29** | **5** | **67** | **0** | **0** |
+| **Total** | **102** | **28** | **0** | **74** | **0** | **0** |
 
-M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
-milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
+M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
+milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
 Updates and Knowledge Hub · Policies are M1: policies were brought forward from M10 and Settings ·
 Attendance Policy (#73) dropped, its row kept as Dropped and counted nowhere (TB, 20/10/2026). M4 and M5 include their public-site
 pages. Settings → Notifications was brought forward to M0 by TB on 19/10/2026 and is counted with
@@ -833,6 +833,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 10 | My Performance | `my-performance` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 56 | My Requests | `my-requests` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
@@ -1255,15 +1256,22 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 56 | My Requests | `my-requests` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
-| 57 | Approvals | `approvals` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
-| 58 | Requisitions | `requisitions` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
-| 59 | Disbursements | `disbursements` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
-| 60 | Budgets | `budgets` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 61 | Categories | `categories` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
+| 58 | Requisitions | `requisitions` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 57 | Approvals | `approvals` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 59 | Disbursements | `disbursements` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 104 | Projects | `projects` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 60 | Budgets | `budgets` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 61 | Categories | `categories` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 
 **Notes**
 
+- 05/11/2026 · AJ · M8 release check (handoff PR 8): every Expenses AI card end to end and the access matrix green, the evaluation set's Expenses cases per role added, no M8 form gap, no stale picture, no empty M8 file; #56 to #61 and #104 stay Built until deployed. Left: on staging, the evaluation run and a real PDF through Read Invoice, then On staging.
+- 05/11/2026 · AJ · The M8 audit's F5 to F25 (`docs/handoff/m8-expenses-audit.md` §4), so #56, #59 and #104 do what guide §2 says (F15): Withdraw on Requisitions, Disbursements and a project's or a requisition's request, Cancel Request until approval, each after a confirm (F5, F13); Projects (#104) open to `expenses` view at scope all, Set Budget only to `expenses.finance`, its requests opening (F10); the KPI cards open their own requests (F21); the recount's lock, one budget per department per year (migration 8020), the head now, line removal, the report's budgets, Possible Duplicates in scope, Gemini's file reading (F6 to F9, F16 to F19). Rows stay Built. Left: PR 8, the release check.
+- 05/11/2026 · AJ · PR 7 of `docs/handoff/m8-expenses.md`, the screens: My Requests (#56, in ESS), Requisitions (#58), Approvals (#57), Disbursements (#59), Projects (#104), Budgets (#60) and Categories (#61) on the real API (`contract.gen.ts`, `useContractForm`, `ListDetail layout="modal"`), the mock on the contract, the User Guide chapter `docs/manual/expenses.md` and its pictures; every row API, UI and Mobile ticked, Built. Left: PR 8, the release check.
+- 05/11/2026 · AJ · Projects added with npm run new:screen (catalogue, route map, screen file, Coming Soon); not started. My Requests (#56) moved into Employee Self-Service (its row is listed there now, counted with M8, as My Queries is with M3), and the Expenses tabs ordered Requisitions, Approvals, Disbursements, Projects, Budgets, Categories (handoff decision 8).
+- 05/11/2026 · AJ · PR 7 of `docs/handoff/m8-expenses.md`, its backend half: a request's history (`GET /expenses/:id/history`, the CEO's removal included), 8099's categories out (reference seed 8101, every environment), the staging seed `seeds/staging/80_expenses.js` (categories, budgets, projects and requests at every stage on the Implementation Team's accounts, after Home's expense rows are taken away), and `ListDetail`'s modal layout in `packages/ui`. No ticks: the screens still call their mock paths. Left: the screens on the contract, the Projects row (`new:screen`), My Requests in ESS, the User Guide chapter and pictures (PR 7), then PR 8.
+- 05/11/2026 · AJ · PR 6 of `docs/handoff/m8-expenses.md`, the AI features (jobs chosen by AJ): Read Invoice (`POST /expenses/mine/invoice-reading`, Image Reading: the staged invoice sent to the model as a file, `complete({ files })`), Suggest Category (`POST /expenses/mine/category-suggestion`, Default) and Check Duplicate (`POST /expenses/:id/duplicate-check`, Default), each on the person's press and kept nowhere; a request now carries `possible_duplicates` (same payee and amount within 30 days, from the database). Tests with the model scripted. No ticks: the screens call them in PR 7. Left: PR 7, PR 8.
+- 05/11/2026 · AJ · PR 5 of `docs/handoff/m8-expenses.md`, Budgets (#60) and Projects backend: `/budgets` (list by year within scope, one budget, New Budget, Edit Budget, Budget History from the audit ledger), `/budgets/projects` and Set Budget through the projects service; committed and spent recounted from the requests in the transaction that moves one; Over Budget against the category line with the department's remaining beside it (audit F1), worked out again whenever its line moves (F2); the `budget-threshold` job (90% of a line, once); the Monthly Expenses report on Home's runner; Home's Budget Used counts committed and spent (decision 16); ⌘K, AI reads and the New Budget, Edit Budget and Set Budget cards. No API tick: #60's screen still calls its mock path until PR 7. Left: the Projects row and every screen (PR 7), PR 6, PR 8.
 - 05/11/2026 · AJ · PR 3 and PR 4 of `docs/handoff/m8-expenses.md`, the backend for requests, categories, requisitions and disbursements: `/expenses/mine` (list, summary, New Request with Send Request, Edit, Send Again, Cancel), `/expenses` (list, one request, Withdraw), `/expenses/approvals` and its summary, `/expense-categories` (list, add, edit, Add Suggested Categories), `/requisitions` (list, one, Create Requisition, the CEO's Remove) and `/disbursements` (list with Reference Missing, Record Disbursement, Add Reference); the two approvals settled onto the requests, Send Back returning a request to its requester; invoices and receipts claimed from the upload engine (`vault.claim`); ⌘K, AI reads and eight cards; unit and integration tests. Approve, Send Back and Reject are the approval's own routes. API stays unticked on #56 to #59 and #61: the screens still call their INTERIM mock paths (`/expenses/requests` and the rest), and a ticked API opens them on staging (`shared/delivery-plan.js`), so the ticks come with PR 7 when the screens call these routes. Left: Budgets and Projects (PR 5, #60), the AI features (PR 6), the screens on the real API and the User Guide chapter (PR 7).
 - 04/11/2026 · AJ · PR 2 of `docs/handoff/m8-expenses.md`, schema and contract: migration 8010 (request lines, payee, invoice, project, many requests to a requisition, the approvals' instances, Reference Missing, category type, project budget, statuses, indexes), seed 8100 (the `expenses.request` and `expenses.requisition` flows, statuses, payee types, `expenses.finance`), the five contract schemas, `budget` numbering. No screen moves: no API yet. Left: PR 3 to PR 8.
 - 04/11/2026 · AJ · Planned from the Modules Review of 04/11/2026 (`docs/guides/expenses.md`, `docs/handoff/m8-expenses.md`): Projects agreed as a seventh Expenses tab (its row comes with `npm run new:screen` in PR 7, with the tab); My Requests (#56) shows in ESS; tabs in the order Requisitions, Approvals, Disbursements, Projects, Budgets, Categories; F31 amended so Expenses records open in the modal on desktop too. Nothing built yet. Left: PR 2 to PR 8 of the handoff.

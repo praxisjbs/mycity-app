@@ -137,7 +137,7 @@ module.exports = defineManifest({
     ExpenseUpdate: "via my_expenses.edit: Edit's own request, which never names its request; the card is ExpenseChange, and Add Line adds an item",
   },
   routes: [
-    { intent: "raise an expense request", screen: "expenses.my-requests", params: { action: "new" } },
+    { intent: "raise an expense request", screen: "ess.my-requests", params: { action: "new" } },
     { intent: "approve expense requests", screen: "expenses.approvals" },
   ],
 });

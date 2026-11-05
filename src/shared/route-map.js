@@ -48,6 +48,7 @@ const SCREENS = Object.freeze({
     "my-performance",
     "my-payslips",
     "my-leave",
+    "my-requests",
     "my-queries",
     "my-documents",
     "work-location-requests",
@@ -86,10 +87,10 @@ const SCREENS = Object.freeze({
     "analytics",
   ],
   expenses: [
-    "my-requests",
-    "approvals",
     "requisitions",
+    "approvals",
     "disbursements",
+    "projects",
     "budgets",
     "categories",
   ],
@@ -376,11 +377,11 @@ const ENTITY_ROUTES = Object.freeze({
   // A request opens on Approvals for whoever decides it, on My Requests for its requester.
   expense: {
     ...screen("expenses", "approvals"),
-    self: screen("expenses", "my-requests"),
+    self: screen("ess", "my-requests"),
   },
   requisition: screen("expenses", "requisitions"),
   disbursement: screen("expenses", "disbursements"),
-  budget: screen("expenses", "budgets"), // search:none not built yet (src/modules/budgets)
+  budget: screen("expenses", "budgets"),
   expense_category: screen("expenses", "categories"),
 
   // Knowledge Hub

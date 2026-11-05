@@ -594,6 +594,7 @@ describe("schedules and heartbeat", () => {
       "announcement-release",
       "attendance-clock-watch",
       "attendance-day-close",
+      "budget-threshold",
       "celebrations",
       "community-membership",
       "exchange-rates",

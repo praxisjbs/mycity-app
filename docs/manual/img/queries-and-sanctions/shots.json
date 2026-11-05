@@ -41,7 +41,7 @@
   },
   "queries-my": {
     "spec": "ea691d078321a402",
-    "source": "7b99d09c63c17fdf",
+    "source": "4e1b0fc0e6e99924",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "queries-respond": {
     "spec": "4a7ca18975c18ad7",
-    "source": "7b99d09c63c17fdf",
+    "source": "4e1b0fc0e6e99924",
     "devices": [
       "desktop",
       "phone"

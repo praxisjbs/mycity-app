@@ -4,12 +4,13 @@
  * @summary A list and the record a row opens: side by side on a wide desktop, and on a phone the list alone with the opened record in a bottom sheet, never below the list (F31).
  * @use Any list whose row opens a record on the same screen: leave requests, payslips, proposals, offers, letter templates. DetailPane is the same rule for a record the desktop layout places elsewhere on the page (under the list beside a chart, above the list). `useSideBySide()` says when a first pick may show unasked.
  * @avoid A record with its own screen (navigate to its `id`); a reader read one at a time that fills the screen (SplitPanes: the mailbox, chat); a form (Modal); a record shown below its list on a phone, in any shape.
- * @phone No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog.
+ * @phone No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `layout="modal"` (Expenses, F31 as amended 04/11/2026) opens the record in the centred dialog at every desktop width too, and the list takes the full width.
  * @a11y The sheet is the shared Modal: titled by `title`, focus moves in and returns to the row on close, Esc and the phone's Back close it (F29). Side by side, the record is a plain column after the list in reading order.
  * @status stable
  * @exports DetailPane
  * @example const beside = useSideBySide(); const shown = picked ?? (beside ? rows[0] : null);
  * @example <ListDetail open={!!picked} onClose={() => setPicked(null)} title="Leave Request" list={<DataView ... onRowClick={setPicked} />} detail={shown && <RequestCard leave={shown} />} />
+ * @example <ListDetail layout="modal" open={!!picked} onClose={() => setPicked(null)} title="Expense Request" list={<DataView ... onRowClick={setPicked} />} detail={picked && <RequestCard id={picked} />} />
  * @example <DetailPane open={!!picked} onClose={() => setPicked(null)} title="Query">{focus && <QueryCard id={focus} />}</DetailPane>
  */
 import { useRef, type ReactNode } from "react";
@@ -71,10 +72,17 @@ export interface ListDetailProps {
   container?: HTMLElement | null;
   /** Layout classes only (spacing), on the side-by-side grid. */
   className?: string;
+  /**
+   * `beside` (the default): the record beside the list on a wide desktop. `modal`: the list takes
+   * the full width and a picked record opens in the shared Modal at every width, the centred
+   * dialog on desktop and the sheet on a phone (F31 as amended for Expenses). Nothing shows unasked.
+   */
+  layout?: "beside" | "modal";
 }
 
-export function ListDetail({ list, detail, open, onClose, title, cols = "1.4/1", full, container, className }: ListDetailProps) {
-  const beside = useSideBySide();
+export function ListDetail({ list, detail, open, onClose, title, cols = "1.4/1", full, container, className, layout = "beside" }: ListDetailProps) {
+  const wide = useSideBySide();
+  const beside = wide && layout === "beside";
   if (beside) {
     return (
       <Grid cols={cols} className={className}>

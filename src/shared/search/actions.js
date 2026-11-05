@@ -330,6 +330,33 @@ const ACTIONS = Object.freeze([
     need: null,
     words: ["log out", "logout", "sign off", "exit"],
   }),
+  a("new_expense_request", "New Request", {
+    screen: "ess.my-requests",
+    params: { action: "new" },
+    need: ["expenses", "create"],
+    words: ["raise an expense", "expense request", "claim", "request money", "new expense"],
+  }),
+  a("create_requisition", "Create Requisition", {
+    screen: "expenses.requisitions",
+    params: { action: "new" },
+    need: ["expenses", "create"],
+    capability: "expenses.finance",
+    words: ["requisition", "group requests", "batch for the ceo"],
+  }),
+  a("new_budget", "New Budget", {
+    screen: "expenses.budgets",
+    params: { action: "new" },
+    need: ["expenses", "create"],
+    capability: "expenses.finance",
+    words: ["set a budget", "department budget", "budget"],
+  }),
+  a("new_expense_category", "New Category", {
+    screen: "expenses.categories",
+    params: { action: "new" },
+    need: ["expenses", "create"],
+    capability: "expenses.finance",
+    words: ["expense category", "add category"],
+  }),
 ]);
 
 /** The link an action opens, or null for one the app runs itself with no screen. */

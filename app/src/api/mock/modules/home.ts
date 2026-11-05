@@ -42,7 +42,7 @@ import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, noContent, notFou
 import { byId, byKey, DEPARTMENTS, PEOPLE, SIGN_INS, teamOf, type MockPerson } from "../data/people";
 import { HISTORY, TODAY, type TodayStatus } from "../data/attendance";
 import { PARTNERS, STAGES } from "../data/partners";
-import { REQUESTS } from "../data/expenses";
+import { pendingExpenses } from "./expenses";
 import { DEPT as PERF_DEPT, OBJECTIVES, SCORECARDS } from "../data/performance";
 import { shiftOf, todayOf } from "./attendance";
 import { attendanceRulesInForce, attendanceVersionInForce } from "./policies";
@@ -281,7 +281,6 @@ const BUDGETS: Array<[string, string, string, string, string]> = [
 ];
 /** Whole percent of money spent, from the kobo digits. */
 const usedPercent = (spent: string, of: string) => Number((BigInt(spent.replace(".", "")) * 100n) / BigInt(of.replace(".", "")));
-const IN_APPROVAL = ["line_manager", "operations", "requisition", "ceo"];
 const leaveCovers = (key: string, day: string) => leaveRequests().some((l) => l.key === key && l.status === "approved" && l.starts_on <= day && l.ends_on >= day);
 const own = (user: string) => (key: string) => key === user;
 const expenseScope = (user: string) => (full(user) ? () => true : own(user));
@@ -708,12 +707,12 @@ const CARDS: MockCard[] = [
       columns: [["request", "Request"], ["employee", "Employee", { phone: true }], ["purpose", "Purpose"], ["category", "Category"], ["amount", "Amount", { numeric: true, phone: true }], ["submitted", "Submitted"]],
       rows: (u) => {
         const mine = expenseScope(u);
-        return REQUESTS.filter((r) => IN_APPROVAL.includes(r.stage) && mine(r.requester)).map((r) => rec(r.request_id, { request: text(r.number), employee: person(byKey(r.requester)), purpose: text(r.title), category: text(r.category), amount: money(r.amount), submitted: time(r.submitted_at) }, `/expenses?tab=approvals&id=${r.request_id}`));
+        return pendingExpenses().filter((r) => mine(r.requester)).map((r) => rec(r.id, { request: text(r.number), employee: person(byKey(r.requester)), purpose: text(r.purpose), category: text(r.category), amount: money(r.amount), submitted: time(r.submitted_at) }, `/expenses?tab=approvals&id=${r.id}`));
       },
     },
     figure: (rows, u) => {
       const mine = expenseScope(u);
-      return { value: null, amount: sumMoney(REQUESTS.filter((r) => IN_APPROVAL.includes(r.stage) && mine(r.requester)).map((r) => r.amount)), denominator: null, groups: {}, extra: { requests: rows.length } };
+      return { value: null, amount: sumMoney(pendingExpenses().filter((r) => mine(r.requester)).map((r) => r.amount)), denominator: null, groups: {}, extra: { requests: rows.length } };
     },
     caption: (f) => `${f.extra.requests} ${f.extra.requests === 1 ? "request" : "requests"}`,
   },

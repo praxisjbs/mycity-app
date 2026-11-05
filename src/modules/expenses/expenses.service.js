@@ -61,6 +61,27 @@ async function tx(fn) {
 }
 
 const notFound = () => new AppError("NOT_FOUND", "That expense request does not exist", 404, { expense_request_id: ["No such request"] });
+
+/**
+ * A request on these budget lines moved: their committed and spent are recounted (the budgets
+ * module's), and the Over Budget flag of each request still deciding on them is worked out again
+ * against the lines as they now stand (guide §6.6 rules 2 and 3), in the caller's transaction.
+ */
+async function countIn(client, lineIds) {
+  const ids = (lineIds || []).filter(Boolean);
+  if (!ids.length) return;
+  await require("../budgets/budgets.service").recountIn(client, ids);
+  await repo.refreshOverBudget(client, ids);
+}
+
+/** The budgets module set or changed a budget's lines: the requests on them are flagged again. */
+const refreshOverBudgetIn = (client, lineIds) => repo.refreshOverBudget(client, lineIds);
+
+/** A budget line taken away: the requests on it that no longer count let go of it (budgets.service update). */
+const detachLineIn = (client, lineId) => repo.detachLine(client, lineId);
+
+/** A budget set after requests were sent counts them (budgets.service create and update). */
+const attachToBudgetIn = (client, budgetId) => repo.attachToBudget(client, budgetId);
 const invalid = (code, message, fields) => new AppError(code, message, 422, fields);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -90,7 +111,7 @@ const newestFirst = (query) => (query.sort ? query : { ...query, sort: { field: 
 
 /** Everyone's requests within the caller's `expenses` scope; somebody else's draft is never shown. */
 const list = (query, scope, reader) =>
-  repo.list(pool, { ...newestFirst(query), reader_employee_id: (reader && reader.employee_id) || null }, scope);
+  repo.list(pool, { ...newestFirst(query), reader_employee_id: (reader && reader.employee_id) || null, reader_user_id: (reader && reader.user_id) || null }, scope);
 
 /** The caller's own requests (ESS · My Requests). */
 const listMine = (employeeId, query) => repo.list(pool, { ...newestFirst(query), employee_id: employeeId }, ALL);
@@ -121,16 +142,51 @@ const INTERNAL = ["employee_id", "invoice_document_id", "approval_state", "appro
  * request) and cancel or withdraw it now (their own, before Operations & People approve; or, with
  * `expenses.finance`, once approved and until it is paid).
  */
-async function publicView(row, reader) {
+async function publicView(row, reader, scope = null) {
   const own = Boolean(reader && reader.employee_id && reader.employee_id === row.employee_id);
   const finance = WITHDRAWABLE.includes(row.status) && reader ? await holdsCapability(reader, FINANCE) : false;
   const out = { ...row };
   for (const k of INTERNAL) delete out[k];
+  const dups = await readableDuplicates(reader, scope, row.possible_duplicates || []);
   return {
     ...out,
+    possible_duplicates: dups.shown.map(duplicateRef),
+    possible_duplicates_hidden: dups.hidden,
     can_edit: own && EDITABLE.includes(row.status),
     can_cancel: (own && CANCELLABLE.includes(row.status)) || finance,
   };
+}
+
+/** A possible duplicate as the contract carries it: nothing about whose it is. */
+const duplicateRef = (d) => ({
+  expense_request_id: d.expense_request_id,
+  number: d.number,
+  purpose: d.purpose,
+  amount: d.amount,
+  status: d.status,
+  submitted_at: d.submitted_at,
+});
+
+/**
+ * The possible duplicates the reader may see, by getFor's own test: their own, within their
+ * `expenses` scope, or one whose pending stage names them (audit F8). The others are only counted:
+ * the request shows that there are more, never their number, purpose or amount. With no scope
+ * given (the requester's own views), only their own requests are shown.
+ */
+async function readableDuplicates(reader, scope, dups) {
+  const shown = [];
+  let hidden = 0;
+  const reach = scope || { scope: "own", scope_ids: reader && reader.employee_id ? [reader.employee_id] : [] };
+  for (const d of dups) {
+    let ok = Boolean(reader && reader.employee_id && d.employee_id === reader.employee_id) || reach.scope === "all" || (reach.scope_ids || []).includes(d.employee_id);
+    if (!ok && reader && d.approval_state === "pending") {
+      const instance = await engine.findOpenInstance(pool, { type: "expense", id: d.expense_request_id });
+      ok = Boolean(instance && (await approvers.canAct(pool, instance.stage_approvers, reader, instance)));
+    }
+    if (ok) shown.push(d);
+    else hidden += 1;
+  }
+  return { shown, hidden };
 }
 
 /**
@@ -148,7 +204,7 @@ async function getFor(user, scope, id) {
     const instance = row.approval_state === "pending" ? await engine.findOpenInstance(pool, { type: "expense", id }) : null;
     if (!instance || !(await approvers.canAct(pool, instance.stage_approvers, user, instance))) throw notFound();
   }
-  return { own, request: await publicView(row, user) };
+  return { own, request: await publicView(row, user, scope) };
 }
 
 /** One of the caller's own requests, or a 404 when it is somebody else's. */
@@ -156,6 +212,53 @@ async function getOwn(user, id) {
   const row = await repo.get(pool, id);
   if (!row || row.employee_id !== user.employee_id) throw notFound();
   return publicView(row, user);
+}
+
+/** What each event says on a request's history; one not listed reads as its catalogue summary. */
+const HISTORY_LABEL = Object.freeze({
+  "expense_request.created": "Saved as a draft",
+  "expense_request.updated": "Changed",
+  "expense_request.submitted": "Sent for approval",
+  "expense_request.approved": "Approved by Operations & People",
+  "expense_request.rejected": "Rejected",
+  "expense_request.sent_back": "Sent back to the requester",
+  "expense_request.cancelled": "Cancelled",
+  "expense_request.withdrawn": "Withdrawn",
+  "workflow.opened": "Approval started",
+  "workflow.advanced": "Approved, on to the next stage",
+  "workflow.completed": "Approval finished",
+  "workflow.changes_requested": "Changes asked for",
+  "workflow.cancelled": "Approval withdrawn",
+  "workflow.escalated": "Approval escalated",
+  "workflow.reminded": "Approvers reminded",
+  "requisition.submitted": "Put in a requisition for the CEO",
+  "requisition.request_removed": "Removed from its requisition by the CEO",
+  "requisition.approved": "Authorised by the CEO",
+  "requisition.rejected": "Requisition rejected by the CEO",
+  "disbursement.recorded": "Paid",
+  "disbursement.reference_added": "Bank reference added",
+});
+
+/** A request's history on its modal, for a reader who may open it, 25 a page (audit F3). */
+async function history(user, scope, id, query) {
+  await getFor(user, scope, id);
+  const page = await repo.historyOf(pool, id, query);
+  const catalogue = require("../../shared/events/catalogue");
+  const labelOf = (action) => HISTORY_LABEL[action] || (catalogue.has(action) ? catalogue.get(action).summary : action);
+  return { ...page, data: page.data.map((r) => ({ at: r.at, action: r.action, label: labelOf(r.action), by: r.by || null, reason: r.reason || null })) };
+}
+
+/**
+ * Check Duplicate on a request the reader may open (expenses.duplicates.js): the model compares it
+ * with the requests it may repeat. Nothing is kept.
+ */
+async function checkDuplicate(user, scope, id) {
+  await getFor(user, scope, id);
+  const row = await repo.get(pool, id);
+  // The model is given only the requests the reader may open (audit F8).
+  const { shown } = await readableDuplicates(user, scope, row.possible_duplicates || []);
+  const out = await require("./expenses.duplicates").check(user, { ...row, possible_duplicates: shown });
+  return out.duplicate ? { ...out, duplicate: duplicateRef(out.duplicate) } : out;
 }
 
 /* ------------------------------------------------------------------ *
@@ -377,6 +480,7 @@ async function withdraw(actor, scope, id, body) {
     const moved = await repo.move(client, id, WITHDRAWABLE, "cancelled", { cancelled_at: "now", requisition_id: null });
     if (!moved) throw new AppError("EXPENSE_NOT_WITHDRAWABLE", "Only an approved request not yet paid is withdrawn", 409);
     if (row.requisition_id) await require("../requisitions/requisitions.service").recountIn(client, row.requisition_id, actor);
+    await countIn(client, [row.budget_line_id]);
     await emit(client, {
       key: EVENTS.EXPENSE_REQUEST_WITHDRAWN,
       entity: { type: "expense", id },
@@ -417,6 +521,7 @@ async function settle(id, state, instanceId) {
     if (!row || row.status !== "submitted" || (instanceId && row.workflow_instance_id !== instanceId)) return null;
     const moved = await repo.move(client, id, ["submitted"], outcome.status, { [outcome.at]: "now" });
     if (!moved) return null;
+    await countIn(client, [row.budget_line_id]);
     await emit(client, {
       key: outcome.key(),
       entity: { type: "expense", id },
@@ -513,10 +618,11 @@ async function lockPayable(client, id) {
   return row;
 }
 
-/** The request is paid: `disbursed`, its amount moving from committed to spent (the recount is PR 5). */
+/** The request is paid: `disbursed`, its amount moving from committed to spent on its budget line. */
 async function markDisbursedIn(client, id) {
   const moved = await repo.move(client, id, ["authorised"], "disbursed", { disbursed_at: "now" });
   if (!moved) throw new AppError("ALREADY_DISBURSED", "This request is already paid", 409, { expense_request_id: ["Already paid"] });
+  await countIn(client, [moved.budget_line_id]);
   return moved;
 }
 
@@ -617,6 +723,8 @@ module.exports = {
   mineSummary,
   getFor,
   getOwn,
+  checkDuplicate,
+  history,
   create,
   update,
   submit,
@@ -631,6 +739,10 @@ module.exports = {
   requisitionTotalIn,
   lockPayable,
   markDisbursedIn,
+  countIn,
+  refreshOverBudgetIn,
+  attachToBudgetIn,
+  detachLineIn,
   createFromCard,
   changeFromCard,
   addLineFromCard,

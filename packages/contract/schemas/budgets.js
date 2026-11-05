@@ -74,6 +74,14 @@ const BudgetUpdate = z
   })
   .strict();
 
+/** Edit Budget as a Praxis AI card: the budget it changes, by id, and its lines again, whole. */
+const BudgetLinesChange = z
+  .object({
+    budget_id: uuid,
+    lines: z.array(BudgetLineInput).min(1, "Add a category").max(25),
+  })
+  .strict();
+
 /** One change in Budget History, from the audit ledger. */
 const BudgetChange = z
   .object({
@@ -105,6 +113,9 @@ const ProjectSpendPage = Paged(ProjectSpend);
 /** Set Budget on a project; null takes it away. */
 const ProjectBudget = z.object({ budget_amount: money.nullable() }).strict();
 
+/** Set Budget as a Praxis AI card: the project it sets, by id. */
+const ProjectBudgetSet = z.object({ project_id: uuid, budget_amount: money.nullable() }).strict();
+
 const TABLES = {
   BudgetLine: {
     table: "budget_line",
@@ -130,6 +141,7 @@ const TABLES = {
     virtual: { year: "sets starts_on and ends_on", lines: "written to budget_line" },
   },
   BudgetUpdate: { table: "budget", virtual: { lines: "written to budget_line" } },
+  BudgetLinesChange: { table: "budget", virtual: { lines: "written to budget_line" } },
   BudgetChange: { table: null, reason: "an audit_ledger entry about a budget" },
   BudgetChangePage: { table: null, reason: "a page of budget changes" },
   ProjectSpend: {
@@ -144,6 +156,7 @@ const TABLES = {
   ProjectSpendListQuery: { table: null, reason: "list controls for the projects" },
   ProjectSpendPage: { table: null, reason: "a page of projects" },
   ProjectBudget: { table: "project" },
+  ProjectBudgetSet: { table: "project" },
 };
 
 module.exports = {
@@ -156,10 +169,12 @@ module.exports = {
   BudgetLineInput,
   BudgetCreate,
   BudgetUpdate,
+  BudgetLinesChange,
   BudgetChange,
   BudgetChangePage,
   ProjectSpend,
   ProjectSpendListQuery,
   ProjectSpendPage,
   ProjectBudget,
+  ProjectBudgetSet,
 };

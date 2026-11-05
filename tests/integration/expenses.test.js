@@ -26,6 +26,7 @@ const { rebuild } = require("./helpers/schema");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
+const lagos = require("../../src/shared/time/lagos");
 const { q, one, drain, harness } = require("./helpers/ai-actions");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -105,10 +106,8 @@ describeDb("expenses against the real migrations", () => {
   });
 
   test("categories: Add Suggested Categories only while there are none; Operations & People add, rename and deactivate; staff only read", async () => {
-    // 8099's five are still seeded (A26; the staging seed takes them out in PR 7), so the suggestions wait.
-    const early = await h.as("ops").post("/expense-categories/suggested").send({});
-    expect([early.status, early.body.error.code]).toEqual([409, "CATEGORIES_EXIST"]);
-    await q("DELETE FROM expense_category");
+    // No category is seeded (A26): 8101 took 8099's five out, so the suggestions are offered at once.
+    expect((await one("SELECT count(*)::int AS n FROM expense_category")).n).toBe(0);
     expect((await h.as("staff").post("/expense-categories/suggested").send({})).body.error.code).toBe("CAPABILITY_REQUIRED");
     const made = await h.as("ops").post("/expense-categories/suggested").send({});
     expect(made.status).toBe(200);
@@ -176,7 +175,7 @@ describeDb("expenses against the real migrations", () => {
 
   test("sent: the line manager, then Operations & People, each from Expenses · Approvals; nobody else decides it", async () => {
     const r = await raise("staff");
-    expect(r).toMatchObject({ status: "submitted", waiting_on: "Line Manager", over_budget: false, can_edit: false, can_cancel: true });
+    expect(r).toMatchObject({ status: "submitted", waiting_on: "Line Manager", over_budget: true, can_edit: false, can_cancel: true });
     expect(r.submitted_at).toEqual(expect.any(String));
 
     const waiting = await h.as("manager").get("/expenses/approvals");
@@ -396,5 +395,56 @@ describeDb("expenses against the real migrations", () => {
     expect(all.body.data.length).toBeGreaterThan(0);
     const found = await h.as("ops").get(`/expenses?q=${encodeURIComponent("t-shirts")}`);
     expect(found.body.data.map((r) => r.purpose)).toEqual(["T-shirts for the walk"]);
+  });
+
+  test("a request's history: its own events, its approval's, and its requisition's removal by the CEO (audit F3), 25 a page", async () => {
+    const r = await approved("staff", { purpose: "History walk water" });
+    const grouped = await h.as("ops").post("/requisitions").send({ expense_request_ids: [r.expense_request_id] });
+    expect(grouped.status).toBe(201);
+    const removed = await h.as("ceo").post(`/requisitions/${grouped.body.requisition_id}/remove`).send({ expense_request_id: r.expense_request_id, reason: "Not this month" });
+    expect(removed.status).toBe(200);
+    await drain();
+    const res = await h.as("staff").get(`/expenses/${r.expense_request_id}/history`);
+    expect([res.status, res.body.error]).toEqual([200, undefined]);
+    expect(res.body.page.size).toBe(25);
+    const actions = res.body.data.map((e) => e.action);
+    expect(actions).toEqual(expect.arrayContaining(["expense_request.created", "expense_request.submitted", "expense_request.approved", "requisition.submitted", "requisition.request_removed"]));
+    expect(res.body.data.find((e) => e.action === "requisition.request_removed")).toMatchObject({ label: "Removed from its requisition by the CEO", reason: "Not this month", by: expect.any(String) });
+    expect((await h.as("outsider").get(`/expenses/${r.expense_request_id}/history`)).status).toBe(404);
+  });
+  test("Possible Duplicates names only the requests the reader may open; the rest are a count, and the AI gets the named ones (audit F8)", async () => {
+    const vendor = { payee_name: "Lekki Tents", account_name: "Lekki Tents Ltd", account_number: "0999999999", lines: [{ description: "Tent", unit_price: "77000.00" }] };
+    const theirs = await raise("outsider", { ...vendor, purpose: "Finance tent" });
+    const ours = await raise("staff", { ...vendor, purpose: "Programmes tent" });
+    const mine = (await h.as("staff").get(`/expenses/${ours.expense_request_id}`)).body;
+    expect([mine.possible_duplicates, mine.possible_duplicates_hidden]).toEqual([[], 1]);
+    // The line manager deciding it reads their team, not Finance.
+    const head = (await h.as("manager").get(`/expenses/${ours.expense_request_id}`)).body;
+    expect([head.possible_duplicates.length, head.possible_duplicates_hidden]).toEqual([0, 1]);
+    const ops = (await h.as("ops").get(`/expenses/${ours.expense_request_id}`)).body;
+    expect(ops.possible_duplicates.map((d) => d.expense_request_id)).toEqual([theirs.expense_request_id]);
+    expect(ops.possible_duplicates_hidden).toBe(0);
+    expect(JSON.stringify(mine)).not.toContain("Finance tent");
+    // Check Duplicate from the requester compares with nothing they cannot open.
+    const checked = await h.as("staff").post(`/expenses/${ours.expense_request_id}/duplicate-check`).send({});
+    expect([checked.status, checked.body.available, checked.body.reason]).toEqual([200, false, "none"]);
+  });
+
+  test("the KPI cards' own filters: disbursed from a day, and approved by the reader from a day (audit F21)", async () => {
+    const year = `${lagos.today().slice(0, 4)}-01-01`;
+    const paid = await h.as("staff").get(`/expenses/mine?disbursed_from=${year}`);
+    expect(paid.body.data.length).toBeGreaterThan(0);
+    expect(paid.body.data.every((r) => r.status === "disbursed")).toBe(true);
+    expect((await h.as("staff").get(`/expenses/mine?disbursed_from=${Number(year.slice(0, 4)) + 1}-01-01`)).body.data).toEqual([]);
+    const month = `${lagos.today().slice(0, 7)}-01`;
+    const approvedByHead = await h.as("manager").get(`/expenses?approved_by_me_from=${month}`);
+    expect(approvedByHead.body.data.length).toBeGreaterThan(0);
+    const decided = await one(
+      `SELECT count(DISTINCT wi.entity_id)::int AS n FROM workflow_decision d JOIN workflow_instance wi ON wi.workflow_instance_id = d.workflow_instance_id
+        JOIN app_user u ON u.user_id = d.actor_id WHERE wi.definition_key = 'expenses.request' AND d.decision = 'approve' AND u.employee_id = $1`,
+      [h.people.manager.employee_id],
+    );
+    expect(approvedByHead.body.page.total).toBe(decided.n);
+    expect((await h.as("other").get(`/expenses?approved_by_me_from=${month}`)).body.data).toEqual([]);
   });
 });

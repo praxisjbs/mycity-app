@@ -80,7 +80,11 @@ mycity-app/
 │                             raised to signed and issued, through the services, tested by
 │                             tests/integration/queries-staging-seed.test.js; lib/signature.js
 │                             draws the pad's signature;
-│                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
+│                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest;
+│                             80_expenses.js: M8's categories, budgets, projects and requests at
+│                             every stage on the Implementation Team's accounts, through the
+│                             services, after taking Home's expense rows and 8099's categories away,
+│                             tested by tests/integration/expenses-staging-seed.test.js; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
@@ -565,10 +569,10 @@ Shared first filled: `shared/dedup`. Prompts: `proposal-draft`, `mou-draft`. Tem
 
 | Module | Files beyond the template |
 |---|---|
-| `expenses` | `.receipt-ai`, `.duplicates` (PR 6), `.budget-check` (the budget line and Over Budget, set when a request is sent) |
+| `expenses` | `.receipt-ai`, `.duplicates` (PR 6), `.budget-check` (the budget line and Over Budget, set when a request is sent and worked out again whenever its line moves) |
 | `requisitions` | none: one requisition owns many requests through `expense_request.requisition_id` |
 | `disbursements` | none: the bank reference is asked for, not required (Reference Missing, no database trigger) |
-| `budgets` | `.variance` (ships empty, A25) |
+| `budgets` | `.variance` (the monthly expenses report by department, project and category, Home's `expenses_monthly` source), `.search`; `jobs/schedulers/budget-threshold.js` and its handler |
 | `expense_categories` | `.ai`, `.search`; no threshold (decision 1 of 04/11/2026) |
 
 Chain for every request: requester, line manager (skipped for a line manager's own), Operations &
@@ -619,13 +623,15 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M5 | `offer-expiry`, `signature-reminder`, `onboarding-dispatch`, `talent-pool-purge` | `offer-expiry`, `signature-reminders`, `talent-pool-purge` |
 | M6 | `payroll-compute`, `payslip-render` | |
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
-| M8 | `budget-threshold`, `approval-ageing` | `budget-threshold`, `approval-ageing` |
+| M8 | `budget-threshold` (the morning's sweep, re-run by hand for a day), `approval-ageing` | `budget-threshold` (each budget line 90% used, committed and spent, told to its department's head and Operations & People once, 07:00 Lagos; `docs/guides/expenses.md` §6.6), `approval-ageing` |
 | M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly), `exchange-rates` (today's exchange rates after midnight Lagos, and again within the hour if that failed) |
 | M10 | `knowledge-embed`, `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | |
 
-`partner-inactivity` (M7) and `budget-threshold` and `approval-ageing` (M8) are superseded by Home's
-`home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity and budget threshold
-read through Home's source adapters, approval ageing reads the workflow tables in the metric's own SQL.
+`partner-inactivity` (M7) and `approval-ageing` (M8) are superseded by Home's
+`home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity reads through Home's
+source adapters, approval ageing reads the workflow tables in the metric's own SQL. Home's Budget
+Threshold rules read whole budgets the same way; M8's `budget-threshold` warns about each category
+line of a budget, once, as the handoff for M8 asked (`docs/handoff/m8-expenses.md` PR 5).
 Their stub files stay for their milestones to delete or fill.
 
 Every scheduler file must be named in `SCHEDULERS` or the worker never starts it;

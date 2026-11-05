@@ -168,6 +168,23 @@ async function names(db, { active } = {}) {
   return (page.data || []).sort((a, b) => Number(b.active) - Number(a.active)).map((c) => c.name).slice(0, 6);
 }
 
+/** The most categories an AI suggestion chooses among: four pages of the list. */
+const SUGGEST_CEILING = 100;
+
+/**
+ * The categories offered on a request, by id and name, for an AI suggestion to choose among
+ * (expenses.receipt-ai.js): read page by page, 25 at a time, up to SUGGEST_CEILING.
+ */
+async function offeredForSuggestion(db) {
+  const out = [];
+  for (let page = 1; out.length < SUGGEST_CEILING; page += 1) {
+    const got = await repo.list(db, { page, active: true, sort: { field: "name", dir: "asc" } }, monthStart());
+    out.push(...got.data.map((c) => ({ id: c.expense_category_id, name: c.name })));
+    if (!got.page.has_next) break;
+  }
+  return out.slice(0, SUGGEST_CEILING);
+}
+
 /** The category a card names, by its name. */
 async function cardCategory(db, id) {
   if (!db || !UUID.test(String(id || ""))) return [];
@@ -181,6 +198,7 @@ async function assertCard(db, id) {
 }
 
 module.exports = {
+  offeredForSuggestion,
   SUGGESTED,
   codeOf,
   monthStart,

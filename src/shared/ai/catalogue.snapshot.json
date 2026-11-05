@@ -61,6 +61,42 @@
       "screen": null
     },
     {
+      "key": "budgets.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "budgets.BudgetCreate",
+      "schema_sha": "48366c44c1be344f",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
+      "key": "budgets.edit",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "budgets.BudgetLinesChange",
+      "schema_sha": "89c5b7949ba39d3b",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
+      "key": "budgets.set_project",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "budgets.ProjectBudgetSet",
+      "schema_sha": "f1b6da0325dc7e94",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
       "key": "calendar.create",
       "kind": "action",
       "module_key": "workspace",
@@ -889,7 +925,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "reports.HomeReportCreate",
-      "schema_sha": "8e19a487e906e095",
+      "schema_sha": "6e82a912cb20ae9d",
       "screen": null,
       "capability": "home.reports"
     },
@@ -1295,6 +1331,28 @@
       "screen": null
     },
     {
+      "key": "budgets.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "budgets.BudgetListQuery",
+      "schema_sha": "8f58085ac320b408",
+      "screen": null
+    },
+    {
+      "key": "budgets.projects",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "budgets.ProjectSpendListQuery",
+      "schema_sha": "8de6d8d4fd152f43",
+      "screen": null
+    },
+    {
       "key": "calendar.month",
       "kind": "read",
       "module_key": "workspace",
@@ -1423,7 +1481,7 @@
       "risk": null,
       "bulk": null,
       "schema": "expenses.ExpenseListQuery",
-      "schema_sha": "3c5b5f92171f3a12",
+      "schema_sha": "cce0a68b30379ee4",
       "screen": null
     },
     {
@@ -1434,7 +1492,7 @@
       "risk": null,
       "bulk": null,
       "schema": "expenses.ExpenseListQuery",
-      "schema_sha": "3c5b5f92171f3a12",
+      "schema_sha": "cce0a68b30379ee4",
       "screen": null
     },
     {
@@ -1445,7 +1503,7 @@
       "risk": null,
       "bulk": null,
       "schema": "expenses.ExpenseListQuery",
-      "schema_sha": "3c5b5f92171f3a12",
+      "schema_sha": "cce0a68b30379ee4",
       "screen": null
     },
     {
@@ -1676,7 +1734,7 @@
       "risk": null,
       "bulk": null,
       "schema": "reports.HomeReportQuery",
-      "schema_sha": "e9de4bfcf427ab5d",
+      "schema_sha": "a7a6a19617a81e73",
       "screen": null
     },
     {
@@ -1941,7 +1999,7 @@
       "bulk": null,
       "schema": null,
       "schema_sha": null,
-      "screen": "expenses.my-requests"
+      "screen": "ess.my-requests"
     },
     {
       "key": "expenses.route.record_an_expense_payment",
@@ -1953,6 +2011,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "expenses.disbursements"
+    },
+    {
+      "key": "expenses.route.set_a_budget",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.budgets"
     },
     {
       "key": "home.route.build_schedule_or_run_a_report",

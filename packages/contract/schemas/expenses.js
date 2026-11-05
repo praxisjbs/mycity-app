@@ -92,6 +92,18 @@ const ExpenseRow = z
   .strict();
 
 /** One request as its modal shows it. Bank details are masked for a reader without `employee.bank`. */
+/** Another request to the same payee for the same amount within 30 days. */
+const ExpenseDuplicateRef = z
+  .object({
+    expense_request_id: uuid,
+    number: z.string(),
+    purpose: z.string(),
+    amount: money,
+    status: ExpenseStatus,
+    submitted_at: isoDateTime.nullable(),
+  })
+  .strict();
+
 const ExpenseRequest = ExpenseRow.extend({
   expense_category_id: uuid,
   project_id: uuid.nullable(),
@@ -110,6 +122,12 @@ const ExpenseRequest = ExpenseRow.extend({
   requisition_number: z.string().nullable(),
   workflow_instance_id: uuid.nullable(),
   budget_remaining: money.nullable(),
+  /** What the request's department has left this year across every category, shown beside the line's (guide §6.6). */
+  department_remaining: money.nullable(),
+  /** Other requests sent within 30 days to the same payee for the same amount (guide §6.8). */
+  possible_duplicates: z.array(ExpenseDuplicateRef).max(5),
+  /** Possible duplicates the reader may not open: counted, never shown (audit F8). */
+  possible_duplicates_hidden: z.number().int().min(0),
   can_edit: z.boolean(),
   can_cancel: z.boolean(),
   approved_at: isoDateTime.nullable(),
@@ -128,6 +146,12 @@ const ExpenseListQuery = listQuery(
     department_id: uuid.optional(),
     payee_type: PayeeType.optional(),
     over_budget: flag.optional(),
+    /** In Flight on My Requests: sent and not yet paid, rejected or cancelled. */
+    in_flight: flag.optional(),
+    /** Disbursed This Year: paid on or after this Lagos day. */
+    disbursed_from: isoDate.optional(),
+    /** Approved This Month on Approvals: requests the reader approved at their stage on or after this Lagos day. */
+    approved_by_me_from: isoDate.optional(),
   },
   ["submitted_at", "amount", "number", "created_at"],
 );
@@ -249,11 +273,25 @@ const TABLES = {
       invoice: "the document behind invoice_document_id",
       requisition_number: "requisition.number",
       budget_remaining: "the budget line's allocation less committed and spent",
+      department_remaining: "the department's budget for the year, every line's allocation less committed and spent",
+      possible_duplicates: "other expense_request rows to the same payee for the same amount within 30 days",
+      possible_duplicates_hidden: "how many of those the reader may not open",
       can_edit: "draft or sent back, and the reader is its requester",
       can_cancel: "the reader may cancel or withdraw it now",
     },
   },
   ExpenseListQuery: { table: null, reason: "list controls for the requests" },
+  ExpenseDuplicateRef: { table: "expense_request" },
+  ExpenseHistoryEntry: { table: null, reason: "an audit_ledger entry about a request, its requisition or its disbursement" },
+  ExpenseHistoryPage: { table: null, reason: "a page of a request's history" },
+  ExpenseInvoiceReading: { table: null, reason: "the staged invoice Read Invoice reads" },
+  ExpenseInvoiceRead: { table: null, reason: "a model's reading of an invoice, never kept" },
+  ExpenseInvoiceSuggestion: { table: null, reason: "Read Invoice's suggestion for the form, never kept" },
+  ExpenseCategoryHint: { table: null, reason: "the form's words Suggest Category reads" },
+  ExpenseCategoryPick: { table: null, reason: "a model's pick of a category, never kept" },
+  ExpenseCategorySuggestion: { table: null, reason: "Suggest Category's answer for the form, never kept" },
+  ExpenseDuplicateJudgement: { table: null, reason: "a model's judgement of a duplicate, never kept" },
+  ExpenseDuplicateCheck: { table: null, reason: "Check Duplicate's answer on the modal, never kept" },
   ExpensePage: { table: null, reason: "a page of requests" },
   ExpenseMineSummary: { table: null, reason: "figures over the caller's requests" },
   ExpenseApprovalsSummary: { table: null, reason: "figures over the requests waiting on the caller" },
@@ -278,6 +316,102 @@ const TABLES = {
   ExpenseLineAdd: { table: "expense_request_line" },
 };
 
+/* ------------------------------------------------------------------ *
+ * AI features (guide §9; jobs chosen by AJ, handoff decision 14). Each answer is a suggestion the
+ * person accepts on the form or reads on the modal; nothing is kept from it.
+ * ------------------------------------------------------------------ */
+
+/**
+ * One line of a request's history on its modal (guide §3 step 8): an event about the request, or
+ * one about its requisition or its disbursement that names it (the CEO's removal, audit F3).
+ */
+const ExpenseHistoryEntry = z
+  .object({
+    at: isoDateTime,
+    action: z.string(),
+    label: z.string(),
+    by: z.string().nullable(),
+    reason: z.string().nullable(),
+  })
+  .strict();
+const ExpenseHistoryPage = Paged(ExpenseHistoryEntry);
+
+/** Read Invoice: the invoice staged for New Request, by its document id. */
+const ExpenseInvoiceReading = z.object({ document_id: uuid }).strict();
+
+/** What the model reads off an invoice (Image Reading): never kept, a suggestion for the form. */
+const ExpenseInvoiceRead = z
+  .object({
+    payee_name: z.string().max(150).nullable(),
+    category: z.string().max(80).nullable(),
+    lines: z
+      .array(
+        z
+          .object({
+            description: z.string().min(1).max(200),
+            quantity: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
+            unit_price: money,
+          })
+          .strict(),
+      )
+      .max(25),
+  })
+  .strict();
+
+/** Read Invoice's answer: what the form may take, or why there is none. */
+const ExpenseInvoiceSuggestion = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit", "unreadable"]).nullable(),
+    payee_name: z.string().nullable(),
+    expense_category_id: uuid.nullable(),
+    category: z.string().nullable(),
+    lines: z.array(ExpenseLineInput),
+    amount: money.nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** Suggest Category: the form's purpose and lines as they stand. */
+const ExpenseCategoryHint = z
+  .object({
+    purpose: text(200),
+    lines: z.array(z.object({ description: text(200) }).strict()).max(25).default([]),
+  })
+  .strict();
+
+/** What the model picks (Default): one of the offered categories by name, or none. */
+const ExpenseCategoryPick = z.object({ category: z.string().max(80).nullable() }).strict();
+
+const ExpenseCategorySuggestion = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    expense_category_id: uuid.nullable(),
+    category: z.string().nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** What the model judges (Default): which earlier request this one repeats, if any, and why. */
+const ExpenseDuplicateJudgement = z
+  .object({
+    duplicate_of: z.string().max(20).nullable(),
+    reason: z.string().min(1).max(300),
+  })
+  .strict();
+
+/** Check Duplicate's answer on the request's modal. */
+const ExpenseDuplicateCheck = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit", "none"]).nullable(),
+    duplicate: ExpenseDuplicateRef.nullable(),
+    explanation: z.string().nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
 module.exports = {
   TABLES,
   ExpenseStatus,
@@ -297,4 +431,15 @@ module.exports = {
   ExpenseRequestAdd,
   ExpenseChange,
   ExpenseLineAdd,
+  ExpenseDuplicateRef,
+  ExpenseHistoryEntry,
+  ExpenseHistoryPage,
+  ExpenseInvoiceReading,
+  ExpenseInvoiceRead,
+  ExpenseInvoiceSuggestion,
+  ExpenseCategoryHint,
+  ExpenseCategoryPick,
+  ExpenseCategorySuggestion,
+  ExpenseDuplicateJudgement,
+  ExpenseDuplicateCheck,
 };

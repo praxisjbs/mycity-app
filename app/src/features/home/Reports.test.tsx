@@ -166,7 +166,7 @@ function copyProblems(root: ParentNode = document.body): string[] {
 }
 
 const READER = { user_id: "8d2c0c2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f", display_name: "Ada Obi", employee_id: "1f2e3d4c-5b6a-4978-8a9b-0c1d2e3f4a5b" };
-const ALL_SOURCES = ["daily_attendance", "leave", "open_alerts", "headcount", "tasks", "partnerships", "expenses", "recruitment"];
+const ALL_SOURCES = ["daily_attendance", "leave", "open_alerts", "headcount", "tasks", "partnerships", "expenses", "expenses_monthly", "recruitment"];
 /** A reader as offeredSources reads them: the CEO, or someone holding these capabilities. */
 const reader = (capabilities: string[], is_ceo = false) => ({ is_ceo, capabilities }) as unknown as Me;
 
