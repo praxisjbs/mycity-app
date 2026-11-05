@@ -32,8 +32,12 @@ with the date, and add a line to §3.
       tracker, the Deal Merchant Agreement and JBS Praxis's answers, standalone as the source of truth
       (05/11/2026)
 - [x] MILESTONES A14 amended (04/11/2026)
+- [x] Numbering prefixes settled: `PAR`, `LED`, `DEAL`, `PRO`, `AGR` (05/11/2026)
+- [x] The Deal Merchant Agreement redacted into `docs/MyCity-ERP-Documents/partnership-samples/`
+      (05/11/2026)
 - [ ] GE and LA read the guide; tick Written in `docs/guides/README.md`
-- [ ] The guide's §13.3 items answered as they come (AI jobs before PR 2 and PR 7; prefixes; samples)
+- [ ] The guide's §13.3 items answered as they come (AI jobs before PR 2 and PR 7; samples in PR 2 and
+      PR 7; Anthropic key before PR 7's demo)
 
 ### PR 1 · Contract, data and scaffolding
 - [ ] Contracts (Appendix C), migrations from `7010`, `7099`'s choices switched off, reference seed
@@ -45,6 +49,8 @@ with the date, and add a line to §3.
 
 ### PR 2 · Categories, lists, fields, templates, proof points
 - [ ] The person confirms the `template-tidy` job
+- [ ] MyCity's ticketing template uploaded in this PR's chat and stored redacted in
+      `partnership-samples/` (does not block the start)
 - [ ] Backend and Categories screen (#104), desktop and phone; template editor; Start From Tracker
 - [ ] Events template from the Deal Merchant Agreement (staging)
 
@@ -70,6 +76,8 @@ with the date, and add a line to §3.
 
 ### PR 7 · Proposal Studio and design kit
 - [ ] The person confirms the `proposal-message` job
+- [ ] MyCity's sample proposal uploaded in this PR's chat and stored redacted in `partnership-samples/`;
+      the kit checked against it (does not block the start)
 - [ ] Studio, AI actions (Top Tier, Sonnet then Gemini Pro), the figure check, the kit and its gallery
 - [ ] Proposals (#53) and the public Proposal page (#105)
 
@@ -83,6 +91,9 @@ with the date, and add a line to §3.
 
 ## 3 · Log
 
+- 05/11/2026 · JP · Before merging PR 0: prefixes settled ("use any prefixes"); the Deal Merchant
+  Agreement redacted into `partnership-samples/` with each placeholder's field; the ticketing template
+  placed on PR 2 and the sample proposal on PR 7, uploaded in those PRs' chats; `main` merged in.
 - 05/11/2026 · JP · The guide rewritten from the Partnerships Workflow Discovery meeting of 5 November
   (Edidiong Etudor), MyCity's tracker (102 rows, 79 named, read column by column with contacts masked),
   the House of Hevix Deal Merchant Agreement and JBS Praxis's 26 answers, and made the single source of

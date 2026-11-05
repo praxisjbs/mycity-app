@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/partnerships/`, `public-app/src/pages/Proposal.tsx` |
 | Permission key(s) | `partnerships` |
 | Capabilities | `partnerships.configure` (the Categories tab: categories, their agreement templates, delivery checklists and custom fields; pipeline stages and lists; proof points; saved proposal templates); `partnerships.money` (see and enter commission, the merchant's take and returns; import returns) |
-| Screens (PROGRESS.md rows) | #50 Pipeline, #51 Partners, #52 Leads, #53 Proposals, #54 Contracts & MOUs, #55 Analytics; new: Partnerships · Categories and Public · Proposal (ratified 05/11/2026, registered by PR 1 as #104 and #105); changes to My Workspace (#21 to #24, #101), Settings · Approvals (#72), Settings · Imports (#93), Home, Mailbox, Public · Sign Offer and Verify Document |
+| Screens (PROGRESS.md rows) | #50 Pipeline, #51 Partners, #52 Leads, #53 Proposals, #54 Contracts & MOUs, #55 Analytics; new: Partnerships · Categories and Public · Proposal (ratified 05/11/2026, registered by PR 1 as #104 and #105); changes to My Workspace (#4 Today, #5 Tasks, #6 Calendar, #101 Projects), Settings · Approvals (#72), Settings · Imports (#93), Home, Mailbox, Public · Sign Offer and Verify Document |
 | Status | Agreed |
 | Last changed | 05/11/2026 |
 
@@ -62,10 +62,10 @@ only ticks progress and keeps the log; it adds no requirement.
 
 ### 0.2 Where things come from
 
-The decisions JBS Praxis took on 05/11/2026 (26 answers, §13.1); the Partnerships Workflow Discovery
+The decisions JBS Praxis took on 05/11/2026 (27 answers, §13.1); the Partnerships Workflow Discovery
 meeting of 5 November 2026 (Edidiong Etudor for MyCity, Tom-Blake Asaah and JBS Praxis); MyCity's
 tracker read column by column on 05/11/2026 (contacts masked; §6.13); MyCity's Deal Merchant Agreement
-(the House of Hevix sample, 5 November); the requirements review of 10 October and the discovery call of
+(a signed sample of 5 November, redacted in `docs/MyCity-ERP-Documents/partnership-samples/`); the requirements review of 10 October and the discovery call of
 2 September; MILESTONES §12, §18 and A14, A21, A23, A26; REUSE_MAP §8; the code as it stands on
 05/11/2026 (`7000`, `7099`, the empty M7 modules, Home's `partners.source.js`). MyCity's material
 inspires this guide; it does not limit it.
@@ -112,7 +112,7 @@ verification page.
 | Partnerships · Proposals (`proposals`) and the Proposal Studio (`?id=`, `?new=`) | Staff app | `partnerships` view, within scope | The proposal list beside the proposal as it will be seen; the studio's Brief, Questions, Draft, Edit and Send steps | New Proposal, Write Draft, Reshuffle, Rewrite Section, Change Layout, Replace Image, Send Proposal, Download PDF, Copy Link, Mark Accepted, Mark Declined, Save as Template, Withdraw |
 | Partnerships · Contracts & MOUs (`contracts-and-mous`) | Staff app | `partnerships` view, within scope | KPI strip, the lifecycle, agreements beside the picked one (approval, signers, verification, renewal) | Generate Agreement, Submit for Approval, Send for Signature, Record Signed Copy, Send Again, Renew, Close Agreement |
 | Partnerships · Analytics (`analytics`) | Staff app | `partnerships` view, within scope; money needs `partnerships.money`; ratings follow Performance's rules | The period; per lead owner the performance sheet's eight measures; signed and returns per month; by category, region and stage | Pick a period, Export |
-| My Workspace · Projects (#101), Tasks (#22), Calendar (#23), Today (#21) | Staff app | Workspace's own rules (A24) | A project, task or event connected to a partner shows it; a signed deal's event days on its team's calendar | **Connect to Partner** on New Project, New Task and New Event; a Partner filter on the lists |
+| My Workspace · Projects (#101), Tasks (#5), Calendar (#6), Today (#4) | Staff app | Workspace's own rules (A24) | A project, task or event connected to a partner shows it; a signed deal's event days on its team's calendar | **Connect to Partner** on New Project, New Task and New Event; a Partner filter on the lists |
 | Settings · Approvals (#72) | Staff app | `settings` view; edit to change | The Partner Agreement flow (§6.9) | Edit Stages, Applies When, as every flow |
 | Settings · Imports (#93) | Staff app | `partnerships` create; returns need `partnerships.money` | Importers Partnership Tracker and Partnership Returns | The engine's steps, with the new **Map Values** step (§6.13) |
 | Home · Overview, Alerts, Reports | Staff app | Home's rules (home.md) | Open Opportunities, Active Partnerships, Signed Value, No Contact 30 Days, Proposals Out; the Partnership Pipeline chart; Partner Inactivity alerts | Open the record behind a card |
@@ -359,7 +359,7 @@ Workspace services.
   false`), deleting nothing a row uses.
 - The reference seed adds `partnerships.configure` and `partnerships.money` with their holders (§8), the
   `partnership.agreement` flow, and the numbering schemes.
-- **Numbering** (proposed; MyCity confirms prefixes): `partner` `PAR-0001` (never resets), `lead`
+- **Numbering** (settled 05/11/2026, §13.1 item 27): `partner` `PAR-0001` (never resets), `lead`
   `LED-0001`, `deal` `DEAL-2026-0001` (yearly), `proposal` `PRO-0001`, `agreement` `AGR-2026-0001`
   (yearly). `schemes.js` drops `mou`; `7099`'s `POP` is replaced.
 - **Indexes:** Home's four (`partner_interaction (partner_id, occurred_at DESC)`, `partner (owner_id)`,
@@ -594,10 +594,12 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `ExportAct
   to `shared/documents/render.js` for every template; there is no second engine.
 - **Tidy With AI:** the person pastes the text of a Word agreement MyCity already uses. The AI returns
   it tidied (headings, numbered clauses, the financials grid as a table) with a proposed field for every
-  value that belongs to a partner or a deal ("The House of HEVIX" becomes `partner.name`, the grid
+  value that belongs to a partner or a deal (the merchant's business name becomes `partner.name`, the grid
   becomes `deal.options`, "26th November, 2026" becomes `deal.valid_until`). Each field shows as a chip
   to Accept, Change or Make an Ask. Nothing is kept until Use Draft. MyCity's Deal Merchant Agreement is
-  rebuilt this way as the Events category's default template (a staging seed holds the result).
+  rebuilt this way as the Events category's default template (a staging seed holds the result); its wording, redacted, is
+  `docs/MyCity-ERP-Documents/partnership-samples/deal-merchant-agreement.md`, with each placeholder's
+  field.
 - **Generate Agreement** on a deal picks the category's default template of the chosen kind, fills it
   from the record and the asks, numbers it and saves a Draft with its `template_version` and `fields`.
   The person edits the filled wording in Draft. An empty required field blocks Submit and names it.
@@ -1040,7 +1042,8 @@ From `@mycity/ui` (docs/COMPONENTS.md): `ListDetail`, `DetailPane`, `DataView`, 
 `MoneyField`, `DateField`, `DateRangeField`, `AddressField`, `PlacesField`, `UploadField`, `Switch`,
 `Wizard`, `StepBar`, `OtpField`, `SignatureField`, `PdfViewer`, `Timeline`, `Chain`, `Meter`,
 `BarChart`, `AreaChart`, `DonutChart`, `TrendChart`, `ActionGroup`, `Tooltip`, `HelpTerm`, `EmptyState`,
-`Paper`, `RichText`, `ExportAction`. **New**, each added with `npm run new:component` (header, test,
+`Paper`, `RichText`; and the app's own `ExportAction` (`app/src/features/shared/sections.tsx`), as
+every screen's Export already uses. **New**, each added with `npm run new:component` (header, test,
 gallery page), never inside the feature: `StageSwitcher` (stages in order, one press to move, keyboard
 and 44 px targets), `QuestionCard` (a studio card: question, why, answer control by kind, suggestion,
 Skip, Reshuffle), `DocumentFrame` (a sandboxed, token-styled preview of server HTML with section
@@ -1062,6 +1065,8 @@ template editor (`mode="document"`), or a sibling `DocumentEditor` if the compon
 - **A wrong signer email**: corrected and sent again; the old link stops working.
 - **An empty required field**: Submit refused, naming the field.
 - **The approval flow edited while one waits**: the waiting request keeps its version (the engine's rule).
+- **The owner's department has no head**: the first stage names nobody, so it falls to the CEO (the
+  engine's rule), and the CEO stage after it is skipped as a repeat.
 - **A template changed after generation**: the agreement keeps its `template_version`; Generate again
   uses the new one.
 - **AI off, capped or failing**: the brief and answers kept; Try Again; the kit's layouts can be filled
@@ -1141,6 +1146,8 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
     person presses Send and confirms the address; the PDF can be downloaded.
 25. Analytics shows the sheet's eight measures; the rating comes from Performance.
 26. This guide is the only source of truth for M7, standalone and elaborate (§0).
+27. Numbering prefixes are `PAR`, `LED`, `DEAL`, `PRO` and `AGR`, as §4.3 sets them ("use any
+    prefixes, we don't mind").
 
 ### 13.2 Decided in writing this guide (change here if wrong)
 
@@ -1160,10 +1167,12 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
 
 - **AI jobs** for `template-tidy` (Default recommended, before PR 2) and `proposal-message` (Fast
   recommended, before PR 7): the person confirms (CLAUDE.md).
-- **Numbering prefixes** (`PAR`, `LED`, `DEAL`, `PRO`, `AGR`): MyCity confirms (the naming email).
-- **MyCity's samples:** Edidiong Etudor is to send the ticketing and partnership templates and a proposal
-  (5 November). The Deal Merchant Agreement is in hand; the kit's tone and proof points are checked
-  against a real proposal when it arrives.
+- **MyCity's samples** (Edidiong Etudor is to send them, 5 November). The **Deal Merchant Agreement** is
+  in hand, redacted in `docs/MyCity-ERP-Documents/partnership-samples/`. The **ticketing template**
+  (Regular, VIP, VVIP) is needed by **PR 2**, where it becomes a category template: upload it in PR 2's
+  chat, which stores a redacted copy beside the agreement. A **sample proposal** is needed by **PR 7**,
+  whose kit is checked against its tone, structure and proof points: upload it in PR 7's chat, which
+  stores a redacted copy too. Neither blocks a PR from starting; each blocks only its PR's last step.
 - **Proof points' first set:** MyCity enters them; staging seeds a demonstration set.
 - **M5's signatures service** is shared; whichever milestone builds first builds it to §6.9 (GE with LA).
 - **MyCity's owners for M7** after Cynthia Osakunih's handover: Edidiong Etudor for partnerships, the new
@@ -1219,6 +1228,9 @@ into one file per screen.
 
 ### PR 2 · Categories, lists, fields, templates and proof points (`m7/categories`) · GE
 
+- **Inputs:** the Deal Merchant Agreement (`docs/MyCity-ERP-Documents/partnership-samples/
+  deal-merchant-agreement.md`); MyCity's ticketing template (Regular, VIP, VVIP), uploaded in this PR's
+  chat when it arrives and stored redacted beside it. Neither blocks the start.
 - **Scope:** `partner_pipeline` categories, lists (stages with meanings), fields, checklists, proof
   points, category templates (on the `templates` module and `template_version`), **Tidy With AI**
   (`template-tidy`, its job confirmed first), Start From Tracker (reading data validations through the
@@ -1294,6 +1306,10 @@ into one file per screen.
 
 ### PR 7 · The Proposal Studio and design kit (`m7/proposal-studio`) · GE, TB
 
+- **Inputs:** a sample proposal MyCity has sent, uploaded in this PR's chat and stored redacted in
+  `docs/MyCity-ERP-Documents/partnership-samples/`; the kit is checked against it before the PR is done.
+  MyCity's Anthropic key on Settings · Integrations before the studio is demonstrated. Neither blocks the
+  start.
 - **Scope:** `proposals` (brief, sources, questions with reshuffle, the writing job, content validation,
   the figure check, edits, rewrites, versions, send with confirmation, the public link and views, accept,
   decline, withdraw, expire, save as template); the AI actions on Top Tier (Sonnet, then Gemini Pro) and
@@ -1441,6 +1457,11 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 05/11/2026 · JP · Before merging: prefixes settled (§13.1 item 27); the redacted Deal Merchant
+  Agreement added to `docs/MyCity-ERP-Documents/partnership-samples/`; which PR needs which MyCity sample
+  (§13.3, Appendix A PR 2 and PR 7); My Workspace's PROGRESS rows corrected (#4, #5, #6, #101);
+  `ExportAction`'s home corrected (§10.3); a department with no head (§11); no partner named from
+  MyCity's documents.
 - 05/11/2026 · JP · Made standalone as M7's only source of truth: §0 (how to use it, the words), table
   columns (§4.2), the full API, components (§10.3), the build plan (Appendix A), definition of done and
   demo (Appendix B), the contract catalogue (Appendix C) and the file map (Appendix D). The handoff only
