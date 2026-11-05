@@ -61,6 +61,7 @@ const TYPES = Object.freeze({
   ole: t("application/x-ole-storage", "ole", "legacy_office"),
   zip: t("application/zip", "zip", "archive"),
   csv: t("text/csv", "csv", "sheet"),
+  json: t("application/json", "json", "text"),
   txt: t("text/plain", "txt", "text"),
   md: t("text/markdown", "md", "text"),
   html: t("text/html", "html", "markup"),
@@ -162,6 +163,7 @@ function textKind(buf, name) {
   )
     return TYPES.html;
   if (/\.csv$/i.test(String(name || ""))) return TYPES.csv;
+  if (/\.json$/i.test(String(name || "")) && /^[[{]/.test(head)) return TYPES.json;
   if (/\.md$/i.test(String(name || ""))) return TYPES.md;
   return TYPES.txt;
 }

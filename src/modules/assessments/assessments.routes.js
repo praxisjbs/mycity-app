@@ -7,7 +7,8 @@
  *   POST /, PATCH /:id, PUT /:id/questions    create; edit (questions fixed once sent)
  *   POST /:id/activate, /:id/deactivate       `recruitment` edit
  *   POST /assist                              `recruitment` edit: Suggest With AI, nothing kept
- *   GET  /:id/export, POST /import            `recruitment` export; create: one assessment as a file
+ *   GET  /:id/export, POST /import, /import/file   `recruitment` export; create: one assessment as a file (the
+ *                                            body, or a file uploaded first under purpose assessment_import)
  *   GET  /sittings, /sittings/:id             `recruitment` view, scope by the vacancy's hiring manager
  *   POST /sittings, /sittings/bulk            `recruitment` edit: Send, Send to Candidates
  *   PUT  /sittings/:id/marks, POST /sittings/:id/cancel   `recruitment` edit
@@ -33,6 +34,9 @@ route(router, "post", "/assist",
 route(router, "post", "/import",
   { body: a.AssessmentExport, response: a.AssessmentDetail, summary: "A new assessment from an exported file" },
   requirePermission("recruitment", "create"), controller.importFrom);
+route(router, "post", "/import/file",
+  { body: a.AssessmentImportFile, response: a.AssessmentDetail, summary: "A new assessment from an uploaded export file" },
+  requirePermission("recruitment", "create"), controller.importFile);
 
 route(router, "get", "/sittings", { query: a.SittingListQuery, response: a.SittingPage, summary: "Sittings sent to candidates" }, view, controller.sittings);
 route(router, "post", "/sittings", { body: a.SittingSend, response: a.SittingDetail, summary: "Send an assessment to a candidate" }, edit, controller.send);

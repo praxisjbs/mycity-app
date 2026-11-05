@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
-import { SITTINGS } from "@/api/mock/data/recruitment";
+import { ASSESSMENTS, SITTINGS } from "@/api/mock/data/recruitment";
 import { sid } from "@/api/mock/core";
 import { copyProblems, dialog, openAs, openRow, press, settled } from "./testKit";
 
@@ -79,5 +79,17 @@ describe("Recruitment · Assessments", () => {
     expect(within(sheet).queryByLabelText("Mark")).toBeNull();
     await press(sheet, "Cancel Sitting");
     expect(SITTINGS.find((s) => s.application_assessment_id === sid("sit:design:segun"))!.status).toBe("cancelled");
+  }, 60000);
+
+  it("Import takes an exported file through the upload engine and makes it here, switched off", async () => {
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=assessments");
+    await press(document.body, "Import");
+    const form = dialog();
+    const input = form.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['{"format":"mycity-assessment-1"}'], "motion-design-brief.json", { type: "application/json" });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(ASSESSMENTS.some((a) => a.name === "Motion Design Brief")).toBe(true), { timeout: 8000 });
+    await settled();
+    expect(ASSESSMENTS.find((a) => a.name === "Motion Design Brief")!.active).toBe(false);
   }, 60000);
 });

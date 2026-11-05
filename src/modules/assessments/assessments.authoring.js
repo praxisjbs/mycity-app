@@ -11,6 +11,8 @@
  *   activate(), deactivate()       on needs at least one question
  *   exportOf(), importFrom()       one assessment as a file (AssessmentExport): approved on staging,
  *                                  imported on production, never seeded there (A26)
+ *   importFile()                   the same from that file uploaded first (purpose assessment_import),
+ *                                  read back from the vault and checked against the contract
  *   assist()                       Suggest With AI (assessment-questions, job Default): nothing kept
  *
  * Each choice option's points are kept only in answer_key_enc, encrypted and bound to the question's
@@ -30,6 +32,8 @@ const vacancyRepo = require("../vacancies/vacancies.repo");
 const repo = require("./assessments.repo");
 const scoring = require("./assessments.scoring");
 const { EVENTS } = require("./assessments.events");
+const vault = require("../../shared/documents/vault");
+const storage = require("../../services/storage/storage.service");
 
 const MODULE = "recruitment";
 
@@ -225,6 +229,24 @@ async function exportOf(id) {
   };
 }
 
+/**
+ * Import from an export file the person uploaded (Assessments · Import): read back from the vault,
+ * only by who may read it (the uploader), and checked against AssessmentExport like the body route.
+ */
+async function importFile(actor, documentId) {
+  const notAFile = () => new AppError("VALIDATION_FAILED", "Not an exported assessment", 422, { document_id: ["Not an exported assessment"] });
+  const doc = await vault.getReadable(pool, actor, documentId);
+  if (doc.mime !== "application/json") throw notAFile(); // only the assessment_import purpose takes JSON
+  let parsed;
+  try {
+    parsed = c.assessments.AssessmentExport.safeParse(JSON.parse((await storage.get(doc.storage_key)).toString("utf8")));
+  } catch {
+    throw notAFile();
+  }
+  if (!parsed.success) throw notAFile();
+  return importFrom(actor, parsed.data);
+}
+
 /** A new, switched-off assessment from an exported file (checked against the contract on the way in). */
 async function importFrom(actor, file) {
   return tx(async (client) => {
@@ -320,6 +342,7 @@ module.exports = {
   deactivate,
   exportOf,
   importFrom,
+  importFile,
   assist,
   rowsOf,
   staffQuestion,
