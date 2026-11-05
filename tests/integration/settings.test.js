@@ -173,6 +173,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "alerts.clear",
         "alerts.manage",
         "announcements.post",
+        "expenses.finance",
         "goals.company",
         "goals.confirm",
         "goals.function",
@@ -245,6 +246,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "alerts.clear",
         "alerts.manage",
         "announcements.post",
+        "expenses.finance",
         "goals.company",
         "goals.function",
         "goals.organisation",
@@ -271,6 +273,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "alerts.clear",
         "alerts.manage",
         "announcements.post",
+        "expenses.finance",
         "goals.company",
         "goals.function",
         "goals.organisation",
@@ -712,8 +715,9 @@ describeDb("access, settings and audit against the real migrations", () => {
     test("every numbered document type, with the next number it would give", async () => {
       const res = await as("ops").get("/settings/numbering");
       expect(res.status).toBe(200);
-      // 21, M2 My Workspace's Project and Task (2099, 2090), and Performance's Organisational Goal (2291).
-      expect(res.body.page.total).toBe(24);
+      // 21, M2 My Workspace's Project and Task (2099, 2090), Performance's Organisational Goal (2291),
+      // and M8's Budget (8099; in schemes.js since 8100).
+      expect(res.body.page.total).toBe(25);
       const expense = res.body.data.find((s) => s.doc_type === "expense");
       expect(expense).toEqual(expect.objectContaining({ label: "Expense Request", prefix: "EXP", next: "EXP-0001", issued: 0 }));
       const staff = res.body.data.find((s) => s.doc_type === "employee");
@@ -723,7 +727,7 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(found.body.data.map((s) => s.doc_type)).toEqual(["payslip"]);
       const summary = await as("ops").get("/settings/numbering/summary");
       // Project and Organisational Goal reset each year (2099, 2291); Task never does (2090).
-      expect(summary.body).toEqual(expect.objectContaining({ types: 24, resetting: 4 }));
+      expect(summary.body).toEqual(expect.objectContaining({ types: 25, resetting: 5 }));
     });
 
     test("a scheme changes the next number, never one issued; a reset needs its period", async () => {

@@ -41,10 +41,8 @@ const TABLES = Object.freeze({
 
 /** What M8 still owes these queries. */
 const OWES = Object.freeze([
-  "Budget statuses as the M8 chain has them (DATABASE_SCHEMA M8): Home reads a budget with approved_at as approved.",
   "Whether committed spend counts as used: Home counts spent_amount only.",
   "The currency rule: Naira budgets only until the owner decides (home.md §13).",
-  "Index budget (owner_id), for the scoped figure (asked by Home).",
 ]);
 
 /** Approved, running on `$1`, in Naira. */

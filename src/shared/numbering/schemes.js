@@ -198,6 +198,13 @@ const SCHEMES = Object.freeze({
     reset: "never",
     include_period: false,
   }, // M8
+  budget: {
+    prefix: "BUD",
+    padding: 4,
+    separator: "-",
+    reset: "yearly",
+    include_period: true,
+  }, // M8 a department's budget for a year, "BUD-2027-0001" (seeded in 8099)
 });
 
 const DOC_TYPES = Object.freeze(Object.keys(SCHEMES));

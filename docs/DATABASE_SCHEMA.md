@@ -503,24 +503,34 @@ agreements and obligations · `7099` seed.
 ### M8 Expenses & Budget Control · 8000 to 8999 · AJ
 
 **Built:** `8000` budgets and lines, expense categories, requests and transactions, requisitions
-and lines, disbursements · `8099` seed.
+and lines, disbursements · `8099` seed · `8010` the chain as agreed on 04/11/2026
+(`docs/guides/expenses.md` §4): `expense_request_line`; on `expense_request` the payee
+(`payee_type` staff, vendor, partner, task_team; `payee_name`, `bank_name`, `account_name`,
+`account_number`, `uses_profile_account`), `invoice_document_id`, `project_id`, `requisition_id`
+(many requests to a requisition), `workflow_instance_id`, `over_budget`, the step timestamps and
+the status CHECK (`draft`, `submitted`, `sent_back`, `approved`, `in_requisition`, `authorised`,
+`disbursed`, `rejected`, `cancelled`); NGN only in the contract and the service, not a CHECK; `expense_category.type` (operating, capital) and
+`description`, no threshold; `requisition.workflow_instance_id`, its status CHECK; on
+`disbursement` the payee as paid, `receipt_document_id`, `paid_on`, one per request, a null
+`payment_reference` meaning Reference Missing and no trigger refusing it (decision 2); the budget
+status CHECK; `project.budget_amount`; the foreign-key and list indexes, Home's included ·
+`8100` seed: the `expenses.request` and `expenses.requisition` flows, the statuses and payee types,
+the `expenses.finance` capability for Operations & People, and 8099's unused `expense_request`
+numbering scheme taken out (a request is numbered `expense`).
 
 **Owes:**
-- A requisition owns many requests (MILESTONES §13); `requisition.expense_request_id UNIQUE`
-  makes it one, so this is a fix-forward change of shape.
-- The approval threshold on the category; per-line flag, tick and remove; the vendor invoice
-  `document_id`; payee details; the project link; `workflow_instance_id`.
-- The trigger that refuses a disbursement without a payment reference.
-- Statuses as the M8 chain has them; one numbering type for expenses (`expense` and
-  `expense_request` are both seeded); `budget` has no scheme in `schemes.js`.
+- The five categories 8099 seeds are a business choice A26 does not allow; they go with M8's
+  staging seed (PR 7), after Home's staging rows that point at them.
+- `requisition.expense_request_id`, `requisition.supplier_name`, `requisition_line` and
+  `expense_transaction` are unused since 8010; dropped one release after M8 ships if still unused.
 - **Read by Home** (home.md §4.1): `expense_request` (`expense_request_id`, `number`, `employee_id`,
   `expense_category_id`, `purpose`, `amount`, `currency`, `status`, `needed_on`, `submitted_at`) and
   `expense_category` (`expense_category_id`, `name`) through
   `src/modules/dashboard/sources/expenses.source.js`, and `budget` (`budget_id`, `number`, `name`,
   `department_id`, `owner_id`, `currency`, `starts_on`, `ends_on`, `approved_at`) with `budget_line`
   (`budget_id`, `amount`, `spent_amount`) through `budgets.source.js`: update them in the same PR.
-  Indexes asked by Home: `expense_request (status)` and `(employee_id)`, `budget (owner_id)`.
-  **Staging holds Home's demonstration rows** in `expense_request`, `budget` and `budget_line`
+  Home's awaiting approval is `submitted` (8010's status list). **Staging holds Home's
+  demonstration rows** in `expense_request`, `budget` and `budget_line`
   (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`
   (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
   takes them away once, in the three steps that file starts with: that seed calls

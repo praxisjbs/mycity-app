@@ -315,6 +315,7 @@ const DOC_LABELS = Object.freeze({
   expense: "Expense Request",
   requisition: "Requisition",
   disbursement: "Disbursement",
+  budget: "Budget",
 });
 
 /** The year and the year and month of today, in Lagos. */

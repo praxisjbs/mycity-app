@@ -32,6 +32,9 @@
  * unbind a binding plan and on the changes then made to it.
  * M3 adds `queries.consequence` (docs/guides/queries.md §6.5, seeded in 3190): a proposed
  * sanction, Operations & People, then the CEO from the fourth rung.
+ * M8 adds `expenses.request` (docs/guides/expenses.md §6.3, seeded in 8100): the line manager
+ * (skipped when the requester manages people), then Operations & People; and `expenses.requisition`
+ * (§6.4): the CEO decides a requisition of approved requests as a whole.
  *
  * A person may also make a flow on screen (Settings, Approvals, New Flow; keyFor, keyTaken). It is
  * stored like any other and opens only once a module's service calls openInstance with its key.
@@ -264,6 +267,41 @@ const DEFAULTS = Object.freeze({
         sla_hours: 48,
       },
     ],
+  },
+  // M8, seeded in 8100 (docs/guides/expenses.md §6.3): a request for money. No threshold
+  // (decision 1 of 04/11/2026): every request takes both stages; a requester who manages people
+  // goes straight to Operations & People.
+  "expenses.request": {
+    key: "expenses.request",
+    module: "expenses",
+    name: "Expense Request",
+    description: "The line manager, then Operations & People. A line manager's own request goes straight to Operations & People.",
+    context: { amount: "money", requester_manages_people: "boolean" },
+    stages: [
+      {
+        key: "line_manager",
+        name: "Line Manager",
+        approver: { type: "manager_of_subject" },
+        condition: { field: "requester_manages_people", op: "=", value: false },
+        sla_hours: 48,
+      },
+      {
+        key: "operations_people",
+        name: "Operations & People",
+        approver: { type: "role", value: "operations_people" },
+        sla_hours: 48,
+      },
+    ],
+  },
+  // M8, seeded in 8100 (docs/guides/expenses.md §6.4): Operations & People's batch of approved
+  // requests, decided by the CEO as a whole.
+  "expenses.requisition": {
+    key: "expenses.requisition",
+    module: "expenses",
+    name: "Requisition",
+    description: "The CEO approves or rejects the batch of approved requests.",
+    context: { total: "money" },
+    stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
   },
 });
 

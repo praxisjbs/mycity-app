@@ -291,6 +291,13 @@ const CAPABILITY_CATALOG = [
     label: "Run Performance",
     description:
       "Run the cycle: quarters and their rules, rounds, reviewer changes, conduct, improvement plans, probation outcomes and imports.",
+  },  // M8 Expenses (docs/guides/expenses.md §8), seeded in 8100.
+  {
+    code: "expenses.finance",
+    module: "expenses",
+    label: "Run Expenses",
+    description:
+      "Group approved requests into requisitions, record disbursements, set budgets and manage the expense categories.",
   },
 ];
 

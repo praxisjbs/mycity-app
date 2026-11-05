@@ -351,7 +351,9 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   the record elsewhere on the page. A screen shows a first pick unasked only while `useSideBySide()`
   is true (or, for a `DetailPane`, off a phone). Never a record card under, over or beside the list
   in a phone's page. A record with its own screen (an `id` route) and a reader that fills the
-  screen (`SplitPanes`) keep their own shapes.
+  screen (`SplitPanes`) keep their own shapes. Expenses (ESS · My Requests and the Expenses tabs)
+  opens its records in the centred dialog on desktop at every width too: `ListDetail`'s modal
+  layout (F31 amended 04/11/2026, AJ).
 - **The main action within thumb reach**: at the bottom of the screen or the sheet, full width.
 - **Tap targets at least 44 × 44 px.** Inline help terms inside a sentence or heading are the only
   exception.
