@@ -182,6 +182,7 @@ const DOC_TYPES = [
   "expense",
   "requisition",
   "disbursement",
+  "budget",
 ];
 const DocType = z.enum(DOC_TYPES);
 const NumberingReset = z.enum(["never", "yearly", "monthly"]);

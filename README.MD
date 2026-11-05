@@ -408,6 +408,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `announcements.post` | `community` | Post announcements and track who has read them | Implementation, Operations & People, Management | `0449` |
 | `mailbox.signature` | `mailbox` | Configure Signature: the company's signature links and what shows on everyone's email signature | Implementation, System Administrator | `1129` |
 | `queries.configure` | `queries` | Write the query rules, the consequence chain and the letter templates (`docs/guides/queries.md`) | Implementation, Operations & People | `3190` |
+| `expenses.finance` | `expenses` | Run Expenses: group approved requests into requisitions, record disbursements, set budgets and manage the expense categories (`docs/guides/expenses.md`) | Implementation, Operations & People | `8100` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 

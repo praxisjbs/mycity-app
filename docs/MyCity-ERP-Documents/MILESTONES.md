@@ -45,7 +45,7 @@ Settled 9 October. These are binding. If the code disagrees with this table, the
 | A11 | **Pixie's workflow engine, ported.** `pixie-girl-hub/src/workflows/engine.js` + `conditions.js` + `default-definitions.js`, per `REUSE_MAP.md` §1.2. | M0 stands it up; M3, M5, M6, M8 consume it |
 | A12 | **Dual-hash signatures.** `content_hash` over canonical payload, `artifact_hash` over vaulted bytes. Two verdicts on the verification page. | M5 |
 | A13 | **AI manifest and search provider ship with every module, from M1.** | Gates 9 and 10 |
-| A14 | **Excel sheets read in M0; generic importer built in M7.** | Schema design this week is driven by their real columns |
+| A14 | **Excel sheets read in M0; generic importer built in M7.** | Schema design this week is driven by their real columns. **Amended 04/11/2026 (JBS Praxis):** the import engine and the staff importer were built in M0 (BACKEND_STRUCTURE §9.1; Settings · Imports, `docs/PROGRESS.md` #93). M7 adds the partnership tracker importer and the mapping polish on that engine, and does not build a second one |
 | A15 | **English only.** No `tr()`, no dictionary, no `title_fr`. | Title Case and no-dash gates still apply — they are copy quality, not translation |
 
 ### 1.3 Added 10 October, absorbed
@@ -1068,6 +1068,11 @@ history, plus export back out. Reuse `master/_shared/dedup.service.js` for dupli
 `exceljs` is already a dependency. Generic, so MyCity can import their remaining trackers
 themselves after handover.
 
+**Amended 04/11/2026 (JBS Praxis, A14).** The engine and the staff importer were built in M0. M7's
+share is `partners.import.js`, the partnership tracker's importer on that engine (its two sheets, its
+column map, its duplicate report), and the polish of the column-mapping screen; the pipeline above is
+not built a second time. The M7 build plan is `docs/handoff/m7-partnerships.md`.
+
 **They are on Google Sheets, not Excel.** A sheet downloaded as `.xlsx` reads identically, so the
 importer needs no Google API integration. Cynthia also warned that templates may change after
 end-of-month feedback, which is the argument for column mapping at import time rather than a fixed
@@ -1088,6 +1093,32 @@ partnership raises a follow-up.
 ## 13 · M8 — Expenses & Budget Control · 8%
 
 **Owner AJ. 7–11 Dec, parallel with M9. Demo Fri 11 Dec.**
+
+**Amended 04/11/2026 (AJ, from the Modules Review of 04/11/2026; TB handed every M8 decision to
+AJ).** Where the text below disagrees, this wins. The design is `docs/guides/expenses.md`, the
+build plan and its sixteen decisions `docs/handoff/m8-expenses.md`.
+
+- **No approval threshold.** Every request goes line manager → Operations & People → requisition
+  → CEO whatever its amount; the per-category threshold and the per-line flag and tick inside a
+  requisition below are withdrawn. The CEO approves or rejects a requisition as a whole and may
+  first remove a single request, which returns to Operations & People with its history.
+- **The bank transaction reference is asked for, not required.** Without it the screen asks Save
+  Without Reference?; a disbursement saved so is flagged Reference Missing until Add Reference
+  fills it. No database trigger refuses it.
+- **A request has line items** (description, quantity, unit price), one category, an optional
+  project and its payee: Staff with Use My Company Account (the bank details on the employee
+  record), Vendor, Partner or Dedicated Task Team (DTT), the bank details typed for the last three. Each
+  request is paid to its own payee.
+- **Budgets are department budgets for a calendar year**, by category, set and changed by
+  Operations & People with every change logged; a request over its department's remaining budget
+  is flagged before approval. Projects (Workspace's) carry an optional budget, on a new
+  **Expenses · Projects** tab.
+- **My Requests is an ESS tab.** The Expenses tabs are Requisitions, Approvals, Disbursements,
+  Projects, Budgets, Categories. Records open in the shared Modal on desktop too (F31 amended).
+- **Categories are entered by MyCity (A26)**: an Add Suggested Categories button offers twelve
+  defaults drawn from MyCity's expenditure sheet; no reference seed holds them.
+- **Nothing is imported** from MyCity's expenditure sheet; budget versus actual starts from the
+  first budget MyCity sets.
 
 ### The closest match in the audit
 
@@ -1164,15 +1195,16 @@ duplicate-claim detection; pending-disbursement reporting; spend analytics.
 
 ### Definition of done
 
-An employee requests cash from a phone. It routes line manager → Operations by a workflow
-definition, and the hierarchy is edited from the UI without a deploy. Operations groups approved
-requests into one requisition; a line at or above its category threshold is flagged and the CEO
-must tick it individually before the requisition can be approved, while lines below it ride with
-the requisition. A line the CEO removes returns to the Operations queue. The approved request sits
-visibly in "approved, not yet disbursed" until finance disburses with a mandatory bank transaction
-reference. Complete history per request. Budget versus actual by department, project and
-category shows budget, actual, variance, remaining, committed and disbursed. A request exceeding
-remaining budget is flagged before approval, not after.
+An employee raises a request with its lines, payee and invoice from a phone. It routes line
+manager → Operations & People by a workflow definition, and the chain is edited from the UI
+without a deploy. Operations & People group approved requests into one requisition; the CEO may
+remove a request (it returns to the Operations & People queue with its history) and approves or
+rejects the requisition as a whole. An approved request sits visibly in "authorised, not yet
+disbursed" until it is paid, with its bank transaction reference or flagged Reference Missing.
+Complete history per request. Each department's budget for the year, and each project's, shows
+allocated, committed, spent and remaining; a request exceeding its department's remaining budget is
+flagged before approval, not after. (Amended 04/11/2026, AJ; the definition it replaces asked for a
+per-category threshold and a mandatory reference.)
 
 ---
 
@@ -1432,7 +1464,7 @@ staff never navigates to it to do their job.
 | People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |
 | People | **Payroll** | 5 | Payroll Runs · Payslips · Salary Structure · Deductions · Statutory | M6 |
 | Business | **Partnerships** | 6 | Pipeline · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 |
-| Business | **Expenses** | 6 | My Requests · Approvals · Requisitions · Disbursements · Budgets · Categories | M8 |
+| Business | **Expenses** | 7 | My Requests (shown in ESS) · Requisitions · Approvals · Disbursements · Projects · Budgets · Categories | M8 (Projects added 04/11/2026, AJ; its tab and PROGRESS row in M8 PR 7) |
 | System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · User Guide | M1 (Policies), M10, M0 (User Guide) |
 | System | **Praxis AI** | 2 | Ask · History | M10 |
 | System | **Settings** | 13 | Organisation · Status · Performance · Faults · Users · Roles & Permissions · Approvals · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |

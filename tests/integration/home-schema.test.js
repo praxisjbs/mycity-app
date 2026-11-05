@@ -421,12 +421,13 @@ describeDb("Home schema and reference data against the real migrations", () => {
       // (policies) Manage Policies to Operations & People and Implementation; 2190 (Performance) the
       // goals and performance capabilities (performance.md §8); 2590 (My Workspace) Manage Late Reasons
       // to Management, Operations & People and Implementation (workspace.md §8); 3190 (Queries)
-      // Configure Queries to Implementation and Operations & People.
+      // Configure Queries to Implementation and Operations & People; 8100 (Expenses) Run Expenses to
+      // Implementation and Operations & People (expenses.md §8).
       const goals = ["goals.company", "goals.confirm", "goals.function", "goals.organisation", "goals.view_all"];
       const sorted = (codes) => [...codes].sort();
       expect(Object.fromEntries(rows.map((r) => [r.role, r.codes]))).toEqual({
-        implementation: sorted([...all, ...goals, "mailbox.signature", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]),
-        operations_people: sorted([...all, "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]),
+        implementation: sorted([...all, ...goals, "expenses.finance", "mailbox.signature", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]),
+        operations_people: sorted([...all, "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]),
         management: sorted([...all, "goals.company", "goals.function", "goals.view_all", "workspace.late_reasons"]),
         head_of_department: sorted([...managers, "goals.function"]),
         manager: managers,
@@ -498,10 +499,11 @@ describeDb("Home schema and reference data against the real migrations", () => {
 
         const codes = await c.query("SELECT code::text AS code FROM capability ORDER BY code::text");
         // 1129's capability is Mailbox's, 1396's the policies', 2190's Performance's, 2590's My
-        // Workspace's and 3190's Queries', untouched by undoing Home's seed.
+        // Workspace's, 3190's Queries' and 8100's Expenses', untouched by undoing Home's seed.
         expect(codes.rows.map((r) => r.code)).toEqual([
           "alerts.clear",
           "announcements.post",
+          "expenses.finance",
           "goals.company",
           "goals.confirm",
           "goals.function",
@@ -523,7 +525,7 @@ describeDb("Home schema and reference data against the real migrations", () => {
               [role],
             )
           ).rows.map((r) => r.code);
-        expect(await heldBy("operations_people")).toEqual(["alerts.clear", "announcements.post", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]);
+        expect(await heldBy("operations_people")).toEqual(["alerts.clear", "announcements.post", "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]);
         expect(await heldBy("manager")).toEqual([]);
         expect(await heldBy("studio_lead")).toEqual(["home.team"]);
         expect(await seededKeysLeft(c)).toEqual([...SEEDED_KEYS].sort());
