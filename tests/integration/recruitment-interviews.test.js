@@ -181,6 +181,19 @@ describeDb("Recruitment · Interviews against the real migrations", () => {
     expect(closed.body.trait_averages.map((t) => t.average)).toEqual([7.5, 7.5]);
     expect(closed.body.panel.map((s) => s.score).sort()).toEqual([7, 8]);
     expect(JSON.stringify(closed.body)).not.toContain("notice period");
+    // The round's close names the vacancy's hiring manager, who is told the report is theirs (guide §7),
+    // by application, never the candidate's name; here they pressed the last card themselves, and nobody
+    // is told of their own action.
+    await drain();
+    const event = await one("SELECT payload FROM event_log WHERE event_key = 'interview.round_closed' ORDER BY created_at DESC LIMIT 1");
+    expect(event.payload).toMatchObject({ subject_employee_id: h.people.ops.employee_id, application_number: expect.stringMatching(/^APP-\d{4}$/) });
+    expect(JSON.stringify(event.payload)).not.toMatch(/Chidi|Okafor/);
+    expect(
+      await one(
+        "SELECT count(*)::int AS n FROM notification n JOIN app_user u ON u.user_id = n.user_id WHERE n.event_key = 'interview.round_closed' AND u.employee_id = $1",
+        [h.people.ops.employee_id],
+      ),
+    ).toEqual({ n: 0 });
     // The interview part of the candidate's scorecard is the round's score.
     const candidate = await h.as("ops").get(`/recruitment/candidates/${applicationId}`);
     expect(candidate.body.scorecard.find((p) => p.code === "interview")).toMatchObject({ score: 75 });

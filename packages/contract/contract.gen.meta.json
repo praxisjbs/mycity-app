@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "883686397f006d0f7c1f17d5b74541b98b34fbed00c56674854e5ddd5c5a99b3",
+  "source_hash": "11ad3ce355e1d033ad0bf9561062652d7cf64b7ba5864f7ffad6fff910600742",
   "schemas": 1553,
   "endpoints": 727,
   "inputs": {
@@ -73,7 +73,7 @@
     "packages/contract/schemas/templates.js": "5c68262e21422e9f522f31ebeab2e9bc0b22faecccb972a28c9631f99738a301",
     "packages/contract/schemas/user_guide.js": "3a14914b7ff89d8ce50a1dbbe921a70370cf5e52d7f41f95f36752c54884b7d1",
     "packages/contract/schemas/users.js": "c62a6bfc703543682f6d190a19a68e86f34363c3f7846a46c54ba905e978064d",
-    "packages/contract/schemas/vacancies.js": "e6e64a26bc29c7dd9e7b0f629c694be18f1090ed5587c782c247f49c1d60cd51",
+    "packages/contract/schemas/vacancies.js": "aa1eec9d7bbb71fccb8cbb621897f2c5a71c22d089427f5c94a9b299533ecedc",
     "packages/contract/schemas/workflow.js": "d070ad092b3a3b634ca1076856066d987734f21c1d8e102b4f2605d68fe0e8f8",
     "packages/contract/schemas/worksites.js": "96dd0eb1c22e1930b48f7ab77c85fee88382d38b1e897b6700ba8b999c5f1f76",
     "packages/contract/schemas/workspace.js": "85d46b8095025384afc99f99185149ea69be72ca519022075014e9dd9befa273",

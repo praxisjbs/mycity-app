@@ -16,7 +16,7 @@ module.exports = recordProvider({
     JOIN candidate k ON k.candidate_id = t.candidate_id
     LEFT JOIN application a ON a.application_id = t.application_id
     LEFT JOIN vacancy v ON v.vacancy_id = a.vacancy_id`,
-  where: "t.removed_at IS NULL",
+  where: "t.removed_at IS NULL AND t.expires_at > now()",
   key: "t.talent_pool_entry_id",
   columns: ["k.first_name", "k.last_name", "k.email"],
   select: "t.talent_pool_entry_id AS id, NULL::text AS ref, btrim(k.first_name || ' ' || k.last_name) AS title, v.title AS sub, 'kept' AS status",

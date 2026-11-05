@@ -367,7 +367,7 @@ async function requestScore(actor, scope, id) {
  */
 async function scoreAll(actor, scope, body) {
   return tx(async (client) => {
-    const { conditions } = await vacancies.keepScreeningConditions(client, scope, body.vacancy_id, body.screening_conditions);
+    const { conditions } = await vacancies.keepScreeningConditions(client, scope, body.vacancy_id, body.screening_conditions, actor);
     const ids = await repo.unscored(client, body.vacancy_id);
     for (const id of ids) {
       await emit(client, {
@@ -406,7 +406,8 @@ async function inviteIn(client, actor, scope, candidateId, vacancyId, { source =
     throw new AppError("VALIDATION_FAILED", "They have applied for this role", 422, { vacancy_id: ["They have applied for this role"] });
   await emit(client, {
     key: EVENTS.APPLICATION_INVITED,
-    entity: { type: "candidate", id: candidateId },
+    // The vacancy, whose link opens on the Audit Log; the person invited is in the payload.
+    entity: { type: "vacancy", id: v.vacancy_id },
     actor,
     payload: { candidate_id: candidateId, vacancy_id: v.vacancy_id, vacancy_title: v.title, source, invited_by: actor.user_id },
   });

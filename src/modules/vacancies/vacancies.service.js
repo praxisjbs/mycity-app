@@ -364,7 +364,7 @@ const protectedConditions = (conditions) =>
  * vacancy's kept ones stand. Called by the candidates service inside its own transaction, before it
  * queues the reads. Returns the vacancy and the conditions to read against.
  */
-async function keepScreeningConditions(client, scope, id, conditions) {
+async function keepScreeningConditions(client, scope, id, conditions, actor = null) {
   const row = await visibleRow(client, id, scope, { lock: true });
   if (row.status === "closed") throw new AppError("VACANCY_CLOSED", "A closed vacancy cannot be changed", 409);
   if (conditions === undefined) {
@@ -382,6 +382,13 @@ async function keepScreeningConditions(client, scope, id, conditions) {
       Object.fromEntries(named.map((i) => [`screening_conditions.${i}`, ["Not a fair condition"]])),
     );
   await repo.setScreeningConditions(client, id, conditions);
+  await emit(client, {
+    key: EVENTS.VACANCY_UPDATED,
+    entity: { type: "vacancy", id },
+    actor,
+    before: { title: row.title, status: row.status },
+    payload: { number: row.number, fields: ["screening_conditions"] },
+  });
   return { row, conditions };
 }
 

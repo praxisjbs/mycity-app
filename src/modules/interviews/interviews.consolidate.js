@@ -54,7 +54,14 @@ async function closeIn(client, row, actor) {
     key: EVENTS.INTERVIEW_ROUND_CLOSED,
     entity: { type: "interview", id: row.interview_id },
     actor,
-    payload: { interview_id: row.interview_id, application_number: row.application_number, interview_score: score },
+    payload: {
+      interview_id: row.interview_id,
+      application_number: row.application_number,
+      vacancy_title: row.vacancy_title,
+      interview_score: score,
+      // The vacancy's hiring manager is told the round is in, so the report can be written (guide §7).
+      subject_employee_id: row.hiring_manager_id,
+    },
   });
   return score;
 }

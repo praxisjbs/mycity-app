@@ -55,7 +55,7 @@ async function buildExport(event, ctx) {
   if (!p.document_id) return;
   const reader = await grantsCache.getAuthUser(pool, p.requested_by || event.actor_user_id);
   if (!reader || reader.status !== "active") return exportFiles.fail(p.document_id, "The person who asked is no longer active.");
-  const scope = await scopeFor(reader, "recruitment", "view");
+  const scope = await scopeFor(reader, "recruitment", "export");
   if (!scope) return exportFiles.fail(p.document_id, "The person who asked no longer holds Recruitment.");
   await exportFiles.make(p.document_id, ctx, async () => {
     const { rows, total, capped } = await service.gather(p.filters || {}, { scope: scope.scope, scope_ids: scope.scope_ids || null });

@@ -239,7 +239,7 @@ async function importFile(actor, documentId) {
   if (doc.mime !== "application/json") throw notAFile(); // only the assessment_import purpose takes JSON
   let parsed;
   try {
-    parsed = c.assessments.AssessmentExport.safeParse(JSON.parse((await storage.get(doc.storage_key)).toString("utf8")));
+    parsed = c.assessments.AssessmentExport.safeParse(JSON.parse((await storage.get(doc.storage_key)).toString("utf8").replace(/^\uFEFF/, "")));
   } catch {
     throw notAFile();
   }

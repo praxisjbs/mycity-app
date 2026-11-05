@@ -412,6 +412,12 @@ const ScorecardSave = z
     message: "A part switched off weighs 0",
     path: ["parts"],
   })
+  // A part on at 0 would count among "n of m parts" yet add nothing, and a candidate scored only on
+  // it would rank as unscored: switch it off instead.
+  .refine((v) => Object.values(v.parts).every((p) => !p.active || p.weight >= 1), {
+    message: "Weigh each part switched on",
+    path: ["parts"],
+  })
   .refine((v) => Object.values(v.parts).reduce((a, p) => a + (p.active ? p.weight : 0), 0) === 100, {
     message: "The parts must add up to 100",
     path: ["parts"],

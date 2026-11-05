@@ -61,6 +61,13 @@ defineDocType(FORM_DOC_TYPE, {
 });
 defineVariables("document", "interview-assessment-form", c.interviews.InterviewAssessmentFormVars);
 
+defineNotification(EVENTS.INTERVIEW_ROUND_CLOSED, {
+  // The vacancy's hiring manager (payload.subject_employee_id): the report is theirs to write now.
+  to: [{ subject: true }],
+  title: "Round Closed",
+  body: (e) => `The panel's cards for ${e.payload.application_number}, ${e.payload.vacancy_title}, are in. Write the report.`,
+});
+
 defineNotification(EVENTS.INTERVIEW_FEEDBACK_DUE, {
   // The panelist (payload.subject_employee_id).
   to: [{ subject: true }],

@@ -106,6 +106,8 @@ async function stalledBatch(client, { before, after = null, size }) {
        JOIN vacancy v ON v.vacancy_id = a.vacancy_id
        LEFT JOIN reference_value rv ON rv.domain = 'application_stage' AND rv.code = a.stage
       WHERE a.status = 'active' AND a.withdrawn_at IS NULL
+        -- a closed role's candidates can be neither moved nor not progressed, so never alert on them
+        AND v.status <> 'closed'
         AND a.current_stage_entered_at < $1::timestamptz
         AND ($2::uuid IS NULL OR a.application_id > $2::uuid)
       ORDER BY a.application_id

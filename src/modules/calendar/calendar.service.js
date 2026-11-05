@@ -79,7 +79,8 @@ function toEvent(row, employeeId) {
     link: row.entity_type ? linkFor(row.entity_type, row.entity_id) : null,
     cancelled_at: iso(row.cancelled_at),
     reminder_minutes: row.reminder_minutes || [],
-    can_edit: row.owner_employee_id === employeeId && !row.cancelled_at,
+    // An entry another module's record keeps (an interview) changes only there (EVENT_OWNED_BY_RECORD).
+    can_edit: row.owner_employee_id === employeeId && !row.cancelled_at && !row.entity_type,
     created_at: iso(row.created_at),
   };
 }

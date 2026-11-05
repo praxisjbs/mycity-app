@@ -75,6 +75,8 @@ const CV_UPLOADS_PER_LINK = 5;
 async function uploadCv(token, file) {
   return tx(async (client) => {
     await openVacancy(client, token);
+    // Counted under the link's lock, so CVs sent at once cannot pass the cap together.
+    await client.query("SELECT 1 FROM public_token WHERE public_token_id = $1 FOR UPDATE", [token.public_token_id]);
     if ((await repo.cvsOnLink(client, APPLY_LINK, token.public_token_id)) >= CV_UPLOADS_PER_LINK)
       throw new AppError("TOO_MANY_FILES", "This link has had enough CVs. Start a new application", 429);
     const doc = await vault.store(client, {
