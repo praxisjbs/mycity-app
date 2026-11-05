@@ -6,7 +6,8 @@
  *
  *   sittings(), sitting()     Assessments · Sittings, each answer beside its question and points
  *   send()                    one sitting a candidate: the start-by day 1 to 14 days on (default 3),
- *                             and for an untimed brief the days after Start it is due (default 5)
+ *                             and for an untimed brief the days after Start it is due (default 5);
+ *                             a candidate before Assessment moves to it
  *   sendBulk()                Send to Candidates: every active candidate of a role at a stage who has
  *                             no live sitting of it; says how many were sent and skipped
  *   mark()                    Mark Answers: written and file answers; the sitting is scored once
@@ -162,6 +163,9 @@ async function sendOne(client, actor, d, applicationId, body) {
     actor,
     payload: { application_assessment_id: id, application_id: applicationId, assessment_code: d.code },
   });
+  // Sent an assessment, the candidate is at Assessment, as Schedule Interview puts them at Interview
+  // (GE, 05/11/2026): only forward, and only on a role whose board has Assessment.
+  await require("../candidates/candidates.service").advanceIn(client, actor, applicationId, "assessment");
   return id;
 }
 

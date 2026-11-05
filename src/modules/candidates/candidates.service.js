@@ -147,7 +147,8 @@ async function detailOf(db, row, user) {
   const sittings = await repo.sittings(db, row.application_id);
   const interviews = await repo.interviews(db, row.application_id);
   const history = await repo.history(db, row.application_id);
-  const editable = (await canEdit(user, row)) && row.vacancy_status !== "closed";
+  const inScope = await canEdit(user, row);
+  const editable = inScope && row.vacancy_status !== "closed";
   const s = shown(row);
   const sc = scorecard(
     parts,
@@ -214,6 +215,8 @@ async function detailOf(db, row, user) {
     })),
     next_stages: row.status === "active" && editable ? pipeline.nextStages(row.stage, board) : [],
     can_edit: editable,
+    // On a closed role too (GE, 05/11/2026): the people still in it can be told.
+    can_not_progress: inScope && row.status === "active",
   };
 }
 
@@ -286,37 +289,61 @@ async function advanceIn(client, actor, applicationId, stage) {
   return true;
 }
 
+/**
+ * Not Progressing, at any stage and on a closed role too (a role closed with people still in it lets
+ * them be told; GE, 05/11/2026). Reopen still needs the role live.
+ */
 async function notProgressed(actor, scope, id, body) {
   return tx(async (client) => {
     const row = await visibleRow(client, id, scope, { lock: true });
     if (row.status !== "active") throw new AppError("MOVE_NOT_ALLOWED", "This candidate is not in progress", 409);
-    assertVacancyLive(row);
-    await transition(client, pipeline.MACHINE, {
-      entity_id: id,
-      from: row.stage,
-      to: pipeline.NOT_PROGRESSED,
-      actor_id: actor.user_id,
-      reason: body.rejection_reason,
-    });
-    await repo.setStatus(client, id, { status: "not_progressed", rejection_reason: body.rejection_reason });
-    // Their live links stop working: any link made for the application, and each sitting not yet
-    // finished ends as cancelled through the assessments' own path (its link stops with it), so a
-    // Reopen can send it again. An Apply link belongs to a vacancy, and to nobody until it is used.
-    await publicToken.revokeFor(client, { subject_type: "application", subject_id: id });
-    const timer = require("../assessments/assessments.timer");
-    for (const sitting of await repo.sittings(client, id)) {
-      if (!["sent", "in_progress"].includes(sitting.status)) continue;
-      const live = await timer.lockSitting(client, sitting.application_assessment_id);
-      if (live && ["sent", "in_progress"].includes(live.status)) await timer.finish(client, live, "cancelled", actor);
-    }
-    await emit(client, {
-      key: EVENTS.APPLICATION_NOT_PROGRESSED,
-      entity: { type: "application", id },
-      actor,
-      payload: { application_id: id, number: row.number, stage: row.stage },
-    });
+    await notProgressIn(client, actor, row, body.rejection_reason);
     return detailOf(client, await repo.get(client, id), actor);
   });
+}
+
+/**
+ * Mark one active application Not Progressing inside the caller's transaction: its live links stop,
+ * its unfinished sittings end as cancelled, and the event sends the candidate their email.
+ */
+async function notProgressIn(client, actor, row, reason) {
+  const id = row.application_id;
+  await transition(client, pipeline.MACHINE, {
+    entity_id: id,
+    from: row.stage,
+    to: pipeline.NOT_PROGRESSED,
+    actor_id: actor.user_id,
+    reason,
+  });
+  await repo.setStatus(client, id, { status: "not_progressed", rejection_reason: reason });
+  // Their live links stop working: any link made for the application, and each sitting not yet
+  // finished ends as cancelled through the assessments' own path (its link stops with it), so a
+  // Reopen can send it again. An Apply link belongs to a vacancy, and to nobody until it is used.
+  await publicToken.revokeFor(client, { subject_type: "application", subject_id: id });
+  const timer = require("../assessments/assessments.timer");
+  for (const sitting of await repo.sittings(client, id)) {
+    if (!["sent", "in_progress"].includes(sitting.status)) continue;
+    const live = await timer.lockSitting(client, sitting.application_assessment_id);
+    if (live && ["sent", "in_progress"].includes(live.status)) await timer.finish(client, live, "cancelled", actor);
+  }
+  await emit(client, {
+    key: EVENTS.APPLICATION_NOT_PROGRESSED,
+    entity: { type: "application", id },
+    actor,
+    payload: { application_id: id, number: row.number, stage: row.stage },
+  });
+}
+
+/** Close Vacancy's Not Progressing for all: every candidate of the role still in progress. */
+async function notProgressAllIn(client, actor, vacancyId, reason) {
+  let n = 0;
+  for (const id of await repo.activeOf(client, vacancyId)) {
+    const row = await repo.get(client, id, { lock: true });
+    if (!row || row.status !== "active") continue;
+    await notProgressIn(client, actor, row, reason);
+    n += 1;
+  }
+  return n;
 }
 
 async function reopen(actor, scope, id) {
@@ -497,6 +524,7 @@ module.exports = {
   move,
   advanceIn,
   notProgressed,
+  notProgressAllIn,
   reopen,
   requestScore,
   scoreAll,

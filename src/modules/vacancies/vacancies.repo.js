@@ -405,6 +405,25 @@ async function activeEmployee(db, employeeId) {
   return rows.length === 1;
 }
 
+/**
+ * A hiring manager holds `recruitment` view through an active login (or is the CEO), as a panelist
+ * must: the notices they are sent open screens of Recruitment (GE, 05/11/2026).
+ */
+async function holdsRecruitment(db, employeeId) {
+  const { rows } = await db.query(
+    `SELECT 1
+       FROM app_user u
+      WHERE u.employee_id = $1 AND u.status = 'active'
+        AND (u.is_ceo = true OR EXISTS (
+              SELECT 1 FROM user_role ur JOIN permission p ON p.role_id = ur.role_id
+               WHERE ur.user_id = u.user_id AND p.module_key = 'recruitment' AND p.can_view = true
+                 AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE)))
+      LIMIT 1`,
+    [employeeId],
+  );
+  return rows.length === 1;
+}
+
 async function departmentExists(db, id) {
   const { rows } = await db.query("SELECT 1 FROM department WHERE department_id = $1", [id]);
   return rows.length === 1;
@@ -513,6 +532,7 @@ module.exports = {
   suggested,
   seat,
   activeEmployee,
+  holdsRecruitment,
   departmentExists,
   departmentName,
   settings,

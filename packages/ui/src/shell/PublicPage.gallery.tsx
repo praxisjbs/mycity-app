@@ -55,7 +55,7 @@ export default {
     ),
     "Message Sent": () => (
       <PageMessage icon="ok" tone="ok" title="Application Sent" action={<Button>See Other Roles</Button>}>
-        We reply within five working days.
+        We read every application.
       </PageMessage>
     ),
     "Message Expired": () => (

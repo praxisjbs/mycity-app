@@ -354,8 +354,11 @@ const VacancyChange = z
   .strict()
   .refine(changesBeside(["vacancy_id"]), nothingOn("vacancy_id"));
 
-/** POST /recruitment/vacancies/:id/close. */
-const VacancyClose = z.object({ close_reason: VacancyCloseReason }).strict();
+/**
+ * POST /recruitment/vacancies/:id/close. `not_progress`: every candidate still in progress is marked
+ * Not Progressing in the same step, and each is sent the Not Progressing email (GE, 05/11/2026).
+ */
+const VacancyClose = z.object({ close_reason: VacancyCloseReason, not_progress: z.boolean().optional() }).strict();
 
 /** One question as the Questions form sends it; an id keeps an existing question. */
 const VacancyQuestionInput = z
@@ -656,7 +659,7 @@ const TABLES = {
     table: "vacancy",
     virtual: { closes_on: "the day picked; stored as closes_at, 23:59:59 Lagos that day" },
   },
-  VacancyClose: { table: "vacancy" },
+  VacancyClose: { table: "vacancy", virtual: { not_progress: "marks the vacancy's active applications not progressed in the same step" } },
   VacancyAdd: {
     table: "vacancy",
     virtual: {

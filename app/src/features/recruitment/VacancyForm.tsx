@@ -30,6 +30,7 @@ import {
   TextField,
   toast,
   todayIso,
+  useConfirm,
   useContractForm,
   useUnsavedChanges,
   Wizard,
@@ -310,9 +311,13 @@ function WriteWithAi({ values, onDraft }: { values: Values; onDraft: (d: Pick<Va
   const status = useApi("GET /api/v1/recruitment/vacancies/assist");
   const draft = useMutation("POST /api/v1/recruitment/vacancies/assist");
   const [line, setLine] = useState("");
+  const confirm = useConfirm();
   if (!status.data?.available) return null;
   const write = async () => {
     if (line.trim().length < 10 || values.title.trim().length < 3) return toast.error("Name the role and say what it does");
+    // Words already typed are not replaced without asking: the draft has no undo (GE, 05/11/2026).
+    const typed = [values.description, values.requirements, values.nice_to_have].some((t) => t.trim() !== "");
+    if (typed && !(await confirm({ title: "Replace Your Text", body: "The draft replaces the description and requirements you typed.", confirmLabel: "Replace Text" }))) return;
     try {
       const d = await draft.run({
         body: {

@@ -257,6 +257,10 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     const outside = await h.as("hod").post("/recruitment/vacancies").send(salesRole({ title: "Another Role" }));
     expect(outside.status).toBe(422);
     expect(outside.body.error.fields).toHaveProperty("hiring_manager_id");
+    // A hiring manager holds `recruitment` view, as a panelist must: their notices open its screens.
+    const noGrant = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Field Officer Lead", hiring_manager_id: h.people.staff.employee_id }));
+    expect(noGrant.status).toBe(422);
+    expect(noGrant.body.error.fields).toEqual({ hiring_manager_id: ["No Recruitment access"] });
 
     const list = await h.as("hod").get("/recruitment/vacancies");
     expect(list.body.data.map((v) => v.title)).toEqual(["Field Coordinator"]);

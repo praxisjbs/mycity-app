@@ -68,7 +68,7 @@ with INTERIM types; every backend file of the four modules empty; no contract, g
 
 From the internal Modules Review of 04/11/2026 (TB, GE, AJ) and MyCity's three documents shared that
 evening (the Interview Assessment Format, the Graphics and Motion Design brief, the Head Sales &
-Revenue job description; kept out of this public repository), all in the guide:
+Revenue job description; kept in `docs/MyCity-ERP-Documents/`, as the repository is private (GE, 05/11/2026)), all in the guide:
 
 9. The Talent Pool (#44) is M4's, GE's; M5 is Offers and Onboarding, AJ.
 10. The interview card is MyCity's form: ten traits rated 1 to 10 each, Others as comments, Candidate
@@ -449,3 +449,39 @@ packages that need none can start. Tick a package only when its own checks pass 
   Applications**, **Time Up**, **My Panels**, **Edit Report**, **Pass Mark**, **Make Assessment**. "The hiring manager is
   told it has closed" is true now. `npm run ci`: see the line below.
 - 05/11/2026 · GE · (auditor) `npm run ci` on eb6bb4c, `main` merged in (M3 #73, M8 #74, the M7 guide #76): **51 of 51 gates pass,** none not built, 14 min (backend suite against Postgres and Redis, frontend tests, screens with Chromium, checks). The first full run had failed one test only, `dark-theme-samples.html` stale after the public site's canvas tokens; regenerated. P14 accepted (its pictures are in, and 21 were retaken after P15's screen fixes). Over to GE: #72 can be marked ready for review; drop the old `User-guide-unchanged` line from its body.
+- 05/11/2026 · GE · **The eight P15 decisions, done** (GE chose each, 05/11/2026): (1) the repository is private,
+  so MyCity's three documents and `demo (5).html` stay in `docs/MyCity-ERP-Documents/` (guide §13, §2 here, the
+  seed's header); (2) Close Vacancy offers **Not Progress All** while anyone is in progress (`VacancyClose.not_progress`,
+  each through `candidates.notProgressIn`, so each gets the email), and Not Progressing works on a closed role
+  (`CandidateDetail.can_not_progress`; moves, Reopen and Score With AI still need it open); (3) a second application
+  by the same email keeps answering the reference and nothing more (guide §6.2, no change in code); (4) a hiring
+  manager holds `recruitment` view through an active login ("No Recruitment access"); (5) Apply's receipt and its
+  Coming Soon line promise no reply time; (6) Send Assessment and Send to Candidates move a candidate before
+  Assessment to it (`candidates.advanceIn`); (7) Write With AI asks before replacing typed words (Replace Your Text);
+  (8) `apply-cv-purge` (nightly, 02:47 Lagos, `candidates.retention`) removes a CV left on an Apply link a day after
+  the link ended without an application. Mock, guide (§3, §5, §6.1 to §6.3, §7, §13, §14), README and the chapter's
+  steps for Close, Write With AI, Not Progressing and Send Assessment follow; tests added.
+- 05/11/2026 · GE · **For Ose: the Recruitment chapter against the screens** (from GE (auditor)'s P15 walk; still
+  open unless marked). Steps: Use Draft is not a step, Write With AI fills the form on Details (**done** with
+  decision 7 above, with **What We Look For**); the wizard's fields per step: **Employment** on Role, **Closes On**
+  on Details, **Show Salary on Careers** and **Publish Now** on Pay and Publish; Score With AI cannot read a scored
+  candidate again; **Send to Candidates** is on an assessment's sheet, with Vacancy, Stage, Start Within Days and
+  Days to Finish; Suggest With AI on an assessment asks nothing first; Candidate Details opens with **Edit**; on My
+  Card only the stars and the decision save as tapped, the words on **Save Draft**; Remove (Talent Pool) asks no
+  reason; the field is **What We Look For** wherever the chapter names it (a field label is four words at most; the
+  careers page keeps What We Are Looking For). Labels exactly as the screens read: **Close Vacancy**, **Cancel
+  Interview**, **Applied**, **View CV**, **Screen Applications**, **Time Up**, **My Panels**, **Edit Report**, **Pass
+  Mark**, **Make Assessment**. Public pages: a description that opens with `## Role Overview` shows the heading twice
+  on the careers page. Retake any picture these touch (`npm run guide:shots -- --stale`).
+- 05/11/2026 · GE · **Follow-ups, by owner** (minor, none blocking #72). **Ose**: the chapter list above, and the
+  doubled Role Overview heading. **GE**: the panel picker offers every employee and its refusal names nobody (a
+  panelists route); the staff vacancy sheet prints raw Markdown (send blocks, draw `RichText`); Create Vacancy from
+  the Organogram leaves the department to pick; the last Submit Card before the start closes the round; a Reschedule
+  dropping the only waiting panelist leaves a full round open; `TIME_UP` is unreachable (extend the link a day);
+  protected phrasings ("Ladies only", "Must be under 30", "Igbo only") pass; pool rows name a vacancy outside the
+  reader's scope; Tidy With AI is hidden from view-only panelists; My Card's star rollback race; View CV saves a Word
+  CV as `.pdf`; Suggested From Organogram shows 25 seats; Import runs unbusy; Candidate Emails' and Invite's Cancel
+  close too much; three-way choices are selects; the Applicants KPI (active) against the column (all); an export
+  whose first 2 KB hold `<script` is refused as markup; the seed finds a role by title only; staging mail to
+  `@example.test` bounces; #72's body still carries the old `User-guide-unchanged` line (dropped when it is marked
+  ready).

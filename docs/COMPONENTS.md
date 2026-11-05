@@ -5430,7 +5430,7 @@ The public site's page on its faint City Green ground: the mark and the theme sw
 ```tsx
 <PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>} links={<a href="/verify">Verify a Document</a>}>...</PublicPage>
 <PublicPage pane={<SkylineHero size="pane" title="Partnerships Associate" record />}>...</PublicPage>
-<PageMessage icon="ok" tone="ok" title="Application Sent">We reply within five working days.</PageMessage>
+<PageMessage icon="ok" tone="ok" title="Application Sent">We read every application.</PageMessage>
 ```
 
 ### PullIndicator

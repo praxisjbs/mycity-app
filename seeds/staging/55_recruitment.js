@@ -13,7 +13,7 @@
  * The hiring managers and the panelists are the Implementation Team's own accounts, never MyCity's
  * staff: Recruitment notifies the hiring manager of each application, the marker of each sitting
  * and each panelist of a card due, and staging sends real mail (TB, 27/10/2026, as Queries does).
- * Every candidate is invented, with an @example.test address; the repository is public.
+ * Every candidate is invented, with an @example.test address; no real person is named here.
  *
  *   Careers Settings  About MyCityApp and MyCity's ten traits from its Interview Assessment
  *                     Format, only while nobody has saved them

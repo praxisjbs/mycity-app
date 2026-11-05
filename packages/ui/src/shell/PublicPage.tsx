@@ -10,7 +10,7 @@
  * @exports PageMessage
  * @example <PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>} links={<a href="/verify">Verify a Document</a>}>...</PublicPage>
  * @example <PublicPage pane={<SkylineHero size="pane" title="Partnerships Associate" record />}>...</PublicPage>
- * @example <PageMessage icon="ok" tone="ok" title="Application Sent">We reply within five working days.</PageMessage>
+ * @example <PageMessage icon="ok" tone="ok" title="Application Sent">We read every application.</PageMessage>
  */
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";

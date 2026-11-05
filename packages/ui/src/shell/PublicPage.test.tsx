@@ -75,7 +75,7 @@ describe("PageMessage", () => {
     const onClick = vi.fn();
     render(
       <PageMessage icon="ok" tone="ok" title="Application Sent" action={<Button onClick={onClick}>See Other Roles</Button>}>
-        We reply within five working days.
+        We read every application.
       </PageMessage>,
     );
     expect(screen.getByRole("heading", { level: 2, name: "Application Sent" })).toBeInTheDocument();

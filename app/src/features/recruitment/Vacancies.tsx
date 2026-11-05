@@ -18,6 +18,7 @@ import {
   Button,
   Card,
   CardHeader,
+  CheckboxField,
   DataView,
   DesktopOnly,
   ErrorState,
@@ -299,12 +300,20 @@ const REASONS: Array<[NonNullable<VacancyDetail["close_reason"]>, string]> = [
   ["on_hold", "On Hold"],
 ];
 
+const NOT_PROGRESS_HELP = "Each is marked Not Progressing and sent the Not Progressing email. Left unticked, they stay on the board and can be marked later.";
+
 function CloseForm({ vacancy, close, onSaved }: { vacancy: VacancyDetail; close: () => void; onSaved: () => void }) {
   const [reason, setReason] = useState<string>("filled");
+  // Anyone still in progress can be told at once: each is marked Not Progressing and gets the email.
+  const [rest, setRest] = useState(false);
   const save = useMutation("POST /api/v1/recruitment/vacancies/:id/close");
   const submit = async () => {
     try {
-      await save.run({ params: { id: vacancy.vacancy_id }, body: { close_reason: reason as NonNullable<VacancyDetail["close_reason"]> } });
+      await save.run({
+        params: { id: vacancy.vacancy_id },
+        body: { close_reason: reason as NonNullable<VacancyDetail["close_reason"]>, ...(rest ? { not_progress: true } : {}) },
+      });
+      if (rest) invalidate("/api/v1/recruitment/candidates");
       close();
       onSaved();
       toast(`${vacancy.number} closed`);
@@ -317,6 +326,11 @@ function CloseForm({ vacancy, close, onSaved }: { vacancy: VacancyDetail; close:
       <Field label="Reason">
         <SelectField options={REASONS} value={reason} onChange={setReason} />
       </Field>
+      {vacancy.in_progress > 0 && (
+        <Field label={`${vacancy.in_progress} Still in Progress`} help={NOT_PROGRESS_HELP}>
+          <CheckboxField label="Not Progress All" value={rest} onChange={setRest} />
+        </Field>
+      )}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="danger" onClick={submit}>Close Vacancy</Button>

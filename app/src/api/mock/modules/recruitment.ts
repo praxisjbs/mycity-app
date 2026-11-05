@@ -346,10 +346,11 @@ R("POST /api/v1/recruitment/vacancies/:id/resume", "edit", (req) =>
 );
 R("POST /api/v1/recruitment/vacancies/:id/close", "edit", (req) =>
   changeable(req, (v) =>
-    parse<{ close_reason: NonNullable<VacancyDetail["close_reason"]> }>(vacancySchemas.VacancyClose, req.body, (b) => {
+    parse<{ close_reason: NonNullable<VacancyDetail["close_reason"]>; not_progress?: boolean }>(vacancySchemas.VacancyClose, req.body, (b) => {
       v.status = "closed";
       v.close_reason = b.close_reason;
       v.closed_at = nowIso();
+      if (b.not_progress) appsOf(v).filter((a) => a.status === "active").forEach((a) => notProgress(a, `The vacancy closed (${b.close_reason.replace("_", " ")})`, req.user));
       return ok(vacancyView(v, req));
     }),
   ),
@@ -536,8 +537,9 @@ function candidateDetail(a: D.MockApplication, req: Req): CandidateDetail {
         days: next ? Math.max(0, h.days - next.days) : daysSince(when),
       };
     }),
-    next_stages: can(req, "edit") ? nextStages(a) : [],
-    can_edit: a.status === "active" && can(req, "edit"),
+    next_stages: can(req, "edit") && vacancyOfApp(a).status !== "closed" ? nextStages(a) : [],
+    can_edit: a.status === "active" && vacancyOfApp(a).status !== "closed" && can(req, "edit"),
+    can_not_progress: a.status === "active" && can(req, "edit"),
   };
 }
 
@@ -660,20 +662,25 @@ R("POST /api/v1/recruitment/candidates/:id/move", "edit", (req) =>
   ),
 );
 
-R("POST /api/v1/recruitment/candidates/:id/not-progressed", "edit", (req) =>
-  actOn(req, (a) =>
-    parse<{ rejection_reason: string }>(candidateSchemas.CandidateNotProgressed, req.body, (b) => {
-      if (a.status !== "active") return fail(409, "MOVE_NOT_ALLOWED", "This candidate is not in progress");
-      a.status = "not_progressed";
-      a.rejection_reason = b.rejection_reason;
-      a.history.push({ to: "not_progressed", days: 0, by: req.user ?? undefined, reason: b.rejection_reason });
-      /* What was still open for them stops with it: a sitting not finished, an interview not held. */
-      sittingsOf(a).filter((s) => s.status === "sent" || s.status === "in_progress").forEach((s) => (s.status = "cancelled"));
-      roundsOf(a).filter((x) => x.status === "scheduled").forEach(cancelRound);
-      return ok(candidateDetail(a, req));
-    }),
-  ),
-);
+/** Not Progressing: what was still open for them stops with it, a sitting not finished, an interview not held. */
+function notProgress(a: D.MockApplication, reason: string, by: string | null) {
+  a.status = "not_progressed";
+  a.rejection_reason = reason;
+  a.history.push({ to: "not_progressed", days: 0, by: by ?? undefined, reason });
+  sittingsOf(a).filter((s) => s.status === "sent" || s.status === "in_progress").forEach((s) => (s.status = "cancelled"));
+  roundsOf(a).filter((x) => x.status === "scheduled").forEach(cancelRound);
+}
+
+// On a closed role too, as the API allows: a role closed with people still in it lets them be told.
+R("POST /api/v1/recruitment/candidates/:id/not-progressed", "edit", (req) => {
+  const a = app(req.params.id);
+  if (!a) return appNotFound();
+  return parse<{ rejection_reason: string }>(candidateSchemas.CandidateNotProgressed, req.body, (b) => {
+    if (a.status !== "active") return fail(409, "MOVE_NOT_ALLOWED", "This candidate is not in progress");
+    notProgress(a, b.rejection_reason, req.user);
+    return ok(candidateDetail(a, req));
+  });
+});
 
 R("POST /api/v1/recruitment/candidates/:id/reopen", "edit", (req) =>
   actOn(req, (a) => {
@@ -941,6 +948,8 @@ function send(a: D.MockApplication, d: AssessmentDetail, startWithin: number, du
     answers: {},
   };
   SITTINGS.unshift(s);
+  // Sent an assessment, they are at Assessment, as the API moves them (only forward, only on its board).
+  if (STAGES.indexOf(a.stage) < STAGES.indexOf("assessment") && vacancyOfApp(a).board_stages.includes("assessment")) moveTo(a, "assessment", null);
   return s;
 }
 

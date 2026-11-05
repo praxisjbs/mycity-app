@@ -303,4 +303,13 @@ describeDb("Recruitment · Assessments against the real migrations", () => {
     const res = await h.as("hod").post("/recruitment/assessments/assist").send({ assessment_type: "technical", vacancy_id: vacancyId, instruction: "Test brand and motion design basics" });
     expect(res.status).toBe(404);
   });
+
+  test("Send Assessment moves a candidate before Assessment to it, as Schedule Interview moves them to Interview", async () => {
+    const early = await applicant("Dayo", "dayo.adeyemi@example.test", "screening");
+    const copy = await one("SELECT assessment_definition_id FROM assessment_definition WHERE code = 'ASM-0002'");
+    const sent = await h.as("ops").post("/recruitment/assessments/sittings").send({ application_id: early, assessment_definition_id: copy.assessment_definition_id });
+    expect(sent.status).toBe(201);
+    expect(await one("SELECT stage FROM application WHERE application_id = $1", [early])).toEqual({ stage: "assessment" });
+    expect(await one("SELECT count(*)::int AS n FROM entity_state_history WHERE entity_id = $1 AND to_state = 'assessment'", [early])).toEqual({ n: 1 });
+  });
 });

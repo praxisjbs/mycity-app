@@ -308,4 +308,62 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     expect(await one("SELECT count(*)::int AS n FROM template_version WHERE kind = 'email' AND key = 'application-received'")).toEqual({ n: 2 });
     expect((await h.as("hod").put("/recruitment/candidates/emails/application-received").send({ subject: "Hello there", body: "Thank you for applying to us." })).status).toBe(403);
   });
+
+  test("apply-cv-purge removes a CV left on an Apply link a day after it ended without an application", async () => {
+    const tok = await startApply();
+    const cv = await sendCv(tok);
+    expect(cv.status).toBe(201);
+    const live = await startApply();
+    const kept = await sendCv(live);
+    // The first link lapsed two days ago; the second is still live.
+    await pool.query("UPDATE public_token SET expires_at = now() - interval '2 days' WHERE public_token_id = (SELECT entity_id::uuid FROM document WHERE document_id = $1)", [cv.body.document_id]);
+    const { removed } = await require("../../src/modules/candidates/candidates.retention").purge();
+    expect(removed).toBe(1);
+    expect(await one("SELECT count(*)::int AS n FROM document WHERE document_id = $1", [cv.body.document_id])).toEqual({ n: 0 });
+    expect(await one("SELECT count(*)::int AS n FROM document WHERE document_id = $1", [kept.body.document_id])).toEqual({ n: 1 });
+  });
+
+  test("Not Progressing works on a closed role; Close Vacancy can tell everyone still in progress at once", async () => {
+    // One more applicant to the Content Producer role, then the role closes without telling them.
+    const tok = await startApply();
+    const cv = await sendCv(tok);
+    const made = await pub().post(`/apply/${tok}`).send(form({ full_name: "Sade Okon", email: "sade.okon@example.test", cv_document_id: cv.body.document_id, answers: { [weekendsId]: "yes" } }));
+    expect(made.status).toBe(201);
+    const { application_id: id } = await one("SELECT application_id FROM application WHERE number = $1", [made.body.reference]);
+    expect((await h.as("ops").post(`/recruitment/vacancies/${vacancyId}/close`).send({ close_reason: "filled" })).status).toBe(200);
+    const sheet = await h.as("ops").get(`/recruitment/candidates/${id}`);
+    expect(sheet.body).toMatchObject({ status: "active", can_edit: false, can_not_progress: true, next_stages: [] });
+    expect((await h.as("ops").post(`/recruitment/candidates/${id}/move`).send({ stage: "screening" })).status).toBe(409);
+    const stopped = await h.as("ops").post(`/recruitment/candidates/${id}/not-progressed`).send({ rejection_reason: "The role was filled before screening" });
+    expect(stopped.body).toMatchObject({ status: "not_progressed", can_not_progress: false });
+    expect((await h.as("ops").post(`/recruitment/candidates/${id}/reopen`).send({})).status).toBe(409);
+
+    // A second role, two people in it, closed with Not Progress All: both stopped, both mailed.
+    const role = await h.as("ops").post("/recruitment/vacancies").send({
+      title: "Video Editor",
+      department_id: dept,
+      hiring_manager_id: h.people.ops.employee_id,
+      positions: 1,
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      location: { token: area("Yaba, Lagos") },
+      description: "The Video Editor cuts the weekly videos that show Lagos on MyCityApp, with the Content Producer and the brand team.",
+      requirements: "Two years editing video for social media, and a reel.",
+      closes_on: lagos.addDays(lagos.today(), 30),
+      publish: true,
+    });
+    expect(role.status).toBe(201);
+    for (const [full, email] of [["Uche Nwosu", "uche.nwosu@example.test"], ["Bola Ade", "bola.ade@example.test"]]) {
+      const t = (await pub().post(`/jobs/${role.body.slug}/apply`).send({})).body.token;
+      const file = await sendCv(t);
+      expect((await pub().post(`/apply/${t}`).send(form({ full_name: full, email, cv_document_id: file.body.document_id }))).status).toBe(201);
+    }
+    await drain();
+    const before = queued("candidate-not-progressed").length;
+    const closed = await h.as("ops").post(`/recruitment/vacancies/${role.body.vacancy_id}/close`).send({ close_reason: "cancelled", not_progress: true });
+    expect(closed.status).toBe(200);
+    expect(await one("SELECT count(*)::int AS n FROM application WHERE vacancy_id = $1 AND status = 'not_progressed' AND rejection_reason = 'The vacancy closed (cancelled)'", [role.body.vacancy_id])).toEqual({ n: 2 });
+    await drain();
+    expect(queued("candidate-not-progressed").length - before).toBe(2);
+  });
 });

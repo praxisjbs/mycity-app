@@ -353,6 +353,41 @@ async function unscored(db, vacancyId) {
   return rows.map((r) => r.application_id);
 }
 
+/** The active applications of a vacancy, oldest first: Close Vacancy's Not Progressing for all. */
+async function activeOf(db, vacancyId) {
+  // pagination:complete Close Vacancy marks every candidate still in progress, each its own row and event
+  const { rows } = await completeQuery(
+    db,
+    `SELECT a.application_id FROM application a
+      WHERE a.vacancy_id = $1 AND a.status = 'active'
+      ORDER BY a.applied_at, a.application_id`,
+    [vacancyId],
+  );
+  return rows.map((r) => r.application_id);
+}
+
+/**
+ * CVs still held by an Apply link that ended a day ago or more without making an application (it
+ * lapsed, was revoked, or was spent by a second application from the same email), or whose link is
+ * gone: at most 200 a run (apply-cv-purge).
+ */
+async function leftCvs(db, entityType) {
+  const { rows } = await db.query(
+    `SELECT d.document_id
+       FROM document d
+       LEFT JOIN public_token t ON t.public_token_id::text = d.entity_id
+      WHERE d.entity_type = $1
+        AND (t.public_token_id IS NULL
+             OR t.expires_at < now() - interval '1 day'
+             OR t.used_at < now() - interval '1 day'
+             OR t.revoked_at < now() - interval '1 day')
+      ORDER BY d.created_at, d.document_id
+      LIMIT 200 -- pagination:batch the sweep takes at most 200 a run; the rest wait for the next`,
+    [entityType],
+  );
+  return rows.map((r) => r.document_id);
+}
+
 /** Keep an AI read. */
 async function setScreening(client, id, { score, summary: text, run_id: runId }) {
   await client.query(
@@ -383,6 +418,8 @@ async function emailSavedAt(db, key, version) {
 
 module.exports = {
   PART_SCORES,
+  activeOf,
+  leftCvs,
   candidate,
   emailSavedAt,
   list,

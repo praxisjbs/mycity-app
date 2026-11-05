@@ -297,7 +297,7 @@ function Receipt({ title, receipt }: { title: string; receipt: ApplicationReceip
         <div ref={mark}>
           <PageMessage icon="ok" tone="ok" title="Application Sent" action={<Button onClick={() => navigate("/jobs")}>See Other Roles</Button>}>
             <p>
-              Thank you for applying for <b className="text-foreground">{title}</b>. We read every application and will email you within five working days.
+              Thank you for applying for <b className="text-foreground">{title}</b>. We read every application and will email you.
             </p>
             <div className="mx-auto mt-4 w-fit rounded-box border border-border bg-muted px-5 py-3 text-center">
               <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase">Your Reference</p>

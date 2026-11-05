@@ -106,7 +106,9 @@ never sign in.
    in `entity_state_history` and `current_stage_entered_at` reset.
 7. **Assessment.** Send Assessment (from the candidate's sheet) picks an active assessment and how many
    days the candidate has to start it: an `application_assessment` sitting and an `assessment.take`
-   token (`assessment-invite` mail). Send to Candidates (Assessments) does the same at once for every
+   token (`assessment-invite` mail), and moves a candidate before Assessment to it, as Schedule
+   Interview moves them to Interview (only forward, only on a board with Assessment; GE, 05/11/2026).
+   Send to Candidates (Assessments) does the same at once for every
    active candidate of one role at one stage who has no live sitting of it (TB, 04/11/2026). On `/assess/<token>` the candidate presses Start; the server sets
    `started_at` and `due_at` (start plus the minutes); every answer saves as it is given, a file answer
    uploaded (up to 25 MB) or given as a link to a larger one (a video, a portfolio); Submit, or
@@ -194,7 +196,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/vacancies` | `VacancyCreate` → `VacancyDetail` | `recruitment` create | no | `publish: true` publishes in the same transaction. A seat holds one live vacancy (422 on `org_seat_id`) |
 | `PATCH /recruitment/vacancies/:id` | `VacancyEdit` → `VacancyDetail` | `recruitment` edit · all/team | no | A closed vacancy is not edited. An optional field sent empty ("" or null) is cleared; one left out stays. Switching to remote removes the place. The pay band is checked against what is kept |
 | `POST /recruitment/vacancies/:id/publish`, `/pause`, `/resume` | `EmptyBody` → `VacancyDetail` | `recruitment` edit · all/team | no | §6.1 |
-| `POST /recruitment/vacancies/:id/close` | `VacancyClose` → `VacancyDetail` | `recruitment` edit · all/team | no | Reason: filled, cancelled, on hold |
+| `POST /recruitment/vacancies/:id/close` | `VacancyClose` → `VacancyDetail` | `recruitment` edit · all/team | no | Reason: filled, cancelled, on hold; `not_progress` marks everyone still in progress Not Progressing in the same step |
 | `PUT /recruitment/vacancies/:id/questions` | `VacancyQuestionsSave` → `VacancyDetail` | `recruitment` edit · all/team | no | Replaces both lists; a question already answered or rated is kept and only retired from the form |
 | `PUT /recruitment/vacancies/:id/scorecard` | `ScorecardSave` → `VacancyDetail` | `recruitment` edit · all/team | no | Each part on or off; the weights of the parts on sum to 100 |
 | `GET /recruitment/vacancies/settings`, `PUT` | `CareersSettings`, `CareersSettingsSave` | view; edit · all | no | Careers Settings: About MyCityApp and the Default Traits New Vacancy starts its interview card from; `can_edit` says whether the reader may save them (edit · all) |
@@ -206,7 +208,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `GET /recruitment/candidates/:id` | `CandidateDetail` | `recruitment` view · all/team | no | `:id` is the application |
 | `GET /recruitment/candidates/:id/cv` | file | `recruitment` view · all/team | no | Streamed by the vault; 409 while the scan is pending, never once infected |
 | `POST /recruitment/candidates/:id/move` | `CandidateMove` → `CandidateDetail` | `recruitment` edit · all/team | no | §6.3 |
-| `POST /recruitment/candidates/:id/not-progressed` | `CandidateNotProgressed` → `CandidateDetail` | `recruitment` edit · all/team | no | Reason required |
+| `POST /recruitment/candidates/:id/not-progressed` | `CandidateNotProgressed` → `CandidateDetail` | `recruitment` edit · all/team | no | Reason required; on a closed role too |
 | `POST /recruitment/candidates/:id/reopen` | `EmptyBody` → `CandidateDetail` | `recruitment` edit · all/team | no | Back to active, at the stage it left |
 | `POST /recruitment/candidates/:id/score` | `EmptyBody` → `CandidateDetail` | `recruitment` edit · all/team | no | `cv-screen`, Deep Reasoning |
 | `POST /recruitment/candidates/score-all` | `ScoreAll` → `ScoreAllQueued` | `recruitment` edit · all/team | no | Screen With AI: the one to three must-meet conditions are kept on the vacancy (left out, the kept ones are used again), then every active, unscored application of it is read through the outbox |
@@ -269,8 +271,14 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   title, department, hiring manager, location (unless remote), description of at least 80 characters,
   requirements of at least 20 and a closing time in the future. Resuming a paused vacancy whose closing
   day has passed is refused on Closes On ("Its closing day has passed"): pick a new day, then resume.
+- Close Vacancy takes a reason (filled, cancelled, on hold) and, while anyone is still in progress,
+  offers to mark them all Not Progressing in the same step (`not_progress`), each sent
+  `candidate-not-progressed` (GE, 05/11/2026). Left unticked, they stay on the board and can still be
+  marked Not Progressing one by one (§6.3).
 - A remote vacancy has no place: switching one to remote removes it. The hiring manager must be an
-  active employee in the writer's scope; a vacant seat holds one live (draft, open or paused) vacancy.
+  active employee in the writer's scope who holds `recruitment` view through an active login (or is
+  the CEO), as a panelist must (decision 5): their notices open Recruitment's screens ("No Recruitment
+  access" otherwise; GE, 05/11/2026). A vacant seat holds one live (draft, open or paused) vacancy.
 - The slug is made once, at first publish, from the title and the location's city
   (`content-producer-lagos`), with `-2`, `-3` on a clash, made while holding a lock on that base so two
   roles published at once cannot take the same one. It never changes: pausing, resuming and
@@ -292,7 +300,9 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   sections, how the role is measured (`## Key Performance Indicators (KPIs)`); then Required Experience and Qualifications
   (`requirements`) and What We Are Looking For (`nice_to_have`). `min_experience_years` is the "8+
   years" of the requirements. Write With AI (`jd-draft`) drafts in that shape from the About MyCityApp
-  text it is given (never a description of the company of its own), and the public page
+  text it is given (never a description of the company of its own); with words already typed in the
+  description, requirements or nice to have, it asks before replacing them (Replace Your Text; GE,
+  05/11/2026), and the public page
   draws it from blocks: the server turns each Markdown text (About MyCityApp, the description, must have,
   nice to have) into blocks with the one safe renderer (`shared/documents/markdown`, `markdownToBlocks`),
   as a policy's text is, and the page draws them with `RichText` (GE · (Ose), 05/11/2026).
@@ -314,7 +324,11 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 - The candidate is found by email (case-insensitive) or created. A stranger's form never renames a
   person already known; it only fills a missing phone. A second application by the same email to the same vacancy does not
   create anything: it answers the first application's reference and changes nothing, so the form
-  cannot be used to learn whether someone applied.
+  cannot be used to learn whether someone applied. The answer is the reference and nothing more: no
+  date, no stage (GE, 05/11/2026, keeping the reference so the person can still quote it).
+- A CV sent on an Apply link that ends without an application (it lapsed, was revoked, or a second
+  application from the same email spent it) is removed a day later by `apply-cv-purge` (§7; GE,
+  05/11/2026): nothing a stranger sends is kept without an application.
 - The answer is an acknowledgement and a reference (`APP-0001`), never the row: no score, no stage.
 - The privacy notice must be accepted (`consented_at`); an application without it is refused.
 
@@ -324,7 +338,9 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   stage ahead of it or one back. The board leaves out Assessment when none of the vacancy's three
   assessment parts is on, and Interview when the interview part is off. Offer and the stages after it are M5's; until M5 ships, Shortlist is
   the last column and Move to Offer is not offered (GE, 04/11/2026).
-- Not Progressing sets `status` `not_progressed` with a reason of at least 10 characters, records the
+- Not Progressing works at any stage and on a closed role too, so the people left in a closed role can
+  be told (`can_not_progress` on the sheet; GE, 05/11/2026); moves, Reopen and Score With AI still need
+  the role not closed. It sets `status` `not_progressed` with a reason of at least 10 characters, records the
   move in history (the stage stays where it was), revokes the links made for the application and its
   sittings (an Apply link belongs to a vacancy, and to nobody until it is used) and emails
   `candidate-not-progressed`. The interviews module cancels the application's scheduled interviews
@@ -491,6 +507,7 @@ with test addresses.
 | `interview.reported` | after the report is saved | audit; the Interview Assessment Form PDF is made in the same save (`documents.generate`) |
 | `talent_pool.added`, `talent_pool.renewed`, `talent_pool.invited`, `talent_pool.removed`, `talent_pool.expired`, `talent_pool.export_requested` | after the write | audit; `apply-invite` on invite; the workbook made in the worker on export |
 | `talent-pool-purge` (scheduler, daily) | always | removes members past their 24 months |
+| `apply-cv-purge` (scheduler, nightly at 02:47 Lagos) | a day after an Apply link ended without an application | removes the CV still held by the link (vault row with `document.removed`, then the file; GE, 05/11/2026) |
 | `assessment-expiry` (scheduler, every minute) | always | ends sittings past `due_at`; expires unstarted sittings past `start_by` |
 | `interview-reminders` (scheduler, daily at 09:17 Lagos) | from the interview's end | reminds each panelist who has not submitted, once a day, until the round closes (`interview.feedback_due`, naming the application and role, never the candidate) |
 
@@ -614,15 +631,24 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 - The psychometric and case-study question banks: Operations & People to send. MyCity's Graphics and
   Motion Design assessment (shared 04/11/2026) is entered on the screen; JBS Praxis's researched ones go
-  on staging only (§6.7). MyCity's documents are not kept in this repository, which is public: the ten
-  traits (§3) and the job description shape (§6.1) named here are MyCity's generic forms, with no
-  person or candidate in them.
+  on staging only (§6.7). The repository is private (GE, 05/11/2026), so MyCity's three documents and
+  its demo stay in `docs/MyCity-ERP-Documents/`; seeds, tests, pictures and this guide still name no real
+  candidate or person (every candidate is invented, @example.test). The ten traits (§3) and the job
+  description shape (§6.1) named here are MyCity's generic forms.
 - Candidate mail volume against the 40 an hour pace on production: the mail plan upgrade is with MyCity's
   management and Operations & People (meeting of 21/10/2026).
 - Whether the careers page is linked from mycityapp.io (10/10/2026, open with MyCity).
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 05/11/2026 · GE · The eight decisions from the P15 audit: (1) the repository is private, so MyCity's
+  documents stay (§13); (2) Close Vacancy offers to mark everyone still in progress Not Progressing, with
+  their emails, and Not Progressing works on a closed role (§6.1, §6.3); (3) a second application by the
+  same email answers the reference and nothing more (§6.2); (4) a hiring manager holds `recruitment`
+  view (§6.1); (5) Apply's receipt promises no reply time; (6) Send Assessment moves the candidate to
+  Assessment (§3 step 7); (7) Write With AI asks before replacing typed words (§6.1); (8)
+  `apply-cv-purge` removes CVs left on Apply links that ended without an application (§6.2, §7).
 
 - 05/11/2026 · GE · (auditor) P15, the close-out audit (five independent reviewers and a walk through the whole flow
   on a live stack: publish, apply with a CV, assessment on a phone, marking, a two-person blind panel, the report

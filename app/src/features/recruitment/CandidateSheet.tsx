@@ -191,13 +191,14 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
             {mayScore && <Button icon="spark" onClick={act(() => score.run({ params: { id }, body: {} }), "CV read")}>Score With AI</Button>}
             <Button onClick={() => modal.open({ title: "Send Assessment", body: () => <SendForm candidate={c} close={back} onSent={reload} /> })}>Send Assessment</Button>
             <Button onClick={() => modal.open({ title: "Schedule Interview", wide: true, body: () => <ScheduleForm applicationId={c.application_id} close={back} onSaved={reload} /> })}>Schedule Interview</Button>
-            <Button variant="danger" onClick={() => modal.open({ title: "Not Progressing", body: () => <NotProgressingForm candidate={c} close={back} onSaved={reload} /> })}>Not Progressing</Button>
             {/* One filled button: the next stage ahead; the others (further on, or one back) stay outlined. */}
             {c.next_stages.map((s) => (
               <Button key={s} variant={s === nextAhead(c) ? "primary" : undefined} onClick={act(() => move.run({ params: { id }, body: { stage: s as "application" } }), `Moved to ${words(s)}`)}>{`Move to ${words(s)}`}</Button>
             ))}
           </>
         )}
+        {/* Not Progressing on a closed role too, so the people left in it can be told. */}
+        {c.can_not_progress && <Button variant="danger" onClick={() => modal.open({ title: "Not Progressing", body: () => <NotProgressingForm candidate={c} close={back} onSaved={reload} /> })}>Not Progressing</Button>}
         {mayAdd && <Button onClick={() => modal.open({ title: "Add to Pool", body: () => <PoolForm candidate={c} close={back} /> })}>Add to Pool</Button>}
         {mayEdit && c.status === "not_progressed" && role.data && role.data.status !== "closed" && <Button variant="primary" onClick={act(() => reopen.run({ params: { id }, body: {} }), `${c.name} reopened`)}>Reopen</Button>}
       </FormFooter>

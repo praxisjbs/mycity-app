@@ -6,7 +6,7 @@ import { Page } from "./Page";
 const COMING: Record<string, string[]> = {
   careers: ["Every open role at MyCity App, in one list", "Share a role's link anywhere", "Search by team or city"],
   vacancy: ["What the role is, what it asks for and how we hire", "The pay range from the role's grade", "Apply in one step, from any phone"],
-  apply: ["Apply with your CV, from a link that is yours alone", "See your CV upload as it goes", "A reference you can quote, and a reply within five working days"],
+  apply: ["Apply with your CV, from a link that is yours alone", "See your CV upload as it goes", "A reference you can quote, and an email when we decide"],
   assess: ["Timed assessments, taken on any phone or laptop", "Every answer saved as you go", "Resume where you stopped if the connection drops"],
   sign: ["Read your offer and sign it with your finger", "The signed document locks and can be verified", "Decline with an optional reason"],
   verify: ["Check a signed MyCity App document by its reference", "Two checks: the wording, and the stored file", "No sign-in needed"],

@@ -151,6 +151,7 @@ const CandidateDetail = Candidate.extend({
   history: z.array(StageMove).max(50),
   next_stages: z.array(M4Stage).max(5),
   can_edit: z.boolean(),
+  can_not_progress: z.boolean(),
 }).strict();
 
 /** GET /recruitment/candidates. `sort=-weighted_total` ranks by the scorecard. */
@@ -407,6 +408,7 @@ const TABLES = {
       history: "entity_state_history for the application",
       next_stages: "the stages it may move to now (guide §6.3)",
       can_edit: "the reader may move it: in scope with recruitment edit, and active",
+      can_not_progress: "the reader may mark it Not Progressing: in scope with recruitment edit and in progress, the role open or closed",
     },
   },
   CandidateListQuery: { table: null, reason: "list controls and filters for Candidates" },

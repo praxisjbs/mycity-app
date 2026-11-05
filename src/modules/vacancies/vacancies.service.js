@@ -171,6 +171,8 @@ async function checkRefs(client, scope, body, vacancyId = null) {
   if (body.hiring_manager_id) {
     if (!(await repo.activeEmployee(client, body.hiring_manager_id)))
       throw field("hiring_manager_id", "Pick an active employee");
+    if (!(await repo.holdsRecruitment(client, body.hiring_manager_id)))
+      throw field("hiring_manager_id", "No Recruitment access");
     if (scope.scope !== "all" && !(scope.scope_ids || []).includes(body.hiring_manager_id))
       throw field("hiring_manager_id", "Pick someone in your team");
   }
@@ -276,6 +278,8 @@ async function publishIn(client, actor, row) {
   });
 }
 
+const CLOSE_WORDS = { filled: "filled", cancelled: "cancelled", on_hold: "on hold" };
+
 /** One lifecycle move: publish, pause, resume, close. */
 function move(to, event) {
   return async (actor, scope, id, body = {}) =>
@@ -297,6 +301,10 @@ function move(to, event) {
           actor,
           payload: { number: row.number, title: row.title, ...(body.close_reason ? { close_reason: body.close_reason } : {}) },
         });
+        // Close can tell everyone still in progress at once (GE, 05/11/2026): each is marked Not
+        // Progressing through the candidates' own path, so each gets their email.
+        if (to === "closed" && body.not_progress)
+          await require("../candidates/candidates.service").notProgressAllIn(client, actor, id, `The vacancy closed (${CLOSE_WORDS[body.close_reason] || "closed"})`);
       }
       return detailOf(client, await repo.get(client, id), actor);
     });

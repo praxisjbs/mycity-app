@@ -88,11 +88,11 @@ and its scorecard at the usual weights. Change either before you publish.
 
 1. On a new vacancy, or one you opened with **Edit**, fill in the title, the department and anything
    you know first.
-2. Press **Write With AI**.
-3. Read the draft: the description, **Required Experience and Qualifications** and **What We Are
-   Looking For**, in MyCity's usual shape.
-4. Press **Use Draft** to put it in the form.
-5. Change what you need. Nothing is saved until you save the vacancy.
+2. On **Details**, type a line in **About the Role** and press **Write With AI**.
+3. When you have already typed a description, the hub asks first. Press **Replace Text** to go on.
+4. The draft fills the description, **Required Experience and Qualifications** and **What We Look
+   For**, in MyCity's usual shape.
+5. Read it and change what you need. Nothing is saved until you save the vacancy.
 
 > **Tip:** When **Write With AI** is not shown, AI is off or has reached its limit. Its help term
 > says which. Write the description yourself; the form works as before.
@@ -118,7 +118,10 @@ A seat holds one draft, open or paused vacancy at a time. Once it has one, it le
 2. For a draft, press **Publish**. It goes on the careers page at its own link.
 3. To stop applications for a while, press **Pause**. The link keeps working and says so.
 4. Press **Resume** to take applications again.
-5. To end it, press **Close** and pick why: filled, cancelled or on hold. Confirm it.
+5. To end it, press **Close Vacancy** and pick why: filled, cancelled or on hold.
+6. When candidates are still in progress, tick **Not Progress All** to tell them all now. Each gets
+   the not progressing email.
+7. Press **Close Vacancy**.
 
 The link is made when you first publish and never changes, even after a pause.
 
@@ -126,8 +129,9 @@ The link is made when you first publish and never changes, even after a pause.
 |---|---|---|
 | *Its closing day has passed* | **Resume** needs a closing day still to come | Press **Edit**, pick a new **Closes On**, save, then press **Resume** |
 
-A closed vacancy cannot be changed or opened again. Write a new one instead. Its candidates stay
-where they are, and their links work until they lapse.
+A closed vacancy cannot be changed or opened again. Write a new one instead. Candidates you did not
+stop stay where they are, and you can still [stop them](#recruitment-candidates-not-progressing) one
+by one.
 
 ### Change a vacancy {#recruitment-vacancies-edit needs="recruitment edit"}
 
@@ -294,7 +298,7 @@ The candidate is emailed that they are not going further. Their links stop worki
 unfinished assessments are cancelled. Their interviews are called off, and the panel and the
 candidate get the calendar cancel. The card stays at its stage, marked as not progressing.
 
-A candidate of a closed vacancy cannot be stopped or scored.
+You can stop a candidate of a closed vacancy too. They cannot be moved, scored or brought back.
 
 ### Bring a candidate back {#recruitment-candidates-reopen needs="recruitment edit"}
 
@@ -320,7 +324,8 @@ from a role you cannot see, the hub says *Already in the pool*.
 4. Type how many days they have to start it, from 1 to 14. It starts at 3.
 5. For a take-home brief with no time limit, also type how many days they have to finish it after
    starting, from 1 to 14. It starts at 5.
-6. Send it. The candidate gets an email with their own link.
+6. Send it. The candidate gets an email with their own link, and moves to **Assessment** when they
+   were at an earlier stage.
 
 A candidate takes each assessment once. To send one to everyone at a stage, use
 [Send to Candidates](#recruitment-assessments-send).
