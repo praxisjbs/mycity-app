@@ -10,7 +10,7 @@ import vacancySchemas from "@mycity/contract/schemas/vacancies.js";
 import type { ScorecardWeight, VacancyDetail, VacancyQuestion } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useApi, useMutation } from "@/api/hooks";
-import { Button, Card, CardHeader, Field, FormError, FormFooter, HelpTerm, NumberField, SelectField, Switch, TextField, toast } from "@mycity/ui";
+import { Button, Card, CardHeader, CheckboxField, Field, FormError, FormFooter, HelpTerm, NumberField, SelectField, TextField, toast } from "@mycity/ui";
 import { say } from "./shared";
 
 type Ask = { id?: string; question_type: "yes_no" | "text" | "choice"; prompt: string; options: string; required: boolean };
@@ -123,7 +123,7 @@ export function QuestionsForm({ vacancy, close, onSaved }: { vacancy: VacancyDet
               </Field>
             )}
             <div className="flex items-center justify-between gap-2">
-              <Switch label="Required" checked={a.required} onChange={(required) => editAsk(i, { required })} />
+              <CheckboxField label="Required" value={a.required} onChange={(required) => editAsk(i, { required })} />
               <Button size="sm" variant="ghost" icon="trash" onClick={() => setAsks((x) => x.filter((_, k) => k !== i))}>Remove</Button>
             </div>
           </div>
@@ -189,7 +189,7 @@ export function ScorecardForm({ vacancy, close, onSaved }: { vacancy: VacancyDet
     <>
       {parts.map((p) => (
         <div key={p.code} className="mb-2 flex items-end justify-between gap-2">
-          <Switch label={p.name} checked={p.active} onChange={(active) => set(p.code, { active })} />
+          <CheckboxField label={p.name} value={p.active} onChange={(active) => set(p.code, { active })} />
           {p.active ? (
             <Field label="Weight" className="w-28">
               <NumberField value={String(p.weight)} onChange={(w: string) => set(p.code, { weight: Math.max(0, Math.min(100, Number.parseInt(w || "0", 10) || 0)) })} />

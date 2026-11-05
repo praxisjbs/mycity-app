@@ -19,13 +19,13 @@ import { useAddressPrefill, type PrefillSchema } from "@/shell/screen-action";
 import {
   AddressField,
   Button,
+  CheckboxField,
   DateField,
   Field,
   Grid,
   MoneyField,
   NumberField,
   SelectField,
-  Switch,
   TextAreaField,
   TextField,
   toast,
@@ -291,8 +291,8 @@ export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: Vacan
                   <MoneyField {...f.field("salary_max")} />
                 </Field>
               </Grid>
-              <Switch label="Show Salary on Careers" checked={f.values.salary_visible} onChange={(on) => f.set("salary_visible", on)} />
-              {!vacancy && <Switch label="Publish Now" checked={f.values.publish} onChange={(on) => f.set("publish", on)} />}
+              <CheckboxField label="Show Salary on Careers" value={f.values.salary_visible} onChange={(on) => f.set("salary_visible", on)} />
+              {!vacancy && <CheckboxField label="Publish Now" value={f.values.publish} onChange={(on) => f.set("publish", on)} />}
             </>
           ),
         },
