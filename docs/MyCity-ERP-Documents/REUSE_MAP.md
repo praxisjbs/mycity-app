@@ -604,8 +604,12 @@ category budget table with variance is small net-new. The SOW weights M8 at 8% a
 already written.
 
 **Not ported:** the `business_config` threshold as a routing constant. Every request goes line
-manager → Operations → requisition → CEO; the per-category threshold only flags a line for the
-CEO's individual tick inside the requisition (`MILESTONES.md` §13).
+manager → Operations → requisition → CEO. **Amended 04/11/2026 (AJ):** there is no threshold at
+all, per category or otherwise, and the CEO decides the requisition as a whole; the donor's
+database trigger requiring the bank transaction ID is not ported either, since the reference is
+asked for and a disbursement without it is flagged Reference Missing (`MILESTONES.md` §13 as
+amended, `docs/guides/expenses.md` §12). Not ported besides: the CEO's one-click disbursement from
+any state, GL posting, cash advances and settlement.
 
 ---
 
