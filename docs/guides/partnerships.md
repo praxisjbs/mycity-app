@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/partnerships/`, `public-app/src/pages/Proposal.tsx` |
 | Permission key(s) | `partnerships` |
 | Capabilities | `partnerships.configure` (the Categories tab: categories, their agreement templates, delivery checklists and custom fields; pipeline stages and lists; proof points; saved proposal templates); `partnerships.money` (see and enter commission, the merchant's take and returns; import returns) |
-| Screens (PROGRESS.md rows) | #50 Pipeline, #51 Partners, #52 Leads, #53 Proposals, #54 Contracts & MOUs, #55 Analytics; new: Partnerships · Categories and Public · Proposal (ratified 05/11/2026, registered by PR 1 as #104 and #105); changes to My Workspace (#4 Today, #5 Tasks, #6 Calendar, #101 Projects), Settings · Approvals (#72), Settings · Imports (#93), Home, Mailbox, Public · Sign Offer and Verify Document |
+| Screens (PROGRESS.md rows) | #50 Pipeline, #51 Partners, #52 Leads, #53 Proposals, #54 Contracts & MOUs, #55 Analytics; new: Partnerships · Categories and Public · Proposal (ratified 05/11/2026; PR 1 registers them in the next two free PROGRESS rows, #104 and #105 while free, and corrects this guide if another milestone took one first); changes to My Workspace (#4 Today, #5 Tasks, #6 Calendar, #101 Projects), Settings · Approvals (#72), Settings · Imports (#93), Home, Mailbox, Public · Sign Offer and Verify Document |
 | Status | Agreed |
 | Last changed | 05/11/2026 |
 
@@ -1177,6 +1177,9 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
 - **M5's signatures service** is shared; whichever milestone builds first builds it to §6.9 (GE with LA).
 - **MyCity's owners for M7** after Cynthia Osakunih's handover: Edidiong Etudor for partnerships, the new
   Operations & People lead for approvals.
+- **Expenses paid to a partner** (M8, merged 04/11/2026): an expense request's payee may be Partner, typed
+  with its bank details and not linked to a partner record. Linking it, so the 360 can show what MyCity
+  paid a partner beside what it earned, is a later decision for AJ and GE; nothing in M7 depends on it.
 - **MyCity's Anthropic account** funded and its key entered on Settings · Integrations before the studio
   is demonstrated.
 
@@ -1212,7 +1215,7 @@ into one file per screen.
   choices and dropping `agreement_obligation` when empty; the reference seed (code lists, both
   capabilities and holders, the `partnership.agreement` flow, numbering); `CAPABILITY_CATALOG` entries;
   the **ratifications**: Partnerships · Categories and Public · Proposal written into MILESTONES §18 (and
-  §12's amendments from §13.1), PROGRESS rows #104 and #105 and the summary counts, `scripts/check/
+  §12's amendments from §13.1), PROGRESS's next two free rows (#104 and #105 while free; M8 may claim one first, in which case PR 1 uses the next and corrects every mention here) and the summary counts, `scripts/check/
   progress.js` `SCREENS`, `src/shared/route-map.js` (tab order Pipeline, Categories, Partners, Leads,
   Proposals, Contracts & MOUs, Analytics), `src/shared/search/screens.js`, the app's catalogue, the public
   site's routes; module skeletons (routes mounted, permission checks, `// ai:none` and `// search:none`
@@ -1461,7 +1464,8 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   Agreement added to `docs/MyCity-ERP-Documents/partnership-samples/`; which PR needs which MyCity sample
   (§13.3, Appendix A PR 2 and PR 7); My Workspace's PROGRESS rows corrected (#4, #5, #6, #101);
   `ExportAction`'s home corrected (§10.3); a department with no head (§11); no partner named from
-  MyCity's documents.
+  MyCity's documents; `main` merged (M8's partner payee noted in §13.3; the new rows are the next free
+  ones).
 - 05/11/2026 · JP · Made standalone as M7's only source of truth: §0 (how to use it, the words), table
   columns (§4.2), the full API, components (§10.3), the build plan (Appendix A), definition of done and
   demo (Appendix B), the contract catalogue (Appendix C) and the file map (Appendix D). The handoff only
