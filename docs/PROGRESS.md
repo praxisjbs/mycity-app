@@ -50,10 +50,10 @@ saying who agreed and when.
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
-| M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
+| M8 Expenses & Budget Control | 6 | 1 | 5 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **101** | **34** | **0** | **67** | **0** | **0** |
+| **Total** | **101** | **29** | **5** | **67** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -1255,15 +1255,16 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 56 | My Requests | `my-requests` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 57 | Approvals | `approvals` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 58 | Requisitions | `requisitions` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 59 | Disbursements | `disbursements` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 56 | My Requests | `my-requests` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
+| 57 | Approvals | `approvals` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
+| 58 | Requisitions | `requisitions` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
+| 59 | Disbursements | `disbursements` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
 | 60 | Budgets | `budgets` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 61 | Categories | `categories` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 61 | Categories | `categories` | M8 | AJ | ☐ | ☐ | ☐ | In progress | 05/11/2026 |
 
 **Notes**
 
+- 05/11/2026 · AJ · PR 3 and PR 4 of `docs/handoff/m8-expenses.md`, the backend for requests, categories, requisitions and disbursements: `/expenses/mine` (list, summary, New Request with Send Request, Edit, Send Again, Cancel), `/expenses` (list, one request, Withdraw), `/expenses/approvals` and its summary, `/expense-categories` (list, add, edit, Add Suggested Categories), `/requisitions` (list, one, Create Requisition, the CEO's Remove) and `/disbursements` (list with Reference Missing, Record Disbursement, Add Reference); the two approvals settled onto the requests, Send Back returning a request to its requester; invoices and receipts claimed from the upload engine (`vault.claim`); ⌘K, AI reads and eight cards; unit and integration tests. Approve, Send Back and Reject are the approval's own routes. API stays unticked on #56 to #59 and #61: the screens still call their INTERIM mock paths (`/expenses/requests` and the rest), and a ticked API opens them on staging (`shared/delivery-plan.js`), so the ticks come with PR 7 when the screens call these routes. Left: Budgets and Projects (PR 5, #60), the AI features (PR 6), the screens on the real API and the User Guide chapter (PR 7).
 - 04/11/2026 · AJ · PR 2 of `docs/handoff/m8-expenses.md`, schema and contract: migration 8010 (request lines, payee, invoice, project, many requests to a requisition, the approvals' instances, Reference Missing, category type, project budget, statuses, indexes), seed 8100 (the `expenses.request` and `expenses.requisition` flows, statuses, payee types, `expenses.finance`), the five contract schemas, `budget` numbering. No screen moves: no API yet. Left: PR 3 to PR 8.
 - 04/11/2026 · AJ · Planned from the Modules Review of 04/11/2026 (`docs/guides/expenses.md`, `docs/handoff/m8-expenses.md`): Projects agreed as a seventh Expenses tab (its row comes with `npm run new:screen` in PR 7, with the tab); My Requests (#56) shows in ESS; tabs in the order Requisitions, Approvals, Disbursements, Projects, Budgets, Categories; F31 amended so Expenses records open in the modal on desktop too. Nothing built yet. Left: PR 2 to PR 8 of the handoff.
 - 25/10/2026 · JP · My Requests (#56), Approvals (#57) and Requisitions (#58), on the mock: on a phone a tapped request or requisition opens in a sheet (F31: `DetailPane`), with its chain, history or Approve, never above or under the list; on desktop the summary's focus still shows where it did. Status unchanged.

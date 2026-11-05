@@ -10,7 +10,7 @@
 | Capabilities | `expenses.finance` (group approved requests into requisitions, record disbursements, set budgets, manage categories) |
 | Screens (PROGRESS.md rows) | #56, #57, #58, #59, #60, #61; Projects gets its row with `new:screen` in PR 7 |
 | Status | Agreed |
-| Last changed | 04/11/2026 |
+| Last changed | 05/11/2026 |
 
 Agreed by AJ on 04/11/2026 from the Modules Review meeting of the same day (TB handed every M8
 decision to AJ). The decisions and the build plan are in `docs/handoff/m8-expenses.md`; where this
@@ -35,7 +35,7 @@ Projects).
 | Expenses · Requisitions (`requisitions`, #58) | staff app | `expenses.finance` holders and the CEO | approved requests not yet in a requisition; the requisitions and their status | tick requests and Create Requisition; the CEO opens one, removes a request, approves or rejects it |
 | Expenses · Approvals (`approvals`, #57) | staff app | anyone a request's approval waits on (line managers, Operations & People) | requests waiting on the reader, with the invoice and the chain | Approve, Send Back, Reject |
 | Expenses · Disbursements (`disbursements`, #59) | staff app | `expenses.finance` holders and the CEO | requests the CEO authorised, waiting to be paid; paid ones with their bank reference | Record Disbursement; Add Reference on one saved without it |
-| Expenses · Projects (`projects`, row added in PR 7) | staff app | `expenses` view, all scope | each project's budget, committed, spent and remaining, and the requests under it | Set Budget (with `expenses.finance`); open a request |
+| Expenses · Projects (`projects`, row added in PR 7) | staff app | `expenses` view, all scope | each project's budget, committed, spent and remaining, and the requests under it | New Request with the project filled; Set Budget (with `expenses.finance`); open a request |
 | Expenses · Budgets (`budgets`, #60) | staff app | `expenses` view; a head sees their own department | each department's budget for the year by category: allocated, committed, spent, remaining | New Budget, Edit Budget (with `expenses.finance`); Budget History |
 | Expenses · Categories (`categories`, #61) | staff app | `expenses` view | the categories, their type, this month's spend | New Category, Edit Category, Deactivate; Add Suggested Categories while there are none |
 | Home · Overview, Expenses Awaiting Approval and Budget Used cards | staff app | as Home shows them | the requests waiting and the budget used | open the list |
@@ -72,7 +72,8 @@ Projects).
    Yes saves it flagged Reference Missing, No returns to the reference field. The request is
    `disbursed` and its amount moves from committed to spent (§6.6).
 7. **Budgets and projects.** Expenses · Budgets shows each department's year; Expenses · Projects
-   each project's. A request larger than its department's remaining budget is flagged before the
+   each project's. Whoever manages a project raises its requests from there: New Request opens
+   with the project filled, the same form and service as on My Requests (handoff decision 17). A request larger than its department's remaining budget is flagged before the
    line manager and Operations & People decide it, never after.
 8. **History.** Every step is one event through `emit()`, so a request's history (raised, each
    decision with its reason, grouped, removed, authorised, paid, reference added) reads from the
@@ -115,6 +116,7 @@ M8's staging seed (PR 7), because Home's staging rows point at them until then
 | `GET /api/v1/expenses` | `ExpenseListQuery` → `ExpensePage` | `expenses` view · all/team/own | yes, 25 | filters `status`, `category_id`, `project_id`, `department_id`, `payee_type`, `q` |
 | `GET /api/v1/expenses/:id` | → `ExpenseRequest` | `expenses` view, or named on its approval | | lines, chain, history, budget check |
 | `GET /api/v1/expenses/approvals` | `ExpenseListQuery` → `ExpensePage` | `expenses` approve | yes, 25 | waiting on the reader |
+| `GET /api/v1/expenses/approvals/summary` | → `ExpenseApprovalsSummary` | `expenses` approve | no | the four KPI cards on Approvals |
 | `POST /api/v1/expenses/:id/withdraw` | `ExpenseCancel` → `ExpenseRequest` | `expenses` edit, `expenses.finance` | | after approval, before payment |
 | `GET /api/v1/requisitions` | `RequisitionListQuery` → `RequisitionPage` | `expenses` view, `expenses.finance` | yes, 25 | the CEO passes |
 | `POST /api/v1/requisitions` | `RequisitionCreate` → `Requisition` | `expenses` create, `expenses.finance` | | 1 to 25 approved requests |
@@ -133,8 +135,15 @@ M8's staging seed (PR 7), because Home's staging rows point at them until then
 | `POST /api/v1/expense-categories/suggested` | `EmptyBody` → `ExpenseCategoryPage` | `expenses` create, `expenses.finance` | | only while there are none |
 
 Approve, Send Back and Reject are the approval's own routes (`/workflow/instances/:id/approve`,
-`request_changes`, `reject`), as every flow in the hub: whoever the stage names decides, with
+`request-changes`, `reject`), as every flow in the hub: whoever the stage names decides, with
 `expenses` approve.
+
+An invoice, and a disbursement's receipt, is staged first through the upload engine
+(`POST /api/v1/documents`) and named on the request by its `document_id`. Saving the record claims
+it (`shared/documents/vault.claim`): the file becomes the record's (`expense_invoice` on the
+request, `disbursement_receipt` on the disbursement, the requester its subject), so the vault's
+read rule lets the requester, their line manager, Operations & People and the CEO open it. A file
+somebody else staged is refused, `invoice_document_id: Upload it again`.
 
 ## 6 · Rules and calculations
 
@@ -152,7 +161,18 @@ Approve, Send Back and Reject are the approval's own routes (`/workflow/instance
    once sent: a change is a Send Back.
 5. The requester cancels a request while it is a draft, sent back, or waiting on the line manager
    or Operations & People (its approval is withdrawn with it). Once Operations & People approve it,
-   only an `expenses.finance` holder withdraws it, with a reason, until it is paid.
+   only an `expenses.finance` holder withdraws it, with a reason, until it is paid. One withdrawn
+   from a requisition leaves it, and the requisition's total is counted again (emptied, it is
+   cancelled).
+6. **Send Back and Send Again** (decided 05/11/2026 in PR 3, as the handoff asked). The engine's
+   Request Changes keeps an approval pending and moves it back to its first stage, where the line
+   manager could still decide a request its requester is changing. So, as a performance review is
+   returned to its reviewer, the handler for `workflow.changes_requested` withdraws the pending
+   approval for its opener and sets the request `sent_back`. The requester edits it and presses Send
+   Again, which opens a new `expenses.request` approval: the flow as Settings · Approvals holds it
+   at that moment, starting again at the line manager. A request in flight still keeps the version
+   it opened on; only a request sent again after a Send Back takes the current one. The earlier
+   approval and its decisions stay on the request's history.
 
 ### 6.2 Statuses
 
@@ -205,7 +225,7 @@ its amount, and the CEO decides the requisition as a whole.
    recounted from the requests in the transaction that moves one, never added to by hand.
 3. Remaining is allocated less committed less spent. A request whose amount is more than its line's
    remaining (or that has no line for its category) carries `over_budget: true` and the approvers
-   see it before they decide. It is a flag, never a block.
+   see it before they decide. It is a flag, never a block. Until PR 5 recounts the budgets, a request with no line is not flagged (there is nothing yet to be over); a request over a line that exists is.
 4. A project's budget is optional. Its committed and spent are counted the same way over the
    requests that name it.
 5. The budget-threshold job warns the department's head and Operations & People when a line
@@ -232,11 +252,14 @@ its amount, and the CEO decides the requisition as a whole.
 | `expense_request.created`, `.updated` | a draft is saved | audit only |
 | `expense_request.submitted` | Send Request, Send Again | opens `expenses.request`; the engine tells the first approver |
 | `workflow.completed` for `expenses.request` | the last stage decides | copies the outcome onto the request (approved or rejected), recounts the budget line; the engine tells the requester |
-| `workflow.changes_requested` for `expenses.request` | Send Back | the request is `sent_back`; the requester is told with the reason |
+| `workflow.changes_requested` for `expenses.request` | Send Back | the approval is withdrawn for its opener and the request is `sent_back` (`expense_request.sent_back`, §6.1 rule 6); the engine tells the requester with the reason |
+| `workflow.cancelled` for `expenses.request` | withdrawn from the approvals screen | a request still `submitted` is `cancelled`; one already sent back or cancelled is left alone |
+| `expense_request.approved`, `.rejected` | the approval's outcome copied | audit only (the engine told the requester) |
 | `expense_request.cancelled`, `.withdrawn` | cancel, withdraw | the approval is withdrawn; a withdrawal tells the requester |
 | `requisition.submitted` | Create Requisition | opens `expenses.requisition`; the engine tells the CEO |
-| `requisition.request_removed` | the CEO removes one | the request's requester and Operations & People are told |
-| `workflow.completed` for `expenses.requisition` | the CEO decides | every request in it moves (§6.4); Operations & People are told |
+| `requisition.request_removed` | the CEO removes one | the request's requester and whoever grouped it are told |
+| `workflow.completed` for `expenses.requisition` | the CEO decides | every request in it moves (§6.4), `requisition.approved` or `.rejected`; the engine tells whoever grouped it |
+| `requisition.cancelled` | its last request was removed or withdrawn | its approval is withdrawn; audit only |
 | `disbursement.recorded` | Record Disbursement | the requester is told it was paid |
 | `disbursement.reference_added` | Add Reference | audit only |
 | `budget.set`, `budget.changed` | a budget is saved | Budget History; the department's head is told of a change |
@@ -261,14 +284,23 @@ requester always sees theirs.
 ## 9 · AI and search
 
 - **AI reads** (`expenses.ai.js`, `requisitions.ai.js`, `disbursements.ai.js`, `budgets.ai.js`,
-  `expense_categories.ai.js`): requests by status, category, project, department and payee type;
-  requisitions waiting on the CEO; disbursements with a reference missing; a department's or a
-  project's budget, committed, spent and remaining. Paged at 25, with the reader's own grant and
-  scope.
-- **AI actions** (cards the person confirms; every create and edit form, the forms gate):
-  New Request (from `ExpenseCreate`), New Category, Create Requisition, Record Disbursement,
-  Add Reference, New Budget and Edit Budget; Approve and Reject through the Approvals cards already
-  shipped. Each runs the module's own service function.
+  `expense_categories.ai.js`): the person's own requests (`expenses.mine`); requests within reach by
+  status, category, project, department and payee type (`expenses.list`); those waiting on the
+  person (`expenses.approvals`); the categories; requisitions and disbursements (with a reference
+  missing) for a holder of `expenses.finance`, an empty page for anyone else, as a read carries no
+  capability; a department's or a project's budget (PR 5). Paged at 25, with the reader's own grant
+  and scope.
+- **AI actions** (cards the person confirms; every create and edit form, the forms gate). Built in
+  PR 3 and PR 4: New Request (`my_expenses.create`, `ExpenseRequestAdd`: the request with its first
+  line flat, sent at once unless the person keeps a draft), Add Line (`my_expenses.add_line`,
+  `ExpenseLineAdd`), Save Request (`my_expenses.edit`, `ExpenseChange`), New Category
+  (`expense_categories.create`), Save Category (`expense_categories.edit`, `ExpenseCategoryChange`),
+  Create Requisition (`requisitions.create`), Record Disbursement (`disbursements.create`, risk
+  money) and Add Reference (`disbursements.add_reference`, `DisbursementReferenceAdd`); New Budget
+  and Edit Budget come with PR 5. Approve, Send Back and Reject go through the approvals' own card
+  (`approvals.decide`). An invoice or a receipt is a file and stays on the form. Each runs the
+  module's own service function, and each says `form: "none: …"` until PR 7 moves the screens onto
+  the contract's schemas.
 - **AI features** (PR 6; jobs chosen by AJ): invoice reading (Image Reading) fills amount, payee
   and category from an uploaded invoice for the person to accept; duplicate check (Default) flags a
   request with the same payee and amount within 30 days of another; a category suggestion (Default)
@@ -295,7 +327,7 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 | Expenses · Requisitions | Approved Requests (tick boxes, Create Requisition); Requisitions (Reference, Requests, Total, Submitted, Status). The modal: its requests, Remove, Approve, Reject (the CEO) | help on Requisitions: "Approved requests grouped for the CEO." | why requests are batched: MILESTONES §13, the manual |
 | Expenses · Approvals | KPI cards With You, Total Value, Oldest, Approved This Month; the list; the modal with lines, invoice (opens as a PDF), budget remaining and an Over Budget pill; Approve, Send Back, Reject | help on Over Budget: "More than the department has left this year." | the chain's configuration: Settings · Approvals, this guide |
 | Expenses · Disbursements | Waiting to Pay and Paid lists; Record Disbursement (Bank Reference, Receipt, Paid On); a Reference Missing pill and Add Reference. No chart (decision 7) | help on Bank Reference: "The bank's transaction ID for this transfer." | audit-anchor reasoning: §6.5 here |
-| Expenses · Projects | projects with Budget, Committed, Spent, Remaining; a project's requests in its modal; Set Budget | help on Committed: "Approved but not yet paid." | how spend is counted: §6.6 |
+| Expenses · Projects | projects with Budget, Committed, Spent, Remaining; a project's requests in its modal; New Request (the project filled), Set Budget | help on Committed: "Approved but not yet paid." | how spend is counted: §6.6 |
 | Expenses · Budgets | Year picker; departments with Allocated, Committed, Spent, Remaining; a budget's lines by category; New Budget, Edit Budget, Budget History | help on Remaining: "Allocated less committed and spent." | the 90% warning rule: §6.6 |
 | Expenses · Categories | the list (Category, Type, This Month, Requests); New Category, Edit Category, Deactivate; Add Suggested Categories while empty | help on Type: "Capital is equipment kept for years." | A26 and where the defaults came from: §6.7, the handoff |
 
@@ -313,6 +345,10 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 
 ## 11 · Edge cases
 
+- **Send Back tells the line manager "Withdrawn"**: withdrawing the approval on a Send Back (§6.1
+  rule 6) goes through the engine's own withdrawal, whose notice tells the stage's approvers the
+  requester withdrew it, beside the engine's Changes Requested notice. As for performance reviews;
+  a wording of its own is the engine's to add.
 - **Requester is a line manager**: the Line Manager stage is skipped (§6.3); they never decide
   their own request (the engine refuses self-approval; the CEO excepted).
 - **No line manager** (the top of the chart): the engine skips the stage, as for leave.
@@ -343,6 +379,10 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 None.
 
 ## 14 · Change log
+
+- 05/11/2026 · AJ · From the review's transcript (26:29): Expenses · Projects offers New Request with the project filled (§2, §3 step 7, §10.1; handoff decision 17). The transcript, not Gemini's summary, is the record: requisitions and department budgets stay (handoff §1).
+
+- 05/11/2026 · AJ · PR 3 and PR 4 built §5's request, category, requisition and disbursement routes. Decided on the way: Send Back withdraws the approval and Send Again opens a new one (§6.1 rule 6); `GET /expenses/approvals/summary` for the Approvals cards (§5); invoices and receipts claimed from the upload engine through `vault.claim` (§5); the card schemas `ExpenseRequestAdd`, `ExpenseChange`, `ExpenseLineAdd`, `ExpenseCategoryChange`, `DisbursementReferenceAdd` (§9); until PR 5 recounts the budgets, a request with no budget line is not flagged Over Budget (§6.6 rule 3 applies from PR 5).
 
 - 05/11/2026 · AJ · Decided the two open questions: the category suggestion is built in PR 6 on Default (§9); Home's Budget Used counts spent and committed (handoff decision 16). §13 now has none.
 - 05/11/2026 · AJ · DTT confirmed as Dedicated Task Team: the payee type reads Dedicated Task Team (DTT); its code stays `task_team`. Taken off §13.

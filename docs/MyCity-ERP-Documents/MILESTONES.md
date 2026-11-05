@@ -1052,7 +1052,7 @@ partnership raises a follow-up.
 
 **Amended 04/11/2026 (AJ, from the Modules Review of 04/11/2026; TB handed every M8 decision to
 AJ).** Where the text below disagrees, this wins. The design is `docs/guides/expenses.md`, the
-build plan and its sixteen decisions `docs/handoff/m8-expenses.md`.
+build plan and its seventeen decisions `docs/handoff/m8-expenses.md`.
 
 - **No approval threshold.** Every request goes line manager → Operations & People → requisition
   → CEO whatever its amount; the per-category threshold and the per-line flag and tick inside a
@@ -1068,7 +1068,8 @@ build plan and its sixteen decisions `docs/handoff/m8-expenses.md`.
 - **Budgets are department budgets for a calendar year**, by category, set and changed by
   Operations & People with every change logged; a request over its department's remaining budget
   is flagged before approval. Projects (Workspace's) carry an optional budget, on a new
-  **Expenses · Projects** tab.
+  **Expenses · Projects** tab, where a project's requests are also raised (New Request with the
+  project filled; handoff decision 17, 05/11/2026).
 - **My Requests is an ESS tab.** The Expenses tabs are Requisitions, Approvals, Disbursements,
   Projects, Budgets, Categories. Records open in the shared Modal on desktop too (F31 amended).
 - **Categories are entered by MyCity (A26)**: an Add Suggested Categories button offers twelve

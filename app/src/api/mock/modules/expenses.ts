@@ -45,7 +45,7 @@ const inFlight = (r: MockRequest) => !["disbursed", "rejected", "draft"].include
 
 route("GET /api/v1/expenses/mine/summary", (req) => {
   const mine = REQUESTS.filter((r) => r.requester === req.user);
-  return ok({ in_flight: mine.filter(inFlight).length, disbursed_this_year: m(mine.filter((r) => r.stage === "disbursed").reduce((a, r) => a + k(r.amount), 0) + 1_420_000_00), average_turnaround: "3.1 days", rejected: mine.filter((r) => r.stage === "rejected").length, focus_id: mine.find(inFlight)?.request_id ?? mine[0]?.request_id ?? null });
+  return ok({ in_flight: mine.filter(inFlight).length, disbursed_this_year: m(mine.filter((r) => r.stage === "disbursed").reduce((a, r) => a + k(r.amount), 0) + 1_420_000_00), average_turnaround_days: 3.1, rejected: mine.filter((r) => r.stage === "rejected").length, focus_id: mine.find(inFlight)?.request_id ?? mine[0]?.request_id ?? null });
 });
 route("GET /api/v1/expenses/approvals/summary", (req) => {
   const mine = REQUESTS.filter((r) => approverOf(r) === req.user);

@@ -217,6 +217,30 @@
       "screen": null
     },
     {
+      "key": "disbursements.add_reference",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "disbursements.DisbursementReferenceAdd",
+      "schema_sha": "bf048bc17c713fd9",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
+      "key": "disbursements.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "money",
+      "bulk": 1,
+      "schema": "disbursements.DisbursementCreate",
+      "schema_sha": "d919cb6f2fdc7d3b",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
       "key": "employees.add",
       "kind": "action",
       "module_key": "people",
@@ -248,6 +272,30 @@
       "schema": "organisation.EmployeeReportingChange",
       "schema_sha": "da7867c5b321fee6",
       "screen": null
+    },
+    {
+      "key": "expense_categories.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expense_categories.ExpenseCategoryCreate",
+      "schema_sha": "3e0563f373a23f6c",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
+      "key": "expense_categories.edit",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expense_categories.ExpenseCategoryChange",
+      "schema_sha": "df1d931c58cd1e16",
+      "screen": null,
+      "capability": "expenses.finance"
     },
     {
       "key": "faults.edit",
@@ -502,6 +550,39 @@
       "bulk": 1,
       "schema": "mailbox.MailCompose",
       "schema_sha": "0bedf6cf9d13a0e5",
+      "screen": null
+    },
+    {
+      "key": "my_expenses.add_line",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expenses.ExpenseLineAdd",
+      "schema_sha": "3ba9eca384b76fe8",
+      "screen": null
+    },
+    {
+      "key": "my_expenses.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expenses.ExpenseRequestAdd",
+      "schema_sha": "94d1b54d747ff542",
+      "screen": null
+    },
+    {
+      "key": "my_expenses.edit",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expenses.ExpenseChange",
+      "schema_sha": "bcfd1ff807ecce53",
       "screen": null
     },
     {
@@ -835,6 +916,18 @@
       "schema_sha": "df44226c82c0f273",
       "screen": null,
       "capability": "home.reports"
+    },
+    {
+      "key": "requisitions.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 25,
+      "schema": "requisitions.RequisitionCreate",
+      "schema_sha": "9b86cc9d339b8ff7",
+      "screen": null,
+      "capability": "expenses.finance"
     },
     {
       "key": "reviews.score",
@@ -1290,6 +1383,17 @@
       "screen": null
     },
     {
+      "key": "disbursements.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "disbursements.DisbursementListQuery",
+      "schema_sha": "f1423a29e38f7e45",
+      "screen": null
+    },
+    {
       "key": "employees.list",
       "kind": "read",
       "module_key": "people",
@@ -1298,6 +1402,50 @@
       "bulk": null,
       "schema": "organisation.EmployeeListQuery",
       "schema_sha": "dfcf3c65b0a27544",
+      "screen": null
+    },
+    {
+      "key": "expense_categories.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "expense_categories.ExpenseCategoryListQuery",
+      "schema_sha": "87ad86edfdf739ab",
+      "screen": null
+    },
+    {
+      "key": "expenses.approvals",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "expenses.ExpenseListQuery",
+      "schema_sha": "3c5b5f92171f3a12",
+      "screen": null
+    },
+    {
+      "key": "expenses.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "expenses.ExpenseListQuery",
+      "schema_sha": "3c5b5f92171f3a12",
+      "screen": null
+    },
+    {
+      "key": "expenses.mine",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "expenses.ExpenseListQuery",
+      "schema_sha": "3c5b5f92171f3a12",
       "screen": null
     },
     {
@@ -1532,6 +1680,17 @@
       "screen": null
     },
     {
+      "key": "requisitions.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "requisitions.RequisitionListQuery",
+      "schema_sha": "d7ba07ceee2c9e7e",
+      "screen": null
+    },
+    {
       "key": "reviews.list",
       "kind": "read",
       "module_key": "performance",
@@ -1739,6 +1898,61 @@
       "schema": null,
       "schema_sha": null,
       "screen": "ess.my-documents"
+    },
+    {
+      "key": "expenses.route.approve_expense_requests",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.approvals"
+    },
+    {
+      "key": "expenses.route.group_approved_expenses_for_the_ceo",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.requisitions"
+    },
+    {
+      "key": "expenses.route.manage_expense_categories",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.categories"
+    },
+    {
+      "key": "expenses.route.raise_an_expense_request",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.my-requests"
+    },
+    {
+      "key": "expenses.route.record_an_expense_payment",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.disbursements"
     },
     {
       "key": "home.route.build_schedule_or_run_a_report",

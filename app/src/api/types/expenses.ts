@@ -39,9 +39,11 @@ export interface ExpenseCreate {
 export interface MineSummary {
   in_flight: number;
   disbursed_this_year: Money;
-  average_turnaround: string;
+  /** Days from sending to paid, this year; the contract's ExpenseMineSummary. */
+  average_turnaround_days: number | null;
   rejected: number;
-  focus_id: Uuid | null;
+  /** The mock's own: the request desktop opens unasked. The API does not send it. */
+  focus_id?: Uuid | null;
 }
 export interface ApprovalsSummary {
   with_you: number;

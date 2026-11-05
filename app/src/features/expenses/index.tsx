@@ -38,7 +38,7 @@ function MyRequests({ id }: { id: string | null }) {
   return (
     <>
       <PageHeader title="My Requests" sub="Your own expense requests" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", wide: true, body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
-      {s.data && <KpiTiles items={[{ label: "In Flight", value: String(s.data.in_flight), tone: s.data.in_flight ? "warn" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Turnaround", value: s.data.average_turnaround }, { label: "Rejected", value: String(s.data.rejected), tone: s.data.rejected ? "err" : "ok" }]} />}
+      {s.data && <KpiTiles items={[{ label: "In Flight", value: String(s.data.in_flight), tone: s.data.in_flight ? "warn" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Turnaround", value: s.data.average_turnaround_days === null ? "None" : `${s.data.average_turnaround_days} days` }, { label: "Rejected", value: String(s.data.rejected), tone: s.data.rejected ? "err" : "ok" }]} />}
       <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Expense Request">
         {focus && (
           <>

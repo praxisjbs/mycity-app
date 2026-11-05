@@ -1166,6 +1166,7 @@ screen.
 
 ## 14 · Change log
 
+- 05/11/2026 · AJ · `shared/documents/vault.claim()` (M8 Expenses PR 3, `expenses.md` §5): a file staged through `POST /documents` (`staged_upload`, readable by its uploader alone) is bound to the record that names it, taking that record's doc type, entity and subject in the record's transaction, so the record's own read rule decides who opens it; only its uploader claims it, once, and a record naming its own file again is answered as it is. Emits `document.claimed`. First claimed as an expense's invoice and a disbursement's receipt.
 - 03/11/2026 · JP · People's records are Praxis AI cards (`organisation.ai.js` with
   `organisation.cards.js`; `organogram.md` §9; `praxis-ai.md` decisions 33 and 36): Add Employee
   and Save Record with the work record alone (personal details, bank and pay never on a card),

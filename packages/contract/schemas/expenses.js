@@ -193,6 +193,39 @@ const ExpenseUpdate = ExpenseFields;
 /** Cancel Request, and an `expenses.finance` holder's Withdraw. */
 const ExpenseCancel = z.object({ reason: optionalText(500) }).strict();
 
+/*
+ * Praxis AI's cards (docs/guides/praxis-ai.md §6.11, decision 33). A card carries flat fields, so
+ * New Request's card holds its first line beside the request and Add Line adds the rest, one line
+ * a press, as a scorecard's lines are carried; Save Request names the request and carries only
+ * what changes. The invoice is a file and stays on the form.
+ */
+
+/** New Request's card: the form's fields, its first line flat, and Send Request (on by default). */
+const ExpenseRequestAdd = ExpenseFields.omit({ lines: true, invoice_document_id: true })
+  .extend({
+    description: text(200),
+    quantity: quantity.default("1"),
+    unit_price: money,
+    submit: z.boolean().default(true),
+  })
+  .strict();
+
+/** Save Request's card: a draft or sent-back request of the person's own, and what changes on it. */
+const ExpenseChange = ExpenseFields.omit({ lines: true, invoice_document_id: true })
+  .partial()
+  .extend({ expense_request_id: uuid })
+  .strict();
+
+/** Add Line's card: one more line on a draft or sent-back request of the person's own. */
+const ExpenseLineAdd = z
+  .object({
+    expense_request_id: uuid,
+    description: text(200),
+    quantity: quantity.default("1"),
+    unit_price: money,
+  })
+  .strict();
+
 const TABLES = {
   ExpenseLine: { table: "expense_request_line" },
   ExpenseRow: {
@@ -232,6 +265,17 @@ const TABLES = {
   },
   ExpenseUpdate: { table: "expense_request", virtual: { lines: "written to expense_request_line" } },
   ExpenseCancel: { table: null, reason: "a reason for the history, not a column" },
+  ExpenseRequestAdd: {
+    table: "expense_request",
+    virtual: {
+      description: "the first line, written to expense_request_line",
+      quantity: "the first line, written to expense_request_line",
+      unit_price: "the first line, written to expense_request_line",
+      submit: "sends it at once",
+    },
+  },
+  ExpenseChange: { table: "expense_request" },
+  ExpenseLineAdd: { table: "expense_request_line" },
 };
 
 module.exports = {
@@ -250,4 +294,7 @@ module.exports = {
   ExpenseCreate,
   ExpenseUpdate,
   ExpenseCancel,
+  ExpenseRequestAdd,
+  ExpenseChange,
+  ExpenseLineAdd,
 };

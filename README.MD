@@ -565,14 +565,14 @@ Shared first filled: `shared/dedup`. Prompts: `proposal-draft`, `mou-draft`. Tem
 
 | Module | Files beyond the template |
 |---|---|
-| `expenses` | `.receipt-ai`, `.duplicates`, `.budget-check` (flag before approval) |
-| `requisitions` | `.lines` (one requisition, many requests; a line at or above its category threshold needs its own CEO tick) |
-| `disbursements` | Bank transaction reference enforced by a database trigger |
+| `expenses` | `.receipt-ai`, `.duplicates` (PR 6), `.budget-check` (the budget line and Over Budget, set when a request is sent) |
+| `requisitions` | none: one requisition owns many requests through `expense_request.requisition_id` |
+| `disbursements` | none: the bank reference is asked for, not required (Reference Missing, no database trigger) |
 | `budgets` | `.variance` (ships empty, A25) |
-| `expense_categories` | Threshold lives on the category |
+| `expense_categories` | `.ai`, `.search`; no threshold (decision 1 of 04/11/2026) |
 
-Chain for every request: requester, line manager, Operations, requisition, CEO, disbursed
-(MILESTONES §13).
+Chain for every request: requester, line manager (skipped for a line manager's own), Operations &
+People, requisition, CEO, disbursed (MILESTONES §13, `docs/guides/expenses.md` §6.3).
 
 ### 5.12 M9 · Settings & Governance · GE · 7 to 11 Dec
 

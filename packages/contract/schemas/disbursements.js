@@ -64,7 +64,16 @@ const DisbursementReference = z
   })
   .strict();
 
+/** Add Reference's card (praxis-ai.md decision 33): the disbursement, by its number, and the reference. */
+const DisbursementReferenceAdd = z
+  .object({
+    disbursement_id: uuid,
+    payment_reference: reference,
+  })
+  .strict();
+
 const TABLES = {
+  DisbursementReferenceAdd: { table: "disbursement" },
   Disbursement: {
     table: "disbursement",
     virtual: {
@@ -90,4 +99,5 @@ module.exports = {
   DisbursementPage,
   DisbursementCreate,
   DisbursementReference,
+  DisbursementReferenceAdd,
 };

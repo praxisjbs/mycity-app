@@ -373,15 +373,15 @@ const ENTITY_ROUTES = Object.freeze({
   agreement: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
 
   // Expenses
-  // search:none not built yet (src/modules/expenses)
+  // A request opens on Approvals for whoever decides it, on My Requests for its requester.
   expense: {
     ...screen("expenses", "approvals"),
     self: screen("expenses", "my-requests"),
   },
-  requisition: screen("expenses", "requisitions"), // search:none not built yet (src/modules/requisitions)
-  disbursement: screen("expenses", "disbursements"), // search:none not built yet (src/modules/disbursements)
+  requisition: screen("expenses", "requisitions"),
+  disbursement: screen("expenses", "disbursements"),
   budget: screen("expenses", "budgets"), // search:none not built yet (src/modules/budgets)
-  expense_category: screen("expenses", "categories"), // search:none not built yet (src/modules/expense_categories)
+  expense_category: screen("expenses", "categories"),
 
   // Knowledge Hub
   // A section or task of the User Guide, by its slug: the guide opens at it (user_guide.search.js).
