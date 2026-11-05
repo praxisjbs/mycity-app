@@ -154,7 +154,7 @@ packages that need none can start. Tick a package only when its own checks pass 
 | P12 | **Search and AI**: `.search.js` and `.ai.js` for candidates, assessments, interviews and talent_pool (vacancies' came with P3, with the New Vacancy and Save Vacancy cards), the route map's record types, ⌘K actions; manifests (reads, routes, `not_offered`); `npm run gen:ai-catalogue`; eval cases; the matrix probes | `src/modules/*/*.search.js`, `src/modules/*/*.ai.js` (the four left), `src/shared/search/actions.js` (M4 lines) | P3 to P6 | GE · 05/11/2026 | ☑ 05/11/2026 |
 | P13 | **Staging seed** `seeds/staging/55_recruitment.js` through the services: Careers Settings with MyCity's ten traits and About MyCityApp, vacancies (one shaped on the Head Sales & Revenue description), applications from `@example.test` candidates, the researched assessments and a take-home brief, sittings, a closed and an open round, pool members; its test; Home's staging vacancy rows removed | `seeds/staging/55_recruitment.js`, its test, `seeds/staging/60_home.js` and `lib/forward-rows.js` (the vacancy rows only) | P3 to P6 | GE · 05/11/2026 | ☑ 05/11/2026 |
 | P14 | **User Guide** `docs/manual/recruitment.md` and `docs/manual/public-site.md` (the M4 pages), front matter `milestones: M4`, a section per screen, pictures via `npm run guide:shots -- --chapter recruitment` | `docs/manual/recruitment.md`, `docs/manual/public-site.md`, `docs/manual/img/recruitment/` | P9 to P11 (reading can start now) | GE (Ose) · 05/11/2026 | ☑ |
-| P15 | **Close-out** (GE (auditor), a separate session, with a system-wide audit of M4; reports back here when done): PROGRESS #38 to #41, #44 and #80 to #83, README map, DATABASE_SCHEMA M4, guide Status, the whole `npm run ci`. GE (this session) then marks PR #72 ready for review | `docs/PROGRESS.md`, `README.MD`, `docs/DATABASE_SCHEMA.md` | all | | ☐ |
+| P15 | **Close-out** (GE (auditor), a separate session, with a system-wide audit of M4; reports back here when done): PROGRESS #38 to #41, #44 and #80 to #83, README map, DATABASE_SCHEMA M4, guide Status, the whole `npm run ci`. GE (this session) then marks PR #72 ready for review | `docs/PROGRESS.md`, `README.MD`, `docs/DATABASE_SCHEMA.md` | all | GE (auditor) · 05/11/2026 | ☑ 05/11/2026 |
 | P16 | **Owners** (GE, 05/11/2026): every milestone's owner as the team now stands, M4 GE, M5 and M8 AJ, M6 and M10 TB, M7 LA, in `MILESTONES.md` (§10 and each milestone's Owner line), `README.MD` (each module section's owner), `docs/PROGRESS.md` (the Owner column), the guides' owner lines, `.github/CODEOWNERS` and the source adapters' `OWNED BY` lines (`src/modules/dashboard/sources/*`). Owners only: no scope, decision or code changes. Kept off the M4 path so it does not slow it | the files named | none | GE · 05/11/2026 | ☑ 05/11/2026 |
 
 ### 5.2 Shared files: anyone edits, by these rules
@@ -394,3 +394,57 @@ packages that need none can start. Tick a package only when its own checks pass 
 - 05/11/2026 · GE · P16 done. Owners as the team now stands: M4 GE, M5 AJ (was LA), M6 TB (was LA), M7 LA (was GE); M8 AJ and M10 TB unchanged. Changed: MILESTONES (§4's table and the M5, M6 and M7 Owner lines, each saying who it was first planned as), README (§5.8 to §5.10 and §12 Team), CLAUDE.md's team line, PROGRESS's Owner column (M5, M6 and M7 rows; My Payslips stays AJ's, an ESS tab), DATABASE_SCHEMA's milestone headings (M4 read TB, now GE), CODEOWNERS (each module of M5 to M7 moved to its owner's block, its new owner first; M4's lines into GE's block), the dashboard sources' OWNED BY (payroll, partners), the attendance and Home guides, and the payroll types' note. Logs and change logs keep the owners of their day. `demo.html` and `demo (5).html` checked: they name no owner for M4 to M7 (only ESS, AJ, and attendance, LA, both unchanged). GitHub handles are the ones CODEOWNERS already lists.
 - 05/11/2026 · GE · Import is on screen after all (GE chose it): **Import** on Assessments takes the exported `.json` through the upload engine (new purpose `assessment_import`: `sniff`, `mime-policy`, `body-limits`, the contract's `UploadPurpose`) and `POST /recruitment/assessments/import/file` makes it switched off. Ose: your chapter's Import steps now match the screen; keep them. This supersedes my two notes that Import stays off screen.
 - 05/11/2026 · GE · P16, one more (GE): M9 Settings & Governance is TB's, who built it (first planned as GE). MILESTONES, README, CLAUDE.md, PROGRESS (its 12 screens; Attendance Policy stays LA's), DATABASE_SCHEMA, the System Health guide and the guides index, and CODEOWNERS (users, security, integrations, settings and system_health into TB's block) follow.
+- 05/11/2026 · GE · (auditor) **P15 done: M4 is Built.** Five independent reviewers (vacancies, candidates and the pool;
+  assessments and interviews; the screens; the flow; the documents) and a walk through the whole flow on a live stack
+  (API, worker, hub and go on their own database with the staging seed): publish a role, apply on the careers page
+  with a CV, the mail, the board, an assessment taken on a phone, marking, a two-person blind panel (each card hidden
+  from the hiring manager until the round closed; private notes never), the report and its form PDF, shortlist, not
+  progressing, the pool and Invite to Apply. Everything works now; two things did not:
+  - **Apply was broken live**: the upload engine sends `purpose` beside the file and the CV and file-answer routes took
+    an empty body, so no CV could be sent and no application made (tests posted without it; the pages ran on the mock).
+    Fixed with `CvUpload` and `AnswerFileUpload`; the integration tests now upload as the page does.
+  - **A spent Apply link said whether an email had applied** (any email sent on it got that person's reference): a
+    second press is answered only for the application holding the CV it sends (guide §11).
+  Also fixed (guide §14): `npm run ci` was red on the branch (AI Control's test did not know M4's five actions; the
+  alerts test kept M7 as GE's after P16); Not Progressing called off an interview already held; a card with no score
+  counted 0; a Head of Department could not open a file answer to mark it (vault rule, staff side); the hiring
+  manager is told when a round closes; Home's SLA alert skips closed roles; Screen With AI audits its conditions; a
+  part on weighs at least 1; the pool export's scope; ⌘K past 24 months; an interview's calendar entry is not
+  editable on the calendar; Invite to Apply's audit link; five CVs a link under a lock; an export with a BOM imports;
+  Organogram's Create Vacancy keeps the seat and needs `recruitment` create; New Vacancy, Questions and Scorecard had
+  unlabelled toggles (now checkboxes); My Card, New Vacancy and Write Report ask before losing words; Schedule
+  Interview searches candidates on the server; a sheet's refusal says the field's words; one filled Move To; Lagos
+  dates; the funnel's scale; the form PDF's headings stay with their sections; `assessment-questions` is personal
+  data (decision 4). PROGRESS (Built, counts, notes newest first), DATABASE_SCHEMA M4, the guide (Built, corrected to
+  the code), README (M5's mails), the Organogram guide, and 21 User Guide pictures retaken (My Card's spec opens Tobi
+  Adeyemi by name: row 1 of My Panels is a closed round, so that picture could no longer be taken). §4's points on
+  Not Progressing and interviews, Suggest With AI, and the failing tests are all resolved.
+  **For GE to decide** (not changed): (1) MyCity's three PDFs and `demo (5).html` are committed in
+  `docs/MyCity-ERP-Documents/`, while guide §13, §2 here and the seed say the repository is public and keeps none
+  (README says private); (2) closing a role with active candidates leaves them unmovable and never told
+  (`VACANCY_CLOSED`): allow Not Progressing on a closed role, or have Close offer it; (3) a duplicate application
+  answers the first one's reference, a gapless number that can hint someone applied before (§6.2 taken literally);
+  (4) a hiring manager without `recruitment` gets notices they cannot open: require the grant, as for a panelist;
+  (5) Apply's receipt promises "within five working days" (the email does not); (6) Send Assessment does not move
+  the candidate to Assessment, while Schedule Interview moves them to Interview; (7) Write With AI replaces typed
+  text with no undo; (8) CVs left on an Apply link are kept forever (no sweep of expired links; NDPR, disk).
+  **Follow-ups** (minor, not done): the panel picker offers every employee (a panelists route; the refusal names
+  nobody); the staff vacancy sheet prints raw Markdown (send blocks, draw `RichText`); Create Vacancy from the
+  Organogram leaves the department to pick (no seat lookup); the last Submit Card before the interview starts closes
+  the round (Close Round refuses that); a Reschedule dropping the only waiting panelist leaves a full round open;
+  `TIME_UP` is unreachable (the link ends at `due_at`; extend it a day); protected phrasings such as "Ladies only",
+  "Must be under 30", "Igbo only" pass; pool rows name an invited or hired vacancy outside the reader's scope; Tidy
+  With AI hidden from view-only panelists; My Card's star rollback race; View CV saves a Word CV as `.pdf`; Suggested
+  From Organogram shows 25 seats; Import runs unbusy; Candidate Emails and Invite's Cancel close too much; three-way
+  choices as selects; the Applicants KPI (active) against the column (all); a description opening `## Role Overview`
+  shows the heading twice on the careers page; an export whose first 2 KB hold `<script` is refused as markup; the
+  seed finds a role by title only; staging mail to `@example.test` bounces; an old commit's
+  `User-guide-unchanged: the Recruitment chapter is P14 and not written yet` trailer still prints (drop it from #72's
+  body). **For Ose, the chapter against the screens:** Use Draft is not a step (Write With AI fills the form, on
+  Details); the wizard's fields per step (Employment on Role, Closes On on Details, Show Salary on Careers and Publish
+  Now on Pay and Publish); Score With AI cannot read a scored candidate again; Send to Candidates is on an
+  assessment's sheet with Vacancy, Stage, Start Within Days and Days to Finish; Suggest With AI on an assessment asks
+  nothing; Candidate Details opens with **Edit**; only stars and the decision save as tapped (words on **Save Draft**);
+  Remove asks no reason; and the labels **Close Vacancy**, **Cancel Interview**, **Applied**, **View CV**, **Screen
+  Applications**, **Time Up**, **My Panels**, **Edit Report**, **Pass Mark**, **Make Assessment**. "The hiring manager is
+  told it has closed" is true now. `npm run ci`: see the line below.

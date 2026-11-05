@@ -534,7 +534,8 @@ Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media
 | `employment_contracts` | `.lifecycle` |
 
 Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Templates: `offer-letter`,
-`offer-packet`, `employment-contract`, `signature-certificate`, and the recruitment mails.
+`offer-packet`, `employment-contract`, `signature-certificate`, and the offer and onboarding mails
+(`offer-sent`, `offer-signed`, `onboarding-documents`; the five recruitment mails are M4's, built).
 
 ### 5.9 M6 · Payroll & Notifications · TB, AJ · 23 to 27 Nov
 
