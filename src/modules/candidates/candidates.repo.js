@@ -185,14 +185,28 @@ async function insertCandidate(client, { first_name: first, last_name: last, ema
   return rows[0].candidate_id;
 }
 
-/** Their name and phone from the newest application (guide §6.2). */
-async function refreshCandidate(client, id, { first_name: first, last_name: last, phone, consented_at: consented }) {
+/** What a later application may add to a person already known: a phone they had not given. */
+async function fillCandidate(client, id, { phone, consented_at: consented }) {
   await client.query(
-    `UPDATE candidate SET first_name = $2, last_name = $3, phone = COALESCE($4, phone),
-            consented_at = COALESCE($5, consented_at)
-      WHERE candidate_id = $1`,
-    [id, first, last, phone || null, consented || null],
+    "UPDATE candidate SET phone = COALESCE(phone, $2), consented_at = COALESCE(consented_at, $3) WHERE candidate_id = $1",
+    [id, phone || null, consented || null],
   );
+}
+
+/** Whether a CV sent on this link is still held by it (and not found infected). */
+async function cvOnLink(db, documentId, entityType, tokenId, docType) {
+  const { rows } = await db.query(
+    `SELECT 1 FROM document WHERE document_id = $1 AND entity_type = $2 AND entity_id = $3 AND doc_type = $4
+        AND scan_status <> 'infected'`,
+    [documentId, entityType, String(tokenId), docType],
+  );
+  return rows.length === 1;
+}
+
+/** How many CVs one link holds. */
+async function cvsOnLink(db, entityType, tokenId) {
+  const { rows } = await db.query("SELECT count(*)::int AS n FROM document WHERE entity_type = $1 AND entity_id = $2", [entityType, String(tokenId)]);
+  return rows[0].n;
 }
 
 /** An application of this person to this vacancy, if they have one. */
@@ -374,7 +388,9 @@ module.exports = {
   applyQuestions,
   candidateByEmail,
   insertCandidate,
-  refreshCandidate,
+  fillCandidate,
+  cvOnLink,
+  cvsOnLink,
   applicationOf,
   insertApplication,
   setCv,

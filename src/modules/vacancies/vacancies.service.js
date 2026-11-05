@@ -346,12 +346,17 @@ async function saveScorecard(actor, scope, id, body) {
  * A language ("speaks Yoruba") or work with children is a fair condition and passes; what slips
  * past this list is still not applied by the model (prompts/cv-screen.md rule 5).
  */
-const PROTECTED =
-  /\b(age|aged|years? old|under \d{2}|over \d{2}|gender|sex|male|female|married|unmarried|marital|spouse|pregnan\w*|religio\w*|christian|muslim|church|mosque|tribe|tribal|ethnic\w*|state of origin|lga of origin|indigene|nationality|disab\w*|genotype|hiv|appearance|attractive|good.looking)\b/i;
+const PROTECTED = [
+  // Age: an age, a range of ages, or a limit; never a number of years of experience ("over 10 years in sales").
+  /\b(aged?\s+(between\s+)?\d{2}|\d{2}\s*(to|-|and)\s*\d{2}\s*(years?\s+old|yrs?\s+old|years?\s+of\s+age)|\d{2}\s*years?\s+old|age\s+(limit|range|between|of\s+\d)|ages?\s+\d{2}|not\s+older\s+than|no\s+older\s+than|younger\s+than|older\s+than\s+\d{2}\b(?!\s*(years?|yrs?)\s+(of|in)\b))/i,
+  // "Must be 25 to 35", "be 21 or over": a person's own number, not their experience's.
+  /\bbe\s+(between\s+)?\d{2}\s*((to|-|and)\s*\d{2}|or\s+(over|under|older|younger))\b(?!\s*(years?|yrs?)\s+(of|in)\b)/i,
+  /\b(gender|sex|male|female|married|unmarried|marital|spouse|pregnan\w*|religio\w*|christian|muslim|tribe|tribal|ethnic\w*|state\s+of\s+origin|lga\s+of\s+origin|indigene|nationality|disab\w*|genotype|hiv|appearance|attractive|good.looking)\b/i,
+];
 
 /** The conditions that name a protected trait, by their index. */
 const protectedConditions = (conditions) =>
-  conditions.map((text, i) => (PROTECTED.test(text) ? i : -1)).filter((i) => i >= 0);
+  conditions.map((text, i) => (PROTECTED.some((re) => re.test(text)) ? i : -1)).filter((i) => i >= 0);
 
 /**
  * Keep the must-meet conditions Screen With AI asked for (guide §6.4), one to three; left out, the

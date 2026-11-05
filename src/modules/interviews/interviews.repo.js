@@ -169,7 +169,8 @@ async function eligible(db, employeeIds) {
       WHERE e.employee_id = ANY($1::uuid[]) AND e.status = 'active'
         AND (u.is_ceo = true OR EXISTS (
               SELECT 1 FROM user_role ur JOIN permission p ON p.role_id = ur.role_id
-               WHERE ur.user_id = u.user_id AND p.module_key = 'recruitment' AND p.can_view = true))`,
+               WHERE ur.user_id = u.user_id AND p.module_key = 'recruitment' AND p.can_view = true
+                 AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE)))`,
     [employeeIds],
   );
   return rows;
@@ -211,12 +212,15 @@ async function updateInterview(client, id, fields) {
   ]);
 }
 
-/** The panel set to these employees: new seats added, seats with no card removed. Returns the ids now on it. */
+/**
+ * The panel set to these employees: new seats added, and a seat taken off goes with its draft (a
+ * draft is never counted). A seat whose card is submitted stays: that card is part of the round.
+ * Returns the ids now on it.
+ */
 async function setPanel(client, interviewId, employeeIds) {
   await client.query(
     `DELETE FROM interview_panelist p
-      WHERE p.interview_id = $1 AND NOT (p.employee_id = ANY($2::uuid[]))
-        AND NOT EXISTS (SELECT 1 FROM interview_feedback f WHERE f.interview_panelist_id = p.interview_panelist_id)`,
+      WHERE p.interview_id = $1 AND NOT (p.employee_id = ANY($2::uuid[])) AND p.submitted_at IS NULL`,
     [interviewId, employeeIds],
   );
   for (const e of employeeIds)
@@ -273,7 +277,9 @@ async function cardScores(db, interviewId) {
   const { rows } = await completeQuery(
     db,
     `SELECT p.interview_panelist_id,
-            COALESCE((SELECT avg(g.rating) FROM interview_rating g WHERE g.interview_feedback_id = f.interview_feedback_id), f.overall_rating)::float AS score
+            COALESCE((SELECT avg(g.rating) FROM interview_rating g
+                        JOIN vacancy_question q ON q.vacancy_question_id = g.vacancy_question_id AND q.active AND q.purpose = 'interview'
+                       WHERE g.interview_feedback_id = f.interview_feedback_id), f.overall_rating)::float AS score
        FROM interview_panelist p JOIN interview_feedback f ON f.interview_panelist_id = p.interview_panelist_id
       WHERE p.interview_id = $1 AND f.submitted_at IS NOT NULL
       ORDER BY p.interview_panelist_id`,
@@ -312,6 +318,10 @@ async function saveReport(client, roundId, { report, decision, by }) {
     "UPDATE interview_round SET report = $2, decision = $3, reported_by = $4, reported_at = now() WHERE interview_round_id = $1",
     [roundId, report, decision, by],
   );
+}
+
+async function setTitle(client, roundId, title) {
+  await client.query("UPDATE interview_round SET title = $2 WHERE interview_round_id = $1", [roundId, title]);
 }
 
 async function setForm(client, roundId, documentId) {
@@ -388,6 +398,7 @@ module.exports = {
   traitAverages,
   closeRound,
   saveReport,
+  setTitle,
   setForm,
   saveDetails,
   due,

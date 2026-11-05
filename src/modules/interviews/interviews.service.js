@@ -61,6 +61,7 @@ async function editScope(user, row) {
 /** InterviewDetail for the reader. */
 async function detailOf(db, row, user) {
   const traits = await panel.traitsOf(db, row.vacancy_id);
+  const inUse = new Set(traits.map((t) => t.vacancy_question_id));
   const seats = await repo.panel(db, row.interview_id, user.employee_id);
   const closed = row.round_status === "closed";
   const averages = closed ? await repo.traitAverages(db, row.interview_id) : [];
@@ -89,7 +90,8 @@ async function detailOf(db, row, user) {
       form_document_id: row.form_document_id,
     },
     panel: seats.map((s) => {
-      const ratings = s.shown ? s.ratings || [] : null;
+      // Only the traits in use count, as in the round's score; a retired trait's rating stays out.
+      const ratings = s.shown ? (s.ratings || []).filter((r) => inUse.has(r.vacancy_question_id)) : null;
       const values = (ratings || []).map((r) => Number(r.rating));
       const score = !s.shown ? null : values.length ? round1(values.reduce((a, b) => a + b, 0) / values.length) : num(s.overall_rating);
       return {

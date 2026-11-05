@@ -152,7 +152,8 @@ async function detailOf(db, row, user) {
   const answers = row.answers || {};
   return {
     ...card(row),
-    weighted_total: sc.weighted_total,
+    // The board's own total (SQL, exact decimals), so the sheet and the ranking never disagree.
+    weighted_total: num(row.weighted_total),
     parts_scored: sc.parts_scored,
     parts_active: sc.parts_active,
     first_name: row.first_name,
@@ -278,6 +279,7 @@ async function notProgressed(actor, scope, id, body) {
   return tx(async (client) => {
     const row = await visibleRow(client, id, scope, { lock: true });
     if (row.status !== "active") throw new AppError("MOVE_NOT_ALLOWED", "This candidate is not in progress", 409);
+    assertVacancyLive(row);
     await transition(client, pipeline.MACHINE, {
       entity_id: id,
       from: row.stage,
@@ -286,11 +288,16 @@ async function notProgressed(actor, scope, id, body) {
       reason: body.rejection_reason,
     });
     await repo.setStatus(client, id, { status: "not_progressed", rejection_reason: body.rejection_reason });
-    // Their live links stop working: any link made for the application or one of its sittings.
-    // (An Apply link belongs to a vacancy and to nobody yet, so there is none of theirs to stop.)
+    // Their live links stop working: any link made for the application, and each sitting not yet
+    // finished ends as cancelled through the assessments' own path (its link stops with it), so a
+    // Reopen can send it again. An Apply link belongs to a vacancy, and to nobody until it is used.
     await publicToken.revokeFor(client, { subject_type: "application", subject_id: id });
-    for (const sitting of await repo.sittings(client, id))
-      await publicToken.revokeFor(client, { subject_type: "application_assessment", subject_id: sitting.application_assessment_id });
+    const timer = require("../assessments/assessments.timer");
+    for (const sitting of await repo.sittings(client, id)) {
+      if (!["sent", "in_progress"].includes(sitting.status)) continue;
+      const live = await timer.lockSitting(client, sitting.application_assessment_id);
+      if (live && ["sent", "in_progress"].includes(live.status)) await timer.finish(client, live, "cancelled", actor);
+    }
     await emit(client, {
       key: EVENTS.APPLICATION_NOT_PROGRESSED,
       entity: { type: "application", id },
@@ -332,6 +339,7 @@ async function requestScore(actor, scope, id) {
   return tx(async (client) => {
     const row = await visibleRow(client, id, scope);
     if (row.status !== "active") throw new AppError("MOVE_NOT_ALLOWED", "This candidate is not in progress", 409);
+    assertVacancyLive(row);
     await emit(client, {
       key: EVENTS.APPLICATION_SCORE_REQUESTED,
       entity: { type: "application", id },
@@ -355,7 +363,8 @@ async function scoreAll(actor, scope, body) {
         key: EVENTS.APPLICATION_SCORE_REQUESTED,
         entity: { type: "application", id },
         actor,
-        payload: { application_id: id, conditions },
+        // bulk: a read Screen With AI asked for is skipped if one is kept by the time it runs.
+        payload: { application_id: id, conditions, bulk: true },
       });
     }
     return { queued: ids.length };

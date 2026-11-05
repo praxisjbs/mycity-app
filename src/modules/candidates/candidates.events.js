@@ -69,7 +69,9 @@ outbox.register(EVENTS.APPLICATION_RECEIVED, "candidates.mail_received", (event)
 outbox.register(EVENTS.APPLICATION_INVITED, "candidates.mail_invite", (event) => mail().invite(event));
 outbox.register(EVENTS.APPLICATION_NOT_PROGRESSED, "candidates.mail_not_progressed", (event) => mail().notProgressed(event));
 outbox.register(EVENTS.APPLICATION_SCORE_REQUESTED, "candidates.score", (event) =>
-  require("./candidates.score").scoreOne(event.payload.application_id, event.payload.conditions || null, event.actor_user_id || null),
+  require("./candidates.score").scoreOne(event.payload.application_id, event.payload.conditions || null, event.actor_user_id || null, {
+    bulk: Boolean(event.payload.bulk),
+  }),
 );
 
 module.exports = { EVENTS, CV_DOC_TYPE, APPLY_LINK, EMAILS };

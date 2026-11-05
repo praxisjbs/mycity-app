@@ -274,14 +274,18 @@ async function owned(client, id, employeeId, { asOwner = false } = {}) {
   if (row.owner_employee_id !== reader)
     throw new AppError("FORBIDDEN", "Only the person who made this event can change it", 403);
   if (row.cancelled_at) throw new AppError("EVENT_CANCELLED", "This event was called off", 409);
+  // An entry kept by another module's record (an interview) changes only from that record, so the
+  // record, its people and its emails never disagree with the calendar.
+  if (!asOwner && row.entity_type)
+    throw new AppError("EVENT_OWNED_BY_RECORD", "Change this on the record it belongs to", 409);
   return visible;
 }
 
 /** Change an event inside the caller's transaction (see owned for `asOwner`). */
 async function editIn(client, actor, id, body, { asOwner = false } = {}) {
   {
-    const before = await owned(client, id, actor.employee_id, { asOwner });
-    const ownerId = before.owner_employee_id || actor.employee_id;
+    const before = await owned(client, id, actor ? actor.employee_id : null, { asOwner });
+    const ownerId = before.owner_employee_id || (actor && actor.employee_id);
     const starts = body.starts_at || iso(before.starts_at);
     const ends = body.ends_at || iso(before.ends_at);
     if (new Date(ends) <= new Date(starts)) {
@@ -328,9 +332,14 @@ const edit = (actor, id, body) => tx((client) => editIn(client, actor, id, body)
 
 /** Call an event off inside the caller's transaction (see owned for `asOwner`). */
 async function cancelIn(client, actor, id, { asOwner = false } = {}) {
+  // Called off already: for the module that keeps the entry, there is nothing more to do.
+  if (asOwner) {
+    const current = await repo.lock(client, id);
+    if (!current || current.cancelled_at) return null;
+  }
   {
-    const before = await owned(client, id, actor.employee_id, { asOwner });
-    const ownerId = before.owner_employee_id || actor.employee_id;
+    const before = await owned(client, id, actor ? actor.employee_id : null, { asOwner });
+    const ownerId = before.owner_employee_id || (actor && actor.employee_id);
     await repo.update(client, id, { cancelled_at: new Date() });
     await repo.nextSequence(client, id);
     await reminders.cancel(client, { key: REMINDER_KEY, entity: entityOf(id) });

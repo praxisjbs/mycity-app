@@ -68,10 +68,13 @@ async function inputFor(a, conditions) {
  * @param {string} applicationId
  * @param {string[]|null} conditions  as Screen With AI kept them; null reads the vacancy's
  * @param {string|null} actorId  who pressed
+ * @param {{bulk?: boolean}} [opts]  bulk: queued by Screen With AI, so skipped once a read is kept
  */
-async function scoreOne(applicationId, conditions, actorId) {
+async function scoreOne(applicationId, conditions, actorId, { bulk = false } = {}) {
   const a = await repo.get(pool, applicationId);
   if (!a || a.status !== "active") return "skipped";
+  // Screen With AI reads only what is still unscored: pressed twice, or after Score With AI, it pays once.
+  if (bulk && a.screening_score !== null && a.screening_score !== undefined) return "skipped";
   const now = await drafts.availability(pool, MODULE);
   if (!now.available) return "off";
   const s = redact.shield(await inputFor(a, conditions));

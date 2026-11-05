@@ -33,7 +33,8 @@ publicRoute(router, "post", "/:token/cv",
 
 publicRoute(router, "post", "/:token",
   { body: k.ApplicationSubmit, response: k.ApplicationReceipt, summary: "Apply for a role" },
-  requirePublicToken(apply.SCOPE),
+  // A second press of Submit reaches the service, which answers it with the first press's receipt.
+  requirePublicToken(apply.SCOPE, { spent: true }),
   async (req, res) => created(res, await apply.submit(req.params.token, req.validated.body)));
 
 module.exports = { basePath: "/apply", surface: "public", router };

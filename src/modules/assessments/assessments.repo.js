@@ -202,6 +202,14 @@ function sittings(db, query, scope) {
   );
 }
 
+/** Hold the links of a sitting (taken before the sitting itself: see assessments.timer lockSitting). */
+async function lockLinks(client, id) {
+  await client.query(
+    "SELECT public_token_id FROM public_token WHERE subject_type = 'application_assessment' AND subject_id = $1 FOR UPDATE",
+    [id],
+  );
+}
+
 async function sitting(db, id, { lock = false } = {}) {
   if (lock) await db.query("SELECT 1 FROM application_assessment WHERE application_assessment_id = $1 FOR UPDATE", [id]);
   const { rows } = await db.query(`SELECT * FROM (${SITTINGS}) x WHERE x.application_assessment_id = $1`, [id]);
@@ -218,14 +226,16 @@ async function liveSitting(db, applicationId, definitionId) {
   return rows[0] || null;
 }
 
+/** A new sitting, or null when a live one of the pair was made a moment ago (the live key). */
 async function insertSitting(client, s) {
   const { rows } = await client.query(
     `INSERT INTO application_assessment (application_id, assessment_definition_id, status, start_by, due_days, sent_by)
      VALUES ($1, $2, 'sent', $3, $4, $5)
+     ON CONFLICT (application_id, assessment_definition_id) WHERE status NOT IN ('cancelled', 'expired') DO NOTHING
      RETURNING application_assessment_id`,
     [s.application_id, s.assessment_definition_id, s.start_by, s.due_days ?? null, s.sent_by],
   );
-  return rows[0].application_assessment_id;
+  return rows[0] ? rows[0].application_assessment_id : null;
 }
 
 /** The link a sitting was sent with (the mail handler makes it after commit). */
@@ -334,6 +344,7 @@ module.exports = {
   summary,
   sittings,
   sitting,
+  lockLinks,
   liveSitting,
   insertSitting,
   setLink,

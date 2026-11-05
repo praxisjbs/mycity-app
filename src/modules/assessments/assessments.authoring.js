@@ -148,6 +148,9 @@ async function create(actor, body) {
 async function update(actor, id, body) {
   return tx(async (client) => {
     const before = await rowOf(client, id, { lock: true });
+    // A sitting sent reads its clock from the assessment: once sent, timed or untimed is fixed.
+    if (before.sent > 0 && body.duration_minutes !== undefined && (body.duration_minutes ?? null) !== (before.duration_minutes ?? null))
+      throw new AppError("ASSESSMENT_IN_USE", "It has been sent, so its time is fixed. Switch it off and make another", 409);
     await repo.update(client, id, body);
     await emit(client, {
       key: EVENTS.ASSESSMENT_UPDATED,
@@ -206,6 +209,7 @@ const deactivate = toggle(false);
 /** AssessmentExport: the assessment and its questions with their points, as Import takes them back. */
 async function exportOf(id) {
   const d = await get(id);
+  if (!d.questions.length) throw new AppError("VALIDATION_FAILED", "Add a question first", 422, { questions: ["Add a question first"] });
   return {
     format: "mycity-assessment-1",
     name: d.name,

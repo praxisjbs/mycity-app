@@ -13,6 +13,7 @@
  *                                     the start-by day → expired
  */
 const { pool } = require("../../config/db");
+const { logger } = require("../../config/logger");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
 const lagos = require("../../shared/time/lagos");
@@ -66,10 +67,24 @@ async function score(client, row, actor = null) {
   return result;
 }
 
-/** End a sitting inside the caller's transaction; `row` is locked. */
+/**
+ * Lock a sitting for a write, its link first: the candidate's page locks the link and then the
+ * sitting, so everything that ends one takes them in that order too, and the two never deadlock.
+ */
+async function lockSitting(client, id) {
+  await repo.lockLinks(client, id);
+  return repo.sitting(client, id, { lock: true });
+}
+
+/**
+ * End a sitting inside the caller's transaction; `row` was locked with lockSitting. A cancelled or
+ * expired sitting's link stops working; a submitted or timed-out one keeps its link until it lapses,
+ * so the candidate who opens it again reads that it is over rather than a dead link (guide §11).
+ */
 async function finish(client, row, status, actor = null) {
   await repo.end(client, row.application_assessment_id, status);
-  await publicToken.revokeFor(client, { subject_type: SUBJECT, subject_id: row.application_assessment_id });
+  if (status === "cancelled" || status === "expired")
+    await publicToken.revokeFor(client, { subject_type: SUBJECT, subject_id: row.application_assessment_id });
   await emit(client, {
     key: ENDED[status],
     entity: { type: SUBJECT, id: row.application_assessment_id },
@@ -97,13 +112,16 @@ async function sweep(now = new Date()) {
     const client = await pool.connect();
     try {
       await atomically(client, async () => {
-        const row = await repo.sitting(client, id, { lock: true });
+        const row = await lockSitting(client, id);
         if (!row) return;
         if (pastDue(row, now)) await finish(client, row, "timed_out");
         else if (row.status === "sent" && row.start_by < lagos.dateOf(now)) await finish(client, row, "expired");
         else return;
         ended += 1;
       });
+    } catch (err) {
+      // One sitting that cannot be ended is logged and tried again next minute; the rest go on.
+      logger.warn({ err: err.code || err.message, application_assessment_id: id }, "assessment-expiry: a sitting could not be ended");
     } finally {
       client.release();
     }
@@ -111,4 +129,4 @@ async function sweep(now = new Date()) {
   return { ended };
 }
 
-module.exports = { dueAt, pastDue, endOfDay, finish, score, sweep };
+module.exports = { dueAt, pastDue, endOfDay, lockSitting, finish, score, sweep };

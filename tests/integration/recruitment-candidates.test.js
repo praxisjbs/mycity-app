@@ -166,7 +166,12 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     const twice = await pub().post(`/apply/${again}`).send(form({ email: "KEMI.BELLO@example.test", cv_document_id: own.body.document_id, answers: { [weekendsId]: "yes" } }));
     expect(twice.status).toBe(201);
     expect(twice.body.reference).toBe("APP-0001");
+    // Answered as now, like any submission: the first application's date is not given away.
+    expect(Date.now() - Date.parse(twice.body.submitted_at)).toBeLessThan(60_000);
     expect(await one("SELECT count(*)::int AS n FROM application")).toEqual({ n: 1 });
+    // A second press on the same spent link gets the receipt, not a 404; another email on it gets the 404.
+    expect((await pub().post(`/apply/${again}`).send(form({ email: "KEMI.BELLO@example.test", cv_document_id: own.body.document_id, answers: { [weekendsId]: "yes" } }))).status).toBe(201);
+    expect((await pub().post(`/apply/${again}`).send(form({ email: "nobody@example.test", cv_document_id: own.body.document_id, answers: { [weekendsId]: "yes" } }))).status).toBe(404);
   });
 
   test("the board shows the estimate as Provisional, the scorecard over the parts on, and the CV waits for its check", async () => {

@@ -131,6 +131,7 @@ async function sendable(client, id) {
 /** One sitting inside the caller's transaction; null when a live one exists. */
 async function sendOne(client, actor, d, applicationId, body) {
   if (await repo.liveSitting(client, applicationId, d.assessment_definition_id)) return null;
+  // A single Send racing Send to Candidates on the same candidate: the second insert makes nothing.
   const id = await repo.insertSitting(client, {
     application_id: applicationId,
     assessment_definition_id: d.assessment_definition_id,
@@ -138,6 +139,7 @@ async function sendOne(client, actor, d, applicationId, body) {
     due_days: d.duration_minutes ? null : body.due_days || 5,
     sent_by: actor.user_id,
   });
+  if (!id) return null;
   await emit(client, {
     key: EVENTS.ASSESSMENT_SENT,
     entity: { type: SUBJECT, id },
@@ -211,7 +213,8 @@ async function mark(actor, scope, id, body) {
 
 async function cancel(actor, scope, id) {
   return tx(async (client) => {
-    const row = await visibleRow(client, id, scope, { lock: true });
+    const seen = await visibleRow(client, id, scope);
+    const row = await timer.lockSitting(client, seen.application_assessment_id);
     if (!["sent", "in_progress"].includes(row.status))
       throw new AppError("MOVE_NOT_ALLOWED", "Only a sitting not yet finished can be cancelled", 409);
     await timer.finish(client, row, "cancelled", actor);

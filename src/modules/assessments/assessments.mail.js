@@ -35,7 +35,7 @@ async function invite(event) {
         created_by: event.actor_user_id || null,
       });
       await repo.setLink(client, id, link.public_token_id);
-      return { row, token: link.token };
+      return { row, token: link.token, linkId: link.public_token_id };
     });
   } finally {
     client.release();
@@ -59,7 +59,8 @@ async function invite(event) {
         assess_url: `${String(config.PUBLIC_ORIGIN).replace(/\/+$/, "")}/assess/${token}`,
       },
     },
-    { jobId: `assessment-invite-${event.event_id}` },
+    // Keyed on the link: a re-run that made a new link (and stopped the old) mails the new one.
+    { jobId: `assessment-invite-${made.linkId}` },
   );
 }
 

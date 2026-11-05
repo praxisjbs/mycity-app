@@ -118,6 +118,10 @@ describeDb("Recruitment · Interviews against the real migrations", () => {
       [interviewId],
     ).catch(() => one("SELECT ce.event_type, ce.entity_type FROM calendar_event ce JOIN interview i ON i.calendar_event_id = ce.calendar_event_id WHERE i.interview_id = $1", [interviewId]));
     expect(entry).toMatchObject({ event_type: "interview", entity_type: "interview" });
+    // The entry is kept by the interview: Calendar refuses to move or call it off on its own.
+    const { calendar_event_id: entryId } = await one("SELECT calendar_event_id FROM interview WHERE interview_id = $1", [interviewId]);
+    expect((await h.as("ops").post(`/calendar/${entryId}/cancel`).send({})).status).toBe(409);
+    expect((await h.as("ops").patch(`/calendar/${entryId}`).send({ title: "Something else" })).status).toBe(409);
 
     await drain();
     const [invite] = mails("interview-invite");
@@ -192,6 +196,8 @@ describeDb("Recruitment · Interviews against the real migrations", () => {
     const form = await one("SELECT doc_type, render_status, entity_type FROM document WHERE document_id = $1", [reported.body.round.form_document_id]);
     expect(form).toMatchObject({ doc_type: "interview_assessment_form", entity_type: "interview" });
     expect((await h.as("staff").put(`/recruitment/interviews/${interviewId}/report`).send({ report: "x".repeat(50), decision: "reject" })).status).toBe(403);
+    // A panelist with only their team's grant, on a role they do not manage, cannot write it.
+    expect([403, 404]).toContain((await h.as("hod").put(`/recruitment/interviews/${interviewId}/report`).send({ report: "x".repeat(50), decision: "reject" })).status);
   });
 
   test("Reschedule tells the candidate only of a new time or place; Not Progressing cancels what is still scheduled", async () => {

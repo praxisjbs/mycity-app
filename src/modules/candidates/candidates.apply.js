@@ -69,9 +69,14 @@ async function link(token) {
 }
 
 /** DocumentRef of the CV, kept against the link until the application is made. */
+/** How many CVs one Apply link may hold: enough to change your mind, not a free file store. */
+const CV_UPLOADS_PER_LINK = 5;
+
 async function uploadCv(token, file) {
   return tx(async (client) => {
     await openVacancy(client, token);
+    if ((await repo.cvsOnLink(client, APPLY_LINK, token.public_token_id)) >= CV_UPLOADS_PER_LINK)
+      throw new AppError("TOO_MANY_FILES", "This link has had enough CVs. Start a new application", 429);
     const doc = await vault.store(client, {
       file,
       purpose: "cv",
@@ -120,33 +125,41 @@ function splitName(full) {
 }
 
 /**
- * ApplicationReceipt. `raw` is the token from the address: it is read again here, held, so two
- * presses of Submit cannot both use it.
+ * ApplicationReceipt. `raw` is the token from the address: it is read again here and held, so two
+ * presses of Submit cannot both use it; the second press finds it spent and is given the receipt the
+ * first one made (guide §11), never a 404.
+ *
+ * Nothing here may tell a stranger whether an email has applied (guide §6.2): the CV and the answers
+ * are checked first, for everyone; an email that already has an application on this role makes
+ * nothing, spends the link, and is answered as any submission is, now. Two people sending the same
+ * new email at once meet the same answer: the second finds the first's application after the
+ * candidate row they share is written.
  */
 async function submit(raw, body) {
   return tx(async (client) => {
-    const live = await publicToken.resolve(client, raw, { scope: SCOPE, forUpdate: true });
+    const live = await publicToken.resolve(client, raw, { scope: SCOPE, forUpdate: true, spent: true });
     if (!live) throw notFound();
+    if (live.spent) return pressedAgain(client, live, body);
     const v = await openVacancy(client, live, { lock: true });
+    if (!(await repo.cvOnLink(client, body.cv_document_id, APPLY_LINK, live.public_token_id, CV_DOC_TYPE)))
+      throw field("cv_document_id", "Attach your CV");
     const questions = await repo.applyQuestions(client, v.vacancy_id);
     const answers = checkAnswers(questions, body.answers);
     const name = splitName(body.full_name);
     const now = new Date();
 
-    let candidateId;
     const known = await repo.candidateByEmail(client, body.email);
-    if (known) {
-      const first = await repo.applicationOf(client, v.vacancy_id, known.candidate_id);
-      if (first) {
-        // Applied before: nothing changes, and the answer is the same as for anyone.
-        await publicToken.consume(client, live.public_token_id);
-        return { reference: first.number, submitted_at: first.applied_at };
-      }
-      candidateId = known.candidate_id;
-      await repo.refreshCandidate(client, candidateId, { ...name, phone: body.phone, consented_at: now });
-    } else {
-      candidateId = await repo.insertCandidate(client, { ...name, email: body.email, phone: body.phone, consented_at: now });
+    const candidateId = known
+      ? known.candidate_id
+      : await repo.insertCandidate(client, { ...name, email: body.email, phone: body.phone, consented_at: now });
+    const first = await repo.applicationOf(client, v.vacancy_id, candidateId);
+    if (first) {
+      // Applied before (or a moment ago on another link): nothing changes, and the answer looks like any other.
+      await publicToken.consume(client, live.public_token_id);
+      return { reference: first.number, submitted_at: now.toISOString() };
     }
+    // A stranger's form never renames a person already known: it only fills what is missing.
+    if (known) await repo.fillCandidate(client, candidateId, { phone: body.phone, consented_at: now });
 
     const { number } = await numbering.allocate(client, "application");
     const source = (await repo.sentByStaff(client, live.public_token_id))
@@ -194,6 +207,15 @@ async function submit(raw, body) {
     });
     return { reference: number, submitted_at: made.applied_at };
   });
+}
+
+/** A second press of Submit on a spent link: the receipt of what the first press made, or the 404. */
+async function pressedAgain(client, token, body) {
+  if (token.subject_type !== "vacancy") throw notFound();
+  const known = await repo.candidateByEmail(client, body.email);
+  const first = known ? await repo.applicationOf(client, token.subject_id, known.candidate_id) : null;
+  if (!first) throw notFound();
+  return { reference: first.number, submitted_at: new Date(first.applied_at).toISOString() };
 }
 
 module.exports = { SCOPE, link, uploadCv, submit, checkAnswers, splitName };

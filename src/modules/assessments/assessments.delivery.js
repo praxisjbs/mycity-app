@@ -153,10 +153,14 @@ async function answer(raw, questionId, body) {
     } else if (q.question_type === "file" && text && !HTTPS.test(text)) {
       throw field("answer", "Upload a file or give an https link");
     }
-    await repo.saveResponse(client, row.application_assessment_id, q.assessment_question_id, {
-      response: text || null,
-      awarded: text ? awarded : null,
-    });
+    // Moving on from a file question without a new answer keeps what was given, a file or a link;
+    // a new link replaces it.
+    const keepGiven = q.question_type === "file" && !text;
+    if (!keepGiven)
+      await repo.saveResponse(client, row.application_assessment_id, q.assessment_question_id, {
+        response: text || null,
+        awarded: text ? awarded : null,
+      });
     await repo.setPosition(client, row.application_assessment_id, body.current_question);
     return { saved_at: new Date().toISOString(), file_name: null };
   });

@@ -316,3 +316,8 @@ packages that need none can start. Tick a package only when its own checks pass 
   `templates/documents/interview-assessment-form.html` and `InterviewAssessmentFormVars`. Not Progressing
   cancels interviews through an outbox handler here, as P4's note asked. `candidates.service.advanceIn` is
   new: another module's step moves a candidate forward only. Next: the re-audit of P4 to P6.
+- 05/11/2026 · GE · Re-audit of P4 to P6 done (three independent reviewers; their findings checked and fixed, guide
+  §14 lists them). Shared changes: `public-token.resolve({ spent })` and `requirePublicToken(scope, { spent })`
+  for a second press; Calendar refuses to change an entry another module keeps (`EVENT_OWNED_BY_RECORD`), and
+  `cancelIn` with `asOwner` is a no-op on one already called off. Left on purpose: a candidate not progressed,
+  reopened and not progressed again before the worker runs may get two emails (each a real event).

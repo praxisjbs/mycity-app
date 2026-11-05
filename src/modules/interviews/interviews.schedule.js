@@ -129,7 +129,10 @@ async function reschedule(actor, scope, id, body) {
     if (body.panel_employee_ids) await checkPanel(client, body.panel_employee_ids, before.candidate_email);
     const place = await placeOf(client, next);
     await repo.updateInterview(client, id, next);
+    if (body.title) await repo.setTitle(client, before.interview_round_id, body.title);
     const panel = body.panel_employee_ids ? await repo.setPanel(client, id, body.panel_employee_ids) : null;
+    // A seat with a submitted card stays on, so the panel is checked once more against its eight.
+    if (panel && panel.length > 8) throw field("panel_employee_ids", "At most 8 panelists");
     const row = await repo.get(client, id, actor.employee_id);
     const entry = entryOf(row, place, panel || undefined);
     if (!panel) delete entry.attendee_ids;
@@ -154,13 +157,13 @@ async function reschedule(actor, scope, id, body) {
 async function cancelIn(client, actor, row, reason) {
   await repo.updateInterview(client, row.interview_id, { status: "cancelled" });
   await repo.closeRound(client, row.interview_round_id, { score: null, by: actor ? actor.user_id : null });
-  if (row.calendar_event_id && actor && actor.employee_id)
-    await calendar.cancelIn(client, actor, row.calendar_event_id, { asOwner: true });
+  // The entry belongs to whoever scheduled it; the module calls it off for them, whoever cancels.
+  if (row.calendar_event_id) await calendar.cancelIn(client, actor, row.calendar_event_id, { asOwner: true });
   await emit(client, {
     key: EVENTS.INTERVIEW_CANCELLED,
     entity: { type: "interview", id: row.interview_id },
     actor,
-    payload: { interview_id: row.interview_id, application_number: row.application_number, reason: reason ? "given" : null },
+    payload: { interview_id: row.interview_id, application_number: row.application_number, reason: reason || null },
   });
 }
 

@@ -159,7 +159,7 @@ describeDb("Recruitment · Assessments against the real migrations", () => {
     expect((await h.as("hod").get(`/recruitment/assessments/sittings/${sent.body.application_assessment_id}`)).status).toBe(404);
   });
 
-  test("the candidate starts on the server's clock, answers as they go, never sees a point, and Submit ends the link", async () => {
+  test("the candidate starts on the server's clock, answers as they go, never sees a point, and Submit ends the sitting", async () => {
     const tok = lastLink();
     const before = await pub().get(`/assess/${tok}`);
     expect(before.status).toBe(200);
@@ -177,6 +177,8 @@ describeDb("Recruitment · Assessments against the real migrations", () => {
     await pub().put(`/assess/${tok}/answers/${text.assessment_question_id}`).send({ answer: "Start from the venue's lights, then pick two accents that read at night.", current_question: 2 });
     expect((await pub().put(`/assess/${tok}/answers/${file.assessment_question_id}`).send({ answer: "a poster I made", current_question: 2 })).status).toBe(422);
     await pub().put(`/assess/${tok}/answers/${file.assessment_question_id}`).send({ answer: "https://example.test/poster", current_question: 2 });
+    // Moving on with nothing new keeps the answer given.
+    await pub().put(`/assess/${tok}/answers/${file.assessment_question_id}`).send({ answer: "", current_question: 2 });
 
     const resumed = await pub().get(`/assess/${tok}`);
     expect(resumed.body).toMatchObject({ current_question: 2 });
@@ -184,7 +186,10 @@ describeDb("Recruitment · Assessments against the real migrations", () => {
 
     const done = await pub().post(`/assess/${tok}/submit`).send({});
     expect(done.body.state).toBe("submitted");
-    expect((await pub().get(`/assess/${tok}`)).status).toBe(404);
+    // Opened again, the link says it is submitted, shows no question and takes no answer.
+    const after = await pub().get(`/assess/${tok}`);
+    expect(after.body).toMatchObject({ state: "submitted", questions: null });
+    expect((await pub().put(`/assess/${tok}/answers/${text.assessment_question_id}`).send({ answer: "more", current_question: 1 })).status).toBe(409);
     await drain();
     expect(await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'assessment.to_mark'")).toEqual({ n: 1 });
   });

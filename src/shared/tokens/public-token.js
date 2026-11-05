@@ -98,17 +98,21 @@ async function issue(
 /**
  * The live token for this scope, or null. `forUpdate` locks the row so a
  * single-use token can be checked and consumed in one transaction.
- * @returns {Promise<{public_token_id: string, scope: string, subject_type: string, subject_id: string, single_use: boolean, expires_at: Date}|null>}
+ * `spent: true` also finds a single-use token already used (never a revoked or
+ * expired one), with `spent` set: a service answers a second press of the same
+ * submit with what the first one made, instead of a 404.
+ * @returns {Promise<{public_token_id: string, scope: string, subject_type: string, subject_id: string, single_use: boolean, expires_at: Date, spent: boolean}|null>}
  */
-async function resolve(client, token, { scope, forUpdate = false } = {}) {
+async function resolve(client, token, { scope, forUpdate = false, spent = false } = {}) {
   if (!looksLikeToken(token) || !SCOPE_RE.test(scope || "")) return null;
   const { rows } = await client.query(
-    `SELECT public_token_id, scope, subject_type, subject_id, single_use, expires_at
+    `SELECT public_token_id, scope, subject_type, subject_id, single_use, expires_at,
+            (single_use AND used_at IS NOT NULL) AS spent
        FROM public_token
       WHERE token_hash = $1 AND scope = $2
         AND revoked_at IS NULL AND expires_at > now()
-        AND NOT (single_use AND used_at IS NOT NULL)${forUpdate ? "\n      FOR UPDATE" : ""}`,
-    [hash(token), scope],
+        AND ($3 OR NOT (single_use AND used_at IS NOT NULL))${forUpdate ? "\n      FOR UPDATE" : ""}`,
+    [hash(token), scope, spent],
   );
   return rows[0] || null;
 }

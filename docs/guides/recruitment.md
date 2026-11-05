@@ -611,6 +611,39 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · Re-audit of P4 to P6 (three independent reviewers), fixed:
+  - **Apply:**
+    - the CV and the answers are checked before anything else, for everyone;
+    - an email that has applied is answered as any submission is, now;
+    - a second press of Submit gets the first receipt, not a 404;
+    - two people sending one new email at once meet the same answer;
+    - a stranger's form never renames a known person, it only fills a missing phone;
+    - one link holds at most five CVs.
+  - **Candidates:**
+    - the sheet's weighted total is the board's;
+    - Not Progressing and Score With AI are refused on a closed role;
+    - Screen With AI skips an application read meanwhile;
+    - Not Progressing cancels the candidate's unfinished sittings, so a Reopen can send them again.
+  - **Protected conditions:** a condition naming an age, a sex or the like is refused by phrase, and
+    "over 10 years in sales" passes.
+  - **Assessments:**
+    - a submitted or timed-out sitting keeps its link until it lapses, so the page can say it is
+      over; cancel and expire still stop it;
+    - moving on from a file question keeps the answer given;
+    - the minutes are fixed once sent;
+    - the link is always locked before the sitting;
+    - Send to Candidates skips a pair sent a moment ago;
+    - an assessment with no questions does not export.
+  - **Interviews:**
+    - the report needs `recruitment` edit over the role, or to be its hiring manager;
+    - an interview's calendar entry changes only from the interview;
+    - removing a panelist removes their draft, and a submitted card stays;
+    - only the traits in use count in a card's score;
+    - an ended role does not seat a panelist;
+    - Close Round waits until the interview has started;
+    - Candidate Details saved after the report remake the form;
+    - a cancel's reason is kept on its audit row.
+
 - 05/11/2026 · GE · P6 built. One round, one interview: Schedule makes the round, its panel and a
   calendar entry in one save (the calendar's `createIn`; the panelists hear as attendees), moves the
   candidate forward to Interview, and mails the candidate `interview-invite` with the .ics after commit; a

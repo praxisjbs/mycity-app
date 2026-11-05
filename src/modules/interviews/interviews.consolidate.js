@@ -19,6 +19,7 @@ const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { assertInScope } = require("../../shared/rbac/scope");
+const { scopeFor } = require("../../middleware/rbac");
 const { formatLongDate } = require("../../shared/time/day-first");
 const documents = require("../../shared/documents/generate");
 const vacancyRepo = require("../vacancies/vacancies.repo");
@@ -70,6 +71,8 @@ async function close(actor, scope, id) {
     const row = await scoped(client, id, actor, scope);
     if (row.round_status !== "open" || row.status === "cancelled")
       throw new AppError("ROUND_CLOSED", "This round is already closed", 409);
+    if (new Date(row.scheduled_start) > new Date())
+      throw new AppError("NOT_STARTED", "Close the round once the interview has started, or cancel it", 409);
     await closeIn(client, row, actor);
     return id;
   });
@@ -92,8 +95,9 @@ async function formData(client, row, reporterName) {
   const seats = (await repo.panel(client, row.interview_id, null)).filter((s) => s.shown && s.submitted_at);
   const averages = new Map((await repo.traitAverages(client, row.interview_id)).map((a) => [a.vacancy_question_id, a.average]));
   const ratingOf = (seat, qid) => ((seat.ratings || []).find((r) => r.vacancy_question_id === qid) || {}).rating;
+  const inUse = new Set(traits.map((t) => t.vacancy_question_id));
   const scoreOfSeat = (seat) => {
-    const rs = (seat.ratings || []).map((r) => Number(r.rating));
+    const rs = (seat.ratings || []).filter((r) => inUse.has(r.vacancy_question_id)).map((r) => Number(r.rating));
     return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : seat.overall_rating;
   };
   return {
@@ -122,23 +126,35 @@ async function formData(client, row, reporterName) {
   };
 }
 
+/** A new Interview Assessment Form from the round as it now stands; its id kept on the round. */
+async function makeForm(client, id, actor) {
+  const after = await repo.get(client, id, actor.employee_id);
+  const doc = await documents.generate(client, {
+    doc_type: FORM_DOC_TYPE,
+    entity: { type: "interview", id },
+    data: await formData(client, after, after.reported_by_name || "Recruitment"),
+    actor,
+  });
+  await repo.setForm(client, after.interview_round_id, doc.document_id);
+  return doc;
+}
+
 async function report(actor, scope, id, body) {
   return tx(async (client) => {
     const row = await repo.get(client, id, actor.employee_id, { lock: true });
     if (!row) throw notFound();
+    // The hiring manager, or `recruitment` edit over this vacancy: the route lets view through so the
+    // hiring manager may write it, so the edit grant is checked here (the view scope is not enough).
     const isHiringManager = Boolean(actor.employee_id && row.hiring_manager_id === actor.employee_id);
-    if (!isHiringManager) assertInScope(scope, row.hiring_manager_id);
+    if (!isHiringManager) {
+      const edit = await scopeFor(actor, "recruitment", "edit");
+      if (!edit) throw new AppError("PERMISSION_DENIED", "Only the hiring manager or a recruiter can write the report", 403);
+      assertInScope({ scope: edit.scope, scope_ids: edit.scope_ids || null }, row.hiring_manager_id);
+    }
     if (row.round_status !== "closed" || row.status === "cancelled")
       throw new AppError("ROUND_OPEN", "Write the report once the round is closed", 409);
     await repo.saveReport(client, row.interview_round_id, { report: body.report, decision: body.decision, by: actor.user_id });
-    const after = await repo.get(client, id, actor.employee_id);
-    const doc = await documents.generate(client, {
-      doc_type: FORM_DOC_TYPE,
-      entity: { type: "interview", id },
-      data: await formData(client, after, after.reported_by_name || "Recruitment"),
-      actor,
-    });
-    await repo.setForm(client, row.interview_round_id, doc.document_id);
+    const doc = await makeForm(client, id, actor);
     await emit(client, {
       key: EVENTS.INTERVIEW_REPORTED,
       entity: { type: "interview", id },
@@ -158,6 +174,8 @@ async function details(actor, scope, id, body) {
     if (typeof total === "number" && typeof relevant === "number" && relevant > total)
       throw new AppError("VALIDATION_FAILED", "More than the total", 422, { relevant_experience_months: ["More than the total"] });
     await repo.saveDetails(client, row.interview_round_id, body);
+    // Once the report is written, the form follows what the card now says.
+    if (row.report) await makeForm(client, id, actor);
     await emit(client, {
       key: EVENTS.INTERVIEW_DETAILS_SAVED,
       entity: { type: "interview", id },

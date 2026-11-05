@@ -15,6 +15,7 @@ const { pool } = require("../../config/db");
 const { config } = require("../../config/env");
 const { atomically } = require("../../shared/db/tx");
 const publicToken = require("../../shared/tokens/public-token");
+const lifecycle = require("../vacancies/vacancies.lifecycle");
 const repo = require("./candidates.repo");
 const { EMAILS } = require("./candidates.events");
 
@@ -52,7 +53,7 @@ async function invite(event) {
   const { candidate_id: candidateId, vacancy_id: vacancyId } = event.payload;
   const v = await repo.vacancy(pool, vacancyId);
   const person = await repo.candidate(pool, candidateId);
-  if (!v || !person || v.status !== "open") return;
+  if (!v || !person || !lifecycle.takesApplications(v)) return;
   const client = await pool.connect();
   let link;
   try {
