@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Owner | GE |
+| Owner | TB |
 | Milestone | M9 |
 | Backend modules | `system_health` |
 | Frontend paths | `app/src/features/settings/SystemHealth.tsx`, `app/src/features/settings/Performance.tsx` |

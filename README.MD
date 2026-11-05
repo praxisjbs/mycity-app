@@ -579,7 +579,7 @@ Shared first filled: `shared/dedup`. Prompts: `proposal-draft`, `mou-draft`. Tem
 Chain for every request: requester, line manager, Operations, requisition, CEO, disbursed
 (MILESTONES §13).
 
-### 5.12 M9 · Settings & Governance · GE · 7 to 11 Dec
+### 5.12 M9 · Settings & Governance · TB · 7 to 11 Dec
 
 | Module | Files beyond the template |
 |---|---|
@@ -935,8 +935,8 @@ On production, run it without `--sample` and enter the real person's details
 
 | Initials | Name | Owns |
 |---|---|---|
-| GE | Godwin-Okoh Elisha | Architecture, schema, M0, M3, M4, M9; community and mailbox in M1 |
-| TB | Tom-Blake Asaah | Dashboard (M1), M6, M10, M11 |
+| GE | Godwin-Okoh Elisha | Architecture, schema, M0, M3, M4; community and mailbox in M1 |
+| TB | Tom-Blake Asaah | Dashboard (M1), M6, M9, M10, M11 |
 | LA | Love Adeola | Migrations and data (M0), attendance (M1), M7 |
 | AJ | Adole Jerome | Frontend foundation, ESS (M1), M2, M5, M8 |
 

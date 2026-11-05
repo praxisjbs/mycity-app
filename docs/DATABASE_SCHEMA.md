@@ -530,7 +530,7 @@ and lines, disbursements · `8099` seed.
   them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
   (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
 
-### M9 Settings & Governance · 9000 to 9999 · GE
+### M9 Settings & Governance · 9000 to 9999 · TB
 
 **Built:** `9000` security events, access reviews and items, integrations, webhooks · `9090`
 reporting views · `9095` `updated_at` triggers (a one-time sweep of the tables that existed then;

@@ -80,8 +80,6 @@
 /packages/contract/schemas/identity.js             @swizfcodes @tomblakeasaah196
 /src/modules/imports/                              @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/imports.js              @swizfcodes @tomblakeasaah196
-/src/modules/integrations/                         @swizfcodes @tomblakeasaah196
-/packages/contract/schemas/integrations.js         @swizfcodes @tomblakeasaah196
 /src/modules/interviews/                           @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/interviews.js           @swizfcodes @tomblakeasaah196
 /src/modules/mailbox/                              @swizfcodes @tomblakeasaah196
@@ -100,18 +98,10 @@
 /packages/contract/schemas/sanctions.js            @swizfcodes @tomblakeasaah196
 /src/modules/search/                               @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/search.js               @swizfcodes @tomblakeasaah196
-/src/modules/security/                             @swizfcodes @tomblakeasaah196
-/packages/contract/schemas/security.js             @swizfcodes @tomblakeasaah196
-/src/modules/settings/                             @swizfcodes @tomblakeasaah196
-/packages/contract/schemas/settings.js             @swizfcodes @tomblakeasaah196
-/src/modules/system_health/                        @swizfcodes @tomblakeasaah196
-/packages/contract/schemas/system_health.js        @swizfcodes @tomblakeasaah196
 /src/modules/talent_pool/                          @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/talent_pool.js          @swizfcodes @tomblakeasaah196
 /src/modules/templates/                            @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/templates.js            @swizfcodes @tomblakeasaah196
-/src/modules/users/                                @swizfcodes @tomblakeasaah196
-/packages/contract/schemas/users.js                @swizfcodes @tomblakeasaah196
 /src/modules/vacancies/                            @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/vacancies.js            @swizfcodes @tomblakeasaah196
 /src/modules/workflow/                             @swizfcodes @tomblakeasaah196
@@ -128,6 +118,8 @@
 /packages/contract/schemas/dashboard.js            @tomblakeasaah196 @swizfcodes
 /src/modules/deductions/                           @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/deductions.js           @tomblakeasaah196 @swizfcodes
+/src/modules/integrations/                         @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/integrations.js         @tomblakeasaah196 @swizfcodes
 /src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/knowledge.js            @tomblakeasaah196 @swizfcodes
 /src/modules/payroll/                              @tomblakeasaah196 @swizfcodes
@@ -140,10 +132,18 @@
 /packages/contract/schemas/reports.js              @tomblakeasaah196 @swizfcodes
 /src/modules/salary_structure/                     @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/salary_structure.js     @tomblakeasaah196 @swizfcodes
+/src/modules/security/                             @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/security.js             @tomblakeasaah196 @swizfcodes
+/src/modules/settings/                             @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/settings.js             @tomblakeasaah196 @swizfcodes
 /src/modules/statutory/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/statutory.js            @tomblakeasaah196 @swizfcodes
+/src/modules/system_health/                        @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/system_health.js        @tomblakeasaah196 @swizfcodes
 /src/modules/user_guide/                           @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/user_guide.js           @tomblakeasaah196 @swizfcodes
+/src/modules/users/                                @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/users.js                @tomblakeasaah196 @swizfcodes
 
 # LA, backup GE
 /src/modules/agreements/                           @LovedataX @swizfcodes @tomblakeasaah196
@@ -225,7 +225,7 @@
 /docs/guides/notifications.md                      @swizfcodes @tomblakeasaah196
 /docs/guides/workspace.md                          @Ghosted34 @tomblakeasaah196 @swizfcodes
 /docs/guides/performance.md                        @tomblakeasaah196 @Ghosted34 @swizfcodes
-/docs/guides/system-health.md                      @swizfcodes @tomblakeasaah196
+/docs/guides/system-health.md                      @tomblakeasaah196 @swizfcodes
 /docs/guides/integrations.md                       @tomblakeasaah196 @swizfcodes
 /docs/guides/addresses.md                          @tomblakeasaah196 @swizfcodes
 /docs/guides/policies.md                           @tomblakeasaah196 @LovedataX @swizfcodes

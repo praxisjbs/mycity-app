@@ -248,7 +248,7 @@ start and still land on 18 December.
 | 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **TB** · AJ |
 | 7 | Partnerships, CRM & Trackers | 10% | 30 Nov–4 Dec | Fri 4 Dec | **LA** · GE |
 | 8 | Expenses & Budget Control | 8% | 7–11 Dec | Fri 11 Dec | **AJ** |
-| 9 | Settings & Governance | 7% | 7–11 Dec ∥ | Fri 11 Dec | **GE** |
+| 9 | Settings & Governance | 7% | 7–11 Dec ∥ | Fri 11 Dec | **TB** |
 | 10 | Staff Knowledge Hub & AI Assistance | 10% | 14–18 Dec | Fri 18 Dec | **TB** · GE |
 | 11 | Handover & Training | 4% | 14–18 Dec ∥ | Fri 18 Dec | **TB** · all |
 
@@ -1178,7 +1178,7 @@ remaining budget is flagged before approval, not after.
 
 ## 14 · M9 — Settings & Governance · 7%
 
-**Owner GE. 7–11 Dec, parallel with M8. Demo Fri 11 Dec.**
+**Owner TB** (who built it; first planned as GE). **7–11 Dec, parallel with M8. Demo Fri 11 Dec.**
 
 Built in M0, surfaced in M9. The permissions and audit foundation is laid at M1 by design, so this
 milestone is a console over mechanisms already load-bearing — which is what makes it safe to run
