@@ -44,6 +44,7 @@ section exists to stop.
 | `user-guide.md` | User Guide: the Knowledge Hub tab that teaches the whole hub, Quick Start and Full Guide, cut on the server to each reader's grants down to the step, pictures of the real screens, Back to Guide, and the gate that keeps it true (brought forward from M11) | TB | M0 | ☑ |
 | `praxis-ai.md` | Praxis AI: Ask and History, questions answered from the modules' reads with the person's own permissions, up to 5 reads a question, routes for changes, voice in (brought forward from M10) | TB, GE | M10 | ☐ |
 | `expenses.md` | Expenses & Budget Control: requests with line items and payees (ESS · My Requests), the line manager and Operations & People approval, requisitions for the CEO, disbursements with the bank reference, department and project budgets, categories | AJ | M8 | ☑ |
+| `partnerships.md` | Partnerships, M7's single source of truth: Pipeline, Categories, Partners and Leads with their 360s, deals, Proposals and the Claude Proposal Studio with its design kit, Contracts & MOUs with approval, signing and QR verification, Analytics; the tracker and returns importers; projects, tasks and events connected to partners; the build plan (Appendix A) | GE, LA | M7 | ☐ |
 
 Tick **Written** when the guide exists and has been read by the owner of every screen in its §2.
 Later milestones add their rows as they start.
