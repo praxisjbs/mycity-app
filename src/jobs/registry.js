@@ -179,6 +179,7 @@ const SCHEDULERS = Object.freeze([
   "places-name",
   "assessment-expiry",
   "interview-reminders",
+  "talent-pool-purge",
   "review-cycles",
   "query-rule-sweep",
   "user-guide-index",

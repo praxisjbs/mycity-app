@@ -242,6 +242,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/pool` | `PoolAdd` → `PoolEntry` | `recruitment` create · all/team | no | From an application, with a reason |
 | `POST /recruitment/pool/:id/invite` | `PoolInvite` → `PoolEntry` | `recruitment` edit · all/team | no | An Apply link to an open vacancy |
 | `POST /recruitment/pool/:id/remove` | `PoolRemove` → `PoolEntry` | `recruitment` delete · all/team | no | Taken off the pool before their time |
+| `POST /recruitment/pool/exports` | `PoolExportRequest` → `ExportFile` (202) | `recruitment` export · all/team | no | The whole filtered pool as a workbook, made in the worker, downloaded on the device that pressed Export |
 | `POST /recruitment/interviews/assist` | `NotesTidyRequest` → `NotesTidy` | `recruitment` view | no | `interview-notes-cleanup`; nothing kept |
 | `GET /api/public/v1/jobs` | `PublicJobListQuery` → `PublicJobPage` | public | yes | `open` and not past its closing time |
 | `GET /api/public/v1/jobs/:slug` | `PublicJob` | public | no | Draft is 404; paused and closed say so; an open role past its closing time reads closed. Names how many have applied (`applicants`) |
@@ -610,6 +611,12 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 05/11/2026 · GE · P6b built. Add to Pool keeps a person for 24 months with why, and adding them again
+  renews the reason and the 24 months, never a second entry. Invite to Apply goes through the candidates
+  module's own invite (`inviteIn`), so the link, the email and the refusals are those of Candidates, and
+  the application has source pool. Remove and the daily `talent-pool-purge` (05:23 Lagos) take a person off
+  without deleting anything. Export makes the filtered pool a workbook in the asker's scope.
 
 - 05/11/2026 · GE · Re-audit of P4 to P6 (three independent reviewers), fixed:
   - **Apply:**

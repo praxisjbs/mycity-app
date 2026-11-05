@@ -379,29 +379,44 @@ async function scoreAll(actor, scope, body) {
  * Invite to Apply: the person is kept (or found by email), and after commit an Apply link for one
  * open vacancy is made and mailed (candidates.mail.js invite). They apply as anyone does.
  */
-async function invite(actor, scope, body, { source = "invited" } = {}) {
+/**
+ * Invite a known person to apply, inside the caller's transaction: the vacancy is in scope and takes
+ * applications, and they have not applied for it. The link is made and mailed after commit
+ * (candidates.mail.js invite). The Talent Pool invites through here too, with source `pool`.
+ * @returns {Promise<{vacancy: object, expires_at: string}>}
+ */
+async function inviteIn(client, actor, scope, candidateId, vacancyId, { source = "invited" } = {}) {
+  const v = await vacancyRepo.get(client, vacancyId);
+  if (!v) throw new AppError("NOT_FOUND", "That vacancy does not exist", 404);
+  assertInScope(scope, v.hiring_manager_id);
+  if (!lifecycle.takesApplications(v))
+    throw new AppError("VALIDATION_FAILED", "Pick an open vacancy", 422, { vacancy_id: ["Pick an open vacancy"] });
+  if (await repo.applicationOf(client, v.vacancy_id, candidateId))
+    throw new AppError("VALIDATION_FAILED", "They have applied for this role", 422, { vacancy_id: ["They have applied for this role"] });
+  await emit(client, {
+    key: EVENTS.APPLICATION_INVITED,
+    entity: { type: "candidate", id: candidateId },
+    actor,
+    payload: { candidate_id: candidateId, vacancy_id: v.vacancy_id, vacancy_title: v.title, source, invited_by: actor.user_id },
+  });
+  return { vacancy: v, expires_at: new Date(Date.now() + mail.INVITE_TTL_HOURS * 3600 * 1000).toISOString() };
+}
+
+async function invite(actor, scope, body) {
   return tx(async (client) => {
-    const v = await vacancyRepo.get(client, body.vacancy_id);
-    if (!v) throw new AppError("NOT_FOUND", "That vacancy does not exist", 404);
-    assertInScope(scope, v.hiring_manager_id);
-    if (!lifecycle.takesApplications(v))
-      throw new AppError("VALIDATION_FAILED", "Pick an open vacancy", 422, { vacancy_id: ["Pick an open vacancy"] });
     const known = await repo.candidateByEmail(client, body.email);
     const candidateId = known
       ? known.candidate_id
       : await repo.insertCandidate(client, { first_name: body.first_name, last_name: body.last_name, email: body.email });
-    if (await repo.applicationOf(client, v.vacancy_id, candidateId))
-      throw new AppError("VALIDATION_FAILED", "They have applied for this role", 422, { email: ["They have applied for this role"] });
-    await emit(client, {
-      key: EVENTS.APPLICATION_INVITED,
-      entity: { type: "candidate", id: candidateId },
-      actor,
-      payload: { candidate_id: candidateId, vacancy_id: v.vacancy_id, vacancy_title: v.title, source, invited_by: actor.user_id },
-    });
-    return {
-      email: known ? known.email : body.email,
-      expires_at: new Date(Date.now() + mail.INVITE_TTL_HOURS * 3600 * 1000).toISOString(),
-    };
+    try {
+      const sent = await inviteIn(client, actor, scope, candidateId, body.vacancy_id);
+      return { email: known ? known.email : body.email, expires_at: sent.expires_at };
+    } catch (err) {
+      // On this form the person is named by their email, so that is where "already applied" belongs.
+      if (err.fields && err.fields.vacancy_id && err.fields.vacancy_id[0] === "They have applied for this role")
+        throw new AppError("VALIDATION_FAILED", "They have applied for this role", 422, { email: ["They have applied for this role"] });
+      throw err;
+    }
   });
 }
 
@@ -473,6 +488,7 @@ module.exports = {
   requestScore,
   scoreAll,
   invite,
+  inviteIn,
   emails,
   email,
   saveEmail,

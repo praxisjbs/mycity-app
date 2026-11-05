@@ -615,6 +615,7 @@ describe("schedules and heartbeat", () => {
       "system-health-digest",
       "system-health-purge",
       "system-health-sample",
+      "talent-pool-purge",
       "task-recurrence",
       "urgent-repeats",
       "user-guide-index",

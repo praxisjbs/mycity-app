@@ -46,14 +46,14 @@ saying who agreed and when.
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 0 | 0 | 5 | 0 | 0 |
-| M4 Recruitment End to End | 9 | 1 | 8 | 0 | 0 | 0 |
+| M4 Recruitment End to End | 9 | 0 | 9 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 4 | 4 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **101** | **26** | **8** | **67** | **0** | **0** |
+| **Total** | **101** | **25** | **9** | **67** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -1213,13 +1213,14 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 41 | Interviews | `interviews` | M4 | GE | ☑ | ☐ | ☐ | In progress | 05/11/2026 |
 | 42 | Offers | `offers` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
 | 43 | Onboarding | `onboarding` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 44 | Talent Pool | `talent-pool` | M4 | GE | ☐ | ☐ | ☐ | Not started | 04/11/2026 |
+| 44 | Talent Pool | `talent-pool` | M4 | GE | ☑ | ☐ | ☐ | In progress | 05/11/2026 |
 
 **Notes**
 
 - 04/11/2026 · GE · (Ose) P7 and P8 audited and fixed (`docs/handoff/m4-recruitment.md` §7): the candidate emails ship as Markdown and render a title's & and a typed name as written; the interview invite says where from the interview's type; the five prompts tightened (no CV cap, protected conditions not applied, fair assessment points); `Countdown` keeps its time across a remount and announces the time really left; `RatingField` gains `disabled`, `decimals` and the full keyboard. Shared fixes in mail subjects, Markdown templates, the AI's no-gap check and phone masking. No ticks: no screen changed. Left: P4 to P6 as the handoff lists.
 - 04/11/2026 · GE · (Ose) M4 packages P7 and P8 on `m4/recruitment` (`docs/handoff/m4-recruitment.md`). P7: the five candidate emails (`templates/email/application-received.html`, `apply-invite.html`, `assessment-invite.html`, `interview-invite.html`, `candidate-not-progressed.html`; `tests/unit/recruitment-emails.test.js`) and the five prompts (`cv-screen`, `assessment-questions`, `interview-notes-cleanup` new; `jd-draft` and `screening-questions` to version 2 with the redaction, no-gap and no-discrimination rules). The contract's `AssessmentInviteEmailVars` takes an untimed sitting (`duration_minutes` or `due_days`) and `InterviewInviteEmailVars` a `rescheduled` flag. P8: `RatingField` (Forms; 1 to 10 stars, two rows of five 44 px stars on a phone, read only for a closed round) and `Countdown` (Display; the server's clock for a timed assessment), each with test and gallery page; `docs/COMPONENTS.md` regenerated. No ticks: no screen changed. Left: P4 to P6 declare the email variables in their events files and pass the prompt inputs the handoff names; P9 and P11 put the two components on the screens.
 - 04/11/2026 · GE · Audit of P1 to P3: migrations folded (4050 removed, its changes in 4010 to 4040; local databases rebuilt), contract fixes (an edit clears a field sent empty, at most 20 traits, numbers never read from an empty field, Screen With AI reuses kept conditions) and Vacancies fixes (a draft can close, remote drops the place, one live vacancy a seat, suggestions, cards and Careers Settings held to scope, an answered question retired when reworded), with tests. Candidates, Assessments, Interviews, Talent Pool, Apply and Assessment (#39 to #41, #44, #82, #83) now owned by GE. Left: P4 onwards.
+- 05/11/2026 · GE · Talent Pool (#44) API built on `m4/recruitment` (P6b): Add to Pool and renew, the list and its figures, Invite to Apply (source pool), Remove, Export, the 24-month purge, ⌘K. Every M4 screen's API is now built. Left: the screens (P9, P11), the staff mock (P10).
 - 05/11/2026 · GE · Interviews (#41) API built on `m4/recruitment` (P6): Schedule with its calendar entry and the candidate's .ics, Reschedule, Cancel, Candidate Details, the blind card (traits 1 to 10 and a decision), submit and the closing rule, Close Round, the report and the Interview Assessment Form, Tidy With AI, the CV for the panel, the daily reminder. Left: the screens (P9).
 - 05/11/2026 · GE · Assessments (#40) and the public Assessment page (#83) API built on `m4/recruitment` (P5): the library (ASM codes, questions with their points sealed, on and off, export and import, Suggest With AI), sittings (Send, Send to Candidates, Mark Answers, Cancel), the candidate's page on the server's clock (Start, answers as given, file or link answers, Submit, TIME_UP), scoring, and the `assessment-expiry` job. Left: the screens (P9, P11).
 - 05/11/2026 · GE · Candidates (#39) and Apply (#82) API built on `m4/recruitment` (P4): Apply with the CV quarantined and kept against its link, the estimate, the board ranked by the weighted scorecard, moves, Not Progressing and Reopen, Score With AI and Screen With AI (`cv-screen`, Deep Reasoning, from the outbox), Invite to Apply, Candidate Emails, ⌘K. Left: the screens (P9, P11); P6 cancels a not-progressed candidate's interviews.

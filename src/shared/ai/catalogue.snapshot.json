@@ -1697,6 +1697,17 @@
       "screen": null
     },
     {
+      "key": "talent_pool.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "talent_pool.PoolListQuery",
+      "schema_sha": "cfabc7d2d676ebf0",
+      "screen": null
+    },
+    {
       "key": "tasks.get",
       "kind": "read",
       "module_key": "workspace",
@@ -2575,6 +2586,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "recruitment.interviews"
+    },
+    {
+      "key": "recruitment.route.invite_someone_from_the_talent_pool_to_apply",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.talent-pool"
     },
     {
       "key": "recruitment.route.invite_someone_to_apply_for_a_vacancy",

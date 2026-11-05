@@ -68,6 +68,11 @@ const PoolRemove = z
   .object({ removed_reason: z.string().trim().max(500, "At most 500 characters").optional() })
   .strict();
 
+/** POST /recruitment/pool/exports: the whole filtered pool as a workbook, answered as documents ExportFile. */
+const PoolExportRequest = z
+  .object({ invited: z.enum(["true", "false"]).optional(), q: z.string().trim().max(100).optional() })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   PoolEntry: {
@@ -89,6 +94,7 @@ const TABLES = {
   PoolAdd: { table: "talent_pool_entry" },
   PoolInvite: { table: null, reason: "the vacancy an Apply link is for; stamped as invited_vacancy_id" },
   PoolRemove: { table: "talent_pool_entry" },
+  PoolExportRequest: { table: null, reason: "the filters of a pool export; nothing is kept but the file" },
 };
 
 module.exports = {
@@ -100,4 +106,5 @@ module.exports = {
   PoolAdd,
   PoolInvite,
   PoolRemove,
+  PoolExportRequest,
 };
