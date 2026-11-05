@@ -122,6 +122,24 @@ async function consume(client, publicTokenId) {
   return rowCount === 1;
 }
 
+/**
+ * Move a live token's end to `until`, never earlier than it was: a link that must outlive its first
+ * date once used (an assessment started on its last day lives until the sitting is due). True when
+ * the token was live and is now that long.
+ * @param {import("pg").PoolClient} client
+ * @param {string} publicTokenId
+ * @param {Date} until
+ */
+async function extend(client, publicTokenId, until) {
+  const { rowCount } = await client.query(
+    `UPDATE public_token
+        SET expires_at = GREATEST(expires_at, LEAST($2::timestamptz, created_at + make_interval(hours => $3)))
+      WHERE public_token_id = $1 AND revoked_at IS NULL AND expires_at > now()`,
+    [publicTokenId, until, MAX_TTL_HOURS],
+  );
+  return rowCount === 1;
+}
+
 /** End every live token for a record (and scope, when given). Returns how many. */
 async function revokeFor(client, { subject_type, subject_id, scope = null }) {
   const { rowCount } = await client.query(
@@ -137,6 +155,7 @@ module.exports = {
   issue,
   resolve,
   consume,
+  extend,
   revokeFor,
   looksLikeToken,
   hash,

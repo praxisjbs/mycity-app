@@ -109,7 +109,7 @@ never sign in.
    active candidate of one role at one stage who has no live sitting of it (TB, 04/11/2026). On `/assess/<token>` the candidate presses Start; the server sets
    `started_at` and `due_at` (start plus the minutes); every answer saves as it is given, a file answer
    uploaded (up to 25 MB) or given as a link to a larger one (a video, a portfolio); Submit, or
-   the clock, ends it (`assessment-expire`). Choice answers score themselves; written and file answers
+   the clock, ends it (`assessment-expiry`). Choice answers score themselves; written and file answers
    wait on Assessments · Sittings for Mark Answers. Once every answer has a mark the sitting is
    `scored` and its percentage lands on the candidate (`assessment.scored`).
 8. **Interview.** Schedule Interview (Interviews, or the candidate's sheet) names the time, in person
@@ -423,7 +423,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 - Start sets `started_at` = now and `due_at` = now + `duration_minutes` (or the due day for an untimed one). The clock is the server's: the
   session returns `ends_at` and `server_now`, and an answer after `due_at` is refused with `TIME_UP`.
   Reopening the link resumes at `current_question` with the time left.
-- Submit, or `assessment-expire` within a minute of `due_at`, ends the sitting (`submitted` or
+- Submit, or `assessment-expiry` within a minute of `due_at`, ends the sitting (`submitted` or
   `timed_out`); answers saved stand. A sitting never started by its start-by day becomes `expired`.
 - Score = Σ awarded ÷ Σ `max_score` × 100, one decimal, once every answer has a mark; an unanswered
   question scores zero. All choice questions: scored at submit. Otherwise the sitting waits for Mark
@@ -471,7 +471,9 @@ with test addresses.
 | `application.reopened` | after Reopen | audit; the card refreshes |
 | `recruitment.candidate_email_saved` | a candidate email reworded, or its default restored | audit |
 | `assessment.sent` | after Send | outbox: `assessment-invite` |
-| `assessment.submitted`, `assessment.timed_out` | at the end of a sitting | auto-scoring; notice to the hiring manager when it waits for marking (`recruitment.assessment_to_mark`) |
+| `assessment.submitted`, `assessment.timed_out` | at the end of a sitting | auto-scoring: scored at once when nothing waits for a mark (an unanswered question counts zero) |
+| `assessment.to_mark` | a finished sitting has written or file answers to mark | notice to the vacancy's hiring manager, by application number, never the candidate's name |
+| `assessment.created`, `.updated`, `.questions_saved`, `.activated`, `.deactivated`, `.imported`, `.started`, `.expired`, `.cancelled`, `.marked` | after the write | audit |
 | `assessment.scored` | when the last mark is given | audit; scorecard refreshes |
 | `interview.scheduled`, `interview.rescheduled`, `interview.cancelled` | after save | outbox: the calendar entry and its invites to panelists; `interview-invite` with `.ics` to the candidate (a cancel sends the `.ics` cancel; a change of panel alone sends the candidate nothing); reminders scheduled or cancelled |
 | `interview.feedback_submitted` | after Submit Card | audit |
@@ -479,7 +481,7 @@ with test addresses.
 | `interview.reported` | after the report is saved | outbox: the Interview Assessment Form PDF (`documents.generate`) |
 | `talent_pool.added`, `talent_pool.invited`, `talent_pool.removed` | after the write | audit; `apply-invite` on invite |
 | `talent-pool-purge` (scheduler, daily) | always | removes members past their 24 months |
-| `assessment-expire` (scheduler, every minute) | always | ends sittings past `due_at`; expires unstarted sittings past `start_by` |
+| `assessment-expiry` (scheduler, every minute) | always | ends sittings past `due_at`; expires unstarted sittings past `start_by` |
 | `interview-feedback-reminder` (reminder engine) | from the interview's end, daily, working hours | reminds each panelist who has not submitted, until the round closes |
 
 ## 8 · Permissions and visibility by role
@@ -608,6 +610,15 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 05/11/2026 · GE · P5 built. An assessment's code is ASM-0001, made under a lock (no numbering scheme:
+  it is a library, not a document). Each option's points are sealed in `answer_key_enc` with the
+  question's id as its record, and read back only by staff reads and scoring. The assessment link is
+  made in the mail handler after Send commits (the token never sits in the outbox), opens again to
+  resume, lives until the start-by day and is moved to `due_at` by Start; ending the sitting stops it.
+  A sitting that ends with nothing to mark is scored at once. Suggest With AI takes `duration_minutes`,
+  and checks a named vacancy's scope before reading its role. File answers use upload purpose
+  `assessment_answer` (25 MB). The clock's job is `assessment-expiry`, as its file is named.
 
 - 05/11/2026 · GE · P4 built: Apply (the link, the CV kept against it until the application is made,
   the estimate, a second application answering the first's reference), the board ranked by the

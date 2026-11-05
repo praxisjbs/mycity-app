@@ -51,6 +51,8 @@ const UploadPurpose = z.enum([
   "signature",
   "brand",
   "performance_evidence",
+  "cv",
+  "assessment_answer",
 ]);
 
 const DocumentSensitivity = z.enum(["normal", "personal", "restricted"]);

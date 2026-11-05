@@ -1158,6 +1158,28 @@
       "screen": null
     },
     {
+      "key": "assessments.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "assessments.AssessmentListQuery",
+      "schema_sha": "b9413bd41ed8ab7a",
+      "screen": null
+    },
+    {
+      "key": "assessments.sittings",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "assessments.SittingListQuery",
+      "schema_sha": "baa8c05b4df75e8d",
+      "screen": null
+    },
+    {
       "key": "attendance.exceptions",
       "kind": "read",
       "module_key": "people",
@@ -2544,6 +2566,17 @@
       "screen": "recruitment.candidates"
     },
     {
+      "key": "recruitment.route.mark_the_answers_of_finished_assessments",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.assessments"
+    },
+    {
       "key": "recruitment.route.screen_a_role_s_applications_with_ai",
       "kind": "route",
       "module_key": "recruitment",
@@ -2553,6 +2586,28 @@
       "schema": null,
       "schema_sha": null,
       "screen": "recruitment.candidates"
+    },
+    {
+      "key": "recruitment.route.send_an_assessment_to_the_candidates_of_a_role",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.assessments"
+    },
+    {
+      "key": "recruitment.route.write_a_new_assessment",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.assessments"
     },
     {
       "key": "recruitment.route.write_a_new_vacancy",

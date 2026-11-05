@@ -38,7 +38,6 @@ async function cvText(documentId) {
 async function inputFor(a, conditions) {
   const v = await vacancies.get(pool, a.vacancy_id);
   const questions = await repo.applyQuestions(pool, a.vacancy_id);
-  const prompts = new Map(questions.map((q) => [q.vacancy_question_id, q.prompt]));
   const { about_company: company } = await vacancies.settings(pool);
   return {
     company,
@@ -54,9 +53,10 @@ async function inputFor(a, conditions) {
     candidate: {
       years_experience: a.years_experience,
       cover_letter: a.cover_letter || "",
-      answers: Object.entries(a.answers || {})
-        .filter(([id]) => prompts.has(id))
-        .map(([id, answer]) => ({ question: prompts.get(id), answer })),
+      // In the form's order: a jsonb object keeps no order of its own.
+      answers: questions
+        .filter((q) => (a.answers || {})[q.vacancy_question_id] !== undefined)
+        .map((q) => ({ question: q.prompt, answer: a.answers[q.vacancy_question_id] })),
     },
     cv_text: await cvText(a.cv_document_id),
   };

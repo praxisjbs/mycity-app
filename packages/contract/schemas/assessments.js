@@ -173,6 +173,8 @@ const AssessmentDraftRequest = z
     vacancy_id: uuid.optional(),
     instruction: z.string().trim().min(10, "Say what it should test").max(2000, "At most 2000 characters"),
     count: z.coerce.number().int().min(3, "At least 3").max(15, "At most 15").default(8),
+    /** The minutes the test will have, so the questions fit them; left out, a take-home brief. */
+    duration_minutes: optionalWhole(5, 240, "At most 240 minutes"),
   })
   .strict();
 

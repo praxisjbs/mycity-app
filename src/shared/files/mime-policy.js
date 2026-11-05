@@ -51,6 +51,9 @@ const ALLOW = Object.freeze({
   performance_evidence: [TYPES.pdf, ...IMAGES, TYPES.docx, TYPES.xlsx, TYPES.pptx, TYPES.csv],
   // A CV sent on the Apply form by a stranger: PDF or Word only (docs/guides/recruitment.md §6.2).
   cv: [TYPES.pdf, TYPES.docx],
+  // A candidate's file answer to an assessment: a spreadsheet, a document, an image or a short video
+  // (docs/guides/recruitment.md §6.7); anything larger is given as a link.
+  assessment_answer: [TYPES.pdf, ...IMAGES, TYPES.docx, TYPES.xlsx, TYPES.pptx, TYPES.csv, ...VIDEO],
 });
 
 const NEVER = new Set(["markup", "archive", "unknown"]);

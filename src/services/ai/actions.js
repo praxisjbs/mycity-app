@@ -226,6 +226,16 @@ const ACTIONS = Object.freeze({
   }),
   // Score With AI and Screen With AI on Candidates (docs/guides/recruitment.md §6.4): a CV read
   // against the role and its must-meet conditions; personal data, so never DeepSeek.
+  // Suggest With AI on an assessment's questions (docs/guides/recruitment.md §6.7, §9).
+  "assessment-questions": Object.freeze({
+    label: "Suggest Assessment Questions",
+    module: "recruitment",
+    job: "default",
+    personal_data: false,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
   "cv-screen": Object.freeze({
     label: "Score Application",
     module: "recruitment",
