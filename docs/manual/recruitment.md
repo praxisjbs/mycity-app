@@ -54,18 +54,22 @@ fields before **Next** lets you on.
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Press **New Vacancy** at the top right. On a phone it is in **Quick Actions**.
    ![New Vacancy](shot:recruitment-vacancy-new)
-3. On **Role**, type the job title and pick the department and the hiring manager.
-4. Pick who the role reports to, and type how many people you are hiring. Press **Next**.
-5. On **Details**, pick the employment type and the arrangement, such as hybrid.
-6. Under the arrangement, you may add a note, such as `2 days in office, 3 from home`.
-7. Start typing the area under location and pick it from the list. A remote role has no location.
-8. Fill in the working days, the probation in months and the years of experience needed.
-9. Write the description. It opens with the About MyCityApp paragraph by itself.
-10. Fill in **Required Experience and Qualifications** and, if you like, **What We Are Looking For**.
-    Press **Next**.
-11. On **Pay and Publish**, type the salary band and choose whether the careers page shows it.
-12. Pick the target start day and the day it **Closes On**.
-13. Press **Publish Vacancy** to put it on the careers page now, or **Save Draft** to finish later.
+3. On **Role**, type the **Job Title** and pick the **Department** and the **Hiring Manager**.
+4. Type how many **Positions** you are hiring, pick the **Employment** type and, if you like, who the
+   role **Reports To**. Press **Next**.
+5. On **Details**, pick the **Arrangement**, such as hybrid. You may add an **Arrangement Note**, such
+   as `2 days in office, 3 from home`.
+6. Start typing the area under **Location** and pick it from the list. A remote role has no location.
+7. Fill in the **Working Days** and the **Probation Months**. Pick the day it **Closes On** and, if
+   you like, the **Target Start**.
+8. Write the **Description**. On the careers page it follows the About MyCityApp paragraph by itself.
+9. Fill in **Required Experience and Qualifications** and, if you like, **What We Look For**.
+   Press **Next**.
+10. On **Pay and Publish**, type the **Years of Experience** needed and the salary band, **Salary
+    From** and **Salary To**. Tick **Show Salary on Careers** to show the band there.
+11. **Publish Now** is ticked. Leave it to put the vacancy on the careers page now, and press
+    **Publish Vacancy**.
+12. Or untick it and press **Save Draft** to finish later.
 
 | Field | What to enter | Needed to publish |
 |---|---|---|
@@ -75,21 +79,22 @@ fields before **Next** lets you on.
 | Location | An area picked from the list | Yes, unless remote |
 | Description | What the role is, its duties and how it is measured; 80 characters or more | Yes |
 | **Required Experience and Qualifications** | What a candidate must have; 20 characters or more | Yes |
-| **What We Are Looking For** | What would help but is not needed | No |
+| **What We Look For** | What would help but is not needed. The careers page heads it What We Are Looking For | No |
 | Salary band | The lowest and highest pay | No |
 | **Closes On** | A day after today; it closes at 23:59 Lagos time | Yes |
 
 A new vacancy takes its interview traits from [Careers Settings](#recruitment-vacancies-settings),
 and its scorecard at the usual weights. Change either before you publish.
 
-> **Tip:** A draft can stay unfinished. Only **Publish Vacancy** needs every field marked Yes.
+> **Tip:** A draft can stay unfinished. Only publishing needs every field marked Yes.
 
 ### Draft the description with AI {#recruitment-vacancies-write-ai needs="recruitment edit"}
 
 1. On a new vacancy, or one you opened with **Edit**, fill in the title, the department and anything
    you know first.
 2. On **Details**, type a line in **About the Role** and press **Write With AI**.
-3. When you have already typed a description, the hub asks first. Press **Replace Text** to go on.
+3. When you have already typed a description, the hub asks first, under **Replace Your Text**.
+   Press **Replace Text** to go on.
 4. The draft fills the description, **Required Experience and Qualifications** and **What We Look
    For**, in MyCity's usual shape.
 5. Read it and change what you need. Nothing is saved until you save the vacancy.
@@ -138,7 +143,7 @@ by one.
 1. Open the vacancy on [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Press **Edit**. The same three steps open with what is saved.
 3. Change what you need. Emptying a field that is not needed clears it.
-4. Save it. The careers page shows the change at once.
+4. Press **Save Vacancy**. The careers page shows the change at once.
 
 Making a role remote removes its location. A closed vacancy has no **Edit**.
 
@@ -218,7 +223,7 @@ Candidates is the board: each application as a card, in a column for its stage.
 2. The tiles count the **Candidates**, those **To Screen**, those **In Interview** and those
    **Shortlisted**.
 3. Pick a role in the vacancy filter to see only its candidates.
-4. The columns are **Application**, **Screening**, **Assessment**, **Interview** and **Shortlist**.
+4. The columns are **Applied**, **Screening**, **Assessment**, **Interview** and **Shortlist**.
    A role that skips a stage has no column for it.
 5. Each card shows the name, the role, the screening score and how many days it has been at its
    stage.
@@ -238,10 +243,10 @@ The best weighted total comes first. A score never moves, rejects or hides anyon
    ![A candidate's sheet](shot:recruitment-candidate-sheet)
 2. The sheet shows their details, their CV, their answers and their assessments and interviews.
 3. **Screening** shows the score, **Provisional** while it is the estimate, and the AI's summary.
-4. **Scorecard** shows each part's score and the **Weighted Total**. Beside it, *3 of 5 parts* says
-   how many parts have a score yet.
+4. **Weighted Total** shows each part's score and the total. Beside it, *3 of 5 parts* says how
+   many parts have a score yet.
 5. **Stage History** lists each move, who made it and when.
-6. Press the CV to open it.
+6. Press **View CV** to open the CV.
 
 A CV that is *Being checked* is still being scanned for viruses. It opens once it is clean. A CV
 with a virus never opens, and the sheet says so.
@@ -253,6 +258,9 @@ with a virus never opens, and the sheet says so.
 3. AI reads the CV, the cover letter and the answers against the role and its must-meet conditions.
 4. The score, from 0 to 100, and a short summary replace the estimate. **Provisional** goes.
 
+**Score With AI** shows only while the CV is ready and the candidate has no AI score. A candidate is
+read once.
+
 The summary says which conditions are met and what AI could not check. A Word file, or a scan with
 no text, is scored without the CV, and the summary says so.
 
@@ -261,18 +269,20 @@ no text, is scored without the CV, and the summary says so.
 Screen With AI reads every candidate of one role who has no AI score yet.
 
 1. Open [Recruitment · Candidates](/recruitment?tab=candidates).
-2. Pick the role in the vacancy filter.
-3. Press **Screen With AI**. You can also start it from ⌘K.
+2. Press **Screen With AI**. You can also start it from ⌘K.
    ![Screen With AI](shot:recruitment-screen-ai)
-4. Type one to three must-meet conditions, such as `A degree in accounting` or `Lives in Lagos`.
-5. Confirm it. The candidates are read one by one, and each card shows its score when it is ready.
+3. Pick the **Vacancy**. The role in the vacancy filter is picked already.
+4. Type a condition under the first **Must Meet**, such as `A degree in accounting` or
+   `Lives in Lagos`. Press **Add Condition** for another, up to three.
+5. Press **Screen Applications**. The candidates are read one by one, and each card shows its score
+   when it is ready.
 
 The role keeps its conditions. Next time, leave them as they are and they are used again.
 
 | The hub says | Why | What to do |
 |---|---|---|
 | A condition is refused | It names an age, a sex, a marital status, a religion, a tribe or a state of origin | Write a condition about skills, experience or where they live |
-| None were read | Every candidate of the role already has an AI score | Use **Score With AI** on one candidate to read them again |
+| *None waiting to be read* | Every candidate of the role already has an AI score | Nothing: each is read once, and the board ranks them |
 
 > **Tip:** When **Screen With AI** and **Score With AI** are not shown, AI is off or has reached
 > its limit. The estimates still rank the board.
@@ -291,8 +301,8 @@ now. Each move goes in **Stage History**, and the days at stage start again.
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
 2. Press **Not Progressing**.
-3. Type the reason, at least 10 characters. Only staff read it.
-4. Confirm it.
+3. Type the **Reason**, at least 10 characters. Only staff read it.
+4. Press **Not Progressing**.
 
 The candidate is emailed that they are not going further. Their links stop working, and their
 unfinished assessments are cancelled. Their interviews are called off, and the panel and the
@@ -310,8 +320,8 @@ You can stop a candidate of a closed vacancy too. They cannot be moved, scored o
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
 2. Press **Add to Pool**.
-3. Type why they are worth keeping, at least 5 characters.
-4. Confirm it. They are kept in the [Talent Pool](#recruitment-pool) for 24 months.
+3. Under **Why Keep Them**, type why they are worth keeping, at least 5 characters.
+4. Press **Add to Pool**. They are kept in the [Talent Pool](#recruitment-pool) for 24 months.
 
 Adding someone already in the pool renews the reason and the 24 months. When they are in the pool
 from a role you cannot see, the hub says *Already in the pool*.
@@ -320,12 +330,13 @@ from a role you cannot see, the hub says *Already in the pool*.
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
 2. Press **Send Assessment**.
-3. Pick the assessment. Only active ones are offered.
-4. Type how many days they have to start it, from 1 to 14. It starts at 3.
-5. For a take-home brief with no time limit, also type how many days they have to finish it after
-   starting, from 1 to 14. It starts at 5.
-6. Send it. The candidate gets an email with their own link, and moves to **Assessment** when they
-   were at an earlier stage.
+3. Pick the **Assessment**. Only active ones are offered.
+4. Under **Start Within Days**, type how many days they have to start it, from 1 to 14. It starts
+   at 3.
+5. For a take-home brief with no time limit, also type the **Days to Finish** after starting, from
+   1 to 14. Left empty, it is 5.
+6. Press **Send Assessment**. The candidate gets an email with their own link, and moves to
+   **Assessment** when they were at an earlier stage.
 
 A candidate takes each assessment once. To send one to everyone at a stage, use
 [Send to Candidates](#recruitment-assessments-send).
@@ -334,7 +345,8 @@ A candidate takes each assessment once. To send one to everyone at a stage, use
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
 2. Press **Schedule Interview**.
-3. Follow [Schedule an interview](#recruitment-interviews-schedule) from step 3.
+3. Follow [Schedule an interview](#recruitment-interviews-schedule) from step 4. The candidate is
+   picked already.
 
 ### Invite someone to apply {#recruitment-candidates-invite needs="recruitment create"}
 
@@ -343,9 +355,9 @@ Invite a person you have found, so they apply to one open role.
 1. Open [Recruitment · Candidates](/recruitment?tab=candidates).
 2. Press **Invite to Apply** at the top. You can also start it from ⌘K.
    ![Invite to Apply](shot:recruitment-invite)
-3. Pick the open vacancy.
-4. Type the person's name and email.
-5. Send it. They get an email with an Apply link that works for 7 days.
+3. Type the person's **First Name**, **Last Name** and **Email**.
+4. Pick the open **Vacancy**.
+5. Press **Send Invitation**. They get an email with an Apply link that works for 7 days.
 
 They apply exactly as anyone does from the careers page, and arrive on the board.
 
@@ -372,11 +384,12 @@ An assessment is timed, with minutes and a clock, or untimed: a take-home brief 
 1. Open [Recruitment · Assessments](/recruitment?tab=assessments).
 2. Press **New Assessment** at the top right. On a phone it is in **Quick Actions**.
    ![New Assessment](shot:recruitment-assessment-new)
-3. Type the name, such as `Excel Skills Test`, and pick the type: psychometric, technical, case
-   study or practical.
-4. Write the instructions the candidate reads before they start.
-5. For a timed test, type the minutes, from 5 to 240. Leave it empty for a take-home brief.
-6. Type the pass score if it has one, then save it.
+3. Type the **Name**, such as `Excel Skills Test`, and pick the **Type**: psychometric, technical,
+   case study or practical.
+4. For a timed test, type the **Minutes**, from 5 to 240. Leave it empty for a take-home brief.
+5. Type the **Pass Mark** if it has one.
+6. Write the **Instructions** the candidate reads before they start.
+7. Press **Make Assessment**.
 
 It gets a code such as *ASM-0001*. It stays off until it has questions and you
 [switch it on](#recruitment-assessments-activate).
@@ -385,8 +398,8 @@ It gets a code such as *ASM-0001*. It stays off until it has questions and you
 
 1. Open the assessment on [Recruitment · Assessments](/recruitment?tab=assessments).
 2. Press **Edit**.
-3. Change the name, the type, the instructions or the pass score.
-4. To make a test untimed, empty the minutes. Save it.
+3. Change the name, the type, the instructions or the **Pass Mark**.
+4. To make a test untimed, empty the **Minutes**. Press **Save Assessment**.
 
 The minutes cannot change once the assessment has been sent to anyone.
 
@@ -394,28 +407,29 @@ The minutes cannot change once the assessment has been sent to anyone.
 
 1. Open the assessment on [Recruitment · Assessments](/recruitment?tab=assessments).
 2. Press **Questions**.
-3. Add a question and pick its kind.
-4. For a choice, type each option and the **Points** it scores. The question's most is its best
-   option.
-5. For a written or a file answer, type the most it can score. You mark these yourself.
-6. Put the questions in order, then save them.
+3. Press **Add Question**, type the **Question** and pick its **Answer**: choice, written, or file
+   or link.
+4. For a choice, type each option and the **Points** it scores. Press **Add Option** for another.
+   The question's most is its best option.
+5. For a written or a file answer, type its **Most Points**. You mark these yourself.
+6. Press **Remove** on a question to take it out. Press **Save Questions**.
 
 | Kind | How it is marked |
 |---|---|
 | Choice | By itself, from the points of the option picked |
 | Written | By hand, on [Mark Answers](#recruitment-assessments-mark) |
-| File | By hand. The candidate uploads a file up to 25 MB, or gives a link to a larger one |
+| File or link | By hand. The candidate uploads a file up to 25 MB, or gives a link to a larger one |
 
-> **Important:** Once an assessment has been sent to anyone, its questions cannot change. Switch it
-> off and make a new one.
+> **Important:** Once an assessment has been sent to anyone, its questions cannot change and
+> **Questions** is gone. Switch it off and make a new one.
 
 ### Suggest questions with AI {#recruitment-assessments-suggest needs="recruitment edit"}
 
 1. In **Questions**, press **Suggest With AI**.
-2. Say what the questions should test and how many you want.
-3. To fit them to a role, pick the vacancy.
-4. Read the suggestions. Keep the ones you want, and check each option's **Points**.
-5. Save the questions. Nothing is kept until you do.
+2. Five questions are added below yours, written from the assessment's type and instructions.
+3. Read them. Change their words, check each option's **Points**, and **Remove** those you do not
+   want.
+4. Press **Save Questions**. Nothing is kept until you do.
 
 ### Switch an assessment on or off {#recruitment-assessments-activate needs="recruitment edit"}
 
@@ -440,13 +454,14 @@ An assessment with no questions cannot be exported.
 
 ### Send to every candidate at a stage {#recruitment-assessments-send needs="recruitment edit"}
 
-1. Open [Recruitment · Assessments](/recruitment?tab=assessments).
-2. Press **Send to Candidates**.
-3. Pick the assessment, the role and the stage. The stage starts at **Assessment**.
-4. Type the days to start it and, for a take-home brief, the days to finish it.
-5. Send it. The hub says how many were sent, and how many already had it.
+1. Open the assessment on [Recruitment · Assessments](/recruitment?tab=assessments).
+2. Press **Send to Candidates**. It shows on an active assessment.
+3. Pick the open **Vacancy** and the **Stage**. The stage starts at **Assessment**.
+4. Type the **Start Within Days** and, for a take-home brief, the **Days to Finish**.
+5. Press **Send Assessment**. The hub says how many were sent, and how many already had it.
 
-Only active candidates are sent it, each once. Each gets an email with their own link.
+Only active candidates are sent it, each once. Each gets an email with their own link, and those at
+an earlier stage move to **Assessment**.
 
 ### Read the sittings {#recruitment-assessments-sittings}
 
@@ -458,12 +473,13 @@ Only active candidates are sent it, each once. Each gets an email with their own
 
 | Where it stands | What it means |
 |---|---|
-| Sent | The link is out; not started yet |
-| In progress | Started and still running |
-| Submitted or timed out | Finished. Waiting for marks, or scored already |
-| Scored | Every answer has a mark; the score is on the candidate |
-| Expired | Never started by its start day |
-| Cancelled | Stopped by staff, or by Not Progressing |
+| **Sent** | The link is out; not started yet |
+| **In Progress** | Started and still running |
+| **To Mark** | Submitted, with answers waiting for marks |
+| **Time Up** | The clock ran out. What was answered counts, marked as for To Mark |
+| **Scored** | Every answer has a mark; the score is on the candidate |
+| **Expired** | Never started by its start day |
+| **Cancelled** | Stopped by staff with **Cancel Sitting**, or by Not Progressing |
 
 ### Mark the answers {#recruitment-assessments-mark needs="recruitment edit"}
 
@@ -486,7 +502,8 @@ the others' cards until the round closes.
 ### Read the interviews {#recruitment-interviews-read}
 
 1. Open [Recruitment · Interviews](/recruitment?tab=interviews).
-2. **Upcoming** shows what is coming; press **Past** for those held.
+2. **Upcoming** shows what is coming; press **Past** for those held, or **My Panels** for those you
+   sit on.
 3. Each shows the candidate, the role, when, how many of the panel have submitted, and the round.
 4. Press an interview. On a computer it opens beside the list; on a phone it opens in a sheet.
    ![An interview's sheet](shot:recruitment-interview-sheet)
@@ -501,11 +518,12 @@ the CEO.
 1. Open [Recruitment · Interviews](/recruitment?tab=interviews).
 2. Press **Schedule Interview**. On a phone it is in **Quick Actions**.
    ![Schedule Interview](shot:recruitment-interview-schedule)
-3. Pick the candidate and the role they applied for.
-4. Pick the day, the start time and the end time.
-5. Pick how it is held: in person at a worksite, by video with its link, or by phone.
-6. Pick the panel. Only people who hold Recruitment are offered.
-7. Save it.
+3. Search for the **Candidate** by name and pick them. Their role shows under their name.
+4. Pick **How** it is held: in person at a **Worksite**, by video with its **Meeting Link**, or by
+   phone. You may give it a **Round Name**, such as `Interview 1`.
+5. Pick the **Day**, when it **Starts** and when it **Ends**.
+6. Pick the **Panel**. Each panelist needs Recruitment; the hub refuses someone without it.
+7. Press **Schedule Interview**.
 
 The candidate moves to **Interview** and gets an email with a calendar file. Each panelist gets a
 calendar invite, also on [My Workspace · Calendar](/workspace?tab=calendar).
@@ -515,9 +533,11 @@ Nobody sits on a panel about themselves. A candidate who works at MyCity cannot 
 ### Change or call off an interview {#recruitment-interviews-reschedule needs="recruitment edit"}
 
 1. Open the interview on [Recruitment · Interviews](/recruitment?tab=interviews).
-2. Press **Reschedule** to change the time, the place or the panel. Save it.
+2. Press **Reschedule** to change the time, the place or the panel, then press **Reschedule** at
+   the foot.
 3. Everyone gets the new time. A change to the panel alone sends the candidate nothing.
-4. To call it off, press **Cancel**, type why and confirm it. Everyone gets the calendar cancel.
+4. To call it off, press **Cancel Interview**, type the **Reason** and press **Cancel Interview**.
+   Everyone gets the calendar cancel.
 
 A panel needs at least one person. Taking someone off removes their unsent card; a card already
 submitted stays.
@@ -527,11 +547,12 @@ submitted stays.
 The details are filled once for the whole panel, before or during the interview.
 
 1. Open the interview on [Recruitment · Interviews](/recruitment?tab=interviews).
-2. Press **Candidate Details**.
-3. Type their current employer.
-4. Pick their academics: **Outstanding**, **Very Good**, **Good**, **Average** or **Poor**.
-5. Type their total experience and their experience relevant to MyCity, in months.
-6. Save them. Every panelist sees them on their card.
+2. Under **Candidate Details**, press **Edit**.
+3. Type their **Current Employer**.
+4. Pick their **Academics**: **Outstanding**, **Very Good**, **Good**, **Average** or **Poor**.
+5. Type their experience in months: **Total Months**, and **Relevant Months** for what bears on
+   MyCity.
+6. Press **Save Details**. Every panelist sees them on their card. Each field is optional.
 
 ### Fill in your card {#recruitment-interviews-card}
 
@@ -545,12 +566,15 @@ You have a card only for an interview whose panel you sit on.
    rows of five.
 5. Each star saves as you press it. To take a rating back, press the same star again: the trait
    is not rated.
-6. Your own score shows as you go: the average of the traits you have rated so far.
-7. Pick your decision: **Select**, **On Hold** or **Reject**.
-8. Write any comments. They are the form's Others, and optional.
+6. **Your score** shows as you go: the average of the traits you have rated so far, and how many
+   are rated.
+7. Pick your **Decision**: **Select**, **On Hold** or **Reject**. It saves as you pick it.
+8. Write any **Comments**. They are the form's Others, and optional.
 9. To tidy your comments, press **Tidy With AI**, read the result and keep it or not.
 10. Write anything for yourself under **Private Notes**. Only you ever see these.
-11. The rest of your card saves as you go too. When it is done, press **Submit Card**.
+11. Press **Save Draft** to keep your comments and notes. Only the stars and the decision save by
+    themselves.
+12. When it is done, press **Submit Card**, then **Submit Card** again to confirm.
 
 **Submit Card** needs every trait rated and a decision. Once submitted, the card cannot change.
 
@@ -586,11 +610,11 @@ the role's interviews can write it too.
 
 1. Open the closed interview on [Recruitment · Interviews](/recruitment?tab=interviews).
 2. Press **Write Report**.
-3. Write what the panel found, at least 40 characters.
-4. Pick the decision: **Select**, **On Hold** or **Reject**.
-5. Save it. The Interview Assessment Form is made from the whole card.
+3. Under **Report**, write what the panel found, at least 40 characters.
+4. Pick the **Decision**: **Select**, **On Hold** or **Reject**.
+5. Press **Save Report**. The Interview Assessment Form is made from the whole card.
 
-You can change the report later. Each save makes the form again.
+To change it later, press **Edit Report**. Each save makes the form again.
 
 ### Download the form {#recruitment-interviews-form}
 
@@ -630,8 +654,8 @@ People join the pool from their candidate's sheet. See
 
 1. Open the person on [Recruitment · Talent Pool](/recruitment?tab=talent-pool).
 2. Press **Invite to Apply**. On a phone it is at the foot of the sheet.
-3. Pick the open vacancy.
-4. Send it. They get an email with an Apply link that works for 7 days.
+3. Pick the open **Vacancy**.
+4. Press **Send Invitation**. They get an email with an Apply link that works for 7 days.
 
 Their row then shows **Invited**. When they apply, their application comes from the pool.
 
@@ -639,7 +663,7 @@ Their row then shows **Invited**. When they apply, their application comes from 
 
 1. Open the person on [Recruitment · Talent Pool](/recruitment?tab=talent-pool).
 2. Press **Remove**.
-3. Type why, and confirm it. They leave the list; nothing about them is deleted.
+3. Press **Remove** again to confirm. They leave the list; nothing about them is deleted.
 
 ### Export the pool {#recruitment-pool-export needs="recruitment export"}
 

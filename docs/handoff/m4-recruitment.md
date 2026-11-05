@@ -485,3 +485,14 @@ packages that need none can start. Tick a package only when its own checks pass 
   whose first 2 KB hold `<script` is refused as markup; the seed finds a role by title only; staging mail to
   `@example.test` bounces; #72's body still carries the old `User-guide-unchanged` line (dropped when it is marked
   ready).
+- 05/11/2026 · GE · (Ose) **Ose's follow-ups, done.** The Recruitment chapter against the screens, every item of the
+  auditor's list: the wizard's fields per step (Employment and Positions on Role; Closes On, Target Start and Write
+  With AI on Details; Years of Experience, Show Salary on Careers and Publish Now on Pay and Publish), Use Draft gone,
+  **What We Look For**, Score With AI reads a candidate once (*None waiting to be read*), Screen With AI's **Vacancy**,
+  **Must Meet** and **Screen Applications**, Send to Candidates from an assessment's sheet with its fields, Suggest
+  With AI adds five without asking, the sittings' states as the screen names them (**To Mark**, **Time Up**),
+  **My Panels**, Candidate Details opens with **Edit**, My Card's **Save Draft** (only stars and the decision save by
+  themselves), **Cancel Interview**, **Edit Report**, **Make Assessment**, **Pass Mark**, **View CV**, **Applied**,
+  Remove asks no reason; and the fields of every form named as they read. The doubled heading: Vacancy drops a
+  description's first line when it is the heading the page gives it (`TextSection`), with a test and the public
+  mock's Graphics role written that way; `public-vacancy` retaken. Guide §10.1 and §14, PROGRESS note.

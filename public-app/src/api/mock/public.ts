@@ -182,7 +182,9 @@ const ROLES: Role[] = [
     min_experience_years: 3,
     applicants: 12,
     closes_at: lagosEnd(21),
+    /* Written as staff often paste it, under its own Role Overview heading: the page shows that heading once. */
     description: [
+      h(2, "Role Overview"),
       p("The Graphics and Motion Designer turns MyCityApp, a city discovery and lifestyle platform, into engaging, culturally relevant visual content that drives awareness and adoption."),
       h(2, "Key Responsibilities"),
       ul("Design the weekly campaign art for the app and social media.", "Edit and animate short promo videos for Instagram Reels and TikTok.", "Keep the brand consistent across every piece."),

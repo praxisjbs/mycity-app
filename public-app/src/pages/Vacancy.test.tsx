@@ -34,6 +34,13 @@ describe("Vacancy", () => {
     expect(screen.getAllByText("23 people have applied").length).toBeGreaterThan(0);
   });
 
+  it("a description that opens with its own Role Overview heading shows it once", async () => {
+    draw("graphics-and-motion-designer-lagos");
+    await screen.findByRole("heading", { level: 1, name: "Graphics and Motion Designer" });
+    expect(screen.getAllByRole("heading", { name: "Role Overview" })).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 3, name: "Key Responsibilities" })).toBeTruthy();
+  });
+
   it("Apply for This Role mints a link and opens the form on it", async () => {
     draw("graphics-and-motion-designer-lagos");
     const [apply] = await screen.findAllByRole("button", { name: "Apply for This Role" });

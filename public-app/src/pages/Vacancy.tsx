@@ -139,8 +139,16 @@ export function Vacancy({ slug }: { slug: string }) {
   );
 }
 
-/** One part of the role's text under its heading; nothing at all when the role has none. */
-function TextSection({ title, blocks }: { title: string; blocks: Block[] | null }) {
+/** The words of a heading block, compared without case or spacing. */
+const headingText = (b: Block | undefined) => (b?.kind === "heading" ? b.spans.map((s) => s.text).join("").trim().toLowerCase().replace(/\s+/g, " ") : null);
+
+/**
+ * One part of the role's text under its heading; nothing at all when the role has none. A text that
+ * opens with the same heading the page gives it (a description written as `## Role Overview`) loses
+ * that first line, so the heading shows once.
+ */
+function TextSection({ title, blocks: all }: { title: string; blocks: Block[] | null }) {
+  const blocks = all && headingText(all[0]) === title.toLowerCase() ? all.slice(1) : all;
   if (!blocks || blocks.length === 0) return null;
   const id = `part-${title.toLowerCase().replace(/\W+/g, "-")}`;
   return (
