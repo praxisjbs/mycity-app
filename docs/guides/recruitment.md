@@ -613,6 +613,8 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · P9 and P10: the staff screens on the contract, one file per tab (`app/src/features/recruitment/`, §10), and the staff mock in the contract's shapes. As built: New Vacancy is a wizard of three steps (Role, Details with Write With AI, Pay and Publish; Publish Vacancy or Save Draft); a vacancy's sheet shows Scorecard Weights, Candidates by Stage, the traits numbered and the Apply questions; Questions edits both lists (Use Defaults puts Careers Settings' traits back; Suggest With AI adds); the board narrows to a role's own columns when filtered; a candidate's sheet holds Move to <Stage>, Send Assessment, Schedule Interview, Not Progressing, Add to Pool and Reopen; Interviews has Upcoming, Past and My Panels; My Card opens full height from the interview's sheet; a form opened from a sheet returns to the sheet when it closes. An assessment's sheet has Export; Import is not on screen (it needs a local file read the upload engine does not do; the API's stays).
+
 - 05/11/2026 · GE · My Card takes the donor's scorecard flow (REUSE_MAP §5.3, praxis-ls applicant-drawer):
   the same numbered traits for every candidate of the role; each star saved as the panelist taps it, put
   back with the error when the save fails; a tap on the star already chosen takes it back to not rated
