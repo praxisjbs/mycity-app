@@ -40,7 +40,8 @@ const notFound = () => new AppError("NOT_FOUND", "That interview does not exist"
 
 /** The round's score from its submitted cards; null when none was submitted. */
 function scoreOf(cards) {
-  const scores = cards.map((c) => Number(c.score)).filter((n) => Number.isFinite(n));
+  // A card with no score (every trait it rated since retired) is left out, never read as 0.
+  const scores = cards.filter((c) => c.score !== null && c.score !== undefined).map((c) => Number(c.score)).filter((n) => Number.isFinite(n));
   if (!scores.length) return null;
   return round1((scores.reduce((a, b) => a + b, 0) / scores.length) * 10);
 }
@@ -83,7 +84,7 @@ const DECISIONS = { select: "Select", on_hold: "On Hold", reject: "Reject" };
 const months = (n) => (n === null || n === undefined ? null : n === 1 ? "1 month" : `${n} months`);
 /** The mean of the numbers given, or null when there are none. */
 function mean(values) {
-  const ns = values.map(Number).filter((n) => Number.isFinite(n));
+  const ns = values.filter((v) => v !== null && v !== undefined).map(Number).filter((n) => Number.isFinite(n));
   return ns.length ? ns.reduce((x, y) => x + y, 0) / ns.length : null;
 }
 const one = (n) => (n === null || n === undefined ? "Not rated" : String(round1(Number(n))));

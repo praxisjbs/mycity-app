@@ -22,6 +22,8 @@ const { defineEvents } = require("../../shared/events/catalogue");
 const { defineNotification } = require("../../shared/notifications/fanout");
 const { defineDocumentType } = require("../../shared/documents/types");
 const outbox = require("../../shared/events/outbox");
+const vault = require("../../shared/documents/vault");
+const { scopeFor } = require("../../middleware/rbac");
 
 const EVENTS = defineEvents("recruitment", {
   "assessment.created": { summary: "An assessment was written" },
@@ -44,6 +46,20 @@ const EVENTS = defineEvents("recruitment", {
 /** A candidate's file answer: a stranger's file, quarantined until scanned (guide §6.7). */
 const ANSWER_DOC_TYPE = "assessment_answer";
 defineDocumentType(ANSWER_DOC_TYPE, { label: "Assessment Answer", module: "recruitment", sensitivity: "personal" });
+
+/**
+ * Who opens a file answer: whoever may read the sitting, so a Head of Department who marks a role's
+ * sittings (scope team, by the vacancy's hiring manager) opens what the candidate sent, as one with
+ * scope all does (guide §8). The file names no employee, so the vault's own rule would refuse a team.
+ */
+vault.defineAccess("application_assessment", async (client, user, doc) => {
+  if (user.is_ceo === true) return true;
+  const row = await require("./assessments.repo").sitting(client, doc.entity_id);
+  if (!row) return false;
+  const s = await scopeFor(user, "recruitment", "view");
+  if (!s) return false;
+  return s.scope === "all" || Boolean(row.hiring_manager_id && (s.scope_ids || []).includes(row.hiring_manager_id));
+});
 
 /** The one thing an assessment link does (public_token scope); its subject is the sitting. */
 const SCOPE = "assessment.take";

@@ -96,13 +96,18 @@ async function get(db, id, employeeId, { lock = false } = {}) {
   return rows[0] || null;
 }
 
-/** The interviews of an application still to happen (Not Progressing cancels them). */
+/**
+ * The interviews of an application still to happen (Not Progressing cancels them). An interview
+ * that has ended stays `scheduled` until its round closes, but it took place: it is left for the
+ * panel to finish and Close Round, never called off after the event.
+ */
 async function scheduledFor(db, applicationId) {
   // pagination:complete one application's scheduled interviews, a handful
   const { rows } = await completeQuery(
     db,
     `SELECT i.interview_id FROM interview i JOIN interview_round r ON r.interview_round_id = i.interview_round_id
-      WHERE r.application_id = $1 AND i.status = 'scheduled' ORDER BY i.scheduled_start, i.interview_id`,
+      WHERE r.application_id = $1 AND i.status = 'scheduled' AND i.scheduled_end > now()
+      ORDER BY i.scheduled_start, i.interview_id`,
     [applicationId],
   );
   return rows.map((r) => r.interview_id);
