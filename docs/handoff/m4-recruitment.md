@@ -448,3 +448,4 @@ packages that need none can start. Tick a package only when its own checks pass 
   Remove asks no reason; and the labels **Close Vacancy**, **Cancel Interview**, **Applied**, **View CV**, **Screen
   Applications**, **Time Up**, **My Panels**, **Edit Report**, **Pass Mark**, **Make Assessment**. "The hiring manager is
   told it has closed" is true now. `npm run ci`: see the line below.
+- 05/11/2026 · GE · (auditor) `npm run ci` on eb6bb4c, `main` merged in (M3 #73, M8 #74, the M7 guide #76): **51 of 51 gates pass,** none not built, 14 min (backend suite against Postgres and Redis, frontend tests, screens with Chromium, checks). The first full run had failed one test only, `dark-theme-samples.html` stale after the public site's canvas tokens; regenerated. P14 accepted (its pictures are in, and 21 were retaken after P15's screen fixes). Over to GE: #72 can be marked ready for review; drop the old `User-guide-unchanged` line from its body.
