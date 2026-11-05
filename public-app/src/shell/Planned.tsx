@@ -10,6 +10,7 @@ const COMING: Record<string, string[]> = {
   assess: ["Timed assessments, taken on any phone or laptop", "Every answer saved as you go", "Resume where you stopped if the connection drops"],
   sign: ["Read your offer and sign it with your finger", "The signed document locks and can be verified", "Decline with an optional reason"],
   verify: ["Check a signed MyCity App document by its reference", "Two checks: the wording, and the stored file", "No sign-in needed"],
+  proposal: ["Read the proposal MyCity App prepared for you", "Download it as a PDF", "Reach the person who sent it"],
 };
 
 /** The Prototype View switch, in mock mode only (laptops and CI; F14). */

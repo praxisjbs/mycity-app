@@ -107,7 +107,7 @@ Open until the PR named closes it here and in the guide.
 | F12 | Decision 2 · No on Save Without Reference? left focus on the button | AJ (review) | review 05/11/2026 | closed 05/11/2026: No puts focus on **Bank Reference**; `Expenses.test.tsx` |
 | F13 | FRONTEND_GUIDE §8.4 · Cancel Request, Deactivate and Remove Budget acted without a confirm | AJ (review) | review 05/11/2026 | closed 05/11/2026: `useConfirm` before Cancel Request, Withdraw, Deactivate and Remove Budget; `Expenses.test.tsx` (Withdraw) |
 | F14 | User Guide · Description read Item 1; Add Line on the Budget form is Add Category; Record Disbursement opens from the row; Deactivate and Save Category unnamed; Withdraw missing | AJ (review) | review 05/11/2026 | closed 05/11/2026: `docs/manual/expenses.md` fixed, Withdraw an approved request added, the confirms named; pictures retaken (`guide:shots --stale`, New Request, My Requests). The Projects tasks' `cap expenses.finance` not added: after F10 the tab is open to its read, and only Set Budget asks the capability, which its task already needs |
-| F15 | PROGRESS · #56, #59 and #104 Built while F5 and F10 left guide §2 unbuilt | AJ (review) | review 05/11/2026 | closed 05/11/2026: F5 and F10 fixed in this change, so the rows stay Built; the PROGRESS note says so |
+| F15 | PROGRESS · #56, #59 and #106 Built while F5 and F10 left guide §2 unbuilt | AJ (review) | review 05/11/2026 | closed 05/11/2026: F5 and F10 fixed in this change, so the rows stay Built; the PROGRESS note says so |
 | F16 | A line any request ever named could not be deleted | AJ (review) | review 05/11/2026 | closed 05/11/2026: refused (set to 0) only when a counted request (sent to paid) names it; the rest let go of it (`expenses.service detachLineIn`); `budgets.test.js` |
 | F17 | A budget's owner was the head at creation; scope and Edit Budget's notice went stale | AJ (review) | review 05/11/2026 | closed 05/11/2026: the budget reads `COALESCE(department.head_employee_id, owner_id)` for scope, the owner shown and the notice; `budgets.test.js` |
 | F18 | The monthly report's budget columns ignored status, NGN and the reader's budget scope | AJ (review) | review 05/11/2026 | closed 05/11/2026: `budgets.variance` reads approved NGN budgets within the reader's scope on the department's head; `budgets.test.js` |
@@ -151,7 +151,7 @@ PR 1 and PR 2 (the design, migration 8010, seed 8100, the contract) merged as #7
   (`GET /expenses/:id/history`); 8099's categories out (reference seed 8101) and the staging seed
   `80_expenses.js` on the Implementation Team's accounts, Home's expense rows taken away;
   `ListDetail layout="modal"` in `packages/ui`. Every Expenses screen on the contract: My Requests
-  in ESS, the tabs Requisitions, Approvals, Disbursements, Projects (new, #104), Budgets,
+  in ESS, the tabs Requisitions, Approvals, Disbursements, Projects (new, #106), Budgets,
   Categories; the line-item form with payee types, Use My Company Account, the invoice with Read
   Invoice and Suggest Category; Over Budget and Possible Duplicate with Check Duplicate; Save
   Without Reference?, Reference Missing and Add Reference; KPI cards opening their records; Add
@@ -175,7 +175,7 @@ Migrations: `8020_budget_one_per_year.sql` (new). Reference seed: `8101_seed_exp
 ## Screens and items
 
 #56 My Requests, #57 Approvals, #58 Requisitions, #59 Disbursements, #60 Budgets,
-#61 Categories, #104 Projects: all Built.
+#61 Categories, #106 Projects: all Built.
 
 ## Audit
 

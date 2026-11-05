@@ -406,6 +406,8 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `announcements.post` | `community` | Post announcements and track who has read them | Implementation, Operations & People, Management | `0449` |
 | `mailbox.signature` | `mailbox` | Configure Signature: the company's signature links and what shows on everyone's email signature | Implementation, System Administrator | `1129` |
 | `queries.configure` | `queries` | Write the query rules, the consequence chain and the letter templates (`docs/guides/queries.md`) | Implementation, Operations & People | `3190` |
+| `partnerships.configure` | `partnerships` | Configure Partnerships: the categories with their agreement templates, delivery checklists and custom fields, the pipeline's stages and lists, the proof points and the saved proposal templates (`docs/guides/partnerships.md`) | Implementation, Operations & People | `7190` |
+| `partnerships.money` | `partnerships` | See Commission and Returns: see and enter commission, the merchant's take and returns, and import returns | Implementation, Operations & People, Management; General Management through their department (in code) | `7190` |
 | `expenses.finance` | `expenses` | Run Expenses: group approved requests into requisitions, record disbursements, set budgets and manage the expense categories (`docs/guides/expenses.md`) | Implementation, Operations & People | `8100` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
@@ -552,18 +554,30 @@ screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2
 
 ### 5.10 M7 · Partnerships, CRM & Trackers · GE, LA · 30 Nov to 4 Dec
 
+The build plan and the file map are `docs/guides/partnerships.md` (Appendix A and D), M7's only
+source of truth. PR 1 (05/11/2026) filled the seven contract files, migrations `7010` to `7040`, seed
+`7190`, and mounted each module's router on `/api/v1/partnerships`, empty until its PR; the files
+below beyond the template are filled, or added, by the PR named.
+
 | Module | Files beyond the template |
 |---|---|
-| `partners` | `.360` (renders correctly with zero data), `.dedup`, `.import` (the tracker) |
-| `partner_pipeline` | `.stages` (MyCity's twelve, in order), `.types` (configurable, A21), `.inactivity` |
-| `leads` | `.convert` |
-| `interactions` | |
-| `proposals` | `.questionnaire`, `.draft` (AI), `.pdf` |
-| `agreements` | `.lifecycle` (Draft to Renewed/Closed, workflow definition), `.renewals` |
-| `partnership_analytics` | `.queries` (per lead owner, A21) |
-| `mailbox/binding/` | `intake.service`, `mail-context.service`, `context-tabs`, `convert.service` |
+| `partners` | `.360` (renders correctly with zero data), `.dedup`, `.convert` (the conversion transaction), `.documents`, `.work`, `.views` (PR 3); `.import` (the tracker, PR 4); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
+| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2); `.deals`, `.options`, `.stages`, `.health`, `.views` (PR 3); `.returns`, `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.types` is not built (categories replace it) and goes with PR 2; `.events` registers `deal.venue` (PR 1) |
+| `leads` | `.360`, `.status` (status from stage), `.views` (PR 3); `.convert` is not built (conversion is `partners.convert`) and goes with PR 3; `.events` registers `lead.cities` (PR 1) |
+| `interactions` | `.mail` (with `mailbox/binding/`, PR 8) |
+| `proposals` | `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views` (PR 7; `.proof` with PR 2); `.questionnaire` and `.pdf` are not built and go with PR 7 |
+| `agreements` | `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`), `.renewals`, `.views` (PR 6; `.tidy` with PR 2) |
+| `partnership_analytics` | `.queries` (per lead owner, A21; PR 8) |
+| `signatures` (shared with M5) | `.service`, `.code` (the email code), `.stamp`, `.certificate`, `.signed-pdf`, `.verify`, `.public.routes` (PR 6 if M5 has not built them) |
+| `mailbox/binding/` | `intake.service`, `mail-context.service`, `context-tabs`, `convert.service` (PR 8) |
 
-Shared first filled: `shared/dedup`. Prompts: `proposal-draft`, `mou-draft`. Templates: `proposal`, `mou`.
+Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR 4);
+`shared/documents/render.js` its table loop if missing (PR 6). Prompts (`services/ai/prompts/`):
+`proposal-questions`, `proposal-draft`, `proposal-rewrite`, `proposal-message`, `template-tidy`;
+`mou-draft` is not built (an MOU is a template). Templates: `templates/documents/` (the agreements,
+`proposal.html`, `signature-certificate.html`), `templates/proposals/` (the design kit),
+`templates/email/` (`proposal-sent`, `agreement-sign`, `agreement-signed`, `agreement-renewal`,
+`sign-code`).
 
 ### 5.11 M8 · Expenses & Budget Control · AJ · 7 to 11 Dec
 

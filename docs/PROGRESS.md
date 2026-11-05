@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 102 screens (96 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 104 screens (97 in the staff app, 7 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -49,11 +49,11 @@ saying who agreed and when.
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
-| M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
+| M7 Partnerships, CRM & Trackers | 8 | 8 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **102** | **28** | **0** | **74** | **0** | **0** |
+| **Total** | **104** | **30** | **0** | **74** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
@@ -1241,6 +1241,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 50 | Pipeline | `pipeline` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
+| 104 | Categories | `categories` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
 | 51 | Partners | `partners` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
 | 52 | Leads | `leads` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
 | 53 | Proposals | `proposals` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
@@ -1249,6 +1250,9 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 05/11/2026 · JP · M7 PR 1, contract, data and scaffolding (`m7/contract-data`, the guide's Appendix A): the seven contract files with every schema of Appendix C (the design kit's twelve layouts as one union; the Workspace link as `PartnerLink`, joining the Workspace forms in PR 5); migrations 7010 to 7040 (categories, templates, checklists, custom fields, leads, deals on a lead or partner with options, team, deliverables, returns and linked mail, the studio's tables, proof points, agreements, Workspace's three link columns; `agreement_obligation` dropped while empty; `partner_type` copied into a category and no longer required); seed 7190 (deal health, interaction types, numbering PAR, LED, DEAL, PRO, AGR, the `partnership.agreement` flow, `partnerships.configure` and `partnerships.money`, 7099's choices switched off); Categories (#104) and the public Proposal page (#105) ratified and registered; the mock split one file a screen; Home's partners source true to the schema. No ticks: the tabs show Coming Soon. Left: PR 2 to PR 9.
+- 05/11/2026 · JP · M7 guide rewritten as the milestone's single source of truth (`docs/guides/partnerships.md`, Status Agreed) from the Partnerships Workflow Discovery meeting of 5 November, MyCity's tracker and Deal Merchant Agreement, and JBS Praxis's 26 answers: leads and partners joined by deals, a Categories tab and a public Proposal page (ratified; PR 1 registers them in the next free rows, #104 and #105 while free), no board, health and blockers, the 360s, Connect to Partner on Workspace, returns, agreements approved and signed with a code and QR, the Claude Proposal Studio. No ticks, no Status change. The handoff now only tracks. Left: PR 1 to PR 9 (the guide's Appendix A).
+- 04/11/2026 · JP · M7 PR 0: the engineering guide `docs/guides/partnerships.md` (Draft) and the build plan `docs/handoff/m7-partnerships.md` are written before any code, and MILESTONES A14 is amended (the import engine was built in M0; M7 adds the tracker importer). No ticks, no Status change. Found: `7000` has no leads table, no partner-type configuration and none of the tracker's region, objective, impact or next action; `7099` seeds business choices A26 forbids; every M7 module, contract, template and prompt file is still empty. Left: GE and LA read the guide and answer its §13, the tracker workbook is obtained, then PR 1 (contract and data).
 - 25/10/2026 · JP · Proposals (#53), on the mock: a tapped proposal opens as a full sheet on a phone (F31: `ListDetail`), never under the list; on desktop it stays beside it. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/partnerships/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/partnerships.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
@@ -1259,15 +1263,15 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 58 | Requisitions | `requisitions` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 | 57 | Approvals | `approvals` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 | 59 | Disbursements | `disbursements` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
-| 104 | Projects | `projects` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 106 | Projects | `projects` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 | 60 | Budgets | `budgets` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 | 61 | Categories | `categories` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 
 **Notes**
 
-- 05/11/2026 · AJ · M8 release check (handoff PR 8): every Expenses AI card end to end and the access matrix green, the evaluation set's Expenses cases per role added, no M8 form gap, no stale picture, no empty M8 file; #56 to #61 and #104 stay Built until deployed. Left: on staging, the evaluation run and a real PDF through Read Invoice, then On staging.
-- 05/11/2026 · AJ · The M8 audit's F5 to F25 (`docs/handoff/m8-expenses-audit.md` §4), so #56, #59 and #104 do what guide §2 says (F15): Withdraw on Requisitions, Disbursements and a project's or a requisition's request, Cancel Request until approval, each after a confirm (F5, F13); Projects (#104) open to `expenses` view at scope all, Set Budget only to `expenses.finance`, its requests opening (F10); the KPI cards open their own requests (F21); the recount's lock, one budget per department per year (migration 8020), the head now, line removal, the report's budgets, Possible Duplicates in scope, Gemini's file reading (F6 to F9, F16 to F19). Rows stay Built. Left: PR 8, the release check.
-- 05/11/2026 · AJ · PR 7 of `docs/handoff/m8-expenses.md`, the screens: My Requests (#56, in ESS), Requisitions (#58), Approvals (#57), Disbursements (#59), Projects (#104), Budgets (#60) and Categories (#61) on the real API (`contract.gen.ts`, `useContractForm`, `ListDetail layout="modal"`), the mock on the contract, the User Guide chapter `docs/manual/expenses.md` and its pictures; every row API, UI and Mobile ticked, Built. Left: PR 8, the release check.
+- 05/11/2026 · AJ · M8 release check (handoff PR 8): every Expenses AI card end to end and the access matrix green, the evaluation set's Expenses cases per role added, no M8 form gap, no stale picture, no empty M8 file; #56 to #61 and #106 stay Built until deployed. Left: on staging, the evaluation run and a real PDF through Read Invoice, then On staging.
+- 05/11/2026 · AJ · The M8 audit's F5 to F25 (`docs/handoff/m8-expenses-audit.md` §4), so #56, #59 and #106 do what guide §2 says (F15): Withdraw on Requisitions, Disbursements and a project's or a requisition's request, Cancel Request until approval, each after a confirm (F5, F13); Projects (#106) open to `expenses` view at scope all, Set Budget only to `expenses.finance`, its requests opening (F10); the KPI cards open their own requests (F21); the recount's lock, one budget per department per year (migration 8020), the head now, line removal, the report's budgets, Possible Duplicates in scope, Gemini's file reading (F6 to F9, F16 to F19). Rows stay Built. Left: PR 8, the release check.
+- 05/11/2026 · AJ · PR 7 of `docs/handoff/m8-expenses.md`, the screens: My Requests (#56, in ESS), Requisitions (#58), Approvals (#57), Disbursements (#59), Projects (#106), Budgets (#60) and Categories (#61) on the real API (`contract.gen.ts`, `useContractForm`, `ListDetail layout="modal"`), the mock on the contract, the User Guide chapter `docs/manual/expenses.md` and its pictures; every row API, UI and Mobile ticked, Built. Left: PR 8, the release check.
 - 05/11/2026 · AJ · Projects added with npm run new:screen (catalogue, route map, screen file, Coming Soon); not started. My Requests (#56) moved into Employee Self-Service (its row is listed there now, counted with M8, as My Queries is with M3), and the Expenses tabs ordered Requisitions, Approvals, Disbursements, Projects, Budgets, Categories (handoff decision 8).
 - 05/11/2026 · AJ · PR 7 of `docs/handoff/m8-expenses.md`, its backend half: a request's history (`GET /expenses/:id/history`, the CEO's removal included), 8099's categories out (reference seed 8101, every environment), the staging seed `seeds/staging/80_expenses.js` (categories, budgets, projects and requests at every stage on the Implementation Team's accounts, after Home's expense rows are taken away), and `ListDetail`'s modal layout in `packages/ui`. No ticks: the screens still call their mock paths. Left: the screens on the contract, the Projects row (`new:screen`), My Requests in ESS, the User Guide chapter and pictures (PR 7), then PR 8.
 - 05/11/2026 · AJ · PR 6 of `docs/handoff/m8-expenses.md`, the AI features (jobs chosen by AJ): Read Invoice (`POST /expenses/mine/invoice-reading`, Image Reading: the staged invoice sent to the model as a file, `complete({ files })`), Suggest Category (`POST /expenses/mine/category-suggestion`, Default) and Check Duplicate (`POST /expenses/:id/duplicate-check`, Default), each on the person's press and kept nowhere; a request now carries `possible_duplicates` (same payee and amount within 30 days, from the database). Tests with the model scripted. No ticks: the screens call them in PR 7. Left: PR 7, PR 8.
@@ -1622,7 +1626,9 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 83 | Assessment | `/assess/<token>` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
 | 84 | Sign Offer | `/sign/<token>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
 | 85 | Verify Document | `/verify/<number>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
+| 105 | Proposal | `/proposal/<token>` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 05/11/2026 · JP · Proposal (#105, `go.mycityapp.io/proposal/<token>`, M7) ratified and registered by M7 PR 1 (docs/guides/partnerships.md §2, §6.10): the route, its row and Coming Soon. Not started: the page, its public routes and the design kit come with M7 PR 7.
 - 15/10/2026 · AJ · Built `public-app/` (A9) from the demo's Public Site pages: Careers, Vacancy, Apply, Assessment, Sign Offer and Verify Document, desktop and phone, light and dark with a visitor toggle, against an in-browser mock of `/api/public/v1`. Added the states the demo does not draw: application received, assessment start, finished and time up, offer signed, declined and expired, the three failed verify verdicts and a reference lookup, and every bad link (unknown, expired, used). No ticks: UI is ticked once the pages run on the real API. Left: the public routes in the contract. Only `GET /verify/:number` and `GET /<surface>/:token/document` are named in BACKEND_STRUCTURE §8; the rest are INTERIM in `public-app/src/api/types/public.ts` for TB (M4) and LA (M5) to agree, including `POST /jobs/:slug/apply` minting the apply token and `POST /apply/:token/cv` for the CV.

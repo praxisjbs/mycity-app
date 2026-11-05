@@ -268,6 +268,33 @@ const DEFAULTS = Object.freeze({
       },
     ],
   },
+  // M7, seeded in 7190 (docs/guides/partnerships.md §6.9): every agreement is approved before it is
+  // sent. The Head of Department of the deal owner's department, then the CEO; Applies When can limit
+  // the first stage (to `commission_deviates`, or a `value` above a figure) on Settings · Approvals.
+  "partnership.agreement": {
+    key: "partnership.agreement",
+    module: "partnerships",
+    name: "Partner Agreement",
+    description: "The Head of Department of the deal owner's department, then the CEO.",
+    context: {
+      value: "money",
+      commission_pct: "number",
+      commission_deviates: "boolean",
+      kind: "text",
+      partner_category_id: "uuid",
+      owner_department_id: "uuid",
+      department_head_employee_id: "uuid",
+    },
+    stages: [
+      {
+        key: "head_of_department",
+        name: "Head of Department",
+        approver: { type: "employee_in_context", value: "department_head_employee_id" },
+        sla_hours: 72,
+      },
+      { key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 },
+    ],
+  },
   // M8, seeded in 8100 (docs/guides/expenses.md §6.3): a request for money. No threshold
   // (decision 1 of 04/11/2026): every request takes both stages; a requester who manages people
   // goes straight to Operations & People.

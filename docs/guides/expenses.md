@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/expenses/` |
 | Permission key(s) | `expenses` |
 | Capabilities | `expenses.finance` (group approved requests into requisitions, record disbursements, set budgets, manage categories) |
-| Screens (PROGRESS.md rows) | #56 (in ESS), #57, #58, #59, #60, #61, #104 Projects |
+| Screens (PROGRESS.md rows) | #56 (in ESS), #57, #58, #59, #60, #61, #106 Projects |
 | Status | Agreed |
 | Last changed | 05/11/2026 |
 
@@ -35,7 +35,7 @@ Projects).
 | Expenses · Requisitions (`requisitions`, #58) | staff app | `expenses.finance` holders and the CEO | approved requests not yet in a requisition; the requisitions and their status | tick requests and Create Requisition; open a request and Withdraw it; the CEO opens one, removes a request, approves or rejects it |
 | Expenses · Approvals (`approvals`, #57) | staff app | anyone a request's approval waits on (line managers, Operations & People) | requests waiting on the reader, with the invoice and the chain | Approve, Send Back, Reject |
 | Expenses · Disbursements (`disbursements`, #59) | staff app | `expenses.finance` holders and the CEO | requests the CEO authorised, waiting to be paid; paid ones with their bank reference | open a waiting request, then Record Disbursement or Withdraw; Add Reference on one saved without it |
-| Expenses · Projects (`projects`, #104) | staff app | `expenses` view, all scope | each project's budget, committed, spent and remaining, and the requests under it | New Request with the project filled; Set Budget (with `expenses.finance`); open a request (Withdraw with `expenses.finance`) |
+| Expenses · Projects (`projects`, #106) | staff app | `expenses` view, all scope | each project's budget, committed, spent and remaining, and the requests under it | New Request with the project filled; Set Budget (with `expenses.finance`); open a request (Withdraw with `expenses.finance`) |
 | Expenses · Budgets (`budgets`, #60) | staff app | `expenses` view; a head sees their own department | each department's budget for the year by category: allocated, committed, spent, remaining | New Budget, Edit Budget (with `expenses.finance`); Budget History |
 | Expenses · Categories (`categories`, #61) | staff app | `expenses` view | the categories, their type, this month's spend | New Category, Edit Category, Deactivate; Add Suggested Categories while there are none |
 | Home · Overview, Expenses Awaiting Approval and Budget Used cards | staff app | as Home shows them | the requests waiting and the budget used | open the list |
@@ -463,7 +463,7 @@ None.
 ## 14 · Change log
 
 - 05/11/2026 · AJ · The audit's F5 to F25 fixed (`docs/handoff/m8-expenses-audit.md` §4): Withdraw on every screen an `expenses.finance` holder opens an approved request (Requisitions, Disbursements, a project's or a requisition's request), Cancel Request until then, each after a confirm (§2, §10.1); Expenses · Projects gated on its read, Set Budget on `expenses.finance` (§2); the recount locks its lines first (§6.6 rule 3); one budget per department per year in migration 8020, its owner the head now, a line only uncounted requests name taken away (rule 5); the monthly report's budgets as `/budgets` reads them (rule 8); Possible Duplicates named only to a reader who may open them, the rest a count (§6.8, `possible_duplicates_hidden`, §5); `disbursed_from` and `approved_by_me_from` on `ExpenseListQuery` for the KPI cards (§5, §10.1); Read Invoice on Gemini through its native file reading, a refused file Unreadable (§9).
-- 05/11/2026 · AJ · PR 7 built §10: every screen on the contract and the real API, records in `ListDetail layout="modal"`, My Requests in ESS, Projects (#104), the mock on the contract, the User Guide chapter. Decided on the way: Read Invoice and Suggest Category fill the form for the person to check, nothing saved until they press (§9, §10.1; no separate Use It); Categories opens a category in its Edit Category form, not a record modal; My Requests' In Flight card reads `in_flight` on `ExpenseListQuery` (§5); New Category, Record Disbursement and New Budget cards carry their forms' schemas (§9).
+- 05/11/2026 · AJ · PR 7 built §10: every screen on the contract and the real API, records in `ListDetail layout="modal"`, My Requests in ESS, Projects (#106), the mock on the contract, the User Guide chapter. Decided on the way: Read Invoice and Suggest Category fill the form for the person to check, nothing saved until they press (§9, §10.1; no separate Use It); Categories opens a category in its Edit Category form, not a record modal; My Requests' In Flight card reads `in_flight` on `ExpenseListQuery` (§5); New Category, Record Disbursement and New Budget cards carry their forms' schemas (§9).
 
 - 05/11/2026 · AJ · PR 7, backend half: `GET /expenses/:id/history` (§3 step 8, §5) reads the requisition's and disbursement's events that name the request, closing audit F3; the reference seed 8101 and the staging seed `80_expenses.js` take 8099's five categories out, closing F4 (§4); Home's forward expense and budget rows are gone from `lib/forward-rows.js`, replaced by the new seed's (DATABASE_SCHEMA M8). The screens are not moved yet.
 

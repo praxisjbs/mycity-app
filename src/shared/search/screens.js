@@ -86,6 +86,7 @@ const SCREENS = Object.freeze([
   s("payroll", "statutory", "Statutory", ["paye", "pension", "nhf", "tax", "remittance"]),
 
   s("partnerships", "pipeline", "Pipeline", ["deals", "partnership pipeline", "crm"]),
+  s("partnerships", "categories", "Categories", ["partnership types", "partner categories", "pipeline settings", "stages", "agreement templates", "delivery checklist", "custom fields", "proof points"]),
   s("partnerships", "partners", "Partners", ["partner", "organisations", "clients", "crm"]),
   s("partnerships", "leads", "Leads", ["lead", "prospects"]),
   s("partnerships", "proposals", "Proposals", ["proposal", "pitch"]),

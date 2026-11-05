@@ -9,6 +9,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type Ancho
  *   /assess/<token>        opaque
  *   /sign/<token>          opaque
  *   /verify/<number>       a reference, not a secret
+ *   /proposal/<token>      opaque, one proposal, not indexable (M7)
  */
 export type Route =
   | { page: "careers" }
@@ -17,13 +18,14 @@ export type Route =
   | { page: "assess"; token: string }
   | { page: "sign"; token: string }
   | { page: "verify"; number: string | null }
+  | { page: "proposal"; token: string }
   | { page: "not-found" };
 
 export function parse(path: string): Route {
   const p = path.replace(/\/+$/, "") || "/";
   if (p === "/" || p === "/jobs") return { page: "careers" };
   if (p === "/verify") return { page: "verify", number: null };
-  const m = /^\/(jobs|apply|assess|sign|verify)\/([^/]+)$/.exec(p);
+  const m = /^\/(jobs|apply|assess|sign|verify|proposal)\/([^/]+)$/.exec(p);
   if (!m) return { page: "not-found" };
   const v = decodeURIComponent(m[2]);
   switch (m[1]) {
@@ -31,6 +33,7 @@ export function parse(path: string): Route {
     case "apply": return { page: "apply", token: v };
     case "assess": return { page: "assess", token: v };
     case "sign": return { page: "sign", token: v };
+    case "proposal": return { page: "proposal", token: v };
     default: return { page: "verify", number: v };
   }
 }

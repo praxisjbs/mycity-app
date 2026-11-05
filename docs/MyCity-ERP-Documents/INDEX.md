@@ -11,6 +11,7 @@ listed with them below.
 | `milestones.html` | The twelve-page presentation deck. Brand aware, with the Gantt, the reuse chart and the architecture diagram. | Double click. Opens in any browser |
 | `demo.html` | The clickable prototype. Fifteen modules, seventy-nine tabs, the six-page public site, two record 360s. Light and dark. | Double click. Opens in any browser |
 | `EMAIL-naming-approval.md` | The naming approval section to paste into the requirements email to Cynthia. Not a client document on its own. | Any markdown reader, or a text editor |
+| `partnership-samples/` | MyCity's partnership documents, redacted: the Deal Merchant Agreement now; the ticketing template and a sample proposal when MyCity sends them. Added 5 November 2026 for M7's category templates and proposal kit (`docs/guides/partnerships.md`). | Any markdown reader, or a text editor |
 | `letter-samples/` | MyCity's six disciplinary letters (query, attendance query, caution, warning, suspension, dismissal), redacted: names, dates and offences are placeholders. Added 27 October 2026 for M3's letter templates. | Any markdown reader, or a text editor |
 
 ## Opening the two HTML files

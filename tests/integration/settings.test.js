@@ -182,6 +182,8 @@ describeDb("access, settings and audit against the real migrations", () => {
         "home.reports",
         "home.team",
         "mailbox.signature",
+        "partnerships.configure",
+        "partnerships.money",
         "performance.manage",
         "policies.manage",
         "queries.configure",
@@ -253,6 +255,8 @@ describeDb("access, settings and audit against the real migrations", () => {
         "goals.view_all",
         "home.reports",
         "home.team",
+        "partnerships.configure",
+        "partnerships.money",
         "performance.manage",
         "policies.manage",
         "queries.configure",
@@ -280,6 +284,8 @@ describeDb("access, settings and audit against the real migrations", () => {
         "goals.view_all",
         "home.reports",
         "home.team",
+        "partnerships.configure",
+        "partnerships.money",
         "performance.manage",
         "policies.manage",
         "queries.configure",
@@ -716,8 +722,9 @@ describeDb("access, settings and audit against the real migrations", () => {
       const res = await as("ops").get("/settings/numbering");
       expect(res.status).toBe(200);
       // 21, M2 My Workspace's Project and Task (2099, 2090), Performance's Organisational Goal (2291),
-      // and M8's Budget (8099; in schemes.js since 8100).
-      expect(res.body.page.total).toBe(25);
+      // M8's Budget (8099; in schemes.js since 8100), and M7's Partner, Lead, Deal and Agreement in
+      // place of the MOU (7099, 7190).
+      expect(res.body.page.total).toBe(28);
       const expense = res.body.data.find((s) => s.doc_type === "expense");
       expect(expense).toEqual(expect.objectContaining({ label: "Expense Request", prefix: "EXP", next: "EXP-0001", issued: 0 }));
       const staff = res.body.data.find((s) => s.doc_type === "employee");
@@ -726,8 +733,9 @@ describeDb("access, settings and audit against the real migrations", () => {
       const found = await as("ops").get("/settings/numbering?q=payslip");
       expect(found.body.data.map((s) => s.doc_type)).toEqual(["payslip"]);
       const summary = await as("ops").get("/settings/numbering/summary");
-      // Project and Organisational Goal reset each year (2099, 2291); Task never does (2090).
-      expect(summary.body).toEqual(expect.objectContaining({ types: 25, resetting: 5 }));
+      // Project and Organisational Goal reset each year (2099, 2291), and M7's Deal and Agreement
+      // (7190); Task never does (2090).
+      expect(summary.body).toEqual(expect.objectContaining({ types: 28, resetting: 7 }));
     });
 
     test("a scheme changes the next number, never one issued; a reset needs its period", async () => {
