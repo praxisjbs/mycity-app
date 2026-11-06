@@ -105,6 +105,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Strikethrough,
+  Table2,
   Trash2,
   Underline,
   Undo2,
@@ -220,6 +221,8 @@ export const ICONS = {
   list: List,
   listnum: ListOrdered,
   quote: Quote,
+  /* The agreement editor's table (docs/guides/partnerships.md §6.8). */
+  table: Table2,
   undo: Undo2,
   redo: Redo2,
   fingerprint: FingerprintPattern,

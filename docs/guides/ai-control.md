@@ -444,6 +444,7 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 
 ## 14 · Change log
 
+- 06/11/2026 · JP · §13: Tidy With AI on Partnerships' agreement templates registered, `template-tidy` (Default), personal data, chosen by JP (`partnerships.md` §6.8, §9).
 - 05/11/2026 · AJ · Files (M8 audit F9, F19): a turn with files goes to Gemini through its native `generateContent`, each file as `inline_data` (the system prompt as `systemInstruction`, JSON by `responseMimeType`), since its OpenAI-compatible endpoint may refuse a PDF data URL; a turn without files stays on the compatible endpoint. Only an Image Reading action that declares `personal_data: true` may send files (a file is never redacted, so it never reaches DeepSeek); any other is refused before a call.
 - 05/11/2026 · AJ · §13: Expenses' three registered, `expense-invoice-read` (Image Reading), `expense-duplicate-check` and `expense-category-suggest` (Default), personal data, chosen by AJ (`expenses.md` §9). `complete()` takes `files` for an Image Reading action: each a picture or a PDF (PNG, JPEG, WebP, PDF, 10 MB at most), sent beside the input as a data URL in the person's turn, never redacted (the picture is the question); `vendors/anthropic.js` turns them into image and document blocks. Any other action given a file is refused before a call.
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { useMutation, usePaged } from "@/api/hooks";
 import { PagedTable } from "@/features/shared/sections";
-import { ActionGroup, Button, Card, CardHeader, EmptyState, Field, FormFooter, HelpTerm, KeyValue, ListDetail, Meter, Money, MoneyField, PageHeader, toast, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { ActionGroup, Button, Card, CardHeader, EmptyState, Field, FormFooter, HelpTerm, KeyValue, ListDetail, Meter, Money, MoneyField, PageHeader, toast, toMoneyString, useConfirm, useContractForm, useModal } from "@mycity/ui";
 import { OwnActions, refreshAll, RequestCard, RequestForm, say, stagePill, useFinance } from "./parts";
 
 /**
@@ -97,14 +97,15 @@ function ProjectCard({ p, close }: { p: ProjectSpend; close: () => void }) {
 }
 
 function BudgetForm({ p, close }: { p: ProjectSpend; close: () => void }) {
-  const f = useContractForm({ budget_amount: p.budget_amount ?? "" }, budgets.ProjectBudget);
+  // The amount as typed ("1,500,000") is read and sent as the contract's two-place string.
+  const f = useContractForm({ budget_amount: p.budget_amount ?? "" }, { safeParse: (v: { budget_amount: string }) => budgets.ProjectBudget.safeParse({ budget_amount: toMoneyString(v.budget_amount) || null }) });
   const save = useMutation("PATCH /api/v1/budgets/projects/:id");
   const confirm = useConfirm();
   const submit = (clear: boolean) => async () => {
     if (!clear && !f.check()) return;
     if (clear && !(await confirm({ title: "Remove Budget", body: `${p.name} will have no budget.`, confirmLabel: "Remove Budget", cancelLabel: "Keep Budget", destructive: true }))) return;
     try {
-      await save.run({ params: { id: p.project_id }, body: { budget_amount: clear ? null : f.values.budget_amount || null } });
+      await save.run({ params: { id: p.project_id }, body: { budget_amount: clear ? null : toMoneyString(f.values.budget_amount) || null } });
       refreshAll();
       close();
       toast(clear ? "Budget taken away" : "Budget set");
