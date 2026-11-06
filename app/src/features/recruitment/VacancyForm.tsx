@@ -1,11 +1,15 @@
 /**
- * New Vacancy and Edit Vacancy (docs/guides/recruitment.md §6.1, §9): a wizard of three steps, Role,
- * Details (where, when and what the role is) and Pay and Publish. The contract's VacancyCreate (or VacancyEdit) checks each
+ * New Vacancy and Edit Vacancy (docs/guides/recruitment.md §3 step 2, §6.1, §9). New Vacancy opens on
+ * its interview (VacancyInterview.tsx), one question at a time, and the draft it ends with opens here,
+ * in the editor, to check and publish; Use Blank Form opens the editor at once with what was answered.
+ * Edit Vacancy is the editor alone. The editor is a wizard of three steps, Role, Details (where, when
+ * and what the role is) and Pay and Publish; the contract's VacancyCreate (or VacancyEdit) checks each
  * field as it is filled. The location is picked, never typed (F27), and a remote role has none. Write
  * With AI drafts the description from a line about the role; nothing is kept until the person saves.
  * A seat (from Suggested From Organogram, or the Organogram's Create Vacancy) fills the title, the
- * department, who it reports to and its line manager as the hiring manager, and the vacancy keeps the
- * seat (`org_seat_id`), so the seat leaves the suggestions once it has one.
+ * department, who it reports to and its line manager as the hiring manager, so the interview starts
+ * with those answered, and the vacancy keeps the seat (`org_seat_id`), so the seat leaves the
+ * suggestions once it has one.
  */
 import { useState } from "react";
 import vacancySchemas from "@mycity/contract/schemas/vacancies.js";
@@ -39,9 +43,11 @@ import {
   Wizard,
   type PlaceValue,
 } from "@mycity/ui";
-import { bodySchema, EMPLOYMENT, orNull, say, sayRefusal } from "./shared";
+import { bodySchema, EMPLOYMENT, orNull, PATTERNS, say, sayRefusal } from "./shared";
+import { VacancyInterview } from "./VacancyInterview";
 
-type Values = {
+/** The editor's values; the interview answers into the same shape. */
+export type Values = {
   title: string;
   department_id: string;
   hiring_manager: PersonRef[];
@@ -64,12 +70,6 @@ type Values = {
   salary_visible: boolean;
   publish: boolean;
 };
-
-const PATTERNS: Array<[string, string]> = [
-  ["on_site", "On Site"],
-  ["hybrid", "Hybrid"],
-  ["remote", "Remote"],
-];
 
 const inDays = (n: number) => todayIso(new Date(Date.now() + n * 86400000));
 const text = (n: number | null | undefined) => (n === null || n === undefined ? "" : String(n));
@@ -96,7 +96,7 @@ function bodyOf(v: Values, edit: Before | null, seatId: string | null) {
 }
 
 /** The API names the hiring manager by its id; the form holds the person. */
-const RENAME = { hiring_manager_id: "hiring_manager" };
+export const RENAME = { hiring_manager_id: "hiring_manager" };
 
 /** The contract's own fields, unwrapped from its refinements, for the address's prefill. */
 const shapeOf = (schema: unknown): PrefillSchema => {
@@ -119,67 +119,86 @@ export function VacancyForm(props: Props) {
   const found = useApi("GET /api/v1/recruitment/vacancies/suggested", { query: { org_seat_id: asked }, enabled: Boolean(asked) });
   // The form's first values are its blank ones, so it waits for the seat (a failed lookup opens it without).
   if (asked && !found.data && !found.error) return <LoadingRows count={6} />;
-  return <VacancyFormBody {...props} seat={props.seat ?? found.data?.data[0]} filled={filled} />;
+  if (props.vacancy) return <VacancyFormBody {...props} filled={filled} start={valuesOf(props.vacancy)} />;
+  return <NewVacancy {...props} seat={props.seat ?? found.data?.data[0]} filled={filled} />;
 }
 
-function VacancyFormBody({ vacancy, seat, filled, close, onSaved }: Props & { filled: Filled }) {
+/** New Vacancy: the interview first, then the editor with what it gathered (and its draft). */
+function NewVacancy(props: Props & { filled: Filled }) {
+  const [gathered, setGathered] = useState<Values | null>(null);
+  if (gathered) return <VacancyFormBody {...props} start={gathered} gathered />;
+  return <VacancyInterview start={newValues(props.seat, props.filled)} close={props.close} onDone={setGathered} />;
+}
+
+/** A vacancy as Edit Vacancy holds it. */
+function valuesOf(vacancy: VacancyDetail): Values {
+  return {
+    title: vacancy.title,
+    department_id: vacancy.department_id ?? "",
+    hiring_manager: vacancy.hiring_manager ? [vacancy.hiring_manager] : [],
+    positions: String(vacancy.positions),
+    employment_type: vacancy.employment_type ?? "full_time",
+    reports_to: vacancy.reports_to ?? "",
+    work_pattern: vacancy.work_pattern ?? "on_site",
+    work_pattern_note: vacancy.work_pattern_note ?? "",
+    location: placeValue(vacancy.location_place),
+    working_days: vacancy.working_days ?? "",
+    closes_on: vacancy.closes_at?.slice(0, 10) ?? inDays(30),
+    target_start_on: vacancy.target_start_on ?? "",
+    probation_months: text(vacancy.probation_months),
+    description: vacancy.description,
+    requirements: vacancy.requirements ?? "",
+    nice_to_have: vacancy.nice_to_have ?? "",
+    min_experience_years: text(vacancy.min_experience_years),
+    salary_min: vacancy.salary_min ?? "",
+    salary_max: vacancy.salary_max ?? "",
+    salary_visible: vacancy.salary_visible,
+    publish: false,
+  };
+}
+
+/** New Vacancy's first values: what the seat or the address fills, the rest blank. */
+function newValues(seat: SeatSuggestion | undefined, filled: Filled): Values {
+  return {
+    title: seat?.title ?? filled.title ?? "",
+    department_id: seat?.department_id ?? filled.department_id ?? "",
+    hiring_manager: seat?.line_manager ? [seat.line_manager] : [],
+    positions: filled.positions ?? "1",
+    employment_type: filled.employment_type ?? "full_time",
+    reports_to: seat?.reports_to ?? "",
+    work_pattern: filled.work_pattern ?? "on_site",
+    work_pattern_note: filled.work_pattern_note ?? "",
+    location: null,
+    working_days: filled.working_days ?? "Monday to Friday",
+    closes_on: filled.closes_on ?? inDays(30),
+    target_start_on: "",
+    probation_months: "6",
+    description: filled.description ?? "",
+    requirements: filled.requirements ?? "",
+    nice_to_have: filled.nice_to_have ?? "",
+    min_experience_years: filled.min_experience_years ?? "",
+    salary_min: "",
+    salary_max: "",
+    salary_visible: false,
+    publish: true,
+  };
+}
+
+/**
+ * The editor. `start` is the vacancy (Edit Vacancy) or what the interview gathered (`gathered`: its
+ * answers and draft count as unsaved words, so closing asks first).
+ */
+function VacancyFormBody({ vacancy, seat, filled, close, onSaved, start, gathered = false }: Props & { filled: Filled; start: Values; gathered?: boolean }) {
   const edit: Before | null = vacancy ? { location: placeValue(vacancy.location_place), closes_on: vacancy.closes_at?.slice(0, 10) ?? "" } : null;
   // The seat named by the address stays the vacancy's even when the lookup finds it taken (the save says so).
   const seatId = vacancy ? null : (seat?.org_seat_id ?? filled.org_seat_id ?? null);
-  const blank: Values = vacancy
-    ? {
-        title: vacancy.title,
-        department_id: vacancy.department_id ?? "",
-        hiring_manager: vacancy.hiring_manager ? [vacancy.hiring_manager] : [],
-        positions: String(vacancy.positions),
-        employment_type: vacancy.employment_type ?? "full_time",
-        reports_to: vacancy.reports_to ?? "",
-        work_pattern: vacancy.work_pattern ?? "on_site",
-        work_pattern_note: vacancy.work_pattern_note ?? "",
-        location: edit!.location,
-        working_days: vacancy.working_days ?? "",
-        closes_on: vacancy.closes_at?.slice(0, 10) ?? inDays(30),
-        target_start_on: vacancy.target_start_on ?? "",
-        probation_months: text(vacancy.probation_months),
-        description: vacancy.description,
-        requirements: vacancy.requirements ?? "",
-        nice_to_have: vacancy.nice_to_have ?? "",
-        min_experience_years: text(vacancy.min_experience_years),
-        salary_min: vacancy.salary_min ?? "",
-        salary_max: vacancy.salary_max ?? "",
-        salary_visible: vacancy.salary_visible,
-        publish: false,
-      }
-    : {
-        title: seat?.title ?? filled.title ?? "",
-        department_id: seat?.department_id ?? filled.department_id ?? "",
-        hiring_manager: seat?.line_manager ? [seat.line_manager] : [],
-        positions: filled.positions ?? "1",
-        employment_type: filled.employment_type ?? "full_time",
-        reports_to: seat?.reports_to ?? "",
-        work_pattern: filled.work_pattern ?? "on_site",
-        work_pattern_note: filled.work_pattern_note ?? "",
-        location: null,
-        working_days: filled.working_days ?? "Monday to Friday",
-        closes_on: filled.closes_on ?? inDays(30),
-        target_start_on: "",
-        probation_months: "6",
-        description: filled.description ?? "",
-        requirements: filled.requirements ?? "",
-        nice_to_have: filled.nice_to_have ?? "",
-        min_experience_years: filled.min_experience_years ?? "",
-        salary_min: "",
-        salary_max: "",
-        salary_visible: false,
-        publish: true,
-      };
   const schema = vacancy ? vacancySchemas.VacancyEdit : vacancySchemas.VacancyCreate;
   const f = useContractForm<Values>(
-    blank,
+    start,
     bodySchema<Values>(schema, (v) => bodyOf(v, edit, seatId), RENAME),
   );
   // Closing a half-written vacancy asks before it is lost.
-  useUnsavedChanges(f.isDirty);
+  useUnsavedChanges(f.isDirty || gathered);
   const departments = useInfinite("GET /api/v1/departments");
   const create = useMutation("POST /api/v1/recruitment/vacancies");
   const patch = useMutation("PATCH /api/v1/recruitment/vacancies/:id");

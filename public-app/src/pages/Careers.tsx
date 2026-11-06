@@ -1,85 +1,104 @@
-import type { PublicJobCard } from "@mycity/contract/contract.gen.ts";
-import { Button, EmptyState, ErrorState, Icon, Pager, SearchInput, Skeleton, SkylineHero } from "@mycity/ui";
-import { usePaged } from "@/api/hooks";
-import { Link } from "@/lib/router";
+import { useEffect, useRef, useState } from "react";
+import { Button, EmptyState, ErrorState, formatDate, PageIntro, Pager, Reveal, RoleListTop, RoleRow, SiteSearch, Skeleton, StickyColumns, TeamList } from "@mycity/ui";
+import { useApi, usePaged } from "@/api/hooks";
+import { Link, useSearchParam } from "@/lib/router";
 import { Page } from "@/shell/Page";
-import { factsOf } from "./shared";
-
-/** More roles than this and a search box shows above them (guide §10.1). */
-const SEARCH_FROM = 8;
+import { factsOf, rolesLine } from "./shared";
 
 /**
- * Careers (#80): what a stranger sees at go.mycityapp.io/jobs. Indexable, open roles only, in the
- * server's pages of 25. The page opens on Lagos's skyline as it is lit at this hour; each role is a
- * card whose whole face opens it.
+ * Careers (#80): every open role at go.mycityapp.io/jobs, indexable, closing soonest first in the
+ * server's pages of 25. Open Roles with its line and search; the teams hiring at the left, one picked
+ * at a time (the server narrows by `department`), the roles at the right; both columns stick, the
+ * shorter waiting. `?q=` (the index's Search Roles) and `?department=<code>` open it narrowed.
  */
 export function Careers() {
-  const list = usePaged("GET /api/public/v1/jobs");
+  const startQ = useSearchParam("q");
+  const startTeam = useSearchParam("department");
+  const [team, setTeam] = useState(startTeam ?? "");
+  const summary = useApi("GET /api/public/v1/jobs/summary");
+  const list = usePaged("GET /api/public/v1/jobs", { filters: team ? { department: team } : {} });
   const searching = !!list.q.trim();
-  const showSearch = searching || (list.page?.total ?? 0) > SEARCH_FROM;
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
+    if (startQ) list.setQ(startQ);
+  }, [startQ, list]);
+
+  const s = summary.data;
+  const total = s?.open ?? list.page?.total ?? 0;
+  const teams = [{ value: "", label: "All Teams", count: s?.open ?? 0 }, ...(s?.departments ?? []).map((d) => ({ value: d.code, label: d.name, count: d.open }))];
+  const clear = () => {
+    list.setQ("");
+    setTeam("");
+  };
+
   return (
-    <Page title="Careers" index layout="open">
-      <SkylineHero eyebrow="Careers at MyCityApp" title="Work With Us" text="Building the app that knows every Nigerian city.">
-        {showSearch && <SearchInput label="Search Roles" placeholder="Role or City" value={list.q} onChange={list.setQ} className="max-w-md" />}
-      </SkylineHero>
-      <section aria-labelledby="open-roles" className="mt-10 phone:mt-6 phone:px-4">
-        <h2 id="open-roles" className="mb-5 animate-enter font-heading text-2xl enter-delay-3">
-          Open Roles
-        </h2>
-        {list.error ? (
-          <ErrorState error={list.error} onRetry={list.reload} />
-        ) : list.loading && !list.page ? (
-          <ul aria-busy="true" className="grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2 lg:grid-cols-3">
-            {[0, 1, 2].map((i) => (
-              <li key={i} className="rounded-card border border-border bg-card p-5">
-                <Skeleton lines={3} />
-              </li>
-            ))}
-          </ul>
-        ) : list.rows.length === 0 ? (
-          searching ? (
-            <EmptyState illustration="Search" title="No Matching Roles" text="Try a shorter word" action={<Button onClick={() => list.setQ("")}>Clear Search</Button>} />
-          ) : (
-            <EmptyState icon="brief" title="No Open Roles" text="New roles are posted here first" />
-          )
-        ) : (
-          <ul className="enter-stagger enter-after-head grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2 lg:grid-cols-3">
-            {list.rows.map((r) => (
-              <RoleCard key={r.slug} role={r} />
-            ))}
-          </ul>
-        )}
-        <Pager page={list.page} onPage={list.setPage} noun="role" label="Open Roles" className="mt-5" />
+    <Page title="Careers" index>
+      <PageIntro
+        eyebrow="Careers at MyCityApp"
+        title="Open Roles"
+        accent="Roles"
+        text={s ? rolesLine(s.open, s.departments.length, s.cities.map((c) => c.name)) : undefined}
+        aside={
+          <SiteSearch
+            tone="intro"
+            label="Search Roles"
+            placeholder="Role or City"
+            value={list.q}
+            onChange={(v) => {
+              list.setQ(v);
+              setTeam("");
+            }}
+          />
+        }
+      />
+      <section id="roles" aria-labelledby="roles-title" className="pt-9 pb-24 phone:pb-18">
+        <div className="public-wrap">
+          <StickyColumns layout="aside">
+            <Reveal as="aside" scroll>
+              <TeamList
+                title="Teams"
+                titleId="roles-title"
+                label="Teams"
+                items={teams}
+                value={team}
+                onChange={setTeam}
+                note={
+                  <>
+                    Know someone for one of these? <Link to="/#refer">Recommend them</Link>
+                  </>
+                }
+              />
+            </Reveal>
+            <div>
+              <RoleListTop shown={list.page?.total ?? 0} total={total} order="Closing soonest first" />
+              {list.error ? (
+                <ErrorState error={list.error} onRetry={list.reload} />
+              ) : list.loading && !list.page ? (
+                <div aria-busy="true" className="flex flex-col gap-6 py-6">
+                  {[0, 1, 2].map((i) => (
+                    <Skeleton key={i} lines={3} />
+                  ))}
+                </div>
+              ) : list.rows.length === 0 ? (
+                searching || team ? (
+                  <EmptyState illustration="Search" title="No Matching Roles" text="Try a shorter word" action={<Button variant="line" size="lg" onClick={clear}>Clear Search</Button>} />
+                ) : (
+                  <EmptyState icon="brief" title="No Open Roles" text="New roles are posted here first" />
+                )
+              ) : (
+                <div>
+                  {list.rows.map((r) => (
+                    <RoleRow key={r.slug} href={`/jobs/${r.slug}`} team={r.department} title={r.title} facts={factsOf(r)} closes={r.closes_at ? formatDate(r.closes_at) : null} />
+                  ))}
+                </div>
+              )}
+              <Pager page={list.page} onPage={list.setPage} noun="role" label="Open Roles" className="mt-5" />
+            </div>
+          </StickyColumns>
+        </div>
       </section>
     </Page>
-  );
-}
-
-/** One open role: its department, its title as the card's link, where and how it is worked. */
-function RoleCard({ role }: { role: PublicJobCard }) {
-  const facts = factsOf(role);
-  return (
-    <li className="group relative flex min-h-44 flex-col gap-2 overflow-hidden rounded-card border border-border bg-card p-5 shadow-1 transition duration-(--dur) ease-out before:absolute before:inset-x-0 before:top-0 before:h-1 before:origin-left before:scale-x-0 before:bg-primary before:transition-transform before:duration-300 focus-within:border-ring focus-within:before:scale-x-100 hover:-translate-y-1 hover:border-secondary hover:shadow-3 hover:before:scale-x-100 motion-reduce:hover:translate-y-0 phone:min-h-0 dark:hover:border-accent-foreground">
-      {role.department && <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase">{role.department}</p>}
-      <h3 className="font-heading text-xl leading-snug">
-        <Link to={`/jobs/${role.slug}`} className="stretch-link text-foreground no-underline outline-none">
-          {role.title}
-        </Link>
-      </h3>
-      {facts.length > 0 && (
-        <ul className="flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-sm text-muted-foreground">
-          {facts.map((f) => (
-            <li key={f.icon} className="inline-flex items-center gap-1.5">
-              <Icon name={f.icon} className="text-subtle-foreground" />
-              {f.text}
-            </li>
-          ))}
-        </ul>
-      )}
-      <span aria-hidden="true" className="mt-auto inline-flex items-center gap-1 pt-2 text-sm font-strong text-accent-foreground">
-        View Role
-        <Icon name="right" className="transition-transform duration-(--dur) group-hover:translate-x-1" />
-      </span>
-    </li>
   );
 }

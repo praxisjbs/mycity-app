@@ -550,6 +550,13 @@ async function assist(user, body) {
   return require("./vacancies.draft").draft(user, body, department, company);
 }
 
+/** The interview's two follow-up questions about the role, from its answers so far; the department named. */
+async function followUps(user, body) {
+  const department = body.department_id ? await repo.departmentName(pool, body.department_id) : null;
+  const { about_company: company } = await repo.settings(pool);
+  return require("./vacancies.draft").followUps(user, body, department, company);
+}
+
 /** Questions and traits to consider for a vacancy in scope, beside the traits it has. */
 async function suggestQuestions(user, scope, id) {
   const row = await visibleRow(pool, id, scope);
@@ -608,6 +615,7 @@ module.exports = {
   settings,
   saveSettings,
   assist,
+  followUps,
   suggestQuestions,
   idOf,
   cardVacancy,

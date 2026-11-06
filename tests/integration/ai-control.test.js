@@ -217,19 +217,19 @@ describeDb("AI Control against the real migrations", () => {
       ]);
       expect(by.embeddings.chain.links.map((l) => [l.model, l.state])).toEqual([["text-embedding-3-small", "not_set_up"]]);
       expect(by.top_tier.chain.links.map((l) => l.model)).toEqual(["gemini-2.5-pro", "claude-sonnet-5-5"]);
-      // Tidy Policy, Review Cleanup, Week Summary, Raise a Query's draft, the mailbox's three, Recruitment's four
-      // (jd-draft, screening-questions, assessment-questions, interview-notes-cleanup), Expenses' Check Duplicate
-      // and Suggest Category, and Partnerships' Tidy Agreement; Data Answers has its own chain.
-      expect(by.default.actions).toBe(14);
+      // Tidy Policy, Review Cleanup, Week Summary, Raise a Query's draft, the mailbox's three, Recruitment's five
+      // (jd-draft, vacancy-follow-ups, screening-questions, assessment-questions, interview-notes-cleanup), Expenses'
+      // Check Duplicate and Suggest Category, and Partnerships' Tidy Agreement; Data Answers has its own chain.
+      expect(by.default.actions).toBe(15);
     });
 
     test("the registered actions: their job, personal data, own chain and today's calls", async () => {
-      // 26 actions: 25 a page (pageQuery), so the last comes on the second.
-      const first = await as("admin").get("/ai-control/actions");
-      const second = await as("admin").get("/ai-control/actions?page=2");
-      expect(first.body.data).toHaveLength(25);
-      const res = { body: { data: [...first.body.data, ...second.body.data] } };
-      expect(res.body.data.map((a) => a.key)).toEqual([
+      // 25 a page: the registry is longer than one.
+      const res = await as("admin").get("/ai-control/actions");
+      const more = await as("admin").get("/ai-control/actions?page=2");
+      expect(res.body.data).toHaveLength(25);
+      const rows = [...res.body.data, ...more.body.data];
+      expect(rows.map((a) => a.key)).toEqual([
         "voice-note-transcription",
         "policy-tidy",
         "data-answers",
@@ -252,14 +252,15 @@ describeDb("AI Control against the real migrations", () => {
         "expense-duplicate-check",
         "expense-category-suggest",
         "jd-draft",
+        "vacancy-follow-ups",
         "screening-questions",
         "assessment-questions",
         "interview-notes-cleanup",
         "cv-screen",
       ]);
-      const by = Object.fromEntries(res.body.data.map((a) => [a.key, a]));
+      const by = Object.fromEntries(rows.map((a) => [a.key, a]));
       // Recruitment's (recruitment.md §9), chosen by GE: all personal data, the CV read on Deep Reasoning.
-      for (const key of ["jd-draft", "screening-questions", "assessment-questions", "interview-notes-cleanup"])
+      for (const key of ["jd-draft", "vacancy-follow-ups", "screening-questions", "assessment-questions", "interview-notes-cleanup"])
         expect(by[key]).toMatchObject({ job: "default", personal_data: true, own_chain: false, chosen_by: "GE" });
       expect(by["cv-screen"]).toMatchObject({ job: "deep_reasoning", personal_data: true, own_chain: false, chosen_by: "GE" });
       expect(by["expense-invoice-read"]).toMatchObject({ job: "image_reading", personal_data: true, chosen_by: "AJ" });

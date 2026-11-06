@@ -1529,6 +1529,10 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 06/11/2026 · GE · (Ose) Public · Proposal's placeholder page moves to the public site's split layout with the rest of
+  go.mycityapp.io (the approved design); its Coming Soon is unchanged. Verify Document's QR page,
+  `/verify/t/<token>` (§6.9), is drawn on the mock: the record, both verdicts and the document with Download PDF, until
+  M5's verify API.
 - 06/11/2026 · TB · PR 2 reviewed (#80): `main` merged in (M4 and M8); New Partner Category in ⌘K and the
   phone's floating button (§9, §10.2, §13.2); a category's sections behind a segmented control on a phone
   (§10.2, §13.2); Tidy With AI's answer recorded (§13.2); Move Up and Move Down on Pipeline Settings renumber

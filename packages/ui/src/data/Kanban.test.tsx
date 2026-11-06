@@ -24,6 +24,32 @@ describe("Kanban on desktop", () => {
     expect(screen.getByText("Lagos Water Board")).toBeInTheDocument();
   });
 
+  it("keeps every stage on one row, scrolling sideways rather than wrapping, each stage a minimum width", () => {
+    const six = Array.from({ length: 6 }, (_, i) => ({ key: `s${i}`, label: `Stage ${i + 1}`, cards: [] }));
+    render(<Kanban columns={six} />);
+    const stages = screen.getAllByRole("region", { name: /^Stage / });
+    expect(stages).toHaveLength(6);
+    const row = stages[0]!.parentElement!;
+    expect(row).toBe(screen.getByRole("region", { name: "Board" }));
+    expect(stages.every((s) => s.parentElement === row)).toBe(true);
+    expect(row).toHaveClass("flex", "overflow-x-auto");
+    expect(row.className).not.toMatch(/grid|wrap/);
+    expect(stages[0]).toHaveClass("min-w-48", "flex-1");
+  });
+
+  it("puts a card's move menu beside its title, not on a row of its own", () => {
+    render(<Kanban columns={COLUMNS} onMove={() => undefined} />);
+    const lead = screen.getByRole("region", { name: "Lead" });
+    const trigger = within(lead).getByRole("button", { name: /Move/ });
+    expect(trigger.parentElement).toHaveClass("absolute", "top-2", "right-2");
+    expect(within(lead).getByText("Lagos Water Board")).toHaveClass("pr-5");
+  });
+
+  it("leaves no room for a menu on a card that cannot move", () => {
+    render(<Kanban columns={COLUMNS} />);
+    expect(screen.getByText("Lagos Water Board")).not.toHaveClass("pr-5");
+  });
+
   it("falls back to the cards it holds when the server sends no count", () => {
     render(<Kanban columns={[{ key: "lead", label: "Lead", cards: COLUMNS[0]!.cards }]} />);
     expect(screen.getByText("1")).toBeInTheDocument();
@@ -160,6 +186,14 @@ describe("Kanban on desktop", () => {
     await userEvent.click(await screen.findByRole("menuitem", { name: "Move to Signed" }));
     await waitFor(() => expect(onMove).toHaveBeenCalledTimes(1));
     expect(within(lead).getByRole("button", { name: /Move/ })).not.toHaveAttribute("aria-busy");
+  });
+
+  it("the row of stages is a named region a keyboard can reach, so it scrolls even with no card in it", () => {
+    const empty = COLUMNS.map((c) => ({ ...c, cards: [], count: undefined }));
+    render(<Kanban columns={empty} loading empty={<p>No Tasks Yet</p>} />);
+    const board = screen.getByRole("region", { name: "Board" });
+    expect(board).toHaveAttribute("tabindex", "0");
+    expect(board.className).toContain("overflow-x-auto");
   });
 
   it("while loading, an empty stage shows a placeholder and the empty state waits", () => {

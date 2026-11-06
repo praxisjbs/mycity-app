@@ -7,7 +7,7 @@
  * Scope is the vacancy's hiring manager (guide §8): `team` and `own` see the vacancies whose
  * hiring_manager_id is in their scope; one with no hiring manager is seen with `all` only.
  *
- * The public reads (publicPage, publicBySlug) name their columns: what reaches a stranger is the
+ * The public reads (publicPage, publicDepartments, publicCities, publicBySlug) name their columns: what reaches a stranger is the
  * service's allow-list, and these queries never hand it a whole row.
  */
 const { personJson } = require("../../shared/db/person");
@@ -478,30 +478,71 @@ async function putSetting(client, key, value, userId) {
  * Public: the careers page (allow-listed by the service)
  * ------------------------------------------------------------------ */
 
-const PUBLIC_COLS = `v.vacancy_id, v.slug::text AS slug, v.title, d.name AS department, v.location, v.work_pattern,
+const PUBLIC_COLS = `v.vacancy_id, v.slug::text AS slug, v.title, d.name AS department, d.code::text AS department_code,
+  v.location, v.work_pattern, v.work_pattern_note, v.employment_type,
   v.status, v.close_reason, v.closes_at, v.published_at`;
 
-/** Open roles taking applications, newest first, searched by title, department or place. */
+/** The roles the careers page lists: open, published, before their closing time. */
+const TAKING = `v.status = 'open' AND v.slug IS NOT NULL AND (v.closes_at IS NULL OR v.closes_at > now())`;
+
+/**
+ * Open roles taking applications, closing soonest first (no closing date after every dated one,
+ * then the newest), searched by title, department or place, and narrowed to one department by code.
+ */
 function publicPage(db, query) {
   return pageQuery(
     db,
     `SELECT ${PUBLIC_COLS}, ${TOTAL_COL}
        FROM vacancy v
        LEFT JOIN department d ON d.department_id = v.department_id
-      WHERE v.status = 'open' AND v.slug IS NOT NULL
-        AND (v.closes_at IS NULL OR v.closes_at > now())
+      WHERE ${TAKING}
         AND ($1::text IS NULL OR search_fold(v.title || ' ' || COALESCE(d.name, '') || ' ' || COALESCE(v.location, ''))
                                   LIKE '%' || search_fold($1) || '%')
-      ORDER BY v.published_at DESC NULLS LAST, v.vacancy_id`,
-    [query.q || null],
+        AND ($2::citext IS NULL OR d.code = $2::citext)
+      ORDER BY v.closes_at ASC NULLS LAST, v.published_at DESC NULLS LAST, v.vacancy_id`,
+    [query.q || null, query.department || null],
     query,
   );
+}
+
+/** The departments with a role on the careers page, by name, each with how many. */
+async function publicDepartments(db) {
+  // pagination:complete the departments hiring: the organisation's few, grouped, for the public index's figures
+  const { rows } = await completeQuery(
+    db,
+    `SELECT d.code::text AS code, d.name, count(*)::int AS open
+       FROM vacancy v
+       JOIN department d ON d.department_id = v.department_id
+      WHERE ${TAKING}
+      GROUP BY d.department_id, d.code, d.name
+      ORDER BY d.name, d.code`,
+    [],
+    { label: "departments hiring" },
+  );
+  return rows;
+}
+
+/** The cities of the careers page's roles (their picked place's city), most roles first. */
+async function publicCities(db) {
+  // pagination:complete the cities hiring: a handful, grouped, for the public index's figures
+  const { rows } = await completeQuery(
+    db,
+    `SELECT min(btrim(p.city)) AS name, count(*)::int AS open
+       FROM vacancy v
+       JOIN place p ON p.owner = 'vacancy.location' AND p.owner_key = v.vacancy_id::text
+      WHERE ${TAKING} AND NULLIF(btrim(p.city), '') IS NOT NULL
+      GROUP BY search_fold(btrim(p.city))
+      ORDER BY count(*) DESC, min(btrim(p.city))`,
+    [],
+    { label: "cities hiring" },
+  );
+  return rows;
 }
 
 /** A published vacancy by its slug (never a draft), with the columns PublicJob names. */
 async function publicBySlug(db, slug) {
   const { rows } = await db.query(
-    `SELECT ${PUBLIC_COLS}, v.employment_type, v.work_pattern_note, v.probation_months, v.reports_to,
+    `SELECT ${PUBLIC_COLS}, v.probation_months, v.reports_to,
             v.min_experience_years, v.working_days, v.salary_visible,
             v.salary_min::text AS salary_min, v.salary_max::text AS salary_max,
             v.description, v.requirements, v.nice_to_have,
@@ -549,5 +590,7 @@ module.exports = {
   settings,
   putSetting,
   publicPage,
+  publicDepartments,
+  publicCities,
   publicBySlug,
 };

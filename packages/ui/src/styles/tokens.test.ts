@@ -96,6 +96,41 @@ describe("tokens.css contrast", () => {
     });
   }
 
+  /*
+   * The public site's own surfaces and inks (public.css): every ink on the site's card and hover tint,
+   * the body's soft ink, the light inks of its Deep Green hero and footer, the white search box's ink
+   * and the solid button's.
+   */
+  for (const [name, values] of [
+    ["light", light],
+    ["dark (chosen)", dark],
+    ["dark (device)", systemDark],
+  ] as const) {
+    it(`keeps the public site's own inks at AA in ${name}`, () => {
+      const surfaces = ["canvas", "canvas-glow", "canvas-card", "canvas-hover"];
+      const pairsOnSite: Array<[string, string]> = [
+        ...surfaces.flatMap((s) => ["foreground", "canvas-soft", "canvas-muted-foreground", "accent-foreground"].map((t) => [t, s] as [string, string])),
+        ...["on-deep", "on-deep-hero", "on-deep-lede", "on-deep-chip", "on-deep-back", "on-deep-link", "on-deep-note", "on-deep-label", "on-deep-base", "on-deep-gold"].map(
+          (t) => [t, "deep"] as [string, string],
+        ),
+        ["search-ink", "paper"],
+        ["search-muted", "paper"],
+        ["solid-foreground", "solid"],
+        ["primary-foreground", "primary"],
+      ];
+      const failing = pairsOnSite
+        .map(([t, s]) => {
+          const fg = values[t];
+          const bg = values[s];
+          if (!fg || !bg) return `${t} on ${s}: missing`;
+          const r = ratio(fg, bg);
+          return r >= 4.5 ? null : `${t} ${fg} on ${s} ${bg}: ${r.toFixed(2)}`;
+        })
+        .filter(Boolean);
+      expect(failing).toEqual([]);
+    });
+  }
+
   it("writes the device dark block the same as the chosen one", () => {
     expect(systemDark).toEqual(dark);
     expect(declarations(/:root:not\(\[data-theme="light"\]\)\s*\{/)).toEqual(declarations(/\n\[data-theme="dark"\]\s*\{/));

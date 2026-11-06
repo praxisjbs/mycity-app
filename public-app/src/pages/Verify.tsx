@@ -1,120 +1,135 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
-import type { VerifyResult } from "@/api/types/public";
-import { Brand, Button, cn, Field, Form, formatDate, formatTime, Icon, Pill, Skeleton, Sub, TextField } from "@mycity/ui";
+import type { VerifyByToken, VerifyResult } from "@/api/types/public";
+import { Button, Form, formatDate, formatTime, Match, PageMessage, Panel, Skeleton, TextField, VerifyCard } from "@mycity/ui";
 import { Page } from "@/shell/Page";
 import { useRouter } from "@/lib/router";
 
 /**
- * Verify Document (#85): two hashes, two verdicts (A12). The content hash is
- * over the data the document was rendered from; the artifact hash is over the
- * stored bytes. One hash alone cannot tell a changed record from a changed
- * file. Anyone with the reference may look; only the type, the signer and the
- * verdicts are shown. Never the file.
+ * Verify Document (#85, M5): two hashes, two verdicts (A12). The content hash is over the data the
+ * document was rendered from; the artifact hash is over the stored bytes. One hash alone cannot tell
+ * a changed record from a changed file. Anyone with the reference may look (`/verify/<number>`): the
+ * type, the signer and the verdicts, never the content. The QR printed on each page of a sealed
+ * document (`/verify/t/<token>`) also shows the document itself (docs/guides/partnerships.md §6.9).
+ * Built on the INTERIM shapes and the mock until M5's verify API lands (types/public.ts).
  */
-const OUTCOME = (r: VerifyResult): { ok: boolean; title: string; text: string } => {
-  if (r.content === "matches" && r.artifact === "matches") return { ok: true, title: "Document verified", text: "The content hash confirms the wording. The artifact hash confirms the stored file. Both match." };
-  if (r.content === "matches") return { ok: false, title: "The stored file was altered", text: "The wording matches what was signed, but the stored file is not the one that was locked. Do not rely on a copy of it." };
-  if (r.artifact === "matches") return { ok: false, title: "The record was altered", text: "The stored file is the one that was locked, but the record it was made from has changed since. Do not rely on it." };
-  return { ok: false, title: "Not this document", text: "Neither the wording nor the stored file matches what was signed under this reference." };
-};
-
-export function Verify({ number }: { number: string | null }) {
+export function Verify({ number, qr }: { number: string | null; qr?: string }) {
   return (
-    <Page title={number ? `Verify ${number}` : "Verify a Document"} brandInCard>
-      <div className="text-center">
-        <Brand name="MyCityApp" />
-      </div>
-      {number ? <VerifyResult number={number} /> : <Lookup />}
+    <Page
+      title="Verify a Document"
+      layout="split"
+      name="Document Check"
+      line="Offer letters, certificates and agreements"
+      text="Check any document we issued."
+      textSize="l"
+      paragraph="Enter the reference printed on the document, for example OFF-0018, or scan the QR code on any of its pages."
+      aside={<Lookup initial={number ?? ""} />}
+    >
+      {qr ? <ByToken token={qr} /> : number ? <ByNumber number={number} /> : <VerifyCard empty={{ title: "Enter a Reference", text: "The document's record shows here." }} />}
     </Page>
   );
 }
 
-function Lookup({ initial = "", heading }: { initial?: string; heading?: ReactNode }) {
+/** The reference and Verify, in the aside: a reference opens its own address, so it can be shared. */
+function Lookup({ initial }: { initial: string }) {
   const { navigate } = useRouter();
   const [ref, setRef] = useState(initial);
   const clean = ref.trim().toUpperCase();
   return (
-    <Form className="mx-auto mt-5 max-w-96" onSubmit={() => clean && navigate(`/verify/${encodeURIComponent(clean)}`)}>
-      {heading ?? (
-        <>
-          <h1 className="text-center text-xl">Verify a Document</h1>
-          <Sub as="p" className="mt-1 mb-4 text-center">Enter the reference printed on the document, for example OFF-0018.</Sub>
-        </>
-      )}
-      <Field label="Reference" htmlFor="ref">
-        <TextField id="ref" value={ref} onChange={setRef} placeholder="OFF-0018" autoCapitalize="characters" spellCheck={false} />
-      </Field>
-      <Button type="submit" variant="primary" block className="mt-3" disabled={!clean}>
+    <Form className="flex max-w-130 gap-2.5 phone:flex-col" onSubmit={() => clean && navigate(`/verify/${encodeURIComponent(clean)}`)}>
+      <div className="min-w-0 flex-1">
+        <TextField aria-label="Reference" value={ref} onChange={setRef} placeholder="OFF-0018" autoCapitalize="characters" autoComplete="off" spellCheck={false} />
+      </div>
+      <Button type="submit" variant="solid" size="lg">
         Verify
       </Button>
     </Form>
   );
 }
 
-function VerifyResult({ number }: { number: string }) {
+/** The verdict in words: both hashes match, or which of the two was altered. */
+function verdict(r: VerifyResult): { tone: "ok" | "warn"; title: string; text: string } {
+  if (r.content === "matches" && r.artifact === "matches") return { tone: "ok", title: "Document Verified", text: "This document is genuine and unchanged." };
+  if (r.content === "matches") return { tone: "warn", title: "Not This Document", text: "The stored file was altered." };
+  if (r.artifact === "matches") return { tone: "warn", title: "Not This Document", text: "The record was altered." };
+  return { tone: "warn", title: "Not This Document", text: "The record and the stored file were altered." };
+}
+
+const rowsOf = (r: VerifyResult) => [
+  { label: "Document", value: r.document_type },
+  { label: "Reference", value: r.number },
+  { label: "Signed By", value: r.signed_by },
+  { label: "Signed On", value: `${formatDate(r.signed_at)}, ${formatTime(r.signed_at)}` },
+  { label: "Issued By", value: r.issued_by },
+  { label: "Content Hash", value: <Match value={r.content} /> },
+  { label: "Artifact Hash", value: <Match value={r.artifact} /> },
+];
+
+function ByNumber({ number }: { number: string }) {
   const r = useApi("GET /api/public/v1/verify/:number", { params: { number } });
   if (r.error)
     return r.error.status === 404 ? (
-      <Lookup
-        initial={number}
-        heading={
-          <div className="mb-4 text-center">
-            <Badge ok={false} />
-            <h1 className="mt-3 text-xl">No document has this reference</h1>
-            <Sub as="p" className="mt-1">Check the reference on the document and try again. It looks like OFF-0018.</Sub>
-          </div>
-        }
-      />
+      <VerifyCard tone="err" title="Not Found" text="No document has this reference." items={[{ label: "Reference", value: number.toUpperCase() }]} note="Check the reference on the document and try again. It looks like OFF-0018." />
     ) : (
-      <div className="mt-6 text-center">
-        <Sub>{r.error.message}</Sub>
-        <Button className="mt-3" onClick={r.reload}>
-          Try Again
-        </Button>
-      </div>
+      <Failed message={r.error.message} retry={r.reload} />
     );
-  const d = r.data;
-  if (!d)
-    return (
-      <div className="mt-6">
-        <Skeleton lines={6} />
-      </div>
+  if (!r.data) return <Waiting />;
+  return <VerifyCard {...verdict(r.data)} items={rowsOf(r.data)} />;
+}
+
+function ByToken({ token }: { token: string }) {
+  const r = useApi("GET /api/public/v1/verify/t/:token", { params: { token } });
+  if (r.error)
+    return r.error.status === 404 ? (
+      <VerifyCard tone="err" title="Not Found" text="This code opens no document." note="Scan the whole code again, or enter the reference printed on the document." />
+    ) : (
+      <Failed message={r.error.message} retry={r.reload} />
     );
-  const o = OUTCOME(d);
-  const pill = (v: VerifyResult["content"]) => <Pill tone={v === "matches" ? "ok" : "err"}>{v === "matches" ? "Matches" : "Differs"}</Pill>;
-  const rows: Array<[string, ReactNode]> = [
-    ["Document", `${d.document_type}, ${d.number}`],
-    ["Signed By", d.signed_by],
-    ["Signed On", `${formatDate(d.signed_at)} at ${formatTime(d.signed_at)} WAT`],
-    ["Content Hash", pill(d.content)],
-    ["Artifact Hash", pill(d.artifact)],
-    ["Issued By", d.issued_by],
-  ];
+  const d: VerifyByToken | undefined = r.data;
+  if (!d) return <Waiting />;
+  const [dear, offer] = d.document.letter;
   return (
-    <>
-      <div className="mt-4.5 text-center">
-        <Badge ok={o.ok} />
-        <h1 className="mt-3 text-xl">{o.title}</h1>
-      </div>
-      <dl className="mt-5 grid cols-term-value gap-x-3 gap-y-2.5 text-sm max-md:cols-term-value-tight">
-        {rows.map(([k, v]) => (
-          <div key={k} className="contents">
-            <dt className="text-subtle-foreground">{k}</dt>
-            <dd className="m-0 font-semibold">{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <Sub as="p" className={cn("mt-4.5 border-t border-border pt-3.5", !o.ok && "text-destructive")}>{o.text}</Sub>
-    </>
+    <VerifyCard
+      {...verdict(d)}
+      items={rowsOf(d)}
+      document={{
+        heading: "The Document",
+        title: d.document.title,
+        paragraphs: [dear, offer].filter((p): p is string => !!p),
+        action: (
+          <Button variant="line" size="sm" icon="download" asChild>
+            <a href={d.document.url} download={d.document.file_name}>
+              Download PDF
+            </a>
+          </Button>
+        ),
+      }}
+    />
   );
 }
 
-function Badge({ ok }: { ok: boolean }) {
+function Waiting() {
   return (
-    <span className={cn("mx-auto flex size-14 items-center justify-center rounded-full", ok ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive")}>
-      <Icon name={ok ? "ok" : "x"} className="size-7" />
-    </span>
+    <Panel>
+      <Skeleton lines={7} />
+    </Panel>
+  );
+}
+
+function Failed({ message, retry }: { message: string; retry: () => unknown }) {
+  return (
+    <Panel bare>
+      <PageMessage
+        title="This Check Did Not Load"
+        action={
+          <Button variant="primary" size="lg" onClick={retry}>
+            Try Again
+          </Button>
+        }
+      >
+        {message}
+      </PageMessage>
+    </Panel>
   );
 }

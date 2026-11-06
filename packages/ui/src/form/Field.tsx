@@ -113,7 +113,7 @@ export function Field({ label, help, info, optional, state, message, children, h
   return (
     <FieldContext.Provider value={ctx}>
       <div className={cn("mb-3.5", className)} data-state={state}>
-        <div className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold text-muted-foreground">
+        <div className="field-head mb-1.5 flex items-baseline gap-2 text-xs font-semibold text-muted-foreground">
           {helpText ? (
             <span id={ids.labelId}>
               <HelpTerm help={helpText} helpId={ids.helpId}>

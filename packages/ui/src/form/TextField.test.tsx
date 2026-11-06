@@ -35,6 +35,31 @@ describe("TextField family", () => {
     expect(screen.getByLabelText("First Name")).not.toHaveAttribute("aria-invalid");
   });
 
+  it("NumberField stepper: minus and plus either side of the figure, held between min and max", async () => {
+    function Years() {
+      const [v, setV] = useState("");
+      return (
+        <Field label="Years of Experience">
+          <NumberField stepper={{ min: 0, max: 50 }} value={v} onChange={setV} />
+        </Field>
+      );
+    }
+    render(<Years />);
+    const input = screen.getByLabelText("Years of Experience");
+    await userEvent.click(screen.getByRole("button", { name: "One More" }));
+    expect(input).toHaveValue("0");
+    await userEvent.click(screen.getByRole("button", { name: "One More" }));
+    expect(input).toHaveValue("1");
+    expect(screen.getByRole("button", { name: "One Fewer" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "One Fewer" }));
+    await userEvent.click(screen.getByRole("button", { name: "One Fewer" }));
+    expect(input).toHaveValue("0");
+    expect(screen.getByRole("button", { name: "One Fewer" })).toBeDisabled();
+    await userEvent.clear(input);
+    await userEvent.type(input, "9y");
+    expect(input).toHaveValue("9");
+  });
+
   it("NumberField keeps digits only, as a string", async () => {
     const user = userEvent.setup();
     render(<Bound kind="number" />);

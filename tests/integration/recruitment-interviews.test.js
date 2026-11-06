@@ -286,6 +286,24 @@ describeDb("Recruitment · Interviews against the real migrations", () => {
     const theirs = (await h.as("hod").get(`/recruitment/interviews/${id}`)).body.panel.find((s) => s.panelist.employee_id === h.people.ops.employee_id);
     expect(theirs).toMatchObject({ decision: null, submitted_at: null });
     expect((await h.as("ops").post(`/recruitment/interviews/${id}/close`).send({})).status).toBe(409);
+
+    // The scorecard goes to a reader whose scope holds the vacancy, never to a seat alone.
+    const ops = (await h.as("ops").get(`/recruitment/interviews/${id}`)).body;
+    expect(ops.scorecard).toHaveLength(5);
+    expect(ops.scorecard.find((p) => p.code === "interview")).toMatchObject({ score: 55 });
+    expect((await h.as("hod").get(`/recruitment/interviews/${id}`)).body).toMatchObject({ scorecard: null, weighted_total: null });
+    // Round Activity: who did what and when, newest first; a reminder names its panelist, never a rating.
+    expect(ops.activity[0]).toMatchObject({ kind: "round_closed", actor_name: "Ada Obi" });
+    expect(ops.activity.map((a) => a.kind)).toEqual(expect.arrayContaining(["scheduled", "feedback_due", "feedback_submitted", "round_closed"]));
+    expect(ops.activity.find((a) => a.kind === "feedback_submitted")).toMatchObject({ actor_name: "Ife Ojo", panelist_name: null });
+    expect(ops.activity.filter((a) => a.kind === "feedback_due").map((a) => a.panelist_name).sort()).toEqual(["Ada Obi", "Ife Ojo"]);
+    expect(ops.activity.find((a) => a.kind === "scheduled")).toMatchObject({ actor_name: "Ada Obi" });
+
+    // With no sort, the interviews still to end come first, then those past.
+    const listed = (await h.as("ops").get("/recruitment/interviews")).body.data;
+    const ended = listed.map((x) => Date.parse(x.scheduled_end) < Date.now());
+    expect(ended).toContain(true);
+    expect(ended).toEqual([...ended].sort());
   });
   test("the panel picker lists only who may sit, searched by name, for those who schedule", async () => {
     const all = await h.as("ops").get("/recruitment/interviews/panelists");

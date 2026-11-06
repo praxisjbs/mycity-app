@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { Button } from "../actions/Button";
 import type { DocumentRef, Uploader } from "../lib/upload";
-import { UploadField } from "./UploadField";
+import { FileRow, UploadField } from "./UploadField";
 
 const doc = (name: string): DocumentRef => ({ document_id: `d-${name}`, file_name: name, size_bytes: 10, mime_type: "application/pdf" });
 const file = (name = "receipt.pdf", size = 10) => {
@@ -26,6 +26,22 @@ describe("UploadField", () => {
     const inputs = container.querySelectorAll('input[type="file"]');
     expect(inputs).toHaveLength(1);
     expect(screen.getByLabelText("Drop files here, or browse")).toBe(inputs[0]);
+  });
+
+  it("zone: one wide button that opens the picker, its words and kinds, and still sends the file", async () => {
+    const onUploaded = vi.fn();
+    const { container } = render(<UploadField look="zone" purpose="cv" label="Choose Your CV" kinds="PDF or Word" multiple={false} upload={fine} onUploaded={onUploaded} />);
+    const button = screen.getByRole("button", { name: "Choose Your CV PDF or Word" });
+    expect(button).toHaveClass("ps-drop-zone");
+    await userEvent.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, file("cv.pdf"));
+    await waitFor(() => expect(onUploaded).toHaveBeenCalledWith([doc("cv.pdf")]));
+  });
+
+  it("FileRow: a file that arrived, its size and its action", () => {
+    render(<FileRow name="Ngozi-Okafor-CV.pdf" sizeBytes={253952} action={<Button>Replace</Button>} />);
+    expect(screen.getByText("Ngozi-Okafor-CV.pdf")).toHaveAttribute("data-copy", "content");
+    expect(screen.getByText("248 KB")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replace" })).toBeInTheDocument();
   });
 
   it("sends the file, shows its percentage, then says it is done", async () => {

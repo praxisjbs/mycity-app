@@ -8,6 +8,7 @@
  * @a11y A timer named by its label and the time left; silent each second, it says once, politely, the time really left when the warning time and the last minute arrive, and Time is up at the end. Nothing is said when it first shows.
  * @status beta
  * @example <Countdown endsAt={session.ends_at} serverNow={session.server_now} onEnd={reload} />
+ * @example <Countdown look="ring" total={3600} endsAt={session.ends_at} serverNow={session.server_now} onEnd={reload} />
  */
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn";
@@ -26,6 +27,10 @@ export interface CountdownProps {
   retryEvery?: number;
   /** What the clock counts, Title Case; "Time Left" unless set. */
   label?: string;
+  /** `ring`: the public site's, the time left in a ring that empties as it runs, red for the last five minutes; pass `total`. */
+  look?: "default" | "ring";
+  /** ring: the whole time, in seconds, that the ring stands for (the assessment's minutes × 60). */
+  total?: number;
   /** Layout classes only. */
   className?: string;
 }
@@ -73,7 +78,10 @@ function spoken(seconds: number): string {
 const stageOf = (left: number, warnAt: number): Stage =>
   left <= 0 ? "end" : left <= 60 ? "last" : left <= warnAt ? "warn" : "ok";
 
-export function Countdown({ endsAt, serverNow, onEnd, warnAt = 300, retryEvery = 10, label = "Time Left", className }: CountdownProps) {
+/** The ring's circumference at radius 88 on its 200 unit box. */
+const RING = 2 * Math.PI * 88;
+
+export function Countdown({ endsAt, serverNow, onEnd, warnAt = 300, retryEvery = 10, label = "Time Left", look = "default", total, className }: CountdownProps) {
   const end = endsAt ? Date.parse(endsAt) : Number.NaN;
   const timed = Number.isFinite(end);
   const offset = offsetOf(serverNow);
@@ -125,6 +133,25 @@ export function Countdown({ endsAt, serverNow, onEnd, warnAt = 300, retryEvery =
   }, [timed, end, stage, left, now, retryEvery]);
 
   if (!timed) return null;
+  if (look === "ring") {
+    const whole = total && total > 0 ? total : Math.max(left, 1);
+    const offsetDash = (RING * (1 - Math.min(1, left / whole))).toFixed(1);
+    return (
+      <div className={cn("ps-ring", className)} data-stage={stage} data-low={stage !== "ok" || undefined}>
+        <svg viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+          <circle className="ps-ring-track" cx="100" cy="100" r="88" fill="none" strokeWidth="12" />
+          <circle className="ps-ring-arc" cx="100" cy="100" r="88" fill="none" strokeWidth="12" strokeLinecap="round" strokeDasharray={RING.toFixed(1)} strokeDashoffset={offsetDash} />
+        </svg>
+        <div className="ps-ring-in" role="timer" aria-live="off" aria-label={`${label}: ${spoken(left)}`}>
+          <b aria-hidden="true">{formatClock(left)}</b>
+          <span aria-hidden="true">left</span>
+        </div>
+        <span role="status" aria-live="polite" className="sr-only">
+          {said}
+        </span>
+      </div>
+    );
+  }
   return (
     <div className={cn("inline-flex flex-col items-end", className)} data-stage={stage}>
       <div
