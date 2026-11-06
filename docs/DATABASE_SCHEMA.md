@@ -498,12 +498,14 @@ or a partner, with its kind, template key and version, fields, body, approval, s
 notice and closing, its status CHECK (`draft` to `closed`), `starts_on` set at signing;
 `agreement_obligation` dropped (empty; the file refuses to run on a row) · `7040` `project`, `task`
 and `calendar_event` gain `partner_id`, `lead_id` and `deal_id` (a partner or a lead, never both) ·
+`7050` `partner_category_template.asks` (a JSON array: the values a person gives when an agreement is
+generated from the template, each with its key, label, type and default; M7 PR 2) ·
 `7190` seed: `deal_health` and `interaction_type` (with `visit`), numbering `lead`, `deal`, `agreement`
 (and `partner`, `proposal` kept), 7099's `partnership_opportunity`, `partnership_agreement` and 0099's
 `mou` schemes taken out, the `partnership.agreement` approval (the Head of Department of the deal
 owner's department, then the CEO), `partnerships.configure` (Implementation, Operations & People) and
 `partnerships.money` (Operations & People, Management, Implementation; General Management through
-their department, in code), and 7099's partner types and stages switched off (A26) · `7050` (M7 PR 3)
+their department, in code), and 7099's partner types and stages switched off (A26) · `7060` (M7 PR 3)
 `partner_document`, a vault document of a lead or a partner (one of the two) with its kind, its deal
 and its origin (`upload`, `proposal`, `agreement`, `signed_copy`), the vault's row naming it as its
 entity so conversion re-points it and never rewrites the vault; and `partner.partner_type` dropped,

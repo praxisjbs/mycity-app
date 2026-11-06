@@ -15,6 +15,10 @@
  *
  * Money is gated (§6.1): commission rates and amounts and the merchant's take are left out of
  * every response for a reader without `partnerships.money`, and refused from one.
+ *
+ * It is also the controller's one door to Categories (§6.3, M7 PR 2): categories, their agreement
+ * templates and delivery checklists, custom fields, MyCity's lists and Start From Tracker, each in
+ * its own file beside this one.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -28,8 +32,10 @@ const { EVENTS } = require("./partner_pipeline.events");
 const repo = require("./partner_pipeline.repo");
 const lists = require("./partner_pipeline.lists");
 const categories = require("./partner_pipeline.categories");
+const checklists = require("./partner_pipeline.checklists");
 const fields = require("./partner_pipeline.fields");
 const options = require("./partner_pipeline.options");
+const setup = require("./partner_pipeline.setup");
 
 const MONEY = "partnerships.money";
 
@@ -188,12 +194,8 @@ async function pipeline(query, scope) {
   };
 }
 
-/** One of MyCity's lists, whole (GET /lists/:list). */
-const values = (key) => lists.values(pool, key);
-/** A page of categories (GET /categories). */
-const categoryPage = (query) => categories.page(pool, query);
-/** The custom field definitions, whole (GET /fields). */
-const fieldList = (query) => fields.list(pool, query);
+/** A category's name and defaults (its commission and validity) for a deal, or null. */
+const categoryOf = (db, id) => (id ? repo.getCategory(db, id) : null);
 
 /* ------------------------------------------------------------------ *
  * Writes
@@ -230,7 +232,7 @@ async function createIn(client, actor, record, body, { held, field = null, allow
   if (signed && !allowSigned) throw invalid(at("stage"), "Pick an open stage");
   if (!signed && allowSigned) throw invalid(at("stage"), "Pick a signed stage");
   if (stage.meaning === "closed_lost") throw invalid(at("stage"), "Pick an open stage");
-  const category = await categories.one(client, record.categoryId);
+  const category = await categoryOf(client, record.categoryId);
   const rate = body.commission_pct ?? (category ? category.default_commission_pct : null);
   const custom = await fields.checkCustom(client, { appliesTo: "deal", categoryId: record.categoryId, values: body.custom });
   if (body.impact && !(await lists.allActive(client, "partnership_impact", body.impact))) throw invalid(at("impact"), "Pick from the list");
@@ -331,7 +333,7 @@ async function update(actor, scope, id, body) {
     const starts = body.event_starts_on !== undefined ? body.event_starts_on : deal.event_starts_on;
     const ends = body.event_ends_on !== undefined ? body.event_ends_on : deal.event_ends_on;
     if (starts && ends && ends < starts) throw invalid("event_ends_on", "Ends before it starts");
-    const category = await categories.one(client, seen.partner_category_id);
+    const category = await categoryOf(client, seen.partner_category_id);
     const changes = {};
     for (const k of ["title", "event_title", "event_starts_on", "event_ends_on", "expected_attendance", "objective", "estimated_value", "expected_close_on", "next_action", "next_action_on", "owner_id", "impact", "impact_rating", "impact_note", "comments"]) {
       if (body[k] !== undefined) changes[k] = body[k];
@@ -399,12 +401,29 @@ module.exports = {
   list,
   get,
   pipeline,
-  values,
-  categoryPage,
-  fieldList,
   createIn,
   create,
   update,
   assertSeen,
   tx,
+  // Categories (M7 PR 2): each lives in its own file beside this one.
+  listCategories: categories.list,
+  getCategory: categories.get,
+  createCategory: categories.create,
+  updateCategory: categories.update,
+  getTemplate: categories.getTemplate,
+  addTemplate: categories.addTemplate,
+  updateTemplate: categories.updateTemplate,
+  saveTemplateWording: categories.saveTemplateWording,
+  addChecklistItem: checklists.addItem,
+  updateChecklistItem: checklists.updateItem,
+  listFields: fields.list,
+  createField: fields.create,
+  updateField: fields.update,
+  checkFieldValue: fields.checkValue,
+  getList: lists.values,
+  addListValue: lists.add,
+  updateListValue: lists.update,
+  readTracker: setup.read,
+  applyTracker: setup.apply,
 };

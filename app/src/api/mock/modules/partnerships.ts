@@ -1,5 +1,4 @@
 import type {
-  CategoryRow,
   Contact,
   DealDetail,
   DealOption,
@@ -24,6 +23,7 @@ import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, pag
 import { byId, byKey, refKey } from "../data/people";
 import { PARTNERS, type MockPartner } from "../data/partners";
 import { pickedPlace, placeOf } from "./maps";
+import { mockCategories, mockList } from "./partnerships_categories";
 
 /**
  * Partnerships on the mock (docs/guides/partnerships.md): Pipeline, Partners, Leads and both 360s in
@@ -44,46 +44,14 @@ const now = () => new Date().toISOString();
  * MyCity's lists and categories, as Categories enters them
  * ------------------------------------------------------------------ */
 
-const STAGE_ROWS: Array<[string, string, ListValue["meaning"]]> = [
-  ["prospect_identified", "Prospect Identified", "prospect"],
-  ["initial_contact", "Initial Contact", "contacted"],
-  ["intro_meeting_scheduled", "Meeting Scheduled", "meeting"],
-  ["intro_meeting_held", "Meeting Held", "meeting"],
-  ["proposal_sent", "Proposal Sent", "proposal"],
-  ["follow_up_ongoing", "Follow-Up Ongoing", "proposal"],
-  ["negotiation", "Negotiation", "negotiation"],
-  ["verbal_approval", "Verbal Approval", "negotiation"],
-  ["contract_review", "Contract Review", "negotiation"],
-  ["partnership_signed", "Partnership Signed", "signed"],
-  ["active_partnership", "Active Partnership", "active"],
-  ["closed_lost", "Closed Lost", "closed_lost"],
-  ["on_hold", "On Hold", "on_hold"],
-];
-const STAGES: ListValue[] = STAGE_ROWS.map(([code, label, meaning], i) => ({ code, label, meaning, position: (i + 1) * 10, active: true }));
-const LISTS: Record<string, ListValue[]> = {
-  partnership_stage: STAGES,
-  partnership_impact: ["App Downloads & Visibility", "Revenue Generation", "Brand Visibility", "User Acquisition", "Vendor Acquisition", "Community Growth"].map((label, i) => ({
-    code: label.toLowerCase().replace(/[^a-z]+/g, "_").replace(/_$/, ""),
-    label,
-    meaning: null,
-    position: (i + 1) * 10,
-    active: true,
-  })),
-  lead_source: ["Referral", "Event", "Inbound", "Outreach"].map((label, i) => ({ code: label.toLowerCase(), label, meaning: null, position: (i + 1) * 10, active: true })),
-  partner_document_kind: ["Proposal", "MOU", "Service Agreement", "Contract", "Brief", "Invoice", "Media", "Other"].map((label, i) => ({
-    code: label.toLowerCase().replace(/\s+/g, "_"),
-    label,
-    meaning: null,
-    position: (i + 1) * 10,
-    active: true,
-  })),
-};
+/** MyCity's stages and lists, and the categories, as Categories holds them (partnerships_categories.ts): one source. */
+const stages = () => mockList("partnership_stage");
 /** The tracker's stage names in the demonstration partners, as MyCity's codes. */
 const FROM_TRACKER: Record<string, string> = {
   "Prospect identified": "prospect_identified",
   "Initial contact": "initial_contact",
-  "Intro meeting scheduled": "intro_meeting_scheduled",
-  "Intro meeting held": "intro_meeting_held",
+  "Intro meeting scheduled": "introductory_meeting_scheduled",
+  "Intro meeting held": "introductory_meeting_held",
   "Proposal sent": "proposal_sent",
   "Follow up": "follow_up_ongoing",
   "Ongoing negotiation": "negotiation",
@@ -93,28 +61,12 @@ const FROM_TRACKER: Record<string, string> = {
   "Active partnership": "active_partnership",
   "On hold": "on_hold",
 };
-const stageOf = (code: string) => STAGES.find((s) => s.code === code) ?? null;
+const stageOf = (code: string) => stages().find((s) => s.code === code) ?? null;
 const meaningOf = (code: string) => stageOf(code)?.meaning ?? null;
 const SIGNED = new Set(["signed", "active"]);
 const LEAD_STATUS: Record<string, LeadRow["status"]> = { prospect: "new", contacted: "contacted", meeting: "contacted", proposal: "qualified", negotiation: "qualified", closed_lost: "lost", signed: "converted", active: "converted" };
 
-interface MockCategory {
-  partner_category_id: string;
-  name: string;
-  default_commission_pct: string | null;
-  default_validity_days: number | null;
-}
-const CATEGORIES: MockCategory[] = [
-  ["Event", "8.00", 30],
-  ["Hospitality", "10.00", 60],
-  ["Sponsorship", null, null],
-  ["Strategic", null, null],
-  ["Government", null, null],
-  ["Media", null, null],
-  ["Community", null, null],
-  ["Vendor", "5.00", 30],
-].map(([name, pct, days]) => ({ partner_category_id: sid(`category:${name}`), name: name as string, default_commission_pct: pct as string | null, default_validity_days: days as number | null }));
-const categoryOf = (id: string | null | undefined) => CATEGORIES.find((c) => c.partner_category_id === id) ?? null;
+const categoryOf = (id: string | null | undefined) => mockCategories().find((c) => c.partner_category_id === id) ?? null;
 
 /* ------------------------------------------------------------------ *
  * Leads, partners and their deals
@@ -219,7 +171,7 @@ const HEALTH_LABEL: Record<string, string> = { on_track: "On Track", follow_up_r
 function seed(p: MockPartner, i: number) {
   const code = FROM_TRACKER[p.stage] ?? "prospect_identified";
   const signed = SIGNED.has(meaningOf(code) ?? "");
-  const category = CATEGORIES.find((c) => c.name === p.type) ?? CATEGORIES[2];
+  const category = mockCategories().find((c) => c.name === p.type) ?? mockCategories()[0];
   const city = cityOf(p.hq);
   const made = at(Math.max(p.days_at_stage, p.quiet_days) + 20, "09:00");
   const r: MockRecord = {
@@ -466,7 +418,7 @@ function lead360(r: MockRecord, money: boolean): Lead360 {
     website: r.website,
     objective: r.objective,
     source: r.source,
-    source_label: LISTS.lead_source.find((x) => x.code === r.source)?.label ?? null,
+    source_label: mockList("lead_source").find((x) => x.code === r.source)?.label ?? null,
     region_view: regionView(r),
     impact: [],
     impact_rating: null,
@@ -527,23 +479,7 @@ function partner360(r: MockRecord, money: boolean): Partner360 {
  * Reads
  * ------------------------------------------------------------------ */
 
-route("GET /api/v1/partnerships/lists/:list", (req) => (LISTS[req.params.list] ? ok({ list: req.params.list, values: LISTS[req.params.list] }) : invalid({ list: ["Choose one"] })));
-route("GET /api/v1/partnerships/categories", (req) =>
-  paged(
-    CATEGORIES.map((c, i): CategoryRow => ({
-      ...c,
-      description: null,
-      counts_as_vendor: c.name === "Vendor",
-      display_order: i + 1,
-      active: true,
-      partners: RECORDS.filter((r) => r.kind === "partner" && r.category_id === c.partner_category_id).length,
-      leads: RECORDS.filter((r) => r.kind === "lead" && r.category_id === c.partner_category_id && r.status !== "converted").length,
-    })),
-    req,
-    { search: (c) => [c.name], filters: { active: (c, v) => String(c.active) === v }, sort: { display_order: (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0), name: (a, b) => a.name.localeCompare(b.name) } },
-  ),
-);
-route("GET /api/v1/partnerships/fields", () => ok({ data: [] }));
+// Lists, categories and fields are read from Categories' mock (partnerships_categories.ts).
 
 const DEAL_FILTERS = {
   stage: (d: MockDeal, v: string) => d.stage === v,
@@ -572,7 +508,7 @@ route("GET /api/v1/partnerships/pipeline", (req) => {
       signed_value: m(signedThisYear.reduce((a, d) => a + (signedValue(d) ? k(signedValue(d)!) : 0), 0)),
       stalled: unfinished.filter((d) => d.health === "stalled").length,
     },
-    by_stage: STAGES.filter((s) => s.meaning !== "closed_lost").map((s) => {
+    by_stage: stages().filter((s) => s.meaning !== "closed_lost").map((s) => {
       const at_ = unfinished.filter((d) => d.stage === s.code);
       return { stage: s.code, label: s.label, meaning: s.meaning, open: at_.length, value: m(at_.reduce((a, d) => a + (d.estimated_value ? k(d.estimated_value) : 0), 0)) };
     }),
@@ -611,7 +547,7 @@ route("GET /api/v1/partnerships/leads/summary", () => {
     contacted: leads.filter((l) => l.status === "contacted").length,
     qualified: leads.filter((l) => l.status === "qualified").length,
     converted_this_month: leads.filter((l) => l.converted_at && l.converted_at.slice(0, 7) === isoDaysAgo(0).slice(0, 7)).length,
-    by_source: [...by.entries()].sort((a, b) => b[1] - a[1]).map(([source, n]) => ({ source, label: LISTS.lead_source.find((x) => x.code === source)?.label ?? "No Source", leads: n })),
+    by_source: [...by.entries()].sort((a, b) => b[1] - a[1]).map(([source, n]) => ({ source, label: mockList("lead_source").find((x) => x.code === source)?.label ?? "No Source", leads: n })),
   });
 });
 route("GET /api/v1/partnerships/leads", (req) =>
@@ -723,7 +659,7 @@ const moneyOf = (v: unknown) => (typeof v === "string" && /^\d+(\.\d{1,2})?$/.te
 
 /** A deal's own fields from DealFields; the problems as the API words them. */
 function dealFrom(b: Body, at_: string, problems: Record<string, string[]>, signedOk: boolean) {
-  const stage = str(b.stage) ? stageOf(String(b.stage)) : signedOk ? stageOf("partnership_signed") : STAGES[0];
+  const stage = str(b.stage) ? stageOf(String(b.stage)) : signedOk ? stageOf("partnership_signed") : stages()[0];
   if (!str(b.title)) problems[`${at_}title`] = ["Required"];
   if (!keyOfEmployee(b.owner_id)) problems[`${at_}owner_id`] = ["Required"];
   if (!stage) problems[`${at_}stage`] = ["Pick a stage"];
@@ -1052,7 +988,7 @@ route("PATCH /api/v1/partnerships/contacts/:id", (req) => {
 route("POST /api/v1/partnerships/documents", (req) => {
   const r = recordOf(String(req.body.partner_id ?? req.body.lead_id ?? ""));
   if (!r) return invalid({ partner_id: ["Pick the lead or the partner"] });
-  const kind = LISTS.partner_document_kind.find((x) => x.code === req.body.kind);
+  const kind = mockList("partner_document_kind").find((x) => x.code === req.body.kind);
   if (!kind) return invalid({ kind: ["Pick from the list"] });
   const doc: PartnerDocument = { document: { document_id: String(req.body.document_id), file_name: "Upload.pdf", size_bytes: 120000, mime_type: "application/pdf" }, kind: kind.code, kind_label: kind.label, deal_id: str(req.body.deal_id), origin: "upload", uploaded_by: refKey(req.user!).display_name, created_at: now() };
   DOCUMENTS.unshift({ ...doc, record_id: r.id });

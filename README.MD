@@ -86,6 +86,9 @@ mycity-app/
 │                             Team as hiring managers and panelists, tested by tests/integration/
 │                             recruitment-staging-seed.test.js;
 │                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest;
+│                             65_partnership_setup.js: Partnerships · Categories as MyCity sets it up (stages,
+│                             impacts, types, the Events checklist and Deal Merchant Agreement, proof points),
+│                             through the services, tested by tests/integration/partnerships-staging-seed.test.js;
 │                             80_expenses.js: M8's categories, budgets, projects and requests at
 │                             every stage on the Implementation Team's accounts, through the
 │                             services, after taking Home's expense rows and 8099's categories away,
@@ -564,13 +567,23 @@ screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2
 The build plan and the file map are `docs/guides/partnerships.md` (Appendix A and D), M7's only
 source of truth. PR 1 (05/11/2026) filled the seven contract files, migrations `7010` to `7040`, seed
 `7190`, and mounted each module's router on `/api/v1/partnerships`, empty until its PR; the files
-below beyond the template are filled, or added, by the PR named. PR 3 (06/11/2026) filled `partners`,
-`leads`, `partner_pipeline`'s deals and `interactions`, template files included (`.ai`, `.search`).
+below beyond the template are filled, or added, by the PR named. PR 2 (06/11/2026) built Categories (#104):
+`partner_pipeline.{categories,checklists,lists,fields,setup}.js` with the controller, routes, repo, service,
+events, `.ai` (reasons only) and `.search` (categories); `proposals.proof.js` (proof points and their image) with
+its routes, repo and events; `agreements.tidy.js` (Tidy With AI, route `POST /templates/tidy`) with its prompt
+`template-tidy.md`; `templates/templates.agreements.js` (the wording of a category's agreement templates);
+`shared/spreadsheet` `readDropdowns`; migration `7050` (a template's asks); the staging seed
+`seeds/staging/65_partnership_setup.js`; `DocumentEditor` in `packages/ui`; on screen
+`app/src/features/partnerships/Categories.tsx`, `PipelineSettings.tsx`, `ProofPoints.tsx` and `forms/`
+(`CategoryForm`, `FieldForm`, `ChecklistForm`, `ListValueForm`, `ProofPointForm`, `TemplateEditor`, `TidyStep`,
+`StartFromTracker`, `template-html.ts`), with its mock `app/src/api/mock/modules/partnerships_categories.ts`.
+PR 3 (06/11/2026) filled `partners`, `leads`, `partner_pipeline`'s deals and `interactions`, template
+files included (`.ai`, `.search`).
 
 | Module | Files beyond the template |
 |---|---|
-| `partners` | `.360` (the Partner 360, renders correctly with zero data), `.dedup` (on `shared/dedup`), `.convert` (the conversion transaction, a lead's records moved to its partner), `.documents` (the Documents tab: `partner_document` rows naming the vault's, migration `7050_partnership_documents.sql`, which also drops `partner.partner_type`) (PR 3); `.import` (the tracker, PR 4); `.work` (PR 5); `.views` (PR 8); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
-| `partner_pipeline` | Deals in the template `.service` and `.repo`; `.options` (a deal's priced lines), `.stages` (stage moves, their rules and history), `.health` (health and blockers), `.returns` (the `deal_return` service and its two money-gated routes), `.lists` (stages with meanings and code lists, a lead's status from its stage), `.categories` and `.fields` (their reads for the screens) (PR 3); the writes of `.categories`, `.lists` and `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2); `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.views` (PR 8); `.types` is not built (categories replace it) and goes with PR 2; `.events` registers `deal.venue` (PR 1) |
+| `partners` | `.360` (the Partner 360, renders correctly with zero data), `.dedup` (on `shared/dedup`), `.convert` (the conversion transaction, a lead's records moved to its partner), `.documents` (the Documents tab: `partner_document` rows naming the vault's, migration `7060_partnership_documents.sql`, which also drops `partner.partner_type`) (PR 3); `.import` (the tracker, PR 4); `.work` (PR 5); `.views` (PR 8); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
+| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2), with the deals' rules added by PR 3: in `.lists` the stages as deals read them (the first stage, signed meanings, a lead's status from its stage, `leadStatusOf`) and in `.fields` a record's custom values checked by `checkValue` (`checkCustom`) and lists narrowed by them (`filterSql`); deals in the template `.service` and `.repo`, `.options` (a deal's priced lines), `.stages` (stage moves, their rules and history), `.health` (health and blockers), `.returns` (the `deal_return` service and its two money-gated routes) (PR 3); `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.views` (PR 8); `.types` was deleted with PR 2 (categories replace it); `.events` registers `deal.venue` (PR 1) |
 | `leads` | `.360` (the Lead 360, renders correctly with zero data) (PR 3); a lead's status is `partner_pipeline.lists`' `leadStatusOf`, kept in step by `leads.service`; conversion is `partners.convert`; `.views` (PR 8); `.events` registers `lead.cities` (PR 1) |
 | `interactions` | `.mail` (with `mailbox/binding/`, PR 8) |
 | `proposals` | `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views` (PR 7; `.proof` with PR 2); `.questionnaire` and `.pdf` are not built and go with PR 7 |

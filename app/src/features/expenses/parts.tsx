@@ -12,7 +12,7 @@ import { paging } from "@/features/shared/wire";
 import type { Tone } from "@/api/types/common";
 import {
   ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, DataView, Details, ErrorState, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, IconButton, KeyValue,
-  LoadingRows, Money, MoneyField, Pager, Pill, SelectField, Sub, TextAreaField, TextField, Timeline, toast, useConfirm, useContractForm, useModal, UploadField,
+  LoadingRows, Money, MoneyField, Pager, Pill, SelectField, Sub, TextAreaField, TextField, Timeline, toast, toMoneyString, useConfirm, useContractForm, useModal, UploadField,
 } from "@mycity/ui";
 
 /*
@@ -58,7 +58,7 @@ const BANKS = ["Access Bank", "First Bank", "GTBank", "Opay", "Providus Bank", "
 
 /* Money in kobo for a total on the form, never in floating point. */
 const kobo = (v: string) => {
-  const [w, f = ""] = String(v || "0").split(".");
+  const [w, f = ""] = (toMoneyString(String(v || "")) || "0").split(".");
   return Number(w || "0") * 100 + Number((f + "00").slice(0, 2));
 };
 const naira = (k: number) => `${Math.trunc(k / 100)}.${String(k % 100).padStart(2, "0")}`;
@@ -68,6 +68,8 @@ const naira = (k: number) => `${Math.trunc(k / 100)}.${String(k % 100).padStart(
  * ------------------------------------------------------------------ */
 
 type LineValue = { description: string; quantity: string; unit_price: string };
+/** The lines as the contract takes them: a unit price as typed ("4,500") sent as a two-place string ("4500.00"). */
+const linesOnWire = (lines: LineValue[]) => lines.map((l) => ({ ...l, unit_price: toMoneyString(l.unit_price) }));
 const EMPTY_LINE: LineValue = { description: "", quantity: "1", unit_price: "" };
 
 /**
@@ -97,7 +99,8 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       account_number: existing?.uses_profile_account ? "" : (existing?.account_number ?? ""),
       invoice_document_id: existing?.invoice?.document_id ?? "",
     },
-    expenses.ExpenseFields,
+    // The schema reads the lines as they will be sent, so "4500" is an amount, not a wrong format.
+    { safeParse: (v: Record<string, unknown>) => expenses.ExpenseFields.safeParse({ ...v, lines: linesOnWire(v.lines as LineValue[]) }) },
   );
   const create = useMutation("POST /api/v1/expenses/mine");
   const edit = useMutation("PATCH /api/v1/expenses/mine/:id");
@@ -111,7 +114,7 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
 
   const save = (send: boolean) => async () => {
     if (!f.check()) return;
-    const body = { ...f.values, lines, invoice_document_id: invoice?.document_id ?? "" };
+    const body = { ...f.values, lines: linesOnWire(lines), invoice_document_id: invoice?.document_id ?? "" };
     try {
       let saved: ExpenseRequest;
       if (existing) {

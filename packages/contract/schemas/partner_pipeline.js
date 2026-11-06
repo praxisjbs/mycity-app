@@ -117,6 +117,24 @@ const CategoryRow = Category.extend({
   leads: z.number().int().min(0),
 }).strict();
 
+/**
+ * An ask (§6.8): a value the person gives when an agreement is generated, with its label and type, and
+ * where MyCity's wording has one, its default. Named in the wording as `{{ ask.<key> }}`.
+ */
+const TemplateAsk = z
+  .object({
+    key: z.string().regex(/^[a-z][a-z0-9_]{0,39}$/, "Lower case letters"),
+    label: text(60),
+    type: FieldType,
+    options: z.array(text(80)).min(1).max(50).optional(),
+    default: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict()
+  .refine((v) => !["pick", "multi_pick"].includes(v.type) || (v.options && v.options.length > 0), {
+    message: "Add the choices",
+    path: ["options"],
+  });
+
 const CategoryTemplate = z
   .object({
     partner_category_template_id: uuid,
@@ -127,9 +145,56 @@ const CategoryTemplate = z
     is_default: z.boolean(),
     countersigned: z.boolean(),
     active: z.boolean(),
+    asks: z.array(TemplateAsk).max(30),
     version: z.number().int().min(0).nullable(),
   })
   .strict();
+
+/**
+ * A record field a template may name (§6.8). `signer.*` are filled by the signing service when the
+ * agreement is signed (§6.9); `deal.options` is the options table and `category.checklist` the numbered
+ * clauses of the delivery checklist.
+ */
+const RecordFieldType = z.enum(["text", "number", "date", "table", "list", "signature"]);
+const RecordField = z
+  .object({
+    field: z.string(),
+    label: z.string(),
+    type: RecordFieldType,
+    source: z.enum(["record", "signing"]),
+  })
+  .strict();
+
+const rf = (field, label, type = "text", source = "record") => Object.freeze({ field, label, type, source });
+
+/** Every record field a category template may name, in the order the editor offers them. */
+const AGREEMENT_RECORD_FIELDS = Object.freeze([
+  rf("today", "Date", "date"),
+  rf("org.name", "MyCity Name"),
+  rf("partner.name", "Business Name"),
+  rf("partner.legal_name", "Legal Name"),
+  rf("partner.headquarters", "Address"),
+  rf("partner.region", "Region"),
+  rf("contact.full_name", "Contact Person"),
+  rf("contact.title", "Contact Position"),
+  rf("contact.phones", "Phone Numbers"),
+  rf("contact.email", "Email"),
+  rf("deal.title", "Deal Title"),
+  rf("deal.event_title", "Event Title"),
+  rf("deal.event_starts_on", "Event Starts", "date"),
+  rf("deal.event_ends_on", "Event Ends", "date"),
+  rf("deal.objective", "Objective"),
+  rf("deal.expected_attendance", "Expected Attendance", "number"),
+  rf("deal.comments", "Comments"),
+  rf("deal.valid_until", "Valid Until", "date"),
+  rf("deal.validity_label", "Validity"),
+  rf("deal.options", "Deal Options", "table"),
+  rf("category.checklist", "Delivery Checklist", "list"),
+  rf("signer.name", "Signer Name", "text", "signing"),
+  rf("signer.title", "Signer Title", "text", "signing"),
+  rf("signer.signed_on", "Date Signed", "date", "signing"),
+  rf("signer.signature", "Signature", "signature", "signing"),
+]);
 
 const ChecklistItem = z
   .object({
@@ -200,14 +265,39 @@ const CategoryUpdate = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field");
 
-/** Add Template: a template's wording is saved through the templates routes; this names it for the category. */
+/** The editor's wording, as HTML: what the template editor saves and Use Draft hands it. */
+const wordingHtml = z.string().trim().min(1, "Write the agreement").max(100000, "Too long");
+
+/**
+ * Add Template: the agreement's name, kind and wording in one save, so no category ever holds a template
+ * with nothing to fill. The key is made from the category and the label when left out; it never changes.
+ */
 const CategoryTemplateCreate = z
   .object({
-    template_key: z.string().trim().regex(/^[a-z0-9][a-z0-9-]{1,79}$/, "must be a template's key"),
+    template_key: z.string().trim().regex(/^[a-z][a-z0-9-]{1,63}$/, "must be a template's key").optional(),
     kind: TemplateKind,
     label: text(80),
     is_default: z.boolean().optional(),
     countersigned: z.boolean().optional(),
+    title: optionalText(150),
+    body_html: wordingHtml,
+    asks: z.array(TemplateAsk).max(30).optional(),
+  })
+  .strict();
+
+/** The picked template with its wording, for the editor (GET /category-templates/:id). */
+const CategoryTemplateDetail = CategoryTemplate.extend({
+  title: z.string().nullable(),
+  body_html: z.string(),
+  record_fields: z.array(RecordField).max(60),
+}).strict();
+
+/** Save the wording as the template's next version; the asks are replaced when given. */
+const TemplateWordingSave = z
+  .object({
+    title: z.string().trim().max(150).nullable().optional(),
+    body_html: wordingHtml,
+    asks: z.array(TemplateAsk).max(30).optional(),
   })
   .strict();
 
@@ -246,11 +336,26 @@ const ProposedField = z
   })
   .strict();
 
+/** What the model is asked to return for Tidy With AI, checked before anyone sees it. */
+const TemplateTidyOutput = z
+  .object({
+    /** The agreement as Markdown, each value that belongs to a record or an ask written as its {{ field }}. */
+    body_markdown: z.string().min(1).max(150000),
+    fields: z.array(ProposedField).max(100),
+  })
+  .strict();
+
+/**
+ * Tidy With AI's answer: the tidied wording for the editor (headings, numbered clauses, the financials grid
+ * as a table, each proposed field a chip), or why there is none: AI is off or its limit is reached (§11).
+ */
 const TemplateTidyDraft = z
   .object({
-    /** The tidied wording: headings, numbered clauses, the financials grid as a table, fields as placeholders. */
-    body: z.string(),
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    body_html: z.string().nullable(),
     fields: z.array(ProposedField).max(100),
+    ai_run_id: uuid.nullable(),
   })
   .strict();
 
@@ -862,10 +967,29 @@ const TABLES = {
   CategoryPage: { table: null, reason: "a page of categories" },
   CategoryCreate: { table: "partner_category" },
   CategoryUpdate: { table: "partner_category" },
-  CategoryTemplateCreate: { table: "partner_category_template" },
+  TemplateAsk: { table: null, reason: "an ask inside partner_category_template.asks" },
+  RecordField: { table: null, reason: "a record field a template may name; a catalogue, not a row" },
+  CategoryTemplateCreate: {
+    table: "partner_category_template",
+    virtual: { title: "the wording's title, kept in template_version", body_html: "the wording, saved as template_version's Markdown" },
+  },
   CategoryTemplateUpdate: { table: "partner_category_template" },
+  CategoryTemplateDetail: {
+    table: "partner_category_template",
+    virtual: {
+      version: "the current template_version.version of its key",
+      title: "template_version.title",
+      body_html: "template_version.body rendered for the editor",
+      record_fields: "the record fields a template may name",
+    },
+  },
+  TemplateWordingSave: {
+    table: null,
+    reason: "new wording saved as the template's next template_version, and its asks",
+  },
   TemplateTidy: { table: null, reason: "pasted wording for Tidy With AI; nothing is kept" },
   ProposedField: { table: null, reason: "a field Tidy With AI proposes; nothing is kept until Use Draft" },
+  TemplateTidyOutput: { table: null, reason: "the model's answer for Tidy With AI, checked before anyone sees it" },
   TemplateTidyDraft: { table: null, reason: "Tidy With AI's draft; nothing is kept until Use Draft" },
   ChecklistItemCreate: { table: "partner_category_checklist_item" },
   ChecklistItemUpdate: { table: "partner_category_checklist_item" },
@@ -970,7 +1094,13 @@ module.exports = {
   RecordRef,
   Category,
   CategoryRow,
+  TemplateAsk,
+  RecordFieldType,
+  RecordField,
+  AGREEMENT_RECORD_FIELDS,
   CategoryTemplate,
+  CategoryTemplateDetail,
+  TemplateWordingSave,
   ChecklistItem,
   Field,
   CategoryDetail,
@@ -982,6 +1112,7 @@ module.exports = {
   CategoryTemplateUpdate,
   TemplateTidy,
   ProposedField,
+  TemplateTidyOutput,
   TemplateTidyDraft,
   ChecklistItemCreate,
   ChecklistItemUpdate,

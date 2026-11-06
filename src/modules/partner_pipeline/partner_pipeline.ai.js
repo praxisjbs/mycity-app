@@ -8,8 +8,9 @@
  * screen's own service function.
  *
  * A move into a signed stage needs the signed copy, a file, so its card sends the person to the
- * deal's 360. Categories, their templates, checklists and custom fields, and MyCity's lists are set
- * up on Categories, never in the chat.
+ * deal's 360. Categories, their templates, checklists and custom fields, MyCity's lists and Start
+ * From Tracker are designed on Categories with the whole set in view (praxis-ai.md decision 33's
+ * design word), never in the chat; the assistant sends the person there.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -27,7 +28,6 @@ const dealLine = (status) => (d) => [{ type: "partner_deal", id: d.deal_id, labe
 const cite = (row) => ({ type: "partner_deal", id: row.deal_id, label: row.title });
 const names = (values, _actor, db) => service.cardNames(db, values);
 const whichDeal = { field: "deal_id", question: "Which deal is it?", read: "deals.list" };
-const DESIGN = "design: set up on Partnerships · Categories, where its effect on every deal is seen before it is saved";
 
 module.exports = defineManifest({
   module: "partnerships",
@@ -138,16 +138,17 @@ module.exports = defineManifest({
     DealCreate: "via deals.create: New Deal's own request, with its venue, options, team and custom values; the card is DealAdd",
     DealUpdate: "via deals.update: Edit Deal's own request, which never names its deal; the card is DealChange",
     ReturnSave: "via deal_returns.save: Enter Returns' own request, which never names its deal or month; the card is DealReturnChange",
-    CategoryCreate: DESIGN,
-    CategoryUpdate: DESIGN,
-    CategoryTemplateCreate: DESIGN,
-    CategoryTemplateUpdate: DESIGN,
-    ChecklistItemCreate: DESIGN,
-    ChecklistItemUpdate: DESIGN,
-    FieldCreate: DESIGN,
-    FieldUpdate: DESIGN,
-    ListValueCreate: DESIGN,
-    ListValueUpdate: DESIGN,
+    CategoryCreate: "design: a category is set up on Categories with its defaults, templates, checklist and fields in view",
+    CategoryUpdate: "design: a category's defaults, retiring and restoring are made on Categories with what it holds in view",
+    CategoryTemplateCreate: "design: an agreement template is written in the template editor with its fields beside the wording",
+    CategoryTemplateUpdate: "design: which template is the default, and retiring one, is decided on Categories with the others in view",
+    TemplateWordingSave: "design: an agreement's wording is edited in the template editor, never from the chat",
+    ChecklistItemCreate: "design: a delivery checklist is ordered on Categories with every item in view",
+    ChecklistItemUpdate: "design: a checklist item is moved and retired on Categories with the whole checklist in view",
+    FieldCreate: "design: a custom field is defined on Categories with the category's other fields in view",
+    FieldUpdate: "design: a custom field is changed and retired on Categories with the category's other fields in view",
+    ListValueCreate: "design: the pipeline's stages and lists are arranged on Categories with the whole list in view",
+    ListValueUpdate: "design: a stage's meaning, order and retiring are changed on Categories with the whole list in view",
   },
   reads: [
     {
@@ -171,12 +172,13 @@ module.exports = defineManifest({
       description: "List the partnership categories (Event, Hospitality, Vendor and the rest), with how many partners and leads each has",
       params: c.partner_pipeline.CategoryListQuery,
       permission: ["partnerships", "view"],
-      run: (_client, params) => service.categoryPage(params),
+      run: (_client, params) => service.listCategories(params),
       cite: (row) => ({ type: "partner_category", id: row.partner_category_id, label: row.name }),
     },
   ],
   routes: [
     { intent: "see the partnership pipeline, stalled deals and what has waited longest", screen: "partnerships.pipeline" },
     { intent: "move a deal or set its health", screen: "partnerships.pipeline" },
+    { intent: "set up a category", screen: "partnerships.categories" },
   ],
 });

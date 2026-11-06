@@ -6,7 +6,7 @@
  * the quiet partners Home's Partner Inactivity alerts sweep.
  *
  * OWNED BY the `partners`, `partner_pipeline`, `interactions`, `proposals` and `agreements`
- * modules, M7 Partnerships, CRM & Trackers, LA (migrations 7000 to 7050).
+ * modules, M7 Partnerships, CRM & Trackers, LA (migrations 7000 to 7060).
  *
  * Since M7 PR 3 every query here is the owning module's own read (partner_pipeline.repo,
  * partners.repo, proposals.repo), by the rule the Partnerships screens keep

@@ -3,6 +3,13 @@
  * What the partner_pipeline module records (docs/guides/partnerships.md §7). Loaded by the API
  * (through the service) and the worker.
  *
+ * Categories and their lists (M7 PR 2):
+ *   category.*              a category, its agreement templates and its delivery checklist
+ *   partnership_field.*     a custom field for leads, partners or deals
+ *   list_value.*            a stage, impact, source or document kind of MyCity's lists
+ *   partnership_setup.*     Start From Tracker applied
+ *
+ * Deals (M7 PR 3):
  *   deal.created          New Deal, or a lead's or partner's first deal
  *   deal.updated          Edit Deal: its terms, options, team, dates or custom values
  *   deal.stage_changed    the stage switcher, Close as Lost, Close Partner or a conversion
@@ -23,6 +30,18 @@ const { defineEvents } = require("../../shared/events/catalogue");
 const places = require("../../shared/places/owners");
 
 const EVENTS = defineEvents("partnerships", {
+  "category.created": { summary: "A partnership category was added" },
+  "category.updated": { summary: "A partnership category was changed, retired or restored" },
+  "category.template_added": { summary: "An agreement template was added to a category" },
+  "category.template_updated": { summary: "A category's agreement template was changed, retired or made the default" },
+  "category.template_saved": { summary: "An agreement template's wording was saved as its next version" },
+  "category.checklist_item_added": { summary: "A delivery checklist item was added to a category" },
+  "category.checklist_item_updated": { summary: "A delivery checklist item was changed, moved or retired" },
+  "partnership_field.created": { summary: "A custom field was added" },
+  "partnership_field.updated": { summary: "A custom field was changed, retired or restored" },
+  "list_value.created": { summary: "A value was added to one of the partnership lists" },
+  "list_value.updated": { summary: "A value of the partnership lists was changed, retired or restored" },
+  "partnership_setup.applied": { summary: "The partnership lists were set up from MyCity's tracker" },
   "deal.created": { summary: "A partnership deal was opened" },
   "deal.updated": { summary: "A partnership deal was changed" },
   "deal.stage_changed": { summary: "A partnership deal moved stage" },

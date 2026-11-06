@@ -1,102 +1,167 @@
 "use strict";
 /**
- * Custom fields (docs/guides/partnerships.md §4.2, §6.3), read and enforced: the definitions a form
- * needs at once (whole, at most 200), every value a lead, a partner or a deal carries checked by its
- * field's type on the server, and a list narrowed by its filterable fields. Holders of
- * `partnerships.configure` add and retire fields on Categories (M7 PR 2).
- *
- *   text, long_text   a string (500 and 5,000 characters)
- *   number            a finite number
- *   money             an amount through shared/money, kept as its two-place string
- *   date              an ISO day
- *   pick, multi_pick  one, or several, of the field's options
- *   yes_no            true or false
- *   url               an http or https address
- *
- * A field applies to leads, partners or deals, of one category or of every category. A key no
- * field of the record has, or one retired, is refused: a retired field keeps its values and is
- * offered no more. Null clears a value.
+ * Custom fields (docs/guides/partnerships.md §6.3): holders of `partnerships.configure` define a field on
+ * Categories for one category or for all, for leads, partners or deals, of a type. A field's key is made
+ * from its label once and never changes: it is the key of every record's `custom` value. Retiring a field
+ * keeps its values (shown as retired) and stops offering it. Values are checked by type here (`checkValue`)
+ * wherever a record's `custom` is written (`checkCustom`, M7 PR 3), and a list is narrowed by its
+ * filterable fields (`filterSql`).
  */
 const c = require("@mycity/contract");
-const money = require("../../shared/money/money");
-const { completeQuery } = require("../../shared/http/paged");
+const { pool } = require("../../config/db");
+const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
+const { emit } = require("../../shared/events/emit");
+const money = require("../../shared/money/money");
+const repo = require("./partner_pipeline.repo");
+const { EVENTS } = require("./partner_pipeline.events");
 
-const COLUMNS = `partnership_field_id, key, label, field_type, options, applies_to, partner_category_id, filterable, position, active`;
+async function tx(fn) {
+  const client = await pool.connect();
+  try {
+    return await atomically(client, () => fn(client));
+  } finally {
+    client.release();
+  }
+}
 
-const shape = (r) => ({ ...r, options: Array.isArray(r.options) ? r.options.map(String) : null });
+const PICKS = new Set(["pick", "multi_pick"]);
+
+/** `ticketing_terms` from "Ticketing Terms"; a letter first, at most 60 characters. */
+function keyOf(label) {
+  const base = String(label)
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 52);
+  return /^[a-z]/.test(base) ? base : `f_${base || "field"}`;
+}
+
+async function freeKey(db, label) {
+  const base = keyOf(label);
+  for (let n = 1; n < 100; n += 1) {
+    const key = n === 1 ? base : `${base}_${n}`;
+    if (!(await repo.fieldKeyTaken(db, key))) return key;
+  }
+  throw new AppError("FIELD_KEY", "Give the field a different name", 409, { label: ["Name in use"] });
+}
+
+const list = async (query) => ({ data: await repo.listFields(pool, query) });
+
+const notFound = () => new AppError("NOT_FOUND", "That field does not exist", 404);
+
+async function create(actor, body) {
+  const id = await tx(async (client) => {
+    if (body.partner_category_id && !(await repo.getCategory(client, body.partner_category_id)))
+      throw new AppError("NOT_FOUND", "That category does not exist", 404, { partner_category_id: ["No such category"] });
+    if (body.options && !PICKS.has(body.field_type))
+      throw new AppError("OPTIONS_NOT_ALLOWED", "Only a pick has choices", 422, { options: ["Picks only"] });
+    const key = await freeKey(client, body.label);
+    const row = await repo.insertField(client, { ...body, key, position: await repo.nextFieldPosition(client) });
+    const after = await repo.getField(client, row.partnership_field_id);
+    await emit(client, {
+      key: EVENTS.PARTNERSHIP_FIELD_CREATED,
+      entity: { type: "partnership_field", id: after.partnership_field_id },
+      actor,
+      after,
+      payload: { partnership_field_id: after.partnership_field_id, key, applies_to: after.applies_to },
+    });
+    return after.partnership_field_id;
+  });
+  return repo.getField(pool, id);
+}
+
+async function update(actor, id, body) {
+  await tx(async (client) => {
+    const before = await repo.getField(client, id);
+    if (!before) throw notFound();
+    if (body.options && !PICKS.has(before.field_type))
+      throw new AppError("OPTIONS_NOT_ALLOWED", "Only a pick has choices", 422, { options: ["Picks only"] });
+    await repo.updateField(client, id, body);
+    const after = await repo.getField(client, id);
+    await emit(client, {
+      key: EVENTS.PARTNERSHIP_FIELD_UPDATED,
+      entity: { type: "partnership_field", id },
+      actor,
+      before,
+      after,
+      payload: { partnership_field_id: id, key: after.key, active: after.active },
+    });
+  });
+  return repo.getField(pool, id);
+}
 
 /**
- * The field definitions, whole (FieldList): a form needs every one of them at once.
- * @param {{query: Function}} db
- * @param {{applies_to?: string, partner_category_id?: string, active?: boolean}} query
+ * One custom value checked by its field's type, as stored in a record's `custom`: text and links as
+ * trimmed strings, numbers as numbers, money as a two-place string, dates as YYYY-MM-DD, yes or no as a
+ * boolean, a pick as one of the field's options and a multi-pick as some of them. Returns the value to keep;
+ * throws a 422 naming the field.
+ * @param {{key: string, label: string, field_type: string, options: string[]|null}} field
  */
-async function list(db, query = {}) {
-  // pagination:complete every field a form draws is needed at once (FieldList, at most 200)
-  const { rows } = await completeQuery(
-    db,
-    `SELECT ${COLUMNS} FROM partnership_field
-      WHERE ($1::text IS NULL OR applies_to = $1)
-        AND ($2::uuid IS NULL OR partner_category_id IS NULL OR partner_category_id = $2)
-        AND ($3::boolean IS NULL OR active = $3)
-      ORDER BY position, label, partnership_field_id`,
-    [query.applies_to || null, query.partner_category_id || null, query.active === undefined ? null : query.active],
-    { label: "the custom fields", ceiling: 200 },
-  );
-  return { data: rows.map(shape) };
+function checkValue(field, value) {
+  const bad = (message) => new AppError("FIELD_VALUE_INVALID", message, 422, { [`custom.${field.key}`]: [message] });
+  if (value === null || value === undefined || value === "") return null;
+  switch (field.field_type) {
+    case "text":
+    case "long_text": {
+      if (typeof value !== "string") throw bad("Words only");
+      return value.trim().slice(0, field.field_type === "text" ? 200 : 5000);
+    }
+    case "url": {
+      if (typeof value !== "string" || !/^https?:\/\/[^\s]+$/i.test(value.trim())) throw bad("Not a link");
+      return value.trim();
+    }
+    case "number": {
+      const n = typeof value === "number" ? value : Number(value);
+      if (!Number.isFinite(n)) throw bad("Not a number");
+      return n;
+    }
+    case "money": {
+      try {
+        return money.toWire(money.money(value));
+      } catch {
+        throw bad("Not an amount");
+      }
+    }
+    case "date": {
+      if (!c.common.isoDate.safeParse(value).success) throw bad("Not a real date");
+      return value;
+    }
+    case "yes_no": {
+      if (typeof value !== "boolean") throw bad("Yes or no");
+      return value;
+    }
+    case "pick": {
+      if (typeof value !== "string" || !(field.options || []).includes(value)) throw bad("Pick a listed choice");
+      return value;
+    }
+    case "multi_pick": {
+      if (!Array.isArray(value) || value.some((v) => !(field.options || []).includes(v))) throw bad("Pick listed choices");
+      return [...new Set(value)];
+    }
+    default:
+      throw bad("Unknown field type");
+  }
 }
+
+/* ------------------------------------------------------------------ *
+ * Values on records, and lists narrowed by them (M7 PR 3)
+ * ------------------------------------------------------------------ */
 
 /** The fields a record of `appliesTo` in `categoryId` carries: its category's and every category's, retired ones included. */
 async function defsFor(db, appliesTo, categoryId) {
-  return (await list(db, { applies_to: appliesTo, partner_category_id: categoryId || undefined })).data.filter(
+  return (await repo.listFields(db, { applies_to: appliesTo, partner_category_id: categoryId || undefined })).filter(
     (f) => !f.partner_category_id || f.partner_category_id === categoryId,
   );
 }
 
-const bad = (key, message) => new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, { [`custom.${key}`]: [message] });
-
-/** One value held to its field's type; returns what is kept. */
-function valueOf(def, value) {
-  const k = def.key;
-  const opts = def.options || [];
-  switch (def.field_type) {
-    case "text":
-    case "long_text": {
-      const max = def.field_type === "text" ? 500 : 5000;
-      if (typeof value !== "string") throw bad(k, "Not text");
-      const t = value.trim();
-      if (t.length > max) throw bad(k, `At most ${max} characters`);
-      return t;
-    }
-    case "number":
-      if (typeof value !== "number" || !Number.isFinite(value)) throw bad(k, "Not a number");
-      return value;
-    case "money":
-      if (!c.common.money.safeParse(typeof value === "string" ? value : "").success) throw bad(k, "Not an amount");
-      return money.toWire(value);
-    case "date":
-      if (!c.common.isoDate.safeParse(value).success) throw bad(k, "Not a real date");
-      return value;
-    case "pick":
-      if (typeof value !== "string" || !opts.includes(value)) throw bad(k, "Pick a choice");
-      return value;
-    case "multi_pick":
-      if (!Array.isArray(value) || value.some((v) => typeof v !== "string" || !opts.includes(v))) throw bad(k, "Pick from the choices");
-      return [...new Set(value)];
-    case "yes_no":
-      if (typeof value !== "boolean") throw bad(k, "Yes or no");
-      return value;
-    case "url":
-      if (typeof value !== "string" || !/^https?:\/\/\S+\.\S+$/i.test(value.trim())) throw bad(k, "Not a web address");
-      return value.trim();
-    default:
-      throw bad(k, "Unknown field");
-  }
-}
+const unknown = (key) => new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, { [`custom.${key}`]: ["Unknown field"] });
 
 /**
- * The custom values a write keeps: each given key held to its field, null clearing it, merged over
- * what the record had.
+ * The custom values a write keeps: each given key held to its field by `checkValue`, null (or empty)
+ * clearing it, merged over what the record had. A key no field of the record has, or one retired, is
+ * refused: a retired field keeps its values and is offered no more.
  * @param {{query: Function}} db
  * @param {{appliesTo: "lead"|"partner"|"deal", categoryId: string|null, values?: object, had?: object}} opts
  * @returns {Promise<object>}
@@ -108,9 +173,10 @@ async function checkCustom(db, { appliesTo, categoryId, values, had = {} }) {
   const defs = new Map((await defsFor(db, appliesTo, categoryId)).map((d) => [d.key, d]));
   for (const [key, value] of given) {
     const def = defs.get(key);
-    if (!def || !def.active) throw bad(key, "Unknown field");
-    if (value === null) delete out[key];
-    else out[key] = valueOf(def, value);
+    if (!def || !def.active) throw unknown(key);
+    const kept = checkValue(def, value);
+    if (kept === null) delete out[key];
+    else out[key] = kept;
   }
   return out;
 }
@@ -128,7 +194,7 @@ async function checkCustom(db, { appliesTo, categoryId, values, had = {} }) {
 async function filterSql(db, appliesTo, filter, column, params) {
   const entries = Object.entries(filter || {});
   if (!entries.length) return "";
-  const defs = new Map((await list(db, { applies_to: appliesTo, active: true })).data.map((d) => [d.key, d]));
+  const defs = new Map((await repo.listFields(db, { applies_to: appliesTo, active: true })).map((d) => [d.key, d]));
   const wanted = {};
   for (const [key, value] of entries) {
     const def = defs.get(key);
@@ -139,4 +205,4 @@ async function filterSql(db, appliesTo, filter, column, params) {
   return `AND ${column} @> $${params.length}::jsonb`;
 }
 
-module.exports = { list, defsFor, checkCustom, filterSql };
+module.exports = { keyOf, list, create, update, checkValue, defsFor, checkCustom, filterSql };

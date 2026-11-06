@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | GE (Godwin-Okoh Elisha); LA (Love Adeola) the importers; AJ the Workspace links |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 3 `m7/leads-partners-deals` (#83, draft) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 `m7/leads-partners-deals` (#83) |
 
 ---
 
@@ -49,11 +49,13 @@ with the date, and add a line to §3.
 - [x] Docs: DATABASE_SCHEMA M7, README §5.10, addresses.md, workspace.md; gates green (05/11/2026)
 
 ### PR 2 · Categories, lists, fields, templates, proof points
-- [ ] The person confirms the `template-tidy` job
+- [x] The person confirms the `template-tidy` job: Default, JP, 06/11/2026
 - [ ] MyCity's ticketing template uploaded in this PR's chat and stored redacted in
-      `partnership-samples/` (does not block the start)
-- [ ] Backend and Categories screen (#104), desktop and phone; template editor; Start From Tracker
-- [ ] Events template from the Deal Merchant Agreement (staging)
+      `partnership-samples/` (does not block the start): not yet received; it is entered in the template
+      editor and stored redacted beside the agreement when it arrives
+- [x] Backend and Categories screen (#104), desktop and phone; template editor; Start From Tracker
+      (06/11/2026)
+- [x] Events template from the Deal Merchant Agreement (staging) (06/11/2026)
 
 ### PR 3 · Leads, partners, deals, the 360s
 - [x] Backend, conversion, duplicates, `StageSwitcher` (06/11/2026)
@@ -96,17 +98,41 @@ with the date, and add a line to §3.
   and `interactions` (without mail) on the contract, with contacts, documents, duplicates, conversion in
   one transaction and both 360s; `StageSwitcher` in packages/ui; Pipeline (#50), Partners (#51), Leads
   (#52), Partner 360 and Lead 360 on the real API, desktop and phone, with their forms and the mock; Home's
-  `partners.source.js` on the modules' reads, `OWES` empty; migration `7050`; `main` (M4, #72) merged in.
-  The calls the guide now records (§13.2, In PR 3): a record's documents are `partner_document` (`7050`,
+  `partners.source.js` on the modules' reads, `OWES` empty; migration `7060`; `main` merged in (M4 #72, then
+  PR 2 #80).
+  The calls the guide now records (§13.2, In PR 3): a record's documents are `partner_document` (`7060`,
   which also drops `partner.partner_type`); the read routes of PR 2's lane (`GET /categories`, `GET
-  /fields`, `GET /lists/:list`) came with PR 3; the `deal_return` service and its two routes came ahead
+  /fields`, `GET /lists/:list`) were built here while PR 2 was open, and PR 2's serve them now; the `deal_return` service and its two routes came ahead
   of PR 4; leaving On Hold needs no reason, a signed deal moves only among signed meanings, On Hold and
   Closed Lost, and only the first move into a signed meaning asks for the signed copy; New Partner's deal
   starts at the first `signed` stage; Partners' Quiet uses the enabled rule's `N`, 30 while none is
   enabled; Follow-Up Required in Title Case on screen; Home's Signed Value counts deals, one row a deal.
-  Left: the Work tab (PR 5) and the Returns tab with Enter Returns (PR 4) show their empty states.
-  Next: PR 2 alongside, then PRs 4 to 7.
+  Merged after PR 2: PR 2's files serve categories, lists and fields, and the deals read through them (one
+  value checker); PR 3's cards replace the interim reasons PR 2 gave `DealCreate`, `DealUpdate` and
+  `ReturnSave`; the mock's categories and lists come from Categories' data alone. Left: the Work tab (PR 5)
+  and the Returns tab with Enter Returns (PR 4) show their empty states; PR 2's review note that
+  Categories' picked category shows its partners and leads as counts only (guide §2 lists them) is not
+  done here. Next: PRs 4 to 7.
 
+- 06/11/2026 · TB · PR 2 reviewed (#80) against Appendix A and merged: `main` merged in (M4 #72 and M8 #75; M7's
+  PROGRESS rows carry LA as owner, as #72 set them); the AI Control test reads the registry's second page (26
+  actions, 25 a page); New Partner Category in ⌘K and the phone's floating button, and Expenses' New Expense
+  Category, since ⌘K holds a label once (a note for AJ in `m8-expenses.md`); the phone's category sheet keeps
+  its segmented control; Pipeline Settings' Move Up and Move Down renumber the list, so a value never lands two
+  places over; the guide's §9, §10.2, §13.2 and Appendix D to match. For PR 3: Categories' picked category
+  shows its partners and leads as counts only (§2 lists them), and on a phone an edit opened from Pipeline
+  Settings or Proof Points replaces that sheet. Next: PR 3, then PR 4 to PR 7.
+- 06/11/2026 · JP · PR 2 (`m7/categories`): Categories (#104) on the real API, desktop and phone. Backend:
+  categories, MyCity's lists with the rules that keep the pipeline whole, custom fields checked by type, the
+  delivery checklist, agreement templates on `template_version` (`templates.agreements`), Tidy With AI
+  (`template-tidy`, Default), Start From Tracker (`readDropdowns`), proof points with images; migration `7050`
+  (a template's asks); the Events category's Deal Merchant Agreement, checklist and a demonstration set on
+  staging. Screen: `DocumentEditor` (a new `packages/ui` component), the list beside the record, Pipeline
+  Settings, Proof Points, and on a phone a sheet with the sections one at a time. Calls the guide now records
+  (§13.2): asks get a column; the wording's routes sit with the category; a proof point's image is an upload,
+  so `ProofPointCreate` lost `document_id`; the record fields a template may name were completed; `DealCreate`,
+  `DealUpdate` and `ReturnSave` carry `design:` reasons until PR 8 declares their cards. Left: MyCity's ticketing
+  template (not received), then PR 3 and PR 6.
 - 05/11/2026 · JP · PR 1 (`m7/contract-data`): the seven contract files (Appendix C), migrations `7010` to
   `7040`, seed `7190`, the capabilities, the flow and the numbering; Categories (#104) and Public ·
   Proposal (#105) ratified; the routers mounted on `/partnerships`, the place owners registered, the mock

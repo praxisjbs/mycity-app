@@ -2685,6 +2685,17 @@
       "screen": "partnerships.pipeline"
     },
     {
+      "key": "partnerships.route.set_up_a_category",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.categories"
+    },
+    {
       "key": "people.route.add_a_department",
       "kind": "route",
       "module_key": "people",

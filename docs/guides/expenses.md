@@ -392,7 +392,10 @@ requester always sees theirs.
 - **Search** (`expenses.search.js`, `requisitions.search.js`, `disbursements.search.js`,
   `budgets.search.js`, `expense_categories.search.js`): a request by number or purpose (words
   expense, request, claim), a requisition and a disbursement by number or bank reference, a budget
-  by department and year, a category by name.
+  by department and year, a category by name. Categories' New Category is the ⌘K action **New
+  Expense Category**, the name the phone's floating button gives it too, since Partnerships has a New
+  Category of its own and ⌘K holds each label once; the header button stays New Category (TB,
+  06/11/2026; `partnerships.md` §13.2).
 
 ## 10 · On screen and mobile
 
@@ -423,7 +426,7 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 | Expenses · Disbursements | Waiting to Pay cards, then Paid with the Reference Missing pill | the Paid On column | Record Disbursement, full width in the sheet | Expenses tabs scroll sideways |
 | Expenses · Projects | project cards with a used bar and Remaining | Committed and Spent (in the sheet) | Set Budget in the sheet | Expenses tabs scroll sideways |
 | Expenses · Budgets | year picker, then department cards with a used bar | the category lines (in the sheet) | Edit Budget in the sheet | Expenses tabs scroll sideways |
-| Expenses · Categories | category cards with type and this month | Requests count | New Category | Expenses tabs scroll sideways |
+| Expenses · Categories | category cards with type and this month | Requests count | New Expense Category, the floating button's action | Expenses tabs scroll sideways |
 
 ## 11 · Edge cases
 
@@ -462,6 +465,7 @@ None.
 
 ## 14 · Change log
 
+- 06/11/2026 · TB · Merging M7 PR 2 (#80): Categories' New Category is New Expense Category in ⌘K and the phone's floating button (§9, §10.2), as Partnerships' is New Partner Category, since ⌘K holds each label once; the header button, the form and the User Guide's step are unchanged. A note for AJ is in `docs/handoff/m8-expenses.md` §6.
 - 05/11/2026 · AJ · The audit's F5 to F25 fixed (`docs/handoff/m8-expenses-audit.md` §4): Withdraw on every screen an `expenses.finance` holder opens an approved request (Requisitions, Disbursements, a project's or a requisition's request), Cancel Request until then, each after a confirm (§2, §10.1); Expenses · Projects gated on its read, Set Budget on `expenses.finance` (§2); the recount locks its lines first (§6.6 rule 3); one budget per department per year in migration 8020, its owner the head now, a line only uncounted requests name taken away (rule 5); the monthly report's budgets as `/budgets` reads them (rule 8); Possible Duplicates named only to a reader who may open them, the rest a count (§6.8, `possible_duplicates_hidden`, §5); `disbursed_from` and `approved_by_me_from` on `ExpenseListQuery` for the KPI cards (§5, §10.1); Read Invoice on Gemini through its native file reading, a refused file Unreadable (§9).
 - 05/11/2026 · AJ · PR 7 built §10: every screen on the contract and the real API, records in `ListDetail layout="modal"`, My Requests in ESS, Projects (#106), the mock on the contract, the User Guide chapter. Decided on the way: Read Invoice and Suggest Category fill the form for the person to check, nothing saved until they press (§9, §10.1; no separate Use It); Categories opens a category in its Edit Category form, not a record modal; My Requests' In Flight card reads `in_flight` on `ExpenseListQuery` (§5); New Category, Record Disbursement and New Budget cards carry their forms' schemas (§9).
 

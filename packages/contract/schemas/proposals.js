@@ -403,7 +403,6 @@ const ProofPointCreate = z
     label: text(80),
     value: optionalText(40),
     detail: optionalText(400),
-    document_id: blank(uuid),
     source_note: optionalText(300),
     position: z.number().int().min(0).max(1000).optional(),
   })
@@ -414,7 +413,8 @@ const ProofPointUpdate = z
     label: text(80).optional(),
     value: z.string().trim().max(40).nullable().optional(),
     detail: z.string().trim().max(400).nullable().optional(),
-    document_id: uuid.nullable().optional(),
+    /** Remove Image: a logo or image is set by uploading it (POST /proof-points/:id/image), never by naming a file. */
+    document_id: z.null().optional(),
     source_note: z.string().trim().max(300).nullable().optional(),
     position: z.number().int().min(0).max(1000).optional(),
     active: z.boolean().optional(),
