@@ -107,8 +107,13 @@ function setsOfFiles(files) {
  */
 const JEST_SHARDS = 5;
 const FE_SHARDS = Object.freeze({ ui: 2, app: 3, "public-app": 1 });
-/** The a11y gate's pages per target (MYCITY_A11Y_SHARD): 174 s for the gallery's alone here. */
-const A11Y_SHARDS = Object.freeze({ gallery: 2, app: 1 });
+/*
+ * Jobs per screen target. On four CPUs here (06/11/2026): the gallery's crawl 40 s, its axe 174 s;
+ * the app's crawl 170 s, its axe 182 s. A gallery job takes a share of axe's pages
+ * (MYCITY_A11Y_SHARD), the first also crawling it whole; an app job takes the same share of the
+ * app's screens for the crawl (MYCITY_SCREEN_SHARD) and for axe.
+ */
+const SCREEN_SHARDS = Object.freeze({ gallery: 3, app: 4 });
 
 /**
  * The matrices ci.yml runs, from the sets a run needs. Each entry is one job; an empty list starts
@@ -117,8 +122,8 @@ const A11Y_SHARDS = Object.freeze({ gallery: 2, app: 1 });
  *   MYCITY_JEST_SHARD   ci-local.js: `jest --shard=i/n`, the slice tests/shard-sequencer.js picks
  *   MYCITY_FE_TESTS     scripts/fe-test.js: which workspaces, and which shard of each
  *   MYCITY_SCREEN_TARGETS, MYCITY_A11Y_TARGETS   lib/screens.js and a11y.js: what they open
- *   MYCITY_A11Y_SHARD   a11y.js: its share of the target's pages; the first shard of a target also
- *                       runs the crawl gates (five-second, two-shells, native-ui), the others a11y
+ *   MYCITY_A11Y_SHARD, MYCITY_SCREEN_SHARD   a11y.js and lib/screens.js: their share of the
+ *                       target's pages (SCREEN_SHARDS below)
  * @param {readonly string[]} sets
  */
 function plan(sets) {
@@ -145,15 +150,19 @@ function plan(sets) {
   }
   const screens = [];
   const screenJobs = (targets, a11y) => {
-    const n = A11Y_SHARDS[a11y];
-    for (let i = 1; i <= n; i++)
+    const n = SCREEN_SHARDS[a11y];
+    for (let i = 1; i <= n; i++) {
+      const share = n === 1 ? "" : `${i}/${n}`;
       screens.push({
         name: n === 1 ? `screens ${a11y}` : `screens ${a11y} ${i} of ${n}`,
         targets,
         a11y,
-        a11y_shard: n === 1 ? "" : `${i}/${n}`,
-        gates: i === 1 ? "--group=screens" : "--only=a11y",
+        a11y_shard: share,
+        // The gallery's crawl is short and runs whole in its first job; the app's is dealt out.
+        screen_shard: a11y === "app" ? share : "",
+        gates: a11y === "app" || i === 1 ? "--group=screens" : "--only=a11y",
       });
+    }
   };
   if (has("screens-gallery")) screenJobs("gallery,demo", "gallery");
   if (has("screens-app")) screenJobs("app", "app");
@@ -292,7 +301,7 @@ module.exports = {
   SETS,
   JEST_SHARDS,
   FE_SHARDS,
-  A11Y_SHARDS,
+  SCREEN_SHARDS,
   isDocument,
   scopeOfFiles,
   setsOfFile,

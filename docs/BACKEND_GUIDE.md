@@ -537,8 +537,9 @@ long ones are split again so that no job runs much past four minutes (GE, 06/11/
 - **frontend tests**: each workspace's vitest files in shards (`vitest --shard`, through
   `scripts/fe-test.js` and `MYCITY_FE_TESTS`); public-app's few ride with another shard.
 - **screens gallery** and **screens app**: every screen gate, once on each target
-  (`MYCITY_SCREEN_TARGETS`, `MYCITY_A11Y_TARGETS`); axe's pages of a target can be dealt over
-  several jobs (`MYCITY_A11Y_SHARD`, the gallery's over two), the first also running the crawl gates.
+  (`MYCITY_SCREEN_TARGETS`, `MYCITY_A11Y_TARGETS`), dealt over several jobs: the gallery's axe
+  pages over three (`MYCITY_A11Y_SHARD`), the first also crawling it whole; the app's screens over
+  four, for the crawl (`MYCITY_SCREEN_SHARD`) and for axe alike.
 - **checks**, as before.
 
 `scripts/check/lib/scope.js` (`plan()`) says how many of each a run starts. The check called **ci**

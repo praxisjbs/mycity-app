@@ -15,7 +15,7 @@ const {
   SETS,
   JEST_SHARDS,
   FE_SHARDS,
-  A11Y_SHARDS,
+  SCREEN_SHARDS,
   isDocument,
   scopeOfFiles,
   setsOfFile,
@@ -191,6 +191,7 @@ describe("names the workflow and the build share with the scope", () => {
       "MYCITY_SCREEN_TARGETS: ${{ matrix.targets }}",
       "MYCITY_A11Y_TARGETS: ${{ matrix.a11y }}",
       "MYCITY_A11Y_SHARD: ${{ matrix.a11y_shard }}",
+      "MYCITY_SCREEN_SHARD: ${{ matrix.screen_shard }}",
     ])
       expect(yml).toContain(v);
     // Each of plan()'s outputs is handed from the scope job and gates its job.
@@ -273,14 +274,16 @@ describe("plan: the jobs a run starts", () => {
     const pieces = p.frontend_tests.flatMap((j) => j.tests.split(" "));
     const want = Object.entries(FE_SHARDS).flatMap(([ws, n]) => (n === 1 ? [ws] : Array.from({ length: n }, (_, i) => `${ws}:${i + 1}/${n}`)));
     expect([...pieces].sort()).toEqual([...want].sort());
-    // The crawl gates once per target (with gallery,demo and app between them), axe's every shard once.
-    const crawls = p.screens.filter((j) => j.gates === "--group=screens");
-    expect(crawls.map((j) => j.targets).join(",").split(",").sort()).toEqual(["app", "demo", "gallery"]);
-    expect(p.screens.filter((j) => j.gates !== "--group=screens").every((j) => j.gates === "--only=a11y")).toBe(true);
-    for (const [t, n] of Object.entries(A11Y_SHARDS)) {
-      const shards = p.screens.filter((j) => j.a11y === t).map((j) => j.a11y_shard);
-      expect(shards).toEqual(n === 1 ? [""] : Array.from({ length: n }, (_, i) => `${i + 1}/${n}`));
-    }
+    // The gallery crawled once, whole; the app's crawl and every target's axe pages dealt out once.
+    const gallery = p.screens.filter((j) => j.a11y === "gallery");
+    const app = p.screens.filter((j) => j.a11y === "app");
+    const shares = (n) => (n === 1 ? [""] : Array.from({ length: n }, (_, i) => `${i + 1}/${n}`));
+    expect(gallery.filter((j) => j.gates === "--group=screens").map((j) => j.targets)).toEqual(["gallery,demo"]);
+    expect(gallery.filter((j) => j.gates !== "--group=screens").every((j) => j.gates === "--only=a11y")).toBe(true);
+    expect(gallery.map((j) => j.a11y_shard)).toEqual(shares(SCREEN_SHARDS.gallery));
+    expect(gallery.every((j) => j.screen_shard === "")).toBe(true);
+    expect(app.every((j) => j.gates === "--group=screens" && j.targets === "app" && j.screen_shard === j.a11y_shard)).toBe(true);
+    expect(app.map((j) => j.screen_shard)).toEqual(shares(SCREEN_SHARDS.app));
     expect(p.frontend).toBe(true);
     expect(p.backend_unit).toBe(false);
     expect(p.all).toBe(true);
@@ -382,5 +385,14 @@ describe("a11y.js shards", () => {
     const got = [1, 2, 3].flatMap((i) => shardOf(pages, { i, n: 3 }));
     expect(got.sort()).toEqual([...pages].sort());
     expect(shardOf(pages, null)).toEqual(pages);
+  });
+});
+
+describe("lib/screens.js shards", () => {
+  const { screenShard } = require("../../scripts/check/lib/screens");
+  test("i/n, or none when unset; anything else is refused", () => {
+    expect(screenShard({})).toBeNull();
+    expect(screenShard({ MYCITY_SCREEN_SHARD: "2/4" })).toEqual({ i: 2, n: 4 });
+    expect(() => screenShard({ MYCITY_SCREEN_SHARD: "5/4" })).toThrow(/i\/n/);
   });
 });

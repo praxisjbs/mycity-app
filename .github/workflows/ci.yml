@@ -13,8 +13,8 @@ name: CI
 #   frontend         the workspaces' typecheck, lint and builds, and the mock check
 #   frontend tests   the workspaces' vitest files in shards (scripts/fe-test.js, MYCITY_FE_TESTS)
 #   screens          Chromium: the gates that open every screen, on the gallery and on the app
-#                    (MYCITY_SCREEN_TARGETS, MYCITY_A11Y_TARGETS), axe's pages in shards
-#                    (MYCITY_A11Y_SHARD)
+#                    (MYCITY_SCREEN_TARGETS, MYCITY_A11Y_TARGETS), their pages in shards
+#                    (MYCITY_A11Y_SHARD, MYCITY_SCREEN_SHARD)
 #   checks           the fast static and process gates, every gate that reads documents among them
 #
 # The scope job decides how many of each a run needs and hands the matrices over
@@ -398,8 +398,9 @@ jobs:
           exit 1
 
       # The screen gates on this job's target: the crawl (lib/screens.js) and axe (a11y.js) open
-      # only it. A target's first job runs every screen gate (`--group=screens`, the gates' static
-      # reads of the source among them) and its share of axe's pages; the others `--only=a11y`.
+      # only it, and only this job's share of its pages. The gallery's first job crawls it whole
+      # (`--group=screens`, the gates' static reads of the source among them), its others run
+      # `--only=a11y`; every app job runs every screen gate on its share of the screens.
       - name: Screen gates
         run: npm run ci -- ${{ matrix.gates }}
         env:
@@ -407,6 +408,7 @@ jobs:
           MYCITY_SCREEN_TARGETS: ${{ matrix.targets }}
           MYCITY_A11Y_TARGETS: ${{ matrix.a11y }}
           MYCITY_A11Y_SHARD: ${{ matrix.a11y_shard }}
+          MYCITY_SCREEN_SHARD: ${{ matrix.screen_shard }}
           GH_TOKEN: ${{ github.token }}
 
   checks:
