@@ -80,7 +80,7 @@ export function TalentPool() {
         items={[
           { label: "In the Pool", value: counted(s?.in_pool) },
           { label: "Invited Back", value: counted(s?.invited_back) },
-          { label: "Hired From the Pool", value: counted(s?.hired_from_pool), tone: "ok" },
+          { label: "Hired From the Pool", value: counted(s?.hired_from_pool), tone: s?.hired_from_pool ? "ok" : undefined },
           { label: "Average Score", value: counted(s?.average_score) },
         ]}
       />
@@ -99,7 +99,7 @@ export function TalentPool() {
         columns={[
           { key: "who", label: "Candidate", render: (p) => <span className="font-semibold">{p.name}</span> },
           { key: "for", label: "Applied For", render: (p) => p.applied_for?.title ?? "–" },
-          { key: "score", label: "Score", render: (p) => <ScoreText score={p.score} provisional={p.score_provisional} /> },
+          { key: "score", label: "Score", align: "n", render: (p) => <ScoreText score={p.score} provisional={p.score_provisional} /> },
           { key: "added", label: "Added", render: (p) => formatDate(p.created_at), desktop: true },
           { key: "reason", label: "Reason", render: (p) => p.reason, desktop: true },
           { key: "kept", label: <HelpTerm help={KEPT_HELP}>Kept Until</HelpTerm>, render: (p) => formatDate(p.expires_at) },
@@ -154,6 +154,8 @@ function PoolSheet({ entry, close, mayInvite, mayRemove }: { entry: PoolEntry; c
 /** Cancel goes back to the person's sheet; only a sent invitation closes it all. */
 function InviteForm({ entry, back, close }: { entry: PoolEntry; back: () => void; close: () => void }) {
   const roles = useVacancyOptions("open");
+  // The role they applied for is not offered: they cannot be invited to it again.
+  const offered = roles.options.filter(([id]) => id !== entry.applied_for?.vacancy_id);
   const f = useContractForm({ vacancy_id: "" }, poolSchemas.PoolInvite);
   const send = useMutation("POST /api/v1/recruitment/pool/:id/invite");
   const [problem, setProblem] = useState<string | null>(null);
@@ -172,7 +174,7 @@ function InviteForm({ entry, back, close }: { entry: PoolEntry; back: () => void
   return (
     <>
       <Field label="Vacancy" {...f.status("vacancy_id")}>
-        <SelectField options={roles.options} placeholder="Pick a role" more={roles.more} onMore={roles.onMore} {...f.field("vacancy_id")} />
+        <SelectField options={offered} placeholder="Pick a role" more={roles.more} onMore={roles.onMore} {...f.field("vacancy_id")} />
       </Field>
       <FormError>{problem}</FormError>
       <FormFooter>

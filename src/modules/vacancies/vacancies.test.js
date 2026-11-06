@@ -24,6 +24,12 @@ describe("the slug", () => {
     expect(slugs.base("***", "Abuja")).toBe("role-abuja");
   });
 
+  test("never takes a path the careers routes hold beside it (/jobs/summary)", () => {
+    expect(slugs.base("Summary", null)).toBe("summary-role");
+    expect(slugs.base("Summary", "Lagos")).toBe("summary-lagos");
+    for (const word of slugs.RESERVED) expect(slugs.base(word, null)).not.toBe(word);
+  });
+
   test("is at most 80 characters and never ends on a hyphen", () => {
     const s = slugs.base("a".repeat(70) + " b".repeat(20), "Port Harcourt");
     expect(s.length).toBeLessThanOrEqual(80);
@@ -133,10 +139,61 @@ describe("routes", () => {
     for (const r of write) expect(["create", "edit"]).toContain(r.permission.action);
   });
 
-  test("the careers page has three public routes and no permission", () => {
+  test("the careers page has four public routes and no permission; the summary is matched before a slug", () => {
     const rs = routesOf(publicRoutes.router);
-    expect(rs.map((r) => `${r.method} ${r.path}`).sort()).toEqual(["GET /", "GET /:slug", "POST /:slug/apply"]);
+    expect(rs.map((r) => `${r.method} ${r.path}`).sort()).toEqual(["GET /", "GET /:slug", "GET /summary", "POST /:slug/apply"]);
     for (const r of rs) expect(r.kind).toBe("public");
+    const order = rs.map((r) => r.path);
+    expect(order.indexOf("/summary")).toBeLessThan(order.indexOf("/:slug"));
+  });
+});
+
+describe("the public index's summary (guide §6.1)", () => {
+  const repo = require("./vacancies.repo");
+  const c = require("@mycity/contract");
+  const row = (slug, closes) => ({
+    vacancy_id: `id-${slug}`,
+    slug,
+    title: slug,
+    department: "Content",
+    department_code: "CNT",
+    location: "Lekki Phase 1, Lagos",
+    work_pattern: "hybrid",
+    work_pattern_note: "2 days in office",
+    employment_type: "full_time",
+    status: "open",
+    close_reason: null,
+    closes_at: closes,
+    published_at: new Date("2026-11-01T09:00:00Z"),
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  test("counts the careers list, names its departments and cities, and takes its first three as Closing Soon", async () => {
+    const page = jest.spyOn(repo, "publicPage").mockResolvedValue({
+      data: [row("a-lagos", new Date("2026-11-11T22:59:59Z")), row("b-lagos", new Date("2026-11-18T22:59:59Z")), row("c-lagos", null), row("d-lagos", null)],
+      page: { number: 1, size: 25, total: 12, pages: 1, has_next: false },
+    });
+    jest.spyOn(repo, "publicDepartments").mockResolvedValue([{ code: "CNT", name: "Content", open: 2 }, { code: "ENG", name: "Engineering", open: 10 }]);
+    jest.spyOn(repo, "publicCities").mockResolvedValue([{ name: "Lagos", open: 11 }, { name: "Abuja", open: 1 }]);
+    jest.spyOn(repo, "settings").mockResolvedValue({ about_company: "MyCityApp is a digital city and lifestyle platform.", default_traits: [], updated_at: null });
+    const out = await careers.summary();
+    expect(page).toHaveBeenCalledWith(expect.anything(), {});
+    const wire = JSON.parse(JSON.stringify(out));
+    expect(c.vacancies.PublicJobsSummary.parse(wire)).toEqual(wire);
+    expect(out.open).toBe(12);
+    expect(out.closing_soon.map((x) => x.slug)).toEqual(["a-lagos", "b-lagos", "c-lagos"]);
+    expect(out.closing_soon[0]).not.toHaveProperty("vacancy_id");
+    expect(out.departments.map((d) => d.code)).toEqual(["CNT", "ENG"]);
+    expect(out.cities).toEqual([{ name: "Lagos", open: 11 }, { name: "Abuja", open: 1 }]);
+    expect(out.about_company[0]).toMatchObject({ kind: "paragraph" });
+  });
+
+  test("with nothing open and no About MyCityApp, every figure is empty", async () => {
+    jest.spyOn(repo, "publicPage").mockResolvedValue({ data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } });
+    jest.spyOn(repo, "publicDepartments").mockResolvedValue([]);
+    jest.spyOn(repo, "publicCities").mockResolvedValue([]);
+    jest.spyOn(repo, "settings").mockResolvedValue({ about_company: null, default_traits: [], updated_at: null });
+    expect(await careers.summary()).toEqual({ open: 0, departments: [], cities: [], closing_soon: [], about_company: null });
   });
 });
 
@@ -201,5 +258,68 @@ describe("must-meet conditions name no protected trait (guide §6.4)", () => {
 
   test("names each refused condition by its index", () => {
     expect(service.protectedConditions(["Lives in Lagos", "Ladies only", "Igbo only"])).toEqual([1, 2]);
+  });
+});
+
+describe("New Vacancy's interview (guide §3 step 2, §9)", () => {
+  const draft = require("./vacancies.draft");
+  const c = require("@mycity/contract");
+
+  test("a follow-up about the work is asked; one about the person's age, sex, family, origin, faith, body or health is dropped", () => {
+    for (const fair of [
+      "Which design tools will the Graphics and Motion Designer use every week?",
+      "Who will the Head, Sales & Revenue work with most closely?",
+      "What health and safety training does the Field Officer need on site?",
+      "How many years of B2B sales should the Head of Sales bring?",
+    ])
+      expect([fair, draft.fairQuestion(fair)]).toEqual([fair, true]);
+    for (const unfair of [
+      "What age range would suit the Content Producer best?",
+      "Would you prefer a male or female Studio Producer?",
+      "Should the Community Manager be married or single?",
+      "Do you prefer a Yoruba candidate for this role?",
+      "Should the Driver be a Christian or a Muslim?",
+      "Must the Field Officer have no disability?",
+      "Should the candidate be in good health for the travel?",
+      "Is there a nationality you prefer for the Data Analyst?",
+      "Does the Receptionist need to be attractive?",
+      "Can the role suit someone with a medical condition?",
+    ])
+      expect([unfair, draft.fairQuestion(unfair)]).toEqual([unfair, false]);
+  });
+
+  test("the plain draft, when the AI cannot write one, is the person's own answers in MyCity's shape", () => {
+    const body = c.vacancies.JdDraftRequest.parse({
+      title: "Data Analyst",
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      min_experience_years: "2",
+      interview: {
+        positions: "2",
+        work_pattern_note: "Two office days",
+        working_days: "Monday to Friday",
+        area: "Yaba, Lagos",
+        reports_to: "Head of Operations",
+        must_haves: "SQL and spreadsheets.\nBuild the weekly figures every team plans by.",
+        extras: "Experience with Looker Studio",
+        follow_ups: [{ question: "Which tools will the Data Analyst use every week?", answer: "Google Sheets and Looker Studio." }],
+      },
+    });
+    const d = draft.plainDraft(body, "Operations");
+    expect(d.description).toMatch(/^MyCityApp is hiring 2 people as Data Analyst, in the Operations team, based in Yaba, Lagos\. The role is hybrid \(Two office days\)\./);
+    expect(d.description).toContain("## Key Responsibilities\n\n- SQL and spreadsheets.\n- Build the weekly figures every team plans by.");
+    expect(d.description).toContain("- Google Sheets and Looker Studio.");
+    expect(d.requirements).toBe("- 2+ years of relevant experience.\n- SQL and spreadsheets.\n- Build the weekly figures every team plans by.");
+    expect(d.nice_to_have).toBe("- Experience with Looker Studio");
+    // A remote role is based nowhere; nothing given is nothing written.
+    const remote = draft.plainDraft(c.vacancies.JdDraftRequest.parse({ title: "Copywriter", work_pattern: "remote", interview: {} }));
+    expect(remote).toEqual({ description: "MyCityApp is hiring one person as Copywriter, working remotely.", requirements: null, nice_to_have: null });
+  });
+
+  test("Write With AI needs a line about the role, or the interview's answers", () => {
+    expect(c.vacancies.JdDraftRequest.safeParse({ title: "Data Analyst" }).success).toBe(false);
+    expect(c.vacancies.JdDraftRequest.safeParse({ title: "Data Analyst", instruction: "Turns figures into weekly reports." }).success).toBe(true);
+    expect(c.vacancies.JdDraftRequest.safeParse({ title: "Data Analyst", interview: {} }).success).toBe(true);
+    expect(c.vacancies.FollowUpsRequest.safeParse({ title: "Data Analyst", interview: { follow_ups: [{ question: "Too short", answer: "x" }] } }).success).toBe(false);
   });
 });

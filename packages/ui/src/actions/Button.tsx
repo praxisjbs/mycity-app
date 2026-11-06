@@ -1,7 +1,7 @@
 /**
  * @component Button
  * @group Actions
- * @summary The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side; busy from the press until the work it starts is done.
+ * @summary The pill button: default, primary (the yellow one), ghost and danger, and on the public site line, solid and glass, with an optional icon either side; busy from the press until the work it starts is done.
  * @use Every action a person takes: Create Rule, Clock In, Export. Hand it the work (onClick={save}, an async handler) and it spins and ignores a second press until the work settles. A link that looks like a button passes asChild with an <a>.
  * @avoid A second primary on one surface (one yellow button per surface); a bare icon (use IconButton); the sign in or clock in call to action (use BigButton); throwing the work away (onClick={() => void save()}: the lint refuses it, F26).
  * @phone At least 44 px tall; a footer stretches the primary to full width at the bottom. Busy keeps its size and colour, so nothing beside it moves.
@@ -11,6 +11,7 @@
  * @example <Button variant="primary" icon="plus">New Rule</Button>
  * @example <Button variant="primary" onClick={save}>Save Worksite</Button>
  * @example <Button variant="ghost" iconRight="right">View All</Button>
+ * @example <Button variant="primary" size="lg" asChild><a href="/jobs/head-sales">Apply for This Role</a></Button>
  */
 import { forwardRef, type ButtonHTMLAttributes, type MouseEvent, type ReactNode } from "react";
 import { Slot, Slottable } from "@radix-ui/react-slot";
@@ -20,13 +21,17 @@ import { Icon, type IconName } from "../icons/Icon";
 import { Tooltip } from "../overlay/Tooltip";
 import { pressState, useElementRef, usePress } from "./press";
 
-export type ButtonVariant = "default" | "primary" | "ghost" | "danger";
+export type ButtonVariant = "default" | "primary" | "ghost" | "danger" | "line" | "solid" | "glass";
 
 const VARIANT: Record<ButtonVariant, string> = {
   default: "border-input bg-background text-foreground hover:border-subtle-foreground hover:bg-muted",
   primary: "on-primary border-primary bg-primary text-primary-foreground hover:brightness-95",
   ghost: "border-transparent bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
   danger: "border-destructive bg-background text-destructive hover:bg-destructive-soft",
+  /* The public site's: an outline on its lines, the solid Deep Green (the teal in dark), and a frosted one on a hero. */
+  line: "border-canvas-line-strong bg-transparent text-foreground hover:bg-canvas-hover",
+  solid: "border-transparent bg-solid text-solid-foreground hover:-translate-y-0.5",
+  glass: "border-on-deep/40 bg-on-deep/6 text-on-deep hover:bg-on-deep/14",
 };
 
 /** Busy softens the button and keeps its colour (the brand yellow stays yellow); waiting dims it further. */
@@ -43,14 +48,14 @@ export type PressHandler<E> = (e: E) => unknown;
 const Spin = ({ className }: { className: string }) => <LoaderCircle className={cn("flex-none animate-spin", className)} aria-hidden="true" />;
 
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> {
-  /** `primary` is the yellow one, one per surface; `danger` is for destructive actions, confirmed in a dialog. */
+  /** `primary` is the yellow one, one per surface; `danger` is for destructive actions, confirmed in a dialog. The public site's: `line` (an outline), `solid` (Next, Verify) and `glass` (Share Role on a hero). */
   variant?: ButtonVariant;
   /** A glyph before the label. */
   icon?: IconName;
   /** A glyph after the label (a chevron for "View All"). */
   iconRight?: IconName;
-  /** `md` follows the density (36 or 40 px); `sm` is 28 px on desktop. Both are 44 px on a phone. */
-  size?: "md" | "sm";
+  /** `md` follows the density (36 or 40 px); `sm` is 28 px on desktop; `lg` is the public site's, 48 px with 16 px text, and a yellow one rises with a glow under the pointer. All are 44 px or more on a phone. */
+  size?: "md" | "sm" | "lg";
   /** Fills the width: the call to action at the foot of a form or page. */
   block?: boolean;
   /**
@@ -92,7 +97,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={cn(
         BASE,
         over && "relative",
-        block ? "h-11 w-full px-4 text-sm" : size === "md" ? "h-control px-3.5 text-sm" : "h-7 px-3 text-xs phone:h-control",
+        size === "lg" ? cn("h-12 gap-2.5 px-5.5 text-lg", variant === "primary" && "hover:-translate-y-0.5 hover:shadow-primary-glow hover:brightness-100", block && "w-full")
+          : block ? "h-11 w-full px-4 text-sm" : size === "md" ? "h-control px-3.5 text-sm" : "h-7 px-3 text-xs phone:h-control",
         "phone:min-h-tap",
         VARIANT[variant],
         className,

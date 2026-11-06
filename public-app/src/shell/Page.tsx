@@ -1,38 +1,17 @@
-import { useEffect, type ReactNode } from "react";
-import { Brand, PublicPage } from "@mycity/ui";
-import { Link } from "@/lib/router";
+import { useEffect } from "react";
+import { PublicPage, type PublicPageProps } from "@mycity/ui";
+import { NAV, parse, sectionOf, useRouter } from "@/lib/router";
 import { DemoLinks } from "./DemoLinks";
 
 /**
- * Every public page (go.mycityapp.io), on PublicPage from @mycity/ui: the mark
- * linking to the careers list, the page on its card, the footer links. `index`
- * decides whether search engines may list the page: only the careers list and
- * an open vacancy may (MILESTONES §6); every token page says noindex.
- * `brandInCard`: the page draws the mark inside its card, so the header leaves it out.
- * `layout`: open for a page a stranger browses (Careers, a vacancy), with a SkylineHero at its head;
- * the card (the default) for a page a person fills in or reads once.
- * `pane`: the page's identity on a SkylineHero of size pane, beside the card on desktop and a band
- * above it on a phone; the page's h1 is there. `bar`: a phone's action bar fixed at the foot.
+ * Every public page (go.mycityapp.io), on PublicPage from @mycity/ui: the one header with the six
+ * links (the page's own marked), the brand opening the index, the site's router for its links, and in
+ * mock mode the demo links at the foot. `title` names the tab and, in the split layout, is the page's
+ * small h1. `index` decides whether search engines may list the page: only the index, the careers
+ * list and an open vacancy may (MILESTONES §6); every token page says noindex.
  */
-export function Page({
-  title,
-  index = false,
-  brandInCard = false,
-  layout = "card",
-  pane,
-  bar,
-  children,
-  below,
-}: {
-  title: string;
-  index?: boolean;
-  brandInCard?: boolean;
-  layout?: "card" | "open";
-  pane?: ReactNode;
-  bar?: ReactNode;
-  children: ReactNode;
-  below?: ReactNode;
-}) {
+export function Page({ title, index = false, ...rest }: { title: string; index?: boolean } & Omit<PublicPageProps, "title" | "nav" | "navigate" | "brandSub" | "foot">) {
+  const { path, navigate } = useRouter();
   useEffect(() => {
     document.title = `${title} · MyCity App`;
     let meta = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
@@ -43,32 +22,15 @@ export function Page({
     }
     meta.content = index ? "index, follow" : "noindex, nofollow";
   }, [title, index]);
+  const here = sectionOf(parse(path));
   return (
     <PublicPage
-      layout={layout}
-      pane={pane}
-      bar={bar}
-      brand={
-        brandInCard ? undefined : (
-          <Link to="/jobs" aria-label="MyCityApp careers" className="no-underline">
-            <Brand name="MyCityApp" />
-          </Link>
-        )
-      }
-      below={below}
-      links={
-        <>
-          <Link to="/jobs" className="hover:text-foreground">
-            Careers
-          </Link>
-          <Link to="/verify" className="hover:text-foreground">
-            Verify a Document
-          </Link>
-        </>
-      }
+      {...rest}
+      title={title}
+      navigate={navigate}
+      brandSub="Careers"
+      nav={NAV.map((n) => ({ ...n, current: n.label === here }))}
       foot={import.meta.env.VITE_API_MODE === "mock" ? <DemoLinks /> : undefined}
-    >
-      {children}
-    </PublicPage>
+    />
   );
 }

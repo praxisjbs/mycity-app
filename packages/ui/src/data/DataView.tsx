@@ -4,7 +4,7 @@
  * @summary THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export.
  * @use Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners.
  * @avoid A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone.
- * @phone The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11).
+ * @phone The columns become cards: the first value is the card's title, a `badge` column (a status pill) sits at its top right, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11).
  * @a11y The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. A row marked as new (RowMarksContext: something unread is about it) says Unread before its first value as well as showing its dot and tint.
  * @status stable
  * @exports LoadingRows
@@ -48,6 +48,8 @@ export interface DataViewColumn<R> {
   sortLabel?: string;
   /** Dropped on a phone, decided per screen in the feature guide's §10 (gate 11). */
   desktop?: boolean;
+  /** A status pill: on a phone it sits at the card's top right beside the title, not as a label and value pair. One per list. */
+  badge?: boolean;
   /** Layout classes only (width, alignment). */
   className?: string;
 }
@@ -248,7 +250,8 @@ export function DataView<R>({
   /* ───── the rows, two ways ───── */
 
   const phoneColumns = columns.filter((c) => !c.desktop);
-  const [head, ...rest] = phoneColumns;
+  const badge = phoneColumns.find((c) => c.badge);
+  const [head, ...rest] = phoneColumns.filter((c) => c !== badge);
 
   const cards = (
     <ul {...content} aria-busy={loading || undefined} className={cn("m-0 flex list-none flex-col p-0", loading && rows.length > 0 && "opacity-60 transition-opacity")}>
@@ -275,13 +278,21 @@ export function DataView<R>({
               <Tick className="relative z-10" checked={keys.includes(key)} onChange={() => toggleRow(key)} label={`Select ${typeof headCell === "string" ? headCell : "row"}`} />
             )}
             <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="text-sm font-semibold wrap-any">
-                {onRowClick ? (
-                  <button type="button" data-row-open="" onClick={() => openRow(row)} className="stretch-link text-left">
-                    {headCell}
-                  </button>
-                ) : (
-                  headCell
+              <span className="flex min-w-0 items-start gap-2">
+                <span className="min-w-0 flex-1 text-sm font-semibold wrap-any">
+                  {onRowClick ? (
+                    <button type="button" data-row-open="" onClick={() => openRow(row)} className="stretch-link text-left">
+                      {headCell}
+                    </button>
+                  ) : (
+                    headCell
+                  )}
+                </span>
+                {/* Taps pass to the card; a help term in the pill stays its own target, as in the pairs below. */}
+                {badge && (
+                  <span className={cn("flex-none", onRowClick && "pointer-events-none relative [&_a]:pointer-events-auto [&_button]:pointer-events-auto")}>
+                    {cell(badge.render(row, i))}
+                  </span>
                 )}
               </span>
               {rest.slice(0, 3).map((c) => (

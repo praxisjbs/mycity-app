@@ -137,10 +137,11 @@ export function Vacancies() {
         columns={[
           { key: "role", label: "Role", render: (v) => <span className="font-semibold">{v.title}</span> },
           { key: "dept", label: "Department", render: (v) => v.department ?? "–", desktop: true },
+          { key: "openings", label: "Openings", align: "n", render: (v) => v.positions, desktop: true },
           { key: "where", label: "Location", render: (v) => (v.work_pattern === "remote" ? "Remote" : (v.location ?? "–")), desktop: true },
           { key: "apps", label: "Applicants", align: "n", render: (v) => v.applicants },
           { key: "closes", label: "Closes", render: closesOn },
-          { key: "status", label: "Status", render: statusOf },
+          { key: "status", label: "Status", badge: true, render: statusOf },
         ]}
       />
       <Grid cols={2} className="mt-3">

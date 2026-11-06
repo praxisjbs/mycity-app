@@ -1584,11 +1584,11 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
-- 06/11/2026 · JP · PR 3 merged with `main` after PR 2 (#80): PR 2's files serve categories, lists and
+- 06/11/2026 · JP · PR 3 merged with `main` after PR 2 (#80) and M4's follow-ups (#79): PR 2's files serve categories, lists and
   fields, and the deals read through them (one value checker, `checkValue`); `partner_document` is migration
   `7060`, PR 2's `7050` being the template's asks; PR 3's cards replace the interim reasons PR 2 gave
   `DealCreate`, `DealUpdate` and `ReturnSave`; on the mock, Categories' data is the one source of the
-  categories and lists (§13.2, In PR 3).
+  categories and lists, and its demonstration stage Follow-Up Ongoing is in Title Case (§13.2, In PR 3).
 - 06/11/2026 · JP · PR 3, leads, partners, deals and the 360s: `leads`, `partners` and `partner_pipeline`'s
   deals (options, team, stage moves with history, health and blockers) on the contract, with
   `interactions` (without mail), contacts, the Documents tab on the vault, duplicates, conversion in one
@@ -1603,6 +1603,10 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   ahead of PR 4; the stage rules (leaving On Hold, moves after signing, the signed copy asked once, §6.5)
   and New Partner's first stage (§6.6); Partners' Quiet `N` (§6.12); Follow-Up Required written in Title
   Case on screen; Home's Signed Value counts deals, one row a deal (§6.17); the file map (Appendix D).
+- 06/11/2026 · GE · (Ose) Public · Proposal's placeholder page moves to the public site's split layout with the rest of
+  go.mycityapp.io (the approved design); its Coming Soon is unchanged. Verify Document's QR page,
+  `/verify/t/<token>` (§6.9), is drawn on the mock: the record, both verdicts and the document with Download PDF, until
+  M5's verify API.
 - 06/11/2026 · TB · PR 2 reviewed (#80): `main` merged in (M4 and M8); New Partner Category in ⌘K and the
   phone's floating button (§9, §10.2, §13.2); a category's sections behind a segmented control on a phone
   (§10.2, §13.2); Tidy With AI's answer recorded (§13.2); Move Up and Move Down on Pipeline Settings renumber

@@ -6,7 +6,7 @@ import type { Endpoints as Contract } from "@mycity/contract/contract.gen.ts";
  * M4's routes come from the generated contract (packages/contract/contract.gen.ts, F15), picked
  * by name so the public client can only reach the public surface: Careers, a Vacancy, Apply and
  * an Assessment, with their request parts as the API accepts them and their responses as it sends
- * them. A page whose routes are not in the contract yet (M5's Sign Offer and Verify) adds its
+ * them, and the index's figures (`/jobs/summary`). A page whose routes are not in the contract yet (M5's Sign Offer and Verify) adds its
  * INTERIM routes here by declaration merging, from `types/public.ts`:
  *
  *   declare module "@/api/endpoints" {
@@ -19,6 +19,7 @@ import type { Endpoints as Contract } from "@mycity/contract/contract.gen.ts";
  */
 type ContractRoute =
   | "GET /api/public/v1/jobs"
+  | "GET /api/public/v1/jobs/summary"
   | "GET /api/public/v1/jobs/:slug"
   | "POST /api/public/v1/jobs/:slug/apply"
   | "GET /api/public/v1/apply/:token"

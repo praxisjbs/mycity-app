@@ -4,9 +4,12 @@
  * @summary The upload engine: the only file input in the product, with a percentage per file and the vault's document as its answer.
  * @use Anywhere a person attaches a file: a CV, a receipt, a signed offer, a mail attachment, an import sheet.
  * @avoid A raw `<input type="file">` anywhere else (gate 18); storing a path or a name instead of the `document_id`; a silent wait on a large file.
- * @phone The drop zone is a full-width tap target, since a phone cannot drop; every file shows its own percentage as it travels.
+ * @phone The drop zone is a full-width tap target, since a phone cannot drop; every file shows its own percentage as it travels. `look="zone"` is the public site's: one wide button, a yellow upload glyph on a Deep Green tile, its words and the kinds of file under them. FileRow shows a file that arrived, with its action.
  * @a11y The words in the drop zone are a real button, which opens the picker; the progress is a named meter per file, and each file's state is in words as well as a glyph. A file that failed says why, with Retry (not for one too large) and Remove, each named for the file.
  * @status stable
+ * @exports FileRow
+ * @example <UploadField look="zone" purpose="cv" label="Choose Your CV" kinds="PDF or Word" multiple={false} upload={upload} onUploaded={setCv} />
+ * @example <FileRow name="Ngozi-Okafor-CV.pdf" sizeBytes={253952} action={replace} />
  * @example <UploadField purpose="receipt" endpoint="/api/v1/documents" upload={api.upload} onUploaded={(docs) => form.set("receipts", docs)} />
  */
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
@@ -65,6 +68,8 @@ export interface UploadFieldProps {
   kinds?: string;
   /** A tighter drop zone, inside a sheet or beside a form's footer. */
   compact?: boolean;
+  /** `zone`: the public site's drop zone, one wide button with its glyph tile, the words in bold and the kinds under them. */
+  look?: "box" | "zone";
   /** A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. */
   trigger?: (open: () => void) => ReactNode;
   /**
@@ -93,6 +98,7 @@ export function UploadField({
   label = "Drop files here, or browse",
   kinds,
   compact,
+  look = "box",
   trigger,
   autoOpen,
   handOff,
@@ -194,6 +200,34 @@ export function UploadField({
           {trigger(open)}
           {picker}
         </>
+      ) : look === "zone" ? (
+        <>
+          <button
+            type="button"
+            className="ps-drop-zone"
+            data-over={over || undefined}
+            onClick={open}
+            onDragOver={(e: DragEvent) => {
+              e.preventDefault();
+              setOver(true);
+            }}
+            onDragLeave={() => setOver(false)}
+            onDrop={(e: DragEvent) => {
+              e.preventDefault();
+              setOver(false);
+              start(e.dataTransfer.files);
+            }}
+          >
+            <span aria-hidden="true" className="ps-drop-ic">
+              <Icon name="upload" className="size-6.5" />
+            </span>
+            <span>
+              <b>{label}</b>
+              {kinds && <> <span>{kinds}</span></>}
+            </span>
+          </button>
+          {picker}
+        </>
       ) : (
         <div
           onDragOver={(e: DragEvent) => {
@@ -265,6 +299,35 @@ export function UploadField({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+export interface FileRowProps {
+  /** The file's name, as it was sent. */
+  name: string;
+  /** Its size. */
+  sizeBytes?: number | null;
+  /** What can be done with it (Replace). */
+  action?: ReactNode;
+  /** Layout classes only (spacing). */
+  className?: string;
+}
+
+/** A file that arrived, on the public site: a green tick tile, its name and size, and its action at the right. */
+export function FileRow({ name, sizeBytes, action, className }: FileRowProps) {
+  return (
+    <div className={cn("ps-file", className)}>
+      <span aria-hidden="true" className="ps-file-ic">
+        <Icon name="doc" className="size-5.5" />
+      </span>
+      <div>
+        <Tooltip label={name}>
+          <b data-copy="content">{name}</b>
+        </Tooltip>
+        {sizeBytes != null && <span>{formatBytes(sizeBytes)}</span>}
+      </div>
+      {action}
     </div>
   );
 }

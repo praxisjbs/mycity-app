@@ -23,6 +23,7 @@ export default {
   states: {
     Policy: () => <RichText blocks={POLICY} />,
     "Under A Card Title": () => <RichText blocks={POLICY} top={3} />,
+    "Site Look": () => <RichText look="site" blocks={[{ kind: "paragraph", spans: [{ text: "The role will own revenue generation and sales team performance.", bold: false, italic: false, href: null }] }, { kind: "heading", level: 3, spans: [{ text: "1. Sales & Revenue Strategy", bold: false, italic: false, href: null }] }, { kind: "bullets", items: [[{ text: "Set clear sales targets and revenue objectives.", bold: false, italic: false, href: null }]] }]} top={3} />,
     "One Paragraph": () => <RichText blocks={POLICY.filter((b) => b.kind === "paragraph")} />,
   },
 } satisfies GalleryEntry;

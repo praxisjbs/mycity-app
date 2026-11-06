@@ -420,6 +420,18 @@ const ScorecardPartInput = z
   })
   .strict();
 
+/** One part of an application's weighted scorecard (guide §6.5), as a candidate's sheet and an interview show it. */
+const ScorecardPart = z
+  .object({
+    code: ScorecardCode,
+    name: z.string(),
+    active: z.boolean(),
+    weight: z.number().int().min(0).max(100),
+    score: z.number().min(0).max(100).nullable(),
+    provisional: z.boolean(),
+  })
+  .strict();
+
 /**
  * PUT /recruitment/vacancies/:id/scorecard: each part on or off for this role, and a whole-number
  * weight; a part off weighs 0, the parts on add up to 100, and screening or interview is on.
@@ -482,20 +494,58 @@ const CareersSettingsSave = z
  * Write With AI (guide §9): nothing here is kept
  * ------------------------------------------------------------------ */
 
-/** POST /recruitment/vacancies/assist: what New Vacancy holds, and the person's notes on the role. */
+/** The role as New Vacancy holds it so far: what both Write With AI and the interview's follow-ups read. */
+const roleSoFar = {
+  title: z.string().trim().min(3, "Name the role").max(120),
+  department_id: uuid.optional(),
+  employment_type: EmploymentType.optional(),
+  work_pattern: WorkPattern.optional(),
+  min_experience_years: optionalWhole(0, 40, "At most 40 years"),
+};
+
+/** One question the AI asked in New Vacancy's interview, and the person's answer (left empty when skipped). */
+const FollowUpAnswer = z
+  .object({
+    question: z.string().trim().min(10).max(300),
+    answer: blank(z.string().trim().max(2000, "At most 2000 characters")),
+  })
+  .strict();
+
+/**
+ * New Vacancy's interview in the person's own words (guide §3 step 2): the answers that are not a
+ * field of the form as they stand (`area` is the picked location's name, read as words, never saved;
+ * `must_haves` and `extras` are free answers), and the AI's follow-ups with their answers. Nothing is kept.
+ */
+const VacancyInterviewAnswers = z
+  .object({
+    positions: optionalWhole(1, 50, "At most 50"),
+    work_pattern_note: blank(z.string().trim().max(80, "At most 80 characters")),
+    working_days: blank(z.string().trim().max(60, "At most 60 characters")),
+    area: blank(z.string().trim().max(160, "At most 160 characters")),
+    reports_to: blank(z.string().trim().max(120, "At most 120 characters")),
+    salary_min: blank(money),
+    salary_max: blank(money),
+    must_haves: blank(z.string().trim().max(4000, "At most 4000 characters")),
+    extras: blank(z.string().trim().max(4000, "At most 4000 characters")),
+    follow_ups: z.array(FollowUpAnswer).max(2).default([]),
+  })
+  .strict();
+
+/**
+ * POST /recruitment/vacancies/assist: what New Vacancy holds, and the person's notes on the role
+ * (Write With AI on the form) or the interview's answers (the draft at the end of the interview).
+ */
 const JdDraftRequest = z
   .object({
-    title: z.string().trim().min(3, "Name the role").max(120),
-    department_id: uuid.optional(),
-    employment_type: EmploymentType.optional(),
-    work_pattern: WorkPattern.optional(),
-    min_experience_years: optionalWhole(0, 40, "At most 40 years"),
-    instruction: z.string().trim().min(10, "Say what the role does").max(2000, "At most 2000 characters"),
+    ...roleSoFar,
+    instruction: blank(z.string().trim().min(10, "Say what the role does").max(2000, "At most 2000 characters")),
+    interview: VacancyInterviewAnswers.optional(),
     description: z.string().trim().max(8000).default(""),
     requirements: z.string().trim().max(4000).default(""),
     nice_to_have: z.string().trim().max(4000).default(""),
   })
-  .strict();
+  .strict()
+  .refine((v) => v.instruction !== undefined || v.interview !== undefined, { message: "Say what the role does", path: ["instruction"] });
 
 /** A drafted description, must have and nice to have, or why there is none. */
 const JdDraft = z
@@ -515,6 +565,41 @@ const JdDraftOutput = z
     description: z.string().trim().min(80).max(8000),
     requirements: z.string().trim().min(20).max(4000),
     nice_to_have: z.string().trim().max(4000),
+  })
+  .strict();
+
+/**
+ * POST /recruitment/vacancies/assist/follow-ups: the interview's answers so far (its eight fixed
+ * questions), for the two questions the AI asks about this role.
+ */
+const FollowUpsRequest = z
+  .object({ ...roleSoFar, interview: VacancyInterviewAnswers })
+  .strict();
+
+/** A question the AI asks about the role, with a hint for the answer. */
+const FollowUpQuestion = z
+  .object({
+    question: z.string(),
+    hint: z.string().nullable(),
+  })
+  .strict();
+
+/** Up to two follow-up questions, or none and why (the interview then ends at its eighth question). */
+const FollowUps = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    questions: z.array(FollowUpQuestion).max(2),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** The model's answer for `vacancy-follow-ups`. */
+const FollowUpsOutput = z
+  .object({
+    questions: z
+      .array(z.object({ question: z.string().trim().min(10).max(300), hint: z.string().trim().max(200) }).strict())
+      .max(2),
   })
   .strict();
 
@@ -553,17 +638,26 @@ const QuestionsDraftOutput = z
  * Public: go.mycityapp.io/jobs (allow-lists, guide §6.1)
  * ------------------------------------------------------------------ */
 
-/** GET /api/public/v1/jobs: search by `q`, newest first. */
-const PublicJobListQuery = listQuery({});
+/**
+ * GET /api/public/v1/jobs: closing soonest first (a role with no closing date last, then the newest),
+ * searched by `q`, and narrowed to one department by its `code` (guide §6.1). An unknown code is an
+ * empty page, not a refusal.
+ */
+const PublicJobListQuery = listQuery({ department: z.string().trim().min(1).max(40).optional() });
 
-/** One open role on Careers. */
+/** One open role on Careers: what its card shows. */
 const PublicJobCard = z
   .object({
     slug: z.string(),
     title: z.string(),
     department: z.string().nullable(),
+    /** The department's code: what `department` on the list and the summary's departments name it by. */
+    department_code: z.string().nullable(),
     location: z.string().nullable(),
     work_pattern: WorkPattern.nullable(),
+    work_pattern_note: z.string().nullable(),
+    employment_type: EmploymentType.nullable(),
+    closes_at: isoDateTime.nullable(),
   })
   .strict();
 
@@ -572,19 +666,15 @@ const PublicJobPage = Paged(PublicJobCard);
 /**
  * GET /api/public/v1/jobs/:slug. A hidden salary band is left out, not sent as null.
  * `state`: open takes applications; paused and closed say so; filled is closed as filled.
- * `how_we_hire` names the steps this role uses, from its scorecard. The four texts written in Markdown
- * (About MyCityApp, the description, must have, nice to have) arrive as blocks from the server's one
+ * `how_we_hire` names the steps this role uses, from its scorecard. The three texts written in Markdown
+ * (the description, must have, nice to have) arrive as blocks from the server's one
  * Markdown renderer (shared/documents/markdown), as a policy's do, so the page draws them as elements.
  */
 const PublicJob = PublicJobCard.extend({
-  employment_type: EmploymentType.nullable(),
-  work_pattern_note: z.string().nullable(),
   probation_months: z.number().int().min(0).nullable(),
   reports_to: z.string().nullable(),
   min_experience_years: z.number().int().min(0).nullable(),
   working_days: z.string().nullable(),
-  /** About MyCityApp, from Careers Settings: the same paragraph on every role. */
-  about_company: z.array(RichTextBlock).nullable(),
   salary_min: money.optional(),
   salary_max: money.optional(),
   description: z.array(RichTextBlock),
@@ -592,9 +682,28 @@ const PublicJob = PublicJobCard.extend({
   nice_to_have: z.array(RichTextBlock).nullable(),
   how_we_hire: z.array(z.enum(["apply", "screening", "assessment", "interview"])).max(4),
   applicants: z.number().int().min(0),
-  closes_at: isoDateTime.nullable(),
   state: z.enum(["open", "paused", "closed", "filled"]),
 }).strict();
+
+/**
+ * GET /api/public/v1/jobs/summary: the public index's figures, over the roles /jobs lists (guide §6.1).
+ * A summary, not a list: the departments and cities are the organisation's few, grouped in SQL; the
+ * three closing soonest are the head of the careers list.
+ */
+const PublicJobsSummary = z
+  .object({
+    /** Roles taking applications now. */
+    open: z.number().int().min(0),
+    /** The departments hiring, by name: what Careers' department filter offers. */
+    departments: z.array(z.object({ code: z.string(), name: z.string(), open: z.number().int().min(1) }).strict()),
+    /** The cities of the roles' places, most roles first; a remote role has none. */
+    cities: z.array(z.object({ name: z.string(), open: z.number().int().min(1) }).strict()),
+    /** The first three of /jobs. */
+    closing_soon: z.array(PublicJobCard).max(3),
+    /** About MyCityApp, from Careers Settings, as blocks; null until it is written. */
+    about_company: z.array(RichTextBlock).nullable(),
+  })
+  .strict();
 
 /** POST /api/public/v1/jobs/:slug/apply: the Apply link's token, shown once. */
 const ApplyStarted = z.object({ token: z.string() }).strict();
@@ -618,6 +727,7 @@ const TABLES = {
     virtual: { weight: "the column's numeric(5,2), as a whole number" },
   },
   ScorecardPartInput: { table: "recruitment_scorecard_criterion" },
+  ScorecardPart: { table: null, reason: "one part of the weighted scorecard, worked out on read" },
   CareersSettings: {
     table: null,
     reason: "setting rows recruitment.about_company and recruitment.default_traits (jsonb values)",
@@ -699,13 +809,20 @@ const TABLES = {
   JdDraftRequest: { table: null, reason: "what New Vacancy holds; nothing is kept" },
   JdDraft: { table: null, reason: "a draft shown before anything changes; nothing is kept" },
   JdDraftOutput: { table: null, reason: "the model's answer, checked before anyone sees it" },
+  FollowUpAnswer: { table: null, reason: "a question of New Vacancy's interview and its answer; nothing is kept" },
+  VacancyInterviewAnswers: { table: null, reason: "New Vacancy's interview in the person's words; nothing is kept" },
+  FollowUpsRequest: { table: null, reason: "the interview's answers so far; nothing is kept" },
+  FollowUpQuestion: { table: null, reason: "a question the model asks about the role; nothing is kept" },
+  FollowUps: { table: null, reason: "follow-up questions shown in the interview; nothing is kept" },
+  FollowUpsOutput: { table: null, reason: "the model's answer, checked before anyone sees it" },
   SuggestedQuestion: { table: null, reason: "a question the model suggests; nothing is kept" },
   QuestionsDraft: { table: null, reason: "suggested questions shown before anything changes" },
   QuestionsDraftOutput: { table: null, reason: "the model's answer, checked before anyone sees it" },
   PublicJobListQuery: { table: null, reason: "list controls for the public careers page" },
   PublicJobCard: { table: null, reason: "the allow-list of a vacancy a stranger may read" },
   PublicJobPage: { table: null, reason: "a page of open roles" },
-  PublicJob: { table: null, reason: "the allow-list of a vacancy a stranger may read, with About MyCityApp" },
+  PublicJob: { table: null, reason: "the allow-list of a vacancy a stranger may read" },
+  PublicJobsSummary: { table: null, reason: "counts over the open roles, by department and city, for the public index" },
   ApplyStarted: { table: null, reason: "the Apply link's token, shown once; only its hash is kept" },
   SlugParams: { table: null, reason: "the :slug path parameter" },
 };
@@ -744,11 +861,18 @@ module.exports = {
   VacancyQuestionsSave,
   ScorecardSave,
   ScorecardPartInput,
+  ScorecardPart,
   CareersSettings,
   CareersSettingsSave,
   JdDraftRequest,
   JdDraft,
   JdDraftOutput,
+  FollowUpAnswer,
+  VacancyInterviewAnswers,
+  FollowUpsRequest,
+  FollowUpQuestion,
+  FollowUps,
+  FollowUpsOutput,
   SuggestedQuestion,
   QuestionsDraft,
   QuestionsDraftOutput,
@@ -756,6 +880,7 @@ module.exports = {
   PublicJobCard,
   PublicJobPage,
   PublicJob,
+  PublicJobsSummary,
   ApplyStarted,
   SlugParams,
 };

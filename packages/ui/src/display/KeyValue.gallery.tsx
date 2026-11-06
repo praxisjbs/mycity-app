@@ -32,5 +32,25 @@ export default {
         ]}
       />
     ),
+    "Site Rows": () => (
+      <KeyValue
+        layout="rows"
+        items={[
+          { label: "Employment", value: "Full Time" },
+          { label: "Working Days", value: "Monday to Saturday" },
+          { label: "Reports To", value: "Chief Executive Officer" },
+        ]}
+      />
+    ),
+    "Site Tiles": () => (
+      <KeyValue
+        layout="tiles"
+        items={[
+          ["Type", "Case Study"],
+          ["Time", "60 minutes"],
+          ["Questions", 3],
+        ]}
+      />
+    ),
   },
 } satisfies GalleryEntry;

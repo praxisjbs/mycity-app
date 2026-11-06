@@ -38,6 +38,8 @@ export const VACANCY_STATUS: Record<VacancyStatus, [StatusTone, string]> = {
 };
 
 export const PATTERN_LABEL: Record<string, string> = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" };
+/** The arrangements a vacancy offers, as New Vacancy's interview and editor choose them. */
+export const PATTERNS = Object.entries(PATTERN_LABEL) as Array<[string, string]>;
 
 export const EMPLOYMENT: Array<[VacanciesEmploymentType, string]> = [
   ["full_time", "Full Time"],

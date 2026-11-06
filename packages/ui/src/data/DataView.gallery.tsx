@@ -13,7 +13,7 @@ const columns: DataViewColumn<SampleRow>[] = [
   { key: "display_name", label: "Name", sortable: true, render: (r) => r.display_name },
   { key: "department", label: "Department", sortable: true, render: (r) => r.department },
   { key: "job_title", label: "Job Title", desktop: true, render: (r) => r.job_title },
-  { key: "status", label: "Status", render: (r) => <StatusPill status={r.status} /> },
+  { key: "status", label: "Status", badge: true, render: (r) => <StatusPill status={r.status} /> },
   { key: "owed", label: "Owed", align: "n", sortable: true, render: (r) => <Money value={r.owed} /> },
   { key: "joined_on", label: "Joined", sortable: true, desktop: true, render: (r) => formatDate(r.joined_on) },
   { key: "note", label: "Note", desktop: true, render: (r) => r.note },

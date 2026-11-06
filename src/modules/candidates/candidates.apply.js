@@ -57,6 +57,8 @@ async function link(token) {
   const questions = await repo.applyQuestions(pool, v.vacancy_id);
   return {
     vacancy_title: v.title,
+    vacancy_department: v.department,
+    vacancy_location: v.location,
     expires_at: token.expires_at,
     questions: questions.map((q) => ({
       vacancy_question_id: q.vacancy_question_id,

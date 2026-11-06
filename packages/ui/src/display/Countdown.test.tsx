@@ -39,6 +39,20 @@ describe("Countdown", () => {
   /** A device whose clock reads the server's time `ahead` ms late or early at the moment the answer lands. */
   const arrive = (a: { server: number }, ahead = 0) => vi.setSystemTime(a.server + ahead);
 
+  it("ring: the time left in a ring that empties as it runs, red once the warning time comes", () => {
+    const a = answer(30 * 60 * 1000);
+    const { container } = render(<Countdown look="ring" total={3600} endsAt={a.endsAt} serverNow={a.serverNow} />);
+    const ring = container.firstElementChild as HTMLElement;
+    expect(ring).toHaveClass("ps-ring");
+    expect(timer()).toHaveAccessibleName("Time Left: 30 minutes");
+    expect(screen.getByText("30:00")).toBeInTheDocument();
+    const arc = container.querySelector(".ps-ring-arc")!;
+    expect(Number(arc.getAttribute("stroke-dashoffset"))).toBeCloseTo(276.5, 0);
+    expect(ring).not.toHaveAttribute("data-low");
+    tick(25 * 60 + 1);
+    expect(ring).toHaveAttribute("data-low");
+  });
+
   it("shows minutes and seconds, with hours only when there are some", () => {
     const a = answer(3909000);
     arrive(a);
