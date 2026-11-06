@@ -4,63 +4,193 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { Button } from "../actions/Button";
 import { Brand } from "./Brand";
-import { PageMessage, PublicPage } from "./PublicPage";
+import { PageMessage, PublicPage, PUBLIC_FOOTER_COLUMNS } from "./PublicPage";
 
-afterEach(() => document.documentElement.removeAttribute("data-theme"));
+afterEach(() => {
+  document.documentElement.removeAttribute("data-theme");
+  vi.restoreAllMocks();
+});
+
+const nav = [
+  { label: "Careers", href: "/jobs", current: true },
+  { label: "Verify Document", href: "/verify" },
+];
 
 describe("PublicPage", () => {
-  it("has a banner, a main and a footer, with the brand, the page and the links", () => {
+  it("has one banner with the site's mark, its nav with the current page marked, a main and a footer", () => {
     render(
-      <PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>} links={<a href="/verify">Verify a Document</a>}>
+      <PublicPage layout="full" nav={nav} brandSub="Careers">
         <p>Open roles</p>
       </PublicPage>,
     );
-    expect(screen.getByRole("banner")).toHaveTextContent("MyCityApp");
+    const banner = screen.getByRole("banner");
+    expect(within(banner).getByRole("link", { name: "MyCityApp Home" })).toHaveAttribute("href", "/");
+    expect(within(banner).getByText("Careers", { selector: ".ps-brand-name span" })).toBeInTheDocument();
+    const main = within(banner).getByRole("navigation", { name: "Main" });
+    expect(within(main).getByRole("link", { name: "Careers" })).toHaveAttribute("aria-current", "page");
+    expect(within(main).getByRole("link", { name: "Verify Document" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("main")).toHaveTextContent("Open roles");
-    expect(screen.getByRole("contentinfo")).toHaveTextContent("MyCity App Ltd · Lagos, Nigeria");
-    expect(screen.getByRole("link", { name: "Verify a Document" })).toBeInTheDocument();
+    expect(screen.getAllByRole("banner")).toHaveLength(1);
   });
 
-  it("draws the page on its card by default, and open lays the page out wide with no card", () => {
+  it("takes the site's own links through its navigate, and leaves other links, and modified clicks, to the browser", async () => {
+    const navigate = vi.fn();
+    render(
+      <PublicPage layout="full" nav={nav} navigate={navigate}>
+        <p>Page</p>
+      </PublicPage>,
+    );
+    await userEvent.click(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Verify Document" }));
+    expect(navigate).toHaveBeenLastCalledWith("/verify");
+    const foot = screen.getByRole("contentinfo");
+    await userEvent.click(within(foot).getByRole("link", { name: "How We Hire" }));
+    expect(navigate).toHaveBeenLastCalledWith("/#hire");
+    const external = within(foot).getByRole("link", { name: "Visit MyCityApp" });
+    expect(external).toHaveAttribute("href", "https://mycityapp.io");
+    const before = navigate.mock.calls.length;
+    external.addEventListener("click", (e) => e.preventDefault());
+    await userEvent.click(external);
+    expect(navigate.mock.calls.length).toBe(before);
+  });
+
+  it("opens the menu with the same links, and closes it on Esc and on a link", async () => {
+    render(
+      <PublicPage layout="full" nav={nav} navigate={() => undefined}>
+        <p>Page</p>
+      </PublicPage>,
+    );
+    const button = screen.getByRole("button", { name: "Menu" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    const menu = screen.getByRole("navigation", { name: "Menu" });
+    expect(within(menu).getAllByRole("link").map((a) => a.textContent)).toEqual(["Careers", "Verify Document"]);
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("navigation", { name: "Menu" })).toBeNull();
+    await userEvent.click(button);
+    await userEvent.click(within(screen.getByRole("navigation", { name: "Menu" })).getByRole("link", { name: "Careers" }));
+    expect(screen.queryByRole("navigation", { name: "Menu" })).toBeNull();
+  });
+
+  it("draws the footer: the mark, the tagline, Lagos's time, the design's columns, the © line and Back to Top", async () => {
+    const scroll = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    render(
+      <PublicPage layout="full">
+        <p>Page</p>
+      </PublicPage>,
+    );
+    const foot = screen.getByRole("contentinfo");
+    expect(foot).toHaveAttribute("data-theme", "dark");
+    expect(within(foot).getByText("The city and lifestyle platform for every Nigerian city.")).toBeInTheDocument();
+    expect(within(foot).getByText("Lagos").nextElementSibling?.tagName).toBe("TIME");
+    expect(within(foot).getByText("Lagos").nextElementSibling?.textContent).toMatch(/^\d{2}:\d{2}$/);
+    const site = within(foot).getByRole("navigation", { name: "Site" });
+    expect(within(site).getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(PUBLIC_FOOTER_COLUMNS.map((c) => c.title));
+    expect(within(site).getAllByRole("link")).toHaveLength(8);
+    expect(within(foot).getByText(/^© \d{4} MyCity App Ltd\. Lagos, Nigeria\.$/)).toBeInTheDocument();
+    expect(within(foot).getByText("JBS Praxis").tagName).toBe("B");
+    await userEvent.click(within(foot).getByRole("button", { name: "Back to Top" }));
+    expect(scroll).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+  });
+
+  it("split: the aside first, named by its h1, in bands (who it is for, the title, text and steps, the credit), the card beside it, no footer", () => {
+    render(
+      <PublicPage
+        layout="split"
+        nav={nav}
+        name="Head, Sales & Revenue"
+        line="Marketing & Sales, Lekki Phase 1, Lagos"
+        title="Apply"
+        text="Your application, in three steps."
+        paragraph="This link works until 08/11/2026."
+        steps={{ items: ["About You", "CV and Questions", "Why This Role"], at: 1 }}
+        aside={<p>60:00 left</p>}
+      >
+        <h2>CV and Questions</h2>
+      </PublicPage>,
+    );
+    const aside = screen.getByRole("complementary", { name: "Apply" });
+    expect(within(aside).getByText("Head, Sales & Revenue").closest("[data-copy]")).toHaveAttribute("data-copy", "content");
+    expect(within(aside).queryByRole("img")).toBeNull();
+    const h1 = within(aside).getByRole("heading", { level: 1, name: "Apply" });
+    expect(h1).toHaveAttribute("data-ui", "page-title");
+    expect(h1).toHaveClass("ps-eyebrow");
+    const display = within(aside).getByText("Your application, in three steps.");
+    expect(display).toHaveClass("ps-auth-h");
+    expect(h1.compareDocumentPosition(display) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(aside).getByText("This link works until 08/11/2026.")).toHaveClass("ps-auth-text");
+    expect(within(aside).getByRole("list", { name: "Steps" }).parentElement).toHaveClass("ps-auth-steps");
+    expect(within(aside).getAllByRole("listitem")[1]).toHaveAttribute("aria-current", "step");
+    expect(within(aside).getByText("60:00 left").parentElement).toHaveClass("ps-auth-extra");
+    expect(within(aside).getByText(/MyCity App Ltd/)).toHaveTextContent(/^© \d{4} MyCity App Ltd$/);
+    const card = screen.getByRole("heading", { level: 2, name: "CV and Questions" });
+    expect(card.parentElement).toHaveClass("ps-auth-work");
+    expect(aside.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("contentinfo")).toBeNull();
+    expect(screen.getByRole("banner")).toBeInTheDocument();
+  });
+
+  it("split: the larger display line for a tool page, and focus can move to the title", () => {
+    const ref = { current: null as HTMLHeadingElement | null };
+    render(
+      <PublicPage layout="split" title="Verify a Document" text="Check any document we issued." textSize="l" titleRef={ref}>
+        <p>Result</p>
+      </PublicPage>,
+    );
+    expect(screen.getByText("Check any document we issued.")).toHaveClass("ps-auth-h-l");
+    const h1 = screen.getByRole("heading", { level: 1, name: "Verify a Document" });
+    expect(ref.current).toBe(h1);
+    expect(h1).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("leaves the footer off a sign-in page, and takes columns of the caller's", () => {
+    const { rerender } = render(
+      <PublicPage layout="full" footer={false}>
+        <p>Apply</p>
+      </PublicPage>,
+    );
+    expect(screen.queryByRole("contentinfo")).toBeNull();
+    rerender(
+      <PublicPage layout="full" columns={[{ title: "Careers", links: [{ label: "Open Roles", href: "/jobs" }] }]}>
+        <p>Apply</p>
+      </PublicPage>,
+    );
+    expect(within(screen.getByRole("navigation", { name: "Site" })).getAllByRole("link")).toHaveLength(1);
+  });
+
+  it("keeps the earlier layouts: the page on its card, open up to 1120 px, and a pane beside the card in sticky columns", () => {
     const { container, rerender } = render(<PublicPage><p>Apply</p></PublicPage>);
     expect(container.firstElementChild).toHaveAttribute("data-layout", "card");
     expect(screen.getByText("Apply").parentElement?.className).toContain("rounded-card");
     expect(screen.getByRole("main").className).toContain("max-w-176");
     rerender(<PublicPage layout="open"><p>Careers</p></PublicPage>);
-    expect(container.firstElementChild).toHaveAttribute("data-layout", "open");
-    expect(screen.getByText("Careers").parentElement?.className).not.toContain("rounded-card");
+    expect(screen.getByText("Careers", { selector: "p" }).parentElement?.className).not.toContain("rounded-card");
     expect(screen.getByRole("main").className).toContain("max-w-280");
-    expect(screen.getByRole("banner").className).toContain("max-w-280");
-  });
-
-  it("stands a pane beside the card: the pane first, inside the main, both in sticky columns", () => {
-    render(
+    rerender(
       <PublicPage pane={<section aria-label="Pane"><h1>Partnerships Associate</h1></section>}>
         <h2>About You</h2>
       </PublicPage>,
     );
-    const main = screen.getByRole("main");
-    expect(main.className).toContain("max-w-280");
-    const cols = main.querySelector("[data-sticky-columns]")!;
+    const cols = screen.getByRole("main").querySelector("[data-sticky-columns]")!;
     expect(cols.children[0]).toHaveTextContent("Partnerships Associate");
     expect(cols.children[1]).toHaveTextContent("About You");
-    expect(screen.getByText("About You").parentElement!.className).toContain("rounded-card");
   });
 
-  it("lays the page on the tinted ground, and the footer gives the mark, the links and Lagos's time", () => {
-    const { container } = render(<PublicPage links={<a href="/jobs">Careers</a>}><p>Page</p></PublicPage>);
+  it("lays the page on the tinted ground, and draws a mark of the page's own when given one", () => {
+    const { container } = render(
+      <PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>}>
+        <p>Page</p>
+      </PublicPage>,
+    );
     expect(container.firstElementChild).toHaveAttribute("data-canvas");
     expect(container.firstElementChild!.className).toContain("public-ground");
-    const foot = screen.getByRole("contentinfo");
-    expect(within(foot).getByText("MyCityApp")).toBeInTheDocument();
-    expect(within(foot).getByRole("navigation", { name: "Site" })).toContainElement(screen.getByRole("link", { name: "Careers" }));
-    expect(within(foot).getByText("Lagos").nextElementSibling?.tagName).toBe("TIME");
+    expect(within(screen.getByRole("banner")).getByRole("link")).toHaveAttribute("href", "/jobs");
   });
 
   it("keeps room at a phone's foot for its bar", () => {
-    render(<PublicPage bar={<div>Apply for This Role</div>}><p>Role</p></PublicPage>);
-    expect(screen.getByRole("contentinfo").querySelector(".bg-deep")!.className).toContain("phone:pb-24");
-    expect(screen.getByRole("main")).toContainElement(screen.getByText("Apply for This Role"));
+    render(<PublicPage bar={<div>Apply Now</div>}><p>Role</p></PublicPage>);
+    expect(screen.getByRole("contentinfo")).toHaveClass("ps-foot-clear");
+    expect(screen.getByRole("main")).toContainElement(screen.getByText("Apply Now"));
   });
 
   it("switches the theme from its button", async () => {
@@ -85,8 +215,17 @@ describe("PageMessage", () => {
 
   it("has no accessibility violations", async () => {
     const { container } = render(
-      <PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>}>
+      <PublicPage layout="full" nav={nav}>
         <PageMessage title="Offer Expired" tone="warn" icon="clock">Ask People for a new link.</PageMessage>
+      </PublicPage>,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations in the split layout", async () => {
+    const { container } = render(
+      <PublicPage layout="split" nav={nav} name="Content Producer" line="Offer of Employment, OFF-0018" title="Offer of Employment" text="Your offer, ready to sign." steps={{ items: ["Read the Letter", "Sign Below"], at: 0 }}>
+        <PageMessage title="Offer Signed" tone="ok" icon="ok">We emailed you a signed copy.</PageMessage>
       </PublicPage>,
     );
     expect(await axe(container)).toHaveNoViolations();

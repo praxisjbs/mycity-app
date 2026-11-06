@@ -22,12 +22,14 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 |---|---|---|---|---|
 | Foundations | [Icon](#icon) | `Icon` | One Lucide glyph by its short name, drawn in the current text colour. | stable |
 | Actions | [ActionGroup](#actiongroup) | `ActionGroup` | Buttons that wait for each other: while one is working, the others in the group dim and ignore presses until it finishes. | stable |
-| Actions | [Button](#button) | `Button`, `IconButton`, `BigButton` | The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side; busy from the press until the work it starts is done. | stable |
+| Actions | [Button](#button) | `Button`, `IconButton`, `BigButton` | The pill button: default, primary (the yellow one), ghost and danger, and on the public site line, solid and glass, with an optional icon either side; busy from the press until the work it starts is done. | stable |
 | Layout | [Card](#card) | `Card`, `CardHeader` | The raised panel every section sits in, with an optional title row (CardHeader) and one Details row at its foot. | stable |
 | Layout | [Grid](#grid) | `Grid` | The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsing to one column on a phone. | stable |
 | Layout | [ListDetail](#listdetail) | `ListDetail`, `DetailPane` | A list and the record a row opens: side by side on a wide desktop, and on a phone the list alone with the opened record in a bottom sheet, never below the list (F31). | stable |
 | Layout | [PageHeader](#pageheader) | `PageHeader` | A page's title, its one-line subtitle (desktop only) and the page's actions. | stable |
+| Layout | [PageIntro](#pageintro) | `PageIntro` | An inner public page's opening: a spaced capital eyebrow, a large headline with one accent word in the brand green, a lede, an optional part at the right (a search), and a hairline under it all; each part rises in turn as the page opens. | beta |
 | Layout | [PhoneOnly](#phoneonly) | `PhoneOnly`, `DesktopOnly` | Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen. | stable |
+| Layout | [Reveal](#reveal) | `Reveal`, `Stagger` | A block that rises into view as it scrolls in (from below, or from the left or right) and fades back out when it leaves, so it rises again when it returns; once in view it can lift under the pointer. `scroll` ties the rise to the scroll itself instead. Stagger rises a row of blocks in turn. | beta |
 | Layout | [SplitPanes](#splitpanes) | `SplitPanes` | A list beside the record it opens, with a divider the person can drag; on a phone the list fills the screen and the record covers it. | stable |
 | Layout | [Stack](#stack) | `Stack`, `Inline` | A vertical run of blocks with an even gap; Inline is the horizontal run that wraps. | stable |
 | Layout | [StickyColumns](#stickycolumns) | `StickyColumns` | Two columns side by side that both stick: the shorter waits while the longer scrolls, and both finish together at the foot of the row. | beta |
@@ -40,6 +42,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Confetti](#confetti) | `Confetti` | A short burst of paper or stars from a celebration card, drawn on a canvas inside it, that settles and stops. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
 | Display | [Countdown](#countdown) | `Countdown` | The time left until an end the server set, counted on the server's clock: a timed assessment's clock. | beta |
+| Display | [CountUp](#countup) | `CountUp` | A whole number that counts up from 0 to its value as it first shows, easing out over about a second. | beta |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
 | Display | [EmptyValue](#emptyvalue) | `EmptyValue` | The marker for a value that is not set: the only dash a screen shows, muted. | stable |
 | Display | [IconCards](#iconcards) | `IconCards`, `IconCard` | A grid of phone icon cards, two to a row; each IconCard is an icon, a title and a line, and opens a sheet with that section. | stable |
@@ -115,6 +118,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [SecretField](#secretfield) | `SecretField` | A password or an API key the server may already keep: Saved (with a key's last four) and Replace, never a character of what is saved. | beta |
 | Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField`, `SelectMenu` | Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField). | stable |
 | Forms | [SignatureField](#signaturefield) | `SignatureField` | A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into. | stable |
+| Forms | [SiteSearch](#sitesearch) | `SiteSearch` | The public site's search box: `hero`, the white box with its yellow button over the index's skyline; `intro`, the card-coloured box beside an inner page's headline. | beta |
 | Forms | [StepBar](#stepbar) | `StepBar` | Where a person is in a few steps: one bar per step, filled up to the step in hand, and Step 2 of 4. | stable |
 | Forms | [Switch](#switch) | `Switch`, `ToggleRow`, `CheckboxField` | On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out. | stable |
 | Forms | [TextField](#textfield) | `TextField`, `PasswordField`, `NumberField`, `PhoneField`, `TextAreaField` | The text input of the form system, with its typed relatives: password, whole number, phone and long text. | stable |
@@ -162,11 +166,11 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it. | stable |
 | Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
 | Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls and pulls to refresh, the floating button, and the bottom bar. | stable |
-| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page on its faint City Green ground: the mark and the theme switch on top; the page on one card (at most 704 px), beside a Deep Green context pane, or as open sections up to 1120 px; a Deep Green footer under a Lagos skyline edge. | stable |
+| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a Deep Green footer under a Lagos skyline edge with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card. | stable |
 | Shell | [PullIndicator](#pullindicator) | `PullIndicator` | The pull to refresh's Pin Drop: the pin in a disc that drops from under the header as the page is pulled, its yellow ring closing at the release point, Deep Green with the reload mark past the second notch. | stable |
 | Shell | [Rail](#rail) | `Rail` | The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot. | stable |
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
-| Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's Deep Green panel: the page's heading over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark). A hero across the top, or the context pane beside a form. | beta |
+| Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's Deep Green hero: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now. | beta |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
@@ -246,7 +250,7 @@ Buttons that wait for each other: while one is working, the others in the group 
 
 ### Button
 
-The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side; busy from the press until the work it starts is done.
+The pill button: default, primary (the yellow one), ghost and danger, and on the public site line, solid and glass, with an optional icon either side; busy from the press until the work it starts is done.
 
 | | |
 |---|---|
@@ -265,10 +269,10 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `variant` | `"default" \| "primary" \| "ghost" \| "danger"` |  | `primary` is the yellow one, one per surface; `danger` is for destructive actions, confirmed in a dialog. |
+| `variant` | `"default" \| "primary" \| "ghost" \| "danger" \| "line" \| "solid" \| "glass"` |  | `primary` is the yellow one, one per surface; `danger` is for destructive actions, confirmed in a dialog. The public site's: `line` (an outline), `solid` (Next, Verify) and `glass` (Share Role on a hero). |
 | `icon` | `IconName` |  | A glyph before the label. |
 | `iconRight` | `IconName` |  | A glyph after the label (a chevron for "View All"). |
-| `size` | `"md" \| "sm"` |  | `md` follows the density (36 or 40 px); `sm` is 28 px on desktop. Both are 44 px on a phone. |
+| `size` | `"md" \| "sm" \| "lg"` |  | `md` follows the density (36 or 40 px); `sm` is 28 px on desktop; `lg` is the public site's, 48 px with 16 px text, and a yellow one rises with a glow under the pointer. All are 44 px or more on a phone. |
 | `block` | `boolean` |  | Fills the width: the call to action at the foot of a form or page. |
 | `onClick` | `PressHandler<MouseEvent<HTMLButtonElement>>` |  | The press. Return the work (onClick={save}, or an async handler) and the button is busy from the press until it settles: a spinner, presses ignored, and its ActionGroup waiting with it. |
 | `busy` | `boolean` |  | Busy by the caller's own measure (a mutation's pending), for work the press does not return. |
@@ -298,6 +302,7 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 <Button variant="primary" icon="plus">New Rule</Button>
 <Button variant="primary" onClick={save}>Save Worksite</Button>
 <Button variant="ghost" iconRight="right">View All</Button>
+<Button variant="primary" size="lg" asChild><a href="/jobs/head-sales">Apply for This Role</a></Button>
 ```
 
 ## Layout
@@ -463,6 +468,38 @@ A page's title, its one-line subtitle (desktop only) and the page's actions.
 <PageHeader title="My Leave" subtitle="2026 entitlement" actions={<Button variant="primary" icon="plus">Request Leave</Button>} />
 ```
 
+### PageIntro
+
+An inner public page's opening: a spaced capital eyebrow, a large headline with one accent word in the brand green, a lede, an optional part at the right (a search), and a hairline under it all; each part rises in turn as the page opens.
+
+| | |
+|---|---|
+| Use | The head of an inner page of the public site (Open Roles), inside PublicPage layout full, where the index has its SkylineHero. |
+| Avoid | The staff app (use PageHeader); a page that opens on a hero; a record's own page (a role: SkylineHero size role); a sign-in page (PublicPage layout split carries its title). |
+| Phone | The right-hand part moves under the headline (from 1040 px down), the eyebrow's spacing tightens, and the lede is left off (a page subtitle is desktop only). |
+| Accessibility | The headline is the page's h1 (data-ui page-title, at most 3 words); the accent word is part of it, not a separate name. The hairline is a separator. Under reduced motion the parts are simply there. |
+| Status | beta |
+| Exports | `PageIntro` |
+| Import | `import { PageIntro } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/PageIntro.tsx` |
+| Test | `packages/ui/src/layout/PageIntro.test.tsx` |
+| Gallery | `packages/ui/src/layout/PageIntro.gallery.tsx` (`npm run gallery`, `#/PageIntro`) |
+
+**PageIntro** props (`PageIntroProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | yes | The page's headline, Title Case, at most 3 words (Open Roles). |
+| `accent` | `string` |  | The word of the title drawn in the brand green (Roles). |
+| `eyebrow` | `ReactNode` |  | The short spaced line over the headline (Careers at MyCityApp). |
+| `text` | `ReactNode` |  | One line under the headline, at most 8 words; desktop only. |
+| `aside` | `ReactNode` |  | What stands at the right of the headline, level with its foot: a search (SiteSearch tone intro). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PageIntro eyebrow="Careers at MyCityApp" title="Open Roles" accent="Roles" text="12 roles across 7 teams, in Lagos and Abuja." aside={<SiteSearch tone="intro" ... />} />
+```
+
 ### PhoneOnly
 
 Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen.
@@ -501,6 +538,57 @@ Shows its content on a phone only; DesktopOnly shows it on a desktop only. What 
 ```tsx
 <PhoneOnly><IconCards>...</IconCards></PhoneOnly>
 <DesktopOnly unmount><AreaChart /></DesktopOnly>
+```
+
+### Reveal
+
+A block that rises into view as it scrolls in (from below, or from the left or right) and fades back out when it leaves, so it rises again when it returns; once in view it can lift under the pointer. `scroll` ties the rise to the scroll itself instead. Stagger rises a row of blocks in turn.
+
+| | |
+|---|---|
+| Use | The public site's motion, which a page takes only through these (FRONTEND_GUIDE §6): the index's sections (a head, a tile, a call to action from each side), Stagger for a row of tiles or steps (each 120 ms after the one before), and `scroll` for the careers list's aside and a vacancy's parts. |
+| Avoid | The staff app, whose motion is the components' own (F6); a list's rows (the list rises as one); anything a person must read before scrolling (the hero and the page intro rise by themselves). |
+| Phone | The same rise, from below even for a block from a side (a phone has no room at its sides); there is no hover on a phone, so a block never lifts. |
+| Accessibility | Layout only: the block stays in the page and in reading order while it is out of view, and under reduced motion it simply shows. Nothing takes focus. Stagger keeps its items' order and their list semantics (ol, ul with li). |
+| Status | beta |
+| Exports | `Reveal`, `Stagger` |
+| Import | `import { Reveal, Stagger } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/Reveal.tsx` |
+| Test | `packages/ui/src/layout/Reveal.test.tsx` |
+| Gallery | `packages/ui/src/layout/Reveal.gallery.tsx` (`npm run gallery`, `#/Reveal`) |
+
+**Reveal** props (`RevealProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The block. |
+| `as` | `"div" \| "article" \| "section" \| "li" \| "header" \| "aside"` |  | The element it is: div unless set (an article for a card, a li inside a list, a section). |
+| `from` | `"up" \| "left" \| "right"` |  | Where it rises from: `up` (the default, 24 px below), `left` or `right` (32 px to that side). |
+| `delay` | `number` |  | How long it waits after coming into view, in ms (the second tile in a row 80, the third 200). |
+| `lift` | `boolean \| "shadow"` |  | Once in view, it rises 4 px under the pointer; `shadow` also lays the site's shadow under it. |
+| `scroll` | `boolean` |  | The rise follows the scroll itself (the block is fully in once it has come a third of the way in), where the browser can; elsewhere it simply shows. `from`, `delay` and `lift` do not apply. |
+| `id` | `string` |  | The element's id, for a link to this part of the page ("/#hire"). |
+| `className` | `string` |  | Layout classes only (a grid span, spacing); the block's own look comes from what is inside it. |
+
+**Stagger** props (`StaggerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The blocks, each rising in turn: every child is one item. |
+| `as` | `"div" \| "ol" \| "ul"` |  | The element that holds them: div unless set (ol or ul for steps and a list, whose items are then li). |
+| `step` | `number` |  | How much later each item rises than the one before, in ms; 120 unless set. |
+| `start` | `number` |  | How long the first item waits, in ms; 0 unless set. |
+| `from` | `"up" \| "left" \| "right"` |  | Where each item rises from (Reveal `from`). |
+| `lift` | `boolean \| "shadow"` |  | Each item lifts under the pointer once in view (Reveal `lift`). |
+| `className` | `string` |  | Layout classes only, for the holder (a grid and its gap). |
+| `itemClassName` | `string` |  | Layout classes only, for each item (a span in the grid). |
+
+```tsx
+<Reveal>{sectionHead}</Reveal>
+<Reveal as="article" from="left" lift="shadow">{callToAction}</Reveal>
+<Reveal delay={120} lift>{tile}</Reveal>
+<Reveal scroll as="section">{part}</Reveal>
+<Stagger as="ol" step={120} className="grid grid-cols-4 gap-6">{steps}</Stagger>
 ```
 
 ### SplitPanes
@@ -602,7 +690,7 @@ Two columns side by side that both stick: the shorter waits while the longer scr
 | `children` | `ReactNode` | yes | The columns, left to right: each child is one column. |
 | `layout` | `"pane" \| "main-side"` |  | `pane` (the default): a 400 px pane beside the rest, side by side from 1041 px. `main-side`: two thirds and one third, from 761 px. |
 | `phoneFirst` | `number` |  | The column, counted from 0, that comes first where the columns stack (a vacancy's Role card above its text on a phone). |
-| `gap` | `number` |  | The space kept above a column stuck at the top, and below one waiting at its foot, in px; 24 unless set. |
+| `gap` | `number` |  | The space kept above a column stuck at the top (under PublicPage's header, which it reads), and below one waiting at its foot, in px; 24 unless set. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -910,6 +998,37 @@ The time left until an end the server set, counted on the server's clock: a time
 
 ```tsx
 <Countdown endsAt={session.ends_at} serverNow={session.server_now} onEnd={reload} />
+```
+
+### CountUp
+
+A whole number that counts up from 0 to its value as it first shows, easing out over about a second.
+
+| | |
+|---|---|
+| Use | The public site's hero figures (Open Roles, Teams Hiring, Cities), where SkylineHero size index draws it for each of its `stats`; a figure a page opens on. |
+| Avoid | A number that changes while the person reads it (a count of new items, a timer: use Countdown or CountBadge); money (use Money); a list's total (the pager shows it). |
+| Phone | The same count, in the size the caller sets around it. |
+| Accessibility | The value is read at once as the final number: the counting digits are hidden from assistive technology and a visually hidden copy carries the value. Under reduced motion the value shows straight away. |
+| Status | beta |
+| Exports | `CountUp` |
+| Import | `import { CountUp } from "@mycity/ui";` |
+| File | `packages/ui/src/display/CountUp.tsx` |
+| Test | `packages/ui/src/display/CountUp.test.tsx` |
+| Gallery | `packages/ui/src/display/CountUp.gallery.tsx` (`npm run gallery`, `#/CountUp`) |
+
+**CountUp** props (`CountUpProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `number` | yes | The number it ends on, a whole number of 0 or more. |
+| `delay` | `number` |  | How long it waits before it starts, in ms; 0 unless set (the hero's figures wait 500, then 120 more each). |
+| `duration` | `number` |  | How long the count takes, in ms; 1100 unless set. |
+| `className` | `string` |  | Layout classes only; the figure takes the size and colour of what holds it. |
+
+```tsx
+<CountUp value={12} />
+<CountUp value={7} delay={620} />
 ```
 
 ### EmptyState
@@ -3053,6 +3172,7 @@ The one <form>: Enter submits, the browser's own bubbles are off, and a save it 
 | `children` | `ReactNode` | yes | The fields and the footer. |
 | `className` | `string` |  | Layout classes only. |
 | `id` | `string` |  | Its id, so a button outside it (a modal footer) can submit it with form={id}. |
+| `role` | `"search"` |  | `search` for a form that is a search box (SiteSearch), so it is a search landmark. |
 
 **FormFooter** props (`FormFooterProps`)
 
@@ -3663,6 +3783,41 @@ A signature drawn with a finger or a mouse, which leaves as a PNG for the docume
 <SignatureField label="Your Signature" onChange={setInk} ref={pad} initial={saved} />
 ```
 
+### SiteSearch
+
+The public site's search box: `hero`, the white box with its yellow button over the index's skyline; `intro`, the card-coloured box beside an inner page's headline.
+
+| | |
+|---|---|
+| Use | The index's SkylineHero (tone hero, Search Roles, which opens the careers list on what was typed) and the careers list's PageIntro (tone intro, sent to the server as q as it is typed). |
+| Avoid | The staff app and any list's own toolbar (use SearchInput); an address (use AddressField); filtering rows already on the screen (FRONTEND_GUIDE §4). |
+| Phone | hero: the button drops under the box at full width and the box squares off; intro: the full width of the page. 16 px text, so the phone does not zoom. |
+| Accessibility | A form with the search role and a visually hidden label naming the box; Enter submits; the button is a real submit button with its own words. The magnifier is decorative. The box takes the focus ring around its whole shape. |
+| Status | beta |
+| Exports | `SiteSearch` |
+| Import | `import { SiteSearch } from "@mycity/ui";` |
+| File | `packages/ui/src/form/SiteSearch.tsx` |
+| Test | `packages/ui/src/form/SiteSearch.test.tsx` |
+| Gallery | `packages/ui/src/form/SiteSearch.gallery.tsx` (`npm run gallery`, `#/SiteSearch`) |
+
+**SiteSearch** props (`SiteSearchProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | What is typed. |
+| `onChange` | `(value: string) => void` | yes | Called on each key. |
+| `onSubmit` | `() => unknown` |  | Enter or the button: return the work to hold the button busy until it settles. Left out, Enter does nothing more (the intro's list already follows what is typed). |
+| `label` | `string` | yes | Names the box for assistive technology, Title Case (Search Roles). |
+| `placeholder` | `string` |  | A format example of at most 3 words (Role or City). |
+| `tone` | `"hero" \| "intro"` |  | `hero` (the default): white, with the button; `intro`: on the page's card colour, no button. |
+| `action` | `string` |  | hero: the button's words, Verb Noun (Search Roles); the label unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<SiteSearch tone="hero" label="Search Roles" placeholder="Role or City" value={q} onChange={setQ} onSubmit={() => navigate(`/jobs?q=${q}`)} action="Search Roles" />
+<SiteSearch tone="intro" label="Search Roles" placeholder="Role or City" value={q} onChange={setQ} />
+```
+
 ### StepBar
 
 Where a person is in a few steps: one bar per step, filled up to the step in hand, and Step 2 of 4.
@@ -3687,7 +3842,8 @@ Where a person is in a few steps: one bar per step, filled up to the step in han
 | `steps` | `readonly string[]` | yes | The steps' titles in order, Title Case, at most 4 words each. |
 | `at` | `number` | yes | The step in hand, counted from 0. |
 | `titled` | `boolean` |  | Also name the step in hand after its number ("Step 2 of 4 · Access"). Off inside Wizard, which shows the title as its heading. |
-| `vertical` | `boolean` |  | A column of the steps by name, each with its number or a tick, for a pane beside the form (the public site's Apply). |
+| `vertical` | `boolean` |  | A column of the steps by name, each in a numbered circle (yellow for the one in hand, green once done), for the aside beside the form (PublicPage layout split `steps`: Apply, Sign Offer). |
+| `complete` | `boolean` |  | vertical: every step done (the application sent, the offer signed). |
 | `decorative` | `boolean` |  | Hides the bar from assistive technology, when another bar on the screen already names the steps (the Wizard's own). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -5022,12 +5178,15 @@ The MyCity pin mark, alone or with the name beside it, in the brand colours of t
 | `name` | `string` |  | The name beside the pin ("MyCityApp", "MyCity App"); the pin alone when left out. |
 | `tone` | `"auto" \| "on-dark"` |  | `auto`: City Green on a light surface, the yellow in the dark theme; `on-dark`: the yellow on the Deep Green rail or splash. |
 | `label` | `string` |  | The accessible name when the pin stands alone. |
+| `tile` | `"deep" \| "secondary"` |  | The public site's mark: the pin in a rounded tile, Deep Green (`deep`, the header) or City Green (`secondary`, the footer), with the name in bold beside it. |
+| `sub` | `string` |  | With `tile`, a small line under the name (Careers); hidden in a phone's header. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
 <Brand />
 <Brand name="MyCityApp" size="m" />
 <Brand tone="on-dark" size="xl" />
+<Brand name="MyCityApp" sub="Careers" tile="deep" />
 ```
 
 ### ComingSoon
@@ -5389,14 +5548,14 @@ The staff app's phone frame: the top bar and title rail, the page, which alone s
 
 ### PublicPage
 
-The public site's page on its faint City Green ground: the mark and the theme switch on top; the page on one card (at most 704 px), beside a Deep Green context pane, or as open sections up to 1120 px; a Deep Green footer under a Lagos skyline edge.
+The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a Deep Green footer under a Lagos skyline edge with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card.
 
 | | |
 |---|---|
-| Use | Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). layout open for a page a stranger browses (Careers, a Vacancy), with a SkylineHero at its head; the card for a page a person fills in or reads once, with a `pane` (SkylineHero size pane) carrying its identity where it has one. |
-| Avoid | The staff app (it has its own shells); a second card inside the card; a page of explanation (a PageMessage says one thing). |
-| Phone | The card runs edge to edge with no side border; with a pane, the pane is a compact band at the top and the card rises over its foot as a sheet; open, the page's first block (its hero) runs edge to edge and its sections keep their own 16 px margin; the header keeps a 16 px margin; the theme switch and the footer's links are 44 px targets; a `bar` is fixed at the foot and the page keeps room for it. |
-| Accessibility | A banner, a main and a contentinfo landmark; the theme switch is a named button; the pane is inside the main, before the card, so the h1 it carries comes first. The skyline edge is decorative. PageMessage's title is a heading (h2) and its icon is decorative. |
+| Use | Every page of go.mycityapp.io. `full` for a page that lays out its own blocks edge to edge (the index's SkylineHero size index, a vacancy's SkylineHero size role, the careers list's PageIntro). `split` for the four pages a person is sent to and works through (Apply, Assessment, Sign Offer, Verify a Document): pass `name` and `line` (the identity band), `title` (the h1, at most 3 words, drawn small and spaced: Apply, Assessment, Offer of Employment, Verify a Document), `text` (the display line in the band's large type, one sentence of at most 20 words), `paragraph` (a short line under it), `steps` or `aside` (the countdown, a reference's form), and the card as children; it leaves the site footer off. card and open are the earlier layouts, kept while the pages move. PageMessage is a whole-page outcome inside the card (sent, expired, not found). |
+| Avoid | The staff app (it has its own shells); a second header or bar under this one; a logo in the split aside (the header carries the brand); a second card inside the card; a page of explanation (a PageMessage says one thing); a sentence as the split title (it is `text`, the display line). |
+| Phone | The header is 60 px with the mark alone (no sub line), the theme switch and the menu, which drops the nav's links down as 52 px rows; the footer's columns stack, each link a 44 px target; a `bar` is fixed at the foot and the page keeps room for it. split: from 1040 px down the aside stacks above the card and stops sticking, and its skyline, its steps and its credit are left off, so the card is close to the top. |
+| Accessibility | A banner, a main and a contentinfo landmark; the nav is named Main and the current page carries aria-current; the menu button says whether it is expanded and Esc closes it; the theme switch and Back to Top are named buttons; the footer's columns sit in a nav named Site, each under a heading. split: the aside is a complementary landmark named by its h1 and comes before the card; the steps are a list named Steps with the one in hand marked. The skyline edge and the aside's skyline are decorative, and nothing rises under reduced motion. PageMessage's title is a heading (h2) and its icon is decorative. |
 | Status | stable |
 | Exports | `PublicPage`, `PageMessage` |
 | Import | `import { PublicPage, PageMessage } from "@mycity/ui";` |
@@ -5408,16 +5567,32 @@ The public site's page on its faint City Green ground: the mark and the theme sw
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `brand` | `ReactNode` |  | The mark at the top left, usually a link home with Brand; left out when the page draws its own inside the card. |
-| `children` | `ReactNode` | yes | The page, drawn on the card. |
-| `pane` | `ReactNode` |  | The context pane: a SkylineHero of size pane with the page's heading and facts. On desktop (1041 px and wider) it stands at the left and the card at the right, both sticking; narrower, it is a band above the card. |
+| `children` | `ReactNode` | yes | The page; in split, the card at the right. |
+| `nav` | `ReadonlyArray<PublicNavItem>` |  | The header's links, left to right; the one for this page has `current`. Below 1181 px they move into the menu. |
+| `navigate` | `(href: string) => void` |  | The site's router: a plain click on one of the site's own links (the mark, the nav, the footer, a hero's All Roles) goes through it instead of loading the page again. A path with a #part ("/#hire") then scrolls to it. |
+| `home` | `string` |  | Where the mark leads; "/" unless set. |
+| `brandSub` | `string` |  | The small line under the name in the header's mark (Careers); none unless set. |
+| `brand` | `ReactNode` |  | Deprecated: the header draws the site's mark. A mark passed here replaces it, only so the pages not yet moved still build. |
+| `layout` | `"card" \| "open" \| "full" \| "split"` |  | `full`: the page lays out its own blocks edge to edge. `split`: the sign-in layout, the aside beside the card (children). `card` (the default): the page on one card, 704 px. `open`: no card, up to 1120 px. card and open are the earlier layouts. |
+| `name` | `ReactNode` |  | split: who or what the page is for, in bold at the top of the aside (the role, the offer, Document Check). No logo: the header carries the brand. |
+| `line` | `ReactNode` |  | split: one muted line under the name (the team and the place, the offer's reference). |
+| `title` | `string` |  | split: the page's h1, Title Case, at most 3 words (Apply, Assessment, Offer of Employment, Verify a Document), drawn small and spaced over the display line. |
+| `titleRef` | `Ref<HTMLHeadingElement>` |  | split: the heading, for a page that moves focus to it; it takes focus without a ring. |
+| `text` | `ReactNode` |  | split: the display line under the title, in the band's large type: one sentence of at most 20 words (Your application, in three steps.). |
+| `textSize` | `"m" \| "l"` |  | split: `m` (the default) for a page a person works through; `l`, larger and heavier, for a page that is itself the tool (Verify a Document.). |
+| `paragraph` | `ReactNode` |  | split: a short paragraph under the display line (when the link ends, who it is for), each sentence at most 20 words. |
+| `steps` | `{ items: readonly string[]; at: number; complete?: boolean }` |  | split: the steps down the aside, numbered, the one in hand in yellow, `complete` once all are done (left off from 1040 px down). |
+| `aside` | `ReactNode` |  | split: what else the main band holds, under the text and the steps: the clock and the question map, a reference's form. |
+| `pane` | `ReactNode` |  | Deprecated, the earlier card layout's context pane (a SkylineHero of size pane) beside the card. The pages move to layout split; it is drawn only so they still build meanwhile. |
 | `below` | `ReactNode` |  | Anything under the card (a second action, a note from the system). |
 | `bar` | `ReactNode` |  | A phone's action bar, fixed at the foot of the screen (a vacancy's Apply); the page keeps room for it. Pass it inside PhoneOnly. |
-| `links` | `ReactNode` |  | The footer's links (Careers, Verify a Document). |
-| `company` | `string` |  | The company line at the foot; MyCity App Ltd · Lagos, Nigeria unless set. |
+| `footer` | `boolean` |  | false leaves the footer off. Default true, and false in split (the sign-in pages carry no site footer). |
+| `columns` | `ReadonlyArray<PublicFooterColumn>` |  | The footer's columns; the approved design's Careers, Company and Documents unless set (PUBLIC_FOOTER_COLUMNS). |
+| `tagline` | `string` |  | The line under the footer's mark. |
+| `links` | `ReactNode` |  | Earlier footer links, no longer drawn: the footer draws `columns`. Left in so the pages that pass it still build. |
+| `company` | `string` |  | The company at the foot, after the © and the year; MyCity App Ltd. Lagos, Nigeria. unless set. |
 | `foot` | `ReactNode` |  | More at the very foot (the mock's demo links, on a laptop only). |
 | `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
-| `layout` | `"card" \| "open"` |  | `card` (the default): the page on one card, 704 px, or beside its pane. `open`: no card, up to 1120 px, the page lays out its own sections. |
 
 **PageMessage** props (`PageMessageProps`)
 
@@ -5430,8 +5605,9 @@ The public site's page on its faint City Green ground: the mark and the theme sw
 | `action` | `ReactNode` |  | One or two actions, usually Buttons. |
 
 ```tsx
-<PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>} links={<a href="/verify">Verify a Document</a>}>...</PublicPage>
-<PublicPage pane={<SkylineHero size="pane" title="Partnerships Associate" record />}>...</PublicPage>
+<PublicPage layout="full" navigate={navigate} nav={[{ label: "Careers", href: "/jobs", current: true }, { label: "Verify Document", href: "/verify" }]}>...</PublicPage>
+<PublicPage layout="split" nav={nav} navigate={navigate} name="Head, Sales & Revenue" line="Marketing & Sales, Lekki Phase 1, Lagos" title="Apply" text="Your application, in three steps." paragraph="This link works until 08/11/2026." steps={{ items: ["About You", "CV and Questions", "Why This Role"], at: 0 }}>{card}</PublicPage>
+<PublicPage layout="split" nav={nav} name="Document Check" line="Offer letters, certificates and agreements" title="Verify a Document" text="Check any document we issued." textSize="l" paragraph="Enter the reference printed on the document." aside={referenceForm}>{result}</PublicPage>
 <PageMessage icon="ok" tone="ok" title="Application Sent">We read every application.</PageMessage>
 ```
 
@@ -5531,14 +5707,14 @@ A small dark card floating at the foot of the shell for something about the app 
 
 ### SkylineHero
 
-The public site's Deep Green panel: the page's heading over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark). A hero across the top, or the context pane beside a form.
+The public site's Deep Green hero: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now.
 
 | | |
 |---|---|
-| Use | The head of a public page that invites a stranger in: Careers (size l, with the search under the heading) and a Vacancy (size m, with the role's facts as chips). size pane is the context pane PublicPage stands beside a page a person works through (Apply, an Assessment): its identity, its facts, and for a running assessment the clock and the progress. |
+| Use | size index for the site's front door (the careers index) and size role for a vacancy (the team as a gold pill, the role's facts as chips, its actions and a note), each inside PublicPage layout full. l, m and pane stay for the pages not yet moved to the approved design. |
 | Avoid | The staff app; decoration under a page that has its own heading already; text more than a line. |
-| Phone | Edge to edge, the heading 24 px, the skyline shorter so the first screen still shows the page under it; the line under the heading is hidden (a page subtitle is desktop only). The pane becomes a compact band above the card (from 1040 px down), its `wide` part left off. |
-| Accessibility | The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline and the street grid are decorative (aria-hidden) and still under reduced motion. The panel takes the dark theme's tokens, so what sits on it (a clock, a progress bar) keeps AA on Deep Green whatever the page's theme. |
+| Phone | Edge to edge. index: still the first screen, 16 px at the sides, the search's button full width under its box, the figures closer; its lede is hidden (a page subtitle is desktop only). role: All Roles stays at the top left, the actions and the note are left off (the page's bar carries Apply). l and m: the heading 24 px, the skyline shorter, the line under the heading hidden. The pane becomes a compact band above the card (from 1040 px down), its `wide` part left off. |
+| Accessibility | The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline, the scrim and the street grid are decorative (aria-hidden) and still under reduced motion, when the parts no longer rise and the figures show their value at once. A counting figure is read as its final value. All Roles is a link. What sits on the panel takes the dark theme's tokens, so it keeps AA on Deep Green whatever the page's theme. |
 | Status | beta |
 | Exports | `SkylineHero` |
 | Import | `import { SkylineHero } from "@mycity/ui";` |
@@ -5556,7 +5732,11 @@ The public site's Deep Green panel: the page's heading over the drawn Lagos skyl
 | `facts` | `ReadonlyArray<{ icon: IconName; text: string }>` |  | The record's facts as chips on the panel, each a glyph and a few words (Lagos, Hybrid, Full Time). |
 | `children` | `ReactNode` |  | What sits under the heading: a search field; on the pane, the clock and the progress. |
 | `wide` | `ReactNode` |  | The pane only: what it adds where it stands beside the page (1041 px and wider), such as the steps; left off the compact band. |
-| `size` | `"l" \| "m" \| "pane"` |  | `l` (the default) for a page's front door, `m` for a record's page (a role), `pane` for the context pane beside a form (PublicPage `pane`). |
+| `size` | `"index" \| "role" \| "l" \| "m" \| "pane"` |  | `index`: the site's front door, the first screen. `role`: a vacancy's head. `l` (the default), `m` and `pane`: the earlier panels (a front door, a record's page, the context pane PublicPage stands beside a form). |
+| `accent` | `string` |  | index and role: the word of a string `title` drawn in the brand yellow (Work With Us, accent Us). |
+| `stats` | `ReadonlyArray<{ value: number; label: string }>` |  | index: the figures under the search, each counting up from 0 as the hero opens (Open Roles, Teams Hiring, Cities). |
+| `back` | `{ label: string; href: string }` |  | role: the link back at the top left (All Roles); it goes through PublicPage's navigate. |
+| `note` | `ReactNode` |  | role: a short line under the actions (12 people have applied); desktop only. |
 | `record` | `boolean` |  | The title names a record (a role, an assessment), so it is content, not interface copy: the copy gates skip it. |
 | `titleRef` | `Ref<HTMLHeadingElement>` |  | The heading, for a page that moves focus to it (an assessment's next question). It takes focus without a ring. |
 | `still` | `boolean` |  | Draws the skyline without motion even where motion is on (the gallery, a still picture). |
@@ -5566,6 +5746,8 @@ The public site's Deep Green panel: the page's heading over the drawn Lagos skyl
 <SkylineHero eyebrow="Careers at MyCityApp" title="Work With Us" text="Building the app that knows every Nigerian city." />
 <SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
 <SkylineHero size="pane" record eyebrow="Your Application" title="Partnerships Associate" text="This link is yours until 12/11/2026." />
+<SkylineHero size="index" eyebrow="Hiring in Lagos and Abuja" title="Work With Us" accent="Us" text="Building the app that knows every Nigerian city." stats={[{ value: 12, label: "Open Roles" }]}><SiteSearch tone="hero" ... /></SkylineHero>
+<SkylineHero size="role" record back={{ label: "All Roles", href: "/jobs" }} eyebrow="Marketing & Sales" title="Head, Sales & Revenue" facts={facts} note="12 people have applied">{actions}</SkylineHero>
 ```
 
 ### TopBar
@@ -6132,7 +6314,9 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `describedBy` | `lib/ids.ts` | A space-separated id list for aria-describedby, skipping the parts not shown; undefined when none are. |
 | `LAGOS_OFFSET` | `lib/lagos.ts` | Lagos keeps UTC+1 all year, so its hour comes straight from the clock. |
 | `lagosHour` | `lib/lagos.ts` | The hour in Lagos now, minutes as a fraction (0 to 24): what lights the drawn skyline. |
-| `useMinute` | `lib/lagos.ts` | The time now, read again each minute: the public site's sky and its footer clock move on with the city. |
+| `lagosClock` | `lib/lagos.ts` | The time now in Lagos as a 24 hour clock reads it (09:05), whatever the device's own zone. |
+| `lagosYear` | `lib/lagos.ts` | The year it is in Lagos now (the public site's © line). |
+| `useMinute` | `lib/lagos.ts` | The time now, read again as each minute turns: the public site's sky and its footer clock move on with the city. |
 | `LINK_ENDINGS` | `lib/links.ts` | What counts as a link in a message (docs/guides/community.md §6). |
 | `FoundLink` (type) | `lib/links.ts` | One link found in text: where it is, as written, and where it goes. |
 | `findLinks` | `lib/links.ts` | Every link in a text, in order. |

@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "../testing/axe";
+import userEvent from "@testing-library/user-event";
 import { SkylineHero } from "./SkylineHero";
+import { SiteNavigate } from "./site-link";
 
 describe("SkylineHero", () => {
   afterEach(() => vi.useRealTimers());
@@ -76,5 +78,56 @@ describe("SkylineHero", () => {
       </div>,
     );
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  describe("the approved design's heroes", () => {
+    it("index: the pill with its dot, the title with its accent word, the lede for desktop, the search and the counting figures", () => {
+      const { container } = render(
+        <SkylineHero size="index" eyebrow="Hiring in Lagos and Abuja" title="Work With Us" accent="Us" text="Building the app that knows every Nigerian city." stats={[{ value: 12, label: "Open Roles" }, { value: 7, label: "Teams Hiring" }]} still>
+          <span>Search Roles</span>
+        </SkylineHero>,
+      );
+      const section = container.querySelector("section")!;
+      expect(section).toHaveClass("ps-hero-index");
+      expect(section).not.toHaveAttribute("data-theme");
+      expect(section.querySelector(".ps-hero-in")).toHaveAttribute("data-theme", "dark");
+      expect(container.querySelector(".ps-dot")).toHaveAttribute("aria-hidden", "true");
+      const h1 = screen.getByRole("heading", { level: 1, name: "Work With Us" });
+      expect(h1).toHaveAttribute("data-ui", "page-title");
+      expect(h1.querySelector("em")).toHaveTextContent("Us");
+      expect(screen.getByText("Building the app that knows every Nigerian city.")).toHaveClass("phone:hidden");
+      expect(screen.getByText("Search Roles").parentElement).toHaveClass("ps-hero-slot");
+      expect(screen.getByText("Open Roles").tagName).toBe("DT");
+      expect(screen.getByText("12")).toHaveClass("sr-only");
+      expect(container.querySelector(".ps-hero-art")).toHaveAttribute("aria-hidden", "true");
+      expect(section).toHaveAttribute("data-still");
+    });
+
+    it("role: All Roles goes through the site's navigate, the team as a gold pill, the facts as chips, the actions and the note", async () => {
+      const navigate = vi.fn();
+      render(
+        <SiteNavigate.Provider value={navigate}>
+          <SkylineHero
+            size="role"
+            record
+            back={{ label: "All Roles", href: "/jobs" }}
+            eyebrow="Marketing & Sales"
+            title="Head, Sales & Revenue"
+            facts={[{ icon: "pin", text: "Lekki Phase 1, Lagos" }]}
+            note="12 people have applied"
+            still
+          >
+            <button type="button">Apply for This Role</button>
+          </SkylineHero>
+        </SiteNavigate.Provider>,
+      );
+      await userEvent.click(screen.getByRole("link", { name: "All Roles" }));
+      expect(navigate).toHaveBeenCalledWith("/jobs");
+      expect(screen.getByText("Marketing & Sales")).toHaveClass("ps-pill-gold");
+      expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute("data-copy", "content");
+      expect(screen.getByRole("list", { name: "About the role" })).toHaveClass("ps-chips");
+      expect(screen.getByRole("button", { name: "Apply for This Role" }).parentElement).toHaveClass("ps-hero-acts");
+      expect(screen.getByText("12 people have applied")).toHaveClass("ps-applied");
+    });
   });
 });

@@ -604,7 +604,9 @@ packages/ui/
   src/
     index.ts                  THE public barrel: everything a feature may import, and nothing else
     styles/                   tokens.css (the only file with a hex value), theme.css (the Tailwind 4
-                              theme and variants), base.css (element defaults, focus ring, reduced motion)
+                              theme and variants), base.css (element defaults, focus ring, reduced motion),
+                              public.css (the public site's header, footer, heroes, split layout and
+                              motion, drawn by its components only; imported by base.css)
     lib/                      history (the window's history: keyed steps, Back closing a phone's
                               overlays, F29), hold (press and hold), cn, format, media (useIsPhone,
                               useInstalled), preferences (theme, density, text size), fonts and
@@ -615,9 +617,11 @@ packages/ui/
     actions/                  Button, IconButton, BigButton, ActionGroup; press.ts, the busy state they,
                               Form and Modal share (F26)
     layout/                   Card, PageHeader, Grid, Stack, Inline, PhoneOnly, DesktopOnly, SplitPanes,
-                              ListDetail and DetailPane (a list and the record it opens, F31)
+                              ListDetail and DetailPane (a list and the record it opens, F31), StickyColumns
+                              (sticky.ts: the header height it sticks under), and the public site's
+                              PageIntro, Reveal and Stagger
     display/                  Pill, StatusPill, Avatar, Who, CountBadge, KeyValue, Banner, EmptyState,
-                              EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money
+                              EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money, CountUp
     navigation/               Tabs, SegmentedControl, Chips
     overlay/                  Modal, SidePanel, ConfirmDialog (useConfirm), Popover, Menu, Tooltip,
                               PhonePage (a full-screen page from the right on a phone)
@@ -639,7 +643,9 @@ packages/ui/
                               and pane.ts (their shapes)
     shell/                    the frame both apps' shells are built from (PR 2): Brand, ComingSoon,
                               NavCapsule and TrailMenu (F28, F29), PullIndicator and pull (F28),
-                              PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
+                              PublicPage (with its split sign-in layout; site-link.ts, its links through the
+                              site's router) and SkylineHero (Skyline.draw.tsx, the drawn Lagos skyline),
+                              DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
                               MoreSheet, FloatingButton, CommandPalette, NotificationCenter (the bell's
                               pane), NotificationRow, ShellNotice
     testing/                  test setup, render helpers, gallery types (not exported from "."), and
@@ -917,14 +923,23 @@ is kept per person (`useDensity`, `mc-density`).
 (.93, 1, 1.08, 1.16). A phone keeps its 16 px fields and 44 px targets.
 
 **Motion (F6).** `--ease-out`, `--ease-spring`, `--dur-fast` (120 ms) and `--dur` (200 ms); all
-durations are 0 under `prefers-reduced-motion`. The public site has one arrival (`animate-enter`
-with `enter-delay-1` to `enter-delay-8`, and `enter-stagger` for a list's items), drawn by
-SkylineHero, PublicPage and the careers list; base.css's reduced-motion rule stops it.
+durations are 0 under `prefers-reduced-motion`. The public site's motion is its components' own (§6),
+never a class a page applies: `SkylineHero` (size index: the parts rise in turn, the skyline's slow
+zoom and its windows; size role: the parts rise), `PageIntro` and `PublicPage` layout split (their
+parts rise as the page opens), `Reveal` (a block rising into view, again each time it returns, or tied
+to the scroll with `scroll`), `Stagger` (a row of blocks rising in turn) and `CountUp` (a hero's
+figures). The earlier arrival (`animate-enter`, `enter-delay-*`, `enter-stagger`) stays inside
+PublicPage's card layouts and SkylineHero's l, m and pane until the pages move. base.css's
+reduced-motion rule stops all of it.
 
 **The public ground** (05/11/2026). PublicPage lays every public page on `--canvas`, a faint City
 Green tint (`public-ground`); inside it (`data-canvas`) `muted-foreground` and `eyebrow` read one
 step deeper (`--canvas-muted-foreground`, `--canvas-eyebrow`) so text keeps AA on the tint; the
-token test holds every pair. Two columns of unequal height on desktop are `StickyColumns`: both
+token test holds every pair. Since the approved design (06/11/2026) the canvas also takes the site's
+card and hairline (`--canvas-card`, `--canvas-line`), 16 px text with 48 px controls, its tinted
+scrollbar, and the site's inks (`canvas-soft`, the `on-deep-*` hero and footer inks), all in
+`tokens.css`; the site's own look is `styles/public.css`, imported by base.css and drawn only by the
+components. A page's width is `public-wrap` (1200 px, 32 px sides, 16 px on a phone). Two columns of unequal height on desktop are `StickyColumns`: both
 stick, the shorter waits, a column taller than the screen scrolls until its foot is in view.
 
 ### 9.4 Shared components

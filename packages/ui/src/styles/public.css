@@ -1,0 +1,461 @@
+/*
+ * The public site (go.mycityapp.io), drawn as the approved design: PublicPage's header, menu and
+ * footer and its split (sign-in) layout, SkylineHero's index and role heroes and the skyline they draw,
+ * PageIntro, SiteSearch, Reveal and Stagger, and the rise of a page's parts as it opens. These classes
+ * are the components' own: a feature uses the components, never the classes (FRONTEND_GUIDE §6). base.css imports it, so both apps'
+ * stylesheets have it with nothing added. Colours are tokens only (tokens.css). The design's widths
+ * are the shells' own: 1180 px (the menu takes the nav), 1040 px (the sign-in layout stacks) and
+ * 760 px (the phone shell). Every motion here stops under reduced motion (base.css).
+ */
+
+/* A page's width on the public site: 1200 px, 32 px at each side, 16 px on a phone. */
+@utility public-wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 32px;
+  @media (max-width: 760px) {
+    padding-inline: 16px;
+  }
+}
+
+/* Under a yellow lg Button on the pointer: its own glow. */
+@utility shadow-primary-glow {
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+@layer components {
+  /* ---- The site ---- */
+  .ps-site {
+    min-height: 100vh;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--foreground);
+  }
+  .ps-site h1, .ps-site h2, .ps-site h3 { text-wrap: balance; }
+  /* A part of a hero, a page's intro or the split aside rising as the page opens, held back in order.
+     Only the components draw these (FRONTEND_GUIDE §6: motion comes with the components). */
+  .ps-rise { animation: hero-rise .9s cubic-bezier(.2, .7, .2, 1) both; }
+  .ps-rise-1 { animation-delay: .05s; }
+  .ps-rise-2 { animation-delay: .18s; }
+  .ps-rise-3 { animation-delay: .32s; }
+  .ps-rise-4 { animation-delay: .46s; }
+  .ps-rise-5 { animation-delay: .6s; }
+
+  /* ---- Header: one glass bar, the brand, the nav on its bottom edge, the theme and the menu ---- */
+  .ps-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--canvas-glass);
+    -webkit-backdrop-filter: saturate(160%) blur(16px);
+    backdrop-filter: saturate(160%) blur(16px);
+    border-bottom: 1px solid var(--canvas-line);
+  }
+  .ps-header-in { display: flex; align-items: center; gap: 24px; min-height: 64px; }
+  .ps-brand { display: flex; align-items: center; gap: 12px; min-height: 44px; margin-right: auto; color: inherit; text-decoration: none; }
+  .ps-mark { width: 36px; height: 36px; border-radius: 11px; background: var(--deep); display: grid; place-items: center; flex: none; }
+  .ps-mark-secondary { background: var(--secondary); }
+  .ps-brand-name { display: flex; flex-direction: column; line-height: 1.1; }
+  .ps-brand-name b { font-size: 18px; letter-spacing: -.02em; font-weight: 700; color: var(--foreground); }
+  .ps-brand-name span { font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
+  .ps-nav { display: flex; align-items: stretch; gap: 6px; align-self: stretch; }
+  .ps-nav a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--canvas-soft);
+    text-decoration: none;
+    transition: color .25s;
+  }
+  .ps-nav a::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -1px;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: var(--primary);
+    transform: scaleX(0);
+    transition: transform .3s ease;
+  }
+  .ps-nav a:hover, .ps-nav a[aria-current="page"] { color: var(--foreground); }
+  .ps-nav a[aria-current="page"] { font-weight: 700; }
+  .ps-nav a:hover::after, .ps-nav a[aria-current="page"]::after { transform: scaleX(1); }
+  .ps-drop { display: flex; flex-direction: column; padding: 8px 24px 24px; border-top: 1px solid var(--canvas-line); }
+  .ps-drop a {
+    display: flex;
+    align-items: center;
+    min-height: 52px;
+    font-size: 18px;
+    font-weight: 500;
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px solid var(--canvas-line);
+  }
+  .ps-drop a[aria-current="page"] { font-weight: 700; }
+  /* The menu button shows below 1181 px (xl:hidden on it). */
+  @media (max-width: 1180px) {
+    .ps-nav { display: none; }
+  }
+  @media (min-width: 1181px) {
+    .ps-drop { display: none; }
+  }
+  @media (max-width: 760px) {
+    .ps-header-in { min-height: 60px; gap: 12px; }
+    .ps-header .ps-brand-name span { display: none; }
+    .ps-drop { padding: 8px 16px 24px; }
+  }
+
+  /* ---- Footer: Deep Green under the skyline's edge ---- */
+  .ps-foot { position: relative; margin-top: 120px; background: var(--deep); color: var(--on-deep-base); }
+  .ps-foot-edge { position: absolute; left: 0; right: 0; top: -70px; display: block; width: 100%; height: 72px; fill: var(--deep); }
+  .ps-foot-in { padding-top: 64px; padding-bottom: 28px; }
+  .ps-foot-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 48px; }
+  .ps-foot-nav { grid-column: span 3; display: grid; grid-template-columns: subgrid; row-gap: 48px; }
+  .ps-foot .ps-brand { margin-right: 0; }
+  .ps-foot .ps-brand-name b { color: var(--on-deep); }
+  .ps-foot-tag { margin: 16px 0 22px; max-width: 30ch; font-size: 16px; color: var(--on-deep-link); }
+  .ps-clock {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--on-deep) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--on-deep) 12%, transparent);
+  }
+  .ps-clock > svg { color: var(--primary); }
+  .ps-clock span { font-size: 14px; }
+  .ps-clock time { font-size: 19px; font-weight: 700; letter-spacing: -.02em; color: var(--on-deep); font-variant-numeric: tabular-nums; }
+  .ps-foot h2 { margin: 0 0 16px; font-size: 15px; font-weight: 600; letter-spacing: normal; color: var(--on-deep); }
+  .ps-foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .ps-foot li a { font-size: 15px; color: var(--on-deep-link); text-decoration: none; transition: color .2s; }
+  .ps-foot li a:hover { color: var(--primary); }
+  .ps-foot-base {
+    margin-top: 52px;
+    padding-top: 20px;
+    border-top: 1px solid color-mix(in srgb, var(--on-deep) 12%, transparent);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 14px;
+  }
+  .ps-foot-base b { font-weight: 600; color: var(--on-deep); }
+  .ps-top {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--on-deep) 20%, transparent);
+    background: transparent;
+    color: var(--on-deep-link);
+    transition: background .2s, color .2s, transform .2s;
+  }
+  .ps-top:hover { background: var(--primary); color: var(--primary-foreground); transform: translateY(-3px); }
+  .ps-foot-more { padding-bottom: 24px; }
+  @media (max-width: 1040px) {
+    .ps-foot-grid { grid-template-columns: 1fr 1fr; }
+    .ps-foot-grid > :first-child, .ps-foot-nav { grid-column: 1 / -1; }
+  }
+  @media (max-width: 760px) {
+    .ps-foot-grid { grid-template-columns: 1fr; }
+    .ps-foot ul { gap: 0; }
+    .ps-foot li a { display: inline-flex; align-items: center; min-height: 44px; }
+    .ps-foot-clear { padding-bottom: 88px; }
+  }
+
+  /* ---- Hero: the drawn skyline behind, a scrim over it, the page's head on top ---- */
+  .ps-hero { position: relative; overflow: hidden; isolation: isolate; background: var(--deep); color: var(--on-deep-hero); }
+  .ps-hero-art { position: absolute; inset: -20px; z-index: -2; transform: scale(1.03); }
+  .ps-hero-art svg { display: block; width: 100%; height: 100%; }
+  .ps-hero-scrim { position: absolute; inset: 0; z-index: -1; }
+  .ps-hero-in {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 32px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .ps-hero h1 {
+    margin: 22px 0 0;
+    font-size: clamp(44px, 6.4vw, 92px);
+    line-height: .95;
+    letter-spacing: -.045em;
+    font-weight: 800;
+    color: var(--on-deep);
+    text-shadow: 0 4px 30px rgb(0 0 0 / .25);
+  }
+  .ps-hero h1 em { font-style: normal; color: var(--primary); }
+  .ps-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px 8px 12px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--deep) 45%, transparent);
+    border: 1px solid color-mix(in srgb, var(--on-deep) 18%, transparent);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--on-deep-lede);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  .ps-pill-gold {
+    padding: 8px 16px;
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+    color: var(--on-deep-gold);
+    font-weight: 600;
+  }
+  .ps-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); animation: ps-ping 2.4s ease-out infinite; }
+  .ps-lede { margin: 18px 0 0; max-width: 40ch; font-size: clamp(17px, 1.5vw, 20px); line-height: 1.5; color: var(--on-deep-lede); text-wrap: balance; }
+  .ps-hero-slot { margin-top: 32px; width: min(620px, 100%); display: flex; justify-content: center; }
+  .ps-stats { margin: 28px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 44px; }
+  /* The label comes first for a screen reader (dt, dd) and second on the screen. */
+  .ps-stat { display: flex; flex-direction: column-reverse; align-items: center; }
+  .ps-stat dd { margin: 0; font-size: 32px; line-height: 1; letter-spacing: -.03em; font-weight: 700; color: var(--on-deep); font-variant-numeric: tabular-nums; }
+  .ps-stat dt { margin-top: 6px; font-size: 14px; line-height: 1.6; color: var(--on-deep-label); }
+
+  /* The index: the first screen under the header, the skyline blurred and slowly breathing. */
+  .ps-hero-index { min-height: calc(100svh - 64px); display: flex; align-items: center; justify-content: center; }
+  .ps-hero-index .ps-hero-in { width: 100%; }
+  .ps-hero-index .ps-hero-art { filter: blur(5px) saturate(1.15); will-change: transform; animation: ps-breathe 22s ease-in-out infinite alternate; }
+  .ps-hero-index .ps-hero-scrim {
+    background:
+      radial-gradient(60% 70% at 50% 45%, color-mix(in srgb, var(--deep) 62%, transparent), color-mix(in srgb, var(--deep) 30%, transparent) 80%),
+      linear-gradient(180deg, color-mix(in srgb, var(--deep) 25%, transparent), color-mix(in srgb, var(--deep) 55%, transparent));
+  }
+  .ps-hero[data-still] .ps-hero-art { animation: none; }
+
+  /* A role: All Roles at the left, the role centred, the foot fading into the page. */
+  .ps-hero-role .ps-hero-art { filter: blur(2.5px) saturate(1.2); }
+  .ps-hero-role::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    height: 140px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--canvas));
+  }
+  .ps-hero-role .ps-hero-scrim {
+    background:
+      radial-gradient(55% 65% at 50% 52%, color-mix(in srgb, var(--deep) 72%, transparent), color-mix(in srgb, var(--deep) 22%, transparent) 85%),
+      linear-gradient(180deg, color-mix(in srgb, var(--deep) 45%, transparent), color-mix(in srgb, var(--deep) 15%, transparent) 40%, color-mix(in srgb, var(--deep) 60%, transparent));
+  }
+  .ps-role-top { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 18px 32px 0; }
+  .ps-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 16px 0 12px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--on-deep-back);
+    text-decoration: none;
+    background: color-mix(in srgb, var(--deep) 45%, transparent);
+    border: 1px solid color-mix(in srgb, var(--on-deep) 16%, transparent);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    transition: background .2s;
+  }
+  .ps-back:hover { background: color-mix(in srgb, var(--deep) 70%, transparent); color: var(--on-deep); }
+  .ps-hero-role .ps-hero-in { padding: 8px 32px 44px; }
+  .ps-hero-role h1 { margin-top: 14px; max-width: 18ch; font-size: clamp(36px, 1rem + 3.4vw, 60px); }
+  .ps-chips { margin: 20px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .ps-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--deep) 50%, transparent);
+    border: 1px solid color-mix(in srgb, var(--on-deep) 16%, transparent);
+    font-size: 14.5px;
+    color: var(--on-deep-chip);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  .ps-chip > svg { width: 18px; height: 18px; color: var(--primary); }
+  .ps-hero-acts { margin-top: 22px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+  .ps-applied { margin-top: 14px; font-size: 14px; color: var(--on-deep-note); }
+  @media (max-width: 760px) {
+    .ps-hero-in { padding: 40px 16px 48px; }
+    .ps-role-top { padding: 16px 16px 0; }
+    .ps-hero-role .ps-hero-in { padding: 24px 16px 56px; }
+    .ps-hero-acts, .ps-applied { display: none; }
+    .ps-stats { gap: 28px; }
+    .ps-stat dd { font-size: 28px; }
+  }
+
+  /* ---- The drawn skyline (Skyline.draw.tsx): each part in its token ---- */
+  .ps-sky-top { stop-color: var(--sky-top); }
+  .ps-sky-mid { stop-color: var(--sky-mid); }
+  .ps-sky-low { stop-color: var(--sky-low); }
+  .ps-sky-sun { stop-color: var(--primary); }
+  .ps-sky-far { fill: var(--sky-far); }
+  .ps-sky-near { fill: var(--sky-near); }
+  .ps-sky-gold { fill: var(--primary); }
+  .ps-sky-cool { fill: var(--sky-window-cool); }
+  .ps-sky-ground { fill: var(--deep); }
+  .ps-sky-cable { stroke: var(--sky-cable); }
+  .ps-sky-road { stroke: var(--sky-road); }
+  .ps-sky-palm { stroke: var(--sky-palm); }
+  .ps-sky-win { animation: ps-twinkle 6s ease-in-out infinite alternate; }
+  [data-still] .ps-sky-win { animation: none; }
+
+  /* ---- An inner page's opening: eyebrow, a large headline with one accent word, a lede, a hairline ---- */
+  .ps-intro-in { padding-top: 48px; padding-bottom: 32px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 48px; align-items: end; }
+  .ps-eyebrow { margin: 0 0 16px; font-size: 12px; font-weight: 600; letter-spacing: .3em; text-transform: uppercase; color: var(--muted-foreground); }
+  .ps-intro h1 { margin: 0; max-width: 15ch; font-size: clamp(40px, 1.5rem + 3.2vw, 68px); line-height: 1.02; letter-spacing: -.04em; font-weight: 800; }
+  .ps-accent { font-style: normal; color: var(--accent-foreground); }
+  .ps-intro-lede { margin: 18px 0 0; max-width: 44ch; font-size: 18px; line-height: 1.6; color: var(--canvas-soft); }
+  .ps-rule hr { margin: 0; border: 0; border-top: 1px solid var(--canvas-line); }
+  @media (max-width: 1040px) {
+    .ps-intro-in { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .ps-intro-in { padding-top: 56px; padding-bottom: 36px; gap: 28px; }
+    .ps-eyebrow { letter-spacing: .24em; }
+  }
+
+  /* ---- Search: the hero's white box with its button, and the intro's box beside the headline ---- */
+  .ps-search { display: flex; align-items: center; border-radius: 999px; }
+  .ps-search:focus-within { outline: 2px solid var(--ring); outline-offset: 3px; }
+  .ps-search > svg { flex: none; }
+  .ps-search input { flex: 1; min-width: 0; min-height: 44px; border: 0; outline: 0; background: transparent; font: 500 16px var(--face-body); }
+  .ps-search-hero { width: min(620px, 100%); gap: 8px; padding: 8px 8px 8px 22px; background: var(--paper); box-shadow: 0 24px 60px rgb(0 0 0 / .35); }
+  .ps-search-hero > svg { color: var(--search-muted); }
+  .ps-search-hero input { padding: 10px 4px; color: var(--search-ink); }
+  .ps-search-hero input::placeholder { color: var(--search-muted); }
+  .ps-search-intro { width: min(440px, 100%); gap: 10px; padding: 6px 6px 6px 18px; background: var(--card); border: 1.5px solid var(--canvas-line-strong); box-shadow: var(--canvas-shadow); }
+  .ps-search-intro > svg { color: var(--muted-foreground); }
+  .ps-search-intro input { padding: 10px 0; color: var(--foreground); }
+  @media (max-width: 760px) {
+    .ps-search-hero { flex-wrap: wrap; border-radius: 24px; padding: 12px; }
+    .ps-search-hero > [data-ui="button"] { width: 100%; }
+  }
+
+  /* ---- PublicPage layout split, the sign-in layout: a sticky aside of bands beside the work, which waits centred ---- */
+  .ps-auth {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px;
+    display: grid;
+    grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+    gap: 72px;
+    align-items: start;
+  }
+  .ps-auth-aside { position: sticky; top: 64px; height: calc(100svh - 64px); color: var(--canvas-soft); isolation: isolate; }
+  .ps-auth-aside::before {
+    content: "";
+    position: absolute;
+    inset: 0 -32px;
+    z-index: -2;
+    background: radial-gradient(90% 60% at 20% 30%, var(--canvas-glow), transparent 70%);
+  }
+  .ps-auth-art {
+    position: absolute;
+    left: -32px;
+    right: -32px;
+    bottom: 0;
+    z-index: -1;
+    height: 52%;
+    opacity: var(--canvas-art);
+    filter: blur(1.5px) saturate(1.1);
+    -webkit-mask-image: linear-gradient(to top, black 35%, transparent);
+    mask-image: linear-gradient(to top, black 35%, transparent);
+    pointer-events: none;
+  }
+  .ps-auth-art svg { display: block; width: 100%; height: 100%; }
+  .ps-auth-inner { position: relative; height: 100%; display: flex; flex-direction: column; padding: 8px 0 24px; }
+  .ps-auth-band { padding: 24px 0; display: flex; flex-direction: column; justify-content: center; }
+  .ps-auth-main, .ps-auth-foot { border-top: 1px solid var(--canvas-line); }
+  .ps-auth-main { flex: 1; min-height: 0; }
+  .ps-auth-foot { padding-bottom: 0; }
+  .ps-auth-id b { display: block; font-size: 19px; letter-spacing: -.02em; color: var(--foreground); }
+  .ps-auth-id span { font-size: 14px; color: var(--muted-foreground); }
+  .ps-auth-body > * { max-width: 44ch; }
+  /* The h1 rides small over the display line, in the eyebrow's spaced capitals. */
+  .ps-auth-title { line-height: 1.5; }
+  .ps-auth-h { margin: 0 0 14px; font-size: clamp(28px, 2.6vw, 38px); line-height: 1.1; letter-spacing: -.03em; font-weight: 700; color: var(--foreground); text-wrap: balance; }
+  .ps-auth-h-l { font-size: clamp(32px, 3vw, 44px); line-height: 1.05; letter-spacing: -.035em; font-weight: 800; }
+  .ps-auth-text { margin: 0; font-size: 17px; line-height: 1.7; color: var(--canvas-soft); }
+  .ps-auth-extra { margin-top: 24px; }
+  .ps-auth-steps { margin-top: 28px; }
+  .ps-auth-credit { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; line-height: 1.6; color: var(--muted-foreground); }
+  .ps-auth-credit b { font-weight: 600; color: var(--foreground); }
+  .ps-auth-work { position: sticky; top: 64px; min-width: 0; min-height: calc(100svh - 64px); display: flex; flex-direction: column; justify-content: center; padding: 32px 0; }
+  @media (max-height: 720px) {
+    .ps-auth-band { padding: 16px 0; }
+    .ps-auth-h:not(.ps-auth-h-l) { font-size: 28px; }
+  }
+  @media (max-width: 1040px) {
+    .ps-auth { grid-template-columns: 1fr; gap: 0; padding: 0 16px; }
+    .ps-auth-aside { position: relative; top: auto; height: auto; }
+    .ps-auth-art, .ps-auth-foot, .ps-auth-steps { display: none; }
+    .ps-auth-inner { padding: 20px 0 0; }
+    .ps-auth-band { padding: 16px 0; }
+    .ps-auth-work { position: static; min-height: 0; padding: 8px 0 40px; }
+  }
+
+  /* ---- Reveal: a block rising into view, again each time it comes back ---- */
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+      opacity .75s ease var(--rd, 0s),
+      transform .75s cubic-bezier(.2, .7, .2, 1) var(--rd, 0s),
+      box-shadow .25s ease,
+      border-color .25s ease;
+  }
+  [data-reveal="left"] { transform: translateX(-32px); }
+  [data-reveal="right"] { transform: translateX(32px); }
+  /* A phone has no room at its sides: a block from either side rises from below there, so the page never scrolls sideways. */
+  @media (max-width: 760px) {
+    [data-reveal="left"], [data-reveal="right"] { transform: translateY(24px); }
+  }
+  [data-reveal][data-visible] { opacity: 1; transform: none; }
+  [data-reveal][data-visible]:hover { transition-delay: 0s; }
+  [data-reveal][data-lift][data-visible]:hover { transform: translateY(-4px); }
+  [data-reveal][data-lift="shadow"][data-visible]:hover { box-shadow: var(--canvas-shadow); }
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] { opacity: 1 !important; transform: none !important; }
+  }
+  /* Reveal scroll: the rise follows the scroll, fully in a third of the way in, where the browser can. */
+  @supports (animation-timeline: view()) {
+    [data-reveal-scroll] { animation: ps-fadeup linear both; animation-timeline: view(); animation-range: entry 0% entry 35%; }
+  }
+}
+@keyframes ps-fadeup { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
+
+@keyframes ps-breathe { from { transform: scale(1.03); } to { transform: scale(1.14); } }
+@keyframes ps-ping { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent); } 80%, 100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--primary) 0%, transparent); } }
+@keyframes ps-twinkle { from { opacity: .35; } to { opacity: .85; } }
+
+/* The page's own scrollbar on the public site: the site's lines on its ground (the thin bar is base.css's). */
+:root:has([data-canvas]) {
+  --sb: var(--canvas-line-strong);
+  --sb-hover: var(--canvas-line-deep);
+}
+:root:has([data-canvas])::-webkit-scrollbar-track { background: var(--canvas); }
+/* Firefox draws only thin; a standard scrollbar-color elsewhere would turn off the 6 px bar above. */
+@supports (-moz-appearance: none) {
+  :root:has([data-canvas]) { scrollbar-color: var(--canvas-line-strong) var(--canvas); }
+}

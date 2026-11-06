@@ -10,8 +10,9 @@
  * @example <StickyColumns layout="pane">{pane}{form}</StickyColumns>
  * @example <StickyColumns layout="main-side" phoneFirst={1}>{article}{roleCard}</StickyColumns>
  */
-import { Children, useLayoutEffect, useRef, type ReactNode } from "react";
+import { Children, useContext, useLayoutEffect, useRef, type ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { StickyTop } from "./sticky";
 
 export interface StickyColumnsProps {
   /** The columns, left to right: each child is one column. */
@@ -20,7 +21,7 @@ export interface StickyColumnsProps {
   layout?: "pane" | "main-side";
   /** The column, counted from 0, that comes first where the columns stack (a vacancy's Role card above its text on a phone). */
   phoneFirst?: number;
-  /** The space kept above a column stuck at the top, and below one waiting at its foot, in px; 24 unless set. */
+  /** The space kept above a column stuck at the top (under PublicPage's header, which it reads), and below one waiting at its foot, in px; 24 unless set. */
   gap?: number;
   /** Layout classes only (spacing). */
   className?: string;
@@ -35,16 +36,17 @@ const COLUMN = { pane: "min-w-0 lg:sticky-col", "main-side": "min-w-0 md:sticky-
 const FIRST = { pane: "max-lg:order-first", "main-side": "max-md:order-first" } as const;
 
 /**
- * Where a column sticks: at the top, `gap` below the screen's edge, when it fits the screen; otherwise
- * where its foot rests `gap` above the screen's bottom (a negative top), so it scrolls until its foot is
- * in view and waits there. Written to the column as --stick-top.
+ * Where a column sticks: at the top, `gap` below the screen's edge (or below a header that sticks, `head`
+ * px tall), when it fits the screen; otherwise where its foot rests `gap` above the screen's bottom (a
+ * negative top), so it scrolls until its foot is in view and waits there. Written to the column as --stick-top.
  */
-function stickTop(columnHeight: number, viewportHeight: number, gap: number): number {
-  return columnHeight <= viewportHeight - 2 * gap ? gap : viewportHeight - columnHeight - gap;
+function stickTop(columnHeight: number, viewportHeight: number, gap: number, head: number): number {
+  return columnHeight <= viewportHeight - head - 2 * gap ? head + gap : viewportHeight - columnHeight - gap;
 }
 
 export function StickyColumns({ children, layout = "pane", phoneFirst, gap = 24, className }: StickyColumnsProps) {
   const root = useRef<HTMLDivElement>(null);
+  const head = useContext(StickyTop);
   const columns = Children.toArray(children);
 
   useLayoutEffect(() => {
@@ -53,7 +55,7 @@ export function StickyColumns({ children, layout = "pane", phoneFirst, gap = 24,
     const cols = Array.from(el.children) as HTMLElement[];
     const place = () => {
       const vh = window.innerHeight;
-      for (const c of cols) c.style.setProperty("--stick-top", `${stickTop(c.offsetHeight, vh, gap)}px`);
+      for (const c of cols) c.style.setProperty("--stick-top", `${stickTop(c.offsetHeight, vh, gap, head)}px`);
     };
     place();
     window.addEventListener("resize", place);
@@ -63,7 +65,7 @@ export function StickyColumns({ children, layout = "pane", phoneFirst, gap = 24,
       window.removeEventListener("resize", place);
       ro?.disconnect();
     };
-  }, [gap, columns.length]);
+  }, [gap, head, columns.length]);
 
   return (
     <div ref={root} data-sticky-columns={layout} className={cn(GRID[layout], className)}>

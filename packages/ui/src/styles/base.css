@@ -9,6 +9,8 @@
  * our tokens. The controls themselves are packages/ui components.
  */
 @import "@fontsource-variable/geist";
+/* The public site's header, footer, heroes, sign-in layout and motion. */
+@import "./public.css";
 
 @layer base {
   body {
@@ -327,7 +329,7 @@
    (tokens.css), so no point of the gradient brings text under it. */
 @utility public-ground {
   background:
-    radial-gradient(120% 70% at 50% -12%, var(--canvas-glow), transparent 72%),
+    radial-gradient(1200px 600px at 50% -200px, var(--canvas-glow), transparent 70%),
     var(--canvas);
 }
 /* A Deep Green panel's street grid: hairlines of the light ink, fading out toward the skyline. */

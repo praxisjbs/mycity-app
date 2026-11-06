@@ -13,6 +13,8 @@
 import type { LucideIcon } from "lucide-react";
 import {
   ALargeSmall,
+  ArrowLeft,
+  ArrowUp,
   ArrowUpDown,
   Bell,
   BellOff,
@@ -229,6 +231,9 @@ export const ICONS = {
   /* Refresh in place, and the trail of places a person has been (F28, F29); `refresh` stays the full reload. */
   rotate: RotateCw,
   history: History,
+  /* The public site: its footer's Back to Top, a role hero's All Roles. */
+  arrowup: ArrowUp,
+  arrowleft: ArrowLeft,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
