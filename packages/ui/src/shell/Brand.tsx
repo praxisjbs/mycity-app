@@ -10,6 +10,7 @@
  * @example <Brand />
  * @example <Brand name="MyCityApp" size="m" />
  * @example <Brand tone="on-dark" size="xl" />
+ * @example <Brand name="MyCityApp" sub="Careers" tile="deep" />
  */
 import { cn } from "../lib/cn";
 
@@ -22,6 +23,10 @@ export interface BrandProps {
   tone?: "auto" | "on-dark";
   /** The accessible name when the pin stands alone. */
   label?: string;
+  /** The public site's mark: the pin in a rounded tile, Deep Green (`deep`, the header) or City Green (`secondary`, the footer), with the name in bold beside it. */
+  tile?: "deep" | "secondary";
+  /** With `tile`, a small line under the name (Careers); hidden in a phone's header. */
+  sub?: string;
   /** Layout classes only (spacing). */
   className?: string;
 }
@@ -32,7 +37,23 @@ const TEXT = { s: "text-base", m: "text-md", l: "text-xl", xl: "text-3xl" } as c
 /** The pin from the logo: the drop with its hole cut out (even-odd), on a 24 px grid. */
 const PIN = "M12 1.6c-4.2 0-7.6 3.4-7.6 7.6 0 5.7 7.6 13.2 7.6 13.2s7.6-7.5 7.6-13.2c0-4.2-3.4-7.6-7.6-7.6zM12 5.3a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 1 0 0-4.6z";
 
-export function Brand({ size = "m", name, tone = "auto", label = "MyCity App", className }: BrandProps) {
+export function Brand({ size = "m", name, tone = "auto", label = "MyCity App", tile, sub, className }: BrandProps) {
+  if (tile)
+    return (
+      <span className={cn("inline-flex items-center gap-3", className)}>
+        <span className={cn("ps-mark", tile === "secondary" && "ps-mark-secondary")}>
+          <svg viewBox="0 0 24 24" className="size-5.5 flex-none fill-primary" {...(name ? { "aria-hidden": true } : { role: "img", "aria-label": label })} focusable="false">
+            <path d={PIN} fillRule="evenodd" />
+          </svg>
+        </span>
+        {name && (
+          <span className="ps-brand-name">
+            <b>{name}</b>
+            {sub && <span>{sub}</span>}
+          </span>
+        )}
+      </span>
+    );
   const fill = tone === "on-dark" ? "fill-primary" : "fill-secondary dark:fill-primary";
   const pin = (
     <svg

@@ -45,4 +45,5 @@ export * from "./PlacesField";
 export * from "./RadioCards";
 export * from "./RatingField";
 export * from "./SecretField";
+export * from "./SiteSearch";
 export * from "./StepBar";

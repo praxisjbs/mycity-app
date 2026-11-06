@@ -24,9 +24,11 @@ export interface FormProps {
   className?: string;
   /** Its id, so a button outside it (a modal footer) can submit it with form={id}. */
   id?: string;
+  /** `search` for a form that is a search box (SiteSearch), so it is a search landmark. */
+  role?: "search";
 }
 
-export function Form({ onSubmit, children, className, id }: FormProps) {
+export function Form({ onSubmit, children, className, id, role }: FormProps) {
   const group = usePressGroup();
   const working = useRef(false);
   const submit = (e: FormEvent<HTMLFormElement>) => {
@@ -46,7 +48,7 @@ export function Form({ onSubmit, children, className, id }: FormProps) {
   };
   return (
     <PressGroupContext.Provider value={group}>
-      <form id={id} className={className} noValidate onSubmit={submit}>
+      <form id={id} role={role} className={className} noValidate onSubmit={submit}>
         {children}
       </form>
     </PressGroupContext.Provider>

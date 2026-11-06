@@ -1,132 +1,403 @@
 /**
  * @component PublicPage
  * @group Shell
- * @summary The public site's page on its faint City Green ground: the mark and the theme switch on top; the page on one card (at most 704 px), beside a Deep Green context pane, or as open sections up to 1120 px; a Deep Green footer under a Lagos skyline edge.
- * @use Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). layout open for a page a stranger browses (Careers, a Vacancy), with a SkylineHero at its head; the card for a page a person fills in or reads once, with a `pane` (SkylineHero size pane) carrying its identity where it has one.
- * @avoid The staff app (it has its own shells); a second card inside the card; a page of explanation (a PageMessage says one thing).
- * @phone The card runs edge to edge with no side border; with a pane, the pane is a compact band at the top and the card rises over its foot as a sheet; open, the page's first block (its hero) runs edge to edge and its sections keep their own 16 px margin; the header keeps a 16 px margin; the theme switch and the footer's links are 44 px targets; a `bar` is fixed at the foot and the page keeps room for it.
- * @a11y A banner, a main and a contentinfo landmark; the theme switch is a named button; the pane is inside the main, before the card, so the h1 it carries comes first. The skyline edge is decorative. PageMessage's title is a heading (h2) and its icon is decorative.
+ * @summary The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a Deep Green footer under a Lagos skyline edge with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card.
+ * @use Every page of go.mycityapp.io. `full` for a page that lays out its own blocks edge to edge (the index's SkylineHero size index, a vacancy's SkylineHero size role, the careers list's PageIntro). `split` for the four pages a person is sent to and works through (Apply, Assessment, Sign Offer, Verify a Document): pass `name` and `line` (the identity band), `title` (the h1, at most 3 words, drawn small and spaced: Apply, Assessment, Offer of Employment, Verify a Document), `text` (the display line in the band's large type, one sentence of at most 20 words), `paragraph` (a short line under it), `steps` or `aside` (the countdown, a reference's form), and the card as children; it leaves the site footer off. card and open are the earlier layouts, kept while the pages move. PageMessage is a whole-page outcome inside the card (sent, expired, not found).
+ * @avoid The staff app (it has its own shells); a second header or bar under this one; a logo in the split aside (the header carries the brand); a second card inside the card; a page of explanation (a PageMessage says one thing); a sentence as the split title (it is `text`, the display line).
+ * @phone The header is 60 px with the mark alone (no sub line), the theme switch and the menu, which drops the nav's links down as 52 px rows; the footer's columns stack, each link a 44 px target; a `bar` is fixed at the foot and the page keeps room for it. split: from 1040 px down the aside stacks above the card and stops sticking, and its skyline, its steps and its credit are left off, so the card is close to the top.
+ * @a11y A banner, a main and a contentinfo landmark; the nav is named Main and the current page carries aria-current; the menu button says whether it is expanded and Esc closes it; the theme switch and Back to Top are named buttons; the footer's columns sit in a nav named Site, each under a heading. split: the aside is a complementary landmark named by its h1 and comes before the card; the steps are a list named Steps with the one in hand marked. The skyline edge and the aside's skyline are decorative, and nothing rises under reduced motion. PageMessage's title is a heading (h2) and its icon is decorative.
  * @status stable
  * @exports PageMessage
- * @example <PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>} links={<a href="/verify">Verify a Document</a>}>...</PublicPage>
- * @example <PublicPage pane={<SkylineHero size="pane" title="Partnerships Associate" record />}>...</PublicPage>
+ * @example <PublicPage layout="full" navigate={navigate} nav={[{ label: "Careers", href: "/jobs", current: true }, { label: "Verify Document", href: "/verify" }]}>...</PublicPage>
+ * @example <PublicPage layout="split" nav={nav} navigate={navigate} name="Head, Sales & Revenue" line="Marketing & Sales, Lekki Phase 1, Lagos" title="Apply" text="Your application, in three steps." paragraph="This link works until 08/11/2026." steps={{ items: ["About You", "CV and Questions", "Why This Role"], at: 0 }}>{card}</PublicPage>
+ * @example <PublicPage layout="split" nav={nav} name="Document Check" line="Offer letters, certificates and agreements" title="Verify a Document" text="Check any document we issued." textSize="l" paragraph="Enter the reference printed on the document." aside={referenceForm}>{result}</PublicPage>
  * @example <PageMessage icon="ok" tone="ok" title="Application Sent">We read every application.</PageMessage>
  */
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useId, useState, type ReactNode, type Ref } from "react";
 import { cn } from "../lib/cn";
-import { formatTime } from "../lib/format";
-import { useMinute } from "../lib/lagos";
+import { lagosClock, lagosYear, useMinute } from "../lib/lagos";
 import { useTheme } from "../lib/preferences";
 import { Icon, type IconName } from "../icons/Icon";
 import { IconButton } from "../actions/Button";
 import { StickyColumns } from "../layout/StickyColumns";
+import { StickyTop } from "../layout/sticky";
+import { useMediaQuery } from "../lib/media";
+import { StepBar } from "../form/StepBar";
 import { Brand } from "./Brand";
+import { Skyline } from "./Skyline.draw";
+import { SiteNavigate, useSiteLink } from "./site-link";
+
+/** One link in the header's nav and its menu. */
+export interface PublicNavItem {
+  label: string;
+  href: string;
+  current?: boolean;
+}
+
+/** One column of the footer: its heading and its links. */
+export interface PublicFooterColumn {
+  title: string;
+  links: ReadonlyArray<{ label: string; href: string }>;
+}
+
+/** The footer's columns as the approved design has them. */
+export const PUBLIC_FOOTER_COLUMNS: ReadonlyArray<PublicFooterColumn> = [
+  {
+    title: "Careers",
+    links: [
+      { label: "Open Roles", href: "/jobs" },
+      { label: "How We Hire", href: "/#hire" },
+      { label: "Recommend Someone", href: "/#refer" },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { label: "What We Build", href: "/#build" },
+      { label: "Visit MyCityApp", href: "https://mycityapp.io" },
+    ],
+  },
+  {
+    title: "Documents",
+    links: [
+      { label: "Verify a Document", href: "/verify" },
+      { label: "Offer Letters", href: "/verify" },
+      { label: "Certificates", href: "/verify" },
+    ],
+  },
+];
 
 export interface PublicPageProps {
-  /** The mark at the top left, usually a link home with Brand; left out when the page draws its own inside the card. */
-  brand?: ReactNode;
-  /** The page, drawn on the card. */
+  /** The page; in split, the card at the right. */
   children: ReactNode;
-  /** The context pane: a SkylineHero of size pane with the page's heading and facts. On desktop (1041 px and wider) it stands at the left and the card at the right, both sticking; narrower, it is a band above the card. */
+  /** The header's links, left to right; the one for this page has `current`. Below 1181 px they move into the menu. */
+  nav?: ReadonlyArray<PublicNavItem>;
+  /** The site's router: a plain click on one of the site's own links (the mark, the nav, the footer, a hero's All Roles) goes through it instead of loading the page again. A path with a #part ("/#hire") then scrolls to it. */
+  navigate?: (href: string) => void;
+  /** Where the mark leads; "/" unless set. */
+  home?: string;
+  /** The small line under the name in the header's mark (Careers); none unless set. */
+  brandSub?: string;
+  /** Deprecated: the header draws the site's mark. A mark passed here replaces it, only so the pages not yet moved still build. */
+  brand?: ReactNode;
+  /** `full`: the page lays out its own blocks edge to edge. `split`: the sign-in layout, the aside beside the card (children). `card` (the default): the page on one card, 704 px. `open`: no card, up to 1120 px. card and open are the earlier layouts. */
+  layout?: "card" | "open" | "full" | "split";
+  /** split: who or what the page is for, in bold at the top of the aside (the role, the offer, Document Check). No logo: the header carries the brand. */
+  name?: ReactNode;
+  /** split: one muted line under the name (the team and the place, the offer's reference). */
+  line?: ReactNode;
+  /** split: the page's h1, Title Case, at most 3 words (Apply, Assessment, Offer of Employment, Verify a Document), drawn small and spaced over the display line. */
+  title?: string;
+  /** split: the heading, for a page that moves focus to it; it takes focus without a ring. */
+  titleRef?: Ref<HTMLHeadingElement>;
+  /** split: the display line under the title, in the band's large type: one sentence of at most 20 words (Your application, in three steps.). */
+  text?: ReactNode;
+  /** split: `m` (the default) for a page a person works through; `l`, larger and heavier, for a page that is itself the tool (Verify a Document.). */
+  textSize?: "m" | "l";
+  /** split: a short paragraph under the display line (when the link ends, who it is for), each sentence at most 20 words. */
+  paragraph?: ReactNode;
+  /** split: the steps down the aside, numbered, the one in hand in yellow, `complete` once all are done (left off from 1040 px down). */
+  steps?: { items: readonly string[]; at: number; complete?: boolean };
+  /** split: what else the main band holds, under the text and the steps: the clock and the question map, a reference's form. */
+  aside?: ReactNode;
+  /** Deprecated, the earlier card layout's context pane (a SkylineHero of size pane) beside the card. The pages move to layout split; it is drawn only so they still build meanwhile. */
   pane?: ReactNode;
   /** Anything under the card (a second action, a note from the system). */
   below?: ReactNode;
   /** A phone's action bar, fixed at the foot of the screen (a vacancy's Apply); the page keeps room for it. Pass it inside PhoneOnly. */
   bar?: ReactNode;
-  /** The footer's links (Careers, Verify a Document). */
+  /** false leaves the footer off. Default true, and false in split (the sign-in pages carry no site footer). */
+  footer?: boolean;
+  /** The footer's columns; the approved design's Careers, Company and Documents unless set (PUBLIC_FOOTER_COLUMNS). */
+  columns?: ReadonlyArray<PublicFooterColumn>;
+  /** The line under the footer's mark. */
+  tagline?: string;
+  /** Earlier footer links, no longer drawn: the footer draws `columns`. Left in so the pages that pass it still build. */
   links?: ReactNode;
-  /** The company line at the foot; MyCity App Ltd · Lagos, Nigeria unless set. */
+  /** The company at the foot, after the © and the year; MyCity App Ltd. Lagos, Nigeria. unless set. */
   company?: string;
   /** More at the very foot (the mock's demo links, on a laptop only). */
   foot?: ReactNode;
   /** false draws the page without its main landmark, inside another page (the gallery). Default true. */
   landmarks?: boolean;
-  /** `card` (the default): the page on one card, 704 px, or beside its pane. `open`: no card, up to 1120 px, the page lays out its own sections. */
-  layout?: "card" | "open";
 }
 
 const WIDTH = "mx-auto w-full max-w-176";
 const WIDE = "mx-auto w-full max-w-280";
 const CARD = "border border-border bg-card p-6 shadow-2 phone:border-x-0 phone:p-4 desk:p-8";
+/** The header's height on desktop, where columns stick under it (public.css .ps-header-in). */
+const HEADER = 64;
 
-export function PublicPage({ brand, children, pane, below, bar, links, company = "MyCity App Ltd · Lagos, Nigeria", foot, landmarks = true, layout = "card" }: PublicPageProps) {
-  const { theme, toggle } = useTheme();
+export function PublicPage({
+  children,
+  nav = [],
+  navigate,
+  home = "/",
+  brandSub,
+  brand,
+  layout = "card",
+  name,
+  line,
+  title,
+  titleRef,
+  text,
+  textSize,
+  paragraph,
+  steps,
+  aside,
+  pane,
+  below,
+  bar,
+  footer = layout !== "split",
+  columns = PUBLIC_FOOTER_COLUMNS,
+  tagline = "The city and lifestyle platform for every Nigerian city.",
+  company = "MyCity App Ltd. Lagos, Nigeria.",
+  foot,
+  landmarks = true,
+}: PublicPageProps) {
   const Main = landmarks ? "main" : "div";
+  const full = layout === "full" || layout === "split";
   const open = layout === "open";
-  const split = !open && pane != null;
-  const width = open || split ? WIDE : WIDTH;
+  const paned = layout === "card" && pane != null;
+  const width = open || paned ? WIDE : WIDTH;
   return (
-    <div className="public-ground flex flex-1 flex-col" data-layout={layout} data-canvas="">
-      <header className={cn(WIDE, "flex items-center justify-between px-6 pt-5 pb-3 phone:px-4")}>
-        <span className="*:inline-flex *:min-h-tap *:items-center">{brand}</span>
-        <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Light Theme" : "Dark Theme"} onClick={toggle} />
-      </header>
-      <Main className={cn(width, "flex-1 px-6 pb-16 phone:px-0 phone:pb-10")}>
-        {split ? (
-          <StickyColumns>
-            {pane}
-            <div className={cn(CARD, "animate-enter rounded-card enter-delay-3 phone:relative phone:-mt-4 phone:rounded-t-sheet phone:rounded-b-none phone:border-b-0")}>{children}</div>
-          </StickyColumns>
-        ) : open ? (
-          children
-        ) : (
-          <div className={cn(CARD, "animate-enter rounded-card enter-delay-1 phone:rounded-none")}>{children}</div>
-        )}
-        {below}
-        {bar}
-      </Main>
-      <Footer links={links} company={company} clear={bar != null}>
-        {foot}
-      </Footer>
+    <SiteNavigate.Provider value={navigate}>
+      <StickyTop.Provider value={HEADER}>
+        <div className="public-ground ps-site flex flex-1 flex-col" data-layout={layout} data-canvas="">
+          <Header nav={nav} home={home} brandSub={brandSub} brand={brand} />
+          <Main className={cn("flex-1", !full && cn(width, "px-6 pt-10 pb-16 phone:px-0 phone:pt-4 phone:pb-10"))}>
+            {layout === "split" ? (
+              <Split name={name} line={line} title={title ?? ""} titleRef={titleRef} text={text} textSize={textSize} paragraph={paragraph} steps={steps} aside={aside}>
+                {children}
+              </Split>
+            ) : full ? (
+              children
+            ) : paned ? (
+              <StickyColumns>
+                {pane}
+                <div className={cn(CARD, "animate-enter rounded-card enter-delay-3 phone:relative phone:-mt-4 phone:rounded-t-sheet phone:rounded-b-none phone:border-b-0")}>{children}</div>
+              </StickyColumns>
+            ) : open ? (
+              children
+            ) : (
+              <div className={cn(CARD, "animate-enter rounded-card enter-delay-1 phone:rounded-none")}>{children}</div>
+            )}
+            {below}
+            {bar}
+          </Main>
+          {footer && (
+            <Footer columns={columns} tagline={tagline} company={company} home={home} clear={bar != null}>
+              {foot}
+            </Footer>
+          )}
+          {!footer && foot != null && <div className="public-wrap pb-6">{foot}</div>}
+        </div>
+      </StickyTop.Provider>
+    </SiteNavigate.Provider>
+  );
+}
+
+/** The sign-in layout: the aside's bands over its skyline, sticking under the header, beside the card, which waits centred. */
+function Split({
+  name,
+  line,
+  title,
+  titleRef,
+  text,
+  textSize = "m",
+  paragraph,
+  steps,
+  aside,
+  children,
+}: Pick<PublicPageProps, "name" | "line" | "titleRef" | "text" | "textSize" | "paragraph" | "steps" | "aside"> & { title: string; children: ReactNode }) {
+  const now = useMinute();
+  const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const titleId = useId();
+  return (
+    <div className="ps-auth">
+      <aside className="ps-auth-aside" aria-labelledby={titleId}>
+        <div aria-hidden="true" className="ps-auth-art">
+          <Skyline still={reduced} />
+        </div>
+        <div className="ps-auth-inner">
+          {(name != null || line != null) && (
+            <div className="ps-auth-band ps-rise ps-rise-2">
+              <span className="ps-auth-id" data-copy="content">
+                {name != null && <b>{name}</b>}
+                {line != null && <span>{line}</span>}
+              </span>
+            </div>
+          )}
+          <div className="ps-auth-band ps-auth-main ps-rise ps-rise-3">
+            <div className="ps-auth-body">
+              <h1 id={titleId} ref={titleRef} tabIndex={titleRef ? -1 : undefined} data-ui="page-title" className="ps-eyebrow ps-auth-title outline-none">
+                {title}
+              </h1>
+              {text != null && <p className={cn("ps-auth-h", textSize === "l" && "ps-auth-h-l")}>{text}</p>}
+              {paragraph != null && <p className="ps-auth-text">{paragraph}</p>}
+              {steps != null && steps.items.length > 0 && (
+                <div className="ps-auth-steps">
+                  <StepBar vertical steps={steps.items} at={steps.at} complete={steps.complete} />
+                </div>
+              )}
+              {aside != null && <div className="ps-auth-extra">{aside}</div>}
+            </div>
+          </div>
+          <div className="ps-auth-band ps-auth-foot">
+            <p className="ps-auth-credit">
+              <span>© {lagosYear(now)} MyCity App Ltd</span>
+              <span>
+                Engineered by <b>JBS Praxis</b>
+              </span>
+            </p>
+          </div>
+        </div>
+      </aside>
+      <div className="ps-auth-work">{children}</div>
     </div>
   );
 }
 
-/** A Lagos skyline drawn as one silhouette: towers, the mast and the round-topped tower, the Link Bridge and its pylon. */
-const EDGE =
-  "M0 64V54h28V64ZM29 64V56h38V64ZM65 64V55h35V64ZM100 64V56h36V64ZM138 64V56h24V64ZM160 64V50h31V64ZM189 64V55h25V64ZM216 64V56h31V64ZM249 64V53h21V64ZM273 64V47h38V64ZM300 64V32h40V64ZM341 64V43h23V64ZM362 64V46h39V64ZM401 64V46h35V64ZM438 64V32h25V64ZM463 64V24h39V64ZM505 64V47h27V64ZM534 64V30h40V64ZM573 64V47h33V64ZM608 64V48h44V64ZM654 64V31h23V64ZM676 64V29h37V64ZM380 64V12h30V64ZM393 12V2h3V12ZM560 64V24Q578 6 596 24V64ZM700 64V44h33V64ZM734 64V40h38V64ZM772 64V47h29V64ZM800 64V52h27V64ZM829 64V38h29V64ZM859 64V40h30V64ZM860 50h740v5H860ZM900 64V50h6V64ZM960 64V50h6V64ZM1020 64V50h6V64ZM1240 64V50h6V64ZM1300 64V50h6V64ZM1360 64V50h6V64ZM1420 64V50h6V64ZM1480 64V50h6V64ZM1540 64V50h6V64ZM1124 64L1128 8h8l4 56ZM1560 64V55h23V64ZM1581 64V50h22V64Z";
-const CABLES =
-  "M1132 14L1066 50M1132 14L1198 50M1132 20L1032 50M1132 20L1232 50M1132 26L998 50M1132 26L1266 50M1132 32L964 50M1132 32L1300 50M1132 38L930 50M1132 38L1334 50M1132 44L896 50M1132 44L1368 50";
+/** The one header: the mark, the nav on its bottom edge, the theme switch, and the menu where the nav does not fit. */
+function Header({ nav, home, brandSub, brand }: { nav: ReadonlyArray<PublicNavItem>; home: string; brandSub?: string; brand?: ReactNode }) {
+  const { theme, toggle } = useTheme();
+  const [menu, setMenu] = useState(false);
+  const close = useCallback(() => setMenu(false), []);
+  const go = useSiteLink(close);
+  const dropId = useId();
+  const here = nav.find((n) => n.current)?.href;
 
-/** The foot of every public page: Deep Green under the skyline's edge, the mark, the links, the company and the time in Lagos. */
-function Footer({ links, company, clear, children }: { links?: ReactNode; company: string; clear: boolean; children?: ReactNode }) {
-  const now = useMinute();
+  // A new page closes the menu; so does Esc while it is open.
+  useEffect(close, [here, close]);
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu]);
+
   return (
-    <footer className="mt-auto">
-      <svg aria-hidden="true" focusable="false" viewBox="0 0 1600 64" preserveAspectRatio="xMidYMax slice" className="block h-12 w-full fill-deep stroke-deep phone:h-9">
-        <path d={EDGE} />
-        <path d={CABLES} fill="none" strokeWidth={1.4} />
-      </svg>
-      <div data-theme="dark" className={cn("on-dark bg-deep text-on-deep-muted", clear && "phone:pb-24")}>
-        <div className={cn(WIDE, "grid grid-cols-1 gap-6 px-6 py-8 text-sm md:grid-cols-3 md:items-start phone:gap-4 phone:px-4 phone:pt-5")}>
-          <div className="flex flex-col gap-2">
-            <Brand name="MyCityApp" tone="on-dark" />
-            <p className="text-xs text-on-deep-faint">{company}</p>
-          </div>
-          {links != null && (
-            <nav aria-label="Site" className="flex flex-wrap gap-x-6 gap-y-1 *:inline-flex *:min-h-tap *:items-center *:font-strong *:text-on-deep-soft *:no-underline md:justify-center">
-              {links}
-            </nav>
-          )}
-          <LagosClock now={now} />
-        </div>
-        {children != null && <div className={cn(WIDE, "px-6 pb-6 phone:px-4")}>{children}</div>}
+    <header className="ps-header">
+      <div className="public-wrap ps-header-in">
+        {brand != null ? (
+          <span className="mr-auto *:inline-flex *:min-h-tap *:items-center">{brand}</span>
+        ) : (
+          <a className="ps-brand" href={home} onClick={go(home)} aria-label="MyCityApp Home">
+            <Brand name="MyCityApp" sub={brandSub} tile="deep" />
+          </a>
+        )}
+        {nav.length > 0 && (
+          <nav className="ps-nav" aria-label="Main">
+            {nav.map((n) => (
+              <a key={n.href + n.label} href={n.href} onClick={go(n.href)} aria-current={n.current ? "page" : undefined}>
+                {n.label}
+              </a>
+            ))}
+          </nav>
+        )}
+        <IconButton
+          icon={theme === "dark" ? "sun" : "moon"}
+          label={theme === "dark" ? "Light Theme" : "Dark Theme"}
+          onClick={toggle}
+          className="size-11 rounded-full text-foreground hover:bg-canvas-hover hover:text-foreground"
+        />
+        {nav.length > 0 && (
+          <IconButton
+            icon={menu ? "x" : "menu"}
+            label="Menu"
+            aria-expanded={menu}
+            aria-controls={dropId}
+            onClick={() => setMenu((m) => !m)}
+            className="size-11 rounded-full xl:hidden text-foreground hover:bg-canvas-hover hover:text-foreground"
+          />
+        )}
       </div>
-    </footer>
+      {menu && (
+        <nav id={dropId} className="ps-drop" aria-label="Menu">
+          {nav.map((n) => (
+            <a key={n.href + n.label} href={n.href} onClick={go(n.href)} aria-current={n.current ? "page" : undefined}>
+              {n.label}
+            </a>
+          ))}
+        </nav>
+      )}
+    </header>
   );
 }
 
-/** The time in Lagos now, read again each minute. */
-function LagosClock({ now }: { now: Date }) {
-  const iso = now.toISOString();
+/** A Lagos skyline drawn as one silhouette along the footer's top edge. */
+const EDGE =
+  "M0 72V52h40V38h30v14h26V22h38v30h20V44h44V8h22v44h30V30h34v22h60V40h26V16h40v36h24V36h50v16h120l8-4h240l8 4h40V30h28v22h36V18h44v34h30V40h40v12h52V26h30v26h44V44h36v28z";
+
+/** The foot of every public page: Deep Green under the skyline's edge, the mark and the time in Lagos, the columns, the © line and Back to Top. */
+function Footer({
+  columns,
+  tagline,
+  company,
+  home,
+  clear,
+  children,
+}: {
+  columns: ReadonlyArray<PublicFooterColumn>;
+  tagline: string;
+  company: string;
+  home: string;
+  clear: boolean;
+  children?: ReactNode;
+}) {
+  const now = useMinute();
+  const go = useSiteLink();
   return (
-    <p className="flex items-center gap-2 text-xs text-on-deep-faint md:justify-end">
-      <Icon name="clock" className="text-primary" />
-      <span>Lagos</span>
-      <time dateTime={iso} className="text-base font-strong text-on-deep tabular-nums">
-        {formatTime(iso)}
-      </time>
-    </p>
+    <footer data-theme="dark" className={cn("on-dark ps-foot", clear && "ps-foot-clear")}>
+      <svg className="ps-foot-edge" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <path d={EDGE} />
+      </svg>
+      <div className="public-wrap ps-foot-in">
+        <div className="ps-foot-grid">
+          <div>
+            <a className="ps-brand" href={home} onClick={go(home)} aria-label="MyCityApp Home">
+              <Brand name="MyCityApp" tile="secondary" />
+            </a>
+            <p className="ps-foot-tag">{tagline}</p>
+            <span className="ps-clock">
+              <Icon name="clock" size="m" />
+              <span>Lagos</span>
+              <time dateTime={now.toISOString()}>{lagosClock(now)}</time>
+            </span>
+          </div>
+          {columns.length > 0 && (
+            <nav aria-label="Site" className="ps-foot-nav">
+              {columns.map((c) => (
+                <div key={c.title}>
+                  <h2>{c.title}</h2>
+                  <ul>
+                    {c.links.map((l) => (
+                      <li key={l.label}>
+                        <a href={l.href} onClick={go(l.href)}>
+                          {l.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </nav>
+          )}
+        </div>
+        <div className="ps-foot-base">
+          <span>
+            © {lagosYear(now)} {company}
+          </span>
+          <span>
+            Engineered by <b>JBS Praxis</b>
+          </span>
+          <button type="button" className="ps-top" aria-label="Back to Top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+            <Icon name="arrowup" size="m" />
+          </button>
+        </div>
+      </div>
+      {children != null && <div className="public-wrap ps-foot-more">{children}</div>}
+    </footer>
   );
 }
 

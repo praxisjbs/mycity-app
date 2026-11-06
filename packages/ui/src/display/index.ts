@@ -8,6 +8,7 @@ export * from "./Bars";
 export * from "./Chain";
 export * from "./Confetti";
 export * from "./CountBadge";
+export * from "./CountUp";
 export * from "./Countdown";
 export * from "./EmptyState";
 export * from "./EmptyValue";
