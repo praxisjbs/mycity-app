@@ -13,7 +13,7 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   ActionGroup, Button, Card, CardHeader, DataView, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatMoneyShort, FormFooter, Grid, HelpTerm,
-  KeyValue, KpiCard, ListDetail, LoadingRows, Money, MoneyField, PageHeader, Pager, Pill, SelectField, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal, UploadField,
+  KeyValue, KpiCard, ListDetail, LoadingRows, Money, MoneyField, PageHeader, Pager, Pill, SelectField, TextAreaField, TextField, toast, todayIso, toMoneyString, useConfirm, useContractForm, useModal, UploadField,
 } from "@mycity/ui";
 import { DecisionForm, OwnActions, refreshAll, RequestCard, say, stagePill, useFinance } from "./parts";
 import { Projects } from "./Projects";
@@ -560,7 +560,9 @@ function BudgetForm({ close, year, budget }: { close: () => void; year?: string;
     year: Number(budget ? budget.starts_on.slice(0, 4) : year),
     lines: (budget?.lines.map((l) => ({ expense_category_id: l.expense_category_id, amount: l.amount })) ?? [{ expense_category_id: "", amount: "" }]) as BudgetLineValue[],
   };
-  const f = useContractForm(start, budget ? budgets.BudgetUpdate : budgets.BudgetCreate);
+  // An amount as typed ("20,000,000") is read and sent as the contract's two-place string.
+  const onWire = (ls: BudgetLineValue[]) => ls.map((l) => ({ ...l, amount: toMoneyString(l.amount) }));
+  const f = useContractForm(start, { safeParse: (v: Record<string, unknown>) => (budget ? budgets.BudgetUpdate : budgets.BudgetCreate).safeParse({ ...v, lines: onWire(v.lines as BudgetLineValue[]) }) });
   const create = useMutation("POST /api/v1/budgets");
   const edit = useMutation("PATCH /api/v1/budgets/:id");
   const lines = f.values.lines as BudgetLineValue[];
@@ -568,8 +570,8 @@ function BudgetForm({ close, year, budget }: { close: () => void; year?: string;
   const submit = async () => {
     if (!f.check(budget ? ["lines"] : undefined)) return;
     try {
-      if (budget) await edit.run({ params: { id: budget.budget_id }, body: { lines } });
-      else await create.run({ body: { department_id: f.values.department_id, year: f.values.year, lines } });
+      if (budget) await edit.run({ params: { id: budget.budget_id }, body: { lines: onWire(lines) } });
+      else await create.run({ body: { department_id: f.values.department_id, year: f.values.year, lines: onWire(lines) } });
       refreshAll();
       close();
       toast(budget ? "Budget saved" : "Budget set");

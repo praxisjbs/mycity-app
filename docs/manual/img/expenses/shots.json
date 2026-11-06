@@ -1,7 +1,7 @@
 {
   "expenses-approvals": {
     "spec": "f049bbc24e10d0e4",
-    "source": "a8b0e8eb27a5a84c",
+    "source": "22135136ffd3b64e",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "expenses-budgets": {
     "spec": "edaa6f1467039762",
-    "source": "a8b0e8eb27a5a84c",
+    "source": "22135136ffd3b64e",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "expenses-categories": {
     "spec": "740c5124f258a17a",
-    "source": "a8b0e8eb27a5a84c",
+    "source": "22135136ffd3b64e",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "expenses-disbursements": {
     "spec": "f21b33e8b22d1812",
-    "source": "a8b0e8eb27a5a84c",
+    "source": "22135136ffd3b64e",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "expenses-projects": {
     "spec": "0576b7858544c143",
-    "source": "a8b0e8eb27a5a84c",
+    "source": "22135136ffd3b64e",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "expenses-requisitions": {
     "spec": "d61f3f642e715df3",
-    "source": "a8b0e8eb27a5a84c",
+    "source": "22135136ffd3b64e",
     "devices": [
       "desktop",
       "phone"
