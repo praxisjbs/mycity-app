@@ -53,6 +53,13 @@ export default {
     "Empty With State": () => (
       <Kanban columns={START.map((c) => ({ ...c, cards: [], count: 0 }))} empty={<EmptyState title="No Deals Yet" text="Add the first partner to start" />} />
     ),
+    "Many Stages": () => (
+      <Kanban
+        columns={[...START, { key: "won", label: "Won", series: 5, cards: [] }, { key: "lost", label: "Lost", series: 6, cards: [] }]}
+        onOpen={() => undefined}
+        onMove={() => undefined}
+      />
+    ),
     "More To Load": () => <Kanban columns={START.map((c, i) => (i === 0 ? { ...c, count: 9, onMore: () => new Promise((r) => setTimeout(r, 800)) } : c))} onMove={() => undefined} />,
   },
 } satisfies GalleryEntry;

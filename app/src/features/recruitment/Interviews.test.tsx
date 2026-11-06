@@ -7,9 +7,11 @@ import { copyProblems, dialog, openAs, openRow, press, settled } from "./testKit
 
 /**
  * Recruitment · Interviews and My Card on the in-browser mock (docs/guides/recruitment.md §6.6, §10):
- * the blind card. Another panelist's submitted card shows Submitted with no score while the round is
- * open; My Card saves each star as it is tapped and takes one back on a second tap; Submit Card refuses
- * a card with traits left to rate; a closed round shows each trait's average, the total and the report.
+ * Upcoming and Recent beside the interview picked (on a phone, in a sheet once tapped), and the blind
+ * card. Another panelist's submitted card shows Submitted and Hidden while the round is open; My Card
+ * saves each star as it is tapped and takes one back on a second tap; Submit Card refuses a card with
+ * traits left to rate; a closed round shows each trait's average, the total, the report, the Weighted
+ * Scorecard and its Round Activity.
  */
 
 vi.mock("@/api/mock/core", async (importOriginal) => {
@@ -37,25 +39,49 @@ afterEach(() => {
   setViewport(1440);
 });
 
+/** Picks the interview of `name` in the list; on desktop it shows beside the list. */
+async function pick(name: string) {
+  fireEvent.click((await screen.findAllByText(name, undefined, { timeout: 8000 }))[0]!);
+  await settled();
+}
+/** The Blind Panel of the interview in view. */
+const blindPanel = (root: HTMLElement = document.body) => within(root).getByRole("table", { name: /Blind Panel/ });
+
 /** The star `n` of the trait whose label reads `trait`. */
 const star = (root: HTMLElement, trait: RegExp, n: number) => within(within(root).getByRole("radiogroup", { name: trait })).getByRole("radio", { name: `${n} of 10` });
 
 describe("Recruitment · Interviews", () => {
-  it("while the round is open, another panelist's card shows Submitted and no score", async () => {
-    await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews&mine=true");
-    const sheet = await openRow("Tobi Adeyemi");
-    const panel = within(sheet).getByRole("table", { name: /Panel/ });
-    const ifeoma = within(panel).getByText(/Ifeoma/).closest("tr")!;
-    expect(within(ifeoma).getByText("Submitted")).toBeTruthy();
-    expect(ifeoma.textContent).not.toMatch(/\d\.\d/);
-    expect(within(sheet).queryByRole("table", { name: /Traits/ })).toBeNull();
+  it("lists the interviews still to end first, soonest first, then those past, latest first", async () => {
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews");
+    const rows = within(screen.getByRole("table", { name: /Upcoming and Recent/ })).getAllByRole("row").slice(1);
+    const names = rows.map((r) => r.textContent ?? "");
+    const at = (name: string) => names.findIndex((t) => t.includes(name));
+    // Halima tomorrow, Tobi yesterday (cards still due), Kunle five days ago.
+    expect(at("Halima Yusuf")).toBeLessThan(at("Tobi Adeyemi"));
+    expect(at("Tobi Adeyemi")).toBeLessThan(at("Kunle Afolabi"));
+    // Beside the list, the first interview shows unasked.
+    expect(blindPanel()).toBeTruthy();
     expect(copyProblems()).toEqual([]);
+  }, 60000);
+
+  it("while the round is open, another panelist's card shows Submitted and Hidden, never a score", async () => {
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews&mine=true");
+    await pick("Tobi Adeyemi");
+    const ifeoma = within(blindPanel()).getByText(/Ifeoma/).closest("tr")!;
+    expect(within(ifeoma).getByText("Submitted")).toBeTruthy();
+    expect(within(ifeoma).getByText("Hidden")).toBeTruthy();
+    expect(ifeoma.textContent).not.toMatch(/\d\.\d/);
+    expect(screen.queryByRole("table", { name: /Traits/ })).toBeNull();
+    expect(screen.getByText("Weighted Scorecard")).toBeTruthy();
+    expect(screen.getByText(/Ifeoma Chukwu submitted their card/)).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
+    expect(await axe(document.body)).toHaveNoViolations();
   }, 60000);
 
   it("My Card: a star is saved as it is tapped, a second tap takes it back, and Submit Card wants every trait", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews&mine=true");
-    await openRow("Tobi Adeyemi");
-    await press(dialog(), "My Card");
+    await pick("Tobi Adeyemi");
+    await press(document.body, "My Card");
     let card = dialog();
     expect(within(card).getByText(/2 of 10 rated/)).toBeTruthy();
     expect(copyProblems()).toEqual([]);
@@ -85,8 +111,8 @@ describe("Recruitment · Interviews", () => {
 
   it("My Card: a failed star goes back to what the server kept, and never over a later tap that saved", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews&mine=true");
-    await openRow("Tobi Adeyemi");
-    await press(dialog(), "My Card");
+    await pick("Tobi Adeyemi");
+    await press(document.body, "My Card");
     const checked = (n: number) => star(dialog(), /Oral Communication Skills/, n).getAttribute("aria-checked") === "true";
     const real = vi.mocked(dispatch).getMockImplementation()!;
     // Each save of the card in turn: "fail", or the milliseconds it takes before it goes through. A slow
@@ -133,23 +159,27 @@ describe("Recruitment · Interviews", () => {
     expect(asked).not.toContain("GET /api/v1/employees");
   }, 60000);
 
-  it("a closed round shows each trait's average, the total and the report", async () => {
+  it("a closed round shows each score, each trait's average, the total, the report and its activity", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews");
-    fireEvent.click(screen.getByRole("radio", { name: "Past" }));
-    await settled();
-    const sheet = await openRow("Kunle Afolabi");
-    expect(within(sheet).getByRole("table", { name: /Traits/ })).toBeTruthy();
-    expect(within(sheet).getByText(/of 100/)).toBeTruthy();
-    expect(within(sheet).getByText(/proven sales leader/)).toBeTruthy();
-    expect(within(sheet).getByRole("button", { name: "Download Form" })).toBeTruthy();
+    await pick("Kunle Afolabi");
+    expect(within(blindPanel()).queryByText("Hidden")).toBeNull();
+    expect(within(blindPanel()).getAllByText(/^\d\.\d$/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("table", { name: /Traits/ })).toBeTruthy();
+    expect(screen.getByText(/of 100/)).toBeTruthy();
+    expect(screen.getByText(/proven sales leader/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Download Form" })).toBeTruthy();
+    expect(screen.getByText(/Report written by/)).toBeTruthy();
     expect(copyProblems()).toEqual([]);
   }, 60000);
 
-  it("on a phone, My Card puts its stars in reach", async () => {
+  it("on a phone, nothing opens until a row is tapped, and My Card puts its stars in reach", async () => {
     setViewport(390);
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews&mine=true");
-    await openRow("Halima Yusuf");
-    await press(dialog(), "My Card");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("table", { name: /Blind Panel/ })).toBeNull();
+    const sheet = await openRow("Halima Yusuf");
+    expect(within(sheet).getByText("Blind Panel")).toBeTruthy();
+    await press(sheet, "My Card");
     expect(within(dialog()).getAllByRole("radio", { name: "10 of 10" }).length).toBe(10);
     expect(copyProblems()).toEqual([]);
   }, 60000);

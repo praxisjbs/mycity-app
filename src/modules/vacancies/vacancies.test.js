@@ -260,3 +260,66 @@ describe("must-meet conditions name no protected trait (guide §6.4)", () => {
     expect(service.protectedConditions(["Lives in Lagos", "Ladies only", "Igbo only"])).toEqual([1, 2]);
   });
 });
+
+describe("New Vacancy's interview (guide §3 step 2, §9)", () => {
+  const draft = require("./vacancies.draft");
+  const c = require("@mycity/contract");
+
+  test("a follow-up about the work is asked; one about the person's age, sex, family, origin, faith, body or health is dropped", () => {
+    for (const fair of [
+      "Which design tools will the Graphics and Motion Designer use every week?",
+      "Who will the Head, Sales & Revenue work with most closely?",
+      "What health and safety training does the Field Officer need on site?",
+      "How many years of B2B sales should the Head of Sales bring?",
+    ])
+      expect([fair, draft.fairQuestion(fair)]).toEqual([fair, true]);
+    for (const unfair of [
+      "What age range would suit the Content Producer best?",
+      "Would you prefer a male or female Studio Producer?",
+      "Should the Community Manager be married or single?",
+      "Do you prefer a Yoruba candidate for this role?",
+      "Should the Driver be a Christian or a Muslim?",
+      "Must the Field Officer have no disability?",
+      "Should the candidate be in good health for the travel?",
+      "Is there a nationality you prefer for the Data Analyst?",
+      "Does the Receptionist need to be attractive?",
+      "Can the role suit someone with a medical condition?",
+    ])
+      expect([unfair, draft.fairQuestion(unfair)]).toEqual([unfair, false]);
+  });
+
+  test("the plain draft, when the AI cannot write one, is the person's own answers in MyCity's shape", () => {
+    const body = c.vacancies.JdDraftRequest.parse({
+      title: "Data Analyst",
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      min_experience_years: "2",
+      interview: {
+        positions: "2",
+        work_pattern_note: "Two office days",
+        working_days: "Monday to Friday",
+        area: "Yaba, Lagos",
+        reports_to: "Head of Operations",
+        must_haves: "SQL and spreadsheets.\nBuild the weekly figures every team plans by.",
+        extras: "Experience with Looker Studio",
+        follow_ups: [{ question: "Which tools will the Data Analyst use every week?", answer: "Google Sheets and Looker Studio." }],
+      },
+    });
+    const d = draft.plainDraft(body, "Operations");
+    expect(d.description).toMatch(/^MyCityApp is hiring 2 people as Data Analyst, in the Operations team, based in Yaba, Lagos\. The role is hybrid \(Two office days\)\./);
+    expect(d.description).toContain("## Key Responsibilities\n\n- SQL and spreadsheets.\n- Build the weekly figures every team plans by.");
+    expect(d.description).toContain("- Google Sheets and Looker Studio.");
+    expect(d.requirements).toBe("- 2+ years of relevant experience.\n- SQL and spreadsheets.\n- Build the weekly figures every team plans by.");
+    expect(d.nice_to_have).toBe("- Experience with Looker Studio");
+    // A remote role is based nowhere; nothing given is nothing written.
+    const remote = draft.plainDraft(c.vacancies.JdDraftRequest.parse({ title: "Copywriter", work_pattern: "remote", interview: {} }));
+    expect(remote).toEqual({ description: "MyCityApp is hiring one person as Copywriter, working remotely.", requirements: null, nice_to_have: null });
+  });
+
+  test("Write With AI needs a line about the role, or the interview's answers", () => {
+    expect(c.vacancies.JdDraftRequest.safeParse({ title: "Data Analyst" }).success).toBe(false);
+    expect(c.vacancies.JdDraftRequest.safeParse({ title: "Data Analyst", instruction: "Turns figures into weekly reports." }).success).toBe(true);
+    expect(c.vacancies.JdDraftRequest.safeParse({ title: "Data Analyst", interview: {} }).success).toBe(true);
+    expect(c.vacancies.FollowUpsRequest.safeParse({ title: "Data Analyst", interview: { follow_ups: [{ question: "Too short", answer: "x" }] } }).success).toBe(false);
+  });
+});

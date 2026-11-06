@@ -535,3 +535,15 @@ packages that need none can start. Tick a package only when its own checks pass 
   and its card and open layouts removed. Guide §2, §5, §6.1, §10 and the change log first; the public chapter and its
   pictures follow the screens; PROGRESS row #107, #84 and #85 In progress. For AJ (M5): the signing and verify API for
   the two pages (INTERIM `types/public.ts`), and the open points in the entry above.
+- 06/11/2026 · GE · Testing on staging, round 1. Fixed: Invite to Apply's "Check this value" (the refusal's field
+  message was over four words; the applied-for role is no longer offered); the staging seed skips Implementation
+  accounts without Recruitment (staging had no interviews and no Design role; the next deploy's seed run adds them).
+  Next: the candidate board on one row that scrolls sideways, New Vacancy in ten steps, the Interviews tab and the
+  KPI cards and tables against `demo (5).html`.
+- 06/11/2026 · GE · Testing on staging, round 1, the rest (GE's choices, three agents): Kanban on one row for every
+  board (packages/ui; AJ told on #79), compact cards; DataView's `badge` column for a phone card's status pill;
+  Vacancies' Openings; Interviews rebuilt to the reference layout (`InterviewDetail` gains `scorecard`,
+  `weighted_total`, `activity`; `ScorecardPart` moved to `vacancies.js`); New Vacancy as a ten-question interview
+  (`VacancyInterview.tsx`; AI action `vacancy-follow-ups`, Default, personal data, chosen by GE; `jd-draft` takes
+  the interview, prompt v5, a plain draft when the AI is off). For AJ: `Field` with `help` around a `TextField`
+  fails axe ("visible label"); New Vacancy's Job Title carries no help term until it is fixed in packages/ui.

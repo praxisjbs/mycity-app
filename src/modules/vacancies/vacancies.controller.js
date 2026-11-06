@@ -19,6 +19,7 @@ module.exports = {
   saveSettings: async (req, res) => ok(res, await service.saveSettings(withActor(req), scopeOf(req), req.validated.body)),
   assistStatus: async (_req, res) => ok(res, await require("./vacancies.draft").status()),
   assist: async (req, res) => ok(res, await service.assist(req.user, req.validated.body)),
+  followUps: async (req, res) => ok(res, await service.followUps(req.user, req.validated.body)),
   get: async (req, res) => ok(res, await service.get(id(req), req.user, scopeOf(req))),
   create: async (req, res) => created(res, await service.create(withActor(req), scopeOf(req), req.validated.body)),
   update: async (req, res) => ok(res, await service.update(withActor(req), scopeOf(req), id(req), req.validated.body)),

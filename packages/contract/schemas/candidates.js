@@ -19,7 +19,7 @@ const { uuid, text, email, phone, isoDateTime, listQuery, Paged } = require("./c
 const { DocumentRef } = require("./documents");
 const { AssessmentType, SittingStatus } = require("./assessments");
 const { InterviewStatus, RoundStatus } = require("./interviews");
-const { ApplicationStage, ScorecardCode, VacancyRef, VacancyQuestionType, M4_STAGES } = require("./vacancies");
+const { ApplicationStage, ScorecardPart, VacancyRef, VacancyQuestionType, M4_STAGES } = require("./vacancies");
 
 /* ------------------------------------------------------------------ *
  * Code lists
@@ -73,18 +73,6 @@ const Candidate = z
   .strict();
 
 const CandidatePage = Paged(Candidate);
-
-/** One part of an application's weighted scorecard (guide §6.5). */
-const ScorecardPart = z
-  .object({
-    code: ScorecardCode,
-    name: z.string(),
-    active: z.boolean(),
-    weight: z.number().int().min(0).max(100),
-    score: z.number().min(0).max(100).nullable(),
-    provisional: z.boolean(),
-  })
-  .strict();
 
 /** An answer to one of the vacancy's Apply questions. */
 const ApplicationAnswer = z
@@ -382,7 +370,6 @@ const TABLES = {
     },
   },
   CandidatePage: { table: null, reason: "a page of applications" },
-  ScorecardPart: { table: null, reason: "one part of the weighted scorecard, worked out on read" },
   ApplicationAnswer: { table: null, reason: "one answer of application.answers (jsonb) beside its question" },
   StageMove: { table: null, reason: "one entity_state_history row of the application, with its days" },
   CandidateSitting: { table: null, reason: "an application_assessment as the candidate's sheet lists it" },
@@ -474,7 +461,6 @@ module.exports = {
   CandidateEmailKey,
   Candidate,
   CandidatePage,
-  ScorecardPart,
   ApplicationAnswer,
   StageMove,
   CandidateSitting,

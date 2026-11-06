@@ -8,7 +8,7 @@ import { copyProblems, dialog, openAs, openRow, press, settled, type } from "./t
 /**
  * Recruitment · Vacancies on the in-browser mock (docs/guides/recruitment.md §6.1, §10): the four
  * figures and the list; a role's sheet with MyCity's ten interview traits and its lifecycle; New
- * Vacancy through its four steps to a published role; Pause asks nothing more and is undone by Resume.
+ * Vacancy from a seat (its interview) and through its editor to a published role; Pause asks nothing more and is undone by Resume.
  */
 
 vi.mock("@/api/mock/core", async (importOriginal) => {
@@ -58,12 +58,13 @@ describe("Recruitment · Vacancies", () => {
     expect(copyProblems()).toEqual([]);
   }, 60000);
 
-  it("Create Vacancy from the Organogram opens New Vacancy with the seat's department, line and manager", async () => {
+  it("Create Vacancy from the Organogram opens New Vacancy's interview with the seat's role, department and manager answered", async () => {
     await openAs("cynthia@mycityapp.io", `/recruitment?tab=vacancies&new=1&title=City+Editor%2C+Abuja&org_seat_id=${SEATS[1]!.org_seat_id}`);
     await settled();
-    const form = dialog();
+    let form = dialog();
     expect((within(form).getByLabelText("Job Title") as HTMLInputElement).value).toBe("City Editor, Abuja");
-    await settled();
+    await press(form, "Next");
+    form = dialog();
     expect(within(form).getByLabelText("Department").textContent).toContain("Content");
     expect(within(form).getByText(/Cynthia/)).toBeTruthy();
   }, 60000);
@@ -77,10 +78,11 @@ describe("Recruitment · Vacancies", () => {
     expect(byTitle("Graphics and Motion Designer").status).toBe("open");
   }, 60000);
 
-  it("New Vacancy: three steps, each checked before the next, to a published remote role", async () => {
+  it("New Vacancy's editor (Use Blank Form): three steps, each checked before the next, to a published remote role", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
     fireEvent.click(screen.getAllByRole("button", { name: /New Vacancy/ })[0]!);
     await settled();
+    await press(dialog(), "Use Blank Form");
     let form = dialog();
     expect(copyProblems()).toEqual([]);
 
