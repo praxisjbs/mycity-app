@@ -112,7 +112,9 @@
   }
 
   /* ---- Footer: Deep Green under the skyline's edge ---- */
-  .ps-foot { position: relative; margin-top: 120px; background: var(--deep); color: var(--on-deep-base); }
+  /* The footer lays its columns out by its own width (a container), so it never spills past itself where it is
+     narrower than the window (inside the gallery's frames); on a page it is the page's width, as before. */
+  .ps-foot { position: relative; margin-top: 120px; background: var(--deep); color: var(--on-deep-base); container-type: inline-size; }
   .ps-foot-edge { position: absolute; left: 0; right: 0; top: -70px; display: block; width: 100%; height: 72px; fill: var(--deep); }
   .ps-foot-in { padding-top: 64px; padding-bottom: 28px; }
   .ps-foot-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 48px; }
@@ -161,12 +163,14 @@
   }
   .ps-top:hover { background: var(--primary); color: var(--primary-foreground); transform: translateY(-3px); }
   .ps-foot-more { padding-bottom: 24px; }
-  @media (max-width: 1040px) {
+  @container (max-width: 1040px) {
     .ps-foot-grid { grid-template-columns: 1fr 1fr; }
     .ps-foot-grid > :first-child, .ps-foot-nav { grid-column: 1 / -1; }
   }
-  @media (max-width: 760px) {
+  @container (max-width: 760px) {
     .ps-foot-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
     .ps-foot ul { gap: 0; }
     .ps-foot li a { display: inline-flex; align-items: center; min-height: 44px; }
     .ps-foot-clear { padding-bottom: 88px; }

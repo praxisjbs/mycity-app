@@ -7,7 +7,7 @@ import { RolePart } from "./RolePart";
 const span = (text: string) => ({ text, bold: false, italic: false, href: null });
 const OVERVIEW: RichTextBlock[] = [
   { kind: "paragraph", spans: [span("The Head, Sales & Revenue will lead MyCityApp and MyLagosApp's commercial growth by developing and executing the sales and revenue strategy.")] },
-  { kind: "heading", level: 3, spans: [span("1. Sales & Revenue Strategy")] },
+  { kind: "heading", level: 2, spans: [span("1. Sales & Revenue Strategy")] },
   { kind: "bullets", items: [[span("Identify new revenue opportunities, products and commercial models.")], [span("Set clear sales targets and revenue objectives.")]] },
 ];
 

@@ -32,7 +32,7 @@ export default {
       </div>
     ),
     "Staggered Steps": () => (
-      <Stagger as="ol" step={120} className="grid grid-cols-1 gap-6 desk:grid-cols-4">
+      <Stagger as="ol" step={120} className="grid grid-cols-1 gap-6 pb-6 desk:grid-cols-4">
         {["Apply", "Screening", "Assessment", "Interview"].map((t, i) => (
           <div key={t} className="text-center">
             <p className="text-3xl font-strong">{i + 1}</p>
