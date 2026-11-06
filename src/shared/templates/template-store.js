@@ -22,9 +22,11 @@
  *   ---
  *   <p>Dear {{ recipient.first_name }}, ...</p>
  *
- * `format` is html for the shipped files (developer-written, reviewed). An edit made in
- * Settings is saved as markdown: people editing letters never write HTML, and Markdown
- * cannot carry a script into a PDF or onto the public site.
+ * `format` is html for the shipped files (developer-written, reviewed) unless the front matter
+ * says `format: markdown`: a default people will edit and restore (the candidate emails) ships
+ * in Markdown, so the editor opens on its exact words and Restore Default saves them back. An
+ * edit made in Settings is saved as markdown: people editing letters never write HTML, and
+ * Markdown cannot carry a script into a PDF or onto the public site.
  *
  * Layouts (templates/documents/letterhead.html, templates/email/layout.html) are not
  * editable: they carry the brand, and the brand is not a setting.
@@ -71,7 +73,7 @@ function frontMatter(text) {
 
 /**
  * The shipped default, from templates/. Version 0. Cached per process.
- * @returns {{kind, key, version: 0, subject, title, body, format: "html"}|null}
+ * @returns {{kind, key, version: 0, subject, title, body, format: "html"|"markdown"}|null}
  */
 function shipped(kind, key) {
   checkKind(kind, key);
@@ -95,7 +97,7 @@ function shipped(kind, key) {
             subject: meta.subject || null,
             title: meta.title || null,
             body,
-            format: "html",
+            format: meta.format === "markdown" ? "markdown" : "html",
           });
         })()
       : null;

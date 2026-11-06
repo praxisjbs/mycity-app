@@ -1,0 +1,44 @@
+<style>
+  .ia-meta { margin: 0 0 1mm 0; font-size: 9pt; color: #71717A; }
+  .ia-meta strong { color: #014339; font-weight: 600; }
+  .ia-body h2 { font-size: 11pt; margin: 6mm 0 2mm 0; break-after: avoid; page-break-after: avoid; }
+  .ia-body table { font-size: 8.5pt; margin: 0; width: 100%; }
+  .ia-body thead { display: table-header-group; }
+  .ia-body thead th { border-bottom: 2px solid #014339; text-align: left; }
+  .ia-body tr { page-break-inside: avoid; }
+  .ia-body td.n, .ia-body th.n { text-align: center; }
+  .ia-sub { display: block; color: #71717A; font-size: 8pt; }
+  .ia-total { margin: 4mm 0 0 0; font-size: 11pt; font-weight: 600; color: #014339; }
+  .ia-report { margin: 0 0 3mm 0; font-size: 9pt; white-space: pre-line; }
+</style>
+<div class="ia-body">
+  <p class="ia-meta"><strong>{{ candidate_name }}</strong> · {{ position }}{{#if department}} · {{ department }}{{/if}}</p>
+  <p class="ia-meta">{{ round_title }} · {{ interview_date }}</p>
+
+  <h2>Candidate Details</h2>
+  <table>
+    <tbody>
+      <tr><td>Current Employer</td><td>{{#if current_employer}}{{ current_employer }}{{else}}Not given{{/if}}</td></tr>
+      <tr><td>Academics</td><td>{{#if academics}}{{ academics }}{{else}}Not given{{/if}}</td></tr>
+      <tr><td>Total Experience</td><td>{{#if total_experience}}{{ total_experience }}{{else}}Not given{{/if}}</td></tr>
+      <tr><td>Experience Relevant to MyCity</td><td>{{#if relevant_experience}}{{ relevant_experience }}{{else}}Not given{{/if}}</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Ratings, 1 to 10</h2>
+  <table>
+    <thead><tr><th>Trait</th>{{#each panelists}}<th class="n">{{ name }}</th>{{/each}}<th class="n">Average</th></tr></thead>
+    <tbody>{{#each traits}}<tr><td>{{ prompt }}</td>{{#each ratings}}<td class="n">{{ value }}</td>{{/each}}<td class="n">{{ average }}</td></tr>{{/each}}</tbody>
+  </table>
+  <p class="ia-total">Interview Score {{ interview_score }} of 100</p>
+
+  <h2>Each Panelist</h2>
+  <table>
+    <thead><tr><th>Interviewer</th><th class="n">Score</th><th>Decision</th><th>Others</th></tr></thead>
+    <tbody>{{#each cards}}<tr><td>{{ name }}</td><td class="n">{{ score }}</td><td>{{ decision }}</td><td>{{#if comments}}{{ comments }}{{/if}}</td></tr>{{/each}}</tbody>
+  </table>
+
+  <h2>Consolidated Report</h2>
+  <p class="ia-report">{{ report }}</p>
+  <p class="ia-meta"><strong>Decision</strong> {{ decision }} · {{ reported_by }}</p>
+</div>

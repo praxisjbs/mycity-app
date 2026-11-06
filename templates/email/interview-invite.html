@@ -1,0 +1,24 @@
+---
+subject: "{{#if cancelled}}Interview cancelled{{else}}{{#if rescheduled}}Interview changed{{else}}Interview invitation{{/if}}{{/if}}: {{ vacancy_title }}"
+title: Interview
+format: markdown
+---
+{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}
+
+{{#if cancelled}}Your interview for {{ vacancy_title }} on {{ datetime scheduled_start }}, Lagos time, is cancelled.
+
+If we set a new time, we will send you a new invitation. The attached update takes it off your calendar.{{else}}{{#if rescheduled}}The details of your interview for {{ vacancy_title }} have changed. Here they are.{{else}}Thank you for your application for {{ vacancy_title }}. We would like to meet you for an interview.{{/if}}
+
+**Starts:** {{ datetime scheduled_start }}, Lagos time
+
+**Ends:** {{ datetime scheduled_end }}
+
+{{#if by_video}}**Where:** by video
+
+[Join the Interview]({{ meeting_url }})
+
+If the link does not open, copy this address into your browser: {{ meeting_url }}{{/if}}{{#if in_person}}**Where:** {{ place }}{{#if place_address}}, {{ place_address }}{{/if}}{{/if}}{{#if by_phone}}**Where:** by phone. We will call you on the number you gave in your application.{{/if}}
+
+If you cannot make this time, please tell us as soon as you can{{#if org.email}} at {{ org.email }}{{/if}}.
+
+The attached invitation adds it to your calendar.{{/if}}

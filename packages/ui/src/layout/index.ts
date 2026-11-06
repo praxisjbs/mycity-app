@@ -8,3 +8,4 @@ export * from "./PageHeader";
 export * from "./PhoneOnly";
 export * from "./SplitPanes";
 export * from "./Stack";
+export * from "./StickyColumns";

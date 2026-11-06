@@ -9,8 +9,30 @@ import { DemoLinks } from "./DemoLinks";
  * decides whether search engines may list the page: only the careers list and
  * an open vacancy may (MILESTONES §6); every token page says noindex.
  * `brandInCard`: the page draws the mark inside its card, so the header leaves it out.
+ * `layout`: open for a page a stranger browses (Careers, a vacancy), with a SkylineHero at its head;
+ * the card (the default) for a page a person fills in or reads once.
+ * `pane`: the page's identity on a SkylineHero of size pane, beside the card on desktop and a band
+ * above it on a phone; the page's h1 is there. `bar`: a phone's action bar fixed at the foot.
  */
-export function Page({ title, index = false, brandInCard = false, children, below }: { title: string; index?: boolean; brandInCard?: boolean; children: ReactNode; below?: ReactNode }) {
+export function Page({
+  title,
+  index = false,
+  brandInCard = false,
+  layout = "card",
+  pane,
+  bar,
+  children,
+  below,
+}: {
+  title: string;
+  index?: boolean;
+  brandInCard?: boolean;
+  layout?: "card" | "open";
+  pane?: ReactNode;
+  bar?: ReactNode;
+  children: ReactNode;
+  below?: ReactNode;
+}) {
   useEffect(() => {
     document.title = `${title} · MyCity App`;
     let meta = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
@@ -23,6 +45,9 @@ export function Page({ title, index = false, brandInCard = false, children, belo
   }, [title, index]);
   return (
     <PublicPage
+      layout={layout}
+      pane={pane}
+      bar={bar}
       brand={
         brandInCard ? undefined : (
           <Link to="/jobs" aria-label="MyCityApp careers" className="no-underline">

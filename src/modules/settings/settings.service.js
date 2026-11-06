@@ -306,6 +306,7 @@ const DOC_LABELS = Object.freeze({
   sanction: "Sanction",
   letter: "Letter",
   vacancy: "Vacancy",
+  application: "Application",
   offer: "Offer Letter",
   contract: "Employment Contract",
   payroll_run: "Payroll Run",

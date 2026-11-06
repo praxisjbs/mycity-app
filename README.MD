@@ -80,6 +80,11 @@ mycity-app/
 │                             raised to signed and issued, through the services, tested by
 │                             tests/integration/queries-staging-seed.test.js; lib/signature.js
 │                             draws the pad's signature;
+│                             55_recruitment.js: Careers Settings, six roles in their states,
+│                             eleven applications through Apply, sittings, interview rounds
+│                             and the Talent Pool, through the services, on the Implementation
+│                             Team as hiring managers and panelists, tested by tests/integration/
+│                             recruitment-staging-seed.test.js;
 │                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest;
 │                             80_expenses.js: M8's categories, budgets, projects and requests at
 │                             every stage on the Implementation Team's accounts, through the
@@ -271,7 +276,8 @@ src/
 ├── services/
 │   ├── storage/       storage.service
 │   ├── media/         image-pipeline · av-pipeline · pdf-pipeline (a PDF's page count and first page) ·
-│   │                  pdf-page (the first page drawn by PDF.js in its own process) · scan · reconcile
+│   │                  pdf-page (the first page drawn by PDF.js in its own process) · pdf-text (a PDF's
+│   │                  text, for the CV reader, in its own process) · scan · reconcile
 │   ├── pdf/           chromium · pdf.service
 │   ├── mail/          system-mail.service · pace (the hourly sending limit) · smtp-errors (what a mail
 │   │                  server's refusal means) · tls-check (a server's TLS and certificate) ·
@@ -511,20 +517,21 @@ Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
 `suspension-without-pay-letter`, `termination-letter`,
 `salary-deduction-letter` (the letter a fine sends, purpose `fine`).
 
-### 5.7 M4 · Recruitment End to End · TB, LA, AJ · 2 to 13 Nov
+### 5.7 M4 · Recruitment End to End · GE · 2 to 13 Nov
 
 | Module | Files beyond the template |
 |---|---|
-| `vacancies` | `.public.routes` (careers list, vacancy by slug), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED), `.slug`, `.draft` (AI JD), `.questions` |
-| `candidates` | `.public.routes` (apply, write only), `.pipeline`, `.screening` (provisional flag), `.scorecard` (A10 weights), `.sla` |
-| `assessments` | `.public.routes` (take, token), `.authoring`, `.delivery`, `.timer` (server side), `.scoring` |
-| `interviews` | `.panel` (blind until the round closes), `.consolidate`, `.schedule` (ICS), `.notes` (AI cleanup) |
+| `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED; the board's stages and How We Hire), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards), `.matrix` (Recruitment's scope probes for the AI access matrix); the staff screens in `app/src/features/recruitment/`, one file per tab (`index.tsx` routes only): `Vacancies.tsx` with `VacancyForm.tsx` (the New Vacancy wizard), `VacancyQuestions.tsx` (Questions and Scorecard), `CareersSettings.tsx` and `CandidateEmails.tsx`; `Candidates.tsx` (the board, Invite to Apply, Screen With AI) and `CandidateSheet.tsx`; `Assessments.tsx` (library, sittings, Mark Answers) and `AssessmentQuestions.tsx`; `Interviews.tsx`, `MyCard.tsx` (the blind card) and `ScheduleInterview.tsx`; `TalentPool.tsx`; M5's INTERIM `Offers.tsx` and `Onboarding.tsx`; `shared.tsx` (labels, pills, refusals); each tab's `*.test.tsx` on the mock, sharing `testKit.tsx`. The mock is `app/src/api/mock/modules/recruitment.ts` (bodies checked by the contract's schemas) with its fixtures in `app/src/api/mock/data/recruitment.ts` |
+| `candidates` | `.public.routes` (apply, write only) and `.apply` (its service, no staff auth), `.pipeline` (the moves, entity_state_history), `.screening` (the estimate, provisional flag), `.score` (Score With AI and Screen With AI, `cv-screen`, from the outbox), `.scorecard` (A10 weights), `.sla` (days at stage), `.mail` (the candidate emails it sends), `.emails` (Candidate Emails, the editor), `.retention` (CVs left on Apply links that ended without an application, removed nightly by `jobs/schedulers/apply-cv-purge`), `.ai`, `.search` |
+| `assessments` | `.public.routes` (take, token) and `.delivery` (its service, no staff auth), `.authoring` (the library, export and import, Suggest With AI), `.service` (sittings: send, Send to Candidates, marks, cancel), `.timer` (the server's clock and how a sitting ends; `jobs/schedulers/assessment-expiry`), `.scoring` (points sealed in `answer_key_enc`), `.mail` (assessment-invite, the link made after commit), `.ai`, `.search` |
+| `interviews` | `.panel` (the card, blind until the round closes; the predicate is `.repo` BLIND), `.consolidate` (Close Round, the report and the Interview Assessment Form), `.schedule` (schedule, reschedule, cancel, the calendar entry and the candidate's ICS), `.notes` (Tidy With AI), `.reminders` (`jobs/schedulers/interview-reminders`), `.service` (the sheet), `.ai`, `.search` |
+| `talent_pool` | `.service` (Add to Pool and renew, Invite to Apply through candidates `inviteIn`, Remove, Export), `.retention` (24 months then purge, `jobs/schedulers/talent-pool-purge`; moved from M5, decided by TB, owned by GE), `.ai`, `.search` |
 
 Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media/scan` (ClamAV),
 `shared/state/state-history`. Prompts: `jd-draft`, `cv-screen`, `screening-questions`,
-`interview-notes-cleanup`. Gate 19 switches on.
+`assessment-questions`, `interview-notes-cleanup`. Gate 19 switches on.
 
-### 5.8 M5 · Offers, Documentation & Onboarding · LA, GE · 16 to 20 Nov
+### 5.8 M5 · Offers, Documentation & Onboarding · AJ, GE · 16 to 20 Nov
 
 | Module | Files beyond the template |
 |---|---|
@@ -532,12 +539,12 @@ Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media
 | `signatures` | `.public.routes` (verify, two verdicts), `.certificate`, `.signed-pdf`, `.verify` |
 | `onboarding` | `.public.routes` (candidate document upload), `.checklist` (documentation before onboarding), `.plans`, `.sop` |
 | `employment_contracts` | `.lifecycle` |
-| `talent_pool` | `.retention` (24 months then purge) |
 
 Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Templates: `offer-letter`,
-`offer-packet`, `employment-contract`, `signature-certificate`, and the recruitment mails.
+`offer-packet`, `employment-contract`, `signature-certificate`, and the offer and onboarding mails
+(`offer-sent`, `offer-signed`, `onboarding-documents`; the five recruitment mails are M4's, built).
 
-### 5.9 M6 · Payroll & Notifications · LA, AJ · 23 to 27 Nov
+### 5.9 M6 · Payroll & Notifications · TB, AJ · 23 to 27 Nov
 
 | Module | Files beyond the template |
 |---|---|
@@ -552,7 +559,7 @@ screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2
 (`docs/guides/notifications.md`). The daily rate divides by the working days from
 `shared/time/working-week` (A22), never by a constant.
 
-### 5.10 M7 · Partnerships, CRM & Trackers · GE, LA · 30 Nov to 4 Dec
+### 5.10 M7 · Partnerships, CRM & Trackers · LA, GE · 30 Nov to 4 Dec
 
 The build plan and the file map are `docs/guides/partnerships.md` (Appendix A and D), M7's only
 source of truth. PR 1 (05/11/2026) filled the seven contract files, migrations `7010` to `7040`, seed
@@ -592,7 +599,7 @@ Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR
 Chain for every request: requester, line manager (skipped for a line manager's own), Operations &
 People, requisition, CEO, disbursed (MILESTONES §13, `docs/guides/expenses.md` §6.3).
 
-### 5.12 M9 · Settings & Governance · GE · 7 to 11 Dec
+### 5.12 M9 · Settings & Governance · TB · 7 to 11 Dec
 
 | Module | Files beyond the template |
 |---|---|
@@ -619,8 +626,9 @@ a declared action a person confirms (A23 as amended 01/11/2026; `docs/guides/pra
 
 No new modules. The User Guide (`docs/manual/`, the Knowledge Hub's User Guide tab) is written
 milestone by milestone from M0 as each is approved (JBS Praxis, 25/10/2026,
-`docs/guides/user-guide.md` §1.1); M11 completes it with the public site's chapter and the
-training sessions, and brings `docs/runbooks/*.md` up to date. The nightly backup, the weekly restore drill and the uptime probe
+`docs/guides/user-guide.md` §1.1); the public site's chapter (`docs/manual/public-site.md`) was begun
+with M4's pages (careers, a vacancy, applying, an assessment) and M5 adds signing and verifying. M11
+completes the guide with the training sessions, and brings `docs/runbooks/*.md` up to date. The nightly backup, the weekly restore drill and the uptime probe
 were built in M0 and run from then on; M11 shows them working for the handover: a restore drill
 timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 `/srv/mycity/backups/drills.jsonl`) and an alert from the probe.
@@ -633,8 +641,8 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail), `link-preview` (a chat link's card, fetched after the message commits) | `celebrations`, `community-membership` (every active login in #general and #announcements, hourly), `announcement-release` (the safety net behind `announcement-publish`), `mail-sync` (every minute: due mail, then every mailbox at the staff mail server's interval), `attendance-day-close`, `attendance-clock-watch` (clock-in and clock-out reminders and the System Clock-Out, every 5 minutes), `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `export-cleanup` (export files removed a day after they were made, every hour); loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | `query-rule-sweep` (people with a task due yesterday still open or done late queued for `overdue_task`, 06:20 Lagos) |
-| M4 | `assessment-expire`, `interview-feedback-reminder` | `assessment-expiry`, `interview-reminders` |
-| M5 | `offer-expiry`, `signature-reminder`, `onboarding-dispatch`, `talent-pool-purge` | `offer-expiry`, `signature-reminders`, `talent-pool-purge` |
+| M4 | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` (the Talent Pool moved from M5, TB 04/11/2026), `apply-cv-purge` (CVs on Apply links that ended without an application, nightly at 02:47 Lagos) |
+| M5 | `offer-expiry`, `signature-reminder`, `onboarding-dispatch` | `offer-expiry`, `signature-reminders` |
 | M6 | `payroll-compute`, `payslip-render` | |
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
 | M8 | `budget-threshold` (the morning's sweep, re-run by hand for a day), `approval-ageing` | `budget-threshold` (each budget line 90% used, committed and spent, told to its department's head and Operations & People once, 07:00 Lagos; `docs/guides/expenses.md` §6.6), `approval-ageing` |
@@ -950,9 +958,9 @@ On production, run it without `--sample` and enter the real person's details
 
 | Initials | Name | Owns |
 |---|---|---|
-| GE | Godwin-Okoh Elisha | Architecture, schema, M0, M3, M7, M9; community and mailbox in M1 |
-| TB | Tom-Blake Asaah | Dashboard (M1), M4, M10, M11 |
-| LA | Love Adeola | Migrations and data (M0), attendance (M1), M5, M6 |
-| AJ | Adole Jerome | Frontend foundation, ESS (M1), M2, M8 |
+| GE | Godwin-Okoh Elisha | Architecture, schema, M0, M3, M4; community and mailbox in M1 |
+| TB | Tom-Blake Asaah | Dashboard (M1), M6, M9, M10, M11 |
+| LA | Love Adeola | Migrations and data (M0), attendance (M1), M7 |
+| AJ | Adole Jerome | Frontend foundation, ESS (M1), M2, M5, M8 |
 
 Engineered by [JBS Praxis](https://jbspraxis.com).

@@ -1,194 +1,468 @@
-import type { ApplicationBody, AssessmentQuestion, AssessmentSession, OfferToSign, Vacancy, VacancyCard, VerifyResult } from "@/api/types/public";
-import { created, fail, inDays, inMinutes, invalid, ok, paged, route } from "./core";
+import type { ApplicationReceipt, ApplyLink, ApplyQuestion, AssessmentSession, PublicJob, PublicJobCard, PublicQuestion } from "@mycity/contract/contract.gen.ts";
+import candidates from "@mycity/contract/schemas/candidates.js";
+import type { OfferToSign, VerifyResult } from "@/api/types/public";
+import { fail, inDays, invalid, ok, paged, route, type Req } from "./core";
 
 /**
- * Fixtures for the public pages. The roles, people and offer numbers are the
- * staff app's own mock (app/src/api/mock/modules/recruitment.ts), so a demo can
- * follow one candidate from the careers page to a signed, verified offer.
+ * Fixtures for the public pages, in the contract's own shapes (P11). The six vacancies, the candidates
+ * and the assessments are the staff app's mock (app/src/api/mock/data/recruitment.ts), so a demo
+ * follows one candidate from the careers page to their assessment; a few more open roles live here
+ * only, so Careers shows its search. Every bad link is the same 404 the API sends.
  */
 
-/* ── Vacancies ── */
-const VACANCIES: Vacancy[] = [
-  {
-    slug: "content-producer", title: "Content Producer", department: "Content", location: "Lagos, Nigeria", work_pattern: "hybrid", work_pattern_note: "3 days on site",
-    employment_type: "Full time", probation_months: 3, reports_to: "Head of Content", salary_min: "400000.00", salary_max: "520000.00",
-    summary: "You will plan, shoot and publish the stories that show people what is on in their city this week. Video first, written second, always on time.",
-    must_have: "Two years producing short-form video for a brand or a publisher. A portfolio we can watch. Comfortable on a set and in an edit.",
-    nice_to_have: "Experience covering live events. Yoruba or Igbo for voice-overs.",
-    how_we_hire: "Application, then a numerical reasoning test and a content calendar case study, then a panel of three. We will tell you where you are at each step.",
-    applicants: 24, state: "open",
-  },
-  {
-    slug: "partnerships-associate", title: "Partnerships Associate", department: "Marketing & Sales", location: "Lagos, Nigeria", work_pattern: "hybrid", work_pattern_note: "4 days on site",
-    employment_type: "Full time", probation_months: 3, reports_to: "Operations", salary_min: "500000.00", salary_max: "700000.00",
-    summary: "You will build and hold the relationships that put MyCityApp in front of millions of Nigerians. Working with brands, government and venues across Lagos and beyond.",
-    must_have: "A degree in management, marketing or business. Fluent English. Four years in partnerships or business development. Comfortable in a room with a commissioner and a brand manager on the same afternoon.",
-    nice_to_have: "Experience in telecoms, banking or hospitality partnerships. A network in Lagos State government.",
-    how_we_hire: "Application, then two psychometric assessments and a case study, then a panel of three. We will tell you where you are at each step.",
-    applicants: 19, state: "open",
-  },
-  {
-    slug: "backend-engineer", title: "Backend Engineer", department: "Engineering", location: "Anywhere in Nigeria", work_pattern: "remote", work_pattern_note: null,
-    employment_type: "Full time", probation_months: 3, reports_to: "Head of Engineering", salary_min: null, salary_max: null,
-    summary: "You will build the services behind the app: listings, bookings, payments and the data that keeps them honest. Node, Postgres and a lot of care.",
-    must_have: "Three years of Node.js in production. Real SQL, not only an ORM. You have been on call for something you built.",
-    nice_to_have: "Payments in Nigeria. Redis and queues. Writing that other engineers enjoy reading.",
-    how_we_hire: "Application, then a technical assessment in Node and SQL, then a panel of three. We will tell you where you are at each step.",
-    applicants: 14, state: "open",
-  },
-  {
-    slug: "studio-assistant", title: "Studio Assistant", department: "Studio", location: "Lagos, Nigeria", work_pattern: "on_site", work_pattern_note: null,
-    employment_type: "Contract, 6 months", probation_months: null, reports_to: "Studio Manager", salary_min: "180000.00", salary_max: "220000.00",
-    summary: "Keep the studio ready: kit, bookings, call sheets and the hundred small things that make a shoot day work.",
-    must_have: "A year on sets or in a studio. Early starts. Careful with expensive equipment.",
-    nice_to_have: null,
-    how_we_hire: "Application, then a short conversation with the Studio Manager.",
-    applicants: 31, state: "paused",
-  },
-  {
-    slug: "customer-support-lead", title: "Customer Support Lead", department: "Support", location: "Abuja, Nigeria", work_pattern: "on_site", work_pattern_note: null,
-    employment_type: "Full time", probation_months: 3, reports_to: "Operations", salary_min: "450000.00", salary_max: "560000.00",
-    summary: "Lead the team that answers every message our users send, and turn what they tell us into fixes.",
-    must_have: "Three years in customer support, one leading a team.",
-    nice_to_have: null,
-    how_we_hire: "Application, then a situational judgement test, then a panel of two.",
-    applicants: 42, state: "filled",
-  },
-];
-const card = (v: Vacancy): VacancyCard => ({ slug: v.slug, title: v.title, department: v.department, location: v.location, work_pattern: v.work_pattern });
+/* ── Text as the API sends it: blocks from the one Markdown renderer ── */
+type Block = PublicJob["description"][number];
+const span = (text: string, bold = false) => ({ text, bold, italic: false, href: null });
+const p = (...parts: Array<string | [string]>): Block => ({ kind: "paragraph", spans: parts.map((x) => (Array.isArray(x) ? span(x[0], true) : span(x))) });
+const h = (level: 2 | 3, text: string): Block => ({ kind: "heading", level, spans: [span(text)] });
+const ul = (...items: string[]): Block => ({ kind: "bullets", items: items.map((t) => [span(t)]) });
 
-/* A paused role leaves the list and keeps its link; a filled one leaves the list and says so. */
-route("GET /api/public/v1/jobs", (req) => paged(VACANCIES.filter((v) => v.state === "open").map(card), req, (v) => [v.title, v.department, v.location]));
-route("GET /api/public/v1/jobs/:slug", (req) => {
-  const v = VACANCIES.find((x) => x.slug === req.params.slug);
-  /* An unpublished or unknown slug gets the same 404 as nonsense: slugs cannot be walked. */
-  return v ? ok(v) : fail(404, "NOT_FOUND", "There is no open role at this address.");
+const ABOUT: Block[] = [
+  p("MyCityApp is a digital city and lifestyle platform connecting people, businesses, experiences and government services across Nigerian cities. We are building a scalable ecosystem that helps businesses reach customers, grow their visibility and generate value through technology."),
+];
+
+/** The end of a day in Lagos (23:59:59, UTC+1), `days` from today. */
+const lagosEnd = (days: number) => {
+  const d = new Date(Date.now() + days * 86400000);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 22, 59, 59)).toISOString();
+};
+
+type Role = PublicJob & { questions: ApplyQuestion[] };
+const q = (id: string, question_type: ApplyQuestion["question_type"], prompt: string, required: boolean, options: string[] | null = null): ApplyQuestion => ({
+  vacancy_question_id: id,
+  question_type,
+  prompt,
+  options,
+  required,
+});
+const role = (r: Partial<Role> & Pick<Role, "slug" | "title" | "department" | "location" | "work_pattern" | "description">): Role => ({
+  employment_type: "full_time",
+  work_pattern_note: null,
+  probation_months: 3,
+  reports_to: null,
+  min_experience_years: null,
+  working_days: "Monday to Friday",
+  about_company: ABOUT,
+  requirements: null,
+  nice_to_have: null,
+  how_we_hire: ["apply", "screening", "interview"],
+  applicants: 0,
+  closes_at: lagosEnd(21),
+  state: "open",
+  questions: [],
+  ...r,
 });
 
-/* ── Apply: a one-time, write-only link ── */
-type ApplyRow = { vacancy: string; expires_at: string; state: "open" | "submitted" };
-const APPLY = new Map<string, ApplyRow>([
-  ["k7Qm2TxV9pLa", { vacancy: "Partnerships Associate", expires_at: inDays(2), state: "open" }],
-  ["Wn4cR8yHj2Zs", { vacancy: "Content Producer", expires_at: inDays(-3), state: "open" }],
+const ROLES: Role[] = [
+  /* MyCity's own job description for the role (docs/MyCity-ERP-Documents), as staff would paste it. */
+  role({
+    slug: "head-sales-revenue-lagos",
+    title: "Head, Sales & Revenue",
+    department: "Marketing & Sales",
+    location: "Lekki Phase 1, Lagos",
+    work_pattern: "hybrid",
+    work_pattern_note: "2 days in office, 3 from home",
+    working_days: "Monday to Saturday",
+    reports_to: "Chief Executive Officer",
+    min_experience_years: 8,
+    probation_months: null,
+    how_we_hire: ["apply", "screening", "assessment", "interview"],
+    applicants: 23,
+    closes_at: lagosEnd(18),
+    description: [
+      p("The Head, Sales & Revenue will lead MyCityApp & MyLagosApp's commercial growth by developing and executing the company's sales and revenue strategy."),
+      p("The role will own revenue generation, sales targets, pipeline development, client and merchant acquisition, commercial partnerships and sales team performance, while building a structured and scalable sales function."),
+      h(2, "Key Responsibilities"),
+      h(3, "1. Sales & Revenue Strategy"),
+      ul(
+        "Develop and execute MyCityApp's & MyLagosApp overall sales and revenue strategy.",
+        "Identify new revenue opportunities, products and commercial models.",
+        "Set clear sales targets and revenue objectives.",
+        "Develop strategies for customer, merchant and corporate acquisition.",
+        "Drive sustainable and predictable revenue growth.",
+      ),
+      h(3, "2. Business Development & Client Acquisition"),
+      ul(
+        "Identify and pursue high-value businesses, brands, merchants and corporate clients.",
+        "Build and manage a strong pipeline of prospective clients.",
+        "Lead high-value pitches, presentations and commercial negotiations.",
+        "Develop strategic relationships with key decision-makers.",
+        "Convert opportunities into paying clients and long-term accounts.",
+      ),
+      h(3, "3. Sales Pipeline & Conversion"),
+      ul(
+        "Establish a structured sales pipeline from lead generation to deal closure.",
+        "Monitor lead quality, conversion rates, sales cycle and deal value.",
+        "Ensure consistent follow-up and movement of opportunities through the pipeline.",
+        "Identify bottlenecks and implement strategies to improve conversion.",
+      ),
+      h(3, "4. Revenue Growth"),
+      ul(
+        "Develop multiple revenue streams across MyCityApp & MyLagosApp's products and services.",
+        "Identify opportunities for upselling, cross-selling and customer retention.",
+        "Monitor revenue performance against targets.",
+        "Develop strategies to increase average revenue per client and overall commercial value.",
+      ),
+      h(3, "5. Sales Team Leadership"),
+      ul(
+        "Build, lead and develop the sales team.",
+        "Assign targets and territories based on business priorities.",
+        "Establish clear sales processes, standards and accountability.",
+        "Coach team members on prospecting, pitching, negotiation and closing.",
+        "Monitor individual and team performance.",
+      ),
+      h(3, "6. Partnerships & Commercial Opportunities"),
+      ul(
+        "Identify strategic commercial partnerships that can generate revenue or significant business value.",
+        "Work with internal teams to develop commercially viable partnership propositions.",
+        "Lead commercial negotiations and ensure agreed terms support MyCityApp's business objectives.",
+        "Track partnership performance and revenue contribution.",
+      ),
+      h(3, "7. Sales Reporting & Forecasting"),
+      ul(
+        "Provide accurate weekly and monthly sales reports.",
+        "Maintain visibility on pipeline value, expected closures and revenue projections.",
+        "Provide management with realistic sales forecasts.",
+        "Use sales data and market insights to guide commercial decisions.",
+      ),
+      h(3, "8. Sales Process & Systems"),
+      ul(
+        "Develop and implement effective sales processes and standards.",
+        "Ensure proper use of CRM and sales management systems.",
+        "Establish clear documentation of leads, opportunities, client engagements and deals.",
+        "Continuously improve the sales process based on performance data and market feedback.",
+      ),
+      h(2, "Key Performance Indicators (KPIs)"),
+      p("The role will be measured primarily on commercial outcomes, including:"),
+      ul(
+        "Revenue generated against target",
+        "New clients/merchants acquired",
+        "Value of closed deals",
+        "Sales pipeline value",
+        "Lead-to-client conversion rate",
+        "Average deal value",
+        "Sales cycle",
+        "Client retention and repeat revenue",
+        "Revenue generated from partnerships",
+        "Sales team performance against targets",
+        "Accuracy of sales forecasts",
+      ),
+    ],
+    requirements: [
+      ul(
+        "Bachelor's degree in Business Administration, Marketing, Economics, Finance or a related field.",
+        "8+ years of relevant experience in Sales, Business Development, Revenue Management, Commercial or related roles.",
+        "Proven experience leading sales teams and delivering revenue targets.",
+        "Demonstrable track record of personally closing significant business deals.",
+        "Experience in technology, digital platforms, fintech, media, advertising, telecommunications, FMCG, hospitality, e-commerce or other high-growth environments is an advantage.",
+        "Strong experience in B2B sales, client acquisition and commercial negotiations.",
+        "Strong understanding of sales pipeline management and CRM systems.",
+        "Excellent negotiation, pitching and relationship-management skills.",
+        "Strong commercial and analytical mindset.",
+        "Ability to operate independently and deliver in a fast-paced, growth-focused environment.",
+      ),
+    ],
+    nice_to_have: [
+      p("We are looking for a commercial leader, not simply a sales administrator. Someone who can identify opportunities, open doors, build relationships, negotiate, close deals and build a high-performing sales engine around those opportunities."),
+      p("The ideal candidate should be target-driven, commercially aggressive, strategic, hands-on and accountable for results."),
+    ],
+    questions: [
+      q("11111111-1111-4111-8111-000000000001", "yes_no", "Have you led a sales team of three or more people?", true),
+      q("11111111-1111-4111-8111-000000000002", "choice", "Which best describes the deals you have closed?", true, ["Under ₦5 million a year", "₦5 million to ₦50 million a year", "Over ₦50 million a year"]),
+      q("11111111-1111-4111-8111-000000000003", "text", "Share a link to a proposal or campaign you led, if you can.", false),
+    ],
+  }),
+  /* MyCity's own Motion and Graphics brief is this role's take-home (VAC-0002 in the staff mock). */
+  role({
+    slug: "graphics-and-motion-designer-lagos",
+    title: "Graphics and Motion Designer",
+    department: "Studio",
+    location: "Ikeja, Lagos",
+    work_pattern: "on_site",
+    min_experience_years: 3,
+    applicants: 12,
+    closes_at: lagosEnd(21),
+    /* Written as staff often paste it, under its own Role Overview heading: the page shows that heading once. */
+    description: [
+      h(2, "Role Overview"),
+      p("The Graphics and Motion Designer turns MyCityApp, a city discovery and lifestyle platform, into engaging, culturally relevant visual content that drives awareness and adoption."),
+      h(2, "Key Responsibilities"),
+      ul("Design the weekly campaign art for the app and social media.", "Edit and animate short promo videos for Instagram Reels and TikTok.", "Keep the brand consistent across every piece."),
+    ],
+    requirements: [ul("Three years of brand and motion design.", "A portfolio of flyers, posts and short videos.", "Adobe After Effects and Illustrator, or the like.")],
+    questions: [q("33333333-3333-4333-8333-000000000001", "text", "A link to your portfolio", true)],
+  }),
+  /* VAC-0003: open, but its closing day has passed, so it takes no one and reads closed. */
+  role({
+    slug: "content-producer-lagos",
+    title: "Content Producer",
+    department: "Content",
+    location: "Lekki Phase 1, Lagos",
+    work_pattern: "hybrid",
+    employment_type: "contract",
+    min_experience_years: 2,
+    applicants: 41,
+    closes_at: lagosEnd(-2),
+    description: [p("The Content Producer plans, shoots and writes the guides and short videos that show MyCityApp users the best of their city, every week, with the Studio and the city editors.")],
+    requirements: [ul("Two years producing content for social media.", "A portfolio of guides or short videos.")],
+  }),
+  /* VAC-0004, paused: the link keeps working and says so. */
+  role({
+    slug: "customer-support-lead-lagos",
+    title: "Customer Support Lead",
+    department: "Support",
+    location: "Ikeja, Lagos",
+    work_pattern: "on_site",
+    min_experience_years: 4,
+    state: "paused",
+    description: [p("The Customer Support Lead runs the team that answers MyCityApp's users and partners by chat, email and phone, and turns what they hear into fixes the product team can act on.")],
+    requirements: [ul("Four years in customer support, one leading a team.", "Calm, clear writing in English.")],
+  }),
+  /* VAC-0006, closed as filled. VAC-0005 (Backend Engineer) is a draft, so it is never on the public site. */
+  role({
+    slug: "partnerships-associate-lagos",
+    title: "Partnerships Associate",
+    department: "Marketing & Sales",
+    location: "Lekki Phase 1, Lagos",
+    work_pattern: "hybrid",
+    min_experience_years: 2,
+    state: "filled",
+    closes_at: lagosEnd(-30),
+    description: [p("The Partnerships Associate signs and looks after the venues and brands that list on MyCityApp, from the first call to the renewal a year on.")],
+    requirements: [ul("Two years in sales or partnerships.", "Comfortable on the phone and in person.")],
+  }),
+  /*
+   * Roles the public mock alone holds, so Careers has more than 8 open and shows its search, and a
+   * salary band and a closed role are seen. Departments are the app mock's own.
+   */
+  role({ slug: "data-analyst-lagos", title: "Data Analyst", department: "Engineering", location: "Lekki Phase 1, Lagos", work_pattern: "hybrid", applicants: 15, salary_min: "500000.00", salary_max: "700000.00", description: [p("The Data Analyst turns what people search, save and book into the figures MyCityApp's teams decide with.")] }),
+  role({ slug: "social-media-manager-lagos", title: "Social Media Manager", department: "Marketing & Sales", location: "Lekki Phase 1, Lagos", work_pattern: "hybrid", applicants: 33, description: [p("The Social Media Manager runs MyCityApp's social channels and grows the community around them.")] }),
+  role({ slug: "city-editor-abuja", title: "City Editor, Abuja", department: "Content", location: "Wuse, Abuja", work_pattern: "on_site", applicants: 8, description: [p("The City Editor owns MyCityApp's guide to Abuja: what is in it, how it reads and how fresh it stays.")] }),
+  role({ slug: "finance-officer-lagos", title: "Finance Officer", department: "Finance", location: "Lekki Phase 1, Lagos", work_pattern: "on_site", reports_to: "Head of Finance", applicants: 19, description: [p("The Finance Officer keeps MyCityApp's books, payments and month-end close in order.")] }),
+  role({ slug: "product-designer-lagos", title: "Product Designer", department: "Studio", location: "Ikeja, Lagos", work_pattern: "hybrid", applicants: 27, description: [p("The Product Designer shapes how people find and book what their city offers in the MyCityApp app.")] }),
+  role({ slug: "community-manager-lagos", title: "Community Manager", department: "Marketing & Sales", location: "Lekki Phase 1, Lagos", work_pattern: "hybrid", applicants: 11, description: [p("The Community Manager brings MyCityApp's users and partners together, online and at city events.")] }),
+  role({ slug: "operations-intern-lagos", title: "Operations Intern", department: "Operations & People", location: "Lekki Phase 1, Lagos", work_pattern: "on_site", employment_type: "internship", probation_months: null, applicants: 64, closes_at: lagosEnd(5), description: [p("Six months with the team that keeps MyCityApp running: people, offices, suppliers and the day to day.")] }),
+  role({ slug: "events-coordinator-lagos", title: "Events Coordinator", department: "Marketing & Sales", location: "Victoria Island, Lagos", work_pattern: "on_site", state: "closed", closes_at: lagosEnd(-3), description: [p("The Events Coordinator plans MyCityApp's city events.")] }),
+];
+
+const cardOf = (r: Role): PublicJobCard => ({ slug: r.slug, title: r.title, department: r.department, location: r.location, work_pattern: r.work_pattern });
+/** As the server's publicState: an open role past its closing time reads closed. */
+const stateOf = (r: Role): PublicJob["state"] => (r.state === "open" && r.closes_at && Date.parse(r.closes_at) <= Date.now() ? "closed" : r.state);
+const jobOf = ({ questions: _q, ...r }: Role): PublicJob => ({ ...r, state: stateOf(r as Role) });
+const notFound = () => fail(404, "NOT_FOUND", "This link is not valid or has expired");
+const takesApplications = (r: Role) => stateOf(r) === "open";
+
+route("GET /api/public/v1/jobs", (req) => paged(ROLES.filter(takesApplications).map(cardOf), req, (v) => [v.title, v.department, v.location]));
+route("GET /api/public/v1/jobs/:slug", (req) => {
+  const r = ROLES.find((x) => x.slug === req.params.slug);
+  return r ? ok(jobOf(r)) : fail(404, "NOT_FOUND", "There is no open role at this address");
+});
+
+/* ── Apply ── */
+type Link = { slug: string; expires_at: string; receipt: ApplicationReceipt | null; email: string | null };
+let nextApp = 42;
+const LINKS = new Map<string, Link>([
+  ["k7Qm2TxV9pLa", { slug: "head-sales-revenue-lagos", expires_at: inDays(2), receipt: null, email: null }],
+  ["Bv3nQ8sLp2Wd", { slug: "graphics-and-motion-designer-lagos", expires_at: inDays(2), receipt: null, email: null }],
+  ["Wn4cR8yHj2Zs", { slug: "partnerships-associate-lagos", expires_at: inDays(-1), receipt: null, email: null }],
 ]);
-const opaque = () => Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"[b % 56]).join("");
+const opaque = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"[b % 56]).join("");
+const liveLink = (token: string) => {
+  const l = LINKS.get(token);
+  return l && Date.parse(l.expires_at) > Date.now() ? l : null;
+};
 
 route("POST /api/public/v1/jobs/:slug/apply", (req) => {
-  const v = VACANCIES.find((x) => x.slug === req.params.slug);
-  if (!v) return fail(404, "NOT_FOUND", "There is no open role at this address.");
-  if (v.state !== "open") return fail(409, v.state === "paused" ? "VACANCY_PAUSED" : "VACANCY_FILLED", v.state === "paused" ? "This role is not taking applications right now." : "This role has been filled.");
+  const r = ROLES.find((x) => x.slug === req.params.slug);
+  if (!r || !takesApplications(r)) return fail(404, "NOT_FOUND", "There is no open role at this address");
   const token = opaque();
-  APPLY.set(token, { vacancy: v.title, expires_at: inDays(2), state: "open" });
-  return created({ token });
+  LINKS.set(token, { slug: r.slug, expires_at: inDays(2), receipt: null, email: null });
+  return ok({ token });
 });
-
-function applyLink(token: string) {
-  const a = APPLY.get(token);
-  if (!a) return { err: fail(404, "TOKEN_INVALID", "This link is not valid. Check you opened the whole address from the email.") };
-  if (a.state === "submitted") return { err: fail(409, "TOKEN_USED", "This application has already been sent. We will email you within five working days.") };
-  if (new Date(a.expires_at).getTime() < Date.now()) return { err: fail(410, "TOKEN_EXPIRED", "This link has expired. Open the role again from the careers page to start a new application.") };
-  return { a };
-}
 route("GET /api/public/v1/apply/:token", (req) => {
-  const { a, err } = applyLink(req.params.token);
-  return err ?? ok({ vacancy_title: a!.vacancy, expires_at: a!.expires_at, state: a!.state });
-});
-let applications = 0;
-route("POST /api/public/v1/apply/:token", (req) => {
-  const { a, err } = applyLink(req.params.token);
-  if (err) return err;
-  const b = req.body as Partial<ApplicationBody>;
-  const e: Record<string, string[]> = {};
-  if (String(b.full_name ?? "").trim().split(/\s+/).length < 2) e.full_name = ["Your first and last name"];
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(b.email ?? "").trim())) e.email = ["An email address we can reach you at"];
-  if (String(b.phone ?? "").replace(/\D/g, "").length < 10) e.phone = ["A phone number with at least 10 digits"];
-  if (!Number.isInteger(b.years_experience) || b.years_experience! < 0 || b.years_experience! > 50) e.years_experience = ["A whole number of years"];
-  if (!b.cv_document_id) e.cv_document_id = ["Attach your CV"];
-  if (String(b.why ?? "").trim().length < 20) e.why = ["A sentence or two, at least 20 characters"];
-  if (Object.keys(e).length) return invalid(e);
-  a!.state = "submitted";
-  applications += 1;
-  return created({ reference: `APP-${String(1040 + applications).padStart(4, "0")}`, submitted_at: new Date().toISOString() });
+  const l = liveLink(req.params.token);
+  if (!l || l.receipt) return notFound();
+  const r = ROLES.find((x) => x.slug === l.slug)!;
+  const out: ApplyLink = { vacancy_title: r.title, expires_at: l.expires_at, questions: r.questions };
+  return ok(out);
 });
 
-/* ── Assessment: the timer runs here, on the "server" ── */
-type Sess = Omit<AssessmentSession, "server_now"> & { all: AssessmentQuestion[] };
-const tq = (n: number, prompt: string, answer: string | null = null): AssessmentQuestion => ({ question_id: `q${n}`, n, kind: "text", prompt, options: null, answer });
-const cq = (n: number, prompt: string, opts: string[]): AssessmentQuestion => ({ question_id: `q${n}`, n, kind: "choice", prompt, options: opts.map((text, i) => ({ id: String.fromCharCode(97 + i), text })), answer: null });
-const ASSESS = new Map<string, Sess>([
-  ["Hb6tZ3qNw8Rk", {
-    candidate_first_name: "Adaeze", vacancy_title: "Partnerships Associate",
-    assessment: { title: "Partnership brief", kind: "Case study", duration_min: 90, question_count: 6, instructions: "Six questions about one partnership. Write as you would to a colleague: plain, specific, with numbers where they help. A person reads every answer." },
-    state: "in_progress", ends_at: inMinutes(42.3), current: 2, submitted_at: null, questions: null,
-    all: [
-      tq(1, "Name three kinds of partner that would bring MyCityApp the most new users in Lagos this year, and why each.", "Telcos for reach, banks for trust and payments, and event venues because they bring people who are already out in the city."),
-      tq(2, "What would you want to know about a partner before the first meeting? List what you would find out and where.", "Their audience size and who it is, what they have tried with other apps, and who signs. Annual reports, LinkedIn, and anyone we know there."),
-      tq(3, "A hotel group wants to list 40 properties on MyCityApp but will not pay a listing fee. Outline the partnership you would propose, and what MyCity gets.", "I would structure it as a revenue share on bookings driven through the app rather than a flat fee..."),
-      tq(4, "The hotel group agrees in principle. Write the three terms you would insist on in the MOU."),
-      tq(5, "Six months in, bookings are a third of the forecast. What do you look at first, and what do you say to the partner?"),
-      tq(6, "Write the two-paragraph email that opens the conversation with the hotel group's commercial director."),
-    ],
-  }],
-  ["Px2mL9vQe4Ty", {
-    candidate_first_name: "Fatima", vacancy_title: "Backend Engineer",
-    assessment: { title: "Numerical reasoning", kind: "Psychometric", duration_min: 25, question_count: 5, instructions: "Five questions. Pick one answer for each. You can go back and change an answer until you submit or the time runs out. A calculator is fine." },
-    state: "not_started", ends_at: null, current: 0, submitted_at: null, questions: null,
-    all: [
-      cq(1, "A venue sold 1,200 tickets at ₦5,000 and 300 at ₦12,000. What was the total?", ["₦9,600,000", "₦8,400,000", "₦9,000,000", "₦10,200,000"]),
-      cq(2, "Bookings rose from 800 to 1,000. By what percentage did they rise?", ["20%", "25%", "80%", "200%"]),
-      cq(3, "A partner earns 15% of each ₦20,000 booking. How much do they earn on 40 bookings?", ["₦120,000", "₦80,000", "₦300,000", "₦12,000"]),
-      cq(4, "Three staff share ₦450,000 in the ratio 2:3:4. How much is the largest share?", ["₦200,000", "₦150,000", "₦180,000", "₦225,000"]),
-      cq(5, "A page loads in 1.6 seconds and must be 25% faster. What is the target?", ["1.2 seconds", "1.4 seconds", "1.0 seconds", "1.25 seconds"]),
-    ],
-  }],
-  ["Jd5sF7aWc3Xe", {
-    candidate_first_name: "Obinna", vacancy_title: "Content Producer",
-    assessment: { title: "Content calendar", kind: "Case study", duration_min: 60, question_count: 3, instructions: "Three questions about a month of content." },
-    state: "submitted", ends_at: null, current: 0, submitted_at: inDays(-6), questions: null, all: [],
-  }],
-]);
-const view = (s: Sess): AssessmentSession => {
-  if (s.state === "in_progress" && s.ends_at && new Date(s.ends_at).getTime() <= Date.now()) {
-    /* Time is up: what was saved is submitted as it stands. */
-    s.state = "timed_out";
-    s.submitted_at = s.ends_at;
+/** The answers held to the vacancy's questions, as the API holds them: field errors name the question. */
+function answersOf(r: Role, answers: Record<string, string>): Record<string, string[]> {
+  const fields: Record<string, string[]> = {};
+  for (const qn of r.questions) {
+    const a = String(answers[qn.vacancy_question_id] ?? "").trim();
+    const key = `answers.${qn.vacancy_question_id}`;
+    if (!a) {
+      if (qn.required) fields[key] = ["Answer this question"];
+    } else if (qn.question_type === "yes_no" && !["yes", "no"].includes(a.toLowerCase())) fields[key] = ["Answer yes or no"];
+    else if (qn.question_type === "choice" && !(qn.options ?? []).includes(a)) fields[key] = ["Pick one of the options"];
   }
-  const { all, ...rest } = s;
-  return { ...rest, server_now: new Date().toISOString(), questions: s.state === "in_progress" ? all : null };
+  return fields;
+}
+
+route("POST /api/public/v1/apply/:token", (req: Req) => {
+  const l = liveLink(req.params.token);
+  if (!l) return notFound();
+  /* A second press finds the link spent and is given the first one's receipt. */
+  if (l.receipt) return ok(l.receipt);
+  const checked = candidates.ApplicationSubmit.safeParse(req.body);
+  const r = ROLES.find((x) => x.slug === l.slug)!;
+  const fields: Record<string, string[]> = {};
+  if (!checked.success) for (const i of checked.error.issues) (fields[i.path.join(".") || "body"] ??= []).push(i.message);
+  Object.assign(fields, answersOf(r, ((req.body as { answers?: Record<string, string> }).answers ?? {}) as Record<string, string>));
+  if (Object.keys(fields).length) return invalid(fields);
+  l.receipt = { reference: `APP-${String(++nextApp).padStart(4, "0")}`, submitted_at: new Date().toISOString() };
+  l.email = String((req.body as { email?: string }).email ?? "");
+  r.applicants += 1;
+  return ok(l.receipt);
+});
+
+/* ── Assessment ── */
+type Sitting = AssessmentSession & { due_days: number | null };
+const tq = (n: number, prompt: string, answer: string | null = null): PublicQuestion => ({ assessment_question_id: `aaaaaaaa-0000-4000-8000-${String(n).padStart(12, "0")}`, n, question_type: "text", prompt, options: null, answer, file_name: null });
+const cq = (n: number, prompt: string, opts: string[], answer: string | null = null): PublicQuestion => ({
+  assessment_question_id: `aaaaaaaa-0000-4000-8000-${String(n).padStart(12, "0")}`,
+  n,
+  question_type: "choice",
+  prompt,
+  options: opts.map((text, i) => ({ id: String.fromCharCode(97 + i), text })),
+  answer,
+  file_name: null,
+});
+const fq = (n: number, prompt: string): PublicQuestion => ({ assessment_question_id: `aaaaaaaa-0000-4000-8000-${String(n).padStart(12, "0")}`, n, question_type: "file", prompt, options: null, answer: null, file_name: null });
+
+/* The staff mock's Sales Scenario Case Study (ASM-0002): 60 minutes, two written answers. */
+const CASE: PublicQuestion[] = [
+  tq(1, "A chain of five Lagos restaurants spends ₦2 million a month on billboards and wants more weekday diners. Write the plan you would pitch them for a three month MyCityApp campaign."),
+  tq(2, "The same chain says the price is too high after one month of weak results. How do you keep the account?"),
+];
+const LIKERT = ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"];
+/* The staff mock's Work Style Profile (ASM-0003): 20 minutes, how far the candidate agrees with each line. */
+const STYLE: PublicQuestion[] = [
+  cq(1, "I finish what I start, even when it gets dull.", LIKERT),
+  cq(2, "I prefer to wait for clear instructions before I begin.", LIKERT),
+  cq(3, "I enjoy meeting people I do not know.", LIKERT),
+];
+/* MyCity's own Motion and Graphics design brief (docs/MyCity-ERP-Documents): two deliverables and a note. */
+const BRIEF: PublicQuestion[] = [
+  fq(
+    1,
+    'Task 1: Static Graphic (Awareness Flyer)\nDesign a social media flyer for Instagram introducing MyCityApp to a new audience, on the concept "Discover Your City with MyCityApp".\n\n• Highlight discovering places (restaurants, events, experiences), exploring your city effortlessly, and connecting with what is happening around you\n• Include a strong call to action, such as Download Now or Explore Your City Like Never Before\n• Keep the layout, typography and brand consistent\n\nSubmit a PNG or JPEG.',
+  ),
+  fq(
+    2,
+    'Task 2: Motion Design (Short Promo Video)\nCreate a promo video of 15 to 30 seconds for Instagram Reels or TikTok, on the concept "A Day in Your City with MyCityApp".\n\n• Show a user discovering places, finding events and exploring the city with the app\n• Use motion, transitions and storytelling; add text overlays or mock UI if you can\n• End with a clear call to action\n\nSubmit an MP4, or paste a link to it if it is over 25 MB.',
+  ),
+  tq(3, "In two or three sentences, explain your creative approach."),
+];
+
+const sitting = (s: Partial<Sitting> & Pick<Sitting, "assessment" | "questions" | "candidate_first_name">): Sitting => ({
+  vacancy_title: "Head, Sales & Revenue",
+  state: "not_started",
+  timed: s.assessment.duration_minutes !== null,
+  start_by: inDays(3).slice(0, 10),
+  ends_at: null,
+  server_now: new Date().toISOString(),
+  current_question: 0,
+  submitted_at: null,
+  due_days: null,
+  ...s,
+});
+const CASE_DEF = { name: "Sales Scenario Case Study", assessment_type: "case_study" as const, duration_minutes: 60, question_count: CASE.length, instructions: "Read the scenario in each question and answer in your own words. You have 60 minutes once you press Start." };
+const STYLE_DEF = { name: "Work Style Profile", assessment_type: "psychometric" as const, duration_minutes: 20, question_count: STYLE.length, instructions: "Say how far you agree with each statement. There are no right or wrong answers." };
+/* The staff mock's ASM-0001 by name; its brief is MyCity's own (docs/MyCity-ERP-Documents). Sent to Segun, as there. */
+const BRIEF_DEF = {
+  name: "Graphics and Motion Design Brief",
+  assessment_type: "practical" as const,
+  duration_minutes: null,
+  question_count: BRIEF.length,
+  instructions:
+    "Two tasks on MyCityApp as a city discovery and lifestyle platform: one static graphic and one short promo video. We are looking at real-world execution, creativity and fit with our brand.\n\nDownload and explore MyCityApp Nigeria first, for the product, its content and its feel. Your work should be your own.",
 };
-const sess = (token: string) => ASSESS.get(token) ?? null;
-const badAssess = () => fail(404, "TOKEN_INVALID", "This assessment link is not valid. Check you opened the whole address from the email.");
+const SITTINGS = new Map<string, Sitting>([
+  ["Px2mL9vQe4Ty", sitting({ candidate_first_name: "Chinedu", assessment: CASE_DEF, questions: CASE.map((x) => ({ ...x })) })],
+  [
+    "Hb6tZ3qNw8Rk",
+    sitting({
+      candidate_first_name: "Funke",
+      assessment: STYLE_DEF,
+      questions: STYLE.map((x, i) => (i === 0 ? { ...x, answer: "d" } : { ...x })),
+      state: "in_progress",
+      ends_at: new Date(Date.now() + 14 * 60000).toISOString(),
+      current_question: 1,
+    }),
+  ],
+  ["Tk8wD3fRm6Qa", sitting({ candidate_first_name: "Segun", vacancy_title: "Graphics and Motion Designer", assessment: BRIEF_DEF, questions: BRIEF.map((x) => ({ ...x })), due_days: 5 })],
+  ["Jd5sF7aWc3Xe", sitting({ candidate_first_name: "Ngozi", vacancy_title: "Graphics and Motion Designer", assessment: BRIEF_DEF, questions: BRIEF.map((x) => ({ ...x })), state: "submitted", submitted_at: inDays(-1) })],
+  ["Mz4pK7tYb2Vn", sitting({ candidate_first_name: "Emeka", assessment: CASE_DEF, questions: CASE.map((x) => ({ ...x })), state: "timed_out", submitted_at: inDays(-2) })],
+]);
+
+/** What the page is sent: the server's own clock beside the end; no questions until it starts. */
+const view = (s: Sitting): AssessmentSession => {
+  const { due_days: _d, ...rest } = s;
+  if (rest.state === "in_progress" && rest.ends_at && Date.parse(rest.ends_at) <= Date.now()) {
+    s.state = "timed_out";
+    s.submitted_at = rest.ends_at;
+    return view(s);
+  }
+  return { ...rest, server_now: new Date().toISOString(), questions: rest.state === "not_started" ? null : rest.questions };
+};
+const sittingOf = (token: string) => SITTINGS.get(token) ?? null;
 
 route("GET /api/public/v1/assess/:token", (req) => {
-  const s = sess(req.params.token);
-  return s ? ok(view(s)) : badAssess();
+  const s = sittingOf(req.params.token);
+  return s ? ok(view(s)) : notFound();
 });
 route("POST /api/public/v1/assess/:token/start", (req) => {
-  const s = sess(req.params.token);
-  if (!s) return badAssess();
+  const s = sittingOf(req.params.token);
+  if (!s) return notFound();
   if (s.state === "not_started") {
     s.state = "in_progress";
-    s.ends_at = inMinutes(s.assessment.duration_min);
+    s.ends_at = s.assessment.duration_minutes ? new Date(Date.now() + s.assessment.duration_minutes * 60000).toISOString() : lagosEnd(s.due_days ?? 5);
   }
   return ok(view(s));
 });
-route("PUT /api/public/v1/assess/:token/answers/:question_id", (req) => {
-  const s = sess(req.params.token);
-  if (!s) return badAssess();
+const running = (s: Sitting | null) => {
+  if (!s) return notFound();
   const v = view(s);
-  if (v.state === "timed_out") return fail(409, "TIME_UP", "The time is up. Your saved answers have been submitted.");
-  if (v.state !== "in_progress") return fail(409, "NOT_IN_PROGRESS", "This assessment is not open.");
-  const q = s.all.find((x) => x.question_id === req.params.question_id);
-  if (!q) return fail(404, "NOT_FOUND", "No such question.");
-  const answer = String(req.body.answer ?? "");
-  if (q.kind === "choice" && answer && !q.options!.some((o) => o.id === answer)) return invalid({ answer: ["Pick one of the options"] });
-  q.answer = answer || null;
-  s.current = Math.max(0, Math.min(s.all.length - 1, Number(req.body.current) || 0));
-  return ok({ saved_at: new Date().toISOString() });
+  if (v.state === "timed_out") return fail(409, "TIME_UP", "The time for this assessment is over");
+  if (v.state !== "in_progress") return fail(409, "NOT_RUNNING", "This assessment is not running");
+  return null;
+};
+route("PUT /api/public/v1/assess/:token/answers/:question_id", (req) => {
+  const s = sittingOf(req.params.token);
+  const refused = running(s);
+  if (refused) return refused;
+  const qn = s!.questions!.find((x) => x.assessment_question_id === req.params.question_id);
+  if (!qn) return notFound();
+  const answer = String((req.body as { answer?: unknown }).answer ?? "").trim();
+  if (answer.length > 20000) return invalid({ answer: ["Too long"] });
+  if (qn.question_type === "choice" && answer && !(qn.options ?? []).some((o) => o.id === answer)) return invalid({ answer: ["Pick one of the options"] });
+  if (qn.question_type === "file" && answer && !/^https:\/\/[^\s/$.?#]\S*$/i.test(answer)) return invalid({ answer: ["Upload a file or give an https link"] });
+  /* Moving on from a file question without a new answer keeps what was given; a new link replaces it. */
+  if (!(qn.question_type === "file" && !answer)) {
+    qn.answer = answer || null;
+    if (qn.question_type === "file") qn.file_name = null;
+  }
+  const at = Number((req.body as { current_question?: unknown }).current_question);
+  if (Number.isInteger(at)) s!.current_question = Math.max(0, Math.min(s!.questions!.length - 1, at));
+  return ok({ saved_at: new Date().toISOString(), file_name: null });
+});
+route("POST /api/public/v1/assess/:token/answers/:question_id/file", (req) => {
+  const s = sittingOf(req.params.token);
+  const refused = running(s);
+  if (refused) return refused;
+  const qn = s!.questions!.find((x) => x.assessment_question_id === req.params.question_id);
+  if (!qn) return notFound();
+  qn.file_name = "answer.pdf";
+  qn.answer = null;
+  return ok({ document_id: crypto.randomUUID(), file_name: qn.file_name, size_bytes: 1024, mime_type: "application/pdf", saved_at: new Date().toISOString() });
 });
 route("POST /api/public/v1/assess/:token/submit", (req) => {
-  const s = sess(req.params.token);
-  if (!s) return badAssess();
+  const s = sittingOf(req.params.token);
+  if (!s) return notFound();
+  if (s.state === "not_started") return fail(409, "NOT_RUNNING", "Start the assessment first");
   const v = view(s);
   if (v.state === "in_progress") {
     s.state = "submitted";

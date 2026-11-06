@@ -414,31 +414,36 @@ the vault; docs/guides/queries.md §6.9).
 - `sanction_fine.employee_accepted_at`, `employee_rejected_at`, `rejection_reason` are unused
   (queries.md §13): dropped in a later release unless M6 needs them.
 
-### M4 Recruitment · 4000 to 4999 · TB
+### M4 Recruitment · 4000 to 4999 · GE
 
 **Built:** `4000` vacancies and questions, candidates, applications and stage history, scorecard
-criteria (A10), assessments, interviews, rounds, panelists and blind feedback · `4099` seed.
+criteria (A10), assessments, interviews, rounds, panelists and blind feedback · `4099` seed ·
+`4010` a vacancy as New Vacancy writes it (`org_seat_id`, the place line of owner `vacancy.location`,
+pay, `working_days`, `screening_conditions`, the lifecycle stamps; `slug` set at first publish),
+`vacancy_question.purpose` and `active` (a used question is retired, never deleted), scorecard parts
+`active` with weights 0 to 100 · `4020` the application as Apply writes it (`number` APP-0001,
+`screening_score` and its summary beside the `provisional_score` estimate, `source` careers, invited or
+pool); `application_stage_history` dropped (a move is a shared `entity_state_history` row) ·
+`4030` sittings (`start_by`, `started_at`, `current_question`, `due_days` for an untimed brief; one live
+sitting an assessment and application), option points only in `answer_key_enc`, file answers
+(`assessment_response.document_id`) · `4040` the round's state, consolidated report, decision, Candidate
+Details and `form_document_id`; each panelist's draft and submitted `interview_feedback` with its
+`decision`; `interview_rating` (one per panelist per trait, 1 to 10) · `4060` `talent_pool_entry` (24
+months a member) and `talent_pool_invite` (each Invite to Apply from the pool) · `4199` the `application`
+numbering scheme, and stage `rejected` retired. Every CHECK equals the contract's enums
+(docs/guides/recruitment.md §4).
 
-**Owes:**
-- The final score beside the provisional one, and the AI-provisional flag.
-- **Read by Home** (home.md §4.1): `vacancy` (`vacancy_id`, `number`, `title`, `status`,
-  `department_id`, `hiring_manager_id`, `positions`, `closes_at`), and for the Recruitment SLA alert
-  rules `application` (`application_id`, `vacancy_id`, `candidate_id`, `stage`, `status`,
-  `current_stage_entered_at`, `withdrawn_at`) with `candidate` (`candidate_id`, `first_name`,
-  `last_name`), through `src/modules/dashboard/sources/vacancies.source.js`: update it in the same PR.
-  Indexes asked by Home: `vacancy (status)`, `application (status, current_stage_entered_at)`.
-  **Staging holds Home's demonstration rows** in `vacancy`, one for each open seat on the organogram
-  (`seeds/staging/60_home.js`, decision O11; taken away by `seeds/staging/80_expenses.js` since M8
-  PR 7, whose own rows replace them). Their ids are written out in `HOME_STAGING_ROWS`
-  (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
-  takes them away once, in the three steps that file starts with: that seed calls
-  `removeHomeStagingRows(client, ["vacancy"])` in its transaction before it writes, which deletes
-  the alerts Home raised about those rows and then the rows, children first; the PR takes the rows
-  out of `seeds/staging/lib/forward-rows.js` and leaves their ids in the manifest, so the call finds
-  them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
-  (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
+**Owes:** nothing for M4 (P15, 05/11/2026). Home reads `vacancy` and `application` through
+`src/modules/dashboard/sources/vacancies.source.js`, which owes nothing, with Home's two indexes;
+Home's staging vacancies are gone (`seeds/staging/55_recruitment.js` removes them through
+`removeHomeStagingRows`).
 
-### M5 Offers, Documentation & Onboarding · 5000 to 5999 · LA
+**Unused, to drop in a later release:** `candidate.location` and `profile`;
+`application.provisional_ai_run_id`; `vacancy.description_ai_run_id`; `application_assessment.starts_at`;
+`interview.location`; `interview_feedback.recommendation` and `scorecard`; and 5000's `talent_pool` and
+`talent_pool_member` (M4 numbers below 5000 and keeps its pool in 4060's tables).
+
+### M5 Offers, Documentation & Onboarding · 5000 to 5999 · AJ
 
 **Built:** `5000` offers, signature requests and signatures, document requirements, onboarding
 cases and checklist items, employment contracts, talent pool · `5099` seed.
@@ -448,7 +453,7 @@ cases and checklist items, employment contracts, talent pool · `5099` seed.
 - Offer approval: `workflow_instance_id` and its workflow definition.
 - The data-privacy acknowledgement, documentation verification status, onboarding plans and SOPs.
 
-### M6 Payroll & Notifications · 6000 to 6999 · LA
+### M6 Payroll & Notifications · 6000 to 6999 · TB
 
 **Built:** nothing in the block. Notifications are M0 (`0060`), web push and each person's
 preferences too (`0460`), and Settings · Notifications with the reminder settings (`0480`), all
@@ -465,7 +470,7 @@ The earlier note that payroll was "deliberately not modelled" was not a decision
 `payroll_run` adds the query there (runs not finished, in the reader's scope), declares its columns
 and makes the card live in the same PR.
 
-### M7 Partnerships, CRM & Trackers · 7000 to 7999 · GE
+### M7 Partnerships, CRM & Trackers · 7000 to 7999 · LA
 
 **Built:** `7000` partners, contacts, opportunities and stage history, interactions, proposals,
 agreements and obligations · `7099` seed · `7010` the categories (`partner_category`, one name
@@ -573,7 +578,7 @@ numbering scheme taken out (a request is numbered `expense`). · `8020` one budg
   them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
   (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
 
-### M9 Settings & Governance · 9000 to 9999 · GE
+### M9 Settings & Governance · 9000 to 9999 · TB
 
 **Built:** `9000` security events, access reviews and items, integrations, webhooks · `9090`
 reporting views · `9095` `updated_at` triggers (a one-time sweep of the tables that existed then;

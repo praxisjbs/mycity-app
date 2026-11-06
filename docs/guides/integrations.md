@@ -569,6 +569,11 @@ mailbox's 50 recipients an hour (40 and 10) and the host's 30 IMAP connections p
 - **Off the list**: when mail to the address is accepted, and after 30 days untouched
   (`integrations-purge`). Correcting a person's email is done in People; a sign-in email that was
   wrong when the login was made is corrected on the server (`docs/runbooks/dns-and-mail.md` §5).
+- **Never handed over**: an address at a name reserved so it can never take mail (RFC 2606 and
+  6761: `.test`, `.example`, `.invalid`, `.localhost`, `example.com`, `.net`, `.org`), such as a
+  staging seed's invented `@example.test` people, is left off the message and logged as not sent;
+  with nobody else on the To line nothing reaches the server and `send()` answers `not_sent`. It
+  would only bounce. Captured mail (nothing set up) keeps every address (GE, 05/11/2026).
 
 ## 7 · Events, jobs and notifications
 

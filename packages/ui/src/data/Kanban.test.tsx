@@ -91,6 +91,26 @@ describe("Kanban on desktop", () => {
     expect(screen.queryByRole("menuitem", { name: "Move to Lead" })).toBeNull();
   });
 
+  it("offers only the stages a card's moves name, and ignores a drop anywhere else", async () => {
+    const onMove = vi.fn();
+    const cols: KanbanColumn[] = COLUMNS.map((c) => (c.key === "lead" ? { ...c, cards: [{ ...c.cards[0]!, moves: ["qualified"] }] } : c));
+    render(<Kanban columns={cols} onMove={onMove} />);
+    await userEvent.click(within(screen.getByRole("region", { name: "Lead" })).getByRole("button", { name: /Move/ }));
+    expect(await screen.findByRole("menuitem", { name: "Move to Qualified" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Move to Signed" })).toBeNull();
+    await userEvent.keyboard("{Escape}");
+    fireEvent.drop(await screen.findByRole("region", { name: "Signed" }), { dataTransfer: { getData: () => "c1|lead", setData: () => undefined } });
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it("a card with no moves left offers no Move To and cannot be dragged", () => {
+    const cols: KanbanColumn[] = COLUMNS.map((c) => (c.key === "lead" ? { ...c, cards: [{ ...c.cards[0]!, moves: [] }] } : c));
+    render(<Kanban columns={cols} onMove={vi.fn()} />);
+    const lead = screen.getByRole("region", { name: "Lead" });
+    expect(within(lead).queryByRole("button", { name: /Move/ })).toBeNull();
+    expect(lead.querySelector("[draggable=true]")).toBeNull();
+  });
+
   it("is read only, and not draggable, without onMove", () => {
     const { container } = render(<Kanban columns={COLUMNS} />);
     expect(screen.queryByRole("button", { name: /Move/ })).toBeNull();
@@ -122,7 +142,8 @@ describe("Kanban on desktop", () => {
     expect(trigger()).not.toBeDisabled();
     await userEvent.click(trigger());
     expect(screen.queryByRole("menuitem", { name: "Move to Signed" })).toBeNull();
-    fireEvent.drop(screen.getByRole("region", { name: "Signed" }), { dataTransfer: { getData: () => "c1|lead", setData: () => undefined } });
+    await userEvent.keyboard("{Escape}");
+    fireEvent.drop(await screen.findByRole("region", { name: "Signed" }), { dataTransfer: { getData: () => "c1|lead", setData: () => undefined } });
     expect(onMove).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Lagos Water Board").closest("[draggable]")).toHaveAttribute("draggable", "false");
     done();

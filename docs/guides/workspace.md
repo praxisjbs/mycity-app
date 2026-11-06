@@ -621,6 +621,13 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · The calendar's write path takes a transaction from another module: `createIn`,
+  `editIn` and `cancelIn` beside create, edit and cancel, which now call them. Recruitment uses them so an
+  interview and its calendar entry are saved together (`recruitment.md` §3 step 8): the entry is of type
+  interview, tied to the interview (`entity_type`), and its panelists are its attendees.
+  `asOwner` lets that module change the entry for whoever scheduled it, as it decides who may. Nothing a
+  person sees on Calendar changed.
+
 - 05/11/2026 · AJ · M8 PR 5: a project's optional budget (`project.budget_amount`, migration 8010) is set on Expenses · Projects through `projects.service.setBudget` (an `expenses.finance` holder, whoever owns the project), event `project.budget_set`; My Workspace · Projects shows nothing new (`docs/guides/expenses.md` §6.6 rule 6).
 - 05/11/2026 · JP · M7 PR 1 (`partnerships.md` Appendix A): `project`, `task` and `calendar_event` gain `partner_id`, `lead_id` and `deal_id` (`7040_partnership_workspace_links.sql`, §4), for Connect to Partner. The contract's `PartnerLink` and `PartnerLinkQuery` (`partners.js`) join the create, edit and list schemas in M7 PR 5 with the services that write them; until then no request, screen or Praxis AI card changes.
 - 03/11/2026 · JP · From the evaluation set on staging: Create Task "for me", its lead written as the person's own name, was drawn with Pick one (`leadIdOf` looked only among the people New Task's picker lists, which leaves the person out as its default) and its card's names failed on the words (`cardNames` sent them to a uuid query). Now the person's own whole name, or "me", is the person, and `cardNames` reads ids alone (§9). Nothing on the Workspace screens changes.

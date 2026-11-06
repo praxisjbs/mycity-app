@@ -29,9 +29,11 @@ const notFound = () =>
 
 /**
  * @param {string} scope   "<thing>.<action>", the one thing this route does
- * @param {{param?: string}} [opts]  the path parameter holding the token, default "token"
+ * @param {{param?: string, spent?: boolean}} [opts]  the path parameter holding the token, default "token";
+ *   spent: also let a used single-use token through, for a route whose service answers a second
+ *   press with what the first made (the service sees `req.public_token.spent` and decides)
  */
-function requirePublicToken(scope, { param = "token" } = {}) {
+function requirePublicToken(scope, { param = "token", spent = false } = {}) {
   if (!/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(scope || "")) {
     throw new Error(
       `requirePublicToken: scope is "<thing>.<action>", got ${JSON.stringify(scope)}`,
@@ -40,7 +42,7 @@ function requirePublicToken(scope, { param = "token" } = {}) {
   const mw = async function publicTokenCheck(req, _res, next) {
     const raw = req.params[param];
     if (!publicToken.looksLikeToken(raw)) throw notFound();
-    const row = await publicToken.resolve(pool, raw, { scope });
+    const row = await publicToken.resolve(pool, raw, { scope, spent });
     if (!row) throw notFound();
     req.public_token = row;
     return next();

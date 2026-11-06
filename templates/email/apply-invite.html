@@ -1,0 +1,16 @@
+---
+subject: "You are invited to apply for {{ vacancy_title }}"
+title: Invitation to Apply
+format: markdown
+---
+{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}
+
+MyCity App would like you to apply for {{ vacancy_title }}. The link below opens the role and a short form, where you add your CV.
+
+[Apply for This Role]({{ apply_url }})
+
+The link is for you alone and works until {{ datetime expires_at }}, Lagos time.
+
+If the link does not open, copy this address into your browser: {{ apply_url }}
+
+Not interested? You can ignore this email.

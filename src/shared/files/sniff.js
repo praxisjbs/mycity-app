@@ -61,6 +61,7 @@ const TYPES = Object.freeze({
   ole: t("application/x-ole-storage", "ole", "legacy_office"),
   zip: t("application/zip", "zip", "archive"),
   csv: t("text/csv", "csv", "sheet"),
+  json: t("application/json", "json", "text"),
   txt: t("text/plain", "txt", "text"),
   md: t("text/markdown", "md", "text"),
   html: t("text/html", "html", "markup"),
@@ -145,6 +146,23 @@ function looksLikeText(buf) {
   return (decoded.match(/\uFFFD/g) || []).length <= 2;
 }
 
+/** The most a file named .json is parsed whole to be sure it is JSON (an assessment export is 1 MB at most). */
+const JSON_PARSE_LIMIT = 5 * 1024 * 1024;
+
+/**
+ * A file named .json that opens with { or [ and parses whole: JSON, which no browser renders as a
+ * page, so words inside it such as "<script" (a question about HTML) are text, not markup.
+ */
+function parsesAsJson(buf, name, head) {
+  if (!/\.json$/i.test(String(name || "")) || !/^[[{]/.test(head) || buf.length > JSON_PARSE_LIMIT) return false;
+  try {
+    JSON.parse(buf.toString("utf8").replace(/^\uFEFF/, ""));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function textKind(buf, name) {
   const head = buf
     .subarray(0, 2048)
@@ -152,6 +170,7 @@ function textKind(buf, name) {
     .replace(/^\uFEFF/, "")
     .trimStart()
     .toLowerCase();
+  if (parsesAsJson(buf, name, head)) return TYPES.json;
   if (head.startsWith("<?xml"))
     return head.includes("<svg") ? TYPES.svg : TYPES.xml;
   if (head.startsWith("<svg")) return TYPES.svg;
@@ -162,6 +181,7 @@ function textKind(buf, name) {
   )
     return TYPES.html;
   if (/\.csv$/i.test(String(name || ""))) return TYPES.csv;
+  if (/\.json$/i.test(String(name || "")) && /^[[{]/.test(head)) return TYPES.json;
   if (/\.md$/i.test(String(name || ""))) return TYPES.md;
   return TYPES.txt;
 }
