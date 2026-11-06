@@ -1269,6 +1269,8 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
   - Partners' Quiet uses the enabled rule's `N`, 30 while none is enabled (§6.12).
   - Screens write Follow-Up Required with both parts capitalised, as Title Case asks (FRONTEND_GUIDE
     §5.4); the stored code is still `follow_up_required`, and this guide keeps the tracker's spelling.
+    The demonstration stage Follow-Up Ongoing on the mock and staging is written the same way, since the
+    stage switcher draws a stage's name as a button; MyCity's tracker keeps its own spelling.
   - Home's Signed Value card counts deals (its caption "deal"), each a row of its records (§6.17).
   - Merged after PR 2 (06/11/2026): PR 2's `7050` is the template's asks, so `partner_document` and the
     `partner_type` drop are `7060`. PR 3 declares `deals.create`, `deals.update` and `deal_returns.save`,
