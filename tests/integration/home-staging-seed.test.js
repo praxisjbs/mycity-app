@@ -34,6 +34,7 @@ const home = require("../../seeds/staging/60_home");
 const workspaceSeed = require("../../seeds/staging/40_workspace");
 const performanceSeed = require("../../seeds/staging/45_performance_plan");
 const reviewsSeed = require("../../seeds/staging/46_performance_reviews");
+const recruitmentSeed = require("../../seeds/staging/55_recruitment");
 const expensesSeed = require("../../seeds/staging/80_expenses");
 const forward = require("../../seeds/staging/lib/forward-rows");
 const { removeHomeStagingRows } = require("../../seeds/staging/lib/home-staging-rows");
@@ -142,11 +143,12 @@ describeDb("Home's staging seed against the real migrations", () => {
 
   test("running it twice leaves every table as the first run left it", () => {
     expect(second).toEqual(first);
-    for (const table of TABLES) expect([table, first[table] > 0]).toEqual([table, true]);
+    // Recruitment's tables are its own seed's now (55_recruitment.js): Home writes none of them.
+    for (const table of TABLES.filter((t) => !recruitmentSeed.RECRUITMENT_TABLES.includes(t))) expect([table, first[table] > 0]).toEqual([table, true]);
   });
 
   test("every id the manifest lists is there, in the column it names", async () => {
-    const taken = [...workspaceSeed.M2_TABLES, ...performanceSeed.PLAN_TABLES, ...reviewsSeed.REVIEW_TABLES, ...expensesSeed.EXPENSE_TABLES];
+    const taken = [...workspaceSeed.M2_TABLES, ...performanceSeed.PLAN_TABLES, ...reviewsSeed.REVIEW_TABLES, ...recruitmentSeed.RECRUITMENT_TABLES, ...expensesSeed.EXPENSE_TABLES];
     for (const { table, id_column: idColumn, ids } of home.HOME_STAGING_ROWS.filter((e) => !taken.includes(e.table))) {
       const { n } = await one(`SELECT count(*)::int AS n FROM ${table} WHERE ${idColumn} = ANY($1::uuid[])`, [ids]);
       expect([table, n]).toEqual([table, ids.length]);
@@ -335,22 +337,6 @@ describeDb("Home's staging seed against the real migrations", () => {
 
   describe("run again after the organisation changed", () => {
     const listed = (table) => home.HOME_STAGING_ROWS.find((e) => e.table === table).ids;
-
-    test("a seat filled since the last run: the run passes, and only the seats still vacant have a vacancy", async () => {
-      const { rows: seats } = await q("SELECT org_seat_id, title FROM org_seat WHERE status = 'vacant' ORDER BY title, org_seat_id");
-      expect(seats.length).toBeGreaterThanOrEqual(2);
-      await q("UPDATE org_seat SET status = 'filled', filled_by_employee_id = $2, filled_on = $3 WHERE org_seat_id = $1", [
-        seats[0].org_seat_id,
-        staff.ceo.employee_id,
-        TODAY,
-      ]);
-      await expect(runFile(home, { now: NOW })).resolves.toBeUndefined();
-      const { rows } = await q("SELECT title, slug::text AS slug, status FROM vacancy WHERE vacancy_id = ANY($1::uuid[]) ORDER BY number", [
-        listed("vacancy"),
-      ]);
-      expect(rows.map((v) => v.title)).toEqual(seats.slice(1, 1 + listed("vacancy").length).map((s) => s.title));
-      expect(rows.every((v) => v.status === "open")).toBe(true);
-    });
 
     test("someone moved to another manager since the last run: the run passes, and none of Home's old reviews comes back", async () => {
       const before = await realStaff(pool);

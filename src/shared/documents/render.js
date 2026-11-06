@@ -192,7 +192,7 @@ const truthy = (v) =>
     (Array.isArray(v) && v.length === 0)
   );
 
-function renderNodes(nodes, scopes, body) {
+function renderNodes(nodes, scopes, body, escape = escapeHtml) {
   let out = "";
   for (const n of nodes) {
     switch (n.kind) {
@@ -205,18 +205,18 @@ function renderNodes(nodes, scopes, body) {
       case "var": {
         const v = lookup(scopes, n.path);
         if (n.helper === "markdown") out += markdownToHtml(v || "");
-        else if (n.helper) out += escapeHtml(HELPERS[n.helper](v));
+        else if (n.helper) out += escape(HELPERS[n.helper](v));
         else
           out +=
             v === null || v === undefined
               ? ""
-              : escapeHtml(typeof v === "object" ? "" : v);
+              : escape(typeof v === "object" ? "" : v);
         break;
       }
       case "if":
         out += truthy(lookup(scopes, n.path))
-          ? renderNodes(n.children, scopes, body)
-          : renderNodes(n.otherwise || [], scopes, body);
+          ? renderNodes(n.children, scopes, body, escape)
+          : renderNodes(n.otherwise || [], scopes, body, escape);
         break;
       case "each": {
         const list = lookup(scopes, n.path);
@@ -227,6 +227,7 @@ function renderNodes(nodes, scopes, body) {
               n.children,
               [...scopes, { data, item, index }],
               body,
+              escape,
             );
           });
         }
@@ -251,4 +252,31 @@ function render(template, data = {}, { body = "" } = {}) {
   return renderNodes(tree, [{ data }], body);
 }
 
-module.exports = { parse, render, variablesOf, TemplateError, HELPERS };
+/*
+ * A Markdown template's values. The Markdown step escapes HTML itself, so a value goes in
+ * unescaped (escaping it here too printed "O&#39;Brien"), and its Markdown signs are held as
+ * private-use characters until the HTML is made, so a name a stranger typed ("[Click](https://…)",
+ * "**Urgent**") stays text and never becomes a link or bold. A new line in a value is a space.
+ */
+const MD_SIGNS = "[]*`|#-_!";
+const MD_HELD = [...MD_SIGNS].map((_, i) => String.fromCharCode(0xe000 + i)).join("");
+const holdMarkdown = (v) =>
+  String(v === null || v === undefined ? "" : v)
+    .replace(/\r?\n/g, " ")
+    .replace(/[[\]*`|#\-_!]/g, (c) => MD_HELD[MD_SIGNS.indexOf(c)]);
+const releaseMarkdown = (html) =>
+  html.replace(/[\ue000-\ue008]/g, (c) => MD_SIGNS[c.charCodeAt(0) - 0xe000]);
+
+/**
+ * Render a Markdown template (an edit saved in Settings, or a default shipped as Markdown) to safe
+ * HTML: names filled, then the one Markdown whitelist, each value escaped exactly once.
+ * @param {string|Array} template
+ * @param {object} data
+ * @returns {string}
+ */
+function renderMarkdown(template, data = {}) {
+  const tree = Array.isArray(template) ? template : parse(template);
+  return releaseMarkdown(markdownToHtml(renderNodes(tree, [{ data }], "", holdMarkdown)));
+}
+
+module.exports = { parse, render, renderMarkdown, variablesOf, TemplateError, HELPERS };

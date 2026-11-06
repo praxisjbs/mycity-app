@@ -26,6 +26,8 @@ const OWNERS = Object.freeze([
   // A temporary site's addresses (attendance.md §6.11): a venue, or a Temporary Home's, which is personal.
   Object.freeze({ name: "attendance_temporary_site_location.address", module: "attendance", level: "address", personal: true }),
   Object.freeze({ name: "employee.home_address", module: "organisation", level: "address", personal: true }),
+  // A vacancy's location (docs/guides/recruitment.md §4): anything from a district to a city.
+  Object.freeze({ name: "vacancy.location", module: "vacancies", level: "area", personal: false }),
   // Partnerships (docs/guides/partnerships.md §6.19): a partner's headquarters is an area; a lead's or
   // partner's region is the cities picked (each a row, keyed by the record and the city's place in
   // the list); a deal's venue is an address. None is personal. The records keep no copy of the line.

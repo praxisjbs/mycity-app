@@ -31,14 +31,46 @@ const MOCK = import.meta.env.VITE_API_MODE === "mock";
 
 const FAILED = "That file could not be opened. Try again.";
 
-/** A gated file's bytes, fetched with the session's token (the map's tiles use it too). */
-export async function fetchBlob(url: string): Promise<Blob> {
+/** A gated file's response, fetched with the session's token. */
+async function fetchGated(url: string): Promise<Response> {
   const res = await fetch(url, {
     credentials: "include",
     headers: session.token ? { Authorization: `Bearer ${session.token}` } : {},
   });
   if (!res.ok) throw new Error(FAILED);
-  return res.blob();
+  return res;
+}
+
+/** A gated file's bytes, fetched with the session's token (the map's tiles use it too). */
+export async function fetchBlob(url: string): Promise<Blob> {
+  return (await fetchGated(url)).blob();
+}
+
+/** The extension of the file name a Content-Disposition header gives, lower case, or null. */
+function servedExtension(disposition: string | null): string | null {
+  if (!disposition) return null;
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  const plain = /filename="([^"]*)"/i.exec(disposition);
+  let name = plain?.[1] ?? "";
+  try {
+    if (star) name = decodeURIComponent(star[1]!.trim());
+  } catch {
+    /* A malformed encoded name: the plain one stands. */
+  }
+  const ext = /\.([a-z0-9]{1,8})$/i.exec(name);
+  return ext ? ext[1]!.toLowerCase() : null;
+}
+
+/**
+ * The name a file is saved under: the screen's name, with the extension of the file the server
+ * sent, so a Word CV saved under a name a screen guessed stays a .docx and opens in Word.
+ */
+export function savedName(filename: string, disposition: string | null): string {
+  const ext = servedExtension(disposition);
+  if (!ext) return filename;
+  const own = /\.([a-z0-9]{1,8})$/i.exec(filename);
+  if (own && own[1]!.toLowerCase() === ext) return filename;
+  return `${own ? filename.slice(0, -own[0].length) : filename}.${ext}`;
 }
 
 /**
@@ -97,8 +129,8 @@ export async function saveBlob(blob: Blob, filename: string): Promise<boolean> {
 }
 
 /**
- * Fetch a gated file and save it under `filename` on this device. True once it is saved; false
- * when it was not, and the screen has already been told why.
+ * Fetch a gated file and save it under `filename` on this device, with the extension of the file the
+ * server sent. True once it is saved; false when it was not, and the screen has already been told why.
  */
 export async function saveFile(url: string, filename: string): Promise<boolean> {
   if (MOCK) {
@@ -106,7 +138,8 @@ export async function saveFile(url: string, filename: string): Promise<boolean> 
     return false;
   }
   try {
-    return await saveBlob(await fetchBlob(url), filename);
+    const res = await fetchGated(url);
+    return await saveBlob(await res.blob(), savedName(filename, res.headers.get("Content-Disposition")));
   } catch {
     toast(FAILED);
     return false;

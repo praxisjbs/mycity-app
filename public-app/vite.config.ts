@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { fileURLToPath } from "node:url";
 import { defineConfig, mergeConfig } from "vite";
 import react from "@vitejs/plugin-react";
@@ -24,6 +25,11 @@ export default defineConfig(({ mode }) =>
     },
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+    },
+    /* Every public page test draws a page, so jsdom is the default here. */
+    test: {
+      environment: "jsdom",
+      setupFiles: ["./src/test-setup.ts"],
     },
     server: {
       port: 5174,

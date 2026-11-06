@@ -69,6 +69,11 @@ const PHONE_INTL =
   /\+\d{1,3}[\s.-]?\(?\d{1,4}\)?[\s.-]?\d{1,4}[\s.-]?\d{1,4}[\s.-]?\d{0,4}/g;
 const PHONE_NG = /\b0[789][01]\d[\s.-]?\d{3}[\s.-]?\d{4}\b/g;
 const TIN = /\b\d{8}-\d{4}\b/g;
+/*
+ * A "+" figure is a phone only with the digits of one (nine or more, country code included) and no
+ * per cent sign after it: "+234 803 123 4567" is masked, "+1500%" and "+2000 2023" on a CV are not.
+ */
+const isPhone = (m, next) => m.replace(/\D/g, "").length >= 9 && next !== "%";
 
 /**
  * What is masked, in order. Each step replaces a value through `put(kind, value)`: scrub() puts
@@ -89,7 +94,10 @@ const STEPS = [
   { contact: true, run: (s, put) => s.replace(EMAIL, (m) => put("EMAIL", m)) },
   {
     contact: true,
-    run: (s, put) => s.replace(PHONE_INTL, (m) => put("PHONE", m)).replace(PHONE_NG, (m) => put("PHONE", m)),
+    run: (s, put) =>
+      s
+        .replace(PHONE_INTL, (m, at, all) => (isPhone(m, all[at + m.length]) ? put("PHONE", m) : m))
+        .replace(PHONE_NG, (m) => put("PHONE", m)),
   },
   {
     contact: false,

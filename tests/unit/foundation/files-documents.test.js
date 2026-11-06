@@ -91,6 +91,22 @@ describe("sniff and the upload policy", () => {
     expect(sniff(Buffer.from([0, 1, 2, 3, 0, 0, 9])).kind).toBe("unknown");
   });
 
+  test("a JSON file that parses is JSON though its text names <script; markup posing as JSON is still refused", () => {
+    // An assessment export with a question about HTML: "<script" in its first 2 KB is words, not a page.
+    const exported = Buffer.from(
+      JSON.stringify({ format: "mycity.assessment", assessment: { name: "Web Basics" }, questions: [{ prompt: "What does a <script> tag do in a page?", max_score: 2 }] }),
+    );
+    expect(sniff(exported, "web-basics.json")).toMatchObject({ ext: "json", kind: "text" });
+    expect(policy.assertAllowed("assessment_import", sniff(exported, "web-basics.json"))).toBeTruthy();
+    // Not JSON at all, or not called .json: the markup sniff stands.
+    expect(sniff(Buffer.from('{"a": 1} <script>alert(1)</script>'), "x.json").kind).toBe("markup");
+    expect(sniff(Buffer.from("<!DOCTYPE html><html><script>alert(1)</script>"), "x.json").kind).toBe("markup");
+    expect(sniff(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), "x.json").kind).toBe("markup");
+    expect(sniff(exported, "web-basics.txt").kind).toBe("markup");
+    // A .json that does not parse and holds no markup is still read as JSON, so the import names the fault.
+    expect(sniff(Buffer.from('{"name": "Web Basics",'), "broken.json").ext).toBe("json");
+  });
+
   test("each purpose accepts its own list and nothing that runs", () => {
     expect(policy.assertAllowed("document", sniff(Buffer.from("%PDF-1.4")))).toBeTruthy();
     expect(() => policy.assertAllowed("avatar", sniff(Buffer.from("%PDF-1.4")))).toThrow(/Accepted: JPG, PNG, WEBP, HEIC/);

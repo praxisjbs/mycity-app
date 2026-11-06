@@ -49,12 +49,22 @@ function placeholdersIn(text, known = () => false, { allowed = () => false } = {
   return out;
 }
 
-/** Each text an answer carries, with its path. */
-function textsOf(v) {
-  const out = [];
-  for (const [key, value] of Object.entries(v || {})) {
-    if (typeof value === "string" && key !== "kind") out.push([[key], value]);
-    else if (Array.isArray(value)) value.forEach((x, i) => typeof x === "string" && out.push([[key, i], x]));
+/**
+ * Each text an answer carries, with its path, however deep: a list of questions or of options is
+ * checked as closely as a top-level text, so "[city]" inside a suggested question is refused too.
+ * A `kind` at any depth is a code, not text.
+ */
+function textsOf(v, path = [], out = [], depth = 0) {
+  if (depth > 6 || v === null || v === undefined) return out;
+  if (Array.isArray(v)) {
+    v.forEach((x, i) => (typeof x === "string" ? out.push([[...path, i], x]) : textsOf(x, [...path, i], out, depth + 1)));
+    return out;
+  }
+  if (typeof v !== "object") return out;
+  for (const [key, value] of Object.entries(v)) {
+    if (typeof value === "string") {
+      if (key !== "kind") out.push([[...path, key], value]);
+    } else textsOf(value, [...path, key], out, depth + 1);
   }
   return out;
 }

@@ -233,6 +233,58 @@ const ACTIONS = Object.freeze({
     built: true,
     direct: true,
   }),
+  // M4 Recruitment (docs/guides/recruitment.md §9): Write With AI on New Vacancy, in MyCity's job
+  // description shape, and Suggest With AI on a vacancy's Apply questions and interview traits.
+  "jd-draft": Object.freeze({
+    label: "Draft Job Description",
+    module: "recruitment",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
+  "screening-questions": Object.freeze({
+    label: "Suggest Vacancy Questions",
+    module: "recruitment",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
+  // Suggest With AI on an assessment's questions (docs/guides/recruitment.md §6.7, §9). Personal data
+  // as every Recruitment action is (decided 04/11/2026): it reads the role a candidate is hired for.
+  "assessment-questions": Object.freeze({
+    label: "Suggest Assessment Questions",
+    module: "recruitment",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
+  // Tidy With AI on a panelist's interview comments (docs/guides/recruitment.md §9): about a person.
+  "interview-notes-cleanup": Object.freeze({
+    label: "Tidy Interview Notes",
+    module: "recruitment",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
+  // Score With AI and Screen With AI on Candidates (docs/guides/recruitment.md §6.4): a CV read
+  // against the role and its must-meet conditions; personal data, so never DeepSeek.
+  "cv-screen": Object.freeze({
+    label: "Score Application",
+    module: "recruitment",
+    job: "deep_reasoning",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
 });
 
 const KEYS = Object.freeze(Object.keys(ACTIONS));

@@ -135,7 +135,7 @@ async function getFor(db, id, employeeId) {
 
 async function lock(client, id) {
   const { rows } = await client.query(
-    "SELECT calendar_event_id, owner_employee_id, cancelled_at FROM calendar_event WHERE calendar_event_id = $1 FOR UPDATE",
+    "SELECT calendar_event_id, owner_employee_id, cancelled_at, entity_type FROM calendar_event WHERE calendar_event_id = $1 FOR UPDATE",
     [id],
   );
   return rows[0] || null;

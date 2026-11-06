@@ -105,6 +105,13 @@
   --animate-tick: tick 1s step-end infinite;
   /* The pull to refresh (F28): the pin landing at the release point. */
   --animate-pin-land: pin-land .34s cubic-bezier(.32, .72, 0, 1);
+  /* The public site's one arrival: a page's parts rising in order as it opens (enter-delay-*, enter-stagger in base.css). */
+  --animate-enter: enter .7s cubic-bezier(.2, .7, .2, 1) both;
+  /* A wizard's step arriving from the side it was reached from. */
+  --animate-step-next: step-next .32s cubic-bezier(.2, .7, .2, 1) both;
+  --animate-step-back: step-back .32s cubic-bezier(.2, .7, .2, 1) both;
+  /* An outcome's mark landing (PageMessage): a small overshoot, once. */
+  --animate-pop: pop .5s cubic-bezier(.32, .72, 0, 1) both;
 }
 
 @theme inline {
@@ -210,6 +217,8 @@
   --color-on-deep-faint: var(--on-deep-faint);
   --color-on-deep-soft: var(--on-deep-soft);
   --color-on-deep-dim: var(--on-deep-dim);
+  --color-canvas: var(--canvas);
+  --color-canvas-glow: var(--canvas-glow);
 
   --shadow-1: var(--shadow-1);
   --shadow-2: var(--shadow-2);
@@ -237,3 +246,7 @@
 @keyframes graze { 0%, 55%, 100% { transform: rotate(0); } 70%, 85% { transform: rotate(34deg); } }
 @keyframes fill-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes pin-land { 0% { transform: translateY(-7px); } 55% { transform: translateY(1.5px) scale(1.06, .9); } 100% { transform: none; } }
+@keyframes enter { from { opacity: 0; transform: translateY(16px); } }
+@keyframes step-next { from { opacity: 0; transform: translateX(18px); } }
+@keyframes step-back { from { opacity: 0; transform: translateX(-18px); } }
+@keyframes pop { 0% { opacity: 0; transform: scale(.6); } 60% { opacity: 1; transform: scale(1.06); } 100% { transform: none; } }

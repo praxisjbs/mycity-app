@@ -43,5 +43,6 @@ export * from "./ComboField";
 export * from "./MoreFields";
 export * from "./PlacesField";
 export * from "./RadioCards";
+export * from "./RatingField";
 export * from "./SecretField";
 export * from "./StepBar";

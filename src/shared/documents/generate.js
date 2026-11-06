@@ -71,8 +71,7 @@ const numbering = require("../numbering/numbering");
 const { SCHEMES } = require("../numbering/schemes");
 const lagos = require("../time/lagos");
 const { emit } = require("../events/emit");
-const { render } = require("./render");
-const { markdownToHtml } = require("./markdown");
+const { render, renderMarkdown } = require("./render");
 const { sha256 } = require("../files/hash");
 const { storageKey, displayName } = require("../files/safe-name");
 const templates = require("../templates/template-store");
@@ -235,8 +234,7 @@ async function orgProfile(client) {
  */
 function renderDocumentHtml(template, data, context) {
   const values = { ...data, ...context, staging: config.APP_ENV === "staging" };
-  const inner = render(template.body, values);
-  const body = template.format === "markdown" ? markdownToHtml(inner) : inner;
+  const body = template.format === "markdown" ? renderMarkdown(template.body, values) : render(template.body, values);
   const page = render(templates.layout("document").body, values, { body });
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${brand().fontCss}</style></head><body>${page}</body></html>`;
 }

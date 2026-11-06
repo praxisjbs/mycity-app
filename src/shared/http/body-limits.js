@@ -40,6 +40,11 @@ const UPLOAD_CAPS = Object.freeze({
   brand: 5 * MB,
   // A check-in's evidence: a report, a screenshot, a sheet (docs/guides/performance.md §6.14).
   performance_evidence: 15 * MB,
+  // A CV on the Apply form (docs/guides/recruitment.md §6.2).
+  cv: 10 * MB,
+  // A file answer to an assessment, at the system's limit (docs/guides/recruitment.md §6.7).
+  assessment_answer: 25 * MB,
+  assessment_import: 1 * MB,
 });
 
 /** "15 MB", for messages people read. */
