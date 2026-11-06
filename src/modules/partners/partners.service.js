@@ -311,8 +311,16 @@ async function close(actor, scope, id, body) {
   return get360(id, scope, actor);
 }
 
+/** A contact by their name among the records the reader may see; null when none or several. */
+async function contactIdOf(db, words, scope) {
+  if (!words || !db) return null;
+  const found = await repo.contactsNamed(db, words, scope);
+  return found.n === 1 ? found.id : null;
+}
+
 module.exports = {
   QUIET_DAYS,
+  contactIdOf,
   saveCities,
   regionViewOf,
   quietFrom,

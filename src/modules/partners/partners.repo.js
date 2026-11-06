@@ -281,7 +281,24 @@ async function homeQuietBatch(db, { before, after = null, size }) {
   return rows;
 }
 
+/** How many contacts are named so among the records the reader may see, and one of them (a Praxis AI card's words). */
+async function contactsNamed(db, words, scope) {
+  const params = [String(words).trim()];
+  const p = deals.recordSeen(scope, { alias: "p", kind: "partner" }, params);
+  const l = deals.recordSeen(scope, { alias: "l", kind: "lead" }, params);
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS n, min(c.partner_contact_id::text) AS id FROM partner_contact c
+       LEFT JOIN partner p ON p.partner_id = c.partner_id
+       LEFT JOIN lead l ON l.lead_id = c.lead_id
+      WHERE search_fold(c.first_name || ' ' || c.last_name) = search_fold($1)
+        AND ((c.partner_id IS NOT NULL ${p}) OR (c.lead_id IS NOT NULL ${l}))`,
+    params,
+  );
+  return rows[0];
+}
+
 module.exports = {
+  contactsNamed,
   homeActiveCount,
   homeActivePage,
   homeQuietCount,

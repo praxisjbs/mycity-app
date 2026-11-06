@@ -139,6 +139,8 @@ module.exports = defineManifest({
       risk: "standard",
       form: "none: Edit Contact changes the contact pressed on a 360 and never names it; the card names the contact (ContactChange)",
       names: (values, _actor, db) => pipeline.cardNames(db, values),
+      // A contact is named, never picked: matched among the records the person may see.
+      resolve: { partner_contact_id: (value, actor, db) => service.contactIdOf(db, value, actor.scope) },
       asks: [{ field: "partner_contact_id", question: "Which contact is it?" }],
       records: (values) => (values.partner_contact_id ? [{ type: "partner_contact", id: values.partner_contact_id }] : []),
       run: (values, actor) => {
