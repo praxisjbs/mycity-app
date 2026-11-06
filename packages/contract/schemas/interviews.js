@@ -16,9 +16,9 @@
  * `:id` on every /recruitment/interviews route is an interview_id.
  */
 const { z } = require("zod");
-const { uuid, isoDateTime, blank, listQuery, Paged } = require("./common");
+const { uuid, isoDateTime, blank, listQuery, Paged, PAGE_SIZE } = require("./common");
 const { PersonRef } = require("./organisation");
-const { VacancyRef, optionalWhole, clearable } = require("./vacancies");
+const { VacancyRef, ScorecardPart, optionalWhole, clearable } = require("./vacancies");
 
 /* ------------------------------------------------------------------ *
  * Code lists
@@ -114,6 +114,32 @@ const InterviewPlace = z
   })
   .strict();
 
+/**
+ * One line of an interview's Round Activity, read from its events (interviews.events.js). It says who
+ * did what and when, never a rating, a decision or a note: who has submitted is not blind (§6.6).
+ */
+const InterviewActivityKind = z.enum([
+  "scheduled",
+  "rescheduled",
+  "cancelled",
+  "details_saved",
+  "feedback_submitted",
+  "round_closed",
+  "reported",
+  "feedback_due",
+]);
+const InterviewActivity = z
+  .object({
+    event_id: uuid,
+    kind: InterviewActivityKind,
+    occurred_at: isoDateTime,
+    /** Who did it; null for the daily run (a reminder, a full round closed once it started). */
+    actor_name: z.string().nullable(),
+    /** The panelist a reminder went to; null for every other kind. */
+    panelist_name: z.string().nullable(),
+  })
+  .strict();
+
 /* ------------------------------------------------------------------ *
  * Staff: list and detail
  * ------------------------------------------------------------------ */
@@ -151,12 +177,23 @@ const InterviewDetail = Interview.extend({
   /** The candidate's CV, which the panel may open. */
   cv_document_id: uuid.nullable(),
   my_feedback: MyFeedback.nullable(),
+  /**
+   * The candidate's weighted scorecard (guide §6.5) and its total, as Candidates shows them; null for a
+   * reader who sees the interview only through a seat on its panel (guide §8).
+   */
+  scorecard: z.array(ScorecardPart).length(5).nullable(),
+  weighted_total: z.number().min(0).max(100).nullable(),
+  /** Round Activity: the interview's events, newest first, the latest 25. */
+  activity: z.array(InterviewActivity).max(PAGE_SIZE),
   can_edit: z.boolean(),
   can_close: z.boolean(),
   can_report: z.boolean(),
 }).strict();
 
-/** GET /recruitment/interviews. `mine=true` keeps the interviews the reader sits on. */
+/**
+ * GET /recruitment/interviews. `mine=true` keeps the interviews the reader sits on. With no `sort`, the
+ * interviews still to end come first, soonest first, then the ones past, latest first.
+ */
 const InterviewListQuery = listQuery(
   {
     when: z.enum(["upcoming", "past"]).optional(),
@@ -428,9 +465,20 @@ const TABLES = {
       trait_averages: "each trait's mean across the submitted cards, once the round is closed",
       cv_document_id: "the application's CV, which the panel may open",
       my_feedback: "the reader's own interview_feedback, when they sit on the panel",
+      scorecard: "the application's weighted scorecard (guide §6.5), when the interview is in the reader's scope",
+      weighted_total: "the scorecard's total over the parts scored, when the interview is in the reader's scope",
+      activity: "the interview's event_log rows, newest first",
       can_edit: "the reader may reschedule or cancel it",
       can_close: "the round is open and the reader may edit it",
       can_report: "the round is closed and the reader is the hiring manager or may edit it",
+    },
+  },
+  InterviewActivity: {
+    table: "event_log",
+    virtual: {
+      kind: "event_log.event_key without its interview. prefix",
+      actor_name: "the employee of the login in actor_user_id",
+      panelist_name: "the employee in payload.subject_employee_id, for a reminder",
     },
   },
   InterviewListQuery: { table: null, reason: "list controls and filters for Interviews" },
@@ -479,6 +527,8 @@ module.exports = {
   MyFeedback,
   InterviewRound,
   InterviewPlace,
+  InterviewActivityKind,
+  InterviewActivity,
   Interview,
   InterviewPage,
   InterviewDetail,

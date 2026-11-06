@@ -139,18 +139,10 @@ async function visibleRow(db, id, scope, opts) {
   return row;
 }
 
-/** CandidateDetail. Run one query after another: inside a write, `db` is one client. */
-async function detailOf(db, row, user) {
-  const parts = await vacancyRepo.scorecard(db, row.vacancy_id);
-  const board = lifecycle.boardStages(parts);
-  const questions = await repo.applyQuestions(db, row.vacancy_id);
-  const sittings = await repo.sittings(db, row.application_id);
-  const interviews = await repo.interviews(db, row.application_id);
-  const history = await repo.history(db, row.application_id);
-  const inScope = await canEdit(user, row);
-  const editable = inScope && row.vacancy_status !== "closed";
+/** The weighted scorecard of an application's row, with the vacancy's parts (guide §6.5). */
+function scorecardOfRow(parts, row) {
   const s = shown(row);
-  const sc = scorecard(
+  return scorecard(
     parts,
     {
       screening: s.score,
@@ -161,6 +153,31 @@ async function detailOf(db, row, user) {
     },
     s.provisional,
   );
+}
+
+/**
+ * An application's scorecard parts and total, for a screen that shows it beside its own record
+ * (an interview); null when there is no such application. The caller has checked the reader's scope.
+ */
+async function scorecardOf(db, applicationId) {
+  const row = await repo.get(db, applicationId);
+  if (!row) return null;
+  const sc = scorecardOfRow(await vacancyRepo.scorecard(db, row.vacancy_id), row);
+  // The board's own total (SQL, exact decimals), as the candidate's sheet shows it.
+  return { parts: sc.parts, weighted_total: num(row.weighted_total) };
+}
+
+/** CandidateDetail. Run one query after another: inside a write, `db` is one client. */
+async function detailOf(db, row, user) {
+  const parts = await vacancyRepo.scorecard(db, row.vacancy_id);
+  const board = lifecycle.boardStages(parts);
+  const questions = await repo.applyQuestions(db, row.vacancy_id);
+  const sittings = await repo.sittings(db, row.application_id);
+  const interviews = await repo.interviews(db, row.application_id);
+  const history = await repo.history(db, row.application_id);
+  const inScope = await canEdit(user, row);
+  const editable = inScope && row.vacancy_status !== "closed";
+  const sc = scorecardOfRow(parts, row);
   const answers = row.answers || {};
   return {
     ...card(row),
@@ -520,6 +537,7 @@ module.exports = {
   list,
   summary,
   get,
+  scorecardOf,
   cv,
   move,
   advanceIn,

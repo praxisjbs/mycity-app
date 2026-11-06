@@ -3991,7 +3991,7 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 |---|---|
 | Use | Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners. |
 | Avoid | A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone. |
-| Phone | The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11). |
+| Phone | The columns become cards: the first value is the card's title, a `badge` column (a status pill) sits at its top right, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11). |
 | Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. A row marked as new (RowMarksContext: something unread is about it) says Unread before its first value as well as showing its dot and tint. |
 | Status | stable |
 | Exports | `DataView`, `LoadingRows` |
@@ -4111,7 +4111,7 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 
 | | |
 |---|---|
-| Use | A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions. |
+| Use | A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions. On desktop the stages stay on one row, sharing the width and scrolling sideways when they do not fit, never wrapping. |
 | Avoid | A list that is not staged (use DataView); dragging as the only way to move a card; more than six stages. |
 | Phone | No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. The board opens on the first stage holding the reader's unread notifications when the first holds none, until the person picks one. |
 | Accessibility | Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26). A card new to its reader (RowMarksContext) says Unread before its title, beside its dot and tint, as a list's row does. |
@@ -4139,6 +4139,7 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `card` | `KanbanCard` | yes | The card. |
+| `menu` | `boolean` |  | Leaves room at the title's end for the card's move menu, which sits at its top right. |
 
 ```tsx
 <Kanban columns={stages} onMove={(card, from, to) => move(card, to)} onOpen={openRecord} empty={<EmptyState title="No Tasks Yet" />} />

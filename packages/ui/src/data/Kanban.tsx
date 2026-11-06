@@ -2,7 +2,7 @@
  * @component Kanban
  * @group Data
  * @summary A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19).
- * @use A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions.
+ * @use A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions. On desktop the stages stay on one row, sharing the width and scrolling sideways when they do not fit, never wrapping.
  * @avoid A list that is not staged (use DataView); dragging as the only way to move a card; more than six stages.
  * @phone No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. The board opens on the first stage holding the reader's unread notifications when the first holds none, until the person picks one.
  * @a11y Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26). A card new to its reader (RowMarksContext) says Unread before its title, beside its dot and tint, as a list's row does.
@@ -103,12 +103,14 @@ export interface KanbanProps {
 export interface KanbanCardBodyProps {
   /** The card. */
   card: KanbanCard;
+  /** Leaves room at the title's end for the card's move menu, which sits at its top right. */
+  menu?: boolean;
 }
 
-export function KanbanCardBody({ card }: KanbanCardBodyProps) {
+export function KanbanCardBody({ card, menu = false }: KanbanCardBodyProps) {
   return (
     <>
-      <b className="mb-1.5 block text-xs leading-snug font-semibold wrap-any">{card.title}</b>
+      <b className={cn("mb-1.5 block text-xs leading-snug font-semibold wrap-any", menu && "pr-5")}>{card.title}</b>
       {(card.meta != null || card.owner) && (
         <span className="flex flex-wrap items-center gap-1.5">
           {card.meta}
@@ -296,13 +298,14 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
   }
 
   return (
-    <div className={cn("grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4", className)} aria-busy={loading || undefined}>
+    // One row of stages: they share the width when they fit and scroll sideways when they do not, never wrapping.
+    <div className={cn("flex gap-2.5 overflow-x-auto pb-1", className)} aria-busy={loading || undefined}>
       {columns.map((column) => (
         <Marked key={column.key} cards={column.cards}>
           {(marks) => (
           <section
             aria-label={column.label}
-            className={cn("min-w-0 rounded-card border border-border bg-muted p-2.5 transition-colors", over === column.key && "border-ring bg-accent")}
+            className={cn("min-w-48 flex-1 rounded-card border border-border bg-muted p-2.5 transition-colors", over === column.key && "border-ring bg-accent")}
             onDragOver={onMove ? (e: DragEvent) => (e.preventDefault(), setOver(column.key)) : undefined}
             onDragLeave={onMove ? () => setOver((o) => (o === column.key ? null : o)) : undefined}
             onDrop={
@@ -328,6 +331,7 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
               {column.cards.map((card) => {
                 const wait = busy.has(card.key);
                 const fresh = marks.marked.has(card.key);
+                const menus = Boolean(onMove) && moveItems(card.key, column.key).length > 0;
                 return (
                   <li
                     key={card.key}
@@ -363,15 +367,16 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
                         className={cn("w-full text-left", onOpen && "stretch-link")}
                       >
                         {fresh && <Unread />}
-                      <KanbanCardBody card={card} />
+                        <KanbanCardBody card={card} menu={menus} />
                       </button>
-                      {onMove && moveItems(card.key, column.key).length > 0 && (
-                        <span className="relative z-10 mt-2 flex justify-end">
+                      {menus && (
+                        // Beside the title, top right, so the card holds no row of its own for it.
+                        <span className="absolute top-2 right-2 z-10 flex">
                           <Menu
                             label="Move To"
                             items={moveItems(card.key, column.key)}
                             trigger={(p) => (
-                              <button {...p} {...held(wait)} type="button" aria-label={`Move ${card.owner ?? "card"}`} className="text-subtle-foreground hover:text-foreground">
+                              <button {...p} {...held(wait)} type="button" aria-label={`Move ${card.owner ?? (typeof card.title === "string" ? card.title : "card")}`} className="rounded-sm p-0.5 text-subtle-foreground hover:bg-muted hover:text-foreground">
                                 {wait ? <Spin /> : <Icon name="dots" size="s" />}
                               </button>
                             )}

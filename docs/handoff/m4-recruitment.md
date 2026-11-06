@@ -523,3 +523,10 @@ packages that need none can start. Tick a package only when its own checks pass 
   accounts without Recruitment (staging had no interviews and no Design role; the next deploy's seed run adds them).
   Next: the candidate board on one row that scrolls sideways, New Vacancy in ten steps, the Interviews tab and the
   KPI cards and tables against `demo (5).html`.
+- 06/11/2026 · GE · Testing on staging, round 1, the rest (GE's choices, three agents): Kanban on one row for every
+  board (packages/ui; AJ told on #79), compact cards; DataView's `badge` column for a phone card's status pill;
+  Vacancies' Openings; Interviews rebuilt to the reference layout (`InterviewDetail` gains `scorecard`,
+  `weighted_total`, `activity`; `ScorecardPart` moved to `vacancies.js`); New Vacancy as a ten-question interview
+  (`VacancyInterview.tsx`; AI action `vacancy-follow-ups`, Default, personal data, chosen by GE; `jd-draft` takes
+  the interview, prompt v5, a plain draft when the AI is off). For AJ: `Field` with `help` around a `TextField`
+  fails axe ("visible label"); New Vacancy's Job Title carries no help term until it is fixed in packages/ui.

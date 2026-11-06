@@ -514,4 +514,91 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     const kept = await keep(["Lives in Lagos", "Fluent in English", "Five years of sales experience"]);
     expect(kept.conditions).toEqual(["Lives in Lagos", "Fluent in English", "Five years of sales experience"]);
   });
+
+  test("New Vacancy's interview: two follow-ups about the role on Default (never DeepSeek), an unfair one dropped; none and no error when the AI is off", async () => {
+    const answers = {
+      title: "Data Analyst",
+      department_id: dept,
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      interview: { positions: "1", area: "Yaba, Lagos", must_haves: "SQL and spreadsheets. Weekly figures for every team.", follow_ups: [] },
+    };
+    expect((await h.as("staff").post("/recruitment/vacancies/assist/follow-ups").send(answers)).status).toBe(403);
+    const sent = script({
+      text: JSON.stringify({
+        questions: [
+          { question: "Which tools will the Data Analyst use every week?", hint: "Name the software the role works in." },
+          { question: "What age range would suit the Data Analyst best?", hint: "A range." },
+        ],
+      }),
+    });
+    const res = await h.as("ops").post("/recruitment/vacancies/assist/follow-ups").send(answers);
+    expect(res.status).toBe(200);
+    expect(c.vacancies.FollowUps.safeParse(res.body).success).toBe(true);
+    expect(res.body).toMatchObject({ available: true, reason: null, questions: [{ question: "Which tools will the Data Analyst use every week?", hint: "Name the software the role works in." }] });
+    expect(sent).toHaveLength(1);
+    // The model reads the role with its department named, and the answers given, and nothing else.
+    const told = JSON.stringify(sent[0]);
+    expect(told).toContain("Operations");
+    expect(told).toContain("Yaba, Lagos");
+    expect(told).not.toContain(dept);
+    expect(await one("SELECT purpose, vendor, prompt_key FROM ai_run WHERE run_id = $1", [res.body.ai_run_id])).toEqual({ purpose: "vacancy-follow-ups", vendor: "gemini", prompt_key: "vacancy-follow-ups" });
+
+    // A model that fails, or the AI switched off: no questions, and the interview goes on.
+    script({ text: "not json" }, { text: "still not json" });
+    const failed = await h.as("ops").post("/recruitment/vacancies/assist/follow-ups").send(answers);
+    expect(failed.status).toBe(200);
+    expect(failed.body).toMatchObject({ available: false, questions: [] });
+    const drafts = require("../../src/services/ai/drafts");
+    jest.spyOn(drafts, "availability").mockResolvedValue({ available: false, reason: "off" });
+    const off = await h.as("ops").post("/recruitment/vacancies/assist/follow-ups").send(answers);
+    expect(off.body).toEqual({ available: false, reason: "off", questions: [], ai_run_id: null });
+  });
+
+  test("New Vacancy's draft from the interview: the model's in MyCity's shape, or a plain draft from the answers when the AI cannot, never an error", async () => {
+    const body = {
+      title: "Data Analyst",
+      department_id: dept,
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      min_experience_years: "2",
+      interview: {
+        positions: "2",
+        work_pattern_note: "Two office days",
+        area: "Yaba, Lagos",
+        must_haves: "SQL and spreadsheets.\nBuild the weekly figures every team plans by.",
+        extras: "Looker Studio",
+        follow_ups: [{ question: "Which tools will the Data Analyst use every week?", answer: "Google Sheets and Looker Studio." }],
+      },
+    };
+    const sent = script({
+      text: JSON.stringify({
+        description:
+          "The Data Analyst turns MyCityApp's listings and bookings into the weekly figures every team plans by.\n\n## Key Responsibilities\n\n### 1. Reporting\n\n- Build the weekly figures.",
+        requirements: "- 2+ years with SQL and spreadsheets.",
+        nice_to_have: "Experience with Looker Studio.",
+      }),
+    });
+    const res = await h.as("ops").post("/recruitment/vacancies/assist").send(body);
+    expect(res.status).toBe(200);
+    expect(c.vacancies.JdDraft.safeParse(res.body).success).toBe(true);
+    expect(res.body).toMatchObject({ available: true, requirements: "- 2+ years with SQL and spreadsheets." });
+    expect(JSON.stringify(sent[0])).toContain("Google Sheets and Looker Studio.");
+
+    // The model fails: the plain draft from the person's own answers.
+    script({ text: "not json" }, { text: "still not json" });
+    const plain = await h.as("ops").post("/recruitment/vacancies/assist").send(body);
+    expect(plain.status).toBe(200);
+    expect(plain.body).toMatchObject({ available: false, reason: "off", ai_run_id: null, nice_to_have: "- Looker Studio" });
+    expect(plain.body.description).toMatch(/^MyCityApp is hiring 2 people as Data Analyst, in the Operations team, based in Yaba, Lagos\./);
+    expect(plain.body.requirements).toBe("- 2+ years of relevant experience.\n- SQL and spreadsheets.\n- Build the weekly figures every team plans by.");
+
+    // Write With AI on the form, with the AI off, still says so and drafts nothing.
+    const drafts = require("../../src/services/ai/drafts");
+    jest.spyOn(drafts, "availability").mockResolvedValue({ available: false, reason: "off" });
+    const form = await h.as("ops").post("/recruitment/vacancies/assist").send({ title: "Data Analyst", instruction: "Turns figures into weekly reports." });
+    expect(form.body).toEqual({ available: false, reason: "off", description: null, requirements: null, nice_to_have: null, ai_run_id: null });
+    const off = await h.as("ops").post("/recruitment/vacancies/assist").send(body);
+    expect(off.body).toMatchObject({ available: false, reason: "off", description: expect.stringMatching(/^MyCityApp is hiring 2 people/) });
+  });
 });

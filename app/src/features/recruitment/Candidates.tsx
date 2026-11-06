@@ -147,7 +147,7 @@ export function Candidates() {
           { label: "Candidates", value: counted(s?.candidates) },
           { label: "To Screen", value: counted(s?.to_screen), tone: s?.to_screen ? "warn" : undefined },
           { label: "In Interview", value: counted(s?.in_interview) },
-          { label: "Shortlisted", value: counted(s?.shortlisted), tone: "ok" },
+          { label: "Shortlisted", value: counted(s?.shortlisted), tone: s?.shortlisted ? "ok" : undefined },
         ]}
       />
       <Toolbar>

@@ -244,6 +244,17 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-11-04",
     built: true,
   }),
+  // The two questions New Vacancy's interview asks about this role from the answers so far
+  // (docs/guides/recruitment.md §3 step 2, §9): Default, as jd-draft (GE, 06/11/2026).
+  "vacancy-follow-ups": Object.freeze({
+    label: "Ask Vacancy Follow-Ups",
+    module: "recruitment",
+    job: "default",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-11-06",
+    built: true,
+  }),
   "screening-questions": Object.freeze({
     label: "Suggest Vacancy Questions",
     module: "recruitment",

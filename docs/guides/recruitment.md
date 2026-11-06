@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #38 Vacancies, #39 Candidates, #40 Assessments, #41 Interviews, #44 Talent Pool; public #80 Careers, #81 Vacancy, #82 Apply, #83 Assessment |
 | Status | Built |
-| Last changed | 05/11/2026 |
+| Last changed | 06/11/2026 |
 
 Sources: MILESTONES §9 (scope, A9, A10, definition of done) and §1 (A23 as amended 01/11/2026);
 REUSE_MAP §5; MILESTONE_QUESTIONS Q4, Q9, Q10; DATABASE_SCHEMA M4; the discovery call of
@@ -48,7 +48,7 @@ never sign in.
 | Recruitment · Vacancies (`vacancies`) | staff app | `recruitment` view, scope by hiring manager | Open, paused, draft and closed vacancies with applicants, days open and the closing date; the funnel by stage; Suggested From Organogram (vacant seats with no vacancy) | New Vacancy (Write With AI for the description), Edit, Publish, Pause, Resume, Close, Copy Link, Questions, Scorecard, Candidate Emails, Careers Settings (About MyCityApp and the Default Traits; saved only with `recruitment` edit over every vacancy), See Candidates |
 | Recruitment · Candidates (`candidates`) | staff app | `recruitment` view, scope by the vacancy's hiring manager | The board: Application, Screening, Assessment, Interview, Shortlist; each card with the screening score and its Provisional flag; a candidate's sheet: details, CV, answers, scores, scorecard, assessments, interviews, time at each stage | Move between stages, Not Progressing (with a reason), Reopen, Add to Pool, Score With AI, Screen With AI (with must-meet conditions), Send Assessment, Schedule Interview, Invite to Apply, open the CV |
 | Recruitment · Assessments (`assessments`) | staff app | `recruitment` view | Assessment definitions (name, type, minutes, questions, sent, average); Sittings (who took what, state, score) with Awaiting Marking | New Assessment, Edit, Questions (with Suggest With AI), Activate or Deactivate, Send to Candidates (every candidate of a role at a stage), Mark Answers |
-| Recruitment · Interviews (`interviews`) | staff app | `recruitment` view, scope by hiring manager or a seat on the panel | Upcoming and recent interviews; one interview's panel (submitted or waiting, scores hidden while the round is open), the candidate's details card filled before the interview, the traits and averages after it closes, the consolidated report and its PDF | Schedule Interview, Reschedule, Cancel, Candidate Details, My Card (each trait 1 to 10, decision, comments, private notes, Tidy With AI, the candidate's CV), Submit Card, Close Round, Write Report, Download Form |
+| Recruitment · Interviews (`interviews`) | staff app | `recruitment` view, scope by hiring manager or a seat on the panel | Upcoming and recent interviews beside the one picked; its Blind Panel (submitted or waiting, scores hidden while the round is open), the candidate's Weighted Scorecard (in scope), the candidate's details card filled before the interview, the traits and averages after it closes, the consolidated report and its PDF, Round Activity | Schedule Interview, Reschedule, Cancel, Candidate Details, My Card (each trait 1 to 10, decision, comments, private notes, Tidy With AI, the candidate's CV), Submit Card, Close Round, Write Report, Download Form |
 | Recruitment · Talent Pool (`talent-pool`) | staff app | `recruitment` view, scope by the hiring manager of the vacancy they applied for | Candidates kept for later: applied for, score, added, reason, invited, until when kept | Add to Pool (from a candidate), Invite to Apply (to an open vacancy), Remove, Export |
 | Careers (`/jobs`) | public site | anyone | Open roles: title, department, area, arrangement; search over 8 roles | Open a role |
 | Vacancy (`/jobs/<slug>`) | public site | anyone | One role: what it is, must have, nice to have, how we hire, salary when shown, arrangement and probation; a paused or closed role says so | Apply for This Role (mints the Apply link) |
@@ -63,11 +63,31 @@ never sign in.
 
 1. **A seat falls empty.** A vacant `org_seat` with no live vacancy shows on Vacancies under Suggested
    From Organogram, 25 a page. Create Vacancy (there, or on the Organogram) opens New Vacancy with the
-   seat's title, department and reporting line filled in, and its line manager as the hiring manager;
-   from the Organogram the form first looks the seat up (`/suggested?org_seat_id=`). The vacancy keeps
+   seat's title, department and reporting line filled in, and its line manager as the hiring manager, so
+   its interview starts with the role and the department answered; from the Organogram the form first
+   looks the seat up (`/suggested?org_seat_id=`). The vacancy keeps
    `org_seat_id`. Nothing is created until someone saves (`organogram.md` §3).
-2. **The vacancy is written.** New Vacancy is a three-step wizard (Role, Details, Pay and Publish). Write
-   With AI drafts the description and the must have and nice to have from what is filled so far
+2. **The vacancy is written.** New Vacancy is an interview of ten questions, one card at a time, each
+   card's hint behind its help term and the count ("Question 3 of 10") sized for the whole interview
+   from the first card (GE, 06/11/2026): (1) the role (Job Title, the one answer required); (2) the
+   Department and Hiring Manager; (3) Positions and Employment; (4) how they work: Arrangement,
+   Arrangement Note, Working Days; (5) where: the Location, picked (F27), passed over for a remote role
+   (the count drops by one); (6) the pay: Salary From, Salary To, Show Salary on Careers; (7) the
+   must-haves and key responsibilities in their own words, and Years of Experience; (8) anything else:
+   Reports To, and in their own words what would set someone apart, the perks, the team; then (9, 10)
+   two questions the AI writes about this role from those answers (`POST
+   /recruitment/vacancies/assist/follow-ups`, `vacancy-follow-ups`), never about age, sex, family,
+   origin, nationality, religion, disability, health or appearance (a question naming one is dropped
+   by the server, with the protected list of §6.4's conditions). Every card but the first has Skip;
+   **Use Blank Form**, on every card, opens the editor at once with what was answered. **Draft Vacancy**
+   on the last card sends the answers to `jd-draft` (`POST /recruitment/vacancies/assist` with
+   `interview`), which writes the description, must have and nice to have in MyCity's shape (§6.1);
+   when the AI is off, over its limit or fails, the interview has eight questions and the server writes
+   a plain draft from the answers instead (the role overview from the answers, Key Responsibilities from
+   the must-haves and follow-ups, never an error). The draft opens in the editor, the three-step wizard
+   (Role, Details, Pay and Publish) that Edit Vacancy also is, to check and publish; nothing is kept
+   until it is saved, and closing the editor or the interview with answers asks first. On the editor,
+   Write With AI drafts the description and the must have and nice to have from what is filled so far
    (`POST /recruitment/vacancies/assist`, prompt `jd-draft`); the draft goes straight into the form for
    the person to read and edit, and nothing is kept until it is saved. Save Draft (Publish Now off) keeps
    a draft (`VAC-0001`); Publish Vacancy makes it `open`, stamps `published_at`, and
@@ -129,8 +149,10 @@ never sign in.
    star), their decision (Select, On Hold or Reject), comments (Tidy With AI, `interview-notes-cleanup`)
    and private notes. The stars and the decision save as they are tapped; the comments and notes on Save
    Draft or Submit Card, and closing the card with words not yet saved asks first. While the round is open, a
-   person reads only their own feedback, the hiring manager and the CEO included (§6.6). Panelists who
-   have not submitted are reminded once a day from the interview's end (`interview-reminders`).
+   person reads only their own feedback, the hiring manager and the CEO included (§6.6): the interview's
+   Blind Panel shows who has submitted, with Hidden for the score. Panelists who have not submitted are
+   reminded once a day from the interview's end (`interview-reminders`); each reminder shows in the
+   interview's Round Activity.
 10. **The round closes** when the last panelist submits, or when someone with `recruitment` edit presses
     Close Round. Then everyone who may see the interview sees every panelist's ratings, comments and
     decision (never another's private notes), each trait's average across the panel, and the round's
@@ -202,7 +224,8 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `PUT /recruitment/vacancies/:id/scorecard` | `ScorecardSave` → `VacancyDetail` | `recruitment` edit · all/team | no | Each part on or off; the weights of the parts on sum to 100 |
 | `GET /recruitment/vacancies/settings`, `PUT` | `CareersSettings`, `CareersSettingsSave` | view; edit · all | no | Careers Settings: About MyCityApp and the Default Traits New Vacancy starts its interview card from; `can_edit` says whether the reader may save them (edit · all) |
 | `GET /recruitment/vacancies/assist` | `AiAvailability` | `recruitment` edit | no | Whether Write With AI answers now |
-| `POST /recruitment/vacancies/assist` | `JdDraftRequest` → `JdDraft` | `recruitment` edit | no | `jd-draft`; nothing kept |
+| `POST /recruitment/vacancies/assist` | `JdDraftRequest` → `JdDraft` | `recruitment` edit | no | `jd-draft`; nothing kept. With `interview` (New Vacancy's answers, `VacancyInterviewAnswers`) and no `instruction`; then, when the AI cannot write it, the plain draft from the answers with `available: false` (§3 step 2) |
+| `POST /recruitment/vacancies/assist/follow-ups` | `FollowUpsRequest` → `FollowUps` | `recruitment` edit | no | `vacancy-follow-ups`: up to two questions about the role with a hint each; none (`available: false`) when the AI is off or fails, never an error; nothing kept |
 | `POST /recruitment/vacancies/:id/assist/questions` | `EmptyBody` → `QuestionsDraft` | `recruitment` edit · all/team | no | `screening-questions`; nothing kept |
 | `GET /recruitment/candidates/summary` | `CandidateSummaryQuery` → `CandidatesSummary` | `recruitment` view · all/team | no | Filter `vacancy_id` |
 | `GET /recruitment/candidates` | `CandidateListQuery` → `CandidatePage` | `recruitment` view · all/team | yes | Filters `stage`, `vacancy_id`, `status`, `q`; sort `weighted_total`, `score`, `applied_at`, `current_stage_entered_at` |
@@ -233,8 +256,8 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/assessments/sittings/bulk` | `SittingSendBulk` → `SittingSendBulkResult` | `recruitment` edit · all/team | no | Send to Candidates: every active candidate of one vacancy at one stage with no live sitting of it |
 | `PUT /recruitment/assessments/sittings/:id/marks` | `SittingMarks` → `SittingDetail` | `recruitment` edit · all/team | no | Written and file answers |
 | `POST /recruitment/assessments/sittings/:id/cancel` | `EmptyBody` → `SittingDetail` | `recruitment` edit · all/team | no | Before it is submitted |
-| `GET /recruitment/interviews` | `InterviewListQuery` → `InterviewPage` | `recruitment` view · all/team/panel | yes | Filters `when` (upcoming, past), `status`, `mine`, `application_id`, `q` |
-| `GET /recruitment/interviews/:id` | `InterviewDetail` | `recruitment` view · all/team/panel | no | Blind while open (§6.6) |
+| `GET /recruitment/interviews` | `InterviewListQuery` → `InterviewPage` | `recruitment` view · all/team/panel | yes | Filters `when` (upcoming, past), `status`, `mine`, `application_id`, `q`; with no `sort`, those still to end first (soonest first), then those past (latest first) |
+| `GET /recruitment/interviews/:id` | `InterviewDetail` | `recruitment` view · all/team/panel | no | Blind while open (§6.6); the candidate's `scorecard` and `weighted_total` for a reader whose scope holds the vacancy (null for a seat alone); `activity`, the interview's events newest first, the latest 25 |
 | `POST /recruitment/interviews` | `InterviewSchedule` → `InterviewDetail` | `recruitment` edit · all/team | no | |
 | `PATCH /recruitment/interviews/:id` | `InterviewReschedule` → `InterviewDetail` | `recruitment` edit · all/team | no | New time, place or panel; invites resent; a panel left with only submitted seats closes the round as the last card would (§6.6) |
 | `POST /recruitment/interviews/:id/cancel` | `InterviewCancel` → `InterviewDetail` | `recruitment` edit · all/team | no | |
@@ -311,6 +334,14 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   as a policy's text is, and the page draws them with `RichText` (GE · (Ose), 05/11/2026). The staff
   sheet draws the same blocks (`VacancyDetail.description_blocks`, `requirements_blocks`,
   `nice_to_have_blocks`), never the raw Markdown; the Markdown itself still comes for Edit (GE, 06/11/2026).
+- New Vacancy's interview (§3 step 2) keeps nothing: its answers live in the browser until the editor
+  saves. Only the role is required; an answer given is checked as it is filled (VacancyEdit's rules),
+  one skipped is not, and the editor then asks for what Publish needs (department, hiring manager,
+  location unless remote, description and requirements). The answers that are not a field of the
+  vacancy (the must-haves, anything else, the follow-ups and theirs, and the location's name as
+  `area`) go only to the model, and the plain draft is built from them: the must-haves also open the
+  editor's requirements and the anything else its nice to have when there is no draft (Use Blank Form).
+  A seat starts the interview with its title, department, hiring manager and reports to answered.
 - **Applicants** is one count everywhere: every application to a role, whatever became of it. The list's
   column counts a role's; the Applicants tile sums it over the open and paused roles. The funnel and a
   role's Candidates by Stage count only those still in progress (GE, 06/11/2026).
@@ -426,6 +457,12 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   Each trait's average across the panel is shown beside it once closed.
 - Candidate Details (current employer, academics, total and relevant experience in months) are filled
   once by `recruitment` edit, not by each panelist, and are not blind.
+- Round Activity is the interview's own events (`event_log`, newest first, the latest 25): scheduled,
+  changed, cancelled, Candidate Details saved, each card submitted (who, never what), each reminder (to
+  whom; a run twice in a day logs it twice but sends it once, so the first is shown), the close and the
+  report. The candidate's Weighted Scorecard (§6.5) shows beside the panel only to a reader whose scope
+  holds the vacancy; a seat alone shows the card, the CV and the Candidate Details, not the candidate's
+  other scores.
 - Panelists may open the candidate's CV from the card (the vault's check passes for a seat on the
   panel).
 - The round closes by itself once every seat on the panel has submitted **and the interview has
@@ -561,7 +598,10 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 ## 9 · AI and search
 
 - **Feature AI** (`src/services/ai/actions.js`, chosen by GE 04/11/2026):
-  - `jd-draft`, Write With AI on New Vacancy: Default.
+  - `jd-draft`, Write With AI on New Vacancy, and its draft at the end of the interview: Default.
+  - `vacancy-follow-ups`, New Vacancy's two follow-up questions about the role: Default, as `jd-draft`
+    (GE, 06/11/2026). A question naming a protected trait or a person's health is dropped before it
+    is shown (`vacancies.draft.js` `fairQuestion`).
   - `screening-questions`, Suggest With AI on a vacancy's questions: Default.
   - `cv-screen`, Score With AI: Deep Reasoning (`ai-control.md` §6.2 names this case).
   - `assessment-questions`, Suggest With AI on an assessment's questions: Default.
@@ -597,10 +637,10 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Recruitment · Vacancies (`vacancies`) | Four KPIs (Open Vacancies, Applicants, In Interview, Past Closing Date); the list: role, department, location, applicants, closes, status; Suggested From Organogram (title, department, Create Vacancy; 25 a page with its pager); the funnel; New Vacancy, Careers Page, Candidate Emails, Careers Settings. A vacancy's sheet: details, public link with Copy Link, Edit, Publish or Pause or Resume, Close, Questions, Scorecard, See Candidates; the Description, Required Experience and Nice to Have drawn as formatted text (headings, lists) | Help term on Scorecard: "Switch off a part this role skips. The parts left on add up to 100." Help on Paused: "Takes no applications. The link keeps working." Help on the Applicants tile: "Everyone who applied to an open or paused role, whatever became of them." | The slug rule, the lifecycle, why a paused role keeps its link: §6.1 here, the manual |
+| Recruitment · Vacancies (`vacancies`) | Four KPIs (Open Vacancies, Applicants, In Interview, Past Closing Date); the list: role, department, openings, location, applicants, closes, status; Suggested From Organogram (title, department, Create Vacancy; 25 a page with its pager); the funnel; New Vacancy, Careers Page, Candidate Emails, Careers Settings. New Vacancy's interview: Question n of 10 (8 with the AI off) as a bar, the question as the card's heading, its fields, Use Blank Form, Back (Cancel on the first), Next or Skip, Draft Vacancy on the last; the editor after it (Role, Details, Pay and Publish). A vacancy's sheet: details, public link with Copy Link, Edit, Publish or Pause or Resume, Close, Questions, Scorecard, See Candidates; the Description, Required Experience and Nice to Have drawn as formatted text (headings, lists) | Help term on Scorecard: "Switch off a part this role skips. The parts left on add up to 100." Help on Paused: "Takes no applications. The link keeps working." Help on the Applicants tile: "Everyone who applied to an open or paused role, whatever became of them." Each interview card's hint on its main field: Hiring Manager "Needed before the role is published. They follow its candidates and decide after interviews."; Arrangement Note "Say which days are in the office, and the hours if they are fixed."; Location "Pick the area. Needed before an on site or hybrid role is published."; Salary From "Leave the band empty if it is not settled yet."; the must-haves "The three to five things that matter most: the skills and experience it needs, and its main responsibilities."; anything else "What would set someone apart, the perks, and the team they join."; a follow-up's own hint, from the AI | Why it asks one question a card, the follow-ups' guard and the plain draft: §3 step 2, §9 here. The slug rule, the lifecycle, why a paused role keeps its link: §6.1 here, the manual |
 | Recruitment · Candidates (`candidates`) | Four KPIs (Candidates, To Screen, In Interview, Shortlisted); vacancy filter; the board's five columns, each card: name, role, screening score with Provisional, days at stage; the sheet: details, CV, answers, Screening (score, Provisional, the AI summary), Scorecard (parts, weighted total, "n of m parts"), assessments, interviews, Stage History; Score With AI, Send Assessment, Schedule Interview, Not Progressing, Reopen, Add to Pool, `Move to <Stage>`, Invite to Apply, Screen With AI (asks one to three must-meet conditions) | Help term on Provisional: "Worked out from the form only. Press Score With AI to read the CV." Help on Weighted Total: "From the parts scored so far, with this role's weights." | The two-tier scoring design and why a score never moves anyone: §6.4 here |
 | Recruitment · Assessments (`assessments`) | Four KPIs (Active, Sent, Awaiting Marking, Average Score); Assessments list: name, type, minutes, questions, sent, average, status; Sittings: candidate, assessment, state, score; New Assessment and Import; an assessment's sheet with its questions and points, Edit, Questions, Activate or Deactivate, Export; Send to Candidates; a sitting's sheet with each answer (a file to open, or the link given) and Mark Answers | Help on Points: "What each option scores." | How the timer and resume work: §6.7, the manual |
-| Recruitment · Interviews (`interviews`) | Upcoming and Past; each row: candidate, role, when, panel submitted out of total, round state; the interview's sheet: when, where or link, Candidate Details, panel with Submitted or Waiting, traits with each rating and the average only once closed, total, report and decision, Download Form; My Card (traits as ten stars, decision, comments, Tidy With AI for every panelist while the AI is available, private notes, View CV; a star that fails to save goes back to the last rating the server kept, unless a later tap of that trait is on its way), Submit Card, Close Round, Write Report, Schedule Interview (its panel picker offers only who holds Recruitment; a refusal names who cannot sit), Reschedule, Cancel | Help on Waiting: "Ratings show when every panelist has submitted or the round is closed." Help on Private Notes: "Only you ever see these." | The blind predicate and its reasons: §6.6 here |
+| Recruitment · Interviews (`interviews`) | All Interviews and My Panels; Upcoming and Recent (still to end first, then past), each row: candidate, role, date, panel size with Your Card, round state (Scheduled, n of m Submitted, Closed, Cancelled); beside it on desktop (a sheet on a phone) the interview picked: when, how, where or link, View CV, Download Form, Reschedule, Cancel Interview, Close Round, Write or Edit Report, My Card; Blind Panel (each panelist, Submitted or Waiting, the score once closed, Hidden before, a dash while waiting; the decision once closed); Weighted Scorecard (each part on, its weight and the candidate's score, the total; for a reader whose scope holds the role); Candidate Details with Edit; traits with each rating and the average only once closed, total, report and decision; Round Activity (scheduled, changed, cancelled, details saved, cards submitted, reminders, closed, report, each with who and when); My Card (traits as ten stars, decision, comments, Tidy With AI for every panelist while the AI is available, private notes, View CV; a star that fails to save goes back to the last rating the server kept, unless a later tap of that trait is on its way), Submit Card, Close Round, Write Report, Schedule Interview (its panel picker offers only who holds Recruitment; a refusal names who cannot sit), Reschedule, Cancel | Help on Hidden: "Each score shows once the round closes. Private notes never show." Help on Weighted Scorecard: "The candidate's score at each part, with the part's weight in the total." Help on Private Notes: "Only you ever see these." | The blind predicate and its reasons: §6.6 here |
 | Recruitment · Talent Pool (`talent-pool`) | Four KPIs (In the Pool, Invited Back, Hired From the Pool, Average Score); the list: candidate, applied for, score with Provisional, added, reason, kept until, Invite to Apply or Invited; Export | Help on Kept Until: "Removed from the pool on this date." | The 24 month rule and the purge job: §6.9 |
 | Careers (`/jobs`) | Work With Us; open roles with department, area and arrangement; search above 8 roles | None | Indexing, slugs: §6.1 |
 | Vacancy (`/jobs/<slug>`) | Title; department, area, arrangement, salary when shown; employment type, working days, probation, reports to, the closing date; About MyCityApp, Role Overview (the description; one that opens with its own `## Role Overview` shows the heading once), Required Experience and Qualifications, What We Are Looking For, How We Hire as its steps; Apply for This Role (beside the text on desktop, a bar at the foot on a phone); a paused, closed or filled banner | None | Why a paused link still works: §6.1 |
@@ -611,10 +651,10 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Recruitment · Vacancies (`vacancies`) | Two KPI cards a row, then vacancy cards (role, status pill, applicants, closes) | The funnel chart; Department and Published columns | New Vacancy in the floating button; a vacancy opens in a sheet with its actions full width at the foot | Bottom bar; the Recruitment tabs along the top |
-| Recruitment · Candidates (`candidates`) | Vacancy filter, then one stage at a time as a segmented control with the stage's cards | Drag between columns (Move To in the sheet instead); the score distribution | A tapped card opens its sheet; `Move to <Stage>` full width at its foot | Bottom bar; the Recruitment tabs |
+| Recruitment · Vacancies (`vacancies`) | Two KPI cards a row, then vacancy cards (role, status pill, applicants, closes); New Vacancy's interview as a full sheet, one question a card, its buttons full width at the foot | The funnel chart; Department, Openings and Location columns | New Vacancy in the floating button; a vacancy opens in a sheet with its actions full width at the foot | Bottom bar; the Recruitment tabs along the top |
+| Recruitment · Candidates (`candidates`) | Vacancy filter, then one stage at a time as a segmented control with the stage's cards (on desktop the stages sit on one row, scrolling sideways when they do not fit) | Drag between columns (Move To in the sheet instead); the score distribution | A tapped card opens its sheet; `Move to <Stage>` full width at its foot | Bottom bar; the Recruitment tabs |
 | Recruitment · Assessments (`assessments`) | Assessments and Sittings as a segmented control; cards | The average-by-assessment chart | New Assessment in the floating button; Mark Answers in a sitting's sheet | Bottom bar; the Recruitment tabs |
-| Recruitment · Interviews (`interviews`) | Upcoming first as cards (candidate, when, panel n of m) | Past behind the segmented control; the activity trail | A tapped interview opens its sheet; My Card full width, opening as its own full sheet, one trait a row with ten 44 px stars, in two rows of five (ten do not fit 390 px) | Bottom bar; the Recruitment tabs |
+| Recruitment · Interviews (`interviews`) | Upcoming and Recent as cards (candidate, date, panel, round state), upcoming first; nothing open until a card is tapped | Role on the card; the interview beside the list (it opens in a sheet instead, Blind Panel and Weighted Scorecard one under the other) | A tapped interview opens its sheet, its actions at the top full width; My Card full width, opening as its own full sheet, one trait a row with ten 44 px stars, in two rows of five (ten do not fit 390 px) | Bottom bar; the Recruitment tabs |
 | Recruitment · Talent Pool (`talent-pool`) | Two KPI cards a row, then pool cards (name, applied for, score, kept until) | Added and Reason columns (in the sheet) | A tapped card opens its sheet with Invite to Apply full width | Bottom bar; the Recruitment tabs |
 | Careers, Vacancy, Apply, Assessment | One column, full width buttons, 44 px targets | Nothing | Apply, Submit, Next Question | The public site's own header |
 
@@ -645,7 +685,8 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - **An empty Careers page**: "No open roles right now".
 - **Mail paused or paced**: the candidate's mail waits; nothing is lost and nothing is sent twice.
 - **AI off or over its limit**: Write With AI, Suggest With AI, Score With AI and Tidy With AI are not
-  shown; everything else works.
+  shown; New Vacancy's interview asks its eight fixed questions and Draft Vacancy writes the plain draft
+  from the answers (§3 step 2); everything else works.
 - **Staging**: real mail is marked `[STAGING]`; the staging seed uses `@example.test` candidates only,
   and system mail never hands an `@example.test` address to the mail server (logged as not sent,
   `integrations.md` §6.16), so nothing bounces. The seed finds the roles it made by its own record of
@@ -676,6 +717,14 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 06/11/2026 · GE · From testing on staging, round 1 (three parts): the candidate board stays on one row and
+  scrolls sideways (the shared Kanban, for every board), its cards compact with Move beside the title; Vacancies
+  lists Openings, and on a phone a list's status is a pill on the card; Interviews is Upcoming and Recent beside
+  the selected interview's Blind Panel, Weighted Scorecard (only for a reader whose scope covers the role) and
+  Round Activity (§5, §6.6, §10); New Vacancy is a ten-question interview, two of them written by the AI
+  (`vacancy-follow-ups`, Default, chosen by GE), that drafts into the editor, and runs eight questions with a
+  plain draft when the AI is off (§3, §5, §6.1, §9, §10, §11).
 
 - 06/11/2026 · GE · From testing on staging: Invite to Apply said "Check this value" when the person had
   already applied for the role (the field's message was six words; it is now "Applied for this role", and

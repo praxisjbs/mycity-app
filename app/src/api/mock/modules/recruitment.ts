@@ -13,6 +13,7 @@ import type {
   RichTextBlock,
   RichTextSpan,
   Interview,
+  InterviewActivity,
   InterviewDetail,
   ScorecardPart,
   ScorecardWeight,
@@ -197,17 +198,61 @@ R("PUT /api/v1/recruitment/vacancies/settings", "edit", (req) =>
   }),
 );
 
-R("GET /api/v1/recruitment/vacancies/assist", "edit", () => ok({ available: true, reason: null }));
+/** Whether the mock's AI answers; a test switches it off to walk New Vacancy's interview without it. */
+export const ASSIST = { available: true };
+const assistOff = () => ({ available: false, reason: "off" as const });
+
+R("GET /api/v1/recruitment/vacancies/assist", "edit", () => ok(ASSIST.available ? { available: true, reason: null } : assistOff()));
+
+type Interviewed = { must_haves?: string; extras?: string; area?: string; positions?: number; follow_ups: Array<{ question: string; answer?: string }> };
+/** A line of an answer per list item. */
+const itemsOf = (text?: string) => (text ?? "").split(/\n|;|(?<=\.)\s+/).map((t) => t.replace(/^[-*]\s*/, "").trim()).filter((t) => t.length > 3);
+
 R("POST /api/v1/recruitment/vacancies/assist", "edit", (req) =>
-  parse<{ title: string; instruction: string; min_experience_years?: number }>(vacancySchemas.JdDraftRequest, req.body, (b) =>
-    ok({
+  parse<{ title: string; instruction?: string; min_experience_years?: number; interview?: Interviewed }>(vacancySchemas.JdDraftRequest, req.body, (b) => {
+    if (b.interview) {
+      // New Vacancy's interview: drafted from the answers, plainly when the AI is off (never an error).
+      const a = b.interview;
+      const musts = itemsOf(a.must_haves);
+      const answered = a.follow_ups.filter((f) => f.answer).map((f) => `- ${f.answer}`);
+      const overview = `MyCityApp is hiring ${a.positions && a.positions > 1 ? `${a.positions} people` : "one person"} as ${b.title}${a.area ? `, based in ${a.area}` : ""}.`;
+      const lines = musts.length ? musts : ["Own the work of the role from plan to result, week by week."];
+      return ok({
+        ...(ASSIST.available ? { available: true, reason: null, ai_run_id: sid(`ai:jd:${Date.now()}`) } : { ...assistOff(), ai_run_id: null }),
+        description: [overview, `## Key Responsibilities\n\n${lines.map((m) => `- ${m}`).join("\n")}`, ...(answered.length ? [`## About the Role\n\n${answered.join("\n")}`] : [])].join("\n\n"),
+        requirements: [...(b.min_experience_years !== undefined ? [`- ${b.min_experience_years}+ years of relevant experience.`] : []), ...musts.map((m) => `- ${m}`)].join("\n") || null,
+        nice_to_have: itemsOf(a.extras).map((e) => `- ${e}`).join("\n") || null,
+      });
+    }
+    if (!ASSIST.available) return ok({ ...assistOff(), description: null, requirements: null, nice_to_have: null, ai_run_id: null });
+    const line = b.instruction ?? "";
+    return ok({
       available: true,
       reason: null,
-      description: `The ${b.title} ${b.instruction.charAt(0).toLowerCase()}${b.instruction.slice(1).replace(/\.?$/, ".")}\n\n## Key Responsibilities\n- Own the work of the role from plan to result, week by week.\n- Report progress to your manager with clear figures.\n- Work closely with the teams around you across MyCityApp.`,
+      description: `The ${b.title} ${line.charAt(0).toLowerCase()}${line.slice(1).replace(/\.?$/, ".")}\n\n## Key Responsibilities\n- Own the work of the role from plan to result, week by week.\n- Report progress to your manager with clear figures.\n- Work closely with the teams around you across MyCityApp.`,
       requirements: `- ${b.min_experience_years ?? 3} years in a similar role.\n- Clear writing and speaking in English.\n- Lives in, or will move to, Lagos.`,
       nice_to_have: "Experience in a consumer app or media business.",
       ai_run_id: sid(`ai:jd:${Date.now()}`),
-    }),
+    });
+  }),
+);
+
+/** New Vacancy's interview: two questions about this role from the answers so far, none when the AI is off. */
+R("POST /api/v1/recruitment/vacancies/assist/follow-ups", "edit", (req) =>
+  parse<{ title: string }>(vacancySchemas.FollowUpsRequest, req.body, (b) =>
+    ok(
+      ASSIST.available
+        ? {
+            available: true,
+            reason: null,
+            questions: [
+              { question: `Which tools will the ${b.title} use every week?`, hint: "Name the software and equipment the role works with." },
+              { question: `Who will the ${b.title} work with most closely?`, hint: "The teams or partners they deal with day to day." },
+            ],
+            ai_run_id: sid(`ai:follow:${Date.now()}`),
+          }
+        : { ...assistOff(), questions: [], ai_run_id: null },
+    ),
   ),
 );
 
@@ -1175,6 +1220,44 @@ function scoreNow(x: D.MockInterview): number | null {
   return s === null ? null : round1(s * 10);
 }
 
+/** Round Activity written by the mock's own writes (a schedule, a change, a cancel, Candidate Details). */
+const LOGGED = new Map<string, InterviewActivity[]>();
+function logged(x: D.MockInterview, kind: InterviewActivity["kind"], user: string | null | undefined) {
+  LOGGED.set(x.interview_id, [
+    { event_id: sid(`ev:${x.interview_id}:${kind}:${Date.now()}:${Math.random()}`), kind, occurred_at: new Date().toISOString(), actor_name: nameOf(user), panelist_name: null },
+    ...(LOGGED.get(x.interview_id) ?? []),
+  ]);
+}
+
+/**
+ * The interview's events, newest first, the latest 25 (interviews.repo activity): what the mock wrote,
+ * and for the fixtures what their data says happened: scheduled a week before (or as it was made),
+ * each card in, a reminder the morning after the end to each seat still waiting, the close, the report.
+ */
+function activityOf(x: D.MockInterview): InterviewActivity[] {
+  const ev = (key: string, kind: InterviewActivity["kind"], occurred_at: string, actor_name: string | null, panelist_name: string | null = null): InterviewActivity => ({
+    event_id: sid(`ev:${x.interview_id}:${key}`),
+    kind,
+    occurred_at,
+    actor_name,
+    panelist_name,
+  });
+  const own = LOGGED.get(x.interview_id) ?? [];
+  const out = [...own];
+  if (!own.some((e) => e.kind === "scheduled")) {
+    const made = new Date(Math.min(Date.parse(x.start) - 7 * 86_400_000, Date.now() - 3_600_000)).toISOString();
+    out.push(ev("scheduled", "scheduled", made, vacancyOfApp(app(x.application_id)!).hiring_manager?.display_name ?? null));
+  }
+  for (const c of cardsOf(x)) {
+    if (c.submitted_days !== null) out.push(ev(`in:${c.employee_key}`, "feedback_submitted", at(c.submitted_days, "16:30"), nameOf(c.employee_key)));
+    else if (x.status === "scheduled" && x.round_status === "open" && Date.parse(x.end) < Date.now() - 86_400_000)
+      out.push(ev(`due:${c.employee_key}`, "feedback_due", new Date(Date.parse(x.end) + 86_400_000).toISOString(), null, nameOf(c.employee_key)));
+  }
+  if (x.status !== "cancelled" && x.round_status === "closed" && x.closed_days !== null) out.push(ev("closed", "round_closed", at(x.closed_days, "17:00"), null));
+  if (x.report) out.push(ev("reported", "reported", at(x.report.days, "12:00"), nameOf(x.report.by)));
+  return out.sort((a, b) => b.occurred_at.localeCompare(a.occurred_at)).slice(0, 25);
+}
+
 function interviewRow(x: D.MockInterview, req: Req): Interview {
   const a = app(x.application_id)!;
   const mine = cardsOf(x).find((c) => c.employee_key === req.user);
@@ -1261,6 +1344,9 @@ function interviewDetail(x: D.MockInterview, req: Req): InterviewDetail {
           submitted_at: mine.submitted_days === null ? null : at(mine.submitted_days, "16:30"),
         }
       : null,
+    /* The candidate's scorecard, for a reader whose scope holds the role (the mock's grant is every role). */
+    ...(can(req, "view") ? { scorecard: scorecardOf(a), weighted_total: weighted(scorecardOf(a)).weighted_total } : { scorecard: null, weighted_total: null }),
+    activity: activityOf(x),
     can_edit: edit && live,
     can_close: edit && live && Date.parse(x.start) <= Date.now(),
     can_report: closed && x.status !== "cancelled" && (edit || v.hiring_manager?.employee_id === byKey(req.user)?.employee_id),
@@ -1280,7 +1366,16 @@ R("GET /api/v1/recruitment/interviews", "view", (req) => {
         application_id: (x, id) => x.application_id === id,
         status: (x, s) => x.status === s,
       },
-      sort: { scheduled_start: (a, b) => a.scheduled_start.localeCompare(b.scheduled_start) },
+      /* With no sort (interviews.repo SORTS): still to end first, soonest first, then the past, latest first. */
+      sort: {
+        soonest: (a, b) => {
+          const pa = Date.parse(a.scheduled_end) < now;
+          const pb = Date.parse(b.scheduled_end) < now;
+          if (pa !== pb) return pa ? 1 : -1;
+          return pa ? b.scheduled_start.localeCompare(a.scheduled_start) : a.scheduled_start.localeCompare(b.scheduled_start);
+        },
+        scheduled_start: (a, b) => a.scheduled_start.localeCompare(b.scheduled_start),
+      },
     },
   );
 });
@@ -1389,6 +1484,7 @@ R("POST /api/v1/recruitment/interviews", "edit", (req) =>
     const refused = applySchedule(x, b);
     if (refused) return refused;
     INTERVIEWS.unshift(x);
+    logged(x, "scheduled", req.user);
     if (STAGES.indexOf(a.stage) < STAGES.indexOf("interview") && vacancyOfApp(a).board_stages.includes("interview")) moveTo(a, "interview", req.user);
     return created(interviewDetail(x, req));
   }),
@@ -1425,6 +1521,7 @@ R("PATCH /api/v1/recruitment/interviews/:id", "edit", (req) =>
     parse<ScheduleBody>(interviewSchemas.InterviewReschedule, req.body, (b) => {
       const refused = applySchedule(x, b);
       if (refused) return refused;
+      logged(x, "rescheduled", req.user);
       /* A panel left with only submitted seats closes as the last card would (schedule.reschedule). */
       closeIfDone(x);
       return ok(interviewDetail(x, req));
@@ -1436,6 +1533,7 @@ R("POST /api/v1/recruitment/interviews/:id/cancel", "edit", (req) =>
   liveRound(req, (x) =>
     parse<{ reason: string }>(interviewSchemas.InterviewCancel, req.body, () => {
       cancelRound(x);
+      logged(x, "cancelled", req.user);
       return ok(interviewDetail(x, req));
     }),
   ),
@@ -1545,6 +1643,7 @@ R("PUT /api/v1/recruitment/interviews/:id/details", "edit", (req) => {
       x.details.relevant = relevant;
       /* A round with its report has its form made again with the new details. */
       if (x.report) x.form_document_id = sid(`doc:form:${x.interview_id}:${Date.now()}`);
+      logged(x, "details_saved", req.user);
       return ok(interviewDetail(x, req));
     },
   );
