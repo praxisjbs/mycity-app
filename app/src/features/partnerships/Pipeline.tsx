@@ -49,7 +49,7 @@ export function Pipeline({ id }: { id: string | null }) {
           <FilterSelect label="Stage" value={stage} onChange={setStage} options={[["", "Every Stage"], ...stages.map((s) => [s.code, s.label] as [string, string])]} />
           <FilterSelect label="Category" value={category} onChange={setCategory} options={[["", "Every Category"], ...categories.options]} more={categories.more} onMore={categories.onMore} />
           <FilterSelect label="Region" value={scope} onChange={setScope} options={[["", "Every Region"], ...SCOPES]} />
-          <FilterSelect label="Health" value={health} onChange={(v) => setHealth(v as Health)} options={[["", "Any Health"], ["on_track", "On Track"], ["follow_up_required", "Follow-up Required"], ["stalled", "Stalled"]]} />
+          <FilterSelect label="Health" value={health} onChange={(v) => setHealth(v as Health)} options={[["", "Any Health"], ["on_track", "On Track"], ["follow_up_required", "Follow-Up Required"], ["stalled", "Stalled"]]} />
         </Grid>
       </DesktopOnly>
       {!d ? (
@@ -66,7 +66,7 @@ export function Pipeline({ id }: { id: string | null }) {
             ]}
           />
           <PhoneOnly className="mt-3">
-            <Chips label="Health" value={health} onChange={(v) => setHealth(v as Health)} options={[["", "All"], ["stalled", "Stalled"], ["follow_up_required", "Follow-up"], ["on_track", "On Track"]]} />
+            <Chips label="Health" value={health} onChange={(v) => setHealth(v as Health)} options={[["", "All"], ["stalled", "Stalled"], ["follow_up_required", "Follow-Up"], ["on_track", "On Track"]]} />
             <PagedTable<DealRow>
               title="Open Deals"
               list={deals}

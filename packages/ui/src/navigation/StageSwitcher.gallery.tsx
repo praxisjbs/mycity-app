@@ -28,7 +28,7 @@ function Start() {
 export default {
   component: "StageSwitcher",
   states: {
-    "A Deal at Proposal Sent": () => <Moving />,
+    "At Proposal Sent": () => <Moving />,
     "A New Deal": () => <Start />,
     "Read Only": () => <StageSwitcher stages={STAGES} value="partnership_signed" onMove={() => undefined} readOnly />,
   },

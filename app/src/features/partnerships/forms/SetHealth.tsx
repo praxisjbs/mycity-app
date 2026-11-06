@@ -4,7 +4,7 @@ import { invalidate, useMutation } from "@/api/hooks";
 import { Button, ChoiceField, Field, FormFooter, TextAreaField, toast, useContractForm } from "@mycity/ui";
 import { failed } from "../lib";
 
-/** Set Health (docs/guides/partnerships.md §6.5): On Track, Follow-up Required or Stalled; Stalled needs its blockers. */
+/** Set Health (docs/guides/partnerships.md §6.5): On Track, Follow-Up Required or Stalled; Stalled needs its blockers. */
 export function SetHealth({ deal, close }: { deal: Pick<DealDetail, "deal_id" | "health" | "blockers">; close: () => void }) {
   const f = useContractForm({ health: deal.health, blockers: deal.blockers ?? "" }, pipeline.HealthSet);
   const set = useMutation("POST /api/v1/partnerships/deals/:id/health");
@@ -22,7 +22,7 @@ export function SetHealth({ deal, close }: { deal: Pick<DealDetail, "deal_id" | 
   return (
     <>
       <Field label="Health" {...f.status("health")}>
-        <ChoiceField {...f.field("health")} options={[["on_track", "On Track"], ["follow_up_required", "Follow-up Required"], ["stalled", "Stalled"]]} />
+        <ChoiceField {...f.field("health")} options={[["on_track", "On Track"], ["follow_up_required", "Follow-Up Required"], ["stalled", "Stalled"]]} />
       </Field>
       {f.values.health === "stalled" && <Field label="Blockers" {...f.status("blockers")}><TextAreaField {...f.field("blockers")} placeholder="Waiting on legal" /></Field>}
       <FormFooter>

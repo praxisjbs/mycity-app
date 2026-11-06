@@ -88,7 +88,7 @@ export function nextStage(stages: ListValue[], code: string): ListValue | null {
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 export const HEALTH: Record<DealRow["health"], { label: string; tone: Tone }> = {
   on_track: { label: "On Track", tone: "ok" },
-  follow_up_required: { label: "Follow-up Required", tone: "warn" },
+  follow_up_required: { label: "Follow-Up Required", tone: "warn" },
   stalled: { label: "Stalled", tone: "err" },
 };
 export const healthPill = (h: DealRow["health"] | null | undefined) => (h ? { tone: HEALTH[h].tone, text: HEALTH[h].label } : null);

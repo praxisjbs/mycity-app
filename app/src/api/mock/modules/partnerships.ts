@@ -50,7 +50,7 @@ const STAGE_ROWS: Array<[string, string, ListValue["meaning"]]> = [
   ["intro_meeting_scheduled", "Meeting Scheduled", "meeting"],
   ["intro_meeting_held", "Meeting Held", "meeting"],
   ["proposal_sent", "Proposal Sent", "proposal"],
-  ["follow_up_ongoing", "Follow-up Ongoing", "proposal"],
+  ["follow_up_ongoing", "Follow-Up Ongoing", "proposal"],
   ["negotiation", "Negotiation", "negotiation"],
   ["verbal_approval", "Verbal Approval", "negotiation"],
   ["contract_review", "Contract Review", "negotiation"],
@@ -214,7 +214,7 @@ const line = (kind: StageHistoryLine["kind"], from: string | null, to: string, b
   by: by ? refKey(by) : null,
   changed_at: when,
 });
-const HEALTH_LABEL: Record<string, string> = { on_track: "On Track", follow_up_required: "Follow-up Required", stalled: "Stalled" };
+const HEALTH_LABEL: Record<string, string> = { on_track: "On Track", follow_up_required: "Follow-Up Required", stalled: "Stalled" };
 
 function seed(p: MockPartner, i: number) {
   const code = FROM_TRACKER[p.stage] ?? "prospect_identified";
@@ -584,13 +584,19 @@ route("GET /api/v1/partnerships/pipeline", (req) => {
     stalled: unfinished.filter((d) => d.health === "stalled").sort((a, b) => a.stage_since.localeCompare(b.stage_since)).slice(0, 25).map(pipelineDeal),
   });
 });
-route("GET /api/v1/partnerships/deals", (req) =>
-  paged(DEALS, req, {
+route("GET /api/v1/partnerships/deals", (req) => {
+  const res = paged(DEALS, req, {
     search: (d) => [d.number, d.title, d.event_title, recordOfDeal(d).name],
     filters: DEAL_FILTERS,
     sort: { expected_close_on: (a, b) => (a.expected_close_on ?? "9").localeCompare(b.expected_close_on ?? "9"), title: (a, b) => a.title.localeCompare(b.title), estimated_value: (a, b) => k(a.estimated_value ?? "0") - k(b.estimated_value ?? "0"), created_at: (a, b) => a.created_at.localeCompare(b.created_at) },
-  }),
-);
+  });
+  // The page of the mock's own deals, answered in the contract's DealRow.
+  if (res.status === 200) {
+    const body = res.body as { data: MockDeal[] };
+    return ok({ ...body, data: body.data.map(dealRow) });
+  }
+  return res;
+});
 route("GET /api/v1/partnerships/deals/:id", (req) => {
   const d = dealOf(req.params.id);
   return d ? ok(dealDetail(d, holdsMoney(req))) : notFound();
