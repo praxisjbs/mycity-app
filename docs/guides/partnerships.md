@@ -10,7 +10,7 @@
 | Capabilities | `partnerships.configure` (the Categories tab: categories, their agreement templates, delivery checklists and custom fields; pipeline stages and lists; proof points; saved proposal templates); `partnerships.money` (see and enter commission, the merchant's take and returns; import returns) |
 | Screens (PROGRESS.md rows) | #50 Pipeline, #51 Partners, #52 Leads, #53 Proposals, #54 Contracts & MOUs, #55 Analytics; new: Partnerships · Categories and Public · Proposal (ratified 05/11/2026; PR 1 registers them in the next two free PROGRESS rows, #104 and #105 while free, and corrects this guide if another milestone took one first); changes to My Workspace (#4 Today, #5 Tasks, #6 Calendar, #101 Projects), Settings · Approvals (#72), Settings · Imports (#93), Home, Mailbox, Public · Sign Offer and Verify Document |
 | Status | Agreed |
-| Last changed | 05/11/2026 |
+| Last changed | 06/11/2026 |
 
 ---
 
@@ -1479,6 +1479,10 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 06/11/2026 · GE · (Ose) Public · Proposal's placeholder page moves to the public site's split layout with the rest of
+  go.mycityapp.io (the approved design); its Coming Soon is unchanged. Verify Document's QR page,
+  `/verify/t/<token>` (§6.9), is drawn on the mock: the record, both verdicts and the document with Download PDF, until
+  M5's verify API.
 - 05/11/2026 · JP · PR 1, contract, data and scaffolding: the seven contract files with Appendix C's
   schemas (the kit's twelve layouts one discriminated union; the mailbox's thread link in
   `interactions.js`; the Workspace link as `PartnerLink`); migrations `7010` to `7040` and seed `7190`

@@ -638,17 +638,26 @@ const QuestionsDraftOutput = z
  * Public: go.mycityapp.io/jobs (allow-lists, guide §6.1)
  * ------------------------------------------------------------------ */
 
-/** GET /api/public/v1/jobs: search by `q`, newest first. */
-const PublicJobListQuery = listQuery({});
+/**
+ * GET /api/public/v1/jobs: closing soonest first (a role with no closing date last, then the newest),
+ * searched by `q`, and narrowed to one department by its `code` (guide §6.1). An unknown code is an
+ * empty page, not a refusal.
+ */
+const PublicJobListQuery = listQuery({ department: z.string().trim().min(1).max(40).optional() });
 
-/** One open role on Careers. */
+/** One open role on Careers: what its card shows. */
 const PublicJobCard = z
   .object({
     slug: z.string(),
     title: z.string(),
     department: z.string().nullable(),
+    /** The department's code: what `department` on the list and the summary's departments name it by. */
+    department_code: z.string().nullable(),
     location: z.string().nullable(),
     work_pattern: WorkPattern.nullable(),
+    work_pattern_note: z.string().nullable(),
+    employment_type: EmploymentType.nullable(),
+    closes_at: isoDateTime.nullable(),
   })
   .strict();
 
@@ -657,19 +666,15 @@ const PublicJobPage = Paged(PublicJobCard);
 /**
  * GET /api/public/v1/jobs/:slug. A hidden salary band is left out, not sent as null.
  * `state`: open takes applications; paused and closed say so; filled is closed as filled.
- * `how_we_hire` names the steps this role uses, from its scorecard. The four texts written in Markdown
- * (About MyCityApp, the description, must have, nice to have) arrive as blocks from the server's one
+ * `how_we_hire` names the steps this role uses, from its scorecard. The three texts written in Markdown
+ * (the description, must have, nice to have) arrive as blocks from the server's one
  * Markdown renderer (shared/documents/markdown), as a policy's do, so the page draws them as elements.
  */
 const PublicJob = PublicJobCard.extend({
-  employment_type: EmploymentType.nullable(),
-  work_pattern_note: z.string().nullable(),
   probation_months: z.number().int().min(0).nullable(),
   reports_to: z.string().nullable(),
   min_experience_years: z.number().int().min(0).nullable(),
   working_days: z.string().nullable(),
-  /** About MyCityApp, from Careers Settings: the same paragraph on every role. */
-  about_company: z.array(RichTextBlock).nullable(),
   salary_min: money.optional(),
   salary_max: money.optional(),
   description: z.array(RichTextBlock),
@@ -677,9 +682,28 @@ const PublicJob = PublicJobCard.extend({
   nice_to_have: z.array(RichTextBlock).nullable(),
   how_we_hire: z.array(z.enum(["apply", "screening", "assessment", "interview"])).max(4),
   applicants: z.number().int().min(0),
-  closes_at: isoDateTime.nullable(),
   state: z.enum(["open", "paused", "closed", "filled"]),
 }).strict();
+
+/**
+ * GET /api/public/v1/jobs/summary: the public index's figures, over the roles /jobs lists (guide §6.1).
+ * A summary, not a list: the departments and cities are the organisation's few, grouped in SQL; the
+ * three closing soonest are the head of the careers list.
+ */
+const PublicJobsSummary = z
+  .object({
+    /** Roles taking applications now. */
+    open: z.number().int().min(0),
+    /** The departments hiring, by name: what Careers' department filter offers. */
+    departments: z.array(z.object({ code: z.string(), name: z.string(), open: z.number().int().min(1) }).strict()),
+    /** The cities of the roles' places, most roles first; a remote role has none. */
+    cities: z.array(z.object({ name: z.string(), open: z.number().int().min(1) }).strict()),
+    /** The first three of /jobs. */
+    closing_soon: z.array(PublicJobCard).max(3),
+    /** About MyCityApp, from Careers Settings, as blocks; null until it is written. */
+    about_company: z.array(RichTextBlock).nullable(),
+  })
+  .strict();
 
 /** POST /api/public/v1/jobs/:slug/apply: the Apply link's token, shown once. */
 const ApplyStarted = z.object({ token: z.string() }).strict();
@@ -797,7 +821,8 @@ const TABLES = {
   PublicJobListQuery: { table: null, reason: "list controls for the public careers page" },
   PublicJobCard: { table: null, reason: "the allow-list of a vacancy a stranger may read" },
   PublicJobPage: { table: null, reason: "a page of open roles" },
-  PublicJob: { table: null, reason: "the allow-list of a vacancy a stranger may read, with About MyCityApp" },
+  PublicJob: { table: null, reason: "the allow-list of a vacancy a stranger may read" },
+  PublicJobsSummary: { table: null, reason: "counts over the open roles, by department and city, for the public index" },
   ApplyStarted: { table: null, reason: "the Apply link's token, shown once; only its hash is kept" },
   SlugParams: { table: null, reason: "the :slug path parameter" },
 };
@@ -855,6 +880,7 @@ module.exports = {
   PublicJobCard,
   PublicJobPage,
   PublicJob,
+  PublicJobsSummary,
   ApplyStarted,
   SlugParams,
 };

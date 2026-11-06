@@ -5,10 +5,10 @@
 | Owner | GE |
 | Milestone | M4 |
 | Backend modules | `vacancies`, `candidates`, `assessments`, `interviews`, `talent_pool` |
-| Frontend paths | `app/src/features/recruitment/`, `public-app/src/pages/Careers.tsx`, `public-app/src/pages/Vacancy.tsx`, `public-app/src/pages/Apply.tsx`, `public-app/src/pages/Assessment.tsx`, `public-app/src/pages/shared.tsx` |
+| Frontend paths | `app/src/features/recruitment/`, `public-app/src/pages/Home.tsx`, `public-app/src/pages/Careers.tsx`, `public-app/src/pages/Vacancy.tsx`, `public-app/src/pages/Apply.tsx`, `public-app/src/pages/Assessment.tsx`, `public-app/src/pages/shared.tsx`, `public-app/src/pages/Guidance.tsx` |
 | Permission key(s) | `recruitment` |
 | Capabilities | none |
-| Screens (PROGRESS.md rows) | #38 Vacancies, #39 Candidates, #40 Assessments, #41 Interviews, #44 Talent Pool; public #80 Careers, #81 Vacancy, #82 Apply, #83 Assessment |
+| Screens (PROGRESS.md rows) | #38 Vacancies, #39 Candidates, #40 Assessments, #41 Interviews, #44 Talent Pool; public #107 Home, #80 Careers, #81 Vacancy, #82 Apply, #83 Assessment |
 | Status | Built |
 | Last changed | 06/11/2026 |
 
@@ -50,10 +50,11 @@ never sign in.
 | Recruitment · Assessments (`assessments`) | staff app | `recruitment` view | Assessment definitions (name, type, minutes, questions, sent, average); Sittings (who took what, state, score) with Awaiting Marking | New Assessment, Edit, Questions (with Suggest With AI), Activate or Deactivate, Send to Candidates (every candidate of a role at a stage), Mark Answers |
 | Recruitment · Interviews (`interviews`) | staff app | `recruitment` view, scope by hiring manager or a seat on the panel | Upcoming and recent interviews beside the one picked; its Blind Panel (submitted or waiting, scores hidden while the round is open), the candidate's Weighted Scorecard (in scope), the candidate's details card filled before the interview, the traits and averages after it closes, the consolidated report and its PDF, Round Activity | Schedule Interview, Reschedule, Cancel, Candidate Details, My Card (each trait 1 to 10, decision, comments, private notes, Tidy With AI, the candidate's CV), Submit Card, Close Round, Write Report, Download Form |
 | Recruitment · Talent Pool (`talent-pool`) | staff app | `recruitment` view, scope by the hiring manager of the vacancy they applied for | Candidates kept for later: applied for, score, added, reason, invited, until when kept | Add to Pool (from a candidate), Invite to Apply (to an open vacancy), Remove, Export |
-| Careers (`/jobs`) | public site | anyone | Open roles: title, department, area, arrangement; search over 8 roles | Open a role |
-| Vacancy (`/jobs/<slug>`) | public site | anyone | One role: what it is, must have, nice to have, how we hire, salary when shown, arrangement and probation; a paused or closed role says so | Apply for This Role (mints the Apply link) |
+| Home (`/`, the public index) | public site | anyone | Open roles, departments hiring and cities (`/jobs/summary`); About MyCityApp from Careers Settings; the three roles closing soonest; How We Hire | Search Roles (opens Careers with `q`), open a role, See All Roles, Copy Careers Link, Verify a Document |
+| Careers (`/jobs`) | public site | anyone | Open roles, closing soonest first: department, title, area, arrangement with its note, employment type, closing date; the departments hiring with their counts | Search, pick one department, open a role |
+| Vacancy (`/jobs/<slug>`) | public site | anyone | One role: what it is, how it is measured, must have, nice to have, how we hire, salary when shown, arrangement and probation; a paused or closed role says so; more roles of its department | Apply for This Role (mints the Apply link), Share Role, Copy Role Link |
 | Apply (`/apply/<token>`) | public site | the holder of the link | The form: name, email, phone, years of experience, CV, the vacancy's own questions, why this role, the privacy notice | Submit Application; the receipt with its reference |
-| Assessment (`/assess/<token>`) | public site | the holder of the link | Intro (type, minutes, questions); the running test with a server timer and autosave; submitted or time up | Start the Assessment, answer, upload a file answer (up to 25 MB) or paste a link to a larger one, Back, Next Question, Finish and Submit Assessment |
+| Assessment (`/assess/<token>`) | public site | the holder of the link | Intro (type, minutes, questions); the running test with a server timer and autosave; submitted or time up | Start the Assessment, answer, upload a file answer (up to 25 MB) or paste a link to a larger one, Back, Next, the question map, Submit Assessment |
 | Home · Overview, Open Vacancies card | staff app | as `home.md` §6 | Open vacancies in scope | Open a vacancy |
 | Home · Alerts, Recruitment SLA | staff app | as `home.md` §6 | Applications at one stage longer than the rule's days | Open the candidate |
 | People · Organogram, Create Vacancy | staff app | `people` edit and `recruitment` create | On a vacant seat | Opens New Vacancy here with what the seat knows filled in (looked up by `org_seat_id` on `/suggested`), keeping the seat |
@@ -277,10 +278,11 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/pool/:id/invite` | `PoolInvite` → `PoolEntry` | `recruitment` edit · all/team | no | An Apply link to an open vacancy |
 | `POST /recruitment/pool/:id/remove` | `PoolRemove` → `PoolEntry` | `recruitment` delete · all/team | no | Taken off the pool before their time |
 | `POST /recruitment/pool/exports` | `PoolExportRequest` → `ExportFile` (202) | `recruitment` export · all/team | no | The whole filtered pool as a workbook, made in the worker, downloaded on the device that pressed Export |
-| `GET /api/public/v1/jobs` | `PublicJobListQuery` → `PublicJobPage` | public | yes | `open` and not past its closing time |
-| `GET /api/public/v1/jobs/:slug` | `PublicJob` | public | no | Draft is 404; paused and closed say so; an open role past its closing time reads closed. Names how many have applied (`applicants`) |
+| `GET /api/public/v1/jobs` | `PublicJobListQuery` → `PublicJobPage` | public | yes | `open` and not past its closing time; closing soonest first; filters `q`, `department` (a department's code) (§6.1) |
+| `GET /api/public/v1/jobs/summary` | `PublicJobsSummary` | public | no | The index's figures: open, departments hiring, cities, the three closing soonest, About MyCityApp (§6.1) |
+| `GET /api/public/v1/jobs/:slug` | `PublicJob` | public | no | Draft is 404; paused and closed say so; an open role past its closing time reads closed. Names how many have applied (`applicants`). No About MyCityApp: that is the index's (`/jobs/summary`) |
 | `POST /api/public/v1/jobs/:slug/apply` | `EmptyBody` → `ApplyStarted` | public, rate limited | no | Mints the Apply token |
-| `GET /api/public/v1/apply/:token` | `ApplyLink` | `application.apply` token | no | The role, its questions, when the link lapses |
+| `GET /api/public/v1/apply/:token` | `ApplyLink` | `application.apply` token | no | The role (title, department, place), its questions, when the link lapses |
 | `POST /api/public/v1/apply/:token/cv` | multipart → `DocumentRef` | `application.apply` token | no | Purpose `cv` (PDF or Word, 10 MB), quarantined and kept against the link until the application is made (`vault.adopt`) |
 | `POST /api/public/v1/apply/:token` | `ApplicationSubmit` → `ApplicationReceipt` | `application.apply` token, spent | no | Write only |
 | `GET /api/public/v1/assess/:token` | `AssessmentSession` | `assessment.take` token | no | `ends_at` and `server_now` for the timer |
@@ -310,10 +312,23 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   roles published at once cannot take the same one. It never changes: pausing, resuming and
   editing keep the same link (MILESTONES §9; GE 04/11/2026, the slug replaces the token for listed
   roles). A draft has a slug only once published.
-- `/jobs` lists vacancies that are `open` and whose `closes_at` is later than now. `/jobs/<slug>` answers
+- `/jobs` lists vacancies that are `open` and whose `closes_at` is later than now, closing soonest
+  first (`closes_at` ascending, a role with no closing date after every dated one, then the newest
+  published), 25 a page. `q` searches the title, department and place; `department` (a department's
+  `code`, as the summary and each card give it) narrows to one department, with `q` or without; an
+  unknown code is an empty page, never a 422. Each card carries what the list shows: department and its
+  code, title, place, arrangement with its note, employment type and closing time (GE, 06/11/2026, the
+  approved public site design). `/jobs/<slug>` answers
   an open, paused or closed vacancy with its `state`; a draft, or a slug that never existed, is the same
   404. A closed vacancy says it is closed; one closed as filled says it was filled; an open one past its
   closing time reads closed.
+- `/jobs/summary` holds the public index's figures over the same roles `/jobs` lists: how many are open,
+  the departments hiring (code, name, how many each, by name), the cities (the city of each role's
+  picked place, most roles first; a remote role has none), the three roles first on `/jobs` (closing
+  soonest) and About MyCityApp as blocks. It is a summary, not a list: the departments and cities are the
+  organisation's few, read whole and grouped in SQL, and the three are the head of the careers list's
+  first page, so nothing pages and no size is asked (GE, 06/11/2026). The slug `summary` is never made:
+  a role that would take it is `summary-role`.
 - `closes_at` is picked as a day and stored as the end of that day in Lagos (23:59:59). Past it, the
   vacancy stays `open` on the staff screens with a Closing Date Passed chip and takes no new applications.
 - The salary band is shown publicly only when `salary_visible`; otherwise the public shape omits both
@@ -331,7 +346,10 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   05/11/2026), and the public page
   draws it from blocks: the server turns each Markdown text (About MyCityApp, the description, must have,
   nice to have) into blocks with the one safe renderer (`shared/documents/markdown`, `markdownToBlocks`),
-  as a policy's text is, and the page draws them with `RichText` (GE · (Ose), 05/11/2026). The staff
+  as a policy's text is, and the page draws them with `RichText` (GE · (Ose), 05/11/2026). About MyCityApp reaches the
+  public site only on the index, through `/jobs/summary`; `PublicJob` no longer carries it (the approved design,
+  06/11/2026). On Vacancy a description's `## Key Performance Indicators (KPIs)` heading starts a part of its own,
+  its list drawn as tiles, and What We Are Looking For opens on its first sentence, large. The staff
   sheet draws the same blocks (`VacancyDetail.description_blocks`, `requirements_blocks`,
   `nice_to_have_blocks`), never the raw Markdown; the Markdown itself still comes for Edit (GE, 06/11/2026).
 - New Vacancy's interview (§3 step 2) keeps nothing: its answers live in the browser until the editor
@@ -356,7 +374,8 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 ### 6.2 Applying
 
 - The Apply token is single use, lives 48 hours (7 days when staff invite), and is spent in the same
-  transaction as the application. `POST /jobs/:slug/apply` is refused (the same 404) unless the vacancy
+  transaction as the application. The link names the role as the form's pane shows it: title,
+  department and place (`ApplyLink`). `POST /jobs/:slug/apply` is refused (the same 404) unless the vacancy
   takes applications now. It is held to the public surface's write limit per address.
 - The CV is a PDF or Word file of at most 10 MB, sent by the stranger and so quarantined until ClamAV
   passes it. It belongs to the token's vacancy; a CV uploaded on another token is refused.
@@ -642,10 +661,12 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 | Recruitment · Assessments (`assessments`) | Four KPIs (Active, Sent, Awaiting Marking, Average Score); Assessments list: name, type, minutes, questions, sent, average, status; Sittings: candidate, assessment, state, score; New Assessment and Import; an assessment's sheet with its questions and points, Edit, Questions, Activate or Deactivate, Export; Send to Candidates; a sitting's sheet with each answer (a file to open, or the link given) and Mark Answers | Help on Points: "What each option scores." | How the timer and resume work: §6.7, the manual |
 | Recruitment · Interviews (`interviews`) | All Interviews and My Panels; Upcoming and Recent (still to end first, then past), each row: candidate, role, date, panel size with Your Card, round state (Scheduled, n of m Submitted, Closed, Cancelled); beside it on desktop (a sheet on a phone) the interview picked: when, how, where or link, View CV, Download Form, Reschedule, Cancel Interview, Close Round, Write or Edit Report, My Card; Blind Panel (each panelist, Submitted or Waiting, the score once closed, Hidden before, a dash while waiting; the decision once closed); Weighted Scorecard (each part on, its weight and the candidate's score, the total; for a reader whose scope holds the role); Candidate Details with Edit; traits with each rating and the average only once closed, total, report and decision; Round Activity (scheduled, changed, cancelled, details saved, cards submitted, reminders, closed, report, each with who and when); My Card (traits as ten stars, decision, comments, Tidy With AI for every panelist while the AI is available, private notes, View CV; a star that fails to save goes back to the last rating the server kept, unless a later tap of that trait is on its way), Submit Card, Close Round, Write Report, Schedule Interview (its panel picker offers only who holds Recruitment; a refusal names who cannot sit), Reschedule, Cancel | Help on Hidden: "Each score shows once the round closes. Private notes never show." Help on Weighted Scorecard: "The candidate's score at each part, with the part's weight in the total." Help on Private Notes: "Only you ever see these." | The blind predicate and its reasons: §6.6 here |
 | Recruitment · Talent Pool (`talent-pool`) | Four KPIs (In the Pool, Invited Back, Hired From the Pool, Average Score); the list: candidate, applied for, score with Provisional, added, reason, kept until, Invite to Apply or Invited; Export | Help on Kept Until: "Removed from the pool on this date." | The 24 month rule and the purge job: §6.9 |
-| Careers (`/jobs`) | Work With Us; open roles with department, area and arrangement; search above 8 roles | None | Indexing, slugs: §6.1 |
-| Vacancy (`/jobs/<slug>`) | Title; department, area, arrangement, salary when shown; employment type, working days, probation, reports to, the closing date; About MyCityApp, Role Overview (the description; one that opens with its own `## Role Overview` shows the heading once), Required Experience and Qualifications, What We Are Looking For, How We Hire as its steps; Apply for This Role (beside the text on desktop, a bar at the foot on a phone); a paused, closed or filled banner | None | Why a paused link still works: §6.1 |
-| Apply (`/apply/<token>`) | The form in three steps (About You; CV and Questions; Why This Role, with the privacy notice and its tick), Back and Next; Submit Application; the receipt with the reference | None | Write-only, no score: §6.2 |
-| Assessment (`/assess/<token>`) | Intro: type, minutes, questions, instructions, Start the Assessment; running: question n of m, the timer, the answer (for a file question: Upload a File, up to 25 MB, or Paste a Link), Saved, Back, Next Question, Finish, then Submit Assessment to confirm; submitted or time up | The resume note under the timer (open the same link again to continue where you were); help on Paste a Link: "For anything over 25 MB: a Google Drive, video or portfolio link anyone can open." | Server clock, autosave mechanics: §6.7 |
+| Home (`/`) | Work With Us with Search Roles; the pill naming the cities hiring; three figures counting up: Open Roles, Teams Hiring, Cities; What We Build (One App, Every City; About MyCityApp from Careers Settings with Visit MyCityApp; four tiles, fixed copy); Closing Soon, the three roles closing soonest (team, title, place, closing date) with See All Roles; How We Hire's four steps; Know Someone Great? with Copy Careers Link (Link Copied for a moment); Verify a Document | None | Where the figures come from: §6.1 |
+| Careers (`/jobs`) | Open Roles with its line (roles, teams, cities) and the search; Teams, All Teams first, each with its count, one picked at a time; Know someone for one of these? Recommend them (to Home's Know Someone Great?); Showing n of m and Closing soonest first; each role a row: team, title, place, arrangement with its note, employment type, Closes and its date; the pager | None | Indexing, slugs, the order: §6.1 |
+| Vacancy (`/jobs/<slug>`) | The hero: All Roles, the team, the title, chips for the place, arrangement, employment type, salary when shown and Closes; Apply for This Role and Share Role; how many have applied. Then Role Overview (the description; one that opens with its own `## Role Overview` shows the heading once), the KPIs as tiles, Required Experience and Qualifications, What We Are Looking For (its first sentence large), How We Hire as numbered tiles; The Role card (Employment, Working Days, Experience, Reports To, Probation; Closes; Apply for This Role; how many have applied) and Know Someone for This? with Copy Role Link; More Roles, up to three others of its team; a paused, closed or filled banner. About MyCityApp is Home's, not each role's | None | Why a paused link still works: §6.1 |
+| Apply (`/apply/<token>`) | The aside: the role's title, team and place; Apply; Your application, in three steps; the day the link ends; the three steps, the one in hand in yellow. The Panel: Step n of m over the step's title; About You (Full Name, Email, Phone, Years of Experience with its minus and plus); CV and Questions (Choose Your CV, then the file with Replace; the role's own questions); Why This Role and the privacy tick; Back and Next, Submit Application; then Application Sent with Your Reference and See Other Roles | Help on Privacy Notice: "We use what you send only to consider you for roles at MyCityApp. Ask us at any time to delete it." | Write-only, no score: §6.2 |
+| Assessment (`/assess/<token>`) | The aside: the role, Your assessment for this role, the assessment's name; before it starts the greeting and the day to start by, while it runs the clock as a ring (timed) or the due day (take-home) and the question map. The Panel: The Assessment (Type, Time, Questions, the instructions, Start the Assessment); Question n of m with Saved, the question, the answer (for a file question: Upload a File, up to 25 MB, or Paste a Link), Back, Next, and Submit Assessment, confirmed in a dialog; Assessment Submitted or The Time Is Up | Help on Paste a Link: "For anything over 25 MB: a Google Drive, video or portfolio link anyone can open." | Server clock, autosave mechanics: §6.7 |
+| Without a link (`/vacancy` or `/jobs/`, `/apply`, `/assess`; `/sign` is M5's) | The page's name, one line, one heading and one button: Choose a Role, Start From a Role or Use Your Email Link, each with See Open Roles; Use Your Offer Email with Verify a Document | None | Why these pages need a link: §6.2, §6.7 |
 
 ### 10.2 Phone layout
 
@@ -656,7 +677,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 | Recruitment · Assessments (`assessments`) | Assessments and Sittings as a segmented control; cards | The average-by-assessment chart | New Assessment in the floating button; Mark Answers in a sitting's sheet | Bottom bar; the Recruitment tabs |
 | Recruitment · Interviews (`interviews`) | Upcoming and Recent as cards (candidate, date, panel, round state), upcoming first; nothing open until a card is tapped | Role on the card; the interview beside the list (it opens in a sheet instead, Blind Panel and Weighted Scorecard one under the other) | A tapped interview opens its sheet, its actions at the top full width; My Card full width, opening as its own full sheet, one trait a row with ten 44 px stars, in two rows of five (ten do not fit 390 px) | Bottom bar; the Recruitment tabs |
 | Recruitment · Talent Pool (`talent-pool`) | Two KPI cards a row, then pool cards (name, applied for, score, kept until) | Added and Reason columns (in the sheet) | A tapped card opens its sheet with Invite to Apply full width | Bottom bar; the Recruitment tabs |
-| Careers, Vacancy, Apply, Assessment | One column, full width buttons, 44 px targets | Nothing | Apply, Submit, Next Question | The public site's own header |
+| Home, Careers, Vacancy, Apply, Assessment | One column, full width buttons, 44 px targets; Home's hero still the first screen, its search button under the box; on Careers the teams as a row of pills above the roles; on Vacancy The Role card above the text; on Apply and Assessment the aside as a band above the Panel | The hero's line and The Role card's Apply (the bar carries it), Share Role and Know Someone for This?; the aside's steps, skyline and credit | Search Roles; Apply in a bar fixed at the foot of a vacancy; Next, Submit Application, Submit Assessment | The public site's header, its six links in the menu |
 
 ## 11 · Edge cases
 
@@ -731,7 +752,22 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
   the role they came from is no longer offered). The staging seed picks hiring managers and panelists only
   from Implementation accounts that hold Recruitment: one teammate without it had every role it managed and
   every panel refused, so staging had no interviews and no Design role.
-
+- 06/11/2026 · GE · (Ose) The approved public site design on the pages (`public-site-demo.html`). Home (#107) at `/`
+  (it no longer opens Careers); Careers with its teams list; Vacancy with the role's hero, its text part by part (the
+  KPIs as tiles, What We Are Looking For as a statement), The Role card, Know Someone for This? and More Roles; Apply
+  and Assessment on PublicPage's split layout (the steps, the ring clock and the question map in the aside); one
+  header with six links on every page, and a guidance screen at `/vacancy` (or `/jobs/`), `/apply` and `/assess` for a
+  visitor with no link. `PublicJob.about_company` dropped: About MyCityApp is Home's alone. The running assessment's
+  buttons read Next and Submit Assessment (still confirmed), the Resume Later note is gone (the greeting says every
+  answer saves). §2, §5, §6.1, §10.
+- 06/11/2026 · GE · (Ose) The data for the approved public site design (`public-site-demo.html`). `GET
+  /api/public/v1/jobs/summary` (`PublicJobsSummary`): open, the departments hiring, the cities, the three
+  closing soonest and About MyCityApp, for the new public index. `/jobs` lists closing soonest first (no
+  closing date last, then the newest) and takes `department`, a department's code, one at a time beside
+  `q`; each card carries the department's code, the arrangement's note, the employment type and the
+  closing time. `ApplyLink` names the role's department and place for the form's pane. The slug `summary`
+  is never made. `PublicJob.about_company` stays (the page stops drawing it; dropping it from the
+  contract waits on the page). §2, §5, §6.1, §6.2, §10.
 - 06/11/2026 · GE · The P15 follow-ups, closed. Interviews: the panel picker lists only who may sit
   (`GET /recruitment/interviews/panelists`) and a refusal names who cannot; a round closes by itself
   only once every seat has submitted and the interview has started (after Submit Card, after a

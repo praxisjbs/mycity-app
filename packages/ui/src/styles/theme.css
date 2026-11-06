@@ -71,6 +71,8 @@
   --tracking-caps: 0.09em;
   /* A one-character-per-box field: a PIN, an OTP. */
   --tracking-otp: 0.4em;
+  /* The public site's spaced eyebrow over a heading (PageIntro, a section's Careers). */
+  --tracking-eyebrow: 0.3em;
 
   --radius-ctl: 9px;
   --radius-box: 10px;
@@ -219,10 +221,30 @@
   --color-on-deep-dim: var(--on-deep-dim);
   --color-canvas: var(--canvas);
   --color-canvas-glow: var(--canvas-glow);
+  --color-canvas-card: var(--canvas-card);
+  --color-canvas-line: var(--canvas-line);
+  --color-canvas-line-strong: var(--canvas-line-strong);
+  --color-canvas-hover: var(--canvas-hover);
+  --color-canvas-soft: var(--canvas-soft);
+  --color-canvas-glass: var(--canvas-glass);
+  --color-solid: var(--solid);
+  --color-solid-foreground: var(--solid-foreground);
+  --color-on-deep-hero: var(--on-deep-hero);
+  --color-on-deep-lede: var(--on-deep-lede);
+  --color-on-deep-chip: var(--on-deep-chip);
+  --color-on-deep-back: var(--on-deep-back);
+  --color-on-deep-link: var(--on-deep-link);
+  --color-on-deep-note: var(--on-deep-note);
+  --color-on-deep-label: var(--on-deep-label);
+  --color-on-deep-base: var(--on-deep-base);
+  --color-on-deep-gold: var(--on-deep-gold);
+  --color-search-ink: var(--search-ink);
+  --color-search-muted: var(--search-muted);
 
   --shadow-1: var(--shadow-1);
   --shadow-2: var(--shadow-2);
   --shadow-3: var(--shadow-3);
+  --shadow-canvas: var(--canvas-shadow);
 }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
@@ -250,3 +272,5 @@
 @keyframes step-next { from { opacity: 0; transform: translateX(18px); } }
 @keyframes step-back { from { opacity: 0; transform: translateX(-18px); } }
 @keyframes pop { 0% { opacity: 0; transform: scale(.6); } 60% { opacity: 1; transform: scale(1.06); } 100% { transform: none; } }
+/* The public site's parts rising as a page opens (public.css .ps-rise, drawn by its components only). */
+@keyframes hero-rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }

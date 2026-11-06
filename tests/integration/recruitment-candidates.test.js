@@ -130,7 +130,7 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     const tok = await startApply();
     const link = await pub().get(`/apply/${tok}`);
     expect(link.status).toBe(200);
-    expect(link.body.vacancy_title).toBe("Content Producer");
+    expect(link.body).toMatchObject({ vacancy_title: "Content Producer", vacancy_department: "Operations", vacancy_location: "Yaba, Lagos" });
     expect(link.body.questions.map((x) => [x.question_type, x.required])).toEqual([
       ["yes_no", true],
       ["text", false],

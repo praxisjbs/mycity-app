@@ -281,10 +281,13 @@ const ApplyQuestion = z
   })
   .strict();
 
-/** GET /api/public/v1/apply/:token: the role, its questions, and when the link lapses. */
+/** GET /api/public/v1/apply/:token: the role as the form's pane names it, its questions, and when the link lapses. */
 const ApplyLink = z
   .object({
     vacancy_title: z.string(),
+    vacancy_department: z.string().nullable(),
+    /** The role's place line; null for a remote role. */
+    vacancy_location: z.string().nullable(),
     expires_at: isoDateTime,
     questions: z.array(ApplyQuestion).max(10),
   })

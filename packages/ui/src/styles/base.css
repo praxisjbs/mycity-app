@@ -9,6 +9,8 @@
  * our tokens. The controls themselves are packages/ui components.
  */
 @import "@fontsource-variable/geist";
+/* The public site's header, footer, heroes, sign-in layout and motion. */
+@import "./public.css";
 
 @layer base {
   body {
@@ -321,13 +323,21 @@
 @utility cols-main-side {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 }
+/* The careers list's teams beside its roles (StickyColumns aside), and a vacancy's text beside The Role
+   card (StickyColumns side), as the approved public design lays them. */
+@utility cols-aside {
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+@utility cols-side {
+  grid-template-columns: minmax(0, 1fr) 340px;
+}
 
 /* The public site's ground (PublicPage): the faint City Green tint, lighter toward the top. The glow
    is lighter than the tint in light and a step above it in dark, and both keep every ink at AA
    (tokens.css), so no point of the gradient brings text under it. */
 @utility public-ground {
   background:
-    radial-gradient(120% 70% at 50% -12%, var(--canvas-glow), transparent 72%),
+    radial-gradient(1200px 600px at 50% -200px, var(--canvas-glow), transparent 70%),
     var(--canvas);
 }
 /* A Deep Green panel's street grid: hairlines of the light ink, fading out toward the skyline. */

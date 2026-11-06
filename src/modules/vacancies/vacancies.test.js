@@ -24,6 +24,12 @@ describe("the slug", () => {
     expect(slugs.base("***", "Abuja")).toBe("role-abuja");
   });
 
+  test("never takes a path the careers routes hold beside it (/jobs/summary)", () => {
+    expect(slugs.base("Summary", null)).toBe("summary-role");
+    expect(slugs.base("Summary", "Lagos")).toBe("summary-lagos");
+    for (const word of slugs.RESERVED) expect(slugs.base(word, null)).not.toBe(word);
+  });
+
   test("is at most 80 characters and never ends on a hyphen", () => {
     const s = slugs.base("a".repeat(70) + " b".repeat(20), "Port Harcourt");
     expect(s.length).toBeLessThanOrEqual(80);
@@ -133,10 +139,61 @@ describe("routes", () => {
     for (const r of write) expect(["create", "edit"]).toContain(r.permission.action);
   });
 
-  test("the careers page has three public routes and no permission", () => {
+  test("the careers page has four public routes and no permission; the summary is matched before a slug", () => {
     const rs = routesOf(publicRoutes.router);
-    expect(rs.map((r) => `${r.method} ${r.path}`).sort()).toEqual(["GET /", "GET /:slug", "POST /:slug/apply"]);
+    expect(rs.map((r) => `${r.method} ${r.path}`).sort()).toEqual(["GET /", "GET /:slug", "GET /summary", "POST /:slug/apply"]);
     for (const r of rs) expect(r.kind).toBe("public");
+    const order = rs.map((r) => r.path);
+    expect(order.indexOf("/summary")).toBeLessThan(order.indexOf("/:slug"));
+  });
+});
+
+describe("the public index's summary (guide §6.1)", () => {
+  const repo = require("./vacancies.repo");
+  const c = require("@mycity/contract");
+  const row = (slug, closes) => ({
+    vacancy_id: `id-${slug}`,
+    slug,
+    title: slug,
+    department: "Content",
+    department_code: "CNT",
+    location: "Lekki Phase 1, Lagos",
+    work_pattern: "hybrid",
+    work_pattern_note: "2 days in office",
+    employment_type: "full_time",
+    status: "open",
+    close_reason: null,
+    closes_at: closes,
+    published_at: new Date("2026-11-01T09:00:00Z"),
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  test("counts the careers list, names its departments and cities, and takes its first three as Closing Soon", async () => {
+    const page = jest.spyOn(repo, "publicPage").mockResolvedValue({
+      data: [row("a-lagos", new Date("2026-11-11T22:59:59Z")), row("b-lagos", new Date("2026-11-18T22:59:59Z")), row("c-lagos", null), row("d-lagos", null)],
+      page: { number: 1, size: 25, total: 12, pages: 1, has_next: false },
+    });
+    jest.spyOn(repo, "publicDepartments").mockResolvedValue([{ code: "CNT", name: "Content", open: 2 }, { code: "ENG", name: "Engineering", open: 10 }]);
+    jest.spyOn(repo, "publicCities").mockResolvedValue([{ name: "Lagos", open: 11 }, { name: "Abuja", open: 1 }]);
+    jest.spyOn(repo, "settings").mockResolvedValue({ about_company: "MyCityApp is a digital city and lifestyle platform.", default_traits: [], updated_at: null });
+    const out = await careers.summary();
+    expect(page).toHaveBeenCalledWith(expect.anything(), {});
+    const wire = JSON.parse(JSON.stringify(out));
+    expect(c.vacancies.PublicJobsSummary.parse(wire)).toEqual(wire);
+    expect(out.open).toBe(12);
+    expect(out.closing_soon.map((x) => x.slug)).toEqual(["a-lagos", "b-lagos", "c-lagos"]);
+    expect(out.closing_soon[0]).not.toHaveProperty("vacancy_id");
+    expect(out.departments.map((d) => d.code)).toEqual(["CNT", "ENG"]);
+    expect(out.cities).toEqual([{ name: "Lagos", open: 11 }, { name: "Abuja", open: 1 }]);
+    expect(out.about_company[0]).toMatchObject({ kind: "paragraph" });
+  });
+
+  test("with nothing open and no About MyCityApp, every figure is empty", async () => {
+    jest.spyOn(repo, "publicPage").mockResolvedValue({ data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } });
+    jest.spyOn(repo, "publicDepartments").mockResolvedValue([]);
+    jest.spyOn(repo, "publicCities").mockResolvedValue([]);
+    jest.spyOn(repo, "settings").mockResolvedValue({ about_company: null, default_traits: [], updated_at: null });
+    expect(await careers.summary()).toEqual({ open: 0, departments: [], cities: [], closing_soon: [], about_company: null });
   });
 });
 

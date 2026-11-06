@@ -88,6 +88,22 @@ describe("Wizard", () => {
     expect(screen.getByRole("heading", { level: 2, name: "The Role" })).toBeInTheDocument();
   });
 
+  it("panel: the steps on one Panel, Step n of m over the step's h2, Back and Next in its foot, the last one yellow", async () => {
+    const onFinish = vi.fn();
+    const { container } = render(<Wizard look="panel" level={2} finish="Submit Application" onFinish={onFinish} steps={steps()} />);
+    expect(container.firstElementChild).toHaveClass("ps-panel");
+    expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+    const next = screen.getByRole("button", { name: "Next" });
+    expect(next.closest(".ps-panel-foot")).not.toBeNull();
+    await userEvent.click(next);
+    expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getByRole("button", { name: "Submit Application" }));
+    expect(onFinish).toHaveBeenCalledOnce();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(<Wizard steps={steps()} finish="Publish Vacancy" onFinish={() => undefined} />);
     expect(await axe(container)).toHaveNoViolations();

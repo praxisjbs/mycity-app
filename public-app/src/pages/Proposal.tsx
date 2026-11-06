@@ -1,4 +1,4 @@
-import { PageMessage } from "@mycity/ui";
+import { PageMessage, Panel } from "@mycity/ui";
 import { Page } from "@/shell/Page";
 
 /**
@@ -8,8 +8,10 @@ import { Page } from "@/shell/Page";
  */
 export function Proposal() {
   return (
-    <Page title="Proposal">
-      <PageMessage title="Nothing Here Yet">Proposals appear here once sent.</PageMessage>
+    <Page title="Proposal" layout="split">
+      <Panel bare>
+        <PageMessage title="Nothing Here Yet">Proposals appear here once sent.</PageMessage>
+      </Panel>
     </Page>
   );
 }

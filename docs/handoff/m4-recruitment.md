@@ -518,6 +518,23 @@ packages that need none can start. Tick a package only when its own checks pass 
   testing on staging, logged here as they come, and the hand-over to M5. AJ takes M5 (Offers and Onboarding, guide
   §2) and we talk with him in that PR's comments: what M4 gives M5 is the shortlist (stage `shortlist`, the last
   column until M5 adds Offer), the Talent Pool's Invite to Apply, and the candidate emails' store (`candidates.emails`).
+- 06/11/2026 · GE · (Ose) Branch `m4/public-site-data` (from this one): the data for the approved public site design
+  (`public-site-demo.html`). `GET /api/public/v1/jobs/summary` (`PublicJobsSummary`), `/jobs` closing soonest first with
+  `department` (a department's code), `PublicJobCard` with `department_code`, `work_pattern_note`, `employment_type`,
+  `closes_at`; `ApplyLink.vacancy_department` and `vacancy_location`; the slug `summary` reserved. Guide §2, §5, §6.1,
+  §6.2, §10 and its change log first. The public mock follows the design (its twelve roles; the paused, filled and
+  past-its-day cases are now Video Editor, Studio Assistant and Copywriter, as the design opens Customer Support Lead,
+  Partnerships Associate and Content Producer). For AJ (M5): the design's Sign Offer has no email code, name, title or
+  consent tick, which partnerships §6.9 asks of the shared signatures service; the INTERIM verify shape (one signer,
+  document type, issued by) is not agreements' `VerifyResult` (signers, status). Both need a decision before M5's contract.
+- 06/11/2026 · GE · (Ose) Branch `m4/public-site`: the approved public site design on the pages, after the shared UI
+  (`3c022810`) and the data (`34e1b9f0`). Home (#107, new) at `/`; Careers, Vacancy, Apply and Assessment rebuilt to the
+  design; Sign Offer and Verify Document (M5) built on the mock, their API left for AJ; one header with six links on
+  every page and guidance screens at `/vacancy` (or `/jobs/`), `/apply`, `/assess` and `/sign`. `PublicJob.about_company`
+  dropped (About MyCityApp is Home's alone). Fourteen new components in `@mycity/ui`, PublicPage's deprecated props
+  and its card and open layouts removed. Guide §2, §5, §6.1, §10 and the change log first; the public chapter and its
+  pictures follow the screens; PROGRESS row #107, #84 and #85 In progress. For AJ (M5): the signing and verify API for
+  the two pages (INTERIM `types/public.ts`), and the open points in the entry above.
 - 06/11/2026 · GE · Testing on staging, round 1. Fixed: Invite to Apply's "Check this value" (the refusal's field
   message was over four words; the applied-for role is no longer offered); the staging seed skips Implementation
   accounts without Recruitment (staging had no interviews and no Design role; the next deploy's seed run adds them).

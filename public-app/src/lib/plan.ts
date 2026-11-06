@@ -16,8 +16,9 @@ export const plan = createDeliveryPlan(__DELIVERY_PLAN__, {
 
 /** Each page's row in PROGRESS.md's "Public site" section, by its path. */
 export const PATH: Record<string, string> = {
+  home: "/",
   careers: "/jobs", vacancy: "/jobs/<slug>", apply: "/apply/<token>", assess: "/assess/<token>", sign: "/sign/<token>", verify: "/verify/<number>", proposal: "/proposal/<token>",
 };
 
 /** Should this page open, or show Coming Soon? */
-export const useScreenState = (page: string) => plan.useScreenState(`Public site|${PATH[page]}`);
+export const useScreenState = (page: string) => plan.useScreenState(`Public site|${PATH[page] ?? page}`);
