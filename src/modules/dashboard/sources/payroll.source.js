@@ -3,7 +3,7 @@
  * Payroll, as Home will read it: the runs not yet finished behind the Payroll In Progress
  * card.
  *
- * OWNED BY the `payroll` module, M6 Payroll & Notifications, LA (no migration yet: the
+ * OWNED BY the `payroll` module, M6 Payroll & Notifications, TB (no migration yet: the
  * 6000 block is empty).
  *
  * No payroll table exists, so Home reads nothing here: the card is hidden in the catalogue,
@@ -27,7 +27,7 @@ const OWES = Object.freeze([
 module.exports = {
   module: "payroll",
   milestone: "M6",
-  owner: "LA",
+  owner: "TB",
   tables: TABLES,
   owes: OWES,
 };

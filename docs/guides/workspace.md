@@ -438,6 +438,7 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
 | `calendar_event.invited`, `.uninvited` | a change adds or takes off attendees | "Invitation: …" to the people added, "No longer invited: …" to the people taken off |
 | handler `calendar.invitations` | `calendar_event.created`, `.changed` (a change they would notice), `.cancelled`, `.invited`, `.uninvited` | one `email-send` job per attendee with a work email: `calendar-invite` with the `.ics` (§6 Invitations by email); held while system mail is paused and sent on Resume |
 | `project.created`, `.edited`, `.completed`, `.reopened` | New Project, Edit Project, Complete Project, Reopen Project | audit; no notice |
+| `project.budget_set` | Set Budget on Expenses · Projects (`projects.service.setBudget`, M8; `docs/guides/expenses.md` §6.6 rule 6) | audit; no notice |
 | `task_late_reason.created`, `.changed` | Add Reason, a switch | audit; no notice |
 | `calendar_event.answered` | an attendee accepts or declines | notification to the owner |
 | `calendar_event.reminder_due` | an event's reminder comes due (reminder engine, `calendar_event_reminder`) | notification to the owner and the attendees who have not declined |
@@ -620,6 +621,14 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 05/11/2026 · GE · The calendar's write path takes a transaction from another module: `createIn`,
+  `editIn` and `cancelIn` beside create, edit and cancel, which now call them. Recruitment uses them so an
+  interview and its calendar entry are saved together (`recruitment.md` §3 step 8): the entry is of type
+  interview, tied to the interview (`entity_type`), and its panelists are its attendees.
+  `asOwner` lets that module change the entry for whoever scheduled it, as it decides who may. Nothing a
+  person sees on Calendar changed.
+
+- 05/11/2026 · AJ · M8 PR 5: a project's optional budget (`project.budget_amount`, migration 8010) is set on Expenses · Projects through `projects.service.setBudget` (an `expenses.finance` holder, whoever owns the project), event `project.budget_set`; My Workspace · Projects shows nothing new (`docs/guides/expenses.md` §6.6 rule 6).
 - 05/11/2026 · JP · M7 PR 1 (`partnerships.md` Appendix A): `project`, `task` and `calendar_event` gain `partner_id`, `lead_id` and `deal_id` (`7040_partnership_workspace_links.sql`, §4), for Connect to Partner. The contract's `PartnerLink` and `PartnerLinkQuery` (`partners.js`) join the create, edit and list schemas in M7 PR 5 with the services that write them; until then no request, screen or Praxis AI card changes.
 - 03/11/2026 · JP · From the evaluation set on staging: Create Task "for me", its lead written as the person's own name, was drawn with Pick one (`leadIdOf` looked only among the people New Task's picker lists, which leaves the person out as its default) and its card's names failed on the words (`cardNames` sent them to a uuid query). Now the person's own whole name, or "me", is the person, and `cardNames` reads ids alone (§9). Nothing on the Workspace screens changes.
 - 03/11/2026 · JP · Every Workspace card asks what it needs before it is drawn (`praxis-ai.md` decision 34, after a task shared with a department was drawn without its lead): which task (the person's own board, `tasks.list`, matched by number or words), which step, which project, which event (`calendar.service.eventChoices`, `eventIdOf`), which reason and on or off, which week; and, for a task shared with a department, "Who leads it?" with that department's people (`tasks.service.leadChoices`, a lead by name `leadIdOf`), so Pick a lead never reaches a card (§9). Nothing on the Workspace screens changes.

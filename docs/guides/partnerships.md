@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Owner | GE (LA: the tracker importer and the returns import) |
+| Owner | LA |
 | Milestone | M7 |
 | Backend modules | `partners`, `partner_pipeline`, `leads`, `interactions`, `proposals`, `agreements`, `partnership_analytics` |
 | Frontend paths | `app/src/features/partnerships/`, `public-app/src/pages/Proposal.tsx` |

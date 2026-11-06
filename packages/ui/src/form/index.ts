@@ -44,5 +44,6 @@ export * from "./DocumentEditor";
 export * from "./MoreFields";
 export * from "./PlacesField";
 export * from "./RadioCards";
+export * from "./RatingField";
 export * from "./SecretField";
 export * from "./StepBar";

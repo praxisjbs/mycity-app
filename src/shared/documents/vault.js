@@ -78,6 +78,7 @@ const EVENTS = defineEvents("settings", {
   "document.generated": { summary: "A document was generated" },
   "document.render_failed": { summary: "A document could not be generated" },
   "document.removed": { summary: "A file was removed from the vault" },
+  "document.claimed": { summary: "A staged file was bound to the record that holds it" },
   "document.derived": {
     summary: "A file's derived sizes were made: a PDF's first page, a video's poster",
   },
@@ -482,6 +483,70 @@ async function purgeTransient(now = new Date(), { db = require("../../config/db"
   return { removed };
 }
 
+/**
+ * Give a stranger's upload to the record it was sent for. A file sent on a public form before
+ * the record exists (a CV on the Apply form) is stored against the link it came on; the
+ * service that creates the record moves it there in the same transaction. Only a file still
+ * held by `from` moves, so an upload sent on another link is refused (null).
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @param {string} documentId
+ * @param {{from: {type: string, id: string}, to: {type: string, id: string}, doc_type: string}} move
+ * @returns {Promise<object|null>} the document row, or null when it is not held by `from`
+ */
+async function adopt(client, documentId, { from, to, doc_type: docType }) {
+  if (!inTransaction(client))
+    throw new Error("vault.adopt must run inside atomically()");
+  const { rows } = await client.query(
+    `UPDATE document SET entity_type = $4, entity_id = $5
+      WHERE document_id = $1 AND entity_type = $2 AND entity_id = $3 AND doc_type = $6
+        AND scan_status <> 'infected'
+      RETURNING ${COLUMNS}`,
+    [documentId, from.type, String(from.id), to.type, String(to.id), docType],
+  );
+  return rows[0] || null;
+}
+
+/** The doc type the upload engine stages a file under (modules/documents, POST /documents). */
+const STAGED_DOC_TYPE = "staged_upload";
+
+/**
+ * Bind a file staged through POST /documents to the record that now holds it (an expense's
+ * invoice, a disbursement's receipt): its doc type, record and subject become the record's, so
+ * the record's own read rule decides who opens it from then on. Only the person who staged it
+ * claims it, once. A file this record already holds is answered as it is, so a draft saved again
+ * names its invoice again without a second claim.
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @param {{document_id: string, doc_type: string, entity: {type: string, id: string},
+ *          subject_employee_id?: string|null, actor: object, field?: string}} opts
+ *   field  the request's field the id came in on, for the refusal
+ * @returns {Promise<object>} the document row
+ */
+async function claim(client, { document_id: id, doc_type: docType, entity, subject_employee_id: subjectId = null, actor, field = "document_id" }) {
+  if (!inTransaction(client)) throw new Error("vault.claim must run inside atomically()");
+  docTypes.assertDocType(docType);
+  const { rows } = await client.query(`SELECT ${COLUMNS} FROM document WHERE document_id = $1 FOR UPDATE`, [id]);
+  const doc = rows[0] || null;
+  if (doc && doc.doc_type === docType && doc.entity_type === entity.type && doc.entity_id === String(entity.id)) return doc;
+  if (!doc || doc.doc_type !== STAGED_DOC_TYPE || !doc.is_current || !doc.uploaded_by || doc.uploaded_by !== actorId(actor))
+    throw new AppError("DOCUMENT_NOT_STAGED", "Upload the file again", 422, { [field]: ["Upload it again"] });
+  const { rows: after } = await client.query(
+    `UPDATE document SET doc_type = $2, entity_type = $3, entity_id = $4, subject_employee_id = $5
+      WHERE document_id = $1
+      RETURNING ${COLUMNS}`,
+    [id, docType, entity.type, String(entity.id), subjectId],
+  );
+  await emit(client, {
+    key: EVENTS.DOCUMENT_CLAIMED,
+    entity: { type: "document", id },
+    module: moduleFor(entity.type),
+    actor,
+    before: { doc_type: doc.doc_type, entity_type: doc.entity_type, entity_id: doc.entity_id },
+    after: { doc_type: docType, entity_type: entity.type, entity_id: String(entity.id) },
+    payload: { document_id: id, doc_type: docType, entity_type: entity.type, entity_id: String(entity.id) },
+  });
+  return after[0];
+}
+
 async function get(client, documentId) {
   const { rows } = await client.query(
     `SELECT ${COLUMNS} FROM document WHERE document_id = $1`,
@@ -788,11 +853,14 @@ module.exports = {
   AREA_FOR,
   store,
   supersede,
+  claim,
+  STAGED_DOC_TYPE,
   lock,
   remove,
   removeFiles,
   TRANSIENT_MINUTES,
   purgeTransient,
+  adopt,
   get,
   getReadable,
   variantOf,

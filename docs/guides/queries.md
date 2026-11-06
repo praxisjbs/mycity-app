@@ -596,6 +596,9 @@ or tier 2.**
 ## 14 · Change log
 
 - 06/11/2026 · JP · The `templates` module gains `templates.agreements`, the wording of Partnerships' agreement templates on the same `template_version` store (`docs/guides/partnerships.md` §6.8, M7 PR 2). Letter templates, their routes, variables and screen are unchanged.
+- 04/11/2026 · GE · (Ose) A letter template edited in Settings (Markdown) and its preview escape each name once
+  (`renderMarkdown`): a name such as O'Brien prints as written, never "O&#39;Brien", and a value can never
+  become Markdown in the letter. Found by the M4 audit of the candidate emails, which share the renderer.
 - 03/11/2026 · JP · Every form of Queries & Sanctions is a Praxis AI card, or never for a named
   reason (§9; `praxis-ai.md` decisions 33, 38 and 39): Raise Query after Confirm It's You, signed
   with the saved signature (§6.9; Draw Signature when there is none, Letter Templates opening Edit

@@ -196,7 +196,9 @@ jobs:
     needs: scope
     if: needs.scope.outputs.scope == 'full'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Typecheck, lint, every workspace's tests and the build: about 18 minutes on a hosted runner by
+    # M8, past 20 with M4's screens; the margin keeps a slow runner from timing out, as for screens.
+    timeout-minutes: 25
     steps:
       - name: Check out (full history)
         uses: actions/checkout@v4

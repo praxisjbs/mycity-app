@@ -14,7 +14,8 @@
 @layer base {
   html, body { min-height: 100%; }
   #root { display: flex; flex-direction: column; min-height: 100dvh; }
-  body { background: var(--muted); }
+  /* The faint City Green ground (tokens.css --canvas), so a page pulled past its end shows the same tint. */
+  body { background: var(--canvas); }
 }
 
 @layer utilities {

@@ -722,9 +722,12 @@ describeDb("access, settings and audit against the real migrations", () => {
       const res = await as("ops").get("/settings/numbering");
       expect(res.status).toBe(200);
       // 21, M2 My Workspace's Project and Task (2099, 2090), Performance's Organisational Goal (2291),
-      // M8's Budget (8099; in schemes.js since 8100), and M7's Partner, Lead, Deal and Agreement in
-      // place of the MOU (7099, 7190).
-      expect(res.body.page.total).toBe(28);
+      // M4's Application (4199), M8's Budget (8099; in schemes.js since 8100), and M7's Partner, Lead,
+      // Deal and Agreement in place of the MOU (7099, 7190).
+      expect(res.body.page.total).toBe(29);
+      expect(res.body.data.find((s) => s.doc_type === "application")).toEqual(
+        expect.objectContaining({ label: "Application", prefix: "APP", next: "APP-0001", issued: 0 }),
+      );
       const expense = res.body.data.find((s) => s.doc_type === "expense");
       expect(expense).toEqual(expect.objectContaining({ label: "Expense Request", prefix: "EXP", next: "EXP-0001", issued: 0 }));
       const staff = res.body.data.find((s) => s.doc_type === "employee");
@@ -734,8 +737,8 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(found.body.data.map((s) => s.doc_type)).toEqual(["payslip"]);
       const summary = await as("ops").get("/settings/numbering/summary");
       // Project and Organisational Goal reset each year (2099, 2291), and M7's Deal and Agreement
-      // (7190); Task never does (2090).
-      expect(summary.body).toEqual(expect.objectContaining({ types: 28, resetting: 7 }));
+      // (7190); Task never does (2090), nor M4's Application.
+      expect(summary.body).toEqual(expect.objectContaining({ types: 29, resetting: 7 }));
     });
 
     test("a scheme changes the next number, never one issued; a reset needs its period", async () => {

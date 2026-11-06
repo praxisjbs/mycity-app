@@ -104,6 +104,18 @@ describe("parseChapter", () => {
     expect(parseChapter(spec("lock: asleep"), "x.md").problems).toEqual(['x.md: shot locked, line 12: lock reads "lock: idle", "lock: time" or "lock: ended"']);
   });
 
+  test("a picture of the public site (site: public) is taken signed out at a public address, and a hub spec stays as it was", () => {
+    const spec = (lines) => `---\ntitle: X\n---\n\n## A {#a}\n\n![A role](shot:role)\n\n\`\`\`shot role\n${lines}\n\`\`\`\n`;
+    const ok = parseChapter(spec("site: public\nopen: /jobs/head-sales-revenue-lagos"), "x.md");
+    expect(ok.problems).toEqual([]);
+    expect(ok.chapter.shots.role).toMatchObject({ site: "public", as: "guest", open: "/jobs/head-sales-revenue-lagos" });
+    expect(parseChapter(spec("site: public\nopen: /assess/Hb6tZ3qNw8Rk"), "x.md").problems).toEqual([]);
+    expect(parseChapter(spec("open: /people?tab=employees"), "x.md").chapter.shots.role).not.toHaveProperty("site");
+    expect(parseChapter(spec("site: public\nopen: /people?tab=employees"), "x.md").problems.join("\n")).toMatch(/open is a public address/);
+    expect(parseChapter(spec("site: public\nas: ceo\nopen: /jobs"), "x.md").problems.join("\n")).toMatch(/taken signed out; leave out as/);
+    expect(parseChapter(spec("site: intranet\nopen: /jobs"), "x.md").problems.join("\n")).toMatch(/site is public/);
+  });
+
   test("a picture of a prompt that opens once per sign-in keeps it (prompt: keep), and nothing else", () => {
     const spec = (line) => `---\ntitle: X\n---\n\n## A {#a}\n\n![Owed](shot:owed)\n\n\`\`\`shot owed\nopen: /ess?tab=policy-updates\n${line}\n\`\`\`\n`;
     const ok = parseChapter(spec("prompt: keep"), "x.md");

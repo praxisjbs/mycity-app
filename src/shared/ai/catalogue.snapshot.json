@@ -61,6 +61,42 @@
       "screen": null
     },
     {
+      "key": "budgets.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "budgets.BudgetCreate",
+      "schema_sha": "48366c44c1be344f",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
+      "key": "budgets.edit",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "budgets.BudgetLinesChange",
+      "schema_sha": "89c5b7949ba39d3b",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
+      "key": "budgets.set_project",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "budgets.ProjectBudgetSet",
+      "schema_sha": "f1b6da0325dc7e94",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
       "key": "calendar.create",
       "kind": "action",
       "module_key": "workspace",
@@ -217,6 +253,30 @@
       "screen": null
     },
     {
+      "key": "disbursements.add_reference",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "disbursements.DisbursementReferenceAdd",
+      "schema_sha": "bf048bc17c713fd9",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
+      "key": "disbursements.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "money",
+      "bulk": 1,
+      "schema": "disbursements.DisbursementCreate",
+      "schema_sha": "d919cb6f2fdc7d3b",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
       "key": "employees.add",
       "kind": "action",
       "module_key": "people",
@@ -248,6 +308,30 @@
       "schema": "organisation.EmployeeReportingChange",
       "schema_sha": "da7867c5b321fee6",
       "screen": null
+    },
+    {
+      "key": "expense_categories.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expense_categories.ExpenseCategoryCreate",
+      "schema_sha": "3e0563f373a23f6c",
+      "screen": null,
+      "capability": "expenses.finance"
+    },
+    {
+      "key": "expense_categories.edit",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expense_categories.ExpenseCategoryChange",
+      "schema_sha": "df1d931c58cd1e16",
+      "screen": null,
+      "capability": "expenses.finance"
     },
     {
       "key": "faults.edit",
@@ -505,6 +589,39 @@
       "screen": null
     },
     {
+      "key": "my_expenses.add_line",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expenses.ExpenseLineAdd",
+      "schema_sha": "3ba9eca384b76fe8",
+      "screen": null
+    },
+    {
+      "key": "my_expenses.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expenses.ExpenseRequestAdd",
+      "schema_sha": "94d1b54d747ff542",
+      "screen": null
+    },
+    {
+      "key": "my_expenses.edit",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expenses.ExpenseChange",
+      "schema_sha": "bcfd1ff807ecce53",
+      "screen": null
+    },
+    {
       "key": "my_leave.request",
       "kind": "action",
       "module_key": "ess",
@@ -589,7 +706,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "settings.NumberingSchemeChange",
-      "schema_sha": "1b74b86726a4a910",
+      "schema_sha": "33cf200824778762",
       "screen": null
     },
     {
@@ -808,7 +925,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "reports.HomeReportCreate",
-      "schema_sha": "8e19a487e906e095",
+      "schema_sha": "6e82a912cb20ae9d",
       "screen": null,
       "capability": "home.reports"
     },
@@ -835,6 +952,18 @@
       "schema_sha": "df44226c82c0f273",
       "screen": null,
       "capability": "home.reports"
+    },
+    {
+      "key": "requisitions.create",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 25,
+      "schema": "requisitions.RequisitionCreate",
+      "schema_sha": "9b86cc9d339b8ff7",
+      "screen": null,
+      "capability": "expenses.finance"
     },
     {
       "key": "reviews.score",
@@ -1048,6 +1177,28 @@
       "screen": null
     },
     {
+      "key": "vacancies.create",
+      "kind": "action",
+      "module_key": "recruitment",
+      "permission": "recruitment.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "vacancies.VacancyAdd",
+      "schema_sha": "02570aff673a402d",
+      "screen": null
+    },
+    {
+      "key": "vacancies.edit",
+      "kind": "action",
+      "module_key": "recruitment",
+      "permission": "recruitment.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "vacancies.VacancyChange",
+      "schema_sha": "ae16fbdfff28d806",
+      "screen": null
+    },
+    {
       "key": "week.support",
       "kind": "action",
       "module_key": "workspace",
@@ -1136,6 +1287,28 @@
       "screen": null
     },
     {
+      "key": "assessments.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "assessments.AssessmentListQuery",
+      "schema_sha": "b9413bd41ed8ab7a",
+      "screen": null
+    },
+    {
+      "key": "assessments.sittings",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "assessments.SittingListQuery",
+      "schema_sha": "baa8c05b4df75e8d",
+      "screen": null
+    },
+    {
       "key": "attendance.exceptions",
       "kind": "read",
       "module_key": "people",
@@ -1202,6 +1375,28 @@
       "screen": null
     },
     {
+      "key": "budgets.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "budgets.BudgetListQuery",
+      "schema_sha": "8f58085ac320b408",
+      "screen": null
+    },
+    {
+      "key": "budgets.projects",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "budgets.ProjectSpendListQuery",
+      "schema_sha": "8de6d8d4fd152f43",
+      "screen": null
+    },
+    {
       "key": "calendar.month",
       "kind": "read",
       "module_key": "workspace",
@@ -1210,6 +1405,28 @@
       "bulk": null,
       "schema": "calendar.CalendarListQuery",
       "schema_sha": "7a157a8d6e304cb2",
+      "screen": null
+    },
+    {
+      "key": "candidates.get",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "candidates.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "candidates.CandidateListQuery",
+      "schema_sha": "0d00a44c6d028998",
       "screen": null
     },
     {
@@ -1290,6 +1507,17 @@
       "screen": null
     },
     {
+      "key": "disbursements.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "disbursements.DisbursementListQuery",
+      "schema_sha": "f1423a29e38f7e45",
+      "screen": null
+    },
+    {
       "key": "employees.list",
       "kind": "read",
       "module_key": "people",
@@ -1298,6 +1526,50 @@
       "bulk": null,
       "schema": "organisation.EmployeeListQuery",
       "schema_sha": "dfcf3c65b0a27544",
+      "screen": null
+    },
+    {
+      "key": "expense_categories.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "expense_categories.ExpenseCategoryListQuery",
+      "schema_sha": "87ad86edfdf739ab",
+      "screen": null
+    },
+    {
+      "key": "expenses.approvals",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "expenses.ExpenseListQuery",
+      "schema_sha": "cce0a68b30379ee4",
+      "screen": null
+    },
+    {
+      "key": "expenses.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "expenses.ExpenseListQuery",
+      "schema_sha": "cce0a68b30379ee4",
+      "screen": null
+    },
+    {
+      "key": "expenses.mine",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "expenses.ExpenseListQuery",
+      "schema_sha": "cce0a68b30379ee4",
       "screen": null
     },
     {
@@ -1364,6 +1636,17 @@
       "bulk": null,
       "schema": "imports.ImportListQuery",
       "schema_sha": "3b5b68e62544d923",
+      "screen": null
+    },
+    {
+      "key": "interviews.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "interviews.InterviewListQuery",
+      "schema_sha": "81c2f8ddcd90026a",
       "screen": null
     },
     {
@@ -1528,7 +1811,18 @@
       "risk": null,
       "bulk": null,
       "schema": "reports.HomeReportQuery",
-      "schema_sha": "e9de4bfcf427ab5d",
+      "schema_sha": "a7a6a19617a81e73",
+      "screen": null
+    },
+    {
+      "key": "requisitions.list",
+      "kind": "read",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "requisitions.RequisitionListQuery",
+      "schema_sha": "d7ba07ceee2c9e7e",
       "screen": null
     },
     {
@@ -1620,6 +1914,17 @@
       "screen": null
     },
     {
+      "key": "talent_pool.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "talent_pool.PoolListQuery",
+      "schema_sha": "cfabc7d2d676ebf0",
+      "screen": null
+    },
+    {
       "key": "tasks.get",
       "kind": "read",
       "module_key": "workspace",
@@ -1650,6 +1955,28 @@
       "bulk": null,
       "schema": "dashboard.HomeTeamQuery",
       "schema_sha": "2349da853e18a360",
+      "screen": null
+    },
+    {
+      "key": "vacancies.get",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "vacancies.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "vacancies.VacancyListQuery",
+      "schema_sha": "cdd9c3dfedb43ced",
       "screen": null
     },
     {
@@ -1739,6 +2066,72 @@
       "schema": null,
       "schema_sha": null,
       "screen": "ess.my-documents"
+    },
+    {
+      "key": "expenses.route.approve_expense_requests",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.approvals"
+    },
+    {
+      "key": "expenses.route.group_approved_expenses_for_the_ceo",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.requisitions"
+    },
+    {
+      "key": "expenses.route.manage_expense_categories",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.categories"
+    },
+    {
+      "key": "expenses.route.raise_an_expense_request",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "ess.my-requests"
+    },
+    {
+      "key": "expenses.route.record_an_expense_payment",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.disbursements"
+    },
+    {
+      "key": "expenses.route.set_a_budget",
+      "kind": "route",
+      "module_key": "expenses",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "expenses.budgets"
     },
     {
       "key": "home.route.build_schedule_or_run_a_report",
@@ -2443,6 +2836,138 @@
       "schema": null,
       "schema_sha": null,
       "screen": "queries.rules"
+    },
+    {
+      "key": "recruitment.route.change_a_vacancy_s_questions_interview_traits_or_scorecard",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.change_careers_settings_about_mycityapp_or_the_default_interview_traits",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.change_the_wording_of_a_candidate_email",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.fill_in_my_interview_card",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.interviews"
+    },
+    {
+      "key": "recruitment.route.invite_someone_from_the_talent_pool_to_apply",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.talent-pool"
+    },
+    {
+      "key": "recruitment.route.invite_someone_to_apply_for_a_vacancy",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.candidates"
+    },
+    {
+      "key": "recruitment.route.mark_the_answers_of_finished_assessments",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.assessments"
+    },
+    {
+      "key": "recruitment.route.schedule_an_interview",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.interviews"
+    },
+    {
+      "key": "recruitment.route.screen_a_role_s_applications_with_ai",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.candidates"
+    },
+    {
+      "key": "recruitment.route.send_an_assessment_to_the_candidates_of_a_role",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.assessments"
+    },
+    {
+      "key": "recruitment.route.write_a_new_assessment",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.assessments"
+    },
+    {
+      "key": "recruitment.route.write_a_new_vacancy",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": "1687bb5133592b2b",
+      "screen": "recruitment.vacancies"
     },
     {
       "key": "settings.route.add_a_public_holiday",

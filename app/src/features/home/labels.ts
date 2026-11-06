@@ -202,6 +202,7 @@ export const REPORT_SOURCE: Record<ReportSourceKey, string> = {
   tasks: "Tasks",
   partnerships: "Partnerships",
   expenses: "Expenses",
+  expenses_monthly: "Monthly Expenses",
   recruitment: "Recruitment",
   overview: "Overview",
   workspace_analytics: "Workspace Analytics",

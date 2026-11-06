@@ -199,6 +199,7 @@ describe("reports", () => {
       "tasks",
       "partnerships",
       "expenses",
+      "expenses_monthly",
       "recruitment",
       "overview",
       "workspace_analytics",

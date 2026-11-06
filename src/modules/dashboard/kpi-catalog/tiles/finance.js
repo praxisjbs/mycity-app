@@ -1,7 +1,7 @@
 "use strict";
 /**
- * Finance cards: expenses awaiting approval, how much of the running budgets is spent, and
- * payroll, which waits for M6.
+ * Finance cards: expenses awaiting approval, how much of the running budgets is used (committed
+ * and spent, handoff decision 16), and payroll, which waits for M6.
  *
  *   expenses, budgets   their source adapters (M8), in the reader's scope on `expenses`
  *   payroll             hidden: no payroll table exists until M6 builds one. The card keeps
@@ -85,6 +85,7 @@ const ENTRIES = [
         { key: "department", label: "Department" },
         { key: "owner", label: "Owner" },
         { key: "allocated", label: "Allocated", numeric: true },
+        { key: "committed", label: "Committed", numeric: true },
         { key: "spent", label: "Spent", numeric: true, phone: true },
         { key: "used", label: "Used", numeric: true, phone: true },
       ],
@@ -98,6 +99,7 @@ const ENTRIES = [
               department: cell.text(r.department),
               owner: cell.person(r.owner),
               allocated: cell.money(r.allocated),
+              committed: cell.money(r.committed),
               spent: cell.money(r.spent),
               used: cell.number(r.used),
             },

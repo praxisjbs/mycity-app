@@ -17,7 +17,7 @@
   },
   "qs-agree": {
     "spec": "663deb49e9bb88ca",
-    "source": "e1b08be9065803d2",
+    "source": "b3dc7b786c23ec93",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "qs-approve-leave": {
     "spec": "f974e711363d9efc",
-    "source": "6e002f1ceb11f05c",
+    "source": "e01dcf17079d7d19",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "qs-check-in": {
     "spec": "590035331c4ca0f0",
-    "source": "c6e2ee62b6c34d81",
+    "source": "ceed7eeacc259184",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "qs-clock-in": {
     "spec": "51edfe0fed8ea055",
-    "source": "a48cbcee2f75f8fb",
+    "source": "00b3e437af2f5b91",
     "devices": [
       "desktop",
       "phone"
@@ -105,7 +105,7 @@
   },
   "qs-help": {
     "spec": "6f0c9af78d68e4fb",
-    "source": "eb227c20d7d58d74",
+    "source": "44de18a6a6a5a3a2",
     "devices": [
       "desktop",
       "phone"
@@ -145,7 +145,7 @@
   },
   "qs-notifications": {
     "spec": "41982194c80e9106",
-    "source": "eb227c20d7d58d74",
+    "source": "44de18a6a6a5a3a2",
     "devices": [
       "desktop",
       "phone"
@@ -193,7 +193,7 @@
   },
   "qs-request-leave": {
     "spec": "0db81a71cb5f5bc5",
-    "source": "70f2c60ca1906d5e",
+    "source": "a18f46959d7731a4",
     "devices": [
       "desktop",
       "phone"
@@ -217,7 +217,7 @@
   },
   "qs-search": {
     "spec": "eee935c1ee9404c8",
-    "source": "eb227c20d7d58d74",
+    "source": "44de18a6a6a5a3a2",
     "devices": [
       "desktop",
       "phone"
@@ -241,7 +241,7 @@
   },
   "qs-team": {
     "spec": "fb8093ebf06b841e",
-    "source": "eb227c20d7d58d74",
+    "source": "44de18a6a6a5a3a2",
     "devices": [
       "desktop",
       "phone"

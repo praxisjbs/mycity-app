@@ -96,7 +96,7 @@ const ACTIONS = Object.freeze([
     need: ["people", "approve"],
     words: ["temporary site", "send people out", "field assignment", "client site", "out of station"],
   }),
-  a("new_category", "New Category", {
+  a("new_category", "New Partner Category", {
     screen: "partnerships.categories",
     params: { action: "new" },
     need: ["partnerships", "edit"],
@@ -108,6 +108,37 @@ const ACTIONS = Object.freeze([
     params: { importer: "employees" },
     need: ["people", "create"],
     words: ["import employees", "staff sheet", "upload staff", "staff spreadsheet"],
+  }),
+  // Recruitment (docs/guides/recruitment.md §9): each opens its tab already asked to start.
+  a("new_vacancy", "New Vacancy", {
+    screen: "recruitment.vacancies",
+    params: { action: "new" },
+    need: ["recruitment", "create"],
+    words: ["post a job", "open a role", "advertise a job", "job description", "hire for", "new job"],
+  }),
+  a("invite_to_apply", "Invite to Apply", {
+    screen: "recruitment.candidates",
+    params: { action: "invite" },
+    need: ["recruitment", "create"],
+    words: ["invite a candidate", "send apply link", "ask someone to apply", "headhunt"],
+  }),
+  a("screen_with_ai", "Screen With AI", {
+    screen: "recruitment.candidates",
+    params: { action: "screen" },
+    need: ["recruitment", "edit"],
+    words: ["screen applicants", "score cvs", "read applications", "rank candidates", "shortlist with ai"],
+  }),
+  a("new_assessment", "New Assessment", {
+    screen: "recruitment.assessments",
+    params: { action: "new" },
+    need: ["recruitment", "create"],
+    words: ["new test", "create test", "aptitude test", "case study", "take-home brief"],
+  }),
+  a("schedule_interview", "Schedule Interview", {
+    screen: "recruitment.interviews",
+    params: { action: "new" },
+    need: ["recruitment", "edit"],
+    words: ["book interview", "set up interview", "interview panel", "invite to interview"],
   }),
   a("start_import", "Start Import", {
     screen: "settings.imports",
@@ -336,6 +367,33 @@ const ACTIONS = Object.freeze([
     run: "sign_out",
     need: null,
     words: ["log out", "logout", "sign off", "exit"],
+  }),
+  a("new_expense_request", "New Request", {
+    screen: "ess.my-requests",
+    params: { action: "new" },
+    need: ["expenses", "create"],
+    words: ["raise an expense", "expense request", "claim", "request money", "new expense"],
+  }),
+  a("create_requisition", "Create Requisition", {
+    screen: "expenses.requisitions",
+    params: { action: "new" },
+    need: ["expenses", "create"],
+    capability: "expenses.finance",
+    words: ["requisition", "group requests", "batch for the ceo"],
+  }),
+  a("new_budget", "New Budget", {
+    screen: "expenses.budgets",
+    params: { action: "new" },
+    need: ["expenses", "create"],
+    capability: "expenses.finance",
+    words: ["set a budget", "department budget", "budget"],
+  }),
+  a("new_expense_category", "New Category", {
+    screen: "expenses.categories",
+    params: { action: "new" },
+    need: ["expenses", "create"],
+    capability: "expenses.finance",
+    words: ["expense category", "add category"],
   }),
 ]);
 

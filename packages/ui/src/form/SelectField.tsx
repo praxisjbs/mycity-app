@@ -470,6 +470,8 @@ export interface SelectFieldProps {
   state?: FieldState;
   /** Unused here (the Field shows it). */
   message?: string;
+  /** Unused here: a pick is always a whole value, so there is no half-typed problem to report. Taken so a form's `{...f.field()}` never reaches the button. */
+  onProblem?: (message: string | undefined, now?: boolean) => void;
   /** Its name in a submitted form. */
   name?: string;
   /** Shown but not usable. */
@@ -492,7 +494,7 @@ export interface SelectFieldProps {
   valueLabel?: ReactNode;
 }
 
-export function SelectField({ value, onChange, onBlur, options, placeholder, state, message: _message, className, id, ...rest }: SelectFieldProps) {
+export function SelectField({ value, onChange, onBlur, options, placeholder, state, message: _message, onProblem: _onProblem, className, id, ...rest }: SelectFieldProps) {
   const { state: mark, ...a } = useFieldControl({ id, state });
   return (
     <SelectMenu

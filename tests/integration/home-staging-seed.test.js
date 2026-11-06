@@ -34,10 +34,13 @@ const home = require("../../seeds/staging/60_home");
 const workspaceSeed = require("../../seeds/staging/40_workspace");
 const performanceSeed = require("../../seeds/staging/45_performance_plan");
 const reviewsSeed = require("../../seeds/staging/46_performance_reviews");
+const recruitmentSeed = require("../../seeds/staging/55_recruitment");
+const expensesSeed = require("../../seeds/staging/80_expenses");
 const forward = require("../../seeds/staging/lib/forward-rows");
 const { removeHomeStagingRows } = require("../../seeds/staging/lib/home-staging-rows");
 const { realStaff } = require("../../seeds/staging/lib/staff");
 const { atomically } = require("../../src/shared/db/tx");
+const { createAdmin, BUILD_ACCOUNT } = require("../../scripts/db/create-admin");
 const sweeps = require("../../src/modules/alerts/alerts.sweeps");
 const { KEY_PREFIX } = require("../../seeds/staging/lib/attendance");
 
@@ -105,12 +108,21 @@ describeDb("Home's staging seed against the real migrations", () => {
     await q("INSERT INTO system_marker (environment) VALUES ('test')");
     workingWeek.invalidateCalendar();
     outbox.markReady();
+    // The Implementation Team's build account, as on staging: M8's seed raises its requests on it.
+    const client = await pool.connect();
+    try {
+      await atomically(client, () => createAdmin(client, { ...BUILD_ACCOUNT, employee: { ...BUILD_ACCOUNT.employee, work_email: "build@jbspraxis.test" } }, "A-long-Test-password-1!", { allowAdditional: true }));
+    } finally {
+      client.release();
+    }
     await runFile(staffSeed);
     // Tasks and the calendar come from My Workspace's own seed, goals, targets and reviews from
     // Performance's; all run before Home's.
     await runFile(workspaceSeed, { now: NOW });
     await runFile(performanceSeed, { now: NOW });
     await runFile(reviewsSeed, { now: NOW });
+    // Requests and budgets come from M8's own seed (80_expenses.js), which takes Home's away first.
+    await runFile(expensesSeed, { now: NOW });
     staff = await realStaff(pool);
     await runFile(home, { now: NOW });
     first = await counts();
@@ -131,11 +143,12 @@ describeDb("Home's staging seed against the real migrations", () => {
 
   test("running it twice leaves every table as the first run left it", () => {
     expect(second).toEqual(first);
-    for (const table of TABLES) expect([table, first[table] > 0]).toEqual([table, true]);
+    // Recruitment's tables are its own seed's now (55_recruitment.js): Home writes none of them.
+    for (const table of TABLES.filter((t) => !recruitmentSeed.RECRUITMENT_TABLES.includes(t))) expect([table, first[table] > 0]).toEqual([table, true]);
   });
 
   test("every id the manifest lists is there, in the column it names", async () => {
-    const taken = [...workspaceSeed.M2_TABLES, ...performanceSeed.PLAN_TABLES, ...reviewsSeed.REVIEW_TABLES];
+    const taken = [...workspaceSeed.M2_TABLES, ...performanceSeed.PLAN_TABLES, ...reviewsSeed.REVIEW_TABLES, ...recruitmentSeed.RECRUITMENT_TABLES, ...expensesSeed.EXPENSE_TABLES];
     for (const { table, id_column: idColumn, ids } of home.HOME_STAGING_ROWS.filter((e) => !taken.includes(e.table))) {
       const { n } = await one(`SELECT count(*)::int AS n FROM ${table} WHERE ${idColumn} = ANY($1::uuid[])`, [ids]);
       expect([table, n]).toEqual([table, ids.length]);
@@ -155,25 +168,33 @@ describeDb("Home's staging seed against the real migrations", () => {
 
   test("hangs everything off the real staff and adds nobody", async () => {
     // The staff sheet's import made every person on the register; the seed made nobody.
+    // The build account (create-admin --build-account) is ours, not on the sheet, as on staging.
     const register = await one(
       `SELECT count(*)::int AS n,
               count(*) FILTER (WHERE EXISTS (SELECT 1 FROM import_row r WHERE r.target_id = e.employee_id::text))::int AS loaded
-         FROM employee e`,
+         FROM employee e WHERE e.work_email <> 'build@jbspraxis.test'`,
     );
     expect(register.n).toBeGreaterThan(0);
     expect(register.loaded).toBe(register.n);
     const outside = await one(
       `SELECT count(*)::int AS n FROM (
          SELECT owner_id AS who FROM partner UNION ALL SELECT owner_id FROM partnership_opportunity
-         UNION ALL SELECT owner_id FROM partnership_agreement UNION ALL SELECT employee_id FROM expense_request
+         UNION ALL SELECT owner_id FROM partnership_agreement
          UNION ALL SELECT owner_id FROM budget UNION ALL SELECT primary_assignee_id FROM task
          UNION ALL SELECT owner_employee_id FROM calendar_event UNION ALL SELECT employee_id FROM employee_target
          UNION ALL SELECT owner_employee_id FROM organisational_goal UNION ALL SELECT employee_id FROM performance_review
          UNION ALL SELECT reviewer_employee_id FROM performance_review UNION ALL SELECT hiring_manager_id FROM vacancy
          UNION ALL SELECT employee_id FROM attendance_event) x
-        WHERE NOT EXISTS (SELECT 1 FROM import_row r WHERE r.target_id = x.who::text)`,
+        WHERE NOT EXISTS (SELECT 1 FROM import_row r WHERE r.target_id = x.who::text)
+          AND x.who NOT IN (SELECT employee_id FROM employee WHERE work_email = 'build@jbspraxis.test')`,
     );
     expect(outside.n).toBe(0);
+    // M8's requests are raised by the Implementation Team's own accounts only (80_expenses.js).
+    const raisers = await one(
+      `SELECT count(*)::int AS n FROM expense_request er JOIN employee e ON e.employee_id = er.employee_id
+         JOIN department d ON d.department_id = e.department_id WHERE d.name <> 'Implementation'`,
+    );
+    expect(raisers.n).toBe(0);
     const owners = await one(
       `SELECT count(*)::int AS n FROM saved_report sr
         WHERE NOT EXISTS (SELECT 1 FROM app_user u JOIN import_row r ON r.target_id = u.employee_id::text
@@ -316,22 +337,6 @@ describeDb("Home's staging seed against the real migrations", () => {
 
   describe("run again after the organisation changed", () => {
     const listed = (table) => home.HOME_STAGING_ROWS.find((e) => e.table === table).ids;
-
-    test("a seat filled since the last run: the run passes, and only the seats still vacant have a vacancy", async () => {
-      const { rows: seats } = await q("SELECT org_seat_id, title FROM org_seat WHERE status = 'vacant' ORDER BY title, org_seat_id");
-      expect(seats.length).toBeGreaterThanOrEqual(2);
-      await q("UPDATE org_seat SET status = 'filled', filled_by_employee_id = $2, filled_on = $3 WHERE org_seat_id = $1", [
-        seats[0].org_seat_id,
-        staff.ceo.employee_id,
-        TODAY,
-      ]);
-      await expect(runFile(home, { now: NOW })).resolves.toBeUndefined();
-      const { rows } = await q("SELECT title, slug::text AS slug, status FROM vacancy WHERE vacancy_id = ANY($1::uuid[]) ORDER BY number", [
-        listed("vacancy"),
-      ]);
-      expect(rows.map((v) => v.title)).toEqual(seats.slice(1, 1 + listed("vacancy").length).map((s) => s.title));
-      expect(rows.every((v) => v.status === "open")).toBe(true);
-    });
 
     test("someone moved to another manager since the last run: the run passes, and none of Home's old reviews comes back", async () => {
       const before = await realStaff(pool);

@@ -57,10 +57,6 @@ const context = () =>
       code,
       expense_category_id: `00000000-0000-4000-b000-00000000000${i}`,
     })),
-    seats: [
-      { title: "Head Sales & Revenue", department_id: "00000000-0000-4000-a000-000000000002" },
-      { title: "Technical Assistant", department_id: "00000000-0000-4000-a000-000000000003" },
-    ],
   });
 
 describe("deterministic ids", () => {
@@ -181,32 +177,18 @@ describe("the rows", () => {
     }
   });
 
-  test("a row whose person has no login, or whose seat or category is missing, is left out", () => {
-    const vacancy = forward.ROWS.find((r) => r.table === "vacancy" && r.key === "open-seat-2");
-    const withoutSeats = { ...x, seats: x.seats.slice(0, 1) };
-    expect(vacancy.values(withoutSeats, [staff.operations])).toBeNull();
-    expect(vacancy.values(x, [{ ...staff.operations, user_id: null }])).toBeNull();
-    const line = forward.ROWS.find((r) => r.table === "budget_line");
-    expect(line.values({ ...x, categories: new Map() }, [])).toBeNull();
+  test("a post nobody holds is refused", () => {
     expect(() => forward.personOf(staff, "chairman")).toThrow(/no post/);
-  });
-
-  test("a vacancy's number and slug follow its place among the open seats, never the seat's title", () => {
-    const first = forward.ROWS.find((r) => r.table === "vacancy" && r.key === "open-seat-1");
-    const before = first.values(x, [staff.operations]);
-    const filled = first.values({ ...x, seats: x.seats.slice(1) }, [staff.operations]);
-    expect(filled.title).not.toBe(before.title);
-    expect([filled.number, filled.slug]).toEqual([before.number, before.slug]);
   });
 
   test("a row whose unique key would take a value a row before it holds is left out", () => {
     const keys = new Map(forward.DELETE_ORDER.map((table) => [table, []]));
-    // A key of one line per budget: each budget's first line is written, its second left out.
-    keys.set("budget_line", [["budget_id"]]);
+    // A key of one agreement per partner owner: each owner's first agreement is written, the rest left out.
+    keys.set("partnership_agreement", [["owner_id"]]);
     const plan = forward.planOf(forward.ROWS, x, staff, keys);
-    const lines = [...plan.values()].filter((p) => p.row.table === "budget_line").map((p) => p.row.key);
-    expect(lines).toEqual(["operations-quarter:office", "marketing-quarter:travel"]);
-    keys.set("budget_line", []);
+    const agreements = [...plan.values()].filter((p) => p.row.table === "partnership_agreement").map((p) => p.row.key);
+    expect(agreements.length).toBeLessThan(forward.ROWS.filter((r) => r.table === "partnership_agreement").length);
+    keys.set("partnership_agreement", []);
     expect(forward.planOf(forward.ROWS, x, staff, keys).size).toBe(forward.ROWS.length);
   });
 });

@@ -1,9 +1,7 @@
-import { useEffect } from "react";
-import { Button, PageMessage } from "@mycity/ui";
+import { lazy, Suspense, useEffect } from "react";
+import { Button, PageMessage, Skeleton } from "@mycity/ui";
 import { useScreenState, plan } from "@/lib/plan";
 import { parse, RouterProvider, useRouter } from "@/lib/router";
-import { Apply } from "@/pages/Apply";
-import { Assessment } from "@/pages/Assessment";
 import { Careers } from "@/pages/Careers";
 import { Proposal } from "@/pages/Proposal";
 import { SignOffer } from "@/pages/SignOffer";
@@ -11,6 +9,21 @@ import { Vacancy } from "@/pages/Vacancy";
 import { Verify } from "@/pages/Verify";
 import { Page } from "@/shell/Page";
 import { PlannedPage, ViewBar } from "@/shell/Planned";
+
+/*
+ * The pages reached by a token load on their own: Apply checks its form with the contract's schema,
+ * which brings Zod, and a stranger opening Careers or a vacancy should not wait for it.
+ */
+const Apply = lazy(() => import("@/pages/Apply").then((m) => ({ default: m.Apply })));
+const Assessment = lazy(() => import("@/pages/Assessment").then((m) => ({ default: m.Assessment })));
+
+function Loading({ title }: { title: string }) {
+  return (
+    <Page title={title}>
+      <Skeleton lines={7} />
+    </Page>
+  );
+}
 
 /** The public site: seven pages, no shell, no sign-in (A9). */
 export function App() {
@@ -35,8 +48,8 @@ function Routes() {
   switch (r.page) {
     case "careers": return <Careers />;
     case "vacancy": return <Vacancy key={r.slug} slug={r.slug} />;
-    case "apply": return <Apply key={r.token} token={r.token} />;
-    case "assess": return <Assessment key={r.token} token={r.token} />;
+    case "apply": return <Suspense fallback={<Loading title="Apply" />}><Apply key={r.token} token={r.token} /></Suspense>;
+    case "assess": return <Suspense fallback={<Loading title="Assessment" />}><Assessment key={r.token} token={r.token} /></Suspense>;
     case "sign": return <SignOffer key={r.token} token={r.token} />;
     case "verify": return <Verify key={r.number ?? ""} number={r.number} />;
     case "proposal": return <Proposal key={r.token} />;

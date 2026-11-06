@@ -14,8 +14,11 @@
  * the queries to `tables`.
  *
  * A budget is its owner's: scope runs on b.owner_id. Running today: approved, and today
- * (Lagos) falls between its first and last day. Used is spent over allocated, as a whole
- * percentage worked out in SQL so no amount passes through JavaScript arithmetic. Naira
+ * (Lagos) falls between its first and last day. Used is committed (approved, not yet paid) and
+ * spent over allocated (M8 decision 16, 05/11/2026: Home warns before the money leaves, as the
+ * Budgets tab's Remaining does), as a whole percentage worked out in SQL so no amount passes
+ * through JavaScript arithmetic. Home's Budget Threshold alert rules read spent alone (their
+ * title says "spent"). Naira
  * budgets only (shared/money): a budget in another currency is left out of the figure and
  * the list, since its percentage cannot be pooled with a Naira one (docs/guides/home.md §13).
  */
@@ -36,12 +39,11 @@ const TABLES = Object.freeze({
     "ends_on",
     "approved_at",
   ],
-  budget_line: ["budget_id", "amount", "spent_amount"],
+  budget_line: ["budget_id", "amount", "committed_amount", "spent_amount"],
 });
 
 /** What M8 still owes these queries. */
 const OWES = Object.freeze([
-  "Whether committed spend counts as used: Home counts spent_amount only.",
   "The currency rule: Naira budgets only until the owner decides (home.md §13).",
 ]);
 
@@ -50,7 +52,7 @@ const RUNNING = `b.approved_at IS NOT NULL AND b.starts_on <= $1::date AND b.end
   AND b.currency = 'NGN'`;
 
 /**
- * Spent over allocated across the budgets running on a Lagos date, within the scope, as a
+ * Committed and spent over allocated across the budgets running on a Lagos date, within the scope, as a
  * whole percentage, and how many budgets that is over (the figure is not measurable over
  * none). A total allocation of nothing reads as 0 used.
  * @param {{query: Function}} client
@@ -62,7 +64,7 @@ async function used(client, { today }, scope) {
   const params = [today];
   const s = scopeClause(scope, { column: "b.owner_id" }, params);
   const { rows } = await client.query(
-    `SELECT COALESCE(round(100 * sum(bl.spent_amount) / NULLIF(sum(bl.amount), 0)), 0)::int AS value,
+    `SELECT COALESCE(round(100 * (sum(bl.committed_amount) + sum(bl.spent_amount)) / NULLIF(sum(bl.amount), 0)), 0)::int AS value,
             count(DISTINCT b.budget_id)::int AS denominator
        FROM budget b
        LEFT JOIN budget_line bl ON bl.budget_id = b.budget_id
@@ -72,18 +74,19 @@ async function used(client, { today }, scope) {
   return rows[0];
 }
 
-/** One page of the budgets running on a Lagos date, within the scope, the most used first. */
+/** One page of the budgets running on a Lagos date, within the scope, the most used (committed and spent) first. */
 function usedPage(client, { today }, scope, query) {
   const params = [today, query.q || null];
   const s = scopeClause(scope, { column: "u.owner_id" }, params);
   return pageQuery(
     client,
-    `SELECT u.budget_id, u.number, u.name, u.department, u.allocated, u.spent, u.used, ${PERSON("e", "d")} AS owner,
+    `SELECT u.budget_id, u.number, u.name, u.department, u.allocated, u.committed, u.spent, u.used, ${PERSON("e", "d")} AS owner,
             ${TOTAL_COL}
        FROM (SELECT b.budget_id, b.number, b.name, b.owner_id, bd.name AS department,
                     COALESCE(sum(bl.amount), 0)::numeric(18,2) AS allocated,
+                    COALESCE(sum(bl.committed_amount), 0)::numeric(18,2) AS committed,
                     COALESCE(sum(bl.spent_amount), 0)::numeric(18,2) AS spent,
-                    COALESCE(round(100 * sum(bl.spent_amount) / NULLIF(sum(bl.amount), 0)), 0)::int AS used
+                    COALESCE(round(100 * (sum(bl.committed_amount) + sum(bl.spent_amount)) / NULLIF(sum(bl.amount), 0)), 0)::int AS used
                FROM budget b
                LEFT JOIN department bd ON bd.department_id = b.department_id
                LEFT JOIN budget_line bl ON bl.budget_id = b.budget_id

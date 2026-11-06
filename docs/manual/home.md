@@ -433,7 +433,8 @@ The form has three steps. A report you run only when you ask has two.
    ![New Report, first step](shot:home-new-report)
 2. On **Report**, type the **Report Name**, such as `Late Today`.
 3. Pick the **Source**: what the report lists. **Daily Attendance**, **Leave**, **Open Alerts** or
-   **Headcount** are the ones with records today.
+   **Headcount** are the ones with records today. **Monthly Expenses** lists last month's spend by
+   department, project and category; schedule it **Monthly** on the 1st.
 4. Narrow it if you need to (see the table below). Leave the statuses unticked to list everyone.
 5. Tick **Share With Managers** to let other managers who run reports see it too. Press **Next**.
 6. On **Schedule**, choose how often it **Repeats**: **Daily**, **Weekly**, **Monthly** or

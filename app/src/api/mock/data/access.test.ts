@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CAPABILITIES, capabilitiesOf, ROLE_CAPABILITIES } from "./access";
 
 const GOALS = ["goals.company", "goals.confirm", "goals.function", "goals.organisation", "goals.view_all"];
-const EVERY = ["alerts.clear", "alerts.manage", "announcements.post", ...GOALS, "home.reports", "home.team", "mailbox.signature", "partnerships.configure", "partnerships.money", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"];
+const EVERY = ["alerts.clear", "alerts.manage", "announcements.post", "expenses.finance", ...GOALS, "home.reports", "home.team", "mailbox.signature", "partnerships.configure", "partnerships.money", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"];
 
 describe("mock capabilities", () => {
   it("the catalogue is the seeded one, A to Z", () => {
@@ -11,7 +11,7 @@ describe("mock capabilities", () => {
 
   it("each role holds what the reference seeds give it", () => {
     expect(capabilitiesOf(["implementation"], false)).toEqual(EVERY);
-    expect(capabilitiesOf(["operations_people"], false)).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "home.reports", "home.team", "partnerships.configure", "partnerships.money", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]);
+    expect(capabilitiesOf(["operations_people"], false)).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "home.reports", "home.team", "partnerships.configure", "partnerships.money", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"]);
     expect(capabilitiesOf(["management"], false)).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "goals.company", "goals.function", "goals.view_all", "home.reports", "home.team", "partnerships.money", "workspace.late_reasons"]);
     expect(capabilitiesOf(["head_of_department"], false)).toEqual(["alerts.clear", "goals.function", "home.reports", "home.team"]);
     expect(capabilitiesOf(["manager"], false)).toEqual(["alerts.clear", "home.reports", "home.team"]);

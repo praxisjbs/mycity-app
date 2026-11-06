@@ -45,6 +45,13 @@
  * and IT's own test. Each caller decides what paused mail becomes: a notice is pushed instead,
  * a digest is dropped, anything else waits in its queue until Resume.
  *
+ * Never deliverable: an address at a name reserved so that it can never take mail (RFC 2606 and
+ * RFC 6761: `.test`, `.example`, `.invalid`, `.localhost`, `example.com`, `.net`, `.org`), such as
+ * the staging seed's invented `@example.test` candidates, is never handed to a mail server: the
+ * server would only bounce it back to the sender. It is left off the message and logged as not
+ * sent; a message with nobody else on its To line is not sent at all (`not_sent` names them).
+ * Captured mail (nothing set up) keeps every address, so tests still read what was written.
+ *
  * Refused: an address the server refuses for good (a 5xx to RCPT TO: no such mailbox, a domain
  * that takes no mail) is kept on the System Sender's Refused Addresses
  * (shared/integrations/refusals.js) and send() throws MailRefusedError (code MAIL_REFUSED),
@@ -61,8 +68,7 @@ const nodemailer = require("nodemailer");
 const { config } = require("../../config/env");
 const { logger } = require("../../config/logger");
 const { pool: defaultPool } = require("../../config/db");
-const { render } = require("../../shared/documents/render");
-const { markdownToHtml } = require("../../shared/documents/markdown");
+const { render, renderMarkdown } = require("../../shared/documents/render");
 const templates = require("../../shared/templates/template-store");
 const variables = require("../../shared/templates/variables");
 const storage = require("../storage/storage.service");
@@ -73,6 +79,35 @@ const usage = require("../../shared/integrations/usage");
 const refusals = require("../../shared/integrations/refusals");
 
 const EMAIL_RE = /^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/;
+
+/** Names that can never take mail (RFC 2606, RFC 6761), and any name under them. */
+const NEVER_DELIVERED = /(^|\.)(test|example|invalid|localhost)$|(^|\.)example\.(com|net|org)$/;
+
+/** Whether an address (a string, or { address }) is at a name that can never take mail. */
+function neverDelivered(a) {
+  const email = String(typeof a === "string" ? a : a.address || a.email || "");
+  const domain = email.slice(email.lastIndexOf("@") + 1).trim().toLowerCase().replace(/\.+$/, "");
+  return NEVER_DELIVERED.test(domain);
+}
+
+/**
+ * The addresses a mail server is handed: those at a reserved name are taken off and named in
+ * `dropped`, so they are logged as not sent rather than bounced.
+ * @param {Array<string|{address: string}>} to @param {Array<string|{address: string}>|undefined} cc
+ */
+function deliverable(to, cc) {
+  const name = (a) => (typeof a === "string" ? a : a.address);
+  const dropped = [...to, ...(cc || [])].filter(neverDelivered).map(name);
+  const keep = (list) => list && list.filter((a) => !neverDelivered(a));
+  const ccKept = keep(cc);
+  return { to: keep(to), cc: ccKept && ccKept.length ? ccKept : undefined, dropped };
+}
+
+/** What send() answers when nobody on the To line can take mail: nothing reached a server. */
+function notSent(template, dropped) {
+  logger.info({ template, to: dropped }, "system mail not sent: a reserved address that never takes mail");
+  return { message_id: null, accepted: [], rejected: [], not_sent: dropped };
+}
 const MAX_RECIPIENTS = 50;
 const CAPTURE_LIMIT = 200;
 
@@ -252,6 +287,16 @@ function addressList(value) {
 }
 
 /** Plain text from the rendered HTML: links kept as "text (url)", tags dropped. */
+/** HTML entities back to the characters they stand for (&amp; last, so "&amp;lt;" stays "&lt;"). */
+function plainText(s) {
+  return String(s)
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 function textOf(html) {
   return String(html)
     .replace(/<(style|head)[\s\S]*?<\/\1>/gi, "")
@@ -260,11 +305,12 @@ function textOf(html) {
     .replace(/<\/(p|div|tr|h[1-6]|li)>/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/^[ \t]+/gm, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -308,11 +354,12 @@ async function renderEmail(
     staging,
     today: require("../../shared/time/lagos").today(),
   };
-  const subject = render(t.subject || t.title || "MyCity App", values)
+  // A subject is a header, not HTML: rendered (which escapes), then read back to its plain text,
+  // so "Sales & Revenue" arrives as typed. The layout's <title> escapes it once again for the page.
+  const subject = plainText(render(t.subject || t.title || "MyCity App", values))
     .replace(/\s+/g, " ")
     .trim();
-  const inner = render(t.body, values);
-  const body = t.format === "markdown" ? markdownToHtml(inner) : inner;
+  const body = t.format === "markdown" ? renderMarkdown(t.body, values) : render(t.body, values);
   const html = render(
     templates.layout("email").body,
     { ...values, subject },
@@ -381,14 +428,19 @@ async function attachmentsOf(db, list) {
  */
 async function send(msg) {
   const db = msg.db || defaultPool;
-  const to = addressList(msg.to);
-  if (to.length === 0) throw new Error("system mail: no recipient");
-  const cc = msg.cc ? addressList(msg.cc) : undefined;
+  const listed = addressList(msg.to);
+  if (listed.length === 0) throw new Error("system mail: no recipient");
+  const listedCc = msg.cc ? addressList(msg.cc) : undefined;
   const first = Array.isArray(msg.to) ? msg.to[0] : msg.to;
   const recipient =
     msg.recipient || (typeof first === "object" ? first : { email: first });
   const { transport: t, settings } = await getTransport();
+  // Paused comes first: the caller's fallback (a pushed notice) must run whoever the mail is for.
   if (settings && settings.paused_at && !WHILE_PAUSED.has(msg.template)) throw new MailPausedError();
+  // A real server is never handed an address that can never take mail; captured mail keeps them.
+  const { to, cc, dropped } = settings ? deliverable(listed, listedCc) : { to: listed, cc: listedCc, dropped: [] };
+  if (to.length === 0) return notSent(msg.template, dropped);
+  if (dropped.length) logger.info({ template: msg.template, to: dropped }, "system mail: left off a reserved address that never takes mail");
   const sender = settings ? settings.values : null;
   const recipients = to.length + (cc ? cc.length : 0);
   // A relay that hosts a recipient's domain but not its mail would accept the message and
@@ -513,13 +565,15 @@ async function plainSender() {
  * @returns {Promise<{message_id: string, accepted: string[], rejected: string[]}>}
  */
 async function sendPlain(msg) {
-  const to = addressList(msg.to);
-  if (to.length === 0) throw new Error("system mail: no recipient");
-  const cc = msg.cc && [].concat(msg.cc).length ? addressList(msg.cc) : undefined;
-  const all = [...to, ...(cc || [])].map((a) => (typeof a === "string" ? a : a.address));
+  const listed = addressList(msg.to);
+  if (listed.length === 0) throw new Error("system mail: no recipient");
+  const listedCc = msg.cc && [].concat(msg.cc).length ? addressList(msg.cc) : undefined;
   const s = await plainSender();
   if (!s && config.MAIL_UNSET !== "capture") throw new MailNotSetUpError();
   const sender = s ? s.values : null;
+  const { to, cc, dropped } = sender ? deliverable(listed, listedCc) : { to: listed, cc: listedCc, dropped: [] };
+  if (to.length === 0) return notSent("plain", dropped);
+  const all = [...to, ...(cc || [])].map((a) => (typeof a === "string" ? a : a.address));
   if (sender) {
     await routeCheck.assertRoutable({ smtpHost: sender.host, to: all, localDomains: sender.local_domains });
     const slot = await pace.reserve(all.length, { limit: sender.per_hour || 0 });
@@ -609,6 +663,7 @@ module.exports = {
   verifyWith,
   smtpOptions,
   refusalOf,
+  neverDelivered,
   reportRefused,
   WHILE_PAUSED,
   MailNotSetUpError,

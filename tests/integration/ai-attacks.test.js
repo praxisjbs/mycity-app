@@ -57,7 +57,8 @@ function week(weeksAhead) {
 }
 
 /** Every prompt the model was sent, as one text, so a planted phrase can be looked for. */
-const everything = (sent) => sent.map((r) => (r.messages || []).map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content))).join("\n")).join("\n");
+const everything = (sent, { system = true } = {}) =>
+  sent.map((r) => (r.messages || []).filter((m) => system || m.role !== "system").map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content))).join("\n")).join("\n");
 
 describeDb("the attack suite against the real migrations, the model scripted", () => {
   let app;
@@ -141,7 +142,10 @@ describeDb("the attack suite against the real migrations, the model scripted", (
     // Neither read was offered as a tool, and each call came back as not available.
     expect(sent[0].tools.map((t) => t.function.name)).not.toEqual(expect.arrayContaining(["employees__list", "attendance__pay_items"]));
     expect(asked.body.reads.map((r) => [r.key, r.outcome, r.rows])).toEqual([["employees.list", "refused", 0], ["attendance.pay_items", "refused", 0]]);
-    expect(everything(sent)).not.toMatch(/salary|account_number|08031234567/);
+    // No record's words reach the model; the system turn may name a card's own fields (New Request's
+    // account_number is the person's to type), never a colleague's value.
+    expect(everything(sent, { system: false })).not.toMatch(/salary|account_number|08031234567/);
+    expect(everything(sent)).not.toMatch(/08031234567/);
     expect(asked.body.declined).toBe("not_available");
     expect(await refusedReads()).toBe(before + 2);
   });

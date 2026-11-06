@@ -1,0 +1,14 @@
+---
+subject: "We have your application for {{ vacancy_title }}"
+title: Application Received
+format: markdown
+---
+{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}
+
+Thank you for applying for {{ vacancy_title }} at MyCity App. Your application is in.
+
+Your reference is **{{ reference }}**.{{#if org.email}} Please quote it if you write to us at {{ org.email }}.{{/if}}
+
+Our team reads every application. If you move on to the next step, we will email you with what comes next.
+
+You do not need to reply to this email.

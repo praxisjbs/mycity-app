@@ -243,12 +243,12 @@ start and still land on 18 December.
 | 1 | Core Operations & Employee Management | 12% | 9–19 Oct | Mon 19 Oct | **TB** · LA · AJ · GE |
 | 2 | Productivity & Performance | 9% | 20–23 Oct | Fri 23 Oct | **AJ** · TB |
 | 3 | Queries & Consequence Management | 5% | 26–30 Oct | Fri 30 Oct | **GE** |
-| 4 | Recruitment End to End | 13% | 2–13 Nov | Fri 13 Nov | **TB** · LA · AJ |
-| 5 | Offers, Documentation & Onboarding | 11% | 16–20 Nov | Fri 20 Nov | **LA** · GE |
-| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **LA** · AJ |
-| 7 | Partnerships, CRM & Trackers | 10% | 30 Nov–4 Dec | Fri 4 Dec | **GE** · LA |
+| 4 | Recruitment End to End | 13% | 2–13 Nov | Fri 13 Nov | **GE** |
+| 5 | Offers, Documentation & Onboarding | 11% | 16–20 Nov | Fri 20 Nov | **AJ** · GE |
+| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **TB** · AJ |
+| 7 | Partnerships, CRM & Trackers | 10% | 30 Nov–4 Dec | Fri 4 Dec | **LA** · GE |
 | 8 | Expenses & Budget Control | 8% | 7–11 Dec | Fri 11 Dec | **AJ** |
-| 9 | Settings & Governance | 7% | 7–11 Dec ∥ | Fri 11 Dec | **GE** |
+| 9 | Settings & Governance | 7% | 7–11 Dec ∥ | Fri 11 Dec | **TB** |
 | 10 | Staff Knowledge Hub & AI Assistance | 10% | 14–18 Dec | Fri 18 Dec | **TB** · GE |
 | 11 | Handover & Training | 4% | 14–18 Dec ∥ | Fri 18 Dec | **TB** · all |
 
@@ -765,7 +765,7 @@ An approved financial consequence reaches the payroll run as a pending deduction
 
 ## 9 · M4 — Recruitment End to End · 13%
 
-**Owner TB** with **LA** (assessment platform) and **AJ**. **2–13 Nov, two weeks.** **Demo Fri 13 Nov.**
+**Owner GE** (full ownership from 04/11/2026; first planned as TB with LA and AJ). **2–13 Nov, two weeks.** **Demo Fri 13 Nov.**
 Largest milestone, and the part with no donor is the part the client cares most about.
 
 ```
@@ -804,7 +804,7 @@ rater**, so one rating per question exists in total. Four precise changes:
 4. Recompute the applicant rating as the average across raters
 
 Then the consolidated report for the hiring manager, and private internal notes that stay private
-permanently. **The blindness Cynthia asked for three times is that one `WHERE` clause.**
+permanently. **The blindness Operations & People asked for three times is that one `WHERE` clause.**
 
 **Weighted scorecard** (A10, from C): Screening 15 + Psychometric 15 + Technical 25 + Case Study 20
 + Interview 25, weights configurable per vacancy, component scores feeding one ranking.
@@ -832,11 +832,50 @@ until the round closes**; the hiring manager then sees all three and produces a 
 The weighted scorecard ranks candidates. Interview notes are cleaned with AI. SLA shows time at
 stage.
 
+**Decided 04/11/2026 (GE, who owns M4 from that day; `docs/guides/recruitment.md` §6 and §14).**
+Seven points settle what the text above leaves open:
+
+- **A listed vacancy is reached by its slug, `/jobs/<slug>`, not a token.** The careers page lists
+  open roles anyway, so the slug carries no secret; it is made once at first publish and never
+  changes, so PAUSED still keeps the same public link. Apply and the assessment stay token-only
+  (`shared/tokens`), and the application stays write-only.
+- **M4's stages end at Shortlist**: application, screening, assessment, interview, shortlist (the
+  seed's codes). Offer and everything after it is M5's.
+- **Candidates are emailed** from five templates Operations & People can edit; the interview invite
+  carries an `.ics`. Panelists get the ordinary staff calendar invite.
+- **AI jobs:** the CV read is Deep Reasoning (`ai-control.md` §6.2); the JD draft, screening and
+  assessment questions and interview-note cleanup are Default. The AI reads a CV only when a person
+  presses Score With AI or Screen With AI; the free estimate is made at once and shown Provisional.
+- **Panelists are people who hold Recruitment.** Blindness covers the hiring manager too until the
+  round closes.
+- **No approval before a vacancy goes live.**
+- **Assessment questions** are choice (auto-scored, each option worth points, which covers
+  psychometric scales), written and file (a spreadsheet for a case study), the last two marked by hand.
+
+**Decided at the internal Modules Review, 04/11/2026 (TB, GE, AJ), with MyCity's documents shared the
+same evening** (`docs/guides/recruitment.md` §6.1 to §6.9):
+
+- **The Talent Pool is M4's** (decided by TB, owned by GE), not M5's; M5 is Offers and Onboarding (AJ).
+- **The interview card is MyCity's Interview Assessment Format**: ten traits, each rated 1 to 10 by
+  every panelist on their own device, and Others; Candidate Details (current employer, academics,
+  experience in months) filled once; the decision Select, On Hold or Reject. The round's score is the
+  panel's mean times 10, and the filled form is generated as a PDF. Panelists may open the CV. The
+  traits are MyCity's list, entered once on each environment (A26).
+- **Screen With AI** runs per role in the background after asking one to three must-meet
+  conditions, reading CV, cover letter and answers against the job description.
+- **Each vacancy switches scorecard parts on or off**; a role may go from screening straight to
+  interview.
+- **Assessments**: Send to Candidates in bulk; untimed take-home briefs due by a day beside timed
+  tests; a file answer up to 25 MB (the system's limit) or a link to a larger one. Assessments JBS
+  Praxis researches go on staging only and reach production by export and import, never a seed.
+- **A vacancy follows MyCity's job description shape** (working days, About MyCityApp, KPIs), and New
+  Vacancy is also a Praxis AI card.
+
 ---
 
 ## 10 · M5 — Offers, Documentation & Onboarding · 11%
 
-**Owner LA** with **GE**. **16–20 Nov. Demo Fri 20 Nov.**
+**Owner AJ** with **GE** (from 05/11/2026; first planned as LA). **16–20 Nov. Demo Fri 20 Nov.**
 
 ```
 Offer → Acceptance → Documentation → Pre-Onboarding → Onboarding
@@ -885,7 +924,7 @@ completes.
 
 ## 11 · M6 — Payroll & Notifications · 11%
 
-**Owner LA** with **AJ**. **23–27 Nov. Demo Fri 27 Nov.**
+**Owner TB** with **AJ** (from 05/11/2026; first planned as LA). **23–27 Nov. Demo Fri 27 Nov.**
 
 ### Jurisdiction decides the donor
 
@@ -961,7 +1000,7 @@ in each opens the same screen.
 
 ## 12 · M7 — Partnerships, CRM & Trackers · 10%
 
-**Owner GE** with **LA** (Excel import). **30 Nov–4 Dec. Demo Fri 4 Dec.**
+**Owner LA** with **GE** (from 05/11/2026; first planned as GE, with LA on the Excel import). **30 Nov–4 Dec. Demo Fri 4 Dec.**
 
 ### Partnership 360
 
@@ -1092,7 +1131,7 @@ partnership raises a follow-up.
 
 **Amended 04/11/2026 (AJ, from the Modules Review of 04/11/2026; TB handed every M8 decision to
 AJ).** Where the text below disagrees, this wins. The design is `docs/guides/expenses.md`, the
-build plan and its sixteen decisions `docs/handoff/m8-expenses.md`.
+build plan and its seventeen decisions `docs/handoff/m8-expenses.md`.
 
 - **No approval threshold.** Every request goes line manager → Operations & People → requisition
   → CEO whatever its amount; the per-category threshold and the per-line flag and tick inside a
@@ -1106,9 +1145,11 @@ build plan and its sixteen decisions `docs/handoff/m8-expenses.md`.
   record), Vendor, Partner or Dedicated Task Team (DTT), the bank details typed for the last three. Each
   request is paid to its own payee.
 - **Budgets are department budgets for a calendar year**, by category, set and changed by
-  Operations & People with every change logged; a request over its department's remaining budget
-  is flagged before approval. Projects (Workspace's) carry an optional budget, on a new
-  **Expenses · Projects** tab.
+  Operations & People with every change logged; a request over what its department has left for
+  its category this year is flagged Over Budget before approval, with the department's whole
+  remaining shown beside it (one rule, AJ 05/11/2026, audit F1). Projects (Workspace's) carry an optional budget, on a new
+  **Expenses · Projects** tab, where a project's requests are also raised (New Request with the
+  project filled; handoff decision 17, 05/11/2026).
 - **My Requests is an ESS tab.** The Expenses tabs are Requisitions, Approvals, Disbursements,
   Projects, Budgets, Categories. Records open in the shared Modal on desktop too (F31 amended).
 - **Categories are entered by MyCity (A26)**: an Add Suggested Categories button offers twelve
@@ -1198,15 +1239,15 @@ remove a request (it returns to the Operations & People queue with its history) 
 rejects the requisition as a whole. An approved request sits visibly in "authorised, not yet
 disbursed" until it is paid, with its bank transaction reference or flagged Reference Missing.
 Complete history per request. Each department's budget for the year, and each project's, shows
-allocated, committed, spent and remaining; a request exceeding its department's remaining budget is
-flagged before approval, not after. (Amended 04/11/2026, AJ; the definition it replaces asked for a
+allocated, committed, spent and remaining; a request exceeding what its department has left for its
+category is flagged before approval, not after, with the department's whole remaining beside it. (Amended 04/11/2026, AJ; the definition it replaces asked for a
 per-category threshold and a mandatory reference.)
 
 ---
 
 ## 14 · M9 — Settings & Governance · 7%
 
-**Owner GE. 7–11 Dec, parallel with M8. Demo Fri 11 Dec.**
+**Owner TB** (who built it; first planned as GE). **7–11 Dec, parallel with M8. Demo Fri 11 Dec.**
 
 Built in M0, surfaced in M9. The permissions and audit foundation is laid at M1 by design, so this
 milestone is a console over mechanisms already load-bearing — which is what makes it safe to run
@@ -1483,8 +1524,8 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | Public | **Public site** | 7 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026) |
 
-Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews in M4 and
-Offers, Onboarding and Talent Pool in M5. The **public site** gets Careers, Vacancy, Apply and
+Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
+(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Careers, Vacancy, Apply and
 Assessment in M4, Sign Offer and Verify Document in M5, and Proposal in M7. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
 M0 by TB on 19/10/2026).

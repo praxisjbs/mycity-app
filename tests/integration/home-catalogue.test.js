@@ -232,7 +232,8 @@ describeDb("the KPI catalogue against the real migrations", () => {
     beforeAll(async () => {
       const userOf = (key) => users[key].user_id;
       const { leave_type_id: annual } = await one("SELECT leave_type_id FROM leave_type WHERE code = 'annual'");
-      const { expense_category_id: travel } = await one("SELECT expense_category_id FROM expense_category WHERE code = 'travel'");
+      // No category is seeded (A26, 8101): the test adds the one its requests name.
+      const { expense_category_id: travel } = await one("INSERT INTO expense_category (code, name) VALUES ('travel', 'Travel') ON CONFLICT (code) DO UPDATE SET active = true RETURNING expense_category_id");
 
       // The register: Ifeanyi left ten days ago, Zainab's confirmation is due in ten.
       await person("leaver", "Ifeanyi", "Obi", "mgr");

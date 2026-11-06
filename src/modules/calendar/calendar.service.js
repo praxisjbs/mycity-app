@@ -79,7 +79,8 @@ function toEvent(row, employeeId) {
     link: row.entity_type ? linkFor(row.entity_type, row.entity_id) : null,
     cancelled_at: iso(row.cancelled_at),
     reminder_minutes: row.reminder_minutes || [],
-    can_edit: row.owner_employee_id === employeeId && !row.cancelled_at,
+    // An entry another module's record keeps (an interview) changes only there (EVENT_OWNED_BY_RECORD).
+    can_edit: row.owner_employee_id === employeeId && !row.cancelled_at && !row.entity_type,
     created_at: iso(row.created_at),
   };
 }
@@ -222,9 +223,14 @@ const payloadOf = (row, attendeeIds) => ({
   when: whenOf(row.starts_at, row.all_day),
 });
 
-async function create(actor, body) {
+/**
+ * Make an event inside the caller's transaction: the calendar's one write path, for this screen and
+ * for a module whose record has a calendar entry (an interview, docs/guides/recruitment.md §3 step 8).
+ * `entity` ties the entry to that record, which its link then opens.
+ */
+async function createIn(client, actor, body, { entity = null } = {}) {
   if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee has a calendar", 403);
-  return tx(async (client) => {
+  {
     const attendees = await checkAttendees(client, body.attendee_ids || [], actor.employee_id);
     const id = await repo.insert(client, {
       title: body.title,
@@ -236,6 +242,8 @@ async function create(actor, body) {
       all_day: body.all_day,
       location: body.location || null,
       visibility: body.visibility,
+      entity_type: entity ? entity.type : undefined,
+      entity_id: entity ? entity.id : undefined,
       created_by: actor.user_id,
     });
     await repo.setAttendees(client, id, attendees);
@@ -249,24 +257,36 @@ async function create(actor, body) {
       payload: payloadOf(row, attendees),
     });
     return toEvent(row, actor.employee_id);
-  });
+  }
 }
 
-/** The owner's event, locked, or 404 / 403. */
-async function owned(client, id, employeeId) {
+const create = (actor, body) => tx((client) => createIn(client, actor, body));
+
+/**
+ * The owner's event, locked, or 404 / 403. `asOwner` is for a module that keeps the entry of its own
+ * record (an interview): the module has decided who may change it, so it acts for the owner.
+ */
+async function owned(client, id, employeeId, { asOwner = false } = {}) {
   const row = await repo.lock(client, id);
   if (!row) throw notFound();
-  const visible = await repo.getFor(client, id, employeeId);
+  const reader = asOwner ? row.owner_employee_id : employeeId;
+  const visible = await repo.getFor(client, id, reader);
   if (!visible) throw notFound();
-  if (row.owner_employee_id !== employeeId)
+  if (row.owner_employee_id !== reader)
     throw new AppError("FORBIDDEN", "Only the person who made this event can change it", 403);
   if (row.cancelled_at) throw new AppError("EVENT_CANCELLED", "This event was called off", 409);
+  // An entry kept by another module's record (an interview) changes only from that record, so the
+  // record, its people and its emails never disagree with the calendar.
+  if (!asOwner && row.entity_type)
+    throw new AppError("EVENT_OWNED_BY_RECORD", "Change this on the record it belongs to", 409);
   return visible;
 }
 
-async function edit(actor, id, body) {
-  return tx(async (client) => {
-    const before = await owned(client, id, actor.employee_id);
+/** Change an event inside the caller's transaction (see owned for `asOwner`). */
+async function editIn(client, actor, id, body, { asOwner = false } = {}) {
+  {
+    const before = await owned(client, id, actor ? actor.employee_id : null, { asOwner });
+    const ownerId = before.owner_employee_id || (actor && actor.employee_id);
     const starts = body.starts_at || iso(before.starts_at);
     const ends = body.ends_at || iso(before.ends_at);
     if (new Date(ends) <= new Date(starts)) {
@@ -278,7 +298,7 @@ async function edit(actor, id, body) {
     await repo.update(client, id, changes);
     const was = await repo.attendeeIds(client, id);
     if (body.attendee_ids)
-      await repo.setAttendees(client, id, await checkAttendees(client, body.attendee_ids, actor.employee_id));
+      await repo.setAttendees(client, id, await checkAttendees(client, body.attendee_ids, ownerId));
     const now = await repo.attendeeIds(client, id);
     const added = now.filter((x) => !was.includes(x));
     const removed = was.filter((x) => !now.includes(x));
@@ -291,13 +311,13 @@ async function edit(actor, id, body) {
       const lead = body.reminder_minutes || (await withReminders(client, before)).reminder_minutes;
       await scheduleReminders(client, id, starts, lead);
     }
-    const after = await withReminders(client, await repo.getFor(client, id, actor.employee_id));
+    const after = await withReminders(client, await repo.getFor(client, id, ownerId));
     await emit(client, {
       key: EVENTS.CALENDAR_EVENT_CHANGED,
       entity: { type: "calendar_event", id },
       actor,
-      before: toEvent(before, actor.employee_id),
-      after: toEvent(after, actor.employee_id),
+      before: toEvent(before, ownerId),
+      after: toEvent(after, ownerId),
       payload: { ...payloadOf(after, now.filter((x) => !added.includes(x))), noticed },
     });
     // Someone newly invited hears an invitation; someone taken off hears that.
@@ -305,17 +325,26 @@ async function edit(actor, id, body) {
       await emit(client, { key: EVENTS.CALENDAR_EVENT_INVITED, entity: { type: "calendar_event", id }, actor, payload: payloadOf(after, added) });
     if (removed.length)
       await emit(client, { key: EVENTS.CALENDAR_EVENT_UNINVITED, entity: { type: "calendar_event", id }, actor, payload: payloadOf(after, removed) });
-    return toEvent(after, actor.employee_id);
-  });
+    return toEvent(after, ownerId);
+  }
 }
 
-async function cancel(actor, id) {
-  return tx(async (client) => {
-    const before = await owned(client, id, actor.employee_id);
+const edit = (actor, id, body) => tx((client) => editIn(client, actor, id, body));
+
+/** Call an event off inside the caller's transaction (see owned for `asOwner`). */
+async function cancelIn(client, actor, id, { asOwner = false } = {}) {
+  // Called off already: for the module that keeps the entry, there is nothing more to do.
+  if (asOwner) {
+    const current = await repo.lock(client, id);
+    if (!current || current.cancelled_at) return null;
+  }
+  {
+    const before = await owned(client, id, actor ? actor.employee_id : null, { asOwner });
+    const ownerId = before.owner_employee_id || (actor && actor.employee_id);
     await repo.update(client, id, { cancelled_at: new Date() });
     await repo.nextSequence(client, id);
     await reminders.cancel(client, { key: REMINDER_KEY, entity: entityOf(id) });
-    const after = await repo.getFor(client, id, actor.employee_id);
+    const after = await repo.getFor(client, id, ownerId);
     await emit(client, {
       key: EVENTS.CALENDAR_EVENT_CANCELLED,
       entity: { type: "calendar_event", id },
@@ -324,9 +353,11 @@ async function cancel(actor, id) {
       after: { cancelled_at: iso(after.cancelled_at) },
       payload: payloadOf(before, await repo.attendeeIds(client, id)),
     });
-    return toEvent(after, actor.employee_id);
-  });
+    return toEvent(after, ownerId);
+  }
 }
+
+const cancel = (actor, id) => tx((client) => cancelIn(client, actor, id));
 
 async function respond(actor, id, { response }) {
   return tx(async (client) => {
@@ -369,4 +400,4 @@ async function assertCardEvent(db, id, employeeId) {
   if (row.cancelled_at) throw new AppError("EVENT_CANCELLED", "This event was called off", 409, { calendar_event_id: ["Called off"] });
 }
 
-module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, edit, cancel, respond, reminderCheck, cardRecords, assertCardEvent, eventChoices, eventIdOf };
+module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, createIn, edit, editIn, cancel, cancelIn, respond, reminderCheck, cardRecords, assertCardEvent, eventChoices, eventIdOf };

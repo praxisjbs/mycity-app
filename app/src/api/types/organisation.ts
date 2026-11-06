@@ -14,7 +14,7 @@ export type {
   EmployeeUpdate,
   EmployeesSummary,
   EmployeeStatus,
-  EmploymentType,
+  OrganisationEmploymentType as EmploymentType,
   Gender,
   LoginState,
   ManagerRef,

@@ -10,6 +10,7 @@ const EVENTS = defineEvents("workspace", {
   "project.edited": { summary: "A project was changed" },
   "project.completed": { summary: "A project was completed" },
   "project.reopened": { summary: "A completed project was reopened" },
+  "project.budget_set": { summary: "A project's budget was set or taken away (Expenses · Projects)" },
 });
 
 module.exports = { EVENTS };

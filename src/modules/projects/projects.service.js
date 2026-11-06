@@ -8,6 +8,8 @@
  *   edit()             its owner, or a reader whose grant is `all`: words, due day, and
  *                      `status` (completed completes it, active reopens it)
  *   assertOpen()       what the tasks service asks before a task joins a project
+ *   setBudget()        Expenses · Projects' Set Budget (docs/guides/expenses.md §6.6 rule 6): the
+ *                      project's optional budget, by an `expenses.finance` holder, whoever owns it
  *   cardRecords(), assertCardProject()   the project a Praxis AI card changes, named, and the
  *                      card's re-check: its owner, or a grant that reaches everyone
  *                      (docs/guides/praxis-ai.md §6.11)
@@ -124,6 +126,31 @@ async function edit(actor, scope, id, body) {
   });
 }
 
+/**
+ * Set Budget on Expenses · Projects: a project's optional budget, or none (null). The route has
+ * checked `expenses.finance`, so it is not held to the project's owner as edit() is.
+ * @param {object} actor
+ * @param {string} id
+ * @param {string|null} amount  two places, or null to take it away
+ */
+async function setBudget(actor, id, amount) {
+  return tx(async (client) => {
+    const locked = await repo.lock(client, id);
+    if (!locked) throw notFound();
+    const before = locked.budget_amount ?? null;
+    if (before === amount) return;
+    await repo.update(client, id, { budget_amount: amount });
+    await emit(client, {
+      key: EVENTS.PROJECT_BUDGET_SET,
+      entity: { type: "project", id },
+      actor,
+      before: { budget_amount: before },
+      after: { budget_amount: amount },
+      payload: { project_id: id, number: locked.number, name: locked.name, budget_amount: amount },
+    });
+  });
+}
+
 /** The project a card changes, by number and name; one that does not exist keeps its id alone, and the check refuses it. */
 async function cardRecords(db, id, scope) {
   if (!c.common.uuid.safeParse(id).success) return [];
@@ -145,4 +172,4 @@ async function assertOpen(db, id) {
   if (status !== "active") throw invalid("project_id", "Project is closed");
 }
 
-module.exports = { list, getFor, create, edit, assertOpen, toProject, cardRecords, assertCardProject };
+module.exports = { list, getFor, create, edit, setBudget, assertOpen, toProject, cardRecords, assertCardProject };

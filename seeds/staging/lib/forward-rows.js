@@ -108,36 +108,7 @@ const AGREEMENTS = [
   { partner: "access-bank", title: "Access Bank cardholder offers", status: "active", value: "1100000.00", started: 230, owner: "head" },
 ];
 
-/** Expense requests waiting for approval (M8), submitted days ago. */
-const EXPENSES = [
-  { key: "printer-toner", purpose: "Printer toner", category: "office", amount: "52000.00", by: "operations", ago: 1 },
-  { key: "lagos-activation-transport", purpose: "Lagos activation transport", category: "travel", amount: "185000.00", by: "head", ago: 0 },
-  { key: "social-media-course", purpose: "Social media course", category: "training", amount: "120000.00", by: "head_team:1", ago: 2 },
-  { key: "listing-team-data", purpose: "Data bundles, listing team", category: "utilities", amount: "45000.00", by: "manager_team:1", ago: 3 },
-  { key: "enugu-launch-transport", purpose: "Enugu city launch, transport", category: "travel", amount: "345000.00", by: "management:1", ago: 1 },
-];
-
-/** This quarter's budgets, approved, and their lines: Operations 90% spent, Marketing well under. */
-const BUDGETS = [
-  {
-    key: "operations-quarter",
-    name: "Operations",
-    owner: "operations",
-    lines: [
-      { category: "office", amount: "1500000.00", spent: "1380000.00" },
-      { category: "utilities", amount: "500000.00", spent: "420000.00" },
-    ],
-  },
-  {
-    key: "marketing-quarter",
-    name: "Marketing",
-    owner: "head",
-    lines: [
-      { category: "travel", amount: "3000000.00", spent: "1450000.00" },
-      { category: "training", amount: "600000.00", spent: "120000.00" },
-    ],
-  },
-];
+/* Expense requests and budgets are M8's own staging seed now (80_expenses.js). */
 
 /* Tasks and the calendar are M2's own staging seed now (40_workspace.js). */
 
@@ -145,12 +116,7 @@ const BUDGETS = [
 
 /* Review rounds and reviews are Performance's own staging seed now (46_performance_reviews.js). */
 
-/**
- * Vacancies (M4) for the organogram's open seats, the first two by title. A vacancy's number
- * and slug follow its place in that list, never the seat's title, so a seat filled between runs
- * moves a title from one vacancy to the next and never a slug.
- */
-const OPEN_SEATS = 2;
+/* Vacancies are Recruitment's own staging seed now (55_recruitment.js). */
 
 /* ------------------------------------------------------------------ *
  * The rows, in the order they are written (parents first)
@@ -163,85 +129,9 @@ const stg = (prefix, n) => `${prefix}-STG-${String(n).padStart(2, "0")}`;
  * names the people a row hangs off, and one missing leaves it out; `parents` the rows that
  * must have been written first; `values` its columns, from the run's context `x` and the
  * people it needs, or null to leave it out (a row that records who made it needs that
- * person's login, an expense or a budget line its category, a vacancy its open seat).
+ * person's login, an expense or a budget line its category).
  */
 const ROWS = Object.freeze([
-  ...Array.from({ length: OPEN_SEATS }, (_, i) => ({
-    table: "vacancy",
-    key: `open-seat-${i + 1}`,
-    needs: ["operations"],
-    values: (x, [ops]) => {
-      const seat = x.seats[i];
-      if (!seat || !ops.user_id) return null;
-      return {
-        number: stg("VAC", i + 1),
-        department_id: seat.department_id,
-        hiring_manager_id: ops.employee_id,
-        title: seat.title,
-        slug: `stg-open-seat-${i + 1}`,
-        description: `${seat.title}, an open seat on the organogram.`,
-        positions: 1,
-        status: "open",
-        opens_at: x.at(x.daysFrom(-20), "09:00"),
-        closes_at: x.at(x.daysFrom(20), "17:00"),
-        created_by: ops.user_id,
-      };
-    },
-  })),
-  ...BUDGETS.flatMap((b, i) => [
-    {
-      table: "budget",
-      key: b.key,
-      needs: [b.owner, "ceo"],
-      values: (x, [owner, ceo]) => ({
-        number: stg("BUD", i + 1),
-        name: `${b.name} ${x.quarterName}`,
-        department_id: owner.department_id,
-        owner_id: owner.employee_id,
-        currency: "NGN",
-        starts_on: x.quarter.from,
-        ends_on: x.quarter.to,
-        status: "approved",
-        approved_by: ceo.user_id,
-        approved_at: x.at(x.quarter.from, "09:00"),
-      }),
-    },
-    ...b.lines.map((line) => ({
-      table: "budget_line",
-      key: `${b.key}:${line.category}`,
-      needs: [],
-      parents: [["budget", b.key]],
-      values: (x) =>
-        x.categories.has(line.category)
-          ? {
-              budget_id: idOf("budget", b.key),
-              expense_category_id: x.categories.get(line.category),
-              amount: line.amount,
-              spent_amount: line.spent,
-            }
-          : null,
-    })),
-  ]),
-  ...EXPENSES.map((e, i) => ({
-    table: "expense_request",
-    key: e.key,
-    needs: [e.by],
-    values: (x, [person]) =>
-      x.categories.has(e.category)
-        ? {
-            number: stg("EXR", i + 1),
-            employee_id: person.employee_id,
-            department_id: person.department_id,
-            expense_category_id: x.categories.get(e.category),
-            purpose: e.purpose,
-            amount: e.amount,
-            currency: "NGN",
-            status: "submitted",
-            needed_on: x.daysFrom(7 + i),
-            submitted_at: x.at(x.daysFrom(-e.ago), "10:00"),
-          }
-        : null,
-  })),
   ...PARTNERS.map((p, i) => ({
     table: "partner",
     key: p.key,
@@ -341,12 +231,11 @@ for (const row of ROWS)
 
 /**
  * What the rows are counted from: the run's day in Lagos, this week, quarter and year, the
- * expense categories by code and the organogram's open seats. Pure, so a test builds one.
+ * and the expense categories by code. Pure, so a test builds one.
  * @param {{now: Date, cal: import("../../../src/shared/time/working-week").Calendar,
- *          categories: Array<{code: string, expense_category_id: string}>,
- *          seats: Array<{title: string, department_id: string|null}>}} input
+ *          categories: Array<{code: string, expense_category_id: string}>}} input
  */
-function contextFrom({ now, cal, categories, seats }) {
+function contextFrom({ now, cal, categories }) {
   const today = lagos.today(now);
   const { year, month } = lagos.yearMonth(today);
   const quarter = quarterOf(today);
@@ -368,19 +257,15 @@ function contextFrom({ now, cal, categories, seats }) {
     inYear: (date) => (date < `${year}-01-01` ? `${year}-01-01` : date),
     inQuarter: (date) => (date > quarter.to ? quarter.to : date),
     categories: new Map(categories.map((c) => [c.code, c.expense_category_id])),
-    seats,
   };
 }
 
-/** contextFrom() with the working week, the categories and the open seats read from the database. */
+/** contextFrom() with the working week and the categories read from the database. */
 async function contextOf(db, now) {
   const { rows: categories } = await db.query(
     "SELECT code::text AS code, expense_category_id FROM expense_category WHERE active",
   );
-  const { rows: seats } = await db.query(
-    "SELECT title, department_id FROM org_seat WHERE status = 'vacant' ORDER BY title, org_seat_id",
-  );
-  return contextFrom({ now, cal: await workingWeek.loadCalendar(db), categories, seats });
+  return contextFrom({ now, cal: await workingWeek.loadCalendar(db), categories });
 }
 
 /** Insert a row by its id, or bring the one already there to these values. */

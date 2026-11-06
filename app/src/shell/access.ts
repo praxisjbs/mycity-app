@@ -50,7 +50,7 @@ export function visibleTabs(me: Me, mod: ModuleDef): TabDef[] {
     /* Announcements is the posting and read-tracking side, for those who post (`announcements.post`, as every route asks); staff read them in #announcements. */
     if (mod.key === "community" && t.slug === "announcements") return hasCapability(me, "announcements.post");
     if (mod.key === "queries" && !FULL(me)) return t.slug === "queries";
-    if (mod.key === "expenses" && !FULL(me)) return ["my-requests", "approvals", "budgets"].includes(t.slug) && (t.slug !== "approvals" || me.manages_people);
+    if (mod.key === "expenses" && !FULL(me)) return ["approvals", "budgets"].includes(t.slug) && (t.slug !== "approvals" || me.manages_people);
     if (mod.key === "performance" && !FULL(me) && !me.manages_people) return t.slug !== "analytics";
     return true;
   });

@@ -856,6 +856,11 @@ describeDb("Home · Reports against the real migrations", () => {
         const run = await runRow(ceoRuns[key].home_report_run_id);
         expect([key, run.status, run.error]).toEqual([key, "done", null]);
         const file = await sheetRows(run.document_id);
+        // Monthly Expenses is read whole into three tables of its own (budgets.variance).
+        if (SOURCES[key].snapshot) {
+          expect([key, file.sheets.slice(-3)]).toEqual([key, ["By Department", "By Project", "By Category"]]);
+          continue;
+        }
         expect([key, file.sheets[1], file.rows[0]]).toEqual([key, SOURCES[key].label, SOURCES[key].columns.map((col) => col.header)]);
       }
       const headcount = await sheetRows((await runRow(ceoRuns.headcount.home_report_run_id)).document_id);

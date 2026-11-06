@@ -172,6 +172,7 @@ const DOC_TYPES = [
   "sanction",
   "letter",
   "vacancy",
+  "application",
   "offer",
   "contract",
   "payroll_run",

@@ -49,6 +49,13 @@ const ALLOW = Object.freeze({
   signature: [TYPES.png],
   brand: [TYPES.png, TYPES.webp],
   performance_evidence: [TYPES.pdf, ...IMAGES, TYPES.docx, TYPES.xlsx, TYPES.pptx, TYPES.csv],
+  // A CV sent on the Apply form by a stranger: PDF or Word only (docs/guides/recruitment.md §6.2).
+  cv: [TYPES.pdf, TYPES.docx],
+  // A candidate's file answer to an assessment: a spreadsheet, a document, an image or a short video
+  // (docs/guides/recruitment.md §6.7); anything larger is given as a link.
+  assessment_answer: [TYPES.pdf, ...IMAGES, TYPES.docx, TYPES.xlsx, TYPES.pptx, TYPES.csv, ...VIDEO],
+  // An assessment exported from another hub, read back by Import (docs/guides/recruitment.md §6.7).
+  assessment_import: [TYPES.json],
 });
 
 const NEVER = new Set(["markup", "archive", "unknown"]);

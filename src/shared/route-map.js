@@ -48,6 +48,7 @@ const SCREENS = Object.freeze({
     "my-performance",
     "my-payslips",
     "my-leave",
+    "my-requests",
     "my-queries",
     "my-documents",
     "work-location-requests",
@@ -87,10 +88,10 @@ const SCREENS = Object.freeze({
     "analytics",
   ],
   expenses: [
-    "my-requests",
-    "approvals",
     "requisitions",
+    "approvals",
     "disbursements",
+    "projects",
     "budgets",
     "categories",
   ],
@@ -341,17 +342,21 @@ const ENTITY_ROUTES = Object.freeze({
   letter_template: screen("queries", "letter-templates"), // search:none a handful of letters, listed whole on Letter Templates, which ⌘K finds by name
 
   // Recruitment
-  vacancy: screen("recruitment", "vacancies"), // search:none not built yet (src/modules/vacancies)
-  candidate: screen("recruitment", "candidates"), // search:none not built yet (src/modules/candidates)
-  assessment: screen("recruitment", "assessments"), // search:none not built yet (src/modules/assessments)
-  interview: screen("recruitment", "interviews"), // search:none not built yet (src/modules/interviews)
+  vacancy: screen("recruitment", "vacancies"),
+  candidate: screen("recruitment", "candidates"),
+  // A CV and the files of an application belong to Recruitment (the vault's moduleFor); the board opens it as a candidate.
+  application: screen("recruitment", "candidates"), // search:none found as a candidate (src/modules/candidates/candidates.search.js)
+  assessment: screen("recruitment", "assessments"),
+  // A sitting and its file answers belong to Recruitment (the vault's moduleFor); it opens on Assessments · Sittings.
+  application_assessment: { ...screen("recruitment", "assessments"), param: "sitting" }, // search:none a sitting is found through its candidate (src/modules/candidates/candidates.search.js)
+  interview: screen("recruitment", "interviews"),
   offer: screen("recruitment", "offers"), // search:none not built yet (src/modules/offers)
   // search:none not built yet (src/modules/onboarding)
   onboarding: {
     ...screen("recruitment", "onboarding"),
     self: screen("ess", "my-documents"),
   },
-  talent_pool_entry: screen("recruitment", "talent-pool"), // search:none not built yet (src/modules/talent_pool)
+  talent_pool_entry: screen("recruitment", "talent-pool"),
 
   // Payroll
   payroll_run: screen("payroll", "payroll-runs"), // search:none not built yet (src/modules/payroll)
@@ -375,15 +380,15 @@ const ENTITY_ROUTES = Object.freeze({
   agreement: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
 
   // Expenses
-  // search:none not built yet (src/modules/expenses)
+  // A request opens on Approvals for whoever decides it, on My Requests for its requester.
   expense: {
     ...screen("expenses", "approvals"),
-    self: screen("expenses", "my-requests"),
+    self: screen("ess", "my-requests"),
   },
-  requisition: screen("expenses", "requisitions"), // search:none not built yet (src/modules/requisitions)
-  disbursement: screen("expenses", "disbursements"), // search:none not built yet (src/modules/disbursements)
-  budget: screen("expenses", "budgets"), // search:none not built yet (src/modules/budgets)
-  expense_category: screen("expenses", "categories"), // search:none not built yet (src/modules/expense_categories)
+  requisition: screen("expenses", "requisitions"),
+  disbursement: screen("expenses", "disbursements"),
+  budget: screen("expenses", "budgets"),
+  expense_category: screen("expenses", "categories"),
 
   // Knowledge Hub
   // A section or task of the User Guide, by its slug: the guide opens at it (user_guide.search.js).
