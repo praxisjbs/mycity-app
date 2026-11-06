@@ -562,8 +562,7 @@ function BudgetForm({ close, year, budget }: { close: () => void; year?: string;
   };
   // An amount as typed ("20,000,000") is read and sent as the contract's two-place string.
   const onWire = (ls: BudgetLineValue[]) => ls.map((l) => ({ ...l, amount: toMoneyString(l.amount) }));
-  const schema = budget ? budgets.BudgetUpdate : budgets.BudgetCreate;
-  const f = useContractForm(start, { safeParse: (v: Record<string, unknown>) => schema.safeParse({ ...v, lines: onWire(v.lines as BudgetLineValue[]) }) });
+  const f = useContractForm(start, { safeParse: (v: Record<string, unknown>) => (budget ? budgets.BudgetUpdate : budgets.BudgetCreate).safeParse({ ...v, lines: onWire(v.lines as BudgetLineValue[]) }) });
   const create = useMutation("POST /api/v1/budgets");
   const edit = useMutation("PATCH /api/v1/budgets/:id");
   const lines = f.values.lines as BudgetLineValue[];
