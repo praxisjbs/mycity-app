@@ -435,11 +435,12 @@ async function send(msg) {
   const recipient =
     msg.recipient || (typeof first === "object" ? first : { email: first });
   const { transport: t, settings } = await getTransport();
+  // Paused comes first: the caller's fallback (a pushed notice) must run whoever the mail is for.
+  if (settings && settings.paused_at && !WHILE_PAUSED.has(msg.template)) throw new MailPausedError();
   // A real server is never handed an address that can never take mail; captured mail keeps them.
   const { to, cc, dropped } = settings ? deliverable(listed, listedCc) : { to: listed, cc: listedCc, dropped: [] };
   if (to.length === 0) return notSent(msg.template, dropped);
   if (dropped.length) logger.info({ template: msg.template, to: dropped }, "system mail: left off a reserved address that never takes mail");
-  if (settings && settings.paused_at && !WHILE_PAUSED.has(msg.template)) throw new MailPausedError();
   const sender = settings ? settings.values : null;
   const recipients = to.length + (cc ? cc.length : 0);
   // A relay that hosts a recipient's domain but not its mail would accept the message and

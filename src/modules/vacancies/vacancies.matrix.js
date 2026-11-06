@@ -16,14 +16,19 @@ const lagos = require("../../shared/time/lagos");
 
 const ALL = { scope: "all", scope_ids: null };
 
+const employeeOf = (who) => who.employee_id || (who.user && who.user.employee_id);
+
 /** A remote vacancy (no place to pick) managed by `hiringManagerId`, made and published by `actor`. */
 async function vacancyFor(actor, hiringManagerId, title) {
   const service = require("./vacancies.service");
   const { rows } = await pool.query("SELECT department_id FROM department ORDER BY created_at, department_id LIMIT 1");
-  return service.create(actor, ALL, {
+  // A hiring manager must hold `recruitment` (guide §6.1), and the matrix's outsider holds nothing: the
+  // role is made under the asker, who reads Recruitment, then handed to whoever the probe names.
+  const own = employeeOf(actor);
+  const v = await service.create(actor, ALL, {
     title,
     department_id: rows[0].department_id,
-    hiring_manager_id: hiringManagerId,
+    hiring_manager_id: own || hiringManagerId,
     positions: 1,
     employment_type: "full_time",
     work_pattern: "remote",
@@ -32,6 +37,9 @@ async function vacancyFor(actor, hiringManagerId, title) {
     closes_on: lagos.addDays(lagos.today(), 30),
     publish: true,
   });
+  if (hiringManagerId && hiringManagerId !== v.hiring_manager?.employee_id)
+    await pool.query("UPDATE vacancy SET hiring_manager_id = $2 WHERE vacancy_id = $1", [v.vacancy_id, hiringManagerId]);
+  return { ...v, hiring_manager_id: hiringManagerId };
 }
 
 /** An application to `vacancy` from an invented candidate, through the candidates repo. */
@@ -99,7 +107,6 @@ async function sittingFor(vacancy, ctx) {
   return { sitting: sent, application: a };
 }
 
-const employeeOf = (who) => who.employee_id || (who.user && who.user.employee_id);
 
 /** { inside, outside } for a Recruitment read. */
 function probeFor(make) {

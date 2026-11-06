@@ -283,7 +283,7 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
         )}
         {v.nice_to_have_blocks && (
           <>
-            <CardHeader title="What We Look For" level={4} className="mt-3" />
+            <CardHeader title="Nice to Have" level={4} className="mt-3" />
             <RichText blocks={v.nice_to_have_blocks} top={4} />
           </>
         )}
