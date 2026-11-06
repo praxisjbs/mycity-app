@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from "react";
 import type { GalleryEntry } from "../testing/gallery";
 import { Button } from "../actions/Button";
-import { StepBar } from "../form/StepBar";
 import { SiteSearch } from "../form/SiteSearch";
 import { Form } from "../form/Form";
 import { TextField } from "../form/TextField";
 import { PageIntro } from "../layout/PageIntro";
-import { Brand } from "./Brand";
+import { Panel } from "../layout/Panel";
+import { VerifyCard } from "../display/VerifyCard";
 import { SkylineHero } from "./SkylineHero";
 import { PageMessage, PublicPage, type PublicNavItem } from "./PublicPage";
 
@@ -17,21 +17,20 @@ const nav = (current: string): PublicNavItem[] =>
     { label: "Verify Document", href: "#/PublicPage?verify" },
   ].map((n) => ({ ...n, current: n.label === current }));
 
-/** The right column's card, as a split page puts its work on one. */
+/** The right column's card, as a split page puts its work on one: a Panel. */
 const card = (title: string, body: ReactNode, action?: string) => (
-  <div className="rounded-sheet border border-border bg-card p-8 shadow-canvas phone:p-5">
-    <h2 data-ui="title" className="text-3xl font-strong">
-      {title}
-    </h2>
-    {body}
-    {action && (
-      <div className="mt-6 flex justify-end">
+  <Panel
+    title={title}
+    foot={
+      action ? (
         <Button variant="solid" size="lg">
           {action}
         </Button>
-      </div>
-    )}
-  </div>
+      ) : undefined
+    }
+  >
+    {body}
+  </Panel>
 );
 
 const LETTER = [
@@ -126,41 +125,12 @@ export default {
         paragraph="Enter the reference printed on the document, for example OFF-0018, or scan the QR code on any of its pages."
         aside={<ReferenceForm />}
       >
-        <div className="rounded-sheet border border-border bg-card shadow-canvas">
-          <PageMessage icon="shield" title="Enter a Reference">
-            The document's record shows here.
-          </PageMessage>
-        </div>
-      </PublicPage>
-    ),
-    "Page With Pane": () => (
-      <PublicPage
-        landmarks={false}
-        brand={
-          <a href="#/PublicPage" aria-label="MyCityApp careers">
-            <Brand name="MyCityApp" />
-          </a>
-        }
-        pane={
-          <SkylineHero
-            size="pane"
-            record
-            eyebrow="Your Application"
-            title="Partnerships Associate"
-            text="This link is yours until 12/11/2026, 18:00."
-            wide={<StepBar steps={["About You", "CV and Questions", "Why This Role"]} at={0} vertical decorative />}
-            still
-          />
-        }
-      >
-        <h2 data-ui="title" className="text-xl font-strong">
-          Contact Details
-        </h2>
+        <VerifyCard empty={{ title: "Enter a Reference", text: "The document's record shows here." }} />
       </PublicPage>
     ),
     "Message Sent": () => (
-      <PageMessage icon="ok" tone="ok" title="Application Sent" action={<Button>See Other Roles</Button>}>
-        We read every application.
+      <PageMessage icon="ok" tone="ok" title="Application Sent" reference={{ label: "Your Reference", value: "APP-0042" }} action={<Button variant="primary" size="lg">See Other Roles</Button>}>
+        We emailed a copy to ngozi.okafor@example.com.
       </PageMessage>
     ),
     "Message Expired": () => (

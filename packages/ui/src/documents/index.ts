@@ -16,6 +16,7 @@ export * from "./EmailFrame";
 export * from "./FileCard";
 export * from "./GuideBody";
 export * from "./GuideResults";
+export * from "./IssuedLetter";
 export * from "./MediaViewer";
 export * from "./PdfViewer";
 export * from "./RichText";

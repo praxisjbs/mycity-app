@@ -116,6 +116,12 @@ import {
   X,
   ZoomIn,
   ZoomOut,
+  ArrowRight,
+  ShieldCheck,
+  Store,
+  TrendingUp,
+  Upload,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 
@@ -234,6 +240,13 @@ export const ICONS = {
   /* The public site: its footer's Back to Top, a role hero's All Roles. */
   arrowup: ArrowUp,
   arrowleft: ArrowLeft,
+  /* The public site's pages: a role row's arrow, What We Build's tiles, a KPI, the calls to action, a drop zone. */
+  arrowright: ArrowRight,
+  shieldok: ShieldCheck,
+  store: Store,
+  trend: TrendingUp,
+  upload: Upload,
+  userplus: UserPlus,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

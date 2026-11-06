@@ -3,7 +3,6 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { Button } from "../actions/Button";
-import { Brand } from "./Brand";
 import { PageMessage, PublicPage, PUBLIC_FOOTER_COLUMNS } from "./PublicPage";
 
 afterEach(() => {
@@ -158,39 +157,28 @@ describe("PublicPage", () => {
     expect(within(screen.getByRole("navigation", { name: "Site" })).getAllByRole("link")).toHaveLength(1);
   });
 
-  it("keeps the earlier layouts: the page on its card, open up to 1120 px, and a pane beside the card in sticky columns", () => {
-    const { container, rerender } = render(<PublicPage><p>Apply</p></PublicPage>);
-    expect(container.firstElementChild).toHaveAttribute("data-layout", "card");
-    expect(screen.getByText("Apply").parentElement?.className).toContain("rounded-card");
-    expect(screen.getByRole("main").className).toContain("max-w-176");
-    rerender(<PublicPage layout="open"><p>Careers</p></PublicPage>);
-    expect(screen.getByText("Careers", { selector: "p" }).parentElement?.className).not.toContain("rounded-card");
-    expect(screen.getByRole("main").className).toContain("max-w-280");
-    rerender(
-      <PublicPage pane={<section aria-label="Pane"><h1>Partnerships Associate</h1></section>}>
-        <h2>About You</h2>
-      </PublicPage>,
-    );
-    const cols = screen.getByRole("main").querySelector("[data-sticky-columns]")!;
-    expect(cols.children[0]).toHaveTextContent("Partnerships Associate");
-    expect(cols.children[1]).toHaveTextContent("About You");
-  });
-
-  it("lays the page on the tinted ground, and draws a mark of the page's own when given one", () => {
+  it("lays the page on the tinted ground, full by default", () => {
     const { container } = render(
-      <PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>}>
+      <PublicPage>
         <p>Page</p>
       </PublicPage>,
     );
     expect(container.firstElementChild).toHaveAttribute("data-canvas");
+    expect(container.firstElementChild).toHaveAttribute("data-layout", "full");
     expect(container.firstElementChild!.className).toContain("public-ground");
-    expect(within(screen.getByRole("banner")).getByRole("link")).toHaveAttribute("href", "/jobs");
+    expect(within(screen.getByRole("banner")).getByRole("link", { name: "MyCityApp Home" })).toHaveAttribute("href", "/");
   });
 
-  it("keeps room at a phone's foot for its bar", () => {
-    render(<PublicPage bar={<div>Apply Now</div>}><p>Role</p></PublicPage>);
+  it("frames a phone's bar at the foot and keeps room for it", () => {
+    render(
+      <PublicPage bar={<p>12 people have applied.</p>}>
+        <p>Role</p>
+      </PublicPage>,
+    );
     expect(screen.getByRole("contentinfo")).toHaveClass("ps-foot-clear");
-    expect(screen.getByRole("main")).toContainElement(screen.getByText("Apply Now"));
+    const bar = screen.getByText("12 people have applied.").parentElement!;
+    expect(bar).toHaveClass("ps-bar");
+    expect(screen.getByRole("main")).toContainElement(bar);
   });
 
   it("switches the theme from its button", async () => {
@@ -209,8 +197,21 @@ describe("PageMessage", () => {
       </PageMessage>,
     );
     expect(screen.getByRole("heading", { level: 2, name: "Application Sent" })).toBeInTheDocument();
+    expect(screen.queryByText("Your Reference")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "See Other Roles" }));
     expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it("shows the reference to quote in its box, the tick landing in its tone", () => {
+    const { container } = render(
+      <PageMessage icon="ok" tone="ok" title="Application Sent" reference={{ label: "Your Reference", value: "APP-0042" }}>
+        We emailed a copy to you.
+      </PageMessage>,
+    );
+    expect(screen.getByText("APP-0042")).toHaveAttribute("data-copy", "content");
+    expect(screen.getByText("Your Reference").parentElement).toHaveClass("ps-ref");
+    expect(container.querySelector(".ps-outcome-ic")).toHaveAttribute("data-tone", "ok");
+    expect(container.querySelector(".ps-outcome-ic")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("has no accessibility violations", async () => {

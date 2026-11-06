@@ -2,14 +2,15 @@
  * @component SignatureField
  * @group Forms
  * @summary A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into.
- * @use Signing an offer, an acknowledgement, a policy, an asset handover (MILESTONES §10: signed on a canvas from a phone).
+ * @use Signing an offer, an acknowledgement, a policy, an asset handover (MILESTONES §10: signed on a canvas from a phone). `look="pad"` is the public site's Sign Offer: a dashed box on the site's tint with a signing line, its cross and the `hint`, and Clear inside the box once drawn.
  * @avoid A typed name as a signature; keeping the image anywhere but the document it belongs to; a pad nobody can clear.
- * @phone This is where it is used most: the pad is full width and drawn with a finger, and Clear is a 44 px target.
+ * @phone This is where it is used most: the pad is full width and drawn with a finger, and Clear is a 44 px target. `look="pad"`: the box keeps its 200 px height, with Clear inside it at the top right once something is drawn.
  * @a11y The pad is named, and Clear says whether anything has been drawn, so the state is never only visual; a typed-name fallback stays the screen's choice.
  * @status stable
  * @example <SignatureField label="Your Signature" onChange={setInk} ref={pad} initial={saved} />
+ * @example <SignatureField look="pad" hint="Draw your signature here" label="Signature box. Draw your signature with a finger or a mouse." onChange={setInk} ref={pad} />
  */
-import { forwardRef, useEffect, useImperativeHandle, useRef, type PointerEvent } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type PointerEvent } from "react";
 import { cn } from "../lib/cn";
 import { Button } from "../actions/Button";
 
@@ -35,6 +36,12 @@ export interface SignatureFieldProps {
    * opens, so they need not draw again. Clear Signature wipes it; drawing adds to it.
    */
   initial?: string | null;
+  /** `pad`: the public site's box, its line, cross and hint, with Clear inside once drawn. */
+  look?: "default" | "pad";
+  /** pad: the words in the empty box (Draw your signature here); they fade as the first stroke lands. */
+  hint?: string;
+  /** pad: marks the box when signing was pressed with nothing drawn. */
+  state?: "bad";
   /** Layout classes only (spacing, height). */
   className?: string;
 }
@@ -47,12 +54,37 @@ const STROKE = 2.2;
  * repaints the canvas's CSS background but never its pixels, so paper drawn there stays white
  * under the dark ink; the PNG carries it, white on the white page it is stamped into.
  */
-function paper(pad: HTMLCanvasElement, ink: CanvasRenderingContext2D) {
+function paper(pad: HTMLCanvasElement, ink: CanvasRenderingContext2D, clear = false) {
   ink.save();
   ink.setTransform(1, 0, 0, 1, 0, 0);
-  ink.fillStyle = getComputedStyle(pad).backgroundColor;
-  ink.fillRect(0, 0, pad.width, pad.height);
+  if (clear) ink.clearRect(0, 0, pad.width, pad.height);
+  else {
+    ink.fillStyle = getComputedStyle(pad).backgroundColor;
+    ink.fillRect(0, 0, pad.width, pad.height);
+  }
   ink.restore();
+}
+
+/**
+ * The pad look draws the ink in the theme's own colour on a clear bitmap, so a dark screen shows it.
+ * The document still takes dark ink on white paper: the strokes are laid in the paper's heading ink
+ * over the paper, whatever colour they were drawn in.
+ */
+function onPaper(src: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement("canvas");
+  out.width = src.width;
+  out.height = src.height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return src;
+  const root = getComputedStyle(document.documentElement);
+  ctx.drawImage(src, 0, 0);
+  ctx.globalCompositeOperation = "source-in";
+  ctx.fillStyle = root.getPropertyValue("--paper-heading").trim() || "black";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.fillStyle = root.getPropertyValue("--paper").trim() || "white";
+  ctx.fillRect(0, 0, out.width, out.height);
+  return out;
 }
 
 /**
@@ -92,8 +124,12 @@ function cropped(pad: HTMLCanvasElement): string {
   return out.toDataURL("image/png");
 }
 
-export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldProps>(function SignatureField({ label, onChange, disabled, noClear, initial, className }, ref) {
+export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldProps>(function SignatureField({ label, onChange, disabled, noClear, initial, look = "default", hint, state, className }, ref) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const isPad = look === "pad";
+  const padLook = useRef(isPad);
+  padLook.current = isPad;
+  const [hasInk, setHasInk] = useState(false);
   const drawing = useRef(false);
   const inked = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -123,7 +159,7 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
       pad.height = height;
       const ink = pad.getContext("2d");
       if (!ink) return;
-      paper(pad, ink);
+      paper(pad, ink, padLook.current);
       if (keep) ink.drawImage(keep, 0, 0, keep.width, keep.height, 0, 0, width, height);
       ink.setTransform(ratio, 0, 0, ratio, 0, 0);
       ink.lineCap = "round";
@@ -153,6 +189,7 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
       const h = image.height * scale;
       ink.drawImage(image, (box.width - w) / 2, (box.height - h) / 2, w, h);
       inked.current = true;
+      setHasInk(true);
       onChange(true);
     };
     image.src = initial;
@@ -182,6 +219,7 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
     last.current = now;
     if (!inked.current) {
       inked.current = true;
+      setHasInk(true);
       onChange(true);
     }
   };
@@ -195,15 +233,38 @@ export const SignatureField = forwardRef<SignatureFieldHandle, SignatureFieldPro
     const pad = canvas.current;
     const ink = pad?.getContext("2d");
     if (!pad || !ink) return;
-    paper(pad, ink);
+    paper(pad, ink, padLook.current);
     inked.current = false;
+    setHasInk(false);
     onChange(false);
   };
 
   useImperativeHandle(ref, () => ({
     clear: wipe,
-    toPng: () => (inked.current && canvas.current ? cropped(canvas.current) : null),
+    toPng: () => (inked.current && canvas.current ? cropped(padLook.current ? onPaper(canvas.current) : canvas.current) : null),
   }));
+
+  const events = { onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerLeave: up, onPointerCancel: up };
+  if (isPad)
+    return (
+      <div className={cn("ps-pad", className)} data-inked={hasInk || undefined} data-state={state} data-pull="off">
+        <canvas ref={canvas} role="img" aria-label={label} className={disabled ? "cursor-default opacity-60" : undefined} {...events} />
+        <span aria-hidden="true" className="ps-pad-line" />
+        <span aria-hidden="true" className="ps-pad-x">
+          ×
+        </span>
+        {hint && (
+          <span aria-hidden="true" className="ps-pad-hint">
+            {hint}
+          </span>
+        )}
+        {hasInk && !disabled && (
+          <button type="button" className="ps-pad-clear" onClick={wipe}>
+            Clear
+          </button>
+        )}
+      </div>
+    );
 
   return (
     <div className={className}>

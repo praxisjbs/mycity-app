@@ -2,16 +2,16 @@
  * @component PublicPage
  * @group Shell
  * @summary The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a Deep Green footer under a Lagos skyline edge with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card.
- * @use Every page of go.mycityapp.io. `full` for a page that lays out its own blocks edge to edge (the index's SkylineHero size index, a vacancy's SkylineHero size role, the careers list's PageIntro). `split` for the four pages a person is sent to and works through (Apply, Assessment, Sign Offer, Verify a Document): pass `name` and `line` (the identity band), `title` (the h1, at most 3 words, drawn small and spaced: Apply, Assessment, Offer of Employment, Verify a Document), `text` (the display line in the band's large type, one sentence of at most 20 words), `paragraph` (a short line under it), `steps` or `aside` (the countdown, a reference's form), and the card as children; it leaves the site footer off. card and open are the earlier layouts, kept while the pages move. PageMessage is a whole-page outcome inside the card (sent, expired, not found).
- * @avoid The staff app (it has its own shells); a second header or bar under this one; a logo in the split aside (the header carries the brand); a second card inside the card; a page of explanation (a PageMessage says one thing); a sentence as the split title (it is `text`, the display line).
- * @phone The header is 60 px with the mark alone (no sub line), the theme switch and the menu, which drops the nav's links down as 52 px rows; the footer's columns stack, each link a 44 px target; a `bar` is fixed at the foot and the page keeps room for it. split: from 1040 px down the aside stacks above the card and stops sticking, and its skyline, its steps and its credit are left off, so the card is close to the top.
+ * @use Every page of go.mycityapp.io. `full` (the default) for a page that lays out its own blocks edge to edge (the index's SkylineHero size index, a vacancy's SkylineHero size role, the careers list's PageIntro). `split` for the pages a person is sent to and works through (Apply, Assessment, Sign Offer, Verify a Document, and a page opened without its link): pass `name` and `line` (the identity band), `title` (the h1, at most 3 words, drawn small and spaced: Apply, Assessment, Offer of Employment, Verify a Document), `text` (the display line in the band's large type, one sentence of at most 20 words), `paragraph` (a short line under it), `steps` or `aside` (the countdown, a reference's form), and the card (a Panel) as children; it leaves the site footer off. PageMessage is a whole-page outcome inside the Panel (sent, signed, expired, not found), with the reference to quote.
+ * @avoid The staff app (it has its own shells); a second header or bar under this one; a logo in the split aside (the header carries the brand); a page of explanation (a PageMessage says one thing); a sentence as the split title (it is `text`, the display line).
+ * @phone The header is 60 px with the mark alone (no sub line), the theme switch and the menu, which drops the nav's links down as 52 px rows; the footer's columns stack, each link a 44 px target; a `bar` is drawn fixed at the foot, frosted, only on a phone, and the page keeps room for it. split: from 1040 px down the aside stacks above the card and stops sticking, and its skyline, its steps and its credit are left off, so the card is close to the top.
  * @a11y A banner, a main and a contentinfo landmark; the nav is named Main and the current page carries aria-current; the menu button says whether it is expanded and Esc closes it; the theme switch and Back to Top are named buttons; the footer's columns sit in a nav named Site, each under a heading. split: the aside is a complementary landmark named by its h1 and comes before the card; the steps are a list named Steps with the one in hand marked. The skyline edge and the aside's skyline are decorative, and nothing rises under reduced motion. PageMessage's title is a heading (h2) and its icon is decorative.
  * @status stable
  * @exports PageMessage
  * @example <PublicPage layout="full" navigate={navigate} nav={[{ label: "Careers", href: "/jobs", current: true }, { label: "Verify Document", href: "/verify" }]}>...</PublicPage>
  * @example <PublicPage layout="split" nav={nav} navigate={navigate} name="Head, Sales & Revenue" line="Marketing & Sales, Lekki Phase 1, Lagos" title="Apply" text="Your application, in three steps." paragraph="This link works until 08/11/2026." steps={{ items: ["About You", "CV and Questions", "Why This Role"], at: 0 }}>{card}</PublicPage>
  * @example <PublicPage layout="split" nav={nav} name="Document Check" line="Offer letters, certificates and agreements" title="Verify a Document" text="Check any document we issued." textSize="l" paragraph="Enter the reference printed on the document." aside={referenceForm}>{result}</PublicPage>
- * @example <PageMessage icon="ok" tone="ok" title="Application Sent">We read every application.</PageMessage>
+ * @example <PageMessage icon="ok" tone="ok" title="Application Sent" reference={{ label: "Your Reference", value: "APP-0042" }} action={seeRoles}>We emailed a copy to you.</PageMessage>
  */
 import { useCallback, useEffect, useId, useState, type ReactNode, type Ref } from "react";
 import { cn } from "../lib/cn";
@@ -19,7 +19,6 @@ import { lagosClock, lagosYear, useMinute } from "../lib/lagos";
 import { useTheme } from "../lib/preferences";
 import { Icon, type IconName } from "../icons/Icon";
 import { IconButton } from "../actions/Button";
-import { StickyColumns } from "../layout/StickyColumns";
 import { StickyTop } from "../layout/sticky";
 import { useMediaQuery } from "../lib/media";
 import { StepBar } from "../form/StepBar";
@@ -78,10 +77,8 @@ export interface PublicPageProps {
   home?: string;
   /** The small line under the name in the header's mark (Careers); none unless set. */
   brandSub?: string;
-  /** Deprecated: the header draws the site's mark. A mark passed here replaces it, only so the pages not yet moved still build. */
-  brand?: ReactNode;
-  /** `full`: the page lays out its own blocks edge to edge. `split`: the sign-in layout, the aside beside the card (children). `card` (the default): the page on one card, 704 px. `open`: no card, up to 1120 px. card and open are the earlier layouts. */
-  layout?: "card" | "open" | "full" | "split";
+  /** `full` (the default): the page lays out its own blocks edge to edge. `split`: the sign-in layout, the aside beside the card (children). */
+  layout?: "full" | "split";
   /** split: who or what the page is for, in bold at the top of the aside (the role, the offer, Document Check). No logo: the header carries the brand. */
   name?: ReactNode;
   /** split: one muted line under the name (the team and the place, the offer's reference). */
@@ -100,11 +97,9 @@ export interface PublicPageProps {
   steps?: { items: readonly string[]; at: number; complete?: boolean };
   /** split: what else the main band holds, under the text and the steps: the clock and the question map, a reference's form. */
   aside?: ReactNode;
-  /** Deprecated, the earlier card layout's context pane (a SkylineHero of size pane) beside the card. The pages move to layout split; it is drawn only so they still build meanwhile. */
-  pane?: ReactNode;
   /** Anything under the card (a second action, a note from the system). */
   below?: ReactNode;
-  /** A phone's action bar, fixed at the foot of the screen (a vacancy's Apply); the page keeps room for it. Pass it inside PhoneOnly. */
+  /** A phone's action bar: what it holds (a line and the action, a vacancy's Apply), drawn fixed and frosted at the foot of a phone's screen only; the page keeps room for it. */
   bar?: ReactNode;
   /** false leaves the footer off. Default true, and false in split (the sign-in pages carry no site footer). */
   footer?: boolean;
@@ -112,8 +107,6 @@ export interface PublicPageProps {
   columns?: ReadonlyArray<PublicFooterColumn>;
   /** The line under the footer's mark. */
   tagline?: string;
-  /** Earlier footer links, no longer drawn: the footer draws `columns`. Left in so the pages that pass it still build. */
-  links?: ReactNode;
   /** The company at the foot, after the © and the year; MyCity App Ltd. Lagos, Nigeria. unless set. */
   company?: string;
   /** More at the very foot (the mock's demo links, on a laptop only). */
@@ -122,9 +115,6 @@ export interface PublicPageProps {
   landmarks?: boolean;
 }
 
-const WIDTH = "mx-auto w-full max-w-176";
-const WIDE = "mx-auto w-full max-w-280";
-const CARD = "border border-border bg-card p-6 shadow-2 phone:border-x-0 phone:p-4 desk:p-8";
 /** The header's height on desktop, where columns stick under it (public.css .ps-header-in). */
 const HEADER = 64;
 
@@ -134,8 +124,7 @@ export function PublicPage({
   navigate,
   home = "/",
   brandSub,
-  brand,
-  layout = "card",
+  layout = "full",
   name,
   line,
   title,
@@ -145,7 +134,6 @@ export function PublicPage({
   paragraph,
   steps,
   aside,
-  pane,
   below,
   bar,
   footer = layout !== "split",
@@ -156,34 +144,21 @@ export function PublicPage({
   landmarks = true,
 }: PublicPageProps) {
   const Main = landmarks ? "main" : "div";
-  const full = layout === "full" || layout === "split";
-  const open = layout === "open";
-  const paned = layout === "card" && pane != null;
-  const width = open || paned ? WIDE : WIDTH;
   return (
     <SiteNavigate.Provider value={navigate}>
       <StickyTop.Provider value={HEADER}>
         <div className="public-ground ps-site flex flex-1 flex-col" data-layout={layout} data-canvas="">
-          <Header nav={nav} home={home} brandSub={brandSub} brand={brand} />
-          <Main className={cn("flex-1", !full && cn(width, "px-6 pt-10 pb-16 phone:px-0 phone:pt-4 phone:pb-10"))}>
+          <Header nav={nav} home={home} brandSub={brandSub} />
+          <Main className="flex-1">
             {layout === "split" ? (
               <Split name={name} line={line} title={title ?? ""} titleRef={titleRef} text={text} textSize={textSize} paragraph={paragraph} steps={steps} aside={aside}>
                 {children}
               </Split>
-            ) : full ? (
-              children
-            ) : paned ? (
-              <StickyColumns>
-                {pane}
-                <div className={cn(CARD, "animate-enter rounded-card enter-delay-3 phone:relative phone:-mt-4 phone:rounded-t-sheet phone:rounded-b-none phone:border-b-0")}>{children}</div>
-              </StickyColumns>
-            ) : open ? (
-              children
             ) : (
-              <div className={cn(CARD, "animate-enter rounded-card enter-delay-1 phone:rounded-none")}>{children}</div>
+              children
             )}
             {below}
-            {bar}
+            {bar != null && <div className="ps-bar">{bar}</div>}
           </Main>
           {footer && (
             <Footer columns={columns} tagline={tagline} company={company} home={home} clear={bar != null}>
@@ -259,7 +234,7 @@ function Split({
 }
 
 /** The one header: the mark, the nav on its bottom edge, the theme switch, and the menu where the nav does not fit. */
-function Header({ nav, home, brandSub, brand }: { nav: ReadonlyArray<PublicNavItem>; home: string; brandSub?: string; brand?: ReactNode }) {
+function Header({ nav, home, brandSub }: { nav: ReadonlyArray<PublicNavItem>; home: string; brandSub?: string }) {
   const { theme, toggle } = useTheme();
   const [menu, setMenu] = useState(false);
   const close = useCallback(() => setMenu(false), []);
@@ -279,13 +254,9 @@ function Header({ nav, home, brandSub, brand }: { nav: ReadonlyArray<PublicNavIt
   return (
     <header className="ps-header">
       <div className="public-wrap ps-header-in">
-        {brand != null ? (
-          <span className="mr-auto *:inline-flex *:min-h-tap *:items-center">{brand}</span>
-        ) : (
-          <a className="ps-brand" href={home} onClick={go(home)} aria-label="MyCityApp Home">
-            <Brand name="MyCityApp" sub={brandSub} tile="deep" />
-          </a>
-        )}
+        <a className="ps-brand" href={home} onClick={go(home)} aria-label="MyCityApp Home">
+          <Brand name="MyCityApp" sub={brandSub} tile="deep" />
+        </a>
         {nav.length > 0 && (
           <nav className="ps-nav" aria-label="Main">
             {nav.map((n) => (
@@ -409,33 +380,32 @@ export interface PageMessageProps {
   icon?: IconName;
   /** The circle's tone; neutral unless set. */
   tone?: PageMessageTone;
-  /** What happened, at most 6 words (Application Sent, Offer Expired). */
+  /** What happened, at most 4 words (Application Sent, Offer Signed). */
   title: ReactNode;
   /** One or two short sentences: what the person can do now. */
   children?: ReactNode;
+  /** The reference to quote, in its dashed box under the words (Your Reference, APP-0042). */
+  reference?: { label: string; value: string };
   /** One or two actions, usually Buttons. */
   action?: ReactNode;
 }
 
-const TONE: Record<PageMessageTone, string> = {
-  neutral: "bg-accent text-accent-foreground",
-  ok: "bg-success-soft text-success",
-  warn: "bg-warning-soft text-warning",
-  err: "bg-destructive-soft text-destructive",
-};
-
-/** A whole-page outcome on the public site: a bad link, an expired offer, an application sent. Its mark lands once as it opens. */
-export function PageMessage({ icon = "alert", tone = "neutral", title, children, action }: PageMessageProps) {
+/** A whole-page outcome on the public site: a bad link, an expired offer, an application sent. Its mark lands as it opens. */
+export function PageMessage({ icon = "alert", tone = "neutral", title, children, reference, action }: PageMessageProps) {
   return (
-    <div className="py-6 text-center">
-      <span className={cn("mx-auto flex size-14 animate-pop items-center justify-center rounded-full enter-delay-3", TONE[tone])}>
-        <Icon name={icon} size="l" />
+    <div className="ps-outcome">
+      <span aria-hidden="true" className="ps-outcome-ic" data-tone={tone}>
+        <Icon name={icon} className="size-11" />
       </span>
-      <h2 data-ui="title" className="mt-3 text-xl font-strong">
-        {title}
-      </h2>
-      {children != null && <div className="mx-auto mt-2 max-w-prose text-sm text-muted-foreground">{children}</div>}
-      {action != null && <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>}
+      <h2 data-ui="title">{title}</h2>
+      {children != null && <div className="ps-outcome-text">{children}</div>}
+      {reference != null && (
+        <div className="ps-ref">
+          <span>{reference.label}</span>
+          <b data-copy="content">{reference.value}</b>
+        </div>
+      )}
+      {action != null && <div className="ps-outcome-acts">{action}</div>}
     </div>
   );
 }
