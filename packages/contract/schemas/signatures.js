@@ -62,6 +62,42 @@ const SignSubmit = z
 /** Decline the Offer (or the agreement): the reason the owner reads. */
 const SignDecline = z.object({ reason: text(500) }).strict();
 
+/** Where the person holding the link stands. */
+const SigningState = z.enum(["awaiting", "signed", "declined", "expired", "withdrawn"]);
+
+/** The signing page (go.mycityapp.io/sign/<token>): the document as its PDF reads, and where signing stands. */
+const SigningView = z
+  .object({
+    reference: z.string(),
+    document_type: SignedDocumentType,
+    title: z.string(),
+    company: z.string(),
+    /** The person this link is for. */
+    signer_name: z.string(),
+    /** The day the document is dated, as its letterhead prints it. */
+    issued_at: isoDateTime,
+    expires_at: isoDateTime.nullable(),
+    state: SigningState,
+    /** The document's text, from the one renderer its PDF is made with. */
+    letter: z.array(z.string()),
+    /** The emailed code was entered; Accept and Sign may be pressed. */
+    code_verified: z.boolean(),
+    signers: z.array(z.lazy(() => SignerView)),
+    signed_at: isoDateTime.nullable(),
+    /** The reference to verify once every signer has signed and the copy is sealed. */
+    verify_number: z.string().nullable(),
+  })
+  .strict();
+
+/** Send Code: where it went (masked) and when another may be asked for. */
+const SignCodeSent = z
+  .object({
+    sent_to: z.string(),
+    expires_at: isoDateTime,
+    resend_after: isoDateTime,
+  })
+  .strict();
+
 /** One signer as the signing and verification pages list them. */
 const SignerView = z
   .object({
@@ -112,6 +148,20 @@ const VerifyByToken = VerifyResult.extend({
     .strict(),
 });
 
+/* ------------------------------------------------------------------ *
+ * Mail
+ * ------------------------------------------------------------------ */
+
+/** signature-code: the six-digit code, ten minutes. Queued after the code's row commits; never in the outbox. */
+const SignatureCodeEmailVars = z
+  .object({ code: z.string().regex(/^\d{6}$/), title: z.string(), minutes: z.number().int().min(1) })
+  .strict();
+
+/** signature-completed: every signer signed; the sealed copy is attached. */
+const SignatureCompletedEmailVars = z
+  .object({ title: z.string(), reference: z.string(), verify_url: z.string() })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   SignTokenParams: { table: null, reason: "the signing link's :token" },
@@ -119,6 +169,10 @@ const TABLES = {
   SignSubmit: { table: null, reason: "a signature and its evidence, kept on the signature row" },
   SignDecline: { table: null, reason: "the reason, kept as the request's end_reason" },
   SignerView: { table: null, reason: "a signature row as the public pages list it" },
+  SigningView: { table: null, reason: "the signing page's view of a signature request and the signer's row" },
+  SignCodeSent: { table: null, reason: "when the code was sent and lapses, kept on the signature row" },
+  SignatureCodeEmailVars: { table: null, reason: "the variables of templates/email/signature-code.html" },
+  SignatureCompletedEmailVars: { table: null, reason: "the variables of templates/email/signature-completed.html" },
   VerifyRefParams: { table: null, reason: "a document's reference" },
   VerifyResult: { table: null, reason: "what verification shows: status, signers and the two verdicts" },
   VerifyByToken: { table: null, reason: "verification from the QR: the record and its document" },
@@ -137,6 +191,11 @@ module.exports = {
   SignaturePng,
   SignSubmit,
   SignDecline,
+  SigningState,
+  SigningView,
+  SignCodeSent,
+  SignatureCodeEmailVars,
+  SignatureCompletedEmailVars,
   SignerView,
   VerifyRefParams,
   VerifyResult,

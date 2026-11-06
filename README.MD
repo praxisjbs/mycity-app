@@ -540,8 +540,8 @@ The design is `docs/guides/offers.md`; the build plan and its log `docs/handoff/
 
 | Module | Files beyond the template |
 |---|---|
-| `offers` | `.public.routes` (sign), `.render` (one markdown renderer for web and PDF), `.expiry` |
-| `signatures` | `.public.routes` (verify, two verdicts), `.certificate`, `.signed-pdf`, `.verify` |
+| `offers` | `.render` (one markdown renderer for web and PDF), `.expiry`; `.public.routes` stays empty (signing is `signatures`' page) |
+| `signatures` | built in M5 PR 2, shared with M7: `.service` (`defineSignable`, `requestIn`, `signAsStaffIn`, `endFor`, the signing page's steps), `.code` (the six-digit email code), `.public.routes` (`/sign/:token` and its code, sign, decline and document; `/verify/:ref`, `/verify/t/:token` and its document), `.certificate`, `.signed-pdf` (sealing from the outbox: the sealed copy, its artifact hash, the copies mailed), `.verify` (two verdicts), `.events`, `.repo`; `jobs/schedulers/signature-reminders` ends lapsed requests; mails `signature-code`, `signature-completed` |
 | `onboarding` | `.public.routes` (candidate document upload), `.checklist` (documentation before onboarding), `.plans`, `.sop` |
 | `employment_contracts` | `.lifecycle` |
 
@@ -589,7 +589,7 @@ its routes, repo and events; `agreements.tidy.js` (Tidy With AI, route `POST /te
 | `proposals` | `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views` (PR 7; `.proof` with PR 2); `.questionnaire` and `.pdf` are not built and go with PR 7 |
 | `agreements` | `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`), `.renewals`, `.views` (PR 6; `.tidy` with PR 2) |
 | `partnership_analytics` | `.queries` (per lead owner, A21; PR 8) |
-| `signatures` (shared with M5) | `.service`, `.code` (the email code), `.stamp`, `.certificate`, `.signed-pdf`, `.verify`, `.public.routes` (PR 6 if M5 has not built them) |
+| `signatures` (shared with M5) | built by M5 (§5.8): M7's agreements declare themselves with `defineSignable` and send with `requestIn`; the stamping is each signable's template, given the signatures by `.signed-pdf` |
 | `mailbox/binding/` | `intake.service`, `mail-context.service`, `context-tabs`, `convert.service` (PR 8) |
 
 Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR 4);

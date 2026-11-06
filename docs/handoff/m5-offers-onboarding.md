@@ -143,7 +143,7 @@ earlier: M5's forms use help terms.
 
 - [x] PR 0 · Docs (06/11/2026)
 - [x] PR 1 · Contract and data (06/11/2026; LA and TB to review)
-- [ ] PR 2 · Signatures service
+- [x] PR 2 · Signatures service (06/11/2026; LA to review)
 - [ ] PR 3 · Offers backend
 - [ ] PR 4 · Offers screens
 - [ ] PR 5 · Acceptance to hire
@@ -168,6 +168,13 @@ earlier: M5's forms use help terms.
 
 ## 6 · Log
 
+- 06/11/2026 · AJ · PR 2 built: `src/modules/signatures` (service with `defineSignable`, code,
+  repo, events, certificate, signed-pdf, verify, public routes on `/sign` and `/verify`), the
+  `signature-reminders` scheduler, the `signature-code` and `signature-completed` mails, 5020's code
+  and verification columns. `tests/integration/signatures.test.js` walks it end to end on the real
+  migrations (order, code, sign, seal, both verdicts and their failures, decline, withdraw, lapse).
+  No signable is declared yet: offers (PR 3) and contracts (PR 5) declare theirs. The offer letter's
+  template prints the signatures, certificate and QR the seal step hands it.
 - 06/11/2026 · AJ · PR 1 built: the four contract files (the sign shapes moved from `agreements.js`
   to `signatures.js`, its test following), migrations 5010 to 5090 and seed 5199, DATABASE_SCHEMA.
   Migration gates, contract columns and the UP, DOWN, UP round trip pass on PostgreSQL 16; the

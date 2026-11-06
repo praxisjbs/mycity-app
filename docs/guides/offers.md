@@ -58,8 +58,11 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    company signs here**: the last approver, or the signatory Operations & People name (the
    Operations & People Lead on MyCity's letter), signs for the company when it is approved, with
    the same signing steps; the letter then carries that signature above the candidate's acceptance.
-3. **Send.** Send Offer renders the letter (one Markdown renderer for the page and the PDF), mints a
-   public token (`offer.sign`), opens a `signature_request` and emails `offer-sent`. In the same
+3. **Send.** Send Offer renders the letter (one Markdown renderer for the page and the PDF) and
+   emails `offer-sent` with the candidate's signing link. The offer's signature request
+   (`signatures.requestIn`, the company's signatory first and the candidate second) is opened when
+   the offer is approved, so the signatory signs in the hub then; the candidate's link
+   (`signature.sign`) is made with it and first mailed here. In the same
    transaction it calls `candidates.advanceIn(client, actor, applicationId, "offer")` (GE's), so the
    card moves to the Offer column.
 4. **Sign.** The candidate opens `/sign/<token>`, reads the same text the PDF holds, receives an
@@ -133,11 +136,15 @@ employee record (masked, never sent to an AI model).
 | `POST /api/v1/recruitment/onboarding/:id/items/:itemId/verify`, `/reject`, `/request` | `ChecklistItemAction` | `recruitment` edit | | |
 | `POST /api/v1/recruitment/onboarding/:id/steps/:stepId/done`, `/complete` | | `recruitment` edit | | |
 | `GET/POST /api/v1/recruitment/onboarding/requirements`, plans | | `recruitment` edit | yes, 25 | Checklist and Plans settings |
-| `GET /api/public/v1/sign/:token` | `OfferToSign` | public token `offer.sign` / `contract.sign` | | 404 for any bad token |
-| `POST /api/public/v1/sign/:token/code`, `/sign`, `/decline` | `SignCodeVerify`, `SignSubmit` | public token | | second press of Accept and Sign returns the signed state |
-| `GET /api/public/v1/sign/:token/document` | PDF | public token | | |
-| `GET /api/public/v1/verify/:number` | `VerifyResult` | public | | status, signers, verdicts; no content |
-| `GET /api/public/v1/verify/t/:token` | `VerifyByToken` | public token | | the record and the document |
+| `GET /api/public/v1/sign/:token` | → `SigningView` | public token `signature.sign` (one a signer) | | the first opening is recorded; 404 for any bad or ended link (signatures) |
+| `POST /api/public/v1/sign/:token/code` | `EmptyBody` → `SignCodeSent` | public token | | a six-digit code to the address the link was sent to; 10 minutes; another after 60 seconds (429) |
+| `POST /api/public/v1/sign/:token/code/verify` | `SignCodeVerify` → `SigningView` | public token | | five wrong tries and a new code must be asked for |
+| `POST /api/public/v1/sign/:token/sign` | `SignSubmit` → `SigningView` | public token | | the code entered within 30 minutes; signers in order; a second press returns the signed state |
+| `POST /api/public/v1/sign/:token/decline` | `SignDecline` → `SigningView` | public token | | ends the request for every signer |
+| `GET /api/public/v1/sign/:token/document` | PDF | public token | | the sealed copy once there is one |
+| `GET /api/public/v1/verify/:ref` | → `VerifyResult` | public | | status, signers, the two verdicts; no content; only a sealed copy |
+| `GET /api/public/v1/verify/t/:token` | → `VerifyByToken` | the sealed copy's QR key | | the record and the document |
+| `GET /api/public/v1/verify/t/:token/document` | PDF | the QR key | | the sealed copy |
 | `GET/POST /api/public/v1/onboard/:token` | `UploadPack`, `UploadItem` | public token `onboarding.upload` | | privacy notice first |
 
 ## 6 · Rules and calculations
@@ -162,13 +169,17 @@ employee record (masked, never sent to an AI model).
 |---|---|---|
 | `offer.submitted`, `offer.approved`, `offer.rejected` | the approval flow | notify the next approver / the owner |
 | `offer.sent` | Send Offer commits | email `offer-sent` with the link |
-| `offer.signed` | Accept and Sign commits | seal the PDF, email the sealed copy (`offer-signed`), start onboarding |
+| `offer.signed` | the offer's signature request completes (`signature.completed`) | start onboarding (PR 5) |
+| `signature.requested`, `.viewed`, `.signed`, `.declined`, `.ended` | the signing steps (signatures) | audit; the owning module reacts through its `defineSignable` hooks in the same transaction |
+| `signature.completed` | the last signer signed | outbox: the sealed copy generated with the signatures, the certificate and the QR (`signatures.signed-pdf`) |
+| `document.generated` (a sealed copy) | the worker rendered it | its stored bytes' hash on every signature row (`artifact_hash`); `signature.sealed` |
+| `signature.sealed` | | every signer mailed the sealed copy (`signature-completed`) |
 | `offer.declined`, `offer.expired`, `offer.withdrawn` | | notify the owner; revoke the token |
 | `onboarding.opened` | after `offer.signed` | email `onboarding-documents` with the upload link |
 | `onboarding.item_uploaded`, `.item_verified`, `.item_rejected` | | notify Operations & People / the hire |
 | `onboarding.completed` | Complete Onboarding | invite the hire's login |
 | `offer-expiry` job | daily | lapse unsigned offers past `expires_at` |
-| `signature-reminders` job | daily | remind signers of open requests |
+| `signature-reminders` job | daily, 06:17 Lagos | ends requests past their end; their links stop working |
 | `onboarding-dispatch` job | daily | move cases to `onboarding` on their start date; remind owners of overdue steps |
 
 ## 8 · Permissions and visibility by role
@@ -251,3 +262,4 @@ Open:
 - 06/11/2026 · AJ · First draft from the Modules Review of 04/11/2026, AJ's decisions on #79 (offer approval, the contract's own signature, the employee at acceptance, BVN, department plans, the seat on hire) and GE's answers (`advanceIn`, `hireIn`, the public pages on #82).
 - 06/11/2026 · AJ · The offer emails go in M4's Candidate Emails; New Offer is a chat card.
 - 06/11/2026 · AJ · From MyCity's sample offer letter and New Joiner list: monthly pay lines and the Offer Summary's fields on the offer, the company signing when the offer is approved, the New Joiner checklist, two guarantors with reference checks, BVN a number only (§3, §4, §6). PR 1's migrations named.
+- 06/11/2026 · AJ · PR 2, the signatures service built (§5's signing and verification routes, §7's events and the sealing): `defineSignable` for each signed record type, the company's signatory signing in the hub, the email code, the QR key that outlives a public link.

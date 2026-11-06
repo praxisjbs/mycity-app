@@ -158,32 +158,7 @@ const OfferEdit = OfferFields.partial();
 /** Withdraw an offer that was sent or is with its approval: the reason the candidate's record keeps. */
 const OfferWithdraw = z.object({ reason: text(500) }).strict();
 
-/* ------------------------------------------------------------------ *
- * The candidate's signing page (go.mycityapp.io/sign/<token>)
- * ------------------------------------------------------------------ */
-
-const OfferSignState = z.enum(["awaiting", "signed", "declined", "expired", "withdrawn"]);
-
-/** What the signing page shows: the letter as the PDF has it, and where the signing stands. */
-const OfferToSign = z
-  .object({
-    reference: z.string(),
-    candidate_name: z.string(),
-    role: z.string(),
-    company: z.string(),
-    /** The day the letter is dated, as its letterhead prints it. */
-    issued_at: isoDateTime,
-    expires_at: isoDateTime,
-    state: OfferSignState,
-    letter: z.array(z.string()),
-    /** The emailed code was entered; Accept and Sign may be pressed. */
-    code_verified: z.boolean(),
-    signers: z.array(SignerView),
-    signed_at: isoDateTime.nullable(),
-    /** go.mycityapp.io/verify/<reference>, once signed. */
-    verify_number: z.string().nullable(),
-  })
-  .strict();
+/* The candidate's signing page is the signatures service's (schemas/signatures.js SigningView). */
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const ROW = {
@@ -220,14 +195,12 @@ const TABLES = {
   OfferCreate: { table: "offer", virtual: FIELDS },
   OfferEdit: { table: "offer", virtual: FIELDS },
   OfferWithdraw: { table: null, reason: "the reason, kept as end_reason" },
-  OfferToSign: { table: null, reason: "the signing page's view of an offer and its signature request" },
 };
 
 module.exports = {
   TABLES,
   OFFER_VALID_DAYS,
   OfferStatus,
-  OfferSignState,
   OfferPayLine,
   OfferPayLineInput,
   OfferRow,
@@ -238,5 +211,4 @@ module.exports = {
   OfferCreate,
   OfferEdit,
   OfferWithdraw,
-  OfferToSign,
 };

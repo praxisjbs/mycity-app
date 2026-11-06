@@ -454,8 +454,9 @@ is twelve times their sum), `workflow_instance_id`, `signature_request_id`, the 
 snapshots, `sent_at`, `withdrawn_at`, `end_reason`, the status CHECK, one open offer per
 application (a declined, expired or withdrawn one leaves room for the next), FK indexes · `5020`
 both hashes on every signature row (A12: `content_hash`, `artifact_hash`), the signer's title,
-method, signature image, code and view times, the request's sealed copy, status CHECKs; a signed row
-must carry its time, method and content hash · `5030` requirement `kind` (file, number, both) and
+role, order, method, signature image, view time and email code (its hash, lapse, tries, when sent),
+the request's reference, title, document type, sealed copy and QR verification key (its hash),
+status CHECKs; a signed row must carry its time, method and content hash · `5030` requirement `kind` (file, number, both) and
 order, the case's phases (`documentation`, `pre_onboarding`, `onboarding`, `completed`,
 `cancelled`) and privacy acknowledgement, each item's typed value and verification,
 `onboarding_guarantor` (two a hire, each with its reference check), the contract's statuses, FK
