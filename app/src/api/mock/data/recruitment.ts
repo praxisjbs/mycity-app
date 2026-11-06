@@ -69,10 +69,13 @@ export const defaultScorecard = (): ScorecardWeight[] => [
 ];
 
 const ASSESSED = ["psychometric", "technical", "case_study"];
-/** The board's columns from the parts switched on (the API's vacancies.lifecycle boardStages). */
+/** The board's columns from the parts switched on, then Offer (the API's vacancies.lifecycle boardColumns). */
 export const boardStages = (scorecard: ScorecardWeight[]): VacancyDetail["board_stages"] => {
   const on = new Set(scorecard.filter((p) => p.active).map((p) => p.code));
-  return M4_STAGES.filter((stage) => (stage === "assessment" ? ASSESSED.some((c) => on.has(c as ScorecardWeight["code"])) : stage === "interview" ? on.has("interview") : true));
+  return [
+    ...M4_STAGES.filter((stage) => (stage === "assessment" ? ASSESSED.some((c) => on.has(c as ScorecardWeight["code"])) : stage === "interview" ? on.has("interview") : true)),
+    "offer",
+  ];
 };
 export const M4_STAGES = ["application", "screening", "assessment", "interview", "shortlist"] as const;
 
@@ -914,6 +917,9 @@ export const EMAILS: Array<Omit<CandidateEmail, "can_edit">> = [
   ["assessment-invite", "Assessment Invitation", "Your assessment for {{ vacancy_title }}", "Hello {{ recipient.first_name }},\n\nThe next step for {{ vacancy_title }} is {{ assessment_name }}. Start it by {{ start_by }}.\n\n[Open the Assessment]({{ assess_url }})", ["vacancy_title", "assessment_name", "duration_minutes", "due_days", "start_by", "assess_url"]],
   ["interview-invite", "Interview Invitation", "Your interview for {{ vacancy_title }}", "Hello {{ recipient.first_name }},\n\nWe would like to meet you for {{ vacancy_title }} on {{ scheduled_start }}. The calendar invitation is attached.", ["vacancy_title", "in_person", "by_video", "by_phone", "scheduled_start", "scheduled_end", "place", "place_address", "meeting_url", "rescheduled", "cancelled"]],
   ["candidate-not-progressed", "Not Progressing", "Your application for {{ vacancy_title }}", "Hello {{ recipient.first_name }},\n\nThank you for your time with us. We will not take your application for {{ vacancy_title }} further.\n\nOur other roles are on [our careers page]({{ careers_url }}).", ["vacancy_title", "careers_url"]],
+  ["offer-sent", "Offer Sent", "Your offer for {{ vacancy_title }}", "Dear {{ recipient.first_name }},\n\nWe are delighted to offer you the role of {{ vacancy_title }} at MyCity App.\n\nYour offer letter, reference **{{ reference }}**, is ready for you to read and sign.\n\n[Read and Sign Your Offer]({{ sign_url }})\n\nThe link works until {{ datetime expires_at }}, Lagos time.", ["vacancy_title", "reference", "sign_url", "expires_at"]],
+  ["offer-signed", "Offer Signed", "Welcome to MyCity App: your signed offer", "Dear {{ recipient.first_name }},\n\nThank you for signing your offer for {{ vacancy_title }}. Welcome to MyCity App.\n\nYour signed offer letter is reference **{{ reference }}**.\n\n[Verify Your Offer]({{ verify_url }})", ["vacancy_title", "reference", "verify_url", "start_on"]],
+  ["onboarding-documents", "Onboarding Documents", "Your documents for {{ vacancy_title }}", "Dear {{ recipient.first_name }},\n\nBefore you start as {{ vacancy_title }}, we need a few documents from you.\n\n[Send Your Documents]({{ documents_url }})", ["vacancy_title", "documents_url", "due_on"]],
 ].map(([key, name, subject, body, vars]) => ({
   key: key as CandidateEmail["key"],
   name: name as string,

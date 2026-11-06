@@ -547,3 +547,11 @@ packages that need none can start. Tick a package only when its own checks pass 
   (`VacancyInterview.tsx`; AI action `vacancy-follow-ups`, Default, personal data, chosen by GE; `jd-draft` takes
   the interview, prompt v5, a plain draft when the AI is off). For AJ: `Field` with `help` around a `TextField`
   fails axe ("visible label"); New Vacancy's Job Title carries no help term until it is fixed in packages/ui.
+- 06/11/2026 · GE · The hand-over to M5, as agreed with AJ on #79 (branch `m4/hire-handoff`): `MACHINE` takes
+  Offer to Hired one step at a time; `candidates.advanceIn` moves forward past Shortlist one stage at a time,
+  `offerEndedIn` takes an unsigned offer back to Shortlist, `hireIn` (from Onboarding only) marks the
+  application hired and calls `vacancies.hiredIn`, which fills the seat (`organisation.fillSeat`, new) and closes
+  the vacancy as filled once its openings are. The board's Offer column (`board_stages` ends at offer; shown once
+  Offers opens); Not Progress All and `in_progress` skip Offer and after; Candidate Emails gains `offer-sent`,
+  `offer-signed` and `onboarding-documents` (wording and `*EmailVars`). For AJ: call these from `offers.service`
+  and `onboarding.service`; widen the three `*EmailVars` in the contract if a mail needs more.

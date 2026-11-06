@@ -35,6 +35,24 @@ describe("the pipeline", () => {
     expect(() => pipeline.assertCanMove(at("screening", "not_progressed"), "interview", ALL)).toThrow("Reopen");
     expect(() => pipeline.assertCanMove(at("screening"), "interview", ALL)).not.toThrow();
   });
+
+  test("Offer and after are M5's: never a hand move, one step at a time through M5's own steps", () => {
+    const at = (stage, status = "active") => ({ stage, status });
+    const board = [...ALL, "offer"];
+    expect(pipeline.nextStages("interview", board)).toEqual(["assessment", "shortlist"]);
+    expect(pipeline.nextStages("offer", board)).toEqual([]);
+    expect(() => pipeline.assertCanMove(at("shortlist"), "offer", board)).toThrow("An offer moves a candidate to Offer");
+    expect(() => pipeline.assertCanMove(at("offer"), "shortlist", board)).toThrow("moved on to an offer");
+    const { moves } = pipeline.MACHINE;
+    expect(moves.shortlist).toContain("offer");
+    expect(moves.interview).not.toContain("offer");
+    expect(moves.offer).toEqual(["documentation", "shortlist", "not_progressed"]);
+    expect(moves.documentation).toEqual(["pre_onboarding", "not_progressed"]);
+    expect(moves.pre_onboarding).toEqual(["onboarding", "not_progressed"]);
+    expect(moves.onboarding).toEqual(["hired", "not_progressed"]);
+    expect(moves.hired).toEqual([]);
+    expect(moves.not_progressed).not.toContain("hired");
+  });
 });
 
 describe("the estimate", () => {
@@ -110,7 +128,7 @@ describe("Candidate Emails", () => {
     expect(emails.markdownOf('<p style="x">Hello {{ recipient.first_name }},</p><p><a href="{{ apply_url }}" style="y">Apply Now</a></p>')).toBe(
       "Hello {{ recipient.first_name }},\n\n[Apply Now]({{ apply_url }})",
     );
-    expect(emails.KEYS).toHaveLength(5);
+    expect(emails.KEYS).toHaveLength(8);
   });
 });
 

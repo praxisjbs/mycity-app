@@ -45,6 +45,7 @@ const EVENTS = defineEvents("people", {
   "employee.photo_updated": { summary: "An employee's photo was set or removed" },
   "org_seat.created": { summary: "A vacant seat was added to the structure" },
   "org_seat.updated": { summary: "A vacant seat was changed" },
+  "org_seat.filled": { summary: "A vacant seat was filled by a new hire" },
   "org_chart.export_requested": { summary: "An organogram PDF was requested" },
 });
 
@@ -87,6 +88,7 @@ outbox.register(EVENTS.EMPLOYEE_CREATED, "organisation.refresh_team_scope", bump
 outbox.register(EVENTS.EMPLOYEE_ARCHIVED, "organisation.refresh_team_scope", bumpTeams);
 outbox.register(EVENTS.EMPLOYEE_RESTORED, "organisation.refresh_team_scope", bumpTeams);
 outbox.register(EVENTS.ORG_SEAT_UPDATED, "organisation.refresh_team_scope", bumpTeams);
+outbox.register(EVENTS.ORG_SEAT_FILLED, "organisation.refresh_team_scope", bumpTeams);
 
 /** A home address saved while search was down is named by the places-name job (F27). */
 require("../../shared/places/owners").owner("employee.home_address", {
