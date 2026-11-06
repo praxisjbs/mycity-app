@@ -54,6 +54,7 @@
     "@radix-ui/react-tooltip": "1.2.16",
     "@radix-ui/react-visually-hidden": "1.2.11",
     "@tiptap/extension-link": "3.32.0",
+    "@tiptap/extension-table": "3.32.0",
     "@tiptap/react": "3.32.0",
     "@tiptap/starter-kit": "3.32.0",
     "clsx": "2.1.1",

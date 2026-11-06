@@ -1166,6 +1166,7 @@ screen.
 
 ## 14 · Change log
 
+- 06/11/2026 · JP · M7 PR 2 adds two small things to the shared layer, for Partnerships · Categories (`docs/guides/partnerships.md` §6.3, §6.8): `shared/spreadsheet` reads a workbook's dropdowns (`readDropdowns`: each column's header and the values its list validation offers), and `shared/documents/markdown` keeps a table when asked (`htmlToMarkdown(html, { tables: true })`); every other caller flattens a table as before.
 - 04/11/2026 · GE · Documents & Numbering (#76) gains Application (`application`, APP-0001, never reset,
   seeded by `4199`): the reference a candidate is given when they apply (`recruitment.md` §6.2).
   `DOC_TYPES` in the contract, the screen's labels and the demo build carry it.

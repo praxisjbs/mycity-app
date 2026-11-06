@@ -78,5 +78,6 @@ describe("Careers", () => {
     const { container } = draw();
     await waitFor(() => expect(roles()).toHaveLength(12));
     expect(await axe(container)).toHaveNoViolations();
-  });
+    // axe over twelve role rows and the teams list: past vitest's 5 s on a busy runner, as the long walks are.
+  }, 30000);
 });

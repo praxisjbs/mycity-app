@@ -1016,7 +1016,7 @@ This keeps a broad question from timing out the AI call or the request behind it
 | M1 onward | One `.ai.js` per module | registry, gate 9 |
 | M2 | `prompts/review-cleanup.md` (`transcription.js` came early, 20/10/2026: Groq, then Gemini, then the browser's captions, `docs/guides/integrations.md` §6.14; keys on Settings · Integrations) | `complete()`, ledger |
 | M4 | `prompts/jd-draft.md`, `prompts/cv-screen.md` | structured output, provisional flag |
-| M7 | `prompts/proposal-draft.md`, `prompts/mou-draft.md` | same |
+| M7 | `prompts/template-tidy.md` (PR 2: Tidy With AI on an agreement template, Default), `prompts/proposal-questions.md`, `prompts/proposal-draft.md`, `prompts/proposal-rewrite.md`, `prompts/proposal-message.md` (PR 7; an MOU is a template, so `mou-draft.md` is not built) | same |
 | M10 | `services/ai/assistant/` (choose reads, answer, cite; `docs/guides/praxis-ai.md`), the Knowledge Hub's search read on its embeddings with pgvector, spend screen | catalogue, authorise, cite, ledger, governance, `converse()` |
 
 ---

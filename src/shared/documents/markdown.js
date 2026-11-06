@@ -265,8 +265,12 @@ const SKIP_TAGS = new Set(["script", "style", "head", "title", "noscript", "temp
  * *italic* and links with a safe target; everything else becomes its text (a table's cells joined
  * on one line, an image dropped). Nothing from the input reaches the output as markup, so the result
  * is safe whatever was pasted.
+ *
+ * `tables: true` keeps a table as the pipe table markdownToHtml reads (its first row the header, a
+ * cell's line breaks and pipes made spaces and slashes), for the one editor that draws tables: an
+ * agreement template's (docs/guides/partnerships.md §6.8). Every other caller flattens as before.
  */
-function htmlToMarkdown(html) {
+function htmlToMarkdown(html, { tables = false } = {}) {
   const { Parser } = require("htmlparser2");
   const blocks = [];
   let buf = "";
@@ -276,6 +280,13 @@ function htmlToMarkdown(html) {
   let skip = 0;
   const marks = [];
   let link = null;
+  let table = null;
+  const cellText = () => buf.replace(/\s+/g, " ").replace(/\|/g, "/").trim();
+  const tableMarkdown = (rows) => {
+    const width = Math.max(...rows.map((r) => r.length));
+    const line = (r) => `| ${Array.from({ length: width }, (_, i) => r[i] || " ").join(" | ")} |`;
+    return [line(rows[0]), `| ${Array.from({ length: width }, () => "---").join(" | ")} |`, ...rows.slice(1).map(line)].join("\n");
+  };
   const end = () => {
     const text = buf.replace(/\s+/g, " ").trim();
     buf = "";
@@ -295,6 +306,24 @@ function htmlToMarkdown(html) {
       onopentag(name, attrs) {
         if (SKIP_TAGS.has(name)) skip += 1;
         if (skip) return;
+        if (tables && name === "table") {
+          end();
+          table = { rows: [], row: null };
+          return;
+        }
+        if (table) {
+          if (name === "tr") table.row = [];
+          else if (name === "td" || name === "th") buf = "";
+          else if (name === "br" || BLOCK_TAGS.has(name)) buf += " ";
+          else if (name === "strong" || name === "b") {
+            marks.push("**");
+            buf += "**";
+          } else if (name === "em" || name === "i") {
+            marks.push("*");
+            buf += "*";
+          }
+          return;
+        }
         if (name === "ul" || name === "ol") {
           end();
           lists.push({ tag: name, n: 0, serial: lists.length ? lists[0].serial : (listCount += 1) });
@@ -326,6 +355,24 @@ function htmlToMarkdown(html) {
           return;
         }
         if (skip) return;
+        if (table) {
+          if (name === "td" || name === "th") {
+            if (table.row) table.row.push(cellText());
+            buf = "";
+          } else if (name === "tr") {
+            if (table.row && table.row.length) table.rows.push(table.row);
+            table.row = null;
+          } else if (name === "table") {
+            if (table.rows.length) blocks.push({ text: tableMarkdown(table.rows) });
+            table = null;
+            buf = "";
+            kind = lists.length ? "li" : "p";
+          } else if ((name === "strong" || name === "b" || name === "em" || name === "i") && marks.length) {
+            const mark = marks.pop();
+            buf = buf.endsWith(mark) ? buf.slice(0, -mark.length) : `${buf}${mark}`;
+          }
+          return;
+        }
         if (name === "ul" || name === "ol") {
           end();
           lists.pop();

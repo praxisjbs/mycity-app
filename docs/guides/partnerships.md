@@ -230,7 +230,10 @@ DEFAULT true`. Not seeded (A26).
 **`partner_category_template`**: `partner_category_template_id`; `partner_category_id NOT NULL`;
 `template_key text NOT NULL` (a key of `template_version`); `kind text CHECK IN ('deal_merchant',
 'mou', 'service_agreement', 'contract')`; `label text`; `is_default boolean`; `countersigned boolean`
-(MyCity signs too); `active boolean`. One default per category and kind (partial unique index).
+(MyCity signs too); `active boolean`; `asks jsonb NOT NULL DEFAULT '[]'` (migration `7050`: the values a
+person gives when an agreement is generated, each `{ key, label, type, options?, default? }`, named in the
+wording as `{{ ask.<key> }}`; a key is made from the label once and never changes). One default per category
+and kind (partial unique index).
 
 **`partner_category_checklist_item`**: `partner_category_checklist_item_id`; `partner_category_id NOT
 NULL`; `title text NOT NULL` (3 to 120 characters); `description text`; `due_from text CHECK IN
@@ -393,13 +396,14 @@ The schemas and their fields are catalogued in Appendix C.
 | `GET /deals/:id/returns`, `PUT /deals/:id/returns/:month` | → `ReturnPage`; `ReturnSave` → `DealReturn` | view, edit · `partnerships.money` | yes | `month` is `YYYY-MM` |
 | `GET /categories`, `GET /categories/:id` | → `CategoryPage`; → `CategoryDetail` | view | yes | |
 | `POST /categories`, `PATCH /categories/:id` | `CategoryCreate`, `CategoryUpdate` → `CategoryDetail` | edit · `partnerships.configure` | | Retire and restore; never delete one in use |
-| `POST /categories/:id/templates`, `PATCH /category-templates/:id` | `CategoryTemplateCreate`, `CategoryTemplateUpdate` → `CategoryDetail` | edit · `partnerships.configure` | | Wording through the templates routes |
-| `POST /templates/tidy` | `TemplateTidy` → `TemplateTidyDraft` | edit · `partnerships.configure` | | AI tidies pasted wording and proposes its fields (§6.8); nothing kept |
+| `POST /categories/:id/templates`, `PATCH /category-templates/:id` | `CategoryTemplateCreate` (name, kind, wording as the editor's HTML, asks), `CategoryTemplateUpdate` → `CategoryDetail` | edit · `partnerships.configure` | | The wording is saved in the same press, through `templates.agreements` on `template_version` |
+| `GET /category-templates/:id`, `PUT /category-templates/:id/wording` | → `CategoryTemplateDetail`; `TemplateWordingSave` → `CategoryTemplateDetail` | view; edit · `partnerships.configure` | | The wording as the editor opens it (each field a chip), and its next version, with its asks |
+| `POST /templates/tidy` | `TemplateTidy` → `TemplateTidyDraft` | edit · `partnerships.configure` | | AI tidies pasted wording and proposes its fields (§6.8); nothing kept; the answer says AI Is Off or the month's limit when there is no draft |
 | `POST /categories/:id/checklist`, `PATCH /checklist-items/:id` | `ChecklistItemCreate`, `ChecklistItemUpdate` → `CategoryDetail` | edit · `partnerships.configure` | | |
 | `GET /fields`, `POST /fields`, `PATCH /fields/:id` | `FieldListQuery` → `FieldList`; `FieldCreate`, `FieldUpdate` → `Field` | view; edit · `partnerships.configure` | no | §6.3 |
 | `GET /lists/:list`, `POST /lists/:list`, `PATCH /lists/:list/:code` | → `ListValues`; `ListValueCreate`, `ListValueUpdate` | view; edit · `partnerships.configure` | no | Stages carry a meaning |
 | `POST /setup/from-tracker`, `POST /setup/from-tracker/apply` | `TrackerSetup` → `TrackerSetupDraft`; `TrackerSetupApply` → `SetupResult` | edit · `partnerships.configure` | | Start From Tracker (§6.13) |
-| `GET /proof-points`, `POST /proof-points`, `PATCH /proof-points/:id` | `ProofPointCreate`, `ProofPointUpdate` → `ProofPoint` | view; edit · `partnerships.configure` | yes | §6.11 |
+| `GET /proof-points`, `POST /proof-points`, `PATCH /proof-points/:id`, `POST /proof-points/:id/image` | `ProofPointCreate`, `ProofPointUpdate`, an upload → `ProofPoint` | view; edit · `partnerships.configure` | yes | §6.11; the image is uploaded to the proof point and stored against it, never named by `document_id` |
 | `GET /leads/summary`, `GET /leads` | → `LeadsSummary`; `LeadListQuery` → `LeadPage` | view · §6.1 | yes | |
 | `GET /leads/:id` | → `Lead360` | view · §6.1 | no | Zero-data safe |
 | `POST /leads`, `PATCH /leads/:id` | `LeadCreate` (with its first deal), `LeadUpdate` → `Lead360` | create; edit · §6.1 | | Idempotency-Key |
@@ -587,12 +591,19 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `ExportAct
 
 - **Templates are built in the hub**, on the one document engine (`shared/documents`, `template_version`,
   declared variables). A template has rich text, headings, numbered clauses, tables and named fields.
-  A field is a **record field** (`partner.name`, `partner.legal_name`, `contact.full_name`,
-  `contact.title`, `contact.phones`, `contact.email`, `partner.region`, `deal.title`,
-  `deal.event_title`, `deal.event_starts_on`, `deal.objective`, `deal.valid_until`,
-  `deal.validity_label`, `deal.options` as the options table, `org.name`, `today`), a **custom field**,
-  or an **ask** (a value the person gives when generating, with its label and type). A template naming an
-  undeclared field is refused on save. If the renderer lacks a table loop for `deal.options`, PR 6 adds it
+  A field is a **record field** (`today`, `org.name`, `partner.name`, `partner.legal_name`,
+  `partner.headquarters`, `partner.region`, `contact.full_name`, `contact.title`, `contact.phones`,
+  `contact.email`, `deal.title`, `deal.event_title`, `deal.event_starts_on`, `deal.event_ends_on`,
+  `deal.objective`, `deal.expected_attendance`, `deal.comments`, `deal.valid_until`, `deal.validity_label`,
+  `deal.options` as the options table, `category.checklist` as the numbered clauses of the delivery checklist,
+  and `signer.name`, `signer.title`, `signer.signed_on`, `signer.signature`, which the signing service fills
+  when the agreement is signed, §6.9), a **custom field** of the category or of every category
+  (`custom.<key>`), or an **ask** (`ask.<key>`: a value the person gives when generating, with its label,
+  type and default). The record fields are `AGREEMENT_RECORD_FIELDS` in the contract. The wording is kept
+  as Markdown (headings, numbered clauses, pipe tables) with each field in `{{ }}` written with its house
+  format (`{{ longdate deal.valid_until }}`); the editor draws each as a chip and a person never types
+  braces. A template naming a field that is none of the three, or an ask it does not declare, is refused on
+  save, naming it. If the renderer lacks a table loop for `deal.options`, PR 6 adds it
   to `shared/documents/render.js` for every template; there is no second engine.
 - **Tidy With AI:** the person pastes the text of a Word agreement MyCity already uses. The AI returns
   it tidied (headings, numbered clauses, the financials grid as a table) with a proposed field for every
@@ -966,7 +977,7 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
 |---|---|---|
 | `proposal-questions`, `proposal-draft`, `proposal-rewrite` | Top Tier: Anthropic Sonnet, then Gemini Pro | JBS Praxis, 05/11/2026 |
 | `proposal-message` | Fast | To confirm before PR 7 (recommended Fast) |
-| `template-tidy` | Default | To confirm before PR 2 (recommended Default) |
+| `template-tidy` | Default (`personal_data: true`, so DeepSeek is never in its chain) | JP, 06/11/2026 |
 
 - **AI reads** (`partners.ai.js`, `leads.ai.js`, `partner_pipeline.ai.js`, `proposals.ai.js`,
   `agreements.ai.js`, `partnership_analytics`'s summary): `leads.list`, `leads.get`, `partners.list`,
@@ -993,7 +1004,9 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   Words: partner, lead, prospect, deal, event, sponsor, tracker, proposal, MOU, contract, agreement,
   commission, renewal. The route map's `partner`, `partner_deal`, `lead`, `proposal`, `contract`, `mou`,
   `agreement` lose `search:none`; Categories and the public Proposal page are added; New Lead, New
-  Partner, New Deal, New Proposal and New Category are ⌘K actions.
+  Partner, New Deal, New Proposal and New Partner Category are ⌘K actions. The last is Categories' New
+  Category, named in full in ⌘K and the phone's floating button because Expenses has a New Category too
+  (§13.2).
 
 ## 10 · On screen and mobile
 
@@ -1028,7 +1041,7 @@ Verb Noun buttons, Lucide icons.
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Pipeline | Two KPI cards (Open Deals, Stalled), the filter chips, then deal cards (record, stage pill, health dot, days at stage) | Signed Value; stage bars beyond the top six | New Lead, full width | Bottom bar More → Partnerships; seven tabs scroll sideways |
-| Categories | Category cards (name, partners, commission) | Pipeline Settings and Proof Points behind their own rows | New Category | A category opens as a sheet, its sections as rows |
+| Categories | Category cards (name, partners, commission) | Pipeline Settings and Proof Points behind their own rows | New Partner Category, the floating button's action | A category opens as a sheet, its four sections (Defaults, Templates, Checklist, Fields) one at a time behind a segmented control |
 | Partners, Partner 360 | Two KPI cards (Active, Quiet), then partner cards; a tapped partner opens the 360 full screen | Export; Owner and Region columns | On the 360, the next stage full width at the foot; Log Interaction in the page menu | The 360's tabs as a scrolling segmented control; Back closes it |
 | Leads, Lead 360 | Two KPI cards (New, Qualified), then lead cards with a status pill | Leads by source | New Lead; on the 360 the next stage at the foot | As the Partner 360 |
 | Proposals, Studio | Proposal cards (partner, status, viewed); the studio one step a screen; question cards one at a time, Skip and Reshuffle under the answer | Change Layout and Move (desktop only; the phone edits text and images) | Write Draft, then Send Proposal at the foot | StepBar at the top; Back steps back |
@@ -1050,8 +1063,8 @@ every screen's Export already uses. **New**, each added with `npm run new:compon
 gallery page), never inside the feature: `StageSwitcher` (stages in order, one press to move, keyboard
 and 44 px targets), `QuestionCard` (a studio card: question, why, answer control by kind, suggestion,
 Skip, Reshuffle), `DocumentFrame` (a sandboxed, token-styled preview of server HTML with section
-overlays for the studio's edit controls), and `RichTextField` gains tables and field chips for the
-template editor (`mode="document"`), or a sibling `DocumentEditor` if the component's owner prefers.
+overlays for the studio's edit controls). `DocumentEditor` (built in PR 2: headings, numbered clauses,
+tables and field chips, with Insert Field) is the template editor, beside `RichTextField`.
 
 ## 11 · Edge cases
 
@@ -1178,15 +1191,50 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
   - A deal's validity is optional (New Lead's form has none); the category's default applies.
   - `agreement_obligation`'s drop refuses to run if the table holds a row, so nothing is lost and the
     schema is the same on every database (MIGRATIONS §11).
+- **In PR 2 (06/11/2026, JP):**
+  - `template-tidy` runs on **Default**, chosen by JP, with `personal_data: true`.
+  - A template's asks are a column, `partner_category_template.asks` (migration `7050`), because `7010` gave
+    them no place; the agreement keeps the values given in its own `fields` (§4.2).
+  - The wording is read and saved by `templates.agreements` in the `templates` module, on `template_version`
+    and the shared template store; its routes sit with the category (`GET` and `PUT /category-templates/:id`),
+    since the `templates` module's own routes are Queries' letters. A template key is made from the category
+    and the name (`events-deal-merchant-agreement`) and never changes.
+  - The editor is a new `packages/ui` component, `DocumentEditor`, beside `RichTextField`, which stays as it is
+    (§10.3 allowed either); the shared Markdown converter keeps a table only when asked (`tables: true`), so
+    letters and policies are unchanged.
+  - A proof point's image is uploaded to it (`POST /proof-points/:id/image`, stored as `proof_point_image`,
+    readable by anyone who may open Partnerships) as Settings' brand files are, so `ProofPointCreate` no longer
+    names a `document_id`; `ProofPointUpdate` takes only `null`, to remove the image.
+  - The record fields a template may name include `partner.headquarters`, `deal.event_ends_on`,
+    `deal.expected_attendance`, `deal.comments`, `category.checklist` and the four `signer.*` fields (§6.8),
+    which the redacted Deal Merchant Agreement needs; PR 6 renders them.
+  - A stage's code is made from its name; MyCity's own "Negotiation" is `negotiation_2` where `7099`'s retired
+    row holds the plain code. A list value is retired, never deleted.
+  - `partner_pipeline`'s controller is filled, so gate 23 asks for the reason of every create and edit schema
+    of its contract: `DealCreate`, `DealUpdate` and `ReturnSave` carry a `design:` reason that says the card
+    arrives with PR 8; PR 8 declares `deals.create`, `deals.update` and `deal_returns.save` and removes them.
+  - Tidy With AI's answer, `TemplateTidyDraft`, says whether there is a draft: `available`, and `reason`
+    (`off`, `limit`) when there is none, so the editor says AI is off or the month's limit is reached instead
+    of failing; the draft is `body_html`, the editor's HTML with each field a chip (it was `body`), with its
+    `ai_run_id`.
+- **At PR 2's review (06/11/2026, TB):**
+  - ⌘K's labels are one each, and Expenses (M8) already had New Category, so both read in full: New Partner
+    Category here and New Expense Category there. Each screen's own New action, which the phone's floating
+    button offers, carries the same name, as the search coverage gate holds it to ⌘K; the screens' header
+    buttons stay New Category (§9, §10.2; `expenses.md` §9, §10.2).
+  - On a phone a category's four sections sit behind a segmented control, one at a time, as the 360s' tabs
+    do: a sheet replaces the last one rather than stacking, and rows opening in place would hide the
+    sections' buttons, which the Accordion is not for (§10.2).
 
 ### 13.3 Still open
 
-- **AI jobs** for `template-tidy` (Default recommended, before PR 2) and `proposal-message` (Fast
-  recommended, before PR 7): the person confirms (CLAUDE.md).
+- **AI job** for `proposal-message` (Fast recommended, before PR 7): the person confirms (CLAUDE.md).
+  `template-tidy` is Default, confirmed by JP on 06/11/2026 (§13.2).
 - **MyCity's samples** (Edidiong Etudor is to send them, 5 November). The **Deal Merchant Agreement** is
   in hand, redacted in `docs/MyCity-ERP-Documents/partnership-samples/`. The **ticketing template**
-  (Regular, VIP, VVIP) is needed by **PR 2**, where it becomes a category template: upload it in PR 2's
-  chat, which stores a redacted copy beside the agreement. A **sample proposal** is needed by **PR 7**,
+  (Regular, VIP, VVIP) was wanted by **PR 2** as a second Events template; it had not arrived when PR 2 was
+  built, so it is built the same way when it does (upload it in any chat: it is stored redacted beside the
+  agreement and entered in the template editor, with no change to the code). A **sample proposal** is needed by **PR 7**,
   whose kit is checked against its tone, structure and proof points: upload it in PR 7's chat, which
   stores a redacted copy too. Neither blocks a PR from starting; each blocks only its PR's last step.
 - **Proof points' first set:** MyCity enters them; staging seeds a demonstration set.
@@ -1412,7 +1460,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 - **`partner_pipeline.js`**
   - `CategoryCreate` { `name`, `description?`, `default_commission_pct?`, `default_validity_days?`, `counts_as_vendor?` }; `CategoryUpdate` (all optional, `active?`); `CategoryDetail` (with `templates`, `checklist`, `fields`, `counts`)
-  - `CategoryTemplateCreate` { `template_key`, `kind`, `label`, `is_default?`, `countersigned?` }
+  - `CategoryTemplateCreate` { `template_key?` (made from the category and the label), `kind`, `label`, `title?`, `body_html` (the wording), `asks?`, `is_default?`, `countersigned?` }; `TemplateAsk` { `key`, `label`, `type`, `options?`, `default?` }; `CategoryTemplateDetail` (the template with its wording and the record fields); `TemplateWordingSave` { `title?`, `body_html`, `asks?` }; `TemplateTidyDraft` { `available`, `reason`, `body_html`, `fields[]`, `ai_run_id` }
   - `ChecklistItemCreate` { `title`, `description?`, `due_from`, `due_days`, `position?` }
   - `FieldCreate` { `label`, `field_type`, `options?`, `applies_to`, `partner_category_id?`, `filterable?` }
   - `ListValueCreate` { `label`, `meaning?` (stages), `position?` }; `ListValueUpdate` { `label?`, `meaning?`, `position?`, `active?` }
@@ -1445,6 +1493,8 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
     check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views`
   - `agreements/`: `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`),
     `.renewals`, `.views`
+  - `templates/` (M3's, shared): `.agreements` (the wording of a category's templates: its fields, chips and
+    checks; PR 2)
   - `partnership_analytics/`: `.queries`
   - `signatures/` (shared with M5): `.service`, `.code` (the email code), `.stamp`, `.certificate`,
     `.signed-pdf`, `.verify`, `.public.routes`
@@ -1469,7 +1519,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   checklist, template editor); Workspace's forms in `app/src/features/workspace/`.
 - **Public** (`public-app/src/pages/`): `Proposal.tsx` (new), `SignOffer.tsx` and `Verify.tsx`
   (extended).
-- **packages/ui:** `StageSwitcher`, `QuestionCard`, `DocumentFrame`, `RichTextField` document mode.
+- **packages/ui:** `StageSwitcher`, `QuestionCard`, `DocumentFrame`, `DocumentEditor` (PR 2).
 - **Seeds:** `seeds/reference/7190_seed_partnerships.sql` (code lists, capabilities, the flow, numbering,
   `7099`'s choices switched off); `seeds/staging/70_partnerships.js` (synthetic).
 - **Tests:** `tests/integration/partnerships-*.test.js` per module; `tests/unit/` for the importer's
@@ -1483,6 +1533,15 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   go.mycityapp.io (the approved design); its Coming Soon is unchanged. Verify Document's QR page,
   `/verify/t/<token>` (§6.9), is drawn on the mock: the record, both verdicts and the document with Download PDF, until
   M5's verify API.
+- 06/11/2026 · TB · PR 2 reviewed (#80): `main` merged in (M4 and M8); New Partner Category in ⌘K and the
+  phone's floating button (§9, §10.2, §13.2); a category's sections behind a segmented control on a phone
+  (§10.2, §13.2); Tidy With AI's answer recorded (§13.2); Move Up and Move Down on Pipeline Settings renumber
+  the list, so a value never lands two places over; Appendix D names `DocumentEditor`.
+- 06/11/2026 · JP · PR 2, Categories (`m7/categories`): categories, MyCity's lists, custom fields, delivery
+  checklists, agreement templates built in the hub (`DocumentEditor`), Tidy With AI, Start From Tracker, proof
+  points and the Categories screen (#104) built to this guide. Corrected here: a template's asks have a column
+  (§4.2, migration `7050`), the record fields a template may name (§6.8), the template and proof point routes
+  (§5), `template-tidy`'s job (§9) and what PR 2 decided (§13.2, §13.3), and Appendix C and D to match.
 - 05/11/2026 · JP · PR 1, contract, data and scaffolding: the seven contract files with Appendix C's
   schemas (the kit's twelve layouts one discriminated union; the mailbox's thread link in
   `interactions.js`; the Workspace link as `PartnerLink`); migrations `7010` to `7040` and seed `7190`

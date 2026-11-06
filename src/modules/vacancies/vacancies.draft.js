@@ -145,7 +145,7 @@ function plainDraft(body, department = null) {
     .filter(Boolean)
     .join("\n\n");
   const requirements = [
-    body.min_experience_years != null ? `- ${body.min_experience_years}+ years of relevant experience.` : null,
+    (body.min_experience_years ?? null) !== null ? `- ${body.min_experience_years}+ years of relevant experience.` : null,
     ...musts.map((m) => `- ${m}`),
   ].filter(Boolean);
   const extras = bulletsOf(a.extras);

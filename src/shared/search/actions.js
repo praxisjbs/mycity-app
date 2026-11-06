@@ -96,6 +96,13 @@ const ACTIONS = Object.freeze([
     need: ["people", "approve"],
     words: ["temporary site", "send people out", "field assignment", "client site", "out of station"],
   }),
+  a("new_category", "New Partner Category", {
+    screen: "partnerships.categories",
+    params: { action: "new" },
+    need: ["partnerships", "edit"],
+    capability: "partnerships.configure",
+    words: ["category", "partnership type", "partner type", "new type", "agreement template", "set up a category"],
+  }),
   a("import_staff", "Import Staff", {
     screen: "settings.imports",
     params: { importer: "employees" },
@@ -381,7 +388,7 @@ const ACTIONS = Object.freeze([
     capability: "expenses.finance",
     words: ["set a budget", "department budget", "budget"],
   }),
-  a("new_expense_category", "New Category", {
+  a("new_expense_category", "New Expense Category", {
     screen: "expenses.categories",
     params: { action: "new" },
     need: ["expenses", "create"],
