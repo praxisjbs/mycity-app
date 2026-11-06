@@ -217,7 +217,7 @@ describeDb("AI Control against the real migrations", () => {
       ]);
       expect(by.embeddings.chain.links.map((l) => [l.model, l.state])).toEqual([["text-embedding-3-small", "not_set_up"]]);
       expect(by.top_tier.chain.links.map((l) => l.model)).toEqual(["gemini-2.5-pro", "claude-sonnet-5-5"]);
-      expect(by.default.actions).toBe(7); // Tidy Policy, Review Cleanup, Week Summary, Raise a Query's draft and the mailbox's three; Data Answers has its own chain
+      expect(by.default.actions).toBe(8); // Tidy Policy, Review Cleanup, Week Summary, Raise a Query's draft, the mailbox's three and Tidy Agreement; Data Answers has its own chain
     });
 
     test("the registered actions: their job, personal data, own chain and today's calls", async () => {
@@ -240,6 +240,7 @@ describeDb("AI Control against the real migrations", () => {
         "guide-search",
         "guide-answer",
         "guide-voice",
+        "template-tidy",
       ]);
       const by = Object.fromEntries(res.body.data.map((a) => [a.key, a]));
       expect(by["data-answers"]).toMatchObject({ job: "default", built: true, own_chain: true, personal_data: true, chosen_by: "TB" });
@@ -257,6 +258,8 @@ describeDb("AI Control against the real migrations", () => {
       // The User Guide's (user-guide.md §6.8 to §6.10), each chosen by JBS Praxis: the answer on Fast.
       expect(by["guide-search"]).toMatchObject({ job: "embeddings", personal_data: true, own_chain: false, chosen_by: "JP" });
       expect(by["guide-answer"]).toMatchObject({ job: "fast", personal_data: true, own_chain: false, chosen_by: "JP" });
+      // Partnerships' (partnerships.md §6.8, §9), chosen by JBS Praxis on 06/11/2026: Tidy With AI on Default, never DeepSeek.
+      expect(by["template-tidy"]).toMatchObject({ job: "default", personal_data: true, own_chain: false, built: true, chosen_by: "JP" });
       expect((await as("admin").get("/ai-control/actions?job=transcription")).body.data.map((a) => a.key)).toEqual([
         "voice-note-transcription",
         "praxis-ai-voice",
