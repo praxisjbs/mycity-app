@@ -1646,7 +1646,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   `raise_query`; Queries & Sanctions subscribes and raises one query per breach (built 27/10/2026,
   AJ). The M1 definition of done ("a late punch raises a query; HR waives it and the deduction is
   restored") is met with PR 3 and that subscriber.
-- **Payroll** (M6, LA) takes pending items into a run (`in_run`) and owns what a payslip shows;
+- **Payroll** (M6, TB) takes pending items into a run (`in_run`) and owns what a payslip shows;
   PR 3 prices them from `employee.gross_monthly` so the person sees them as they happen.
 - **Cynthia is told** the home fence is 150 m, not the 100 m of her email, and why (TB, 20/10/2026).
 - **Home Location ships off** (TB, 22/10/2026, §1.3 H2), although the 21/10 handover agreed to keep

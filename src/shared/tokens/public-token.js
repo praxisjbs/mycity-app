@@ -98,17 +98,21 @@ async function issue(
 /**
  * The live token for this scope, or null. `forUpdate` locks the row so a
  * single-use token can be checked and consumed in one transaction.
- * @returns {Promise<{public_token_id: string, scope: string, subject_type: string, subject_id: string, single_use: boolean, expires_at: Date}|null>}
+ * `spent: true` also finds a single-use token already used (never a revoked or
+ * expired one), with `spent` set: a service answers a second press of the same
+ * submit with what the first one made, instead of a 404.
+ * @returns {Promise<{public_token_id: string, scope: string, subject_type: string, subject_id: string, single_use: boolean, expires_at: Date, spent: boolean}|null>}
  */
-async function resolve(client, token, { scope, forUpdate = false } = {}) {
+async function resolve(client, token, { scope, forUpdate = false, spent = false } = {}) {
   if (!looksLikeToken(token) || !SCOPE_RE.test(scope || "")) return null;
   const { rows } = await client.query(
-    `SELECT public_token_id, scope, subject_type, subject_id, single_use, expires_at
+    `SELECT public_token_id, scope, subject_type, subject_id, single_use, expires_at,
+            (single_use AND used_at IS NOT NULL) AS spent
        FROM public_token
       WHERE token_hash = $1 AND scope = $2
         AND revoked_at IS NULL AND expires_at > now()
-        AND NOT (single_use AND used_at IS NOT NULL)${forUpdate ? "\n      FOR UPDATE" : ""}`,
-    [hash(token), scope],
+        AND ($3 OR NOT (single_use AND used_at IS NOT NULL))${forUpdate ? "\n      FOR UPDATE" : ""}`,
+    [hash(token), scope, spent],
   );
   return rows[0] || null;
 }
@@ -118,6 +122,24 @@ async function consume(client, publicTokenId) {
   const { rowCount } = await client.query(
     "UPDATE public_token SET used_at = now() WHERE public_token_id = $1 AND used_at IS NULL",
     [publicTokenId],
+  );
+  return rowCount === 1;
+}
+
+/**
+ * Move a live token's end to `until`, never earlier than it was: a link that must outlive its first
+ * date once used (an assessment started on its last day lives until the sitting is due). True when
+ * the token was live and is now that long.
+ * @param {import("pg").PoolClient} client
+ * @param {string} publicTokenId
+ * @param {Date} until
+ */
+async function extend(client, publicTokenId, until) {
+  const { rowCount } = await client.query(
+    `UPDATE public_token
+        SET expires_at = GREATEST(expires_at, LEAST($2::timestamptz, created_at + make_interval(hours => $3)))
+      WHERE public_token_id = $1 AND revoked_at IS NULL AND expires_at > now()`,
+    [publicTokenId, until, MAX_TTL_HOURS],
   );
   return rowCount === 1;
 }
@@ -137,6 +159,7 @@ module.exports = {
   issue,
   resolve,
   consume,
+  extend,
   revokeFor,
   looksLikeToken,
   hash,

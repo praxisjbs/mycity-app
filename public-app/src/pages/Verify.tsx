@@ -40,7 +40,7 @@ function Lookup({ initial = "", heading }: { initial?: string; heading?: ReactNo
       {heading ?? (
         <>
           <h1 className="text-center text-xl">Verify a Document</h1>
-          <Sub className="mt-1 mb-4 text-center">Enter the reference printed on the document, for example OFF-0018.</Sub>
+          <Sub as="p" className="mt-1 mb-4 text-center">Enter the reference printed on the document, for example OFF-0018.</Sub>
         </>
       )}
       <Field label="Reference" htmlFor="ref">
@@ -63,7 +63,7 @@ function VerifyResult({ number }: { number: string }) {
           <div className="mb-4 text-center">
             <Badge ok={false} />
             <h1 className="mt-3 text-xl">No document has this reference</h1>
-            <Sub className="mt-1">Check the reference on the document and try again. It looks like OFF-0018.</Sub>
+            <Sub as="p" className="mt-1">Check the reference on the document and try again. It looks like OFF-0018.</Sub>
           </div>
         }
       />
@@ -106,7 +106,7 @@ function VerifyResult({ number }: { number: string }) {
           </div>
         ))}
       </dl>
-      <Sub className={cn("mt-4.5 border-t border-border pt-3.5", !o.ok && "text-destructive")}>{o.text}</Sub>
+      <Sub as="p" className={cn("mt-4.5 border-t border-border pt-3.5", !o.ok && "text-destructive")}>{o.text}</Sub>
     </>
   );
 }

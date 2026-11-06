@@ -35,7 +35,7 @@ function Head({ d }: { d: OfferToSign }) {
         <Brand name="MyCityApp" />
       </div>
       <h1 className="text-xl">Offer of Employment</h1>
-      <Sub className="mt-1">
+      <Sub as="p" className="mt-1">
         {d.candidate_name} · {d.role} · {d.reference}
       </Sub>
     </>
@@ -71,7 +71,7 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
   return (
     <Page title="Offer of Employment" brandInCard>
       <Head d={d} />
-      <Sub className="mt-0.5">
+      <Sub as="p" className="mt-0.5">
         Expires {formatDate(d.expires_at)}
       </Sub>
       <div className="mt-3.5 max-h-44 overflow-y-auto rounded-box border border-border p-3.5 text-sm leading-relaxed text-muted-foreground max-md:max-h-64" tabIndex={0} aria-label="The offer letter">
@@ -100,7 +100,7 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
           <Button variant="primary" block className="mt-2" disabled={!inked} onClick={sign}>
             Accept and Sign
           </Button>
-          <Sub className="mt-2.5 text-center">Once signed, this document is locked and verifiable at go.mycityapp.io/verify</Sub>
+          <Sub as="p" className="mt-2.5 text-center">Once signed, this document is locked and verifiable at go.mycityapp.io/verify</Sub>
           <div className="mt-3 text-center">
             <button type="button" className="text-xs font-semibold text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => setDeclining(true)}>
               Decline the Offer

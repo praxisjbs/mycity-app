@@ -38,6 +38,12 @@ export interface KanbanCard {
   meta?: ReactNode;
   /** Whose it is; their initials show as an avatar. */
   owner?: string;
+  /**
+   * The stages this card may move to, when the server says (a candidate moves forward, or one stage
+   * back). Move To lists only these and a drop on any other stage is ignored; empty, the card stays
+   * put. Left out, every other stage.
+   */
+  moves?: string[];
 }
 
 /** One stage. */
@@ -195,9 +201,16 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
 
   const bare = !loading && empty !== undefined && columns.every((c) => c.cards.length === 0 && !c.count);
 
+  /** May `card` go to stage `to`? Within its own stage, always; elsewhere, as its `moves` say. */
+  const allowed = (card: string, from: string, to: string) => {
+    if (from === to) return true;
+    const moves = columns.find((c) => c.key === from)?.cards.find((c) => c.key === card)?.moves;
+    return !moves || moves.includes(to);
+  };
+
   /** Moves a card once: work handed back holds it until it settles, either way. */
   const move = (card: string, from: string, to: string, before: string | null) => {
-    if (!onMove || moving.current.has(card)) return;
+    if (!onMove || moving.current.has(card) || !allowed(card, from, to)) return;
     const work = onMove(card, from, to, before);
     if (!isThenable(work)) return;
     moving.current.add(card);
@@ -214,7 +227,7 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
     const within: MenuItem[] = [];
     if (reorder && i > 0) within.push({ label: "Move Up", icon: "up", onSelect: () => move(card, from, from, cards[i - 1]!.key) });
     if (reorder && i >= 0 && i < cards.length - 1) within.push({ label: "Move Down", icon: "down", onSelect: () => move(card, from, from, cards[i + 2]?.key ?? null) });
-    const across: MenuItem[] = columns.filter((c) => c.key !== from).map((c) => ({ label: `Move to ${c.label}`, icon: "right" as const, onSelect: () => move(card, from, c.key, null) }));
+    const across: MenuItem[] = columns.filter((c) => c.key !== from && allowed(card, from, c.key)).map((c) => ({ label: `Move to ${c.label}`, icon: "right" as const, onSelect: () => move(card, from, c.key, null) }));
     return within.length ? [...within, "sep", ...across] : across;
   };
   /** A drag's card and stage, as onDragStart wrote them; nothing for a card still moving. */
@@ -254,7 +267,7 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
                       {fresh && <Unread />}
                       <KanbanCardBody card={card} />
                     </button>
-                    {onMove && (
+                    {onMove && moveItems(card.key, current.key).length > 0 && (
                       <span className="relative z-10 mt-2 flex">
                         <Menu
                           label="Move To"
@@ -334,7 +347,7 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
                     }
                   >
                     <div
-                      draggable={Boolean(onMove) && !wait}
+                      draggable={Boolean(onMove) && !wait && card.moves?.length !== 0}
                       onDragStart={onMove ? (e: DragEvent) => e.dataTransfer.setData("text/plain", `${card.key}|${column.key}`) : undefined}
                       className={cn(
                         "relative rounded-box border border-border p-2.5 transition hover:-translate-y-0.5 hover:shadow-2",
@@ -352,7 +365,7 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
                         {fresh && <Unread />}
                       <KanbanCardBody card={card} />
                       </button>
-                      {onMove && (
+                      {onMove && moveItems(card.key, column.key).length > 0 && (
                         <span className="relative z-10 mt-2 flex justify-end">
                           <Menu
                             label="Move To"

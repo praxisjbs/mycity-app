@@ -1,0 +1,91 @@
+import { useState } from "react";
+import type { GalleryEntry } from "../testing/gallery";
+import { Field } from "./Field";
+import { RatingField } from "./RatingField";
+
+function Trait({ trait, initial }: { trait: string; initial: number | null }) {
+  const [v, setV] = useState<number | null>(initial);
+  return (
+    <Field label={trait}>
+      <RatingField value={v} onChange={setV} />
+    </Field>
+  );
+}
+
+function Card() {
+  const [a, setA] = useState<number | null>(8);
+  const [b, setB] = useState<number | null>(6);
+  const [c, setC] = useState<number | null>(null);
+  return (
+    <div className="flex flex-col gap-4">
+      <Field label="Level of Confidence">
+        <RatingField value={a} onChange={setA} />
+      </Field>
+      <Field label="Oral Communication Skills">
+        <RatingField value={b} onChange={setB} />
+      </Field>
+      <Field label="Job Knowledge and Experience">
+        <RatingField value={c} onChange={setC} />
+      </Field>
+    </div>
+  );
+}
+
+function Missing() {
+  const [v, setV] = useState<number | null>(null);
+  return (
+    <Field label="Stability Level in Career" state={v ? undefined : "bad"} message="Rate this trait">
+      <RatingField value={v} onChange={setV} />
+    </Field>
+  );
+}
+
+function Overall() {
+  const [v, setV] = useState<number | null>(4);
+  return (
+    <Field label="Overall Rating">
+      <RatingField value={v} onChange={setV} max={5} />
+    </Field>
+  );
+}
+
+function Closed() {
+  return (
+    <div className="flex flex-col gap-3">
+      <RatingField label="Appearance and Grooming" value={8} readOnly decimals={1} />
+      <RatingField label="Level of Confidence" value={7.3} readOnly decimals={1} />
+      <RatingField label="Accuracy in Language" value={null} readOnly decimals={1} />
+    </div>
+  );
+}
+
+/** A draft card: a tap on the star already chosen takes the rating back. */
+function Clearable() {
+  const [v, setV] = useState<number | null>(6);
+  return (
+    <Field label="Clarity of Thought and Expression">
+      <RatingField value={v} onChange={setV} onClear={() => setV(null)} />
+    </Field>
+  );
+}
+
+function Submitted() {
+  return (
+    <Field label="Oral Communication Skills">
+      <RatingField value={7} disabled />
+    </Field>
+  );
+}
+
+export default {
+  component: "RatingField",
+  states: {
+    "Interview Card": () => <Card />,
+    "Not Rated": () => <Trait trait="Future Growth Potential in Career" initial={null} />,
+    "Field Error": () => <Missing />,
+    "Five Stars": () => <Overall />,
+    "Tap Again to Clear": () => <Clearable />,
+    "Card Submitted": () => <Submitted />,
+    "Panel Means": () => <Closed />,
+  },
+} satisfies GalleryEntry;

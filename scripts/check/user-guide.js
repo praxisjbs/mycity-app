@@ -91,9 +91,9 @@ const ICONS = (() => {
   return new Set([...body.matchAll(/^\s+([a-z][a-z0-9]*):/gm)].map((m) => m[1]));
 })();
 
-/** Every text the hub carries: where a bold name must be found (6). */
+/** Every text the hub and the public site carry: where a bold name must be found (6). The public site's chapter names its pages' words. */
 const CORPUS = (() => {
-  const roots = ["app/src", "packages/ui/src", "src", "packages/contract/schemas", "seeds/reference", "templates"];
+  const roots = ["app/src", "public-app/src", "packages/ui/src", "src", "packages/contract/schemas", "seeds/reference", "templates"];
   const parts = [];
   const walk = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -204,7 +204,8 @@ const stale = [];
 for (const { file, chapter } of chapters) {
   const shots = readShots(chapter.slug);
   for (const [id, spec] of Object.entries(chapter.shots)) {
-    const module = moduleOfOpen(spec.open);
+    // A public page (`site: public`) is the public site's own address, checked by its parser.
+    const module = spec.site === "public" ? null : moduleOfOpen(spec.open);
     if (module && !hasModule(module)) say(`${file}: picture ${id} opens ${spec.open}, which is not a module of the hub`);
     const missing = spec.devices.filter((d) => !fs.existsSync(path.join(IMG, chapter.slug, `${id}.${d}.png`)));
     if (missing.length) {

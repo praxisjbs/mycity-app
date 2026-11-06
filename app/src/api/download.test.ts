@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Toaster } from "@mycity/ui";
 import { installMatchMedia } from "@mycity/ui/testing";
-import { saveBlob } from "./download";
+import { saveBlob, savedName } from "./download";
 
 installMatchMedia();
 
@@ -69,5 +69,21 @@ describe("saveBlob", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save File" }));
     await waitFor(() => expect(shared).toHaveBeenCalledTimes(2));
     expect(clicked).toHaveLength(0);
+  });
+});
+
+describe("savedName", () => {
+  const word = `attachment; filename="Bisi Adeyemi CV.docx"; filename*=UTF-8''${encodeURIComponent("Bisi Adeyemi CV.docx")}`;
+
+  it("keeps the served file's extension, so a Word CV is never saved as a PDF", () => {
+    expect(savedName("Bisi Adeyemi CV.pdf", word)).toBe("Bisi Adeyemi CV.docx");
+    expect(savedName("Bisi Adeyemi CV", word)).toBe("Bisi Adeyemi CV.docx");
+  });
+
+  it("leaves a name alone when its extension already matches, or the server names none", () => {
+    expect(savedName("cv.DOCX", word)).toBe("cv.DOCX");
+    expect(savedName("Organogram.pdf", null)).toBe("Organogram.pdf");
+    expect(savedName("Organogram.pdf", "attachment")).toBe("Organogram.pdf");
+    expect(savedName("cv.pdf", 'attachment; filename="cv.pdf"')).toBe("cv.pdf");
   });
 });

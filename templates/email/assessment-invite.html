@@ -1,0 +1,20 @@
+---
+subject: "Your assessment for {{ vacancy_title }}"
+title: Assessment
+format: markdown
+---
+{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}
+
+Thank you for your application for {{ vacancy_title }}. The next step is an assessment: {{ assessment_name }}.
+
+{{#if duration_minutes}}**Time allowed:** {{ duration_minutes }} minutes from when you press Start.{{else}}{{#if due_days}}**Days to finish:** {{ due_days }}, counted from when you press Start.{{/if}}{{/if}}
+
+**Start by:** the end of {{ longdate start_by }}, Lagos time.
+
+{{#if duration_minutes}}The clock keeps running if you close the page, so start when you have that time free and a steady connection. Every answer saves as you go, and the same link takes you back to where you stopped.{{else}}This is a take-home task. Once you have started, the link works until your work is due: your answers save as you go, and you send your work in when it is ready.{{/if}}
+
+[Open the Assessment]({{ assess_url }})
+
+If the link does not open, copy this address into your browser: {{ assess_url }}
+
+The link is for you alone. Please do not share it.

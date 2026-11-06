@@ -6,7 +6,8 @@
  *
  *   spec    the picture's own spec (open, as, device, do, marks, crop, sources), as written
  *   source  the screen's code when it was taken: its feature folder (app/src/features/<module>,
- *           tests aside) and every path the spec lists under `sources`
+ *           tests aside), or for a public page (`site: public`) its page file and the public
+ *           shell, and every path the spec lists under `sources`
  *
  * A picture whose hashes differ from the ones in its chapter's shots.json is stale: the screen
  * or the spec changed after it was taken, and `npm run guide:shots -- --stale` retakes it.
@@ -46,6 +47,15 @@ const moduleOfOpen = (open) => {
   return m ? m[1].replace(/-/g, "_") : null;
 };
 
+/** A public address's page files (public-app/src/pages, one file a screen): "/jobs/<slug>" is the Vacancy. */
+function publicPagesOf(open) {
+  const m = /^\/([a-z]+)(\/[^/?]+)?/.exec(String(open || ""));
+  if (!m) return [];
+  const page = { apply: "Apply", assess: "Assessment", sign: "SignOffer", verify: "Verify" }[m[1]] ?? (m[2] ? "Vacancy" : "Careers");
+  const shared = m[1] === "jobs" ? ["public-app/src/pages/shared.tsx"] : ["public-app/src/pages/LinkProblem.tsx"];
+  return [`public-app/src/pages/${page}.tsx`, ...shared, "public-app/src/shell"];
+}
+
 /** Every file a picture depends on, repo-relative, sorted: its screen's feature folder and its sources. */
 function sourcesOf(spec, root = ROOT) {
   const out = new Set();
@@ -59,8 +69,11 @@ function sourcesOf(spec, root = ROOT) {
       for (const e of fs.readdirSync(full).sort()) walk(`${rel}/${e}`);
     } else if (!/\.test\.[jt]sx?$/.test(rel)) out.add(rel);
   };
-  const module = moduleOfOpen(spec.open);
-  if (module && fs.existsSync(path.join(root, "app/src/features", module))) walk(`app/src/features/${module}`);
+  if (spec.site === "public") for (const p of publicPagesOf(spec.open)) walk(p);
+  else {
+    const module = moduleOfOpen(spec.open);
+    if (module && fs.existsSync(path.join(root, "app/src/features", module))) walk(`app/src/features/${module}`);
+  }
   for (const s of spec.sources || []) walk(s.replace(/\/$/, ""));
   return [...out].sort();
 }
@@ -85,4 +98,4 @@ function readShots(chapterSlug, dir = IMG) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
 }
 
-module.exports = { ROOT, MANUAL, IMG, isChapter, readChapters, moduleOfOpen, sourcesOf, hashesOf, readShots };
+module.exports = { ROOT, MANUAL, IMG, isChapter, readChapters, moduleOfOpen, publicPagesOf, sourcesOf, hashesOf, readShots };

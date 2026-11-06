@@ -30,6 +30,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Layout | [PhoneOnly](#phoneonly) | `PhoneOnly`, `DesktopOnly` | Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen. | stable |
 | Layout | [SplitPanes](#splitpanes) | `SplitPanes` | A list beside the record it opens, with a divider the person can drag; on a phone the list fills the screen and the record covers it. | stable |
 | Layout | [Stack](#stack) | `Stack`, `Inline` | A vertical run of blocks with an even gap; Inline is the horizontal run that wraps. | stable |
+| Layout | [StickyColumns](#stickycolumns) | `StickyColumns` | Two columns side by side that both stick: the shorter waits while the longer scrolls, and both finish together at the foot of the row. | beta |
 | Display | [Accordion](#accordion) | `Accordion` | Questions and their answers, each closed until it is opened. | stable |
 | Display | [Avatar](#avatar) | `Avatar`, `Who` | A person's photo, or their initials in a round chip when there is none, with an optional presence dot; Who is the avatar with the name and a second line. | stable |
 | Display | [Banner](#banner) | `Banner` | One line across a page or a card in a status tone, with an icon and at most one action. | stable |
@@ -38,6 +39,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's picture: photographs of eight cities at dusk taking turns, drifting slowly under a film grain and rising points of light, each with its ticking clock, and the sign-in form in a panel of smoked glass. | beta |
 | Display | [Confetti](#confetti) | `Confetti` | A short burst of paper or stars from a celebration card, drawn on a canvas inside it, that settles and stops. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
+| Display | [Countdown](#countdown) | `Countdown` | The time left until an end the server set, counted on the server's clock: a timed assessment's clock. | beta |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
 | Display | [EmptyValue](#emptyvalue) | `EmptyValue` | The marker for a value that is not set: the only dash a screen shows, muted. | stable |
 | Display | [IconCards](#iconcards) | `IconCards`, `IconCard` | A grid of phone icon cards, two to a row; each IconCard is an icon, a title and a line, and opens a sheet with that section. | stable |
@@ -107,6 +109,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
 | Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
 | Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
+| Forms | [RatingField](#ratingfield) | `RatingField` | A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; disabled locks a given rating in place, readOnly draws one already given or a panel's mean. | beta |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
 | Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row. | stable |
@@ -160,10 +163,11 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it. | stable |
 | Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
 | Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls and pulls to refresh, the floating button, and the bottom bar. | stable |
-| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer. | stable |
+| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page on its faint City Green ground: the mark and the theme switch on top; the page on one card (at most 704 px), beside a Deep Green context pane, or as open sections up to 1120 px; a Deep Green footer under a Lagos skyline edge. | stable |
 | Shell | [PullIndicator](#pullindicator) | `PullIndicator` | The pull to refresh's Pin Drop: the pin in a disc that drops from under the header as the page is pulled, its yellow ring closing at the release point, Deep Green with the reload mark past the second notch. | stable |
 | Shell | [Rail](#rail) | `Rail` | The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot. | stable |
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
+| Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's Deep Green panel: the page's heading over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark). A hero across the top, or the context pane beside a form. | beta |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
@@ -575,6 +579,38 @@ A vertical run of blocks with an even gap; Inline is the horizontal run that wra
 <Inline gap={2}><Pill tone="ok">Approved</Pill><Pill>Annual Leave</Pill></Inline>
 ```
 
+### StickyColumns
+
+Two columns side by side that both stick: the shorter waits while the longer scrolls, and both finish together at the foot of the row.
+
+| | |
+|---|---|
+| Use | A page with two columns of unequal height on desktop: the public site's context pane beside its form (`pane`), a vacancy's text beside The Role card (`main-side`). |
+| Avoid | A list and the record it opens (use ListDetail); panes that scroll on their own at the height of the screen (use SplitPanes); a phone, where there are no columns. |
+| Phone | No columns and nothing sticks: the columns stack, `phoneFirst` coming first. |
+| Accessibility | Layout only: the reading order is the order the columns are given; nothing is hidden or moved for assistive technology. |
+| Status | beta |
+| Exports | `StickyColumns` |
+| Import | `import { StickyColumns } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/StickyColumns.tsx` |
+| Test | `packages/ui/src/layout/StickyColumns.test.tsx` |
+| Gallery | `packages/ui/src/layout/StickyColumns.gallery.tsx` (`npm run gallery`, `#/StickyColumns`) |
+
+**StickyColumns** props (`StickyColumnsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The columns, left to right: each child is one column. |
+| `layout` | `"pane" \| "main-side"` |  | `pane` (the default): a 400 px pane beside the rest, side by side from 1041 px. `main-side`: two thirds and one third, from 761 px. |
+| `phoneFirst` | `number` |  | The column, counted from 0, that comes first where the columns stack (a vacancy's Role card above its text on a phone). |
+| `gap` | `number` |  | The space kept above a column stuck at the top, and below one waiting at its foot, in px; 24 unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<StickyColumns layout="pane">{pane}{form}</StickyColumns>
+<StickyColumns layout="main-side" phoneFirst={1}>{article}{roleCard}</StickyColumns>
+```
+
 ## Display
 
 ### Accordion
@@ -842,6 +878,39 @@ A small round number: how many unread, waiting or new things sit behind a tab, a
 ```tsx
 <CountBadge count={3} label="approvals waiting" />
 <CountBadge count={120} tone="err" />
+```
+
+### Countdown
+
+The time left until an end the server set, counted on the server's clock: a timed assessment's clock.
+
+| | |
+|---|---|
+| Use | A deadline the server holds and enforces, given as its end and the server's own now from the same answer: a timed assessment on the public site. |
+| Avoid | A date to show (use formatDate); a day something is due, such as an untimed take-home brief (say the day; with endsAt null nothing is drawn); progress through steps (use ProgressBar). |
+| Phone | The same clock at the same size; it sits at the top of the page, right of the question count, and never wraps. |
+| Accessibility | A timer named by its label and the time left; silent each second, it says once, politely, the time really left when the warning time and the last minute arrive, and Time is up at the end. Nothing is said when it first shows. |
+| Status | beta |
+| Exports | `Countdown` |
+| Import | `import { Countdown } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Countdown.tsx` |
+| Test | `packages/ui/src/display/Countdown.test.tsx` |
+| Gallery | `packages/ui/src/display/Countdown.gallery.tsx` (`npm run gallery`, `#/Countdown`) |
+
+**Countdown** props (`CountdownProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `endsAt` | `string \| null` | yes | When the time runs out, ISO, as the server sent it; null (an untimed sitting) draws nothing. |
+| `serverNow` | `string` | yes | The server's time in the same answer, ISO. The clock counts from when this answer first arrived, so a wrong device clock or a remount changes nothing. |
+| `onEnd` | `() => unknown` |  | Called when the time runs out, and again every `retryEvery` seconds while it stays run out (the server may take a moment to close it). |
+| `warnAt` | `number` |  | Seconds left at which the clock turns amber and says so; 300 unless set. The last minute is always red. |
+| `retryEvery` | `number` |  | Seconds between calls to onEnd once the time has run out; 10 unless set. |
+| `label` | `string` |  | What the clock counts, Title Case; "Time Left" unless set. |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<Countdown endsAt={session.ends_at} serverNow={session.server_now} onEnd={reload} />
 ```
 
 ### EmptyState
@@ -3318,6 +3387,46 @@ Pick one of two to five options shown as stacked rows, each with an optional gly
 <RadioCards label="Payroll Access" value={level} onChange={setLevel} options={levels.map((l) => ({ value: l.code, label: l.name, leading: <LevelMeter value={l.rank} label={l.name} decorative /> }))} />
 ```
 
+### RatingField
+
+A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; disabled locks a given rating in place, readOnly draws one already given or a panel's mean.
+
+| | |
+|---|---|
+| Use | A score a person gives by eye against a scale: a trait on the interview card, an overall rating. disabled for a card already submitted; readOnly for ratings and averages shown back once a panel's round closes. |
+| Avoid | A number that is counted or typed (use NumberField); a choice between named options (use ChoiceField or RadioCards); a rating that saves the moment it is tapped outside a form (pair it with the form's own save). |
+| Phone | Every star is a 44 px target; ten stars sit in two rows of five so the row never runs off a 390 px screen. No hover preview: the tap is the choice. On desktop the stars follow the density (36 px Compact, 40 px Comfortable). |
+| Accessibility | A radio group: each star is a radio named "7 of 10"; Left and Right, Up and Down, Home and End move and choose, and the readout beside it is hidden so the value is never read twice. With onClear, a tap on the star already chosen, or Delete or Backspace, takes the rating back to not rated. Inside a Field its label names the group (and the readOnly image) and the error is linked; alone, pass label. readOnly is one image named "Level of Confidence: 7 of 10". |
+| Status | beta |
+| Exports | `RatingField` |
+| Import | `import { RatingField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/RatingField.tsx` |
+| Test | `packages/ui/src/form/RatingField.test.tsx` |
+| Gallery | `packages/ui/src/form/RatingField.gallery.tsx` (`npm run gallery`, `#/RatingField`) |
+
+**RatingField** props (`RatingFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `number \| null` | yes | The rating given, 1 to max; null while none is given. A value off the scale shows as not rated. readOnly also takes a mean (7.4), its stars rounded. |
+| `onChange` | `(value: number) => void` |  | Called with the rating tapped or chosen with the keys. Not needed when readOnly or disabled. |
+| `onClear` | `() => void` |  | Called when the rating is taken back: a tap on the star already chosen, or Delete or Backspace. A mis-tapped star on a draft can then go back to not rated instead of staying inside an average. Without it a chosen star stays chosen. |
+| `onBlur` | `() => void` |  | Called when focus leaves the stars. |
+| `max` | `number` |  | The top of the scale, 3 to 10; 10 unless set. |
+| `label` | `string` |  | Names the stars when no Field label sits above them. |
+| `disabled` | `boolean` |  | Shows the rating in place but takes no change: a card already submitted. |
+| `readOnly` | `boolean` |  | Draws the rating as a picture without letting it change: a panelist's rating, or a trait's mean, once the round is closed. |
+| `decimals` | `number` |  | readOnly only: decimal places in the readout, so a column of means reads alike (1 shows 7 as 7.0). A whole number and one decimal otherwise. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<Field label="Level of Confidence" {...form.status("confidence")}><RatingField {...form.field("confidence")} /></Field>
+<RatingField label="Oral Communication Skills" value={7.3} readOnly decimals={1} />
+<RatingField label="Level of Confidence" value={card.rating} onChange={rate} onClear={unrate} />
+```
+
 ### RecordPicker
 
 Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything.
@@ -3501,6 +3610,7 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `placeholder` | `string` |  | Shown on the button while nothing is chosen (Choose One). |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it). |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Unused here: a pick is always a whole value, so there is no half-typed problem to report. Taken so a form's `{...f.field()}` never reaches the button. |
 | `name` | `string` |  | Its name in a submitted form. |
 | `disabled` | `boolean` |  | Shown but not usable. |
 | `"aria-label"` | `string` |  | Names it when no Field label sits above it. |
@@ -3610,11 +3720,14 @@ Where a person is in a few steps: one bar per step, filled up to the step in han
 | `steps` | `readonly string[]` | yes | The steps' titles in order, Title Case, at most 4 words each. |
 | `at` | `number` | yes | The step in hand, counted from 0. |
 | `titled` | `boolean` |  | Also name the step in hand after its number ("Step 2 of 4 · Access"). Off inside Wizard, which shows the title as its heading. |
+| `vertical` | `boolean` |  | A column of the steps by name, each with its number or a tick, for a pane beside the form (the public site's Apply). |
+| `decorative` | `boolean` |  | Hides the bar from assistive technology, when another bar on the screen already names the steps (the Wizard's own). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
 <StepBar steps={["Name", "Access", "Details", "Review"]} at={1} />
 <StepBar steps={["Name", "Access", "Details", "Review"]} at={1} titled />
+<StepBar steps={["About You", "CV and Questions", "Why This Role"]} at={1} vertical decorative />
 ```
 
 ### Switch
@@ -3840,7 +3953,7 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 | Use | More than six fields or more than one topic (FRONTEND_GUIDE §8.1): a vacancy, an employee, a policy. |
 | Avoid | Six fields or fewer (one modal form); steps that are not topics. |
 | Phone | Opens in a full-screen sheet; the indicator shows the step number and title; Next is full width at the bottom. |
-| Accessibility | The current step is announced; the indicator marks it with aria-current; focus moves to the step's heading when it changes. |
+| Accessibility | The current step is announced; the indicator marks it with aria-current; focus moves to the step's heading when it changes. A new step slides in from the side it was reached from, still under reduced motion. |
 | Status | stable |
 | Exports | `Wizard` |
 | Import | `import { Wizard } from "@mycity/ui";` |
@@ -3861,6 +3974,7 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 | `onStepChange` | `(index: number) => void` |  | Called with the step index each time it changes, so a draft can remember it. |
 | `step` | `number` |  | The step in view, when the form decides it (a refusal on a field of step 1 takes the person back there). Set it with `onStepChange`; left unset, the wizard keeps its own step. |
 | `error` | `ReactNode` |  | The one general error, above the footer: a refusal that names no field (FRONTEND_GUIDE §8.3). |
+| `level` | `2 \| 3` |  | The step heading's level: h3 under a modal's title (the default), h2 straight under a page's own h1. |
 
 ```tsx
 <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
@@ -5308,14 +5422,14 @@ The staff app's phone frame: the top bar and title rail, the page, which alone s
 
 ### PublicPage
 
-The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer.
+The public site's page on its faint City Green ground: the mark and the theme switch on top; the page on one card (at most 704 px), beside a Deep Green context pane, or as open sections up to 1120 px; a Deep Green footer under a Lagos skyline edge.
 
 | | |
 |---|---|
-| Use | Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). |
+| Use | Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). layout open for a page a stranger browses (Careers, a Vacancy), with a SkylineHero at its head; the card for a page a person fills in or reads once, with a `pane` (SkylineHero size pane) carrying its identity where it has one. |
 | Avoid | The staff app (it has its own shells); a second card inside the card; a page of explanation (a PageMessage says one thing). |
-| Phone | The card runs edge to edge with no side border; the header and footer keep a 16 px margin; the theme switch is a 44 px target. |
-| Accessibility | A banner, a main and a contentinfo landmark; the theme switch is a named button. PageMessage's title is a heading (h2) and its icon is decorative. |
+| Phone | The card runs edge to edge with no side border; with a pane, the pane is a compact band at the top and the card rises over its foot as a sheet; open, the page's first block (its hero) runs edge to edge and its sections keep their own 16 px margin; the header keeps a 16 px margin; the theme switch and the footer's links are 44 px targets; a `bar` is fixed at the foot and the page keeps room for it. |
+| Accessibility | A banner, a main and a contentinfo landmark; the theme switch is a named button; the pane is inside the main, before the card, so the h1 it carries comes first. The skyline edge is decorative. PageMessage's title is a heading (h2) and its icon is decorative. |
 | Status | stable |
 | Exports | `PublicPage`, `PageMessage` |
 | Import | `import { PublicPage, PageMessage } from "@mycity/ui";` |
@@ -5329,11 +5443,14 @@ The public site's page: the mark and the theme switch on top, the page on one ca
 |---|---|---|---|
 | `brand` | `ReactNode` |  | The mark at the top left, usually a link home with Brand; left out when the page draws its own inside the card. |
 | `children` | `ReactNode` | yes | The page, drawn on the card. |
+| `pane` | `ReactNode` |  | The context pane: a SkylineHero of size pane with the page's heading and facts. On desktop (1041 px and wider) it stands at the left and the card at the right, both sticking; narrower, it is a band above the card. |
 | `below` | `ReactNode` |  | Anything under the card (a second action, a note from the system). |
+| `bar` | `ReactNode` |  | A phone's action bar, fixed at the foot of the screen (a vacancy's Apply); the page keeps room for it. Pass it inside PhoneOnly. |
 | `links` | `ReactNode` |  | The footer's links (Careers, Verify a Document). |
 | `company` | `string` |  | The company line at the foot; MyCity App Ltd · Lagos, Nigeria unless set. |
 | `foot` | `ReactNode` |  | More at the very foot (the mock's demo links, on a laptop only). |
 | `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
+| `layout` | `"card" \| "open"` |  | `card` (the default): the page on one card, 704 px, or beside its pane. `open`: no card, up to 1120 px, the page lays out its own sections. |
 
 **PageMessage** props (`PageMessageProps`)
 
@@ -5347,7 +5464,8 @@ The public site's page: the mark and the theme switch on top, the page on one ca
 
 ```tsx
 <PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>} links={<a href="/verify">Verify a Document</a>}>...</PublicPage>
-<PageMessage icon="ok" tone="ok" title="Application Sent">We reply within five working days.</PageMessage>
+<PublicPage pane={<SkylineHero size="pane" title="Partnerships Associate" record />}>...</PublicPage>
+<PageMessage icon="ok" tone="ok" title="Application Sent">We read every application.</PageMessage>
 ```
 
 ### PullIndicator
@@ -5442,6 +5560,45 @@ A small dark card floating at the foot of the shell for something about the app 
 
 ```tsx
 <ShellNotice icon="refresh" actions={<Button variant="primary" size="sm">Reload</Button>}>A new version is ready</ShellNotice>
+```
+
+### SkylineHero
+
+The public site's Deep Green panel: the page's heading over the drawn Lagos skyline, lit as Lagos is lit right now (day, dusk, night, its windows coming on after dark). A hero across the top, or the context pane beside a form.
+
+| | |
+|---|---|
+| Use | The head of a public page that invites a stranger in: Careers (size l, with the search under the heading) and a Vacancy (size m, with the role's facts as chips). size pane is the context pane PublicPage stands beside a page a person works through (Apply, an Assessment): its identity, its facts, and for a running assessment the clock and the progress. |
+| Avoid | The staff app; decoration under a page that has its own heading already; text more than a line. |
+| Phone | Edge to edge, the heading 24 px, the skyline shorter so the first screen still shows the page under it; the line under the heading is hidden (a page subtitle is desktop only). The pane becomes a compact band above the card (from 1040 px down), its `wide` part left off. |
+| Accessibility | The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline and the street grid are decorative (aria-hidden) and still under reduced motion. The panel takes the dark theme's tokens, so what sits on it (a clock, a progress bar) keeps AA on Deep Green whatever the page's theme. |
+| Status | beta |
+| Exports | `SkylineHero` |
+| Import | `import { SkylineHero } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/SkylineHero.tsx` |
+| Test | `packages/ui/src/shell/SkylineHero.test.tsx` |
+| Gallery | `packages/ui/src/shell/SkylineHero.gallery.tsx` (`npm run gallery`, `#/SkylineHero`) |
+
+**SkylineHero** props (`SkylineHeroProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The page's heading: what the page is (Work With Us, the role's title, Question 2 of 7). |
+| `eyebrow` | `ReactNode` |  | One short line over the heading: whose it is (Careers at MyCityApp, the role's department). |
+| `text` | `ReactNode` |  | One line under the heading. On l and m at most 8 words, desktop only; on the pane, a line the person needs (the link's expiry, a greeting), shown everywhere. |
+| `facts` | `ReadonlyArray<{ icon: IconName; text: string }>` |  | The record's facts as chips on the panel, each a glyph and a few words (Lagos, Hybrid, Full Time). |
+| `children` | `ReactNode` |  | What sits under the heading: a search field; on the pane, the clock and the progress. |
+| `wide` | `ReactNode` |  | The pane only: what it adds where it stands beside the page (1041 px and wider), such as the steps; left off the compact band. |
+| `size` | `"l" \| "m" \| "pane"` |  | `l` (the default) for a page's front door, `m` for a record's page (a role), `pane` for the context pane beside a form (PublicPage `pane`). |
+| `record` | `boolean` |  | The title names a record (a role, an assessment), so it is content, not interface copy: the copy gates skip it. |
+| `titleRef` | `Ref<HTMLHeadingElement>` |  | The heading, for a page that moves focus to it (an assessment's next question). It takes focus without a ring. |
+| `still` | `boolean` |  | Draws the skyline without motion even where motion is on (the gallery, a still picture). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<SkylineHero eyebrow="Careers at MyCityApp" title="Work With Us" text="Building the app that knows every Nigerian city." />
+<SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
+<SkylineHero size="pane" record eyebrow="Your Application" title="Partnerships Associate" text="This link is yours until 12/11/2026." />
 ```
 
 ### TopBar
@@ -6006,6 +6163,9 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `ControlIds` (type) | `lib/ids.ts` | The ids of one control and the parts that describe it. |
 | `useControlIds` | `lib/ids.ts` | The ids for one control, from a readable stem (the field name) and a page-unique suffix. |
 | `describedBy` | `lib/ids.ts` | A space-separated id list for aria-describedby, skipping the parts not shown; undefined when none are. |
+| `LAGOS_OFFSET` | `lib/lagos.ts` | Lagos keeps UTC+1 all year, so its hour comes straight from the clock. |
+| `lagosHour` | `lib/lagos.ts` | The hour in Lagos now, minutes as a fraction (0 to 24): what lights the drawn skyline. |
+| `useMinute` | `lib/lagos.ts` | The time now, read again each minute: the public site's sky and its footer clock move on with the city. |
 | `LINK_ENDINGS` | `lib/links.ts` | What counts as a link in a message (docs/guides/community.md §6). |
 | `FoundLink` (type) | `lib/links.ts` | One link found in text: where it is, as written, and where it goes. |
 | `findLinks` | `lib/links.ts` | Every link in a text, in order. |

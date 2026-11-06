@@ -13,7 +13,7 @@
  *   attendance     today and the 14 working days before it, through the attendance module's
  *                  own day writer and day-close (lib/attendance.js)
  *   forward rows   goals and targets, a review cycle, partners and their pipeline, expenses
- *                  and budgets, and vacancies for the open seats, by SQL with fixed ids
+ *                  and budgets, by SQL with fixed ids (vacancies are 55_recruitment.js's now)
  *                  listed in HOME_STAGING_ROWS (lib/home-staging-rows.js), which says
  *                  how each owning milestone takes them away when its own seed lands (M2's
  *                  tasks and calendar come from 40_workspace.js)

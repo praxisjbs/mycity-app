@@ -10,7 +10,8 @@
  *   npm run guide:shots -- --stale              only the ones the gate calls stale or missing
  *
  * Each picture is taken on the staff app's demo build (the in-browser mock on the staging seed's
- * people, never anybody's real data), signed in as its spec's account, at desktop (1440 × 900)
+ * people, never anybody's real data), signed in as its spec's account, or with `site: public` on
+ * the public site's demo build, signed out as a candidate is, at desktop (1440 × 900)
  * and phone (390 × 844) size: the script opens its address, does its steps, draws its numbered
  * marks over their targets, and saves `docs/manual/img/<chapter>/<shot>.<device>.png`. The
  * chapter's `shots.json` keeps each picture's hashes (scripts/guide/lib.js), which the gate
@@ -21,7 +22,7 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const { ensureAppBuild, serve, appSettle, launch, WIDTHS, APP_DIST } = require("../check/lib/screens");
+const { ensureAppBuild, ensurePublicBuild, serve, appSettle, launch, WIDTHS, APP_DIST, PUBLIC_DIST } = require("../check/lib/screens");
 const { IMG, readChapters, hashesOf, readShots } = require("./lib");
 
 /** The demo's accounts (app/src/api/mock/data): who each `as` signs in as. */
@@ -303,7 +304,8 @@ async function take(page, shot, device, file, { guest = false, origin = "" } = {
   if (guest) {
     await page.goto(`${origin}${shot.spec.open}`);
     await page.addStyleTag({ content: HIDE_DEMO });
-    await page.waitForSelector("#root *", { timeout: 10000 });
+    // Any element drawn: the first in #root may be the demo's own chrome, which HIDE_DEMO hides.
+    await page.waitForSelector("#root *:visible", { timeout: 10000 });
     await page.evaluate(() => document.fonts.ready.then(() => true));
   } else {
     // Move inside the app: a reload would sign out (the session lives in memory).
@@ -351,15 +353,23 @@ async function main(argv) {
     console.log("guide:shots: nothing to take");
     return 0;
   }
-  ensureAppBuild();
-  const { server, origin } = await serve(APP_DIST);
+  // The hub's demo, and the public site's when a picture asks for it: each built and served once.
+  const sites = {};
+  const siteOf = (shot) => (shot.spec.site === "public" ? "public" : "hub");
+  for (const site of new Set(list.map(siteOf))) {
+    if (site === "public") ensurePublicBuild();
+    else ensureAppBuild();
+    sites[site] = await serve(site === "public" ? PUBLIC_DIST : APP_DIST);
+  }
   const browser = await launch();
   const failed = [];
   const taken = new Map();
   try {
-    for (const account of new Set(list.map((s) => s.spec.as)))
+    for (const key of new Set(list.map((s) => `${siteOf(s)} ${s.spec.as}`)))
       for (const device of ["desktop", "phone"]) {
-        const mine = list.filter((s) => s.spec.as === account && s.spec.devices.includes(device));
+        const [site, account] = key.split(" ");
+        const { origin } = sites[site];
+        const mine = list.filter((s) => siteOf(s) === site && s.spec.as === account && s.spec.devices.includes(device));
         if (!mine.length) continue;
         let s = await session(browser, origin, account, device);
         for (const shot of mine) {
@@ -397,7 +407,7 @@ async function main(argv) {
       }
   } finally {
     await browser.close();
-    server.close();
+    for (const { server } of Object.values(sites)) server.close();
   }
   for (const shot of taken.values()) {
     if (failed.some((f) => f.startsWith(`${shot.chapter}/${shot.id} `))) continue;

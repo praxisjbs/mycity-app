@@ -46,14 +46,14 @@ saying who agreed and when.
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 0 | 0 | 5 | 0 | 0 |
-| M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
-| M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
+| M4 Recruitment End to End | 9 | 0 | 0 | 9 | 0 | 0 |
+| M5 Offers, Documentation & Onboarding | 4 | 4 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 8 | 8 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **104** | **30** | **0** | **74** | **0** | **0** |
+| **Total** | **104** | **21** | **0** | **83** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
@@ -1208,16 +1208,35 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 38 | Vacancies | `vacancies` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 39 | Candidates | `candidates` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 40 | Assessments | `assessments` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 41 | Interviews | `interviews` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 42 | Offers | `offers` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 43 | Onboarding | `onboarding` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 44 | Talent Pool | `talent-pool` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
+| 38 | Vacancies | `vacancies` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 39 | Candidates | `candidates` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 40 | Assessments | `assessments` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 41 | Interviews | `interviews` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 42 | Offers | `offers` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 43 | Onboarding | `onboarding` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 44 | Talent Pool | `talent-pool` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 
 **Notes**
 
+- 05/11/2026 · GE · (Ose) Follow-ups from P15: the Recruitment chapter matches the screens (the wizard's fields per step, Publish Now, What We Look For, Screen Applications and Must Meet, Score With AI reads once, Send to Candidates from an assessment, the sittings' states as shown, My Panels, Candidate Details' Edit, My Card's Save Draft, Cancel Interview, Edit Report, Remove asks no reason), and Vacancy (#81) shows Role Overview once when a description opens with that heading (its picture retaken). Left: GE's follow-ups in the handoff.
+- 06/11/2026 · GE · The P15 follow-ups closed on Vacancies, Candidates, Assessments, Interviews and Talent Pool (#38 to #41, #44) and the public Assessment (#83): panelists only on a panel, rounds close once full and started, the staff sheet's formatted texts, a seat's Create Vacancy filled in, protected phrasings refused, Time Up reachable, the pool's scope, Word CVs, one-press Import, Cancel goes back, radio groups for short choices; mail to reserved domains never sent. Pictures retaken. No ticks changed. Ose's chapter corrections are in. Left: nothing open on M4 but #72's review.
+- 05/11/2026 · GE · The eight decisions from the P15 audit, built: Close Vacancy offers Not Progress All for those still in progress, and Not Progressing works on a closed role (#38, #39); a hiring manager needs `recruitment` view; Send Assessment moves the candidate to Assessment (#39, #40); Write With AI asks before replacing typed words (#38); Apply's receipt promises no reply time (#82); the nightly `apply-cv-purge` removes CVs left on Apply links that ended without an application; the repository is private, so MyCity's documents stay. Guide, chapter and its pictures follow; tests added. No ticks changed. Left: the minor follow-ups in `docs/handoff/m4-recruitment.md` (Ose's chapter corrections; GE's list).
+- 05/11/2026 · GE · (auditor) P15, close-out: Vacancies, Candidates, Assessments, Interviews and Talent Pool (#38 to #41, #44) and the public Careers, Vacancy, Apply and Assessment (#80 to #83) are Built (API, UI and Mobile all ticked). Audited by five independent reviewers and walked end to end on a live stack (publish, apply with a CV, the assessment on a phone, marking, a blind two-person panel, the report and its form, shortlist, not progressing, the pool and its invite). Fixed on the way: Apply's CV upload was refused (no application could be made), a spent Apply link said whether an email had applied, and the findings listed in `docs/handoff/m4-recruitment.md` §7. The guide is Built; its pictures retaken. Left for GE: the follow-ups in that §7 entry. Not on staging until #72 merges.
+- 05/11/2026 · GE · P16: the Owner column follows the team as it now stands (M5 AJ, M6 TB, M7 LA; M4 GE, M8 AJ, M10 TB as before). No status changed. Left: P14, P15.
+- 05/11/2026 · GE · P13, the Recruitment staging seed (`seeds/staging/55_recruitment.js`, tested by `tests/integration/recruitment-staging-seed.test.js`): every Recruitment screen (#38 to #41, #44) and the public pages have records on staging after the next `scripts/db/seed.js --staging`, through the services, on invented `@example.test` candidates, with the Implementation Team as hiring managers and panelists. Home's staging vacancies removed. No ticks: no screen changed. Left: P14, P15, P16.
+- 05/11/2026 · GE · (Ose) P14: the User Guide for M4. `docs/manual/recruitment.md` (Vacancies, Candidates, Assessments, Interviews, Talent Pool: a section a screen, every bold name as the screen reads it, `needs` on what wants the edit grant) with its 18 pictures on desktop and phone (`docs/manual/img/recruitment/`, `npm run guide:shots -- --chapter recruitment`), and `docs/manual/public-site.md` (Careers, a vacancy, Apply, an assessment, as a candidate sees them). Checked against the P9 screens: Careers Settings' traits are each a **Default Trait** with **Add Trait**, **Remove** and **Save Settings**; a sitting opens with its marks and **Mark Answers** saves them; **To Mark** filters the sittings. The user-guide gate now reads `public-app/src` for the public chapter's words. Gate, the guide's parse and search tests and the User Guide integration test pass. Left: nothing for P14.
+- 05/11/2026 · GE · (Ose) The User Guide's pictures reach the public site: a spec with `site: public` is taken signed out on the public app's demo build (`scripts/guide/shoot.js`, `ensurePublicBuild` in `scripts/check/lib/screens.js`, the parser in `packages/contract/guide.js`, its page files as its sources in `scripts/guide/lib.js`). `public-site.md` has eight pictures, desktop and phone. They showed two faults on the P11 pages, fixed: the upload line said its size twice ("up to 10 MB, up to 10 MB"), and a long assessment question was all bold (its first line is now the question, the rest body text).
+- 05/11/2026 · GE · P9 and P10: the staff screens of Vacancies, Candidates, Assessments, Interviews and Talent Pool (#38 to #41, #44) on the contract, one file per tab (`app/src/features/recruitment/`, `index.tsx` routes only; decision 15), built from MyCity's documents: the Head, Sales & Revenue job description shapes New Vacancy (a three-step wizard, Role, Details and Pay and Publish, with Write With AI; Questions with Apply questions and the interview traits; Scorecard; Careers Settings with MyCity's ten default traits; Candidate Emails), the Interview Assessment Format is My Card (each trait rated 1 to 10 with ten stars, saved as tapped, a second tap takes it back, the panelist's own score as they go; decision, comments, private notes; Submit Card) and the interview's sheet (Candidate Details, the panel blind until the round closes, each trait's average, the total, the report, Download Form), and the Graphics and Motion Design assessment is the practical brief Mark Answers opens (a file or a link per answer). The board of five stages with Move To, Not Progressing, Reopen, Add to Pool, Send Assessment, Schedule Interview, Invite to Apply and Screen With AI; the Talent Pool with Invite to Apply, Remove and Export. A form opened from a sheet returns to it. The mock (`app/src/api/mock/modules/recruitment.ts`, fixtures in `mock/data/recruitment.ts`) answers every M4 route of guide §5 in the contract's shapes and checks bodies with the contract's schemas; M5's Offers and Onboarding (#42, #43) moved to their own files unchanged. Tests: five screen tests (15 cases, axe and the copy rules), app suite 89 files and 686 tests, typecheck, lint, forms, palette, dashes, components, native-ui, search coverage, addresses, five-second and two-shells pass. Status stays In progress: Status and the summary counts are P15's (handoff §5). Left: P11 (the public pages, #80 to #83), P13 (staging seed), P14 (the manual chapter and its pictures).
+- 05/11/2026 · GE · Talent Pool (#44) API built on `m4/recruitment` (P6b): Add to Pool and renew, the list and its figures, Invite to Apply (source pool), Remove, Export, the 24-month purge, ⌘K. Every M4 screen's API is now built. Left: the screens (P9, P11), the staff mock (P10).
+- 05/11/2026 · GE · Interviews (#41) API built on `m4/recruitment` (P6): Schedule with its calendar entry and the candidate's .ics, Reschedule, Cancel, Candidate Details, the blind card (traits 1 to 10 and a decision), submit and the closing rule, Close Round, the report and the Interview Assessment Form, Tidy With AI, the CV for the panel, the daily reminder. Left: the screens (P9).
+- 05/11/2026 · GE · Assessments (#40) and the public Assessment page (#83) API built on `m4/recruitment` (P5): the library (ASM codes, questions with their points sealed, on and off, export and import, Suggest With AI), sittings (Send, Send to Candidates, Mark Answers, Cancel), the candidate's page on the server's clock (Start, answers as given, file or link answers, Submit, TIME_UP), scoring, and the `assessment-expiry` job. Left: the screens (P9, P11).
+- 05/11/2026 · GE · Candidates (#39) and Apply (#82) API built on `m4/recruitment` (P4): Apply with the CV quarantined and kept against its link, the estimate, the board ranked by the weighted scorecard, moves, Not Progressing and Reopen, Score With AI and Screen With AI (`cv-screen`, Deep Reasoning, from the outbox), Invite to Apply, Candidate Emails, ⌘K. Left: the screens (P9, P11); P6 cancels a not-progressed candidate's interviews.
+- 04/11/2026 · GE · (Ose) P7 and P8 audited and fixed (`docs/handoff/m4-recruitment.md` §7): the candidate emails ship as Markdown and render a title's & and a typed name as written; the interview invite says where from the interview's type; the five prompts tightened (no CV cap, protected conditions not applied, fair assessment points); `Countdown` keeps its time across a remount and announces the time really left; `RatingField` gains `disabled`, `decimals` and the full keyboard. Shared fixes in mail subjects, Markdown templates, the AI's no-gap check and phone masking. No ticks: no screen changed. Left: P4 to P6 as the handoff lists.
+- 04/11/2026 · GE · (Ose) M4 packages P7 and P8 on `m4/recruitment` (`docs/handoff/m4-recruitment.md`). P7: the five candidate emails (`templates/email/application-received.html`, `apply-invite.html`, `assessment-invite.html`, `interview-invite.html`, `candidate-not-progressed.html`; `tests/unit/recruitment-emails.test.js`) and the five prompts (`cv-screen`, `assessment-questions`, `interview-notes-cleanup` new; `jd-draft` and `screening-questions` to version 2 with the redaction, no-gap and no-discrimination rules). The contract's `AssessmentInviteEmailVars` takes an untimed sitting (`duration_minutes` or `due_days`) and `InterviewInviteEmailVars` a `rescheduled` flag. P8: `RatingField` (Forms; 1 to 10 stars, two rows of five 44 px stars on a phone, read only for a closed round) and `Countdown` (Display; the server's clock for a timed assessment), each with test and gallery page; `docs/COMPONENTS.md` regenerated. No ticks: no screen changed. Left: P4 to P6 declare the email variables in their events files and pass the prompt inputs the handoff names; P9 and P11 put the two components on the screens.
+- 04/11/2026 · GE · Audit of P1 to P3: migrations folded (4050 removed, its changes in 4010 to 4040; local databases rebuilt), contract fixes (an edit clears a field sent empty, at most 20 traits, numbers never read from an empty field, Screen With AI reuses kept conditions) and Vacancies fixes (a draft can close, remote drops the place, one live vacancy a seat, suggestions, cards and Careers Settings held to scope, an answered question retired when reworded), with tests. Candidates, Assessments, Interviews, Talent Pool, Apply and Assessment (#39 to #41, #44, #82, #83) now owned by GE. Left: P4 onwards.
+- 04/11/2026 · GE · Vacancies (#38) API built on `m4/recruitment` (P3): list, sheet, New Vacancy and Edit, Publish, Pause, Resume, Close, questions and traits, scorecard parts, Careers Settings, Suggested From Organogram, Write With AI, the New Vacancy and Save Vacancy cards, ⌘K. The careers page's API too: Careers (#80) and Vacancy (#81), with the Apply link Vacancy's button mints. Left: the screens (P9, P11) and Apply itself (P4, #82).
+- 04/11/2026 · GE · Talent Pool (#44) moves from M5 (LA) to M4 (GE), from the internal Modules Review of 04/11/2026 (TB): MILESTONES §9 and §18. Also from that review and MyCity's interview form, assessment brief and job description: the interview card's ten traits rated 1 to 10, Screen With AI with must-meet conditions, scorecard parts on or off, Send to Candidates, untimed assessments, file or link answers (`docs/guides/recruitment.md`). Left: the review's migrations (4060, and the changes later folded into 4010 to 4040) and the contract for them, then P3 onwards.
+- 04/11/2026 · GE · M4 on `m4/recruitment` (#72), packages P1 and P2 (`docs/handoff/m4-recruitment.md`): the contract for Vacancies, Candidates, Assessments and Interviews and the public Careers, Vacancy, Apply and Assessment pages (`packages/contract/schemas/{vacancies,candidates,assessments,interviews}.js`), and migrations 4010 to 4040 with seed 4199 (the application number APP-0001), round trip passed. No screen moved yet. Left: the four backends (P3 to P6), then the screens.
 - 25/10/2026 · JP · Candidates (#39), Interviews (#41), Offers (#42) and Onboarding (#43), on the mock: on a phone a tapped record opens in a sheet (F31: `ListDetail`, `DetailPane`), never under the list; Interviews' Consolidate moves into that sheet on a phone. A candidate's card on the board opened nothing (it passed a prop Kanban does not take); it opens the candidate now. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/recruitment/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/recruitment.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
@@ -1225,11 +1244,11 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 45 | Payroll Runs | `payroll-runs` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 46 | Payslips | `payslips` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 47 | Salary Structure | `salary-structure` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 48 | Deductions | `deductions` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 49 | Statutory | `statutory` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
+| 45 | Payroll Runs | `payroll-runs` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
+| 46 | Payslips | `payslips` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
+| 47 | Salary Structure | `salary-structure` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
+| 48 | Deductions | `deductions` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
+| 49 | Statutory | `statutory` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
@@ -1240,13 +1259,13 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 50 | Pipeline | `pipeline` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 104 | Categories | `categories` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 51 | Partners | `partners` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 52 | Leads | `leads` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 53 | Proposals | `proposals` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 54 | Contracts & MOUs | `contracts-and-mous` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 55 | Analytics | `analytics` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
+| 50 | Pipeline | `pipeline` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 104 | Categories | `categories` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 51 | Partners | `partners` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 52 | Leads | `leads` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 53 | Proposals | `proposals` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 54 | Contracts & MOUs | `contracts-and-mous` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 55 | Analytics | `analytics` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
@@ -1403,20 +1422,20 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 95 | Status | `status` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
-| 96 | Performance | `performance` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
-| 97 | Faults | `faults` | M9 | GE | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
-| 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 29/10/2026 |
+| 69 | Organisation | `organisation` | M9 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 95 | Status | `status` | M9 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 96 | Performance | `performance` | M9 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 97 | Faults | `faults` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 70 | Users | `users` | M9 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 71 | Roles & Permissions | `roles-and-permissions` | M9 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 72 | Approvals | `approvals` | M9 | TB | ☑ | ☑ | ☑ | Built | 29/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | LA | ☑ | ☑ | ☑ | Dropped | 20/10/2026 |
 | 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 76 | Documents & Numbering | `documents-and-numbering` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 78 | Security | `security` | M9 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 79 | Audit Log | `audit-log` | M9 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
@@ -1620,15 +1639,18 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Path | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 80 | Careers | `/jobs` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 81 | Vacancy | `/jobs/<slug>` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 82 | Apply | `/apply/<token>` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 83 | Assessment | `/assess/<token>` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 84 | Sign Offer | `/sign/<token>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 85 | Verify Document | `/verify/<number>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 105 | Proposal | `/proposal/<token>` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
+| 80 | Careers | `/jobs` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 81 | Vacancy | `/jobs/<slug>` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 82 | Apply | `/apply/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 83 | Assessment | `/assess/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
+| 84 | Sign Offer | `/sign/<token>` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 85 | Verify Document | `/verify/<number>` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 105 | Proposal | `/proposal/<token>` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
 - 05/11/2026 · JP · Proposal (#105, `go.mycityapp.io/proposal/<token>`, M7) ratified and registered by M7 PR 1 (docs/guides/partnerships.md §2, §6.10): the route, its row and Coming Soon. Not started: the page, its public routes and the design kit come with M7 PR 7.
+- 05/11/2026 · GE · (Ose) P11 re-audit: a file answer's upload now answers the stored document (`AnswerFileSaved`, as an Apply CV does), so the live page no longer shows a saved file as failed (integration test added); a link saved over a file clears the file's card; the public mock holds the staff mock's six vacancies, candidates and assessments (a draft is never public; a role past its closing day reads closed, as the server reads it); the merge's reformatting of the recruitment guide, the handoff and this file undone (it had broken the guides gate and written `<Stage></stage>`).
+- 05/11/2026 · GE · (Ose) Public site redesign (#80 to #85, presentation only): the City Green ground (`--canvas`, AA held by the token test), a Deep Green footer with a Lagos skyline edge and Lagos time, Apply and Assessment beside a sticky Deep Green context pane on desktop (a band on a phone), Vacancy on `StickyColumns` (both columns stick, the shorter waits), one staggered arrival, wizard steps that slide. New in `@mycity/ui`: `StickyColumns`, SkylineHero size `pane`, StepBar `vertical`, `lib/lagos.ts`. Left: retake the public chapter's pictures; Sign Offer and Verify (M5, LA) keep a centred card until a pane is agreed.
+- 05/11/2026 · GE · (Ose) P11: Careers, Vacancy, Apply and Assessment on the contract (`contract.gen.ts`; `types/public.ts` keeps only M5's sign and verify). Careers and a vacancy open on SkylineHero, Lagos lit as it is at the hour, in PublicPage's new open layout; role cards, search above 8, the server's pages. A vacancy's four texts arrive as blocks and draw with RichText; The Role card with Apply for This Role beside the text on desktop, a bar at the foot on a phone; paused, closed and filled banners. Apply is a three-step Wizard on ApplicationSubmit (the vacancy's questions marked as the server marks them, the privacy tick), then the receipt. Assessment: intro, Countdown or the due day, autosave with Saved, file answers by upload or link, Finish then Submit Assessment, submitted and time up. Apply and Assessment load as their own chunks, so Zod stays off the careers pages. The M4 mock rewritten in the contract's shapes; 18 page tests. Left: P15's Status and counts; pictures for the public chapter once shoot.js can open public-app (P14).
 - 15/10/2026 · AJ · Built `public-app/` (A9) from the demo's Public Site pages: Careers, Vacancy, Apply, Assessment, Sign Offer and Verify Document, desktop and phone, light and dark with a visitor toggle, against an in-browser mock of `/api/public/v1`. Added the states the demo does not draw: application received, assessment start, finished and time up, offer signed, declined and expired, the three failed verify verdicts and a reference lookup, and every bad link (unknown, expired, used). No ticks: UI is ticked once the pages run on the real API. Left: the public routes in the contract. Only `GET /verify/:number` and `GET /<surface>/:token/document` are named in BACKEND_STRUCTURE §8; the rest are INTERIM in `public-app/src/api/types/public.ts` for TB (M4) and LA (M5) to agree, including `POST /jobs/:slug/apply` minting the apply token and `POST /apply/:token/cv` for the CV.

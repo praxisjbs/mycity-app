@@ -80,6 +80,14 @@ describe("Wizard", () => {
     expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Engineer");
   });
 
+  it("draws its step heading at the level asked: h3 under a modal's title, h2 under a page's h1", () => {
+    const { unmount } = render(<Wizard steps={steps()} finish="Publish Vacancy" onFinish={() => undefined} />);
+    expect(screen.getByRole("heading", { level: 3, name: "The Role" })).toBeInTheDocument();
+    unmount();
+    render(<Wizard level={2} steps={steps()} finish="Submit Application" onFinish={() => undefined} />);
+    expect(screen.getByRole("heading", { level: 2, name: "The Role" })).toBeInTheDocument();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(<Wizard steps={steps()} finish="Publish Vacancy" onFinish={() => undefined} />);
     expect(await axe(container)).toHaveNoViolations();

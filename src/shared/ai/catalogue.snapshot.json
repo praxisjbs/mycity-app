@@ -828,7 +828,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "settings.NumberingSchemeChange",
-      "schema_sha": "1b74b86726a4a910",
+      "schema_sha": "33cf200824778762",
       "screen": null
     },
     {
@@ -1321,6 +1321,28 @@
       "screen": null
     },
     {
+      "key": "vacancies.create",
+      "kind": "action",
+      "module_key": "recruitment",
+      "permission": "recruitment.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "vacancies.VacancyAdd",
+      "schema_sha": "02570aff673a402d",
+      "screen": null
+    },
+    {
+      "key": "vacancies.edit",
+      "kind": "action",
+      "module_key": "recruitment",
+      "permission": "recruitment.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "vacancies.VacancyChange",
+      "schema_sha": "ae16fbdfff28d806",
+      "screen": null
+    },
+    {
       "key": "week.support",
       "kind": "action",
       "module_key": "workspace",
@@ -1406,6 +1428,28 @@
       "bulk": null,
       "schema": "workflow.ApprovalMineQuery",
       "schema_sha": "cedee0f3495723f9",
+      "screen": null
+    },
+    {
+      "key": "assessments.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "assessments.AssessmentListQuery",
+      "schema_sha": "b9413bd41ed8ab7a",
+      "screen": null
+    },
+    {
+      "key": "assessments.sittings",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "assessments.SittingListQuery",
+      "schema_sha": "baa8c05b4df75e8d",
       "screen": null
     },
     {
@@ -1505,6 +1549,28 @@
       "bulk": null,
       "schema": "calendar.CalendarListQuery",
       "schema_sha": "7a157a8d6e304cb2",
+      "screen": null
+    },
+    {
+      "key": "candidates.get",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "candidates.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "candidates.CandidateListQuery",
+      "schema_sha": "0d00a44c6d028998",
       "screen": null
     },
     {
@@ -1758,6 +1824,17 @@
       "bulk": null,
       "schema": "interactions.InteractionListQuery",
       "schema_sha": "897d58ffdc4d066a",
+      "screen": null
+    },
+    {
+      "key": "interviews.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "interviews.InterviewListQuery",
+      "schema_sha": "81c2f8ddcd90026a",
       "screen": null
     },
     {
@@ -2069,6 +2146,17 @@
       "screen": null
     },
     {
+      "key": "talent_pool.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "talent_pool.PoolListQuery",
+      "schema_sha": "cfabc7d2d676ebf0",
+      "screen": null
+    },
+    {
       "key": "tasks.get",
       "kind": "read",
       "module_key": "workspace",
@@ -2099,6 +2187,28 @@
       "bulk": null,
       "schema": "dashboard.HomeTeamQuery",
       "schema_sha": "2349da853e18a360",
+      "screen": null
+    },
+    {
+      "key": "vacancies.get",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "vacancies.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "vacancies.VacancyListQuery",
+      "schema_sha": "cdd9c3dfedb43ced",
       "screen": null
     },
     {
@@ -3024,6 +3134,138 @@
       "schema": null,
       "schema_sha": null,
       "screen": "queries.rules"
+    },
+    {
+      "key": "recruitment.route.change_a_vacancy_s_questions_interview_traits_or_scorecard",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.change_careers_settings_about_mycityapp_or_the_default_interview_traits",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.change_the_wording_of_a_candidate_email",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.vacancies"
+    },
+    {
+      "key": "recruitment.route.fill_in_my_interview_card",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.interviews"
+    },
+    {
+      "key": "recruitment.route.invite_someone_from_the_talent_pool_to_apply",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.talent-pool"
+    },
+    {
+      "key": "recruitment.route.invite_someone_to_apply_for_a_vacancy",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.candidates"
+    },
+    {
+      "key": "recruitment.route.mark_the_answers_of_finished_assessments",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.assessments"
+    },
+    {
+      "key": "recruitment.route.schedule_an_interview",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.interviews"
+    },
+    {
+      "key": "recruitment.route.screen_a_role_s_applications_with_ai",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.candidates"
+    },
+    {
+      "key": "recruitment.route.send_an_assessment_to_the_candidates_of_a_role",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.assessments"
+    },
+    {
+      "key": "recruitment.route.write_a_new_assessment",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.assessments"
+    },
+    {
+      "key": "recruitment.route.write_a_new_vacancy",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": "1687bb5133592b2b",
+      "screen": "recruitment.vacancies"
     },
     {
       "key": "settings.route.add_a_public_holiday",

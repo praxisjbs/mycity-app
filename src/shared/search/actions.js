@@ -102,6 +102,37 @@ const ACTIONS = Object.freeze([
     need: ["people", "create"],
     words: ["import employees", "staff sheet", "upload staff", "staff spreadsheet"],
   }),
+  // Recruitment (docs/guides/recruitment.md §9): each opens its tab already asked to start.
+  a("new_vacancy", "New Vacancy", {
+    screen: "recruitment.vacancies",
+    params: { action: "new" },
+    need: ["recruitment", "create"],
+    words: ["post a job", "open a role", "advertise a job", "job description", "hire for", "new job"],
+  }),
+  a("invite_to_apply", "Invite to Apply", {
+    screen: "recruitment.candidates",
+    params: { action: "invite" },
+    need: ["recruitment", "create"],
+    words: ["invite a candidate", "send apply link", "ask someone to apply", "headhunt"],
+  }),
+  a("screen_with_ai", "Screen With AI", {
+    screen: "recruitment.candidates",
+    params: { action: "screen" },
+    need: ["recruitment", "edit"],
+    words: ["screen applicants", "score cvs", "read applications", "rank candidates", "shortlist with ai"],
+  }),
+  a("new_assessment", "New Assessment", {
+    screen: "recruitment.assessments",
+    params: { action: "new" },
+    need: ["recruitment", "create"],
+    words: ["new test", "create test", "aptitude test", "case study", "take-home brief"],
+  }),
+  a("schedule_interview", "Schedule Interview", {
+    screen: "recruitment.interviews",
+    params: { action: "new" },
+    need: ["recruitment", "edit"],
+    words: ["book interview", "set up interview", "interview panel", "invite to interview"],
+  }),
   a("start_import", "Start Import", {
     screen: "settings.imports",
     params: { action: "new" },

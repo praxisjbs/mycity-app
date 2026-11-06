@@ -57,6 +57,8 @@ const DEMO = "docs/MyCity-ERP-Documents/demo.html";
  * under node_modules/.cache, which every scanner, ESLint and git already skip, and never ships.
  */
 const APP_DIST = "node_modules/.cache/mycity/demo-app";
+/** The public site's demo build (the in-browser mock), for the User Guide's pictures of it. */
+const PUBLIC_DIST = "node_modules/.cache/mycity/demo-public";
 
 const WIDTHS = {
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
@@ -630,6 +632,28 @@ function ensureAppBuild() {
   return true;
 }
 
+/**
+ * Build the public site on its in-browser mock (vite build --mode demo), unless the last build is
+ * newer than its source, packages/ui and the delivery plan. The User Guide's public pictures are
+ * taken on it (scripts/guide/shoot.js, `site: public`).
+ */
+function ensurePublicBuild() {
+  const site = path.join(ROOT, "public-app");
+  if (!fs.existsSync(site)) return false;
+  const built = path.join(ROOT, PUBLIC_DIST, "index.html");
+  const source = Math.max(newest(path.join(site, "src")), newest(path.join(ROOT, "packages", "ui", "src")), newest(path.join(site, "index.html")), newest(path.join(site, "vite.config.ts")), newest(path.join(site, "package.json")), newest(path.join(ROOT, "docs", "PROGRESS.md")));
+  if (fs.existsSync(built) && fs.statSync(built).mtimeMs >= source) return true;
+  const vite = path.join(ROOT, "node_modules", "vite", "bin", "vite.js");
+  if (!fs.existsSync(vite)) throw new Error("The workspace has no packages installed. Run `npm ci` at the root, then again.");
+  const r = spawnSync(process.execPath, [vite, "build", "--mode", "demo", "--outDir", path.join(ROOT, PUBLIC_DIST), "--emptyOutDir", "--logLevel", "warn"], {
+    cwd: site,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (r.status !== 0) throw new Error(`public-app/ did not build (vite build --mode demo):\n${String(r.stdout || "").slice(-1500)}${String(r.stderr || "").slice(-800)}`);
+  return true;
+}
+
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json" };
 
 /** Serve a built single-page app on a free local port: files as they are, every other path gets index.html. */
@@ -933,4 +957,4 @@ function run(gate, body) {
   });
 }
 
-module.exports = { crawl, demoWanted, summarise, finish, run, collect, ensureAppBuild, serve, appSettle, launch, hashOf, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, APP_DIST, ROOT };
+module.exports = { crawl, demoWanted, summarise, finish, run, collect, ensureAppBuild, ensurePublicBuild, serve, appSettle, launch, hashOf, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, APP_DIST, PUBLIC_DIST, ROOT };

@@ -3,7 +3,8 @@
  * Vacancies, as Home reads them: the open vacancies behind the Open Vacancies card, and the
  * applications left at one stage too long, for Home's Recruitment SLA alert rules.
  *
- * OWNED BY the `vacancies` and `candidates` modules, M4 Recruitment, TB (migration 4000).
+ * OWNED BY the `vacancies` and `candidates` modules, M4 Recruitment, GE (migrations 4000 to 4060;
+ * docs/guides/recruitment.md).
  *
  * Home reads these tables before the modules that own them are built, so this file is the one
  * place Home names them. The M4 pull request that builds `vacancies` and `candidates` MUST, in
@@ -37,13 +38,16 @@ const TABLES = Object.freeze({
   candidate: ["candidate_id", "first_name", "last_name"],
 });
 
-/** What M4 still owes these queries. */
+/**
+ * What M4 still owes these queries. Paid on m4/recruitment (GE, 04/11/2026): vacancy.status is
+ * checked (draft, open, paused, closed; 4010) and indexed (vacancy_status_idx); application.status is
+ * checked (active, not_progressed, withdrawn, hired; 4020) and (status, current_stage_entered_at) is
+ * indexed (application_status_stage_since_idx). Left for P4 (candidates.pipeline): the moves that
+ * reset current_stage_entered_at.
+ */
 const OWES = Object.freeze([
-  "The vacancy lifecycle (README vacancies.lifecycle): its statuses have no CHECK yet; Home counts `open`.",
-  "Index vacancy (status), for the open count (asked by Home).",
   "The application lifecycle (README candidates.pipeline, .sla): Home reads an application `active` and not withdrawn " +
     "as in progress, and current_stage_entered_at as when it reached its stage.",
-  "Index application (status, current_stage_entered_at), for the Recruitment SLA sweep (asked by Home).",
 ]);
 
 /**
@@ -102,6 +106,8 @@ async function stalledBatch(client, { before, after = null, size }) {
        JOIN vacancy v ON v.vacancy_id = a.vacancy_id
        LEFT JOIN reference_value rv ON rv.domain = 'application_stage' AND rv.code = a.stage
       WHERE a.status = 'active' AND a.withdrawn_at IS NULL
+        -- a closed role's candidates can be neither moved nor not progressed, so never alert on them
+        AND v.status <> 'closed'
         AND a.current_stage_entered_at < $1::timestamptz
         AND ($2::uuid IS NULL OR a.application_id > $2::uuid)
       ORDER BY a.application_id
@@ -114,7 +120,7 @@ async function stalledBatch(client, { before, after = null, size }) {
 module.exports = {
   module: "vacancies",
   milestone: "M4",
-  owner: "TB",
+  owner: "GE",
   tables: TABLES,
   owes: OWES,
   openCount,

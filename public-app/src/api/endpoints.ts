@@ -1,20 +1,37 @@
+import type { Endpoints as Contract } from "@mycity/contract/contract.gen.ts";
+
 /**
  * The endpoint map the client is typed against: "METHOD /path" → its shapes.
  *
- * The generated contract (packages/contract/contract.gen.ts) exports the same
- * shape as `Endpoints`. Until it covers every module, each module's interim
- * types file adds its routes here by declaration merging:
+ * M4's routes come from the generated contract (packages/contract/contract.gen.ts, F15), picked
+ * by name so the public client can only reach the public surface: Careers, a Vacancy, Apply and
+ * an Assessment, with their request parts as the API accepts them and their responses as it sends
+ * them. A page whose routes are not in the contract yet (M5's Sign Offer and Verify) adds its
+ * INTERIM routes here by declaration merging, from `types/public.ts`:
  *
  *   declare module "@/api/endpoints" {
  *     interface Endpoints {
- *       "GET /api/v1/employees": { query: EmployeeListQuery; body: never; params: never; response: Paged<EmployeeRow> };
+ *       "GET /api/public/v1/sign/:token": { query: never; body: never; params: { token: string }; response: OfferToSign };
  *     }
  *   }
  *
  * A wrong path, a wrong field or a wrong response shape is then a type error.
  */
+type ContractRoute =
+  | "GET /api/public/v1/jobs"
+  | "GET /api/public/v1/jobs/:slug"
+  | "POST /api/public/v1/jobs/:slug/apply"
+  | "GET /api/public/v1/apply/:token"
+  | "POST /api/public/v1/apply/:token/cv"
+  | "POST /api/public/v1/apply/:token"
+  | "GET /api/public/v1/assess/:token"
+  | "POST /api/public/v1/assess/:token/start"
+  | "PUT /api/public/v1/assess/:token/answers/:question_id"
+  | "POST /api/public/v1/assess/:token/answers/:question_id/file"
+  | "POST /api/public/v1/assess/:token/submit";
+
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Endpoints {}
+export interface Endpoints extends Pick<Contract, ContractRoute> {}
 
 export interface EndpointShape {
   query: unknown;
