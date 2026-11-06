@@ -121,11 +121,8 @@ const ContactChange = z
 
 const signedEvidence = (v) => Boolean(v.signed_copy_document_id) !== (v.signed_before_hub === true);
 
-/**
- * New Partner: an organisation whose relationship is already signed. Its first deal is at a signed or
- * active stage (the server checks the stage's meaning), with the signed copy or "signed before the hub".
- */
-const PartnerCreate = z
+/** A partner's own fields, shared by New Partner and Edit Partner (as a lead's are, LeadFields). */
+const PartnerFields = z
   .object({
     name: text(150),
     legal_name: optionalText(200),
@@ -133,16 +130,25 @@ const PartnerCreate = z
     region: RegionInput,
     industry: optionalText(80),
     website: optionalText(200),
-    headquarters: PlaceInput.optional(),
+    /** Picked from the address search at the level of an area; null or left out for none. */
+    headquarters: PlaceInput.nullish(),
     logo_document_id: blank(uuid),
     owner_id: uuid,
     since: blank(isoDate),
     custom: CustomValues.optional(),
-    contact: ContactInput,
-    deal: DealFields,
-    signed_copy_document_id: blank(uuid),
-    signed_before_hub: z.boolean().optional(),
   })
+  .strict();
+
+/**
+ * New Partner: an organisation whose relationship is already signed. Its first deal is at a signed or
+ * active stage (the server checks the stage's meaning), with the signed copy or "signed before the hub".
+ */
+const PartnerCreate = PartnerFields.extend({
+  contact: ContactInput,
+  deal: DealFields,
+  signed_copy_document_id: blank(uuid),
+  signed_before_hub: z.boolean().optional(),
+})
   .strict()
   .refine(signedEvidence, { message: "Attach the signed copy", path: ["signed_copy_document_id"] });
 
@@ -474,6 +480,7 @@ const TABLES = {
   ContactCreate: { table: "partner_contact" },
   ContactUpdate: { table: "partner_contact" },
   ContactChange: { table: "partner_contact" },
+  PartnerFields: { table: "partner", virtual: { region: ORGANISATION.region, headquarters: ORGANISATION.headquarters } },
   PartnerCreate: {
     table: "partner",
     virtual: ORGANISATION,
@@ -556,6 +563,7 @@ module.exports = {
   ContactCreate,
   ContactUpdate,
   ContactChange,
+  PartnerFields,
   PartnerCreate,
   PartnerUpdate,
   PartnerClose,

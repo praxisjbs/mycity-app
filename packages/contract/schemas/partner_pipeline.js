@@ -55,6 +55,9 @@ const percent = z
   .regex(/^\d{1,3}(\.\d{1,2})?$/, "must be a percentage like 8 or 12.50")
   .refine((v) => Number(v) <= 100, "must be 100 or less");
 
+/** A count a form types (expected attendance): a whole number, or the digits typed. */
+const count = z.union([z.number().int().min(0).max(10000000), z.string().trim().regex(/^\d{1,8}$/, "Whole number").transform(Number)]);
+
 /** A query-string boolean: "true" or "false". */
 const flag = z.enum(["true", "false"]).transform((v) => v === "true");
 
@@ -462,11 +465,12 @@ const DealFields = z
     event_title: optionalText(150),
     event_starts_on: blank(isoDate),
     event_ends_on: blank(isoDate),
-    venue: PlaceInput.optional(),
-    expected_attendance: z.number().int().min(0).max(10000000).optional(),
+    /** Picked from the address search; null or left out for none. */
+    venue: PlaceInput.nullish(),
+    expected_attendance: blank(count),
     objective: optionalText(2000),
     /** A stage of MyCity's list; the first active stage when left out. */
-    stage: listCode.optional(),
+    stage: blank(listCode),
     /** Projected value: the owner's estimate. */
     estimated_value: blank(money),
     commission_pct: blank(percent),
@@ -478,7 +482,7 @@ const DealFields = z
     member_ids: z.array(uuid).max(20).optional(),
     options: z.array(DealOptionInput).max(5, "At most five options").optional(),
     impact: z.array(listCode).max(9).optional(),
-    impact_rating: ImpactRating.optional(),
+    impact_rating: blank(ImpactRating),
     impact_note: optionalText(500),
     comments: optionalText(2000),
     custom: CustomValues.optional(),
@@ -502,7 +506,7 @@ const DealUpdate = z
     event_starts_on: isoDate.nullable().optional(),
     event_ends_on: isoDate.nullable().optional(),
     venue: PlaceInput.nullable().optional(),
-    expected_attendance: z.number().int().min(0).max(10000000).nullable().optional(),
+    expected_attendance: count.nullable().optional(),
     objective: z.string().trim().max(2000).nullable().optional(),
     estimated_value: money.nullable().optional(),
     commission_pct: percent.nullable().optional(),

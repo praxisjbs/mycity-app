@@ -33,11 +33,11 @@ const LeadFields = z
     website: optionalText(200),
     objective: optionalText(2000),
     /** A lead_source code. */
-    source: listCode.optional(),
+    source: blank(listCode),
     owner_id: uuid,
     identified_on: blank(isoDate),
     impact: z.array(listCode).max(9).optional(),
-    impact_rating: ImpactRating.optional(),
+    impact_rating: blank(ImpactRating),
     impact_note: optionalText(500),
     comments: optionalText(2000),
     custom: CustomValues.optional(),
