@@ -621,7 +621,7 @@ function Categories() {
   const list = usePaged("GET /api/v1/expense-categories", { sort: "name" });
   const suggested = useMutation("POST /api/v1/expense-categories/suggested");
   const add = () => modal.open({ title: "New Category", body: (c) => <CategoryForm close={c} /> });
-  useScreenAction(finance ? { label: "New Category", onSelect: add } : null);
+  useScreenAction(finance ? { label: "New Expense Category", onSelect: add } : null);
   const empty = !list.loading && list.page?.total === 0 && !list.q;
   return (
     <>

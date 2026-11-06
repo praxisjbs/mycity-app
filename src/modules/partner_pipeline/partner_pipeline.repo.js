@@ -316,6 +316,20 @@ async function updateValue(client, domain, code, patch) {
   await client.query(`UPDATE reference_value SET ${sets.join(", ")} WHERE domain = $1 AND code = $2`, params);
 }
 
+/**
+ * Number a list's values in use 10, 20, 30 in their order, after one is moved. A move places a value one
+ * past its neighbour (Move Up and Move Down), so the gaps stay ten wide and no two values ever tie.
+ */
+async function renumberValues(client, domain) {
+  await client.query(
+    `UPDATE reference_value v SET display_order = r.n * 10
+       FROM (SELECT code, row_number() OVER (ORDER BY display_order, label, code) AS n
+               FROM reference_value WHERE domain = $1 AND active) r
+      WHERE v.domain = $1 AND v.code = r.code AND v.display_order <> r.n * 10`,
+    [domain],
+  );
+}
+
 /** The active stages carrying a meaning, other than one code: what is left to count as it. */
 const stagesCounting = async (db, meaning, exceptCode) =>
   Number(
@@ -367,6 +381,7 @@ module.exports = {
   nextValuePosition,
   insertValue,
   updateValue,
+  renumberValues,
   stagesCounting,
   stageInUse,
 };

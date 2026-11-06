@@ -224,7 +224,11 @@ describeDb("AI Control against the real migrations", () => {
     });
 
     test("the registered actions: their job, personal data, own chain and today's calls", async () => {
-      const res = await as("admin").get("/ai-control/actions");
+      // 26 actions: 25 a page (pageQuery), so the last comes on the second.
+      const first = await as("admin").get("/ai-control/actions");
+      const second = await as("admin").get("/ai-control/actions?page=2");
+      expect(first.body.data).toHaveLength(25);
+      const res = { body: { data: [...first.body.data, ...second.body.data] } };
       expect(res.body.data.map((a) => a.key)).toEqual([
         "voice-note-transcription",
         "policy-tidy",

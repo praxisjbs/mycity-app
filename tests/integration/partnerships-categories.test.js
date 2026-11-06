@@ -249,6 +249,26 @@ describeDb("Partnerships · Categories against the real migrations", () => {
     expect(impact.body.values.find((v) => v.label === "Brand Visibility").meaning).toBeNull();
   });
 
+  test("Move Up and Move Down land a value one place over, however often it is moved", async () => {
+    const mine = ["Website Form", "Agency Referral", "Walk-in Visit"];
+    for (const label of mine) expect((await ops("post", "/lists/lead_source").send({ label })).status).toBe(201);
+    const order = (body) => body.values.filter((v) => v.active && mine.includes(v.label));
+    // As the screen moves one: one past the neighbour it passes (PipelineSettings.tsx).
+    const up = async (label) => {
+      const now = order((await ops("get", "/lists/lead_source")).body);
+      const at = now.findIndex((v) => v.label === label);
+      const res = await ops("patch", `/lists/lead_source/${now[at].code}`).send({ position: now[at - 1].position - 1 });
+      expect(res.status).toBe(200);
+      return order(res.body).map((v) => v.label);
+    };
+    expect(await up("Walk-in Visit")).toEqual(["Website Form", "Walk-in Visit", "Agency Referral"]);
+    expect(await up("Walk-in Visit")).toEqual(["Walk-in Visit", "Website Form", "Agency Referral"]);
+    // Two values on one position would fall back to A to Z, putting Agency Referral first.
+    expect(await up("Agency Referral")).toEqual(["Walk-in Visit", "Agency Referral", "Website Form"]);
+    const positions = order((await ops("get", "/lists/lead_source")).body).map((v) => v.position);
+    expect(new Set(positions).size).toBe(positions.length);
+  });
+
   /* ---------------------------------------------------------------- */
 
   test("a custom field gets its key from its label once; a pick needs choices; retiring keeps it listed", async () => {

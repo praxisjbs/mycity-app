@@ -107,6 +107,7 @@ async function update(actor, list, code, body) {
       if (losing) await assertMeaningKept(client, before);
     }
     await repo.updateValue(client, list, code, body);
+    if (body.position !== undefined) await repo.renumberValues(client, list);
     await emit(client, {
       key: EVENTS.LIST_VALUE_UPDATED,
       entity: { type: "list_value", id: `${list}:${code}` },

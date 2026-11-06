@@ -388,7 +388,7 @@ const ACTIONS = Object.freeze([
     capability: "expenses.finance",
     words: ["set a budget", "department budget", "budget"],
   }),
-  a("new_expense_category", "New Category", {
+  a("new_expense_category", "New Expense Category", {
     screen: "expenses.categories",
     params: { action: "new" },
     need: ["expenses", "create"],

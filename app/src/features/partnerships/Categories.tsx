@@ -68,7 +68,7 @@ export function Categories() {
   const [view, setView] = useState<View>("categories");
   const add = () => modal.open({ title: "New Category", body: (close) => <CategoryForm close={close} /> });
   const tracker = () => modal.open({ title: "Start From Tracker", wide: true, body: (close) => <StartFromTracker close={close} /> });
-  useScreenAction(configure ? { label: "New Category", onSelect: add } : null);
+  useScreenAction(configure ? { label: "New Partner Category", onSelect: add } : null);
   const sheet = (title: string, body: React.ReactNode) => modal.open({ title, full: true, body: () => body });
 
   return (

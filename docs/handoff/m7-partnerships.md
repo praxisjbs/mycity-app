@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | GE (Godwin-Okoh Elisha); LA (Love Adeola) the importers; AJ the Workspace links |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 `m7/categories` (draft) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, `m7/categories`) |
 
 ---
 
@@ -94,6 +94,14 @@ with the date, and add a line to §3.
 
 ## 3 · Log
 
+- 06/11/2026 · TB · PR 2 reviewed (#80) against Appendix A and merged: `main` merged in (M4 #72 and M8 #75; M7's
+  PROGRESS rows carry LA as owner, as #72 set them); the AI Control test reads the registry's second page (26
+  actions, 25 a page); New Partner Category in ⌘K and the phone's floating button, and Expenses' New Expense
+  Category, since ⌘K holds a label once (a note for AJ in `m8-expenses.md`); the phone's category sheet keeps
+  its segmented control; Pipeline Settings' Move Up and Move Down renumber the list, so a value never lands two
+  places over; the guide's §9, §10.2, §13.2 and Appendix D to match. For PR 3: Categories' picked category
+  shows its partners and leads as counts only (§2 lists them), and on a phone an edit opened from Pipeline
+  Settings or Proof Points replaces that sheet. Next: PR 3, then PR 4 to PR 7.
 - 06/11/2026 · JP · PR 2 (`m7/categories`): Categories (#104) on the real API, desktop and phone. Backend:
   categories, MyCity's lists with the rules that keep the pipeline whole, custom fields checked by type, the
   delivery checklist, agreement templates on `template_version` (`templates.agreements`), Tidy With AI

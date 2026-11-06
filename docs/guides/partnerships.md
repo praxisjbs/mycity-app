@@ -1004,7 +1004,9 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   Words: partner, lead, prospect, deal, event, sponsor, tracker, proposal, MOU, contract, agreement,
   commission, renewal. The route map's `partner`, `partner_deal`, `lead`, `proposal`, `contract`, `mou`,
   `agreement` lose `search:none`; Categories and the public Proposal page are added; New Lead, New
-  Partner, New Deal, New Proposal and New Category are ⌘K actions.
+  Partner, New Deal, New Proposal and New Partner Category are ⌘K actions. The last is Categories' New
+  Category, named in full in ⌘K and the phone's floating button because Expenses has a New Category too
+  (§13.2).
 
 ## 10 · On screen and mobile
 
@@ -1039,7 +1041,7 @@ Verb Noun buttons, Lucide icons.
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Pipeline | Two KPI cards (Open Deals, Stalled), the filter chips, then deal cards (record, stage pill, health dot, days at stage) | Signed Value; stage bars beyond the top six | New Lead, full width | Bottom bar More → Partnerships; seven tabs scroll sideways |
-| Categories | Category cards (name, partners, commission) | Pipeline Settings and Proof Points behind their own rows | New Category | A category opens as a sheet, its sections as rows |
+| Categories | Category cards (name, partners, commission) | Pipeline Settings and Proof Points behind their own rows | New Partner Category, the floating button's action | A category opens as a sheet, its four sections (Defaults, Templates, Checklist, Fields) one at a time behind a segmented control |
 | Partners, Partner 360 | Two KPI cards (Active, Quiet), then partner cards; a tapped partner opens the 360 full screen | Export; Owner and Region columns | On the 360, the next stage full width at the foot; Log Interaction in the page menu | The 360's tabs as a scrolling segmented control; Back closes it |
 | Leads, Lead 360 | Two KPI cards (New, Qualified), then lead cards with a status pill | Leads by source | New Lead; on the 360 the next stage at the foot | As the Partner 360 |
 | Proposals, Studio | Proposal cards (partner, status, viewed); the studio one step a screen; question cards one at a time, Skip and Reshuffle under the answer | Change Layout and Move (desktop only; the phone edits text and images) | Write Draft, then Send Proposal at the foot | StepBar at the top; Back steps back |
@@ -1211,6 +1213,18 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
   - `partner_pipeline`'s controller is filled, so gate 23 asks for the reason of every create and edit schema
     of its contract: `DealCreate`, `DealUpdate` and `ReturnSave` carry a `design:` reason that says the card
     arrives with PR 8; PR 8 declares `deals.create`, `deals.update` and `deal_returns.save` and removes them.
+  - Tidy With AI's answer, `TemplateTidyDraft`, says whether there is a draft: `available`, and `reason`
+    (`off`, `limit`) when there is none, so the editor says AI is off or the month's limit is reached instead
+    of failing; the draft is `body_html`, the editor's HTML with each field a chip (it was `body`), with its
+    `ai_run_id`.
+- **At PR 2's review (06/11/2026, TB):**
+  - ⌘K's labels are one each, and Expenses (M8) already had New Category, so both read in full: New Partner
+    Category here and New Expense Category there. Each screen's own New action, which the phone's floating
+    button offers, carries the same name, as the search coverage gate holds it to ⌘K; the screens' header
+    buttons stay New Category (§9, §10.2; `expenses.md` §9, §10.2).
+  - On a phone a category's four sections sit behind a segmented control, one at a time, as the 360s' tabs
+    do: a sheet replaces the last one rather than stacking, and rows opening in place would hide the
+    sections' buttons, which the Accordion is not for (§10.2).
 
 ### 13.3 Still open
 
@@ -1505,7 +1519,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   checklist, template editor); Workspace's forms in `app/src/features/workspace/`.
 - **Public** (`public-app/src/pages/`): `Proposal.tsx` (new), `SignOffer.tsx` and `Verify.tsx`
   (extended).
-- **packages/ui:** `StageSwitcher`, `QuestionCard`, `DocumentFrame`, `RichTextField` document mode.
+- **packages/ui:** `StageSwitcher`, `QuestionCard`, `DocumentFrame`, `DocumentEditor` (PR 2).
 - **Seeds:** `seeds/reference/7190_seed_partnerships.sql` (code lists, capabilities, the flow, numbering,
   `7099`'s choices switched off); `seeds/staging/70_partnerships.js` (synthetic).
 - **Tests:** `tests/integration/partnerships-*.test.js` per module; `tests/unit/` for the importer's
@@ -1515,6 +1529,10 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 06/11/2026 · TB · PR 2 reviewed (#80): `main` merged in (M4 and M8); New Partner Category in ⌘K and the
+  phone's floating button (§9, §10.2, §13.2); a category's sections behind a segmented control on a phone
+  (§10.2, §13.2); Tidy With AI's answer recorded (§13.2); Move Up and Move Down on Pipeline Settings renumber
+  the list, so a value never lands two places over; Appendix D names `DocumentEditor`.
 - 06/11/2026 · JP · PR 2, Categories (`m7/categories`): categories, MyCity's lists, custom fields, delivery
   checklists, agreement templates built in the hub (`DocumentEditor`), Tidy With AI, Start From Tracker, proof
   points and the Categories screen (#104) built to this guide. Corrected here: a template's asks have a column

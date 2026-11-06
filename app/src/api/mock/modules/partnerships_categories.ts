@@ -351,6 +351,11 @@ route("PATCH /api/v1/partnerships/lists/:list/:code", (req) => {
     if (!left && REQUIRED[v.meaning]) return fail(409, "STAGE_LAST_OF_MEANING", `Keep a stage that ${REQUIRED[v.meaning]} a deal`, { meaning: ["Last of its kind"] });
   }
   Object.assign(v, b);
+  // As the API does after a move: the values in use numbered 10, 20, 30 in their order, so none ever ties.
+  if (b.position !== undefined)
+    ordered(req.params.list)
+      .filter((x) => x.active)
+      .forEach((x, i) => (x.position = (i + 1) * 10));
   return ok({ list: req.params.list, values: ordered(req.params.list) });
 });
 
