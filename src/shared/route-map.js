@@ -366,9 +366,11 @@ const ENTITY_ROUTES = Object.freeze({
   statutory_return: screen("payroll", "statutory"), // search:none not built yet (src/modules/statutory)
 
   // Partnerships
-  partner: screen("partnerships", "partners"), // search:none not built yet (src/modules/partners)
-  partner_deal: screen("partnerships", "pipeline"), // search:none not built yet (src/modules/partner_pipeline)
-  lead: screen("partnerships", "leads"), // search:none not built yet (src/modules/leads)
+  // A partner and a lead open their 360 beside their list; a deal opens on Pipeline, which opens
+  // the 360 of the lead or partner it is on (docs/guides/partnerships.md §6.2).
+  partner: screen("partnerships", "partners"),
+  partner_deal: screen("partnerships", "pipeline"),
+  lead: screen("partnerships", "leads"),
   proposal: screen("partnerships", "proposals"), // search:none not built yet (src/modules/proposals)
   contract: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
   mou: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
