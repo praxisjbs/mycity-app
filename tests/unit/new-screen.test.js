@@ -58,7 +58,7 @@ describe("new:screen", () => {
     const [, screens, notStarted] = /\| \*\*Total\*\* \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \|/.exec(fs.readFileSync(path.join(ROOT, "docs/PROGRESS.md"), "utf8"));
     expect(progress).toContain(`| **Total** | **${Number(screens) + 1}** | **${Number(notStarted) + 1}** |`);
     expect(read("scripts/check/progress.js")).toContain("const SCREENS = 107;");
-    expect(read("tests/unit/foundation/events-workflow.test.js")).toContain(".toHaveLength(97)");
+    expect(read("tests/unit/foundation/events-workflow.test.js")).toContain(".toHaveLength(98)");
   });
 
   test("keeps a multi-line list multi-line", () => {
