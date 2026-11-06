@@ -564,19 +564,31 @@ screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2
 The build plan and the file map are `docs/guides/partnerships.md` (Appendix A and D), M7's only
 source of truth. PR 1 (05/11/2026) filled the seven contract files, migrations `7010` to `7040`, seed
 `7190`, and mounted each module's router on `/api/v1/partnerships`, empty until its PR; the files
-below beyond the template are filled, or added, by the PR named.
+below beyond the template are filled, or added, by the PR named. PR 3 (06/11/2026) filled `partners`,
+`leads`, `partner_pipeline`'s deals and `interactions`, template files included (`.ai`, `.search`).
 
 | Module | Files beyond the template |
 |---|---|
-| `partners` | `.360` (renders correctly with zero data), `.dedup`, `.convert` (the conversion transaction), `.documents`, `.work`, `.views` (PR 3); `.import` (the tracker, PR 4); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
-| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2); `.deals`, `.options`, `.stages`, `.health`, `.views` (PR 3); `.returns`, `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.types` is not built (categories replace it) and goes with PR 2; `.events` registers `deal.venue` (PR 1) |
-| `leads` | `.360`, `.status` (status from stage), `.views` (PR 3); `.convert` is not built (conversion is `partners.convert`) and goes with PR 3; `.events` registers `lead.cities` (PR 1) |
+| `partners` | `.360` (the Partner 360, renders correctly with zero data), `.dedup` (on `shared/dedup`), `.convert` (the conversion transaction, a lead's records moved to its partner), `.documents` (the Documents tab: `partner_document` rows naming the vault's, migration `7050_partnership_documents.sql`, which also drops `partner.partner_type`) (PR 3); `.import` (the tracker, PR 4); `.work` (PR 5); `.views` (PR 8); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
+| `partner_pipeline` | Deals in the template `.service` and `.repo`; `.options` (a deal's priced lines), `.stages` (stage moves, their rules and history), `.health` (health and blockers), `.returns` (the `deal_return` service and its two money-gated routes), `.lists` (stages with meanings and code lists, a lead's status from its stage), `.categories` and `.fields` (their reads for the screens) (PR 3); the writes of `.categories`, `.lists` and `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2); `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.views` (PR 8); `.types` is not built (categories replace it) and goes with PR 2; `.events` registers `deal.venue` (PR 1) |
+| `leads` | `.360` (the Lead 360, renders correctly with zero data) (PR 3); a lead's status is `partner_pipeline.lists`' `leadStatusOf`, kept in step by `leads.service`; conversion is `partners.convert`; `.views` (PR 8); `.events` registers `lead.cities` (PR 1) |
 | `interactions` | `.mail` (with `mailbox/binding/`, PR 8) |
 | `proposals` | `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views` (PR 7; `.proof` with PR 2); `.questionnaire` and `.pdf` are not built and go with PR 7 |
 | `agreements` | `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`), `.renewals`, `.views` (PR 6; `.tidy` with PR 2) |
 | `partnership_analytics` | `.queries` (per lead owner, A21; PR 8) |
 | `signatures` (shared with M5) | `.service`, `.code` (the email code), `.stamp`, `.certificate`, `.signed-pdf`, `.verify`, `.public.routes` (PR 6 if M5 has not built them) |
 | `mailbox/binding/` | `intake.service`, `mail-context.service`, `context-tabs`, `convert.service` (PR 8) |
+
+PR 3's screens: `app/src/features/partnerships/` `Pipeline.tsx`, `Partners.tsx`, `Partner360.tsx`,
+`Leads.tsx`, `Lead360.tsx` on the contract, with `record.tsx` (what both 360s are built from: the deal
+with its stage switcher, and the shared tabs) and `forms/` (`parts.tsx`, the fields New Lead, New
+Partner, New Deal and their edits share; `RecordForm.tsx`, Edit Lead and Edit Partner; `DealForm.tsx`,
+`SetHealth.tsx`, `ContactForm.tsx`, `ConvertLead.tsx`, `ClosePartner.tsx`, `UploadDocument.tsx`,
+beside PR 1's `LeadForm`, `PartnerForm`, `MoveStage`, `LogInteraction`,
+`LoseLead`), tested on the mock by `screens.test.tsx`; `packages/ui/src/navigation/StageSwitcher.tsx`
+(a deal's stages one press at a time, with `StageSwitcher.test.tsx` and `StageSwitcher.gallery.tsx`);
+tested on the real migrations by `tests/integration/partnerships-records.test.js` (scope, money,
+conversion, stage rules, health, the 360s, Home's cards).
 
 Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR 4);
 `shared/documents/render.js` its table loop if missing (PR 6). Prompts (`services/ai/prompts/`):

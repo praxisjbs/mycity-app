@@ -1526,6 +1526,20 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 06/11/2026 · JP · PR 3, leads, partners, deals and the 360s: `leads`, `partners` and `partner_pipeline`'s
+  deals (options, team, stage moves with history, health and blockers) on the contract, with
+  `interactions` (without mail), contacts, the Documents tab on the vault, duplicates, conversion in one
+  transaction (`partners.convert`), `partners.360` and `leads.360`; the `StageSwitcher` component; the
+  Pipeline (#50), Partners (#51) and Leads (#52) screens with both 360s on the real API, desktop and
+  phone, their forms and the mock (Work and Returns show their empty states until PRs 5 and 4); the
+  reads and cards of §9 PR 3 names; partners, leads and deals in search with New Lead and New Partner;
+  Home's `partners.source.js` on the modules' reads, `OWES` empty (home.md §4.1); migration `7050`.
+  Corrected here, each recorded in §13.2: a record's documents are `partner_document` (§4.1, §4.2, §6.4)
+  and `7050` drops `partner.partner_type`; the read routes of PR 2's lane (`GET /categories`, `GET
+  /fields`, `GET /lists/:list`) came with this PR; the `deal_return` service and its two routes came
+  ahead of PR 4; the stage rules (leaving On Hold, moves after signing, the signed copy asked once, §6.5)
+  and New Partner's first stage (§6.6); Partners' Quiet `N` (§6.12); Follow-Up Required written in Title
+  Case on screen; Home's Signed Value counts deals, one row a deal (§6.17); the file map (Appendix D).
 - 05/11/2026 · JP · PR 1, contract, data and scaffolding: the seven contract files with Appendix C's
   schemas (the kit's twelve layouts one discriminated union; the mailbox's thread link in
   `interactions.js`; the Workspace link as `PartnerLink`); migrations `7010` to `7040` and seed `7190`

@@ -49,11 +49,11 @@ saying who agreed and when.
 | M4 Recruitment End to End | 9 | 0 | 0 | 9 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 4 | 4 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
-| M7 Partnerships, CRM & Trackers | 8 | 8 | 0 | 0 | 0 | 0 |
+| M7 Partnerships, CRM & Trackers | 8 | 5 | 0 | 3 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **104** | **21** | **0** | **83** | **0** | **0** |
+| **Total** | **104** | **18** | **0** | **86** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
@@ -1259,16 +1259,17 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 50 | Pipeline | `pipeline` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 50 | Pipeline | `pipeline` | M7 | LA | ☑ | ☑ | ☑ | Built | 06/11/2026 |
 | 104 | Categories | `categories` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
-| 51 | Partners | `partners` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
-| 52 | Leads | `leads` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 51 | Partners | `partners` | M7 | LA | ☑ | ☑ | ☑ | Built | 06/11/2026 |
+| 52 | Leads | `leads` | M7 | LA | ☑ | ☑ | ☑ | Built | 06/11/2026 |
 | 53 | Proposals | `proposals` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 | 54 | Contracts & MOUs | `contracts-and-mous` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 | 55 | Analytics | `analytics` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 06/11/2026 · JP · M7 PR 3, leads, partners, deals and the 360s (`m7/leads-partners-deals`, #83, the guide's Appendix A): Pipeline (#50), Partners (#51) and Leads (#52) with the Partner 360 and Lead 360 on the real API, desktop and phone: `leads`, `partners`, `partner_pipeline`'s deals (options, team, stage moves with history, health and blockers, returns' service) and `interactions` (without mail) on the contract; contacts, the Documents tab on the vault (`partner_document`, migration 7050, which also drops `partner_type`), duplicates, conversion in one transaction; New Lead, New Partner, New Deal, the stage switcher's Move Stage, Set Health, Log Interaction, Add Contact, Upload Document, Convert to Partner, Close as Lost and Close Partner; `StageSwitcher` in packages/ui; partners, leads and deals in ⌘K with New Lead and New Partner; the Praxis AI reads and cards; Home's partners source on the modules' reads. Left: the 360's Work tab (PR 5) and Returns tab with Enter Returns (PR 4) show their empty states until then; Categories (#104) is PR 2; Proposals, Contracts & MOUs and Analytics are PRs 6 to 8.
 - 05/11/2026 · JP · M7 PR 1, contract, data and scaffolding (`m7/contract-data`, the guide's Appendix A): the seven contract files with every schema of Appendix C (the design kit's twelve layouts as one union; the Workspace link as `PartnerLink`, joining the Workspace forms in PR 5); migrations 7010 to 7040 (categories, templates, checklists, custom fields, leads, deals on a lead or partner with options, team, deliverables, returns and linked mail, the studio's tables, proof points, agreements, Workspace's three link columns; `agreement_obligation` dropped while empty; `partner_type` copied into a category and no longer required); seed 7190 (deal health, interaction types, numbering PAR, LED, DEAL, PRO, AGR, the `partnership.agreement` flow, `partnerships.configure` and `partnerships.money`, 7099's choices switched off); Categories (#104) and the public Proposal page (#105) ratified and registered; the mock split one file a screen; Home's partners source true to the schema. No ticks: the tabs show Coming Soon. Left: PR 2 to PR 9.
 - 05/11/2026 · JP · M7 guide rewritten as the milestone's single source of truth (`docs/guides/partnerships.md`, Status Agreed) from the Partnerships Workflow Discovery meeting of 5 November, MyCity's tracker and Deal Merchant Agreement, and JBS Praxis's 26 answers: leads and partners joined by deals, a Categories tab and a public Proposal page (ratified; PR 1 registers them in the next free rows, #104 and #105 while free), no board, health and blockers, the 360s, Connect to Partner on Workspace, returns, agreements approved and signed with a code and QR, the Claude Proposal Studio. No ticks, no Status change. The handoff now only tracks. Left: PR 1 to PR 9 (the guide's Appendix A).
 - 04/11/2026 · JP · M7 PR 0: the engineering guide `docs/guides/partnerships.md` (Draft) and the build plan `docs/handoff/m7-partnerships.md` are written before any code, and MILESTONES A14 is amended (the import engine was built in M0; M7 adds the tracker importer). No ticks, no Status change. Found: `7000` has no leads table, no partner-type configuration and none of the tracker's region, objective, impact or next action; `7099` seeds business choices A26 forbids; every M7 module, contract, template and prompt file is still empty. Left: GE and LA read the guide and answer its §13, the tracker workbook is obtained, then PR 1 (contract and data).

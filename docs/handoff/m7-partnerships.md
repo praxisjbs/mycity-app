@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | GE (Godwin-Okoh Elisha); LA (Love Adeola) the importers; AJ the Workspace links |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 `m7/contract-data` (draft) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 3 `m7/leads-partners-deals` (#83, draft) |
 
 ---
 
@@ -56,9 +56,9 @@ with the date, and add a line to §3.
 - [ ] Events template from the Deal Merchant Agreement (staging)
 
 ### PR 3 · Leads, partners, deals, the 360s
-- [ ] Backend, conversion, duplicates, `StageSwitcher`
-- [ ] Pipeline (#50), Partners (#51), Leads (#52) and both 360s, desktop and phone
-- [ ] Home's partners source moved; home.md §4.1
+- [x] Backend, conversion, duplicates, `StageSwitcher` (06/11/2026)
+- [x] Pipeline (#50), Partners (#51), Leads (#52) and both 360s, desktop and phone (06/11/2026)
+- [x] Home's partners source moved; home.md §4.1 (06/11/2026)
 
 ### PR 4 · Importers and returns
 - [ ] Map Values in `shared/import`; foundation.md
@@ -91,6 +91,21 @@ with the date, and add a line to §3.
 - [ ] `docs/manual/partnerships.md` with pictures; the Quick Start card
 
 ## 3 · Log
+
+- 06/11/2026 · JP · PR 3 (`m7/leads-partners-deals`, #83): `leads`, `partners`, `partner_pipeline`'s deals
+  and `interactions` (without mail) on the contract, with contacts, documents, duplicates, conversion in
+  one transaction and both 360s; `StageSwitcher` in packages/ui; Pipeline (#50), Partners (#51), Leads
+  (#52), Partner 360 and Lead 360 on the real API, desktop and phone, with their forms and the mock; Home's
+  `partners.source.js` on the modules' reads, `OWES` empty; migration `7050`; `main` (M4, #72) merged in.
+  The calls the guide now records (§13.2, In PR 3): a record's documents are `partner_document` (`7050`,
+  which also drops `partner.partner_type`); the read routes of PR 2's lane (`GET /categories`, `GET
+  /fields`, `GET /lists/:list`) came with PR 3; the `deal_return` service and its two routes came ahead
+  of PR 4; leaving On Hold needs no reason, a signed deal moves only among signed meanings, On Hold and
+  Closed Lost, and only the first move into a signed meaning asks for the signed copy; New Partner's deal
+  starts at the first `signed` stage; Partners' Quiet uses the enabled rule's `N`, 30 while none is
+  enabled; Follow-Up Required in Title Case on screen; Home's Signed Value counts deals, one row a deal.
+  Left: the Work tab (PR 5) and the Returns tab with Enter Returns (PR 4) show their empty states.
+  Next: PR 2 alongside, then PRs 4 to 7.
 
 - 05/11/2026 · JP · PR 1 (`m7/contract-data`): the seven contract files (Appendix C), migrations `7010` to
   `7040`, seed `7190`, the capabilities, the flow and the numbering; Categories (#104) and Public ·

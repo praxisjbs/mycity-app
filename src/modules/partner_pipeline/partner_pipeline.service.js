@@ -189,7 +189,7 @@ async function pipeline(query, scope) {
 }
 
 /** One of MyCity's lists, whole (GET /lists/:list). */
-const values = (list) => lists.values(pool, list);
+const values = (key) => lists.values(pool, key);
 /** A page of categories (GET /categories). */
 const categoryPage = (query) => categories.page(pool, query);
 /** The custom field definitions, whole (GET /fields). */
@@ -376,16 +376,16 @@ async function assertSeen(db, id, scope) {
  * What a Praxis AI card's ids name (decision 32): the owner (a person), and the category, lead,
  * partner, deal or contact it is about.
  * @param {{query: Function}} db
- * @param {{owner_id?: string, partner_category_id?: string, lead_id?: string, partner_id?: string, deal_id?: string, partner_contact_id?: string}} values
+ * @param {{owner_id?: string, partner_category_id?: string, lead_id?: string, partner_id?: string, deal_id?: string, partner_contact_id?: string}} ids
  */
-async function cardNames(db, values) {
-  const people = await require("../organisation/organisation.cards").peopleNamed(db, [values.owner_id].filter(Boolean));
+async function cardNames(db, ids) {
+  const people = await require("../organisation/organisation.cards").peopleNamed(db, [ids.owner_id].filter(Boolean));
   const records = await repo.cardNames(db, {
-    categories: [values.partner_category_id],
-    leads: [values.lead_id],
-    partners: [values.partner_id],
-    deals: [values.deal_id],
-    contacts: [values.partner_contact_id],
+    categories: [ids.partner_category_id],
+    leads: [ids.lead_id],
+    partners: [ids.partner_id],
+    deals: [ids.deal_id],
+    contacts: [ids.partner_contact_id],
   });
   return [...people, ...records];
 }
