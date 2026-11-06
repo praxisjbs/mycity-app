@@ -197,61 +197,9 @@ const AgreementsSummary = z
   })
   .strict();
 
-/* ------------------------------------------------------------------ *
- * Signing and verification (the signatures service, shared with M5)
- * ------------------------------------------------------------------ */
-
-const SignTokenParams = z.object({ token: z.string().min(16).max(200) }).strict();
-
-/** The six-digit code emailed to the address the link was sent to; ten minutes, five tries. */
-const SignCodeVerify = z.object({ code: z.string().regex(/^\d{6}$/, "Six digits") }).strict();
-
-/** A drawn signature as the pad gives it: a PNG data URL, at most about 1.5 MB. */
-const SignaturePng = z
-  .string()
-  .max(2000000, "Too large")
-  .regex(/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/, "Draw your signature");
-
-/** Sign Agreement: full name and title, drawn or typed, and I Agree to Sign Electronically. */
-const SignSubmit = z
-  .object({
-    full_name: text(120),
-    title: optionalText(120),
-    method: z.enum(["draw", "type"]),
-    signature_png: SignaturePng.optional(),
-    typed: text(120).optional(),
-    consent: z.literal(true),
-  })
-  .strict()
-  .refine((v) => v.method !== "draw" || Boolean(v.signature_png), { message: "Draw your signature", path: ["signature_png"] })
-  .refine((v) => v.method !== "type" || Boolean(v.typed), { message: "Type your signature", path: ["typed"] });
-
-/** By reference: AGR-2026-0001. A reference is not a secret, so it reveals no content. */
-const VerifyRefParams = z.object({ ref: z.string().trim().min(3).max(60) }).strict();
-
-const VerifyResult = z
-  .object({
-    reference: z.string(),
-    title: z.string(),
-    status: z.enum(["signed", "active", "expiring", "expired", "renewed", "closed"]),
-    signers: z.array(
-      z
-        .object({
-          name: z.string(),
-          title: z.string().nullable(),
-          side: SignerSide,
-          signed_at: isoDateTime.nullable(),
-        })
-        .strict(),
-    ),
-    /** Signed on paper and recorded, not in the hub. */
-    signed_outside: z.boolean(),
-    /** The two checks (A12): the content matches what was signed; the stored file is the one sealed. */
-    verdicts: z.object({ content: z.boolean(), artifact: z.boolean() }).strict(),
-    /** Only when opened from the document's QR. */
-    document: z.object({ file_name: z.string(), url: z.string() }).strict().optional(),
-  })
-  .strict();
+/* Signing and verification are the signatures service's, shared with M5: schemas/signatures.js
+ * (SignTokenParams, SignCodeVerify, SignaturePng, SignSubmit, SignDecline, VerifyRefParams,
+ * VerifyResult, VerifyByToken), moved there on 06/11/2026 (GE, LA; docs/guides/offers.md). */
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const ROW = {
@@ -294,11 +242,6 @@ const TABLES = {
   },
   RenewalPage: { table: null, reason: "a page of renewals due" },
   AgreementsSummary: { table: null, reason: "figures over the agreements" },
-  SignTokenParams: { table: null, reason: "the signing link's :token" },
-  SignCodeVerify: { table: null, reason: "the one-time code a signer was emailed" },
-  SignSubmit: { table: null, reason: "a signature and its evidence, kept on the signature row" },
-  VerifyRefParams: { table: null, reason: "a document's reference" },
-  VerifyResult: { table: null, reason: "what verification shows: status, signers and the two verdicts" },
 };
 
 module.exports = {
@@ -323,10 +266,4 @@ module.exports = {
   RenewalRow,
   RenewalPage,
   AgreementsSummary,
-  SignTokenParams,
-  SignCodeVerify,
-  SignaturePng,
-  SignSubmit,
-  VerifyRefParams,
-  VerifyResult,
 };

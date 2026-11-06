@@ -533,6 +533,8 @@ Shared first filled: `shared/tokens`, `middleware/public-token`, `services/media
 
 ### 5.8 M5 · Offers, Documentation & Onboarding · AJ, GE · 16 to 20 Nov
 
+The design is `docs/guides/offers.md`; the build plan and its log `docs/handoff/m5-offers-onboarding.md`.
+
 | Module | Files beyond the template |
 |---|---|
 | `offers` | `.public.routes` (sign), `.render` (one markdown renderer for web and PDF), `.expiry` |

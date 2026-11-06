@@ -1479,6 +1479,11 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 06/11/2026 · AJ · The signing and verification shapes (`SignTokenParams`, `SignCodeVerify`,
+  `SignaturePng`, `SignSubmit`, `VerifyRefParams`, `VerifyResult`) moved from `agreements.js` to
+  `signatures.js` (GE on #79: M5 builds the shared service first, LA reviews), with `SignDecline`,
+  `SignerView` and `VerifyByToken` added. `VerifyResult` now names the document type and carries
+  `record_status` for an agreement's own state. `docs/guides/offers.md`.
 - 05/11/2026 · JP · PR 1, contract, data and scaffolding: the seven contract files with Appendix C's
   schemas (the kit's twelve layouts one discriminated union; the mailbox's thread link in
   `interactions.js`; the Workspace link as `PartnerLink`); migrations `7010` to `7040` and seed `7190`
