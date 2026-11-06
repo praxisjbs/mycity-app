@@ -4,7 +4,8 @@
  * Categories for one category or for all, for leads, partners or deals, of a type. A field's key is made
  * from its label once and never changes: it is the key of every record's `custom` value. Retiring a field
  * keeps its values (shown as retired) and stops offering it. Values are checked by type here (`checkValue`)
- * wherever a record's `custom` is written (M7 PR 3 onward).
+ * wherever a record's `custom` is written (`checkCustom`, M7 PR 3), and a list is narrowed by its
+ * filterable fields (`filterSql`).
  */
 const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
@@ -144,4 +145,64 @@ function checkValue(field, value) {
   }
 }
 
-module.exports = { keyOf, list, create, update, checkValue };
+/* ------------------------------------------------------------------ *
+ * Values on records, and lists narrowed by them (M7 PR 3)
+ * ------------------------------------------------------------------ */
+
+/** The fields a record of `appliesTo` in `categoryId` carries: its category's and every category's, retired ones included. */
+async function defsFor(db, appliesTo, categoryId) {
+  return (await repo.listFields(db, { applies_to: appliesTo, partner_category_id: categoryId || undefined })).filter(
+    (f) => !f.partner_category_id || f.partner_category_id === categoryId,
+  );
+}
+
+const unknown = (key) => new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, { [`custom.${key}`]: ["Unknown field"] });
+
+/**
+ * The custom values a write keeps: each given key held to its field by `checkValue`, null (or empty)
+ * clearing it, merged over what the record had. A key no field of the record has, or one retired, is
+ * refused: a retired field keeps its values and is offered no more.
+ * @param {{query: Function}} db
+ * @param {{appliesTo: "lead"|"partner"|"deal", categoryId: string|null, values?: object, had?: object}} opts
+ * @returns {Promise<object>}
+ */
+async function checkCustom(db, { appliesTo, categoryId, values, had = {} }) {
+  const out = { ...(had || {}) };
+  const given = Object.entries(values || {});
+  if (!given.length) return out;
+  const defs = new Map((await defsFor(db, appliesTo, categoryId)).map((d) => [d.key, d]));
+  for (const [key, value] of given) {
+    const def = defs.get(key);
+    if (!def || !def.active) throw unknown(key);
+    const kept = checkValue(def, value);
+    if (kept === null) delete out[key];
+    else out[key] = kept;
+  }
+  return out;
+}
+
+/**
+ * The SQL that narrows a list by its filterable custom fields (`{"ticketing":"exclusive"}`); a key
+ * that is no filterable field of the records is a 422.
+ * @param {{query: Function}} db
+ * @param {"lead"|"partner"|"deal"} appliesTo
+ * @param {object|undefined} filter  the parsed CustomFilter
+ * @param {string} column  the records' `custom` column, qualified
+ * @param {Array} params   appended to
+ * @returns {Promise<string>} "" or "AND ..."
+ */
+async function filterSql(db, appliesTo, filter, column, params) {
+  const entries = Object.entries(filter || {});
+  if (!entries.length) return "";
+  const defs = new Map((await repo.listFields(db, { applies_to: appliesTo, active: true })).map((d) => [d.key, d]));
+  const wanted = {};
+  for (const [key, value] of entries) {
+    const def = defs.get(key);
+    if (!def || !def.filterable) throw new AppError("VALIDATION_FAILED", "Check the filters", 422, { custom: [`No filter ${key}`] });
+    wanted[key] = def.field_type === "multi_pick" && !Array.isArray(value) ? [value] : value;
+  }
+  params.push(JSON.stringify(wanted));
+  return `AND ${column} @> $${params.length}::jsonb`;
+}
+
+module.exports = { keyOf, list, create, update, checkValue, defsFor, checkCustom, filterSql };

@@ -49,11 +49,11 @@ saying who agreed and when.
 | M4 Recruitment End to End | 10 | 0 | 0 | 10 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 4 | 2 | 2 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
-| M7 Partnerships, CRM & Trackers | 8 | 7 | 0 | 1 | 0 | 0 |
+| M7 Partnerships, CRM & Trackers | 8 | 4 | 0 | 4 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **105** | **18** | **2** | **85** | **0** | **0** |
+| **Total** | **105** | **15** | **2** | **88** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
@@ -1260,16 +1260,17 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 50 | Pipeline | `pipeline` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 50 | Pipeline | `pipeline` | M7 | LA | ☑ | ☑ | ☑ | Built | 06/11/2026 |
 | 104 | Categories | `categories` | M7 | LA | ☑ | ☑ | ☑ | Built | 06/11/2026 |
-| 51 | Partners | `partners` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
-| 52 | Leads | `leads` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
+| 51 | Partners | `partners` | M7 | LA | ☑ | ☑ | ☑ | Built | 06/11/2026 |
+| 52 | Leads | `leads` | M7 | LA | ☑ | ☑ | ☑ | Built | 06/11/2026 |
 | 53 | Proposals | `proposals` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 | 54 | Contracts & MOUs | `contracts-and-mous` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 | 55 | Analytics | `analytics` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 06/11/2026 · JP · M7 PR 3, leads, partners, deals and the 360s (`m7/leads-partners-deals`, #83, the guide's Appendix A): Pipeline (#50), Partners (#51) and Leads (#52) with the Partner 360 and Lead 360 on the real API, desktop and phone: `leads`, `partners`, `partner_pipeline`'s deals (options, team, stage moves with history, health and blockers, returns' service) and `interactions` (without mail) on the contract; contacts, the Documents tab on the vault (`partner_document`, migration 7060, which also drops `partner_type`), duplicates, conversion in one transaction; New Lead, New Partner, New Deal, the stage switcher's Move Stage, Set Health, Log Interaction, Add Contact, Upload Document, Convert to Partner, Close as Lost and Close Partner; `StageSwitcher` in packages/ui; partners, leads and deals in ⌘K with New Lead and New Partner; the Praxis AI reads and cards; Home's partners source on the modules' reads. Merged after PR 2 (#80): its files serve categories, lists and fields, and the deals read through them. Left: the 360's Work tab (PR 5) and Returns tab with Enter Returns (PR 4) show their empty states until then; Categories' picked category shows its partners and leads as counts only (PR 2's review note; the guide's §2 lists them); Proposals, Contracts & MOUs and Analytics are PRs 6 to 8.
 - 06/11/2026 · TB · M7 PR 2 reviewed (#80): Categories' New action is New Partner Category in ⌘K and the phone's floating button (Expenses' is New Expense Category; ⌘K holds a label once); Pipeline Settings' Move Up and Move Down renumber the list. No status changed. Left: PR 3 to PR 9.
 - 06/11/2026 · JP · M7 PR 2, Categories (#104, `m7/categories`, docs/guides/partnerships.md Appendix A): Categories on the real API, desktop and phone, ticked. Categories with their defaults, counts and retire and restore; MyCity's lists (stages with what each counts as, impacts, lead sources, document kinds) and the rules that keep the pipeline whole (a stage that starts, signs and loses; the last stage of a meaning in use); custom fields typed and checked by type; each category's delivery checklist, ordered; agreement templates built in the hub on the one document engine (`DocumentEditor`, a new `packages/ui` component with tables and field chips; wording checked against the record's fields, the category's custom fields and the template's asks); Tidy With AI (`template-tidy`, job Default, chosen by JP 06/11/2026), kept nothing until Use Draft, words held to the pasted text; Start From Tracker reading a workbook's dropdowns (`readDropdowns` in `shared/spreadsheet`); proof points with their images; the Events category's Deal Merchant Agreement, checklist and a demonstration set on staging (`seeds/staging/65_partnership_setup.js`). Migration 7050 (a template's asks). On phone, a category opens in a sheet with its sections one at a time and Pipeline Settings and Proof Points behind their own rows. Left: MyCity's ticketing template (not yet uploaded; it becomes an Events template in the same editor), PR 3 onward.
 - 05/11/2026 · JP · M7 PR 1, contract, data and scaffolding (`m7/contract-data`, the guide's Appendix A): the seven contract files with every schema of Appendix C (the design kit's twelve layouts as one union; the Workspace link as `PartnerLink`, joining the Workspace forms in PR 5); migrations 7010 to 7040 (categories, templates, checklists, custom fields, leads, deals on a lead or partner with options, team, deliverables, returns and linked mail, the studio's tables, proof points, agreements, Workspace's three link columns; `agreement_obligation` dropped while empty; `partner_type` copied into a category and no longer required); seed 7190 (deal health, interaction types, numbering PAR, LED, DEAL, PRO, AGR, the `partnership.agreement` flow, `partnerships.configure` and `partnerships.money`, 7099's choices switched off); Categories (#104) and the public Proposal page (#105) ratified and registered; the mock split one file a screen; Home's partners source true to the schema. No ticks: the tabs show Coming Soon. Left: PR 2 to PR 9.

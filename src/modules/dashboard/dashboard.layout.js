@@ -212,11 +212,11 @@ async function orgKpi(client, { today, user }) {
 }
 
 /**
- * The Naira value of the agreements signed in each month of this year, a month with nothing
- * signed at 0.00, in the reader's `partnerships` scope: the agreements the Signed Value card
- * counts, each in the month it starts until M7 records when it was signed
- * (partners.source.js). The year is read whole, as the card reads it, so the months add up
- * to the card; they run to this month, or to a later one an agreement already starts in.
+ * The Naira value of the deals signed in each month of this year, a month with nothing
+ * signed at 0.00, in the reader's `partnerships` scope: the deals the Signed Value card
+ * counts, each in the month it was signed (partners.source.js). The year is read whole, as
+ * the card reads it, so the months add up to the card; they run to this month, or to a later
+ * one a deal is already dated in.
  */
 async function signedValue(client, { today, scopes }) {
   const year = today.slice(0, 4);
