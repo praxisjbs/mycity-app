@@ -9,6 +9,7 @@ import { MyPayslipsPage } from "./Payslips";
 import { MyPerformancePage } from "./Performance";
 import { MyProfilePage } from "./Profile";
 import { MyQueriesPage } from "./Queries";
+import { MyRequestsPage } from "@/features/expenses/MyRequests";
 import { MySecurityPage } from "./Security";
 
 export default function Ess({ tab }: ModuleScreenProps) {
@@ -21,6 +22,7 @@ export default function Ess({ tab }: ModuleScreenProps) {
     case "my-performance": return <MyPerformancePage />;
     case "my-payslips": return <MyPayslipsPage />;
     case "my-leave": return <MyLeavePage />;
+    case "my-requests": return <MyRequestsPage />;
     case "my-queries": return <MyQueriesPage />;
     case "my-documents": return <MyDocumentsPage />;
     case "org-chart": return <OrgTree mode="viewer" />;

@@ -24,6 +24,9 @@
 
 /** The tables, children before parents: the order their rows are deleted in. */
 const DELETE_ORDER = Object.freeze([
+  // A task or an event may be connected to a partner and its deal (7040), so they go first.
+  "calendar_event",
+  "task",
   "partner_interaction",
   "partnership_agreement",
   "partnership_proposal",
@@ -32,8 +35,6 @@ const DELETE_ORDER = Object.freeze([
   "expense_request",
   "budget_line",
   "budget",
-  "calendar_event",
-  "task",
   "employee_target",
   "organisational_goal",
   "performance_review",

@@ -85,7 +85,11 @@ mycity-app/
 │                             and the Talent Pool, through the services, on the Implementation
 │                             Team as hiring managers and panelists, tested by tests/integration/
 │                             recruitment-staging-seed.test.js;
-│                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
+│                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest;
+│                             80_expenses.js: M8's categories, budgets, projects and requests at
+│                             every stage on the Implementation Team's accounts, through the
+│                             services, after taking Home's expense rows and 8099's categories away,
+│                             tested by tests/integration/expenses-staging-seed.test.js; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
@@ -408,6 +412,8 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `announcements.post` | `community` | Post announcements and track who has read them | Implementation, Operations & People, Management | `0449` |
 | `mailbox.signature` | `mailbox` | Configure Signature: the company's signature links and what shows on everyone's email signature | Implementation, System Administrator | `1129` |
 | `queries.configure` | `queries` | Write the query rules, the consequence chain and the letter templates (`docs/guides/queries.md`) | Implementation, Operations & People | `3190` |
+| `partnerships.configure` | `partnerships` | Configure Partnerships: the categories with their agreement templates, delivery checklists and custom fields, the pipeline's stages and lists, the proof points and the saved proposal templates (`docs/guides/partnerships.md`) | Implementation, Operations & People | `7190` |
+| `partnerships.money` | `partnerships` | See Commission and Returns: see and enter commission, the merchant's take and returns, and import returns | Implementation, Operations & People, Management; General Management through their department (in code) | `7190` |
 | `expenses.finance` | `expenses` | Run Expenses: group approved requests into requisitions, record disbursements, set budgets and manage the expense categories (`docs/guides/expenses.md`) | Implementation, Operations & People | `8100` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
@@ -555,31 +561,43 @@ screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2
 
 ### 5.10 M7 · Partnerships, CRM & Trackers · LA, GE · 30 Nov to 4 Dec
 
+The build plan and the file map are `docs/guides/partnerships.md` (Appendix A and D), M7's only
+source of truth. PR 1 (05/11/2026) filled the seven contract files, migrations `7010` to `7040`, seed
+`7190`, and mounted each module's router on `/api/v1/partnerships`, empty until its PR; the files
+below beyond the template are filled, or added, by the PR named.
+
 | Module | Files beyond the template |
 |---|---|
-| `partners` | `.360` (renders correctly with zero data), `.dedup`, `.import` (the tracker) |
-| `partner_pipeline` | `.stages` (MyCity's twelve, in order), `.types` (configurable, A21), `.inactivity` |
-| `leads` | `.convert` |
-| `interactions` | |
-| `proposals` | `.questionnaire`, `.draft` (AI), `.pdf` |
-| `agreements` | `.lifecycle` (Draft to Renewed/Closed, workflow definition), `.renewals` |
-| `partnership_analytics` | `.queries` (per lead owner, A21) |
-| `mailbox/binding/` | `intake.service`, `mail-context.service`, `context-tabs`, `convert.service` |
+| `partners` | `.360` (renders correctly with zero data), `.dedup`, `.convert` (the conversion transaction), `.documents`, `.work`, `.views` (PR 3); `.import` (the tracker, PR 4); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
+| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2); `.deals`, `.options`, `.stages`, `.health`, `.views` (PR 3); `.returns`, `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.types` is not built (categories replace it) and goes with PR 2; `.events` registers `deal.venue` (PR 1) |
+| `leads` | `.360`, `.status` (status from stage), `.views` (PR 3); `.convert` is not built (conversion is `partners.convert`) and goes with PR 3; `.events` registers `lead.cities` (PR 1) |
+| `interactions` | `.mail` (with `mailbox/binding/`, PR 8) |
+| `proposals` | `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views` (PR 7; `.proof` with PR 2); `.questionnaire` and `.pdf` are not built and go with PR 7 |
+| `agreements` | `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`), `.renewals`, `.views` (PR 6; `.tidy` with PR 2) |
+| `partnership_analytics` | `.queries` (per lead owner, A21; PR 8) |
+| `signatures` (shared with M5) | `.service`, `.code` (the email code), `.stamp`, `.certificate`, `.signed-pdf`, `.verify`, `.public.routes` (PR 6 if M5 has not built them) |
+| `mailbox/binding/` | `intake.service`, `mail-context.service`, `context-tabs`, `convert.service` (PR 8) |
 
-Shared first filled: `shared/dedup`. Prompts: `proposal-draft`, `mou-draft`. Templates: `proposal`, `mou`.
+Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR 4);
+`shared/documents/render.js` its table loop if missing (PR 6). Prompts (`services/ai/prompts/`):
+`proposal-questions`, `proposal-draft`, `proposal-rewrite`, `proposal-message`, `template-tidy`;
+`mou-draft` is not built (an MOU is a template). Templates: `templates/documents/` (the agreements,
+`proposal.html`, `signature-certificate.html`), `templates/proposals/` (the design kit),
+`templates/email/` (`proposal-sent`, `agreement-sign`, `agreement-signed`, `agreement-renewal`,
+`sign-code`).
 
 ### 5.11 M8 · Expenses & Budget Control · AJ · 7 to 11 Dec
 
 | Module | Files beyond the template |
 |---|---|
-| `expenses` | `.receipt-ai`, `.duplicates`, `.budget-check` (flag before approval) |
-| `requisitions` | `.lines` (one requisition, many requests; a line at or above its category threshold needs its own CEO tick) |
-| `disbursements` | Bank transaction reference enforced by a database trigger |
-| `budgets` | `.variance` (ships empty, A25) |
-| `expense_categories` | Threshold lives on the category |
+| `expenses` | `.receipt-ai`, `.duplicates` (PR 6), `.budget-check` (the budget line and Over Budget, set when a request is sent and worked out again whenever its line moves) |
+| `requisitions` | none: one requisition owns many requests through `expense_request.requisition_id` |
+| `disbursements` | none: the bank reference is asked for, not required (Reference Missing, no database trigger) |
+| `budgets` | `.variance` (the monthly expenses report by department, project and category, Home's `expenses_monthly` source), `.search`; `jobs/schedulers/budget-threshold.js` and its handler |
+| `expense_categories` | `.ai`, `.search`; no threshold (decision 1 of 04/11/2026) |
 
-Chain for every request: requester, line manager, Operations, requisition, CEO, disbursed
-(MILESTONES §13).
+Chain for every request: requester, line manager (skipped for a line manager's own), Operations &
+People, requisition, CEO, disbursed (MILESTONES §13, `docs/guides/expenses.md` §6.3).
 
 ### 5.12 M9 · Settings & Governance · TB · 7 to 11 Dec
 
@@ -627,13 +645,15 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M5 | `offer-expiry`, `signature-reminder`, `onboarding-dispatch` | `offer-expiry`, `signature-reminders` |
 | M6 | `payroll-compute`, `payslip-render` | |
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
-| M8 | `budget-threshold`, `approval-ageing` | `budget-threshold`, `approval-ageing` |
+| M8 | `budget-threshold` (the morning's sweep, re-run by hand for a day), `approval-ageing` | `budget-threshold` (each budget line 90% used, committed and spent, told to its department's head and Operations & People once, 07:00 Lagos; `docs/guides/expenses.md` §6.6), `approval-ageing` |
 | M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly), `exchange-rates` (today's exchange rates after midnight Lagos, and again within the hour if that failed) |
 | M10 | `knowledge-embed`, `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | |
 
-`partner-inactivity` (M7) and `budget-threshold` and `approval-ageing` (M8) are superseded by Home's
-`home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity and budget threshold
-read through Home's source adapters, approval ageing reads the workflow tables in the metric's own SQL.
+`partner-inactivity` (M7) and `approval-ageing` (M8) are superseded by Home's
+`home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity reads through Home's
+source adapters, approval ageing reads the workflow tables in the metric's own SQL. Home's Budget
+Threshold rules read whole budgets the same way; M8's `budget-threshold` warns about each category
+line of a budget, once, as the handoff for M8 asked (`docs/handoff/m8-expenses.md` PR 5).
 Their stub files stay for their milestones to delete or fill.
 
 Every scheduler file must be named in `SCHEDULERS` or the worker never starts it;

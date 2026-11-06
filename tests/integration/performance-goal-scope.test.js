@@ -473,7 +473,8 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
   test("everyone in General Management holds the plan through the department, not a role (P27)", async () => {
     const grantsCache = require("../../src/shared/rbac/grants-cache");
     const held = (who) => grantsCache.getCapabilities(pool, people[who].user.user_id);
-    const GM = ["goals.company", "goals.organisation", "goals.view_all"];
+    // With partnerships' commission and returns (partnerships.md §8), held the same way.
+    const GM = ["goals.company", "goals.organisation", "goals.view_all", "partnerships.money"];
     // A Technical Assistant with only the staff role, in the CEO's department.
     expect(await held("tech")).toEqual(GM);
     expect(await held("ada")).toEqual([]);
@@ -496,7 +497,7 @@ describeDb("who reads the OKR tree, and sharing a company goal, against the real
     await grantsCache.invalidateUser(people.tech.user.user_id);
     expect(await held("tech")).toEqual(GM);
 
-    // A person moved out of it loses the three, and with them the plan.
+    // A person moved out of it loses them, and with them the plan.
     await q("UPDATE employee SET department_id = $2 WHERE employee_id = $1", [emp("tech"), ids.tbo]);
     await grantsCache.invalidateUser(people.tech.user.user_id);
     expect(await held("tech")).toEqual([]);

@@ -56,7 +56,19 @@ const ExpenseCategoryUpdate = z
   .strict()
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "Nothing to change", path: ["name"] });
 
+/** Save Category's card (praxis-ai.md decision 33): the category, matched by its name, and what changes. */
+const ExpenseCategoryChange = z
+  .object({
+    expense_category_id: uuid,
+    name: text(80).optional(),
+    type: CategoryType.optional(),
+    description: optionalText(300),
+    active: z.boolean().optional(),
+  })
+  .strict();
+
 const TABLES = {
+  ExpenseCategoryChange: { table: "expense_category" },
   ExpenseCategory: {
     table: "expense_category",
     virtual: {
@@ -78,4 +90,5 @@ module.exports = {
   ExpenseCategoryPage,
   ExpenseCategoryCreate,
   ExpenseCategoryUpdate,
+  ExpenseCategoryChange,
 };

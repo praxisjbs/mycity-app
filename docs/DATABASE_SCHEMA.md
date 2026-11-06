@@ -473,38 +473,68 @@ and makes the card live in the same PR.
 ### M7 Partnerships, CRM & Trackers · 7000 to 7999 · LA
 
 **Built:** `7000` partners, contacts, opportunities and stage history, interactions, proposals,
-agreements and obligations · `7099` seed.
+agreements and obligations · `7099` seed · `7010` the categories (`partner_category`, one name
+however it is cased) with their agreement templates (`partner_category_template`, a key of
+`template_version` and one default a kind), delivery checklists (`partner_category_checklist_item`)
+and custom fields (`partnership_field`, a fixed snake_case key, picks with their options), and `lead`
+(`LED-0001`; its status read from its deal's stage by the service, a lost one with its reason, a
+converted one with its partner; GIN on `custom`, trigram on the name) · `7020` `partner` gains its
+category, region scope, logo, since, lead, custom values and closing, its status `active`, `dormant`
+or `closed` (a `prospect` row became `dormant`) and `partner_type` copied into a category of that
+name and no longer required; `partner_contact` on a lead or a partner (one of the two) with several
+phones and a signatory flag; `partnership_opportunity` is the deal (`DEAL-2026-0001`): on a lead or a
+partner, its event, venue (a place, `deal.venue`), objective, health (Stalled needs blockers), next
+action, commission and its deviation, validity, signing, completion, impact, comments and custom
+values, status `open`, `live`, `completed` or `lost`, no default stage; `partnership_stage_history`
+with `kind` (stage or health) and `source`; `partner_interaction` on a lead or a partner, its type
+CHECK (`call`, `meeting`, `email`, `visit`, `note`) and a linked message logged once; `deal_option`
+(up to five a deal), `deal_member`, `deal_deliverable` (a checklist item once a deal, its task),
+`deal_return` (a deal's month once) and `partner_mail_thread` (one record a thread); Home's four
+indexes · `7030` `proposal_template`; `partnership_proposal` gains its brief, content, design template,
+AI run, validity, public token, recipients, views, outcome and the version it revises, its status
+CHECK (`brief` to `withdrawn`); `proposal_question`, `proposal_source`, `proposal_asset`,
+`proposal_view` (the address as a keyed hash only) and `proof_point`; `partnership_agreement` on a lead
+or a partner, with its kind, template key and version, fields, body, approval, sealed copy, renewal
+notice and closing, its status CHECK (`draft` to `closed`), `starts_on` set at signing;
+`agreement_obligation` dropped (empty; the file refuses to run on a row) · `7040` `project`, `task`
+and `calendar_event` gain `partner_id`, `lead_id` and `deal_id` (a partner or a lead, never both) ·
+`7190` seed: `deal_health` and `interaction_type` (with `visit`), numbering `lead`, `deal`, `agreement`
+(and `partner`, `proposal` kept), 7099's `partnership_opportunity`, `partnership_agreement` and 0099's
+`mou` schemes taken out, the `partnership.agreement` approval (the Head of Department of the deal
+owner's department, then the CEO), `partnerships.configure` (Implementation, Operations & People) and
+`partnerships.money` (Operations & People, Management, Implementation; General Management through
+their department, in code), and 7099's partner types and stages switched off (A26).
+`docs/guides/partnerships.md` §4 is the field-by-field account.
 
 **Owes:**
-- Leads (new, contacted, qualified, converted, lost): no table.
-- The pipeline as MyCity's tracker has it (MILESTONES §12): region, objective, potential impact,
-  next action, date identified, comments; MyCity's twelve stages and partner types in place of the
-  seeded ones (A26: business choices are not seeded).
-- Mail threads bound to a record; proposal answers and `ai_run_id`; MOU and contract type, renewal
-  date, viewed and expiring states, the agreement workflow.
-- Numbering: `partner`, `partnership_opportunity`, `partnership_agreement` have no scheme in
-  `schemes.js`.
-- **Read by Home** (home.md §4.1): `partner` (`partner_id`, `name`, `partner_type`, `status`,
-  `owner_id`, `created_at`), `partner_interaction` (`partner_id`, `occurred_at`),
-  `partnership_opportunity` (`partnership_opportunity_id`, `partner_id`, `title`, `stage`, `status`,
-  `owner_id`, `estimated_value`, `currency`, `expected_close_on`), `partnership_proposal`
+- `partner.partner_type`: nothing reads it since 7020; dropped by a fix-forward in M7 PR 3, one
+  release later (MIGRATIONS §8).
+- MyCity's own stages (with their meanings), impact, sources, document kinds and categories: entered
+  on Partnerships · Categories or by Start From Tracker (M7 PR 2), never seeded (A26).
+- The writers: every table above is written only through M7's services, PR 2 to PR 8 (the guide's
+  Appendix A); the Workspace link columns through the Workspace services, PR 5.
+- **Read by Home** (home.md §4.1): `partner` (`partner_id`, `name`, `partner_category_id`, `status`,
+  `owner_id`, `created_at`) with `partner_category` (`partner_category_id`, `name`), `lead` (`lead_id`,
+  `name`), `partner_interaction` (`partner_id`, `occurred_at`), `partnership_opportunity`
+  (`partnership_opportunity_id`, `partner_id`, `lead_id`, `title`, `stage`, `status`, `owner_id`,
+  `estimated_value`, `currency`, `expected_close_on`), `partnership_proposal`
   (`partnership_proposal_id`, `partnership_opportunity_id`, `number`, `value`, `currency`, `sent_at`,
-  `accepted_at`) and `partnership_agreement` (`partnership_agreement_id`, `partner_id`, `number`,
-  `title`, `status`, `starts_on`, `value`, `currency`, `owner_id`) through
-  `src/modules/dashboard/sources/partners.source.js`: update it in the same PR. Replacing the seeded
-  stages changes what the pipeline chart counts. Indexes asked by Home: `partner_interaction
-  (partner_id, occurred_at DESC)`, `partner (owner_id)`, `partnership_opportunity (owner_id, status)`,
-  `partnership_agreement (status, starts_on)`.
+  `accepted_at`) and `partnership_agreement` (`partnership_agreement_id`, `partner_id`, `lead_id`,
+  `number`, `title`, `status`, `starts_on`, `value`, `currency`, `owner_id`) through
+  `src/modules/dashboard/sources/partners.source.js`. M7 PR 3 moves those queries to its modules'
+  reads (open and live deals, signed values in the year signed, proposals `sent` or `viewed`) and
+  clears the adapter's `owes` (partnerships.md §6.17).
   **Staging holds Home's demonstration rows** in `partner`, `partner_interaction`,
   `partnership_opportunity`, `partnership_proposal` and `partnership_agreement`
   (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`
   (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
-  takes them away once, in the three steps that file starts with: that seed calls
+  (M7 PR 8) takes them away once, in the three steps that file starts with: that seed calls
   `removeHomeStagingRows(client, [these tables])` in its transaction before it writes, which deletes
   the alerts Home raised about those rows and then the rows, children first; the PR takes the rows
   out of `seeds/staging/lib/forward-rows.js` and leaves their ids in the manifest, so the call finds
   them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
-  (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
+  (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`). The categories 7020 made
+  from those rows' partner types stay with M7's staging seed.
 
 ### M8 Expenses & Budget Control · 8000 to 8999 · AJ
 
@@ -522,11 +552,12 @@ the status CHECK (`draft`, `submitted`, `sent_back`, `approved`, `in_requisition
 status CHECK; `project.budget_amount`; the foreign-key and list indexes, Home's included ·
 `8100` seed: the `expenses.request` and `expenses.requisition` flows, the statuses and payee types,
 the `expenses.finance` capability for Operations & People, and 8099's unused `expense_request`
-numbering scheme taken out (a request is numbered `expense`).
+numbering scheme taken out (a request is numbered `expense`). · `8020` one budget per department per year: a unique index on `budget (department_id, starts_on)` for every budget but a closed one, a later duplicate closed first (M8 audit F7).
 
 **Owes:**
-- The five categories 8099 seeds are a business choice A26 does not allow; they go with M8's
-  staging seed (PR 7), after Home's staging rows that point at them.
+- Paid 05/11/2026 (M8 PR 7): the five categories 8099 seeded are taken out by the reference seed
+  `8101_seed_expense_categories_out.sql` wherever nothing names them (production included), and by
+  `seeds/staging/80_expenses.js` on staging once it has taken Home's rows away.
 - `requisition.expense_request_id`, `requisition.supplier_name`, `requisition_line` and
   `expense_transaction` are unused since 8010; dropped one release after M8 ships if still unused.
 - **Read by Home** (home.md §4.1): `expense_request` (`expense_request_id`, `number`, `employee_id`,
@@ -534,7 +565,8 @@ numbering scheme taken out (a request is numbered `expense`).
   `expense_category` (`expense_category_id`, `name`) through
   `src/modules/dashboard/sources/expenses.source.js`, and `budget` (`budget_id`, `number`, `name`,
   `department_id`, `owner_id`, `currency`, `starts_on`, `ends_on`, `approved_at`) with `budget_line`
-  (`budget_id`, `amount`, `spent_amount`) through `budgets.source.js`: update them in the same PR.
+  (`budget_id`, `amount`, `committed_amount`, `spent_amount`; Budget Used counts committed and spent
+  since M8 PR 5) through `budgets.source.js`: update them in the same PR.
   Home's awaiting approval is `submitted` (8010's status list). **Staging holds Home's
   demonstration rows** in `expense_request`, `budget` and `budget_line`
   (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`

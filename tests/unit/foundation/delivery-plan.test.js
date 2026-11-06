@@ -17,7 +17,7 @@ afterEach(() => deliveryPlan.use());
 
 describe("the plan, read from the docs", () => {
   test("each screen is its PROGRESS section and slug, with its milestone and ticks; each milestone its demo day", () => {
-    expect(docs.screens["Expenses|approvals"]).toEqual({ m: "M8", api: false, delivered: false });
+    expect(docs.screens["Payroll|payroll-runs"]).toEqual({ m: "M6", api: false, delivered: false });
     expect(docs.screens["Employee Self-Service|my-leave"]).toMatchObject({ m: "M1", api: true, delivered: true });
     expect(docs.milestones.find((m) => m.key === "M8")).toMatchObject({ n: 8, demo: "2026-12-11" });
     // "with M1": the foundation takes the next milestone's demo day.
@@ -64,25 +64,25 @@ describe("the API's answers", () => {
     expect(["production", "staging", "development", "test"].map((env) => deliveryPlan.ruleFor(env))).toEqual(["production", "staging", "staging", "all"]);
   });
 
-  test("on staging, Expenses is held back until its API is ticked, and what has shipped opens", () => {
+  test("on staging, Payroll is held back until its API is ticked, and what has shipped opens", () => {
     deliveryPlan.use({ plan: docs, rule: "staging" });
-    expect(deliveryPlan.screenOpen("expenses", "approvals")).toBe(false);
+    expect(deliveryPlan.screenOpen("payroll", "payroll-runs")).toBe(false);
     expect(deliveryPlan.screenOpen("ess", "my-leave")).toBe(true);
-    expect(deliveryPlan.moduleOpen("expenses")).toBe(false);
-    expect(deliveryPlan.linkOpens("/expenses?tab=approvals&id=1")).toBe(false);
-    expect(deliveryPlan.typeOpens("expense")).toBe(false);
+    expect(deliveryPlan.moduleOpen("payroll")).toBe(false);
+    expect(deliveryPlan.linkOpens("/payroll?tab=payroll-runs&id=1")).toBe(false);
+    expect(deliveryPlan.typeOpens("payroll_run")).toBe(false);
     expect(deliveryPlan.typeOpens("leave_request")).toBe(true);
     expect(deliveryPlan.typeOpens("not_a_route")).toBe(true);
-    expect(deliveryPlan.closedTypes()).toEqual(expect.arrayContaining(["expense", "requisition"]));
+    expect(deliveryPlan.closedTypes()).toEqual(expect.arrayContaining(["payroll_run", "deduction"]));
     expect(deliveryPlan.closedTypes()).not.toContain("leave_request");
   });
 
   test("a test, or a plan that cannot be read, holds nothing back", () => {
     deliveryPlan.use({ plan: docs, rule: "all" });
-    expect(deliveryPlan.screenOpen("expenses", "approvals")).toBe(true);
+    expect(deliveryPlan.screenOpen("payroll", "payroll-runs")).toBe(true);
     expect(deliveryPlan.closedTypes()).toEqual([]);
     deliveryPlan.use({ plan: null, rule: "staging" });
-    expect(deliveryPlan.screenOpen("expenses", "approvals")).toBe(true);
+    expect(deliveryPlan.screenOpen("payroll", "payroll-runs")).toBe(true);
   });
 });
 
@@ -97,8 +97,8 @@ describe("⌘K by the plan", () => {
       const provider = require("../../../src/shared/search/provider");
       const plan = require("../../../src/shared/delivery-plan");
       const staff = provider.recordProvider(spec);
-      const expenses = provider.recordProvider({ ...spec, type: "expense", module: "expenses", label: "Expenses" });
-      jest.spyOn(reg, "providers").mockReturnValue([staff, expenses]);
+      const runs = provider.recordProvider({ ...spec, type: "payroll_run", module: "payroll", label: "Payroll Runs" });
+      jest.spyOn(reg, "providers").mockReturnValue([staff, runs]);
       const rows = [{ id: "r-1", title: "Ada Obi", _total: 1 }];
       const client = { query: async (sql) => ({ rows: /\bLIMIT\b/.test(sql) ? rows : [] }), release() {} };
       const db = { connect: async () => client };
@@ -106,20 +106,20 @@ describe("⌘K by the plan", () => {
       plan.use({ plan: docs, rule: "staging" });
       expect((await service.search(db, user, { q: "ada" })).groups.map((g) => g.type)).toEqual(["employee"]);
       plan.use({ plan: docs, rule: "all" });
-      expect((await service.search(db, user, { q: "ada" })).groups.map((g) => g.type)).toEqual(["employee", "expense"]);
+      expect((await service.search(db, user, { q: "ada" })).groups.map((g) => g.type)).toEqual(["employee", "payroll_run"]);
     });
   });
 
   test("a screen or an action that would open Coming Soon is never offered", () => {
     const { screenEntries, actionEntries } = require("../../../src/shared/search/search.service");
-    // Settings' holder sees every tab of a module it views, Expenses' Approvals among them.
-    const reader = { grants: { expenses: ["view", "create", "edit"], ess: ["view", "create"], settings: ["view"] }, capabilities: [], is_ceo: false, manages_people: true };
+    // Settings' holder sees every tab of a module it views, Payroll's Payroll Runs among them.
+    const reader = { grants: { payroll: ["view", "create", "edit"], ess: ["view", "create"], settings: ["view"] }, capabilities: [], is_ceo: false, manages_people: true };
     const screensOf = () => screenEntries(reader).map((e) => e.hit.link);
     deliveryPlan.use({ plan: docs, rule: "all" });
-    expect(screensOf()).toEqual(expect.arrayContaining(["/expenses?tab=approvals", "/ess?tab=my-leave"]));
+    expect(screensOf()).toEqual(expect.arrayContaining(["/payroll?tab=payroll-runs", "/ess?tab=my-leave"]));
     deliveryPlan.use({ plan: docs, rule: "staging" });
     expect(screensOf()).toContain("/ess?tab=my-leave");
-    expect(screensOf().filter((link) => link.startsWith("/expenses"))).toEqual([]);
+    expect(screensOf().filter((link) => link.startsWith("/payroll"))).toEqual([]);
     expect(actionEntries(reader).map((e) => e.hit.link).filter((link) => link && !deliveryPlan.linkOpens(link))).toEqual([]);
   });
 });

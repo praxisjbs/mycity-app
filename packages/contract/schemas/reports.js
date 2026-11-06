@@ -97,6 +97,8 @@ const HOME_REPORT_SOURCES = Object.freeze({
   tasks: Object.freeze({ module: "workspace", filters: Object.freeze([]), offered: true }),
   partnerships: Object.freeze({ module: "partnerships", filters: Object.freeze([]), offered: true }),
   expenses: Object.freeze({ module: "expenses", filters: Object.freeze([]), offered: true }),
+  /** Last month's spend by department, project and category (docs/guides/expenses.md §6.6 rule 8). */
+  expenses_monthly: Object.freeze({ module: "expenses", filters: Object.freeze([]), offered: true }),
   recruitment: Object.freeze({ module: "recruitment", filters: Object.freeze([]), offered: true }),
   overview: Object.freeze({ module: "home", filters: Object.freeze([]), offered: false }),
   workspace_analytics: Object.freeze({

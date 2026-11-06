@@ -14,9 +14,10 @@
  * and clear `owes` as it pays each item (docs/guides/home.md §4.1, docs/DATABASE_SCHEMA.md M7
  * Owes). A unit test holds `tables` to the migrated schema and the queries to `tables`.
  *
- * The rules Home reads them by, until M7 settles its vocabularies:
+ * The rules Home reads them by, until M7 PR 3 moves them to its modules' reads:
  *   a partner, an opportunity or an agreement is its owner's (owner_id), so a row with no
- *     owner is seen only with `all` scope; a proposal is its opportunity's owner's
+ *     owner is seen only with `all` scope; a proposal is its opportunity's owner's; an
+ *     opportunity or an agreement is a partner's or a lead's (7020), named by whichever it is
  *   open opportunity     status `open`
  *   active partnership   a partner with status `active`
  *   signed               an agreement with status `signed` or `active`, in the year it starts
@@ -24,7 +25,7 @@
  *                        30 days ago (Lagos); one never contacted counts from when it was added
  *   proposal out         sent, not accepted, its opportunity still open
  * Stage codes are business data (A26) and never appear here; a stage is labelled from the
- * `partnership_stage` code list and ordered by it.
+ * `partnership_stage` list and ordered by it. A partner's type is its category's name.
  *
  * Money is Naira only (shared/money): a sum counts rows in `NGN` and leaves other
  * currencies out; a count counts every row (docs/guides/home.md §13).
@@ -36,11 +37,14 @@ const { PERSON } = require("../kpi-catalog/shared");
 
 /** The forward tables and the columns these queries read. */
 const TABLES = Object.freeze({
-  partner: ["partner_id", "name", "partner_type", "status", "owner_id", "created_at"],
+  partner: ["partner_id", "name", "partner_category_id", "status", "owner_id", "created_at"],
+  partner_category: ["partner_category_id", "name"],
+  lead: ["lead_id", "name"],
   partner_interaction: ["partner_id", "occurred_at"],
   partnership_opportunity: [
     "partnership_opportunity_id",
     "partner_id",
+    "lead_id",
     "title",
     "stage",
     "status",
@@ -61,6 +65,7 @@ const TABLES = Object.freeze({
   partnership_agreement: [
     "partnership_agreement_id",
     "partner_id",
+    "lead_id",
     "number",
     "title",
     "status",
@@ -71,15 +76,13 @@ const TABLES = Object.freeze({
   ],
 });
 
-/** What M7 still owes these queries. */
+/** What M7 still owes these queries (partnerships.md §6.17, PR 3 moves them to the modules' reads). */
 const OWES = Object.freeze([
-  "MyCity's twelve stages and partner types in place of the seeded ones (DATABASE_SCHEMA M7, A26).",
-  "Partner and agreement statuses: Home reads a partner `active` as active, an agreement `signed` or `active` as signed.",
-  "The agreement workflow, its signed date and MOU or contract type: until then an agreement counts in the year it starts.",
-  "Mail threads bound to a partner: until then contact is the interactions recorded.",
+  "The pipeline by MyCity's own stages (entered on Categories, PR 2) and their meanings: 7099's seeded stages are off.",
+  "Open Opportunities and Signed Value from the deals: a deal `open` or `live`, its signed value in the year signed (§6.6).",
+  "Proposals Out from the proposal's own status, `sent` or `viewed`, in place of its sent and accepted dates.",
+  "No Contact 30 Days on live deals and linked mail (§6.12, §6.15): until then contact is the interactions recorded.",
   "The currency rule for sums: Naira only until the owner decides (home.md §13).",
-  "Index partner_interaction (partner_id, occurred_at DESC), partner (owner_id), partnership_opportunity (owner_id, " +
-    "status) and partnership_agreement (status, starts_on) (asked by Home).",
 ]);
 
 /** Days without contact that make an active partner quiet. */
@@ -123,15 +126,16 @@ function pipelinePage(client, scope, query) {
   const s = scopeClause(scope, { column: "po.owner_id" }, params);
   return pageQuery(
     client,
-    `SELECT po.partnership_opportunity_id, po.title, p.name AS partner, po.stage,
+    `SELECT po.partnership_opportunity_id, po.title, COALESCE(p.name, l.name) AS partner, po.stage,
             COALESCE(rv.label, po.stage) AS stage_label, po.estimated_value, po.currency, po.expected_close_on,
             ${PERSON("e", "d")} AS owner, ${TOTAL_COL}
        FROM partnership_opportunity po
-       JOIN partner p ON p.partner_id = po.partner_id
+       LEFT JOIN partner p ON p.partner_id = po.partner_id
+       LEFT JOIN lead l ON l.lead_id = po.lead_id
        LEFT JOIN reference_value rv ON rv.domain = 'partnership_stage' AND rv.code = po.stage
        LEFT JOIN employee e ON e.employee_id = po.owner_id
        LEFT JOIN department d ON d.department_id = e.department_id
-      WHERE po.status = 'open' AND ${search(1, "po.title || ' ' || p.name")}
+      WHERE po.status = 'open' AND ${search(1, "po.title || ' ' || COALESCE(p.name, l.name)")}
         ${s.and}
       ORDER BY ${orderBy(query, { expected_close_on: "po.expected_close_on" }, "po.partnership_opportunity_id")}`,
     params,
@@ -171,15 +175,16 @@ async function activeCount(client, scope) {
   return (await one(client, `SELECT count(*)::int AS n FROM partner p WHERE p.status = 'active' ${s.and}`, params)).n;
 }
 
-/** One page of the active partners, within the scope, by name, each with when they were last in contact. */
+/** One page of the active partners, within the scope, by name, each with its category and when it was last in contact. */
 function activePage(client, scope, query) {
   const params = [query.q || null];
   const s = scopeClause(scope, { column: "p.owner_id" }, params);
   return pageQuery(
     client,
-    `SELECT p.partner_id, p.name, p.partner_type, ${LAST_CONTACT} AS last_contact_at,
+    `SELECT p.partner_id, p.name, pc.name::text AS category, ${LAST_CONTACT} AS last_contact_at,
             ${PERSON("e", "d")} AS owner, ${TOTAL_COL}
        FROM partner p
+       LEFT JOIN partner_category pc ON pc.partner_category_id = p.partner_category_id
        LEFT JOIN employee e ON e.employee_id = p.owner_id
        LEFT JOIN department d ON d.department_id = e.department_id
       WHERE p.status = 'active' AND ${search(1, "p.name")}
@@ -281,14 +286,15 @@ function signedPage(client, { today }, scope, query) {
   const s = scopeClause(scope, { column: "pa.owner_id" }, params);
   return pageQuery(
     client,
-    `SELECT pa.partnership_agreement_id, pa.number, pa.title, p.name AS partner, pa.starts_on, pa.value,
+    `SELECT pa.partnership_agreement_id, pa.number, pa.title, COALESCE(p.name, l.name) AS partner, pa.starts_on, pa.value,
             pa.currency, ${PERSON("e", "d")} AS owner, ${TOTAL_COL}
        FROM partnership_agreement pa
-       JOIN partner p ON p.partner_id = pa.partner_id
+       LEFT JOIN partner p ON p.partner_id = pa.partner_id
+       LEFT JOIN lead l ON l.lead_id = pa.lead_id
        LEFT JOIN employee e ON e.employee_id = pa.owner_id
        LEFT JOIN department d ON d.department_id = e.department_id
       WHERE ${SIGNED} AND pa.starts_on >= $1::date AND pa.starts_on <= $2::date
-        AND ${search(3, "pa.title || ' ' || p.name")}
+        AND ${search(3, "pa.title || ' ' || COALESCE(p.name, l.name)")}
         ${s.and}
       ORDER BY ${orderBy(query, { starts_on: "pa.starts_on DESC" }, "pa.partnership_agreement_id")}`,
     params,
@@ -346,12 +352,13 @@ function proposalsOutPage(client, scope, query) {
   const s = scopeClause(scope, { column: "po.owner_id" }, params);
   return pageQuery(
     client,
-    `SELECT pp.partnership_proposal_id, pp.number, po.title AS opportunity, p.name AS partner, pp.sent_at,
+    `SELECT pp.partnership_proposal_id, pp.number, po.title AS opportunity, COALESCE(p.name, l.name) AS partner, pp.sent_at,
             pp.value, pp.currency, ${TOTAL_COL}
        FROM partnership_proposal pp
        JOIN partnership_opportunity po ON po.partnership_opportunity_id = pp.partnership_opportunity_id
-       JOIN partner p ON p.partner_id = po.partner_id
-      WHERE ${PROPOSAL_OUT} AND ${search(1, "po.title || ' ' || p.name")}
+       LEFT JOIN partner p ON p.partner_id = po.partner_id
+       LEFT JOIN lead l ON l.lead_id = po.lead_id
+      WHERE ${PROPOSAL_OUT} AND ${search(1, "po.title || ' ' || COALESCE(p.name, l.name)")}
         ${s.and}
       ORDER BY ${orderBy(query, { sent_at: "pp.sent_at" }, "pp.partnership_proposal_id")}`,
     params,

@@ -502,6 +502,8 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
   opens New Vacancy on Recruitment with the role's title and its seat (`org_seat_id`), so the vacancy keeps
   the seat: it leaves Suggested From Organogram and the seat holds one live vacancy. It shows to who may also
   create a vacancy (`recruitment` create), as New Vacancy needs. The department is picked on the form.
+- 05/11/2026 · AJ · No change to the Org Chart: `app/src/features/ess/index.tsx`, which also renders it, gained the My Requests tab (M8, `docs/guides/ess.md`).
+
 - 03/11/2026 · JP · People's forms are Praxis AI cards (§9; `praxis-ai.md` decisions 33 and 36):
   Add Employee and Save Record with the work record alone, Save Line, Add Department and Save
   Department, Add Role and Save Role, each through this module's own function in its own

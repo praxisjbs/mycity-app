@@ -114,7 +114,8 @@ module.exports = defineManifest({
       asks: [{ field: "doc_type", question: "Which numbering is it?", read: "numbering.list" }],
       run: async (values, actor) => {
         const { doc_type: docType, ...changes } = values;
-        const saved = (await service.numberingList({ page: 1 })).data.find((r) => r.doc_type === docType) || {};
+        // The type's own scheme, not a page of the list: past the first 25 types it would not be there.
+        const saved = (await service.numberingScheme(docType)) || {};
         const body = asForm(c.settings.NumberingSchemeSave, { prefix: saved.prefix, padding: saved.padding, separator: saved.separator, reset: saved.reset, include_period: saved.include_period, ...given(changes) });
         return service.saveScheme(docType, body, actor);
       },

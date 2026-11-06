@@ -66,16 +66,16 @@ function personOf(staff, slot) {
  * The records
  * ------------------------------------------------------------------ */
 
-/** Partners and their pipeline (M7): four active, four prospects with an opportunity each. */
+/** Partners and their pipeline (M7): four active, four dormant with an open opportunity each. */
 const PARTNERS = [
-  { key: "mtn-nigeria", name: "MTN Nigeria", type: "corporate", status: "active", owner: "head", added: 240, industry: "Telecoms", site: "mtn.ng" },
-  { key: "providusbank", name: "ProvidusBank", type: "corporate", status: "active", owner: "head_team:1", added: 200, industry: "Banking", site: "providusbank.com" },
-  { key: "ikeja-city-mall", name: "Ikeja City Mall", type: "corporate", status: "active", owner: "head_team:2", added: 280, industry: "Retail", site: "ikejacitymall.com" },
-  { key: "access-bank", name: "Access Bank", type: "corporate", status: "active", owner: "head", added: 150, industry: "Banking", site: "accessbankplc.com" },
-  { key: "lagos-state-government", name: "Lagos State Government", type: "government", status: "prospect", owner: "head", added: 60, industry: "Government", site: "lagosstate.gov.ng" },
-  { key: "eko-hotels", name: "Eko Hotels", type: "corporate", status: "prospect", owner: "head_team:3", added: 50, industry: "Hospitality", site: "ekohotels.com" },
-  { key: "filmhouse-cinemas", name: "Filmhouse Cinemas", type: "corporate", status: "prospect", owner: "head_team:1", added: 40, industry: "Entertainment", site: "filmhouseng.com" },
-  { key: "kano-trade-council", name: "Kano Trade Council", type: "government", status: "prospect", owner: "head", added: 35, industry: "Government", site: "kanocc.org.ng" },
+  { key: "mtn-nigeria", name: "MTN Nigeria", status: "active", owner: "head", added: 240, industry: "Telecoms", site: "mtn.ng" },
+  { key: "providusbank", name: "ProvidusBank", status: "active", owner: "head_team:1", added: 200, industry: "Banking", site: "providusbank.com" },
+  { key: "ikeja-city-mall", name: "Ikeja City Mall", status: "active", owner: "head_team:2", added: 280, industry: "Retail", site: "ikejacitymall.com" },
+  { key: "access-bank", name: "Access Bank", status: "active", owner: "head", added: 150, industry: "Banking", site: "accessbankplc.com" },
+  { key: "lagos-state-government", name: "Lagos State Government", status: "dormant", owner: "head", added: 60, industry: "Government", site: "lagosstate.gov.ng" },
+  { key: "eko-hotels", name: "Eko Hotels", status: "dormant", owner: "head_team:3", added: 50, industry: "Hospitality", site: "ekohotels.com" },
+  { key: "filmhouse-cinemas", name: "Filmhouse Cinemas", status: "dormant", owner: "head_team:1", added: 40, industry: "Entertainment", site: "filmhouseng.com" },
+  { key: "kano-trade-council", name: "Kano Trade Council", status: "dormant", owner: "head", added: 35, industry: "Government", site: "kanocc.org.ng" },
 ];
 
 /** Contact recorded with a partner, days ago. Access Bank has none, so it counts from when it was added. */
@@ -108,36 +108,7 @@ const AGREEMENTS = [
   { partner: "access-bank", title: "Access Bank cardholder offers", status: "active", value: "1100000.00", started: 230, owner: "head" },
 ];
 
-/** Expense requests waiting for approval (M8), submitted days ago. */
-const EXPENSES = [
-  { key: "printer-toner", purpose: "Printer toner", category: "office", amount: "52000.00", by: "operations", ago: 1 },
-  { key: "lagos-activation-transport", purpose: "Lagos activation transport", category: "travel", amount: "185000.00", by: "head", ago: 0 },
-  { key: "social-media-course", purpose: "Social media course", category: "training", amount: "120000.00", by: "head_team:1", ago: 2 },
-  { key: "listing-team-data", purpose: "Data bundles, listing team", category: "utilities", amount: "45000.00", by: "manager_team:1", ago: 3 },
-  { key: "enugu-launch-transport", purpose: "Enugu city launch, transport", category: "travel", amount: "345000.00", by: "management:1", ago: 1 },
-];
-
-/** This quarter's budgets, approved, and their lines: Operations 90% spent, Marketing well under. */
-const BUDGETS = [
-  {
-    key: "operations-quarter",
-    name: "Operations",
-    owner: "operations",
-    lines: [
-      { category: "office", amount: "1500000.00", spent: "1380000.00" },
-      { category: "utilities", amount: "500000.00", spent: "420000.00" },
-    ],
-  },
-  {
-    key: "marketing-quarter",
-    name: "Marketing",
-    owner: "head",
-    lines: [
-      { category: "travel", amount: "3000000.00", spent: "1450000.00" },
-      { category: "training", amount: "600000.00", spent: "120000.00" },
-    ],
-  },
-];
+/* Expense requests and budgets are M8's own staging seed now (80_expenses.js). */
 
 /* Tasks and the calendar are M2's own staging seed now (40_workspace.js). */
 
@@ -161,60 +132,6 @@ const stg = (prefix, n) => `${prefix}-STG-${String(n).padStart(2, "0")}`;
  * person's login, an expense or a budget line its category).
  */
 const ROWS = Object.freeze([
-  ...BUDGETS.flatMap((b, i) => [
-    {
-      table: "budget",
-      key: b.key,
-      needs: [b.owner, "ceo"],
-      values: (x, [owner, ceo]) => ({
-        number: stg("BUD", i + 1),
-        name: `${b.name} ${x.quarterName}`,
-        department_id: owner.department_id,
-        owner_id: owner.employee_id,
-        currency: "NGN",
-        starts_on: x.quarter.from,
-        ends_on: x.quarter.to,
-        status: "approved",
-        approved_by: ceo.user_id,
-        approved_at: x.at(x.quarter.from, "09:00"),
-      }),
-    },
-    ...b.lines.map((line) => ({
-      table: "budget_line",
-      key: `${b.key}:${line.category}`,
-      needs: [],
-      parents: [["budget", b.key]],
-      values: (x) =>
-        x.categories.has(line.category)
-          ? {
-              budget_id: idOf("budget", b.key),
-              expense_category_id: x.categories.get(line.category),
-              amount: line.amount,
-              spent_amount: line.spent,
-            }
-          : null,
-    })),
-  ]),
-  ...EXPENSES.map((e, i) => ({
-    table: "expense_request",
-    key: e.key,
-    needs: [e.by],
-    values: (x, [person]) =>
-      x.categories.has(e.category)
-        ? {
-            number: stg("EXR", i + 1),
-            employee_id: person.employee_id,
-            department_id: person.department_id,
-            expense_category_id: x.categories.get(e.category),
-            purpose: e.purpose,
-            amount: e.amount,
-            currency: "NGN",
-            status: "submitted",
-            needed_on: x.daysFrom(7 + i),
-            submitted_at: x.at(x.daysFrom(-e.ago), "10:00"),
-          }
-        : null,
-  })),
   ...PARTNERS.map((p, i) => ({
     table: "partner",
     key: p.key,
@@ -222,7 +139,6 @@ const ROWS = Object.freeze([
     values: (x, [owner]) => ({
       number: stg("PAR", i + 1),
       name: p.name,
-      partner_type: p.type,
       status: p.status,
       industry: p.industry,
       country_code: "NG",

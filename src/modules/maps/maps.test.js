@@ -452,8 +452,12 @@ describe("keeping a place", () => {
       "attendance_home.address",
       "attendance_location_request.address",
       "attendance_temporary_site_location.address",
+      "deal.venue",
       "employee.home_address",
+      "lead.cities",
       "organisation.address",
+      "partner.cities",
+      "partner.headquarters",
       "vacancy.location",
       "worksite.address",
     ]);

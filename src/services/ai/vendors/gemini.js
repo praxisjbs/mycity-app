@@ -90,6 +90,10 @@ async function complete({
   fetchImpl = fetch,
 }) {
   if (!apiKey) throw new VendorError("gemini: no API key", "config");
+  // A turn carrying a file (Image Reading: an invoice, services/ai/llm.service.js files) goes to the
+  // native generateContent, which takes PDFs and pictures as inline data; the OpenAI-compatible
+  // endpoint may refuse a PDF data URL (audit F9).
+  if (!tools && hasFiles(messages)) return completeNative({ apiKey, model, messages, json, temperature, maxTokens, timeoutMs, fetchImpl });
   const body = {
     model,
     // Gemini's thought signatures ride on its tool calls and go back with them.
@@ -251,6 +255,61 @@ async function listModelsDetailed({ apiKey, timeoutMs = 20_000, fetchImpl }) {
  *          maxTokens?: number, timeoutMs?: number, fetchImpl?: typeof fetch}} req
  * @returns {Promise<{text: string, usage: {input_tokens: number, output_tokens: number}, model: string, finish_reason: string|null}>}
  */
+const DATA_URL = /^data:([a-z]+\/[a-z0-9.+-]+);base64,(.*)$/i;
+
+/** Whether any turn carries a file as an OpenAI-compatible data URL part. */
+const hasFiles = (messages) =>
+  (messages || []).some((m) => Array.isArray(m.content) && m.content.some((p) => p && p.type === "image_url" && DATA_URL.test(String(p.image_url && p.image_url.url))));
+
+/** One OpenAI-compatible content part as a native part: text, or a file as inline data. */
+function nativePart(p) {
+  if (p.type === "text") return p.text ? { text: p.text } : null;
+  const m = DATA_URL.exec(String(p.image_url && p.image_url.url));
+  return m ? { inline_data: { mime_type: m[1], data: m[2] } } : null;
+}
+
+/**
+ * complete() through the native generateContent, for a turn with files: the system prompt as
+ * systemInstruction, each turn's text and files as parts, JSON asked for by mime type. The answer
+ * has complete()'s shape; a refusal is a VendorError with its status, as there.
+ */
+async function completeNative({ apiKey, model, messages, json, temperature, maxTokens, timeoutMs, fetchImpl }) {
+  const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+  const contents = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: (Array.isArray(m.content) ? m.content.map(nativePart) : [{ text: String(m.content || "") }]).filter(Boolean),
+    }))
+    .filter((c) => c.parts.length);
+  const body = {
+    contents,
+    generationConfig: { temperature, ...(maxTokens ? { maxOutputTokens: maxTokens } : {}), ...(json ? { responseMimeType: "application/json" } : {}) },
+  };
+  if (system) body.systemInstruction = { parts: [{ text: system }] };
+  const id = String(model).replace(/^models\//, "");
+  const { data } = await request("gemini", `${NATIVE_URL}/models/${encodeURIComponent(id)}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    timeoutMs,
+    fetchImpl,
+  });
+  const candidate = (Array.isArray(data.candidates) && data.candidates[0]) || {};
+  const parts = (candidate.content && Array.isArray(candidate.content.parts) && candidate.content.parts) || [];
+  const meta = data.usageMetadata || {};
+  return {
+    text: parts.filter((p) => p && typeof p.text === "string" && !p.thought).map((p) => p.text).join(""),
+    toolCalls: [],
+    usage: {
+      input_tokens: Number(meta.promptTokenCount) || 0,
+      output_tokens: (Number(meta.candidatesTokenCount) || 0) + (Number(meta.thoughtsTokenCount) || 0),
+    },
+    model: data.modelVersion || id,
+    finish_reason: candidate.finishReason || null,
+  };
+}
+
 async function transcribe({ apiKey, model, audio, mime, prompt, maxTokens = 8192, timeoutMs = 30_000, fetchImpl }) {
   if (!apiKey) throw new VendorError("gemini: no API key", "config");
   const body = {
@@ -344,6 +403,7 @@ async function search({ apiKey, model, system, prompt, maxTokens = 16384, timeou
 }
 
 module.exports = {
+  completeNative,
   name: "gemini",
   BASE_URL,
   NATIVE_URL,

@@ -73,6 +73,20 @@ function inputOf(args) {
 }
 
 /**
+ * One OpenAI-compatible content part as Claude's block: text as text, a data URL as an image, or a
+ * document for a PDF (an invoice read on the Image Reading job, services/ai/llm.service.js).
+ */
+function blockOf(part) {
+  if (!part) return null;
+  if (part.type === "text") return part.text ? { type: "text", text: part.text } : null;
+  const url = part.type === "image_url" && part.image_url && part.image_url.url;
+  const m = /^data:([a-z]+\/[a-z0-9.+-]+);base64,(.*)$/i.exec(String(url || ""));
+  if (!m) return null;
+  const source = { type: "base64", media_type: m[1], data: m[2] };
+  return m[1] === "application/pdf" ? { type: "document", source } : { type: "image", source };
+}
+
+/**
  * The conversation, kept in OpenAI's shape, as Anthropic's Messages API takes it: an assistant's
  * tool calls become `tool_use` blocks, each tool's result a `tool_result` block in the user turn
  * that follows, and turns of the same role are joined, since the API wants them to alternate. A
@@ -99,6 +113,8 @@ function toAnthropic(messages) {
         blocks.push({ type: "tool_use", id: safeId(c.id, i), name: c.function.name, input: inputOf(c.function.arguments) }),
       );
       push("assistant", blocks);
+    } else if (Array.isArray(m.content)) {
+      push("user", m.content.map(blockOf).filter(Boolean));
     } else {
       const text = typeof m.content === "string" ? m.content : "";
       if (text) push("user", [{ type: "text", text }]);
@@ -162,4 +178,4 @@ async function complete({ apiKey, model, system, messages, tools = null, toolCho
   };
 }
 
-module.exports = { name: "anthropic", BASE_URL, VERSION, ALLOWED, listModels, complete };
+module.exports = { name: "anthropic", BASE_URL, VERSION, ALLOWED, listModels, complete, toAnthropic };

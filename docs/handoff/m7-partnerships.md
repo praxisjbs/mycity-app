@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | GE (Godwin-Okoh Elisha); LA (Love Adeola) the importers; AJ the Workspace links |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | None yet beyond PR 0 |
+| Pull requests | PR 0 (#76, merged); PR 1 `m7/contract-data` (draft) |
 
 ---
 
@@ -40,12 +40,13 @@ with the date, and add a line to §3.
       PR 7; Anthropic key before PR 7's demo)
 
 ### PR 1 · Contract, data and scaffolding
-- [ ] Contracts (Appendix C), migrations from `7010`, `7099`'s choices switched off, reference seed
-- [ ] Capabilities, the `partnership.agreement` flow, numbering
-- [ ] Ratifications applied: Categories and the public Proposal page (MILESTONES §18, PROGRESS #104 and
-      #105, `SCREENS`, route map, search screens, catalogue, public routes)
-- [ ] Frontend split into one file per screen; module skeletons
-- [ ] Docs: DATABASE_SCHEMA M7, README §5.10, addresses.md, workspace.md; gates green
+- [x] Contracts (Appendix C), migrations from `7010`, `7099`'s choices switched off, reference seed
+      (05/11/2026)
+- [x] Capabilities, the `partnership.agreement` flow, numbering (05/11/2026)
+- [x] Ratifications applied: Categories and the public Proposal page (MILESTONES §18, PROGRESS #104 and
+      #105, `SCREENS`, route map, search screens, catalogue, public routes) (05/11/2026)
+- [x] Frontend split into one file per screen; module skeletons (05/11/2026)
+- [x] Docs: DATABASE_SCHEMA M7, README §5.10, addresses.md, workspace.md; gates green (05/11/2026)
 
 ### PR 2 · Categories, lists, fields, templates, proof points
 - [ ] The person confirms the `template-tidy` job
@@ -91,6 +92,15 @@ with the date, and add a line to §3.
 
 ## 3 · Log
 
+- 05/11/2026 · JP · PR 1 (`m7/contract-data`): the seven contract files (Appendix C), migrations `7010` to
+  `7040`, seed `7190`, the capabilities, the flow and the numbering; Categories (#104) and Public ·
+  Proposal (#105) ratified; the routers mounted on `/partnerships`, the place owners registered, the mock
+  split one file a screen, Home's partners source on the new schema; DATABASE_SCHEMA, README §5.10,
+  addresses.md, workspace.md, home.md and foundation.md. Five calls the guide now records (§13.2): the
+  controllers stay empty until their PRs (gate 23 rule 6), `PartnerLink` joins the Workspace forms in PR 5,
+  `partner_type` is dropped in PR 3 (MIGRATIONS §8), the region's owners are `lead.cities` and
+  `partner.cities` (gate 22), a deal's validity is optional. Next: PR 2 and PR 3, in parallel; PR 2 asks
+  the person to confirm `template-tidy`'s job first.
 - 05/11/2026 · JP · Before merging PR 0: prefixes settled ("use any prefixes"); the Deal Merchant
   Agreement redacted into `partnership-samples/` with each placeholder's field; the ticketing template
   placed on PR 2 and the sample proposal on PR 7, uploaded in those PRs' chats; `main` merged in.

@@ -69,7 +69,7 @@ async function get(db, id, scope) {
 /** Lock a project's row for a change; its status, for a task joining it. */
 async function lock(client, id) {
   const { rows } = await client.query(
-    "SELECT project_id, status, owner_employee_id FROM project WHERE project_id = $1 FOR UPDATE",
+    "SELECT project_id, number, name, status, owner_employee_id, budget_amount FROM project WHERE project_id = $1 FOR UPDATE",
     [id],
   );
   return rows[0] || null;
@@ -89,7 +89,7 @@ async function insert(client, row) {
   return rows[0].project_id;
 }
 
-const WRITABLE = ["name", "description", "due_on", "status", "completed_at"];
+const WRITABLE = ["name", "description", "due_on", "status", "completed_at", "budget_amount"];
 
 async function update(client, id, changes) {
   const keys = Object.keys(changes).filter((k) => WRITABLE.includes(k));

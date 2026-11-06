@@ -8,6 +8,7 @@ export const CAPABILITIES = [
   { code: "alerts.clear", name: "Clear Alerts", description: "Clear or dismiss an alert on Home." },
   { code: "alerts.manage", name: "Manage Alert Rules", description: "Create, change and switch off the rules that raise alerts on Home." },
   { code: "announcements.post", name: "Post Announcements", description: "Post to the announcements channel and track who has read a post." },
+  { code: "expenses.finance", name: "Run Expenses", description: "Group approved requests into requisitions, record disbursements, set budgets and manage the expense categories." },
   { code: "goals.company", name: "Set Company OKRs", description: "Set the company objectives and key results, and send the company plan." },
   { code: "goals.confirm", name: "Confirm Scores", description: "Confirm the month's key result scores the heads propose." },
   { code: "goals.function", name: "Set Function OKRs", description: "Set a function's objectives, key results and KPIs, report its month and send its plan, as its head or acting head." },
@@ -29,7 +30,7 @@ const MANAGES = ["alerts.clear", "home.reports", "home.team"];
 /** Role code → the capabilities it holds by default. */
 export const ROLE_CAPABILITIES: Record<string, string[]> = {
   implementation: EVERY,
-  operations_people: [...HOME, "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"],
+  operations_people: [...HOME, "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"],
   management: [...HOME, "goals.company", "goals.function", "goals.view_all", "workspace.late_reasons"],
   head_of_department: [...MANAGES, "goals.function"],
   manager: MANAGES,

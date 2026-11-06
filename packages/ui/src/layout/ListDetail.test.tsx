@@ -157,3 +157,55 @@ describe("DetailPane", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+/** Expenses' layout (F31 as amended): the picked record only, in the dialog, at every width. */
+function ModalRequests() {
+  const [picked, setPicked] = useState<string | null>(null);
+  const shown = REQUESTS.find((r) => r.id === picked) ?? null;
+  return (
+    <ListDetail
+      layout="modal"
+      open={picked !== null}
+      onClose={() => setPicked(null)}
+      title="Expense Request"
+      list={
+        <ul>
+          {REQUESTS.map((r) => (
+            <li key={r.id}>
+              <button type="button" onClick={() => setPicked(r.id)}>
+                {r.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      }
+      detail={shown && <p>{`${shown.type} request from ${shown.name}`}</p>}
+    />
+  );
+}
+
+describe("ListDetail in the modal layout", () => {
+  it("on a wide desktop shows the list alone and opens the picked record in a dialog", async () => {
+    render(<ModalRequests />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByText(/request from/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
+    const dialog = await screen.findByRole("dialog", { name: "Expense Request" });
+    expect(dialog).toHaveTextContent("Sick request from Chidi Eze");
+  });
+
+  it("on a phone opens the same record in the sheet", async () => {
+    setViewport(390);
+    render(<ModalRequests />);
+    await userEvent.click(screen.getByRole("button", { name: "Adaeze Okonkwo" }));
+    expect(await screen.findByRole("dialog", { name: "Expense Request" })).toHaveTextContent("Annual request from Adaeze Okonkwo");
+  });
+
+  it("has no axe violations with the record open", async () => {
+    const { container } = render(<ModalRequests />);
+    await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
+    await screen.findByRole("dialog");
+    expect(await axe(await screen.findByRole("dialog"))).toHaveNoViolations();
+    expect(container).toBeTruthy();
+  });
+});

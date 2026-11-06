@@ -105,11 +105,13 @@ describeDb("Praxis AI's Home and Settings cards against the real migrations", ()
     expect(after.filter((d) => d.weekday !== 6)).toEqual(before.filter((d) => d.weekday !== 6));
 
     // A numbering scheme by its document's name; only the prefix changes, the rest of the scheme kept.
-    const scheme = (await h.as("ops").get("/settings/numbering")).body.data.find((s) => s.doc_type === "task");
+    // By its name: with M7's types the list runs past one page, and Task is on the second.
+    const taskScheme = async () => (await h.as("ops").get("/settings/numbering?q=task")).body.data.find((s) => s.doc_type === "task");
+    const scheme = await taskScheme();
     const numbering = (await drawn("ops", "numbering.edit", { doc_type: "task", prefix: "tk" })).card;
     expect(numbering).toMatchObject({ action_key: "numbering.edit", label: "Save Numbering", problems: {} });
     expect((await h.press("ops", numbering.ai_action_draft_id)).status).toBe(200);
-    expect((await h.as("ops").get("/settings/numbering")).body.data.find((s) => s.doc_type === "task")).toMatchObject({ prefix: "TK", padding: scheme.padding, reset: scheme.reset });
+    expect(await taskScheme()).toMatchObject({ prefix: "TK", padding: scheme.padding, reset: scheme.reset });
   });
 
   test("Notifications: a person's own notices.preference, notices.quiet_hours and notices.digest; the company's notice_rules.edit and notice_reminders.edit for Settings alone", async () => {

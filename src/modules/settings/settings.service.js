@@ -311,8 +311,11 @@ const DOC_LABELS = Object.freeze({
   contract: "Employment Contract",
   payroll_run: "Payroll Run",
   payslip: "Payslip",
+  partner: "Partner",
+  lead: "Lead",
+  deal: "Deal",
   proposal: "Proposal",
-  mou: "MOU",
+  agreement: "Agreement",
   expense: "Expense Request",
   requisition: "Requisition",
   disbursement: "Disbursement",
@@ -352,6 +355,14 @@ async function numberingList(query) {
   const labelled = q ? DOC_TYPES.filter((t) => (DOC_LABELS[t] || "").toLowerCase().includes(q)) : [];
   const page = await repo.numberingPage(pool, query, period, [...DOC_TYPES], labelled);
   return { ...page, data: page.data.map((r) => schemeOut(r, period)) };
+}
+
+/** One document type's scheme as the list shows it, wherever it sits in the list; null for a type with no row. */
+async function numberingScheme(docType) {
+  if (!SCHEMES[docType]) return null;
+  const period = periodNow();
+  const row = await repo.findScheme(pool, docType, period);
+  return row ? schemeOut(row, period) : null;
 }
 
 /** GET /settings/numbering/summary */
@@ -510,6 +521,7 @@ module.exports = {
   removeHoliday,
   DOC_LABELS,
   numberingList,
+  numberingScheme,
   numberingSummary,
   saveScheme,
   securityPolicy,

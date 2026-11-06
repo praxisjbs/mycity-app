@@ -165,6 +165,33 @@ function ask(vendor, provider, { apiKey, model, messages, output, tools = null, 
  */
 const resets = (err) => Boolean(err) && (err.status === 402 || (err.kind === "rate_limited" && Number(err.retryAfterMs) > 0));
 
+/** The most one picture or scan may weigh before it is sent: providers refuse larger inline files. */
+const FILE_MAX_BYTES = 10 * 1024 * 1024;
+const FILE_TYPES = Object.freeze(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
+
+/** Files go only to an Image Reading action, only of a kind a model reads, never too large. */
+function assertFiles(purpose, files) {
+  const action = require("./actions").of(purpose);
+  if (action.job !== "image_reading") throw new Error(`ai.complete: ${purpose} is not an Image Reading action and takes no files`);
+  // A file is never redacted, so only an action that declares personal data (and so never goes to
+  // DeepSeek) may send one (audit F19).
+  if (action.personal_data !== true) throw new Error(`ai.complete: ${purpose} sends files, so it must declare personal_data`);
+  for (const f of files) {
+    if (!f || !Buffer.isBuffer(f.data) || !FILE_TYPES.includes(f.mime_type))
+      throw new Error(`ai.complete: a file is a Buffer of ${FILE_TYPES.join(", ")}`);
+    if (f.data.length > FILE_MAX_BYTES) throw new AppError("AI_FILE_TOO_LARGE", "This file is too large to read", 422);
+  }
+}
+
+/**
+ * The person's turn with its files, as OpenAI-compatible content parts: the text first, then each
+ * file as a data URL. vendors/anthropic.js turns them into its own image and document blocks.
+ */
+const withFiles = (text, files) => [
+  { type: "text", text },
+  ...files.map((f) => ({ type: "image_url", image_url: { url: `data:${f.mime_type};base64,${f.data.toString("base64")}` } })),
+];
+
 /**
  * Ask a model. See the header for the path every call takes.
  * @param {object} req
@@ -181,6 +208,9 @@ const resets = (err) => Boolean(err) && (err.status === 402 || (err.kind === "ra
  * @param {number} [req.temperature]
  * @param {number} [req.maxTokens]
  * @param {number} [req.timeoutMs]  how long each attempt waits; AI_REQUEST_TIMEOUT_MS unless a screen waits on it
+ * @param {Array<{mime_type: string, data: Buffer}>} [req.files]  Image Reading only: the pictures or
+ *        scans the model reads (an invoice), sent beside the input as data URLs; never redacted,
+ *        since the picture is the question, so only an action that declares personal data takes one
  * @param {{query: Function}} [req.db]
  * @param {{gemini?: object, anthropic?: object, deepseek?: object, stub: object}} [req.vendors]  tests
  * @param {string} [req.promptsDir]  tests
@@ -201,6 +231,7 @@ async function complete(req) {
     db = require("../../config/db").pool,
     vendors = DEFAULT_VENDORS,
     promptsDir = PROMPTS_DIR,
+    files = [],
   } = req || {};
   if (!PURPOSE_RE.test(String(purpose || "")))
     throw new Error(`ai.complete: purpose is kebab-case, got "${purpose}"`);
@@ -208,6 +239,7 @@ async function complete(req) {
     throw new Error(`ai.complete: "${module}" is not a module key`);
   if (output && typeof output.safeParse !== "function")
     throw new Error("ai.complete: output is a Zod schema");
+  if (files.length) assertFiles(purpose, files);
   const p = loadPrompt(prompt, promptsDir);
 
   let g;
@@ -242,12 +274,10 @@ async function complete(req) {
     prompt: p,
   });
   const safe = redactValue(input, { egress, keep });
+  const asked = typeof safe === "string" ? safe : JSON.stringify(safe, null, 2);
   const messages = [
     { role: "system", content: systemText(p.body, output) },
-    {
-      role: "user",
-      content: typeof safe === "string" ? safe : JSON.stringify(safe, null, 2),
-    },
+    { role: "user", content: files.length ? withFiles(asked, files) : asked },
   ];
   let step = 0;
   let cost = "0.00";
@@ -965,6 +995,7 @@ function __clearPrompts() {
 }
 
 module.exports = {
+  FILE_TYPES,
   complete,
   converse,
   search,

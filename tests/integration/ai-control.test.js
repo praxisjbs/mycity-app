@@ -217,9 +217,10 @@ describeDb("AI Control against the real migrations", () => {
       ]);
       expect(by.embeddings.chain.links.map((l) => [l.model, l.state])).toEqual([["text-embedding-3-small", "not_set_up"]]);
       expect(by.top_tier.chain.links.map((l) => l.model)).toEqual(["gemini-2.5-pro", "claude-sonnet-5-5"]);
-      // Tidy Policy, Review Cleanup, Week Summary, Raise a Query's draft, the mailbox's three and Recruitment's four
-      // (jd-draft, screening-questions, assessment-questions, interview-notes-cleanup); Data Answers has its own chain.
-      expect(by.default.actions).toBe(11);
+      // Tidy Policy, Review Cleanup, Week Summary, Raise a Query's draft, the mailbox's three, Recruitment's four
+      // (jd-draft, screening-questions, assessment-questions, interview-notes-cleanup) and Expenses' Check Duplicate
+      // and Suggest Category; Data Answers has its own chain.
+      expect(by.default.actions).toBe(13);
     });
 
     test("the registered actions: their job, personal data, own chain and today's calls", async () => {
@@ -247,12 +248,16 @@ describeDb("AI Control against the real migrations", () => {
         "assessment-questions",
         "interview-notes-cleanup",
         "cv-screen",
+        "expense-invoice-read",
+        "expense-duplicate-check",
+        "expense-category-suggest",
       ]);
       const by = Object.fromEntries(res.body.data.map((a) => [a.key, a]));
       // Recruitment's (recruitment.md §9), chosen by GE: all personal data, the CV read on Deep Reasoning.
       for (const key of ["jd-draft", "screening-questions", "assessment-questions", "interview-notes-cleanup"])
         expect(by[key]).toMatchObject({ job: "default", personal_data: true, own_chain: false, chosen_by: "GE" });
       expect(by["cv-screen"]).toMatchObject({ job: "deep_reasoning", personal_data: true, own_chain: false, chosen_by: "GE" });
+      expect(by["expense-invoice-read"]).toMatchObject({ job: "image_reading", personal_data: true, chosen_by: "AJ" });
       expect(by["data-answers"]).toMatchObject({ job: "default", built: true, own_chain: true, personal_data: true, chosen_by: "TB" });
       expect(by["data-answers"].chain.links.map((l) => l.model)).toEqual(["gemini-3.8-flash", "gemini-2.5-pro"]);
       expect(by["policy-tidy"]).toMatchObject({ own_chain: false, chain: expect.objectContaining({ scope: "job", key: "default" }) });

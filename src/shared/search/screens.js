@@ -86,13 +86,13 @@ const SCREENS = Object.freeze([
   s("payroll", "statutory", "Statutory", ["paye", "pension", "nhf", "tax", "remittance"]),
 
   s("partnerships", "pipeline", "Pipeline", ["deals", "partnership pipeline", "crm"]),
+  s("partnerships", "categories", "Categories", ["partnership types", "partner categories", "pipeline settings", "stages", "agreement templates", "delivery checklist", "custom fields", "proof points"]),
   s("partnerships", "partners", "Partners", ["partner", "organisations", "clients", "crm"]),
   s("partnerships", "leads", "Leads", ["lead", "prospects"]),
   s("partnerships", "proposals", "Proposals", ["proposal", "pitch"]),
   s("partnerships", "contracts-and-mous", "Contracts & MOUs", ["contracts", "mou", "agreements"]),
   s("partnerships", "analytics", "Analytics", ["partnership analytics", "partnership report"]),
 
-  s("expenses", "my-requests", "My Requests", ["expense", "expenses", "claim", "reimbursement", "my expenses"]),
   s("expenses", "approvals", "Approvals", ["expense approvals", "approve expenses"]),
   s("expenses", "requisitions", "Requisitions", ["requisition", "purchase request"]),
   s("expenses", "disbursements", "Disbursements", ["disbursement", "payments out", "payouts"]),
@@ -133,6 +133,8 @@ const SCREENS = Object.freeze([
   s("settings", "imports", "Imports", ["import", "upload", "spreadsheet", "import history"]),
   s("knowledge", "user-guide", "User Guide", ["help", "manual", "how to", "guide", "instructions", "tutorial", "quick start", "getting started"]),
   s("people", "departments", "Departments", ["department", "function", "functions", "team", "teams", "unit", "head of department", "department head", "move people", "merge department"]),
+  s("ess", "my-requests", "My Requests", ["expense", "expenses", "claim", "reimbursement", "my expenses", "raise an expense"]),
+  s("expenses", "projects", "Projects", ["project spend", "project budget", "spend per project"]),
   // new:screen adds screens above this line
 ]);
 
@@ -184,7 +186,7 @@ function tabVisible(screen, reader) {
   if (module === "community" && tab === "announcements") return hasCapability(reader, "announcements.post");
   if (module === "queries" && !full) return tab === "queries";
   if (module === "expenses" && !full)
-    return ["my-requests", "approvals", "budgets"].includes(tab) && (tab !== "approvals" || reader.manages_people);
+    return ["approvals", "budgets"].includes(tab) && (tab !== "approvals" || reader.manages_people);
   if (module === "performance" && !full && !reader.manages_people) return tab !== "analytics";
   return true;
 }

@@ -170,20 +170,41 @@ const SCHEMES = Object.freeze({
     reset: "monthly",
     include_period: true,
   }, // M6 "PAY-2026-10-0001"
+  partner: {
+    prefix: "PAR",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M7 a partner, "PAR-0001" (seeded in 7099; docs/guides/partnerships.md §4.3)
+  lead: {
+    prefix: "LED",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M7 a lead, "LED-0001" (seeded in 7190)
+  deal: {
+    prefix: "DEAL",
+    padding: 4,
+    separator: "-",
+    reset: "yearly",
+    include_period: true,
+  }, // M7 a deal, "DEAL-2026-0001" (seeded in 7190)
   proposal: {
     prefix: "PRO",
     padding: 4,
     separator: "-",
     reset: "never",
     include_period: false,
-  }, // M7
-  mou: {
-    prefix: "MOU",
+  }, // M7 a proposal, "PRO-0001" (seeded in 0099)
+  agreement: {
+    prefix: "AGR",
     padding: 4,
     separator: "-",
-    reset: "never",
-    include_period: false,
-  }, // M7
+    reset: "yearly",
+    include_period: true,
+  }, // M7 an agreement (an MOU, a Deal Merchant Agreement, a contract), "AGR-2026-0001" (seeded in 7190)
   expense: {
     prefix: "EXP",
     padding: 4,

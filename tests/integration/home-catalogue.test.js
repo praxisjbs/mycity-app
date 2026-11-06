@@ -232,7 +232,8 @@ describeDb("the KPI catalogue against the real migrations", () => {
     beforeAll(async () => {
       const userOf = (key) => users[key].user_id;
       const { leave_type_id: annual } = await one("SELECT leave_type_id FROM leave_type WHERE code = 'annual'");
-      const { expense_category_id: travel } = await one("SELECT expense_category_id FROM expense_category WHERE code = 'travel'");
+      // No category is seeded (A26, 8101): the test adds the one its requests name.
+      const { expense_category_id: travel } = await one("INSERT INTO expense_category (code, name) VALUES ('travel', 'Travel') ON CONFLICT (code) DO UPDATE SET active = true RETURNING expense_category_id");
 
       // The register: Ifeanyi left ten days ago, Zainab's confirmation is due in ten.
       await person("leaver", "Ifeanyi", "Obi", "mgr");
@@ -347,14 +348,14 @@ describeDb("the KPI catalogue against the real migrations", () => {
       const partner = async (name, status, owner, createdAt = ago(100)) =>
         (
           await one(
-            `INSERT INTO partner (number, name, partner_type, status, owner_id, created_at)
-             VALUES ($1, $2, 'government', $3, $4, $5) RETURNING partner_id`,
+            `INSERT INTO partner (number, name, status, owner_id, created_at)
+             VALUES ($1, $2, $3, $4, $5) RETURNING partner_id`,
             [number("PAR"), name, status, people[owner], createdAt],
           )
         ).partner_id;
       const arts = await partner("Lagos Arts Council", "active", "staff");
       const trade = await partner("Kano Trade Council", "active", "outsider", ago(60));
-      await partner("Abuja Film Board", "prospect", "staff");
+      await partner("Abuja Film Board", "dormant", "staff");
       await q(
         `INSERT INTO partner_interaction (partner_id, interaction_type, subject, occurred_at)
          VALUES ($1, 'call', 'Festival plans', $2)`,

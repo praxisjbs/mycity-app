@@ -92,6 +92,11 @@ const JOBS = Object.freeze([
     summary: "A day's birthday and work anniversary cards posted again, by hand",
   },
   {
+    queue: "budget-threshold",
+    concurrency: 1,
+    summary: "A morning's budget-threshold sweep run again, by hand",
+  },
+  {
     queue: "review-cycle-open",
     concurrency: 1,
     summary: "A day's monthly review rounds opened again, by hand",
@@ -184,6 +189,7 @@ const SCHEDULERS = Object.freeze([
   "review-cycles",
   "query-rule-sweep",
   "user-guide-index",
+  "budget-threshold",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */
