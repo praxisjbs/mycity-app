@@ -194,6 +194,17 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-10-25",
     built: true,
   }),
+  // Tidy With AI on the agreement template editor (docs/guides/partnerships.md §6.8, §9): the pasted
+  // wording tidied, with a field proposed for each value; only when the person presses it, nothing kept.
+  "template-tidy": Object.freeze({
+    label: "Tidy Agreement",
+    module: "partnerships",
+    job: "default",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-11-06",
+    built: true,
+  }),
   "integration-test": Object.freeze({
     label: "Connection Test",
     module: "integrations",

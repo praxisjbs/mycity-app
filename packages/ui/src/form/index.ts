@@ -40,6 +40,7 @@ export * from "./AddressField";
 export * from "./ChannelGrid";
 export * from "./ColorField";
 export * from "./ComboField";
+export * from "./DocumentEditor";
 export * from "./MoreFields";
 export * from "./PlacesField";
 export * from "./RadioCards";

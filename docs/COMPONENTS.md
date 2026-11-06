@@ -96,6 +96,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [ColorField](#colorfield) | `ColorField` | A colour as #RRGGBB, pasted or typed, with a square of it beside the value. | beta |
 | Forms | [ComboField](#combofield) | `ComboField` | A value typed or picked: the server suggests what is already in use as the person types, and what they type that it does not know is kept as it is. | stable |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
+| Forms | [DocumentEditor](#documenteditor) | `DocumentEditor` | The editor for an agreement template's wording: headings, numbered clauses, tables, and named fields drawn as chips. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
@@ -2908,6 +2909,42 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 
 ```tsx
 <DateField min={todayIso()} {...form.field("start_date")} />
+```
+
+### DocumentEditor
+
+The editor for an agreement template's wording: headings, numbered clauses, tables, and named fields drawn as chips.
+
+| | |
+|---|---|
+| Use | An agreement template on Categories, and Tidy With AI's draft before it is kept. A chip stands for a value filled when the agreement is made (a business name, the deal's options). |
+| Avoid | A message, an announcement or a policy (use RichTextField); a short answer (TextField); fields typed by hand as braces, which the editor never asks of a person. |
+| Phone | The toolbar wraps and every control is 44 px; Insert Field opens the branded sheet; a table scrolls inside its own box and the page never scrolls sideways. |
+| Accessibility | A named multi-line textbox with a formatting group whose buttons say whether they are on; a chip is one unit read by its label and removed with Backspace; the whole toolbar is reachable by Tab. |
+| Status | stable |
+| Exports | `DocumentEditor` |
+| Import | `import { DocumentEditor } from "@mycity/ui";` |
+| File | `packages/ui/src/form/DocumentEditor.tsx` |
+| Test | `packages/ui/src/form/DocumentEditor.test.tsx` |
+| Gallery | `packages/ui/src/form/DocumentEditor.gallery.tsx` (`npm run gallery`, `#/DocumentEditor`) |
+
+**DocumentEditor** props (`DocumentEditorProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The HTML, as the server hands it back (chips are `span[data-field]`). |
+| `onChange` | `(html: string) => void` | yes | Called with the new HTML, or "" when the box is emptied. |
+| `onBlur` | `() => void` |  | Called when the person leaves the box: the moment it is first checked. |
+| `label` | `string` | yes | Names the box, Title Case, at most 4 words; the Field's label otherwise. |
+| `fields` | `DocumentEditorField[]` | yes | Every value the wording may name, offered by Insert Field; a chip the list lacks still shows by its own label. |
+| `placeholder` | `string` |  | A format example of at most 3 words, never an instruction. |
+| `readOnly` | `boolean` |  | Read it without being able to change it. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `id` | `string` |  | The control's id, when the caller sets it; the Field's otherwise. |
+
+```tsx
+<Field label="Wording" {...f.status("body_html")}><DocumentEditor label="Wording" fields={fields} {...f.field("body_html")} /></Field>
 ```
 
 ### Field

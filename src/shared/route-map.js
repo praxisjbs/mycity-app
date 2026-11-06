@@ -365,10 +365,11 @@ const ENTITY_ROUTES = Object.freeze({
   statutory_return: screen("payroll", "statutory"), // search:none not built yet (src/modules/statutory)
 
   // Partnerships
+  partner_category: screen("partnerships", "categories"),
   partner: screen("partnerships", "partners"), // search:none not built yet (src/modules/partners)
-  partner_deal: screen("partnerships", "pipeline"), // search:none not built yet (src/modules/partner_pipeline)
+  partner_deal: screen("partnerships", "pipeline"), // search:none deals are found by partner_pipeline.search.js once M7 PR 3 builds them; until then it finds categories only
   lead: screen("partnerships", "leads"), // search:none not built yet (src/modules/leads)
-  proposal: screen("partnerships", "proposals"), // search:none not built yet (src/modules/proposals)
+  proposal: screen("partnerships", "proposals"), // search:none proposals are found by proposals.search.js once M7 PR 7 builds the studio; until then the module holds proof points, which are cited, not looked for
   contract: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
   mou: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
   agreement: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)

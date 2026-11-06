@@ -337,6 +337,31 @@
     padding: 2px 12px;
     color: var(--muted-foreground);
   }
+  /* An agreement's tables and named fields (DocumentEditor): a table scrolls inside its own box, a field is
+     one chip that reads by its label. */
+  .rte table { border-collapse: collapse; margin: 8px 0; width: 100%; table-layout: fixed; overflow: hidden; }
+  .rte th, .rte td {
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    vertical-align: top;
+    min-width: 48px;
+    position: relative;
+  }
+  .rte th { background: var(--muted); font-weight: 600; text-align: left; }
+  .rte .selectedCell::after { content: ""; position: absolute; inset: 0; background: var(--accent); opacity: 0.4; pointer-events: none; }
+  .rte-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-foreground);
+    padding: 0 8px;
+    font-size: var(--text-xs);
+    line-height: 20px;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .rte .ProseMirror-selectednode.rte-chip { outline: 2px solid var(--ring); }
 }
 
 /* A disclosure's marker: a + that becomes a minus when it is open (Accordion,

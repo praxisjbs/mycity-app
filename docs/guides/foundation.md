@@ -1166,6 +1166,7 @@ screen.
 
 ## 14 · Change log
 
+- 06/11/2026 · JP · M7 PR 2 adds two small things to the shared layer, for Partnerships · Categories (`docs/guides/partnerships.md` §6.3, §6.8): `shared/spreadsheet` reads a workbook's dropdowns (`readDropdowns`: each column's header and the values its list validation offers), and `shared/documents/markdown` keeps a table when asked (`htmlToMarkdown(html, { tables: true })`); every other caller flattens a table as before.
 - 05/11/2026 · JP · Settings · Documents & Numbering lists M7's document types as `docs/guides/partnerships.md` §4.3 settles them: Partner (PAR), Lead (LED), Deal (DEAL, yearly), Proposal (PRO) and Agreement (AGR, yearly) in place of the MOU, which is an agreement now (`schemes.js`, the contract's `DOC_TYPES`, seed `7190`). The screen is unchanged; it reads the types from the code. With 28 types the list runs to a second page, so Praxis AI's Save Numbering card now reads the scheme it changes by its type (`settings.service.numberingScheme`), not from the list's first page, where Task no longer is.
 - 03/11/2026 · JP · People's records are Praxis AI cards (`organisation.ai.js` with
   `organisation.cards.js`; `organogram.md` §9; `praxis-ai.md` decisions 33 and 36): Add Employee
