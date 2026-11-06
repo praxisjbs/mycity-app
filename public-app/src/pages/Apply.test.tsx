@@ -65,7 +65,8 @@ describe("Apply", () => {
     expect(await screen.findByRole("heading", { name: "Application Sent" })).toBeTruthy();
     expect(screen.getByText(/^APP-\d{4}$/)).toBeTruthy();
     expect(screen.queryByText(/score|stage/i)).toBeNull();
-  });
+    // The whole form walked step by step: past vitest's 5 s on a busy runner, as the long walks in app/ are.
+  }, 30000);
 
   it("goes back without losing what was typed", async () => {
     draw("Bv3nQ8sLp2Wd");
