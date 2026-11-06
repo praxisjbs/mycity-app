@@ -55,9 +55,12 @@ export const fold = (s: unknown) =>
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
 
-/** One page of a list, searched and paged here as the server would. Unknown query keys are refused. */
-export function paged<T>(rows: T[], req: Req, search?: (row: T) => unknown[]): RawResponse {
-  for (const k of Object.keys(req.query)) if (!["page", "q"].includes(k)) return invalid({ [k]: ["is not a filter on this list"] });
+/**
+ * One page of a list, searched and paged here as the server would. Unknown query keys are refused;
+ * `filters` names the list's own filters, which the caller has already applied to `rows`.
+ */
+export function paged<T>(rows: T[], req: Req, search?: (row: T) => unknown[], filters: string[] = []): RawResponse {
+  for (const k of Object.keys(req.query)) if (!["page", "q", ...filters].includes(k)) return invalid({ [k]: ["is not a filter on this list"] });
   const q = fold(req.query.q).trim();
   const out = q && search ? rows.filter((r) => search(r).some((v) => fold(v).includes(q))) : rows;
   const size = __CONTRACT_PAGE_SIZE__;

@@ -4,7 +4,8 @@
  * signed in, so this file loads no staff auth (public-surface gate) and answers only allow-lists:
  * every field a stranger may read is named below, and nothing else ever leaves.
  *
- *   list(query)               GET  /api/public/v1/jobs            open roles taking applications
+ *   list(query)               GET  /api/public/v1/jobs            open roles taking applications, closing soonest first
+ *   summary()                 GET  /api/public/v1/jobs/summary    the public index's figures over those roles
  *   get(slug)                 GET  /api/public/v1/jobs/:slug      one role; a draft or an unknown slug is the same 404
  *   startApplication(slug)    POST /api/public/v1/jobs/:slug/apply   a single-use Apply link, 48 hours
  *
@@ -30,8 +31,12 @@ const card = (r) => ({
   slug: r.slug,
   title: r.title,
   department: r.department,
+  department_code: r.department_code,
   location: r.location,
   work_pattern: r.work_pattern,
+  work_pattern_note: r.work_pattern_note,
+  employment_type: r.employment_type,
+  closes_at: r.closes_at,
 });
 
 async function list(query) {
@@ -40,6 +45,29 @@ async function list(query) {
 }
 
 const { blocksOf } = lifecycle;
+
+/** How many roles the index's Closing Soon shows: the first of the careers list. */
+const CLOSING_SOON = 3;
+
+/**
+ * PublicJobsSummary. The open count and the three closing soonest come from the careers list's own
+ * first page (its order, its filter), so the index and Careers can never disagree.
+ */
+async function summary() {
+  const [first, departments, cities, settings] = await Promise.all([
+    repo.publicPage(pool, {}),
+    repo.publicDepartments(pool),
+    repo.publicCities(pool),
+    repo.settings(pool),
+  ]);
+  return {
+    open: first.page.total,
+    departments: departments.map((d) => ({ code: d.code, name: d.name, open: d.open })),
+    cities: cities.map((c) => ({ name: c.name, open: c.open })),
+    closing_soon: first.data.slice(0, CLOSING_SOON).map(card),
+    about_company: blocksOf(settings.about_company),
+  };
+}
 
 /** PublicJob, built field by field. A hidden salary band is left out, not sent as null. */
 async function get(slug) {
@@ -93,4 +121,4 @@ async function startApplication(slug) {
   }
 }
 
-module.exports = { APPLY_TTL_HOURS, list, get, startApplication, howWeHire: lifecycle.howWeHire };
+module.exports = { APPLY_TTL_HOURS, CLOSING_SOON, list, summary, get, startApplication, howWeHire: lifecycle.howWeHire };

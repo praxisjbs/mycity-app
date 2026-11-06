@@ -23,11 +23,11 @@ describe("Assessment", () => {
   it("opens on its intro, and Start the Assessment puts the first question under the clock", async () => {
     draw("Px2mL9vQe4Ty");
     expect(await screen.findByRole("heading", { level: 1, name: "Sales Scenario Case Study" })).toBeTruthy();
-    expect(screen.getByText(/^Hello Chinedu\./)).toBeTruthy();
+    expect(screen.getByText(/^Hello Ngozi\./)).toBeTruthy();
     const facts = screen.getByRole("list", { name: "About the Assessment" });
-    for (const t of ["Case Study", "60 minutes", "2"]) expect(within(facts).getByText(t)).toBeTruthy();
+    for (const t of ["Case Study", "60 minutes", "3"]) expect(within(facts).getByText(t)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Start the Assessment" }));
-    await question(1, 2);
+    await question(1, 3);
     expect(screen.getByRole("timer")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Your Answer"), { target: { value: "Weekday lunch guides for each branch, with a booking offer." } });
     expect(await screen.findByText("Saved", {}, { timeout: 4000 })).toBeTruthy();
