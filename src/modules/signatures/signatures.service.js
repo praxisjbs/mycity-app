@@ -172,6 +172,20 @@ async function issueLinks(client, actor, signatureRequestId) {
 }
 
 /**
+ * Set when a pending request ends, in the caller's transaction: an offer opened at approval has no
+ * end until Send Offer sets its expiry. The links issued after it live until then.
+ */
+async function setExpiryIn(client, signatureRequestId, expiresAt) {
+  if (!(await repo.setExpiry(client, signatureRequestId, new Date(expiresAt))))
+    throw refused("NOT_OPEN", "This document can no longer be signed");
+}
+
+/** The signers of a request as a record shows them (SignerView), in signing order. */
+async function signersOf(db, signatureRequestId) {
+  return (await repo.signaturesOf(db, signatureRequestId)).map(signerView);
+}
+
+/**
  * End a record's open requests (an offer withdrawn, a case cancelled), in the caller's transaction:
  * every pending signer's link stops working. `status` is revoked or expired.
  */
@@ -246,7 +260,10 @@ const signerView = (x) => ({
 /** SigningView for one signer's link. */
 async function viewOf(db, r, s) {
   const adapter = adapterOf(r.subject_type);
-  const [org, letter, all] = await Promise.all([profile.readProfile(db), adapter.letter(db, r.subject_id), repo.signaturesOf(db, r.signature_request_id)]);
+  // One after another: inside a write, `db` is one client.
+  const org = await profile.readProfile(db);
+  const letter = await adapter.letter(db, r.subject_id);
+  const all = await repo.signaturesOf(db, r.signature_request_id);
   const signedAt = s.signed_at ? new Date(s.signed_at).toISOString() : null;
   return {
     reference: r.reference,
@@ -477,6 +494,8 @@ module.exports = {
   adapterOf,
   requestIn,
   issueLinks,
+  setExpiryIn,
+  signersOf,
   endFor,
   expireLapsed,
   view,

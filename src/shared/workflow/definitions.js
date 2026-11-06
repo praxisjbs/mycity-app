@@ -32,6 +32,8 @@
  * unbind a binding plan and on the changes then made to it.
  * M3 adds `queries.consequence` (docs/guides/queries.md §6.5, seeded in 3190): a proposed
  * sanction, Operations & People, then the CEO from the fourth rung.
+ * M5 adds `recruitment.offer` (docs/guides/offers.md §3 step 2, seeded in 5299): an offer of
+ * employment, the head of the hiring department, then the CEO.
  * M8 adds `expenses.request` (docs/guides/expenses.md §6.3, seeded in 8100): the line manager
  * (skipped when the requester manages people), then Operations & People; and `expenses.requisition`
  * (§6.4): the CEO decides a requisition of approved requests as a whole.
@@ -271,6 +273,27 @@ const DEFAULTS = Object.freeze({
   // M7, seeded in 7190 (docs/guides/partnerships.md §6.9): every agreement is approved before it is
   // sent. The Head of Department of the deal owner's department, then the CEO; Applies When can limit
   // the first stage (to `commission_deviates`, or a `value` above a figure) on Settings · Approvals.
+  "recruitment.offer": {
+    key: "recruitment.offer",
+    module: "recruitment",
+    name: "Offer of Employment",
+    description: "The head of the hiring department, then the CEO, before the offer is signed for the company and sent.",
+    context: {
+      annual_compensation: "money",
+      outside_range: "boolean",
+      department_id: "uuid",
+      department_head_employee_id: "uuid",
+    },
+    stages: [
+      {
+        key: "head_of_department",
+        name: "Head of Department",
+        approver: { type: "employee_in_context", value: "department_head_employee_id" },
+        sla_hours: 72,
+      },
+      { key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 },
+    ],
+  },
   "partnership.agreement": {
     key: "partnership.agreement",
     module: "partnerships",

@@ -18,6 +18,11 @@ ALTER TABLE offer ADD COLUMN IF NOT EXISTS work_pattern text;
 ALTER TABLE offer ADD COLUMN IF NOT EXISTS office_days smallint;
 ALTER TABLE offer ADD COLUMN IF NOT EXISTS annual_leave_days smallint;
 ALTER TABLE offer ADD COLUMN IF NOT EXISTS incentives text;
+ALTER TABLE offer ADD COLUMN IF NOT EXISTS outside_range boolean NOT NULL DEFAULT false;
+ALTER TABLE offer ADD COLUMN IF NOT EXISTS range_reason text;
+ALTER TABLE offer ADD COLUMN IF NOT EXISTS additional_terms text;
+ALTER TABLE offer ADD COLUMN IF NOT EXISTS terms_version integer;
+ALTER TABLE offer ADD COLUMN IF NOT EXISTS submitted_at timestamptz;
 
 -- The monthly compensation, line by line (Basic Salary, Internet & Recharge Allowance, ...).
 -- offer.annual_compensation is twelve times their sum, written by the offers service.
@@ -38,7 +43,7 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'offer_status_check') THEN
     ALTER TABLE offer ADD CONSTRAINT offer_status_check
-      CHECK (status IN ('draft', 'approval', 'sent', 'accepted', 'declined', 'expired', 'withdrawn'));
+      CHECK (status IN ('draft', 'approval', 'approved', 'sent', 'accepted', 'declined', 'expired', 'withdrawn'));
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'offer_probation_months_check') THEN
     ALTER TABLE offer ADD CONSTRAINT offer_probation_months_check
@@ -73,7 +78,7 @@ END $$;
 -- One open offer per application; a declined, expired or withdrawn one leaves room for the next.
 ALTER TABLE offer DROP CONSTRAINT IF EXISTS offer_application_id_key;
 CREATE UNIQUE INDEX IF NOT EXISTS offer_one_open_per_application
-  ON offer (application_id) WHERE status IN ('draft', 'approval', 'sent', 'accepted');
+  ON offer (application_id) WHERE status IN ('draft', 'approval', 'approved', 'sent', 'accepted');
 CREATE INDEX IF NOT EXISTS offer_application_id_idx ON offer (application_id);
 CREATE INDEX IF NOT EXISTS offer_status_idx ON offer (status);
 CREATE INDEX IF NOT EXISTS offer_expires_at_idx ON offer (expires_at) WHERE status = 'sent';
@@ -113,6 +118,11 @@ ALTER TABLE offer DROP CONSTRAINT IF EXISTS offer_decision_snapshot_check;
 ALTER TABLE offer DROP CONSTRAINT IF EXISTS offer_score_snapshot_check;
 ALTER TABLE offer DROP CONSTRAINT IF EXISTS offer_probation_months_check;
 ALTER TABLE offer DROP CONSTRAINT IF EXISTS offer_status_check;
+ALTER TABLE offer DROP COLUMN IF EXISTS submitted_at;
+ALTER TABLE offer DROP COLUMN IF EXISTS terms_version;
+ALTER TABLE offer DROP COLUMN IF EXISTS additional_terms;
+ALTER TABLE offer DROP COLUMN IF EXISTS range_reason;
+ALTER TABLE offer DROP COLUMN IF EXISTS outside_range;
 ALTER TABLE offer DROP COLUMN IF EXISTS incentives;
 ALTER TABLE offer DROP COLUMN IF EXISTS annual_leave_days;
 ALTER TABLE offer DROP COLUMN IF EXISTS office_days;

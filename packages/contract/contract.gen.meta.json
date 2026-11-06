@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "772d87b981be120fd19cbb68ae8e6fed7f5853cce02bd17840e42b3c3d6791b7",
-  "schemas": 1893,
-  "endpoints": 796,
+  "source_hash": "cbc8fde96571d5e69c966c19d724435a4b88e23b647cff04ce60bd7df0fa3735",
+  "schemas": 1906,
+  "endpoints": 813,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "21c1dd7833ceff90bacf317e3f091b7d48682a46291670949e3069435e570de2",
@@ -42,7 +42,7 @@
     "packages/contract/schemas/mailbox.js": "e67e5676fb7985852c18dd9a1aa370a41aff21487eead2eed3cacf36d315fa45",
     "packages/contract/schemas/maps.js": "aca5dc368c5c2da84d1612c7141991c9b86397b96395aea607c427987b43985c",
     "packages/contract/schemas/notifications.js": "742af8dbdf50b9ecc2be93e4f26e81e220bb8ff2ae4b7eb5432c22f081142960",
-    "packages/contract/schemas/offers.js": "1bf9c90301f5ff625c51b7aafc7088609e05dc3c465a4ccc8cb561e45cb7aff7",
+    "packages/contract/schemas/offers.js": "31f5a327f91c4d71b6a5d80f50ccc1d4b557d0c9d71051cff5ff49d550b0b640",
     "packages/contract/schemas/onboarding.js": "65c2c31e2fd9cce7eef88c97050436653157c95c703782222692a3088adb3105",
     "packages/contract/schemas/organisation.js": "725d4924775a6ddec58fec188c29edb50f542254d1f90785ae2cd63013899538",
     "packages/contract/schemas/partner_pipeline.js": "ed8057550b5a2c7cfb39030c8eb9915f2c06f5183abd0ff119d5014aba4c1314",
@@ -111,6 +111,7 @@
     "src/modules/mailbox/mailbox.routes.js": "4f88cd6f02653a5f075fc68df43fe0cad2baf09d175bce87d3661d7695b378ab",
     "src/modules/maps/maps.routes.js": "9c599740faf06f10c982f0b16d045ca5048b595124276fa47f870e8331c9c267",
     "src/modules/notifications/notifications.routes.js": "affb5b54394c32c53a71a9909e6df45c2bf02a59c7b65f9da72f81918393fd8a",
+    "src/modules/offers/offers.routes.js": "06d2c1047945e2843fa50d46aa5edc83aa2afbe51a81390949d3b15eb5e04874",
     "src/modules/organisation/organisation.routes.js": "b33b3ded8246f6dc962c6a4e62510642039102614e7fa8d32e5179effa2f1391",
     "src/modules/partner_pipeline/partner_pipeline.routes.js": "cdf2bf4087cfca0e9861dd4d30af16a073e0aee8e1ecef1134e68596f804d203",
     "src/modules/partners/partners.routes.js": "778d7d025ea77a5ffa5689d744dc22923e97cd296ffe406281822df2569156d5",

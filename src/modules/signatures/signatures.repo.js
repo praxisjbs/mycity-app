@@ -153,6 +153,15 @@ async function endRequest(client, requestId, status, reason) {
   return rowCount === 1;
 }
 
+/** A pending request's end, set when the document is sent (an offer's expiry starts at Send Offer). */
+async function setExpiry(client, requestId, expiresAt) {
+  const { rowCount } = await client.query(
+    "UPDATE signature_request SET expires_at = $2 WHERE signature_request_id = $1 AND status = 'pending'",
+    [requestId, expiresAt],
+  );
+  return rowCount === 1;
+}
+
 async function completeRequest(client, requestId) {
   const { rowCount } = await client.query(
     "UPDATE signature_request SET status = 'completed', completed_at = now() WHERE signature_request_id = $1 AND status = 'pending'",
@@ -209,6 +218,7 @@ module.exports = {
   markSignatureEnded,
   markDeclined,
   endRequest,
+  setExpiry,
   completeRequest,
   setSealing,
   setSealed,

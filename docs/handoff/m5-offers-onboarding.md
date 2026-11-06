@@ -144,7 +144,7 @@ earlier: M5's forms use help terms.
 - [x] PR 0 · Docs (06/11/2026)
 - [x] PR 1 · Contract and data (06/11/2026; LA and TB to review)
 - [x] PR 2 · Signatures service (06/11/2026; LA to review)
-- [ ] PR 3 · Offers backend
+- [x] PR 3 · Offers backend (06/11/2026; GE to confirm the Head of Department grant and the board's Offer column)
 - [ ] PR 4 · Offers screens
 - [ ] PR 5 · Acceptance to hire
 - [ ] PR 6 · Onboarding backend
@@ -168,6 +168,20 @@ earlier: M5's forms use help terms.
 
 ## 6 · Log
 
+- 06/11/2026 · AJ · PR 3 built: `src/modules/offers` (service, repo, render, events, routes,
+  controller, ai, search, test), the `offer-letter` standard wording from MyCity's sample letter
+  (Markdown, edited on the Offers settings, its version kept on the offer at approval) and the
+  `offer-sent` mail, `recruitment.offer` (seed 5299 and DEFAULTS), the canonical `OFFER_LETTER`, the
+  letterhead's appendix and sealing blocks, `documents.generate`'s `template_version`, and
+  signatures' `setExpiryIn` and `signersOf`. `tests/integration/offers.test.js` walks New Offer to
+  accepted, rejected, declined, withdrawn and Not Progressing on the real migrations. Changed on the
+  way: no `offer-expiry` job (the signature request's lapse expires the offer; the stubs are
+  deleted, and `.public.routes` with them); `offer.accepted` replaces `offer.signed`; Submit needs
+  a department and the Offer Signatory; a withdrawal while the offer is with its approval follows
+  the engine's rule (its submitter or the CEO). For GE: seed 5299 gives Head of Department
+  `approve` on recruitment (team), without which the flow's first stage refuses them; and
+  `advanceIn(..., "offer")` is a no-op until the board has an Offer column. For PR 5: Send Offer is
+  not yet refused when no document requirement is set (guide §11).
 - 06/11/2026 · AJ · PR 2 built: `src/modules/signatures` (service with `defineSignable`, code,
   repo, events, certificate, signed-pdf, verify, public routes on `/sign` and `/verify`), the
   `signature-reminders` scheduler, the `signature-code` and `signature-completed` mails, 5020's code

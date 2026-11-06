@@ -540,7 +540,7 @@ The design is `docs/guides/offers.md`; the build plan and its log `docs/handoff/
 
 | Module | Files beyond the template |
 |---|---|
-| `offers` | `.render` (one markdown renderer for web and PDF), `.expiry`; `.public.routes` stays empty (signing is `signatures`' page) |
+| `offers` | built in M5 PR 3: `.service` (New Offer with the score snapshot, a draft's edits, Submit for Approval on `recruitment.offer`, the approval settled from the outbox, the company's signature, Send and Resend, Withdraw, Not Progressing, the signatures hooks, the Offers settings), `.render` (one set of values and one Markdown renderer for the record, the signing page and the PDF), `.repo`, `.events` (the `offer_letter` doc type, `defineSignable("offer")`), `.routes`, `.controller`, `.ai` (New Offer as a card), `.search`; mail `offer-sent`. No public routes and no expiry job of its own: signing is `signatures`' page, and `signature-reminders` ends a lapsed offer's request, which expires the offer |
 | `signatures` | built in M5 PR 2, shared with M7: `.service` (`defineSignable`, `requestIn`, `signAsStaffIn`, `endFor`, the signing page's steps), `.code` (the six-digit email code), `.public.routes` (`/sign/:token` and its code, sign, decline and document; `/verify/:ref`, `/verify/t/:token` and its document), `.certificate`, `.signed-pdf` (sealing from the outbox: the sealed copy, its artifact hash, the copies mailed), `.verify` (two verdicts), `.events`, `.repo`; `jobs/schedulers/signature-reminders` ends lapsed requests; mails `signature-code`, `signature-completed` |
 | `onboarding` | `.public.routes` (candidate document upload), `.checklist` (documentation before onboarding), `.plans`, `.sop` |
 | `employment_contracts` | `.lifecycle` |
@@ -656,7 +656,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | `query-rule-sweep` (people with a task due yesterday still open or done late queued for `overdue_task`, 06:20 Lagos) |
 | M4 | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` (the Talent Pool moved from M5, TB 04/11/2026), `apply-cv-purge` (CVs on Apply links that ended without an application, nightly at 02:47 Lagos) |
-| M5 | `offer-expiry`, `signature-reminder`, `onboarding-dispatch` | `offer-expiry`, `signature-reminders` |
+| M5 | `signature-reminder`, `onboarding-dispatch` | `signature-reminders` (lapsed signature requests ended, a sent offer's among them, 06:17 Lagos) |
 | M6 | `payroll-compute`, `payslip-render` | |
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
 | M8 | `budget-threshold` (the morning's sweep, re-run by hand for a day), `approval-ageing` | `budget-threshold` (each budget line 90% used, committed and spent, told to its department's head and Operations & People once, 07:00 Lagos; `docs/guides/expenses.md` §6.6), `approval-ageing` |

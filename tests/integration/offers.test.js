@@ -1,0 +1,292 @@
+"use strict";
+/**
+ * Recruitment · Offers end to end (docs/guides/offers.md §3 steps 1 to 5, §6): New Offer from a
+ * shortlisted candidate with the score snapshot, the monthly range, Submit for Approval through the
+ * `recruitment.offer` flow (the head of the hiring department, then the CEO), the letter generated and
+ * its signature request opened at approval, the Offer Signatory signing in the hub, Send Offer with the
+ * candidate's link, the candidate signing or declining on the public page, Withdraw, Not Progressing,
+ * the Offers settings, and New Offer as an assistant card (offers.create). The real migrations through
+ * HTTP, every response parsed with its contract (APP_ENV=test). The mail queue is mocked.
+ *
+ *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/offers
+ *
+ * Refuses to run unless the database name ends in "_test". Every person here is invented.
+ */
+const request = require("supertest");
+const { config } = require("../../src/config/env");
+const { pool } = require("../../src/config/db");
+
+jest.mock("../../src/jobs/queues", () => ({
+  enqueue: jest.fn(async () => ({ id: "1" })),
+  getQueue: jest.fn(() => ({ getDelayed: async () => [] })),
+  closeQueues: jest.fn(async () => {}),
+  DEFAULTS: {},
+}));
+
+const queues = require("../../src/jobs/queues");
+const { rebuild } = require("./helpers/schema");
+const { buildApp } = require("../../src/app");
+const outbox = require("../../src/shared/events/outbox");
+const grantsCache = require("../../src/shared/rbac/grants-cache");
+const lagos = require("../../src/shared/time/lagos");
+const token = require("../../src/shared/places/token");
+const { one, drain, harness } = require("./helpers/ai-actions");
+
+const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
+
+const area = (formatted) =>
+  token.sign({ source: "search", formatted, lat: 6.45, lon: 3.42, provider_id: `test:${formatted}`, kind: "area", city: "Lagos", state: "Lagos", country_code: "ng", timezone: "Africa/Lagos", verified: true, pending: false });
+
+const mails = (template) => queues.enqueue.mock.calls.filter((c) => c[0] === "email-send" && c[1] === template).map((c) => c[2]);
+const codesSent = () => mails("signature-code").map((m) => m.data.code);
+const tokenOf = (mail) => mail.data.sign_url.split("/").pop();
+const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+describeDb("Recruitment · Offers against the real migrations", () => {
+  let app;
+  let h;
+  let vacancyId;
+  let n = 0;
+  const pub = () => ({
+    get: (path) => request(app).get(`/api/public/v1${path}`).set("X-Forwarded-For", h.nextIp()),
+    post: (path) => request(app).post(`/api/public/v1${path}`).set("X-Forwarded-For", h.nextIp()).set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Version/17.0 Mobile Safari/604.1"),
+  });
+
+  async function applicant(first, stage = "shortlist") {
+    n += 1;
+    const k = await one("INSERT INTO candidate (first_name, last_name, email) VALUES ($1, 'Okafor', $2) RETURNING candidate_id", [first, `${first.toLowerCase()}.okafor@example.test`]);
+    const a = await one(
+      "INSERT INTO application (number, vacancy_id, candidate_id, source, stage, status) VALUES ($1, $2, $3, 'careers', $4, 'active') RETURNING application_id",
+      [`APP-${String(900 + n).padStart(4, "0")}`, vacancyId, k.candidate_id, stage],
+    );
+    return a.application_id;
+  }
+
+  const terms = (applicationId, monthly = ["400000.00", "30000.00", "20000.00"]) => ({
+    application_id: applicationId,
+    job_title: "Partnerships Manager",
+    start_date: lagos.addDays(lagos.today(), 21),
+    reports_to: "Chief Executive Officer",
+    role_function: "Partnerships",
+    role_scope: "Company-wide",
+    employment_type: "full_time",
+    work_pattern: "hybrid",
+    office_days: 2,
+    annual_leave_days: 15,
+    probation_months: 3,
+    working_hours: "Monday to Friday, 9:00 a.m. to 5:00 p.m.",
+    pay_lines: [
+      { name: "Basic Salary", monthly_amount: monthly[0] },
+      { name: "Internet & Recharge Allowance", monthly_amount: monthly[1] },
+      { name: "Transportation Allowance", monthly_amount: monthly[2] },
+    ],
+    job_description: "## Key Responsibilities\n\n- Sign and grow the venues and brands in the city guides.",
+  });
+
+  /** Submit, both approvals, the outbox: the offer approved with its letter and request. */
+  async function approved(offerId) {
+    const sub = await h.as("ops").post(`/recruitment/offers/${offerId}/submit`).send({});
+    expect(sub.status).toBe(200);
+    expect(sub.body.status).toBe("approval");
+    const instance = sub.body.workflow_instance_id;
+    expect((await h.as("hod").post(`/workflow/instances/${instance}/approve`).send({})).status).toBe(200);
+    expect((await h.as("ceo").post(`/workflow/instances/${instance}/approve`).send({})).status).toBe(200);
+    await drain();
+    return (await h.as("ops").get(`/recruitment/offers/${offerId}`)).body;
+  }
+
+  async function signedAndSent(offerId) {
+    const signed = await h.as("ops").post(`/recruitment/offers/${offerId}/sign`).send({ full_name: "Ada Obi", title: "Operations & People Lead", method: "type", typed: "Ada Obi", consent: true });
+    expect(signed.status).toBe(200);
+    const sent = await h.as("ops").post(`/recruitment/offers/${offerId}/send`).send({});
+    expect(sent.status).toBe(200);
+    return sent.body;
+  }
+
+  beforeAll(async () => {
+    await rebuild(pool, config.DB_NAME);
+    outbox.markReady();
+    ({ app } = buildApp({ strict: true, accessLog: false }));
+    h = harness(app);
+    await h.makePeople([
+      { who: "ops", first: "Ada", last: "Obi", email: "ops@mycity.test", job: "Operations & People Lead", role: "operations_people", password: "Opera!ions2026", department: "Operations" },
+      { who: "hod", first: "Ife", last: "Ojo", email: "hod@mycity.test", job: "Head of Partnerships", role: "head_of_department", password: "Head#Programmes26", department: "Partnerships" },
+      { who: "ceo", first: "Amaka", last: "Eze", email: "ceo@mycity.test", job: "Chief Executive Officer", role: "management", ceo: true, password: "Chief#Officer26" },
+      { who: "staff", first: "Tunde", last: "Ade", email: "tunde@mycity.test", job: "Field Officer", role: "employee", password: "Staff#Member2026", department: "Partnerships" },
+    ]);
+    await grantsCache.bumpTeamVersion();
+    await drain();
+    const dept = (await one("SELECT department_id FROM department WHERE name = 'Partnerships'")).department_id;
+    await pool.query("UPDATE department SET head_employee_id = $2, head_seat_id = NULL WHERE department_id = $1", [dept, h.people.hod.employee_id]);
+    const made = await h.as("ops").post("/recruitment/vacancies").send({
+      title: "Partnerships Manager",
+      department_id: dept,
+      hiring_manager_id: h.people.hod.employee_id,
+      positions: 1,
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      location: { token: area("Lekki, Lagos") },
+      salary_min: "400000.00",
+      salary_max: "600000.00",
+      description: "The Partnerships Manager signs and grows the venues, brands and creators that make the city guides worth opening.",
+      requirements: "Five years closing partnerships in media or hospitality.",
+      closes_on: lagos.addDays(lagos.today(), 30),
+      publish: true,
+    });
+    expect(made.status).toBe(201);
+    vacancyId = made.body.vacancy_id;
+  }, 120_000);
+
+  afterAll(async () => {
+    await require("../../src/shared/observability/error-reporter").flush();
+    await pool.end();
+  });
+
+  test("New Offer starts from the vacancy; the monthly total is checked against its range; one open offer an application", async () => {
+    const appId = await applicant("Chidi");
+    const start = await h.as("ops").get(`/recruitment/offers/draft?application_id=${appId}`);
+    expect(start.status).toBe(200);
+    expect(start.body).toMatchObject({ candidate_name: "Chidi Okafor", job_title: "Partnerships Manager", salary_min: "400000.00", salary_max: "600000.00" });
+    expect(start.body.pay_lines).toEqual([{ name: "Basic Salary", monthly_amount: "400000.00" }]);
+
+    const outside = await h.as("ops").post("/recruitment/offers").send(terms(appId, ["700000.00", "0.00", "0.00"]));
+    expect(outside.status).toBe(422);
+    expect(outside.body.error.fields).toEqual({ range_reason: ["Say why"] });
+
+    const made = await h.as("ops").post("/recruitment/offers").send(terms(appId));
+    expect(made.status).toBe(201);
+    expect(made.body).toMatchObject({ status: "draft", currency: "NGN", monthly_total: "450000.00", annual_compensation: "5400000.00", outside_range: false, can_edit: true, can_submit: true, can_sign: false });
+    expect(made.body.number).toMatch(/^OFF-\d{4}$/);
+    expect(made.body.letter.join("\n")).toContain("Basic Salary · ₦400,000.00");
+    expect(made.body.letter.join("\n")).toContain("Schedule A: Role Description");
+
+    expect((await h.as("ops").post("/recruitment/offers").send(terms(appId))).body.error.code).toBe("OFFER_OPEN");
+    // An application not yet at Shortlist takes no offer; staff do not reach Offers at all.
+    const early = await applicant("Bisi", "interview");
+    expect((await h.as("ops").post("/recruitment/offers").send(terms(early))).status).toBe(409);
+    expect((await h.as("staff").get("/recruitment/offers")).status).toBe(403);
+
+    const edited = await h.as("ops").patch(`/recruitment/offers/${made.body.offer_id}`).send({ pay_lines: [{ name: "Basic Salary", monthly_amount: "650000.00" }], range_reason: "Matched a competing offer" });
+    expect(edited.status).toBe(200);
+    expect(edited.body).toMatchObject({ outside_range: true, range_reason: "Matched a competing offer", monthly_total: "650000.00" });
+
+    const list = await h.as("ops").get("/recruitment/offers?status=draft");
+    expect(list.body.data.map((o) => o.offer_id)).toContain(made.body.offer_id);
+    expect((await h.as("ops").get("/recruitment/offers/summary")).body.drafts).toBeGreaterThanOrEqual(1);
+  });
+
+  test("Submit needs the Offer Signatory; approval generates the letter and opens its request; the signatory signs, then Send", async () => {
+    const appId = await applicant("Emeka");
+    const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    expect((await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/submit`).send({})).body.error.code).toBe("NO_SIGNATORY");
+
+    const named = await h.as("ops").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.ops.employee_id });
+    expect(named.status).toBe(200);
+    expect(named.body.signatory.display_name).toBe("Ada Obi");
+
+    const after = await approved(offer.offer_id);
+    expect(after).toMatchObject({ status: "approved", can_sign: true, can_send: false });
+    expect(after.document).toBeTruthy();
+    expect(after.signers.map((s) => [s.name, s.role, s.status])).toEqual([
+      ["Ada Obi", "mycity", "pending"],
+      ["Emeka Okafor", "candidate", "pending"],
+    ]);
+    expect(await one("SELECT terms_version, approved_at IS NOT NULL AS stamped FROM offer WHERE offer_id = $1", [offer.offer_id])).toEqual({ terms_version: 0, stamped: true });
+
+    // Not before the company has signed; and only the signatory signs for it.
+    expect((await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/send`).send({})).body.error.code).toBe("NOT_SIGNED");
+    expect((await h.as("hod").post(`/recruitment/offers/${offer.offer_id}/sign`).send({ full_name: "Ife Ojo", method: "type", typed: "Ife Ojo", consent: true })).status).toBe(403);
+
+    const sent = await signedAndSent(offer.offer_id);
+    expect(sent).toMatchObject({ status: "sent", can_resend: true, can_send: false });
+    expect(sent.expires_at).toBeTruthy();
+    // Send moves the card to Offer through candidates.advanceIn, once the board has an Offer column
+    // (GE's M4 change); until then advanceIn leaves it at Shortlist.
+    expect(["shortlist", "offer"]).toContain((await one("SELECT stage FROM application WHERE application_id = $1", [appId])).stage);
+    const [mail] = mails("offer-sent").filter((m) => m.to.email === "emeka.okafor@example.test");
+    expect(mail.data).toMatchObject({ job_title: "Partnerships Manager" });
+    // No link is kept or sits in the outbox.
+    const t = tokenOf(mail);
+    expect(JSON.stringify((await one("SELECT coalesce(json_agg(payload), '[]'::json) AS p FROM event_log WHERE event_key LIKE 'offer.%'")).p)).not.toContain(t);
+
+    // The candidate reads the same letter and signs: the offer is accepted, the copy sealed.
+    const page = await pub().get(`/sign/${t}`);
+    expect(page.status).toBe(200);
+    expect(page.body.letter.join("\n")).toContain("Total Monthly Compensation");
+    expect((await pub().post(`/sign/${t}/code`).send({})).status).toBe(200);
+    expect((await pub().post(`/sign/${t}/code/verify`).send({ code: codesSent().pop() })).status).toBe(200);
+    const signed = await pub().post(`/sign/${t}/sign`).send({ full_name: "Emeka Okafor", method: "draw", signature_png: PNG, consent: true });
+    expect(signed.status).toBe(200);
+    expect(signed.body.state).toBe("signed");
+    await drain();
+    const done = (await h.as("ops").get(`/recruitment/offers/${offer.offer_id}`)).body;
+    expect(done).toMatchObject({ status: "accepted", can_withdraw: false });
+    expect(done.document.document_id).not.toBe(after.document.document_id);
+    const hashes = await one("SELECT array_agg(DISTINCT content_hash) AS h FROM signature WHERE signature_request_id = (SELECT signature_request_id FROM offer WHERE offer_id = $1)", [offer.offer_id]);
+    expect(hashes.h).toHaveLength(1);
+  }, 60_000);
+
+  test("Rejected returns to draft with the reason; a declined offer ends and the application takes a new one", async () => {
+    const appId = await applicant("Ngozi");
+    const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    const sub = await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/submit`).send({});
+    expect((await h.as("hod").post(`/workflow/instances/${sub.body.workflow_instance_id}/reject`).send({ reason: "Start a week later" })).status).toBe(200);
+    await drain();
+    const back = (await h.as("ops").get(`/recruitment/offers/${offer.offer_id}`)).body;
+    expect(back).toMatchObject({ status: "draft", end_reason: "Start a week later", can_submit: true });
+
+    await approved(offer.offer_id);
+    await signedAndSent(offer.offer_id);
+    const t = tokenOf(mails("offer-sent").filter((m) => m.to.email === "ngozi.okafor@example.test").pop());
+    const declined = await pub().post(`/sign/${t}/decline`).send({ reason: "I accepted another role." });
+    expect(declined.status).toBe(200);
+    const ended = (await h.as("ops").get(`/recruitment/offers/${offer.offer_id}`)).body;
+    expect(ended).toMatchObject({ status: "declined", end_reason: "I accepted another role." });
+    // At Offer now, with no open offer: a new one may be made.
+    expect((await h.as("ops").post("/recruitment/offers").send(terms(appId))).status).toBe(201);
+  }, 60_000);
+
+  test("Withdraw stops the link; Not Progressing withdraws the application's open offer", async () => {
+    const appId = await applicant("Kemi");
+    const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    await approved(offer.offer_id);
+    await signedAndSent(offer.offer_id);
+    const t = tokenOf(mails("offer-sent").filter((m) => m.to.email === "kemi.okafor@example.test").pop());
+    const out = await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/withdraw`).send({ reason: "The role was put on hold." });
+    expect(out.status).toBe(200);
+    expect(out.body).toMatchObject({ status: "withdrawn", end_reason: "The role was put on hold." });
+    expect((await pub().get(`/sign/${t}`)).status).toBe(404);
+
+    const other = await applicant("Femi");
+    const draftOffer = (await h.as("ops").post("/recruitment/offers").send(terms(other))).body;
+    expect((await h.as("ops").post(`/recruitment/candidates/${other}/not-progressed`).send({ rejection_reason: "The role was filled by another candidate." })).status).toBe(200);
+    await drain();
+    expect(await one("SELECT status, end_reason FROM offer WHERE offer_id = $1", [draftOffer.offer_id])).toEqual({ status: "withdrawn", end_reason: "The candidate was not progressed" });
+  }, 60_000);
+
+  test("Offers settings: the standard wording is checked against its variables, saved as a version and restored", async () => {
+    const start = await h.as("ops").get("/recruitment/offers/settings/letter");
+    expect(start.status).toBe(200);
+    expect(start.body).toMatchObject({ version: 0, is_default: true });
+    expect(start.body.variables).toEqual(expect.arrayContaining(["job_title", "pay_lines", "monthly_total"]));
+    const bad = await h.as("ops").put("/recruitment/offers/settings/letter").send({ body: `${start.body.body}\n\n{{ salary_band }}` });
+    expect(bad.status).toBe(422);
+    const saved = await h.as("ops").put("/recruitment/offers/settings/letter").send({ body: `${start.body.body}\n\nWe look forward to working with you.` });
+    expect(saved.body).toMatchObject({ version: 1, is_default: false });
+    const restored = await h.as("ops").post("/recruitment/offers/settings/letter/restore").send({});
+    expect(restored.body).toMatchObject({ version: 2, body: start.body.body });
+  });
+
+  test("offers.create: New Offer as the assistant's card drafts from the vacancy with the basic salary given", async () => {
+    const manifest = require("../../src/modules/offers/offers.ai");
+    const action = manifest.actions.find((a) => a.key === "offers.create");
+    expect(action).toBeTruthy();
+    const appId = await applicant("Tolu");
+    const offer = await action.run(
+      { application_id: appId, start_date: lagos.addDays(lagos.today(), 30), basic_salary: "450000.00" },
+      { ...h.people.ops, scope: { scope: "all", scope_ids: null } },
+    );
+    expect(offer).toMatchObject({ status: "draft", job_title: "Partnerships Manager", monthly_total: "450000.00", outside_range: false });
+    expect(offer.pay_lines.map((l) => l.name)).toEqual(["Basic Salary"]);
+  });
+});

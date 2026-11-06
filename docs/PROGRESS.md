@@ -47,13 +47,13 @@ saying who agreed and when.
 | M2 Productivity & Performance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 0 | 0 | 5 | 0 | 0 |
 | M4 Recruitment End to End | 10 | 0 | 0 | 10 | 0 | 0 |
-| M5 Offers, Documentation & Onboarding | 4 | 2 | 2 | 0 | 0 | 0 |
+| M5 Offers, Documentation & Onboarding | 4 | 1 | 3 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 8 | 7 | 0 | 1 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **105** | **18** | **2** | **85** | **0** | **0** |
+| **Total** | **105** | **17** | **3** | **85** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
@@ -1212,12 +1212,13 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 39 | Candidates | `candidates` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 | 40 | Assessments | `assessments` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 | 41 | Interviews | `interviews` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
-| 42 | Offers | `offers` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 42 | Offers | `offers` | M5 | AJ | ☑ | ☐ | ☐ | In progress | 06/11/2026 |
 | 43 | Onboarding | `onboarding` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 44 | Talent Pool | `talent-pool` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 
 **Notes**
 
+- 06/11/2026 · AJ · M5 PR 3, Offers (#42) API (`docs/handoff/m5-offers-onboarding.md`; `docs/guides/offers.md` §3 to §9): New Offer from a shortlisted candidate with the score snapshot and monthly pay lines checked against the vacancy's range, a draft's edits, Submit for Approval on `recruitment.offer` (Head of Department, then the CEO; seed 5299 with Head of Department's recruitment `approve`), the letter generated and its signature request opened at approval, the Offer Signatory signing in the hub, Send and Resend with the candidate's link mailed after commit, Withdraw, Not Progressing withdrawing the open offer, accepted, declined and expired from the signatures hooks, the Offers settings (signatory and standard wording), ⌘K and the assistant's New Offer card. `tests/integration/offers.test.js`. Left: PR 4 (the Offers screen and its manual section), PR 5 to PR 8; the card moving to the Offer column waits on GE's board change.
 - 06/11/2026 · AJ · M5 PR 1 and PR 2 (`docs/handoff/m5-offers-onboarding.md`): the M5 contract and migrations 5010 to 5090, and the signatures service behind Sign Offer (#84) and Verify Document (#85): the public signing steps with the email code, sealing, and verification by reference and by QR with both verdicts. No ticks: the offers that use it come with PR 3. Left: PR 3 to PR 8.
 - 06/11/2026 · AJ · M5 planned: `docs/guides/offers.md` (Draft) and `docs/handoff/m5-offers-onboarding.md` for Offers (#42), Onboarding (#43), Sign Offer (#84) and Verify Document (#85), from the 04/11 review and the decisions on #79. No ticks changed. Left: PR 1 to PR 8 of the handoff; a public Upload Documents row comes with PR 6.
 - 05/11/2026 · GE · (Ose) Follow-ups from P15: the Recruitment chapter matches the screens (the wizard's fields per step, Publish Now, What We Look For, Screen Applications and Must Meet, Score With AI reads once, Send to Candidates from an assessment, the sittings' states as shown, My Panels, Candidate Details' Edit, My Card's Save Draft, Cancel Interview, Edit Report, Remove asks no reason), and Vacancy (#81) shows Role Overview once when a description opens with that heading (its picture retaken). Left: GE's follow-ups in the handoff.

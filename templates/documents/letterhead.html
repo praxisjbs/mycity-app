@@ -35,6 +35,27 @@
   .lh-letter .lh-sign-for { font-weight: 700; text-transform: uppercase; }
   .lh-letter .lh-sign-name { font-weight: 700; }
   .lh-letter .lh-sign-gap { height: 36px; }
+  /* A signed document (M5, M7; src/modules/signatures): its appendices (Additional Terms, Schedule A)
+     after the body, then every signature, the certificate of each signer's evidence, and the QR that
+     verifies it. Each signature is drawn (an image) or typed (in a signature face). */
+  .lh-appendix { margin-top: 20px; break-before: page; page-break-before: always; }
+  .lh-appendix h2 { font-size: 12pt; text-transform: uppercase; color: #014339; margin: 0 0 10px 0; }
+  .lh-seal-signs { margin-top: 24px; break-inside: avoid; page-break-inside: avoid; }
+  .lh-seal-sign { display: inline-block; vertical-align: top; width: 74mm; margin: 0 6mm 8mm 0; }
+  .lh-seal-sign img { height: 44px; display: block; margin-bottom: 2px; }
+  .lh-seal-typed { font-family: "Brush Script MT", "Segoe Script", cursive; font-size: 20pt; color: #014339; line-height: 1.2; }
+  .lh-seal-line { border-top: 0.3mm solid #A1A1AA; padding-top: 1.5mm; font-size: 9pt; }
+  .lh-seal-name { font-weight: 600; }
+  .lh-seal-muted { color: #71717A; font-size: 8.5pt; }
+  .lh-cert { break-before: page; page-break-before: always; }
+  .lh-cert h2 { font-size: 12pt; color: #014339; margin: 0 0 10px 0; }
+  .lh-cert table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .lh-cert td { padding: 4px 6px; border-bottom: 1px solid #E4E4E7; vertical-align: top; word-break: break-all; }
+  .lh-cert td:first-child { width: 34mm; color: #71717A; word-break: normal; }
+  .lh-cert-signer { margin-bottom: 8mm; break-inside: avoid; page-break-inside: avoid; }
+  .lh-cert-signer img { height: 32px; }
+  .lh-qr { display: flex; gap: 6mm; align-items: center; margin-top: 8mm; font-size: 8.5pt; color: #71717A; }
+  .lh-qr img { width: 28mm; height: 28mm; }
   .lh-staging { position: fixed; top: 40%; left: 0; right: 0; text-align: center; font-size: 64pt; font-weight: 700; color: rgba(218, 30, 16, 0.12); transform: rotate(-24deg); pointer-events: none; }
 </style>
 {{#if staging}}<div class="lh-staging">STAGING</div>{{/if}}
@@ -62,7 +83,20 @@
   <div class="lh-letter-to">{{#each doc.letter.to}}<div>{{ line }}</div>{{/each}}</div>
   {{else}}{{#if doc.title}}<h1 class="lh-title">{{ doc.title }}</h1>{{/if}}{{/if}}
   {{> body}}
+  {{#each doc.appendix}}<section class="lh-appendix lh-body"><h2>{{ title }}</h2>{{ markdown markdown }}</section>{{/each}}
+  {{#if doc.sealing}}<div class="lh-seal-signs">{{#each doc.sealing.signers}}<div class="lh-seal-sign">{{#if signature}}<img src="{{ signature }}" alt="Signature of {{ name }}">{{else}}{{#if typed}}<div class="lh-seal-typed">{{ typed }}</div>{{/if}}{{/if}}<div class="lh-seal-line"><div class="lh-seal-name">{{ name }}</div>{{#if title}}<div class="lh-seal-muted">{{ title }}</div>{{/if}}<div class="lh-seal-muted">{{ label }}{{#if signed_at}} · {{ datetime signed_at }}{{/if}}</div></div></div>{{/each}}</div>{{/if}}
   {{#if doc.signer}}<div class="lh-sign">{{#if doc.letter}}<div class="lh-sign-close">Yours faithfully,</div><div class="lh-sign-for">For: {{ org.name }}</div>{{else}}<div class="lh-sign-for">For {{ org.name }}</div>{{/if}}{{#if doc.signer.signature}}<img src="{{ doc.signer.signature }}" alt="Signature of {{ doc.signer.name }}">{{else}}{{#if doc.letter}}<div class="lh-sign-gap"></div>{{/if}}{{/if}}<div class="lh-sign-name">{{ doc.signer.name }}</div><div class="lh-sign-role">{{ doc.signer.role }}</div></div>{{/if}}
+  {{#if doc.sealing.certificate}}<section class="lh-cert"><h2>Signature Certificate</h2>{{#each doc.sealing.certificate}}<div class="lh-cert-signer"><table>
+    <tr><td>Signer</td><td>{{ name }}{{#if title}}, {{ title }}{{/if}}</td></tr>
+    <tr><td>Email</td><td>{{ email }}</td></tr>
+    <tr><td>Signature</td><td>{{#if signature}}<img src="{{ signature }}" alt="Signature of {{ name }}">{{else}}{{ typed }}{{/if}} ({{ method }})</td></tr>
+    <tr><td>Signed</td><td>{{ signed_at }}</td></tr>
+    {{#if code_verified_at}}<tr><td>Email code</td><td>Verified {{ code_verified_at }}</td></tr>{{/if}}
+    {{#if ip}}<tr><td>IP address</td><td>{{ ip }}</td></tr>{{/if}}
+    {{#if device}}<tr><td>Device</td><td>{{ device }}</td></tr>{{/if}}
+    <tr><td>Content hash</td><td>{{ content_hash }}</td></tr>
+  </table></div>{{/each}}</section>{{/if}}
+  {{#if doc.sealing.qr}}<div class="lh-qr"><img src="{{ doc.sealing.qr }}" alt="Verification code"><div>Verify this document at {{ doc.sealing.verify_url }}<br>Reference {{ doc.sealing.reference }}</div></div>{{/if}}
 </main>
 </td></tr></tbody>
 </table>
