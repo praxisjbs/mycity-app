@@ -1221,7 +1221,7 @@ async function reportsOfSeat(db, seatId) {
     { label: "the people under a seat", ceiling: TREE_CEILING },
   );
   // pagination:complete every open role under a seat moves to the person who fills it
-  const { rows: seats } = await completeQuery(
+  const { rows: roles } = await completeQuery(
     db,
     `SELECT s.org_seat_id FROM org_seat s
       WHERE s.line_manager_seat_id = $1 AND s.status <> 'closed'
@@ -1229,7 +1229,7 @@ async function reportsOfSeat(db, seatId) {
     [seatId],
     { label: "the open roles under a seat", ceiling: TREE_CEILING },
   );
-  return { people, seats: seats.map((r) => r.org_seat_id) };
+  return { people, seats: roles.map((r) => r.org_seat_id) };
 }
 
 /**
