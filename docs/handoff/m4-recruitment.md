@@ -8,7 +8,7 @@ design itself is `docs/guides/recruitment.md`; read it before you touch code.
 | | |
 |---|---|
 | Branch | `m4/recruitment` (everyone pushes here; the PR targets `main`) |
-| Pull request | #72 (draft: GitHub runs no CI on a draft, so run the checks yourself, §6) |
+| Pull request | #72, merged 06/11/2026. Follow-ups go on a new draft PR from this same branch (draft: GitHub runs no CI on a draft, so run the checks yourself, §6) |
 | Owner | GE (Godwin-Okoh Elisha), full ownership from 04/11/2026; packages claimed by whoever builds them |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 04/11/2026 |
@@ -513,3 +513,8 @@ packages that need none can start. Tick a package only when its own checks pass 
   the 51st, frontend tests, failed one Settings · Approvals case on a timeout under the run's load (untouched by M4);
   it passes alone twice and the whole app suite passes again (696 of 696). Every P15 decision, follow-up and chapter
   correction is closed. #72 waits only on GE's word to mark it ready (its old `User-guide-unchanged` line goes then).
+- 06/11/2026 · GE · **#72 merged** (squashed as 3e7b5ed): M4 Recruitment is on `main`, and so on staging. `main` is
+  merged back into this branch (no change of tree) for what comes next, on a new draft PR: GE's own findings from
+  testing on staging, logged here as they come, and the hand-over to M5. AJ takes M5 (Offers and Onboarding, guide
+  §2) and we talk with him in that PR's comments: what M4 gives M5 is the shortlist (stage `shortlist`, the last
+  column until M5 adds Offer), the Talent Pool's Invite to Apply, and the candidate emails' store (`candidates.emails`).
