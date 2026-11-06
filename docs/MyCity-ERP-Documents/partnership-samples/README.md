@@ -12,7 +12,7 @@ rebuilt in the hub's template editor, and each placeholder becomes the field nam
 | Sample | Template it shapes | Category | Needed by |
 |---|---|---|---|
 | [deal-merchant-agreement.md](deal-merchant-agreement.md) | `deal-merchant-agreement.html` | Event (and any deal category) | PR 2 (the template), PR 6 (generation and signing) |
-| The ticketing template (Regular, VIP, VVIP), to come from MyCity | a ticketing agreement template | Event | PR 2: upload it in that PR's chat |
+| The ticketing template (Regular, VIP, VVIP), to come from MyCity | a ticketing agreement template | Event | Wanted by PR 2; not yet received. Upload it in any chat: it is stored here redacted and entered in Categories' template editor |
 | A partnership proposal MyCity has sent, to come from MyCity | the proposal design kit's tone and proof points (not a template) | All | PR 7: upload it in that PR's chat |
 
 A chat that receives one of the samples to come stores it here, redacted the same way, and adds its row.

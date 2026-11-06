@@ -132,6 +132,79 @@ async function parseUpload({ buffer, filename = "" }) {
   return parseCsv(buffer);
 }
 
+/* ── Dropdowns ───────────────────────────────────────────────────────────── */
+
+const colLetter = (n) => {
+  let out = "";
+  for (let c = n; c > 0; c = Math.floor((c - 1) / 26)) out = String.fromCharCode(65 + ((c - 1) % 26)) + out;
+  return out;
+};
+
+const text = (cell) => {
+  const v = cellValue(cell);
+  return v === null || v === undefined ? "" : String(v).trim();
+};
+
+/** The distinct, non-empty values a list validation offers, in the order it offers them. */
+function listValues(wb, ws, formula) {
+  const f = String(formula || "").trim();
+  const quoted = /^"([\s\S]*)"$/.exec(f);
+  const raw = [];
+  if (quoted) {
+    raw.push(...quoted[1].split(","));
+  } else {
+    const bang = f.lastIndexOf("!");
+    const named = bang >= 0 ? f.slice(0, bang).replace(/^=/, "").replace(/^'|'$/g, "").replace(/''/g, "'") : null;
+    const ref = /^([A-Z]{1,3}\d+)(?::([A-Z]{1,3}\d+))?$/.exec((bang >= 0 ? f.slice(bang + 1) : f.replace(/^=/, "")).replace(/\$/g, ""));
+    if (!ref) return [];
+    const sheet = named ? wb.getWorksheet(named) : ws;
+    if (!sheet) return [];
+    const first = ref[1];
+    const last = ref[2] || ref[1];
+    const range = sheet.getCell(first);
+    const end = sheet.getCell(last);
+    for (let r = range.row; r <= Math.min(end.row, range.row + 500); r += 1)
+      for (let c = range.col; c <= Math.min(end.col, range.col + 20); c += 1) raw.push(text(sheet.getCell(r, c)));
+  }
+  const seen = new Set();
+  return raw
+    .map((v) => v.trim())
+    .filter((v) => v && !seen.has(v.toLowerCase()) && seen.add(v.toLowerCase()));
+}
+
+/**
+ * The dropdowns of a workbook: for each sheet, every column carrying a list validation, with the text
+ * above its first validated cell (its header) and the values it offers. A person's own workbook is the
+ * source of MyCity's lists, so Start From Tracker reads what the sheet's authors chose to offer
+ * (docs/guides/partnerships.md §6.3). Reads nothing else of the cells.
+ * @param {{buffer: Buffer}} opts
+ * @returns {Promise<Array<{sheet: string, column: string, header: string|null, values: string[]}>>}
+ */
+async function readDropdowns({ buffer }) {
+  const wb = await loadWorkbook(buffer);
+  const out = [];
+  wb.eachSheet((ws) => {
+    if (isGuidance(ws)) return;
+    const model = (ws.dataValidations && ws.dataValidations.model) || {};
+    const groups = new Map();
+    for (const [address, dv] of Object.entries(model)) {
+      if (!dv || dv.type !== "list" || !dv.formulae || !dv.formulae.length) continue;
+      const cell = ws.getCell(address.split(":")[0]);
+      const key = `${cell.col}|${dv.formulae[0]}`;
+      const g = groups.get(key) || { col: cell.col, row: cell.row, formula: dv.formulae[0] };
+      g.row = Math.min(g.row, cell.row);
+      groups.set(key, g);
+    }
+    for (const g of groups.values()) {
+      let header = null;
+      for (let r = g.row - 1; r >= Math.max(1, g.row - 6) && !header; r -= 1) header = text(ws.getCell(r, g.col)) || null;
+      const values = listValues(wb, ws, g.formula);
+      if (values.length) out.push({ sheet: ws.name, column: colLetter(g.col), header, values });
+    }
+  });
+  return out.sort((a, b) => (a.sheet === b.sheet ? a.column.length - b.column.length || a.column.localeCompare(b.column) : 0));
+}
+
 /* ── Grids for the import engine ─────────────────────────────────────────── */
 
 /** Drop empty trailing cells and rows. */
@@ -236,6 +309,7 @@ module.exports = {
   parseWorkbook,
   parseUpload,
   readSheets,
+  readDropdowns,
   looksLikeXlsx,
   XLSX_MAX_BYTES,
   MAX_SHEETS,
