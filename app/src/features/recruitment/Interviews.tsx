@@ -155,7 +155,6 @@ export function Interviews() {
         />
       </Toolbar>
       <ListDetail
-        cols="1/1.5"
         open={picked !== null}
         onClose={() => setPicked(null)}
         title="Interview"
@@ -187,14 +186,20 @@ export function Interviews() {
             ]}
           />
         }
-        detail={shown ? <InterviewRecord key={shown} id={shown} /> : null}
+        // Beside the list: the interview and its panel; the rest of the record follows in full width below,
+        // in even pairs. On a phone the whole record is in its sheet.
+        detail={shown ? <InterviewRecord key={shown} id={shown} part={beside ? "top" : "all"} /> : null}
       />
+      {beside && shown && <InterviewRecord key={`${shown}-rest`} id={shown} part="rest" />}
     </>
   );
 }
 
-/** One interview, as it sits beside the list or in its sheet: the Blind Panel, the scorecard, the round. */
-export function InterviewRecord({ id }: { id: string }) {
+/**
+ * One interview: the summary and its Blind Panel (`top`, beside the list), the scorecard, details, activity
+ * and the round's result (`rest`, full width below the list on desktop), or all of it (`all`, a phone's sheet).
+ */
+export function InterviewRecord({ id, part = "all" }: { id: string; part?: "top" | "rest" | "all" }) {
   const modal = useModal();
   const confirm = useConfirm();
   const mayEdit = useAuth().can("recruitment", "edit");
@@ -202,7 +207,7 @@ export function InterviewRecord({ id }: { id: string }) {
   const shut = useMutation("POST /api/v1/recruitment/interviews/:id/close");
   const x = read.data;
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
-  if (!x) return <Card><LoadingRows count={8} /></Card>;
+  if (!x) return part === "rest" ? null : <Card><LoadingRows count={8} /></Card>;
   const reload = () => {
     read.reload();
     invalidate("/api/v1/recruitment/interviews");
@@ -249,56 +254,72 @@ export function InterviewRecord({ id }: { id: string }) {
       ]}
     />
   );
-  return (
-    <Stack>
-      <Card as="article">
-        <CardHeader record title={x.candidate_name} right={<Pill dot={false}>{x.round.title}</Pill>} />
-        <KeyValue
-          items={[
-            ["Role", x.vacancy.title],
-            ["When", when(x)],
-            ["How", INTERVIEW_TYPE[x.interview_type]],
-            ...(x.worksite ? [["Where", [x.worksite.name, x.worksite.address].filter(Boolean).join(", ")] as [string, string]] : []),
-            ...(x.meeting_url ? [["Link", <a key="l" className="wrap-any underline" href={x.meeting_url} target="_blank" rel="noopener noreferrer">{x.meeting_url}</a>] as [string, React.ReactNode]] : []),
-          ]}
-        />
-        <ActionGroup>
-          <div className="mt-3 flex flex-wrap justify-end gap-2">
-            {x.cv_document_id && <Button icon="doc" onClick={() => saveFile(`/api/v1/recruitment/interviews/${id}/cv`, `${x.candidate_name} CV.pdf`)}>View CV</Button>}
-            {x.round.form_document_id && <Button icon="download" onClick={() => saveFile(`/api/v1/documents/${x.round.form_document_id}/content`, `Interview Assessment Form ${x.candidate_name}.pdf`)}>Download Form</Button>}
-            {x.can_edit && <Button onClick={() => modal.open({ title: "Reschedule", wide: true, body: (close) => <ScheduleForm interview={x} close={close} onSaved={reload} /> })}>Reschedule</Button>}
-            {x.can_edit && <Button variant="danger" onClick={() => modal.open({ title: "Cancel Interview", body: (close) => <CancelForm interview={x} close={close} onSaved={reload} /> })}>Cancel Interview</Button>}
-            {x.can_close && <Button onClick={closeRound}>Close Round</Button>}
-            {x.can_report && <Button onClick={() => modal.open({ title: "Write Report", body: (close) => <ReportForm interview={x} close={close} onSaved={reload} /> })}>{x.round.report ? "Edit Report" : "Write Report"}</Button>}
-            {x.on_panel && live && <Button variant="primary" className="max-md:w-full" onClick={myCard}>My Card</Button>}
-          </div>
-        </ActionGroup>
-      </Card>
-      {x.scorecard ? (
-        <Grid cols={2} scroll={false} flush>
-          {blindPanel}
-          <Card>
-            <CardHeader title="Weighted Scorecard" help={SCORECARD_HELP} right={x.weighted_total === null ? undefined : <b className="tabular-nums">{x.weighted_total.toFixed(1)}</b>} />
-            <Bars rows={parts.map((p) => ({ label: `${p.name}, ${p.weight}%`, percent: p.score ?? 0, value: <ScoreText score={p.score} provisional={p.provisional} /> }))} />
-          </Card>
-        </Grid>
-      ) : (
-        blindPanel
+  const summary = (
+    <Card as="article">
+      <CardHeader record title={x.candidate_name} right={<Pill dot={false}>{x.round.title}</Pill>} />
+      <KeyValue
+        items={[
+          ["Role", x.vacancy.title],
+          ["When", when(x)],
+          ["How", INTERVIEW_TYPE[x.interview_type]],
+          ...(x.worksite ? [["Where", [x.worksite.name, x.worksite.address].filter(Boolean).join(", ")] as [string, string]] : []),
+          ...(x.meeting_url ? [["Link", <a key="l" className="wrap-any underline" href={x.meeting_url} target="_blank" rel="noopener noreferrer">{x.meeting_url}</a>] as [string, React.ReactNode]] : []),
+        ]}
+      />
+      <ActionGroup>
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          {x.cv_document_id && <Button icon="doc" onClick={() => saveFile(`/api/v1/recruitment/interviews/${id}/cv`, `${x.candidate_name} CV.pdf`)}>View CV</Button>}
+          {x.round.form_document_id && <Button icon="download" onClick={() => saveFile(`/api/v1/documents/${x.round.form_document_id}/content`, `Interview Assessment Form ${x.candidate_name}.pdf`)}>Download Form</Button>}
+          {x.can_edit && <Button onClick={() => modal.open({ title: "Reschedule", wide: true, body: (close) => <ScheduleForm interview={x} close={close} onSaved={reload} /> })}>Reschedule</Button>}
+          {x.can_edit && <Button variant="danger" onClick={() => modal.open({ title: "Cancel Interview", body: (close) => <CancelForm interview={x} close={close} onSaved={reload} /> })}>Cancel Interview</Button>}
+          {x.can_close && <Button onClick={closeRound}>Close Round</Button>}
+          {x.can_report && <Button onClick={() => modal.open({ title: "Write Report", body: (close) => <ReportForm interview={x} close={close} onSaved={reload} /> })}>{x.round.report ? "Edit Report" : "Write Report"}</Button>}
+          {x.on_panel && live && <Button variant="primary" className="max-md:w-full" onClick={myCard}>My Card</Button>}
+        </div>
+      </ActionGroup>
+    </Card>
+  );
+  const scorecard = x.scorecard ? (
+    <Card>
+      <CardHeader title="Weighted Scorecard" help={SCORECARD_HELP} right={x.weighted_total === null ? undefined : <b className="tabular-nums">{x.weighted_total.toFixed(1)}</b>} />
+      <Bars rows={parts.map((p) => ({ label: `${p.name}, ${p.weight}%`, percent: p.score ?? 0, value: <ScoreText score={p.score} provisional={p.provisional} /> }))} />
+    </Card>
+  ) : null;
+  const details = (
+    <Card>
+      <CardHeader
+        title="Candidate Details"
+        right={mayEdit && live ? <Button size="sm" icon="edit" onClick={() => modal.open({ title: "Candidate Details", body: (close) => <DetailsForm interview={x} close={close} onSaved={reload} /> })}>Edit</Button> : undefined}
+      />
+      <KeyValue
+        items={[
+          ["Current Employer", x.round.current_employer ?? "–"],
+          ["Academics", ACADEMICS.find(([k]) => k === x.round.academics)?.[1] ?? "–"],
+          ["Total Experience", months(x.round.total_experience_months)],
+          ["Relevant Experience", months(x.round.relevant_experience_months)],
+        ]}
+      />
+    </Card>
+  );
+  const activity = (
+    <>
+      {x.activity.length > 0 && (
+        <Card>
+          <CardHeader title="Round Activity" />
+          <Timeline
+            label="Round Activity"
+            items={x.activity.map((a) => ({
+              title: activityLine(a),
+              when: formatDateTime(a.occurred_at),
+              tone: a.kind === "feedback_submitted" || a.kind === "round_closed" || a.kind === "reported" ? "done" : undefined,
+            }))}
+          />
+        </Card>
       )}
-      <Card>
-        <CardHeader
-          title="Candidate Details"
-          right={mayEdit && live ? <Button size="sm" icon="edit" onClick={() => modal.open({ title: "Candidate Details", body: (close) => <DetailsForm interview={x} close={close} onSaved={reload} /> })}>Edit</Button> : undefined}
-        />
-        <KeyValue
-          items={[
-            ["Current Employer", x.round.current_employer ?? "–"],
-            ["Academics", ACADEMICS.find(([k]) => k === x.round.academics)?.[1] ?? "–"],
-            ["Total Experience", months(x.round.total_experience_months)],
-            ["Relevant Experience", months(x.round.relevant_experience_months)],
-          ]}
-        />
-      </Card>
+    </>
+  );
+  const result = (
+    <>
       {closed && x.trait_averages.length > 0 && (
         <DataView
           title="Traits"
@@ -329,19 +350,35 @@ export function InterviewRecord({ id }: { id: string }) {
           {x.round.report && <p className="mt-2 text-sm whitespace-pre-line" data-copy="content">{x.round.report}</p>}
         </Card>
       )}
-      {x.activity.length > 0 && (
-        <Card>
-          <CardHeader title="Round Activity" />
-          <Timeline
-            label="Round Activity"
-            items={x.activity.map((a) => ({
-              title: activityLine(a),
-              when: formatDateTime(a.occurred_at),
-              tone: a.kind === "feedback_submitted" || a.kind === "round_closed" || a.kind === "reported" ? "done" : undefined,
-            }))}
-          />
-        </Card>
-      )}
+    </>
+  );
+  if (part === "top")
+    return (
+      <Stack>
+        {summary}
+        {blindPanel}
+      </Stack>
+    );
+  if (part === "rest")
+    return (
+      <Stack className="mt-3">
+        {/* The same split as the list and the record above, so the columns line up. */}
+        <Grid cols="1.4/1">
+          {scorecard ?? details}
+          {scorecard ? details : activity}
+        </Grid>
+        {scorecard && activity}
+        {result}
+      </Stack>
+    );
+  return (
+    <Stack>
+      {summary}
+      {blindPanel}
+      {scorecard}
+      {details}
+      {result}
+      {activity}
     </Stack>
   );
 }
