@@ -494,6 +494,8 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 05/11/2026 · AJ · No change to the Org Chart: `app/src/features/ess/index.tsx`, which also renders it, gained the My Requests tab (M8, `docs/guides/ess.md`).
+
 - 03/11/2026 · JP · People's forms are Praxis AI cards (§9; `praxis-ai.md` decisions 33 and 36):
   Add Employee and Save Record with the work record alone, Save Line, Add Department and Save
   Department, Add Role and Save Role, each through this module's own function in its own

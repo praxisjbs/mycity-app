@@ -110,6 +110,32 @@ const CASES = Object.freeze([
   { id: "card.leave-type", as: "operations_people", question: "Add a leave type called Study Leave with 5 days a year.", shows: ["cards"], action: "leave_types.add" },
   { id: "card.leave-type-edit", as: "operations_people", question: "Give Compassionate Leave 7 days a year.", shows: ["cards"], action: "leave_types.edit" },
   { id: "card.leave-record", as: "operations_people", question: "Record two days of annual leave for {person} next Thursday and Friday.", shows: ["cards"], action: "leave.record" },
+  // M8 Expenses (docs/guides/expenses.md §9): the request cards for anyone, the rest for a holder of expenses.finance.
+  { id: "card.expense-request", as: "employee", question: "Raise an expense for 2 crates of water at 4,500 naira each for the Ikeja activation, paid to Chuks Stores at GTBank, account 0123456789.", shows: ["cards"], action: "my_expenses.create" },
+  { id: "card.expense-line", as: "employee", question: "Add a line to my request {my_expenses.add_line#expense_request_id}: 10 branded caps at 2,500 each.", shows: ["cards"], action: "my_expenses.add_line" },
+  { id: "card.expense-edit", as: "employee", question: "Change the purpose of my request {my_expenses.edit#expense_request_id} to Ikeja activation refreshments.", shows: ["cards"], action: "my_expenses.edit" },
+  { id: "card.expense-category", as: "operations_people", question: "Add an expense category called Field Logistics.", shows: ["cards"], action: "expense_categories.create" },
+  { id: "card.expense-category-edit", as: "operations_people", question: "Deactivate the {expense_categories.edit#expense_category_id} expense category.", shows: ["cards"], action: "expense_categories.edit" },
+  { id: "card.requisition", as: "operations_people", question: "Group the approved expense requests into a requisition for the CEO.", shows: ["cards"], action: "requisitions.create", given: ["requisitions.create#expense_request_ids"] },
+  { id: "card.disbursement", as: "operations_people", question: "Record the payment for {disbursements.create#expense_request_id}, paid today, bank reference GT2611050042.", shows: ["cards"], action: "disbursements.create" },
+  { id: "card.budget", as: "operations_people", question: "Set the {departments.edit#department_id} budget for 2027: 2,000,000 naira for {expense_categories.edit#expense_category_id}.", shows: ["cards"], action: "budgets.create" },
+  { id: "card.budget-edit", as: "operations_people", question: "Change the {budgets.edit#budget_id} budget to 2,500,000 naira for {expense_categories.edit#expense_category_id}.", shows: ["cards"], action: "budgets.edit" },
+  { id: "card.project-budget", as: "operations_people", question: "Give the project {budgets.set_project#project_id} a budget of 1,500,000 naira.", shows: ["cards"], action: "budgets.set_project" },
+  { id: "card.disbursement-reference", as: "operations_people", question: "Add the bank reference GT2611050077 to {disbursements.add_reference#disbursement_id}.", shows: ["cards"], action: "disbursements.add_reference" },
+  // A request is raised by its requester and paid by a holder of expenses.finance: a member of staff is never drawn those cards.
+  // Expenses' reads, as each role of docs/guides/expenses.md §8 holds them (M8 release check).
+  { id: "expenses.mine", as: "employee", question: "Where are my expense requests?", reads: ["expenses.mine"] },
+  { id: "expenses.not-others", as: "employee", question: "What expense requests has {person} raised?", never: ["expenses.list", "expenses.approvals", "disbursements.list"] },
+  { id: "expenses.waiting-on-me", as: "head_of_department", question: "Which expense requests are waiting on me?", reads: ["expenses.approvals"] },
+  { id: "expenses.team", as: "head_of_department", question: "What has my team spent on expenses this month?", reads: ["expenses.list"] },
+  { id: "expenses.to-pay", as: "operations_people", question: "Which expense requests are waiting to be paid?", reads: ["expenses.list", "disbursements.list"] },
+  { id: "expenses.no-reference", as: "operations_people", question: "Which payments are missing a bank reference?", reads: ["disbursements.list"] },
+  { id: "expenses.categories", as: "operations_people", question: "Which expense categories do we offer?", reads: ["expense_categories.list"] },
+  { id: "expenses.requisitions", as: "ceo", question: "Which requisitions are waiting for me?", reads: ["requisitions.list", "expenses.approvals"] },
+  { id: "expenses.budgets", as: "management", question: "How much of each department's budget is left this year?", reads: ["budgets.list"] },
+  { id: "expenses.projects", as: "management", question: "Which projects are over their budget?", reads: ["budgets.projects"] },
+  { id: "card.budget-not-mine", as: "head_of_department", question: "Raise my department's budget for this year by 500,000 naira.", shows: ["cards"], no_action: ["budgets.create", "budgets.edit", "budgets.set_project"] },
+  { id: "card.disbursement-not-mine", as: "employee", question: "Record the payment for my last expense request, paid today.", shows: ["cards"], no_action: ["disbursements.create", "requisitions.create", "expense_categories.create"] },
   { id: "card.employee-add", as: "operations_people", question: "Add Ada Obi as a Sales Executive in {departments.edit#department_id}, ada.obi@mycityapp.io, 08031234567, starting next Monday, full time and remote.", shows: ["cards"], action: "employees.add" },
   { id: "card.employee-edit", as: "operations_people", question: "Change {person}'s job title to Senior Field Officer.", shows: ["cards"], action: "employees.edit" },
   { id: "card.reporting", as: "operations_people", question: "{colleague} now reports to me.", shows: ["cards"], action: "employees.reporting" },
@@ -183,6 +209,8 @@ const CASES = Object.freeze([
   { id: "card.leave-approve", as: "operations_people", question: "Approve the leave requests waiting on me.", shows: ["cards"], action: "leave.approve", given: ["waiting_leave"] },
   { id: "card.leave-reject", as: "operations_people", question: "Reject the leave requests waiting on me: the team is short that week.", shows: ["cards"], action: "leave.reject", given: ["waiting_leave"] },
   { id: "card.approvals", as: "ceo", question: "Approve every request waiting on me.", shows: ["cards"], action: "approvals.decide" },
+  // The CEO's requisition is decided through the approvals' own card, never a requisitions action (audit F20).
+  { id: "card.requisition-approve", as: "ceo", question: "Approve the requisition waiting on me.", shows: ["cards"], action: "approvals.decide", given: ["waiting_requisition"] },
   { id: "card.message", as: "employee", question: "Tell {person} that the weekly report is ready for them.", shows: ["cards"], action: "community.message" },
   { id: "card.post", as: "employee", question: "Post in general that the office closes at 3 on Friday.", shows: ["cards"], action: "community.post" },
   { id: "card.mail", as: "operations_people", question: "Email ada@partner.test to confirm the venue visit on Thursday at 10.", shows: ["cards"], action: "mail.send" },
@@ -312,6 +340,13 @@ const FILLS = Object.freeze({
     find: async (_pool, actor) => {
       const waiting = await require("../../src/modules/workflow/workflow.service").mine(actor, { page: 1 });
       return waiting.data.some((r) => r.definition_key === "leave.approval") ? "yes" : null;
+    },
+  },
+  waiting_requisition: {
+    what: "requisition waiting on the CEO",
+    find: async (_pool, actor) => {
+      const waiting = await require("../../src/modules/workflow/workflow.service").mine(actor, { page: 1 });
+      return waiting.data.some((r) => r.definition_key === "expenses.requisition") ? "yes" : null;
     },
   },
 });

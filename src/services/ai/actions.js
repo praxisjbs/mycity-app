@@ -194,6 +194,35 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-10-25",
     built: true,
   }),
+  // M8 Expenses (docs/guides/expenses.md §9): the three suggestions a person accepts, jobs chosen by
+  // AJ (docs/handoff/m8-expenses.md decision 14).
+  "expense-invoice-read": Object.freeze({
+    label: "Read Invoice",
+    module: "expenses",
+    job: "image_reading",
+    personal_data: true,
+    chosen_by: "AJ",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
+  "expense-duplicate-check": Object.freeze({
+    label: "Check Duplicate",
+    module: "expenses",
+    job: "default",
+    personal_data: true,
+    chosen_by: "AJ",
+    chosen_at: "2026-11-04",
+    built: true,
+  }),
+  "expense-category-suggest": Object.freeze({
+    label: "Suggest Category",
+    module: "expenses",
+    job: "default",
+    personal_data: true,
+    chosen_by: "AJ",
+    chosen_at: "2026-11-05",
+    built: true,
+  }),
   "integration-test": Object.freeze({
     label: "Connection Test",
     module: "integrations",

@@ -428,7 +428,8 @@ criteria (A10), assessments, interviews, rounds, panelists and blind feedback ·
   `last_name`), through `src/modules/dashboard/sources/vacancies.source.js`: update it in the same PR.
   Indexes asked by Home: `vacancy (status)`, `application (status, current_stage_entered_at)`.
   **Staging holds Home's demonstration rows** in `vacancy`, one for each open seat on the organogram
-  (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`
+  (`seeds/staging/60_home.js`, decision O11; taken away by `seeds/staging/80_expenses.js` since M8
+  PR 7, whose own rows replace them). Their ids are written out in `HOME_STAGING_ROWS`
   (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
   takes them away once, in the three steps that file starts with: that seed calls
   `removeHomeStagingRows(client, ["vacancy"])` in its transaction before it writes, which deletes
@@ -546,11 +547,12 @@ the status CHECK (`draft`, `submitted`, `sent_back`, `approved`, `in_requisition
 status CHECK; `project.budget_amount`; the foreign-key and list indexes, Home's included ·
 `8100` seed: the `expenses.request` and `expenses.requisition` flows, the statuses and payee types,
 the `expenses.finance` capability for Operations & People, and 8099's unused `expense_request`
-numbering scheme taken out (a request is numbered `expense`).
+numbering scheme taken out (a request is numbered `expense`). · `8020` one budget per department per year: a unique index on `budget (department_id, starts_on)` for every budget but a closed one, a later duplicate closed first (M8 audit F7).
 
 **Owes:**
-- The five categories 8099 seeds are a business choice A26 does not allow; they go with M8's
-  staging seed (PR 7), after Home's staging rows that point at them.
+- Paid 05/11/2026 (M8 PR 7): the five categories 8099 seeded are taken out by the reference seed
+  `8101_seed_expense_categories_out.sql` wherever nothing names them (production included), and by
+  `seeds/staging/80_expenses.js` on staging once it has taken Home's rows away.
 - `requisition.expense_request_id`, `requisition.supplier_name`, `requisition_line` and
   `expense_transaction` are unused since 8010; dropped one release after M8 ships if still unused.
 - **Read by Home** (home.md §4.1): `expense_request` (`expense_request_id`, `number`, `employee_id`,
@@ -558,7 +560,8 @@ numbering scheme taken out (a request is numbered `expense`).
   `expense_category` (`expense_category_id`, `name`) through
   `src/modules/dashboard/sources/expenses.source.js`, and `budget` (`budget_id`, `number`, `name`,
   `department_id`, `owner_id`, `currency`, `starts_on`, `ends_on`, `approved_at`) with `budget_line`
-  (`budget_id`, `amount`, `spent_amount`) through `budgets.source.js`: update them in the same PR.
+  (`budget_id`, `amount`, `committed_amount`, `spent_amount`; Budget Used counts committed and spent
+  since M8 PR 5) through `budgets.source.js`: update them in the same PR.
   Home's awaiting approval is `submitted` (8010's status list). **Staging holds Home's
   demonstration rows** in `expense_request`, `budget` and `budget_line`
   (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`

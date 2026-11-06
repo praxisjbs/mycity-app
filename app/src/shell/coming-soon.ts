@@ -23,6 +23,7 @@ export const COMING: Record<string, string[]> = {
   "ess/my-attendance": ["Every clock-in and clock-out, with where it was made", "Late days and missed clock-outs, and why they were raised", "Your attendance against the month"],
   "ess/my-performance": ["Your KPIs for the month, weighted to 100%", "The goal chain above your KPI, up to the CEO", "Self rating first, then your manager, then a second approval"],
   "ess/my-payslips": ["A payslip for every approved run, as a PDF", "Deductions, each linked to its query", "Any past year, from your start date"],
+  "ess/my-requests": ["Ask for company money, line by line, with the invoice", "See who your request waits on", "Get told when it is paid"],
   "ess/my-leave": ["Your entitlement, what you have taken and what is left", "Request leave; your line manager decides", "Approved leave shows on the team calendar"],
   "ess/my-queries": ["Open queries with a 24 hour response window", "Archived queries, with your response kept on record", "Sanctions, and any deduction they carried"],
   "ess/my-documents": ["Your documents in the vault: contract, ID, certificates", "Upload what is missing, with a progress bar", "Expiry dates, with a reminder before they lapse"],
@@ -93,12 +94,11 @@ export const COMING: Record<string, string[]> = {
   "partnerships/analytics": ["Each lead owner's month, as your performance sheet has it", "Deals signed and returns by month", "By category, region and stage"],
 
   /* Expenses */
-  "expenses/my-requests": ["Request money for work, with receipts attached", "See where your request is in the approval chain", "Get notified when it is paid"],
-  "expenses/approvals": ["Requests waiting on you, oldest first", "Approve, return or decline with a reason", "The budget each request draws on"],
-  "expenses/requisitions": ["Group approved requests into one requisition", "Sent to the CEO for approval", "One payment run per requisition"],
-  "expenses/disbursements": ["Pay approved requisitions", "Record the transfer reference for each payment", "Requesters notified when paid"],
-  "expenses/budgets": ["Budgets by department and month", "Spend against budget, live", "Alerts before a budget runs out"],
-  "expenses/categories": ["Expense categories and their limits", "Which categories need receipts", "Who can approve each category"],
+  "expenses/approvals": ["Requests waiting on you, oldest first", "Approve, send back or reject with a reason", "The budget each request draws on"],
+  "expenses/requisitions": ["Group approved requests into one requisition", "The CEO approves or rejects it whole", "Remove a request before deciding"],
+  "expenses/disbursements": ["Record each transfer with its bank reference", "Saved without one shows Reference Missing", "Requesters told when paid"],
+  "expenses/budgets": ["Each department's year by category", "Committed, spent and remaining, live", "Every change in Budget History"],
+  "expenses/categories": ["Expense categories, operating or capital", "This month's spend by category", "Add the suggested ones in one press"],
 
   /* Knowledge Hub */
   "knowledge/policies": ["Every company policy, versioned and signed", "The Attendance policy as a worksheet", "Who has acknowledged each version"],
@@ -124,4 +124,5 @@ export const COMING: Record<string, string[]> = {
   "settings/imports": ["Import a spreadsheet of records, column by column", "See what will be created before you commit", "Every import kept, with its error file and Revert"],
   "knowledge/user-guide": ["How to use every screen, step by step", "Pictures of each screen, numbered", "Open a screen from a step and come back"],
   "people/departments": ["Every department, its head and its people", "Set a head, move people, merge or retire", "Reporting lines and rights follow the head"],
+  "expenses/projects": ["Each project's budget and spend", "Raise a request for a project", "Committed and spent per project"],
 };

@@ -50,12 +50,28 @@ describe("the source registry", () => {
   test("each source on the form has a name, its columns Title Case and of a kind a file formats", () => {
     for (const s of Object.values(sources.SOURCES).filter((x) => x.offered)) {
       expect(typeof s.label).toBe("string");
+      if (s.snapshot) {
+        // A source read whole (Monthly Expenses) builds its own tables.
+        expect([s.key, typeof s.tables]).toEqual([s.key, "function"]);
+        continue;
+      }
       expect(typeof s.read).toBe("function");
       for (const col of s.columns) {
         expect([s.key, col.kind]).toEqual([s.key, expect.stringMatching(/^(text|date|datetime|number|money)$/)]);
         expect([s.key, col.header]).toEqual([s.key, expect.stringMatching(/^[A-Z][A-Za-z%-]*( [A-Z][A-Za-z%-]*)*$/)]);
       }
     }
+  });
+
+  test("Monthly Expenses: last month's spend in three tables, by department, project and category", () => {
+    const s = sources.SOURCES.expenses_monthly;
+    expect([s.module, s.offered, s.filters]).toEqual(["expenses", true, []]);
+    const row = { name: "Programmes", sent: 2, sent_amount: "10.00", paid: "5.00", committed: "0.00", allocated: "100.00", remaining: "95.00" };
+    const out = s.tables({ month: { from: "2026-10-01", to: "2026-10-31" }, departments: [row], projects: [], categories: [] });
+    expect(out.lines).toEqual(["Month: October 2026."]);
+    expect(out.tables.map((t) => t.title)).toEqual(["By Department", "By Project", "By Category"]);
+    expect(out.tables[0].columns.map((col) => col.header)).toEqual(["Department", "Requests", "Requested", "Paid", "Committed", "Budget", "Remaining"]);
+    expect(out.tables[0]).toMatchObject({ rows: [row], total: 1 });
   });
 
   test("the forward sources are their KPI card's records, column for column, in the card's module", () => {

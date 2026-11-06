@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/ess/`, `app/src/features/attendance/EssAttendance.tsx`, `app/src/features/people/Leave.tsx` |
 | Permission key(s) | `ess` (always `own` scope); `people` for People · Leave |
 | Capabilities | none |
-| Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
+| Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #56 My Requests (M8), #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
 | Last changed | 26/10/2026 |
 
@@ -44,6 +44,7 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · My Performance (`my-performance`) | Staff app | Every employee | Score to date, rating, this month's check-in, commitments on time, agreement; My Scorecard, This Month's Check-In, My Commitments (Performance PR 4), Rolls Up To, My Reviews, My PIP when open (Performance PR 3; `docs/guides/performance.md` §10) | Agree Scorecard, Disagree With Reason; Start Check-In, Save Draft, Submit Check-In, Dictate, Tidy With AI, Add Evidence, Change Score; open a review and download a closed one's PDF; a link to their own scorecard opens My Scorecard |
 | ESS · My Payslips (`my-payslips`) | Staff app | Every employee | Payslips by year, gross, net, deductions, next payday, a preview | Change year, preview a month, download a PDF, email a copy, open the deductions breakdown |
 | ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests | Request leave, cancel a request while it waits or before it starts, open a request or a figure's list, open the leave calendar |
+| ESS · My Requests (`my-requests`) | Staff app | Every employee | Their own expense requests: KPI cards, the list, a request in the modal. Built by M8 (`docs/guides/expenses.md` §2, §10), listed here because it is an ESS tab | New Request, Edit, Send Again, Cancel Request |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee | One tab, a Queries and Sanctions switch: their queries (open first) and their sanctions | Respond to an open query; open a letter. Sanctions are read only |
 | ESS · My Documents (`my-documents`) | Staff app | Every employee | Their vault: contracts, certificates, ID; signed, verified, expiring, missing | Upload a requested document, preview, download |
 | ESS · My Security (`my-security`) | Staff app | Every employee | Password (when it was changed), two-step sign-in, the PIN, passkeys, where they are signed in, recent sign-ins with how each began; a link to My Devices | Change password; set up, change or turn off two-step (no Turn Off while a role they hold requires it) and choose how often it asks; new recovery codes; set, change or remove the PIN; add, rename or remove a passkey; sign out one device or all the others; open My Devices |
@@ -429,6 +430,8 @@ Deductions figure and every form open the shared modal.
 - **My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?
 
 ## 14 · Change log
+
+- 05/11/2026 · AJ · My Requests (#56) moved from Expenses into ESS, after My Leave (M8 handoff decision 8). Its screen, rules and API are M8's, in `docs/guides/expenses.md`; `app/src/features/ess/index.tsx` renders `features/expenses/MyRequests.tsx`.
 
 - 03/11/2026 · JP · Record Leave, Add Type, Save Type and Send Response are Praxis AI cards (§9;
   `praxis-ai.md` decisions 33 and 39): Record Leave and Save Type after Confirm It's You;

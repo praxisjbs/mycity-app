@@ -108,36 +108,7 @@ const AGREEMENTS = [
   { partner: "access-bank", title: "Access Bank cardholder offers", status: "active", value: "1100000.00", started: 230, owner: "head" },
 ];
 
-/** Expense requests waiting for approval (M8), submitted days ago. */
-const EXPENSES = [
-  { key: "printer-toner", purpose: "Printer toner", category: "office", amount: "52000.00", by: "operations", ago: 1 },
-  { key: "lagos-activation-transport", purpose: "Lagos activation transport", category: "travel", amount: "185000.00", by: "head", ago: 0 },
-  { key: "social-media-course", purpose: "Social media course", category: "training", amount: "120000.00", by: "head_team:1", ago: 2 },
-  { key: "listing-team-data", purpose: "Data bundles, listing team", category: "utilities", amount: "45000.00", by: "manager_team:1", ago: 3 },
-  { key: "enugu-launch-transport", purpose: "Enugu city launch, transport", category: "travel", amount: "345000.00", by: "management:1", ago: 1 },
-];
-
-/** This quarter's budgets, approved, and their lines: Operations 90% spent, Marketing well under. */
-const BUDGETS = [
-  {
-    key: "operations-quarter",
-    name: "Operations",
-    owner: "operations",
-    lines: [
-      { category: "office", amount: "1500000.00", spent: "1380000.00" },
-      { category: "utilities", amount: "500000.00", spent: "420000.00" },
-    ],
-  },
-  {
-    key: "marketing-quarter",
-    name: "Marketing",
-    owner: "head",
-    lines: [
-      { category: "travel", amount: "3000000.00", spent: "1450000.00" },
-      { category: "training", amount: "600000.00", spent: "120000.00" },
-    ],
-  },
-];
+/* Expense requests and budgets are M8's own staging seed now (80_expenses.js). */
 
 /* Tasks and the calendar are M2's own staging seed now (40_workspace.js). */
 
@@ -187,60 +158,6 @@ const ROWS = Object.freeze([
         created_by: ops.user_id,
       };
     },
-  })),
-  ...BUDGETS.flatMap((b, i) => [
-    {
-      table: "budget",
-      key: b.key,
-      needs: [b.owner, "ceo"],
-      values: (x, [owner, ceo]) => ({
-        number: stg("BUD", i + 1),
-        name: `${b.name} ${x.quarterName}`,
-        department_id: owner.department_id,
-        owner_id: owner.employee_id,
-        currency: "NGN",
-        starts_on: x.quarter.from,
-        ends_on: x.quarter.to,
-        status: "approved",
-        approved_by: ceo.user_id,
-        approved_at: x.at(x.quarter.from, "09:00"),
-      }),
-    },
-    ...b.lines.map((line) => ({
-      table: "budget_line",
-      key: `${b.key}:${line.category}`,
-      needs: [],
-      parents: [["budget", b.key]],
-      values: (x) =>
-        x.categories.has(line.category)
-          ? {
-              budget_id: idOf("budget", b.key),
-              expense_category_id: x.categories.get(line.category),
-              amount: line.amount,
-              spent_amount: line.spent,
-            }
-          : null,
-    })),
-  ]),
-  ...EXPENSES.map((e, i) => ({
-    table: "expense_request",
-    key: e.key,
-    needs: [e.by],
-    values: (x, [person]) =>
-      x.categories.has(e.category)
-        ? {
-            number: stg("EXR", i + 1),
-            employee_id: person.employee_id,
-            department_id: person.department_id,
-            expense_category_id: x.categories.get(e.category),
-            purpose: e.purpose,
-            amount: e.amount,
-            currency: "NGN",
-            status: "submitted",
-            needed_on: x.daysFrom(7 + i),
-            submitted_at: x.at(x.daysFrom(-e.ago), "10:00"),
-          }
-        : null,
   })),
   ...PARTNERS.map((p, i) => ({
     table: "partner",

@@ -627,6 +627,9 @@ You can cancel a request while it waits, or approved leave before it starts.
 If it says **This leave can no longer be cancelled**, the leave has started. Ask People and
 Operations.
 
+> **Tip:** Asking for company money is the **My Requests** tab, after **My Leave**. It has its own
+> chapter: [My Requests](#expenses-my-requests).
+
 ## My Documents {#ess-documents screen=ess/my-documents icon=doc}
 
 Your document vault: your contract, certificates, ID and anything People asked you for.

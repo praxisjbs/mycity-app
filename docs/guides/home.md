@@ -188,7 +188,7 @@ column to the migrated schema, and the schema gate holds every query to them.
 | `payroll.source.js` | payroll · M6 · LA | nothing yet: Payroll In Progress is hidden and has no query until M6 creates its tables |
 | `partners.source.js` | partners and pipeline · M7 · GE | `partner` (its type is its category's name, `partner_category`), `lead`, `partner_interaction`, `partnership_opportunity`, `partnership_agreement`, `partnership_proposal`: pipeline, signed value, quiet partners (and Partner Inactivity alerts), proposals out; a deal or agreement on a lead is named by the lead (since M7 PR 1; PR 3 moves the queries to M7's modules, partnerships.md §6.17) |
 | `expenses.source.js` | expenses · M8 · AJ | `expense_request` and `expense_category`: awaiting approval, with each request's category |
-| `budgets.source.js` | budgets · M8 · AJ | `budget`, `budget_line`: budget used, and the budgets past a share spent (Budget Threshold alerts) |
+| `budgets.source.js` | budgets · M8 · AJ | `budget`, `budget_line`: budget used (committed and spent over allocated, M8 decision 16), and the budgets past a share spent (Budget Threshold alerts) |
 
 **The milestone that builds a table updates its adapter in the same PR**: it moves or replaces the
 query, keeps the declared columns true, and clears its `owes`. Each adapter's header says so, and
@@ -526,6 +526,8 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   department), `tasks`, `partnerships`, `expenses`, `recruitment` (the records behind Overdue
   Tasks, Active Partnerships, Expenses Awaiting Approval and Open Vacancies, read through their
   milestones' source adapters; empty until those are built and used, and no filters until then),
+  `expenses_monthly` (Monthly Expenses: the month before the report's moment, by department,
+  project and category, from M8's `budgets.variance`; `docs/guides/expenses.md` §6.6 rule 8),
   `overview` (the Overview Export, never offered on the form) and `workspace_analytics` (My
   Workspace · Analytics' Export, never offered either; its filters `task_scope`, `analytics_period`,
   `period_from`, `period_to`; it also needs the `workspace` export grant, so its file follows
@@ -852,6 +854,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 05/11/2026 · AJ · M8 PR 5 (`docs/guides/expenses.md` §6.6): Budget Used counts committed and spent over allocated (M8 decision 16), and its Budgets Running Now list gains a Committed column; `budgets.source.js`'s `owes` keeps only the currency rule. Budget Threshold alert rules still read spent alone. Reports gain the `expenses_monthly` source, Monthly Expenses, on the New Report form (§6 Reports). PR 7: Home's staging seed writes no expense requests, budgets or budget lines any more (`seeds/staging/lib/forward-rows.js`); M8's `80_expenses.js` takes them away and writes its own, so Expenses Awaiting Approval and Budget Used read M8's rows on staging.
 - 05/11/2026 · JP · M7 PR 1 (`partnerships.md` Appendix A): `partners.source.js` is true to M7's new schema. A partner's Type on Active Partnerships is its category's name (`partner_type` is no longer read, and goes in M7 PR 3); a deal or an agreement may be on a lead, so the lists name it by its lead or partner and keep every row their counts hold; Home's four indexes are built; `owes` names what PR 3 still moves. Staging's partners that were `prospect` are `dormant`. No card or chart changes.
 - 03/11/2026 · JP · Home's forms in the chat (`praxis-ai.md` decisions 33 and 35): alert rules made and changed, reports built, renamed and scheduled, as Praxis AI cards held to `alerts.manage` and `home.reports` as their routes are; a role's Home cards are `design`, never in the chat (§9). No screen changed.
 - 01/11/2026 · JP · Praxis AI Engine PR5 (`praxis-ai.md` §6.15, §6.17): `team.today` and `activity.list` carry matrix probes (a report of the asker's on the roster for a reader who may open the Team tab, their arrival on Activity Today for a reader with a `people` grant, an outsider never); `alerts.ai.js` and `reports.ai.js` account for their Create schemas in `not_offered` (a rule is set on Alerts with its threshold in view, a report is built on Reports with its sources and schedule in view).

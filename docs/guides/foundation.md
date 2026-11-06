@@ -1166,6 +1166,7 @@ screen.
 
 ## 14 · Change log
 
+- 05/11/2026 · AJ · `shared/documents/vault.claim()` (M8 Expenses PR 3, `expenses.md` §5): a file staged through `POST /documents` (`staged_upload`, readable by its uploader alone) is bound to the record that names it, taking that record's doc type, entity and subject in the record's transaction, so the record's own read rule decides who opens it; only its uploader claims it, once, and a record naming its own file again is answered as it is. Emits `document.claimed`. First claimed as an expense's invoice and a disbursement's receipt.
 - 05/11/2026 · JP · Settings · Documents & Numbering lists M7's document types as `docs/guides/partnerships.md` §4.3 settles them: Partner (PAR), Lead (LED), Deal (DEAL, yearly), Proposal (PRO) and Agreement (AGR, yearly) in place of the MOU, which is an agreement now (`schemes.js`, the contract's `DOC_TYPES`, seed `7190`). The screen is unchanged; it reads the types from the code. With 28 types the list runs to a second page, so Praxis AI's Save Numbering card now reads the scheme it changes by its type (`settings.service.numberingScheme`), not from the list's first page, where Task no longer is.
 - 03/11/2026 · JP · People's records are Praxis AI cards (`organisation.ai.js` with
   `organisation.cards.js`; `organogram.md` §9; `praxis-ai.md` decisions 33 and 36): Add Employee
