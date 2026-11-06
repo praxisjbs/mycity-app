@@ -520,7 +520,113 @@ async function cardNames(db, ids) {
   return rows;
 }
 
+/* ------------------------------------------------------------------ *
+ * Home's reads (docs/guides/home.md §4.1; partnerships.md §6.17), through its partners adapter
+ * ------------------------------------------------------------------ */
+
+const HOME_FROM = `FROM partnership_opportunity po
+  LEFT JOIN partner p ON p.partner_id = po.partner_id
+  LEFT JOIN lead l ON l.lead_id = po.lead_id
+  LEFT JOIN reference_value rv ON rv.domain = 'partnership_stage' AND rv.code = po.stage
+  LEFT JOIN employee e ON e.employee_id = po.owner_id
+  LEFT JOIN department d ON d.department_id = e.department_id`;
+
+const homeSearch = (n) => `($${n}::text IS NULL OR search_fold(po.title || ' ' || COALESCE(p.name, l.name, '')) LIKE '%' || search_fold($${n}) || '%')`;
+
+/** How many deals are open, within the scope (Open Opportunities). */
+async function homeOpenCount(db, scope) {
+  const params = [];
+  const seen = dealSeen(scope, "po", params);
+  const { rows } = await db.query(`SELECT count(*)::int AS n FROM partnership_opportunity po WHERE po.status = 'open' ${seen}`, params);
+  return rows[0].n;
+}
+
+/** A page of the open deals, within the scope, soonest expected to close first. */
+function homeOpenPage(db, scope, query) {
+  const params = [query.q || null];
+  const seen = dealSeen(scope, "po", params);
+  return pageQuery(
+    db,
+    `SELECT po.partnership_opportunity_id, po.title, COALESCE(p.name, l.name) AS partner, po.stage, COALESCE(rv.label, po.stage) AS stage_label,
+            po.estimated_value, po.currency, po.expected_close_on, ${personJson("e", "d")} AS owner, ${TOTAL_COL}
+       ${HOME_FROM}
+      WHERE po.status = 'open' AND ${homeSearch(1)} ${seen}
+      ORDER BY ${orderBy(query, { expected_close_on: "po.expected_close_on" }, "po.partnership_opportunity_id")}`,
+    params,
+    query,
+  );
+}
+
+/** The open deals at each stage, within the scope, in the list's order (a stage it does not list comes last). */
+async function homeOpenByStage(db, scope) {
+  const params = [];
+  const seen = dealSeen(scope, "po", params);
+  const { rows } = await db.query(
+    `SELECT po.stage, COALESCE(rv.label, po.stage) AS label, count(*)::int AS open
+       FROM partnership_opportunity po
+       LEFT JOIN reference_value rv ON rv.domain = 'partnership_stage' AND rv.code = po.stage
+      WHERE po.status = 'open' ${seen}
+      GROUP BY po.stage, rv.label, rv.display_order
+      ORDER BY rv.display_order NULLS LAST, po.stage`,
+    params,
+  );
+  return rows;
+}
+
+/** The deals signed between two Lagos days, within the scope: their Naira signed value and how many (every currency). */
+async function homeSigned(db, { from, to }, scope) {
+  const params = [from, to];
+  const seen = dealSeen(scope, "po", params);
+  const { rows } = await db.query(
+    `SELECT COALESCE(sum(${signedValue("po")}) FILTER (WHERE po.currency = 'NGN'), 0)::numeric(18,2) AS amount, count(*)::int AS n
+       FROM partnership_opportunity po
+      WHERE po.signed_at IS NOT NULL AND (po.signed_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $1::date AND $2::date ${seen}`,
+    params,
+  );
+  return rows[0];
+}
+
+/** A page of the deals signed between two Lagos days, within the scope, the most recent first. */
+function homeSignedPage(db, { from, to }, scope, query) {
+  const params = [from, to, query.q || null];
+  const seen = dealSeen(scope, "po", params);
+  return pageQuery(
+    db,
+    `SELECT po.partnership_opportunity_id, po.number, po.title, COALESCE(p.name, l.name) AS partner, po.signed_at,
+            ${signedValue("po")} AS value, po.currency, ${personJson("e", "d")} AS owner, ${TOTAL_COL}
+       ${HOME_FROM}
+      WHERE po.signed_at IS NOT NULL AND (po.signed_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $1::date AND $2::date
+        AND ${homeSearch(3)} ${seen}
+      ORDER BY ${orderBy(query, { signed_at: "po.signed_at DESC" }, "po.partnership_opportunity_id")}`,
+    params,
+    query,
+  );
+}
+
+/** The Naira value signed in each month between two Lagos days, within the scope, oldest first; a month with none has no row. */
+async function homeSignedByMonth(db, { from, to }, scope) {
+  const params = [from, to];
+  const seen = dealSeen(scope, "po", params);
+  const { rows } = await db.query(
+    `SELECT to_char(date_trunc('month', po.signed_at AT TIME ZONE 'Africa/Lagos'), 'YYYY-MM') AS month,
+            sum(${signedValue("po")})::numeric(18,2) AS amount
+       FROM partnership_opportunity po
+      WHERE po.signed_at IS NOT NULL AND po.currency = 'NGN' AND (po.signed_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $1::date AND $2::date ${seen}
+      GROUP BY 1
+      HAVING sum(${signedValue("po")}) IS NOT NULL
+      ORDER BY 1`,
+    params,
+  );
+  return rows;
+}
+
 module.exports = {
+  homeOpenCount,
+  homeOpenPage,
+  homeOpenByStage,
+  homeSigned,
+  homeSignedPage,
+  homeSignedByMonth,
   cardNames,
   dealSeen,
   recordSeen,

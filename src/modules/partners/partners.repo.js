@@ -203,7 +203,90 @@ async function emailTaken(db, { kind, id }, email, exceptId = null) {
   return rows.length > 0;
 }
 
+/* ------------------------------------------------------------------ *
+ * Home's reads (docs/guides/home.md §4.1; partnerships.md §6.12, §6.17), through its partners
+ * adapter and Home's Partner Inactivity alerts
+ * ------------------------------------------------------------------ */
+
+/** When a partner was last in contact: its latest interaction, else when it was added. */
+const LAST_SEEN = `COALESCE(${deals.lastContact("partner", "p.partner_id")}, p.created_at)`;
+const homeSearch = (n) => `($${n}::text IS NULL OR search_fold(p.name) LIKE '%' || search_fold($${n}) || '%')`;
+
+/** How many partners are active, within the scope (Active Partnerships). */
+async function homeActiveCount(db, scope) {
+  const params = [];
+  const seen = deals.recordSeen(scope, { alias: "p", kind: "partner" }, params);
+  const { rows } = await db.query(`SELECT count(*)::int AS n FROM partner p WHERE p.status = 'active' ${seen}`, params);
+  return rows[0].n;
+}
+
+/** A page of the active partners, within the scope, by name, with their category and last contact. */
+function homeActivePage(db, scope, query) {
+  const params = [query.q || null];
+  const seen = deals.recordSeen(scope, { alias: "p", kind: "partner" }, params);
+  return pageQuery(
+    db,
+    `SELECT p.partner_id, p.name, pc.name::text AS category, ${LAST_SEEN} AS last_contact_at, ${personJson("e", "d")} AS owner, ${TOTAL_COL}
+       FROM partner p
+       LEFT JOIN partner_category pc ON pc.partner_category_id = p.partner_category_id
+       LEFT JOIN employee e ON e.employee_id = p.owner_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE p.status = 'active' AND ${homeSearch(1)} ${seen}
+      ORDER BY ${orderBy(query, { name: "p.name" }, "p.partner_id")}`,
+    params,
+    query,
+  );
+}
+
+/** How many active partners have had no contact since an instant, within the scope. */
+async function homeQuietCount(db, since, scope) {
+  const params = [since];
+  const seen = deals.recordSeen(scope, { alias: "p", kind: "partner" }, params);
+  const { rows } = await db.query(`SELECT count(*)::int AS n FROM partner p WHERE p.status = 'active' AND ${LAST_SEEN} < $1::timestamptz ${seen}`, params);
+  return rows[0].n;
+}
+
+/** A page of the quiet partners, within the scope, the longest quiet first. */
+function homeQuietPage(db, since, scope, query) {
+  const params = [since, query.q || null];
+  const seen = deals.recordSeen(scope, { alias: "p", kind: "partner" }, params);
+  return pageQuery(
+    db,
+    `SELECT p.partner_id, p.name, ${LAST_SEEN} AS last_contact_at, ${personJson("e", "d")} AS owner, ${TOTAL_COL}
+       FROM partner p
+       LEFT JOIN employee e ON e.employee_id = p.owner_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE p.status = 'active' AND ${LAST_SEEN} < $1::timestamptz AND ${homeSearch(2)} ${seen}
+      ORDER BY ${orderBy(query, { last_contact_at: "last_contact_at" }, "p.partner_id")}`,
+    params,
+    query,
+  );
+}
+
+/**
+ * The active partners last in contact before `before`, a batch of at most `size` after `after` (by
+ * id): Home's Partner Inactivity rules read them in their daily sweep, whatever the owner.
+ */
+async function homeQuietBatch(db, { before, after = null, size }) {
+  const { rows } = await db.query(
+    `SELECT q.partner_id, q.name, q.last_contact_at
+       FROM (SELECT p.partner_id, p.name, ${LAST_SEEN} AS last_contact_at
+               FROM partner p
+              WHERE p.status = 'active' AND ($2::uuid IS NULL OR p.partner_id > $2::uuid)) q
+      WHERE q.last_contact_at < $1::timestamptz
+      ORDER BY q.partner_id
+      LIMIT $3 -- pagination:batch the partners one step of Home's alert sweep reads`,
+    [before, after, size],
+  );
+  return rows;
+}
+
 module.exports = {
+  homeActiveCount,
+  homeActivePage,
+  homeQuietCount,
+  homeQuietPage,
+  homeQuietBatch,
   list,
   get,
   summary,

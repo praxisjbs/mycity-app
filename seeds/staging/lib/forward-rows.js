@@ -100,7 +100,11 @@ const PROPOSALS = [
   { opportunity: "eko-hotels", value: "2800000.00", sent: 34, by: "head_team:3" },
 ];
 
-/** Agreements signed this year, starting `started` days ago (never before the 1st of January). */
+/**
+ * Agreements signed this year, starting `started` days ago (never before the 1st of January), each
+ * on the deal it signed: a live deal signed that day, which Signed Value counts at the agreement's
+ * value (partnerships.md §6.6, §6.17).
+ */
 const AGREEMENTS = [
   { partner: "mtn-nigeria", title: "MTN Nigeria sponsorship", status: "active", value: "18400000.00", started: 200, owner: "head" },
   { partner: "providusbank", title: "ProvidusBank ticketing", status: "signed", value: "9200000.00", started: 26, owner: "head_team:1" },
@@ -212,14 +216,35 @@ const ROWS = Object.freeze([
         : null,
   })),
   ...AGREEMENTS.map((a, i) => ({
+    table: "partnership_opportunity",
+    key: `${a.partner}:signed`,
+    needs: [a.owner],
+    parents: [["partner", a.partner]],
+    values: (x, [owner]) => ({
+      number: stg("POP", OPPORTUNITIES.length + i + 1),
+      partner_id: idOf("partner", a.partner),
+      title: a.title,
+      stage: "active",
+      status: "live",
+      owner_id: owner.employee_id,
+      estimated_value: a.value,
+      currency: "NGN",
+      signed_at: x.at(x.inYear(x.daysFrom(-a.started)), "10:00"),
+    }),
+  })),
+  ...AGREEMENTS.map((a, i) => ({
     table: "partnership_agreement",
     key: a.partner,
     needs: [a.owner],
-    parents: [["partner", a.partner]],
+    parents: [
+      ["partner", a.partner],
+      ["partnership_opportunity", `${a.partner}:signed`],
+    ],
     values: (x, [owner]) => {
       const starts = x.inYear(x.daysFrom(-a.started));
       return {
         partner_id: idOf("partner", a.partner),
+        partnership_opportunity_id: idOf("partnership_opportunity", `${a.partner}:signed`),
         number: stg("AGR", i + 1),
         title: a.title,
         status: a.status,

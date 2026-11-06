@@ -198,7 +198,7 @@ describeDb("the KPI catalogue against the real migrations", () => {
       for (const id of kpi.LIVE_IDS) expect([id, figures[id] === null]).toEqual([id, false]);
       for (const id of ZERO_UNTIL_RECORDS) expect([id, figures[id].value]).toEqual([id, 0]);
       expect(figures.expenses_pending).toEqual({ amount: "0.00", requests: 0 });
-      expect(figures.partnerships_signed_value).toEqual({ amount: "0.00", agreements: 0 });
+      expect(figures.partnerships_signed_value).toEqual({ amount: "0.00", deals: 0 });
       expect(figures.budget_vs_actual).toEqual({ value: 0, denominator: 0 });
       expect(figures.headcount).toEqual({ value: 6 });
       expect(figures.attendance_today).toMatchObject({ value: 0, denominator: 6, late: 0 });
@@ -372,25 +372,26 @@ describeDb("the KPI catalogue against the real migrations", () => {
       const festival = await opportunity(arts, "Festival Sponsorship", "open", "staff");
       const fair = await opportunity(trade, "Trade Fair Stand", "open", "outsider");
       const lapsed = await opportunity(arts, "Old Exhibition", "lost", "staff");
-      const proposal = (opportunityId, sent, accepted) =>
+      // A proposal is out while it is sent or viewed (partnerships.md §6.17).
+      const proposal = (opportunityId, status, sent, accepted) =>
         q(
           `INSERT INTO partnership_proposal (partnership_opportunity_id, number, status, created_by, sent_at, accepted_at, value, currency)
-           VALUES ($1, $2, 'sent', $3, $4, $5, 2500.00, 'NGN')`,
-          [opportunityId, number("PRP"), userOf("ops"), sent, accepted],
+           VALUES ($1, $2, $3, $4, $5, $6, 2500.00, 'NGN')`,
+          [opportunityId, number("PRP"), status, userOf("ops"), sent, accepted],
         );
-      await proposal(festival, ago(3), null);
-      await proposal(lapsed, ago(30), null);
-      await proposal(fair, ago(9), ago(2));
-      const agreement = (partnerId, status, startsOn, value, currency, owner) =>
+      await proposal(festival, "sent", ago(3), null);
+      await proposal(lapsed, "expired", ago(30), null);
+      await proposal(fair, "accepted", ago(9), ago(2));
+      // Signed Value counts the deals signed in the year, at their signed value (§6.6, §6.17).
+      const signed = (partnerId, status, signedAt, value, currency, owner) =>
         q(
-          `INSERT INTO partnership_agreement (partner_id, number, title, status, starts_on, value, currency, owner_id)
-           VALUES ($1, $2, 'Sponsorship', $3, $4, $5, $6, $7)`,
-          [partnerId, number("AGR"), status, startsOn, value, currency, people[owner]],
+          `INSERT INTO partnership_opportunity (number, partner_id, title, stage, status, owner_id, estimated_value, currency, signed_at)
+           VALUES ($1, $2, 'Sponsorship', 'active', $3, $4, $5, $6, $7)`,
+          [number("POP"), partnerId, status, people[owner], value, currency, signedAt],
         );
-      await agreement(arts, "signed", "2026-03-01", "5000.00", "NGN", "staff");
-      await agreement(trade, "active", "2026-06-01", "1000.00", "USD", "outsider");
-      await agreement(arts, "draft", "2026-05-01", "700.00", "NGN", "staff");
-      await agreement(arts, "signed", "2025-05-01", "900.00", "NGN", "staff");
+      await signed(arts, "live", "2026-03-01T10:00:00+01:00", "5000.00", "NGN", "staff");
+      await signed(trade, "live", "2026-06-01T10:00:00+01:00", "1000.00", "USD", "outsider");
+      await signed(arts, "completed", "2025-05-01T10:00:00+01:00", "900.00", "NGN", "staff");
 
       // Expenses and budgets (M8).
       const expense = (key, amount, currency, status) =>
@@ -483,7 +484,7 @@ describeDb("the KPI catalogue against the real migrations", () => {
     test("money: Naira wire strings, other currencies left out of the sum but not the count", async () => {
       const { figures } = await reader("ops");
       expect(figures.expenses_pending).toEqual({ amount: "1200.50", requests: 3 });
-      expect(figures.partnerships_signed_value).toEqual({ amount: "5000.00", agreements: 2 });
+      expect(figures.partnerships_signed_value).toEqual({ amount: "5000.00", deals: 2 });
       expect(figures.budget_vs_actual).toEqual({ value: 25, denominator: 1 });
       const card = kpi.cardOf(kpi.BY_ID.get("expenses_pending"), figures.expenses_pending);
       expect(card).toMatchObject({ amount: "1200.50", value: null, caption: "3 requests" });
@@ -508,7 +509,7 @@ describeDb("the KPI catalogue against the real migrations", () => {
         alerts_high_open: { value: 1, aged: 0 },
         approvals_awaiting_you: { value: 1, overdue: 0 },
         expenses_pending: { amount: "1000.50", requests: 2 },
-        partnerships_signed_value: { amount: "5000.00", agreements: 1 },
+        partnerships_signed_value: { amount: "5000.00", deals: 1 },
         budget_vs_actual: { value: 25, denominator: 1 },
       });
       expect(figures.attendance_today).toMatchObject({ value: 1, denominator: 3, late: 0, no_clock_out_yesterday: 1 });
@@ -535,7 +536,7 @@ describeDb("the KPI catalogue against the real migrations", () => {
         my_tasks_overdue: { value: 1 },
         partnerships_quiet_30d: { value: 1 },
         expenses_pending: { amount: "200.00", requests: 1 },
-        partnerships_signed_value: { amount: "0.00", agreements: 1 },
+        partnerships_signed_value: { amount: "0.00", deals: 1 },
         my_leave_left: { value: 20 },
       });
     });
@@ -566,7 +567,7 @@ describeDb("the KPI catalogue against the real migrations", () => {
           for (const row of rows) expect([id, Object.keys(row.cells).sort()]).toEqual([id, columns]);
           const counted = {
             count: () => f.value,
-            money: () => (id === "expenses_pending" ? f.requests : f.agreements),
+            money: () => (id === "expenses_pending" ? f.requests : f.deals),
             pct: () => f.denominator,
             pair: () => Object.entries(f.groups).reduce((n, [g, v]) => (g === "no_clock_out_yesterday" ? n : n + v), 0),
             days: () => rows.length,
