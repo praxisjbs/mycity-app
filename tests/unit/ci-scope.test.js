@@ -295,9 +295,14 @@ describe("plan: the jobs a run starts", () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  test("public-app rides with another shard, or runs alone when nothing else does", () => {
-    expect(plan(["public-app"]).frontend_tests).toEqual([{ name: "frontend tests public-app", tests: "public-app" }]);
-    expect(plan(["app", "public-app"]).frontend_tests.at(-1).tests).toMatch(/^app:\d+\/\d+ public-app$/);
+  test("public-app's shards ride one to a job with app's (or ui's), or run alone when nothing else does", () => {
+    const n = FE_SHARDS["public-app"];
+    const own = plan(["public-app"]).frontend_tests.map((j) => j.tests);
+    expect(own).toEqual(n === 1 ? ["public-app"] : Array.from({ length: n }, (_, i) => `public-app:${i + 1}/${n}`));
+    const withApp = plan(["app", "public-app"]).frontend_tests.map((j) => j.tests.split(" "));
+    expect(withApp).toHaveLength(FE_SHARDS.app);
+    for (const job of withApp) expect(job.filter((p) => p.startsWith("public-app")).length).toBeLessThanOrEqual(Math.ceil(n / FE_SHARDS.app));
+    expect(withApp.flat().filter((p) => p.startsWith("public-app"))).toHaveLength(n);
   });
 
   test("no sets, no jobs: the document gates alone", () => {
@@ -344,7 +349,8 @@ describe("the facts the narrow sets stand on", () => {
 });
 
 describe("tests/shard-sequencer.js: jest's backend shards", () => {
-  const { deal, cost } = require("../shard-sequencer");
+  const { cost } = require("../shard-sequencer");
+  const { deal } = require("../../scripts/lib/deal");
 
   test("every file goes to exactly one shard, the same deal every time", () => {
     const paths = Array.from({ length: 40 }, (_, i) => `/r/tests/integration/f${i}.test.js`);

@@ -526,19 +526,21 @@ they run as jobs side by side, so a run takes as long as its slowest job (AJ, 19
 long ones are split again so that no job runs much past four minutes (GE, 06/11/2026; a run took
 21 minutes behind 16 minutes of tests on one runner):
 
-- **backend 1 of 5** to **5 of 5**: jest in five shards, each with its own PostgreSQL and Redis, so
-  the integration files (one at a time against one database) spread over five runners;
-  `tests/shard-sequencer.js` deals the files out by expected cost, and the first shard also runs
-  the schema gates.
+- **backend 1 of 6** to **6 of 6**: jest in six shards, each with its own PostgreSQL and Redis, so
+  the integration files (one at a time against one database) spread over six runners;
+  `tests/shard-sequencer.js` deals the files out by expected cost (`scripts/lib/deal.js`), and the
+  first shard also runs the schema gates.
 - **frontend**: typecheck, lint, the builds and the mock check. TypeScript's incremental state is
   cached between runs, so typecheck rechecks only what changed; the restored state is dated 1970,
   so it is never taken as up to date, only as files whose result can be reused when their text,
   and everything they depend on, is unchanged.
-- **frontend tests**: each workspace's vitest files in shards (`vitest --shard`, through
-  `scripts/fe-test.js` and `MYCITY_FE_TESTS`); public-app's few ride with another shard.
+- **frontend tests**: each workspace's vitest files in shards (`scripts/fe-test.js`,
+  `MYCITY_FE_TESTS`): ui in two, app in three, public-app in three riding one to a job with app's.
+  The files are dealt by size (`scripts/lib/deal.js`), not by vitest's `--shard`, which deals by
+  count and once gave one shard app's three slowest files.
 - **screens gallery** and **screens app**: every screen gate, once on each target
   (`MYCITY_SCREEN_TARGETS`, `MYCITY_A11Y_TARGETS`), dealt over several jobs: the gallery's axe
-  pages over three (`MYCITY_A11Y_SHARD`), the first also crawling it whole; the app's screens over
+  pages over four (`MYCITY_A11Y_SHARD`), the first also crawling it whole; the app's screens over
   four, for the crawl (`MYCITY_SCREEN_SHARD`) and for axe alike.
 - **checks**, as before.
 
@@ -554,7 +556,7 @@ stops at the first failure (serially). Beside the other groups the frontend's te
 machine's CPUs less two (`MYCITY_TEST_WORKERS`, read by `scripts/fe-test.js`), one workspace after
 another, since tests that wait on a clock fail when starved. While you work, run the group you touched, or
 `-- --only=<ids>`; run the whole thing once before marking the PR ready.
-Chromium, ffmpeg's packages, npm's downloads and TypeScript's incremental state are cached
+Chromium and its system libraries, ffmpeg's packages, npm's downloads and TypeScript's incremental state are cached
 between runs. More jobs bill more runner minutes than four (each installs its own packages, about a
 minute), so the draft rule below matters more, not less.
 

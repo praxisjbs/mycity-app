@@ -105,15 +105,15 @@ function setsOfFiles(files) {
  * app's files take about twice ui's though ui has more of them (222 s and 87 s on a laptop-class
  * machine, public-app's 14 s), hence more shards for app. Tune these from a run's job times.
  */
-const JEST_SHARDS = 5;
-const FE_SHARDS = Object.freeze({ ui: 2, app: 3, "public-app": 1 });
+const JEST_SHARDS = 6;
+const FE_SHARDS = Object.freeze({ ui: 2, app: 3, "public-app": 3 });
 /*
  * Jobs per screen target. On four CPUs here (06/11/2026): the gallery's crawl 40 s, its axe 174 s;
  * the app's crawl 170 s, its axe 182 s. A gallery job takes a share of axe's pages
  * (MYCITY_A11Y_SHARD), the first also crawling it whole; an app job takes the same share of the
  * app's screens for the crawl (MYCITY_SCREEN_SHARD) and for axe.
  */
-const SCREEN_SHARDS = Object.freeze({ gallery: 3, app: 4 });
+const SCREEN_SHARDS = Object.freeze({ gallery: 4, app: 4 });
 
 /**
  * The matrices ci.yml runs, from the sets a run needs. Each entry is one job; an empty list starts
@@ -136,18 +136,16 @@ function plan(sets) {
         gates: i === 0 ? "--group=backend" : "--only=test",
       }))
     : [];
-  const pieces = [];
-  for (const [ws, n] of Object.entries(FE_SHARDS)) {
-    if (!has(ws)) continue;
-    for (let i = 1; i <= n; i++) pieces.push(n === 1 ? ws : `${ws}:${i}/${n}`);
-  }
-  // public-app's 60 tests are too few for a runner of their own: they ride with app's last shard,
-  // or with ui's when app is not running.
-  const tests = [];
-  for (const p of pieces) {
-    if (p === "public-app" && tests.length) tests[tests.length - 1].push(p);
-    else tests.push([p]);
-  }
+  const piecesOf = (ws) => {
+    const n = FE_SHARDS[ws];
+    return has(ws) ? Array.from({ length: n }, (_, i) => (n === 1 ? ws : `${ws}:${i + 1}/${n}`)) : [];
+  };
+  // ui's and app's shards are a job each. public-app's are too few for runners of their own: each
+  // rides with one of app's shards (or ui's when app is not running), one to a job, so no job runs
+  // two big pieces side by side. With neither running, they are jobs of their own.
+  const tests = [...piecesOf("app"), ...piecesOf("ui")].map((p) => [p]);
+  const hosts = tests.length;
+  piecesOf("public-app").forEach((p, k) => (hosts ? tests[k % hosts].push(p) : tests.push([p])));
   const screens = [];
   const screenJobs = (targets, a11y) => {
     const n = SCREEN_SHARDS[a11y];

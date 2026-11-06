@@ -105,6 +105,7 @@ mycity-app/
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
 │   │                         (--group, --only, --except pick a CI job's share)
+│   ├── lib/deal.js           deals files to CI shards by expected cost (jest's and vitest's shards)
 │   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test);
 │   │                         in CI one job's shards of them (MYCITY_FE_TESTS)
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md;
