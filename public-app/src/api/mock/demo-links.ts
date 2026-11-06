@@ -5,15 +5,14 @@
  */
 export const DEMO_LINKS: Array<[string, string]> = [
   ["Home", "/"],
-  ["Careers", "/jobs"],
-  ["Careers, a search", "/jobs?q=Lagos"],
+  ["Open roles", "/jobs"],
+  ["Open roles, a search", "/jobs?q=Lagos"],
   ["Vacancy", "/jobs/head-sales-revenue-lagos"],
   ["Vacancy, short", "/jobs/operations-intern-lagos"],
-  ["Careers, one team", "/jobs?department=MKT"],
+  ["Open roles, one team", "/jobs?department=MKT"],
   ["Paused role", "/jobs/video-editor-lagos"],
   ["Filled role", "/jobs/studio-assistant-lagos"],
   ["Closing day passed", "/jobs/copywriter-lagos"],
-  ["Vacancy, no role picked", "/vacancy"],
   ["Apply", "/apply/k7Qm2TxV9pLa"],
   ["Apply, no link", "/apply"],
   ["Apply, portfolio question", "/apply/Bv3nQ8sLp2Wd"],

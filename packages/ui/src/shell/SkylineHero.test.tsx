@@ -89,8 +89,9 @@ describe("SkylineHero", () => {
       );
       const section = container.querySelector("section")!;
       expect(section).toHaveClass("ps-hero-index");
+      /* It takes the page's theme: glass teal in light, Deep Green in dark (public.css maps its inks). */
       expect(section).not.toHaveAttribute("data-theme");
-      expect(section.querySelector(".ps-hero-in")).toHaveAttribute("data-theme", "dark");
+      expect(section.querySelector(".ps-hero-in")).not.toHaveAttribute("data-theme");
       expect(container.querySelector(".ps-dot")).toHaveAttribute("aria-hidden", "true");
       const h1 = screen.getByRole("heading", { level: 1, name: "Work With Us" });
       expect(h1).toHaveAttribute("data-ui", "page-title");

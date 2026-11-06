@@ -128,13 +128,21 @@
   --canvas-eyebrow: #8F630B;
   /* The public site's own surfaces and lines (PublicPage, public.css). Inside the canvas --card and --border take
      the first two, so every card and hairline on go.mycityapp.io sits on the site's palette. */
-  --canvas-card: #FFFFFF;
+  --canvas-card: #F3FAF7;             /* a faded glass teal, never pure white: foreground 18.79:1, canvas-soft 10.49:1,
+                                         canvas-muted-foreground 4.99:1, accent-foreground 10.64:1, canvas-eyebrow 5.01:1 */
   --canvas-line: #D3E4DD;             /* hairlines, decorative */
   --canvas-line-strong: #B7D2C8;      /* outlined buttons, step rings, the scrollbar's thumb; decorative */
   --canvas-line-deep: #8DB8AA;        /* the scrollbar's thumb under the pointer; decorative */
-  --canvas-hover: #F4FAF7;            /* a row or button under the pointer; canvas-muted-foreground 5.00:1, canvas-soft 10.51:1 */
+  --canvas-hover: #EAF5F0;            /* a row or button under the pointer; canvas-muted-foreground 4.73:1, canvas-soft 9.96:1 */
+  /* Inside the canvas the hub's white surfaces take the same glass teal one step lighter: fields and outlined buttons
+     (--background), menus (--popover) and the hero's search box and the letter (--paper). Every ink above keeps more
+     on it than on the card (foreground 19.19:1, canvas-muted-foreground 5.10:1, search-muted 5.10:1). */
+  --canvas-field: #F7FCFA;
+  --canvas-popover: #F7FCFA;
+  --canvas-paper: #F7FCFA;
+  --canvas-gloss: none;               /* dark only: a faint sheen at the top of each card */
   --canvas-soft: #3B3B42;             /* derived: body ink one step under foreground. 9.98:1 on canvas, 10.86:1 on its glow,
-                                         11.11:1 on canvas-card, 10.51:1 on canvas-hover */
+                                         10.49:1 on canvas-card, 9.96:1 on canvas-hover */
   --canvas-glass: rgba(235, 245, 241, .84); /* the header's frosted bar */
   --canvas-shadow: 0 18px 40px rgba(1, 34, 29, .10);
   --canvas-art: .2;                   /* how strongly the sign-in aside's skyline shows */
@@ -152,7 +160,8 @@
   --on-deep-label: #B8D0C8;           /* 10.33:1: the hero's figure labels */
   --on-deep-base: #B5CCC5;            /* 9.94:1: the footer's own text */
   --on-deep-gold: #FFE88A;            /* 13.75:1: a role's team pill */
-  /* The hero's search box is white in both themes, so its ink is fixed too: 19.90:1 and 5.28:1 on white. */
+  /* The hero's search box is paper in both themes (glass teal on the light site, white on the dark), so its ink is fixed
+     too: 19.19:1 and 5.10:1 on the light, 19.90:1 and 5.28:1 on white. */
   --search-ink: #09090B;
   --search-muted: #6B6B73;
 
@@ -166,6 +175,33 @@
   --sky-cable: #6CC7B1;
   --sky-road: #5DB9A2;
   --sky-palm: #011A14;
+
+  /* ---- The public site's hero and footer (public.css .ps-hero, .ps-foot): a deeper glass teal in light, Deep Green
+     in dark. Inside them --deep, the on-deep inks and the skyline take these, so each reads the page's theme ---- */
+  --site-ground: #D3E9E0;
+  --site-ink: #09090B;                /* 15.63:1 on site-ground */
+  --site-ink-hero: #14201D;           /* 13.16:1 */
+  --site-ink-lede: #2B3835;           /* 9.60:1 */
+  --site-ink-chip: #1C2926;           /* 11.83:1 */
+  --site-ink-back: #1C2926;           /* 11.83:1 */
+  --site-ink-link: #2B3835;           /* 9.60:1 */
+  --site-ink-note: #3A4744;           /* 7.62:1 */
+  --site-ink-label: #3A4744;          /* 7.62:1 */
+  --site-ink-base: #3A4744;           /* 7.62:1 */
+  --site-ink-gold: #6B4A05;           /* 6.33:1; 6.28:1 on its yellow-tinted pill */
+  --site-accent: #014339;             /* the heading's accent word, link hover, the chips' glyphs: 8.86:1 */
+  --site-glow: none;                  /* the heading's shadow */
+  --site-lift: 0 18px 44px rgba(1, 34, 29, .16); /* under the hero's search box */
+  --site-art: .5;                     /* how strongly the footer's skyline shows */
+  --site-sky-top: #EEF7F3;
+  --site-sky-mid: #D6ECE3;
+  --site-sky-low: #B5DACB;
+  --site-sky-far: #B2D7C9;
+  --site-sky-near: #8CC1AE;
+  --site-sky-window-cool: #F1FAF7;
+  --site-sky-cable: #6DB09D;
+  --site-sky-road: #7FBCA9;
+  --site-sky-palm: #5E9A86;
 
   /* ---- The sign-in screen's city scenes, both themes: decorative art, no text sits on them unshaded ---- */
   --scene-night-top: #010F0D;
@@ -329,6 +365,35 @@
   --canvas-art: .45;
   --solid: #45C8B0;
   --solid-foreground: #01221D;
+  /* The site's fields, menus and paper, its cards' sheen, and its hero and footer on Deep Green (each as light's). */
+  --canvas-field: #01110E;
+  --canvas-popover: #012C25;
+  --canvas-paper: #FFFFFF;
+  --canvas-gloss: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 45%);
+  --site-ground: #01221D;
+  --site-ink: #FFFFFF;
+  --site-ink-hero: #F2F7F5;
+  --site-ink-lede: #DCEBE6;
+  --site-ink-chip: #EAF3F0;
+  --site-ink-back: #E3EEEA;
+  --site-ink-link: #CFE0DA;
+  --site-ink-note: #C4D9D2;
+  --site-ink-label: #B8D0C8;
+  --site-ink-base: #B5CCC5;
+  --site-ink-gold: #FFE88A;
+  --site-accent: #FFDF55;
+  --site-glow: 0 4px 30px rgba(0, 0, 0, .25);
+  --site-lift: 0 24px 60px rgba(0, 0, 0, .35);
+  --site-art: .4;
+  --site-sky-top: #012A22;
+  --site-sky-mid: #0E6150;
+  --site-sky-low: #3A9A83;
+  --site-sky-far: #0D5144;
+  --site-sky-near: #01302A;
+  --site-sky-window-cool: #9FE3D3;
+  --site-sky-cable: #6CC7B1;
+  --site-sky-road: #5DB9A2;
+  --site-sky-palm: #011A14;
   color-scheme: dark;
 }
 
@@ -394,6 +459,34 @@
     --canvas-art: .45;
     --solid: #45C8B0;
     --solid-foreground: #01221D;
+    --canvas-field: #01110E;
+    --canvas-popover: #012C25;
+    --canvas-paper: #FFFFFF;
+    --canvas-gloss: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 45%);
+    --site-ground: #01221D;
+    --site-ink: #FFFFFF;
+    --site-ink-hero: #F2F7F5;
+    --site-ink-lede: #DCEBE6;
+    --site-ink-chip: #EAF3F0;
+    --site-ink-back: #E3EEEA;
+    --site-ink-link: #CFE0DA;
+    --site-ink-note: #C4D9D2;
+    --site-ink-label: #B8D0C8;
+    --site-ink-base: #B5CCC5;
+    --site-ink-gold: #FFE88A;
+    --site-accent: #FFDF55;
+    --site-glow: 0 4px 30px rgba(0, 0, 0, .25);
+    --site-lift: 0 24px 60px rgba(0, 0, 0, .35);
+    --site-art: .4;
+    --site-sky-top: #012A22;
+    --site-sky-mid: #0E6150;
+    --site-sky-low: #3A9A83;
+    --site-sky-far: #0D5144;
+    --site-sky-near: #01302A;
+    --site-sky-window-cool: #9FE3D3;
+    --site-sky-cable: #6CC7B1;
+    --site-sky-road: #5DB9A2;
+    --site-sky-palm: #011A14;
     color-scheme: dark;
   }
 }
@@ -401,12 +494,17 @@
 /*
  * The public site's ground (PublicPage sets data-canvas on its frame). Inside it the two inks the
  * tint would bring under AA read one step deeper, on the canvas and on everything drawn over it.
- * A Deep Green panel inside it (data-theme="dark") declares its own inks and is not touched.
+ * A Deep Green panel inside it (data-theme="dark") declares its own inks and is not touched. What the
+ * site opens over the page (a menu, a select's list) is drawn at the foot of <body>, so it takes the same.
  */
-[data-canvas] {
+[data-canvas],
+body:has([data-canvas]) > :not(#root) {
   --muted-foreground: var(--canvas-muted-foreground);
   --eyebrow: var(--canvas-eyebrow);
   --card: var(--canvas-card);
+  --background: var(--canvas-field);
+  --popover: var(--canvas-popover);
+  --paper: var(--canvas-paper);
   --border: var(--canvas-line);
   /* The public site is not the compact hub: 16 px text and fields, 48 px controls, 44 px targets (the approved design). */
   --control-h: 48px;

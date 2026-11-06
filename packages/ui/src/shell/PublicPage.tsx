@@ -1,7 +1,7 @@
 /**
  * @component PublicPage
  * @group Shell
- * @summary The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a Deep Green footer under a Lagos skyline edge with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card.
+ * @summary The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a footer on the site's ground (glass teal in light, Deep Green in dark) under a Lagos skyline edge, the skyline faint behind it, with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card.
  * @use Every page of go.mycityapp.io. `full` (the default) for a page that lays out its own blocks edge to edge (the index's SkylineHero size index, a vacancy's SkylineHero size role, the careers list's PageIntro). `split` for the pages a person is sent to and works through (Apply, Assessment, Sign Offer, Verify a Document, and a page opened without its link): pass `name` and `line` (the identity band), `title` (the h1, at most 3 words, drawn small and spaced: Apply, Assessment, Offer of Employment, Verify a Document), `text` (the display line in the band's large type, one sentence of at most 20 words), `paragraph` (a short line under it), `steps` or `aside` (the countdown, a reference's form), and the card (a Panel) as children; it leaves the site footer off. PageMessage is a whole-page outcome inside the Panel (sent, signed, expired, not found), with the reference to quote.
  * @avoid The staff app (it has its own shells); a second header or bar under this one; a logo in the split aside (the header carries the brand); a page of explanation (a PageMessage says one thing); a sentence as the split title (it is `text`, the display line).
  * @phone The header is 60 px with the mark alone (no sub line), the theme switch and the menu, which drops the nav's links down as 52 px rows; the footer's columns stack, each link a 44 px target; a `bar` is drawn fixed at the foot, frosted, only on a phone, and the page keeps room for it. split: from 1040 px down the aside stacks above the card and stops sticking, and its skyline, its steps and its credit are left off, so the card is close to the top.
@@ -300,7 +300,7 @@ function Header({ nav, home, brandSub }: { nav: ReadonlyArray<PublicNavItem>; ho
 const EDGE =
   "M0 72V52h40V38h30v14h26V22h38v30h20V44h44V8h22v44h30V30h34v22h60V40h26V16h40v36h24V36h50v16h120l8-4h240l8 4h40V30h28v22h36V18h44v34h30V40h40v12h52V26h30v26h44V44h36v28z";
 
-/** The foot of every public page: Deep Green under the skyline's edge, the mark and the time in Lagos, the columns, the © line and Back to Top. */
+/** The foot of every public page: the site's ground of the theme under the skyline's edge, the skyline faint behind it, the mark and the time in Lagos, the columns, the © line and Back to Top. */
 function Footer({
   columns,
   tagline,
@@ -319,7 +319,10 @@ function Footer({
   const now = useMinute();
   const go = useSiteLink();
   return (
-    <footer data-theme="dark" className={cn("on-dark ps-foot", clear && "ps-foot-clear")}>
+    <footer className={cn("ps-foot", clear && "ps-foot-clear")}>
+      <div aria-hidden="true" className="ps-foot-art">
+        <Skyline still />
+      </div>
       <svg className="ps-foot-edge" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true" focusable="false">
         <path d={EDGE} />
       </svg>
