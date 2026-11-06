@@ -167,6 +167,14 @@ jobs:
       # apt wants, so a new image saves a fresh set instead of downloading on every run (a fixed
       # key never saved again, and on 23/10/2026 a slow mirror ran the whole 94 MB past the job's
       # limit). A new image starts from the last image's files and fetches only what changed.
+      # The runner's apt mirror can stall part way through a download (06/11/2026: 21 MB of
+      # Chromium's libraries for five minutes, in two runs). The capped try then ended npx but not
+      # the apt-get under it, whose lock failed the second try at once. A stalled fetch now times
+      # out and is fetched again, and apt waits for its lock rather than failing on it.
+      - name: apt retries a stalled mirror and waits for its lock
+        run: |
+          printf '%s\n' 'Acquire::Retries "5";' 'Acquire::http::Timeout "20";' 'Acquire::https::Timeout "20";' \
+            'DPkg::Lock::Timeout "300";' | sudo tee /etc/apt/apt.conf.d/80-ci-mirror >/dev/null
       - name: Which runner image
         id: image
         run: echo "id=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
@@ -374,6 +382,14 @@ jobs:
       # Chromium's system libraries come from the runner's apt mirror, nine screen jobs at once:
       # one job of the first sharded run waited out both capped tries (06/11/2026). Their .deb
       # files are kept between runs as ffmpeg's are, keyed on the runner image and the browser.
+      # The runner's apt mirror can stall part way through a download (06/11/2026: 21 MB of
+      # Chromium's libraries for five minutes, in two runs). The capped try then ended npx but not
+      # the apt-get under it, whose lock failed the second try at once. A stalled fetch now times
+      # out and is fetched again, and apt waits for its lock rather than failing on it.
+      - name: apt retries a stalled mirror and waits for its lock
+        run: |
+          printf '%s\n' 'Acquire::Retries "5";' 'Acquire::http::Timeout "20";' 'Acquire::https::Timeout "20";' \
+            'DPkg::Lock::Timeout "300";' | sudo tee /etc/apt/apt.conf.d/80-ci-mirror >/dev/null
       - name: Which runner image
         id: image
         run: echo "id=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
@@ -393,9 +409,12 @@ jobs:
           for attempt in 1 2; do
             timeout 600 npx playwright install --with-deps chromium && exit 0
             echo "::warning::Installing Chromium did not finish (try $attempt of 2)"
+            # The cap ends npx, not the apt-get it started: stop that one and let it go before the next try.
+            sudo pkill -x apt-get || true
+            for _ in $(seq 30); do pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null || break; sleep 2; done
             sudo dpkg --configure -a || true
           done
-          echo "::error::Chromium could not be installed in two tries: its download or the runner's apt mirror is not answering. Re-run the job."
+          echo "::error::Chromium could not be installed in two tries: its download or the runner's apt mirror stalled each time. Re-run the job."
           exit 1
       # The browser comes from the cache; the system libraries it needs from theirs when it holds
       # them, else from the mirror, and what the mirror sent is kept for the next run.
@@ -412,9 +431,12 @@ jobs:
               exit 0
             fi
             echo "::warning::Installing Chromium's system libraries did not finish (try $attempt of 2)"
+            # The cap ends npx, not the apt-get it started: stop that one and let it go before the next try.
+            sudo pkill -x apt-get || true
+            for _ in $(seq 30); do pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null || break; sleep 2; done
             sudo dpkg --configure -a || true
           done
-          echo "::error::Chromium's system libraries could not be installed in two tries: the runner's apt mirror is not answering. Re-run the job."
+          echo "::error::Chromium's system libraries could not be installed in two tries: the runner's apt mirror stalled each time. Re-run the job."
           exit 1
 
       # The screen gates on this job's target: the crawl (lib/screens.js) and axe (a11y.js) open
