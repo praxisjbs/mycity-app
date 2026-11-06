@@ -519,12 +519,33 @@ draft runs none (a week of CI used a month of GitHub's Actions minutes, TB 19/10
 yourself before pushing**; it is the same command and the same result. A PR cannot merge until it
 is green.
 
-On GitHub the gates run as four jobs side by side, so a run takes as long as its slowest job
-(AJ, 19/10/2026): **backend** (PostgreSQL, Redis and ffmpeg: jest and the schema gates),
-**frontend** (typecheck, lint, the three workspaces' tests at once, builds), **screens** (Chromium:
-the gates that open every screen) and **checks** (the fast static and process gates). The check
-called **ci** waits for all four, and it is the one branch protection requires. To run one job's
-gates yourself, `npm run ci -- --group=<name>`; `node scripts/ci-local.js --groups` lists them.
+The gates fall in four groups: **backend** (PostgreSQL, Redis and ffmpeg: jest and the schema
+gates), **frontend** (typecheck, lint, the three workspaces' tests, builds), **screens** (Chromium:
+the gates that open every screen) and **checks** (the fast static and process gates). On GitHub
+they run as jobs side by side, so a run takes as long as its slowest job (AJ, 19/10/2026), and the
+long ones are split again so that no job runs much past four minutes (GE, 06/11/2026; a run took
+21 minutes behind 16 minutes of tests on one runner):
+
+- **backend 1 of 5** to **5 of 5**: jest in five shards, each with its own PostgreSQL and Redis, so
+  the integration files (one at a time against one database) spread over five runners;
+  `tests/shard-sequencer.js` deals the files out by expected cost, and the first shard also runs
+  the schema gates.
+- **frontend**: typecheck, lint, the builds and the mock check. TypeScript's incremental state is
+  cached between runs, so typecheck rechecks only what changed; the restored state is dated 1970,
+  so it is never taken as up to date, only as files whose result can be reused when their text,
+  and everything they depend on, is unchanged.
+- **frontend tests**: each workspace's vitest files in shards (`vitest --shard`, through
+  `scripts/fe-test.js` and `MYCITY_FE_TESTS`); public-app's few ride with another shard.
+- **screens gallery** and **screens app**: every screen gate, once on each target
+  (`MYCITY_SCREEN_TARGETS`, `MYCITY_A11Y_TARGETS`); axe's pages of a target can be dealt over
+  several jobs (`MYCITY_A11Y_SHARD`, the gallery's over two), the first also running the crawl gates.
+- **checks**, as before.
+
+`scripts/check/lib/scope.js` (`plan()`) says how many of each a run starts. The check called **ci**
+waits for all of them, and it is the one branch protection requires. The sharding is CI's alone:
+the variables that pick a share are never set on a laptop, so `npm run ci` runs every gate, whole.
+To run one group's gates yourself, `npm run ci -- --group=<name>` (`--except=<ids>` leaves some
+out); `node scripts/ci-local.js --groups` lists them.
 Locally `npm run ci` runs the four groups at the same time too (JBS Praxis, 25/10/2026), each
 gate's line printed as it ends with its group, so a full run takes about as long as the backend's
 tests rather than the sum of all four; `-- --serial` runs one gate after another, and `-- --fast`
@@ -532,9 +553,9 @@ stops at the first failure (serially). Beside the other groups the frontend's te
 machine's CPUs less two (`MYCITY_TEST_WORKERS`, read by `scripts/fe-test.js`), one workspace after
 another, since tests that wait on a clock fail when starved. While you work, run the group you touched, or
 `-- --only=<ids>`; run the whole thing once before marking the PR ready.
-Chromium, ffmpeg's packages and npm's downloads are cached between runs. Four jobs bill more
-runner minutes than one (each installs its own packages), so the draft rule below matters more,
-not less.
+Chromium, ffmpeg's packages, npm's downloads and TypeScript's incremental state are cached
+between runs. More jobs bill more runner minutes than four (each installs its own packages, about a
+minute), so the draft rule below matters more, not less.
 
 **Run it as CI does** (JBS Praxis, 27/10/2026). CI runs the Node major `.nvmrc` names, and
 `npm run ci` refuses another (`nvm use`): on Node 22's larger default heap the backend suite never
@@ -562,8 +583,25 @@ and why):
   head has passed this tree; before that (still running, red, or `main` moved), the whole run
   (27/10/2026).
 
-In both cases only the **checks** job runs; backend, frontend and screens are skipped and start no
-runner.
+In those cases only the **checks** job runs; every other job is skipped and starts no runner.
+
+- **Otherwise a PR runs only the sets its files can affect** (GE, 06/11/2026; `setsOfFile` in
+  `scope.js`, the *scope* job's log lists each skipped set and why):
+
+  | The PR touches | It runs |
+  |---|---|
+  | `app/` | app's tests, frontend, screens app, and jest's unit files (a few read `app/`) |
+  | `public-app/` | public-app's tests, frontend, screens app (its gates read public-app's source), jest's unit files |
+  | `src/`, `migrations/`, `seeds/`, `templates/`, `tests/` | the backend shards only |
+  | `docs/PROGRESS.md`, `MILESTONES.md` | what reads the delivery plan: backend, frontend, app's and public-app's tests, screens app |
+  | anything else: `packages/ui`, `packages/contract`, `scripts/` (the CI scripts among them), root config, `package-lock.json`, `.github/`, `ops/`, a page or picture under `docs/` | everything |
+
+  The sets add up: a PR touching `app/` and `src/` runs both rows. A skipped job starts no runner,
+  and **ci** counts it as passed. A push to `main` or a run by hand runs everything (or, as above,
+  only the document gates when a PR's run passed the same tree). A PR run that skipped sets leaves
+  no tree behind, so after its merge `main` runs everything once. `tests/unit/ci-scope.test.js`
+  holds the rules, and the facts they stand on: no frontend file imports backend code, no
+  integration file reads frontend source, and packages/ui never reads the delivery plan.
 
 These are the usual reasons a run is red:
 

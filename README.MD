@@ -104,7 +104,9 @@ mycity-app/
 ├── assets/fonts/             Geist, for PDFs
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
-│   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test)
+│   │                         (--group, --only, --except pick a CI job's share)
+│   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test);
+│   │                         in CI one job's shards of them (MYCITY_FE_TESTS)
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md;
 │   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30);
 │   │                         ai-catalogue.js writes src/shared/ai/catalogue.snapshot.json, the AI manifests as
@@ -115,7 +117,8 @@ mycity-app/
 │   │   ├── lib/changes.js    what a change touched (git diff vs main) and its trailers,
 │   │   │                     shared by check/progress.js, check/guides.js, check/readme-map.js
 │   │   ├── lib/scope.js      how much of `npm run ci` a GitHub run needs: full, docs (documents
-│   │   │                     only) or tested (main's tree already passed in its PR); ci.yml asks it
+│   │   │                     only) or tested (main's tree already passed in its PR), the sets a
+│   │   │                     PR's files can affect, and the job matrices (plan()); ci.yml asks it
 │   │   ├── lib/copy.js       the screen copy rules: word LIMITS, word count, Title Case, explainer
 │   │   │                     titles, refused button labels (gates 8, 11, 12, 17; FRONTEND_GUIDE §5)
 │   │   ├── lib/gallery.js    builds packages/ui's gallery when stale and serves it (gates 8, 11, a11y)
@@ -160,7 +163,8 @@ mycity-app/
 ├── tests/
 │   ├── unit/                 cross-module unit tests
 │   ├── integration/          real Postgres + Redis (RUN_DB_TESTS=1)
-│   └── staging/              verify-staging suite, runs against the staging hosts
+│   ├── staging/              verify-staging suite, runs against the staging hosts
+│   └── shard-sequencer.js    deals jest's files to CI's backend shards by expected cost (jest --shard)
 ├── docs/
 │   ├── MyCity-ERP-Documents/ the client document pack
 │   │   └── letter-samples/   MyCity's six disciplinary letters, redacted to placeholders (queries.md §6.7)
@@ -188,7 +192,7 @@ mycity-app/
 │                             fonts) and build.js (the standalone page in dist/; --check fits each
 │                             page to A4, at most 17, and prints the PDF)
 ├── .github/
-│   ├── workflows/            ci.yml (`npm run ci` as four parallel jobs, backend, frontend, screens and checks, and the `ci` check over them; none on a draft PR), release.yml, rollback.yml, uptime.yml, ai-nightly.yml (Praxis AI's attack suite on staging every night, docs/guides/praxis-ai.md §6.17)
+│   ├── workflows/            ci.yml (`npm run ci` as parallel jobs: backend in shards, backend unit, frontend, frontend tests in shards, screens per target and checks, only those a PR's files can affect, and the `ci` check over them; none on a draft PR), release.yml, rollback.yml, uptime.yml, ai-nightly.yml (Praxis AI's attack suite on staging every night, docs/guides/praxis-ai.md §6.17)
 │   │                         (the uptime probe every 10 minutes)
 │   ├── CODEOWNERS            who must approve each path (checked by check/codeowners.js)
 │   └── pull_request_template.md

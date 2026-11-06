@@ -1,20 +1,33 @@
 name: CI
 
 # Every gate in scripts/ci-local.js, the same command everyone runs locally (`npm run ci`), split
-# into four jobs that run side by side, so a run takes as long as its slowest job rather than the
-# sum of them all (AJ, 19/10/2026; docs/BACKEND_GUIDE.md §8.4):
+# into jobs that run side by side, so a run takes as long as its slowest job rather than the sum of
+# them all (AJ, 19/10/2026; docs/BACKEND_GUIDE.md §8.4). The long ones are split again (GE,
+# 06/11/2026): a run took 21 minutes behind one 16-minute job of tests on one runner, and now takes
+# about six:
 #
-#   backend   PostgreSQL, Redis and ffmpeg: the whole jest suite and the schema gates
-#   frontend  the workspaces' typecheck, lint, tests (side by side, scripts/fe-test.js) and builds
-#   screens   Chromium: the gates that open every screen at phone and desktop size
-#   checks    the fast static and process gates, every gate that reads documents among them
+#   backend          PostgreSQL, Redis and ffmpeg: jest in 5 shards, each with its own database,
+#                    the schema gates in the first (tests/shard-sequencer.js balances the files)
+#   backend unit     jest without the database, when only the frontend changed (a few unit files
+#                    read app/ and public-app/ source)
+#   frontend         the workspaces' typecheck, lint and builds, and the mock check
+#   frontend tests   the workspaces' vitest files in shards (scripts/fe-test.js, MYCITY_FE_TESTS)
+#   screens          Chromium: the gates that open every screen, on the gallery and on the app
+#                    (MYCITY_SCREEN_TARGETS, MYCITY_A11Y_TARGETS), axe's pages in shards
+#                    (MYCITY_A11Y_SHARD)
+#   checks           the fast static and process gates, every gate that reads documents among them
 #
-# Each job runs `npm run ci -- --group=<name>`; `node scripts/ci-local.js --groups` lists which
-# gate is where. A last job named "ci" passes only when all four did: branch protection on main
-# requires that one check, so it keeps its name.
+# The scope job decides how many of each a run needs and hands the matrices over
+# (scripts/check/lib/scope.js plan()); each job runs `npm run ci` with --group, --only or --except
+# and the variables its entry sets, so a laptop with none of them set still runs every gate, whole.
+# `node scripts/ci-local.js --groups` lists which gate is in which group. A last job named "ci"
+# passes only when every job did, or was skipped because the run did not need it: branch
+# protection on main requires that one check, so it keeps its name.
 #
 # Downloads that never change between runs are cached: npm's (setup-node), Chromium (keyed on the
-# pinned playwright version) and ffmpeg's packages (keyed on the runner image).
+# pinned playwright version), ffmpeg's packages (keyed on the runner image) and TypeScript's
+# incremental state (the frontend job; never trusted as up to date, see there). More jobs bill more
+# runner minutes, each its own install (about a minute), so the draft rule below matters more.
 #
 # This workflow never deploys and never references the production environment
 # (check/production-environment-refs.js). Deploys are release.yml.
@@ -25,7 +38,11 @@ name: CI
 #     starts when it is marked ready (ready_for_review), then on every push
 #   - a change to documents only, or a push to main whose tree a pull request's run already
 #     passed, runs only the gates that read documents (scripts/check/lib/scope.js): the checks
-#     job alone; backend, frontend and screens are skipped and start no runner
+#     job alone; every other job is skipped and starts no runner
+#   - otherwise a pull request runs the sets its files can affect (GE, 06/11/2026): one touching
+#     only app/ skips packages/ui's and public-app's tests and the gallery's screens, one touching
+#     only src/ skips every frontend job; packages/, scripts/, root config, the lockfile and
+#     .github/ run everything. A push to main or a run by hand runs everything
 
 on:
   pull_request:
@@ -65,7 +82,8 @@ env:
   CI_STRICT: "1"
 
 jobs:
-  # full, docs or tested, and why (printed in the log). Needs nothing installed.
+  # full, docs or tested, and why; the sets this run needs and each job matrix (printed in the
+  # log). Needs nothing installed.
   scope:
     name: scope
     if: >-
@@ -76,6 +94,12 @@ jobs:
     timeout-minutes: 5
     outputs:
       scope: ${{ steps.scope.outputs.scope }}
+      backend: ${{ steps.scope.outputs.backend }}
+      backend_unit: ${{ steps.scope.outputs.backend_unit }}
+      frontend: ${{ steps.scope.outputs.frontend }}
+      frontend_tests: ${{ steps.scope.outputs.frontend_tests }}
+      screens: ${{ steps.scope.outputs.screens }}
+      all: ${{ steps.scope.outputs.all }}
     steps:
       - name: Check out (full history, the scope diffs against main)
         uses: actions/checkout@v4
@@ -91,12 +115,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+  # jest's integration files share one database and run one at a time: 16 minutes in one job on
+  # one CPU. Each shard has its own PostgreSQL and Redis, so the shards cannot meet.
   backend:
-    name: backend
+    name: ${{ matrix.name }}
     needs: scope
-    if: needs.scope.outputs.scope == 'full'
+    if: needs.scope.outputs.backend != '[]'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # A shard's own work is about three minutes; the margin keeps a slow runner from timing out.
+    timeout-minutes: 12
+    strategy:
+      # Every shard reports, so five unrelated failures are five lines in one run, not five runs.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.scope.outputs.backend) }}
     # A real PostgreSQL 16 with pgvector and Redis, so the integration suite and gate 4's round
     # trip run the shared layer against the real migrations on every PR (docs/MIGRATIONS.md §12).
     # A throwaway database for CI only; nothing here is staging or production.
@@ -180,10 +212,13 @@ jobs:
         env:
           DATABASE_URL: postgres://mycity:mycity@127.0.0.1:5432/mycity_test
 
+      # The first shard runs `--group=backend` (its slice of jest and the schema gates), the
+      # others `--only=test`; MYCITY_JEST_SHARD is the slice.
       - name: Backend gates
-        run: npm run ci -- --group=backend
+        run: npm run ci -- ${{ matrix.gates }}
         env:
           CI_SCOPE: ${{ needs.scope.outputs.scope }}
+          MYCITY_JEST_SHARD: ${{ matrix.shard }}
           # Integration suite and gate 4's live round trip, against the services above.
           RUN_DB_TESTS: "1"
           APP_ENV: test
@@ -191,14 +226,14 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6379/15
           GH_TOKEN: ${{ github.token }}
 
-  frontend:
-    name: frontend
+  # A change to app/ or public-app/ alone cannot reach the API, but a few of jest's unit files read
+  # their source (new-screen, check-frontend-gates): those run, without a database (20 s).
+  backend-unit:
+    name: backend unit
     needs: scope
-    if: needs.scope.outputs.scope == 'full'
+    if: needs.scope.outputs.backend_unit == 'true'
     runs-on: ubuntu-latest
-    # Typecheck, lint, every workspace's tests and the build: about 18 minutes on a hosted runner by
-    # M8, past 20 with M4's screens; the margin keeps a slow runner from timing out, as for screens.
-    timeout-minutes: 25
+    timeout-minutes: 8
     steps:
       - name: Check out (full history)
         uses: actions/checkout@v4
@@ -211,20 +246,106 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
-      - name: Frontend gates
-        run: npm run ci -- --group=frontend
+      - name: jest without the database
+        run: npm run ci -- --only=test
+        env:
+          CI_SCOPE: ${{ needs.scope.outputs.scope }}
+          APP_ENV: test
+          GH_TOKEN: ${{ github.token }}
+
+  frontend:
+    name: frontend
+    needs: scope
+    if: needs.scope.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install
+        run: npm ci
+
+      # TypeScript's incremental state (the .tsbuildinfo files each workspace keeps under its
+      # node_modules/.tmp), so typecheck checks again only what changed: about 20 s warm, 100 s
+      # cold. Restored after the install, which empties node_modules. The key moves with every
+      # commit, so each run saves the state it ended with; a new lockfile starts cold.
+      - name: TypeScript's incremental state, cached
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/ui/node_modules/.tmp
+            app/node_modules/.tmp
+            public-app/node_modules/.tmp
+          key: tsbuildinfo-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: tsbuildinfo-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+      # A stale state must never hide an error. A restored state is newer than the checkout, and
+      # `tsc -b` may take a project whose state is newer than its files as up to date: dated
+      # 1970, every project is always checked again. The state then only spares work: TypeScript
+      # reuses a file's result only when its text, and the text of everything it depends on,
+      # hashes the same as when the result was kept (tried on 06/11/2026: an error in a file that
+      # did not change, from a type that did, is still reported from a restored state).
+      - name: The cached state is never taken as up to date
+        run: find packages/ui/node_modules/.tmp app/node_modules/.tmp public-app/node_modules/.tmp -name '*.tsbuildinfo' -exec touch -d @0 {} + 2>/dev/null || true
+
+      # Every frontend gate but the tests, which the next job runs in shards.
+      - name: Frontend gates (typecheck, lint, build, mock check)
+        run: npm run ci -- --group=frontend --except=fe-test
         env:
           CI_SCOPE: ${{ needs.scope.outputs.scope }}
           GH_TOKEN: ${{ github.token }}
 
-  screens:
-    name: screens
+  # The three workspaces' vitest files took 16 minutes side by side on one 4-core runner; vitest's
+  # own shards of each workspace (scripts/fe-test.js) spread them over several.
+  frontend-tests:
+    name: ${{ matrix.name }}
     needs: scope
-    if: needs.scope.outputs.scope == 'full'
+    if: needs.scope.outputs.frontend_tests != '[]'
     runs-on: ubuntu-latest
-    # The screen gates and the a11y gate crawl the gallery and every app screen at two
-    # sizes (about 7 minutes on a laptop); the margin keeps a slow runner from timing out.
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.scope.outputs.frontend_tests) }}
+    steps:
+      - name: Check out (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Frontend tests
+        run: npm run ci -- --only=fe-test
+        env:
+          CI_SCOPE: ${{ needs.scope.outputs.scope }}
+          MYCITY_FE_TESTS: ${{ matrix.tests }}
+          GH_TOKEN: ${{ github.token }}
+
+  # The screen gates open the gallery and the app; each job opens one of them (a11y alone took 11
+  # minutes over both), builds only that one, and axe's share of its pages.
+  screens:
+    name: ${{ matrix.name }}
+    needs: scope
+    if: needs.scope.outputs.screens != '[]'
+    runs-on: ubuntu-latest
+    # The gates crawl one target at two sizes (a few minutes); the margin covers a cold Chromium
+    # install, which may take its two capped tries.
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.scope.outputs.screens) }}
     steps:
       - name: Check out (full history, the screen gates read what changed)
         uses: actions/checkout@v4
@@ -276,10 +397,16 @@ jobs:
           echo "::error::Chromium's system libraries could not be installed in two tries: the runner's apt mirror is not answering. Re-run the job."
           exit 1
 
+      # The screen gates on this job's target: the crawl (lib/screens.js) and axe (a11y.js) open
+      # only it. A target's first job runs every screen gate (`--group=screens`, the gates' static
+      # reads of the source among them) and its share of axe's pages; the others `--only=a11y`.
       - name: Screen gates
-        run: npm run ci -- --group=screens
+        run: npm run ci -- ${{ matrix.gates }}
         env:
           CI_SCOPE: ${{ needs.scope.outputs.scope }}
+          MYCITY_SCREEN_TARGETS: ${{ matrix.targets }}
+          MYCITY_A11Y_TARGETS: ${{ matrix.a11y }}
+          MYCITY_A11Y_SHARD: ${{ matrix.a11y_shard }}
           GH_TOKEN: ${{ github.token }}
 
   checks:
@@ -310,7 +437,7 @@ jobs:
   # failed ci (always() did); the newer run that cancelled it reports for the commit.
   ci:
     name: ci
-    needs: [scope, backend, frontend, screens, checks]
+    needs: [scope, backend, backend-unit, frontend, frontend-tests, screens, checks]
     if: ${{ !cancelled() && needs.scope.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -322,21 +449,22 @@ jobs:
           echo "$RESULTS" | node -e '
             const needs = JSON.parse(require("fs").readFileSync(0, "utf8"));
             const bad = Object.entries(needs).filter(([, n]) => !["success", "skipped"].includes(n.result));
-            for (const [job, n] of Object.entries(needs)) console.log(`${job.padEnd(9)} ${n.result}`);
+            for (const [job, n] of Object.entries(needs)) console.log(`${job.padEnd(15)} ${n.result}`);
             if (needs.scope.result !== "success" || needs.checks.result !== "success" || bad.length) process.exit(1);
           '
 
-      # The tree this pull request's full run passed (GitHub's merge of it into main as main is
-      # now). After the merge, main's run finds it and skips what this tree already passed
-      # (scripts/check/lib/scope.js, TREE_ARTIFACT and TREE_FILE).
+      # The tree this pull request's run passed (GitHub's merge of it into main as main is now),
+      # kept only when the run ran every set: after the merge, main's run finds it and skips what
+      # this tree already passed (scripts/check/lib/scope.js, TREE_ARTIFACT and TREE_FILE). A run
+      # that skipped sets its change could not affect leaves none, so main runs everything once.
       - name: Check out (only to read the tree)
-        if: success() && github.event_name == 'pull_request' && needs.scope.outputs.scope == 'full'
+        if: success() && github.event_name == 'pull_request' && needs.scope.outputs.all == 'true'
         uses: actions/checkout@v4
       - name: Record the tree this run passed
-        if: success() && github.event_name == 'pull_request' && needs.scope.outputs.scope == 'full'
+        if: success() && github.event_name == 'pull_request' && needs.scope.outputs.all == 'true'
         run: git rev-parse 'HEAD^{tree}' > ci-tree.txt
       - name: Keep it for main's run after the merge
-        if: success() && github.event_name == 'pull_request' && needs.scope.outputs.scope == 'full'
+        if: success() && github.event_name == 'pull_request' && needs.scope.outputs.all == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ci-tree

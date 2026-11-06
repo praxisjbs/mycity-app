@@ -53,6 +53,121 @@ function scopeOfFiles(files) {
   return files.length > 0 && files.every((f) => isDocument(f.path)) ? "docs" : "full";
 }
 
+/*
+ * SETS. A full run is split into sets that CI runs as jobs of their own (ci.yml, plan() below). A
+ * pull request runs only the sets its files can affect (GE, 06/11/2026); a push to main, a run by
+ * hand, or anything not a pull request runs them all.
+ *
+ *   backend          the whole jest suite against PostgreSQL and Redis, in JEST_SHARDS jobs, and the
+ *                    schema gates
+ *   backend-unit     jest without the database: the unit files, a few of which read app/ and
+ *                    public-app/ source (new-screen, check-frontend-gates). Run when the frontend
+ *                    changed and the backend did not; `backend` already includes it
+ *   frontend         the workspaces' typecheck, lint and builds, and the mock check
+ *   ui, app, public-app   one workspace's vitest files, in FE_SHARDS jobs
+ *   screens-gallery  the screen gates and axe on the gallery (and demo.html when it changed)
+ *   screens-app      the same on the staff app's screens; also the gates' static reads of app/ and
+ *                    public-app/ source (toasts, copy props, native inputs)
+ */
+const SETS = Object.freeze(["backend", "backend-unit", "frontend", "ui", "app", "public-app", "screens-gallery", "screens-app"]);
+
+/**
+ * The sets a change to one file can affect. Anything not named here (packages/ui, packages/contract,
+ * scripts/ and the CI scripts, root config, package-lock.json, .github/, ops/, a page or picture
+ * under docs/) runs every set: what it reaches is too wide to name, and a set skipped wrongly lets
+ * a broken change through. tests/unit/ci-scope.test.js holds the edges, and holds the facts the
+ * narrow rules stand on (no app imports backend code; no integration file reads frontend source).
+ * @returns {readonly string[]}
+ */
+function setsOfFile(file) {
+  if (isDocument(file)) return [];
+  // The delivery plan: the API, both apps' builds and their tests (vite.config.ts injects it), and
+  // the app's screens. Not packages/ui or its gallery, which never read it.
+  if (READ_BY_CODE.has(file)) return ["backend", "frontend", "app", "public-app", "screens-app"];
+  if (file.startsWith("app/")) return ["backend-unit", "frontend", "app", "screens-app"];
+  if (file.startsWith("public-app/")) return ["backend-unit", "frontend", "public-app", "screens-app"];
+  if (/^(src|migrations|seeds|templates|tests)\//.test(file)) return ["backend"];
+  return SETS;
+}
+
+/** Every set any of the files can affect, in SETS order; `backend` takes in `backend-unit`. */
+function setsOfFiles(files) {
+  const wanted = new Set(files.flatMap((f) => setsOfFile(f.path)));
+  if (wanted.has("backend")) wanted.delete("backend-unit");
+  return SETS.filter((s) => wanted.has(s));
+}
+
+/*
+ * How each set is split into jobs on GitHub's runners, so that no job's own work runs past about
+ * four minutes (a run under six, wall clock; GE, 06/11/2026). Run 42283369560 on a 4-core runner:
+ * jest 937 s in one process (its integration files share one database, so it never used more than
+ * one CPU), vitest 960 s for the three workspaces side by side. Alone on four CPUs (06/11/2026)
+ * app's files take about twice ui's though ui has more of them (222 s and 87 s on a laptop-class
+ * machine, public-app's 14 s), hence more shards for app. Tune these from a run's job times.
+ */
+const JEST_SHARDS = 5;
+const FE_SHARDS = Object.freeze({ ui: 2, app: 3, "public-app": 1 });
+/** The a11y gate's pages per target (MYCITY_A11Y_SHARD): 174 s for the gallery's alone here. */
+const A11Y_SHARDS = Object.freeze({ gallery: 2, app: 1 });
+
+/**
+ * The matrices ci.yml runs, from the sets a run needs. Each entry is one job; an empty list starts
+ * no runner (the job's `if`). The variables each entry sets are read by the scripts that do the
+ * work, so `npm run ci` on a laptop, where none is set, still runs everything in one go:
+ *   MYCITY_JEST_SHARD   ci-local.js: `jest --shard=i/n`, the slice tests/shard-sequencer.js picks
+ *   MYCITY_FE_TESTS     scripts/fe-test.js: which workspaces, and which shard of each
+ *   MYCITY_SCREEN_TARGETS, MYCITY_A11Y_TARGETS   lib/screens.js and a11y.js: what they open
+ *   MYCITY_A11Y_SHARD   a11y.js: its share of the target's pages; the first shard of a target also
+ *                       runs the crawl gates (five-second, two-shells, native-ui), the others a11y
+ * @param {readonly string[]} sets
+ */
+function plan(sets) {
+  const has = (s) => sets.includes(s);
+  const backend = has("backend")
+    ? Array.from({ length: JEST_SHARDS }, (_, i) => ({
+        name: `backend ${i + 1} of ${JEST_SHARDS}`,
+        shard: `${i + 1}/${JEST_SHARDS}`,
+        // The schema gates once, in the first shard; every shard runs its slice of jest.
+        gates: i === 0 ? "--group=backend" : "--only=test",
+      }))
+    : [];
+  const pieces = [];
+  for (const [ws, n] of Object.entries(FE_SHARDS)) {
+    if (!has(ws)) continue;
+    for (let i = 1; i <= n; i++) pieces.push(n === 1 ? ws : `${ws}:${i}/${n}`);
+  }
+  // public-app's 60 tests are too few for a runner of their own: they ride with app's last shard,
+  // or with ui's when app is not running.
+  const tests = [];
+  for (const p of pieces) {
+    if (p === "public-app" && tests.length) tests[tests.length - 1].push(p);
+    else tests.push([p]);
+  }
+  const screens = [];
+  const screenJobs = (targets, a11y) => {
+    const n = A11Y_SHARDS[a11y];
+    for (let i = 1; i <= n; i++)
+      screens.push({
+        name: n === 1 ? `screens ${a11y}` : `screens ${a11y} ${i} of ${n}`,
+        targets,
+        a11y,
+        a11y_shard: n === 1 ? "" : `${i}/${n}`,
+        gates: i === 1 ? "--group=screens" : "--only=a11y",
+      });
+  };
+  if (has("screens-gallery")) screenJobs("gallery,demo", "gallery");
+  if (has("screens-app")) screenJobs("app", "app");
+  return {
+    backend,
+    backend_unit: has("backend-unit"),
+    frontend: has("frontend"),
+    frontend_tests: tests.map((t) => ({ name: `frontend tests ${t.join(" ")}`, tests: t.join(" ") })),
+    screens,
+    // The tree is recorded for main's run only when this run ran everything (ci.yml).
+    all: SETS.every((s) => s === "backend-unit" || has(s)),
+  };
+}
+
 /** gh, with the job's token. Returns stdout, or null when the call failed. */
 function gh(args) {
   const r = spawnSync(process.env.MYCITY_GH || "gh", args, {
@@ -111,12 +226,21 @@ function passedRun({ repo, head, tree, call = gh, treeOf = treeOfRun }) {
 }
 
 /**
- * The scope of this run, and why.
+ * The scope of this run, and why, and the sets it runs (SETS): every one on a full run that is not
+ * a pull request; on a pull request, the ones its files can affect; none on a docs or tested run,
+ * which runs the document gates alone.
  * @param {{event?: string, action?: string, files: Array<{path: string}>, repo?: string, sha?: string,
  *          head?: string, tree?: string, tested?: Function, passed?: Function}} p
- * @returns {{scope: "full"|"docs"|"tested", reason: string}}
+ * @returns {{scope: "full"|"docs"|"tested", reason: string, sets: string[]}}
  */
-function decide({ event, action, files, repo, sha, head, tree, tested = testedRun, passed = passedRun }) {
+function decide(p) {
+  const out = decideScope(p);
+  if (out.scope !== "full") return { ...out, sets: [] };
+  if (p.event !== "pull_request") return { ...out, sets: SETS.filter((s) => s !== "backend-unit") };
+  return { ...out, sets: setsOfFiles(p.files) };
+}
+
+function decideScope({ event, action, files, repo, sha, head, tree, tested = testedRun, passed = passedRun }) {
   if (event !== "pull_request" && event !== "push") return { scope: "full", reason: "not a pull request or a push" };
   if (scopeOfFiles(files) === "docs") return { scope: "docs", reason: `${files.length} document(s) changed, nothing else` };
   if (event === "push" && repo && sha && tree) {
@@ -130,7 +254,10 @@ function decide({ event, action, files, repo, sha, head, tree, tested = testedRu
   return { scope: "full", reason: "the change touches code, or this tree was not tested" };
 }
 
-/** ci-local.js --decide-scope: prints the scope, and hands it to the workflow step in Actions. */
+/**
+ * ci-local.js --decide-scope: prints the scope and the sets, and hands them to the workflow step in
+ * Actions: `scope`, `reason`, `sets` (JSON) and each of plan()'s matrices (JSON).
+ */
 function main() {
   const event = changes.githubEvent() || {};
   const out = changes.IN_CI
@@ -143,11 +270,37 @@ function main() {
         head: event.pull_request && event.pull_request.head ? event.pull_request.head.sha : undefined,
         tree: changes.git(["rev-parse", "HEAD^{tree}"]).trim(),
       })
-    : { scope: "full", reason: "not in GitHub Actions" };
+    : { scope: "full", reason: "not in GitHub Actions", sets: SETS.filter((s) => s !== "backend-unit") };
+  const jobs = plan(out.sets);
   console.log(`scope: ${out.scope} (${out.reason})`);
-  if (process.env.GITHUB_OUTPUT)
-    fs.appendFileSync(process.env.GITHUB_OUTPUT, `scope=${out.scope}\nreason=${out.reason}\n`);
-  return out;
+  console.log(`sets:  ${out.sets.join(", ") || "none, the document gates alone"}`);
+  // backend-unit is part of backend: not "skipped" when backend runs.
+  for (const s of SETS) if (!out.sets.includes(s) && !(s === "backend-unit" && out.sets.includes("backend"))) console.log(`  skipped ${s}: ${out.scope === "full" ? "nothing this change touched can affect it" : `scope ${out.scope}`}`);
+  if (process.env.GITHUB_OUTPUT) {
+    const lines = [`scope=${out.scope}`, `reason=${out.reason}`, `sets=${JSON.stringify(out.sets)}`];
+    for (const [k, v] of Object.entries(jobs)) lines.push(`${k}=${JSON.stringify(v)}`);
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
+  }
+  return { ...out, jobs };
 }
 
-module.exports = { DOC_GATES, READ_BY_CODE, TREE_ARTIFACT, TREE_FILE, isDocument, scopeOfFiles, testedRun, passedRun, treeOfRun, decide, main };
+module.exports = {
+  DOC_GATES,
+  READ_BY_CODE,
+  TREE_ARTIFACT,
+  TREE_FILE,
+  SETS,
+  JEST_SHARDS,
+  FE_SHARDS,
+  A11Y_SHARDS,
+  isDocument,
+  scopeOfFiles,
+  setsOfFile,
+  setsOfFiles,
+  plan,
+  testedRun,
+  passedRun,
+  treeOfRun,
+  decide,
+  main,
+};
