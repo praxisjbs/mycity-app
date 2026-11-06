@@ -74,7 +74,6 @@ async function get(slug) {
   if (!slugs.looksLikeSlug(slug)) throw notFound();
   const row = await repo.publicBySlug(pool, slug);
   if (!row) throw notFound();
-  const { about_company: about } = await repo.settings(pool);
   return {
     ...card(row),
     employment_type: row.employment_type,
@@ -83,7 +82,6 @@ async function get(slug) {
     reports_to: row.reports_to,
     min_experience_years: row.min_experience_years,
     working_days: row.working_days,
-    about_company: blocksOf(about),
     ...(row.salary_visible && row.salary_min ? { salary_min: row.salary_min } : {}),
     ...(row.salary_visible && row.salary_max ? { salary_max: row.salary_max } : {}),
     description: blocksOf(row.description) || [],

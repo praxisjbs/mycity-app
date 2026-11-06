@@ -188,9 +188,8 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     expect(role.body).toMatchObject({ state: "open", how_we_hire: ["apply", "screening", "assessment", "interview"], working_days: "Monday to Saturday", applicants: 0 });
     // The role's Markdown texts arrive as blocks from the one renderer, so the page draws elements, never HTML.
     const text = (spans) => spans.map((x) => x.text).join("");
-    expect(role.body.about_company).toHaveLength(1);
-    expect(role.body.about_company[0].kind).toBe("paragraph");
-    expect(text(role.body.about_company[0].spans)).toMatch(/^MyCityApp is a digital city/);
+    // About MyCityApp is the index's (/jobs/summary), never each role's.
+    expect(role.body).not.toHaveProperty("about_company");
     expect(role.body.description.map((b) => b.kind)).toEqual(["paragraph", "heading", "heading", "bullets"]);
     expect(role.body.description[1]).toMatchObject({ kind: "heading", level: 2 });
     expect(text(role.body.description[1].spans)).toBe("Key Responsibilities");

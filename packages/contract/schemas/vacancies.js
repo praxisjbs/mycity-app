@@ -581,8 +581,8 @@ const PublicJobPage = Paged(PublicJobCard);
 /**
  * GET /api/public/v1/jobs/:slug. A hidden salary band is left out, not sent as null.
  * `state`: open takes applications; paused and closed say so; filled is closed as filled.
- * `how_we_hire` names the steps this role uses, from its scorecard. The four texts written in Markdown
- * (About MyCityApp, the description, must have, nice to have) arrive as blocks from the server's one
+ * `how_we_hire` names the steps this role uses, from its scorecard. The three texts written in Markdown
+ * (the description, must have, nice to have) arrive as blocks from the server's one
  * Markdown renderer (shared/documents/markdown), as a policy's do, so the page draws them as elements.
  */
 const PublicJob = PublicJobCard.extend({
@@ -590,8 +590,6 @@ const PublicJob = PublicJobCard.extend({
   reports_to: z.string().nullable(),
   min_experience_years: z.number().int().min(0).nullable(),
   working_days: z.string().nullable(),
-  /** About MyCityApp, from Careers Settings: the same paragraph on every role. */
-  about_company: z.array(RichTextBlock).nullable(),
   salary_min: money.optional(),
   salary_max: money.optional(),
   description: z.array(RichTextBlock),
@@ -731,7 +729,7 @@ const TABLES = {
   PublicJobListQuery: { table: null, reason: "list controls for the public careers page" },
   PublicJobCard: { table: null, reason: "the allow-list of a vacancy a stranger may read" },
   PublicJobPage: { table: null, reason: "a page of open roles" },
-  PublicJob: { table: null, reason: "the allow-list of a vacancy a stranger may read, with About MyCityApp" },
+  PublicJob: { table: null, reason: "the allow-list of a vacancy a stranger may read" },
   PublicJobsSummary: { table: null, reason: "counts over the open roles, by department and city, for the public index" },
   ApplyStarted: { table: null, reason: "the Apply link's token, shown once; only its hash is kept" },
   SlugParams: { table: null, reason: "the :slug path parameter" },
