@@ -5,3 +5,4 @@ export { Tabs, TabPanel, type TabsProps, type TabPanelProps, type TabItem } from
 export { SegmentedControl, type SegmentedControlProps } from "./SegmentedControl";
 export { Chips, type ChipsProps } from "./Chips";
 export type { Choice, ChoiceOption } from "./options";
+export * from "./StageSwitcher";

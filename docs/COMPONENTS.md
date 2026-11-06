@@ -72,6 +72,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [YearsMedal](#yearsmedal) | `YearsMedal` | The years a person has been at MyCity, large, inside a gold laurel. | beta |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
+| Navigation | [StageSwitcher](#stageswitcher) | `StageSwitcher` | A deal's stages in order, the current one marked; one press on another stage moves the deal there. | beta |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
 | Overlays | [ConfirmDialog](#confirmdialog) | `ConfirmDialog` | A yes or no before an action that cannot be taken back, named for the thing it acts on ("Delete Rule"). | stable |
 | Overlays | [LockScreen](#lockscreen) | `LockScreen` | The full-screen lock over the staff app when a session ends: who is signed in, why it locked, and their password to carry on. | beta |
@@ -2019,6 +2020,38 @@ Two to five views of the same thing side by side in one pill (Mine, My Team; Wee
 
 ```tsx
 <SegmentedControl label="Whose Tasks" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />
+```
+
+### StageSwitcher
+
+A deal's stages in order, the current one marked; one press on another stage moves the deal there.
+
+| | |
+|---|---|
+| Use | A record that moves through a list of stages one press at a time: a partnership deal on its 360 (docs/guides/partnerships.md §6.5). The screen asks for a reason, or the signed copy, after the press when the move needs one. |
+| Avoid | Filtering a list by stage (use Chips or FilterSelect); a board of cards in columns (use Kanban); steps of a form (use Wizard or StepBar). |
+| Phone | One row that scrolls sideways inside itself, the current stage brought into view; each stage is a 44 px target. The screen puts the next stage full width at the foot of the record. |
+| Accessibility | A group named by `label`; each stage is a button, the current one aria-current="step" and refused, the others named "Move to Proposal Sent". Left and Right move between stages. While a move runs its button says aria-busy and the others aria-disabled. |
+| Status | beta |
+| Exports | `StageSwitcher` |
+| Import | `import { StageSwitcher } from "@mycity/ui";` |
+| File | `packages/ui/src/navigation/StageSwitcher.tsx` |
+| Test | `packages/ui/src/navigation/StageSwitcher.test.tsx` |
+| Gallery | `packages/ui/src/navigation/StageSwitcher.gallery.tsx` (`npm run gallery`, `#/StageSwitcher`) |
+
+**StageSwitcher** props (`StageSwitcherProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `stages` | `readonly StageOption[]` | yes | The stages in order, the ones a deal may move to (retired stages left out, the current one kept). |
+| `value` | `string` | yes | The code of the stage the record is at. |
+| `onMove` | `(code: string) => unknown` | yes | One press on another stage: hand back the work (a promise) so the stage spins and the others wait until it settles (F26). |
+| `label` | `string` |  | Names the group for assistive technology ("Stage"). |
+| `readOnly` | `boolean` |  | The record is read only (a converted lead): the stages show, none can be pressed. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<StageSwitcher label="Stage" stages={stages} value={deal.stage} onMove={(code) => move(code)} />
 ```
 
 ### Tabs
