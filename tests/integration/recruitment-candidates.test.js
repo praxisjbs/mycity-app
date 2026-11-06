@@ -29,6 +29,8 @@ const lagos = require("../../src/shared/time/lagos");
 const token = require("../../src/shared/places/token");
 const ai = require("../../src/services/ai/llm.service");
 const drafts = require("../../src/services/ai/drafts");
+const { atomically } = require("../../src/shared/db/tx");
+const vault = require("../../src/shared/documents/vault");
 const { one, drain, harness } = require("./helpers/ai-actions");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -38,6 +40,16 @@ const area = (formatted) =>
 
 /** A PDF as small as one can be: what the type check reads. */
 const PDF = Buffer.from("%PDF-1.4\n1 0 obj<< /Type /Catalog >>endobj\ntrailer<< /Root 1 0 R >>\n%%EOF\n");
+const WORD = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** A Word file as far as the sniffer reads one: a ZIP whose first entry is word/document.xml. */
+const DOCX = (() => {
+  const n = Buffer.from("word/document.xml");
+  const head = Buffer.alloc(30);
+  head.writeUInt32LE(0x04034b50, 0);
+  head.writeUInt16LE(n.length, 26);
+  return Buffer.concat([head, n, Buffer.from("<w:document/>")]);
+})();
 
 /** The emails queued so far, by template. */
 const queued = (template) => queues.enqueue.mock.calls.filter((call) => call[0] === "email-send" && call[1] === template).map((call) => call[2]);
@@ -365,5 +377,50 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     expect(await one("SELECT count(*)::int AS n FROM application WHERE vacancy_id = $1 AND status = 'not_progressed' AND rejection_reason = 'The vacancy closed (cancelled)'", [role.body.vacancy_id])).toEqual({ n: 2 });
     await drain();
     expect(queued("candidate-not-progressed").length - before).toBe(2);
+  });
+  test("View CV serves a Word CV as the Word file it is, under its own name", async () => {
+    const role = await h.as("ops").post("/recruitment/vacancies").send({
+      title: "Social Media Writer",
+      department_id: dept,
+      hiring_manager_id: h.people.ops.employee_id,
+      positions: 1,
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      location: { token: area("Yaba, Lagos") },
+      description: "The Social Media Writer writes the daily posts that tell Lagos what is on, with the Content Producer and the brand team.",
+      requirements: "Two years writing for social media, and samples.",
+      closes_on: lagos.addDays(lagos.today(), 30),
+      publish: true,
+    });
+    expect(role.status).toBe(201);
+    const tok = (await pub().post(`/jobs/${role.body.slug}/apply`).send({})).body.token;
+    const sent = await pub()
+      .post(`/apply/${tok}/cv`)
+      .field("purpose", "cv")
+      .attach("file", DOCX, { filename: "Tolu Bakare CV.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    expect(sent.status).toBe(201);
+    expect(sent.body).toMatchObject({ file_name: "Tolu Bakare CV.docx", mime_type: WORD });
+    const made = await pub()
+      .post(`/apply/${tok}`)
+      .send(form({ full_name: "Tolu Bakare", email: "tolu.bakare@example.test", cv_document_id: sent.body.document_id }));
+    expect(made.status).toBe(201);
+    const client = await pool.connect();
+    try {
+      await atomically(client, () => vault.completeScan(client, sent.body.document_id, { clean: true }));
+    } finally {
+      client.release();
+    }
+    const { application_id: id } = await one("SELECT application_id FROM application WHERE number = $1", [made.body.reference]);
+    expect((await h.as("ops").get(`/recruitment/candidates/${id}`)).body.cv).toMatchObject({ file_name: "Tolu Bakare CV.docx", mime_type: WORD });
+    const file = await h.as("ops").get(`/recruitment/candidates/${id}/cv`).buffer(true).parse((res, done) => {
+      const parts = [];
+      res.on("data", (c) => parts.push(c));
+      res.on("end", () => done(null, Buffer.concat(parts)));
+    });
+    expect(file.status).toBe(200);
+    expect(file.headers["content-type"]).toBe(WORD);
+    expect(file.headers["content-disposition"]).toMatch(/^attachment; filename="Tolu Bakare CV\.docx"/);
+    expect(file.headers["content-disposition"]).not.toMatch(/\.pdf/);
+    expect(Buffer.compare(file.body, DOCX)).toBe(0);
   });
 });

@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { ASSESSMENTS, SITTINGS } from "@/api/mock/data/recruitment";
-import { sid } from "@/api/mock/core";
+import { dispatch, sid } from "@/api/mock/core";
 import { copyProblems, dialog, openAs, openRow, press, settled } from "./testKit";
 
 /**
@@ -87,9 +87,19 @@ describe("Recruitment · Assessments", () => {
     const form = dialog();
     const input = form.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(['{"format":"mycity-assessment-1"}'], "motion-design-brief.json", { type: "application/json" });
+    const importButton = () => within(form).getByRole("button", { name: "Import Assessment" }) as HTMLButtonElement;
+    // Nothing to import until the file has arrived.
+    expect(importButton().disabled).toBe(true);
     fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(importButton().disabled).toBe(false), { timeout: 8000 });
+    expect(ASSESSMENTS.some((a) => a.name === "Motion Design Brief")).toBe(false);
+    // One press, one request: a second press while it imports is refused (F26).
+    vi.mocked(dispatch).mockClear();
+    fireEvent.click(importButton());
+    fireEvent.click(importButton());
     await waitFor(() => expect(ASSESSMENTS.some((a) => a.name === "Motion Design Brief")).toBe(true), { timeout: 8000 });
     await settled();
+    expect(vi.mocked(dispatch).mock.calls.filter(([r]) => r.path.endsWith("/assessments/import/file"))).toHaveLength(1);
     expect(ASSESSMENTS.find((a) => a.name === "Motion Design Brief")!.active).toBe(false);
   }, 60000);
 });

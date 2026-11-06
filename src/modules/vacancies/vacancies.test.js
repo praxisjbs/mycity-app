@@ -139,3 +139,67 @@ describe("routes", () => {
     for (const r of rs) expect(r.kind).toBe("public");
   });
 });
+
+describe("must-meet conditions name no protected trait (guide §6.4)", () => {
+  const UNFAIR = [
+    ["Ladies only", "sex"],
+    ["Must be under 30", "age"],
+    ["Igbo only", "ethnicity"],
+    ["Men only", "sex"],
+    ["Male candidates preferred", "sex"],
+    ["Must be 25-35", "age"],
+    ["Aged 25 to 35", "age"],
+    ["Not older than 35", "age"],
+    ["Must be 25 years or older", "age"],
+    ["Between 22 and 30", "age"],
+    ["Young and energetic", "age"],
+    ["Date of birth after 1995", "age"],
+    ["Must be Hausa", "ethnicity"],
+    ["A native Igbo speaker", "ethnicity"],
+    ["Mother tongue Yoruba", "ethnicity"],
+    ["Northerners only", "ethnicity"],
+    ["Must be a Muslim", "religion"],
+    ["Born again Christian", "religion"],
+    ["Must be married", "family"],
+    ["Must be single", "family"],
+    ["Not pregnant", "family"],
+    ["No children", "family"],
+    ["No disability", "disability"],
+    ["Able-bodied", "disability"],
+    ["Genotype AA", "disability"],
+    ["Indigene of Lagos State", "origin"],
+    ["State of origin: Anambra", "origin"],
+    ["From Anambra only", "origin"],
+  ];
+  test.each(UNFAIR)("%p is refused as %p", (text, trait) => {
+    expect(service.traitsNamed(text)).toContain(trait);
+  });
+
+  const FAIR = [
+    "Lives in Lagos",
+    "A degree in finance",
+    "Fluent in English",
+    "Five years of sales experience",
+    "Over 10 years in sales",
+    "Over 15 years in sales",
+    "At least 20 years of experience",
+    "Speaks Yoruba",
+    "Experience working with children",
+    "Responds in under 30 minutes",
+    "Manages a team of 20 people",
+    "Acts in good faith",
+    "Knowledge of the Nigerian market",
+    "Experience selling women's clothing",
+    "National sales experience",
+    "Lives in Ibadan",
+    "Bachelor's degree in marketing",
+    "Can work at heights",
+  ];
+  test.each(FAIR)("%p passes", (text) => {
+    expect(service.traitsNamed(text)).toEqual([]);
+  });
+
+  test("names each refused condition by its index", () => {
+    expect(service.protectedConditions(["Lives in Lagos", "Ladies only", "Igbo only"])).toEqual([1, 2]);
+  });
+});

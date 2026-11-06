@@ -35,7 +35,8 @@
  * (lib/home-staging-rows.js removeHomeStagingRows).
  *
  * Run only by `scripts/db/seed.js --staging` (which refuses production three ways), after
- * 50_queries.js. Idempotent: Careers Settings once, a role by its title, an application by its
+ * 50_queries.js. Idempotent: Careers Settings once, a role by this seed's own record of making it
+ * (SEEDED_ROLE: renamed since, it is still found; a person's role with the same title never is), an application by its
  * email and role, an assessment by its name, a sitting by its application and assessment, a round
  * by its application, a pool entry by its candidate; a second run adds nothing. With nobody in the
  * Implementation department, or no Operations & People login, nothing is added.
@@ -49,6 +50,7 @@ const placeToken = require("../../src/shared/places/token");
 const lagos = require("../../src/shared/time/lagos");
 const { realStaff } = require("./lib/staff");
 const { removeHomeStagingRows } = require("./lib/home-staging-rows");
+const requestContext = require("../../src/config/request-context");
 
 const src = (p) => require(path.join(__dirname, "..", "..", "src", p));
 
@@ -362,6 +364,25 @@ async function callerOf(db, person) {
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
+/** The request id the seed runner gives every staging seed (scripts/db/seed.js). */
+const SEED_REQUEST = "seed-staging";
+
+/**
+ * A role this seed made, found by its own record of making it, never by the title the role has
+ * now: the vacancy whose `vacancy.created` a seed run emitted (event_log is append-only, and its
+ * request id is the runner's) with the spec's title as it was made. A role renamed on staging is
+ * still the same role; one a person made with the same title is never taken for it. Still there:
+ * a role deleted since is made again.
+ */
+const SEEDED_ROLE = `
+  SELECT v.vacancy_id
+    FROM event_log e
+    JOIN vacancy v ON v.vacancy_id::text = e.entity_id
+   WHERE e.event_key = 'vacancy.created' AND e.entity_type = 'vacancy'
+     AND e.request_id = $1 AND e.payload->>'title' = $2
+   ORDER BY e.occurred_at, e.event_id
+   LIMIT 1 -- pagination:batch the one role this seed made from a spec`;
+
 /** Run `fn` in a transaction of its own. */
 async function inTx(pool, fn) {
   const client = await pool.connect();
@@ -413,7 +434,7 @@ module.exports = async function seed({ pool, log = () => {} }) {
   const roles = {};
   let made = 0;
   for (const [n, spec] of VACANCIES.entries()) {
-    const found = await one(pool, "SELECT vacancy_id FROM vacancy WHERE title = $1 ORDER BY created_at LIMIT 1 -- pagination:batch one role by its title", [spec.title]);
+    const found = await one(pool, SEEDED_ROLE, [requestContext.getRequestId() || SEED_REQUEST, spec.title]);
     if (found) {
       roles[spec.key] = found.vacancy_id;
       continue;

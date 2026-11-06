@@ -34,7 +34,7 @@ import {
   Pill,
   RatingField,
   SegmentedControl,
-  SelectField,
+  ChoiceField,
   TextAreaField,
   TextField,
   toast,
@@ -309,7 +309,7 @@ function ReportForm({ interview, close, onSaved }: { interview: InterviewDetail;
         <TextAreaField {...f.field("report")} rows={6} />
       </Field>
       <Field label="Decision" {...f.status("decision")}>
-        <SelectField options={DECISIONS} placeholder="Pick a decision" {...f.field("decision")} />
+        <ChoiceField options={DECISIONS} {...f.field("decision")} />
       </Field>
       <FormError>{problem}</FormError>
       <FormFooter>
@@ -351,7 +351,7 @@ function DetailsForm({ interview, close, onSaved }: { interview: InterviewDetail
         <TextField {...f.field("current_employer")} maxLength={160} />
       </Field>
       <Field label="Academics" optional {...f.status("academics")}>
-        <SelectField options={ACADEMICS} placeholder="Pick a grade" {...f.field("academics")} />
+        <ChoiceField options={ACADEMICS} {...f.field("academics")} />
       </Field>
       <Grid cols={2}>
         <Field label="Total Months" optional {...f.status("total_experience_months")}>

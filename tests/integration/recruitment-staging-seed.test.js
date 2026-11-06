@@ -207,4 +207,45 @@ describeDb("Recruitment's staging seed against the real migrations", () => {
   test("a second run adds nothing", () => {
     expect(second).toEqual(first);
   });
+
+  // Last: it changes what the runs above made.
+  test("a role renamed on staging is still the seed's, and a person's role with a seeded title is never taken for one", async () => {
+    const c = require("@mycity/contract");
+    const grantsCache = require("../../src/shared/rbac/grants-cache");
+    const vacancies = require("../../src/modules/vacancies/vacancies.service");
+    const lagos = require("../../src/shared/time/lagos");
+    const at = async (title) => (await q("SELECT vacancy_id, department_id, hiring_manager_id FROM vacancy WHERE title = $1", [title])).rows;
+    const [content] = await at("Content Producer");
+    await q("UPDATE vacancy SET title = 'Content Producer, Video' WHERE vacancy_id = $1", [content.vacancy_id]);
+    const [support] = await at("Customer Support Lead");
+    const ops = { ...(await grantsCache.getAuthUser(pool, staff.operations.user_id)), ip: null };
+    const theirs = await requestContext.run({ requestId: "a-person", surface: "api" }, () =>
+      vacancies.create(
+        ops,
+        { scope: "all", scope_ids: null },
+        c.vacancies.VacancyCreate.parse({
+          title: "Customer Support Lead",
+          department_id: support.department_id,
+          hiring_manager_id: support.hiring_manager_id,
+          positions: 1,
+          employment_type: "full_time",
+          work_pattern: "remote",
+          description: "A second support lead, written by a person on staging, which the seed must leave alone.",
+          requirements: "Four years in customer support.",
+          closes_on: lagos.addDays(lagos.today(), 30),
+        }),
+      ),
+    );
+    const before = await counts();
+    await runFile(seed, logs);
+    await settle();
+    const after = await counts();
+    expect(after).toEqual(before);
+    expect(await at("Content Producer")).toEqual([]);
+    const apps = async (id) => (await q("SELECT count(*)::int AS n FROM application WHERE vacancy_id = $1", [id])).rows[0].n;
+    expect(await apps(content.vacancy_id)).toBeGreaterThan(0);
+    expect(await apps(theirs.vacancy_id)).toBe(0);
+    expect((await q("SELECT status::text AS s FROM vacancy WHERE vacancy_id = $1", [theirs.vacancy_id])).rows[0].s).toBe("draft");
+    expect((await q("SELECT status::text AS s FROM vacancy WHERE vacancy_id = $1", [support.vacancy_id])).rows[0].s).toBe("paused");
+  });
 });

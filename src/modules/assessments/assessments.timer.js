@@ -22,6 +22,12 @@ const repo = require("./assessments.repo");
 const scoring = require("./assessments.scoring");
 const { EVENTS, SUBJECT } = require("./assessments.events");
 
+/**
+ * How long a started sitting's link outlives its due_at: a day, so the candidate who saves or opens the
+ * link late reads Time Up from the sitting rather than a link that no longer exists.
+ */
+const LINK_GRACE_MS = 24 * 3_600_000;
+
 /** The last instant of a Lagos day. */
 const endOfDay = (date) => new Date(lagos.endOfDayExclusive(date).getTime() - 1000);
 
@@ -129,4 +135,4 @@ async function sweep(now = new Date()) {
   return { ended };
 }
 
-module.exports = { dueAt, pastDue, endOfDay, lockSitting, finish, score, sweep };
+module.exports = { LINK_GRACE_MS, dueAt, pastDue, endOfDay, lockSitting, finish, score, sweep };

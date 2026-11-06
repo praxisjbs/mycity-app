@@ -6,6 +6,9 @@
  *                                  cards' scores × 10, one decimal (a card's score is the mean of its
  *                                  ratings, or its overall rating); every submitted card becomes readable
  *                                  to those who may see the interview; drafts never are
+ *   closeIfDone(client, row, actor)  the round closes by itself: every seat submitted and the
+ *                                  interview started (after Submit Card, a Reschedule, the sweep)
+ *   closeStarted()                 the daily sweep: a round full before its start, once started
  *   close(actor, scope, id)        Close Round, before every card is in
  *   report(actor, scope, id, body) the consolidated report and its decision, once closed, by
  *                                  `recruitment` edit in scope or the vacancy's hiring manager; each save
@@ -64,6 +67,29 @@ async function closeIn(client, row, actor) {
     },
   });
   return score;
+}
+
+/**
+ * The round closes by itself once every seat on the panel has submitted and the interview has
+ * started, the same rule as Close Round (NOT_STARTED before it). Called after the last Submit Card,
+ * after a Reschedule that leaves only submitted seats, and by the daily sweep for a round that was
+ * full before its start. `row` is read after the change. Returns whether it closed.
+ */
+async function closeIfDone(client, row, actor) {
+  if (row.round_status !== "open" || row.status !== "scheduled") return false;
+  if (!row.panel_size || row.submitted_count !== row.panel_size) return false;
+  if (new Date(row.scheduled_start) > new Date()) return false;
+  await closeIn(client, row, actor);
+  return true;
+}
+
+/** The daily sweep: rounds whose cards were all in before the start, closed once it has passed. */
+async function closeStarted() {
+  let closed = 0;
+  for (const id of await repo.fullAndStarted(pool)) {
+    if (await tx(async (client) => closeIfDone(client, await repo.get(client, id, null, { lock: true }), null))) closed += 1;
+  }
+  return closed;
 }
 
 /** An interview of the reader's scope, locked, or 404. */
@@ -194,4 +220,4 @@ async function details(actor, scope, id, body) {
   });
 }
 
-module.exports = { closeIn, close, report, details, scoreOf, formData };
+module.exports = { closeIn, closeIfDone, closeStarted, close, report, details, scoreOf, formData };

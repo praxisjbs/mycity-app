@@ -8,7 +8,8 @@
  *   schedule(), reschedule(), cancel()       interviews.schedule.js
  *   saveFeedback(), submitFeedback()         interviews.panel.js
  *   close(), report(), details()             interviews.consolidate.js
- *   tidy()                    interviews.notes.js
+ *   panelists()               who may sit on a panel, a page of 25 searched by name (the picker)
+ *   tidy(), tidyStatus()      interviews.notes.js
  *
  * Who sees an interview: the vacancy's hiring manager in the reader's `recruitment` scope, or a seat on
  * its panel (guide §8). Who sees a card's scoring: interviews.repo.js BLIND.
@@ -173,6 +174,8 @@ module.exports = {
   report: then(consolidate.report),
   details: then(consolidate.details),
   tidy: (user, body) => notes.tidy(user, body),
+  tidyStatus: () => notes.status(),
+  panelists: (query) => repo.panelists(pool, query),
   listed,
   sees,
 };

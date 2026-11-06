@@ -56,15 +56,16 @@ never sign in.
 | Assessment (`/assess/<token>`) | public site | the holder of the link | Intro (type, minutes, questions); the running test with a server timer and autosave; submitted or time up | Start the Assessment, answer, upload a file answer (up to 25 MB) or paste a link to a larger one, Back, Next Question, Finish and Submit Assessment |
 | Home · Overview, Open Vacancies card | staff app | as `home.md` §6 | Open vacancies in scope | Open a vacancy |
 | Home · Alerts, Recruitment SLA | staff app | as `home.md` §6 | Applications at one stage longer than the rule's days | Open the candidate |
-| People · Organogram, Create Vacancy | staff app | `people` edit and `recruitment` create | On a vacant seat | Opens New Vacancy here with the seat's title filled in, keeping the seat (`org_seat_id`) |
+| People · Organogram, Create Vacancy | staff app | `people` edit and `recruitment` create | On a vacant seat | Opens New Vacancy here with what the seat knows filled in (looked up by `org_seat_id` on `/suggested`), keeping the seat |
 | My Workspace · Calendar | staff app | each panelist | The interview as a calendar entry with its `.ics` invite | Open it |
 
 ## 3 · How the screens relate
 
 1. **A seat falls empty.** A vacant `org_seat` with no live vacancy shows on Vacancies under Suggested
-   From Organogram. Create Vacancy (there, or on the Organogram) opens New Vacancy with the seat's
-   title, department and reporting line filled in; the vacancy keeps `org_seat_id`. Nothing is created
-   until someone saves (`organogram.md` §3).
+   From Organogram, 25 a page. Create Vacancy (there, or on the Organogram) opens New Vacancy with the
+   seat's title, department and reporting line filled in, and its line manager as the hiring manager;
+   from the Organogram the form first looks the seat up (`/suggested?org_seat_id=`). The vacancy keeps
+   `org_seat_id`. Nothing is created until someone saves (`organogram.md` §3).
 2. **The vacancy is written.** New Vacancy is a three-step wizard (Role, Details, Pay and Publish). Write
    With AI drafts the description and the must have and nice to have from what is filled so far
    (`POST /recruitment/vacancies/assist`, prompt `jd-draft`); the draft goes straight into the form for
@@ -189,10 +190,10 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /recruitment/vacancies/summary` | `VacanciesSummary` | `recruitment` view · all/team | no | Open, applicants, in interview, past closing date; funnel by stage; `careers_url`, this environment's careers page (Careers Page) |
+| `GET /recruitment/vacancies/summary` | `VacanciesSummary` | `recruitment` view · all/team | no | Open, applicants (every application to an open or paused role, whatever became of it: the list's Applicants summed over those roles), in interview, past closing date; funnel by stage (active applications only); `careers_url`, this environment's careers page (Careers Page) |
 | `GET /recruitment/vacancies` | `VacancyListQuery` → `VacancyPage` | `recruitment` view · all/team | yes | Filters `status`, `department_id`, `q`; sort `closes_at`, `title`, `created_at`, `published_at` |
-| `GET /recruitment/vacancies/suggested` | `SeatSuggestionListQuery` → `SeatSuggestionPage` | `recruitment` view · all/team | yes | Vacant seats with no draft, open or paused vacancy; a team reader sees the seats whose line manager is in their scope |
-| `GET /recruitment/vacancies/:id` | `VacancyDetail` | `recruitment` view · all/team | no | With its questions in use (a retired one is left out) and scorecard weights |
+| `GET /recruitment/vacancies/suggested` | `SeatSuggestionListQuery` → `SeatSuggestionPage` | `recruitment` view · all/team | yes | Vacant seats with no draft, open or paused vacancy, each with its line manager (`line_manager`); `org_seat_id` finds one (the Organogram's Create Vacancy); a team reader sees the seats whose line manager is in their scope |
+| `GET /recruitment/vacancies/:id` | `VacancyDetail` | `recruitment` view · all/team | no | With its questions in use (a retired one is left out) and scorecard weights; the description, must have and nice to have both as written (Markdown, for Edit) and as blocks (`*_blocks`, for the sheet) |
 | `POST /recruitment/vacancies` | `VacancyCreate` → `VacancyDetail` | `recruitment` create | no | `publish: true` publishes in the same transaction. A seat holds one live vacancy (422 on `org_seat_id`) |
 | `PATCH /recruitment/vacancies/:id` | `VacancyEdit` → `VacancyDetail` | `recruitment` edit · all/team | no | A closed vacancy is not edited. An optional field sent empty ("" or null) is cleared; one left out stays. Switching to remote removes the place. The pay band is checked against what is kept |
 | `POST /recruitment/vacancies/:id/publish`, `/pause`, `/resume` | `EmptyBody` → `VacancyDetail` | `recruitment` edit · all/team | no | §6.1 |
@@ -206,7 +207,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `GET /recruitment/candidates/summary` | `CandidateSummaryQuery` → `CandidatesSummary` | `recruitment` view · all/team | no | Filter `vacancy_id` |
 | `GET /recruitment/candidates` | `CandidateListQuery` → `CandidatePage` | `recruitment` view · all/team | yes | Filters `stage`, `vacancy_id`, `status`, `q`; sort `weighted_total`, `score`, `applied_at`, `current_stage_entered_at` |
 | `GET /recruitment/candidates/:id` | `CandidateDetail` | `recruitment` view · all/team | no | `:id` is the application |
-| `GET /recruitment/candidates/:id/cv` | file | `recruitment` view · all/team | no | Streamed by the vault; 409 while the scan is pending, never once infected |
+| `GET /recruitment/candidates/:id/cv` | file | `recruitment` view · all/team | no | Streamed by the vault as its own type and name (a Word CV stays `.docx`, also when a screen saves it under a name of its own); 409 while the scan is pending, never once infected |
 | `POST /recruitment/candidates/:id/move` | `CandidateMove` → `CandidateDetail` | `recruitment` edit · all/team | no | §6.3 |
 | `POST /recruitment/candidates/:id/not-progressed` | `CandidateNotProgressed` → `CandidateDetail` | `recruitment` edit · all/team | no | Reason required; on a closed role too |
 | `POST /recruitment/candidates/:id/reopen` | `EmptyBody` → `CandidateDetail` | `recruitment` edit · all/team | no | Back to active, at the stage it left |
@@ -225,7 +226,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/assessments/assist` | `AssessmentDraftRequest` → `AssessmentDraft` | `recruitment` edit | no | `assessment-questions`; nothing kept |
 | `GET /recruitment/assessments/:id/export` | `AssessmentExport` | `recruitment` export | no | One assessment and its questions with points, as a file |
 | `POST /recruitment/assessments/import` | `AssessmentExport` → `AssessmentDetail` | `recruitment` create | no | A new, inactive assessment from such a file |
-| `POST /recruitment/assessments/import/file` | `AssessmentImportFile` → `AssessmentDetail` | `recruitment` create | no | Import on screen: the export file uploaded first (`POST /documents`, purpose `assessment_import`, JSON up to 1 MB), read back from the vault by who uploaded it and checked as `AssessmentExport` |
+| `POST /recruitment/assessments/import/file` | `AssessmentImportFile` → `AssessmentDetail` | `recruitment` create | no | Import on screen: the export file uploaded first (`POST /documents`, purpose `assessment_import`, JSON up to 1 MB; a file that parses as JSON is never refused as markup for words such as `<script` in a question), read back from the vault by who uploaded it and checked as `AssessmentExport`. Sent by **Import Assessment** once the file has arrived, one press one request |
 | `GET /recruitment/assessments/sittings` | `SittingListQuery` → `SittingPage` | `recruitment` view · all/team | yes | Filters `status`, `application_id`, `marking` |
 | `GET /recruitment/assessments/sittings/:id` | `SittingDetail` | `recruitment` view · all/team | no | Answers, with points |
 | `POST /recruitment/assessments/sittings` | `SittingSend` → `SittingDetail` | `recruitment` edit · all/team | no | §6.7 |
@@ -235,15 +236,17 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `GET /recruitment/interviews` | `InterviewListQuery` → `InterviewPage` | `recruitment` view · all/team/panel | yes | Filters `when` (upcoming, past), `status`, `mine`, `application_id`, `q` |
 | `GET /recruitment/interviews/:id` | `InterviewDetail` | `recruitment` view · all/team/panel | no | Blind while open (§6.6) |
 | `POST /recruitment/interviews` | `InterviewSchedule` → `InterviewDetail` | `recruitment` edit · all/team | no | |
-| `PATCH /recruitment/interviews/:id` | `InterviewReschedule` → `InterviewDetail` | `recruitment` edit · all/team | no | New time, place or panel; invites resent |
+| `PATCH /recruitment/interviews/:id` | `InterviewReschedule` → `InterviewDetail` | `recruitment` edit · all/team | no | New time, place or panel; invites resent; a panel left with only submitted seats closes the round as the last card would (§6.6) |
 | `POST /recruitment/interviews/:id/cancel` | `InterviewCancel` → `InterviewDetail` | `recruitment` edit · all/team | no | |
 | `PUT /recruitment/interviews/:id/feedback` | `FeedbackSave` → `InterviewDetail` | `recruitment` view · panel | no | The caller's own draft |
-| `POST /recruitment/interviews/:id/feedback/submit` | `EmptyBody` → `InterviewDetail` | `recruitment` view · panel | no | Locks it; the last one closes the round |
+| `POST /recruitment/interviews/:id/feedback/submit` | `EmptyBody` → `InterviewDetail` | `recruitment` view · panel | no | Locks it; the last one closes the round once the interview has started (§6.6) |
 | `POST /recruitment/interviews/:id/close` | `EmptyBody` → `InterviewDetail` | `recruitment` edit · all/team | no | |
 | `PUT /recruitment/interviews/:id/details` | `RoundDetailsSave` → `InterviewDetail` | `recruitment` edit · all/team | no | Candidate Details on the card, before or during the round; a field sent empty is cleared |
 | `PUT /recruitment/interviews/:id/report` | `RoundReport` → `InterviewDetail` | `recruitment` edit · all/team, or the hiring manager | no | Closed rounds only; generates the form PDF |
 | `GET /recruitment/interviews/:id/cv` | file | `recruitment` view · panel or scope | no | The candidate's CV, for the panel |
-| `POST /recruitment/interviews/assist` | `NotesTidyRequest` → `NotesTidy` | `recruitment` view | no | `interview-notes-cleanup`; nothing kept |
+| `GET /recruitment/interviews/panelists` | `PanelistListQuery` → `PanelistPage` | `recruitment` edit | yes | Who may sit on a panel (§6.6), searched by name (`q`); the panel picker |
+| `GET /recruitment/interviews/assist` | `AiAvailability` | `recruitment` view | no | Whether Tidy With AI may answer now; read by My Card |
+| `POST /recruitment/interviews/assist` | `NotesTidyRequest` → `NotesTidy` | `recruitment` view · a panelist with a card still to write | no | `interview-notes-cleanup`; nothing kept; anyone else 403 `NOT_PANELIST` |
 | `GET /recruitment/pool/summary` | `PoolSummary` | `recruitment` view · all/team | no | In the pool, invited back, hired from the pool, average score |
 | `GET /recruitment/pool` | `PoolListQuery` → `PoolPage` | `recruitment` view · all/team | yes | Filters `q`, `invited`; sort `created_at`, `score`, `expires_at` |
 | `GET /recruitment/pool/:id` | `IdParams` → `PoolEntry` | `recruitment` view · all/team | no | One person, for a link to someone past the list's first page |
@@ -305,7 +308,12 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   05/11/2026), and the public page
   draws it from blocks: the server turns each Markdown text (About MyCityApp, the description, must have,
   nice to have) into blocks with the one safe renderer (`shared/documents/markdown`, `markdownToBlocks`),
-  as a policy's text is, and the page draws them with `RichText` (GE · (Ose), 05/11/2026).
+  as a policy's text is, and the page draws them with `RichText` (GE · (Ose), 05/11/2026). The staff
+  sheet draws the same blocks (`VacancyDetail.description_blocks`, `requirements_blocks`,
+  `nice_to_have_blocks`), never the raw Markdown; the Markdown itself still comes for Edit (GE, 06/11/2026).
+- **Applicants** is one count everywhere: every application to a role, whatever became of it. The list's
+  column counts a role's; the Applicants tile sums it over the open and paused roles. The funnel and a
+  role's Candidates by Stage count only those still in progress (GE, 06/11/2026).
 - A new vacancy gets the five scorecard rows at 15, 15, 25, 20, 25, all on, and its interview traits
   from the Default Traits. Each part is switched on or off for the role (TB, 04/11/2026); a part switched
   off has weight 0, and the weights of the parts on are whole numbers summing to 100. At least
@@ -370,6 +378,13 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   one that slips past is not applied by the model), and returns a score
   from 0 to 100 and a summary that says which conditions are met and what it could not verify. Contact details are shielded before the call (`redact.shield`).
   It writes `screening_score`, `screening_summary`, `screening_ai_run_id` and `screened_at`.
+- **The fairness check** on a must-meet condition (`vacancies.service` `traitsNamed`) reads it folded
+  (case, accents, dashes, dots) for sex ("Ladies only", "Male candidates"), age ("Must be under 30",
+  "25-35", "Young"; a number of years of experience is not an age), ethnicity or tribe ("Igbo only", "a
+  native Yoruba speaker"; a language as a skill, "Speaks Yoruba", "Fluent in English", passes),
+  religion, marriage, children and pregnancy, disability and health (genotype), state or LGA of origin
+  ("Indigene of Lagos State"; where someone lives, "Lives in Lagos", passes), nationality and
+  appearance. Each refused condition is named on its own line: "Not a fair condition" (GE, 06/11/2026).
 - The screening score shown is `screening_score` when there is one, otherwise `provisional_score`
   with `screening_provisional: true`. **Every surface that shows a screening score shows Provisional
   beside it while it is the estimate.**
@@ -391,7 +406,10 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 ### 6.6 Blind panels (A10, MILESTONES §9)
 
 - A panelist is an employee who holds `recruitment` view. Only those people are offered on the panel
-  picker, and the API refuses anyone else (422 on `panel_employee_ids`).
+  picker (`GET /interviews/panelists`, one predicate with the check on a save, `interviews.repo.js`
+  `MAY_SIT`), and the API refuses anyone else: 422 `NOT_PANELISTS`, "Not all hold Recruitment" on
+  `panel_employee_ids`, and a message naming who ("Tunde Ade does not hold Recruitment"; past three
+  names, "and n others") that the form shows on its error line.
 - **While the round is open, a feedback row is readable only by the person who wrote it.** The hiring
   manager, Operations & People and the CEO included. Everyone else sees who has submitted and who has
   not, never a rating. This is one predicate on the read (`f.submitted_at IS NOT NULL AND r.status =
@@ -410,8 +428,14 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   once by `recruitment` edit, not by each panelist, and are not blind.
 - Panelists may open the candidate's CV from the card (the vault's check passes for a seat on the
   panel).
-- The round closes when its last panelist submits, or on Close Round (`recruitment` edit). A closed round
-  does not reopen; a card cannot be changed after Submit.
+- The round closes by itself once every seat on the panel has submitted **and the interview has
+  started**, the same line Close Round holds (`NOT_STARTED` before the start): at the last Submit Card,
+  at a Reschedule that takes off the only seats still waiting, or, for a panel complete before the
+  start, at the daily sweep after it (`interview-reminders`, `consolidate.closeStarted`). Before the
+  start a full round stays open. Close Round (`recruitment` edit) closes it with the cards that are in.
+  A closed round does not reopen; a card cannot be changed after Submit.
+- Tidy With AI is any panelist's with a card still to write, whatever their grant (`recruitment` view,
+  as for the card); an edit grant alone does not reach it.
 - The consolidated report (at least 40 characters, with the decision) is written once the round is
   closed, by the hiring manager or someone with `recruitment` edit, and can be edited by them. Each save
   regenerates the Interview Assessment Form (`interview-assessment-form`, `documents.generate`): the
@@ -430,9 +454,11 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 - An assessment needs at least one question to be activated and to be sent. Its questions cannot be
   changed once it has been sent to anyone; deactivate it and make another.
 - Send: the candidate gets one sitting of an assessment per application. Before Start the link
-  lives until the start-by day (1 to 14 days, default 3) at 23:59 Lagos; once started it lives until the
-  sitting ends at `due_at`, so a test started at 23:30 on its start-by day, or a brief due days later,
-  keeps its link (GE · (Ose), 04/11/2026). Ending the sitting spends it. Marks and option points are numbers; an empty
+  lives until the start-by day (1 to 14 days, default 3) at 23:59 Lagos; once started it lives until a
+  day past the sitting's `due_at`, so a test started at 23:30 on its start-by day, or a brief due days later,
+  keeps its link (GE · (Ose), 04/11/2026), and a save or a visit after the time ran out reaches the
+  sitting and reads Time Up (`TIME_UP`) rather than a dead link (GE, 05/11/2026). Cancelling or
+  expiring the sitting spends it. Marks and option points are numbers; an empty
   one is refused, never read as 0. Send to Candidates sends one assessment to
   every active candidate of a vacancy at a stage (default Assessment) without a live sitting of it, and
   says how many were sent and how many already had one.
@@ -445,7 +471,9 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   04/11/2026; Edit clears the minutes to make one untimed). An untimed sitting is due at 23:59 Lagos on a day staff pick when sending (1 to 14 days
   after Start, default 5; `due_days`), shows that day instead of a clock, and is ended by Submit or by that day.
 - Start sets `started_at` = now and `due_at` = now + `duration_minutes` (or the due day for an untimed one). The clock is the server's: the
-  session returns `ends_at` and `server_now`, and an answer after `due_at` is refused with `TIME_UP`.
+  session returns `ends_at` and `server_now`, and an answer after `due_at` is refused with `TIME_UP`,
+  also once the sitting has already been ended by its clock. A sitting that ended at or after `due_at`
+  reads `timed_out` on its page, though it was scored at once.
   Reopening the link resumes at `current_question` with the time left.
 - Submit, or `assessment-expiry` within a minute of `due_at`, ends the sitting (`submitted` or
   `timed_out`); answers saved stand. A sitting never started by its start-by day becomes `expired`.
@@ -478,6 +506,9 @@ with test addresses.
   with them.
 - The score shown is the screening score of the application they were added from, with Provisional when
   it is the estimate.
+- A vacancy outside the reader's scope is never named: `invited_vacancy` (and `applied_for`) is null when
+  its hiring manager is outside it, in the list, one person's sheet and the export (the row still shows
+  Invited and when). A reader with `all` sees every title (GE, 05/11/2026).
 
 ## 7 · Events, jobs and notifications
 
@@ -566,10 +597,10 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Recruitment · Vacancies (`vacancies`) | Four KPIs (Open Vacancies, Applicants, In Interview, Past Closing Date); the list: role, department, location, applicants, closes, status; Suggested From Organogram (title, department, Create Vacancy); the funnel; New Vacancy, Careers Page, Candidate Emails, Careers Settings. A vacancy's sheet: details, public link with Copy Link, Edit, Publish or Pause or Resume, Close, Questions, Scorecard, See Candidates | Help term on Scorecard: "Switch off a part this role skips. The parts left on add up to 100." Help on Paused: "Takes no applications. The link keeps working." | The slug rule, the lifecycle, why a paused role keeps its link: §6.1 here, the manual |
+| Recruitment · Vacancies (`vacancies`) | Four KPIs (Open Vacancies, Applicants, In Interview, Past Closing Date); the list: role, department, location, applicants, closes, status; Suggested From Organogram (title, department, Create Vacancy; 25 a page with its pager); the funnel; New Vacancy, Careers Page, Candidate Emails, Careers Settings. A vacancy's sheet: details, public link with Copy Link, Edit, Publish or Pause or Resume, Close, Questions, Scorecard, See Candidates; the Description, Required Experience and What We Look For drawn as formatted text (headings, lists) | Help term on Scorecard: "Switch off a part this role skips. The parts left on add up to 100." Help on Paused: "Takes no applications. The link keeps working." Help on the Applicants tile: "Everyone who applied to an open or paused role, whatever became of them." | The slug rule, the lifecycle, why a paused role keeps its link: §6.1 here, the manual |
 | Recruitment · Candidates (`candidates`) | Four KPIs (Candidates, To Screen, In Interview, Shortlisted); vacancy filter; the board's five columns, each card: name, role, screening score with Provisional, days at stage; the sheet: details, CV, answers, Screening (score, Provisional, the AI summary), Scorecard (parts, weighted total, "n of m parts"), assessments, interviews, Stage History; Score With AI, Send Assessment, Schedule Interview, Not Progressing, Reopen, Add to Pool, `Move to <Stage>`, Invite to Apply, Screen With AI (asks one to three must-meet conditions) | Help term on Provisional: "Worked out from the form only. Press Score With AI to read the CV." Help on Weighted Total: "From the parts scored so far, with this role's weights." | The two-tier scoring design and why a score never moves anyone: §6.4 here |
 | Recruitment · Assessments (`assessments`) | Four KPIs (Active, Sent, Awaiting Marking, Average Score); Assessments list: name, type, minutes, questions, sent, average, status; Sittings: candidate, assessment, state, score; New Assessment and Import; an assessment's sheet with its questions and points, Edit, Questions, Activate or Deactivate, Export; Send to Candidates; a sitting's sheet with each answer (a file to open, or the link given) and Mark Answers | Help on Points: "What each option scores." | How the timer and resume work: §6.7, the manual |
-| Recruitment · Interviews (`interviews`) | Upcoming and Past; each row: candidate, role, when, panel submitted out of total, round state; the interview's sheet: when, where or link, Candidate Details, panel with Submitted or Waiting, traits with each rating and the average only once closed, total, report and decision, Download Form; My Card (traits as ten stars, decision, comments, private notes, View CV), Submit Card, Close Round, Write Report, Schedule Interview, Reschedule, Cancel | Help on Waiting: "Ratings show when every panelist has submitted or the round is closed." Help on Private Notes: "Only you ever see these." | The blind predicate and its reasons: §6.6 here |
+| Recruitment · Interviews (`interviews`) | Upcoming and Past; each row: candidate, role, when, panel submitted out of total, round state; the interview's sheet: when, where or link, Candidate Details, panel with Submitted or Waiting, traits with each rating and the average only once closed, total, report and decision, Download Form; My Card (traits as ten stars, decision, comments, Tidy With AI for every panelist while the AI is available, private notes, View CV; a star that fails to save goes back to the last rating the server kept, unless a later tap of that trait is on its way), Submit Card, Close Round, Write Report, Schedule Interview (its panel picker offers only who holds Recruitment; a refusal names who cannot sit), Reschedule, Cancel | Help on Waiting: "Ratings show when every panelist has submitted or the round is closed." Help on Private Notes: "Only you ever see these." | The blind predicate and its reasons: §6.6 here |
 | Recruitment · Talent Pool (`talent-pool`) | Four KPIs (In the Pool, Invited Back, Hired From the Pool, Average Score); the list: candidate, applied for, score with Provisional, added, reason, kept until, Invite to Apply or Invited; Export | Help on Kept Until: "Removed from the pool on this date." | The 24 month rule and the purge job: §6.9 |
 | Careers (`/jobs`) | Work With Us; open roles with department, area and arrangement; search above 8 roles | None | Indexing, slugs: §6.1 |
 | Vacancy (`/jobs/<slug>`) | Title; department, area, arrangement, salary when shown; employment type, working days, probation, reports to, the closing date; About MyCityApp, Role Overview (the description; one that opens with its own `## Role Overview` shows the heading once), Required Experience and Qualifications, What We Are Looking For, How We Hire as its steps; Apply for This Role (beside the text on desktop, a bar at the foot on a phone); a paused, closed or filled banner | None | Why a paused link still works: §6.1 |
@@ -615,7 +646,11 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - **Mail paused or paced**: the candidate's mail waits; nothing is lost and nothing is sent twice.
 - **AI off or over its limit**: Write With AI, Suggest With AI, Score With AI and Tidy With AI are not
   shown; everything else works.
-- **Staging**: real mail is marked `[STAGING]`; the staging seed uses `@example.test` candidates only.
+- **Staging**: real mail is marked `[STAGING]`; the staging seed uses `@example.test` candidates only,
+  and system mail never hands an `@example.test` address to the mail server (logged as not sent,
+  `integrations.md` §6.16), so nothing bounces. The seed finds the roles it made by its own record of
+  making them (the `vacancy.created` its run emitted), so a role renamed on staging, or a person's role
+  with a seeded title, is never mistaken for one.
 
 ## 12 · Donor code
 
@@ -642,9 +677,24 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 06/11/2026 · GE · The P15 follow-ups, closed. Interviews: the panel picker lists only who may sit
+  (`GET /recruitment/interviews/panelists`) and a refusal names who cannot; a round closes by itself
+  only once every seat has submitted and the interview has started (after Submit Card, after a
+  Reschedule that drops the last waiting panelist, or at the daily reminder run); Tidy With AI is for
+  any panelist with a card to write (`GET /recruitment/interviews/assist`); My Card puts a star back
+  only to what the server last kept. Vacancies: the staff sheet draws its texts as blocks; Create
+  Vacancy from a seat fills in the department, reports to and hiring manager; the screening check
+  refuses protected phrasings (sex, age, origin, religion, marriage, disability and more); Suggested
+  From Organogram pages; Applicants is every application, on the tile and the column. Candidates and
+  the rest: an assessment link lives a day past its due time, so Time Up is reachable; the pool never
+  names a vacancy outside the reader's scope; a Word CV saves with its own name; Import Assessment is
+  one press; Cancel goes back one step; short fixed choices are radio groups; a JSON export that
+  mentions `<script` imports; mail to reserved domains (`@example.test`) is never handed to the mail
+  server; the staging seed finds its roles by its own creation events.
 - 05/11/2026 · GE · (Ose) The careers page shows a part's heading once: a description that opens with its own
   `## Role Overview` (as staff paste MyCity's job descriptions) loses that first line on Vacancy (§10.1). The
   Recruitment chapter follows the screens (the auditor's list in the handoff).
+
 - 05/11/2026 · GE · The eight decisions from the P15 audit: (1) the repository is private, so MyCity's
   documents stay (§13); (2) Close Vacancy offers to mark everyone still in progress Not Progressing, with
   their emails, and Not Progressing works on a closed role (§6.1, §6.3); (3) a second application by the

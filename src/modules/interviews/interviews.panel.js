@@ -7,7 +7,8 @@
  *   save(actor, id, body)    the reader's own draft: ratings for the vacancy's traits (1 to 10), or one
  *                            overall rating when it has none, a decision, comments (Others), notes
  *   submit(actor, id)        needs every trait rated (or the overall rating) and a decision; locks the
- *                            card; the last card to arrive closes the round (interviews.consolidate)
+ *                            card; the last card to arrive closes the round once the interview has
+ *                            started (interviews.consolidate closeIfDone)
  *
  * Only a panelist of the interview writes here, whatever their grant (`recruitment` view is enough:
  * a seat on the panel is the permission).
@@ -93,9 +94,9 @@ async function submit(actor, id) {
       actor,
       payload: { interview_id: id, application_number: row.application_number },
     });
-    // The last card closes the round.
-    const fresh = await repo.get(client, id, actor.employee_id);
-    if (fresh.submitted_count === fresh.panel_size) await consolidate.closeIn(client, fresh, actor);
+    // The last card closes the round once the interview has started; before it, the round waits for
+    // the start (the daily sweep) or Close Round, as Close Round itself does (NOT_STARTED).
+    await consolidate.closeIfDone(client, await repo.get(client, id, actor.employee_id), actor);
     return id;
   });
 }

@@ -2,6 +2,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { dispatch, fail } from "@/api/mock/core";
 import { copyProblems, dialog, openAs, openRow, press, settled } from "./testKit";
 
 /**
@@ -81,6 +82,56 @@ describe("Recruitment · Interviews", () => {
     await settled();
     expect(within(dialog()).queryByText(/Rate 8 more traits/)).toBeNull();
   }, 90000);
+
+  it("My Card: a failed star goes back to what the server kept, and never over a later tap that saved", async () => {
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews&mine=true");
+    await openRow("Tobi Adeyemi");
+    await press(dialog(), "My Card");
+    const checked = (n: number) => star(dialog(), /Oral Communication Skills/, n).getAttribute("aria-checked") === "true";
+    const real = vi.mocked(dispatch).getMockImplementation()!;
+    // Each save of the card in turn: "fail", or the milliseconds it takes before it goes through. A slow
+    // second save lets the screen draw the first one's failure before the second lands, as on a network.
+    const outcomes: Array<"fail" | number> = [];
+    vi.mocked(dispatch).mockImplementation(async (req) => {
+      if (req.method !== "PUT" || !req.path.endsWith("/feedback")) return real(req);
+      const next = outcomes.shift() ?? 0;
+      if (next === "fail") return fail(503, "UNAVAILABLE", "Not saved. Try again.");
+      await new Promise((r) => setTimeout(r, next));
+      return real(req);
+    });
+    try {
+      // Two taps in flight; the first fails, the second saves: the star stays on the second.
+      outcomes.push("fail", 600);
+      fireEvent.click(star(dialog(), /Oral Communication Skills/, 5));
+      fireEvent.click(star(dialog(), /Oral Communication Skills/, 7));
+      await settled();
+      expect(checked(7)).toBe(true);
+      expect(within(dialog()).queryByText("Not saved. Try again.")).toBeNull();
+
+      // The first saves, the second fails: back to the first, the last the server confirmed.
+      outcomes.push(0, "fail");
+      fireEvent.click(star(dialog(), /Oral Communication Skills/, 4));
+      fireEvent.click(star(dialog(), /Oral Communication Skills/, 6));
+      await settled();
+      expect(checked(4)).toBe(true);
+      expect(checked(6)).toBe(false);
+      expect(within(dialog()).getByText("Not saved. Try again.")).toBeTruthy();
+    } finally {
+      vi.mocked(dispatch).mockImplementation(real);
+    }
+    // Put back as the other tests found it.
+    fireEvent.click(star(dialog(), /Oral Communication Skills/, 4));
+    await settled();
+  }, 90000);
+
+  it("Schedule Interview offers only the people who may sit on a panel", async () => {
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews");
+    vi.mocked(dispatch).mockClear();
+    await press(document.body, "Schedule Interview");
+    const asked = vi.mocked(dispatch).mock.calls.map(([r]) => `${r.method} ${r.path}`);
+    expect(asked).toContain("GET /api/v1/recruitment/interviews/panelists");
+    expect(asked).not.toContain("GET /api/v1/employees");
+  }, 60000);
 
   it("a closed round shows each trait's average, the total and the report", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=interviews");

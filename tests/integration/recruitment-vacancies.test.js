@@ -191,6 +191,13 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     expect(JSON.stringify(role.body)).not.toContain(draft.vacancy_id);
     expect((await pub().get("/jobs/no-such-role")).status).toBe(404);
     expect((await pub().get("/jobs/Bad_Slug")).status).toBe(404);
+
+    // The staff sheet draws the same blocks, and keeps the Markdown for the edit form.
+    const sheet = (await h.as("ops").get(`/recruitment/vacancies/${draft.vacancy_id}`)).body;
+    expect(sheet.description_blocks).toEqual(role.body.description);
+    expect(sheet.requirements_blocks).toEqual(role.body.requirements);
+    expect(sheet.nice_to_have_blocks).toEqual(role.body.nice_to_have);
+    expect(sheet.description).toMatch(/^The Head, Sales & Revenue/);
   });
 
   test("Apply for This Role mints a single-use Apply link; a draft or paused role gives the same 404", async () => {
@@ -286,7 +293,16 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
   test("Suggested From Organogram lists vacant seats until a vacancy takes one", async () => {
     const seat = await one("INSERT INTO org_seat (title, department_id, status) VALUES ('Partnerships Associate', $1, 'vacant') RETURNING org_seat_id", [dept]);
     const before = await h.as("ops").get("/recruitment/vacancies/suggested");
-    expect(before.body.data).toEqual([expect.objectContaining({ org_seat_id: seat.org_seat_id, title: "Partnerships Associate", department: "Operations" })]);
+    expect(before.body.data).toEqual([expect.objectContaining({ org_seat_id: seat.org_seat_id, title: "Partnerships Associate", department: "Operations", line_manager: null })]);
+    // The Organogram's Create Vacancy finds its one seat by id, with what New Vacancy fills in.
+    await q("UPDATE org_seat SET line_manager_id = $1 WHERE org_seat_id = $2", [h.people.ops.employee_id, seat.org_seat_id]);
+    const one_ = await h.as("ops").get(`/recruitment/vacancies/suggested?org_seat_id=${seat.org_seat_id}`);
+    expect(one_.body.data).toEqual([
+      expect.objectContaining({ org_seat_id: seat.org_seat_id, department_id: dept, reports_to: "Ada Obi", line_manager: expect.objectContaining({ employee_id: h.people.ops.employee_id, display_name: "Ada Obi" }) }),
+    ]);
+    const other = await h.as("ops").get(`/recruitment/vacancies/suggested?org_seat_id=${dept}`);
+    expect(other.body.data).toEqual([]);
+    await q("UPDATE org_seat SET line_manager_id = NULL WHERE org_seat_id = $1", [seat.org_seat_id]);
     // A Head of Department sees only the seats of people they lead.
     expect((await h.as("hod").get("/recruitment/vacancies/suggested")).body.data).toEqual([]);
     const made = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Partnerships Associate", org_seat_id: seat.org_seat_id }));
@@ -443,5 +459,59 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     expect(first.body.data).toHaveLength(25);
     expect(first.body.page.total).toBe(26);
     expect((await pub().get("/jobs?q=sales%20associate&page=2")).body.data).toHaveLength(1);
+  });
+
+  test("Suggested From Organogram pages in 25s", async () => {
+    for (let i = 0; i < 26; i += 1) await q("INSERT INTO org_seat (title, department_id, status) VALUES ($1, $2, 'vacant')", [`Field Seat ${i}`, dept]);
+    const first = await h.as("ops").get("/recruitment/vacancies/suggested");
+    expect(first.body.data).toHaveLength(25);
+    expect(first.body.page.total).toBe(26);
+    expect((await h.as("ops").get("/recruitment/vacancies/suggested?page=2")).body.data).toHaveLength(1);
+  });
+
+  test("Applicants on the tiles is the list's Applicants summed over the open and paused roles, whatever became of each", async () => {
+    const role = await one("SELECT vacancy_id FROM vacancy WHERE status = 'open' ORDER BY number LIMIT 1");
+    const before = (await h.as("ops").get("/recruitment/vacancies/summary")).body.applicants;
+    const { rows: ks } = await q(
+      "INSERT INTO candidate (first_name, last_name, email) VALUES ('Bola', 'Ige', 'bola.ige@example.test'), ('Uche', 'Nwosu', 'uche.nwosu@example.test') RETURNING candidate_id",
+    );
+    await q(
+      `INSERT INTO application (vacancy_id, candidate_id, number, status, source)
+       VALUES ($1, $2, 'APP-KPI-1', 'active', 'careers'), ($1, $3, 'APP-KPI-2', 'not_progressed', 'careers')`,
+      [role.vacancy_id, ks[0].candidate_id, ks[1].candidate_id],
+    );
+    const s = (await h.as("ops").get("/recruitment/vacancies/summary")).body;
+    let listed = 0;
+    for (let page = 1; ; page += 1) {
+      const res = (await h.as("ops").get(`/recruitment/vacancies?page=${page}`)).body;
+      listed += res.data.filter((v) => v.status === "open" || v.status === "paused").reduce((n, v) => n + v.applicants, 0);
+      if (page * 25 >= res.page.total) break;
+    }
+    expect(s.applicants).toBe(before + 2);
+    expect(s.applicants).toBe(listed);
+    // The funnel counts only those still in progress.
+    const active = (await one("SELECT count(*)::int AS n FROM application a JOIN vacancy v USING (vacancy_id) WHERE a.status = 'active' AND v.status IN ('open', 'paused')")).n;
+    expect(s.funnel.reduce((n, f) => n + f.count, 0)).toBe(active);
+    expect(active).toBeLessThan(s.applicants);
+  });
+
+  test("Screen With AI's conditions: a protected trait is refused on its own line, a fair one is kept", async () => {
+    const role = await one("SELECT vacancy_id FROM vacancy WHERE status = 'open' ORDER BY number LIMIT 1");
+    const { atomically } = require("../../src/shared/db/tx");
+    const keep = async (conditions) => {
+      const client = await pool.connect();
+      try {
+        return await atomically(client, () => service.keepScreeningConditions(client, { scope: "all", scope_ids: null }, role.vacancy_id, conditions));
+      } finally {
+        client.release();
+      }
+    };
+    for (const bad of ["Ladies only", "Must be under 30", "Igbo only"]) {
+      const err = await keep(["Lives in Lagos", bad]).catch((e) => e);
+      expect(err).toMatchObject({ code: "VALIDATION_FAILED", status: 422 });
+      expect(err.fields).toEqual({ "screening_conditions.1": ["Not a fair condition"] });
+    }
+    const kept = await keep(["Lives in Lagos", "Fluent in English", "Five years of sales experience"]);
+    expect(kept.conditions).toEqual(["Lives in Lagos", "Fluent in English", "Five years of sales experience"]);
   });
 });

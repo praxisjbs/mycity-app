@@ -2,7 +2,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
-import { VACANCIES } from "@/api/mock/data/recruitment";
+import { SEATS, VACANCIES } from "@/api/mock/data/recruitment";
 import { copyProblems, dialog, openAs, openRow, press, settled, type } from "./testKit";
 
 /**
@@ -50,7 +50,22 @@ describe("Recruitment · Vacancies", () => {
     expect(within(sheet).getByText("Future Growth Potential in Career")).toBeTruthy();
     expect(within(sheet).getByText(/go\.mycityapp\.io\/jobs\//)).toBeTruthy();
     for (const name of ["Edit", "Questions", "Scorecard", "Pause", "See Candidates"]) expect(within(sheet).getByRole("button", { name })).toBeTruthy();
+    // The description is drawn from its blocks: real headings and lists, never the Markdown's marks.
+    expect(within(sheet).getByRole("heading", { name: "Key Responsibilities" })).toBeTruthy();
+    expect(within(sheet).getAllByRole("listitem").length).toBeGreaterThan(3);
+    expect(within(sheet).queryByText(/^##|\n- /)).toBeNull();
+    expect(sheet.textContent).not.toContain("## ");
     expect(copyProblems()).toEqual([]);
+  }, 60000);
+
+  it("Create Vacancy from the Organogram opens New Vacancy with the seat's department, line and manager", async () => {
+    await openAs("cynthia@mycityapp.io", `/recruitment?tab=vacancies&new=1&title=City+Editor%2C+Abuja&org_seat_id=${SEATS[1]!.org_seat_id}`);
+    await settled();
+    const form = dialog();
+    expect((within(form).getByLabelText("Job Title") as HTMLInputElement).value).toBe("City Editor, Abuja");
+    await settled();
+    expect(within(form).getByLabelText("Department").textContent).toContain("Content");
+    expect(within(form).getByText(/Cynthia/)).toBeTruthy();
   }, 60000);
 
   it("Pause and Resume a role", async () => {
@@ -82,7 +97,8 @@ describe("Recruitment · Vacancies", () => {
     await press(form, "Next");
 
     form = dialog();
-    await chooseOption(within(form).getByLabelText("Arrangement"), "Remote");
+    fireEvent.click(within(within(form).getByRole("radiogroup", { name: "Arrangement" })).getByRole("radio", { name: "Remote" }));
+    await settled();
     expect(within(form).queryByLabelText("Location")).toBeNull();
     type(form, "Description", "The Data Analyst turns MyCityApp's listings, bookings and partner figures into the weekly numbers every team plans by.");
     type(form, "Required Experience and Qualifications", "Two years with SQL and spreadsheets in a busy team.");

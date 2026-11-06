@@ -43,8 +43,15 @@ const notFound = () => new AppError("NOT_FOUND", "That person is not in the pool
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
-/** PoolEntry. */
-function entry(r) {
+/** Whether `scope` may see a vacancy managed by `managerId` (the rule assertInScope applies). */
+const sees = (scope, managerId) =>
+  !scope || scope.scope === "all" || Boolean(managerId && (scope.scope_ids || []).includes(managerId));
+
+/**
+ * PoolEntry. A vacancy outside the reader's scope is not named: a reader scoped to some hiring managers
+ * sees that the person was invited back, never the title of another manager's role.
+ */
+function entry(r, scope) {
   const screening = num(r.screening_score);
   const provisional = num(r.provisional_score);
   return {
@@ -53,7 +60,7 @@ function entry(r) {
     name: r.name,
     email: r.email,
     application_id: r.application_id,
-    applied_for: r.applied_vacancy_id ? { vacancy_id: r.applied_vacancy_id, number: r.applied_number, title: r.applied_title } : null,
+    applied_for: r.applied_vacancy_id && sees(scope, r.hiring_manager_id) ? { vacancy_id: r.applied_vacancy_id, number: r.applied_number, title: r.applied_title } : null,
     score: screening !== null ? screening : provisional,
     score_provisional: screening === null && provisional !== null,
     reason: r.reason,
@@ -61,7 +68,7 @@ function entry(r) {
     created_at: iso(r.created_at),
     expires_at: iso(r.expires_at),
     invited_at: iso(r.invited_at),
-    invited_vacancy: r.invited_vacancy_id ? { vacancy_id: r.invited_vacancy_id, number: r.invited_number, title: r.invited_title } : null,
+    invited_vacancy: r.invited_vacancy_id && sees(scope, r.invited_hiring_manager_id) ? { vacancy_id: r.invited_vacancy_id, number: r.invited_number, title: r.invited_title } : null,
     hired_from_pool: Boolean(r.hired_from_pool),
     removed_at: iso(r.removed_at),
   };
@@ -69,7 +76,7 @@ function entry(r) {
 
 async function list(query, scope) {
   const page = await repo.list(pool, query, scope);
-  return { ...page, data: page.data.map(entry) };
+  return { ...page, data: page.data.map((r) => entry(r, scope)) };
 }
 
 async function summary(scope) {
@@ -82,7 +89,7 @@ async function get(id, scope) {
   const row = await repo.get(pool, id);
   if (!row) throw notFound();
   assertInScope(scope, row.hiring_manager_id);
-  return entry(row);
+  return entry(row, scope);
 }
 
 /** A live entry of the reader's scope, locked, or 404. */
@@ -116,7 +123,7 @@ async function add(actor, scope, body) {
       actor,
       payload: { talent_pool_entry_id: id, application_number: app.number },
     });
-    return entry(await repo.get(client, id));
+    return entry(await repo.get(client, id), scope);
   });
 }
 
@@ -131,7 +138,7 @@ async function invite(actor, scope, id, body) {
       actor,
       payload: { talent_pool_entry_id: id, vacancy_id: body.vacancy_id },
     });
-    return entry(await repo.get(client, id));
+    return entry(await repo.get(client, id), scope);
   });
 }
 
@@ -146,7 +153,7 @@ async function remove(actor, scope, id, body) {
       payload: { talent_pool_entry_id: id, candidate_id: row.candidate_id },
     });
     // Answered as it was just before it left, with when it left; it is no longer listed.
-    return { ...entry(row), removed_at: new Date().toISOString() };
+    return { ...entry(row, scope), removed_at: new Date().toISOString() };
   });
 }
 
@@ -177,7 +184,7 @@ async function gather(filters, scope) {
   const push = (data) =>
     rows.push(
       ...data.map((r) => {
-        const e = entry(r);
+        const e = entry(r, scope);
         return {
           name: e.name,
           email: e.email,

@@ -9,7 +9,7 @@
  * form all use: the reader's own card, or a submitted card of a closed round. Private notes are read
  * only for the reader's own card (myFeedback), never in a panel read.
  */
-const { personJson } = require("../../shared/db/person");
+const { personJson, photoUrlSql } = require("../../shared/db/person");
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 
 /**
@@ -165,17 +165,53 @@ async function myFeedback(db, interviewId, employeeId) {
   return rows[0] || null;
 }
 
-/** Employees who may sit on a panel: active, with a login that holds `recruitment` view (or the CEO). */
+/**
+ * Employee `e` may sit on a panel: active, with an active login that holds `recruitment` view (or the
+ * CEO). One predicate for the picker (panelists) and the check on a save (eligible).
+ */
+const MAY_SIT = `e.status = 'active' AND EXISTS (
+    SELECT 1 FROM app_user u
+     WHERE u.employee_id = e.employee_id AND u.status = 'active'
+       AND (u.is_ceo = true OR EXISTS (
+             SELECT 1 FROM user_role ur JOIN permission p ON p.role_id = ur.role_id
+              WHERE ur.user_id = u.user_id AND p.module_key = 'recruitment' AND p.can_view = true
+                AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE))))`;
+
+/** Employees who may sit on a panel, of those named. */
 async function eligible(db, employeeIds) {
   const { rows } = await db.query(
-    `SELECT DISTINCT e.employee_id, e.work_email::text AS work_email
+    `SELECT e.employee_id, e.work_email::text AS work_email
        FROM employee e
-       JOIN app_user u ON u.employee_id = e.employee_id AND u.status = 'active'
-      WHERE e.employee_id = ANY($1::uuid[]) AND e.status = 'active'
-        AND (u.is_ceo = true OR EXISTS (
-              SELECT 1 FROM user_role ur JOIN permission p ON p.role_id = ur.role_id
-               WHERE ur.user_id = u.user_id AND p.module_key = 'recruitment' AND p.can_view = true
-                 AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE)))`,
+      WHERE e.employee_id = ANY($1::uuid[]) AND ${MAY_SIT}`,
+    [employeeIds],
+  );
+  return rows;
+}
+
+/** One page of the people who may sit on a panel, narrowed by name (the panel picker). */
+function panelists(db, query) {
+  return pageQuery(
+    db,
+    `SELECT e.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, e.job_title,
+            d.name AS department, ${photoUrlSql("e")} AS photo_url, ${TOTAL_COL}
+       FROM employee e
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE ${MAY_SIT}
+        AND ($1::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($1) || '%')
+      ORDER BY e.first_name, e.last_name, e.employee_id`,
+    [query.q || null],
+    query,
+  );
+}
+
+/** The names of these employees, for a refusal that says who. */
+async function namesOf(db, employeeIds) {
+  if (!employeeIds.length) return [];
+  // pagination:complete the people named on one panel, at most 8 by the contract
+  const { rows } = await completeQuery(
+    db,
+    `SELECT employee_id, btrim(first_name || ' ' || last_name) AS display_name
+       FROM employee WHERE employee_id = ANY($1::uuid[]) ORDER BY first_name, last_name, employee_id`,
     [employeeIds],
   );
   return rows;
@@ -366,6 +402,38 @@ async function due(db) {
   return rows;
 }
 
+/**
+ * Interviews whose every panelist submitted before the start: their rounds wait for the start to
+ * close (interviews.reminders sweeps them once it has passed).
+ */
+async function fullAndStarted(db) {
+  // pagination:complete the rounds the daily sweep closes; a full round before its start is rare
+  const { rows } = await completeQuery(
+    db,
+    `SELECT i.interview_id
+       FROM interview i JOIN interview_round r ON r.interview_round_id = i.interview_round_id
+      WHERE r.status = 'open' AND i.status = 'scheduled' AND i.scheduled_start <= now()
+        AND EXISTS (SELECT 1 FROM interview_panelist p WHERE p.interview_id = i.interview_id)
+        AND NOT EXISTS (SELECT 1 FROM interview_panelist p WHERE p.interview_id = i.interview_id AND p.submitted_at IS NULL)
+      ORDER BY i.interview_id`,
+  );
+  return rows.map((r) => r.interview_id);
+}
+
+/** Whether the employee has a card still to write: a seat, not submitted, on a live round. */
+async function hasOpenSeat(db, employeeId) {
+  if (!employeeId) return false;
+  const { rows } = await db.query(
+    `SELECT EXISTS (
+       SELECT 1 FROM interview_panelist p
+         JOIN interview i ON i.interview_id = p.interview_id
+         JOIN interview_round r ON r.interview_round_id = i.interview_round_id
+        WHERE p.employee_id = $1 AND p.submitted_at IS NULL AND i.status = 'scheduled' AND r.status = 'open') AS yes`,
+    [employeeId],
+  );
+  return rows[0].yes;
+}
+
 /** A worksite still in use, by id, with its readable address line. */
 async function worksite(db, id) {
   const { rows } = await db.query(
@@ -397,6 +465,8 @@ module.exports = {
   panel,
   myFeedback,
   eligible,
+  panelists,
+  namesOf,
   insertRound,
   insertInterview,
   updateInterview,
@@ -413,6 +483,8 @@ module.exports = {
   setForm,
   saveDetails,
   due,
+  fullAndStarted,
+  hasOpenSeat,
   worksite,
   icsSequence,
   actorOf,

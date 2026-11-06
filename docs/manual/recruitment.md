@@ -29,12 +29,16 @@ Vacancies lists each role MyCity is hiring for, and the seats on the organogram 
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. The tiles count the **Open Vacancies**, the **Applicants**, those **In Interview** and the roles
-   **Past Closing Date**. A phone shows two tiles a row.
+   **Past Closing Date**. A phone shows two tiles a row. **Applicants** counts everyone who applied
+   to an open or paused role, whatever became of them.
 3. The list shows each role with its department, location, applicants, closing day and status.
+   A role's applicants are counted the same way, so the tile is the open and paused roles' added up.
 4. On a computer, the funnel shows how many candidates stand at each stage.
 5. Press a vacancy. On a computer it opens beside the list; on a phone it opens in a sheet.
    ![A vacancy's sheet](shot:recruitment-vacancy-sheet)
-6. The sheet shows the role's details and its public link. Press **Copy Link** to share it.
+6. The sheet shows the role's details and its public link. Press **Copy Link** to share it. Its
+   description, required experience and what we look for read with their headings and lists, as
+   the careers page shows them.
 7. Press **See Candidates** to open its candidates on the board.
 8. Press **Careers Page** at the top to open the careers page as a candidate sees it.
 
@@ -107,13 +111,14 @@ and its scorecard at the usual weights. Change either before you publish.
 **Suggested From Organogram** lists the vacant seats on the organogram that have no vacancy yet.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
-2. Find the seat under **Suggested From Organogram**.
+2. Find the seat under **Suggested From Organogram**. It shows 25 seats a page; page on below it.
 3. Press **Create Vacancy** beside it.
-4. **New Vacancy** opens with the seat's title, department and reporting line filled in.
+4. **New Vacancy** opens with the seat's title, department and reporting line filled in, and the
+   seat's manager as the **Hiring Manager**. Change any of them if they do not fit.
 5. Follow [Write a new vacancy](#recruitment-vacancies-new) from step 3. Nothing is made until you
    save.
 6. {needs="people edit"} You can also press **Create Vacancy** on a vacant seat on
-   [People · Organogram](/people?tab=organogram).
+   [People · Organogram](/people?tab=organogram). **New Vacancy** opens here filled in the same way.
 
 A seat holds one draft, open or paused vacancy at a time. Once it has one, it leaves the list.
 
@@ -189,8 +194,9 @@ not progressing.
 3. Press the email you want to change.
 4. Change its subject and its words. Keep the words in double braces, such as
    `{{ vacancy_title }}`: the hub fills them in.
-5. Save it. The next email sent uses the new words.
-6. To go back to the wording MyCity started with, press **Restore Default**.
+5. Press **Save Email**. The next email sent uses the new words, and you are back at the list.
+6. To go back to the wording MyCity started with, press **Restore Default**. **Cancel** takes you back
+   to the list without saving.
 
 > **Important:** Only someone who may change every vacancy can save an email, as each one goes to
 > every candidate.
@@ -447,8 +453,8 @@ Assessments written on staging reach the live hub this way, so nothing is typed 
    downloads. See [Save a file you download](#start-downloads).
 3. {needs="recruitment create"} On the other hub, open
    [Recruitment · Assessments](/recruitment?tab=assessments) and press **Import**.
-4. {needs="recruitment create"} Pick the file. A new assessment is made, switched off, for you to
-   check and activate.
+4. {needs="recruitment create"} Pick the file, and once it shows **Done**, press **Import Assessment**.
+   A new assessment is made, switched off, for you to check and activate.
 
 An assessment with no questions cannot be exported.
 
@@ -522,7 +528,8 @@ the CEO.
 4. Pick **How** it is held: in person at a **Worksite**, by video with its **Meeting Link**, or by
    phone. You may give it a **Round Name**, such as `Interview 1`.
 5. Pick the **Day**, when it **Starts** and when it **Ends**.
-6. Pick the **Panel**. Each panelist needs Recruitment; the hub refuses someone without it.
+6. Pick the **Panel**. Only people who hold Recruitment are offered; if someone cannot sit, the form
+   names them.
 7. Press **Schedule Interview**.
 
 The candidate moves to **Interview** and gets an email with a calendar file. Each panelist gets a
@@ -540,7 +547,8 @@ Nobody sits on a panel about themselves. A candidate who works at MyCity cannot 
    Everyone gets the calendar cancel.
 
 A panel needs at least one person. Taking someone off removes their unsent card; a card already
-submitted stays.
+submitted stays. If everyone left on the panel has submitted and the interview has started, the round
+closes.
 
 ### Fill in the candidate's details {#recruitment-interviews-details needs="recruitment edit"}
 
@@ -583,7 +591,9 @@ reminds you once a day after the interview ends.
 
 ### Close a round {#recruitment-interviews-close needs="recruitment edit"}
 
-The round closes by itself when the last panelist submits. To close it before then:
+The round closes by itself when the last panelist submits, once the interview has started. If every
+card is in before the start, it closes at the first daily check after the start. To close it before
+then:
 
 1. Open the interview on [Recruitment · Interviews](/recruitment?tab=interviews).
 2. Press **Close Round**. It works once the interview has started.
@@ -655,7 +665,8 @@ People join the pool from their candidate's sheet. See
 1. Open the person on [Recruitment · Talent Pool](/recruitment?tab=talent-pool).
 2. Press **Invite to Apply**. On a phone it is at the foot of the sheet.
 3. Pick the open **Vacancy**.
-4. Press **Send Invitation**. They get an email with an Apply link that works for 7 days.
+4. Press **Send Invitation**. They get an email with an Apply link that works for 7 days. **Cancel**
+   takes you back to their sheet.
 
 Their row then shows **Invited**. When they apply, their application comes from the pool.
 

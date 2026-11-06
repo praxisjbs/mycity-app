@@ -312,6 +312,10 @@ export const VACANCIES: VacancyDetail[] = SEEDS.map((s) => {
     description: s.description,
     requirements: s.requirements,
     nice_to_have: s.nice_to_have ?? null,
+    // Drawn from the Markdown on every read (modules/recruitment.ts vacancyView), as the server does.
+    description_blocks: [],
+    requirements_blocks: null,
+    nice_to_have_blocks: null,
     target_start_on: null,
     paused_at: s.status === "paused" ? at(3, "11:00") : null,
     closed_at: s.status === "closed" ? at(30, "17:00") : null,
@@ -369,8 +373,8 @@ export const vacancyByKey = (key: string) => VACANCIES.find((v) => v.vacancy_id 
 
 /** Vacant seats with no live vacancy (Suggested From Organogram). */
 export const SEATS = [
-  { org_seat_id: sid("seat:finance-officer"), title: "Finance Officer", department_id: deptId("Finance"), department: "Finance", reports_to: "Head of Finance" },
-  { org_seat_id: sid("seat:city-editor"), title: "City Editor, Abuja", department_id: deptId("Content"), department: "Content", reports_to: "Head of Content" },
+  { org_seat_id: sid("seat:finance-officer"), title: "Finance Officer", department_id: deptId("Finance"), department: "Finance", reports_to: "Head of Finance", line_manager: null },
+  { org_seat_id: sid("seat:city-editor"), title: "City Editor, Abuja", department_id: deptId("Content"), department: "Content", reports_to: refKey("cynthia").display_name, line_manager: refKey("cynthia") },
 ];
 
 /* ------------------------------------------------------------------ *

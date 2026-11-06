@@ -254,11 +254,36 @@ describeDb("Recruitment · Assessments against the real migrations", () => {
     const sent = await h.as("ops").post("/recruitment/assessments/sittings").send({ application_id: otherApplicationId, assessment_definition_id: briefId, start_within_days: 1 });
     await drain();
     const tok = lastLink();
+    // Started in the last hour of its start-by day: the link would end before the test's time is up.
+    await q(
+      "UPDATE public_token SET expires_at = now() + interval '1 hour' WHERE public_token_id = (SELECT public_token_id FROM application_assessment WHERE application_assessment_id = $1)",
+      [sent.body.application_assessment_id],
+    );
     const started = await pub().post(`/assess/${tok}/start`).send({});
-    await q("UPDATE application_assessment SET due_at = now() - interval '1 minute' WHERE application_assessment_id = $1", [sent.body.application_assessment_id]);
-    const late = await pub().put(`/assess/${tok}/answers/${started.body.questions[0].assessment_question_id}`).send({ answer: "x", current_question: 0 });
+    // Start keeps the link a day past due_at, so a late save reaches the sitting and is told TIME_UP.
+    const life = await one(
+      `SELECT extract(epoch FROM t.expires_at - s.due_at)::int AS grace
+         FROM application_assessment s JOIN public_token t ON t.public_token_id = s.public_token_id
+        WHERE s.application_assessment_id = $1`,
+      [sent.body.application_assessment_id],
+    );
+    expect(life.grace).toBe(24 * 3600);
+    // Two hours after the time ran out: the sitting and its link both moved back two hours.
+    await q("UPDATE application_assessment SET due_at = now() - interval '2 hours' WHERE application_assessment_id = $1", [sent.body.application_assessment_id]);
+    await q(
+      "UPDATE public_token SET expires_at = now() + interval '22 hours' WHERE public_token_id = (SELECT public_token_id FROM application_assessment WHERE application_assessment_id = $1)",
+      [sent.body.application_assessment_id],
+    );
+    const qid = started.body.questions[0].assessment_question_id;
+    const late = await pub().put(`/assess/${tok}/answers/${qid}`).send({ answer: "x", current_question: 0 });
     expect(late.status).toBe(409);
     expect(late.body.error.code).toBe("TIME_UP");
+    // The page reads it again and shows Time Up, though the sitting was scored at once.
+    expect((await pub().get(`/assess/${tok}`)).body).toMatchObject({ state: "timed_out", questions: null });
+    // A save after the sitting has already ended by its clock is told the same.
+    const later = await pub().put(`/assess/${tok}/answers/${qid}`).send({ answer: "y", current_question: 0 });
+    expect(later.status).toBe(409);
+    expect(later.body.error.code).toBe("TIME_UP");
     // Timed out with nothing answered, so nothing waits for a mark: it is scored at once, an unanswered question counting zero.
     expect(await one("SELECT status, score::float AS score, submitted_at IS NOT NULL AS ended FROM application_assessment WHERE application_assessment_id = $1", [sent.body.application_assessment_id])).toEqual({
       status: "scored",

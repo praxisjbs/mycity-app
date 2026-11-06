@@ -19,7 +19,6 @@ const publicToken = require("../../shared/tokens/public-token");
 const repo = require("./vacancies.repo");
 const lifecycle = require("./vacancies.lifecycle");
 const slugs = require("./vacancies.slug");
-const md = require("../../shared/documents/markdown");
 
 /** An Apply link lives 48 hours (guide §6.2). */
 const APPLY_TTL_HOURS = 48;
@@ -40,8 +39,7 @@ async function list(query) {
   return { ...page, data: page.data.map(card) };
 }
 
-/** A Markdown text as the page draws it: blocks from the one renderer, or null when there is none. */
-const blocksOf = (text) => (text && String(text).trim() ? md.markdownToBlocks(text) : null);
+const { blocksOf } = lifecycle;
 
 /** PublicJob, built field by field. A hidden salary band is left out, not sent as null. */
 async function get(slug) {

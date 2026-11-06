@@ -4,11 +4,13 @@
  *
  *   GET  /, /:id, /:id/cv               `recruitment` view: scope by the vacancy's hiring manager, or a
  *                                       seat on the panel; blind while the round is open
+ *   GET  /panelists                     `recruitment` edit: who may sit on a panel (the panel picker)
  *   POST /, PATCH /:id, POST /:id/cancel   `recruitment` edit: Schedule, Reschedule, Cancel
  *   PUT  /:id/feedback, POST /:id/feedback/submit   `recruitment` view and a seat on the panel: My Card
  *   POST /:id/close, PUT /:id/details   `recruitment` edit: Close Round, Candidate Details
  *   PUT  /:id/report                    `recruitment` view: edit in scope, or the vacancy's hiring manager
- *   POST /assist                        `recruitment` view: Tidy With AI, nothing kept
+ *   GET, POST /assist                   `recruitment` view: Tidy With AI, nothing kept; POST only for a
+ *                                       panelist with a card still to write (interviews.notes)
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -24,6 +26,8 @@ const edit = requirePermission("recruitment", "edit");
 
 route(router, "get", "/", { query: i.InterviewListQuery, response: i.InterviewPage, summary: "Interviews the reader may see" }, view, controller.list);
 route(router, "post", "/", { body: i.InterviewSchedule, response: i.InterviewDetail, summary: "Schedule an interview" }, edit, controller.schedule);
+route(router, "get", "/panelists", { query: i.PanelistListQuery, response: i.PanelistPage, summary: "Who may sit on a panel" }, edit, controller.panelists);
+route(router, "get", "/assist", { response: c.queries.AiAvailability, summary: "Whether Tidy With AI may answer now" }, view, controller.tidyStatus);
 route(router, "post", "/assist", { body: i.NotesTidyRequest, response: i.NotesTidy, summary: "Tidy a card's comments; nothing is kept" }, view, controller.tidy);
 route(router, "get", "/:id", { ...byId, response: i.InterviewDetail, summary: "One interview, blind while its round is open" }, view, controller.get);
 route(router, "patch", "/:id", { ...byId, body: i.InterviewReschedule, response: i.InterviewDetail, summary: "Change an interview's time, place or panel" }, edit, controller.reschedule);

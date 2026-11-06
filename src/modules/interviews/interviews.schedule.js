@@ -7,7 +7,8 @@
  *
  *   schedule(actor, scope, body)          a new round; the candidate moves to Interview
  *   reschedule(actor, scope, id, body)    a new time, place or panel; a change of panel alone is not
- *                                         sent to the candidate
+ *                                         sent to the candidate; a panel left with only submitted
+ *                                         seats closes the round as the last card would
  *   cancel(actor, scope, id, body)        the entry and the candidate's invite cancelled; the round
  *                                         closes with no score
  *   cancelForApplication(applicationId, userId)   Not Progressing cancels what is still scheduled
@@ -26,6 +27,7 @@ const calendar = require("../calendar/calendar.service");
 const candidates = require("../candidates/candidates.service");
 const candidateRepo = require("../candidates/candidates.repo");
 const repo = require("./interviews.repo");
+const consolidate = require("./interviews.consolidate");
 const { EVENTS } = require("./interviews.events");
 
 async function tx(fn) {
@@ -40,10 +42,29 @@ async function tx(fn) {
 const notFound = () => new AppError("NOT_FOUND", "That interview does not exist", 404);
 const field = (name, message) => new AppError("VALIDATION_FAILED", message, 422, { [name]: [message] });
 
-/** The panel checked: everyone holds Recruitment and is on the staff, and none of them is the candidate. */
+/** "Ada Obi", "Ada Obi and Ife Ojo", "Ada Obi, Ife Ojo and 2 others". */
+function sayNames(names) {
+  if (names.length <= 1) return names[0] || "Someone";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]}`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} others`;
+}
+
+/**
+ * The panel checked: everyone holds Recruitment and is on the staff, and none of them is the candidate.
+ * A refusal names who cannot sit (the form's line); the field's own message stays short.
+ */
 async function checkPanel(client, ids, candidateEmail) {
   const ok = await repo.eligible(client, ids);
-  if (ok.length !== new Set(ids).size) throw field("panel_employee_ids", "Pick people who hold Recruitment");
+  const allowed = new Set(ok.map((e) => e.employee_id));
+  const out = [...new Set(ids)].filter((id) => !allowed.has(id));
+  if (out.length) {
+    const names = (await repo.namesOf(client, out)).map((e) => e.display_name);
+    const who = sayNames(names.length ? names : out.map(() => "Someone"));
+    throw new AppError("NOT_PANELISTS", `${who} ${out.length === 1 ? "does" : "do"} not hold Recruitment`, 422, {
+      panel_employee_ids: ["Not all hold Recruitment"],
+    });
+  }
   if (ok.some((e) => e.work_email && candidateEmail && e.work_email.toLowerCase() === candidateEmail.toLowerCase()))
     throw field("panel_employee_ids", "The candidate cannot sit on the panel");
 }
@@ -149,6 +170,8 @@ async function reschedule(actor, scope, id, body) {
       actor,
       payload: { interview_id: id, application_number: before.application_number, candidate_told: moved },
     });
+    // A panel left with only submitted seats closes as the last Submit Card would (once started).
+    await consolidate.closeIfDone(client, await repo.get(client, id, actor.employee_id), actor);
     return id;
   });
 }

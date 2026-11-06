@@ -37,6 +37,7 @@ import {
   PageHeader,
   Pill,
   SegmentedControl,
+  ChoiceField,
   SelectField,
   TextAreaField,
   TextField,
@@ -294,10 +295,10 @@ function AssessmentForm({ assessment, close, onSaved }: { assessment?: Assessmen
       <Field label="Name" {...f.status("name")}>
         <TextField {...f.field("name")} placeholder="Sales Case Study" maxLength={120} />
       </Field>
-      <Grid cols={3}>
-        <Field label="Type" {...f.status("assessment_type")}>
-          <SelectField options={TYPES} {...f.field("assessment_type")} />
-        </Field>
+      <Field label="Type" {...f.status("assessment_type")}>
+        <ChoiceField options={TYPES} {...f.field("assessment_type")} />
+      </Field>
+      <Grid cols={2}>
         <Field label="Minutes" optional {...f.status("duration_minutes")}>
           <NumberField {...f.field("duration_minutes")} />
         </Field>
@@ -323,9 +324,15 @@ function AssessmentForm({ assessment, close, onSaved }: { assessment?: Assessmen
  */
 function ImportForm({ close, onImported }: { close: () => void; onImported: (a: AssessmentDetail) => void }) {
   const [problem, setProblem] = useState<string | null>(null);
+  const [doc, setDoc] = useState<DocumentRef | null>(null);
   const run = useMutation("POST /api/v1/recruitment/assessments/import/file");
-  const take = async (docs: DocumentRef[]) => {
-    const doc = docs[0];
+  // The upload only brings the file; Import reads it, one press one request (F26): the button spins and
+  // refuses a second press until the import has answered.
+  const take = (docs: DocumentRef[]) => {
+    setProblem(null);
+    setDoc(docs[0] ?? null);
+  };
+  const importIt = async () => {
     if (!doc) return;
     setProblem(null);
     try {
@@ -343,7 +350,8 @@ function ImportForm({ close, onImported }: { close: () => void; onImported: (a: 
       <UploadField purpose="assessment_import" endpoint="/api/v1/documents" upload={upload} accept=".json" multiple={false} maxBytes={1024 * 1024} kinds="An exported assessment" onUploaded={take} />
       <FormError>{problem}</FormError>
       <FormFooter>
-        <Button onClick={close}>Close</Button>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" icon="addbox" onClick={importIt} disabled={!doc}>Import Assessment</Button>
       </FormFooter>
     </>
   );
@@ -377,14 +385,12 @@ function BulkSendForm({ assessment, close }: { assessment: AssessmentDetail; clo
       <Field label="Vacancy" {...f.status("vacancy_id")}>
         <SelectField options={roles.options} placeholder="Pick a role" more={roles.more} onMore={roles.onMore} {...f.field("vacancy_id")} />
       </Field>
-      <Grid cols={2}>
-        <Field label="Stage" {...f.status("stage")}>
-          <SelectField options={BULK_STAGES} {...f.field("stage")} />
-        </Field>
-        <Field label="Start Within Days" {...f.status("start_within_days")}>
-          <NumberField {...f.field("start_within_days")} />
-        </Field>
-      </Grid>
+      <Field label="Stage" {...f.status("stage")}>
+        <ChoiceField options={BULK_STAGES} {...f.field("stage")} />
+      </Field>
+      <Field label="Start Within Days" {...f.status("start_within_days")}>
+        <NumberField {...f.field("start_within_days")} />
+      </Field>
       {assessment.duration_minutes === null && (
         <Field label="Days to Finish" optional {...f.status("due_days")}>
           <NumberField {...f.field("due_days")} />

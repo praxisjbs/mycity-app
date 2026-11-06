@@ -10,6 +10,8 @@ import type {
   CandidateDetail,
   CandidateEmail,
   CandidatesCandidate,
+  RichTextBlock,
+  RichTextSpan,
   Interview,
   InterviewDetail,
   ScorecardPart,
@@ -24,7 +26,7 @@ import type { OfferRow, OnboardingDetail } from "@/api/types/recruitment";
 import type { Status } from "@/api/types/performance";
 import type { RawResponse } from "../../client";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
-import { byId, byKey, DEPARTMENTS, grantsFor, refKey } from "../data/people";
+import { byId, byKey, DEPARTMENTS, grantsFor, PEOPLE, ref, refKey } from "../data/people";
 import * as D from "../data/recruitment";
 import { pickAnAddress, placeOf } from "./maps";
 import { WORKSITES as SITES } from "./worksites";
@@ -93,12 +95,45 @@ const traitsOf = (v: VacancyDetail) => v.questions.filter((q) => q.active && q.p
 const STAGES = D.M4_STAGES;
 const reached = (a: D.MockApplication, stage: string) => STAGES.indexOf(a.stage) >= STAGES.indexOf(stage as (typeof STAGES)[number]);
 
+/** A line's spans: **bold** and *italic* only, which is what the vacancy texts use. */
+const spansOf = (line: string): RichTextSpan[] =>
+  line
+    .split(/(\*\*[^*]+\*\*|\*[^*]+\*)/)
+    .filter(Boolean)
+    .map((t) =>
+      t.startsWith("**") ? { text: t.slice(2, -2), bold: true, italic: false, href: null } : t.startsWith("*") && t.length > 2 ? { text: t.slice(1, -1), bold: false, italic: true, href: null } : { text: t, bold: false, italic: false, href: null },
+    );
+
+/** A vacancy's Markdown as the server's one renderer returns it: headings, lists and paragraphs; null when empty. */
+function blocksOf(text: string | null): RichTextBlock[] | null {
+  if (!text || !text.trim()) return null;
+  const out: RichTextBlock[] = [];
+  for (const chunk of text.split(/\n\s*\n/)) {
+    for (const line of chunk.split("\n").filter((l) => l.trim())) {
+      const heading = /^(#{1,4})\s+(.*)$/.exec(line);
+      const item = /^\s*(?:([-*])|(\d+)\.)\s+(.*)$/.exec(line);
+      const last = out[out.length - 1];
+      if (heading) out.push({ kind: "heading", level: Math.min(4, Math.max(2, heading[1].length)), spans: spansOf(heading[2]) });
+      else if (item) {
+        const kind = item[1] ? "bullets" : "numbered";
+        if (last && last.kind === kind) last.items.push(spansOf(item[3]));
+        else out.push({ kind, items: [spansOf(item[3])] });
+      } else if (last && last.kind === "paragraph" && !chunk.startsWith(line)) last.spans.push({ text: " ", bold: false, italic: false, href: null }, ...spansOf(line));
+      else out.push({ kind: "paragraph", spans: spansOf(line) });
+    }
+  }
+  return out;
+}
+
 function vacancyView(v: VacancyDetail, req: Req): VacancyDetail {
   const apps = appsOf(v);
   const live = apps.filter((a) => a.status === "active");
   const closesPast = v.closes_at !== null && Date.parse(v.closes_at) < Date.now();
   return {
     ...v,
+    description_blocks: blocksOf(v.description) ?? [],
+    requirements_blocks: blocksOf(v.requirements),
+    nice_to_have_blocks: blocksOf(v.nice_to_have),
     applicants: apps.length,
     in_progress: live.length,
     past_closing: v.status === "open" && closesPast,
@@ -135,7 +170,8 @@ R("GET /api/v1/recruitment/vacancies/summary", "view", () => {
   const live = D.APPLICATIONS.filter((a) => a.status === "active");
   return ok({
     open: VACANCIES.filter((v) => v.status === "open").length,
-    applicants: live.length,
+    // Every application to an open or paused role, as the list's Applicants counts each (guide §6.1).
+    applicants: VACANCIES.filter((v) => v.status === "open" || v.status === "paused").reduce((n, v) => n + appsOf(v).length, 0),
     in_interview: live.filter((a) => a.stage === "interview").length,
     past_closing: VACANCIES.filter((v) => v.status === "open" && v.closes_at && Date.parse(v.closes_at) < Date.now()).length,
     careers_url: "https://go.mycityapp.io/jobs",
@@ -147,6 +183,7 @@ R("GET /api/v1/recruitment/vacancies/suggested", "view", (req) =>
   paged(
     D.SEATS.filter((s) => !VACANCIES.some((v) => v.org_seat_id === s.org_seat_id && v.status !== "closed")),
     req,
+    { search: (s) => [s.title, s.department], filters: { org_seat_id: (s, id) => s.org_seat_id === id } },
   ),
 );
 
@@ -1264,6 +1301,20 @@ interface ScheduleBody {
   panel_employee_ids?: string[];
 }
 
+/** May sit on a panel: holds `recruitment` view (interviews.repo MAY_SIT). */
+const maySit = (p: { user_key: string }) => (grantsFor(p.user_key).recruitment ?? []).includes("view");
+/** "Ada Obi", "Ada Obi and Ife Ojo", "Ada Obi, Ife Ojo and 2 others". */
+const sayNames = (names: string[]) =>
+  names.length <= 1 ? (names[0] ?? "Someone") : names.length === 2 ? `${names[0]} and ${names[1]}` : names.length === 3 ? `${names[0]}, ${names[1]} and ${names[2]}` : `${names[0]}, ${names[1]} and ${names.length - 2} others`;
+
+R("GET /api/v1/recruitment/interviews/panelists", "edit", (req) =>
+  paged(
+    PEOPLE.filter(maySit).map((p) => ref(p)!),
+    req,
+    { search: (p) => [p.display_name] },
+  ),
+);
+
 /** Apply a schedule or a reschedule; a 422 on a worksite or a person that is not one. */
 function applySchedule(x: D.MockInterview, b: ScheduleBody): RawResponse | null {
   if (b.worksite_id !== undefined) {
@@ -1274,6 +1325,9 @@ function applySchedule(x: D.MockInterview, b: ScheduleBody): RawResponse | null 
   if (b.panel_employee_ids) {
     const people = b.panel_employee_ids.map((id) => byId(id));
     if (people.some((p) => !p)) return field("panel_employee_ids", "Pick people on the staff list");
+    /* Only people who hold Recruitment sit; the refusal names who cannot (interviews.schedule checkPanel). */
+    const out = people.filter((p) => !maySit(p!)).map((p) => p!.display_name);
+    if (out.length) return fail(422, "NOT_PANELISTS", `${sayNames(out)} ${out.length === 1 ? "does" : "do"} not hold Recruitment`, { panel_employee_ids: ["Not all hold Recruitment"] });
     const before = cardsOf(x);
     /* A seat taken off the panel loses its draft; a submitted card stays (interviews.repo setPanel). */
     const kept = before.filter((c) => c.submitted_days !== null && !people.some((p) => p!.user_key === c.employee_key));
@@ -1340,8 +1394,14 @@ R("POST /api/v1/recruitment/interviews", "edit", (req) =>
   }),
 );
 
+R("GET /api/v1/recruitment/interviews/assist", "view", () => ok({ available: true, reason: null }));
+
+/* A panelist with a card still to write, whatever their grant (interviews.notes tidy). */
+const hasOpenSeat = (req: Req) =>
+  INTERVIEWS.some((x) => x.status === "scheduled" && x.round_status === "open" && cardsOf(x).some((c) => c.employee_key === req.user && c.submitted_days === null));
+
 R("POST /api/v1/recruitment/interviews/assist", "view", (req) =>
-  parse<{ text: string }>(interviewSchemas.NotesTidyRequest, req.body, (b) => {
+  !hasOpenSeat(req) ? fail(403, "NOT_PANELIST", "Only a panelist with a card to write can tidy it") : parse<{ text: string }>(interviewSchemas.NotesTidyRequest, req.body, (b) => {
     const text = b.text
       .split(/(?<=[.!?])\s+|\n+/)
       .map((s) => s.trim())
@@ -1361,7 +1421,15 @@ function liveRound(req: Req, then: (x: D.MockInterview) => RawResponse): RawResp
 }
 
 R("PATCH /api/v1/recruitment/interviews/:id", "edit", (req) =>
-  liveRound(req, (x) => parse<ScheduleBody>(interviewSchemas.InterviewReschedule, req.body, (b) => applySchedule(x, b) ?? ok(interviewDetail(x, req)))),
+  liveRound(req, (x) =>
+    parse<ScheduleBody>(interviewSchemas.InterviewReschedule, req.body, (b) => {
+      const refused = applySchedule(x, b);
+      if (refused) return refused;
+      /* A panel left with only submitted seats closes as the last card would (schedule.reschedule). */
+      closeIfDone(x);
+      return ok(interviewDetail(x, req));
+    }),
+  ),
 );
 
 R("POST /api/v1/recruitment/interviews/:id/cancel", "edit", (req) =>
@@ -1397,6 +1465,13 @@ function closeRound(x: D.MockInterview) {
   x.closed_days = 0;
   x.status = "done";
   SCORES.set(x.interview_id, scoreNow(x));
+}
+
+/** The round closes by itself once every seat has submitted and the interview has started (consolidate.closeIfDone). */
+function closeIfDone(x: D.MockInterview) {
+  const cards = cardsOf(x);
+  if (x.status !== "scheduled" || x.round_status !== "open" || !cards.length) return;
+  if (cards.every((k) => k.submitted_days !== null) && Date.parse(x.start) <= Date.now()) closeRound(x);
 }
 
 R("PUT /api/v1/recruitment/interviews/:id/feedback", "view", (req) =>
@@ -1439,8 +1514,7 @@ R("POST /api/v1/recruitment/interviews/:id/feedback/submit", "view", (req) =>
     } else if (!c.overall_rating) fields.overall_rating = ["Give a rating"];
     if (Object.keys(fields).length) return fail(422, "VALIDATION_FAILED", "Finish your card first", fields);
     c.submitted_days = 0;
-    /* The last card closes the round. */
-    if (cardsOf(x).every((k) => k.submitted_days !== null)) closeRound(x);
+    closeIfDone(x);
     return ok(interviewDetail(x, req));
   }),
 );

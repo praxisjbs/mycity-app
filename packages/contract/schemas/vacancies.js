@@ -178,9 +178,17 @@ const VacancyDetail = Vacancy.extend({
   salary_min: money.nullable(),
   salary_max: money.nullable(),
   salary_visible: z.boolean(),
+  /** The three texts as written, in Markdown, for the edit form. */
   description: z.string(),
   requirements: z.string().nullable(),
   nice_to_have: z.string().nullable(),
+  /**
+   * The same three texts as the sheet draws them: blocks from the server's one Markdown renderer
+   * (shared/documents/markdown), as the careers page has them (PublicJob); null when there is none.
+   */
+  description_blocks: z.array(RichTextBlock),
+  requirements_blocks: z.array(RichTextBlock).nullable(),
+  nice_to_have_blocks: z.array(RichTextBlock).nullable(),
   target_start_on: isoDate.nullable(),
   paused_at: isoDateTime.nullable(),
   closed_at: isoDateTime.nullable(),
@@ -209,6 +217,10 @@ const VacancyListQuery = listQuery(
 const VacanciesSummary = z
   .object({
     open: z.number().int().min(0),
+    /**
+     * Every application to an open or paused vacancy, whatever became of it: the list's Applicants,
+     * summed over those roles (guide §6.1). The funnel counts only those still in progress.
+     */
     applicants: z.number().int().min(0),
     in_interview: z.number().int().min(0),
     past_closing: z.number().int().min(0),
@@ -217,7 +229,11 @@ const VacanciesSummary = z
   })
   .strict();
 
-/** GET /recruitment/vacancies/suggested: a vacant seat on the organogram with no live vacancy. */
+/**
+ * GET /recruitment/vacancies/suggested: a vacant seat on the organogram with no live vacancy, with
+ * what New Vacancy fills in from it: the title, the department, who it reports to and the seat's line
+ * manager as the hiring manager.
+ */
 const SeatSuggestion = z
   .object({
     org_seat_id: uuid,
@@ -225,11 +241,13 @@ const SeatSuggestion = z
     department_id: uuid,
     department: z.string(),
     reports_to: z.string().nullable(),
+    line_manager: PersonRef.nullable(),
   })
   .strict();
 
 const SeatSuggestionPage = Paged(SeatSuggestion);
-const SeatSuggestionListQuery = listQuery({});
+/** `org_seat_id` finds the one seat the Organogram's Create Vacancy opened New Vacancy from. */
+const SeatSuggestionListQuery = listQuery({ org_seat_id: uuid.optional() });
 
 /* ------------------------------------------------------------------ *
  * Staff: writes
@@ -630,6 +648,9 @@ const TABLES = {
       days_open: "whole Lagos days since published_at, to closed_at or today",
       public_url: "the careers page origin and /jobs/<slug>, once published",
       location_place: "the location as a place, from place (owner vacancy.location)",
+      description_blocks: "vacancy.description as blocks (shared/documents/markdown)",
+      requirements_blocks: "vacancy.requirements as blocks",
+      nice_to_have_blocks: "vacancy.nice_to_have as blocks",
       questions: "the vacancy_question rows",
       scorecard: "the recruitment_scorecard_criterion rows",
       by_stage: "active applications counted by stage",
@@ -644,6 +665,7 @@ const TABLES = {
     virtual: {
       department: "department.name",
       reports_to: "the line manager's name, or the seat above's title",
+      line_manager: "the seat's line manager, from employee and department",
     },
   },
   SeatSuggestionPage: { table: null, reason: "a page of vacant seats" },

@@ -7,9 +7,11 @@
  *   assertPublishable(row)   what Publish needs, as field errors (422)
  *   publicState(row, now)    what the careers page says about it: open, paused, closed or filled
  *   boardStages(scorecard)   the board's columns; howWeHire(parts) the careers page's steps
+ *   blocksOf(text)           a Markdown text as the careers page and the staff sheet draw it
  */
 const { defineMachine } = require("../../shared/state/state-history");
 const { AppError } = require("../../shared/errors");
+const md = require("../../shared/documents/markdown");
 
 /** The M4 stages, in board order (contract vacancies.js M4_STAGES). */
 const M4_STAGES = Object.freeze(["application", "screening", "assessment", "interview", "shortlist"]);
@@ -93,4 +95,7 @@ function howWeHire(activeParts) {
   return steps;
 }
 
-module.exports = { MACHINE, M4_STAGES, assertCanMove, assertPublishable, publicState, takesApplications, boardStages, howWeHire };
+/** A Markdown text as blocks from the one renderer (PublicJob, VacancyDetail), or null when there is none. */
+const blocksOf = (text) => (text && String(text).trim() ? md.markdownToBlocks(text) : null);
+
+module.exports = { MACHINE, M4_STAGES, assertCanMove, assertPublishable, publicState, takesApplications, boardStages, howWeHire, blocksOf };

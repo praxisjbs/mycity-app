@@ -114,6 +114,9 @@ function PoolSheet({ entry, close, mayInvite, mayRemove }: { entry: PoolEntry; c
   const modal = useModal();
   const confirm = useConfirm();
   const remove = useMutation("POST /api/v1/recruitment/pool/:id/remove");
+  // A form opened from here goes back to the sheet on Cancel (the app holds one dialog at a time).
+  const back = () =>
+    modal.open({ title: entry.name, body: (done) => <PoolSheet entry={entry} close={done} mayInvite={mayInvite} mayRemove={mayRemove} /> });
   const out = async () => {
     const yes = await confirm({ title: "Remove From Pool", body: `${entry.name} leaves the pool now.`, confirmLabel: "Remove", destructive: true });
     if (!yes) return;
@@ -142,13 +145,14 @@ function PoolSheet({ entry, close, mayInvite, mayRemove }: { entry: PoolEntry; c
       <FormFooter>
         <Button onClick={close}>Close</Button>
         {mayRemove && <Button variant="danger" onClick={out}>Remove</Button>}
-        {mayInvite && <Button variant="primary" onClick={() => modal.open({ title: "Invite to Apply", body: (done) => <InviteForm entry={entry} close={() => (done(), close())} /> })}>Invite to Apply</Button>}
+        {mayInvite && <Button variant="primary" onClick={() => modal.open({ title: "Invite to Apply", body: (done) => <InviteForm entry={entry} back={back} close={done} /> })}>Invite to Apply</Button>}
       </FormFooter>
     </>
   );
 }
 
-function InviteForm({ entry, close }: { entry: PoolEntry; close: () => void }) {
+/** Cancel goes back to the person's sheet; only a sent invitation closes it all. */
+function InviteForm({ entry, back, close }: { entry: PoolEntry; back: () => void; close: () => void }) {
   const roles = useVacancyOptions("open");
   const f = useContractForm({ vacancy_id: "" }, poolSchemas.PoolInvite);
   const send = useMutation("POST /api/v1/recruitment/pool/:id/invite");
@@ -172,7 +176,7 @@ function InviteForm({ entry, close }: { entry: PoolEntry; close: () => void }) {
       </Field>
       <FormError>{problem}</FormError>
       <FormFooter>
-        <Button onClick={close}>Cancel</Button>
+        <Button onClick={back}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Send Invitation</Button>
       </FormFooter>
     </>

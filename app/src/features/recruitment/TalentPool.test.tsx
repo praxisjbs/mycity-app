@@ -44,7 +44,12 @@ describe("Recruitment · Talent Pool", () => {
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
 
-    const sheet = await openRow("Femi Lawal");
+    let sheet = await openRow("Femi Lawal");
+    // Cancel goes back to the person's sheet, never past it.
+    await press(sheet, "Invite to Apply");
+    await press(dialog(), "Cancel");
+    sheet = dialog();
+    expect(within(sheet).getByRole("button", { name: "Invite to Apply" })).toBeTruthy();
     await press(sheet, "Invite to Apply");
     const form = dialog();
     await press(form, "Send Invitation");
@@ -52,6 +57,8 @@ describe("Recruitment · Talent Pool", () => {
     await chooseOption(within(dialog()).getByLabelText("Vacancy"), /Graphics and Motion Designer/);
     await press(dialog(), "Send Invitation");
     expect(POOL.find((p) => p.name === "Femi Lawal")!.invited_vacancy?.title).toBe("Graphics and Motion Designer");
+    // A sent invitation closes it all.
+    expect(screen.queryByRole("dialog")).toBeNull();
   }, 60000);
 
   it("a link to one person (?id=) opens them, read by their id", async () => {

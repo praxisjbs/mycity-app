@@ -27,6 +27,7 @@ const grantsCache = require("../../src/shared/rbac/grants-cache");
 const lagos = require("../../src/shared/time/lagos");
 const token = require("../../src/shared/places/token");
 const retention = require("../../src/modules/talent_pool/talent_pool.retention");
+const service = require("../../src/modules/talent_pool/talent_pool.service");
 const { q, one, drain, harness } = require("./helpers/ai-actions");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -148,6 +149,28 @@ describeDb("Recruitment · Talent Pool against the real migrations", () => {
     expect(await one("SELECT source FROM application WHERE number = $1", [applied.body.reference])).toEqual({ source: "pool" });
     expect(await one("SELECT count(*)::int AS n FROM talent_pool_invite")).toEqual({ n: 1 });
     expect((await h.as("ops").get("/recruitment/pool?invited=true")).body.page.total).toBe(1);
+  });
+
+  test("a reader scoped to some hiring managers is never told the title of another manager's role", async () => {
+    // The role applied for is now the Head of Department's; the role they were invited to stays with Operations.
+    await q("UPDATE vacancy SET hiring_manager_id = $2 WHERE vacancy_id = $1", [first.vacancy_id, h.people.hod.employee_id]);
+    await grantsCache.bumpTeamVersion();
+    try {
+      const listed = await h.as("hod").get("/recruitment/pool");
+      expect(listed.status).toBe(200);
+      expect(listed.body.data).toEqual([expect.objectContaining({ talent_pool_entry_id: entryId, applied_for: expect.objectContaining({ title: "City Editor" }), invited_vacancy: null })]);
+      expect(listed.body.data[0].invited_at).toBeTruthy();
+      expect((await h.as("hod").get(`/recruitment/pool/${entryId}`)).body).toMatchObject({ invited_vacancy: null });
+      expect(JSON.stringify(listed.body)).not.toMatch(/Venue Partnerships Lead/);
+      // Operations & People read every role, so they still see both.
+      expect((await h.as("ops").get(`/recruitment/pool/${entryId}`)).body).toMatchObject({ invited_vacancy: { title: "Venue Partnerships Lead" } });
+      // The export a scoped reader asks for leaves the title out too.
+      const sheet = await service.gather({}, { scope: "team", scope_ids: [h.people.hod.employee_id] });
+      expect(sheet.rows).toEqual([expect.objectContaining({ applied_for: expect.stringContaining("City Editor"), invited_to: "" })]);
+      expect((await service.gather({}, { scope: "all", scope_ids: null })).rows[0].invited_to).toMatch(/Venue Partnerships Lead/);
+    } finally {
+      await q("UPDATE vacancy SET hiring_manager_id = $2 WHERE vacancy_id = $1", [first.vacancy_id, h.people.ops.employee_id]);
+    }
   });
 
   test("Export makes the whole pool a workbook for the person who pressed it", async () => {

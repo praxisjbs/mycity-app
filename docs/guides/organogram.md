@@ -494,6 +494,10 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 06/11/2026 · GE · Create Vacancy on a vacant seat: New Vacancy now looks the seat up
+  (`GET /recruitment/vacancies/suggested?org_seat_id=`) and opens with its title, department, reporting
+  line and line manager (as the hiring manager) filled in; the department is no longer left to pick
+  (`recruitment.md` §3 step 1).
 - 05/11/2026 · GE · (auditor) M4 close-out (P15): Create Vacancy on a vacant seat (the drawn tree and Focus)
   opens New Vacancy on Recruitment with the role's title and its seat (`org_seat_id`), so the vacancy keeps
   the seat: it leaves Suggested From Organogram and the seat holds one live vacancy. It shows to who may also

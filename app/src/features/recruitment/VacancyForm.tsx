@@ -3,8 +3,9 @@
  * Details (where, when and what the role is) and Pay and Publish. The contract's VacancyCreate (or VacancyEdit) checks each
  * field as it is filled. The location is picked, never typed (F27), and a remote role has none. Write
  * With AI drafts the description from a line about the role; nothing is kept until the person saves.
- * A seat from Suggested From Organogram fills the title, the department and who it reports to, and
- * the vacancy keeps the seat (`org_seat_id`), so the seat leaves the suggestions once it has one.
+ * A seat (from Suggested From Organogram, or the Organogram's Create Vacancy) fills the title, the
+ * department, who it reports to and its line manager as the hiring manager, and the vacancy keeps the
+ * seat (`org_seat_id`), so the seat leaves the suggestions once it has one.
  */
 import { useState } from "react";
 import vacancySchemas from "@mycity/contract/schemas/vacancies.js";
@@ -20,9 +21,11 @@ import {
   AddressField,
   Button,
   CheckboxField,
+  ChoiceField,
   DateField,
   Field,
   Grid,
+  LoadingRows,
   MoneyField,
   NumberField,
   SelectField,
@@ -102,10 +105,26 @@ const shapeOf = (schema: unknown): PrefillSchema => {
   return s as PrefillSchema;
 };
 
-export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: VacancyDetail; seat?: SeatSuggestion; close: () => void; onSaved?: (v: VacancyDetail) => void }) {
+type Props = { vacancy?: VacancyDetail; seat?: SeatSuggestion; close: () => void; onSaved?: (v: VacancyDetail) => void };
+type Filled = Partial<Record<string, string>>;
+
+/**
+ * A seat comes from Suggested From Organogram (the row) or from the Organogram's Create Vacancy (the
+ * address names `org_seat_id`). From the address, the seat is looked up first, so the form opens with
+ * everything the seat knows (title, department, reports to, its line manager as hiring manager).
+ */
+export function VacancyForm(props: Props) {
+  const filled: Filled = useAddressPrefill(shapeOf(vacancySchemas.VacancyCreate), !props.vacancy);
+  const asked = props.vacancy || props.seat ? undefined : filled.org_seat_id;
+  const found = useApi("GET /api/v1/recruitment/vacancies/suggested", { query: { org_seat_id: asked }, enabled: Boolean(asked) });
+  // The form's first values are its blank ones, so it waits for the seat (a failed lookup opens it without).
+  if (asked && !found.data && !found.error) return <LoadingRows count={6} />;
+  return <VacancyFormBody {...props} seat={props.seat ?? found.data?.data[0]} filled={filled} />;
+}
+
+function VacancyFormBody({ vacancy, seat, filled, close, onSaved }: Props & { filled: Filled }) {
   const edit: Before | null = vacancy ? { location: placeValue(vacancy.location_place), closes_on: vacancy.closes_at?.slice(0, 10) ?? "" } : null;
-  const filled = useAddressPrefill(shapeOf(vacancySchemas.VacancyCreate), !vacancy);
-  // A seat comes from Suggested From Organogram (the row) or from the Organogram's Create Vacancy (the address).
+  // The seat named by the address stays the vacancy's even when the lookup finds it taken (the save says so).
   const seatId = vacancy ? null : (seat?.org_seat_id ?? filled.org_seat_id ?? null);
   const blank: Values = vacancy
     ? {
@@ -134,7 +153,7 @@ export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: Vacan
     : {
         title: seat?.title ?? filled.title ?? "",
         department_id: seat?.department_id ?? filled.department_id ?? "",
-        hiring_manager: [],
+        hiring_manager: seat?.line_manager ? [seat.line_manager] : [],
         positions: filled.positions ?? "1",
         employment_type: filled.employment_type ?? "full_time",
         reports_to: seat?.reports_to ?? "",
@@ -226,7 +245,7 @@ export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: Vacan
                   <NumberField {...f.field("positions")} />
                 </Field>
                 <Field label="Employment" {...f.status("employment_type")}>
-                  <SelectField options={EMPLOYMENT} {...f.field("employment_type")} />
+                  <ChoiceField options={EMPLOYMENT} {...f.field("employment_type")} />
                 </Field>
                 <Field label="Reports To" optional {...f.status("reports_to")}>
                   <TextField {...f.field("reports_to")} placeholder="Chief Executive Officer" />
@@ -242,7 +261,7 @@ export function VacancyForm({ vacancy, seat, close, onSaved }: { vacancy?: Vacan
             <>
               <Grid cols={2}>
                 <Field label="Arrangement" {...f.status("work_pattern")}>
-                  <SelectField options={PATTERNS} {...f.field("work_pattern")} />
+                  <ChoiceField options={PATTERNS} {...f.field("work_pattern")} />
                 </Field>
                 <Field label="Arrangement Note" optional {...f.status("work_pattern_note")}>
                   <TextField {...f.field("work_pattern_note")} placeholder="Two office days" maxLength={80} />

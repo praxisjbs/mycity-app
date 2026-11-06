@@ -101,9 +101,11 @@ describeDb("Recruitment · Interviews against the real migrations", () => {
 
   test("Schedule: the panel holds Recruitment, the candidate moves to Interview, the panel's calendars and the candidate's .ics follow", async () => {
     const base = { application_id: applicationId, interview_type: "video", scheduled_start: at(2, 0), scheduled_end: at(2, 1), meeting_url: "https://meet.example.test/abc" };
-    const refused = await h.as("ops").post("/recruitment/interviews").send({ ...base, panel_employee_ids: [h.people.staff.employee_id] });
+    const refused = await h.as("ops").post("/recruitment/interviews").send({ ...base, panel_employee_ids: [h.people.ops.employee_id, h.people.staff.employee_id] });
     expect(refused.status).toBe(422);
-    expect(refused.body.error.fields).toHaveProperty("panel_employee_ids");
+    expect(refused.body.error.fields).toEqual({ panel_employee_ids: ["Not all hold Recruitment"] });
+    // The form's line names who cannot sit, and only them.
+    expect(refused.body.error.message).toBe("Tunde Ade does not hold Recruitment");
     expect((await h.as("ops").post("/recruitment/interviews").send({ ...base, interview_type: "in_person", meeting_url: undefined, panel_employee_ids: panelOf() })).status).toBe(422);
 
     const made = await h.as("ops").post("/recruitment/interviews").send({ ...base, panel_employee_ids: panelOf() });
@@ -174,6 +176,8 @@ describeDb("Recruitment · Interviews against the real migrations", () => {
       ],
       decision: "on_hold",
     });
+    // The interview has begun: the last card closes the round (before the start it would wait).
+    await q("UPDATE interview SET scheduled_start = now() - interval '10 minutes' WHERE interview_id = $1", [interviewId]);
     const closed = await h.as("ops").post(`/recruitment/interviews/${interviewId}/feedback/submit`).send({});
     // Cards 8 (9 and 7) and 7 (6 and 8): (8 + 7) ÷ 2 × 10
     expect(closed.body).toMatchObject({ round_status: "closed", status: "done", can_report: true });
@@ -282,5 +286,102 @@ describeDb("Recruitment · Interviews against the real migrations", () => {
     const theirs = (await h.as("hod").get(`/recruitment/interviews/${id}`)).body.panel.find((s) => s.panelist.employee_id === h.people.ops.employee_id);
     expect(theirs).toMatchObject({ decision: null, submitted_at: null });
     expect((await h.as("ops").post(`/recruitment/interviews/${id}/close`).send({})).status).toBe(409);
+  });
+  test("the panel picker lists only who may sit, searched by name, for those who schedule", async () => {
+    const all = await h.as("ops").get("/recruitment/interviews/panelists");
+    expect(all.status).toBe(200);
+    const ids = all.body.data.map((p) => p.employee_id);
+    expect(ids).toEqual(expect.arrayContaining([h.people.ops.employee_id, h.people.hod.employee_id]));
+    expect(ids).not.toContain(h.people.staff.employee_id);
+    expect(all.body.page.size).toBe(25);
+    const ife = await h.as("ops").get("/recruitment/interviews/panelists?q=ife");
+    expect(ife.body.data.map((p) => p.display_name)).toEqual(["Ife Ojo"]);
+    expect((await h.as("staff").get("/recruitment/interviews/panelists")).status).toBe(403);
+  });
+
+  test("every card in before the start: the round waits for the start, then the daily sweep closes it", async () => {
+    const id = (
+      await h.as("ops").post("/recruitment/interviews").send({
+        application_id: await applicant("Bisi", "bisi.okafor@example.test"),
+        interview_type: "phone",
+        scheduled_start: at(1, 0),
+        scheduled_end: at(1, 1),
+        panel_employee_ids: [h.people.ops.employee_id],
+      })
+    ).body.interview_id;
+    await h.as("ops").put(`/recruitment/interviews/${id}/feedback`).send({
+      ratings: [
+        { vacancy_question_id: traits[0], rating: 8 },
+        { vacancy_question_id: traits[1], rating: 6 },
+      ],
+      decision: "select",
+    });
+    const sent = await h.as("ops").post(`/recruitment/interviews/${id}/feedback/submit`).send({});
+    expect(sent.body).toMatchObject({ round_status: "open", status: "scheduled", submitted_count: 1, panel_size: 1, can_close: false });
+    expect((await h.as("ops").post(`/recruitment/interviews/${id}/close`).send({})).status).toBe(409);
+    await reminders.remind();
+    expect((await h.as("ops").get(`/recruitment/interviews/${id}`)).body.round_status).toBe("open");
+
+    // Once it has started, the sweep closes it as the last card would have.
+    await q("UPDATE interview SET scheduled_start = now() - interval '5 minutes' WHERE interview_id = $1", [id]);
+    expect(await reminders.remind()).toMatchObject({ closed: 1 });
+    const after = (await h.as("ops").get(`/recruitment/interviews/${id}`)).body;
+    expect(after).toMatchObject({ round_status: "closed", status: "done" });
+    expect(after.round.interview_score).toBe(70);
+  });
+
+  test("a Reschedule that takes off the only panelist still waiting closes the round, once started", async () => {
+    const plan = async (first, start) =>
+      (
+        await h.as("ops").post("/recruitment/interviews").send({
+          application_id: await applicant(first, `${first.toLowerCase()}.okafor@example.test`),
+          interview_type: "phone",
+          scheduled_start: start,
+          scheduled_end: at(1, 2),
+          panel_employee_ids: panelOf(),
+        })
+      ).body.interview_id;
+    const card = async (id) => {
+      await h.as("hod").put(`/recruitment/interviews/${id}/feedback`).send({
+        ratings: [
+          { vacancy_question_id: traits[0], rating: 9 },
+          { vacancy_question_id: traits[1], rating: 9 },
+        ],
+        decision: "select",
+      });
+      await h.as("hod").post(`/recruitment/interviews/${id}/feedback/submit`).send({});
+    };
+
+    // Under way: dropping the waiting seat leaves only submitted cards, so the round closes.
+    const started = await plan("Kemi", at(0, -1));
+    await card(started);
+    const moved = await h.as("ops").patch(`/recruitment/interviews/${started}`).send({ panel_employee_ids: [h.people.hod.employee_id] });
+    expect(moved.status).toBe(200);
+    expect(moved.body).toMatchObject({ round_status: "closed", status: "done", panel_size: 1, submitted_count: 1 });
+    expect(moved.body.round.interview_score).toBe(90);
+
+    // Not yet started: the round stays open until the start, as for the last card.
+    const later = await plan("Femi", at(1, 0));
+    await card(later);
+    const kept = await h.as("ops").patch(`/recruitment/interviews/${later}`).send({ panel_employee_ids: [h.people.hod.employee_id] });
+    expect(kept.body).toMatchObject({ round_status: "open", panel_size: 1, submitted_count: 1 });
+  });
+
+  test("Tidy With AI is a panelist's: open to a seat with a card to write, not to an edit grant alone", async () => {
+    const text = "She knew the venue market well and answered quickly.";
+    // Every seat Ada (edit) held is submitted or taken off by now: her grant alone does not reach it.
+    expect((await h.as("ops").post("/recruitment/interviews/assist").send({ text })).status).toBe(403);
+    expect((await h.as("staff").get("/recruitment/interviews/assist")).status).toBe(403);
+    await h.as("ops").post("/recruitment/interviews").send({
+      application_id: await applicant("Tola", "tola.okafor@example.test"),
+      interview_type: "phone",
+      scheduled_start: at(2, 0),
+      scheduled_end: at(2, 1),
+      panel_employee_ids: [h.people.hod.employee_id],
+    });
+    expect((await h.as("hod").get("/recruitment/interviews/assist")).status).toBe(200);
+    const tidied = await h.as("hod").post("/recruitment/interviews/assist").send({ text });
+    expect(tidied.status).toBe(200);
+    expect(tidied.body).toHaveProperty("available");
   });
 });

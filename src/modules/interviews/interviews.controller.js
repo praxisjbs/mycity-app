@@ -26,4 +26,6 @@ module.exports = {
   details: async (req, res) => ok(res, await service.details(withActor(req), scopeOf(req), id(req), req.validated.body)),
   report: async (req, res) => ok(res, await service.report(withActor(req), scopeOf(req), id(req), req.validated.body)),
   tidy: async (req, res) => ok(res, await service.tidy(req.user, req.validated.body)),
+  tidyStatus: async (_req, res) => ok(res, await service.tidyStatus()),
+  panelists: async (req, res) => sendPaged(res, await service.panelists(req.validated.query)),
 };

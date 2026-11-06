@@ -167,6 +167,13 @@ const InterviewListQuery = listQuery(
   ["scheduled_start"],
 );
 
+/**
+ * GET /recruitment/interviews/panelists: who may sit on a panel (active, with a login that holds
+ * `recruitment` view, or the CEO), searched by name; what the panel picker offers.
+ */
+const PanelistListQuery = listQuery();
+const PanelistPage = Paged(PersonRef);
+
 /* ------------------------------------------------------------------ *
  * Staff: writes
  * ------------------------------------------------------------------ */
@@ -427,6 +434,8 @@ const TABLES = {
     },
   },
   InterviewListQuery: { table: null, reason: "list controls and filters for Interviews" },
+  PanelistListQuery: { table: null, reason: "list controls for the people who may sit on a panel" },
+  PanelistPage: { table: null, reason: "a page of people who may sit on a panel" },
   InterviewSchedule: {
     table: "interview",
     virtual: {
@@ -474,6 +483,8 @@ module.exports = {
   InterviewPage,
   InterviewDetail,
   InterviewListQuery,
+  PanelistListQuery,
+  PanelistPage,
   InterviewSchedule,
   InterviewReschedule,
   InterviewCancel,

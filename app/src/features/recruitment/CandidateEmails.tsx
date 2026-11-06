@@ -13,7 +13,9 @@ import { say, sayRefusal } from "./shared";
 export function CandidateEmails({ close }: { close: () => void }) {
   const modal = useModal();
   const list = usePaged("GET /api/v1/recruitment/candidates/emails");
-  const open = (e: CandidateEmail) => modal.open({ title: e.name, wide: true, body: (done) => <EmailForm emailKey={e.key} close={done} /> });
+  // An email opened from the list goes back to the list when it closes (the app holds one dialog at a time).
+  const back = () => modal.open({ title: "Candidate Emails", wide: true, body: (done) => <CandidateEmails close={done} /> });
+  const open = (e: CandidateEmail) => modal.open({ title: e.name, wide: true, body: () => <EmailForm emailKey={e.key} close={back} /> });
   return (
     <>
       <DataView<CandidateEmail>

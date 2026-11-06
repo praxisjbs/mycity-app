@@ -3,7 +3,7 @@
  * assessment-invite (docs/guides/recruitment.md §6.7, §6.8), from the outbox after Send commits. The
  * link is made here, so its token never sits in the outbox: single use is not set (the candidate
  * opens it again to resume), it lives until 23:59 Lagos on the start-by day, and Start moves its end
- * to the sitting's due_at. A handler run again makes a new link and stops the old one, and the email
+ * to a day past the sitting's due_at (so a late save is told TIME_UP). A handler run again makes a new link and stops the old one, and the email
  * is queued once per event.
  */
 const { pool } = require("../../config/db");

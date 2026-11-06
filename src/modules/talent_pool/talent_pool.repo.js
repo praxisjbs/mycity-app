@@ -17,7 +17,7 @@ const ROWS = `
          t.invited_at, t.invited_vacancy_id, t.removed_at, t.added_by,
          btrim(k.first_name || ' ' || k.last_name) AS name, k.email::text AS email,
          v.vacancy_id AS applied_vacancy_id, v.number::text AS applied_number, v.title AS applied_title, v.hiring_manager_id,
-         iv.number::text AS invited_number, iv.title AS invited_title,
+         iv.number::text AS invited_number, iv.title AS invited_title, iv.hiring_manager_id AS invited_hiring_manager_id,
          a.screening_score, a.provisional_score, COALESCE(a.screening_score, a.provisional_score) AS score,
          NULLIF(btrim(COALESCE(ae.first_name, '') || ' ' || COALESCE(ae.last_name, '')), '') AS added_by_name,
          EXISTS (SELECT 1 FROM application h

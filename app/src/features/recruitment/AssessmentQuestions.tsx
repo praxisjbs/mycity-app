@@ -9,7 +9,7 @@ import assessmentSchemas from "@mycity/contract/schemas/assessments.js";
 import type { AssessmentDetail } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useApi, useMutation } from "@/api/hooks";
-import { Button, Card, CardHeader, Field, FormError, FormFooter, Grid, HelpTerm, NumberField, SelectField, TextAreaField, TextField, toast } from "@mycity/ui";
+import { Button, Card, CardHeader, ChoiceField, Field, FormError, FormFooter, Grid, HelpTerm, NumberField, TextAreaField, TextField, toast } from "@mycity/ui";
 import { say } from "./shared";
 
 type Option = { text: string; points: string };
@@ -112,7 +112,7 @@ export function AssessmentQuestions({ assessment, close, onSaved }: { assessment
           </Field>
           <Grid cols={2}>
             <Field label="Answer" {...mark(`${i}.question_type`)}>
-              <SelectField options={KINDS} value={q.question_type} onChange={(t) => edit(i, { question_type: t as Question["question_type"], options: t === "choice" && !q.options.length ? [{ text: "", points: "1" }, { text: "", points: "0" }] : q.options })} />
+              <ChoiceField options={KINDS} value={q.question_type} onChange={(t) => edit(i, { question_type: t as Question["question_type"], options: t === "choice" && !q.options.length ? [{ text: "", points: "1" }, { text: "", points: "0" }] : q.options })} />
             </Field>
             {q.question_type !== "choice" && (
               <Field label="Most Points" {...mark(`${i}.max_score`)}>

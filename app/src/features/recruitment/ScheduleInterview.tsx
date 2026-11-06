@@ -2,17 +2,19 @@
  * Schedule Interview and Reschedule (docs/guides/recruitment.md §6.6): the candidate, how they are
  * met (in person at a worksite, by video with its link, or by phone), the day and its times in
  * Lagos, and the panel. Each panelist gets the calendar entry; the candidate gets the invitation with
- * its .ics. A person taken off the panel loses an unsent draft; a submitted card stays.
+ * its .ics. The panel picker offers only people who hold Recruitment (GET /interviews/panelists), and a
+ * refusal names anyone who cannot sit. A person taken off the panel loses an unsent draft; a
+ * submitted card stays.
  */
 import { useState } from "react";
 import interviewSchemas from "@mycity/contract/schemas/interviews.js";
 import type { InterviewDetail } from "@mycity/contract/contract.gen.ts";
 import type { PersonRef } from "@/api/types/common";
 import { ApiError } from "@/api/client";
+import { usePhotos } from "@/api/download";
 import { invalidate, useInfinite, useMutation, usePaged } from "@/api/hooks";
-import { EmployeePicker } from "@/features/shared/pickers";
 import { paging } from "@/features/shared/wire";
-import { Button, DateField, Field, FormError, FormFooter, Grid, RecordPicker, SelectField, TextField, TimeField, toast, todayIso, useContractForm } from "@mycity/ui";
+import { Button, ChoiceField, DateField, Field, FormError, FormFooter, Grid, PersonPicker, RecordPicker, SelectField, TextField, TimeField, toast, todayIso, useContractForm } from "@mycity/ui";
 import { bodySchema, INTERVIEW_TYPE, renamed, sayRefusal } from "./shared";
 
 type Values = {
@@ -49,6 +51,21 @@ function bodyOf(v: Values, edit: boolean) {
     ...(v.interview_type === "video" && v.meeting_url.trim() ? { meeting_url: v.meeting_url.trim() } : {}),
     panel_employee_ids: v.panel.map((p) => p.employee_id),
   };
+}
+
+/** Only the people who may sit on a panel (they hold Recruitment), 25 at a time, searched by the server. */
+function PanelPicker({ value, onChange }: { value: PersonRef[]; onChange: (value: PersonRef[]) => void }) {
+  const list = usePaged("GET /api/v1/recruitment/interviews/panelists");
+  const photos = usePhotos(list.rows.map((row) => row.photo_url));
+  return (
+    <PersonPicker
+      photo={(person) => photos(person.photo_url)}
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value}
+      onChange={onChange}
+      multiple
+    />
+  );
 }
 
 export function ScheduleForm({ applicationId, interview, close, onSaved }: { applicationId?: string; interview?: InterviewDetail; close: () => void; onSaved?: (x: InterviewDetail) => void }) {
@@ -89,6 +106,8 @@ export function ScheduleForm({ applicationId, interview, close, onSaved }: { app
       onSaved?.(saved);
     } catch (e) {
       sayRefusal(e instanceof ApiError ? Object.assign(e, { fields: renamed(e.fields, RENAME) }) : e, f, setProblem);
+      // Someone on the panel cannot sit on it: the line under the form says who.
+      if (e instanceof ApiError && e.code === "NOT_PANELISTS") setProblem(e.message);
     }
   };
   const type = f.values.interview_type;
@@ -112,7 +131,7 @@ export function ScheduleForm({ applicationId, interview, close, onSaved }: { app
       )}
       <Grid cols={2}>
         <Field label="How" {...f.status("interview_type")}>
-          <SelectField options={TYPES} {...f.field("interview_type")} />
+          <ChoiceField options={TYPES} {...f.field("interview_type")} />
         </Field>
         <Field label="Round Name" optional {...f.status("title")}>
           <TextField {...f.field("title")} placeholder="Interview 1" maxLength={120} />
@@ -140,7 +159,7 @@ export function ScheduleForm({ applicationId, interview, close, onSaved }: { app
         </Field>
       </Grid>
       <Field label="Panel" {...f.status("panel")}>
-        <EmployeePicker multiple value={f.values.panel} onChange={(p) => f.set("panel", p)} filters={{ status: "active" }} />
+        <PanelPicker value={f.values.panel} onChange={(p) => f.set("panel", p)} />
       </Field>
       <FormError>{problem}</FormError>
       <FormFooter>

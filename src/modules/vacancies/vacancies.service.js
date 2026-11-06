@@ -139,6 +139,9 @@ async function detailOf(db, row, user) {
     description: row.description,
     requirements: row.requirements,
     nice_to_have: row.nice_to_have,
+    description_blocks: lifecycle.blocksOf(row.description) || [],
+    requirements_blocks: lifecycle.blocksOf(row.requirements),
+    nice_to_have_blocks: lifecycle.blocksOf(row.nice_to_have),
     target_start_on: row.target_start_on,
     paused_at: row.paused_at,
     closed_at: row.closed_at,
@@ -349,23 +352,126 @@ async function saveScorecard(actor, scope, id, body) {
 }
 
 /**
- * A condition about a protected trait (guide §6.4; the same list the cv-screen prompt ignores): age,
- * sex, marital or family status, pregnancy, religion, ethnicity or tribe, state or LGA of origin,
- * nationality, disability, genotype or appearance. Refused before it is kept, so it is never read.
- * A language ("speaks Yoruba") or work with children is a fair condition and passes; what slips
- * past this list is still not applied by the model (prompts/cv-screen.md rule 5).
+ * A condition about a protected trait (guide §6.4; the same list the cv-screen prompt ignores): sex,
+ * age, ethnicity or tribe (and a language asked for as an origin), religion, marital or family status
+ * and pregnancy, disability or health, state or LGA of origin, nationality and appearance. Refused
+ * before it is kept, so it is never read. A language as a skill ("Fluent in English", "Speaks
+ * Yoruba"), where someone lives ("Lives in Lagos"), years of experience ("Over 10 years in sales") and
+ * work with children are fair and pass; what slips past this list is still not applied by the model
+ * (prompts/cv-screen.md rule 5).
+ *
+ * The text is folded first (lower case, accents off, curly quotes straight, any run of dashes,
+ * slashes, dots or underscores a space), so "Ladies-only", "L.G.A." and "Muslim/Christian" read as
+ * their words.
  */
-const PROTECTED = [
-  // Age: an age, a range of ages, or a limit; never a number of years of experience ("over 10 years in sales").
-  /\b(aged?\s+(between\s+)?\d{2}|\d{2}\s*(to|-|and)\s*\d{2}\s*(years?\s+old|yrs?\s+old|years?\s+of\s+age)|\d{2}\s*years?\s+old|age\s+(limit|range|between|of\s+\d)|ages?\s+\d{2}|not\s+older\s+than|no\s+older\s+than|younger\s+than|older\s+than\s+\d{2}\b(?!\s*(years?|yrs?)\s+(of|in)\b))/i,
-  // "Must be 25 to 35", "be 21 or over": a person's own number, not their experience's.
-  /\bbe\s+(between\s+)?\d{2}\s*((to|-|and)\s*\d{2}|or\s+(over|under|older|younger))\b(?!\s*(years?|yrs?)\s+(of|in)\b)/i,
-  /\b(gender|sex|male|female|married|unmarried|marital|spouse|pregnan\w*|religio\w*|christian|muslim|tribe|tribal|ethnic\w*|state\s+of\s+origin|lga\s+of\s+origin|indigene|nationality|disab\w*|genotype|hiv|appearance|attractive|good.looking)\b/i,
-];
+const fold = (text) =>
+  String(text)
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[‘’ʼ`]/g, "'")
+    .replace(/[‐-―]/g, "-")
+    .replace(/(\d)\s*-\s*(\d)/g, "$1 to $2")
+    .replace(/[-_/\\.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** A person's own age: a number 15 to 69 (an experience of 10 or 12 years never reads as an age). */
+const AGE = "(?:1[5-9]|[2-6]\\d)";
+/** What a number counts when it is not an age: years in a job, hours, sales, people. */
+const NOT_AGE =
+  "(?!\\s*(?:\\+\\s*)?(?:years?|yrs?)\\s+(?:of\\s+(?!age\\b)|in\\b|experience|working|post|relevant|professional|industry|as\\b|on\\b|at\\b|with\\b|doing|managing|leading|selling|running))" +
+  "(?!\\s*(?:%|percent|per\\b|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|km|kilomet\\w*|miles?|kg|words?|wpm|people|staff|persons?|clients?|customers?|accounts?|units?|calls?|deals?|leads?|sales|stores?|shops?|branches?|cities|states|million|thousand|naira|k\\b|m\\b))";
+
+/**
+ * Nigeria's larger peoples, named as an origin; a language skill naming one is fair (see LANGUAGE).
+ * Names that are also a place people live (Edo, Oyo, Ekiti, Ibadan) are left to STATES and their context.
+ */
+const PEOPLES =
+  "igbo|ibo|yoruba|hausa|fulani|ijaw|izon|kanuri|tiv|ibibio|efik|annang|bini|esan|urhobo|itsekiri|isoko|nupe|igala|idoma|ebira|igbira|gwari|gbagyi|jukun|berom|ogoni|ejagham";
+/** The states and the capital territory, named as an origin. */
+const STATES =
+  "abia|adamawa|akwa ibom|anambra|bauchi|bayelsa|benue|borno|cross river|delta|ebonyi|edo|ekiti|enugu|gombe|imo|jigawa|kaduna|kano|katsina|kebbi|kogi|kwara|lagos|nasarawa|niger|ogun|ondo|osun|oyo|plateau|rivers|sokoto|taraba|yobe|zamfara|fct|abuja";
+
+/** A language asked for as a skill: speaking, reading, writing or translating it. */
+const LANGUAGE = /\b(speak\w*|spoken|fluen\w*|conversant|proficien\w*|read\w*|writ\w*|language|interpret\w*|translat\w*|communicat\w*|bilingual)\b/;
+/** A language asked for as an origin: a native, a mother tongue, by birth. */
+const ORIGIN_WORDS = /\b(native|mother tongue|first language|by birth|by origin|origin\w*|indigen\w*|ancestr\w*|descent|heritage|blood)\b/;
+
+/** Each trait's test, on the folded text. */
+const PROTECTED = Object.freeze([
+  {
+    trait: "sex",
+    test: (t) =>
+      /\b(gender|sex|sexes|male|males|female|females|man|men|woman|women|lady|ladies|gentleman|gentlemen|girls?|boys?|guys?|feminine|masculine|he or she|she or he|transgender)\b(?!'s|s')/.test(t) ||
+      /\b(mr|mrs|miss|ms)\b\s*(only|$)/.test(t),
+  },
+  {
+    trait: "age",
+    test: (t) =>
+      /\b(age|aged|ages|years? old|yrs? old|years? of age|young|younger|youngest|youthful|elderly|over the hill|millennials?|gen ?z|date of birth|dob|birth year|year of birth|born (in|after|before|between) \d{4})\b/.test(t) ||
+      new RegExp(`\\b(under|below|over|above|beyond|exceed\\w*|older than|younger than|less than|more than|no more than|not more than|not above|not over|maximum( of)?|max|minimum( of)?|min|at least|at most|up to)\\s+${AGE}\\b${NOT_AGE}`).test(t) ||
+      new RegExp(`\\b(be|is|are|aged)\\s+(between\\s+)?${AGE}\\b${NOT_AGE}`).test(t) ||
+      new RegExp(`\\bbetween\\s+${AGE}\\s+(and|to)\\s+${AGE}\\b${NOT_AGE}`).test(t) ||
+      new RegExp(`\\b${AGE}\\s+to\\s+${AGE}\\s*(years?|yrs?)?\\s*(only|$)`).test(t) ||
+      new RegExp(`^${AGE}\\s*(\\+|years?|yrs?)?\\s*(or (under|over|below|above|younger|older|less|more))?\\s*(only)?$`).test(t),
+  },
+  {
+    trait: "ethnicity",
+    test: (t) => {
+      if (/\b(tribe|tribes|tribal|tribesm[ae]n|ethnic\w*|race|races|racial|colou?red|skin (colou?r|tone)|complexion|fair skinned|light skinned|dark skinned|albin\w*|northerners?|southerners?|easterners?|westerners?|middle belt\w*|hausa fulani)\b/.test(t))
+        return true;
+      if (!new RegExp(`\\b(${PEOPLES})s?\\b`).test(t)) return false;
+      // "Speaks Yoruba" is a skill; "Igbo only", "Must be Yoruba" or "a native Hausa speaker" is an origin.
+      return ORIGIN_WORDS.test(t) || !LANGUAGE.test(t);
+    },
+  },
+  {
+    trait: "origin",
+    test: (t) =>
+      /\b(state of origin|lga of origin|l g a of origin|local government (area )?of origin|hometown|home town|home state|village of origin|indigen\w*|non indigen\w*|native of|hails? from|originally from|origin)\b/.test(t) ||
+      new RegExp(`\\b(${STATES})( state)?\\s+(origin|indigenes?|natives?|people|man|men|woman|women|sons?|daughters?|born)\\b`).test(t) ||
+      new RegExp(`\\b(born in|from)\\s+(${STATES})( state)?\\s*(only|$)`).test(t) && !/\b(live|lives|living|resid\w*|based|relocat\w*|commute\w*)\b/.test(t),
+  },
+  {
+    trait: "religion",
+    test: (t) =>
+      /\b(religio\w*|(?<!(good|bad) )faith|christians?|christianity|muslims?|moslems?|islam\w*|catholics?|protestants?|pentecostal\w*|anglicans?|methodists?|baptists?|adventists?|jehovah\w*|evangelical\w*|born again|church\w*|mosques?|hijab\w*|veil\w*|turban\w*|pray\w*|sabbath|god fearing|godly|atheists?|agnostics?|pagan\w*|traditional worship\w*|traditionalists?|hindus?|jewish|jews?|buddhists?|sharia)\b/.test(t),
+  },
+  {
+    trait: "family",
+    test: (t) =>
+      /\b(marital|married|marry|marriage|unmarried|spouses?|husbands?|wives|wife|divorc\w*|widow\w*|separated|fianc\w*|engaged to|spinsters?|pregnan\w*|maternity|paternity|childless|child free|no (kids|children|child)|(has|have|having|without) (no )?(kids|children|child)\b|family (status|planning|commitments?)|plans? to (marry|have)|nursing mothers?|single (mothers?|fathers?|parents?|ladies|women|men|status)|mothers?|fathers?)\b/.test(t) ||
+      /\b(be|is|are|must|only)\s+single\b|\bsingle\s*(only|$)/.test(t),
+  },
+  {
+    trait: "disability",
+    test: (t) =>
+      /\b(disab\w*|handicap\w*|able bodied|abled|impair\w*|blind(?! (panel|review|spot|test|copy))|deaf|dumb|mute|lame|cripple\w*|wheelchair\w*|amputee\w*|stammer\w*|stutter\w*|mental(ly)? (ill\w*|health|disorder\w*)|psychiatric|epilep\w*|sickle|genotype|blood group|hiv|hepatitis|medical (history|condition\w*)|chronic (illness|condition))\b/.test(t),
+  },
+  {
+    trait: "nationality",
+    test: (t) =>
+      /\b(nationality|nationals|citizens? only|citizenship|foreigners?|expatriates?|non nigerians?)\b/.test(t) ||
+      /\b(nigerians?|ghanaians?|cameroonians?)\s*(only|$)|\bonly\s+nigerians?\b/.test(t),
+  },
+  {
+    trait: "appearance",
+    test: (t) =>
+      /\b(appearance|attractive|good looking|pretty|beautiful|handsome|cute|sexy|slim|slender|petite|curvy|plus size|fat|obese|overweight|skinny|tall|heights?|overweight|body (size|shape|type)|photogenic)\b/.test(t) &&
+      !/\bwork(ing)? at heights?\b/.test(t),
+  },
+]);
+
+/** The traits a condition names, or none. */
+const traitsNamed = (text) => {
+  const t = fold(text);
+  return PROTECTED.filter((p) => p.test(t)).map((p) => p.trait);
+};
 
 /** The conditions that name a protected trait, by their index. */
 const protectedConditions = (conditions) =>
-  conditions.map((text, i) => (PROTECTED.some((re) => re.test(text)) ? i : -1)).filter((i) => i >= 0);
+  conditions.map((text, i) => (traitsNamed(text).length ? i : -1)).filter((i) => i >= 0);
 
 /**
  * Keep the must-meet conditions Screen With AI asked for (guide §6.4), one to three; left out, the
@@ -498,6 +604,7 @@ module.exports = {
   saveScorecard,
   keepScreeningConditions,
   protectedConditions,
+  traitsNamed,
   settings,
   saveSettings,
   assist,

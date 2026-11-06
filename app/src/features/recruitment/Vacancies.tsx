@@ -19,7 +19,6 @@ import {
   Card,
   CardHeader,
   CheckboxField,
-  DataView,
   DesktopOnly,
   ErrorState,
   FilterSelect,
@@ -31,7 +30,8 @@ import {
   LoadingRows,
   PageHeader,
   Pill,
-  SelectField,
+  RichText,
+  ChoiceField,
   Field,
   toast,
   Toolbar,
@@ -54,6 +54,7 @@ const STATUSES: Array<[string, string]> = [
   ["closed", "Closed"],
 ];
 const PAUSED_HELP = "Takes no applications. The link keeps working.";
+const APPLICANTS_HELP = "Everyone who applied to an open or paused role, whatever became of them.";
 const SCORECARD_HELP = "Switch off a part this role skips. The parts left on add up to 100.";
 
 const closesOn = (v: Pick<Vacancy, "closes_at" | "past_closing">) =>
@@ -116,7 +117,7 @@ export function Vacancies() {
         mobileCols={2}
         items={[
           { label: "Open Vacancies", value: counted(s?.open) },
-          { label: "Applicants", value: counted(s?.applicants) },
+          { label: "Applicants", value: counted(s?.applicants), help: APPLICANTS_HELP },
           { label: "In Interview", value: counted(s?.in_interview) },
           { label: "Past Closing Date", value: counted(s?.past_closing), tone: s?.past_closing ? "warn" : undefined },
         ]}
@@ -143,12 +144,12 @@ export function Vacancies() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        <DataView<SeatSuggestion>
+        <PagedTable<SeatSuggestion>
           title="Suggested From Organogram"
-          rows={seats.rows}
+          list={seats}
           rowKey={(x) => x.org_seat_id}
-          loading={seats.loading}
-          error={seats.error}
+          noun="seat"
+          nounPlural="seats"
           empty={{ title: "No Empty Seats" }}
           columns={[
             { key: "title", label: "Seat", render: (x) => <span className="font-semibold">{x.title}</span> },
@@ -273,8 +274,19 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
       </Card>
       <Card className="mt-3" data-copy="content">
         <CardHeader title="Description" />
-        <p className="text-sm whitespace-pre-line">{v.description}</p>
-        {v.requirements && <p className="mt-3 text-sm whitespace-pre-line">{v.requirements}</p>}
+        <RichText blocks={v.description_blocks} top={4} />
+        {v.requirements_blocks && (
+          <>
+            <CardHeader title="Required Experience" level={4} className="mt-3" />
+            <RichText blocks={v.requirements_blocks} top={4} />
+          </>
+        )}
+        {v.nice_to_have_blocks && (
+          <>
+            <CardHeader title="What We Look For" level={4} className="mt-3" />
+            <RichText blocks={v.nice_to_have_blocks} top={4} />
+          </>
+        )}
       </Card>
       <FormFooter>
         <Button onClick={() => (close(), navigate(hrefFor("recruitment", "candidates", { vacancy: v.vacancy_id })))}>See Candidates</Button>
@@ -324,7 +336,7 @@ function CloseForm({ vacancy, close, onSaved }: { vacancy: VacancyDetail; close:
   return (
     <>
       <Field label="Reason">
-        <SelectField options={REASONS} value={reason} onChange={setReason} />
+        <ChoiceField options={REASONS} value={reason} onChange={setReason} />
       </Field>
       {vacancy.in_progress > 0 && (
         <Field label={`${vacancy.in_progress} Still in Progress`} help={NOT_PROGRESS_HELP}>

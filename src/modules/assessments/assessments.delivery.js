@@ -12,7 +12,8 @@
  *
  * The clock is the server's: an answer after due_at is refused with TIME_UP, and a sitting found
  * past its time is ended there and then, as the scheduler would a minute later. Start moves the
- * link's end to due_at, so a test started on its last day keeps its link (GE · (Ose), 04/11/2026).
+ * link's end to a day past due_at (timer.LINK_GRACE_MS), so a test started on its last day keeps its
+ * link, and a save that arrives late reaches the sitting and is told TIME_UP rather than a dead link.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -50,6 +51,12 @@ async function sittingOf(db, raw, opts = {}) {
 
 const STATE = { sent: "not_started", in_progress: "in_progress", submitted: "submitted", scored: "submitted", timed_out: "timed_out" };
 
+/** A sitting scored at once when its time ran out still reads as time up: it ended at or after due_at. */
+const stateOf = (row) =>
+  row.status === "scored" && row.due_at && row.submitted_at && new Date(row.submitted_at) >= new Date(row.due_at)
+    ? "timed_out"
+    : STATE[row.status];
+
 /** AssessmentSession, field by field. Questions only once started and while it runs. */
 async function sessionOf(db, row) {
   const live = row.status === "in_progress";
@@ -80,7 +87,7 @@ async function sessionOf(db, row) {
       question_count: row.question_count,
       instructions: row.instructions,
     },
-    state: STATE[row.status],
+    state: stateOf(row),
     timed: Boolean(row.duration_minutes),
     start_by: row.start_by,
     ends_at: row.due_at ? new Date(row.due_at).toISOString() : null,
@@ -112,7 +119,7 @@ async function start(raw) {
     if (row.start_by < lagos.today()) throw notFound();
     const due = timer.dueAt(row);
     await repo.start(client, row.application_assessment_id, due);
-    await publicToken.extend(client, token.public_token_id, due);
+    await publicToken.extend(client, token.public_token_id, new Date(due.getTime() + timer.LINK_GRACE_MS));
     await emit(client, {
       key: EVENTS.ASSESSMENT_STARTED,
       entity: { type: SUBJECT, id: row.application_assessment_id },
@@ -130,7 +137,11 @@ async function running(client, raw, questionId) {
     await timer.finish(client, row, "timed_out");
     return { ended: true };
   }
-  if (row.status !== "in_progress") throw new AppError("NOT_RUNNING", "This assessment is not running", 409);
+  if (row.status !== "in_progress") {
+    // Ended by its clock already (the scheduler, or a read of the link): the same answer as a late save.
+    if (stateOf(row) === "timed_out") throw timeUp();
+    throw new AppError("NOT_RUNNING", "This assessment is not running", 409);
+  }
   const q = (await repo.questions(client, row.assessment_definition_id)).find((x) => x.assessment_question_id === questionId);
   if (!q) throw notFound();
   return { row, q };

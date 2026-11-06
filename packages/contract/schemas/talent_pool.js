@@ -84,7 +84,7 @@ const TABLES = {
       score: "that application's screening_score, or provisional_score while there is none",
       score_provisional: "true while score is provisional_score",
       added_by_name: "the display name of who added them",
-      invited_vacancy: "the vacancy they were invited to",
+      invited_vacancy: "the vacancy they were invited to; null when its hiring manager is outside the reader's scope",
       hired_from_pool: "a later application of source pool reached stage hired",
     },
   },

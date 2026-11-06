@@ -32,5 +32,25 @@ describe("routes", () => {
     expect(action("POST", "/:id/close")).toBe("edit");
     expect(action("PUT", "/:id/feedback")).toBe("view");
     expect(action("POST", "/:id/feedback/submit")).toBe("view");
+    // The panel picker lists who may sit, for those who schedule; Tidy With AI is a panelist's, on view.
+    expect(action("GET", "/panelists")).toBe("edit");
+    expect(action("GET", "/assist")).toBe("view");
+    expect(action("POST", "/assist")).toBe("view");
+  });
+});
+
+describe("the round closes by itself", () => {
+  const row = (over) => ({ round_status: "open", status: "scheduled", panel_size: 2, submitted_count: 2, scheduled_start: new Date(Date.now() - 60_000).toISOString(), ...over });
+  const untouched = { query: () => { throw new Error("no write expected"); } };
+
+  test("not before the interview has started, as Close Round", async () => {
+    expect(await consolidate.closeIfDone(untouched, row({ scheduled_start: new Date(Date.now() + 3_600_000).toISOString() }), null)).toBe(false);
+  });
+
+  test("not while a seat is still waiting, nor with nobody on the panel, nor once closed or cancelled", async () => {
+    expect(await consolidate.closeIfDone(untouched, row({ submitted_count: 1 }), null)).toBe(false);
+    expect(await consolidate.closeIfDone(untouched, row({ panel_size: 0, submitted_count: 0 }), null)).toBe(false);
+    expect(await consolidate.closeIfDone(untouched, row({ round_status: "closed" }), null)).toBe(false);
+    expect(await consolidate.closeIfDone(untouched, row({ status: "cancelled" }), null)).toBe(false);
   });
 });

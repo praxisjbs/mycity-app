@@ -10,7 +10,7 @@ import vacancySchemas from "@mycity/contract/schemas/vacancies.js";
 import type { ScorecardWeight, VacancyDetail, VacancyQuestion } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useApi, useMutation } from "@/api/hooks";
-import { Button, Card, CardHeader, CheckboxField, Field, FormError, FormFooter, HelpTerm, NumberField, SelectField, TextField, toast } from "@mycity/ui";
+import { Button, Card, CardHeader, CheckboxField, ChoiceField, Field, FormError, FormFooter, HelpTerm, NumberField, TextField, toast } from "@mycity/ui";
 import { say } from "./shared";
 
 type Ask = { id?: string; question_type: "yes_no" | "text" | "choice"; prompt: string; options: string; required: boolean };
@@ -115,7 +115,7 @@ export function QuestionsForm({ vacancy, close, onSaved }: { vacancy: VacancyDet
               <TextField value={a.prompt} onChange={(prompt) => editAsk(i, { prompt })} maxLength={500} />
             </Field>
             <Field label="Answer" {...mark(`ask.${i}.question_type`)}>
-              <SelectField options={ASK_TYPES} value={a.question_type} onChange={(t) => editAsk(i, { question_type: t as Ask["question_type"] })} />
+              <ChoiceField options={ASK_TYPES} value={a.question_type} onChange={(t) => editAsk(i, { question_type: t as Ask["question_type"] })} />
             </Field>
             {a.question_type === "choice" && (
               <Field label="Options" {...mark(`ask.${i}.options`)}>

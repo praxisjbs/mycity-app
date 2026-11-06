@@ -496,3 +496,16 @@ packages that need none can start. Tick a package only when its own checks pass 
   Remove asks no reason; and the fields of every form named as they read. The doubled heading: Vacancy drops a
   description's first line when it is the heading the page gives it (`TextSection`), with a test and the public
   mock's Graphics role written that way; `public-vacancy` retaken. Guide §10.1 and §14, PROGRESS note.
+- 06/11/2026 · GE · **The P15 follow-ups, closed** (GE's list of 20; three agents, by area). Interviews: panelists
+  route and a named refusal (`NOT_PANELISTS`); a round closes by itself only once full and started (`closeIfDone`, the
+  daily `interview-reminders` run closes one full before its start); Reschedule closes a full started round; Tidy With
+  AI for any panelist with a card to write; My Card's rollback per trait. Vacancies: the sheet's texts as blocks
+  (`*_blocks`); Create Vacancy from a seat fills department, reports to and hiring manager; `traitsNamed` refuses
+  protected phrasings; Suggested From Organogram pages; Applicants is every application. Candidates, assessments and
+  pool: the take link lives a day past `due_at` (Time Up reachable; a timed-out sitting reads `timed_out`); the pool
+  nulls an out-of-scope vacancy; downloads keep the server's file name (a Word CV stays `.docx`); Import Assessment is
+  a footer press; Cancel on Invite and Candidate Emails goes back one step; short fixed choices are `ChoiceField`
+  (filters stay `FilterSelect`); a parsing JSON file is never refused as markup. Mail: reserved domains are never
+  sent. Seed: roles found by its own `vacancy.created` events. Guide (§2, §3, §5, §6.1, §6.4, §6.6, §6.7, §6.9, §10,
+  §11, §14), chapter steps, the Organogram and Integrations guides follow; 18 pictures retaken. Ose's chapter list is done
+  (his entry above). Left: #72's old `User-guide-unchanged` line (dropped when it is marked ready).

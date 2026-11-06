@@ -326,6 +326,13 @@ async function summary(db, scope) {
   );
   const p2 = [];
   const s2 = scopeClause(scope, { column: "v.hiring_manager_id" }, p2);
+  // Applicants: every application to a live role, as the list's column counts it (guide §6.1).
+  const { rows: applied } = await db.query(
+    `SELECT count(*)::int AS applicants
+       FROM application a JOIN vacancy v ON v.vacancy_id = a.vacancy_id
+      WHERE v.status IN ('open', 'paused') ${s2.and}`,
+    p2,
+  );
   // pagination:complete one count per stage, at most ten
   const funnel = await completeQuery(
     db,
@@ -339,7 +346,7 @@ async function summary(db, scope) {
   return {
     open: rows[0].open,
     past_closing: rows[0].past_closing,
-    applicants: funnel.rows.reduce((n, r) => n + r.count, 0),
+    applicants: applied[0].applicants,
     in_interview: by.get("interview") || 0,
     funnel: M4_STAGES.map((stage) => ({ stage, count: by.get(stage) || 0 })),
   };
@@ -350,23 +357,27 @@ async function summary(db, scope) {
  * ------------------------------------------------------------------ */
 
 /**
- * Vacant seats with no draft, open or paused vacancy, newest first. A team-scoped reader sees the
- * seats whose line manager is in their scope, as they would see the vacancy it becomes.
+ * Vacant seats with no draft, open or paused vacancy, newest first, 25 a page. A team-scoped reader
+ * sees the seats whose line manager is in their scope, as they would see the vacancy it becomes.
+ * `org_seat_id` narrows it to the one seat the Organogram's Create Vacancy names.
  */
 function suggested(db, query, scope) {
-  const params = [query.q || null];
+  const params = [query.q || null, query.org_seat_id || null];
   const s = scopeClause(scope, { column: "s.line_manager_id" }, params);
   return pageQuery(
     db,
     `SELECT s.org_seat_id, s.title, s.department_id, d.name AS department,
-            COALESCE(btrim(lm.first_name || ' ' || lm.last_name), up.title) AS reports_to, ${TOTAL_COL}
+            COALESCE(btrim(lm.first_name || ' ' || lm.last_name), up.title) AS reports_to,
+            ${personJson("lm", "lmd")} AS line_manager, ${TOTAL_COL}
        FROM org_seat s
        JOIN department d ON d.department_id = s.department_id
        LEFT JOIN employee lm ON lm.employee_id = s.line_manager_id
+       LEFT JOIN department lmd ON lmd.department_id = lm.department_id
        LEFT JOIN org_seat up ON up.org_seat_id = s.line_manager_seat_id
       WHERE s.status = 'vacant'
         AND NOT EXISTS (SELECT 1 FROM vacancy v WHERE v.org_seat_id = s.org_seat_id AND v.status IN ('draft', 'open', 'paused'))
         AND ($1::text IS NULL OR search_fold(s.title || ' ' || d.name) LIKE '%' || search_fold($1) || '%')
+        AND ($2::uuid IS NULL OR s.org_seat_id = $2)
         ${s.and}
       ORDER BY s.created_at DESC, s.org_seat_id`,
     params,

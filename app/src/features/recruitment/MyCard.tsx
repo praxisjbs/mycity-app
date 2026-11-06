@@ -1,9 +1,9 @@
 /**
  * My Card: a panelist's own blind card for one interview (docs/guides/recruitment.md §3 step 9, §6.6,
  * §10), MyCity's Interview Assessment Format on screen. The role's traits, numbered and the same for
- * every candidate, each rated 1 to 10 with ten stars; each star is saved the moment it is tapped and
- * put back, with the error, when the save fails; a tap on the star already chosen takes it back to
- * not rated. The panelist's own score, the mean of what they have rated, shows as they go. Then a
+ * every candidate, each rated 1 to 10 with ten stars; each star is saved the moment it is tapped and,
+ * when the save fails and no later tap is waiting, put back to what the server last kept, with the
+ * error; a tap on the star already chosen takes it back to not rated. The panelist's own score, the mean of what they have rated, shows as they go. Then a
  * decision, comments and private notes, and Submit Card, which locks it. Nobody else reads it until
  * the round closes; private notes stay the author's always.
  */
@@ -38,7 +38,8 @@ export function MyCard({ interview, close, onChanged }: { interview: InterviewDe
   useUnsavedChanges(!submitted && (comments !== keptText.comments || notes !== keptText.notes));
   const [problem, setProblem] = useState<string | null>(null);
   const [marks, setMarks] = useState<Record<string, string>>({});
-  const ai = useApi("GET /api/v1/recruitment/vacancies/assist");
+  // Read on `recruitment` view, as the card is: every panelist may tidy their own comments.
+  const ai = useApi("GET /api/v1/recruitment/interviews/assist");
   const save = useMutation("PUT /api/v1/recruitment/interviews/:id/feedback");
   const send = useMutation("POST /api/v1/recruitment/interviews/:id/feedback/submit");
   const tidy = useMutation("POST /api/v1/recruitment/interviews/assist");
@@ -67,35 +68,51 @@ export function MyCard({ interview, close, onChanged }: { interview: InterviewDe
       return after;
     });
 
-  /** One trait, saved as it is tapped; put back to what was last kept when the save fails. */
+  // The latest tap of each trait (and of the overall rating and the decision). A failed save puts its
+  // star back only while it is still the latest tap there: a later tap, queued behind it, decides what
+  // the star shows, and when that one fails too it goes back to what the server last confirmed.
+  const taps = useRef<Record<string, number>>({});
+  const tap = (key: string) => {
+    const n = (taps.current[key] ?? 0) + 1;
+    taps.current[key] = n;
+    return () => taps.current[key] === n;
+  };
+
+  /** One trait, saved as it is tapped; put back to what the server last confirmed when the save fails. */
   const rate = async (q: string, rating: number | null) => {
+    const latest = tap(`rating:${q}`);
     setLocal((s) => ({ ...s, [q]: rating }));
     setProblem(null);
     unmark("ratings");
     try {
       await put({ ratings: [{ vacancy_question_id: q, rating }] });
     } catch (e) {
+      if (!latest()) return;
       setLocal((s) => ({ ...s, [q]: kept.current.ratings[q] ?? null }));
       setProblem(e instanceof ApiError ? e.message : "That rating was not saved");
     }
   };
   const rateOverall = async (rating: number | null) => {
+    const latest = tap("overall");
     setOverall(rating);
     setProblem(null);
     unmark("overall_rating");
     try {
       await put({ overall_rating: rating });
     } catch (e) {
+      if (!latest()) return;
       setOverall(kept.current.overall);
       setProblem(e instanceof ApiError ? e.message : "That rating was not saved");
     }
   };
   const decide = async (d: InterviewDecision) => {
+    const latest = tap("decision");
     setDecision(d);
     unmark("decision");
     try {
       await put({ decision: d });
     } catch (e) {
+      if (!latest()) return;
       setDecision(kept.current.decision);
       say(e);
     }
