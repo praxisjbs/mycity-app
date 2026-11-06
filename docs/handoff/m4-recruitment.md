@@ -8,7 +8,7 @@ design itself is `docs/guides/recruitment.md`; read it before you touch code.
 | | |
 |---|---|
 | Branch | `m4/recruitment` (everyone pushes here; the PR targets `main`) |
-| Pull request | #72 (draft: GitHub runs no CI on a draft, so run the checks yourself, §6) |
+| Pull request | #72, merged 06/11/2026. Follow-ups go on a new draft PR from this same branch (draft: GitHub runs no CI on a draft, so run the checks yourself, §6) |
 | Owner | GE (Godwin-Okoh Elisha), full ownership from 04/11/2026; packages claimed by whoever builds them |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 04/11/2026 |
@@ -513,3 +513,37 @@ packages that need none can start. Tick a package only when its own checks pass 
   the 51st, frontend tests, failed one Settings · Approvals case on a timeout under the run's load (untouched by M4);
   it passes alone twice and the whole app suite passes again (696 of 696). Every P15 decision, follow-up and chapter
   correction is closed. #72 waits only on GE's word to mark it ready (its old `User-guide-unchanged` line goes then).
+- 06/11/2026 · GE · **#72 merged** (squashed as 3e7b5ed): M4 Recruitment is on `main`, and so on staging. `main` is
+  merged back into this branch (no change of tree) for what comes next, on a new draft PR: GE's own findings from
+  testing on staging, logged here as they come, and the hand-over to M5. AJ takes M5 (Offers and Onboarding, guide
+  §2) and we talk with him in that PR's comments: what M4 gives M5 is the shortlist (stage `shortlist`, the last
+  column until M5 adds Offer), the Talent Pool's Invite to Apply, and the candidate emails' store (`candidates.emails`).
+- 06/11/2026 · GE · (Ose) Branch `m4/public-site-data` (from this one): the data for the approved public site design
+  (`public-site-demo.html`). `GET /api/public/v1/jobs/summary` (`PublicJobsSummary`), `/jobs` closing soonest first with
+  `department` (a department's code), `PublicJobCard` with `department_code`, `work_pattern_note`, `employment_type`,
+  `closes_at`; `ApplyLink.vacancy_department` and `vacancy_location`; the slug `summary` reserved. Guide §2, §5, §6.1,
+  §6.2, §10 and its change log first. The public mock follows the design (its twelve roles; the paused, filled and
+  past-its-day cases are now Video Editor, Studio Assistant and Copywriter, as the design opens Customer Support Lead,
+  Partnerships Associate and Content Producer). For AJ (M5): the design's Sign Offer has no email code, name, title or
+  consent tick, which partnerships §6.9 asks of the shared signatures service; the INTERIM verify shape (one signer,
+  document type, issued by) is not agreements' `VerifyResult` (signers, status). Both need a decision before M5's contract.
+- 06/11/2026 · GE · (Ose) Branch `m4/public-site`: the approved public site design on the pages, after the shared UI
+  (`3c022810`) and the data (`34e1b9f0`). Home (#107, new) at `/`; Careers, Vacancy, Apply and Assessment rebuilt to the
+  design; Sign Offer and Verify Document (M5) built on the mock, their API left for AJ; one header with six links on
+  every page and guidance screens at `/vacancy` (or `/jobs/`), `/apply`, `/assess` and `/sign`. `PublicJob.about_company`
+  dropped (About MyCityApp is Home's alone). Fourteen new components in `@mycity/ui`, PublicPage's deprecated props
+  and its card and open layouts removed. Guide §2, §5, §6.1, §10 and the change log first; the public chapter and its
+  pictures follow the screens; PROGRESS row #107, #84 and #85 In progress. For AJ (M5): the signing and verify API for
+  the two pages (INTERIM `types/public.ts`), and the open points in the entry above.
+- 06/11/2026 · GE · Testing on staging, round 1. Fixed: Invite to Apply's "Check this value" (the refusal's field
+  message was over four words; the applied-for role is no longer offered); the staging seed skips Implementation
+  accounts without Recruitment (staging had no interviews and no Design role; the next deploy's seed run adds them).
+  Next: the candidate board on one row that scrolls sideways, New Vacancy in ten steps, the Interviews tab and the
+  KPI cards and tables against `demo (5).html`.
+- 06/11/2026 · GE · Testing on staging, round 1, the rest (GE's choices, three agents): Kanban on one row for every
+  board (packages/ui; AJ told on #79), compact cards; DataView's `badge` column for a phone card's status pill;
+  Vacancies' Openings; Interviews rebuilt to the reference layout (`InterviewDetail` gains `scorecard`,
+  `weighted_total`, `activity`; `ScorecardPart` moved to `vacancies.js`); New Vacancy as a ten-question interview
+  (`VacancyInterview.tsx`; AI action `vacancy-follow-ups`, Default, personal data, chosen by GE; `jd-draft` takes
+  the interview, prompt v5, a plain draft when the AI is off). For AJ: `Field` with `help` around a `TextField`
+  fails axe ("visible label"); New Vacancy's Job Title carries no help term until it is fixed in packages/ui.

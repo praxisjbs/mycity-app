@@ -36,6 +36,15 @@ describe("RichText", () => {
     expect(screen.getByRole("heading", { level: 4, name: "Breaks" })).toBeInTheDocument();
   });
 
+  it("site: a numbered heading's number on its badge, read once, in the site's look", () => {
+    const span = (text: string) => ({ text, bold: false, italic: false, href: null });
+    const { container } = render(<RichText look="site" top={3} blocks={[{ kind: "heading", level: 3, spans: [span("1. Sales & Revenue Strategy")] }, { kind: "bullets", items: [[span("Set clear sales targets.")]] }]} />);
+    expect(container.firstElementChild).toHaveClass("ps-rte");
+    const h = screen.getByRole("heading", { level: 4, name: "1. Sales & Revenue Strategy" });
+    expect(h.querySelector("[data-n]")).toHaveTextContent("1");
+    expect(h.querySelector("[data-n]")).toHaveAttribute("aria-hidden", "true");
+  });
+
   it("never makes a link of an unsafe address, and never injects markup", () => {
     const { container } = render(
       <RichText blocks={[{ kind: "paragraph", spans: [span("<b>not bold</b>"), span(" click", { href: "javascript:alert(1)" })] }]} />,

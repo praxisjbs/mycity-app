@@ -2,7 +2,7 @@
  * @component RichText
  * @group Documents
  * @summary Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML.
- * @use A policy's text on Policy Updates and Knowledge Hub · Policies; any text a person wrote that the API gives back as blocks.
+ * @use A policy's text on Policy Updates and Knowledge Hub · Policies; any text a person wrote that the API gives back as blocks. `look="site"` is the public site's: a role's text in its body ink, a numbered heading's number on a Deep Green badge, bullets as small yellow squares.
  * @avoid Text being written (use RichTextField); an email's own HTML (use EmailFrame); a short plain answer (a paragraph is enough).
  * @phone The same text at the phone's body size; long words and links wrap rather than push the page sideways.
  * @a11y Real headings, lists and links in reading order, so a screen reader can move by heading; pass `top` so the headings sit under the page's own.
@@ -34,9 +34,14 @@ export interface RichTextProps {
   blocks: RichTextBlock[];
   /** The heading level the text's top headings take (2 unless set): one below the heading the text sits under. */
   top?: 2 | 3 | 4;
+  /** `site`: the public site's (a vacancy's text): its body ink and size, numbered headings on a badge, yellow bullets. */
+  look?: "default" | "site";
   /** Layout classes only (spacing, width); the look is the component's own. */
   className?: string;
 }
+
+/** A heading that opens with its number ("1. Sales & Revenue Strategy"): the number, and the rest. */
+const NUMBERED = /^(\d{1,2})\.\s+/;
 
 const SAFE = /^(https?:|mailto:|tel:)/i;
 
@@ -54,13 +59,28 @@ function Spans({ spans }: { spans: RichTextSpan[] }) {
   );
 }
 
-export function RichText({ blocks, top = 2, className }: RichTextProps) {
+export function RichText({ blocks, top = 2, look = "default", className }: RichTextProps) {
+  const site = look === "site";
   return (
-    <div {...content} className={cn("rte text-sm leading-relaxed break-words text-muted-foreground", className)}>
+    <div {...content} className={cn(site ? "ps-rte break-words" : "rte text-sm leading-relaxed break-words text-muted-foreground", className)}>
       {blocks.map((b, i) => {
         if (b.kind === "heading") {
           const level = Math.min(6, top + Math.max(0, b.level - 2));
           const H = `h${level}` as "h2" | "h3" | "h4" | "h5" | "h6";
+          const first = b.spans[0];
+          const n = site && first ? NUMBERED.exec(first.text) : null;
+          if (n && first)
+            return (
+              <H key={i}>
+                <span data-n="" aria-hidden="true">
+                  {n[1]}
+                </span>
+                <span className="sr-only">{n[1]}.</span>{" "}
+                <span>
+                  <Spans spans={[{ ...first, text: first.text.slice(n[0].length) }, ...b.spans.slice(1)]} />
+                </span>
+              </H>
+            );
           return <H key={i} className="text-foreground"><Spans spans={b.spans} /></H>;
         }
         if (b.kind === "paragraph") return <p key={i}><Spans spans={b.spans} /></p>;

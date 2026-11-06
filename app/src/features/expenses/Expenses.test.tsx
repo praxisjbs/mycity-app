@@ -149,3 +149,23 @@ describe("My Requests", () => {
     expect(tick().getAttribute("aria-checked") ?? String((tick() as HTMLInputElement).checked)).toBe("false");
   }, 40000);
 });
+
+describe("Expenses · amounts as typed", () => {
+  it("New Budget takes an amount typed with commas and no decimals; nothing is refused as a wrong format", async () => {
+    await as("cynthia@mycityapp.io", <Expenses tab="budgets" id={null} />, "Budgets");
+    fireEvent.click(screen.getAllByRole("button", { name: "New Budget" })[0]);
+    const form = await screen.findByRole("dialog", { name: "New Budget" }, { timeout: 5000 });
+    const pick = async (name: string, last = false) => {
+      fireEvent.click(within(form).getByRole("combobox", { name }));
+      const options = await screen.findAllByRole("option");
+      fireEvent.click(options[last ? options.length - 1 : 0]);
+    };
+    // The last department has no budget for the year in the mock.
+    await pick("Department", true);
+    await pick("Category 1");
+    fireEvent.change(within(form).getByRole("textbox", { name: "Amount" }), { target: { value: "20,000,000" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Set Budget" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "New Budget" }) === null || within(form).queryByText(/already has a budget/i)).toBeTruthy(), { timeout: 5000 });
+    expect(screen.queryByText("Check the format")).toBeNull();
+  }, 40000);
+});

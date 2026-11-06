@@ -414,9 +414,13 @@ module.exports = async function seed({ pool, log = () => {} }) {
 
   const staff = await realStaff(pool);
   const recruiter = await callerOf(pool, staff.operations);
-  const team = staff.everyone.filter((p) => p.department === TEAM && p.user_id);
+  // Only accounts that hold Recruitment: a hiring manager and a panelist must (guide §6.1, §6.6), and
+  // one teammate without it would refuse every role it manages and every panel it sits on.
+  const holds = src("modules/vacancies/vacancies.repo").holdsRecruitment;
+  const team = [];
+  for (const p of staff.everyone.filter((x) => x.department === TEAM && x.user_id)) if (await holds(pool, p.employee_id)) team.push(p);
   if (!recruiter || !team.length) {
-    log(`recruitment: ${recruiter ? `nobody in ${TEAM}` : "no Operations & People login"}, nothing added`);
+    log(`recruitment: ${recruiter ? `nobody in ${TEAM} holds Recruitment` : "no Operations & People login"}, nothing added`);
     return;
   }
   const managers = team; // hiring managers, in turn

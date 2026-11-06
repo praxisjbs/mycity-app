@@ -8,7 +8,8 @@
  *   POST /:id/publish, /pause, /resume, /close   `recruitment` edit: the lifecycle
  *   PUT  /:id/questions, /:id/scorecard     `recruitment` edit
  *   GET, PUT /settings                      Careers Settings: view; edit
- *   GET, POST /assist, POST /:id/assist/questions   `recruitment` edit: Write With AI, nothing kept
+ *   GET, POST /assist, POST /assist/follow-ups, POST /:id/assist/questions   `recruitment` edit: Write With AI
+ *                                           and New Vacancy's interview, nothing kept
  *
  * The careers page is vacancies.public.routes.js (/api/public/v1/jobs).
  */
@@ -45,6 +46,10 @@ route(router, "get", "/assist",
 route(router, "post", "/assist",
   { body: v.JdDraftRequest, response: v.JdDraft, summary: "Draft a job description; nothing is kept" },
   requirePermission("recruitment", "edit"), controller.assist);
+
+route(router, "post", "/assist/follow-ups",
+  { body: v.FollowUpsRequest, response: v.FollowUps, summary: "Two questions about the role for New Vacancy's interview; nothing is kept" },
+  requirePermission("recruitment", "edit"), controller.followUps);
 
 route(router, "get", "/",
   { query: v.VacancyListQuery, response: v.VacancyPage, summary: "Vacancies the reader may see" },

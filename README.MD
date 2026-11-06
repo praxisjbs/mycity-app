@@ -86,6 +86,9 @@ mycity-app/
 │                             Team as hiring managers and panelists, tested by tests/integration/
 │                             recruitment-staging-seed.test.js;
 │                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest;
+│                             65_partnership_setup.js: Partnerships · Categories as MyCity sets it up (stages,
+│                             impacts, types, the Events checklist and Deal Merchant Agreement, proof points),
+│                             through the services, tested by tests/integration/partnerships-staging-seed.test.js;
 │                             80_expenses.js: M8's categories, budgets, projects and requests at
 │                             every stage on the Implementation Team's accounts, through the
 │                             services, after taking Home's expense rows and 8099's categories away,
@@ -521,7 +524,7 @@ Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
 
 | Module | Files beyond the template |
 |---|---|
-| `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED; the board's stages and How We Hire), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards), `.matrix` (Recruitment's scope probes for the AI access matrix); the staff screens in `app/src/features/recruitment/`, one file per tab (`index.tsx` routes only): `Vacancies.tsx` with `VacancyForm.tsx` (the New Vacancy wizard), `VacancyQuestions.tsx` (Questions and Scorecard), `CareersSettings.tsx` and `CandidateEmails.tsx`; `Candidates.tsx` (the board, Invite to Apply, Screen With AI) and `CandidateSheet.tsx`; `Assessments.tsx` (library, sittings, Mark Answers) and `AssessmentQuestions.tsx`; `Interviews.tsx`, `MyCard.tsx` (the blind card) and `ScheduleInterview.tsx`; `TalentPool.tsx`; M5's INTERIM `Offers.tsx` and `Onboarding.tsx`; `shared.tsx` (labels, pills, refusals); each tab's `*.test.tsx` on the mock, sharing `testKit.tsx`. The mock is `app/src/api/mock/modules/recruitment.ts` (bodies checked by the contract's schemas) with its fixtures in `app/src/api/mock/data/recruitment.ts` |
+| `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED; the board's stages and How We Hire), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`; New Vacancy's interview: `vacancy-follow-ups`, prompt `services/ai/prompts/vacancy-follow-ups.md`, and its plain draft when the AI cannot write one), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards), `.matrix` (Recruitment's scope probes for the AI access matrix); the staff screens in `app/src/features/recruitment/`, one file per tab (`index.tsx` routes only): `Vacancies.tsx` with `VacancyInterview.tsx` (New Vacancy's ten questions, tested by `VacancyInterview.test.tsx`) and `VacancyForm.tsx` (the editor it opens, and Edit Vacancy), `VacancyQuestions.tsx` (Questions and Scorecard), `CareersSettings.tsx` and `CandidateEmails.tsx`; `Candidates.tsx` (the board, Invite to Apply, Screen With AI) and `CandidateSheet.tsx`; `Assessments.tsx` (library, sittings, Mark Answers) and `AssessmentQuestions.tsx`; `Interviews.tsx`, `MyCard.tsx` (the blind card) and `ScheduleInterview.tsx`; `TalentPool.tsx`; M5's INTERIM `Offers.tsx` and `Onboarding.tsx`; `shared.tsx` (labels, pills, refusals); each tab's `*.test.tsx` on the mock, sharing `testKit.tsx`. The mock is `app/src/api/mock/modules/recruitment.ts` (bodies checked by the contract's schemas) with its fixtures in `app/src/api/mock/data/recruitment.ts` |
 | `candidates` | `.public.routes` (apply, write only) and `.apply` (its service, no staff auth), `.pipeline` (the moves, entity_state_history), `.screening` (the estimate, provisional flag), `.score` (Score With AI and Screen With AI, `cv-screen`, from the outbox), `.scorecard` (A10 weights), `.sla` (days at stage), `.mail` (the candidate emails it sends), `.emails` (Candidate Emails, the editor), `.retention` (CVs left on Apply links that ended without an application, removed nightly by `jobs/schedulers/apply-cv-purge`), `.ai`, `.search` |
 | `assessments` | `.public.routes` (take, token) and `.delivery` (its service, no staff auth), `.authoring` (the library, export and import, Suggest With AI), `.service` (sittings: send, Send to Candidates, marks, cancel), `.timer` (the server's clock and how a sitting ends; `jobs/schedulers/assessment-expiry`), `.scoring` (points sealed in `answer_key_enc`), `.mail` (assessment-invite, the link made after commit), `.ai`, `.search` |
 | `interviews` | `.panel` (the card, blind until the round closes; the predicate is `.repo` BLIND), `.consolidate` (Close Round, the report and the Interview Assessment Form), `.schedule` (schedule, reschedule, cancel, the calendar entry and the candidate's ICS), `.notes` (Tidy With AI), `.reminders` (`jobs/schedulers/interview-reminders`), `.service` (the sheet), `.ai`, `.search` |
@@ -566,12 +569,21 @@ screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2
 The build plan and the file map are `docs/guides/partnerships.md` (Appendix A and D), M7's only
 source of truth. PR 1 (05/11/2026) filled the seven contract files, migrations `7010` to `7040`, seed
 `7190`, and mounted each module's router on `/api/v1/partnerships`, empty until its PR; the files
-below beyond the template are filled, or added, by the PR named.
+below beyond the template are filled, or added, by the PR named. PR 2 (06/11/2026) built Categories (#104):
+`partner_pipeline.{categories,checklists,lists,fields,setup}.js` with the controller, routes, repo, service,
+events, `.ai` (reasons only) and `.search` (categories); `proposals.proof.js` (proof points and their image) with
+its routes, repo and events; `agreements.tidy.js` (Tidy With AI, route `POST /templates/tidy`) with its prompt
+`template-tidy.md`; `templates/templates.agreements.js` (the wording of a category's agreement templates);
+`shared/spreadsheet` `readDropdowns`; migration `7050` (a template's asks); the staging seed
+`seeds/staging/65_partnership_setup.js`; `DocumentEditor` in `packages/ui`; on screen
+`app/src/features/partnerships/Categories.tsx`, `PipelineSettings.tsx`, `ProofPoints.tsx` and `forms/`
+(`CategoryForm`, `FieldForm`, `ChecklistForm`, `ListValueForm`, `ProofPointForm`, `TemplateEditor`, `TidyStep`,
+`StartFromTracker`, `template-html.ts`), with its mock `app/src/api/mock/modules/partnerships_categories.ts`.
 
 | Module | Files beyond the template |
 |---|---|
 | `partners` | `.360` (renders correctly with zero data), `.dedup`, `.convert` (the conversion transaction), `.documents`, `.work`, `.views` (PR 3); `.import` (the tracker, PR 4); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
-| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2); `.deals`, `.options`, `.stages`, `.health`, `.views` (PR 3); `.returns`, `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.types` is not built (categories replace it) and goes with PR 2; `.events` registers `deal.venue` (PR 1) |
+| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2); `.deals`, `.options`, `.stages`, `.health`, `.views` (PR 3); `.returns`, `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.types` was deleted with PR 2 (categories replace it); `.events` registers `deal.venue` (PR 1) |
 | `leads` | `.360`, `.status` (status from stage), `.views` (PR 3); `.convert` is not built (conversion is `partners.convert`) and goes with PR 3; `.events` registers `lead.cities` (PR 1) |
 | `interactions` | `.mail` (with `mailbox/binding/`, PR 8) |
 | `proposals` | `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views` (PR 7; `.proof` with PR 2); `.questionnaire` and `.pdf` are not built and go with PR 7 |

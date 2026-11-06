@@ -146,7 +146,8 @@ async function summary(db, query, scope) {
 async function vacancy(db, id, { lock = false } = {}) {
   const { rows } = await db.query(
     `SELECT v.vacancy_id, v.number::text AS number, v.title, v.status, v.closes_at, v.min_experience_years,
-            v.hiring_manager_id
+            v.hiring_manager_id, v.location,
+            (SELECT d.name FROM department d WHERE d.department_id = v.department_id) AS department
        FROM vacancy v WHERE v.vacancy_id = $1${lock ? " FOR SHARE" : ""}`,
     [id],
   );

@@ -5,9 +5,10 @@ import type { DocumentRef, IsoDateTime } from "./common";
  * contract lands. M4's pages (Careers, Vacancy, Apply, Assessment) take the generated contract
  * (`api/endpoints.ts` picks their routes; their types come from `@mycity/contract/contract.gen.ts`).
  *
- * Rules the shapes keep (MILESTONES §6, the demo's notes):
+ * Rules the shapes keep (MILESTONES §6, the demo's notes, docs/guides/partnerships.md §6.9):
  * - Signing is reached by an opaque, per-person token.
- * - Verify returns the document type, the signer and two verdicts. Never the file.
+ * - Verify by reference returns the document type, the signer and two verdicts, never the content;
+ *   only the QR's token (`/verify/t/<token>`) also returns the document itself.
  */
 
 export interface OfferToSign {
@@ -15,6 +16,8 @@ export interface OfferToSign {
   candidate_name: string;
   role: string;
   company: string;
+  /** The day the letter is dated, as its letterhead prints it. */
+  issued_at: IsoDateTime;
   expires_at: IsoDateTime;
   state: "awaiting" | "signed" | "declined" | "expired" | "withdrawn";
   /** The same text that is in the PDF, from the one renderer (MILESTONES §10). */
@@ -35,12 +38,24 @@ export interface VerifyResult {
   artifact: Verdict;
 }
 
+/** Verify by the QR's token: the same record, and the document it is about. */
+export interface VerifyByToken extends VerifyResult {
+  document: {
+    title: string;
+    /** The letter's text, as the PDF has it (the same renderer as OfferToSign.letter). */
+    letter: string[];
+    file_name: string;
+    url: string;
+  };
+}
+
 declare module "@/api/endpoints" {
   interface Endpoints {
     "GET /api/public/v1/sign/:token": { query: never; body: never; params: { token: string }; response: OfferToSign };
     "POST /api/public/v1/sign/:token/sign": { query: never; body: { signature_png: string }; params: { token: string }; response: OfferToSign };
     "POST /api/public/v1/sign/:token/decline": { query: never; body: { reason: string }; params: { token: string }; response: OfferToSign };
     "GET /api/public/v1/verify/:number": { query: never; body: never; params: { number: string }; response: VerifyResult };
+    "GET /api/public/v1/verify/t/:token": { query: never; body: never; params: { token: string }; response: VerifyByToken };
   }
 }
 

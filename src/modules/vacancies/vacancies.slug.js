@@ -10,6 +10,9 @@
  */
 const MAX = 80;
 
+/** Paths the careers page's routes hold beside /jobs/:slug, so never a role's slug. */
+const RESERVED = new Set(["summary"]);
+
 /** Lower-case words of a-z and 0-9 joined by hyphens: accents folded, everything else dropped. */
 function words(text) {
   return String(text || "")
@@ -31,7 +34,8 @@ function base(title, city = null) {
   const t = words(title).replace(/-and-/g, "-") || "role";
   const c = words(city);
   const joined = c && !t.endsWith(`-${c}`) ? `${t}-${c}` : t;
-  return joined.slice(0, MAX).replace(/-+$/, "");
+  const slug = joined.slice(0, MAX).replace(/-+$/, "");
+  return RESERVED.has(slug) ? `${slug}-role` : slug;
 }
 
 /**
@@ -56,4 +60,4 @@ async function unique(client, slug) {
 /** A slug in the shape the public routes accept (the contract's SlugParams). */
 const looksLikeSlug = (s) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(s || ""));
 
-module.exports = { base, unique, words, looksLikeSlug };
+module.exports = { RESERVED, base, unique, words, looksLikeSlug };

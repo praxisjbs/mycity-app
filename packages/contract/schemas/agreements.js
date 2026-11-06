@@ -29,6 +29,43 @@ const SignerState = z.enum(["waiting", "sent", "viewed", "signed", "declined"]);
 /** An ask's or a field's value by its key: what the template was filled with. */
 const FieldValues = z.record(z.string().regex(/^[a-z][a-z0-9_.]{0,79}$/), AnswerValue);
 
+/**
+ * What a category template may say (§6.8): the roots of the names its wording reads, so a template that names
+ * a root it cannot fill is refused when it is saved (shared/templates/variables). The finer check, that a
+ * name under a root is one of `AGREEMENT_RECORD_FIELDS`, a custom field of the category or an ask of the
+ * template, is the template service's. Every part is optional here: a draft is filled as far as the record
+ * goes, and Submit names what is still empty (§6.8).
+ */
+const TemplateText = z.string().nullable().optional();
+const AgreementVars = z
+  .object({
+    partner: z
+      .object({ name: TemplateText, legal_name: TemplateText, headquarters: TemplateText, region: TemplateText })
+      .optional(),
+    contact: z.object({ full_name: TemplateText, title: TemplateText, phones: TemplateText, email: TemplateText }).optional(),
+    deal: z
+      .object({
+        title: TemplateText,
+        event_title: TemplateText,
+        event_starts_on: isoDate.nullable().optional(),
+        event_ends_on: isoDate.nullable().optional(),
+        objective: TemplateText,
+        expected_attendance: z.number().int().nullable().optional(),
+        comments: TemplateText,
+        valid_until: isoDate.nullable().optional(),
+        validity_label: TemplateText,
+        options: z.array(z.record(z.string(), z.string().nullable())).optional(),
+      })
+      .optional(),
+    category: z.object({ checklist: z.array(z.string()).optional() }).optional(),
+    signer: z
+      .object({ name: TemplateText, title: TemplateText, signed_on: isoDate.nullable().optional(), signature: TemplateText })
+      .optional(),
+    custom: z.record(z.string(), z.unknown()).optional(),
+    ask: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
 /* ------------------------------------------------------------------ *
  * Writing
  * ------------------------------------------------------------------ */
@@ -209,6 +246,7 @@ const ROW = {
   owner: "the person, from employee and department",
 };
 const TABLES = {
+  AgreementVars: { table: null, reason: "the names a category template may read, declared for the template engine" },
   AgreementGenerate: {
     table: "partnership_agreement",
     virtual: { deal_id: "written as partnership_opportunity_id", asks: "kept in fields with the record's values" },
@@ -250,6 +288,7 @@ module.exports = {
   SignerSide,
   SignerState,
   FieldValues,
+  AgreementVars,
   AgreementGenerate,
   AgreementUpdate,
   SignerInput,

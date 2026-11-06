@@ -234,6 +234,17 @@ describe("DataView on a phone", () => {
     expect(screen.getAllByText("Department")).toHaveLength(ROWS.length);
   });
 
+  it("puts a badge column at the card's top right, beside the title, with no label", () => {
+    phone();
+    const columns: DataViewColumn<Row>[] = [...COLUMNS.slice(0, 2), { key: "state", label: "State", badge: true, render: () => "Open" }];
+    view({ list: list(), columns });
+    expect(screen.queryByText("State")).toBeNull();
+    const title = screen.getByText("Ada Obi");
+    expect(within(title.parentElement!).getByText("Open")).toBeInTheDocument();
+    // The value pairs keep their room: Department is still a labelled pair.
+    expect(screen.getAllByText("Department")).toHaveLength(ROWS.length);
+  });
+
   it("offers sort in an action sheet, since there is no table header", async () => {
     phone();
     const setSort = vi.fn();

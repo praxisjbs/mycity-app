@@ -31,7 +31,8 @@ Vacancies lists each role MyCity is hiring for, and the seats on the organogram 
 2. The tiles count the **Open Vacancies**, the **Applicants**, those **In Interview** and the roles
    **Past Closing Date**. A phone shows two tiles a row. **Applicants** counts everyone who applied
    to an open or paused role, whatever became of them.
-3. The list shows each role with its department, location, applicants, closing day and status.
+3. The list shows each role with its department, openings, location, applicants, closing day and
+   status.
    A role's applicants are counted the same way, so the tile is the open and paused roles' added up.
 4. On a computer, the funnel shows how many candidates stand at each stage.
 5. Press a vacancy. On a computer it opens beside the list; on a phone it opens in a sheet.
@@ -52,28 +53,39 @@ Vacancies lists each role MyCity is hiring for, and the seats on the organogram 
 
 ### Write a new vacancy {#recruitment-vacancies-new needs="recruitment create"}
 
-The form has three steps: **Role**, **Details** and **Pay and Publish**. Each step checks its own
-fields before **Next** lets you on.
+**New Vacancy** asks you about the role one question at a time, then drafts the vacancy from your
+answers. The bar at the top counts the questions, such as `Question 3 of 10`. Only the job title is
+needed: press **Skip** on any other question you cannot answer yet. Each question's help term says
+what a useful answer gives.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Press **New Vacancy** at the top right. On a phone it is in **Quick Actions**.
    ![New Vacancy](shot:recruitment-vacancy-new)
-3. On **Role**, type the **Job Title** and pick the **Department** and the **Hiring Manager**.
-4. Type how many **Positions** you are hiring, pick the **Employment** type and, if you like, who the
-   role **Reports To**. Press **Next**.
-5. On **Details**, pick the **Arrangement**, such as hybrid. You may add an **Arrangement Note**, such
-   as `2 days in office, 3 from home`.
-6. Start typing the area under **Location** and pick it from the list. A remote role has no location.
-7. Fill in the **Working Days** and the **Probation Months**. Pick the day it **Closes On** and, if
-   you like, the **Target Start**.
-8. Write the **Description**. On the careers page it follows the About MyCityApp paragraph by itself.
-9. Fill in **Required Experience and Qualifications** and, if you like, **What We Look For**.
-   Press **Next**.
-10. On **Pay and Publish**, type the **Years of Experience** needed and the salary band, **Salary
-    From** and **Salary To**. Tick **Show Salary on Careers** to show the band there.
-11. **Publish Now** is ticked. Leave it to put the vacancy on the careers page now, and press
+3. Type the **Job Title** and press **Next**.
+4. Pick the **Department** and the **Hiring Manager**. Press **Next**.
+5. Type how many **Positions** you are hiring and pick the **Employment** type. Press **Next**.
+6. Pick the **Arrangement**, such as hybrid. You may add an **Arrangement Note**, such as
+   `2 days in office, 3 from home`, and the **Working Days**. Press **Next**.
+7. Start typing the area under **Location** and pick it from the list. A remote role skips this
+   question.
+8. Type the salary band, **Salary From** and **Salary To**. Tick **Show Salary on Careers** to show
+   it there.
+9. Under **Your Answer**, say what the role must have and what it will do, in your own words. Add the
+   **Years of Experience** needed.
+10. Add who the role **Reports To**, and anything else candidates should know: what would set
+    someone apart, the perks, the team.
+11. The hub then asks two questions of its own about this role. Answer them, or press **Skip**.
+12. Press **Draft Vacancy**. The vacancy opens in three steps, **Role**, **Details** and **Pay and
+    Publish**, with your answers and a drafted **Description**, **Required Experience and
+    Qualifications** and **What We Look For**.
+13. Check each step and press **Next**. On **Details**, pick the day it **Closes On**. You may add the
+    **Probation Months** and the **Target Start**.
+14. **Publish Now** is ticked. Leave it to put the vacancy on the careers page now, and press
     **Publish Vacancy**.
-12. Or untick it and press **Save Draft** to finish later.
+15. Or untick it and press **Save Draft** to finish later.
+
+To skip the questions, press **Use Blank Form** on any question. The three steps open with what you
+have answered so far, and you fill in the rest yourself.
 
 | Field | What to enter | Needed to publish |
 |---|---|---|
@@ -87,6 +99,9 @@ fields before **Next** lets you on.
 | Salary band | The lowest and highest pay | No |
 | **Closes On** | A day after today; it closes at 23:59 Lagos time | Yes |
 
+> **Tip:** When AI is off or has reached its limit, there are eight questions, not ten, and
+> **Draft Vacancy** writes a plain draft from your answers. Read it and add to it before you publish.
+
 A new vacancy takes its interview traits from [Careers Settings](#recruitment-vacancies-settings),
 and its scorecard at the usual weights. Change either before you publish.
 
@@ -94,8 +109,10 @@ and its scorecard at the usual weights. Change either before you publish.
 
 ### Draft the description with AI {#recruitment-vacancies-write-ai needs="recruitment edit"}
 
-1. On a new vacancy, or one you opened with **Edit**, fill in the title, the department and anything
-   you know first.
+**Draft Vacancy**, at the end of a new vacancy's questions, drafts it for you. To draft the
+description again, or for a vacancy you opened with **Edit**:
+
+1. Fill in the title, the department and anything you know first.
 2. On **Details**, type a line in **About the Role** and press **Write With AI**.
 3. When you have already typed a description, the hub asks first, under **Replace Your Text**.
    Press **Replace Text** to go on.
@@ -103,8 +120,8 @@ and its scorecard at the usual weights. Change either before you publish.
    For**, in MyCity's usual shape.
 5. Read it and change what you need. Nothing is saved until you save the vacancy.
 
-> **Tip:** When **Write With AI** is not shown, AI is off or has reached its limit. Its help term
-> says which. Write the description yourself; the form works as before.
+> **Tip:** When **Write With AI** is not shown, AI is off or has reached its limit. Write the
+> description yourself; the form works as before.
 
 ### Start from an empty seat {#recruitment-vacancies-suggested needs="recruitment create"}
 
@@ -113,8 +130,8 @@ and its scorecard at the usual weights. Change either before you publish.
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Find the seat under **Suggested From Organogram**. It shows 25 seats a page; page on below it.
 3. Press **Create Vacancy** beside it.
-4. **New Vacancy** opens with the seat's title, department and reporting line filled in, and the
-   seat's manager as the **Hiring Manager**. Change any of them if they do not fit.
+4. **New Vacancy** opens with the seat's title, department and reporting line already answered, and
+   the seat's manager as the **Hiring Manager**. Change any of them if they do not fit.
 5. Follow [Write a new vacancy](#recruitment-vacancies-new) from step 3. Nothing is made until you
    save.
 6. {needs="people edit"} You can also press **Create Vacancy** on a vacant seat on
@@ -229,8 +246,9 @@ Candidates is the board: each application as a card, in a column for its stage.
 2. The tiles count the **Candidates**, those **To Screen**, those **In Interview** and those
    **Shortlisted**.
 3. Pick a role in the vacancy filter to see only its candidates.
-4. The columns are **Applied**, **Screening**, **Assessment**, **Interview** and **Shortlist**.
-   A role that skips a stage has no column for it.
+4. The columns are **Applied**, **Screening**, **Assessment**, **Interview** and **Shortlist**,
+   side by side in one row. A role that skips a stage has no column for it. On a narrow screen,
+   scroll the board sideways to reach the last columns.
 5. Each card shows the name, the role, the screening score and how many days it has been at its
    stage.
 6. On a phone, press a stage at the top to see its cards, one stage at a time.
@@ -508,16 +526,24 @@ the others' cards until the round closes.
 ### Read the interviews {#recruitment-interviews-read}
 
 1. Open [Recruitment · Interviews](/recruitment?tab=interviews).
-2. **Upcoming** shows what is coming; press **Past** for those held, or **My Panels** for those you
-   sit on.
-3. Each shows the candidate, the role, when, how many of the panel have submitted, and the round.
-4. Press an interview. On a computer it opens beside the list; on a phone it opens in a sheet.
+2. **Upcoming and Recent** lists what is coming first, soonest first, then those held. Press
+   **My Panels** for the ones you sit on, or **All Interviews** for every one you may see.
+3. Each shows the candidate, the role, the date, the panel, and the round: **Scheduled**, how many
+   cards are in, **Closed** or **Cancelled**.
+4. Press an interview. On a computer it shows beside the list; on a phone it opens in a sheet.
    ![An interview's sheet](shot:recruitment-interview-sheet)
 5. It shows when and where, or the video link, and the **Candidate Details**.
-6. The panel shows each person as **Submitted** or **Waiting**.
+6. **Blind Panel** shows each person as **Submitted** or **Waiting**. A submitted score reads
+   **Hidden** until the round closes.
+7. **Weighted Scorecard** shows the candidate's score at each part and its weight, with the total.
+   It shows only if the role is yours to see; a panelist alone does not see it.
+8. **Round Activity** shows who scheduled or changed it, each card submitted, each reminder, the
+   close and the report, with when.
 
 While the round is open, nobody reads another person's card. That includes the hiring manager and
 the CEO.
+
+A candidate at the **Interview** stage shows here only once an interview is scheduled for them.
 
 ### Schedule an interview {#recruitment-interviews-schedule needs="recruitment edit"}
 
@@ -606,8 +632,8 @@ A closed round never opens again. The hiring manager is told it has closed.
 Once the round closes, everyone who may see the interview reads the results.
 
 1. Open the interview on [Recruitment · Interviews](/recruitment?tab=interviews).
-2. Each trait shows every panelist's rating and the average across the panel.
-3. Each panelist's decision and comments show under their name.
+2. **Blind Panel** shows each panelist's score and decision.
+3. Each trait shows every panelist's rating and the average across the panel.
 4. The total is the panel's average rating times ten, out of 100. It is the interview's part of the
    scorecard.
 

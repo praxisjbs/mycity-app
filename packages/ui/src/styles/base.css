@@ -9,6 +9,8 @@
  * our tokens. The controls themselves are packages/ui components.
  */
 @import "@fontsource-variable/geist";
+/* The public site's header, footer, heroes, sign-in layout and motion. */
+@import "./public.css";
 
 @layer base {
   body {
@@ -321,13 +323,21 @@
 @utility cols-main-side {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 }
+/* The careers list's teams beside its roles (StickyColumns aside), and a vacancy's text beside The Role
+   card (StickyColumns side), as the approved public design lays them. */
+@utility cols-aside {
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+@utility cols-side {
+  grid-template-columns: minmax(0, 1fr) 340px;
+}
 
 /* The public site's ground (PublicPage): the faint City Green tint, lighter toward the top. The glow
    is lighter than the tint in light and a step above it in dark, and both keep every ink at AA
    (tokens.css), so no point of the gradient brings text under it. */
 @utility public-ground {
   background:
-    radial-gradient(120% 70% at 50% -12%, var(--canvas-glow), transparent 72%),
+    radial-gradient(1200px 600px at 50% -200px, var(--canvas-glow), transparent 70%),
     var(--canvas);
 }
 /* A Deep Green panel's street grid: hairlines of the light ink, fading out toward the skyline. */
@@ -400,6 +410,31 @@
     padding: 2px 12px;
     color: var(--muted-foreground);
   }
+  /* An agreement's tables and named fields (DocumentEditor): a table scrolls inside its own box, a field is
+     one chip that reads by its label. */
+  .rte table { border-collapse: collapse; margin: 8px 0; width: 100%; table-layout: fixed; overflow: hidden; }
+  .rte th, .rte td {
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    vertical-align: top;
+    min-width: 48px;
+    position: relative;
+  }
+  .rte th { background: var(--muted); font-weight: 600; text-align: left; }
+  .rte .selectedCell::after { content: ""; position: absolute; inset: 0; background: var(--accent); opacity: 0.4; pointer-events: none; }
+  .rte-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-foreground);
+    padding: 0 8px;
+    font-size: var(--text-xs);
+    line-height: 20px;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .rte .ProseMirror-selectednode.rte-chip { outline: 2px solid var(--ring); }
 }
 
 /* A disclosure's marker: a + that becomes a minus when it is open (Accordion,

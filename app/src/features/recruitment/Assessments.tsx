@@ -141,7 +141,7 @@ export function Assessments() {
             { key: "questions", label: "Questions", align: "n", render: (a) => a.question_count, desktop: true },
             { key: "sent", label: "Sent", align: "n", render: (a) => a.sent, desktop: true },
             { key: "avg", label: "Average", align: "n", render: (a) => (a.average_score === null ? "–" : Math.round(a.average_score)) },
-            { key: "status", label: "Status", render: (a) => (a.active ? pill(["ok", "Active"]) : pill(["neutral", "Off"])) },
+            { key: "status", label: "Status", badge: true, render: (a) => (a.active ? pill(["ok", "Active"]) : pill(["neutral", "Off"])) },
           ]}
         />
       ) : (
@@ -157,7 +157,7 @@ export function Assessments() {
             { key: "who", label: "Candidate", render: (x) => <span className="font-semibold">{x.candidate_name}</span> },
             { key: "what", label: "Assessment", render: (x) => x.assessment_name },
             { key: "role", label: "Role", render: (x) => x.vacancy_title, desktop: true },
-            { key: "state", label: "State", render: (x) => pill(SITTING_STATUS[x.status]) },
+            { key: "state", label: "State", badge: true, render: (x) => pill(SITTING_STATUS[x.status]) },
             { key: "score", label: "Score", align: "n", render: (x) => (x.score === null ? (x.to_mark ? `${x.to_mark} to mark` : "–") : Math.round(x.score)) },
           ]}
         />

@@ -131,15 +131,17 @@ imported into a public page by accident.
 Public addresses are short, because a stranger reads them:
 
 ```
+go.mycityapp.io/                               the index (Home), indexable
 go.mycityapp.io/jobs                           careers list, indexable
 go.mycityapp.io/jobs/partnerships-associate    one vacancy, readable slug, shareable
 go.mycityapp.io/apply/<token>                  opaque, one person, not indexable
 go.mycityapp.io/assess/<token>                 opaque
 go.mycityapp.io/sign/<token>                   opaque
 go.mycityapp.io/verify/OFF-0018                a reference, not a secret
+go.mycityapp.io/verify/t/<token>               the QR code on a sealed document, opaque
 ```
 
-Only the careers list and an open vacancy carry readable addresses, because a careers page exists
+Only the index, the careers list and an open vacancy carry readable addresses, because a careers page exists
 to be found and shared. Everything a single person is invited to is reached by an opaque token that
 cannot be enumerated.
 
@@ -1520,9 +1522,23 @@ Applied to the tables below, `scripts/check/progress.js`, `src/shared/route-map.
 `src/shared/search/screens.js`, the app's catalogue, the public site's routes and `docs/PROGRESS.md`
 (rows #104 and #105). Their engineering shape is in `docs/guides/partnerships.md`.
 
+**Ratified 06/11/2026 (GE).** One screen joins the inventory, taking the inventory to 104 and the
+public site to eight pages: **Public · Home** (`go.mycityapp.io/`), the site's index, M4. It
+introduces MyCityApp to a stranger or a partner before the roles: the hero with Search Roles and
+the open roles, teams and cities, What We Build, the roles closing soon, How We Hire, and Know
+Someone Great? and Verify a Document. `/` no longer redirects to `/jobs`. It is indexable, holds no
+personal data and reads only the careers summary (`GET /api/public/v1/jobs/summary`). The site's one
+header links Careers, Vacancy, Apply, Assessment, Sign Offer and Verify Document; opened from the
+header without a personal link, Vacancy, Apply, Assessment and Sign Offer show a short screen saying
+where to start, not an error. Verify Document also opens from the QR code on a sealed document's
+pages (`go.mycityapp.io/verify/t/<token>`, `docs/guides/partnerships.md` §6.9). Applied to the table
+below, the public site's routes and `docs/PROGRESS.md` (row #107). The design is
+`docs/MyCity-ERP-Documents/public-site-demo.html`; its engineering shape is in
+`docs/guides/recruitment.md` §10.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
-application, its own build, its own origin, listed below only because it carries seven of the
-screens (six of the 92 approved, and Proposal, ratified 05/11/2026) and those screens need names too. Nothing in the admin rail links to it, and a member of
+application, its own build, its own origin, listed below only because it carries eight of the
+screens (six of the 92 approved, Proposal, ratified 05/11/2026, and Home, ratified 06/11/2026) and those screens need names too. Nothing in the admin rail links to it, and a member of
 staff never navigates to it to do their job.
 
 | Area | Module | Tabs | Screens | Built in |
@@ -1547,10 +1563,10 @@ staff never navigates to it to do their job.
 
 | | Site | Pages | Screens | Built in |
 |---|---|---|---|---|
-| Public | **Public site** | 7 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026) |
+| Public | **Public site** | 8 | Home · Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026; Home ratified 06/11/2026) |
 
 Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
-(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Careers, Vacancy, Apply and
+(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Home, Careers, Vacancy, Apply and
 Assessment in M4, Sign Offer and Verify Document in M5, and Proposal in M7. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
 M0 by TB on 19/10/2026).

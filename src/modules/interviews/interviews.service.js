@@ -12,8 +12,11 @@
  *   tidy(), tidyStatus()      interviews.notes.js
  *
  * Who sees an interview: the vacancy's hiring manager in the reader's `recruitment` scope, or a seat on
- * its panel (guide §8). Who sees a card's scoring: interviews.repo.js BLIND.
+ * its panel (guide §8). Who sees a card's scoring: interviews.repo.js BLIND. The candidate's scorecard
+ * goes only to a reader whose scope holds the vacancy: a seat alone shows the card, the CV and the
+ * Candidate Details, never the candidate's other scores.
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { AppError } = require("../../shared/errors");
 const vault = require("../../shared/documents/vault");
@@ -23,6 +26,10 @@ const panel = require("./interviews.panel");
 const schedule = require("./interviews.schedule");
 const consolidate = require("./interviews.consolidate");
 const notes = require("./interviews.notes");
+const candidates = require("../candidates/candidates.service");
+
+/** The events Round Activity reads (interviews.events.js), each as `interview.<kind>`. */
+const ACTIVITY_KEYS = c.interviews.InterviewActivityKind.options.map((k) => `interview.${k}`);
 
 const notFound = () => new AppError("NOT_FOUND", "That interview does not exist", 404);
 const iso = (v) => (v ? new Date(v).toISOString() : null);
@@ -54,6 +61,12 @@ function sees(scope, row) {
   return row.on_panel || scope.scope === "all" || Boolean(row.hiring_manager_id && (scope.scope_ids || []).includes(row.hiring_manager_id));
 }
 
+/** The reader's `recruitment` view scope holds the vacancy's hiring manager (a seat alone does not). */
+async function inViewScope(user, row) {
+  const s = user ? await scopeFor(user, "recruitment", "view") : null;
+  return Boolean(s && (s.scope === "all" || (row.hiring_manager_id && (s.scope_ids || []).includes(row.hiring_manager_id))));
+}
+
 async function editScope(user, row) {
   const s = user ? await scopeFor(user, "recruitment", "edit") : null;
   return Boolean(s && (s.scope === "all" || (row.hiring_manager_id && (s.scope_ids || []).includes(row.hiring_manager_id))));
@@ -69,6 +82,8 @@ async function detailOf(db, row, user) {
   const mine = await repo.myFeedback(db, row.interview_id, user.employee_id);
   const edit = await editScope(user, row);
   const live = row.status === "scheduled" && !closed;
+  const card = (await inViewScope(user, row)) ? await candidates.scorecardOf(db, row.application_id) : null;
+  const events = await repo.activity(db, row.interview_id, ACTIVITY_KEYS);
   return {
     ...listed(row),
     worksite: row.worksite_id ? { worksite_id: row.worksite_id, name: row.worksite_name, address: row.worksite_address } : null,
@@ -125,6 +140,15 @@ async function detailOf(db, row, user) {
           submitted_at: iso(mine.submitted_at),
         }
       : null,
+    scorecard: card ? card.parts : null,
+    weighted_total: card ? card.weighted_total : null,
+    activity: events.data.map((e) => ({
+      event_id: e.event_id,
+      kind: e.event_key.slice("interview.".length),
+      occurred_at: iso(e.occurred_at),
+      actor_name: e.actor_name,
+      panelist_name: e.panelist_name,
+    })),
     can_edit: edit && live,
     // Close Round once the interview has started (consolidate.close refuses it before, NOT_STARTED).
     can_close: edit && live && Date.parse(row.scheduled_start) <= Date.now(),

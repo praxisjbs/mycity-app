@@ -33,6 +33,16 @@ describe("KeyValue", () => {
     expect(screen.getByText("0")).toBeInTheDocument();
   });
 
+  it("rows and tiles: the public site's pairs, the value as content", () => {
+    const { container, rerender } = render(<KeyValue layout="rows" items={[{ label: "Employment", value: "Full Time" }, { label: "Probation", value: null }]} />);
+    expect(container.firstElementChild).toHaveClass("ps-kv");
+    expect(screen.getByText("Full Time")).toHaveAttribute("data-copy", "content");
+    expect(screen.getByText("Probation").nextElementSibling?.textContent).not.toBe("");
+    rerender(<KeyValue layout="tiles" items={[["Type", "Case Study"], ["Time", "60 minutes"], ["Questions", 3]]} />);
+    expect(container.firstElementChild).toHaveClass("ps-kv-tiles");
+    expect(screen.getByText("60 minutes").tagName).toBe("DD");
+  });
+
   it("stacks labels over values when asked", () => {
     const { container } = render(<KeyValue layout="stacked" items={[["Start Date", "13/10/2026"]]} />);
     expect(container.querySelector("dl")?.className).not.toContain("desk:grid-cols-5");

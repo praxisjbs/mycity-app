@@ -26,5 +26,7 @@ export default {
     Default: () => <SignatureField label="Your Signature" onChange={() => undefined} />,
     Signing,
     "Already Signed": () => <SignatureField label="Your Signature" onChange={() => undefined} disabled />,
+    "Site Pad": () => <SignatureField look="pad" hint="Draw your signature here" label="Signature box. Draw your signature with a finger or a mouse." onChange={() => undefined} />,
+    "Site Pad, Nothing Drawn": () => <SignatureField look="pad" state="bad" hint="Draw your signature here" label="Signature box. Draw your signature with a finger or a mouse." onChange={() => undefined} />,
   },
 } satisfies GalleryEntry;

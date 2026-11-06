@@ -23,6 +23,15 @@ describe("Brand", () => {
     expect(container.querySelector("svg")).toHaveClass("fill-secondary");
   });
 
+  it("draws the public site's tile, with the name and its line beside it", () => {
+    const { container } = render(<Brand name="MyCityApp" sub="Careers" tile="deep" />);
+    expect(container.querySelector(".ps-mark svg")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("MyCityApp").tagName).toBe("B");
+    expect(screen.getByText("Careers")).toBeInTheDocument();
+    const { container: alone } = render(<Brand tile="secondary" />);
+    expect(alone.querySelector(".ps-mark-secondary svg")).toHaveAttribute("aria-label", "MyCity App");
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(
       <div>

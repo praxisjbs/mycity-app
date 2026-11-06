@@ -604,7 +604,9 @@ packages/ui/
   src/
     index.ts                  THE public barrel: everything a feature may import, and nothing else
     styles/                   tokens.css (the only file with a hex value), theme.css (the Tailwind 4
-                              theme and variants), base.css (element defaults, focus ring, reduced motion)
+                              theme and variants), base.css (element defaults, focus ring, reduced motion),
+                              public.css (the public site's header, footer, heroes, split layout and
+                              motion, drawn by its components only; imported by base.css)
     lib/                      history (the window's history: keyed steps, Back closing a phone's
                               overlays, F29), hold (press and hold), cn, format, media (useIsPhone,
                               useInstalled), preferences (theme, density, text size), fonts and
@@ -615,9 +617,11 @@ packages/ui/
     actions/                  Button, IconButton, BigButton, ActionGroup; press.ts, the busy state they,
                               Form and Modal share (F26)
     layout/                   Card, PageHeader, Grid, Stack, Inline, PhoneOnly, DesktopOnly, SplitPanes,
-                              ListDetail and DetailPane (a list and the record it opens, F31)
+                              ListDetail and DetailPane (a list and the record it opens, F31), StickyColumns
+                              (sticky.ts: the header height it sticks under), and the public site's
+                              PageIntro, Reveal and Stagger
     display/                  Pill, StatusPill, Avatar, Who, CountBadge, KeyValue, Banner, EmptyState,
-                              EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money
+                              EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money, CountUp
     navigation/               Tabs, SegmentedControl, Chips
     overlay/                  Modal, SidePanel, ConfirmDialog (useConfirm), Popover, Menu, Tooltip,
                               PhonePage (a full-screen page from the right on a phone)
@@ -639,7 +643,9 @@ packages/ui/
                               and pane.ts (their shapes)
     shell/                    the frame both apps' shells are built from (PR 2): Brand, ComingSoon,
                               NavCapsule and TrailMenu (F28, F29), PullIndicator and pull (F28),
-                              PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
+                              PublicPage (with its split sign-in layout; site-link.ts, its links through the
+                              site's router) and SkylineHero (Skyline.draw.tsx, the drawn Lagos skyline),
+                              DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
                               MoreSheet, FloatingButton, CommandPalette, NotificationCenter (the bell's
                               pane), NotificationRow, ShellNotice
     testing/                  test setup, render helpers, gallery types (not exported from "."), and
@@ -721,26 +727,31 @@ public-app/
                               /api/public proxy, tests on jsdom; no PWA, no service worker
   eslint.config.js            extends @mycity/ui/eslint
   src/
-    main.tsx  App.tsx         entry; the six routes and a not-found page; Apply and Assessment load on
-                              their own (Apply's contract schema brings Zod)
+    main.tsx  App.tsx         entry; the index and the seven pages, the guidance screens and a not-found
+                              page; Apply and Assessment load on their own (Apply's contract schema brings Zod)
     test-setup.ts             every test file: the 4 second wait, matchMedia and the rest jsdom lacks
     styles/index.css          Tailwind and the @mycity/ui styles
-    lib/                      plan (the delivery plan bound to this site), router
+    lib/                      plan (the delivery plan bound to this site), router (the addresses and the
+                              header's six links), copy (a link copied, Link Copied for a moment)
     api/
       client.ts               fetch to /api/public/v1 only, made with createApiClient; no session, no cookie
       hooks.ts  endpoints.ts  the shared hooks bound to this client; the endpoint map: the M4 routes picked
                               from contract.gen.ts, the M5 ones from types/public.ts
       types/public.ts         INTERIM shapes for the M5 routes (sign, verify) until their contract lands
       mock/                   the in-browser mock, laptops and CI only; demo-links.ts lists sample addresses
-    shell/                    Page (PublicPage with the site's links and noindex), Planned (Coming Soon, the
-                              Prototype View switch), DemoLinks (mock only)
-    pages/                    Careers, Vacancy, Apply, Assessment (each with its test), SignOffer, Verify,
-                              LinkProblem; shared.tsx holds the careers labels and a role's facts
+    shell/                    Page (PublicPage with the header's six links, the router and noindex), Planned
+                              (Coming Soon), DemoLinks (mock only)
+    pages/                    Home, Careers, Vacancy, Apply, Assessment, SignOffer, Verify (each with its
+                              test), Guidance (a page opened without its link), LinkProblem, Proposal;
+                              shared.tsx holds the careers labels and a role's facts
 ```
 
-Addresses are `/jobs`, `/jobs/<slug>`, `/apply/<token>`, `/assess/<token>`, `/sign/<token>` and
-`/verify/<number>` (MILESTONES §6). Only the careers list and an open vacancy may be indexed; every
-other page sets `noindex`. In mock mode a Demo Links menu at the foot of each page opens every
+Addresses are `/` (the index), `/jobs`, `/jobs/<slug>`, `/apply/<token>`, `/assess/<token>`,
+`/sign/<token>`, `/verify/<number>` and `/verify/t/<token>` (the QR on a sealed document) (MILESTONES
+§6); `/vacancy` (and `/jobs/`), `/apply`, `/assess` and `/sign`, the header's links, open a guidance
+screen for a visitor with no link. Only the index, the careers list and an open vacancy may be
+indexed; every other page sets `noindex`. The site has no Prototype View switch: its one header
+carries the six links (06/11/2026). In mock mode a Demo Links menu at the foot of each page opens every
 state (a used or expired link, a paused or filled role, each verify outcome); the mock keeps its
 state in memory, so a reload starts it again.
 
@@ -917,14 +928,24 @@ is kept per person (`useDensity`, `mc-density`).
 (.93, 1, 1.08, 1.16). A phone keeps its 16 px fields and 44 px targets.
 
 **Motion (F6).** `--ease-out`, `--ease-spring`, `--dur-fast` (120 ms) and `--dur` (200 ms); all
-durations are 0 under `prefers-reduced-motion`. The public site has one arrival (`animate-enter`
-with `enter-delay-1` to `enter-delay-8`, and `enter-stagger` for a list's items), drawn by
-SkylineHero, PublicPage and the careers list; base.css's reduced-motion rule stops it.
+durations are 0 under `prefers-reduced-motion`. The public site's motion is its components' own (§6),
+never a class a page applies: `SkylineHero` (size index: the parts rise in turn, the skyline's slow
+zoom and its windows; size role: the parts rise), `PageIntro` and `PublicPage` layout split (their
+parts rise as the page opens), `Reveal` (a block rising into view, again each time it returns, or tied
+to the scroll with `scroll`), `Stagger` (a row of blocks rising in turn) and `CountUp` (a hero's
+figures). The page blocks draw their own rise (SectionHead, FeatureGrid, RoleTile, HireSteps, CtaCard,
+RolePart). PublicPage's card and open layouts are gone (06/11/2026); SkylineHero's l, m and pane
+keep the earlier arrival (`animate-enter`) until they are removed. base.css's
+reduced-motion rule stops all of it.
 
 **The public ground** (05/11/2026). PublicPage lays every public page on `--canvas`, a faint City
 Green tint (`public-ground`); inside it (`data-canvas`) `muted-foreground` and `eyebrow` read one
 step deeper (`--canvas-muted-foreground`, `--canvas-eyebrow`) so text keeps AA on the tint; the
-token test holds every pair. Two columns of unequal height on desktop are `StickyColumns`: both
+token test holds every pair. Since the approved design (06/11/2026) the canvas also takes the site's
+card and hairline (`--canvas-card`, `--canvas-line`), 16 px text with 48 px controls, its tinted
+scrollbar, and the site's inks (`canvas-soft`, the `on-deep-*` hero and footer inks), all in
+`tokens.css`; the site's own look is `styles/public.css`, imported by base.css and drawn only by the
+components. A page's width is `public-wrap` (1200 px, 32 px sides, 16 px on a phone). Two columns of unequal height on desktop are `StickyColumns`: both
 stick, the shorter waits, a column taller than the screen scrolls until its foot is in view.
 
 ### 9.4 Shared components

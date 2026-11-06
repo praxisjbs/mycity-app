@@ -1,7 +1,7 @@
 import type { GalleryEntry } from "../testing/gallery";
 import { Button } from "../actions/Button";
 import { Field } from "./Field";
-import { UploadField } from "./UploadField";
+import { FileRow, UploadField } from "./UploadField";
 import { slowUploader } from "./fixtures";
 
 export default {
@@ -9,6 +9,18 @@ export default {
   states: {
     Default: () => <UploadField purpose="receipt" upload={slowUploader} />,
     "One File": () => <UploadField purpose="cv" upload={slowUploader} multiple={false} accept=".pdf,.doc,.docx" kinds="PDF or Word" maxBytes={5 * 1024 * 1024} label="Choose your CV" />,
+    "Site Zone": () => <UploadField look="zone" purpose="cv" upload={slowUploader} multiple={false} accept=".pdf,.doc,.docx" kinds="PDF or Word" label="Choose Your CV" />,
+    "Site File": () => (
+      <FileRow
+        name="Ngozi-Okafor-CV.pdf"
+        sizeBytes={253952}
+        action={
+          <Button variant="ghost" size="lg">
+            Replace
+          </Button>
+        }
+      />
+    ),
     Compact: () => <UploadField purpose="receipt" upload={slowUploader} compact />,
     "Own Control": () => <UploadField purpose="attachment" upload={slowUploader} trigger={(open) => <Button icon="clip" onClick={open}>Attach File</Button>} />,
     "In A Field": () => (
