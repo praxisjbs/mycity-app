@@ -81,6 +81,13 @@ describeDb("Recruitment's staging seed against the real migrations", () => {
         ...BUILD_ACCOUNT,
         employee: { ...BUILD_ACCOUNT.employee, first_name: "Ada", middle_name: "Grace", last_name: "Builder", preferred_name: "Ada", work_email: "ada@jbspraxis.test" },
       },
+      // A teammate without Recruitment (an Employee login): never a hiring manager or a panelist, or every
+      // role they managed and every panel they sat on would be refused.
+      {
+        ...BUILD_ACCOUNT,
+        role_code: "employee",
+        employee: { ...BUILD_ACCOUNT.employee, first_name: "Obi", middle_name: "Chuka", last_name: "Helper", preferred_name: "Obi", work_email: "obi@jbspraxis.test" },
+      },
     ];
     for (const account of team) {
       const client = await pool.connect();
@@ -146,13 +153,18 @@ describeDb("Recruitment's staging seed against the real migrations", () => {
   });
 
   test("hiring managers and panelists are the Implementation Team's accounts; every candidate is @example.test", async () => {
-    const team = staff.everyone.filter((p) => p.department === "Implementation").map((p) => p.employee_id);
-    expect(team).toHaveLength(2);
+    const everyone = staff.everyone.filter((p) => p.department === "Implementation");
+    expect(everyone).toHaveLength(3);
+    const helper = everyone.find((p) => p.work_email === "obi@jbspraxis.test").employee_id;
+    const team = everyone.map((p) => p.employee_id).filter((id) => id !== helper);
     const managers = (await q("SELECT DISTINCT hiring_manager_id FROM vacancy")).rows.map((r) => r.hiring_manager_id);
     expect(managers.every((id) => team.includes(id))).toBe(true);
     const panel = (await q("SELECT DISTINCT employee_id FROM interview_panelist")).rows.map((r) => r.employee_id);
     expect(panel.length).toBeGreaterThan(0);
     expect(panel.every((id) => team.includes(id))).toBe(true);
+    // Six roles and three interviews, though one teammate holds no Recruitment.
+    expect((await q("SELECT count(*)::int AS n FROM vacancy")).rows[0].n).toBe(6);
+    expect((await q("SELECT count(*)::int AS n FROM interview")).rows[0].n).toBe(3);
     const emails = (await q("SELECT email::text AS email FROM candidate")).rows.map((r) => r.email);
     expect(emails).toHaveLength(11);
     expect(emails.every((e) => e.endsWith("@example.test"))).toBe(true);

@@ -518,3 +518,8 @@ packages that need none can start. Tick a package only when its own checks pass 
   testing on staging, logged here as they come, and the hand-over to M5. AJ takes M5 (Offers and Onboarding, guide
   §2) and we talk with him in that PR's comments: what M4 gives M5 is the shortlist (stage `shortlist`, the last
   column until M5 adds Offer), the Talent Pool's Invite to Apply, and the candidate emails' store (`candidates.emails`).
+- 06/11/2026 · GE · Testing on staging, round 1. Fixed: Invite to Apply's "Check this value" (the refusal's field
+  message was over four words; the applied-for role is no longer offered); the staging seed skips Implementation
+  accounts without Recruitment (staging had no interviews and no Design role; the next deploy's seed run adds them).
+  Next: the candidate board on one row that scrolls sideways, New Vacancy in ten steps, the Interviews tab and the
+  KPI cards and tables against `demo (5).html`.

@@ -430,7 +430,7 @@ async function inviteIn(client, actor, scope, candidateId, vacancyId, { source =
   if (!lifecycle.takesApplications(v))
     throw new AppError("VALIDATION_FAILED", "Pick an open vacancy", 422, { vacancy_id: ["Pick an open vacancy"] });
   if (await repo.applicationOf(client, v.vacancy_id, candidateId))
-    throw new AppError("VALIDATION_FAILED", "They have applied for this role", 422, { vacancy_id: ["They have applied for this role"] });
+    throw new AppError("VALIDATION_FAILED", "They have applied for this role", 422, { vacancy_id: ["Applied for this role"] });
   await emit(client, {
     key: EVENTS.APPLICATION_INVITED,
     // The vacancy, whose link opens on the Audit Log; the person invited is in the payload.
@@ -452,8 +452,8 @@ async function invite(actor, scope, body) {
       return { email: known ? known.email : body.email, expires_at: sent.expires_at };
     } catch (err) {
       // On this form the person is named by their email, so that is where "already applied" belongs.
-      if (err.fields && err.fields.vacancy_id && err.fields.vacancy_id[0] === "They have applied for this role")
-        throw new AppError("VALIDATION_FAILED", "They have applied for this role", 422, { email: ["They have applied for this role"] });
+      if (err.fields && err.fields.vacancy_id && err.fields.vacancy_id[0] === "Applied for this role")
+        throw new AppError("VALIDATION_FAILED", "They have applied for this role", 422, { email: ["Applied for this role"] });
       throw err;
     }
   });

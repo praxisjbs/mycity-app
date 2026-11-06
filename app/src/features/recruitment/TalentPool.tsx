@@ -154,6 +154,8 @@ function PoolSheet({ entry, close, mayInvite, mayRemove }: { entry: PoolEntry; c
 /** Cancel goes back to the person's sheet; only a sent invitation closes it all. */
 function InviteForm({ entry, back, close }: { entry: PoolEntry; back: () => void; close: () => void }) {
   const roles = useVacancyOptions("open");
+  // The role they applied for is not offered: they cannot be invited to it again.
+  const offered = roles.options.filter(([id]) => id !== entry.applied_for?.vacancy_id);
   const f = useContractForm({ vacancy_id: "" }, poolSchemas.PoolInvite);
   const send = useMutation("POST /api/v1/recruitment/pool/:id/invite");
   const [problem, setProblem] = useState<string | null>(null);
@@ -172,7 +174,7 @@ function InviteForm({ entry, back, close }: { entry: PoolEntry; back: () => void
   return (
     <>
       <Field label="Vacancy" {...f.status("vacancy_id")}>
-        <SelectField options={roles.options} placeholder="Pick a role" more={roles.more} onMore={roles.onMore} {...f.field("vacancy_id")} />
+        <SelectField options={offered} placeholder="Pick a role" more={roles.more} onMore={roles.onMore} {...f.field("vacancy_id")} />
       </Field>
       <FormError>{problem}</FormError>
       <FormFooter>

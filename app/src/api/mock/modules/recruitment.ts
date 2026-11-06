@@ -662,7 +662,7 @@ R("POST /api/v1/recruitment/candidates/invitations", "create", (req) =>
   parse<{ first_name: string; last_name: string; email: string; vacancy_id: string }>(candidateSchemas.ApplyInvite, req.body, (b) => {
     const v = vacancy(b.vacancy_id);
     if (!v || v.status !== "open") return field("vacancy_id", "Pick an open vacancy");
-    if (appsOf(v).some((a) => a.email.toLowerCase() === b.email.toLowerCase())) return field("email", "They have applied for this role");
+    if (appsOf(v).some((a) => a.email.toLowerCase() === b.email.toLowerCase())) return field("email", "Applied for this role");
     return ok({ email: b.email, expires_at: `${isoDaysAhead(7)}T22:59:59.000Z` });
   }),
 );
@@ -1644,7 +1644,7 @@ R("POST /api/v1/recruitment/pool/:id/invite", "edit", (req) => {
   return parse<{ vacancy_id: string }>(poolSchemas.PoolInvite, req.body, (b) => {
     const v = vacancy(b.vacancy_id);
     if (!v || v.status !== "open") return field("vacancy_id", "Pick an open vacancy");
-    if (appsOf(v).some((a) => a.candidate_id === p.candidate_id)) return field("vacancy_id", "They have applied for this role");
+    if (appsOf(v).some((a) => a.candidate_id === p.candidate_id)) return field("vacancy_id", "Applied for this role");
     p.invited_at = nowIso();
     p.invited_vacancy = vref(v);
     return ok(p);

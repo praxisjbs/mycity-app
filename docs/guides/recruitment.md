@@ -677,6 +677,12 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 06/11/2026 · GE · From testing on staging: Invite to Apply said "Check this value" when the person had
+  already applied for the role (the field's message was six words; it is now "Applied for this role", and
+  the role they came from is no longer offered). The staging seed picks hiring managers and panelists only
+  from Implementation accounts that hold Recruitment: one teammate without it had every role it managed and
+  every panel refused, so staging had no interviews and no Design role.
+
 - 06/11/2026 · GE · The P15 follow-ups, closed. Interviews: the panel picker lists only who may sit
   (`GET /recruitment/interviews/panelists`) and a refusal names who cannot; a round closes by itself
   only once every seat has submitted and the interview has started (after Submit Card, after a
