@@ -243,14 +243,14 @@ describeDb("AI Control against the real migrations", () => {
         "guide-search",
         "guide-answer",
         "guide-voice",
+        "expense-invoice-read",
+        "expense-duplicate-check",
+        "expense-category-suggest",
         "jd-draft",
         "screening-questions",
         "assessment-questions",
         "interview-notes-cleanup",
         "cv-screen",
-        "expense-invoice-read",
-        "expense-duplicate-check",
-        "expense-category-suggest",
       ]);
       const by = Object.fromEntries(res.body.data.map((a) => [a.key, a]));
       // Recruitment's (recruitment.md §9), chosen by GE: all personal data, the CV read on Deep Reasoning.
