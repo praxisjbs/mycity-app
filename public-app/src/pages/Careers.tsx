@@ -6,7 +6,7 @@ import { Page } from "@/shell/Page";
 import { factsOf, rolesLine } from "./shared";
 
 /**
- * Careers (#80): every open role at go.mycityapp.io/jobs, indexable, closing soonest first in the
+ * Careers (#80), the header's Vacancy: every open role at go.mycityapp.io/jobs, indexable, closing soonest first in the
  * server's pages of 25. Open Roles with its line and search; the teams hiring at the left, one picked
  * at a time (the server narrows by `department`), the roles at the right; both columns stick, the
  * shorter waiting. `?q=` (the index's Search Roles) and `?department=<code>` open it narrowed.
@@ -34,7 +34,7 @@ export function Careers() {
   };
 
   return (
-    <Page title="Careers" index>
+    <Page title="Vacancy" index>
       <PageIntro
         eyebrow="Careers at MyCityApp"
         title="Open Roles"
