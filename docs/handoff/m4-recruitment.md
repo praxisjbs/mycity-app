@@ -509,3 +509,7 @@ packages that need none can start. Tick a package only when its own checks pass 
   sent. Seed: roles found by its own `vacancy.created` events. Guide (§2, §3, §5, §6.1, §6.4, §6.6, §6.7, §6.9, §10,
   §11, §14), chapter steps, the Organogram and Integrations guides follow; 18 pictures retaken. Ose's chapter list is done
   (his entry above). Left: #72's old `User-guide-unchanged` line (dropped when it is marked ready).
+- 06/11/2026 · GE · `npm run ci` on 8b2ce41 (the decisions and the follow-ups, Ose's chapter in): 50 of 51 gates pass;
+  the 51st, frontend tests, failed one Settings · Approvals case on a timeout under the run's load (untouched by M4);
+  it passes alone twice and the whole app suite passes again (696 of 696). Every P15 decision, follow-up and chapter
+  correction is closed. #72 waits only on GE's word to mark it ready (its old `User-guide-unchanged` line goes then).
