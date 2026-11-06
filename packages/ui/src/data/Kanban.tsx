@@ -299,7 +299,14 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
 
   return (
     // One row of stages: they share the width when they fit and scroll sideways when they do not, never wrapping.
-    <div className={cn("flex gap-2.5 overflow-x-auto pb-1", className)} aria-busy={loading || undefined}>
+    // The row is a named, focusable region, so a keyboard can scroll it even when no card is in it (loading, empty).
+    <div
+      role="region"
+      aria-label="Board"
+      tabIndex={0}
+      className={cn("flex gap-2.5 overflow-x-auto pb-1", className)}
+      aria-busy={loading || undefined}
+    >
       {columns.map((column) => (
         <Marked key={column.key} cards={column.cards}>
           {(marks) => (
