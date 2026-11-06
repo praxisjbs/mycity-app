@@ -39,3 +39,13 @@ export function factsOf(r: PublicJobCard & Partial<Pick<PublicJob, "work_pattern
 
 /** "1 person has applied", "23 people have applied". */
 export const applicantsLine = (n: number) => (n === 1 ? "1 person has applied" : `${n} people have applied`);
+
+/** "Lagos", "Lagos and Abuja", "Lagos, Abuja and Ibadan". */
+export const joinAnd = (names: readonly string[]) =>
+  names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+/** The careers line from the index's figures: "12 roles across 7 teams, in Lagos and Abuja." */
+export function rolesLine(open: number, teams: number, cities: readonly string[]): string {
+  const roles = `${open} ${open === 1 ? "role" : "roles"} across ${teams} ${teams === 1 ? "team" : "teams"}`;
+  return cities.length ? `${roles}, in ${joinAnd(cities)}.` : `${roles}.`;
+}

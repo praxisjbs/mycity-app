@@ -58,7 +58,6 @@ const role = (r: Partial<Role> & Pick<Role, "slug" | "title" | "department" | "l
   reports_to: null,
   min_experience_years: null,
   working_days: "Monday to Friday",
-  about_company: ABOUT,
   requirements: null,
   nice_to_have: null,
   how_we_hire: ["apply", "screening", "interview"],

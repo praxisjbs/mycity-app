@@ -527,3 +527,11 @@ packages that need none can start. Tick a package only when its own checks pass 
   Partnerships Associate and Content Producer). For AJ (M5): the design's Sign Offer has no email code, name, title or
   consent tick, which partnerships §6.9 asks of the shared signatures service; the INTERIM verify shape (one signer,
   document type, issued by) is not agreements' `VerifyResult` (signers, status). Both need a decision before M5's contract.
+- 06/11/2026 · GE · (Ose) Branch `m4/public-site`: the approved public site design on the pages, after the shared UI
+  (`3c022810`) and the data (`34e1b9f0`). Home (#107, new) at `/`; Careers, Vacancy, Apply and Assessment rebuilt to the
+  design; Sign Offer and Verify Document (M5) built on the mock, their API left for AJ; one header with six links on
+  every page and guidance screens at `/vacancy` (or `/jobs/`), `/apply`, `/assess` and `/sign`. `PublicJob.about_company`
+  dropped (About MyCityApp is Home's alone). Fourteen new components in `@mycity/ui`, PublicPage's deprecated props
+  and its card and open layouts removed. Guide §2, §5, §6.1, §10 and the change log first; the public chapter and its
+  pictures follow the screens; PROGRESS row #107, #84 and #85 In progress. For AJ (M5): the signing and verify API for
+  the two pages (INTERIM `types/public.ts`), and the open points in the entry above.

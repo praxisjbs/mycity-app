@@ -1,11 +1,33 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { PublicJob } from "@mycity/contract/contract.gen.ts";
-import { Banner, Button, Card, CardHeader, Chain, DesktopOnly, formatDate, formatMoney, Icon, KeyValue, PageMessage, PhoneOnly, RichText, Skeleton, SkylineHero, StickyColumns, Sub, type IconName } from "@mycity/ui";
+import {
+  Banner,
+  Button,
+  formatDate,
+  formatMoney,
+  HireSteps,
+  IconList,
+  PageMessage,
+  Panel,
+  Quote,
+  RichText,
+  RoleCard,
+  RolePart,
+  RoleTile,
+  RoleTiles,
+  SectionHead,
+  ShareCard,
+  Skeleton,
+  SkylineHero,
+  StickyColumns,
+  type IconName,
+} from "@mycity/ui";
 import { api, ApiError } from "@/api/client";
-import { useApi } from "@/api/hooks";
-import { Link, useRouter } from "@/lib/router";
+import { useApi, usePaged } from "@/api/hooks";
+import { siteUrl, useCopy } from "@/lib/copy";
+import { useRouter } from "@/lib/router";
 import { Page } from "@/shell/Page";
-import { applicantsLine, EMPLOYMENT, factsOf, HIRING_STEP } from "./shared";
+import { applicantsLine, EMPLOYMENT, factsOf, HIRING_STEP, PATTERN } from "./shared";
 
 type Block = PublicJob["description"][number];
 
@@ -16,45 +38,89 @@ const NOT_OPEN: Record<Exclude<PublicJob["state"], "open">, { tone: "warn" | "in
   filled: { tone: "info", text: "This role has been filled. Thank you to everyone who applied." },
 };
 
+/** The words of a block, compared without case or spacing. */
+const textOf = (b: Block | undefined) => (b && b.kind !== "bullets" && b.kind !== "numbered" ? b.spans.map((s) => s.text).join("").trim() : "");
+const fold = (t: string) => t.toLowerCase().replace(/\s+/g, " ");
+/** A description's own heading for how the role is measured (`## Key Performance Indicators (KPIs)`). */
+const KPI = /key performance indicators/i;
+
 /**
- * Vacancy (#81): one role at a readable, shareable slug. Indexable while it is open. The role's
- * text arrives as blocks from the server's one Markdown renderer and is drawn with RichText. Apply
- * for This Role mints a one-time Apply link and opens it: beside the text on desktop, in a bar at
- * the foot on a phone. A paused, closed or filled role keeps its page and says so.
+ * The description cut at its measures: the role's text up to its KPI heading, and the KPIs as their
+ * own part (the heading as the role wrote it, its opening words, and each measure as a tile).
+ */
+function splitMeasures(blocks: Block[]) {
+  const at = blocks.findIndex((b) => b.kind === "heading" && b.level === 2 && KPI.test(textOf(b)));
+  if (at < 0) return { text: blocks, measures: null };
+  const rest = blocks.slice(at + 1);
+  const end = rest.findIndex((b) => b.kind === "heading" && b.level === 2);
+  const own = end < 0 ? rest : rest.slice(0, end);
+  const list = own.find((b): b is Extract<Block, { kind: "bullets" | "numbered" }> => b.kind === "bullets" || b.kind === "numbered");
+  return {
+    text: [...blocks.slice(0, at), ...(end < 0 ? [] : rest.slice(end))],
+    measures: { title: textOf(blocks[at]), lead: own.filter((b) => b !== list), items: list ? list.items.map((spans) => spans.map((s) => s.text).join("")) : [] },
+  };
+}
+
+/**
+ * What We Are Looking For as the design states it: its first sentence large, the rest under it. A
+ * text that does not open with a paragraph stays as it was written.
+ */
+function statement(blocks: Block[]): { lead: string; rest: Block[] } | null {
+  const first = blocks[0];
+  if (!first || first.kind !== "paragraph" || first.spans.some((s) => s.bold || s.italic || s.href)) return null;
+  const words = textOf(first);
+  const m = /^(.+?[.!?])\s+(.+)$/s.exec(words);
+  const span = (text: string) => ({ text, bold: false, italic: false, href: null });
+  if (!m) return { lead: words, rest: blocks.slice(1) };
+  return { lead: m[1]!, rest: [{ kind: "paragraph", spans: [span(m[2]!)] }, ...blocks.slice(1)] };
+}
+
+/**
+ * Vacancy (#81): one role at a readable, shareable slug, indexable while it is open. The role's hero
+ * over Lagos's skyline (All Roles, its team, its facts, Apply for This Role and Share Role), then its
+ * text part by part beside The Role card, both sticking with the shorter waiting; More Roles of its
+ * team under them. On a phone the card comes first and Apply sits in the bar at the foot. A paused,
+ * closed or filled role keeps its page and says so. About MyCityApp is the index's, not each role's.
  */
 export function Vacancy({ slug }: { slug: string }) {
   const { navigate } = useRouter();
   const v = useApi("GET /api/public/v1/jobs/:slug", { params: { slug } });
+  const code = v.data?.department_code ?? null;
+  const more = usePaged("GET /api/public/v1/jobs", { filters: code ? { department: code } : {}, enabled: !!code });
   const [problem, setProblem] = useState<string | null>(null);
+  const { copied, copy } = useCopy();
 
   if (v.error)
     return (
-      <Page title="Role Not Found">
-        {v.error.status === 404 ? (
-          <PageMessage icon="brief" title="Role Not Found" action={<Button variant="primary" onClick={() => navigate("/jobs")}>See Open Roles</Button>}>
-            The link may be mistyped, or the role was never published.
-          </PageMessage>
-        ) : (
-          <PageMessage title="This Role Did Not Load" action={<Button variant="primary" onClick={v.reload}>Try Again</Button>}>
-            {v.error.message}
-          </PageMessage>
-        )}
+      <Page title="Vacancy" layout="split">
+        <Panel bare>
+          {v.error.status === 404 ? (
+            <PageMessage icon="brief" title="Role Not Found" action={<Button variant="primary" size="lg" onClick={() => navigate("/jobs")}>See Open Roles</Button>}>
+              The link may be mistyped, or the role was never published.
+            </PageMessage>
+          ) : (
+            <PageMessage title="This Role Did Not Load" action={<Button variant="primary" size="lg" onClick={v.reload}>Try Again</Button>}>
+              {v.error.message}
+            </PageMessage>
+          )}
+        </Panel>
       </Page>
     );
   const d = v.data;
   if (!d)
     return (
-      <Page title="Careers" layout="open">
-        <div aria-busy="true" className="rounded-sheet bg-deep p-8 phone:rounded-none phone:p-4">
+      <Page title="Careers">
+        <div aria-busy="true" className="public-wrap py-12">
           <Skeleton lines={3} />
-        </div>
-        <div className="mt-8 phone:px-4">
-          <Skeleton lines={8} />
+          <div className="mt-10">
+            <Skeleton lines={8} />
+          </div>
         </div>
       </Page>
     );
 
   const open = d.state === "open";
+  const link = siteUrl(`/jobs/${d.slug}`);
   const apply = async () => {
     setProblem(null);
     try {
@@ -66,97 +132,157 @@ export function Vacancy({ slug }: { slug: string }) {
       setProblem(e instanceof ApiError ? e.message : "The application did not start. Try again.");
     }
   };
+  const closes = d.closes_at ? formatDate(d.closes_at) : null;
   const pay = d.salary_min && d.salary_max ? `${formatMoney(d.salary_min, { kobo: false })} to ${formatMoney(d.salary_max, { kobo: false })}` : null;
-  const facts: Array<{ icon: IconName; text: string }> = [...factsOf(d), ...(pay ? [{ icon: "wallet" as const, text: pay }] : [])];
+  const facts: Array<{ icon: IconName; text: string }> = [
+    ...factsOf(d),
+    ...(pay ? [{ icon: "wallet" as const, text: pay }] : []),
+    ...(closes ? [{ icon: "calendar" as const, text: `Closes ${closes}` }] : []),
+  ];
   const details = [
-    { label: "Employment Type", value: d.employment_type ? EMPLOYMENT[d.employment_type] : null },
+    { label: "Employment", value: d.employment_type ? EMPLOYMENT[d.employment_type] : null },
     { label: "Working Days", value: d.working_days },
     { label: "Experience", value: d.min_experience_years ? `At least ${d.min_experience_years} years` : null },
-    { label: "Probation", value: d.probation_months ? `${d.probation_months} months` : null },
     { label: "Reports To", value: d.reports_to },
-    { label: "Closing Date", value: d.closes_at ? formatDate(d.closes_at) : null },
+    { label: "Probation", value: d.probation_months ? `${d.probation_months} months` : null },
   ].filter((x): x is { label: string; value: string } => !!x.value);
   const notOpen = d.state === "open" ? null : NOT_OPEN[d.state];
-  const applyButton = (
-    <Button variant="primary" block onClick={apply}>
-      Apply for This Role
-    </Button>
-  );
-
-  const bar = open ? (
-    <PhoneOnly className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-border bg-card/95 px-4 pt-3 pb-safe-3 backdrop-blur">
-      <Sub as="p" className="min-w-0 flex-1">
-        {applicantsLine(d.applicants)}
-      </Sub>
-      <div className="flex-none">{applyButton}</div>
-    </PhoneOnly>
-  ) : undefined;
+  const { text, measures } = splitMeasures(own(d.description, "Role Overview") ?? []);
+  const wanted = own(d.nice_to_have, "What We Are Looking For");
+  const said = wanted ? statement(wanted) : null;
+  const requirements = own(d.requirements, "Required Experience and Qualifications");
+  const others = more.rows.filter((r) => r.slug !== d.slug).slice(0, 3);
 
   return (
-    <Page title={d.title} index={open} layout="open" bar={bar}>
-      <Link to="/jobs" className="mb-3 inline-flex min-h-tap items-center gap-1.5 text-sm font-strong text-muted-foreground no-underline hover:text-foreground phone:px-4">
-        <Icon name="left" />
-        All Roles
-      </Link>
-      <SkylineHero size="m" eyebrow={d.department} title={d.title} facts={facts} />
+    <Page
+      title={d.title}
+      index={open}
+      bar={
+        open ? (
+          <>
+            <p>
+              {applicantsLine(d.applicants)}.{closes ? ` Closes ${closes}.` : ""}
+            </p>
+            <Button variant="primary" onClick={apply}>
+              Apply
+            </Button>
+          </>
+        ) : undefined
+      }
+    >
+      <SkylineHero size="role" record back={{ label: "All Roles", href: "/jobs" }} eyebrow={d.department} title={d.title} facts={facts} note={open ? applicantsLine(d.applicants) : undefined}>
+        {open && (
+          <>
+            <Button variant="primary" size="lg" onClick={apply}>
+              Apply for This Role
+            </Button>
+            <Button variant="glass" size="lg" onClick={() => copy("hero", link)}>
+              {copied === "hero" ? "Link Copied" : "Share Role"}
+            </Button>
+          </>
+        )}
+      </SkylineHero>
       {notOpen && (
-        <Banner tone={notOpen.tone} className="mt-5 phone:mx-4" action={<Button size="sm" onClick={() => navigate("/jobs")}>See Open Roles</Button>}>
-          {notOpen.text}
-        </Banner>
+        <div className="public-wrap mt-5">
+          <Banner tone={notOpen.tone} action={<Button size="sm" onClick={() => navigate("/jobs")}>See Open Roles</Button>}>
+            {notOpen.text}
+          </Banner>
+        </div>
       )}
-      <StickyColumns layout="main-side" phoneFirst={1} className="mt-8 animate-enter enter-delay-3 phone:mt-5 phone:px-4">
-        <article className="flex min-w-0 flex-col gap-9 phone:gap-7">
-          <TextSection title="About MyCityApp" blocks={d.about_company} />
-          <TextSection title="Role Overview" blocks={d.description} />
-          <TextSection title="Required Experience and Qualifications" blocks={d.requirements} />
-          <TextSection title="What We Are Looking For" blocks={d.nice_to_have} />
-          {d.how_we_hire.length > 0 && (
-            <section aria-labelledby="how-we-hire">
-              <h2 id="how-we-hire" className="mb-3 font-heading text-xl">
-                How We Hire
-              </h2>
-              <Chain label="How We Hire" steps={d.how_we_hire.map((s) => ({ label: HIRING_STEP[s] }))} />
-            </section>
-          )}
-        </article>
-        <aside>
-          <Card as="section" className="flex flex-col gap-4">
-            <CardHeader title="The Role" />
-            {details.length > 0 && <KeyValue layout="stacked" items={details} />}
-            {open && (
-              <DesktopOnly className="flex flex-col gap-2 border-t border-border pt-4">
-                {applyButton}
-                <Sub as="p" className="text-center">
-                  {applicantsLine(d.applicants)}
-                </Sub>
-              </DesktopOnly>
+      <div className="public-wrap pt-12 pb-8 phone:pt-14">
+        <StickyColumns layout="side" phoneFirst={1}>
+          <article className="min-w-0">
+            {text.length > 0 && (
+              <RolePart title="Role Overview">
+                <RichText look="site" blocks={text} top={3} />
+              </RolePart>
             )}
-            {problem && <Banner tone="err">{problem}</Banner>}
-          </Card>
-        </aside>
-      </StickyColumns>
+            {measures && (
+              <RolePart title={measures.title} record>
+                {measures.lead.length > 0 && <RichText look="site" blocks={measures.lead} top={3} />}
+                {measures.items.length > 0 && <IconList icon="trend" label={measures.title} items={measures.items} />}
+              </RolePart>
+            )}
+            {requirements && (
+              <RolePart title="Required Experience and Qualifications">
+                <RichText look="site" blocks={requirements} top={3} />
+              </RolePart>
+            )}
+            {wanted && (
+              <RolePart title="What We Are Looking For">
+                {said ? (
+                  <Quote look="feature" lead={said.lead}>
+                    {said.rest.length > 0 ? <Paragraphs blocks={said.rest} /> : null}
+                  </Quote>
+                ) : (
+                  <RichText look="site" blocks={wanted} top={3} />
+                )}
+              </RolePart>
+            )}
+            {d.how_we_hire.length > 0 && (
+              <RolePart title="How We Hire">
+                <HireSteps compact label="How We Hire" steps={d.how_we_hire.map((s) => ({ title: HIRING_STEP[s] }))} />
+              </RolePart>
+            )}
+          </article>
+          <aside>
+            <RoleCard
+              title="The Role"
+              items={details}
+              closing={closes ? `Closes ${closes}` : undefined}
+              action={
+                open ? (
+                  <Button variant="primary" size="lg" block onClick={apply}>
+                    Apply for This Role
+                  </Button>
+                ) : undefined
+              }
+              note={open ? applicantsLine(d.applicants) : undefined}
+            >
+              {problem && (
+                <div className="px-6 pb-6">
+                  <Banner tone="err">{problem}</Banner>
+                </div>
+              )}
+            </RoleCard>
+            {open && (
+              <ShareCard
+                title="Know Someone for This?"
+                text="Send them this role. Their application comes straight to us."
+                action={
+                  <Button variant="line" size="sm" onClick={() => copy("share", link)}>
+                    {copied === "share" ? "Link Copied" : "Copy Role Link"}
+                  </Button>
+                }
+              />
+            )}
+          </aside>
+        </StickyColumns>
+      </div>
+      {others.length > 0 && (
+        <section aria-labelledby="more-title" className="public-wrap pt-20 phone:pt-16">
+          <SectionHead align="split" size="m" title="More Roles" id="more-title" />
+          <RoleTiles label="More Roles" start={0}>
+            {others.map((r) => (
+              <RoleTile key={r.slug} href={`/jobs/${r.slug}`} team={r.department} title={r.title} line={[r.location, r.work_pattern ? PATTERN[r.work_pattern] : null].filter(Boolean).join(". ") + "."} />
+            ))}
+          </RoleTiles>
+        </section>
+      )}
     </Page>
   );
 }
 
-/** The words of a heading block, compared without case or spacing. */
-const headingText = (b: Block | undefined) => (b?.kind === "heading" ? b.spans.map((s) => s.text).join("").trim().toLowerCase().replace(/\s+/g, " ") : null);
+/** The words of a few paragraphs, for the smaller lines of a statement. */
+function Paragraphs({ blocks }: { blocks: Block[] }): ReactNode {
+  return blocks.map((b, i) => <p key={i}>{textOf(b)}</p>);
+}
 
 /**
- * One part of the role's text under its heading; nothing at all when the role has none. A text that
- * opens with the same heading the page gives it (a description written as `## Role Overview`) loses
- * that first line, so the heading shows once.
+ * One part of the role's text without a first heading that repeats the part's own (a description
+ * written as `## Role Overview`), so the heading shows once; null when the role has none.
  */
-function TextSection({ title, blocks: all }: { title: string; blocks: Block[] | null }) {
-  const blocks = all && headingText(all[0]) === title.toLowerCase() ? all.slice(1) : all;
-  if (!blocks || blocks.length === 0) return null;
-  const id = `part-${title.toLowerCase().replace(/\W+/g, "-")}`;
-  return (
-    <section aria-labelledby={id}>
-      <h2 id={id} className="mb-3 font-heading text-xl">
-        {title}
-      </h2>
-      <RichText blocks={blocks} top={3} />
-    </section>
-  );
+function own(all: Block[] | null, title: string): Block[] | null {
+  const blocks = all && all[0]?.kind === "heading" && fold(textOf(all[0])) === fold(title) ? all.slice(1) : all;
+  return blocks && blocks.length > 0 ? blocks : null;
 }

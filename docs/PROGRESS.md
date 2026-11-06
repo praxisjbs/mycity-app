@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 104 screens (97 in the staff app, 7 on the public site) plus
+**The single record of what is built.** 105 screens (97 in the staff app, 8 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -46,14 +46,14 @@ saying who agreed and when.
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 0 | 0 | 5 | 0 | 0 |
-| M4 Recruitment End to End | 9 | 0 | 0 | 9 | 0 | 0 |
-| M5 Offers, Documentation & Onboarding | 4 | 4 | 0 | 0 | 0 | 0 |
+| M4 Recruitment End to End | 10 | 0 | 0 | 10 | 0 | 0 |
+| M5 Offers, Documentation & Onboarding | 4 | 2 | 2 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 8 | 8 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **104** | **21** | **0** | **83** | **0** | **0** |
+| **Total** | **105** | **19** | **2** | **84** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
@@ -1639,16 +1639,18 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Path | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 80 | Careers | `/jobs` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
-| 81 | Vacancy | `/jobs/<slug>` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
-| 82 | Apply | `/apply/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
-| 83 | Assessment | `/assess/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 05/11/2026 |
-| 84 | Sign Offer | `/sign/<token>` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 85 | Verify Document | `/verify/<number>` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 107 | Home | `/` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
+| 80 | Careers | `/jobs` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
+| 81 | Vacancy | `/jobs/<slug>` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
+| 82 | Apply | `/apply/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
+| 83 | Assessment | `/assess/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
+| 84 | Sign Offer | `/sign/<token>` | M5 | AJ | ☐ | ☐ | ☐ | In progress | 06/11/2026 |
+| 85 | Verify Document | `/verify/<number>` | M5 | AJ | ☐ | ☐ | ☐ | In progress | 06/11/2026 |
 | 105 | Proposal | `/proposal/<token>` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 06/11/2026 · GE · (Ose) The approved public site design applied to the pages (`public-site-demo.html`, branch `m4/public-site`): Home (#107, new, at `/`: Work With Us with Search Roles and the three figures counting up, What We Build with About MyCityApp, Closing Soon, How We Hire, Know Someone Great? and Verify a Document), Careers (#80: Open Roles, the teams list one at a time, the role rows, both columns sticky), Vacancy (#81: the role's hero with Share Role, its text part by part with the KPIs as tiles and What We Are Looking For as a statement, The Role card and Know Someone for This?, More Roles, Apply in the phone's bar; About MyCityApp only on Home, and dropped from `PublicJob`), Apply (#82) and Assessment (#83: the ring clock and the question map in the aside) on PublicPage's split layout, Sign Offer (#84: the letter, Sign Below with Clear in the box, Decline the Offer) and Verify Document (#85: by reference and by its QR at `/verify/t/<token>`). One header with six links on every page (the old prototype view switch gone); `/vacancy` (and `/jobs/`), `/apply`, `/assess` and `/sign` open a guidance screen without a link. New in `@mycity/ui`: Panel, SectionHead, FeatureGrid, RoleRow, TeamList, RoleTile, HireSteps, CtaCard, RolePart, IconList, RoleCard, QuestionMap, IssuedLetter, VerifyCard; looks for Wizard, KeyValue, Quote, RichText, Countdown, SignatureField, UploadField and NumberField; PublicPage's `pane`, `brand`, `links` and its card and open layouts removed. Page and router tests; the public chapter and its pictures retaken. #84 and #85 stay unticked: their screens run on the INTERIM shapes and the mock until AJ's M5 signing and verify API. Left: that API (M5, AJ); MILESTONES §18 to list Home beside the public pages (GE).
 - 06/11/2026 · GE · (Ose) The data for the approved public site design (`public-site-demo.html`), for Careers and Vacancy (#80, #81), Apply (#82) and the new public index: `GET /api/public/v1/jobs/summary` (open roles, the departments hiring, the cities, the three closing soonest, About MyCityApp); `/jobs` closing soonest first with a `department` filter beside `q`, its cards carrying the department's code, the arrangement's note, the employment type and the closing date; `ApplyLink` names the role's department and place. The public mock holds the design's twelve open roles in its closing order, its Head, Sales & Revenue facts, its three-question case study, its OFF-0018 offer and the verify cases (OFF-0016, OFF-0012, OFF-0011, OFF-0099, OFF-0018 once signed, a QR token for OFF-0016, INTERIM until M5). Unit and integration tests; guide §2, §5, §6.1, §6.2, §10. No ticks changed. Left: the pages themselves (index, Careers' department list, Vacancy's More Roles, Verify by QR), a PROGRESS row for the index, and the signing and verify API, which is M5's (AJ).
 - 05/11/2026 · JP · Proposal (#105, `go.mycityapp.io/proposal/<token>`, M7) ratified and registered by M7 PR 1 (docs/guides/partnerships.md §2, §6.10): the route, its row and Coming Soon. Not started: the page, its public routes and the design kit come with M7 PR 7.
 - 05/11/2026 · GE · (Ose) P11 re-audit: a file answer's upload now answers the stored document (`AnswerFileSaved`, as an Apply CV does), so the live page no longer shows a saved file as failed (integration test added); a link saved over a file clears the file's card; the public mock holds the staff mock's six vacancies, candidates and assessments (a draft is never public; a role past its closing day reads closed, as the server reads it); the merge's reformatting of the recruitment guide, the handoff and this file undone (it had broken the guides gate and written `<Stage></stage>`).

@@ -8,21 +8,23 @@ import {
   ConfirmDialog,
   Countdown,
   Field,
-  FileCard,
+  FileRow,
   formatDate,
+  formatTime,
   HelpTerm,
   Icon,
+  KeyValue,
   PageMessage,
-  ProgressBar,
+  Panel,
+  QuestionMap,
   RadioCards,
   SelectField,
   Skeleton,
-  SkylineHero,
-  StatStrip,
   TextAreaField,
   TextField,
   UploadField,
 } from "@mycity/ui";
+import type { ReactNode, Ref } from "react";
 import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import { upload } from "@/api/upload";
@@ -43,10 +45,12 @@ const ANSWER_FILES = ".pdf,.docx,.xlsx,.pptx,.csv,.jpg,.jpeg,.png,.webp,.heic,.m
 const HTTPS = /^https:\/\/[^\s/$.?#]\S*$/i;
 
 /**
- * Assessment (#83): a timed test or a take-home brief, reached by its link. The clock is the
- * server's (Countdown counts from the answer's own `server_now`), every answer saves as it is
- * given, and opening the same link again resumes at the same question with the time really left.
- * The candidate sees that they finished, never a score.
+ * Assessment (#83): a timed test or a take-home brief, reached by its link, on the split layout: the
+ * role and the assessment's name in the aside, with the greeting before it starts and the clock (a
+ * ring) and the question map while it runs; the work on its Panel. The clock is the server's
+ * (Countdown counts from the answer's own `server_now`), every answer saves as it is given, and
+ * opening the same link again resumes at the same question with the time really left. The candidate
+ * sees that they finished, never a score.
  */
 export function Assessment({ token }: { token: string }) {
   const s = useApi("GET /api/public/v1/assess/:token", { params: { token } });
@@ -54,13 +58,24 @@ export function Assessment({ token }: { token: string }) {
   const d = s.data;
   if (!d)
     return (
-      <Page title="Assessment" pane={<SkylineHero size="pane" title="Assessment" />}>
-        <Skeleton lines={6} />
-      </Page>
+      <Shell>
+        <Panel>
+          <Skeleton lines={6} />
+        </Panel>
+      </Shell>
     );
   if (d.state === "not_started") return <Intro d={d} token={token} onStarted={s.set} />;
   if (d.state === "in_progress" && d.questions) return <Sitting key={d.ends_at ?? "open"} d={d} token={token} onEnded={s.set} reload={s.reload} />;
   return <Ended d={d} />;
+}
+
+/** The assessment's page: who it is for and its name in the aside, and what the aside adds now. */
+function Shell({ d, paragraph, aside, children }: { d?: AssessmentSession; paragraph?: ReactNode; aside?: ReactNode; children: ReactNode }) {
+  return (
+    <Page title="Assessment" layout="split" name={d?.vacancy_title} line={d ? "Your assessment for this role" : undefined} text={d ? `${d.assessment.name}.` : undefined} paragraph={paragraph} aside={aside}>
+      {children}
+    </Page>
+  );
 }
 
 function Intro({ d, token, onStarted }: { d: AssessmentSession; token: string; onStarted: (d: AssessmentSession) => void }) {
@@ -75,32 +90,27 @@ function Intro({ d, token, onStarted }: { d: AssessmentSession; token: string; o
     }
   };
   return (
-    <Page
-      title="Assessment"
-      pane={
-        <SkylineHero size="pane" record eyebrow={d.vacancy_title} title={a.name} text={`Hello ${d.candidate_first_name}. Start by ${formatDate(d.start_by)}.`}>
-          <StatStrip
-            label="About the Assessment"
-            className="mb-0"
-            items={[
-              { label: "Type", value: TYPE[a.assessment_type] },
-              { label: d.timed ? "Time" : "Take Home", value: d.timed && a.duration_minutes ? `${a.duration_minutes} minutes` : "Your own pace" },
-              { label: "Questions", value: a.question_count },
-            ]}
-          />
-        </SkylineHero>
-      }
-    >
-      {a.instructions && (
-        <p className="text-md leading-relaxed whitespace-pre-line text-muted-foreground" data-copy="content">
-          {a.instructions}
-        </p>
-      )}
-      {problem && <Banner tone="err" className="mt-4">{problem}</Banner>}
-      <Button variant="primary" block className={a.instructions ? "mt-6" : undefined} onClick={start}>
-        Start the Assessment
-      </Button>
-    </Page>
+    <Shell d={d} paragraph={`Hello ${d.candidate_first_name}. Start by ${formatDate(d.start_by)}. Every answer saves as you type.`}>
+      <Panel as="section" title="The Assessment">
+        <KeyValue
+          layout="tiles"
+          items={[
+            { label: "Type", value: TYPE[a.assessment_type] },
+            { label: d.timed ? "Time" : "Take Home", value: d.timed && a.duration_minutes ? `${a.duration_minutes} minutes` : "Your own pace" },
+            { label: "Questions", value: a.question_count },
+          ]}
+        />
+        {a.instructions && (
+          <p className="mt-7 text-lg leading-relaxed whitespace-pre-line text-canvas-soft" data-copy="content">
+            {a.instructions}
+          </p>
+        )}
+        {problem && <Banner tone="err" className="mt-4">{problem}</Banner>}
+        <Button variant="primary" size="lg" block className="mt-7" onClick={start}>
+          Start the Assessment
+        </Button>
+      </Panel>
+    </Shell>
   );
 }
 
@@ -233,99 +243,87 @@ function Sitting({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
   const answered = questions.filter((x) => (answers[x.assessment_question_id] ?? "").trim() || files[x.assessment_question_id]).length;
   const last = i === total - 1;
 
+  const done = questions.map((x) => !!((answers[x.assessment_question_id] ?? "").trim() || files[x.assessment_question_id]));
+  const map = <QuestionMap label="Questions" count={total} at={i} answered={done} onPick={(to) => to !== i && go(to)} />;
+
   return (
-    <Page
-      title="Assessment"
-      pane={
-        <SkylineHero size="pane" eyebrow={d.assessment.name} title={`Question ${i + 1} of ${total}`} titleRef={heading}>
-          <div className="flex items-end justify-between gap-4 lg:flex-col lg:items-start lg:gap-5">
-            {d.timed ? (
-              <Countdown endsAt={d.ends_at} serverNow={d.server_now} onEnd={reload} className="lg:items-start" />
-            ) : (
-              <div>
-                <p className="text-2xs font-strong tracking-wide text-eyebrow uppercase">Due</p>
-                <p className="text-md font-strong tabular-nums">{d.ends_at ? `${formatDate(d.ends_at)}, 23:59` : null}</p>
-              </div>
-            )}
-            <HelpTerm
-              className="text-xs"
-              align="end"
-              help={
-                d.timed
-                  ? "Your answers save as you go. Open the same link again to carry on where you were; the clock keeps running."
-                  : "Your answers save as you go. Open the same link again to carry on where you were."
-              }
-            >
-              Resume Later
-            </HelpTerm>
-          </div>
-          <ProgressBar className="mt-4" label={`${answered} of ${total} Answered`} value={answered} max={total} showValue={false} tone="ok" />
-        </SkylineHero>
+    <Shell
+      d={d}
+      paragraph={d.timed ? undefined : d.ends_at ? `Due ${formatDate(d.ends_at)}, 23:59.` : undefined}
+      aside={
+        <>
+          {d.timed && <Countdown look="ring" total={(d.assessment.duration_minutes ?? 0) * 60} endsAt={d.ends_at} serverNow={d.server_now} onEnd={reload} />}
+          {map}
+        </>
       }
     >
-      <section key={qid} aria-labelledby={`prompt-${qid}`} className="animate-rise">
-        <Prompt id={`prompt-${qid}`} text={q.prompt} />
-        <div className="mt-4">
-          {q.question_type === "choice" ? (
-            <ChoiceAnswer q={q} value={answers[qid] ?? ""} onChange={(v) => change(v, true)} />
-          ) : q.question_type === "file" ? (
-            <FileAnswer
-              q={q}
-              token={token}
-              link={linkMode[qid] ?? false}
-              onLink={(on) => setLinkMode((m) => ({ ...m, [qid]: on }))}
-              value={answers[qid] ?? ""}
-              onChange={(v) => change(v)}
-              onBlur={() => void (linkProblem() || flush(i))}
-              fileName={files[qid] ?? null}
-              onFile={(name) => {
-                setFiles((f) => ({ ...f, [qid]: name }));
-                setAnswers((a) => ({ ...a, [qid]: "" }));
-                answersRef.current = { ...answersRef.current, [qid]: "" };
-                dirty.current.delete(qid);
-                setSave("saved");
-              }}
-              error={bad[qid] || undefined}
-            />
-          ) : (
-            <Field label="Your Answer">
-              <TextAreaField rows={8} maxLength={20000} value={answers[qid] ?? ""} onChange={(v) => change(v)} onBlur={() => void flush(i)} />
-            </Field>
-          )}
-        </div>
-      </section>
-
-      {problem && <Banner tone="err" className="mt-4">{problem}</Banner>}
-      <div className="mt-6 flex items-center gap-3 border-t border-border pt-4 phone:flex-col phone:items-stretch">
-        <SaveLine state={save} onRetry={() => flush(i)} />
-        <ActionGroup>
-          <div className="flex gap-2 phone:w-full">
+      <Panel
+        as="section"
+        eyebrow={`Question ${i + 1} of ${total}`}
+        status={<SaveLine state={save} onRetry={() => flush(i)} />}
+        progress={{ value: i + 1, max: total }}
+        foot={
+          <ActionGroup>
             {i > 0 && (
-              <Button className="phone:flex-1" onClick={() => go(i - 1)}>
+              <Button variant="line" size="lg" onClick={() => go(i - 1)}>
                 Back
               </Button>
             )}
             {last ? (
-              <Button variant="primary" className="phone:flex-1" onClick={() => !linkProblem() && setConfirm(true)}>
-                Finish
+              <Button variant="primary" size="lg" onClick={() => !linkProblem() && setConfirm(true)}>
+                Submit Assessment
               </Button>
             ) : (
-              <Button variant="primary" className="phone:flex-1" onClick={() => go(i + 1)}>
-                Next Question
+              <Button variant="solid" size="lg" onClick={() => go(i + 1)}>
+                Next
               </Button>
             )}
+          </ActionGroup>
+        }
+      >
+        <div key={qid} className="animate-rise">
+          <Prompt id={`prompt-${qid}`} text={q.prompt} headingRef={heading} />
+          <div className="mt-6">
+            {q.question_type === "choice" ? (
+              <ChoiceAnswer q={q} value={answers[qid] ?? ""} onChange={(v) => change(v, true)} />
+            ) : q.question_type === "file" ? (
+              <FileAnswer
+                q={q}
+                token={token}
+                link={linkMode[qid] ?? false}
+                onLink={(on) => setLinkMode((m) => ({ ...m, [qid]: on }))}
+                value={answers[qid] ?? ""}
+                onChange={(v) => change(v)}
+                onBlur={() => void (linkProblem() || flush(i))}
+                fileName={files[qid] ?? null}
+                onFile={(name) => {
+                  setFiles((f) => ({ ...f, [qid]: name }));
+                  setAnswers((a) => ({ ...a, [qid]: "" }));
+                  answersRef.current = { ...answersRef.current, [qid]: "" };
+                  dirty.current.delete(qid);
+                  setSave("saved");
+                }}
+                error={bad[qid] || undefined}
+              />
+            ) : (
+              <Field label="Your Answer">
+                <TextAreaField rows={10} maxLength={20000} value={answers[qid] ?? ""} onChange={(v) => change(v)} onBlur={() => void flush(i)} />
+              </Field>
+            )}
           </div>
-        </ActionGroup>
-      </div>
+          {problem && <Banner tone="err" className="mt-4">{problem}</Banner>}
+        </div>
+      </Panel>
       <ConfirmDialog
         open={confirm}
         title="Submit Assessment"
         body={`You answered ${answered} of ${total} questions. Answers cannot change after this.`}
+        confirmLabel="Submit Assessment"
         cancelLabel="Keep Going"
         onConfirm={submit}
         onCancel={() => setConfirm(false)}
       />
-    </Page>
+    </Shell>
   );
 }
 
@@ -333,43 +331,47 @@ function Sitting({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
  * A question as its author wrote it: the first line is the question, read in bold; a brief's
  * further lines (what to make, how to send it) follow as body text, so a long one is not a wall of bold.
  */
-function Prompt({ id, text }: { id: string; text: string }) {
+function Prompt({ id, text, headingRef }: { id: string; text: string; headingRef: Ref<HTMLHeadingElement> }) {
   const [first = "", ...rest] = text.split("\n");
   const more = rest.join("\n").trim();
   return (
     <div id={id} data-copy="content">
-      <p className="text-lg leading-normal font-strong text-foreground">{first}</p>
-      {more && <p className="mt-2 text-md leading-relaxed whitespace-pre-line text-muted-foreground">{more}</p>}
+      <h2 ref={headingRef} tabIndex={-1} className="text-xl leading-snug font-strong text-foreground outline-none">
+        {first}
+      </h2>
+      {more && <p className="mt-3 text-md leading-relaxed whitespace-pre-line text-canvas-soft">{more}</p>}
     </div>
   );
 }
 
-/** Saving, Saved, or Not Saved with a way to try again. Said politely as it changes. */
+/** Saving, Saved, or Not Saved with a way to try again, at the right of the question's top line. Said politely as it changes. */
 function SaveLine({ state, onRetry }: { state: SaveState; onRetry: () => unknown }) {
   return (
-    <div aria-live="polite" className="flex min-h-tap flex-1 items-center gap-2 text-xs text-subtle-foreground">
+    <span aria-live="polite" className="inline-flex items-center gap-2">
       {state === "saving" && (
-        <>
+        <span className="inline-flex items-center gap-2 text-sm font-strong text-muted-foreground">
           <Icon name="refresh" className="animate-spin motion-reduce:animate-none" />
           Saving
-        </>
+        </span>
       )}
       {state === "saved" && (
-        <span className="inline-flex animate-rise items-center gap-2">
-          <Icon name="ok" className="text-success" />
+        <span className="inline-flex animate-rise items-center gap-2 text-sm font-strong text-success">
+          <Icon name="ok" />
           Saved
         </span>
       )}
       {state === "error" && (
         <>
-          <Icon name="alert" className="text-destructive" />
-          <span className="text-destructive">Not Saved</span>
+          <span className="inline-flex items-center gap-2 text-sm font-strong text-destructive">
+            <Icon name="alert" />
+            Not Saved
+          </span>
           <Button size="sm" onClick={onRetry}>
             Try Again
           </Button>
         </>
       )}
-    </div>
+    </span>
   );
 }
 
@@ -425,15 +427,16 @@ function FileAnswer({
         </Field>
       ) : (
         <>
-          {fileName && <FileCard name={fileName} mime="application/octet-stream" tone="plain" />}
+          {fileName && <FileRow name={fileName} />}
           <UploadField
+            look="zone"
             endpoint={`/api/public/v1/assess/${encodeURIComponent(token)}/answers/${q.assessment_question_id}/file`}
             purpose="assessment_answer"
             upload={upload}
             multiple={false}
             accept={ANSWER_FILES}
             kinds="PDF, Office, image or video"
-            label={fileName ? "Replace the File" : "Upload a File"}
+            label={fileName ? "Replace the File" : "Choose a File"}
             handOff
             onUploaded={(docs) => docs[0] && onFile(docs[0].file_name)}
           />
@@ -447,15 +450,19 @@ function FileAnswer({
 function Ended({ d }: { d: AssessmentSession }) {
   const done = d.state === "submitted";
   return (
-    <Page title="Assessment">
-      <PageMessage icon={done ? "ok" : "clock"} tone={done ? "ok" : "warn"} title={done ? "Assessment Submitted" : "The Time Is Up"}>
-        <p>
-          {done
-            ? `Thank you, ${d.candidate_first_name}. We have your answers to ${d.assessment.name}.`
-            : `Your saved answers to ${d.assessment.name} were sent as they stood when the time ran out.`}
-        </p>
-        <p className="mt-2">We will email you about the next step for {d.vacancy_title}. You can close this page.</p>
-      </PageMessage>
-    </Page>
+    <Shell d={d}>
+      <Panel bare>
+        <PageMessage icon={done ? "ok" : "clock"} tone={done ? "ok" : "warn"} title={done ? "Assessment Submitted" : "The Time Is Up"}>
+          <p>
+            {done
+              ? d.submitted_at
+                ? `Your answers reached the hiring team at ${formatTime(d.submitted_at)}.`
+                : "Your answers reached the hiring team."
+              : `Your saved answers to ${d.assessment.name} were sent as they stood when the time ran out.`}
+          </p>
+          <p>We will email you about the next step for {d.vacancy_title}.</p>
+        </PageMessage>
+      </Panel>
+    </Shell>
   );
 }
