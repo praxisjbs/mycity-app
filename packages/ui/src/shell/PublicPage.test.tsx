@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 const nav = [
-  { label: "Careers", href: "/jobs", current: true },
+  { label: "Vacancy", href: "/jobs", current: true },
   { label: "Verify Document", href: "/verify" },
 ];
 
@@ -26,7 +26,7 @@ describe("PublicPage", () => {
     expect(within(banner).getByRole("link", { name: "MyCityApp Home" })).toHaveAttribute("href", "/");
     expect(within(banner).getByText("Careers", { selector: ".ps-brand-name span" })).toBeInTheDocument();
     const main = within(banner).getByRole("navigation", { name: "Main" });
-    expect(within(main).getByRole("link", { name: "Careers" })).toHaveAttribute("aria-current", "page");
+    expect(within(main).getByRole("link", { name: "Vacancy" })).toHaveAttribute("aria-current", "page");
     expect(within(main).getByRole("link", { name: "Verify Document" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("main")).toHaveTextContent("Open roles");
     expect(screen.getAllByRole("banner")).toHaveLength(1);
@@ -63,11 +63,11 @@ describe("PublicPage", () => {
     await userEvent.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
     const menu = screen.getByRole("navigation", { name: "Menu" });
-    expect(within(menu).getAllByRole("link").map((a) => a.textContent)).toEqual(["Careers", "Verify Document"]);
+    expect(within(menu).getAllByRole("link").map((a) => a.textContent)).toEqual(["Vacancy", "Verify Document"]);
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("navigation", { name: "Menu" })).toBeNull();
     await userEvent.click(button);
-    await userEvent.click(within(screen.getByRole("navigation", { name: "Menu" })).getByRole("link", { name: "Careers" }));
+    await userEvent.click(within(screen.getByRole("navigation", { name: "Menu" })).getByRole("link", { name: "Vacancy" }));
     expect(screen.queryByRole("navigation", { name: "Menu" })).toBeNull();
   });
 
@@ -79,7 +79,9 @@ describe("PublicPage", () => {
       </PublicPage>,
     );
     const foot = screen.getByRole("contentinfo");
-    expect(foot).toHaveAttribute("data-theme", "dark");
+    /* The page's theme, with the skyline faint behind it. */
+    expect(foot).not.toHaveAttribute("data-theme");
+    expect(foot.querySelector(".ps-foot-art svg")).toBeInTheDocument();
     expect(within(foot).getByText("The city and lifestyle platform for every Nigerian city.")).toBeInTheDocument();
     expect(within(foot).getByText("Lagos").nextElementSibling?.tagName).toBe("TIME");
     expect(within(foot).getByText("Lagos").nextElementSibling?.textContent).toMatch(/^\d{2}:\d{2}$/);

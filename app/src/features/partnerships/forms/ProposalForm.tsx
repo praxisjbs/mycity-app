@@ -41,7 +41,7 @@ export function ProposalForm({ close, partner }: { close: () => void; partner: s
           check: () => f.check(["partner_id", "what", "why_now"]),
           body: (
             <>
-              <Field label="Who It Is For" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} valueLabel={f.values.partner_id === partner ? preset.data?.name : undefined} {...paging(partners)} {...f.field("partner_id")} /></Field>
+              <Field label="Who It Is For" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} valueLabel={f.values.partner_id === partner ? preset.data?.partner.name : undefined} {...paging(partners)} {...f.field("partner_id")} /></Field>
               <Field label="What We Propose" {...f.field("what")}><TextAreaField {...f.field("what")} placeholder="Four-city health activation" /></Field>
               <Field label="Why Now" {...f.field("why_now")}><TextField {...f.field("why_now")} placeholder="Fits campaign window" /></Field>
             </>

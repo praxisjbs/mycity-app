@@ -1,7 +1,7 @@
 /**
  * @component CtaCard
  * @group Display
- * @summary A call to action as a large card: Deep Green with a yellow glow, or the site's white card, each with its glyph in a soft square, a title, a line and one action at its foot; it slides in from its side and lifts with a shadow under the pointer. CtaCards lays two side by side.
+ * @summary A call to action as a large card: Deep Green with a yellow glow, or the site's card, each with its glyph in a soft square, a title, a line and one action at its foot; it slides in from its side and lifts with a shadow under the pointer. CtaCards lays two side by side.
  * @use The foot of the public index: Know Someone Great? (Copy Careers Link) beside Verify a Document.
  * @avoid A notice about the system (Banner); several actions on one card; a record (RoleTile); the staff app.
  * @phone One to a row, 28 px inside; it rises from below rather than from a side.
@@ -24,7 +24,7 @@ export interface CtaCardProps {
   action?: ReactNode;
   /** The glyph in its soft square. */
   icon: IconName;
-  /** `deep`: Deep Green with a yellow glow; `card` (the default): the site's white card. */
+  /** `deep`: Deep Green with a yellow glow; `card` (the default): the site's card. */
   tone?: "deep" | "card";
   /** The side it slides in from: `left` or `right`; from below unless set. */
   from?: "left" | "right";

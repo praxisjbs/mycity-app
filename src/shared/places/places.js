@@ -7,6 +7,7 @@
  *   const { line } = await places.save(client, "worksite.address", worksiteId, body.address);
  *   //  the module writes `line` into its own column (its lists, masks and search read that)
  *   await places.remove(client, "worksite.address", worksiteId);      // an optional address cleared
+ *   await places.copy(client, { name, key }, { name, key });          // one record's address given to another
  *   const view = await places.view(db, "worksite.address", worksiteId);   // PlaceView, or null
  *   const byKey = await places.views(db, "worksite.address", ids);       // Map key → PlaceView
  *
@@ -93,6 +94,31 @@ async function save(client, name, key, place, { field } = {}) {
     ],
   );
   return { line: lineOf(place), place_id: row.place_id };
+}
+
+/**
+ * Give one record's address to another field of another record, in the owner's transaction (a
+ * partnership lead's cities becoming its partner's on conversion): the same place, a row of its own.
+ * @returns {Promise<boolean>} whether there was an address to copy
+ */
+async function copy(client, from, to) {
+  owners.get(from.name);
+  owners.get(to.name);
+  const { rowCount } = await client.query(
+    `INSERT INTO place (owner, owner_key, source, formatted, details, lat, lon, accuracy_m, provider_id,
+                        kind, city, state, country_code, verified, pending, named_at)
+     SELECT $3, $4, source, formatted, details, lat, lon, accuracy_m, provider_id,
+            kind, city, state, country_code, verified, pending, named_at
+       FROM place WHERE owner = $1 AND owner_key = $2
+     ON CONFLICT (owner, owner_key) DO UPDATE SET
+       source = EXCLUDED.source, formatted = EXCLUDED.formatted, details = EXCLUDED.details,
+       lat = EXCLUDED.lat, lon = EXCLUDED.lon, accuracy_m = EXCLUDED.accuracy_m,
+       provider_id = EXCLUDED.provider_id, kind = EXCLUDED.kind, city = EXCLUDED.city,
+       state = EXCLUDED.state, country_code = EXCLUDED.country_code, verified = EXCLUDED.verified,
+       pending = EXCLUDED.pending, named_at = EXCLUDED.named_at`,
+    [from.name, String(from.key), to.name, String(to.key)],
+  );
+  return rowCount > 0;
 }
 
 /** Forget a record's address for one field (an optional address cleared). */
@@ -195,4 +221,4 @@ async function nameWaiting({ pool, nearest, tx, emit, limit = 25 }) {
   return { named, stopped: false };
 }
 
-module.exports = { save, remove, view, views, viewOf, lineOf, nameWaiting, WRONG_LEVEL };
+module.exports = { save, copy, remove, view, views, viewOf, lineOf, nameWaiting, WRONG_LEVEL };

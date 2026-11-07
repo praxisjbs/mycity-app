@@ -27,7 +27,7 @@ const STAGES = Object.freeze([
   ["Introductory Meeting Scheduled", "meeting"],
   ["Introductory Meeting Held", "meeting"],
   ["Proposal Sent", "proposal"],
-  ["Follow-up Ongoing", "proposal"],
+  ["Follow-Up Ongoing", "proposal"],
   ["Negotiation", "negotiation"],
   ["Verbal Approval", "negotiation"],
   ["Contract Review", "negotiation"],

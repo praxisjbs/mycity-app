@@ -1,13 +1,19 @@
 "use strict";
-// search:none deals arrive with M7 PR 3; the categories are found by partner_pipeline.search.js
 /**
- * Partnerships · Categories: the HTTP edge (docs/guides/partnerships.md §5). Reads need `partnerships`
- * view; every write needs edit and the `partnerships.configure` capability, checked on the route.
+ * Partnerships · the pipeline: the HTTP edge (docs/guides/partnerships.md §5) for Categories (M7 PR 2:
+ * categories, templates, checklists, custom fields, MyCity's lists, Start From Tracker) and for deals,
+ * Pipeline and returns (M7 PR 3). Reads need `partnerships` view; Categories' writes need edit and
+ * `partnerships.configure`, checked on the route. A deal's scope comes from the `partnerships` grant
+ * (§6.1); money from `partnerships.money`, checked on the route and in the service.
  */
 const { ok, created } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
+const { scopeOf } = require("../../shared/rbac/scope");
 const { withActor } = require("../../shared/events/emit");
 const service = require("./partner_pipeline.service");
+const stages = require("./partner_pipeline.stages");
+const health = require("./partner_pipeline.health");
+const returns = require("./partner_pipeline.returns");
 
 const id = (req) => req.validated.params.id;
 
@@ -38,4 +44,15 @@ module.exports = {
 
   readTracker: async (req, res) => ok(res, await service.readTracker(withActor(req), req.validated.body)),
   applyTracker: async (req, res) => ok(res, await service.applyTracker(withActor(req), req.validated.body)),
+
+  pipeline: async (req, res) => ok(res, await service.pipeline(req.validated.query, scopeOf(req))),
+  listDeals: async (req, res) => sendPaged(res, await service.list(req.validated.query, scopeOf(req))),
+  getDeal: async (req, res) => ok(res, await service.get(id(req), scopeOf(req), req.user)),
+  createDeal: async (req, res) => created(res, await service.create(withActor(req), scopeOf(req), req.validated.body)),
+  updateDeal: async (req, res) => ok(res, await service.update(withActor(req), scopeOf(req), id(req), req.validated.body)),
+  moveStage: async (req, res) => ok(res, await stages.move(withActor(req), scopeOf(req), id(req), req.validated.body)),
+  setHealth: async (req, res) => ok(res, await health.set(withActor(req), scopeOf(req), id(req), req.validated.body)),
+  returns: async (req, res) => sendPaged(res, await returns.page(id(req), req.validated.query, scopeOf(req))),
+  saveReturn: async (req, res) =>
+    ok(res, await returns.save(withActor(req), scopeOf(req), id(req), req.validated.params.month, req.validated.body)),
 };

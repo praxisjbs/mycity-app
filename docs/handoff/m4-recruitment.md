@@ -547,3 +547,8 @@ packages that need none can start. Tick a package only when its own checks pass 
   (`VacancyInterview.tsx`; AI action `vacancy-follow-ups`, Default, personal data, chosen by GE; `jd-draft` takes
   the interview, prompt v5, a plain draft when the AI is off). For AJ: `Field` with `help` around a `TextField`
   fails axe ("visible label"); New Vacancy's Job Title carries no help term until it is fixed in packages/ui.
+- 06/11/2026 · GE · (Ose) Public site follow-ups on `m4/public-site`: Careers and Vacancy merged into one header
+  link (Vacancy, `/jobs`; `/vacancy` and `/jobs/` put back to it; Choose a Role guidance removed); the hero and
+  footer follow the theme (`--site-*` tokens, light glass teal and a light skyline, the footer's skyline faint
+  behind it); no pure white on the light site, a faint sheen on dark cards; the theme kept on reload by
+  `public-app/public/boot.js` (the CSP refused the inline script). Next: the `hireIn` follow-up PR for AJ.

@@ -45,7 +45,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
 | Display | [Countdown](#countdown) | `Countdown` | The time left until an end the server set, counted on the server's clock: a timed assessment's clock. | beta |
 | Display | [CountUp](#countup) | `CountUp` | A whole number that counts up from 0 to its value as it first shows, easing out over about a second. | beta |
-| Display | [CtaCard](#ctacard) | `CtaCard`, `CtaCards` | A call to action as a large card: Deep Green with a yellow glow, or the site's white card, each with its glyph in a soft square, a title, a line and one action at its foot; it slides in from its side and lifts with a shadow under the pointer. CtaCards lays two side by side. | beta |
+| Display | [CtaCard](#ctacard) | `CtaCard`, `CtaCards` | A call to action as a large card: Deep Green with a yellow glow, or the site's card, each with its glyph in a soft square, a title, a line and one action at its foot; it slides in from its side and lifts with a shadow under the pointer. CtaCards lays two side by side. | beta |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
 | Display | [EmptyValue](#emptyvalue) | `EmptyValue` | The marker for a value that is not set: the only dash a screen shows, muted. | stable |
 | Display | [FeatureGrid](#featuregrid) | `FeatureGrid` | What a company builds, as one Deep Green feature card (its own words and an action, the pin drawn faint behind) beside a grid of tiles, each a yellow glyph on Deep Green, a title and a line; the feature slides in from the left and the tiles rise in turn. | beta |
@@ -89,6 +89,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
 | Navigation | [QuestionMap](#questionmap) | `QuestionMap` | The questions of a sitting as numbered squares: the one in hand in yellow, each answered one in green, a press moving to that question. | beta |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
+| Navigation | [StageSwitcher](#stageswitcher) | `StageSwitcher` | A deal's stages in order, the current one marked; one press on another stage moves the deal there. | beta |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
 | Navigation | [TeamList](#teamlist) | `TeamList` | The teams hiring, one picked at a time, each with how many roles it has: a column of rows on desktop (the one picked in Deep Green with a yellow count), a row of pills that scrolls sideways inside itself below 1041 px. | beta |
 | Overlays | [ConfirmDialog](#confirmdialog) | `ConfirmDialog` | A yes or no before an action that cannot be taken back, named for the thing it acts on ("Delete Rule"). | stable |
@@ -181,11 +182,11 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it. | stable |
 | Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
 | Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls and pulls to refresh, the floating button, and the bottom bar. | stable |
-| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a Deep Green footer under a Lagos skyline edge with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card. | stable |
+| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a footer on the site's ground (glass teal in light, Deep Green in dark) under a Lagos skyline edge, the skyline faint behind it, with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card. | stable |
 | Shell | [PullIndicator](#pullindicator) | `PullIndicator` | The pull to refresh's Pin Drop: the pin in a disc that drops from under the header as the page is pulled, its yellow ring closing at the release point, Deep Green with the reload mark past the second notch. | stable |
 | Shell | [Rail](#rail) | `Rail` | The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot. | stable |
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
-| Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's Deep Green hero: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now. | beta |
+| Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's hero, glass teal in light and Deep Green in dark: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now. | beta |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
@@ -1125,7 +1126,7 @@ A whole number that counts up from 0 to its value as it first shows, easing out 
 
 ### CtaCard
 
-A call to action as a large card: Deep Green with a yellow glow, or the site's white card, each with its glyph in a soft square, a title, a line and one action at its foot; it slides in from its side and lifts with a shadow under the pointer. CtaCards lays two side by side.
+A call to action as a large card: Deep Green with a yellow glow, or the site's card, each with its glyph in a soft square, a title, a line and one action at its foot; it slides in from its side and lifts with a shadow under the pointer. CtaCards lays two side by side.
 
 | | |
 |---|---|
@@ -1148,7 +1149,7 @@ A call to action as a large card: Deep Green with a yellow glow, or the site's w
 | `text` | `ReactNode` | yes | One line under it, a sentence or two of at most 20 words each. |
 | `action` | `ReactNode` |  | The one action at its foot (a Button). |
 | `icon` | `IconName` | yes | The glyph in its soft square. |
-| `tone` | `"deep" \| "card"` |  | `deep`: Deep Green with a yellow glow; `card` (the default): the site's white card. |
+| `tone` | `"deep" \| "card"` |  | `deep`: Deep Green with a yellow glow; `card` (the default): the site's card. |
 | `from` | `"left" \| "right"` |  | The side it slides in from: `left` or `right`; from below unless set. |
 | `delay` | `number` |  | How long it waits once in view, in ms. |
 | `id` | `string` |  | The card's id, for a link to it (/#refer). |
@@ -2657,6 +2658,38 @@ Two to five views of the same thing side by side in one pill (Mine, My Team; Wee
 
 ```tsx
 <SegmentedControl label="Whose Tasks" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />
+```
+
+### StageSwitcher
+
+A deal's stages in order, the current one marked; one press on another stage moves the deal there.
+
+| | |
+|---|---|
+| Use | A record that moves through a list of stages one press at a time: a partnership deal on its 360 (docs/guides/partnerships.md §6.5). The screen asks for a reason, or the signed copy, after the press when the move needs one. |
+| Avoid | Filtering a list by stage (use Chips or FilterSelect); a board of cards in columns (use Kanban); steps of a form (use Wizard or StepBar). |
+| Phone | One row that scrolls sideways inside itself, the current stage brought into view; each stage is a 44 px target. The screen puts the next stage full width at the foot of the record. |
+| Accessibility | A group named by `label`; each stage is a button, the current one aria-current="step" and refused, the others named "Move to Proposal Sent". Left and Right move between stages. While a move runs its button says aria-busy and the others aria-disabled. |
+| Status | beta |
+| Exports | `StageSwitcher` |
+| Import | `import { StageSwitcher } from "@mycity/ui";` |
+| File | `packages/ui/src/navigation/StageSwitcher.tsx` |
+| Test | `packages/ui/src/navigation/StageSwitcher.test.tsx` |
+| Gallery | `packages/ui/src/navigation/StageSwitcher.gallery.tsx` (`npm run gallery`, `#/StageSwitcher`) |
+
+**StageSwitcher** props (`StageSwitcherProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `stages` | `readonly StageOption[]` | yes | The stages in order, the ones a deal may move to (retired stages left out, the current one kept). |
+| `value` | `string` | yes | The code of the stage the record is at. |
+| `onMove` | `(code: string) => unknown` | yes | One press on another stage: hand back the work (a promise) so the stage spins and the others wait until it settles (F26). |
+| `label` | `string` |  | Names the group for assistive technology ("Stage"). |
+| `readOnly` | `boolean` |  | The record is read only (a converted lead): the stages show, none can be pressed. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<StageSwitcher label="Stage" stages={stages} value={deal.stage} onMove={(code) => move(code)} />
 ```
 
 ### Tabs
@@ -6122,7 +6155,7 @@ The staff app's phone frame: the top bar and title rail, the page, which alone s
 
 ### PublicPage
 
-The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a Deep Green footer under a Lagos skyline edge with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card.
+The public site's frame on its faint City Green ground: one glass header (the mark, the nav underlined in yellow, the theme switch, a menu below 1181 px), the page in one of its layouts, and a footer on the site's ground (glass teal in light, Deep Green in dark) under a Lagos skyline edge, the skyline faint behind it, with the site's columns, the time in Lagos and Back to Top. layout split is the sign-in layout: a sticky aside of bands (who it is for; the small h1 over a large display line, a paragraph and the steps or the clock; the credit) over a faint skyline, beside the page's card.
 
 | | |
 |---|---|
@@ -6279,14 +6312,14 @@ A small dark card floating at the foot of the shell for something about the app 
 
 ### SkylineHero
 
-The public site's Deep Green hero: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now.
+The public site's hero, glass teal in light and Deep Green in dark: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now.
 
 | | |
 |---|---|
 | Use | size index for the site's front door (the careers index) and size role for a vacancy (the team as a gold pill, the role's facts as chips, its actions and a note), each inside PublicPage layout full. l, m and pane stay for the pages not yet moved to the approved design. |
 | Avoid | The staff app; decoration under a page that has its own heading already; text more than a line. |
 | Phone | Edge to edge. index: still the first screen, 16 px at the sides, the search's button full width under its box, the figures closer; its lede is hidden (a page subtitle is desktop only). role: All Roles stays at the top left, the actions and the note are left off (the page's bar carries Apply). l and m: the heading 24 px, the skyline shorter, the line under the heading hidden. The pane becomes a compact band above the card (from 1040 px down), its `wide` part left off. |
-| Accessibility | The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline, the scrim and the street grid are decorative (aria-hidden) and still under reduced motion, when the parts no longer rise and the figures show their value at once. A counting figure is read as its final value. All Roles is a link. What sits on the panel takes the dark theme's tokens, so it keeps AA on Deep Green whatever the page's theme. |
+| Accessibility | The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline, the scrim and the street grid are decorative (aria-hidden) and still under reduced motion, when the parts no longer rise and the figures show their value at once. A counting figure is read as its final value. All Roles is a link. index and role take the page's theme, their inks AA on its ground (tokens.css --site-*); the earlier panels take the dark theme's tokens, so they keep AA on Deep Green whatever the page's theme. |
 | Status | beta |
 | Exports | `SkylineHero` |
 | Import | `import { SkylineHero } from "@mycity/ui";` |
