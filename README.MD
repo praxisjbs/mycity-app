@@ -108,6 +108,7 @@ mycity-app/
 │   ├── lib/deal.js           deals files to CI shards by expected cost (jest's and vitest's shards)
 │   ├── ci-chromium-libs.sh   a CI screens job's Chromium system libraries: the cache, else the mirror
 │   │                         raced against the set another screens job of the run shares (ci.yml)
+│   │                         and, when the mirror cannot serve it, the set less the optional fonts
 │   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test);
 │   │                         in CI one job's shards of them (MYCITY_FE_TESTS)
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md;
