@@ -5,8 +5,8 @@ import { axe } from "@mycity/ui/testing";
 import { RouterProvider } from "@/lib/router";
 import { Guidance } from "./Guidance";
 
-/** The four pages a person is sent to, opened from the header without a link of their own. */
-const draw = (of: "vacancy" | "apply" | "assess" | "sign") =>
+/** The three pages a person is sent to, opened from the header without a link of their own. */
+const draw = (of: "apply" | "assess" | "sign") =>
   render(
     <RouterProvider>
       <Guidance of={of} />
@@ -17,7 +17,6 @@ afterEach(() => window.history.replaceState({}, "", "/"));
 
 describe("Guidance", () => {
   it.each([
-    ["vacancy", "Vacancy", "Choose a Role", "See Open Roles", "/jobs"],
     ["apply", "Apply", "Start From a Role", "See Open Roles", "/jobs"],
     ["assess", "Assessment", "Use Your Email Link", "See Open Roles", "/jobs"],
     ["sign", "Sign Offer", "Use Your Offer Email", "Verify a Document", "/verify"],

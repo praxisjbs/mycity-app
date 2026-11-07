@@ -826,11 +826,26 @@ async function crawlApp(browser, width, target, origin, list, errors) {
 }
 
 /**
+ * CI only: this job's share of the app's screens, "i/n" (MYCITY_SCREEN_SHARD, scripts/check/lib/scope.js
+ * plan()). The app's crawl took most of the five-second gate's four minutes on one runner, so CI
+ * deals its screens over jobs side by side: shard i takes every nth from the ith, and the n shards
+ * together crawl every screen once. Unset, as on a laptop, every screen.
+ */
+function screenShard(env = process.env) {
+  const v = env.MYCITY_SCREEN_SHARD;
+  if (!v) return null;
+  const m = /^([1-9]\d*)\/([1-9]\d*)$/.exec(v);
+  if (!m || Number(m[1]) > Number(m[2])) throw new Error(`MYCITY_SCREEN_SHARD is "${v}": it must be i/n, e.g. 2/4`);
+  return { i: Number(m[1]), n: Number(m[2]) };
+}
+
+/**
  * Crawl every target at both widths. Returns
  *   { checked: [ids], notBuilt: [notes], screens: [...], errors: [...], notes: [...] }
  */
 async function crawl() {
   const only = (process.env.MYCITY_SCREEN_TARGETS || "gallery,demo,app").split(",").map((t) => t.trim());
+  const shard = screenShard();
   const withDemo = only.includes("demo") && demoWanted(changedOrNull()) && fs.existsSync(path.join(ROOT, DEMO));
   if (only.includes("app")) ensureAppBuild();
   const appList = path.join(ROOT, APP_DIST, "screens.json");
@@ -844,6 +859,7 @@ async function crawl() {
         only.includes("app") ? hashOf([appList, appIndex]) : "no-app",
         hashOf([__filename, path.join(__dirname, "copy.js"), path.join(__dirname, "gallery.js")]),
         only.join("+"),
+        shard ? `${shard.i}/${shard.n}` : "all",
       ].join("|"),
     )
     .digest("hex")
@@ -888,7 +904,8 @@ async function crawl() {
     if (!only.includes("app")) {
       result.notes.push("app/ not crawled (MYCITY_SCREEN_TARGETS)");
     } else if (fs.existsSync(appList) && fs.existsSync(appIndex)) {
-      const list = JSON.parse(fs.readFileSync(appList, "utf8")).screens;
+      const all = JSON.parse(fs.readFileSync(appList, "utf8")).screens;
+      const list = shard ? all.filter((_, k) => k % shard.n === shard.i - 1) : all;
       const app = await serve(APP_DIST);
       try {
         for (const width of Object.keys(WIDTHS)) {
@@ -898,7 +915,7 @@ async function crawl() {
       } finally {
         app.server.close();
       }
-      result.checked.push("app/");
+      result.checked.push(shard ? `app/ (screens ${shard.i} of every ${shard.n}, ${list.length} of ${all.length})` : "app/");
     } else {
       throw new Error("app/ did not produce dist/screens.json. Run `npm run build:demo` in app/ and read its output.");
     }
@@ -957,4 +974,4 @@ function run(gate, body) {
   });
 }
 
-module.exports = { crawl, demoWanted, summarise, finish, run, collect, ensureAppBuild, ensurePublicBuild, serve, appSettle, launch, hashOf, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, APP_DIST, PUBLIC_DIST, ROOT };
+module.exports = { crawl, screenShard, demoWanted, summarise, finish, run, collect, ensureAppBuild, ensurePublicBuild, serve, appSettle, launch, hashOf, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, APP_DIST, PUBLIC_DIST, ROOT };

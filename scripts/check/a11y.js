@@ -34,6 +34,11 @@
  *   node scripts/check/a11y.js                     exit 0 ok, 1 problems
  *   node scripts/check/a11y.js --component=Button  only that gallery page (repeatable; the app is skipped)
  *   MYCITY_A11Y_TARGETS=app node scripts/check/a11y.js   one target (gallery, app)
+ *   MYCITY_A11Y_SHARD=2/3 node scripts/check/a11y.js     every third page or screen, from the second
+ *
+ * MYCITY_A11Y_SHARD is CI's alone (scripts/check/lib/scope.js plan()): the gallery's pages took
+ * most of the 11 minutes this gate ran on one runner, so CI deals them, and the app's screens,
+ * over jobs side by side; the n shards together open every page once. Unset, every page.
  */
 const crypto = require("node:crypto");
 const fs = require("node:fs");
@@ -51,6 +56,21 @@ const only = process.argv
   .slice(2)
   .filter((a) => a.startsWith("--component="))
   .map((a) => a.slice(12));
+const SHARD = (() => {
+  const v = process.env.MYCITY_A11Y_SHARD;
+  if (!v) return null;
+  const m = /^([1-9]\d*)\/([1-9]\d*)$/.exec(v);
+  if (!m || Number(m[1]) > Number(m[2])) {
+    console.error(`a11y: MYCITY_A11Y_SHARD is "${v}": it must be i/n, e.g. 2/3`);
+    process.exit(2);
+  }
+  return { i: Number(m[1]), n: Number(m[2]) };
+})();
+/** Pure: shard i of n takes every nth item from the ith; all n take each item once. */
+function shardOf(list, shard = SHARD) {
+  return shard ? list.filter((_, k) => k % shard.n === shard.i - 1) : list;
+}
+const shardNote = SHARD ? `, shard ${SHARD.i} of ${SHARD.n}` : "";
 const TARGETS = (process.env.MYCITY_A11Y_TARGETS || (only.length ? "gallery" : "gallery,app")).split(",").map((t) => t.trim());
 
 function axeSource() {
@@ -218,11 +238,12 @@ async function checkGallery(browser, axe) {
     let names = await gallery.componentNames(probe, server.url);
     await probe.close();
     if (only.length) names = names.filter((n) => only.includes(n));
+    names = shardOf(names);
     if (!names.length) throw new Error(only.length ? `no gallery page named ${only.join(", ")}` : "the gallery lists no component pages");
     const combos = [];
     for (const width of Object.keys(WIDTHS)) for (const density of DENSITIES) combos.push(checkCombo(browser, server.url, names, width, density, axe));
     const violations = (await Promise.all(combos)).flat();
-    return { scope: `${names.length} component page(s), ${names.length * combos.length} views (390 and 1440 px, compact and comfortable, light and dark frames)`, violations };
+    return { scope: `${names.length} component page(s)${shardNote}, ${names.length * combos.length} views (390 and 1440 px, compact and comfortable, light and dark frames)`, violations };
   } finally {
     await server.close();
   }
@@ -230,12 +251,12 @@ async function checkGallery(browser, axe) {
 
 async function checkAppTarget(browser, axe) {
   screens.ensureAppBuild();
-  const list = JSON.parse(fs.readFileSync(path.join(ROOT, screens.APP_DIST, "screens.json"), "utf8")).screens;
+  const list = shardOf(JSON.parse(fs.readFileSync(path.join(ROOT, screens.APP_DIST, "screens.json"), "utf8")).screens);
   const app = await screens.serve(screens.APP_DIST);
   try {
     const violations = [];
     for (const width of Object.keys(WIDTHS)) violations.push(...(await checkApp(browser, app.origin, list, width, axe)));
-    return { scope: `app/: ${list.length} screens, ${list.length * 2} views (390 and 1440 px)`, violations };
+    return { scope: `app/: ${list.length} screens${shardNote}, ${list.length * 2} views (390 and 1440 px)`, violations };
   } finally {
     app.server.close();
   }
@@ -253,7 +274,7 @@ async function main() {
   const todo = [];
   for (const target of TARGETS) {
     if (!["gallery", "app"].includes(target)) throw new Error(`unknown target "${target}" (gallery, app)`);
-    const key = crypto.createHash("sha1").update(target).update(inputsOf(target)).update(fs.readFileSync(__filename)).digest("hex").slice(0, 16);
+    const key = crypto.createHash("sha1").update(target).update(shardNote).update(inputsOf(target)).update(fs.readFileSync(__filename)).digest("hex").slice(0, 16);
     const cacheFile = path.join(os.tmpdir(), `mycity-a11y-${key}.json`);
     try {
       results[target] = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
@@ -295,7 +316,7 @@ async function main() {
   console.log(`a11y: ok (${scope})`);
 }
 
-module.exports = { merge };
+module.exports = { merge, shardOf };
 
 if (require.main === module) {
   main().catch((err) => {

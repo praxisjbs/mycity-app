@@ -1,11 +1,11 @@
 /**
  * @component SkylineHero
  * @group Shell
- * @summary The public site's Deep Green hero: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now.
+ * @summary The public site's hero, glass teal in light and Deep Green in dark: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now.
  * @use size index for the site's front door (the careers index) and size role for a vacancy (the team as a gold pill, the role's facts as chips, its actions and a note), each inside PublicPage layout full. l, m and pane stay for the pages not yet moved to the approved design.
  * @avoid The staff app; decoration under a page that has its own heading already; text more than a line.
  * @phone Edge to edge. index: still the first screen, 16 px at the sides, the search's button full width under its box, the figures closer; its lede is hidden (a page subtitle is desktop only). role: All Roles stays at the top left, the actions and the note are left off (the page's bar carries Apply). l and m: the heading 24 px, the skyline shorter, the line under the heading hidden. The pane becomes a compact band above the card (from 1040 px down), its `wide` part left off.
- * @a11y The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline, the scrim and the street grid are decorative (aria-hidden) and still under reduced motion, when the parts no longer rise and the figures show their value at once. A counting figure is read as its final value. All Roles is a link. What sits on the panel takes the dark theme's tokens, so it keeps AA on Deep Green whatever the page's theme.
+ * @a11y The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline, the scrim and the street grid are decorative (aria-hidden) and still under reduced motion, when the parts no longer rise and the figures show their value at once. A counting figure is read as its final value. All Roles is a link. index and role take the page's theme, their inks AA on its ground (tokens.css --site-*); the earlier panels take the dark theme's tokens, so they keep AA on Deep Green whatever the page's theme.
  * @status beta
  * @example <SkylineHero eyebrow="Careers at MyCityApp" title="Work With Us" text="Building the app that knows every Nigerian city." />
  * @example <SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
@@ -94,7 +94,10 @@ function withAccent(title: ReactNode, accent?: string): ReactNode {
   );
 }
 
-/** The approved design's heroes: the drawn skyline under a scrim, the head centred over it. */
+/**
+ * The approved design's heroes: the drawn skyline under a scrim, the head centred over it, on the site's ground of the
+ * page's theme (a deeper glass teal in light, Deep Green in dark; public.css maps --deep and the inks to it).
+ */
 function SiteHero({ title, eyebrow, text, facts, children, size, record, titleRef, still, className, accent, stats, back, note }: SkylineHeroProps) {
   const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
   const go = useSiteLink();
@@ -107,14 +110,14 @@ function SiteHero({ title, eyebrow, text, facts, children, size, record, titleRe
       </div>
       <div aria-hidden="true" className="ps-hero-scrim" />
       {!index && back != null && (
-        <div className="ps-role-top on-dark" data-theme="dark">
+        <div className="ps-role-top">
           <a className="ps-back ps-rise ps-rise-1" href={back.href} onClick={go(back.href)}>
             <Icon name="arrowleft" className="size-4.5" />
             {back.label}
           </a>
         </div>
       )}
-      <div className="ps-hero-in on-dark" data-theme="dark">
+      <div className="ps-hero-in">
         {eyebrow != null && (
           <span className={cn("ps-pill ps-rise ps-rise-1", !index && "ps-pill-gold")} {...(record ? content : {})}>
             {index && <span aria-hidden="true" className="ps-dot" />}

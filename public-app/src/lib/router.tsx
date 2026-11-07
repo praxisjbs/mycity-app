@@ -4,7 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useState, type Ancho
  * The public site's addresses (MILESTONES §6), short because a stranger reads them:
  *
  *   /                      the index (Work With Us), indexable
- *   /jobs                  careers list, indexable; ?q= and ?department=<code> narrow it
+ *   /jobs                  every open role (the header's Vacancy), indexable; ?q= and ?department=<code> narrow it
+ *   /vacancy, /jobs/       the same list: the address is put back to /jobs
  *   /jobs/<slug>           one vacancy, readable slug, shareable
  *   /apply/<token>         opaque, one person, not indexable
  *   /assess/<token>        opaque
@@ -13,14 +14,15 @@ import { createContext, useCallback, useContext, useEffect, useState, type Ancho
  *   /verify/t/<token>      the QR on a sealed document: the record and the document itself
  *   /proposal/<token>      opaque, one proposal, not indexable (M7)
  *
- * The header's links reach every page, so the four a person is sent to by a link of their own
- * have a guidance screen when opened without one: /vacancy (and /jobs/), /apply, /assess, /sign.
+ * The header's links reach every page, so the three a person is sent to by a link of their own
+ * have a guidance screen when opened without one: /apply, /assess, /sign. Vacancy needs none: its
+ * link opens the open roles, and a role opened from them stays under Vacancy.
  */
 export type Route =
   | { page: "home" }
   | { page: "careers" }
   | { page: "vacancy"; slug: string }
-  | { page: "guide"; of: "vacancy" | "apply" | "assess" | "sign" }
+  | { page: "guide"; of: "apply" | "assess" | "sign" }
   | { page: "apply"; token: string }
   | { page: "assess"; token: string }
   | { page: "sign"; token: string }
@@ -30,11 +32,9 @@ export type Route =
   | { page: "not-found" };
 
 export function parse(path: string): Route {
-  if (path === "/jobs/") return { page: "guide", of: "vacancy" };
   const p = path.replace(/\/+$/, "") || "/";
   if (p === "/") return { page: "home" };
-  if (p === "/jobs") return { page: "careers" };
-  if (p === "/vacancy") return { page: "guide", of: "vacancy" };
+  if (p === "/jobs" || p === "/vacancy") return { page: "careers" };
   if (p === "/apply" || p === "/assess" || p === "/sign") return { page: "guide", of: p.slice(1) as "apply" | "assess" | "sign" };
   if (p === "/verify") return { page: "verify", number: null };
   const qr = /^\/verify\/t\/([^/]+)$/.exec(p);
@@ -52,10 +52,9 @@ export function parse(path: string): Route {
   }
 }
 
-/** The header's six links, left to right, and the one each page marks as current. */
+/** The header's five links, left to right, and the one each page marks as current. */
 export const NAV = [
-  { label: "Careers", href: "/jobs" },
-  { label: "Vacancy", href: "/vacancy" },
+  { label: "Vacancy", href: "/jobs" },
   { label: "Apply", href: "/apply" },
   { label: "Assessment", href: "/assess" },
   { label: "Sign Offer", href: "/sign" },
@@ -65,9 +64,9 @@ export const NAV = [
 /** Which header link a route belongs to; the index belongs to none. */
 export function sectionOf(r: Route): (typeof NAV)[number]["label"] | null {
   switch (r.page) {
-    case "careers": return "Careers";
+    case "careers":
     case "vacancy": return "Vacancy";
-    case "guide": return ({ vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer" } as const)[r.of];
+    case "guide": return ({ apply: "Apply", assess: "Assessment", sign: "Sign Offer" } as const)[r.of];
     case "apply": return "Apply";
     case "assess": return "Assessment";
     case "sign": return "Sign Offer";
