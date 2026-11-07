@@ -43,6 +43,7 @@ export * from "./ComboField";
 export * from "./DocumentEditor";
 export * from "./MoreFields";
 export * from "./PlacesField";
+export * from "./QuestionCard";
 export * from "./RadioCards";
 export * from "./RatingField";
 export * from "./SecretField";
