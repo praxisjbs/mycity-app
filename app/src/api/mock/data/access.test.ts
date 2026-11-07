@@ -20,7 +20,7 @@ describe("mock capabilities", () => {
     expect(Object.keys(ROLE_CAPABILITIES)).toHaveLength(7);
   });
 
-  it("everyone in General Management holds the plan's three and the commission without a role (the API's CEO-department rule)", () => {
+  it("everyone in General Management holds the plan's three and partnerships' money without a role (the API's CEO-department rule)", () => {
     expect(capabilitiesOf(["employee"], false, true)).toEqual(["goals.company", "goals.organisation", "goals.view_all", "partnerships.money"]);
     expect(capabilitiesOf(["manager"], false, true)).toEqual(["alerts.clear", "goals.company", "goals.organisation", "goals.view_all", "home.reports", "home.team", "partnerships.money"]);
     expect(capabilitiesOf(["employee"], false, false)).toEqual([]);

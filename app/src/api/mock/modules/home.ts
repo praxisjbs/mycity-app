@@ -664,11 +664,14 @@ const CARDS: MockCard[] = [
     module: "partnerships",
     records: {
       title: "Signed This Year",
-      columns: [["agreement", "Agreement"], ["partner", "Partner", { phone: true }], ["starts_on", "Starts"], ["value", "Value", { numeric: true, phone: true }], ["owner", "Owner"]],
-      rows: () => signedThisYear().map((p) => rec(sid(`agreement:${p.name}`), { agreement: text(`${p.name} Agreement`), partner: text(p.name), starts_on: date(p.since!), value: money(p.value), owner: person(byKey(p.owner)) }, `/partnerships?tab=partners&id=${p.partner_id}`)),
+      columns: [["deal", "Deal"], ["partner", "Partner", { phone: true }], ["signed", "Signed"], ["value", "Value", { numeric: true, phone: true }], ["owner", "Owner"]],
+      rows: () =>
+        signedThisYear()
+          .sort((a, b) => b.since!.localeCompare(a.since!))
+          .map((p) => rec(sid(`deal:${p.name}`), { deal: text(`${p.name}, ${p.type}`), partner: text(p.name), signed: time(`${p.since}T10:00:00+01:00`), value: money(p.value), owner: person(byKey(p.owner)) }, `/partnerships?tab=partners&id=${p.partner_id}`)),
     },
-    figure: (rows) => ({ value: null, amount: sumMoney(signedThisYear().map((p) => p.value)), denominator: null, groups: {}, extra: { agreements: rows.length } }),
-    caption: (f) => `${f.extra.agreements} ${f.extra.agreements === 1 ? "agreement" : "agreements"}`,
+    figure: (rows) => ({ value: null, amount: sumMoney(signedThisYear().map((p) => p.value)), denominator: null, groups: {}, extra: { deals: rows.length } }),
+    caption: (f) => `${f.extra.deals} ${f.extra.deals === 1 ? "deal" : "deals"}`,
   },
   {
     key: "partnerships_quiet_30d",
@@ -900,7 +903,7 @@ function onTimeDonut(user: string): HomeDonut {
   };
 }
 
-/** The year read whole, as Signed Value reads it: to this month, or to a later one an agreement starts in. */
+/** The year read whole, as Signed Value reads it: to this month, or to a later one a deal is signed in. */
 function signedByMonth(): HomeChart {
   const year = thisYear();
   const last = Math.max(Number(todayIso().slice(5, 7)), ...signedThisYear().map((p) => Number(p.since!.slice(5, 7))));

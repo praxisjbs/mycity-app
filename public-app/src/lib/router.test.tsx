@@ -6,10 +6,10 @@ import { parse, sectionOf } from "./router";
 describe("router", () => {
   it.each([
     ["/", { page: "home" }, null],
-    ["/jobs", { page: "careers" }, "Careers"],
+    ["/jobs", { page: "careers" }, "Vacancy"],
     ["/jobs/head-sales-revenue-lagos", { page: "vacancy", slug: "head-sales-revenue-lagos" }, "Vacancy"],
-    ["/jobs/", { page: "guide", of: "vacancy" }, "Vacancy"],
-    ["/vacancy", { page: "guide", of: "vacancy" }, "Vacancy"],
+    ["/jobs/", { page: "careers" }, "Vacancy"],
+    ["/vacancy", { page: "careers" }, "Vacancy"],
     ["/apply", { page: "guide", of: "apply" }, "Apply"],
     ["/apply/k7Qm2TxV9pLa", { page: "apply", token: "k7Qm2TxV9pLa" }, "Apply"],
     ["/assess", { page: "guide", of: "assess" }, "Assessment"],

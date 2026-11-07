@@ -15,10 +15,10 @@
  * Statuses: active while any deal is live; dormant when none is; closed by Close Partner.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { DocumentRef } = require("./documents");
-const { PlaceInput, PlaceView } = require("./maps");
+const { PlaceInput, PlaceView, PlaceToken } = require("./maps");
 const { RegionScope, DealHealth, DealFields, DealRow, Deliverable, Field, CustomValues, CustomFilter, listCode, flag } = require("./partner_pipeline");
 const { Interaction } = require("./interactions");
 
@@ -100,17 +100,29 @@ const ContactUpdate = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field");
 
+/** Edit Contact as a card: the contact beside the fields that change. */
+const ContactChange = z
+  .object({
+    partner_contact_id: recordId("contact"),
+    first_name: text(80).optional(),
+    last_name: text(80).optional(),
+    job_title: z.string().trim().max(120).nullable().optional(),
+    email: email.nullable().optional(),
+    phones: z.array(phone).max(4).optional(),
+    signatory: z.boolean().optional(),
+    primary_contact: z.boolean().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["partner_contact_id"]), nothingOn("partner_contact_id"));
+
 /* ------------------------------------------------------------------ *
  * Partners
  * ------------------------------------------------------------------ */
 
 const signedEvidence = (v) => Boolean(v.signed_copy_document_id) !== (v.signed_before_hub === true);
 
-/**
- * New Partner: an organisation whose relationship is already signed. Its first deal is at a signed or
- * active stage (the server checks the stage's meaning), with the signed copy or "signed before the hub".
- */
-const PartnerCreate = z
+/** A partner's own fields, shared by New Partner and Edit Partner (as a lead's are, LeadFields). */
+const PartnerFields = z
   .object({
     name: text(150),
     legal_name: optionalText(200),
@@ -118,16 +130,25 @@ const PartnerCreate = z
     region: RegionInput,
     industry: optionalText(80),
     website: optionalText(200),
-    headquarters: PlaceInput.optional(),
+    /** Picked from the address search at the level of an area; null or left out for none. */
+    headquarters: PlaceInput.nullish(),
     logo_document_id: blank(uuid),
     owner_id: uuid,
     since: blank(isoDate),
     custom: CustomValues.optional(),
-    contact: ContactInput,
-    deal: DealFields,
-    signed_copy_document_id: blank(uuid),
-    signed_before_hub: z.boolean().optional(),
   })
+  .strict();
+
+/**
+ * New Partner: an organisation whose relationship is already signed. Its first deal is at a signed or
+ * active stage (the server checks the stage's meaning), with the signed copy or "signed before the hub".
+ */
+const PartnerCreate = PartnerFields.extend({
+  contact: ContactInput,
+  deal: DealFields,
+  signed_copy_document_id: blank(uuid),
+  signed_before_hub: z.boolean().optional(),
+})
   .strict()
   .refine(signedEvidence, { message: "Attach the signed copy", path: ["signed_copy_document_id"] });
 
@@ -150,6 +171,51 @@ const PartnerUpdate = z
 
 /** Close Partner: its open deals are lost with it, each with this reason. */
 const PartnerClose = z.object({ reason: z.string().trim().min(10, "At least 10 characters").max(1000) }).strict();
+
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards on partners and contacts (docs/guides/partnerships.md §9; praxis-ai.md §6.11,
+ * decision 33): flat fields the chat can carry, each reaching the screen's own service function.
+ * A card records a partner signed before the hub; a signed copy is a file, attached on its screen.
+ * ------------------------------------------------------------------ */
+
+/** New Partner as a card: the organisation, its primary contact and its first deal, signed before the hub. */
+const PartnerAdd = z
+  .object({
+    name: text(150),
+    partner_category_id: uuid,
+    region_scope: RegionScope,
+    /** With `cities`: the city, picked as every address is. */
+    city: PlaceToken.optional(),
+    industry: optionalText(80),
+    owner_id: uuid,
+    since: blank(isoDate),
+    contact_first_name: text(80),
+    contact_last_name: text(80),
+    contact_job_title: optionalText(120),
+    contact_email: blank(email),
+    contact_phone: blank(phone),
+    deal_title: text(150),
+    /** A signed or active stage; the first signed one when left out. */
+    deal_stage: listCode.optional(),
+    estimated_value: blank(money),
+  })
+  .strict()
+  .refine((v) => v.region_scope !== "cities" || Boolean(v.city), { message: "Pick a city", path: ["city"] });
+
+/** Edit Partner as a card: the partner beside the fields that change. */
+const PartnerChange = z
+  .object({
+    partner_id: recordId("partner"),
+    name: text(150).optional(),
+    legal_name: z.string().trim().max(200).nullable().optional(),
+    partner_category_id: uuid.optional(),
+    industry: z.string().trim().max(80).nullable().optional(),
+    website: z.string().trim().max(200).nullable().optional(),
+    owner_id: uuid.optional(),
+    since: isoDate.nullable().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["partner_id"]), nothingOn("partner_id"));
 
 /** One partner as the list shows it. */
 const PartnerRow = z
@@ -413,6 +479,8 @@ const TABLES = {
   Contact: { table: "partner_contact" },
   ContactCreate: { table: "partner_contact" },
   ContactUpdate: { table: "partner_contact" },
+  ContactChange: { table: "partner_contact" },
+  PartnerFields: { table: "partner", virtual: { region: ORGANISATION.region, headquarters: ORGANISATION.headquarters } },
   PartnerCreate: {
     table: "partner",
     virtual: ORGANISATION,
@@ -422,6 +490,21 @@ const TABLES = {
     table: "partner",
     virtual: { region: ORGANISATION.region, headquarters: ORGANISATION.headquarters },
   },
+  PartnerAdd: {
+    table: "partner",
+    virtual: {
+      city: "a place row, owner partner.cities",
+      contact_first_name: "the primary partner_contact.first_name",
+      contact_last_name: "the primary partner_contact.last_name",
+      contact_job_title: "the primary partner_contact.job_title",
+      contact_email: "the primary partner_contact.email",
+      contact_phone: "the primary partner_contact.phone",
+      deal_title: "its first partnership_opportunity.title",
+      deal_stage: "its first partnership_opportunity.stage",
+      estimated_value: "its first partnership_opportunity.estimated_value",
+    },
+  },
+  PartnerChange: { table: "partner" },
   PartnerClose: { table: null, reason: "the reason, kept as partner.close_reason and on each open deal lost with it" },
   PartnerRow: {
     table: "partner",
@@ -479,9 +562,13 @@ module.exports = {
   Contact,
   ContactCreate,
   ContactUpdate,
+  ContactChange,
+  PartnerFields,
   PartnerCreate,
   PartnerUpdate,
   PartnerClose,
+  PartnerAdd,
+  PartnerChange,
   PartnerRow,
   PartnerDetail,
   PartnerListQuery,

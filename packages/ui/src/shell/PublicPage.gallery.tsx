@@ -12,7 +12,7 @@ import { PageMessage, PublicPage, type PublicNavItem } from "./PublicPage";
 
 const nav = (current: string): PublicNavItem[] =>
   [
-    { label: "Careers", href: "#/PublicPage" },
+    { label: "Vacancy", href: "#/PublicPage" },
     { label: "Apply", href: "#/PublicPage?apply" },
     { label: "Verify Document", href: "#/PublicPage?verify" },
   ].map((n) => ({ ...n, current: n.label === current }));
@@ -58,14 +58,14 @@ export default {
   component: "PublicPage",
   states: {
     "The Index": () => (
-      <PublicPage layout="full" landmarks={false} nav={nav("Careers")} brandSub="Careers">
+      <PublicPage layout="full" landmarks={false} nav={nav("Vacancy")} brandSub="Careers">
         <SkylineHero size="index" eyebrow="Hiring in Lagos and Abuja" title="Work With Us" accent="Us" text="Building the app that knows every Nigerian city." stats={[{ value: 12, label: "Open Roles" }]} still>
           <SiteSearch label="Search Roles" placeholder="Role or City" value="" onChange={() => undefined} onSubmit={() => undefined} />
         </SkylineHero>
       </PublicPage>
     ),
     "Inner Page": () => (
-      <PublicPage layout="full" landmarks={false} nav={nav("Careers")} brandSub="Careers">
+      <PublicPage layout="full" landmarks={false} nav={nav("Vacancy")} brandSub="Careers">
         <PageIntro eyebrow="Careers at MyCityApp" title="Open Roles" accent="Roles" text="12 roles across 7 teams, in Lagos and Abuja." />
       </PublicPage>
     ),

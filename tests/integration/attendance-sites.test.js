@@ -601,7 +601,8 @@ describeDb("temporary sites and check-ins against the real migrations", () => {
     expect((byNumber.body.groups || []).map((g) => g.type)).toContain("attendance_temporary_site");
     const byAddress = await as("ops").get("/search?q=Sample Road");
     expect((byAddress.body.groups || []).map((g) => g.type)).not.toContain("attendance_temporary_site");
-    const ownSearch = await as("other").get("/search?q=Partner Training");
+    // "Partner" leading a search narrows it to partners (a type hint), so the site is found by the rest of its name.
+    const ownSearch = await as("other").get("/search?q=Training Week");
     const ownGroup = (ownSearch.body.groups || []).find((g) => g.type === "attendance_own_temporary_site");
     expect(ownGroup.items[0]).toMatchObject({ ref: site.number, link: `/ess?tab=work-location-requests&site=${site.temporary_site_id}` });
     const action = await as("staff").get("/search?q=work site");

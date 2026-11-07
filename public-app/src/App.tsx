@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Button, PageMessage, Panel, Skeleton } from "@mycity/ui";
 import { useScreenState } from "@/lib/plan";
 import { parse, RouterProvider, useRouter } from "@/lib/router";
@@ -42,8 +42,13 @@ export function App() {
 const ROW: Record<string, string> = { home: "home", careers: "careers", vacancy: "vacancy", apply: "apply", assess: "assess", sign: "sign", verify: "verify", "verify-qr": "verify", proposal: "proposal" };
 
 function Routes() {
-  const { path } = useRouter();
+  const { path, search, navigate } = useRouter();
   const r = parse(path);
+  /* /vacancy and /jobs/ are the open roles too: the address is put back to the one people share. */
+  const moved = r.page === "careers" && path !== "/jobs";
+  useEffect(() => {
+    if (moved) navigate(`/jobs${search}`, { replace: true });
+  }, [moved, search, navigate]);
   const row = r.page === "guide" ? r.of : ROW[r.page];
   const state = useScreenState(row ?? "");
   if (row && !state.open)
@@ -63,7 +68,7 @@ function Routes() {
   }
 }
 
-const TITLE: Record<string, string> = { home: "Work With Us", careers: "Careers", vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer", verify: "Verify a Document", proposal: "Proposal" };
+const TITLE: Record<string, string> = { home: "Work With Us", careers: "Vacancy", vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer", verify: "Verify a Document", proposal: "Proposal" };
 
 function NotFound() {
   const { navigate } = useRouter();

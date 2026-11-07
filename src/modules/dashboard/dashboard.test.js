@@ -54,7 +54,7 @@ function sampleFigure(entry) {
     on_leave: 1,
     no_clock_out_yesterday: 1,
     aged: 2,
-    agreements: 3,
+    deals: 3,
     requests: 5,
     leave_type: "Annual",
     groups: {},
