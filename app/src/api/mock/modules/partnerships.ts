@@ -1,5 +1,6 @@
 import type {
   Contact,
+  CustomValues,
   DealDetail,
   DealOption,
   DealReturn,
@@ -23,7 +24,7 @@ import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, pag
 import { byId, byKey, refKey } from "../data/people";
 import { PARTNERS, type MockPartner } from "../data/partners";
 import { pickedPlace, placeOf } from "./maps";
-import { mockCategories, mockList } from "./partnerships_categories";
+import { mockCategories, mockFields, mockList } from "./partnerships_categories";
 
 /**
  * Partnerships on the mock (docs/guides/partnerships.md): Pipeline, Partners, Leads and both 360s in
@@ -99,6 +100,10 @@ interface MockRecord {
   closed_at: string | null;
   close_reason: string | null;
   headquarters: PlaceView | null;
+  custom: CustomValues;
+  impact: string[];
+  impact_rating: LeadDetail["impact_rating"];
+  impact_note: string | null;
 }
 interface MockDeal {
   id: string;
@@ -134,6 +139,8 @@ interface MockDeal {
   impact_rating: DealDetail["impact_rating"];
   impact_note: string | null;
   comments: string | null;
+  custom: CustomValues;
+  impact: string[];
 }
 
 const RECORDS: MockRecord[] = [];
@@ -201,6 +208,10 @@ function seed(p: MockPartner, i: number) {
     closed_at: null,
     close_reason: null,
     headquarters: null,
+    custom: {},
+    impact: [],
+    impact_rating: null,
+    impact_note: null,
   };
   if (code === "on_hold") r.status = "contacted";
   RECORDS.push(r);
@@ -244,6 +255,8 @@ function seed(p: MockPartner, i: number) {
     impact_rating: (["high", "medium", "low"] as const)[i % 3],
     impact_note: null,
     comments: null,
+    custom: {},
+    impact: [],
   };
   if (deal.blockers) deal.health = "stalled";
   if (deal.health === "stalled" && !deal.blockers) deal.blockers = "No reply since the last meeting";
@@ -348,11 +361,11 @@ function dealDetail(d: MockDeal, money: boolean): DealDetail {
     completed_at: null,
     close_reason: d.close_reason,
     signed_value: signedValue(d),
-    impact: [],
+    impact: d.impact,
     impact_rating: d.impact_rating,
     impact_note: d.impact_note,
     comments: d.comments,
-    custom: {},
+    custom: d.custom,
     options: d.options.map((o) => (money ? o : { deal_option_id: o.deal_option_id, position: o.position, label: o.label, original_price: o.original_price, discount_pct: o.discount_pct, deal_price: o.deal_price, price_note: o.price_note })),
     members: d.members.map((key, i) => ({ employee: refKey(key), role: i === 0 ? "owner" : "support" })),
     deliverables: [],
@@ -406,6 +419,29 @@ function partnerRow(r: MockRecord): PartnerRow {
   };
 }
 const regionView = (r: MockRecord) => ({ scope: r.region_scope, cities: r.cities, label: regionLabel(r) });
+/** The custom fields a record of a category is given (its category's and every category's), retired ones too. */
+const fieldsFor = (appliesTo: "lead" | "partner" | "deal", categoryId: string | null) =>
+  mockFields().filter((f) => f.applies_to === appliesTo && (f.partner_category_id === null || f.partner_category_id === categoryId));
+/** Custom values written over what a record had: null or empty clears one, as the API's checkCustom does. */
+function customFrom(had: CustomValues, given: unknown): CustomValues {
+  const out = { ...had };
+  for (const [key, value] of Object.entries((given ?? {}) as CustomValues)) {
+    if (value === null || value === "" || (Array.isArray(value) && value.length === 0)) delete out[key];
+    else out[key] = value;
+  }
+  return out;
+}
+/** A list's `custom` filter (`{"ticket_model":"Free Entry"}`): every value given is the record's. */
+const customMatches = (custom: CustomValues, filter: string) => {
+  try {
+    return Object.entries(JSON.parse(filter) as Record<string, unknown>).every(([key, value]) => {
+      const kept = custom[key];
+      return Array.isArray(kept) ? kept.includes(value as string) : kept === value;
+    });
+  } catch {
+    return false;
+  }
+};
 const contactsOf = (r: MockRecord) => CONTACTS.filter((c) => (r.kind === "partner" ? c.partner_id : c.lead_id) === r.id).sort((a, b) => Number(b.primary_contact) - Number(a.primary_contact));
 const interactionsOf = (r: MockRecord) => INTERACTIONS.filter((x) => (r.kind === "partner" ? x.partner_id : x.lead_id) === r.id).sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
 const sinceContact = (r: MockRecord) => days(lastContact(r) ?? r.created_at);
@@ -420,11 +456,11 @@ function lead360(r: MockRecord, money: boolean): Lead360 {
     source: r.source,
     source_label: mockList("lead_source").find((x) => x.code === r.source)?.label ?? null,
     region_view: regionView(r),
-    impact: [],
-    impact_rating: null,
-    impact_note: null,
+    impact: r.impact,
+    impact_rating: r.impact_rating,
+    impact_note: r.impact_note,
     comments: r.comments,
-    custom: {},
+    custom: r.custom,
     lost_reason: r.lost_reason,
     converted_partner_id: r.converted_partner_id,
     converted_at: r.converted_at,
@@ -435,7 +471,7 @@ function lead360(r: MockRecord, money: boolean): Lead360 {
     deal: d ? dealDetail(d, money) : null,
     contacts: contactsOf(r).slice(0, 25),
     overview: { events: [], interactions: interactionsOf(r).slice(0, 5) },
-    custom_fields: [],
+    custom_fields: fieldsFor("lead", r.category_id),
   };
 }
 function partner360(r: MockRecord, money: boolean): Partner360 {
@@ -451,7 +487,7 @@ function partner360(r: MockRecord, money: boolean): Partner360 {
     region_view: regionView(r),
     logo: null,
     lead_id: r.lead_id,
-    custom: {},
+    custom: r.custom,
     closed_at: r.closed_at,
     close_reason: r.close_reason,
     signed_outside: r.signed_outside,
@@ -471,7 +507,11 @@ function partner360(r: MockRecord, money: boolean): Partner360 {
     contacts: contactsOf(r).slice(0, 25),
     overview: { events: [], interactions: interactionsOf(r).slice(0, 5) },
     deliverables: [],
-    custom_fields: [],
+    custom_fields: fieldsFor("partner", r.category_id),
+    history: deals
+      .flatMap((d) => d.history.map((h) => ({ ...h, deal_id: d.id, deal_number: d.number, deal_title: d.title })))
+      .sort((a, b) => b.changed_at.localeCompare(a.changed_at))
+      .slice(0, 25),
   };
 }
 
@@ -564,6 +604,7 @@ route("GET /api/v1/partnerships/leads", (req) =>
         region_scope: (l, v) => recordOf(l.lead_id)?.region_scope === v,
         stage: (l, v) => leadDeal(recordOf(l.lead_id)!)?.stage === v,
         health: (l, v) => l.health === v,
+        custom: (l, v) => customMatches(recordOf(l.lead_id)!.custom, v),
       },
       sort: { name: (a, b) => a.name.localeCompare(b.name), identified_on: (a, b) => (a.identified_on ?? "").localeCompare(b.identified_on ?? ""), created_at: (a, b) => a.created_at.localeCompare(b.created_at) },
     },
@@ -584,6 +625,7 @@ route("GET /api/v1/partnerships/partners/summary", () => {
     quiet: partners.filter(quiet).length,
     live_deals: live.length,
     signed_value: m(DEALS.filter((d) => d.partner_id).reduce((a, d) => a + (signedValue(d) ? k(signedValue(d)!) : 0), 0)),
+    quiet_days: 30,
   });
 });
 route("GET /api/v1/partnerships/partners", (req) =>
@@ -600,6 +642,7 @@ route("GET /api/v1/partnerships/partners", (req) =>
         stage: (p, v) => DEALS.some((d) => d.partner_id === p.partner_id && d.stage === v),
         health: (p, v) => p.health === v,
         quiet: (p, v) => (v === "true" ? quiet(recordOf(p.partner_id)!) : true),
+        custom: (p, v) => customMatches(recordOf(p.partner_id)!.custom, v),
       },
       sort: { name: (a, b) => a.name.localeCompare(b.name), last_contact_at: (a, b) => (a.last_contact_at ?? "").localeCompare(b.last_contact_at ?? ""), since: (a, b) => (a.since ?? "").localeCompare(b.since ?? ""), created_at: (a, b) => (recordOf(a.partner_id)?.created_at ?? "").localeCompare(recordOf(b.partner_id)?.created_at ?? "") },
     },
@@ -657,6 +700,14 @@ type Body = Record<string, unknown>;
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 const moneyOf = (v: unknown) => (typeof v === "string" && /^\d+(\.\d{1,2})?$/.test(v.trim()) ? m(k(v.trim())) : null);
 
+/** A deal's validity from the contract's Validity: 30 or 60 days, a date, else the category's days. */
+function validityFrom(v: unknown, categoryDays: number | null) {
+  const given = (v ?? null) as { days?: number; until?: string } | null;
+  if (given && given.days) return { validity_days: given.days, valid_until: null };
+  if (given && given.until) return { validity_days: null, valid_until: given.until };
+  return { validity_days: categoryDays, valid_until: null };
+}
+
 /** A deal's own fields from DealFields; the problems as the API words them. */
 function dealFrom(b: Body, at_: string, problems: Record<string, string[]>, signedOk: boolean) {
   const stage = str(b.stage) ? stageOf(String(b.stage)) : signedOk ? stageOf("partnership_signed") : stages()[0];
@@ -694,8 +745,7 @@ function newDeal(b: Body, record: MockRecord, stage: ListValue, by: string): Moc
     next_action: str(b.next_action),
     next_action_on: str(b.next_action_on),
     commission_pct: rate,
-    validity_days: category?.default_validity_days ?? null,
-    valid_until: null,
+    ...validityFrom(b.validity, category?.default_validity_days ?? null),
     signed_at: signed ? now() : null,
     close_reason: null,
     options: Array.isArray(b.options)
@@ -712,6 +762,8 @@ function newDeal(b: Body, record: MockRecord, stage: ListValue, by: string): Moc
     impact_rating: (str(b.impact_rating) as DealDetail["impact_rating"]) ?? null,
     impact_note: str(b.impact_note),
     comments: str(b.comments),
+    custom: customFrom({}, b.custom),
+    impact: Array.isArray(b.impact) ? (b.impact as string[]) : [],
   };
   DEALS.unshift(d);
   return d;
@@ -768,6 +820,10 @@ function recordFrom(kind: "lead" | "partner", b: Body, by: string): MockRecord {
     closed_at: null,
     close_reason: null,
     headquarters: b.headquarters ? placeOf(b.headquarters)?.view ?? null : null,
+    custom: customFrom({}, b.custom),
+    impact: Array.isArray(b.impact) ? (b.impact as string[]) : [],
+    impact_rating: (str(b.impact_rating) as LeadDetail["impact_rating"]) ?? null,
+    impact_note: str(b.impact_note),
   };
   regionFrom(b, r);
   RECORDS.unshift(r);
@@ -837,6 +893,10 @@ route("PATCH /api/v1/partnerships/deals/:id", (req) => {
     DEALS.shift();
   }
   if (Array.isArray(b.member_ids)) d.members = [d.owner!, ...(b.member_ids as string[]).map(keyOfEmployee).filter((x): x is string => !!x && x !== d.owner)];
+  if (Array.isArray(b.impact)) d.impact = b.impact as string[];
+  if (b.impact_rating !== undefined) d.impact_rating = (b.impact_rating as DealDetail["impact_rating"]) ?? null;
+  if (b.custom !== undefined) d.custom = customFrom(d.custom, b.custom);
+  if (b.validity !== undefined) Object.assign(d, b.validity === null ? { validity_days: null, valid_until: null } : validityFrom(b.validity, null));
   return ok(dealDetail(d, holdsMoney(req)));
 });
 route("POST /api/v1/partnerships/deals/:id/stage", (req) => {
@@ -863,7 +923,7 @@ route("POST /api/v1/partnerships/deals/:id/stage", (req) => {
     if (signs) convert(r, d, String(req.body.signed_copy_document_id), req.user!);
     else if (to.meaning !== "on_hold") {
       r.status = LEAD_STATUS[to.meaning ?? ""] ?? r.status;
-      if (r.status === "lost") r.lost_reason = reason;
+      r.lost_reason = r.status === "lost" ? reason : null;
     }
   } else if (r.status !== "closed") r.status = DEALS.some((x) => x.partner_id === r.id && x.status === "live") ? "active" : "dormant";
   return ok(dealDetail(d, holdsMoney(req)));
@@ -895,7 +955,7 @@ route("PUT /api/v1/partnerships/deals/:id/returns/:month", (req) => {
 /** A lead's deal signed: the partner made, the deal, contacts, documents and interactions moved (§6.4). */
 function convert(r: MockRecord, d: MockDeal, copy: string | null, by: string) {
   if (r.status === "converted") return r.converted_partner_id!;
-  const p = recordFrom("partner", { name: r.name, partner_category_id: r.category_id, owner_id: byKey(r.owner)?.employee_id, industry: r.industry, website: r.website, region: { scope: r.region_scope } }, by);
+  const p = recordFrom("partner", { name: r.name, partner_category_id: r.category_id, owner_id: byKey(r.owner)?.employee_id, industry: r.industry, website: r.website, region: { scope: r.region_scope }, custom: r.custom }, by);
   p.cities = r.cities;
   p.lead_id = r.id;
   d.partner_id = p.id;
@@ -915,6 +975,10 @@ route("PATCH /api/v1/partnerships/leads/:id", (req) => {
   if (b.partner_category_id) r.category_id = String(b.partner_category_id);
   if (b.owner_id) r.owner = keyOfEmployee(b.owner_id) ?? r.owner;
   if (b.region) regionFrom(b, r);
+  if (Array.isArray(b.impact)) r.impact = b.impact as string[];
+  if (b.impact_rating !== undefined) r.impact_rating = (b.impact_rating as LeadDetail["impact_rating"]) ?? null;
+  if (b.impact_note !== undefined) r.impact_note = str(b.impact_note);
+  if (b.custom !== undefined) r.custom = customFrom(r.custom, b.custom);
   return ok(lead360(r, holdsMoney(req)));
 });
 route("POST /api/v1/partnerships/leads/:id/lose", (req) => {
@@ -950,6 +1014,7 @@ route("PATCH /api/v1/partnerships/partners/:id", (req) => {
   if (b.owner_id) r.owner = keyOfEmployee(b.owner_id) ?? r.owner;
   if (b.region) regionFrom(b, r);
   if (b.headquarters !== undefined) r.headquarters = b.headquarters ? (placeOf(b.headquarters)?.view ?? null) : null;
+  if (b.custom !== undefined) r.custom = customFrom(r.custom, b.custom);
   return ok(partner360(r, holdsMoney(req)));
 });
 route("POST /api/v1/partnerships/partners/:id/close", (req) => {

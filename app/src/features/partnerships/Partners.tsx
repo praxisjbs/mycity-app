@@ -6,6 +6,7 @@ import { PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import { Button, Chips, formatMoneyShort, formatWhen, ListDetail, PageHeader, StatusPill, useIsPhone, useModal, useSideBySide, Who } from "@mycity/ui";
+import { filterQuery, NO_FILTERS, RecordFilters, type RecordFilterValue } from "./filters";
 import { Partner360 } from "./Partner360";
 import { PartnerForm } from "./forms/PartnerForm";
 import { healthPill, partnerPill, useMay } from "./lib";
@@ -23,8 +24,9 @@ export function Partners({ id }: { id: string | null }) {
   const { navigate } = useRouter();
   const mayCreate = useMay("create");
   const [view, setView] = useState<View>("all");
+  const [filter, setFilter] = useState<RecordFilterValue>(NO_FILTERS);
   const s = useApi("GET /api/v1/partnerships/partners/summary");
-  const filters = view === "quiet" ? { quiet: "true" as const } : view === "all" ? {} : { status: view };
+  const filters = { ...filterQuery(filter), ...(view === "quiet" ? { quiet: "true" as const } : view === "all" ? {} : { status: view }) };
   const list = usePaged("GET /api/v1/partnerships/partners", { filters, sort: "name" });
   const openPartner = (pid: string) => navigate(`/partnerships?tab=partners&id=${pid}`);
   const newPartner = () => modal.open({ title: "New Partner", wide: true, body: (close) => <PartnerForm close={close} onCreated={openPartner} /> });
@@ -39,12 +41,13 @@ export function Partners({ id }: { id: string | null }) {
           mobileCols={2}
           items={[
             { label: "Active", value: String(s.data.active), tone: "ok" },
-            { label: "Quiet", value: String(s.data.quiet), tone: s.data.quiet ? "err" : undefined, help: "Active partners with no contact in 30 days." },
+            { label: "Quiet", value: String(s.data.quiet), tone: s.data.quiet ? "err" : undefined, help: `Active partners with no contact in ${s.data.quiet_days} days.` },
             ...(phone ? [] : [{ label: "Live Deals", value: String(s.data.live_deals) }, { label: "Signed Value", value: formatMoneyShort(s.data.signed_value) }]),
           ]}
         />
       )}
       <Chips label="Partners" value={view} onChange={setView} options={[["all", "All"], ["active", "Active"], ["dormant", "Dormant"], ["quiet", "Quiet"], ["closed", "Closed"]]} className="mt-3" />
+      <RecordFilters value={filter} onChange={setFilter} kind="partner" />
       <ListDetail
         open={Boolean(id)}
         onClose={() => navigate("/partnerships?tab=partners")}
@@ -65,6 +68,7 @@ export function Partners({ id }: { id: string | null }) {
               { key: "r", label: "Region", render: (p) => p.region ?? "None", desktop: true },
               { key: "s", label: "Stage", render: (p) => p.stage_label ?? <StatusPill status={partnerPill(p.status)} /> },
               { key: "h", label: "Health", render: (p) => <StatusPill status={healthPill(p.health)} />, desktop: true },
+              { key: "o", label: "Owner", render: (p) => p.owner?.display_name ?? "No Owner", desktop: true },
               { key: "c", label: "Last Contact", render: (p) => (p.last_contact_at ? formatWhen(p.last_contact_at) : "Never") },
             ]}
           />

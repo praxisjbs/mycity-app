@@ -19,7 +19,7 @@ const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, bla
 const { PersonRef } = require("./organisation");
 const { DocumentRef } = require("./documents");
 const { PlaceInput, PlaceView, PlaceToken } = require("./maps");
-const { RegionScope, DealHealth, DealFields, DealRow, Deliverable, Field, CustomValues, CustomFilter, listCode, flag } = require("./partner_pipeline");
+const { RegionScope, DealHealth, DealFields, DealRow, Deliverable, RecordHistoryLine, Field, CustomValues, CustomFilter, listCode, flag } = require("./partner_pipeline");
 const { Interaction } = require("./interactions");
 
 const PartnerStatus = z.enum(["active", "dormant", "closed"]);
@@ -278,6 +278,8 @@ const PartnersSummary = z
     quiet: z.number().int().min(0),
     live_deals: z.number().int().min(0),
     signed_value: money,
+    /** The days without contact that make an active partner quiet: the enabled Partner Inactivity rule's, else 30 (§6.12). */
+    quiet_days: z.number().int().min(1),
   })
   .strict();
 
@@ -319,6 +321,8 @@ const Partner360 = z
       .strict(),
     deliverables: z.array(Deliverable).max(25),
     custom_fields: z.array(Field).max(200),
+    /** The stage and health lines of the deals the reader sees, the latest 25, newest first (Activity, §6.2). */
+    history: z.array(RecordHistoryLine).max(25),
   })
   .strict();
 

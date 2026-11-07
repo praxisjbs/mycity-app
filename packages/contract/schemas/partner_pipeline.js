@@ -737,6 +737,13 @@ const StageHistoryLine = z
   })
   .strict();
 
+/** A history line on a record's 360 (the Partner 360's Activity, §6.2): the line and the deal it is about. */
+const RecordHistoryLine = StageHistoryLine.extend({
+  deal_id: uuid,
+  deal_number: z.string(),
+  deal_title: z.string(),
+}).strict();
+
 /** A delivery checklist item raised as a Workspace task on signing (§6.7); its status is its task's. */
 const Deliverable = z
   .object({
@@ -1039,6 +1046,17 @@ const TABLES = {
       by: "the person behind changed_by",
     },
   },
+  RecordHistoryLine: {
+    table: "partnership_stage_history",
+    virtual: {
+      from_label: "the from stage's or health's label",
+      to_label: "the to stage's or health's label",
+      by: "the person behind changed_by",
+      deal_id: "partnership_stage_history.partnership_opportunity_id, named as every later table names it",
+      deal_number: "the deal's number",
+      deal_title: "the deal's title",
+    },
+  },
   Deliverable: {
     table: "deal_deliverable",
     virtual: { status: "its task's status", due_on: "its task's due day", owner: "its task's assignee" },
@@ -1147,6 +1165,7 @@ module.exports = {
   DealStageChange,
   DealHealthChange,
   StageHistoryLine,
+  RecordHistoryLine,
   Deliverable,
   DealRow,
   DealDetail,

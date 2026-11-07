@@ -12,7 +12,8 @@
  *   Partner           signed stage, which converts it (partners.convert.js); idempotent
  *
  * An owner outside the reader's scope is refused: a lead made for someone else would vanish from
- * the person who made it (§6.1).
+ * the person who made it (§6.1). createIn writes a lead in a caller's transaction, for New Lead and
+ * for the Partnership Tracker import (M7 PR 4, source `import`).
  */
 const { pool } = require("../../config/db");
 const { emit } = require("../../shared/events/emit");
@@ -29,11 +30,8 @@ const dealRepo = require("../partner_pipeline/partner_pipeline.repo");
 const notFound = () => new AppError("NOT_FOUND", "That lead does not exist, or you cannot see it.", 404);
 const invalid = (field, message) => new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, { [field]: [message] });
 
-/** An owner the reader may give a record to: anyone with `all`, else someone in their scope. */
-function assertOwner(scope, ownerId, field = "owner_id") {
-  if (!scope || scope.scope === "all") return;
-  if (!(scope.scope_ids || []).includes(ownerId)) throw invalid(field, "Outside your team");
-}
+/** An owner the reader may give a record to: anyone with `all`, else someone in their scope (§6.1). */
+const assertOwner = (scope, ownerId, field) => pipeline.assertOwner(scope, ownerId, field);
 
 const partnersService = () => require("../partners/partners.service");
 
@@ -69,48 +67,64 @@ function get360(id, scope, actor) {
  * Writes
  * ------------------------------------------------------------------ */
 
+/**
+ * A lead, its primary contact and its first deal, in the caller's transaction: New Lead, and a row of
+ * the Partnership Tracker import (M7 PR 4), whose row may name no contact. The caller has checked the
+ * owners against the reader's scope.
+ * @param {object} body  LeadCreate (`contact` optional here)
+ * @param {{held: boolean, source?: "person"|"import"}} opts
+ * @returns {Promise<{lead_id: string, number: string, deal_id: string}>}
+ */
+async function createIn(client, actor, body, { held, source = "person" }) {
+  if (body.source && !(await lists.allActive(client, "lead_source", [body.source]))) throw invalid("source", "Pick from the list");
+  if (body.impact && !(await lists.allActive(client, "partnership_impact", body.impact))) throw invalid("impact", "Pick from the list");
+  const custom = await fields.checkCustom(client, { appliesTo: "lead", categoryId: body.partner_category_id, values: body.custom });
+  const { number } = await numbering.allocate(client, "lead");
+  const identifiedOn = body.identified_on ?? lagos.today();
+  const leadId = await repo.insert(client, {
+    number,
+    status: "new",
+    name: body.name,
+    partner_category_id: body.partner_category_id,
+    industry: body.industry ?? null,
+    region_scope: body.region.scope,
+    website: body.website ?? null,
+    objective: body.objective ?? null,
+    source: body.source ?? null,
+    owner_id: body.owner_id,
+    identified_on: identifiedOn,
+    impact: body.impact ?? null,
+    impact_rating: body.impact_rating ?? null,
+    impact_note: body.impact_note ?? null,
+    comments: body.comments ?? null,
+    custom,
+  });
+  await saveRegion(client, leadId, body.region);
+  if (body.contact) await partnersService().contactIn(client, actor, { kind: "lead", id: leadId }, body.contact, { primary: true, field: "contact" });
+  const deal = await pipeline.createIn(client, actor, { kind: "lead", id: leadId, categoryId: body.partner_category_id }, body.deal, {
+    held,
+    field: "deal",
+    source,
+    identifiedOn,
+  });
+  await repo.update(client, leadId, { status: lists.leadStatusOf(deal.stage.meaning, "new") });
+  await emit(client, {
+    key: EVENTS.LEAD_CREATED,
+    entity: { type: "lead", id: leadId },
+    actor,
+    after: { number, name: body.name, owner_id: body.owner_id },
+    payload: { lead_id: leadId, number, deal_id: deal.deal_id, owner_id: body.owner_id, source },
+  });
+  return { lead_id: leadId, number, deal_id: deal.deal_id };
+}
+
 /** New Lead (POST /leads): the lead, its primary contact and its first deal. */
 async function create(actor, scope, body) {
   assertOwner(scope, body.owner_id);
   assertOwner(scope, body.deal.owner_id, "deal.owner_id");
   const held = await pipeline.holdsMoney(actor);
-  const id = await pipeline.tx(async (client) => {
-    if (body.source && !(await lists.allActive(client, "lead_source", [body.source]))) throw invalid("source", "Pick from the list");
-    if (body.impact && !(await lists.allActive(client, "partnership_impact", body.impact))) throw invalid("impact", "Pick from the list");
-    const custom = await fields.checkCustom(client, { appliesTo: "lead", categoryId: body.partner_category_id, values: body.custom });
-    const { number } = await numbering.allocate(client, "lead");
-    const leadId = await repo.insert(client, {
-      number,
-      status: "new",
-      name: body.name,
-      partner_category_id: body.partner_category_id,
-      industry: body.industry ?? null,
-      region_scope: body.region.scope,
-      website: body.website ?? null,
-      objective: body.objective ?? null,
-      source: body.source ?? null,
-      owner_id: body.owner_id,
-      identified_on: body.identified_on ?? lagos.today(),
-      impact: body.impact ?? null,
-      impact_rating: body.impact_rating ?? null,
-      impact_note: body.impact_note ?? null,
-      comments: body.comments ?? null,
-      custom,
-    });
-    await saveRegion(client, leadId, body.region);
-    await partnersService().contactIn(client, actor, { kind: "lead", id: leadId }, body.contact, { primary: true, field: "contact" });
-    const deal = await pipeline.createIn(client, actor, { kind: "lead", id: leadId, categoryId: body.partner_category_id }, body.deal, { held, field: "deal" });
-    await repo.update(client, leadId, { status: lists.leadStatusOf(deal.stage.meaning, "new") });
-    await emit(client, {
-      key: EVENTS.LEAD_CREATED,
-      entity: { type: "lead", id: leadId },
-      actor,
-      after: { number, name: body.name, owner_id: body.owner_id },
-      payload: { lead_id: leadId, number, deal_id: deal.deal_id, owner_id: body.owner_id },
-    });
-    return leadId;
-  });
-  return get360(id, scope, actor);
+  const made = await pipeline.tx((client) => createIn(client, actor, body, { held }));
+  return get360(made.lead_id, scope, actor);
 }
 
 /** A lead the reader may see, locked for a change; a converted one is read only. */
@@ -160,6 +174,8 @@ async function syncStatus(client, actor, leadId, meaning, reason) {
   const status = lists.leadStatusOf(meaning, lead.status);
   const changes = { status };
   if (status === "lost") changes.lost_reason = reason || lead.lost_reason || "Closed lost";
+  // A lost lead reopened by its deal's move is no longer lost (§6.4).
+  else if (lead.lost_reason) changes.lost_reason = null;
   if (status === lead.status && status !== "lost") return;
   await repo.update(client, leadId, changes);
   await emit(client, {
@@ -216,4 +232,4 @@ async function convert(actor, scope, id, body) {
   });
 }
 
-module.exports = { assertOwner, list, summary, get360, create, update, syncStatus, lose, convert };
+module.exports = { assertOwner, list, summary, get360, createIn, create, update, syncStatus, lose, convert };

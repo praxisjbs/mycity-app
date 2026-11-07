@@ -519,7 +519,7 @@ category). `docs/guides/partnerships.md` §4 is the field-by-field account.
   Appendix A); the Workspace link columns through the Workspace services, PR 5.
 - **Read by Home** (home.md §4.1): `partner` (`partner_id`, `name`, `partner_category_id`, `status`,
   `owner_id`, `created_at`) with `partner_category` (`partner_category_id`, `name`), `lead` (`lead_id`,
-  `name`), `partner_interaction` (`partner_id`, `occurred_at`), `partnership_opportunity`
+  `name`, `owner_id`), `partner_interaction` (`partner_id`, `occurred_at`), `partnership_opportunity`
   (`partnership_opportunity_id`, `number`, `partner_id`, `lead_id`, `title`, `stage`, `status`,
   `owner_id`, `estimated_value`, `currency`, `expected_close_on`, `signed_at`), `deal_member`
   (`deal_id`, `employee_id`), `partnership_proposal` (`partnership_proposal_id`,

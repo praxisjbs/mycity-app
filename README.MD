@@ -609,7 +609,11 @@ beside PR 1's `LeadForm`, `PartnerForm`, `MoveStage`, `LogInteraction`,
 `LoseLead`), tested on the mock by `screens.test.tsx`; `packages/ui/src/navigation/StageSwitcher.tsx`
 (a deal's stages one press at a time, with `StageSwitcher.test.tsx` and `StageSwitcher.gallery.tsx`);
 tested on the real migrations by `tests/integration/partnerships-records.test.js` (scope, money,
-conversion, stage rules, health, the 360s, Home's cards).
+conversion, stage rules, health, the 360s, Home's cards). The audit after PR 3 (06/11/2026) added
+`app/src/features/partnerships/filters.tsx` (the desktop filters Pipeline, Partners and Leads share:
+Stage, Category, Region, Owner, Health and the filterable custom fields) and, for PR 4's importer, the
+in-transaction `leads.service` `createIn`, `partners.service` `createIn` and
+`partner_pipeline.returns` `saveIn`.
 
 Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR 4);
 `shared/documents/render.js` its table loop if missing (PR 6). Prompts (`services/ai/prompts/`):

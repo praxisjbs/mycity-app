@@ -13,6 +13,9 @@
  *                   number given is the contact's phone, every one kept
  *   quiet           a live partner with no contact since the start of the day N days ago (Lagos):
  *                   N the enabled Partner Inactivity rule's threshold on Home · Alerts, else 30
+ *
+ * createIn writes a partner in a caller's transaction, for New Partner and for a signed row of the
+ * Partnership Tracker import (M7 PR 4, source `import`).
  */
 const { pool } = require("../../config/db");
 const { emit } = require("../../shared/events/emit");
@@ -53,11 +56,15 @@ async function regionViewOf(db, owner, id, scope, label) {
   return { scope: scope || null, cities: keys.filter((k) => found.has(k)).map((k) => found.get(k)), label: label || null };
 }
 
-/** The instant contact must be on or after for a live partner not to be quiet. */
-async function quietFrom(db) {
+/** The days without contact that make a live partner quiet: the enabled Partner Inactivity rule's, else 30. */
+async function quietDays(db) {
   const { rows } = await db.query("SELECT min(threshold)::int AS n FROM home_alert_rule WHERE metric = 'partner_inactivity' AND enabled");
-  const days = rows[0] && rows[0].n ? rows[0].n : QUIET_DAYS;
-  return lagos.startOfDay(lagos.addDays(lagos.today(), -days));
+  return rows[0] && rows[0].n ? rows[0].n : QUIET_DAYS;
+}
+
+/** The instant contact must be on or after for a live partner not to be quiet. */
+async function quietFrom(db, days = null) {
+  return lagos.startOfDay(lagos.addDays(lagos.today(), -(days ?? (await quietDays(db)))));
 }
 
 /* ------------------------------------------------------------------ *
@@ -150,9 +157,10 @@ async function list(query, scope) {
   return repo.list(pool, query, scope, { quietFrom: await quietFrom(pool), customSql, params });
 }
 
-/** The cards above Partners (GET /partners/summary). */
+/** The cards above Partners (GET /partners/summary), with the days that make a partner quiet. */
 async function summary(scope) {
-  return repo.summary(pool, scope, { quietFrom: await quietFrom(pool) });
+  const days = await quietDays(pool);
+  return { ...(await repo.summary(pool, scope, { quietFrom: await quietFrom(pool, days) })), quiet_days: days };
 }
 
 /** The Partner 360 (GET /partners/:id). */
@@ -197,53 +205,63 @@ async function insertIn(client, actor, row, { region, headquarters, field = null
   return { partner_id: id, number };
 }
 
+/**
+ * A partner already signed, its primary contact and its first deal at a signed or active stage, in the
+ * caller's transaction: New Partner, and a signed row of the Partnership Tracker import (M7 PR 4,
+ * "signed before the hub"), whose row may name no contact. The caller has checked the owners.
+ * @param {object} body  PartnerCreate (`contact` optional here)
+ * @param {{held: boolean, source?: "person"|"import"}} opts
+ * @returns {Promise<{partner_id: string, number: string, deal_id: string}>}
+ */
+async function createIn(client, actor, body, { held, source = "person" }) {
+  const custom = await fields.checkCustom(client, { appliesTo: "partner", categoryId: body.partner_category_id, values: body.custom });
+  const made = await insertIn(
+    client,
+    actor,
+    {
+      name: body.name,
+      legal_name: body.legal_name ?? null,
+      partner_category_id: body.partner_category_id,
+      region_scope: body.region.scope,
+      industry: body.industry ?? null,
+      website: body.website ?? null,
+      logo_document_id: body.logo_document_id ?? null,
+      owner_id: body.owner_id,
+      since: body.since ?? lagos.today(),
+      custom,
+    },
+    { region: body.region, headquarters: body.headquarters, metadata: body.signed_before_hub ? { signed_before_hub: true } : {} },
+  );
+  const record = { kind: "partner", id: made.partner_id };
+  if (body.contact) await contactIn(client, actor, record, body.contact, { primary: true, field: "contact" });
+  const deal = await pipeline.createIn(client, actor, { ...record, categoryId: body.partner_category_id }, body.deal, { held, field: "deal", allowSigned: true, source });
+  if (body.signed_copy_document_id) {
+    await require("./partners.documents").attachIn(client, actor, {
+      record,
+      deal_id: deal.deal_id,
+      document_id: body.signed_copy_document_id,
+      origin: "signed_copy",
+      field: "signed_copy_document_id",
+    });
+  }
+  await syncStatus(client, actor, made.partner_id);
+  await emit(client, {
+    key: EVENTS.PARTNER_CREATED,
+    entity: { type: "partner", id: made.partner_id },
+    actor,
+    after: { number: made.number, name: body.name, owner_id: body.owner_id },
+    payload: { partner_id: made.partner_id, number: made.number, deal_id: deal.deal_id, owner_id: body.owner_id, source },
+  });
+  return { partner_id: made.partner_id, number: made.number, deal_id: deal.deal_id };
+}
+
 /** New Partner (POST /partners): already signed, with its first deal at a signed or active stage. */
 async function create(actor, scope, body) {
   leads().assertOwner(scope, body.owner_id);
   leads().assertOwner(scope, body.deal.owner_id, "deal.owner_id");
   const held = await pipeline.holdsMoney(actor);
-  const id = await pipeline.tx(async (client) => {
-    const custom = await fields.checkCustom(client, { appliesTo: "partner", categoryId: body.partner_category_id, values: body.custom });
-    const made = await insertIn(
-      client,
-      actor,
-      {
-        name: body.name,
-        legal_name: body.legal_name ?? null,
-        partner_category_id: body.partner_category_id,
-        region_scope: body.region.scope,
-        industry: body.industry ?? null,
-        website: body.website ?? null,
-        logo_document_id: body.logo_document_id ?? null,
-        owner_id: body.owner_id,
-        since: body.since ?? lagos.today(),
-        custom,
-      },
-      { region: body.region, headquarters: body.headquarters, metadata: body.signed_before_hub ? { signed_before_hub: true } : {} },
-    );
-    const record = { kind: "partner", id: made.partner_id };
-    await contactIn(client, actor, record, body.contact, { primary: true, field: "contact" });
-    const deal = await pipeline.createIn(client, actor, { ...record, categoryId: body.partner_category_id }, body.deal, { held, field: "deal", allowSigned: true });
-    if (body.signed_copy_document_id) {
-      await require("./partners.documents").attachIn(client, actor, {
-        record,
-        deal_id: deal.deal_id,
-        document_id: body.signed_copy_document_id,
-        origin: "signed_copy",
-        field: "signed_copy_document_id",
-      });
-    }
-    await syncStatus(client, actor, made.partner_id);
-    await emit(client, {
-      key: EVENTS.PARTNER_CREATED,
-      entity: { type: "partner", id: made.partner_id },
-      actor,
-      after: { number: made.number, name: body.name, owner_id: body.owner_id },
-      payload: { partner_id: made.partner_id, number: made.number, deal_id: deal.deal_id, owner_id: body.owner_id },
-    });
-    return made.partner_id;
-  });
-  return get360(id, scope, actor);
+  const made = await pipeline.tx((client) => createIn(client, actor, body, { held }));
+  return get360(made.partner_id, scope, actor);
 }
 
 /** A partner the reader may see, locked. */
@@ -323,6 +341,7 @@ module.exports = {
   contactIdOf,
   saveCities,
   regionViewOf,
+  quietDays,
   quietFrom,
   contactsOf,
   contactIn,
@@ -333,6 +352,7 @@ module.exports = {
   get360,
   syncStatus,
   insertIn,
+  createIn,
   create,
   update,
   close,

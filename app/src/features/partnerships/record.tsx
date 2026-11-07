@@ -1,14 +1,14 @@
-import type { Contact, CustomValues, DealDetail, Field as CustomField, Interaction, StageHistoryLine } from "@mycity/contract/contract.gen.ts";
+import type { Contact, CustomValues, DealDetail, Field as CustomField, Interaction, RecordHistoryLine, StageHistoryLine } from "@mycity/contract/contract.gen.ts";
 import type { ReactNode } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { PagedTable } from "@/features/shared/sections";
-import { Button, Card, CardHeader, DataView, Details, EmptyState, formatDate, formatDateTime, formatMoney, KeyValue, LoadingRows, PhoneOnly, Pill, StageSwitcher, StatusPill, Timeline, toast, useModal } from "@mycity/ui";
+import { Button, Card, CardHeader, DataView, Details, EmptyState, formatDate, formatDateTime, formatMoney, HelpTerm, KeyValue, LoadingRows, PhoneOnly, Pill, StageSwitcher, StatusPill, Timeline, toast, useModal } from "@mycity/ui";
 import { ContactForm } from "./forms/ContactForm";
 import { DealForm } from "./forms/DealForm";
 import { MoveStage } from "./forms/MoveStage";
 import { SetHealth } from "./forms/SetHealth";
 import { UploadDocument } from "./forms/UploadDocument";
-import { fail, healthPill, moveNeeds, nextStage, useStages } from "./lib";
+import { fail, healthPill, MEANING_LABEL, moveNeeds, nextStage, useStages } from "./lib";
 
 /**
  * What both 360s are built from (docs/guides/partnerships.md §6.2, §10.1): a deal with its stage
@@ -27,6 +27,7 @@ export function useMover(deal: DealDetail | null) {
     if (!deal) return;
     const needs = moveNeeds(stages, deal, code);
     if (!needs.to) return;
+    if (needs.refused) return toast(needs.refused);
     if (needs.reason || needs.copy) {
       const to = needs.to;
       modal.open({ title: needs.copy ? "Attach Signed Copy" : `Move to ${to.label}`, body: (close) => <MoveStage deal={deal} to={to} reason={needs.reason} copy={needs.copy} close={close} /> });
@@ -57,8 +58,11 @@ export function NextStage({ deal, readOnly }: { deal: DealDetail | null; readOnl
   );
 }
 
-/** One deal on a 360's Overview: its stages, health, blockers, next action and expected close. */
-export function DealPanel({ deal, readOnly, money }: { deal: DealDetail; readOnly?: boolean; money?: boolean }) {
+/**
+ * One deal on a 360's Overview: its stages, health, blockers, next action and expected close.
+ * `categoryId` is its lead's or partner's: Edit Deal reads the category's defaults and custom fields.
+ */
+export function DealPanel({ deal, readOnly, money, categoryId }: { deal: DealDetail; readOnly?: boolean; money?: boolean; categoryId?: string | null }) {
   const modal = useModal();
   const { stages } = useStages();
   const onMove = useMover(deal);
@@ -73,7 +77,7 @@ export function DealPanel({ deal, readOnly, money }: { deal: DealDetail; readOnl
           readOnly ? undefined : (
             <span className="flex gap-2">
               <Button size="sm" onClick={() => modal.open({ title: "Set Health", body: (close) => <SetHealth deal={deal} close={close} /> })}>Set Health</Button>
-              <Button size="sm" onClick={() => modal.open({ title: "Edit Deal", wide: true, body: (close) => <DealForm deal={deal} close={close} /> })}>Edit Deal</Button>
+              <Button size="sm" onClick={() => modal.open({ title: "Edit Deal", wide: true, body: (close) => <DealForm deal={deal} categoryId={categoryId ?? null} close={close} /> })}>Edit Deal</Button>
             </span>
           )
         }
@@ -82,6 +86,16 @@ export function DealPanel({ deal, readOnly, money }: { deal: DealDetail; readOnl
       <KeyValue
         items={[
           ["Number", deal.number],
+          [
+            "Stage",
+            deal.meaning ? (
+              <HelpTerm key="s" help={`Counts as ${MEANING_LABEL[deal.meaning]} in totals and reports.`}>
+                {deal.stage_label}
+              </HelpTerm>
+            ) : (
+              deal.stage_label
+            ),
+          ],
           ["Health", <StatusPill key="h" status={healthPill(deal.health)} />],
           ...(deal.blockers ? ([["Blockers", deal.blockers]] as Array<[ReactNode, ReactNode]>) : []),
           ["Next Action", deal.next_action ? `${deal.next_action}${deal.next_action_on ? `, ${formatDate(deal.next_action_on)}` : ""}` : "None"],
@@ -107,15 +121,15 @@ export function DealPanel({ deal, readOnly, money }: { deal: DealDetail; readOnl
   );
 }
 
-/** A deal's stage and health lines, newest first. */
-export function HistoryCard({ lines }: { lines: StageHistoryLine[] }) {
+/** Stage and health lines, newest first; a record's lines each name their deal. */
+export function HistoryCard({ lines }: { lines: Array<StageHistoryLine | RecordHistoryLine> }) {
   if (!lines.length) return null;
   return (
     <Card>
       <CardHeader title="Stage History" />
       <Timeline
         items={lines.map((h) => ({
-          title: h.kind === "stage" ? `Moved to ${h.to_label}` : `Health: ${h.to_label}`,
+          title: `${"deal_title" in h ? `${h.deal_title} · ` : ""}${h.kind === "stage" ? `Moved to ${h.to_label}` : `Health: ${h.to_label}`}`,
           when: formatDateTime(h.changed_at),
           text: [h.by?.display_name, h.reason].filter(Boolean).join(". ") || undefined,
         }))}
@@ -140,8 +154,8 @@ export function InteractionsCard({ items, title = "Latest Interactions" }: { ite
 
 const KIND: Record<Interaction["interaction_type"], string> = { call: "Call", meeting: "Meeting", email: "Email", visit: "Visit", note: "Note" };
 
-/** Activity: every interaction, newest first, and (for a lead) its deal's history. */
-export function ActivityTab({ record, history }: { record: RecordKey; history?: StageHistoryLine[] }) {
+/** Activity: every interaction, newest first, and the stage and health history (a lead's deal's; a partner's deals'). */
+export function ActivityTab({ record, history }: { record: RecordKey; history?: Array<StageHistoryLine | RecordHistoryLine> }) {
   const list = usePaged("GET /api/v1/partnerships/interactions", { filters: record.type === "partner" ? { partner_id: record.id } : { lead_id: record.id }, sort: "-occurred_at" });
   return (
     <>
@@ -163,8 +177,8 @@ export function ActivityTab({ record, history }: { record: RecordKey; history?: 
   );
 }
 
-/** Documents: every file of the record, newest first; Upload Document. */
-export function DocumentsTab({ record, readOnly }: { record: RecordKey; readOnly?: boolean }) {
+/** Documents: every file of the record, newest first; Upload Document; a partner signed before the hub says so (§6.6). */
+export function DocumentsTab({ record, readOnly, signedOutside }: { record: RecordKey; readOnly?: boolean; signedOutside?: boolean }) {
   const modal = useModal();
   const list = usePaged("GET /api/v1/partnerships/documents", { filters: record.type === "partner" ? { partner_id: record.id } : { lead_id: record.id }, sort: "-created_at" });
   const ORIGIN: Record<string, string> = { upload: "Upload", proposal: "Proposal", agreement: "Agreement", signed_copy: "Signed Copy" };
@@ -174,7 +188,12 @@ export function DocumentsTab({ record, readOnly }: { record: RecordKey; readOnly
       list={list}
       rowKey={(d) => d.document.document_id}
       noun="document"
-      right={readOnly ? undefined : <Button size="sm" icon="plus" onClick={() => modal.open({ title: "Upload Document", body: (close) => <UploadDocument record={record} close={close} /> })}>Upload Document</Button>}
+      right={
+        <span className="flex items-center gap-2">
+          {signedOutside && <Pill>Signed Before the Hub</Pill>}
+          {!readOnly && <Button size="sm" icon="plus" onClick={() => modal.open({ title: "Upload Document", body: (close) => <UploadDocument record={record} close={close} /> })}>Upload Document</Button>}
+        </span>
+      }
       empty={{ title: "No Documents Yet", text: "Signed copies and uploads show here." }}
       columns={[
         { key: "f", label: "File", render: (d) => d.document.file_name },

@@ -10,8 +10,9 @@
  *
  * Since M7 PR 3 every query here is the owning module's own read (partner_pipeline.repo,
  * partners.repo, proposals.repo), by the rule the Partnerships screens keep
- * (docs/guides/partnerships.md §6.1, §6.17): a deal is seen by its owner's scope or its team, a
- * partner by its owner's scope or a deal on it the reader may see. A pull request that changes
+ * (docs/guides/partnerships.md §6.1, §6.17): a deal is seen by its owner's scope, its team or the
+ * scope of its lead's or partner's owner, a partner by its owner's scope or a deal on it whose owner
+ * or team the reader may see. A pull request that changes
  * what those modules write MUST, in the same PR, keep these reads and `tables` true to every
  * column they name (docs/guides/home.md §4.1). A unit test holds `tables` to the migrated schema
  * and the queries to `tables`.
@@ -39,7 +40,7 @@ const proposals = require("../../proposals/proposals.repo");
 const TABLES = Object.freeze({
   partner: ["partner_id", "name", "partner_category_id", "status", "owner_id", "created_at"],
   partner_category: ["partner_category_id", "name"],
-  lead: ["lead_id", "name"],
+  lead: ["lead_id", "name", "owner_id"],
   partner_interaction: ["partner_id", "occurred_at"],
   partnership_opportunity: [
     "partnership_opportunity_id",

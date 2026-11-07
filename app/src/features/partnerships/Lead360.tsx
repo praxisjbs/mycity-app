@@ -81,18 +81,18 @@ export function Lead360({ id }: { id: string }) {
           { label: "Projected Value", value: formatMoneyShort(x.kpis.projected_value) },
           { label: "Days at Stage", value: String(x.kpis.days_at_stage) },
           { label: "Health", value: x.kpis.health ? HEALTH[x.kpis.health].label : "None", tone: x.kpis.health === "stalled" ? "err" : x.kpis.health === "follow_up_required" ? "warn" : undefined },
-          { label: "Days Since Contact", value: daysWord(x.kpis.days_since_contact), help: SINCE_CONTACT_HELP },
+          { label: "Days Since Last Contact", value: daysWord(x.kpis.days_since_contact), help: SINCE_CONTACT_HELP },
         ]}
       />
       <Tabs label={lead.name} items={TABS.map((t) => ({ value: t, label: LABEL[t] }))} value={tab} onValueChange={(v) => setTab(v as Tab)} className="mt-3" />
       <div className="mt-3 grid gap-3">
         {tab === "overview" && (
           <>
-            {x.deal ? <DealPanel deal={x.deal} readOnly={readOnly} money={money} /> : <EmptyState title="No Deal Yet" text="A lead is captured with its deal." />}
+            {x.deal ? <DealPanel deal={x.deal} readOnly={readOnly} money={money} categoryId={lead.partner_category_id} /> : <EmptyState title="No Deal Yet" text="A lead is captured with its deal." />}
             <InteractionsCard items={x.overview.interactions} />
           </>
         )}
-        {tab === "deal" && (x.deal ? <DealPanel deal={x.deal} readOnly={readOnly} money={money} /> : <EmptyState title="No Deal Yet" />)}
+        {tab === "deal" && (x.deal ? <DealPanel deal={x.deal} readOnly={readOnly} money={money} categoryId={lead.partner_category_id} /> : <EmptyState title="No Deal Yet" />)}
         {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} />}
         {tab === "work" && <WorkTab />}
         {tab === "activity" && <ActivityTab record={record} history={x.deal?.history} />}

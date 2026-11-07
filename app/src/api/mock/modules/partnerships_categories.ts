@@ -335,6 +335,8 @@ const ordered = (list: string) => [...(LISTS[list] ?? [])].sort((a, b) => Number
 
 /** The categories as Categories holds them now, for the deals' mock (partnerships.ts): one source, so a rename shows on Pipeline too. */
 export const mockCategories = () => CATEGORIES;
+/** The custom field definitions as Categories holds them now, for the deals' mock. */
+export const mockFields = () => FIELDS;
 /** One of MyCity's lists as Categories holds it now, in its order, for the deals' mock. */
 export const mockList = (list: string): ListValue[] => ordered(list);
 route("GET /api/v1/partnerships/lists/:list", (req) => (LISTS[req.params.list] ? ok({ list: req.params.list, values: ordered(req.params.list) }) : notFound()));

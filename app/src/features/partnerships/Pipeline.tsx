@@ -5,30 +5,24 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, Chips, DataView, DesktopOnly, FilterSelect, formatMoneyShort, Grid, LoadingRows, PageHeader, PhoneOnly, StatusPill, useModal, Who } from "@mycity/ui";
+import { Button, Card, Chips, DataView, DesktopOnly, formatMoneyShort, Grid, LoadingRows, PageHeader, PhoneOnly, StatusPill, useModal, Who } from "@mycity/ui";
+import { filterQuery, NO_FILTERS, RecordFilters, type RecordFilterValue } from "./filters";
 import { DealForm } from "./forms/DealForm";
 import { LeadForm } from "./forms/LeadForm";
-import { healthPill, recordHref, SCOPES, useCategoryOptions, useMay, useStages } from "./lib";
-
-type Health = "" | "on_track" | "follow_up_required" | "stalled";
+import { healthPill, recordHref, useMay } from "./lib";
 
 /**
  * Partnerships · Pipeline (#50, docs/guides/partnerships.md §2, §10): the KPI strip, deals by stage,
- * the longest at a stage and the stalled with their blockers, filtered by stage, category, region and
- * health. No board (§6.5): a row opens its lead's or partner's 360, where the stage moves. A deal
+ * the longest at a stage and the stalled with their blockers, filtered by stage, category, region, owner
+ * and health. No board (§6.5): a row opens its lead's or partner's 360, where the stage moves. A deal
  * named by the address (`?id=`, ⌘K, Home) opens its record's 360.
  */
 export function Pipeline({ id }: { id: string | null }) {
   const modal = useModal();
   const { navigate } = useRouter();
   const mayCreate = useMay("create");
-  const { stages } = useStages();
-  const categories = useCategoryOptions();
-  const [stage, setStage] = useState("");
-  const [category, setCategory] = useState("");
-  const [scope, setScope] = useState("");
-  const [health, setHealth] = useState<Health>("");
-  const filters = { ...(stage && { stage }), ...(category && { partner_category_id: category }), ...(scope && { region_scope: scope as "national" }), ...(health && { health }) };
+  const [filter, setFilter] = useState<RecordFilterValue>(NO_FILTERS);
+  const filters = filterQuery(filter, false);
   const p = useApi("GET /api/v1/partnerships/pipeline", { query: filters });
   const deals = usePaged("GET /api/v1/partnerships/deals", { filters: { ...filters, status: "open" as const }, sort: "expected_close_on" });
   const named = useApi("GET /api/v1/partnerships/deals/:id", { params: { id: id ?? "" }, enabled: Boolean(id) });
@@ -44,14 +38,7 @@ export function Pipeline({ id }: { id: string | null }) {
   return (
     <>
       <PageHeader title="Pipeline" sub="Every open deal and where it stands" actions={mayCreate ? <Button variant="primary" icon="plus" onClick={newLead}>New Lead</Button> : undefined} />
-      <DesktopOnly>
-        <Grid cols={4} className="mb-3">
-          <FilterSelect label="Stage" value={stage} onChange={setStage} options={[["", "Every Stage"], ...stages.map((s) => [s.code, s.label] as [string, string])]} />
-          <FilterSelect label="Category" value={category} onChange={setCategory} options={[["", "Every Category"], ...categories.options]} more={categories.more} onMore={categories.onMore} />
-          <FilterSelect label="Region" value={scope} onChange={setScope} options={[["", "Every Region"], ...SCOPES]} />
-          <FilterSelect label="Health" value={health} onChange={(v) => setHealth(v as Health)} options={[["", "Any Health"], ["on_track", "On Track"], ["follow_up_required", "Follow-Up Required"], ["stalled", "Stalled"]]} />
-        </Grid>
-      </DesktopOnly>
+      <RecordFilters value={filter} onChange={setFilter} />
       {!d ? (
         <Card><LoadingRows count={6} /></Card>
       ) : (
@@ -66,7 +53,7 @@ export function Pipeline({ id }: { id: string | null }) {
             ]}
           />
           <PhoneOnly className="mt-3">
-            <Chips label="Health" value={health} onChange={(v) => setHealth(v as Health)} options={[["", "All"], ["stalled", "Stalled"], ["follow_up_required", "Follow-Up"], ["on_track", "On Track"]]} />
+            <Chips label="Health" value={filter.health} onChange={(v) => setFilter({ ...filter, health: v })} options={[["", "All"], ["stalled", "Stalled"], ["follow_up_required", "Follow-Up"], ["on_track", "On Track"]]} />
             <PagedTable<DealRow>
               title="Open Deals"
               list={deals}
