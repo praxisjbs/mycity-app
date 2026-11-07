@@ -28,8 +28,17 @@ const QuestionState = z.enum(["open", "answered", "skipped", "replaced"]);
 const SourceKind = z.enum(["notes", "transcript"]);
 const AssetRole = z.enum(["cover", "gallery", "logo", "section"]);
 const ProofPointKind = z.enum(["stat", "partner_logo", "endorsement", "result"]);
-/** The design kit's layouts (§6.11). */
-const LayoutName = z.enum(["cover", "letter", "opportunity", "why_mycity", "audience", "deliverables", "packages", "timeline", "proof", "terms", "next_steps", "closing"]);
+/** The design kit's layouts (§6.11): twelve, and Insight, a page for one chart (TB, 07/11/2026). */
+const LayoutName = z.enum(["cover", "letter", "opportunity", "why_mycity", "audience", "deliverables", "packages", "timeline", "proof", "terms", "next_steps", "closing", "insight"]);
+/** The kit's own drawings, in MyCity's colours, named as icons are (§6.11; TB, 07/11/2026). */
+const ILLUSTRATIONS = [
+  "skyline", "stage", "ticket", "phone_app", "map_pins", "crowd", "handshake", "growth",
+  "calendar", "megaphone", "camera", "check_in", "souvenirs", "storefront", "hotel", "dining",
+  "mobility", "flight", "campus", "civic", "media", "trophy", "globe", "target",
+];
+const IllustrationName = z.enum(ILLUSTRATIONS);
+/** The charts the kit draws as SVG (§6.11): columns, bars, stacked columns, a line, an area, a donut, progress rings. */
+const ChartKind = z.enum(["bar", "hbar", "stacked", "line", "area", "donut", "progress"]);
 
 /** An answer, a suggestion or an ask's value: by its card's kind; money as a string, a date ISO. */
 const AnswerValue = z.union([z.string().max(5000), z.number(), z.array(z.string().max(200)).max(20), z.null()]);
@@ -62,6 +71,44 @@ const para = text(1200);
 const asset = uuid.nullable();
 const stat = z.object({ value: text(40), label: text(120) }).strict();
 const lucide = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/, "must be a Lucide icon's name");
+/** A section's drawing from the kit's set, or none. */
+const illustration = IllustrationName.nullable().default(null);
+
+const ChartPoint = z.object({ label: text(60), value: z.number().min(0).max(1e12) }).strict();
+/** One series of a chart; its name shows in the legend when a chart has more than one. */
+const ChartSeries = z.object({ name: text(60).nullable().default(null), points: z.array(ChartPoint).min(1).max(12) }).strict();
+
+/**
+ * A chart, drawn by the renderer as SVG from these figures (§6.11). Every value is a figure, so each
+ * carries its source in the section's `sources` like any other. A donut and progress rings take one
+ * series (rings are percentages, 0 to 100); a stacked chart takes two or more; a line or an area at
+ * least two points; series side by side name the same points in the same order.
+ */
+const ProposalChart = z
+  .object({
+    kind: ChartKind,
+    title: text(80),
+    /** What a value counts, written after it: "%", "downloads". */
+    unit: z.string().trim().max(20).nullable().default(null),
+    series: z.array(ChartSeries).min(1).max(4),
+  })
+  .strict()
+  .superRefine((chart, ctx) => {
+    const issue = (message, path = ["series"]) => ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
+    const [first] = chart.series;
+    if (["donut", "progress"].includes(chart.kind) && chart.series.length > 1) issue("One series only");
+    if (chart.kind === "donut" && (first.points.length < 2 || first.points.length > 6)) issue("Two to six slices");
+    if (chart.kind === "progress") {
+      if (first.points.length > 4) issue("At most four rings");
+      if (first.points.some((p) => p.value > 100)) issue("Rings are percentages");
+    }
+    if (chart.kind === "stacked" && chart.series.length < 2) issue("Two series or more");
+    if (["line", "area"].includes(chart.kind) && first.points.length < 2) issue("Two points or more");
+    const labels = first.points.map((p) => p.label).join("\u0000");
+    if (chart.series.some((s) => s.points.map((p) => p.label).join("\u0000") !== labels)) issue("Series name the same points");
+  });
+/** A section's chart, or none. */
+const chart = ProposalChart.nullable().default(null);
 
 const CoverSection = z
   .object({
@@ -94,6 +141,8 @@ const OpportunitySection = z
     heading,
     paragraphs: z.array(para).min(1).max(4),
     pull_quote: text(240).nullable(),
+    chart,
+    illustration,
   })
   .strict();
 
@@ -106,6 +155,7 @@ const WhyMyCitySection = z
       .array(z.object({ proof_point_id: uuid.nullable(), value: text(40), label: text(120) }).strict())
       .min(3)
       .max(6),
+    chart,
   })
   .strict();
 
@@ -116,18 +166,7 @@ const AudienceSection = z
     heading,
     intro: para.nullable(),
     stats: z.array(stat).min(1).max(6),
-    /** Drawn by the renderer as SVG from these figures. */
-    chart: z
-      .object({
-        kind: z.enum(["bar", "donut"]),
-        title: text(80),
-        series: z
-          .array(z.object({ label: text(60), value: z.number().min(0) }).strict())
-          .min(2)
-          .max(8),
-      })
-      .strict()
-      .nullable(),
+    chart,
   })
   .strict();
 
@@ -140,6 +179,7 @@ const DeliverablesSection = z
       .array(z.object({ title: text(120), detail: text(400).nullable(), icon: lucide }).strict())
       .min(1)
       .max(12),
+    illustration,
   })
   .strict();
 
@@ -165,6 +205,7 @@ const PackagesSection = z
       )
       .min(1)
       .max(5),
+    chart,
   })
   .strict();
 
@@ -186,6 +227,7 @@ const TimelineSection = z
       )
       .min(1)
       .max(6),
+    illustration,
   })
   .strict();
 
@@ -198,6 +240,7 @@ const ProofSection = z
       .array(z.object({ proof_point_id: uuid, label: text(80) }).strict())
       .max(12),
     results: z.array(stat).max(6),
+    chart,
   })
   .strict();
 
@@ -210,6 +253,7 @@ const TermsSection = z
       .array(z.object({ label: text(60), detail: text(400) }).strict())
       .min(1)
       .max(8),
+    illustration,
   })
   .strict();
 
@@ -229,6 +273,7 @@ const NextStepsSection = z
       .strict(),
     /** A QR to the web version. */
     show_qr: z.boolean(),
+    illustration,
   })
   .strict();
 
@@ -238,6 +283,20 @@ const ClosingSection = z
     layout: z.literal("closing"),
     message: text(240).nullable(),
     image_asset_id: asset,
+    /** Drawn in place of the photograph when set. */
+    illustration,
+  })
+  .strict();
+
+/** A page for one chart: what it shows in a line, the chart, and an optional note (TB, 07/11/2026). */
+const InsightSection = z
+  .object({
+    ...sectionBase,
+    layout: z.literal("insight"),
+    heading,
+    takeaway: text(160),
+    chart: ProposalChart,
+    note: text(240).nullable().default(null),
   })
   .strict();
 
@@ -255,6 +314,7 @@ const Section = z.discriminatedUnion("layout", [
   TermsSection,
   NextStepsSection,
   ClosingSection,
+  InsightSection,
 ]);
 
 /** The proposal's content: its sections in order, each key once. */
@@ -545,6 +605,10 @@ const TABLES = {
   TermsSection: { table: null, reason: KIT },
   NextStepsSection: { table: null, reason: KIT },
   ClosingSection: { table: null, reason: KIT },
+  InsightSection: { table: null, reason: KIT },
+  ChartPoint: { table: null, reason: "a point of a section's chart, kept in its content" },
+  ChartSeries: { table: null, reason: "a series of a section's chart, kept in its content" },
+  ProposalChart: { table: null, reason: "a section's chart, kept in its content" },
   ProposalContent: { table: null, reason: "partnership_proposal.content: the sections in order" },
   ProposalStart: {
     table: "partnership_proposal",
@@ -601,6 +665,12 @@ module.exports = {
   AssetRole,
   ProofPointKind,
   LayoutName,
+  ILLUSTRATIONS,
+  IllustrationName,
+  ChartKind,
+  ChartPoint,
+  ChartSeries,
+  ProposalChart,
   AnswerValue,
   FigureSource,
   CoverSection,
@@ -615,6 +685,7 @@ module.exports = {
   TermsSection,
   NextStepsSection,
   ClosingSection,
+  InsightSection,
   Section,
   ProposalContent,
   ProposalStart,

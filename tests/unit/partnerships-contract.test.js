@@ -22,7 +22,7 @@ const SECTIONS = {
   letter: { paragraphs: ["Thank you for your time on Tuesday.", "Here is what we heard."], signer_name: "Ada Obi", signer_title: "Growth Lead", signer_photo_asset_id: null },
   opportunity: { heading: "The Moment", paragraphs: ["December brings the city out."], pull_quote: null },
   why_mycity: { heading: "Why MyCity", points: [1, 2, 3].map((n) => ({ proof_point_id: null, value: `${n}0,000+`, label: "Downloads" })) },
-  audience: { heading: "Who Comes", intro: null, stats: [{ value: "18 to 35", label: "Age" }], chart: { kind: "donut", title: "By City", series: [{ label: "Lagos", value: 60 }, { label: "Abuja", value: 40 }] } },
+  audience: { heading: "Who Comes", intro: null, stats: [{ value: "18 to 35", label: "Age" }], chart: { kind: "donut", title: "By City", unit: "%", series: [{ name: null, points: [{ label: "Lagos", value: 60 }, { label: "Abuja", value: 40 }] }] } },
   deliverables: { heading: "What We Do", items: [{ title: "Check-in on MyCityApp", detail: null, icon: "qr-code" }] },
   packages: { heading: "Packages", display: "cards", options: [{ label: "VIP", price: "25000.00", price_note: null, includes: ["Front row"], terms: null }] },
   timeline: { heading: "Timeline", phases: [{ name: "Build-up", starts_on: "2026-11-20", ends_on: null, detail: "Campaign starts" }] },
@@ -30,6 +30,7 @@ const SECTIONS = {
   terms: { heading: "Terms", items: [{ label: "Validity", detail: "30 days from signing" }] },
   next_steps: { heading: "Next Steps", steps: ["Sign the agreement"], contact: { name: "Ada Obi", title: null, email: "ada@mycityapp.io", phone: null }, show_qr: true },
   closing: { message: null, image_asset_id: null },
+  insight: { heading: "Downloads", takeaway: "Event weeks double downloads", chart: { kind: "line", title: "Downloads", unit: null, series: [{ name: null, points: [{ label: "Oct", value: 4100 }, { label: "Nov", value: 9200 }] }] }, note: null },
 };
 const section = (layout, extra = {}) => ({ key: layout, layout, ...SECTIONS[layout], ...extra });
 
@@ -56,6 +57,23 @@ describe("the design kit's content", () => {
     no(c.proposals.Section, section("why_mycity", { points: SECTIONS.why_mycity.points.slice(0, 2) }), "points");
     no(c.proposals.Section, section("packages", { options: [] }), "options");
     no(c.proposals.Section, section("audience", { chart: { kind: "pie", title: "x", series: [] } }));
+  });
+
+  test("a chart is drawn from figures the kit can draw (TB, 07/11/2026)", () => {
+    const pts = (...v) => v.map((value, i) => ({ label: `P${i + 1}`, value }));
+    const chart = (kind, series) => ({ kind, title: "Reach", series });
+    ok(c.proposals.ProposalChart, chart("stacked", [{ name: "2025", points: pts(1, 2) }, { name: "2026", points: pts(3, 4) }]));
+    ok(c.proposals.ProposalChart, chart("progress", [{ points: pts(80, 45) }]));
+    no(c.proposals.ProposalChart, chart("donut", [{ points: pts(1, 2) }, { points: pts(3, 4) }]), "series");
+    no(c.proposals.ProposalChart, chart("donut", [{ points: pts(1) }]), "series");
+    no(c.proposals.ProposalChart, chart("progress", [{ points: pts(120) }]), "series");
+    no(c.proposals.ProposalChart, chart("stacked", [{ points: pts(1, 2) }]), "series");
+    no(c.proposals.ProposalChart, chart("line", [{ points: pts(1) }]), "series");
+    no(c.proposals.ProposalChart, chart("bar", [{ points: pts(1, 2) }, { points: [{ label: "Other", value: 1 }, { label: "P2", value: 2 }] }]), "series");
+    // A chart and a drawing ride on the content layouts; an Insight page must have its chart.
+    ok(c.proposals.Section, section("opportunity", { chart: SECTIONS.insight.chart, illustration: "stage" }));
+    no(c.proposals.Section, section("opportunity", { illustration: "unicorn" }), "illustration");
+    no(c.proposals.Section, section("insight", { chart: null }), "chart");
     no(c.proposals.Section, section("deliverables", { items: [{ title: "x", detail: null, icon: "<svg>" }] }));
   });
 
