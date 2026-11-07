@@ -15,6 +15,7 @@
 const { z } = require("zod");
 const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
+const { partnerLinkFields, partnerLinkEditFields, linkRules, linkEditRules, PartnerLinkView } = require("./partners");
 
 const ProjectStatus = z.enum(["active", "completed"]);
 
@@ -41,6 +42,8 @@ const Project = z
     open: z.number().int().min(0),
     done: z.number().int().min(0),
     can_edit: z.boolean(),
+    /** The partner or lead and deal it is for (Connect to Partner, M7), named only for a reader who sees them. */
+    partner_link: PartnerLinkView.nullable(),
     created_at: isoDateTime,
   })
   .strict();
@@ -50,18 +53,24 @@ const ProjectPage = Paged(Project);
 const ProjectListQuery = listQuery(
   {
     status: ProjectStatus.default("active"),
+    /** The Partner filter (M7): the projects connected to this partner or lead. */
+    partner_id: uuid.optional(),
+    lead_id: uuid.optional(),
   },
   ["name", "due_on", "created_at"],
 );
 
-/** POST /projects: the caller owns it. */
-const ProjectCreate = z
-  .object({
-    name: text(120),
-    description: optionalText(2000),
-    due_on: blank(isoDate),
-  })
-  .strict();
+/** POST /projects: the caller owns it. Connect to Partner adds the partner or lead and deal it is for. */
+const ProjectCreate = linkRules(
+  z
+    .object({
+      name: text(120),
+      description: optionalText(2000),
+      due_on: blank(isoDate),
+      ...partnerLinkFields,
+    })
+    .strict(),
+);
 
 /** What a screen button may fill on New Project through the address (praxis-ai.md §6.4). */
 const ProjectPrefill = z
@@ -79,15 +88,16 @@ const ProjectEditFields = z
     description: z.string().trim().max(2000).nullable().optional(),
     due_on: isoDate.nullable().optional(),
     status: ProjectStatus.optional(),
+    ...partnerLinkEditFields,
   })
   .strict();
-const ProjectEdit = ProjectEditFields.refine((v) => Object.keys(v).length > 0, "Change at least one field");
+const ProjectEdit = linkEditRules(ProjectEditFields.refine((v) => Object.keys(v).length > 0, "Change at least one field"));
 
 /**
  * Edit Project as Praxis AI's card (docs/guides/praxis-ai.md §6.11): the project beside the form's
  * fields, which the page's own form never names; `status` as Complete Project and Reopen Project.
  */
-const ProjectChange = ProjectEditFields.extend({ project_id: recordId("project") }).refine(changesBeside(["project_id"]), nothingOn("project_id"));
+const ProjectChange = linkEditRules(ProjectEditFields.extend({ project_id: recordId("project") }).refine(changesBeside(["project_id"]), nothingOn("project_id")));
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
@@ -99,6 +109,7 @@ const TABLES = {
       open: "count of the project's open tasks the reader can see",
       done: "count of the project's done tasks the reader can see",
       can_edit: "the reader owns it, or their workspace grant is all",
+      partner_link: "project.partner_id, lead_id and deal_id, named from partner, lead and partnership_opportunity for a reader who sees them",
     },
   },
   ProjectPage: { table: null, reason: "a page of projects" },

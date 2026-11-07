@@ -234,7 +234,13 @@ async function createIn(client, actor, body, { held, source = "person" }) {
   );
   const record = { kind: "partner", id: made.partner_id };
   if (body.contact) await contactIn(client, actor, record, body.contact, { primary: true, field: "contact" });
-  const deal = await pipeline.createIn(client, actor, { ...record, categoryId: body.partner_category_id }, body.deal, { held, field: "deal", allowSigned: true, source });
+  const deal = await pipeline.createIn(client, actor, { ...record, categoryId: body.partner_category_id }, body.deal, {
+    held,
+    field: "deal",
+    allowSigned: true,
+    source,
+    signedBeforeHub: body.signed_before_hub === true,
+  });
   if (body.signed_copy_document_id) {
     await require("./partners.documents").attachIn(client, actor, {
       record,

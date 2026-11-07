@@ -681,14 +681,15 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M4 | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` (the Talent Pool moved from M5, TB 04/11/2026), `apply-cv-purge` (CVs on Apply links that ended without an application, nightly at 02:47 Lagos) |
 | M5 | `offer-expiry`, `signature-reminder`, `onboarding-dispatch` | `offer-expiry`, `signature-reminders` |
 | M6 | `payroll-compute`, `payslip-render` | |
-| M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
+| M7 | `partner-inactivity` (the morning's follow-ups, re-run by hand), `agreement-renewal` | `partner-inactivity` (each newly quiet partner's and lead's follow-up: its deals Follow-Up Required and one task for its owner, 06:30 Lagos, after `home-alert-sweeps`; `docs/guides/partnerships.md` §6.12), `agreement-renewals` |
 | M8 | `budget-threshold` (the morning's sweep, re-run by hand for a day), `approval-ageing` | `budget-threshold` (each budget line 90% used, committed and spent, told to its department's head and Operations & People once, 07:00 Lagos; `docs/guides/expenses.md` §6.6), `approval-ageing` |
 | M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly), `exchange-rates` (today's exchange rates after midnight Lagos, and again within the hour if that failed) |
 | M10 | `knowledge-embed`, `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | |
 
-`partner-inactivity` (M7) and `approval-ageing` (M8) are superseded by Home's
-`home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity reads through Home's
-source adapters, approval ageing reads the workflow tables in the metric's own SQL. Home's Budget
+Home's `home-alert-sweeps` raises the Partner Inactivity alert (`src/modules/alerts/alerts.metrics.js`,
+through Home's source adapters); M7's `partner-inactivity` is the follow-up after it, never a second
+alert. `approval-ageing` (M8) is superseded by Home's sweep, which reads the workflow tables in the
+metric's own SQL. Home's Budget
 Threshold rules read whole budgets the same way; M8's `budget-threshold` warns about each category
 line of a budget, once, as the handoff for M8 asked (`docs/handoff/m8-expenses.md` PR 5).
 Their stub files stay for their milestones to delete or fill.
