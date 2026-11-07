@@ -118,7 +118,7 @@ own migration block (§1.1), to every rule in `docs/MIGRATIONS.md`.
 
 | Table | Migration | Track | Notes |
 |---|---|---|---|
-| `department`, `employee`, `org_seat`, `reporting_line` | 0040, 0110, 0210 | A | Employees carry every column of 0110 and 0210; vacant seats are `org_seat` rows |
+| `department`, `employee`, `org_seat`, `reporting_line` | 0040, 0110, 0210 | A | Employees carry every column of 0110 and 0210; vacant seats are `org_seat` rows, filled by a hire through `organisation.fillSeat` |
 | `app_user`, `user_role` | 0010, 0020, 0200 | A | Roster logins: `password_hash = '!invited'`, roles from `seeds/staff/roles.json` |
 | `import_batch`, `import_row`, `import_mapping_profile` | 0085 | B | BACKEND_STRUCTURE §9.3 |
 | `document`, document versions | 0080 | B | Through the vault and upload engine only. `0350` adds `verified_at` and `verified_by`: People accepting a file is a person's judgement, not the virus scan (§6.9) |
@@ -1166,6 +1166,10 @@ screen.
 
 ## 14 · Change log
 
+- 06/11/2026 · GE · The organisation service gains `fillSeat(client, seatId, employeeId, actor)` and the read
+  `findSeatById`, for Recruitment's hire (`recruitment.md` §6.1, `organogram.md` §6): a vacant seat is marked
+  filled by the new employee, who takes its department and line, and its reports and open roles report to them;
+  `org_seat.filled` refreshes team scope as `org_seat.updated` does.
 - 06/11/2026 · JP · M7 PR 2 adds two small things to the shared layer, for Partnerships · Categories (`docs/guides/partnerships.md` §6.3, §6.8): `shared/spreadsheet` reads a workbook's dropdowns (`readDropdowns`: each column's header and the values its list validation offers), and `shared/documents/markdown` keeps a table when asked (`htmlToMarkdown(html, { tables: true })`); every other caller flattens a table as before.
 - 04/11/2026 · GE · Documents & Numbering (#76) gains Application (`application`, APP-0001, never reset,
   seeded by `4199`): the reference a candidate is given when they apply (`recruitment.md` §6.2).

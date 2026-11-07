@@ -35,6 +35,7 @@ const findDepartmentByName = (client, name) => repo.findDepartmentByName(client,
 const findDepartmentByCode = (client, code) => repo.findDepartmentByCode(client, code);
 const findEmployeeByWorkEmail = (client, email) => repo.findEmployeeByWorkEmail(client, email);
 const findEmployeeById = (client, employeeId) => repo.findEmployeeById(client, employeeId);
+const findSeatById = (client, seatId) => repo.findSeatById(client, seatId);
 
 /** "HR & Operations" → "HR_OPERATIONS"; a number is added when the code is taken. */
 async function departmentCode(client, name) {
@@ -976,6 +977,52 @@ async function changeSeat(client, seatId, patch, actor) {
 }
 
 /**
+ * A new hire takes a vacant seat (Recruitment's vacancies.hiredIn, when M5's onboarding completes;
+ * #79, 06/11/2026), inside the caller's transaction. The seat is marked filled by the person from
+ * today and leaves the chart, where the person now stands in its place:
+ *   1. the person works in the seat's department and reports where the seat reported;
+ *   2. everyone whose solid or dotted line pointed at the seat, and every open role under it,
+ *      reports to the person;
+ *   3. a head seat's department is now headed by the person (syncHeadRoles).
+ * Each line moves through the reporting write, so it is audited and team scope follows.
+ * @returns {Promise<object>} the seat, filled
+ */
+async function fillSeat(client, seatId, employeeId, actor) {
+  const before = await repo.findSeatById(client, seatId);
+  if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
+  if (before.status !== "vacant") throw new AppError("SEAT_NOT_VACANT", "This role is not open.", 409);
+  const person = await repo.findEmployeeById(client, employeeId);
+  if (!person || person.status === "archived")
+    throw new AppError("NOT_FOUND", "That employee is not on the staff list now.", 404);
+  const reports = await repo.reportsOfSeat(client, seatId);
+  const after = await repo.fillSeat(client, seatId, employeeId, lagos.today());
+  await emit(client, {
+    key: EVENTS.ORG_SEAT_FILLED,
+    entity: { type: "org_seat", id: seatId },
+    actor,
+    before,
+    after,
+    payload: { org_seat_id: seatId, employee_id: employeeId, title: before.title },
+  });
+  const reason = `Took the role ${before.title}`;
+  // 1. The person stands where the seat stood.
+  if (person.department_id !== before.department_id)
+    await updateEmployee(client, employeeId, { department_id: before.department_id }, actor);
+  const seatLine = lineOfSeat(before);
+  if (hasLine(seatLine)) await followLine(client, employeeId, seatLine, reason, actor);
+  // 2. Whoever answered to the seat answers to the person.
+  for (const r of reports.people) {
+    if (r.employee_id === employeeId) continue;
+    if (r.solid) await followLine(client, r.employee_id, { line_manager_id: employeeId }, reason, actor);
+    if (r.dotted) await setReportingLine(client, r.employee_id, { dotted_manager_id: employeeId, reason }, actor);
+  }
+  for (const s of reports.seats) await followSeatLine(client, s, { line_manager_id: employeeId }, actor);
+  // 3. A head seat now heads through its person.
+  await syncHeadRoles(client, actor);
+  return after;
+}
+
+/**
  * The seat with this title, or a new one (the importer's VACANT rows). A seat in the row's own
  * department is the one; failing that, a seat of that title made before this import (one the
  * names step moved to another department), never one an earlier row of the same import made,
@@ -1567,6 +1614,8 @@ module.exports = {
   seats,
   createSeat,
   updateSeat,
+  fillSeat,
+  findSeatById,
   findOrCreateSeat,
   orgChart,
   requestOrgChartExport,

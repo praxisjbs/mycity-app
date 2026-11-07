@@ -1,6 +1,7 @@
 "use strict";
 /**
- * Candidate Emails (docs/guides/recruitment.md §6.8): the five emails a candidate is sent, each a
+ * Candidate Emails (docs/guides/recruitment.md §6.8): the eight emails a candidate is sent (M4's five,
+ * then the three M5's offers and onboarding send, kept here so one screen words them all), each a
  * shipped default in templates/email/ (version 0) that Operations & People may reword. A save is
  * the next template_version, in Markdown, checked against the email's declared variables before it
  * is kept; Restore Default saves the shipped wording as the next version, so every wording ever
@@ -12,13 +13,16 @@
 const store = require("../../shared/templates/template-store");
 const variables = require("../../shared/templates/variables");
 
-/** The five, in the order Candidate Emails lists them, with the names the screen shows. */
+/** The eight, in the order Candidate Emails lists them, with the names the screen shows. */
 const NAMES = Object.freeze({
   "application-received": "Application Received",
   "apply-invite": "Invitation to Apply",
   "assessment-invite": "Assessment Invitation",
   "interview-invite": "Interview Invitation",
   "candidate-not-progressed": "Not Progressing",
+  "offer-sent": "Offer Sent",
+  "offer-signed": "Offer Signed",
+  "onboarding-documents": "Onboarding Documents",
 });
 const KEYS = Object.freeze(Object.keys(NAMES));
 

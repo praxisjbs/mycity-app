@@ -9,6 +9,7 @@
  *   application.invited         Invite to Apply: the link is made here, after commit, and mailed
  *                               (apply-invite); its token never sits in the outbox
  *   application.moved, .reopened   a pipeline move (§6.3); audit
+ *   application.hired           M5's onboarding completed (candidates.hireIn); audit
  *   application.not_progressed  candidate-not-progressed to the candidate
  *   application.score_requested Score With AI or Screen With AI: the AI read, one at a time
  *   application.scored          an AI read was kept
@@ -30,6 +31,7 @@ const EVENTS = defineEvents("recruitment", {
   "application.moved": { summary: "A candidate moved stage" },
   "application.not_progressed": { summary: "A candidate was not progressed" },
   "application.reopened": { summary: "A candidate was reopened" },
+  "application.hired": { summary: "A candidate was hired" },
   "application.score_requested": { summary: "An AI read of an application was asked for" },
   "application.scored": { summary: "An application was scored with AI" },
   "recruitment.candidate_email_saved": { summary: "A candidate email's wording was saved" },
@@ -48,13 +50,23 @@ const EMAILS = Object.freeze({
   invite: "apply-invite",
   notProgressed: "candidate-not-progressed",
 });
+/** The three M5 sends (offers and onboarding), worded on Candidate Emails with the rest. */
+const M5_EMAILS = Object.freeze({
+  offerSent: "offer-sent",
+  offerSigned: "offer-signed",
+  onboardingDocuments: "onboarding-documents",
+});
 defineVariables("email", EMAILS.received, c.candidates.ApplicationReceivedEmailVars);
 defineVariables("email", EMAILS.invite, c.candidates.ApplyInviteEmailVars);
 defineVariables("email", EMAILS.notProgressed, c.candidates.CandidateNotProgressedEmailVars);
-// Candidate Emails edits all five (guide §6.8), so the five are declared here, once; the assessments
-// and interviews modules send theirs with these variables and do not declare them again.
+// Candidate Emails edits all eight (guide §6.8), so the eight are declared here, once; the assessments
+// and interviews modules, and M5's offers and onboarding, send theirs with these variables and do not
+// declare them again.
 defineVariables("email", "assessment-invite", c.assessments.AssessmentInviteEmailVars);
 defineVariables("email", "interview-invite", c.interviews.InterviewInviteEmailVars);
+defineVariables("email", M5_EMAILS.offerSent, c.candidates.OfferSentEmailVars);
+defineVariables("email", M5_EMAILS.offerSigned, c.candidates.OfferSignedEmailVars);
+defineVariables("email", M5_EMAILS.onboardingDocuments, c.candidates.OnboardingDocumentsEmailVars);
 
 defineNotification(EVENTS.APPLICATION_RECEIVED, {
   // The vacancy's hiring manager (payload.subject_employee_id).
@@ -74,4 +86,4 @@ outbox.register(EVENTS.APPLICATION_SCORE_REQUESTED, "candidates.score", (event) 
   }),
 );
 
-module.exports = { EVENTS, CV_DOC_TYPE, APPLY_LINK, EMAILS };
+module.exports = { EVENTS, CV_DOC_TYPE, APPLY_LINK, EMAILS, M5_EMAILS };

@@ -136,10 +136,11 @@ function vacancyView(v: VacancyDetail, req: Req): VacancyDetail {
     requirements_blocks: blocksOf(v.requirements),
     nice_to_have_blocks: blocksOf(v.nice_to_have),
     applicants: apps.length,
-    in_progress: live.length,
+    // Not Progress All reaches only the M4 stages; Offer and after are M5's.
+    in_progress: live.filter((a) => (STAGES as readonly string[]).includes(a.stage)).length,
     past_closing: v.status === "open" && closesPast,
     days_open: v.published_at ? daysSince(v.published_at) - (v.closed_at ? daysSince(v.closed_at) : 0) : null,
-    by_stage: v.board_stages.map((stage) => ({ stage, count: live.filter((a) => a.stage === stage).length })),
+    by_stage: STAGES.map((stage) => ({ stage, count: live.filter((a) => a.stage === stage).length })),
     can_edit: v.status !== "closed" && can(req, "edit"),
   };
 }
@@ -573,7 +574,8 @@ function candidateRow(a: D.MockApplication): CandidatesCandidate {
 /** Where a card may move now: any column ahead, or the one just behind (candidates.pipeline). */
 function nextStages(a: D.MockApplication): D.MockApplication["stage"][] {
   if (a.status !== "active" || vacancyOfApp(a).status === "closed") return [];
-  const board = vacancyOfApp(a).board_stages as D.MockApplication["stage"][];
+  // Offer is set only by M5's steps, never by hand.
+  const board = vacancyOfApp(a).board_stages.filter((s) => s !== "offer") as D.MockApplication["stage"][];
   const i = board.indexOf(a.stage);
   return i < 0 ? board.filter((s) => s !== a.stage) : board.filter((_, k) => k > i || k === i - 1);
 }
@@ -736,6 +738,7 @@ R("POST /api/v1/recruitment/candidates/:id/move", "edit", (req) =>
     parse<{ stage: D.MockApplication["stage"]; reason?: string }>(candidateSchemas.CandidateMove, req.body, (b) => {
       if (a.status !== "active") return fail(409, "MOVE_NOT_ALLOWED", "Reopen this candidate before moving them");
       if (b.stage === a.stage) return fail(409, "MOVE_NOT_ALLOWED", "The candidate is already at this stage");
+      if ((b.stage as string) === "offer") return fail(409, "MOVE_NOT_ALLOWED", "An offer moves a candidate to Offer");
       if (!vacancyOfApp(a).board_stages.includes(b.stage)) return fail(409, "MOVE_NOT_ALLOWED", "This role does not use that stage");
       if (!nextStages(a).includes(b.stage)) return fail(409, "MOVE_NOT_ALLOWED", "Move one stage back at most");
       moveTo(a, b.stage, req.user, b.reason);
