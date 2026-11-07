@@ -7,6 +7,7 @@ import roster from "../data/roster.json";
 import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
 import { decideExpense, expenseInstance } from "./expenses";
+import { decideOffer, offerInstance, offersWaitingOn } from "./offers";
 import { decidePlan, decideTargetChange, decideUnbind, performanceInstance, performanceWaitingOn } from "./performance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
 import { decideCommitment } from "./workspace";
@@ -997,6 +998,7 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
       decideUnbind(req.user!, req.params.id, approve, reason) ??
       decideTargetChange(req.user!, req.params.id, approve, reason) ??
       decideExpense(req.user!, req.params.id, approve, reason) ??
+      decideOffer(req.user!, req.params.id, approve, reason) ??
       notFound()
     );
   }
@@ -1045,7 +1047,7 @@ function leaveInstance(user: string, wid: string): ApprovalInstance | null {
   };
 }
 route("GET /api/v1/workflow/instances/:id", (req) => {
-  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id) ?? expenseInstance(req.user!, req.params.id) ?? leaveInstance(req.user!, req.params.id);
+  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id) ?? expenseInstance(req.user!, req.params.id) ?? offerInstance(req.user!, req.params.id) ?? leaveInstance(req.user!, req.params.id);
   return found ? ok(found) : notFound();
 });
 route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));
@@ -1085,7 +1087,7 @@ export function waitingOn(user: string): ApprovalWaiting[] {
         link: `/people?tab=leave&id=${l.leave_request_id}`,
       };
     })
-    .concat(locationRequestsWaitingOn(user), reviewsWaitingOn(user), performanceWaitingOn(user))
+    .concat(locationRequestsWaitingOn(user), reviewsWaitingOn(user), performanceWaitingOn(user), offersWaitingOn(user))
     .sort((a, b) => a.stage_entered_at.localeCompare(b.stage_entered_at));
 }
 route("GET /api/v1/workflow/mine", (req) => paged(waitingOn(req.user!), req, { filters: { module_key: (r, v) => r.module_key === v } }));

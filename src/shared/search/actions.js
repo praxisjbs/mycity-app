@@ -140,6 +140,13 @@ const ACTIONS = Object.freeze([
     need: ["recruitment", "edit"],
     words: ["book interview", "set up interview", "interview panel", "invite to interview"],
   }),
+  // M5 (docs/guides/offers.md §9): New Offer opens on `new=1`, as the assistant's route does.
+  a("new_offer", "New Offer", {
+    screen: "recruitment.offers",
+    params: { new: "1" },
+    need: ["recruitment", "create"],
+    words: ["make an offer", "offer letter", "job offer", "offer of employment"],
+  }),
   a("start_import", "Start Import", {
     screen: "settings.imports",
     params: { action: "new" },

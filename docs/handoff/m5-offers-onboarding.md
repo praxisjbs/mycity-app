@@ -8,7 +8,7 @@ the build plan and its log.
 | | |
 |---|---|
 | Branch | `m5/offers` |
-| Pull request | not opened yet |
+| Pull request | #85 (draft, PR 0 to PR 4); PR 5 on opens a new one from the same branch |
 | Owner | AJ (Adole Jerome); every M5 decision is AJ's (team ownership, 06/11/2026: GE M4, AJ M5 and M8, LA M7, TB M6 and M10) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 06/11/2026 |
@@ -142,10 +142,10 @@ earlier: M5's forms use help terms.
 ## 4 · Checklist
 
 - [x] PR 0 · Docs (06/11/2026)
-- [x] PR 1 · Contract and data (06/11/2026; LA and TB to review)
-- [x] PR 2 · Signatures service (06/11/2026; LA to review)
-- [x] PR 3 · Offers backend (06/11/2026; GE to confirm the Head of Department grant and the board's Offer column)
-- [ ] PR 4 · Offers screens
+- [x] PR 1 · Contract and data (06/11/2026; reviewed by AJ 07/11/2026, for LA and TB)
+- [x] PR 2 · Signatures service (06/11/2026; reviewed by AJ 07/11/2026, for LA)
+- [x] PR 3 · Offers backend (06/11/2026; the Head of Department grant and the board's Offer column confirmed by AJ 07/11/2026, for GE)
+- [x] PR 4 · Offers screens (07/11/2026)
 - [ ] PR 5 · Acceptance to hire
 - [ ] PR 6 · Onboarding backend
 - [ ] PR 7 · Onboarding screens
@@ -161,13 +161,50 @@ earlier: M5's forms use help terms.
 - The line manager comes from the vacancy's Organogram seat, not the free-text `reports_to`; the
   hire's address is picked (`AddressField`) at documentation, as `candidate.location` is free text.
 - The `4099` seed still lists the retired `rejected` stage (GE).
-- Still owed by MyCity: a sample employment contract; the blank Employee Data, Guarantor and Account
-  Opening forms; the full New Hire Induction deck; the Incentive Policy (October 2026).
+- Arrived from MyCity 07/11/2026 (AJ): the blank Employee Data Form, Guarantor Form and Providus
+  Salary Account Opening Form (PDF, for PR 6's checklist items and the guarantor fields), the HR
+  Induction deck (27 slides, ending in Your First 30 Days: Week 1, Weeks 2 to 3, Week 4, for PR 6's
+  plan steps), the Incentive Plan (October 2026: per-category rates over ₦500,000, the quarterly
+  80% bonus and the team pool; the offer's Incentives text and Section 4 point to it), and a second
+  sample offer letter (two pages: deductions for PAYE and pension, per-unit incentives such as
+  ₦5,000 a business onboarded, annual leave after six months). The second letter is shorter than the
+  standard wording of 06/11; the offer's Incentives and Benefits fields already carry its extra lines.
+- Still owed by MyCity: a sample employment contract (PR 5).
 
 ---
 
 ## 6 · Log
 
+- 07/11/2026 · AJ · The open reviews, taken by AJ (every M5 item falls to AJ): nothing in PR 1 to 3
+  breaks an existing structure. 5020's CHECKs on `signature_request` and `signature` meet no other
+  writer (M7's agreements do not write them yet) and no row older than 5020; 5090 drops tables no
+  code reads (M4's pool is `talent_pool_entry`); `employee.bvn` never leaves the record unmasked (the
+  Employee 360 copies fields by name; `field-mask`, the logger and `ai/redact` hold it back); 5299's
+  `approve` for Head of Department is set only on 0290's untouched grant and opens nothing on
+  recruitment but its approvals (`recruitment.offer` is its only flow); the moved sign shapes have no
+  importer left in `agreements.js`. Migration round trips, drift and the whole backend suite pass.
+- 07/11/2026 · AJ · PR 4, the failed send (guide §11): the offer shows when the mail server refused
+  the candidate's address after it was sent (`send_refused_at`, from `mail_refusal`), and Change
+  Email (`POST /offers/:id/recipient`) corrects it on the candidate (`candidates.correctEmailIn`, new
+  in M4's service, event `application.email_corrected`) and on their signature
+  (`signatures.setSignerEmailIn`), then mails a fresh link. The mock's Not Progressing withdraws the
+  candidate's open offer, as the API does.
+- 07/11/2026 · AJ · PR 4 built: Recruitment · Offers rewritten on the contract (`Offers.tsx`, with
+  `OfferForm.tsx`, `OfferSign.tsx` and `OfferSettings.tsx`), its INTERIM types and mock gone; the mock
+  is `app/src/api/mock/modules/offers.ts` (every status; the approval answered through the workflow
+  routes, so My Approvals lists it too). The record: summary and Score, Monthly Pay against the
+  vacancy's range, Approval with Approve Offer and Reject Offer for whom it waits on (decided on #85:
+  on the offer as well as My Approvals), Signers, History from the offer's dates (the contract has no
+  history list; its dates say it), the letter on paper (content, not counted by the word limits;
+  decided on #85) and Download PDF. New and Edit Offer are a four-step wizard. The board's Offer
+  column opens with this screen: Open Offer and Make Offer on the candidate's sheet, through a new
+  `OfferListQuery.application_id` (contract first; decided on #85). Sign Offer and Verify Document
+  wired to the signatures routes, the public INTERIM types gone: the email code, name, title, draw or
+  type, consent, Signers; Verify lists every signer and the status. The signing code's field messages
+  are four words now (Ask for another code). `Field` with a help term passes axe (the #79 note; a test
+  added). User Guide: Offers in `recruitment.md`, Sign Offer and Verify a Document in
+  `public-site.md`. PROGRESS: #42 UI and Mobile; #84 and #85 API, UI and Mobile. The failed send and
+  the mock's Not Progressing came after (the entries above).
 - 07/11/2026 · AJ · Merged `main` (GE's hand-over to M5, #88): Send now moves the card to Offer;
   declined, expired and withdrawn offers move it back to Shortlist with `candidates.offerEndedIn`;
   `offer-sent` is Candidate Emails' template with `candidates.OfferSentEmailVars`. Open for PR 5:

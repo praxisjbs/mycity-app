@@ -337,6 +337,29 @@ async function offerEndedIn(client, actor, applicationId, reason) {
 }
 
 /**
+ * A candidate's email corrected, in the caller's transaction (M5's Change Email on a sent offer
+ * whose mail the server refused): the person's address on every application of theirs, recorded
+ * as `application.email_corrected` on this one. A candidate is one person per address, so an
+ * address another candidate holds is refused. False when it is the address they have already.
+ */
+async function correctEmailIn(client, actor, applicationId, email) {
+  const row = await repo.get(client, applicationId, { lock: true });
+  if (!row) throw notFound();
+  if (String(row.email).toLowerCase() === String(email).toLowerCase()) return false;
+  const other = await repo.candidateByEmail(client, email);
+  if (other && other.candidate_id !== row.candidate_id)
+    throw new AppError("EMAIL_TAKEN", "Another candidate has this email", 409, { email: ["Another candidate has it"] });
+  await repo.setEmail(client, row.candidate_id, email);
+  await emit(client, {
+    key: EVENTS.APPLICATION_EMAIL_CORRECTED,
+    entity: { type: "application", id: applicationId },
+    actor,
+    payload: { application_id: applicationId, number: row.number, candidate_id: row.candidate_id },
+  });
+  return true;
+}
+
+/**
  * The hire, in the caller's transaction (M5, when onboarding completes; #79, 06/11/2026): the
  * application moves from Onboarding to Hired with status hired, so it leaves the board and every
  * count of people in progress, and `application.hired` is recorded. Then the vacancy hears of it
@@ -603,6 +626,7 @@ module.exports = {
   move,
   advanceIn,
   offerEndedIn,
+  correctEmailIn,
   hireIn,
   notProgressed,
   notProgressAllIn,

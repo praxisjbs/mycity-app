@@ -111,6 +111,21 @@ async function setCode(client, signatureId, { code_hash: hash, minutes }) {
   return rows[0];
 }
 
+/**
+ * A pending signer's address corrected: any code sent to the old one stops counting. Only one
+ * outside the hub, not yet signed. True when a row changed.
+ */
+async function setSignerEmail(client, requestId, role, email) {
+  const { rowCount } = await client.query(
+    `UPDATE signature
+        SET signer_email = $3, code_hash = NULL, code_expires_at = NULL, code_attempts = 0,
+            code_sent_at = NULL, code_verified_at = NULL
+      WHERE signature_request_id = $1 AND signer_role = $2 AND signer_type <> 'user' AND status = 'pending'`,
+    [requestId, role, email],
+  );
+  return rowCount > 0;
+}
+
 async function countWrongCode(client, signatureId) {
   await client.query("UPDATE signature SET code_attempts = code_attempts + 1 WHERE signature_id = $1", [signatureId]);
 }
@@ -201,6 +216,7 @@ async function lapsed(db) {
 }
 
 module.exports = {
+  setSignerEmail,
   insertRequest,
   insertSignature,
   request,

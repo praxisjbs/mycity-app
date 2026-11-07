@@ -2,7 +2,7 @@
 title: The Public Site
 order: 2000
 milestones: M4
-summary: The site candidates use: the front page, open roles, a vacancy, applying, and taking an assessment.
+summary: The site candidates use: the front page, open roles, a vacancy, applying, taking an assessment, signing an offer and verifying a document.
 icon: globe
 ---
 
@@ -234,6 +234,75 @@ A test never started by its start day expires, and its link no longer opens it. 
 one from the candidate's sheet. Pressing **Assessment** in the bar at the top, with no link, says
 *Use Your Email Link*.
 
+## Sign Offer {#public-sign icon=signature}
+
+A candidate signs their offer of employment on this page, from the link in the email Send Offer sent.
+Signing it is accepting it. They need no account.
+
+### Read and confirm it is them {#public-sign-read}
+
+1. The candidate opens the link in their email.
+2. The role, the offer's number and the day it expires are at the left, with the three steps.
+3. The letter shows exactly as its PDF reads, then **Signers**: MyCity's signature, already in, and
+   theirs, **Waiting**.
+   ![The offer, before signing](shot:public-sign)
+4. Under **Confirm Your Email**, they press **Send Code**. A six-digit code goes to the address the
+   offer was sent to, and the page shows where.
+5. They type or paste the **Email Code**. A full code is checked straight away; **Confirm Code**
+   checks it too.
+
+The code works for ten minutes. **Send Again** sends another after a minute. After five wrong codes,
+they must ask for another.
+
+### Sign it {#public-sign-sign}
+
+1. Under **Sign Below**, their **Full Name** is filled in; they may add a **Title**.
+2. Under **Signature**, they pick **Draw** and sign in the box with a finger or a mouse, or **Type**
+   and type it.
+   ![Sign Below](shot:public-sign-below)
+3. They tick **Agree to Sign Electronically**.
+4. They press **Accept and Sign**. The page says *Offer Signed*, with the offer's reference and
+   **Verify This Document**.
+
+They and MyCity each get the signed copy by email. A signed offer is locked; it cannot change or be
+declined after.
+
+### Decline it {#public-sign-decline}
+
+1. They press **Decline the Offer**, at either step.
+2. They type the **Reason for Declining** and press **Confirm Decline**. **Back to the Offer** goes
+   back instead.
+3. The page says *Offer Declined*. The hiring team is told, with the reason.
+
+An offer past its day says *This Offer Has Expired*, and one withdrawn says *Offer Withdrawn*. Pressing
+**Sign Offer** in the bar at the top, with no link, says *Use Your Offer Email*.
+
+## Verify a Document {#public-verify icon=shield}
+
+Anyone can check a document MyCity signed and sealed, such as an offer letter, on this page. It shows
+whether it is genuine and unchanged, never what it says.
+
+### Check a reference {#public-verify-reference}
+
+1. Open [Verify a Document](https://go.mycityapp.io/verify), or press **Verify Document** in the bar
+   at the top.
+2. Type the reference printed on the document, such as `OFF-0017`, and press **Verify**.
+   ![A verified document](shot:public-verify)
+3. *Document Verified* means it is genuine and unchanged. The record shows its **Status**, who signed
+   it and when, and who issued it.
+4. **Content Hash** and **Artifact Hash** each read **Matches** or **Differs**. *Not This Document*
+   says which was altered: the record, the stored file, or both.
+
+A reference nobody issued shows *Not Found*.
+
+### Scan the QR code {#public-verify-qr}
+
+Every page of a sealed document carries a QR code.
+
+1. Scan it with a phone's camera. It opens the same check.
+2. Under it, **The Document** shows the opening of the letter, with **Download PDF** for the sealed
+   copy.
+
 ```shot public-home
 site: public
 open: /
@@ -328,4 +397,40 @@ do:
 crop: modal
 marks:
   1: button "Submit Assessment" | Sends the answers; they cannot change after
+```
+
+```shot public-sign
+site: public
+open: /sign/Rt8wN2kPz5Gb
+do:
+  - wait: button "Send Code"
+marks:
+  1: button "Send Code" | A code to the candidate's email
+```
+
+```shot public-sign-below
+site: public
+open: /sign/Rt8wN2kPz5Gb
+do:
+  - click: button "Send Code"
+  - click: css input[autocomplete="one-time-code"]
+  - press: 4
+  - press: 8
+  - press: 2
+  - press: 9
+  - press: 1
+  - press: 3
+  - wait: button "Accept and Sign"
+marks:
+  1: button "Accept and Sign" | Signs and accepts
+```
+
+```shot public-verify
+site: public
+open: /verify/OFF-0017
+do:
+  - wait: text "Document Verified"
+marks:
+  1: text "Content Hash" | Over what was signed
+  2: text "Artifact Hash" | Over the stored file
 ```

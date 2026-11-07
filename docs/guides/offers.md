@@ -5,17 +5,16 @@
 | Owner | AJ |
 | Milestone | M5 |
 | Backend modules | `offers`, `signatures`, `onboarding`, `employment_contracts` |
-| Frontend paths | `app/src/features/recruitment/Offers.tsx`, `app/src/features/recruitment/Onboarding.tsx` |
+| Frontend paths | `app/src/features/recruitment/Offers.tsx` (with `OfferForm.tsx`, `OfferSign.tsx`, `OfferSettings.tsx`), `app/src/features/recruitment/Onboarding.tsx`, `public-app/src/pages/SignOffer.tsx`, `public-app/src/pages/Verify.tsx` |
 | Permission key(s) | `recruitment` (offers and onboarding cases); `people` (the hire's documents on the Employee 360) |
 | Capabilities | none; who approves an offer is the `recruitment.offer` flow on Settings · Approvals, not a capability |
 | Screens (PROGRESS.md rows) | #42 Offers, #43 Onboarding; public #84 Sign Offer, #85 Verify Document, and a new public Upload Documents row (PR 6 registers it with `npm run new:screen`); changes to #39 Candidates (the Offer column, GE), People · Employee 360 (a Documents tab), Settings · Approvals (#72) |
 | Status | Draft |
-| Last changed | 06/11/2026 |
+| Last changed | 07/11/2026 |
 
-The public pages (`public-app/src/pages/SignOffer.tsx`, `Verify.tsx`) and the People 360 Documents
-tab join **Frontend paths** in the PR that wires them (PR 4 and PR 7, §12 of the handoff). Until
-then GE's #82 owns their screens and `foundation.md` owns `app/src/features/people/`, so adding them
-here now would make every change to those files ask for this guide too.
+The public pages (`public-app/src/pages/SignOffer.tsx`, `Verify.tsx`) joined **Frontend paths** with
+PR 4, which wired them. The People 360 Documents tab joins with PR 7; until then `foundation.md` owns
+`app/src/features/people/`, so adding it here now would make every change there ask for this guide too.
 
 ---
 
@@ -34,7 +33,7 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
 |---|---|---|---|---|
 | Recruitment · Offers (`offers`) | staff app | `recruitment` view; a hiring manager their vacancies (team scope) | every offer: number, candidate, role, compensation, status, expiry; the offer's letter as the candidate will read it, its approval chain and signers | New Offer (from a shortlisted application), Edit, Submit for Approval, Approve and Reject (approvers), Send Offer, Resend, Withdraw, Download PDF |
 | Recruitment · Onboarding (`onboarding`) | staff app | `recruitment` view | every onboarding case: hire, role, start date, status, checklist progress; one case's checklist, contract and plan | Verify and Reject a document, Request Document, Send Reminder, Mark Step Done, Complete Onboarding; Checklist and Plans settings |
-| Recruitment · Candidates (`candidates`) | staff app | as M4 | the Offer column (GE) | open the offer from the card |
+| Recruitment · Candidates (`candidates`) | staff app | as M4 | the Offer column (GE) | Open Offer on the sheet of a card at Offer or after (Offers opened by `?application=`); Make Offer on a shortlisted one (`?new=1&application=`) |
 | Public · Sign Offer (`/sign/<token>`) | go.mycityapp.io | the candidate holding the link | the letter, the signing steps, the outcome | Send Code, sign (draw or type), Accept and Sign, Decline the Offer |
 | Public · Verify Document (`/verify/<number>`, `/verify/t/<token>`) | go.mycityapp.io | anyone | status, signers, the two verdicts; by QR token the document too | look up a reference |
 | Public · Upload Documents (`/onboard/<token>`) | go.mycityapp.io | the new hire holding the link | the checklist: required, uploaded, outstanding, each item's verification | accept the privacy notice, upload each document, enter BVN |
@@ -136,12 +135,13 @@ employee record (masked, never sent to an AI model).
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /api/v1/recruitment/offers` | `OfferListQuery` → `OfferPage` | `recruitment` view · all/team | yes, 25 | filters: status, vacancy, q |
+| `GET /api/v1/recruitment/offers` | `OfferListQuery` → `OfferPage` | `recruitment` view · all/team | yes, 25 | filters: status, vacancy, application (the board's Open Offer), q |
 | `GET /api/v1/recruitment/offers/summary` | → `OffersSummary` | `recruitment` view | | drafts, with approval, to send, with candidates, accepted this month |
 | `GET /api/v1/recruitment/offers/draft` | `OfferDraftQuery` → `OfferDraft` | `recruitment` create | | what New Offer starts from |
 | `POST /api/v1/recruitment/offers` | `OfferCreate` → `OfferDetail` | `recruitment` create | | application active at `shortlist` (or `offer` after one ended); department and worksite default to the vacancy's |
 | `GET/PATCH /api/v1/recruitment/offers/:id` | `OfferDetail`, `OfferEdit` | `recruitment` view/edit | | edit only in draft |
 | `POST /api/v1/recruitment/offers/:id/submit`, `/send`, `/resend` | `EmptyBody` → `OfferDetail` | `recruitment` edit | | |
+| `POST /api/v1/recruitment/offers/:id/recipient` | `OfferRecipient` → `OfferDetail` | `recruitment` edit | | Change Email on a sent offer: the address on the candidate (`candidates.correctEmailIn`) and on their signature, then a fresh link mailed to it, every earlier one revoked |
 | `POST /api/v1/recruitment/offers/:id/withdraw` | `OfferWithdraw` → `OfferDetail` | `recruitment` edit | | with its approval, approved or sent |
 | `POST /api/v1/recruitment/offers/:id/sign` | `SignSubmit` → `OfferDetail` | `recruitment` view, and the signer named on its request | | the company's signature, in the hub |
 | `GET /api/v1/recruitment/offers/:id/document` | PDF | `recruitment` view | | the sealed copy once there is one |
@@ -225,16 +225,16 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Recruitment · Offers | the offers list (number, candidate, role, compensation, status, expiry); the offer's letter, approval chain and signers; New Offer, Send Offer, Withdraw | help on Score: the weighted total when the offer was made | the approval snapshot rule, the two hashes: §6 here, the manual |
+| Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list (candidate, role, annual compensation, status, expiry); the offer's summary, Monthly Pay with Outside Range and its reason, Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates), the letter on paper and Download PDF; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
 | Recruitment · Onboarding | the cases list (hire, role, start date, status, items outstanding); a case's checklist with each item's state, the contract, the plan steps | help on Pre-Onboarding: every required document verified and the contract signed | why documentation comes first: §3 here |
-| Public · Sign Offer | the letter, the signing steps, Accept and Sign, Decline the Offer, the outcome | help on the email code | "this document is locked and verifiable" reassurance: never shown |
+| Public · Sign Offer | the letter, Signers, the three steps (Read the Letter, Confirm Your Email, Sign Below), Send Code, the code, full name, title, Draw or Type, Agree to Sign Electronically, Accept and Sign, Decline the Offer, the outcome | help on Email Code | "this document is locked and verifiable" reassurance: never shown |
 | Public · Upload Documents | the privacy notice to accept, each item with its state, upload | help on BVN | how the files are stored: the manual |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Recruitment · Offers | offer cards with a status pill; a tapped card opens the offer in a bottom sheet | the compensation column (in the sheet instead) | Send Offer, full width in the sheet | bottom bar Recruitment; tabs scroll sideways |
+| Recruitment · Offers | the four figures two to a row, then offer cards with a status pill; a tapped card opens the offer in a full bottom sheet | the role, compensation and expiry columns (in the sheet instead); the page subtitle | the record's next step (Submit for Approval, Sign for Company or Send Offer), full width in the sheet; New Offer in Quick Actions | bottom bar Recruitment; tabs scroll sideways |
 | Recruitment · Onboarding | case cards with items outstanding; the case opens in a sheet | the plan's due dates (in the step) | Verify, full width per item | as above |
 | Public · Sign Offer | the role and expiry, then the letter, then the signature box | the steps list | Accept and Sign, full width at the foot | the public header menu |
 
@@ -244,7 +244,11 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 - `/sign` with no token shows the guidance screen (Use Your Offer Email), never Not Found (GE, #82).
 - The candidate declines after accepting: not possible; a signed offer is locked.
 - The vacancy is closed while an offer is open: the offer stands; Not Progress All skips it.
-- The hire's email bounces: the offer shows the failed send; Resend after editing the address.
+- The hire's email bounces: when the mail server refuses the candidate's address for good after the
+  offer was sent, the offer shows it (`send_refused_at`, read from the System Sender's Refused
+  Addresses, `mail_refusal`; mail accepted for the address later clears it). Change Email corrects
+  the address on the candidate and their signature and sends a fresh link; an address another
+  candidate holds is refused. A bounce that comes back later as a mail of its own is not seen.
 - A file over the upload engine's limit: refused, with the limit named.
 - No document requirements set: Send Offer is refused until the checklist has at least one required item.
 - The hire leaves before the start date: Withdraw on the case ends it; the employee is archived.
@@ -282,3 +286,5 @@ Open:
 - 06/11/2026 · AJ · PR 2, the signatures service built (§5's signing and verification routes, §7's events and the sealing): `defineSignable` for each signed record type, the company's signatory signing in the hub, the email code, the QR key that outlives a public link.
 - 06/11/2026 · AJ · PR 3, the offers backend (§3 steps 1 to 4, §5, §6, §7, §9): the Offer Signatory setting, the letter generated and its request opened at approval with the wording's version kept, Send making the link after commit, expiry through `signature-reminders` (no `offer-expiry` job), Head of Department's recruitment `approve` grant for the flow's first stage, `offer.accepted` in place of `offer.signed`.
 - 07/11/2026 · AJ · Merged with `main` after GE's hand-over (#88): `offer-sent` uses Candidate Emails' wording and `candidates.OfferSentEmailVars` (the offers contract's own copy removed); Send moves the card to Offer, and an offer ending unsigned moves it back to Shortlist (`offerEndedIn`).
+- 07/11/2026 · AJ · PR 4, the screens (§2, §5, §10): Recruitment · Offers on the contract (the figures, the list beside the offer, Monthly Pay against the vacancy's range, the approval with Approve and Reject through the workflow routes for whom it waits on, Signers, History from the offer's dates, the letter on paper, the actions per `can_*`; New and Edit Offer as a four-step wizard; Sign for the Company; Offer Settings), opened by `?id=`, `?new=1`, `?application=`, `?status=` and `?panel=settings`; `OfferListQuery.application_id` for the board's Open Offer (Make Offer on a shortlisted card); Sign Offer and Verify Document on the signatures routes (the email code, name, title, draw or type, the consent, the signers; every signer and the status on Verify). The code's field messages are four words (Ask for another code).
+- 07/11/2026 · AJ · PR 4: the failed send (§5, §11): `OfferDetail.candidate_email`, `send_refused_at` and `can_change_email`; Change Email (`POST /:id/recipient`, `OfferRecipient`) through `candidates.correctEmailIn` and `signatures.setSignerEmailIn`.

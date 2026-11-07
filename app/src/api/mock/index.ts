@@ -20,6 +20,7 @@ import "./modules/performance";
 import "./modules/reviews";
 import "./modules/queries";
 import "./modules/recruitment";
+import "./modules/offers";
 import "./modules/payroll";
 import "./modules/partnerships";
 import "./modules/partnerships_categories";

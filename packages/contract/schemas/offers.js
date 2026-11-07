@@ -28,7 +28,7 @@
  * string, NGN only.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, email, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
 const { DocumentRef } = require("./documents");
 const { InterviewDecision } = require("./interviews");
 const { EmploymentType, WorkPattern, PersonRef } = require("./organisation");
@@ -120,6 +120,13 @@ const OfferDetail = OfferRow.extend({
   declined_at: isoDateTime.nullable(),
   withdrawn_at: isoDateTime.nullable(),
   end_reason: z.string().nullable(),
+  /** Where the candidate's mail goes: their address on the application. */
+  candidate_email: z.string(),
+  /**
+   * When the mail server refused that address for good, after the offer was last sent (the System
+   * Sender's Refused Addresses); null when nothing was refused, or mail to it has gone through since.
+   */
+  send_refused_at: isoDateTime.nullable(),
   can_edit: z.boolean(),
   can_submit: z.boolean(),
   /** The reader is the Offer Signatory and the company has not signed yet. */
@@ -127,12 +134,16 @@ const OfferDetail = OfferRow.extend({
   can_send: z.boolean(),
   can_resend: z.boolean(),
   can_withdraw: z.boolean(),
+  /** Sent, and the reader may edit: the candidate's address can be corrected and the link sent again. */
+  can_change_email: z.boolean(),
 });
 
 const OfferListQuery = listQuery(
   {
     status: OfferStatus.optional(),
     vacancy_id: uuid.optional(),
+    /** One application's offers: the board's Offer column opens its card's offer. */
+    application_id: uuid.optional(),
   },
   ["created_at", "expires_at", "number", "annual_compensation"],
 );
@@ -190,6 +201,12 @@ const OfferEdit = OfferFields.partial();
 
 /** Withdraw an offer that is with its approval, approved or sent: the reason the record keeps. */
 const OfferWithdraw = z.object({ reason: text(500) }).strict();
+
+/**
+ * POST /recruitment/offers/:id/recipient (Change Email): a sent offer's candidate address
+ * corrected, on the candidate and on their signature, and a fresh link mailed to it.
+ */
+const OfferRecipient = z.object({ email }).strict();
 
 /** GET /recruitment/offers/draft: the application New Offer is for. */
 const OfferDraftQuery = z.object({ application_id: uuid }).strict();
@@ -367,6 +384,9 @@ const TABLES = {
       can_send: "approved and signed for the company, and the reader may edit",
       can_resend: "sent, and the reader may edit",
       can_withdraw: "with its approval, approved or sent, and the reader may edit",
+      candidate_email: "candidate.email, through application",
+      send_refused_at: "mail_refusal.last_refused_at for the candidate's address, when after sent_at",
+      can_change_email: "sent, and the reader may edit",
     },
   },
   OfferListQuery: { table: null, reason: "list controls and filters for the offers" },
@@ -376,6 +396,7 @@ const TABLES = {
   OfferCreate: { table: "offer", virtual: FIELDS },
   OfferEdit: { table: "offer", virtual: FIELDS },
   OfferWithdraw: { table: null, reason: "the reason, kept as end_reason" },
+  OfferRecipient: { table: null, reason: "written to candidate.email and the candidate's signature.signer_email" },
   OfferDraft: { table: null, reason: "New Offer's starting values, from the application and its vacancy" },
   OfferDraftQuery: { table: null, reason: "the application New Offer starts from" },
   OfferCard: { table: null, reason: "the assistant's New Offer: written to offer and offer_pay_line by the same create" },
@@ -404,6 +425,7 @@ module.exports = {
   OfferCreate,
   OfferEdit,
   OfferWithdraw,
+  OfferRecipient,
   OfferDraft,
   OfferDraftQuery,
   OfferCard,

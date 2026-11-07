@@ -26,6 +26,7 @@ module.exports = {
   sign: async (req, res) => ok(res, await service.sign(withActor(req), scopeOf(req), id(req), req.validated.body, meta(req))),
   send: async (req, res) => ok(res, await service.send(withActor(req), scopeOf(req), id(req))),
   resend: async (req, res) => ok(res, await service.resend(withActor(req), scopeOf(req), id(req))),
+  changeEmail: async (req, res) => ok(res, await service.changeEmail(withActor(req), scopeOf(req), id(req), req.validated.body)),
   withdraw: async (req, res) => ok(res, await service.withdraw(withActor(req), scopeOf(req), id(req), req.validated.body)),
   document: async (req, res) => vault.serve(req, res, await service.documentOf(id(req), scopeOf(req))),
   settings: async (_req, res) => ok(res, await service.settings()),

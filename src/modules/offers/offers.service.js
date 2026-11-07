@@ -175,12 +175,15 @@ async function detailOf(db, o, user) {
     declined_at: iso(o.declined_at),
     withdrawn_at: iso(o.withdrawn_at),
     end_reason: o.end_reason,
+    candidate_email: o.candidate_email,
+    send_refused_at: o.status === "sent" ? iso(await repo.refusedSince(db, o.candidate_email, o.sent_at)) : null,
     can_edit: editable && o.status === "draft",
     can_submit: editable && o.status === "draft",
     can_sign: o.status === "approved" && Boolean(mine) && Boolean(company) && company.status === "pending",
     can_send: editable && o.status === "approved" && Boolean(company) && company.status === "signed",
     can_resend: editable && o.status === "sent",
     can_withdraw: editable && ["approval", "approved", "sent"].includes(o.status),
+    can_change_email: editable && o.status === "sent",
   };
 }
 
@@ -543,6 +546,27 @@ async function resend(actor, scope, id) {
   return detail;
 }
 
+/**
+ * Change Email (guide §11, the hire's email bounces): a sent offer's candidate address corrected
+ * on the candidate (candidates.correctEmailIn, M4's one write path) and on their signature, then a
+ * fresh link mailed to it after commit, every earlier one revoked, as Resend does.
+ */
+async function changeEmail(actor, scope, id, body) {
+  const { detail, row, link } = await tx(async (client) => {
+    const o = await visible(client, id, scope, { lock: true });
+    if (!(await mayEdit(actor, o))) throw notFound();
+    if (o.status !== "sent") throw refused("NOT_SENT", "Only a sent offer can be resent");
+    await candidates.correctEmailIn(client, actor, o.application_id, body.email);
+    await signatures.setSignerEmailIn(client, o.signature_request_id, "candidate", body.email);
+    const fresh = await repo.get(client, id);
+    const l = await linkIn(client, actor, fresh);
+    await emit(client, { key: EVENTS.OFFER_RESENT, entity: { type: SUBJECT, id }, actor, payload: ownerPayload(fresh) });
+    return { detail: await detailOf(client, fresh, actor), row: fresh, link: l };
+  });
+  await mail(row, link);
+  return detail;
+}
+
 /* ------------------------------------------------------------------ *
  * Ending
  * ------------------------------------------------------------------ */
@@ -740,6 +764,7 @@ module.exports = {
   sign,
   send,
   resend,
+  changeEmail,
   withdraw,
   withdrawForApplication,
   letterOf,

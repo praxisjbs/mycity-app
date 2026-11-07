@@ -52,7 +52,7 @@ const SORTS = {
 
 /** One page of offers in scope. */
 function list(db, query, scope) {
-  const params = [query.status || null, query.vacancy_id || null, query.q || null];
+  const params = [query.status || null, query.vacancy_id || null, query.q || null, query.application_id || null];
   const s = scopeClause(scope, { column: "x.hiring_manager_id" }, params);
   return pageQuery(
     db,
@@ -61,6 +61,7 @@ function list(db, query, scope) {
       WHERE ($1::text IS NULL OR x.status = $1)
         AND ($2::uuid IS NULL OR x.vacancy_id = $2)
         AND ($3::text IS NULL OR x.haystack LIKE '%' || search_fold($3) || '%')
+        AND ($4::uuid IS NULL OR x.application_id = $4)
         ${s.and}
       ORDER BY ${orderBy(query, SORTS, "x.offer_id")}`,
     params,
@@ -73,6 +74,20 @@ async function get(db, id, { lock = false } = {}) {
   if (lock) await db.query("SELECT 1 FROM offer WHERE offer_id = $1 FOR UPDATE", [id]);
   const { rows } = await db.query(`SELECT * FROM (${ROWS}) x WHERE x.offer_id = $1`, [id]);
   return rows[0] || null;
+}
+
+/**
+ * When the mail server last refused this address for good, if that was at or after `since` (the
+ * System Sender's Refused Addresses, shared/integrations/refusals.js). Mail accepted for the address
+ * takes it off that list, so a row means it is still refused.
+ */
+async function refusedSince(db, email, since) {
+  if (!email || !since) return null;
+  const { rows } = await db.query(
+    "SELECT last_refused_at FROM mail_refusal WHERE email = $1::citext AND last_refused_at >= $2",
+    [email, since],
+  );
+  return rows[0] ? rows[0].last_refused_at : null;
 }
 
 /** The offer a signature request is for. */
@@ -294,6 +309,7 @@ async function letterSavedAt(db, kind, key) {
 }
 
 module.exports = {
+  refusedSince,
   SIGNATORY_SETTING,
   list,
   get,

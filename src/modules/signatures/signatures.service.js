@@ -180,6 +180,18 @@ async function setExpiryIn(client, signatureRequestId, expiresAt) {
     throw refused("NOT_OPEN", "This document can no longer be signed");
 }
 
+/**
+ * A pending signer's address corrected, in the caller's transaction (an offer's Change Email):
+ * the signer of `role` outside the hub. Make their link afterwards with issueLinks, which revokes
+ * the old one. Refused when nobody of that role still has to sign.
+ */
+async function setSignerEmailIn(client, signatureRequestId, role, email) {
+  const r = await repo.request(client, signatureRequestId, { forUpdate: true });
+  if (!r || r.status !== "pending") throw refused("NOT_OPEN", "This document can no longer be signed");
+  if (!(await repo.setSignerEmail(client, signatureRequestId, role, email)))
+    throw refused("NOT_OPEN", "This document can no longer be signed");
+}
+
 /** The signers of a request as a record shows them (SignerView), in signing order. */
 async function signersOf(db, signatureRequestId) {
   return (await repo.signaturesOf(db, signatureRequestId)).map(signerView);
@@ -344,9 +356,9 @@ async function verifyCode(token, entered) {
     const { r, s } = await opened(client, token, { forUpdate: true });
     await assertMayAct(client, r, s);
     if (!s.code_hash || !s.code_expires_at || new Date(s.code_expires_at) <= new Date())
-      return { error: new AppError("CODE_EXPIRED", "Ask for a new code", 422, { code: ["Ask for a new code"] }) };
+      return { error: new AppError("CODE_EXPIRED", "Ask for a new code", 422, { code: ["Ask for another code"] }) };
     if (s.code_attempts >= code.CODE_TRIES)
-      return { error: new AppError("CODE_LOCKED", "Too many tries. Ask for a new code", 422, { code: ["Ask for a new code"] }) };
+      return { error: new AppError("CODE_LOCKED", "Too many tries. Ask for a new code", 422, { code: ["Ask for another code"] }) };
     if (!code.matches(s.signature_id, entered, s.code_hash)) {
       await repo.countWrongCode(client, s.signature_id);
       return { error: new AppError("CODE_WRONG", "That code is not right", 422, { code: ["Wrong code"] }) };
@@ -495,6 +507,7 @@ module.exports = {
   requestIn,
   issueLinks,
   setExpiryIn,
+  setSignerEmailIn,
   signersOf,
   endFor,
   expireLapsed,

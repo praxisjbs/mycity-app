@@ -172,6 +172,10 @@ describeDb("Recruitment · Offers against the real migrations", () => {
 
     const list = await h.as("ops").get("/recruitment/offers?status=draft");
     expect(list.body.data.map((o) => o.offer_id)).toContain(made.body.offer_id);
+    // The board's Offer column opens a card's offer by its application.
+    const mine = await h.as("ops").get(`/recruitment/offers?application_id=${appId}`);
+    expect(mine.body.data.map((o) => o.offer_id)).toEqual([made.body.offer_id]);
+    expect((await h.as("ops").get(`/recruitment/offers?application_id=${early}`)).body.data).toEqual([]);
     expect((await h.as("ops").get("/recruitment/offers/summary")).body.drafts).toBeGreaterThanOrEqual(1);
   });
 
@@ -223,6 +227,43 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     expect(done.document.document_id).not.toBe(after.document.document_id);
     const hashes = await one("SELECT array_agg(DISTINCT content_hash) AS h FROM signature WHERE signature_request_id = (SELECT signature_request_id FROM offer WHERE offer_id = $1)", [offer.offer_id]);
     expect(hashes.h).toHaveLength(1);
+  }, 60_000);
+
+  test("a refused send shows on the offer; Change Email corrects the address and sends a fresh link", async () => {
+    const appId = await applicant("Ifunanya");
+    await h.as("ops").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.ops.employee_id });
+    const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    await approved(offer.offer_id);
+    const sent = await signedAndSent(offer.offer_id);
+    expect(sent).toMatchObject({ candidate_email: "ifunanya.okafor@example.test", send_refused_at: null, can_change_email: true });
+    const [first] = mails("offer-sent").filter((m) => m.to.email === "ifunanya.okafor@example.test");
+    const oldToken = tokenOf(first);
+
+    // The mail server refused the address for good (system mail keeps it on Refused Addresses).
+    await require("../../src/shared/integrations/refusals").record({ emails: ["ifunanya.okafor@example.test"], template: "offer-sent", smtp_code: 550, reply: "no such user" });
+    const refusedNow = (await h.as("ops").get(`/recruitment/offers/${offer.offer_id}`)).body;
+    expect(refusedNow.send_refused_at).toBeTruthy();
+
+    // An address another candidate holds is refused; a good one is put on the candidate and the signer.
+    const other = await applicant("Bola");
+    const taken = await one("SELECT k.email::text AS email FROM application a JOIN candidate k USING (candidate_id) WHERE a.application_id = $1", [other]);
+    const clash = await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/recipient`).send({ email: taken.email });
+    expect(clash.status).toBe(409);
+    expect(clash.body.error.fields).toEqual({ email: ["Another candidate has it"] });
+
+    const fixed = await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/recipient`).send({ email: "ifunanya.okafor@example.org" });
+    expect(fixed.status).toBe(200);
+    expect(fixed.body).toMatchObject({ candidate_email: "ifunanya.okafor@example.org", send_refused_at: null, status: "sent" });
+    expect(await one("SELECT k.email::text AS email FROM application a JOIN candidate k USING (candidate_id) WHERE a.application_id = $1", [appId])).toEqual({ email: "ifunanya.okafor@example.org" });
+    expect(await one("SELECT signer_email::text AS e FROM signature WHERE signature_request_id = (SELECT signature_request_id FROM offer WHERE offer_id = $1) AND signer_role = 'candidate'", [offer.offer_id])).toEqual({ e: "ifunanya.okafor@example.org" });
+    const [again] = mails("offer-sent").filter((m) => m.to.email === "ifunanya.okafor@example.org");
+    expect(again).toBeTruthy();
+    // The old link stops working; the new one opens the offer.
+    expect((await pub().get(`/sign/${oldToken}`)).status).toBe(404);
+    expect((await pub().get(`/sign/${tokenOf(again)}`)).status).toBe(200);
+    // Only a sent offer's address is changed here.
+    const draft = (await h.as("ops").post("/recruitment/offers").send(terms(await applicant("Tayo")))).body;
+    expect((await h.as("ops").post(`/recruitment/offers/${draft.offer_id}/recipient`).send({ email: "tayo@example.org" })).body.error.code).toBe("NOT_SENT");
   }, 60_000);
 
   test("Rejected returns to draft with the reason; a declined offer ends and the application takes a new one", async () => {

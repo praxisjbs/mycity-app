@@ -5,7 +5,7 @@
  *   GET  /, /summary, /:id, /:id/document   `recruitment` view: scope by the vacancy's hiring manager
  *   GET  /draft                             `recruitment` create: what New Offer starts from
  *   POST /                                  `recruitment` create: New Offer
- *   PATCH /:id, POST /:id/submit, /send, /resend, /withdraw   `recruitment` edit, in scope
+ *   PATCH /:id, POST /:id/submit, /send, /resend, /recipient, /withdraw   `recruitment` edit, in scope
  *   POST /:id/sign                          `recruitment` view: the Offer Signatory named on its request
  *                                           signs for the company (signatures.signAsStaffIn checks them)
  *   GET, PUT /settings/...                  `recruitment` edit: Offer Signatory and the standard wording
@@ -40,6 +40,7 @@ route(router, "post", "/:id/submit", { ...byId, body: c.common.EmptyBody, respon
 route(router, "post", "/:id/sign", { ...byId, body: c.signatures.SignSubmit, response: o.OfferDetail, summary: "Sign for the company" }, view, controller.sign);
 route(router, "post", "/:id/send", { ...byId, body: c.common.EmptyBody, response: o.OfferDetail, summary: "Send the offer to the candidate" }, edit, controller.send);
 route(router, "post", "/:id/resend", { ...byId, body: c.common.EmptyBody, response: o.OfferDetail, summary: "Send the signing link again" }, edit, controller.resend);
+route(router, "post", "/:id/recipient", { ...byId, body: o.OfferRecipient, response: o.OfferDetail, summary: "Correct the candidate's email and send the link again" }, edit, controller.changeEmail);
 route(router, "post", "/:id/withdraw", { ...byId, body: o.OfferWithdraw, response: o.OfferDetail, summary: "Withdraw an open offer" }, edit, controller.withdraw);
 route(router, "get", "/:id/document", { ...byId, no_content: true, summary: "The offer letter's PDF" }, view, controller.document);
 
