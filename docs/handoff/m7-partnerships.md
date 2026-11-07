@@ -9,10 +9,10 @@ with the date, and add a line to §3.
 |---|---|
 | Source of truth | `docs/guides/partnerships.md` (Status Agreed, 05/11/2026) |
 | Build plan | The guide's Appendix A (PR 1 to PR 9, lanes and order) |
-| Owner | GE (Godwin-Okoh Elisha); LA (Love Adeola) the importers; AJ the Workspace links |
+| Owner | LA (Love Adeola), M7's owner as CLAUDE.md, the guide and PROGRESS name it; GE (Godwin-Okoh Elisha) builds most PRs, LA the importers, AJ the Workspace links (the guide's Appendix A) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 `m7/leads-partners-deals` (#83) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`) |
 
 ---
 
@@ -61,11 +61,15 @@ with the date, and add a line to §3.
 - [x] Backend, conversion, duplicates, `StageSwitcher` (06/11/2026)
 - [x] Pipeline (#50), Partners (#51), Leads (#52) and both 360s, desktop and phone (06/11/2026)
 - [x] Home's partners source moved; home.md §4.1 (06/11/2026)
+- [x] Audit of PRs 1 to 3 against the guide, TB's four calls applied (the guide's §13.2, the audit) (06/11/2026)
 
 ### PR 4 · Importers and returns
 - [ ] Map Values in `shared/import`; foundation.md
-- [ ] Partnership Tracker and Partnership Returns importers; synthetic fixture
-- [ ] Returns tab and Enter Returns; settings.md chapter pictures retaken
+- [ ] Partnership Tracker and Partnership Returns importers, through `leads.createIn`, `partners.createIn`
+      and `partner_pipeline.returns.saveIn` with source `import` (ready since the audit); synthetic fixture
+- [ ] Returns tab and Enter Returns on PR 3's service and routes; settings.md chapter pictures retaken
+- [ ] Export on Partners and Leads in the tracker's columns (`partnerships.partners`, `partnerships.leads`,
+      `partnerships.deals`)
 
 ### PR 5 · Workspace links and deliverables
 - [ ] workspace.md first; Connect to Partner on projects, tasks, events; Partner filter
@@ -94,6 +98,23 @@ with the date, and add a line to §3.
 
 ## 3 · Log
 
+- 06/11/2026 · TB · Audit of PRs 1 to 3 against the guide before PR 4, with TB's four calls (the guide's
+  §13.2, the audit; §14). Who sees a deal: its owner's scope, its team, or its lead's or partner's
+  owner's, one rule everywhere, so the 360s list and count only the deals the reader sees; New Deal and
+  Edit Deal keep the owner in scope; the duplicate check stays outside scope (numbers and names only);
+  Categories' counts follow scope and the picked category lists its partners and leads (PR 2's review
+  note, done). Fixed: a reopened lost lead kept its lost reason; a signed deal's validity changed lost its
+  date; an earlier stage on a signed deal asked why before refusing; a refusal's toast said "Check the
+  highlighted fields" over nothing. Built to §10.1 where PR 3 left it out: Deal Options, Commission,
+  Validity and Team on New Deal and Edit Deal; Impact and the custom fields behind Advanced on every form;
+  the Partners and Leads lists' filters (Stage, Category, Region, Owner, Health, filterable custom fields)
+  with Owner and Region columns, Pipeline's Owner; the Partner 360's stage and health history
+  (`Partner360.history`), help on Dormant and on a stage, Signed Before the Hub on Documents, Days Since
+  Last Contact; Partners' Quiet help names its days (`PartnersSummary.quiet_days`). For PR 4: the
+  in-transaction `leads.createIn`, `partners.createIn` and `partner_pipeline.returns.saveIn` take source
+  `import` (and the batch), the deal's history line and its events carry `source`, and a new lead's deal
+  takes the lead's identified date; Export is PR 4's. Home reads `lead.owner_id` (home.md). Tests: six
+  integration tests and two screen tests. Next: PR 4 to PR 7.
 - 06/11/2026 · JP · PR 3 (`m7/leads-partners-deals`, #83): `leads`, `partners`, `partner_pipeline`'s deals
   and `interactions` (without mail) on the contract, with contacts, documents, duplicates, conversion in
   one transaction and both 360s; `StageSwitcher` in packages/ui; Pipeline (#50), Partners (#51), Leads

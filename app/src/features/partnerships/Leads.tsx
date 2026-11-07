@@ -6,6 +6,7 @@ import { BarsCard, PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import { Button, Chips, DesktopOnly, formatWhen, ListDetail, PageHeader, Pill, StatusPill, useIsPhone, useModal, useSideBySide, Who } from "@mycity/ui";
+import { filterQuery, NO_FILTERS, RecordFilters, type RecordFilterValue } from "./filters";
 import { Lead360 } from "./Lead360";
 import { DealForm } from "./forms/DealForm";
 import { LeadForm } from "./forms/LeadForm";
@@ -24,8 +25,9 @@ export function Leads({ id }: { id: string | null }) {
   const { navigate } = useRouter();
   const mayCreate = useMay("create");
   const [view, setView] = useState<View>("open");
+  const [filter, setFilter] = useState<RecordFilterValue>(NO_FILTERS);
   const s = useApi("GET /api/v1/partnerships/leads/summary");
-  const list = usePaged("GET /api/v1/partnerships/leads", { filters: view === "open" ? {} : { status: view }, sort: "name" });
+  const list = usePaged("GET /api/v1/partnerships/leads", { filters: { ...filterQuery(filter), ...(view === "open" ? {} : { status: view }) }, sort: "name" });
   const openLead = (lid: string) => navigate(`/partnerships?tab=leads&id=${lid}`);
   const newDeal = (partnerId: string) => modal.open({ title: "New Deal", wide: true, body: (close) => <DealForm partnerId={partnerId} close={close} /> });
   const newLead = () => modal.open({ title: "New Lead", wide: true, body: (close) => <LeadForm close={close} onCreated={openLead} onNewDeal={(pid) => (close(), newDeal(pid))} /> });
@@ -47,6 +49,7 @@ export function Leads({ id }: { id: string | null }) {
         />
       )}
       <Chips label="Leads" value={view} onChange={setView} options={[["open", "Open"], ["new", "New"], ["qualified", "Qualified"], ["converted", "Converted"], ["lost", "Lost"]]} className="mt-3" />
+      <RecordFilters value={filter} onChange={setFilter} kind="lead" />
       <ListDetail
         open={Boolean(id)}
         onClose={() => navigate("/partnerships?tab=leads")}
@@ -67,6 +70,8 @@ export function Leads({ id }: { id: string | null }) {
               { key: "st", label: "Status", render: (l) => (l.on_hold ? <Pill tone="warn">On Hold</Pill> : <StatusPill status={leadPill(l.status)} />) },
               { key: "s", label: "Stage", render: (l) => l.stage_label ?? "None", desktop: true },
               { key: "h", label: "Health", render: (l) => <StatusPill status={healthPill(l.health)} />, desktop: true },
+              { key: "r", label: "Region", render: (l) => l.region ?? "None", desktop: true },
+              { key: "o", label: "Owner", render: (l) => l.owner?.display_name ?? "No Owner", desktop: true },
               { key: "c", label: "Last Contact", render: (l) => (l.last_contact_at ? formatWhen(l.last_contact_at) : "Never"), desktop: true },
             ]}
           />

@@ -18,18 +18,18 @@ const returns = require("./partner_pipeline.returns");
 const id = (req) => req.validated.params.id;
 
 module.exports = {
-  listCategories: async (req, res) => sendPaged(res, await service.listCategories(req.validated.query)),
-  getCategory: async (req, res) => ok(res, await service.getCategory(id(req))),
-  createCategory: async (req, res) => created(res, await service.createCategory(withActor(req), req.validated.body)),
-  updateCategory: async (req, res) => ok(res, await service.updateCategory(withActor(req), id(req), req.validated.body)),
+  listCategories: async (req, res) => sendPaged(res, await service.listCategories(req.validated.query, scopeOf(req))),
+  getCategory: async (req, res) => ok(res, await service.getCategory(id(req), scopeOf(req))),
+  createCategory: async (req, res) => created(res, await service.createCategory(withActor(req), req.validated.body, scopeOf(req))),
+  updateCategory: async (req, res) => ok(res, await service.updateCategory(withActor(req), id(req), req.validated.body, scopeOf(req))),
 
   getTemplate: async (req, res) => ok(res, await service.getTemplate(id(req))),
-  addTemplate: async (req, res) => created(res, await service.addTemplate(withActor(req), id(req), req.validated.body)),
-  updateTemplate: async (req, res) => ok(res, await service.updateTemplate(withActor(req), id(req), req.validated.body)),
+  addTemplate: async (req, res) => created(res, await service.addTemplate(withActor(req), id(req), req.validated.body, scopeOf(req))),
+  updateTemplate: async (req, res) => ok(res, await service.updateTemplate(withActor(req), id(req), req.validated.body, scopeOf(req))),
   saveTemplateWording: async (req, res) => ok(res, await service.saveTemplateWording(withActor(req), id(req), req.validated.body)),
 
-  addChecklistItem: async (req, res) => created(res, await service.addChecklistItem(withActor(req), id(req), req.validated.body)),
-  updateChecklistItem: async (req, res) => ok(res, await service.updateChecklistItem(withActor(req), id(req), req.validated.body)),
+  addChecklistItem: async (req, res) => created(res, await service.addChecklistItem(withActor(req), id(req), req.validated.body, scopeOf(req))),
+  updateChecklistItem: async (req, res) => ok(res, await service.updateChecklistItem(withActor(req), id(req), req.validated.body, scopeOf(req))),
 
   listFields: async (req, res) => ok(res, await service.listFields(req.validated.query)),
   createField: async (req, res) => created(res, await service.createField(withActor(req), req.validated.body)),

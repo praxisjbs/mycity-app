@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { CategoryDetail, CategoryRow, CategoryTemplate, ChecklistItem, Field } from "@mycity/contract/contract.gen.ts";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { useSearchParams } from "@/lib/router";
+import { PagedTable } from "@/features/shared/sections";
+import { useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Button,
@@ -34,7 +35,7 @@ import { StartFromTracker } from "./forms/StartFromTracker";
 import { TemplateEditor } from "./forms/TemplateEditor";
 import { PipelineSettings } from "./PipelineSettings";
 import { ProofPoints } from "./ProofPoints";
-import { APPLIES_LABEL, dueText, FIELD_TYPE_LABEL, KIND_LABEL, refusal, useConfigure } from "./lib";
+import { APPLIES_LABEL, dueText, FIELD_TYPE_LABEL, KIND_LABEL, recordHref, refusal, useConfigure } from "./lib";
 
 /**
  * Partnerships · Categories (#104, `categories`; docs/guides/partnerships.md §6.3, §10): MyCity's partnership
@@ -199,7 +200,12 @@ function CategoryRecord({ id }: { id: string; onGone: () => void }) {
   const edit = () => modal.open({ title: "Edit Category", body: (close) => <CategoryForm category={d} close={close} /> });
 
   const cards: Record<Section, React.ReactNode> = {
-    defaults: <DefaultsCard d={d} edit={configure ? edit : undefined} />,
+    defaults: (
+      <div className="grid gap-4">
+        <DefaultsCard d={d} edit={configure ? edit : undefined} />
+        <RecordsCard d={d} />
+      </div>
+    ),
     templates: <TemplatesCard d={d} configure={configure} />,
     checklist: <ChecklistCard d={d} configure={configure} />,
     fields: <FieldsCard d={d} configure={configure} />,
@@ -241,6 +247,59 @@ function CategoryRecord({ id }: { id: string; onGone: () => void }) {
         SECTIONS.map(([key]) => <div key={key}>{cards[key]}</div>)
       )}
     </div>
+  );
+}
+
+/**
+ * The category's partners and leads the reader may see (§2, §6.3), a page of 25 at a time; a row opens
+ * its 360. On a phone it sits in the Defaults section, so the sheet keeps its four sections (§10.2).
+ */
+function RecordsCard({ d }: { d: CategoryDetail }) {
+  const { navigate } = useRouter();
+  const [kind, setKind] = useState<"partner" | "lead">("partner");
+  const filters = { partner_category_id: d.partner_category_id };
+  const partners = usePaged("GET /api/v1/partnerships/partners", { filters, sort: "name", enabled: kind === "partner" });
+  const leads = usePaged("GET /api/v1/partnerships/leads", { filters, sort: "name", enabled: kind === "lead" });
+  const chips = (
+    <Chips
+      label="Records"
+      value={kind}
+      onChange={setKind}
+      options={[
+        { value: "partner", label: "Partners", count: d.counts.partners },
+        { value: "lead", label: "Leads", count: d.counts.leads },
+      ]}
+      className="mb-0"
+    />
+  );
+  return kind === "partner" ? (
+    <PagedTable
+      title="In This Category"
+      list={partners}
+      right={chips}
+      rowKey={(p) => p.partner_id}
+      noun="partner"
+      onRowClick={(p) => navigate(recordHref({ type: "partner", id: p.partner_id }))}
+      empty={{ title: "No Partners Yet", text: "Partners of this category show here." }}
+      columns={[
+        { key: "n", label: "Partner", render: (p) => <Who name={p.name} sub={p.number} /> },
+        { key: "o", label: "Owner", render: (p) => p.owner?.display_name ?? "No Owner", desktop: true },
+      ]}
+    />
+  ) : (
+    <PagedTable
+      title="In This Category"
+      list={leads}
+      right={chips}
+      rowKey={(l) => l.lead_id}
+      noun="lead"
+      onRowClick={(l) => navigate(recordHref({ type: "lead", id: l.lead_id }))}
+      empty={{ title: "No Leads Yet", text: "Leads of this category show here." }}
+      columns={[
+        { key: "n", label: "Lead", render: (l) => <Who name={l.name} sub={l.number} /> },
+        { key: "o", label: "Owner", render: (l) => l.owner?.display_name ?? "No Owner", desktop: true },
+      ]}
+    />
   );
 }
 

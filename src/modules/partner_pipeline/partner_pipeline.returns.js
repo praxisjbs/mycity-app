@@ -19,25 +19,36 @@ async function page(id, query, scope) {
   return repo.returnsPage(pool, id, query);
 }
 
+/**
+ * Save a month of a locked deal's returns, in the caller's transaction, replacing what it held:
+ * Enter Returns (`entered`), or a row of the Partnership Returns import (`import`, with its batch,
+ * M7 PR 4). The caller has checked the deal and the money capability.
+ * @param {{deal_id: string, number: string}} deal  repo.lock()'s row
+ * @param {string} month  `YYYY-MM`
+ * @param {{source?: "entered"|"import", importBatchId?: string|null}} [opts]
+ */
+async function saveIn(client, actor, deal, month, body, { source = "entered", importBatchId = null } = {}) {
+  const day = firstOf(month);
+  const before = await repo.returnOf(client, deal.deal_id, day);
+  await repo.upsertReturn(client, { deal_id: deal.deal_id, month: day, ...body, source, import_batch_id: importBatchId, entered_by: actor ? actor.user_id : null });
+  const after = await repo.returnOf(client, deal.deal_id, day);
+  await emit(client, {
+    key: EVENTS.DEAL_RETURN_SAVED,
+    entity: { type: "partner_deal", id: deal.deal_id },
+    actor,
+    before: before ? { units_sold: before.units_sold, downloads: before.downloads } : null,
+    after: { units_sold: after.units_sold, downloads: after.downloads },
+    payload: { deal_id: deal.deal_id, number: deal.number, month: day, source },
+  });
+  return after;
+}
+
 /** Enter Returns (PUT /deals/:id/returns/:month): a month at a time, replacing what it held. */
 async function save(actor, scope, id, month, body) {
   return service.tx(async (client) => {
     await service.assertSeen(client, id, scope);
-    const deal = await repo.lock(client, id);
-    const day = firstOf(month);
-    const before = await repo.returnOf(client, id, day);
-    await repo.upsertReturn(client, { deal_id: id, month: day, ...body, entered_by: actor.user_id });
-    const after = await repo.returnOf(client, id, day);
-    await emit(client, {
-      key: EVENTS.DEAL_RETURN_SAVED,
-      entity: { type: "partner_deal", id },
-      actor,
-      before: before ? { units_sold: before.units_sold, downloads: before.downloads } : null,
-      after: { units_sold: after.units_sold, downloads: after.downloads },
-      payload: { deal_id: id, number: deal.number, month: day },
-    });
-    return after;
+    return saveIn(client, actor, await repo.lock(client, id), month, body);
   });
 }
 
-module.exports = { page, save };
+module.exports = { page, save, saveIn };
