@@ -196,6 +196,7 @@ function pagesOf(s, ctx) {
           signer_title: s.signer_title,
           paras: paras.map((text, j) => ({ text, lead: i === 0 && j === 0 })),
           last: i === pages.length - 1,
+          bleed: "left",
         },
         visual: null,
       }));
@@ -215,6 +216,7 @@ function pagesOf(s, ctx) {
             side_quote: pageSide === "quote",
             side_illus: pageSide === "illus",
             quote: s.pull_quote,
+            bleed: pageSide === "quote" ? "right" : null,
             visual: pageSide === "quote" ? Boolean(s.illustration) : Boolean(pageSide),
           },
           visual: !pageSide ? null : pageSide === "chart" ? { chart: s.chart } : s.illustration ? { drawing: s.illustration } : null,
@@ -223,9 +225,14 @@ function pagesOf(s, ctx) {
     }
     case "why_mycity": {
       const n = s.points.length;
+      const cols = s.chart ? 2 : n === 4 ? 4 : n === 2 ? 2 : 3;
+      // The figures as large as their column allows: the longest value and the columns decide.
+      const longest = Math.max(...s.points.map((p) => p.value.length));
+      const room = 1136 / cols / (s.chart ? 1.7 : 1);
+      const size = ["fig-xl", "fig-l", "fig-m", "fig-s"].find((_, i) => longest * [0.64, 0.5, 0.39, 0.3][i] * 100 <= room) || "fig-s";
       return [
         {
-          vm: { heading: s.heading, points: s.points, count: n, cols: s.chart ? 2 : n === 4 ? 4 : 3, visual: Boolean(s.chart) },
+          vm: { heading: s.heading, points: s.points.map((p) => ({ ...p, size })), count: n, cols, visual: Boolean(s.chart) },
           visual: s.chart ? { chart: s.chart } : null,
         },
       ];
@@ -320,7 +327,7 @@ function pagesOf(s, ctx) {
       const qr = s.show_qr && ctx.qr ? ctx.qr : null;
       return [
         {
-          vm: { heading: s.heading, steps: s.steps.map((text) => ({ text })), contact: s.contact, qr, visual: !qr && Boolean(s.illustration) },
+          vm: { heading: s.heading, steps: s.steps.map((text) => ({ text })), contact: s.contact, qr, visual: !qr && Boolean(s.illustration), bleed: "right" },
           visual: !qr && s.illustration ? { drawing: s.illustration } : null,
         },
       ];
@@ -422,6 +429,7 @@ function renderProposal(content, ctx, { mode = "pdf" } = {}) {
           key: p.s.key,
           label: labelOf(p.s),
           tone: TONES[p.s.layout] || null,
+          bleed: p.vm.bleed || null,
           route: i > 0 && p.s.layout !== "closing",
           reference: full.reference,
           page_no: i + 1,
