@@ -19,6 +19,12 @@
  *    `{{#each list}}` repeats for each item; inside it, names read from the item first,
  *    then from outside, and `@index` / `@number` give the position (0- and 1-based).
  *  - A layout includes its page with `{{> body}}`.
+ *  - A value can be a block the code built (never one a template or a person writes): a list of
+ *    words prints as numbered clauses, a grid (`{ head: [...], rows: [[...]] }`) as a table, and a
+ *    signature the hub stamped (`{ signature: "data:image/png;base64,…", typed, name }`) as its
+ *    image, or its typed name in a signature face. Every cell and clause is escaped as any value
+ *    is; a signature's picture is only ever a PNG data URL (docs/guides/partnerships.md §6.8, an
+ *    agreement's options, its delivery checklist and its execution block).
  *  - A name that walks the prototype ("__proto__", "constructor") is refused when the
  *    template is parsed, and a value is only read from an object's own properties.
  *  - A template that does not parse fails at parse time, naming the line: in Settings
@@ -192,7 +198,60 @@ const truthy = (v) =>
     (Array.isArray(v) && v.length === 0)
   );
 
-function renderNodes(nodes, scopes, body, escape = escapeHtml) {
+/** A signature's picture: a PNG the signing pad drew and the vault re-encoded, nothing else. */
+const PNG_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
+
+const isGrid = (v) =>
+  v !== null && typeof v === "object" && !Array.isArray(v) && Array.isArray(v.head) && Array.isArray(v.rows);
+const isSignature = (v) =>
+  v !== null && typeof v === "object" && !Array.isArray(v) && ("signature" in v || "typed" in v) && !isGrid(v);
+const isClauses = (v) => Array.isArray(v) && v.every((x) => typeof x === "string" || typeof x === "number");
+const cellText = (v) => (v === null || v === undefined ? "" : typeof v === "object" ? "" : String(v));
+
+/** A signature as HTML: the stamped picture, or the typed name; empty before it is signed. */
+function signatureHtml(v) {
+  const name = escapeHtml(cellText(v.name));
+  if (typeof v.signature === "string" && PNG_DATA_URL.test(v.signature))
+    return `<img class="doc-signature" src="${v.signature}" alt="Signature of ${name}">`;
+  if (v.typed) return `<span class="doc-signature-typed">${escapeHtml(cellText(v.typed))}</span>`;
+  return "";
+}
+
+/** A block value in an HTML template. */
+function blockHtml(v) {
+  if (isGrid(v)) {
+    const row = (cells, tag) => `<tr>${cells.map((c) => `<${tag}>${escapeHtml(cellText(c))}</${tag}>`).join("")}</tr>`;
+    return `<table>${row(v.head, "th")}${v.rows.map((r) => row(Array.isArray(r) ? r : [], "td")).join("")}</table>`;
+  }
+  if (isSignature(v)) return signatureHtml(v);
+  if (isClauses(v)) return v.length ? `<ol>${v.map((x) => `<li>${escapeHtml(cellText(x))}</li>`).join("")}</ol>` : "";
+  return "";
+}
+
+/**
+ * A block value in a Markdown template: a pipe table or numbered clauses, each cell held as any value
+ * is (holdMarkdown), on lines of their own. A signature leaves a marker the HTML step stamps.
+ */
+function blockMarkdown(v, hold, stamps) {
+  if (isGrid(v)) {
+    const width = Math.max(v.head.length, 1);
+    const line = (cells) => `| ${Array.from({ length: width }, (_, k) => hold(cellText(cells[k])) || " ").join(" | ")} |`;
+    const rule = `|${" --- |".repeat(width)}`;
+    return `\n\n${[line(v.head), rule, ...v.rows.map((r) => line(Array.isArray(r) ? r : []))].join("\n")}\n\n`;
+  }
+  if (isSignature(v)) {
+    stamps.push(signatureHtml(v));
+    return `${STAMP_OPEN}${stamps.length - 1}${STAMP_CLOSE}`;
+  }
+  if (isClauses(v)) return v.length ? `\n\n${v.map((x, k) => `${k + 1}. ${hold(cellText(x))}`).join("\n")}\n\n` : "";
+  return "";
+}
+
+/** Private-use marks around a stamped signature's place in a Markdown template, outside MD_HELD's range. */
+const STAMP_OPEN = "\ue010";
+const STAMP_CLOSE = "\ue011";
+
+function renderNodes(nodes, scopes, body, escape = escapeHtml, stamps = null) {
   let out = "";
   for (const n of nodes) {
     switch (n.kind) {
@@ -206,17 +265,15 @@ function renderNodes(nodes, scopes, body, escape = escapeHtml) {
         const v = lookup(scopes, n.path);
         if (n.helper === "markdown") out += markdownToHtml(v || "");
         else if (n.helper) out += escape(HELPERS[n.helper](v));
-        else
-          out +=
-            v === null || v === undefined
-              ? ""
-              : escape(typeof v === "object" ? "" : v);
+        else if (v !== null && typeof v === "object")
+          out += stamps ? blockMarkdown(v, escape, stamps) : blockHtml(v);
+        else out += v === null || v === undefined ? "" : escape(v);
         break;
       }
       case "if":
         out += truthy(lookup(scopes, n.path))
-          ? renderNodes(n.children, scopes, body, escape)
-          : renderNodes(n.otherwise || [], scopes, body, escape);
+          ? renderNodes(n.children, scopes, body, escape, stamps)
+          : renderNodes(n.otherwise || [], scopes, body, escape, stamps);
         break;
       case "each": {
         const list = lookup(scopes, n.path);
@@ -228,6 +285,7 @@ function renderNodes(nodes, scopes, body, escape = escapeHtml) {
               [...scopes, { data, item, index }],
               body,
               escape,
+              stamps,
             );
           });
         }
@@ -276,7 +334,53 @@ const releaseMarkdown = (html) =>
  */
 function renderMarkdown(template, data = {}) {
   const tree = Array.isArray(template) ? template : parse(template);
-  return releaseMarkdown(markdownToHtml(renderNodes(tree, [{ data }], "", holdMarkdown)));
+  const stamps = [];
+  const html = releaseMarkdown(markdownToHtml(renderNodes(tree, [{ data }], "", holdMarkdown, stamps)));
+  return html.replace(new RegExp(`${STAMP_OPEN}(\\d+)${STAMP_CLOSE}`, "g"), (_, k) => stamps[Number(k)] || "");
 }
 
-module.exports = { parse, render, renderMarkdown, variablesOf, TemplateError, HELPERS };
+/**
+ * Fill a Markdown template's names and give back Markdown, not HTML: an agreement's wording filled
+ * from its record for the person to edit in Draft. Values are held exactly as renderMarkdown holds
+ * them and released afterwards, so a value prints as written but can never close a name or open a
+ * new one ("{{" in a partner's name is kept as text). `keep` names the roots left as they are, to be
+ * filled later (`signer`, at signing).
+ * @param {string} template
+ * @param {object} data
+ * @param {{keep?: string[]}} [opts]
+ * @returns {string}
+ */
+function fillMarkdown(template, data = {}, { keep = [] } = {}) {
+  const tree = Array.isArray(template) ? template : parse(template);
+  const kept = new Set(keep);
+  // A value never opens or closes a name, however it was typed.
+  const value = (v) => holdMarkdown(v).replace(/\{\{/g, "{ {").replace(/\}\}/g, "} }");
+  const out = [];
+  const walk = (nodes, scopes) => {
+    for (const n of nodes) {
+      const waits = n.path && kept.has(n.path.split(".")[0]);
+      if (n.kind === "text") out.push(n.text);
+      else if (n.kind === "var" && waits) out.push(`{{ ${n.helper ? `${n.helper} ` : ""}${n.path} }}`);
+      else if (n.kind === "var") {
+        const v = lookup(scopes, n.path);
+        if (n.helper === "markdown") out.push(String(v || "").replace(/\{\{/g, "{ {").replace(/\}\}/g, "} }"));
+        else if (n.helper) out.push(value(HELPERS[n.helper](v)));
+        else if (v !== null && typeof v === "object") out.push(blockMarkdown(v, value, []));
+        else out.push(v === null || v === undefined ? "" : value(v));
+      } else if (n.kind === "if") {
+        // A part that waits for signing is kept: its names are filled when the document is signed.
+        walk(waits || truthy(lookup(scopes, n.path)) ? n.children : n.otherwise || [], scopes);
+      } else if (n.kind === "each" && !waits) {
+        const list = lookup(scopes, n.path);
+        if (Array.isArray(list))
+          list.forEach((item, index) =>
+            walk(n.children, [...scopes, { data: item !== null && typeof item === "object" ? item : {}, item, index }]),
+          );
+      }
+    }
+  };
+  walk(tree, [{ data }]);
+  return releaseMarkdown(out.join(""));
+}
+
+module.exports = { parse, render, renderMarkdown, fillMarkdown, variablesOf, TemplateError, HELPERS };

@@ -1,7 +1,7 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "c9a6a56103cfc18036ddffdfd006f6370e11ba64dbd689c01936603efca3d458",
-  "schemas": 1873,
+  "source_hash": "4bbcd6dd1c159da1cbbc1cf620c2bac4d05ad62f0ad12f0ee96a18ced2691c27",
+  "schemas": 1874,
   "endpoints": 825,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
@@ -50,7 +50,7 @@
     "packages/contract/schemas/partnership_analytics.js": "5bc40a5f276b280da6d9625187d1e61cfdd801cebd60256ca13c4581ae891097",
     "packages/contract/schemas/payroll.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/payslips.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/policies.js": "bd0b66366708fe398467bd1934a461f27cff2e51b7eae39622399f164cc76f2e",
+    "packages/contract/schemas/policies.js": "069c09178e09da0d7dad8ffd0d6551d4108a4c0ab78a0c0c0dee4b0fa4ba4a3e",
     "packages/contract/schemas/projects.js": "65f2359ecf258b0055c351e5c2b5ff5d6510313497a5f9b14eece1633a0158db",
     "packages/contract/schemas/proposals.js": "e20b928b910678f2aee6b72d719d191cd3b191ad30b89ed27ad601f951efff92",
     "packages/contract/schemas/queries.js": "eff94a0fefb6dc5776b26a732f65bbdfa9e75997c75cf899cdf004f5285e1b7f",
@@ -64,7 +64,7 @@
     "packages/contract/schemas/search.js": "d2d2cc6675a7948131bb4b28c313f85997c4391d3641b897c1cc58b2cfb1c3ed",
     "packages/contract/schemas/security.js": "6cf6f6a58006e811045e71036358fd5a74aeccc27f82db0174acc5cfd4c329e0",
     "packages/contract/schemas/settings.js": "dce0330eaf76c0c347e7f01e4cede61f2915097d620a67d08761abcd871816d9",
-    "packages/contract/schemas/signatures.js": "bcaeabdebce4f04c442efe1aa81e1aaeafff894c2c6b52b48045cc32a6ac1b5a",
+    "packages/contract/schemas/signatures.js": "774ccc140fff7c4481d3bec48266d714d1b1f8bf4b4993ef2ae4a61fb34b2c48",
     "packages/contract/schemas/statutory.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/system_health.js": "b8f88ebb106feef46f22f1ddefceede5619593afccd7244f75d6b6db626378f7",
     "packages/contract/schemas/talent_pool.js": "0838168b19d903f183f38a489f4de88ad080f17145fed88da3e8043e66e7fe19",

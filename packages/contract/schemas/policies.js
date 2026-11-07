@@ -59,12 +59,19 @@ const RichTextSpan = z
   })
   .strict();
 
-/** One block of text: a heading, a paragraph, or a list's items. */
+/** One cell of a table block: its runs of text. */
+const RichTextCell = z.array(RichTextSpan);
+
+/**
+ * One block of text: a heading, a paragraph, a list's items, or a table (its header row and its
+ * rows, every row as long as the header; an agreement's Financials grid).
+ */
 const RichTextBlock = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("heading"), level: z.number().int().min(2).max(4), spans: z.array(RichTextSpan) }).strict(),
   z.object({ kind: z.literal("paragraph"), spans: z.array(RichTextSpan) }).strict(),
   z.object({ kind: z.literal("bullets"), items: z.array(z.array(RichTextSpan)) }).strict(),
   z.object({ kind: z.literal("numbered"), items: z.array(z.array(RichTextSpan)) }).strict(),
+  z.object({ kind: z.literal("table"), head: z.array(RichTextCell).min(1).max(12), rows: z.array(z.array(RichTextCell)).max(100) }).strict(),
 ]);
 
 /** A rules policy as staff read it: a section's sentences, each tagged when the version changed it. */

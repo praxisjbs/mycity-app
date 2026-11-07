@@ -98,6 +98,13 @@ with the date, and add a line to §3.
 
 ## 3 · Log
 
+- 07/11/2026 · TB · PR 6 (`m7/agreements-signing`) started, draft, unfinished. TB's calls: the one
+  signatures service is AJ's from #85, brought in unchanged (credited) and improved here, landing on
+  `main` through PR 6; AJ's migration `5020` carried byte for byte (gate 3 needs a named exception);
+  our schema from `7100`; Sign and Verify wired here for every document. Done: the import (AJ's 73
+  tests pass on `main`), `RichTextBlock` tables, `render.js` block values (clauses, grid, stamped
+  signature) and `fillMarkdown`, `SigningView.blocks`, `SignerStatus` with `void`. Next: the PR's
+  handover prompt.
 - 06/11/2026 · TB · Audit of PRs 1 to 3 against the guide before PR 4, with TB's four calls (the guide's
   §13.2, the audit; §14). Who sees a deal: its owner's scope, its team, or its lead's or partner's
   owner's, one rule everywhere, so the 360s list and count only the deals the reader sees; New Deal and
