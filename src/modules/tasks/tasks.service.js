@@ -564,7 +564,7 @@ async function watchersFor(db, { watcher_ids: named, watcher_department_id: depa
  * checked against what the person sees in Partnerships; else, in a connected project, the project's.
  * `trusted`: Partnerships sets the task itself (a deliverable, a follow-up) for a record it has read.
  */
-async function linkFor_(client, actor, body, { trusted = false } = {}) {
+async function partnerLinkOf(client, actor, body, { trusted = false } = {}) {
   const named = { partner_id: body.partner_id || null, lead_id: body.lead_id || null, deal_id: body.deal_id || null };
   if (named.partner_id || named.lead_id || named.deal_id) {
     await links().checkLink(client, actor, named, { trusted });
@@ -580,7 +580,7 @@ async function linkFor_(client, actor, body, { trusted = false } = {}) {
  * @param {object} scope  scopeOf(req) under `workspace` create
  * @param {object} body   TaskCreate
  * @param {{client?: object, trusted?: boolean}} [opts]  the caller's transaction, when it has one;
- *   `trusted` when Partnerships sets the task for a record it has read (linkFor_)
+ *   `trusted` when Partnerships sets the task for a record it has read (partnerLinkOf)
  */
 async function create(actor, scope, body, { client: within = null, trusted = false } = {}) {
   if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee can hold tasks", 403);
@@ -597,7 +597,7 @@ async function create(actor, scope, body, { client: within = null, trusted = fal
     await checkTarget(client, body.employee_target_id, assigneeId);
     await checkRecord(client, body.entity_type, body.entity_id);
     await checkProject(client, body.project_id);
-    const link = await linkFor_(client, actor, body, { trusted });
+    const link = await partnerLinkOf(client, actor, body, { trusted });
     const watching = await watchersFor(client, body, { leadId: assigneeId, setterId: actor.employee_id, members });
     const cal = await workingWeek.loadCalendar(client);
     const dueAt = recurrence.dueFor(body, lagos.today(), cal);
