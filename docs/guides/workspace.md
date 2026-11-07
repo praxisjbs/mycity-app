@@ -160,7 +160,7 @@ project, which anyone may start and everyone may find, with a board of its own (
 | `task_assignee` (2000) | `task_id`, `employee_id`, `assignment_role` | the people sharing a task beside its lead (`assignment_role` `collaborator`; `reviewer` is unused), at most 25, never the lead; the lead is always `task.primary_assignee_id`. Written only by the tasks service; a task with none is Individual |
 | `task_comment` (2000) | `task_id`, `author_user_id`, `body`, `deleted_at` | paged at 25, newest last unless asked; the panel asks newest first (`sort=-created_at`) with Load More |
 | `task_activity` (2010) | `task_id`, `actor_user_id`, `kind`, `from_status`, `to_status`, `detail` | history the panel and Since You Were Away read; never updated (trigger), removed only with its task |
-| `calendar_event` (2000, 2010) | `calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`, `ends_at`, `all_day`, `location`, `visibility`, `entity_type`, `entity_id`, `cancelled_at` | `event_type` CHECK `meeting`, `deadline`, `campaign`, `event`, `interview`; `visibility` CHECK `private`, `attendees`, `everyone`. `entity_type`/`entity_id` point at an interview (M4) or a signed deal's event days (M7, `partner_deal`, §6 Connect to Partner) without a foreign key into a later milestone; an event so kept changes only from its record. Read by Home |
+| `calendar_event` (2000, 2010) | `calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`, `ends_at`, `all_day`, `location`, `visibility`, `entity_type`, `entity_id`, `cancelled_at` | `event_type` CHECK `meeting`, `deadline`, `campaign`, `event`, `interview`; `visibility` CHECK `private`, `attendees`, `everyone`. `entity_type`/`entity_id` point at an interview (M4) or a signed deal's event days (M7: `partner`, with the deal's `deal_id`, §6 Connect to Partner) without a foreign key into a later milestone; an event so kept changes only from its record. Read by Home |
 | `calendar_event_attendee` (2010) | `calendar_event_id`, `employee_id`, `response` | `response` CHECK `pending`, `accepted`, `declined`; UNIQUE (event, employee) |
 | `task.late_reason` (2020, 2510) | `late_reason` | a `task_late_reason.code` or NULL; the CHECK of 2020 gave way to the table in 2510, and the service accepts only a reason switched on |
 | `task_late_reason` (2510) | `task_late_reason_id`, `code`, `label`, `active`, `display_order`, `created_by` | Why Late's reasons; `code` UNIQUE, lower_snake, made from the label when added; never deleted, only switched off (`active`), so an answer given keeps its reason. Six to start (2590). Written only by the tasks service |
@@ -424,8 +424,8 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
   signed deal's deliverables are tasks for the deal's owner, set by them so they may reassign them,
   connected to the deal and in its most recent active connected project; a quiet partner's
   follow-up is a task for its owner; a signed deal's event days are one all-day event owned by the
-  deal's owner, its team invited, visibility `attendees`, kept by the deal (`entity_type`
-  `partner_deal`): Edit Event and Call Off refuse it (409 `EVENT_OWNED_BY_RECORD`), and it moves
+  deal's owner, its team invited, visibility `attendees`, kept by its partner (`entity_type`
+  `partner`, with the deal's `deal_id`), so it opens the Partner 360: Edit Event and Call Off refuse it (409 `EVENT_OWNED_BY_RECORD`), and it moves
   with the deal's dates and is called off when the deal is lost.
 - **A lead becomes a partner.** In the conversion's transaction each service moves what was
   connected to the lead onto the partner (`relinkIn`, one event a service), so the Partner filter
@@ -646,7 +646,7 @@ is listed here as tier 1 or tier 2.**
   longer offers it for new work.
 - **A lead becomes a partner**: its connected work moves to the partner with it.
 - **A partner closed**: its work stays connected; it is no longer offered for new work.
-- **A signed deal's event days**: kept by the deal; Edit Event and Call Off are not offered (409
+- **A signed deal's event days**: kept by its partner, opening the Partner 360; Edit Event and Call Off are not offered (409
   `EVENT_OWNED_BY_RECORD` from the API); its dates move with the deal's, and a lost deal calls it off.
 - **An attendee with no work email**: the notice in the app only.
 - **System mail paused**: invitations, updates and cancellations wait in order and go out on
@@ -671,7 +671,7 @@ and are built (§6).
 
 ## 14 · Change log
 
-- 07/11/2026 · AJ · M7 PR 5 (`partnerships.md` §6.16, Appendix A): Connect to Partner on New Project, New Task and New Event and their edits (Partner, leads marked, and Deal; Disconnect), written by the three services after Partnerships checks the person sees the record and the deal (`partners.work.checkLink`); a task made in a connected project takes its link; `partner_link` on every task, project and event, named only for a reader who sees the record; the Partner filter on Tasks and Projects (`partner_id`, `lead_id`); `relinkIn` moves a lead's work to its partner on conversion (`project.relinked`, `task.relinked`, `calendar_event.relinked`); a signed deal's event days are an event the deal keeps (`entity_type` `partner_deal`); the Workspace cards carry the optional partner and deal (§2 to §11).
+- 07/11/2026 · AJ · M7 PR 5 (`partnerships.md` §6.16, Appendix A): Connect to Partner on New Project, New Task and New Event and their edits (Partner, leads marked, and Deal; Disconnect), written by the three services after Partnerships checks the person sees the record and the deal (`partners.work.checkLink`); a task made in a connected project takes its link; `partner_link` on every task, project and event, named only for a reader who sees the record; the Partner filter on Tasks and Projects (`partner_id`, `lead_id`); `relinkIn` moves a lead's work to its partner on conversion (`project.relinked`, `task.relinked`, `calendar_event.relinked`); a signed deal's event days are an event its partner keeps (`entity_type` `partner`, with the deal's `deal_id`); the Workspace cards carry the optional partner and deal (§2 to §11).
 - 05/11/2026 · GE · The calendar's write path takes a transaction from another module: `createIn`,
   `editIn` and `cancelIn` beside create, edit and cancel, which now call them. Recruitment uses them so an
   interview and its calendar entry are saved together (`recruitment.md` §3 step 8): the entry is of type

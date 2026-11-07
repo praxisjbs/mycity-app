@@ -256,13 +256,17 @@ async function relinkLead(client, leadId, partnerId) {
   return rows.map((r) => r.calendar_event_id);
 }
 
-/** The event a record keeps (a signed deal's days: `entity_type` partner_deal), whether called off or not, or null. */
-async function keptBy(db, entityType, entityId) {
+/**
+ * The event a partner keeps for one of its deals (a signed deal's days: `entity_type` partner, with its
+ * `deal_id`), called off or not, or null. Connect to Partner never sets `entity_type`, so a meeting
+ * connected to the same deal is never taken for it.
+ */
+async function keptForDeal(db, dealId) {
   const { rows } = await db.query(
-    "SELECT calendar_event_id, owner_employee_id, cancelled_at FROM calendar_event WHERE entity_type = $1 AND entity_id = $2 ORDER BY created_at DESC, calendar_event_id LIMIT 1",
-    [entityType, entityId],
+    "SELECT calendar_event_id, owner_employee_id, cancelled_at FROM calendar_event WHERE entity_type = 'partner' AND deal_id = $1 ORDER BY created_at DESC, calendar_event_id LIMIT 1",
+    [dealId],
   );
   return rows[0] || null;
 }
 
-module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf, namesOf, relinkLead, keptBy };
+module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf, namesOf, relinkLead, keptForDeal };

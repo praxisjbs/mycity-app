@@ -2,8 +2,9 @@
 /**
  * A signed deal's event days on its team's calendar (docs/guides/partnerships.md §6.16): one all-day
  * event, from the event's first day to its last, owned by the deal's owner, its team invited,
- * visibility `attendees`, at the deal's venue, connected to the partner and the deal. The deal keeps
- * it (`entity_type` `partner_deal`), so it changes only from here: Edit Event and Call Off refuse it.
+ * visibility `attendees`, at the deal's venue, connected to the partner and the deal. Its partner
+ * keeps it (`entity_type` `partner`, with the deal's `deal_id`), so it changes only from here: Edit
+ * Event and Call Off refuse it, and it opens the Partner 360.
  *
  *   on signing       made, unless the tracker import signed the deal (source `import`)
  *   on a change      a deal's dates, title, venue, owner or team changed: the event follows; dates
@@ -76,8 +77,7 @@ async function sync(dealId, { create = true, actorUserId = null } = {}) {
   return tx(async (client) => {
     const calendar = require("../calendar/calendar.service");
     const deal = await dealOf(client, dealId);
-    const entity = { type: "partner_deal", id: dealId };
-    const kept = await calendar.keptBy(client, entity);
+    const kept = await calendar.keptForDeal(client, dealId);
     const standing = kept && !kept.cancelled_at ? kept : null;
     const signed = Boolean(deal && deal.signed_at && deal.starts_on);
     if (!signed || deal.status === "lost") {
@@ -106,13 +106,14 @@ async function sync(dealId, { create = true, actorUserId = null } = {}) {
       await calendar.editIn(client, await ownerActor(client, standing.owner_employee_id, actorUserId), standing.calendar_event_id, changes, { asOwner: true });
       return "moved";
     }
-    if (!create || deal.status !== "live") return "kept";
+    // A signed deal always has its partner: a lead's converts in the signing's transaction.
+    if (!create || deal.status !== "live" || !deal.partner_id) return "kept";
     const actor = await ownerActor(client, deal.owner_id, actorUserId);
     if (!actor) {
       logger.warn({ deal_id: dealId }, "event days not placed: the deal's owner has no login");
       return "kept";
     }
-    await calendar.createIn(client, actor, { ...want, reminder_minutes: [] }, { entity, trusted: true });
+    await calendar.createIn(client, actor, { ...want, reminder_minutes: [] }, { entity: { type: "partner", id: deal.partner_id }, trusted: true });
     return "made";
   });
 }

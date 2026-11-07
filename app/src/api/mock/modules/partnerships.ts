@@ -68,6 +68,8 @@ const SIGNED = new Set(["signed", "active"]);
 const LEAD_STATUS: Record<string, LeadRow["status"]> = { prospect: "new", contacted: "contacted", meeting: "contacted", proposal: "qualified", negotiation: "qualified", closed_lost: "lost", signed: "converted", active: "converted" };
 
 const categoryOf = (id: string | null | undefined) => mockCategories().find((c) => c.partner_category_id === id) ?? null;
+/** A category's name, for the work pickers (partnerships_work.ts). */
+export const categoryNameOf = (id: string | null | undefined) => categoryOf(id)?.name ?? null;
 
 /* ------------------------------------------------------------------ *
  * Leads, partners and their deals
@@ -143,8 +145,8 @@ interface MockDeal {
   impact: string[];
 }
 
-const RECORDS: MockRecord[] = [];
-const DEALS: MockDeal[] = [];
+export const RECORDS: MockRecord[] = [];
+export const DEALS: MockDeal[] = [];
 const CONTACTS: Contact[] = [];
 const INTERACTIONS: Interaction[] = [];
 const DOCUMENTS: Array<PartnerDocument & { record_id: string }> = [];
@@ -304,8 +306,8 @@ function seed(p: MockPartner, i: number) {
 }
 PARTNERS.forEach(seed);
 
-const recordOf = (id: string | null | undefined) => RECORDS.find((r) => r.id === id) ?? null;
-const dealOf = (id: string | null | undefined) => DEALS.find((d) => d.id === id) ?? null;
+export const recordOf = (id: string | null | undefined) => RECORDS.find((r) => r.id === id) ?? null;
+export const dealOf = (id: string | null | undefined) => DEALS.find((d) => d.id === id) ?? null;
 const recordOfDeal = (d: MockDeal) => recordOf(d.partner_id ?? d.lead_id)!;
 const regionLabel = (r: MockRecord) =>
   r.region_scope === "cities" ? r.cities.map((c) => (c.formatted ?? "").split(",")[0]).join(", ") || null : r.region_scope ? { national: "National", africa: "Africa", worldwide: "Worldwide" }[r.region_scope] : null;

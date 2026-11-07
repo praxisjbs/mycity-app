@@ -426,7 +426,7 @@ async function relinkIn(client, actor, { lead_id: leadId, partner_id: partnerId 
   return moved.length;
 }
 
-/** The event a record keeps (a signed deal's days), or null: for the module whose record it is. */
-const keptBy = (db, entity) => repo.keptBy(db, entity.type, entity.id);
+/** The event a partner keeps for a signed deal's days, or null: for the module whose record it is. */
+const keptForDeal = (db, dealId) => repo.keptForDeal(db, dealId);
 
-module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, createIn, edit, editIn, cancel, cancelIn, respond, reminderCheck, cardRecords, assertCardEvent, eventChoices, eventIdOf, relinkIn, keptBy };
+module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, createIn, edit, editIn, cancel, cancelIn, respond, reminderCheck, cardRecords, assertCardEvent, eventChoices, eventIdOf, relinkIn, keptForDeal };

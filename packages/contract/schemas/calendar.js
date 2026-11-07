@@ -27,7 +27,7 @@ const CalendarEventType = z.enum(["meeting", "deadline", "campaign", "event", "i
 const CalendarVisibility = z.enum(["private", "attendees", "everyone"]);
 const AttendeeResponse = z.enum(["pending", "accepted", "declined"]);
 /** Records an event may belong to; each is a key of shared/route-map ENTITY_ROUTES. */
-const CalendarEntityType = z.enum(["interview", "partner", "partner_deal", "vacancy"]);
+const CalendarEntityType = z.enum(["interview", "partner", "vacancy"]);
 /** Up to three reminders before an event starts, in minutes (0: at the start; at most 14 days). */
 const ReminderMinutes = z.array(z.number().int().min(0).max(20160)).max(3);
 
