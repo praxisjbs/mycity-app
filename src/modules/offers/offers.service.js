@@ -49,6 +49,8 @@ const VALID = c.offers.OFFER_VALID_DAYS;
 /** The stages an application may take an offer from: Shortlist, or Offer again after one ended. */
 const OFFERABLE = new Set(["shortlist", "offer"]);
 const ENDED_REASON = "The candidate was not progressed";
+/** The actor of a step nobody in the hub pressed (the candidate's own decline, a lapse). */
+const NOBODY = Object.freeze({ user_id: null });
 
 const notFound = () => new AppError("NOT_FOUND", "That offer does not exist", 404);
 const refused = (code, message, status = 409, fields) => new AppError(code, message, status, fields);
@@ -493,7 +495,7 @@ async function mail(o, link) {
       to: { name: o.candidate_name, email: o.candidate_email },
       recipient: { first_name: o.candidate_first_name, last_name: o.candidate_last_name, email: o.candidate_email },
       template: EMAILS.sent,
-      data: { job_title: o.job_title, company: await companyOf(pool), sign_url: link.url, expires_at: iso(o.expires_at) },
+      data: { vacancy_title: o.job_title, reference: o.number, sign_url: link.url, expires_at: iso(o.expires_at) },
     },
     { jobId: `offer-sent-${link.signature_id}-${new Date(link.expires_at).getTime()}-${Date.now()}` },
   );
@@ -559,6 +561,8 @@ async function withdrawIn(client, actor, o, reason, { asRequester = false } = {}
   if (o.signature_request_id) await signatures.endFor(client, actor, { subject_type: SUBJECT, subject_id: o.offer_id, status: "revoked", reason });
   if (!(await repo.setStatus(client, o.offer_id, ["draft", "approval", "approved", "sent"], "withdrawn", { withdrawn_at: new Date(), end_reason: reason })))
     return false;
+  // A sent offer had moved the card to Offer: it goes back to Shortlist (none when Not Progressing).
+  await candidates.offerEndedIn(client, actor || NOBODY, o.application_id, reason);
   await emit(client, { key: EVENTS.OFFER_WITHDRAWN, entity: { type: SUBJECT, id: o.offer_id }, actor, payload: ownerPayload(o, { reason }) });
   return true;
 }
@@ -643,6 +647,7 @@ async function acceptedIn(client, ctx) {
 async function declinedIn(client, ctx) {
   const o = await repo.get(client, ctx.request.subject_id, { lock: true });
   if (!o || !(await repo.setStatus(client, o.offer_id, ["sent"], "declined", { declined_at: new Date(), end_reason: ctx.reason || null }))) return;
+  await candidates.offerEndedIn(client, NOBODY, o.application_id, "The candidate declined the offer");
   await emit(client, { key: EVENTS.OFFER_DECLINED, entity: { type: SUBJECT, id: o.offer_id }, actor: null, payload: ownerPayload(o) });
 }
 
@@ -651,6 +656,7 @@ async function endedIn(client, ctx) {
   if (ctx.status !== "expired") return;
   const o = await repo.get(client, ctx.request.subject_id, { lock: true });
   if (!o || !(await repo.setStatus(client, o.offer_id, ["sent", "approved"], "expired", { end_reason: ctx.reason || null }))) return;
+  await candidates.offerEndedIn(client, NOBODY, o.application_id, "The offer expired unsigned");
   await emit(client, { key: EVENTS.OFFER_EXPIRED, entity: { type: SUBJECT, id: o.offer_id }, actor: null, payload: ownerPayload(o) });
 }
 

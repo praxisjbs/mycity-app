@@ -53,7 +53,7 @@ const FLOW = "recruitment.offer";
 /** The offer letter (guide §3 steps 3 and 5). */
 const DOC_TYPE = "offer_letter";
 
-/** The emails this module sends. */
+/** The emails this module sends: worded on Candidate Emails, their variables declared by candidates.events.js. */
 const EMAILS = Object.freeze({ sent: "offer-sent" });
 
 defineDocType(DOC_TYPE, {
@@ -69,7 +69,6 @@ defineDocType(DOC_TYPE, {
   sealing: (d) => d.sealing || null,
 });
 defineVariables("document", render.TEMPLATE, c.offers.OfferLetterVars);
-defineVariables("email", EMAILS.sent, c.offers.OfferSentEmailVars);
 
 const service = () => require("./offers.service");
 

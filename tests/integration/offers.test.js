@@ -200,11 +200,10 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     const sent = await signedAndSent(offer.offer_id);
     expect(sent).toMatchObject({ status: "sent", can_resend: true, can_send: false });
     expect(sent.expires_at).toBeTruthy();
-    // Send moves the card to Offer through candidates.advanceIn, once the board has an Offer column
-    // (GE's M4 change); until then advanceIn leaves it at Shortlist.
-    expect(["shortlist", "offer"]).toContain((await one("SELECT stage FROM application WHERE application_id = $1", [appId])).stage);
+    // Send moves the card to the Offer column (candidates.advanceIn).
+    expect(await one("SELECT stage FROM application WHERE application_id = $1", [appId])).toEqual({ stage: "offer" });
     const [mail] = mails("offer-sent").filter((m) => m.to.email === "emeka.okafor@example.test");
-    expect(mail.data).toMatchObject({ job_title: "Partnerships Manager" });
+    expect(mail.data).toMatchObject({ vacancy_title: "Partnerships Manager", reference: offer.number });
     // No link is kept or sits in the outbox.
     const t = tokenOf(mail);
     expect(JSON.stringify((await one("SELECT coalesce(json_agg(payload), '[]'::json) AS p FROM event_log WHERE event_key LIKE 'offer.%'")).p)).not.toContain(t);
@@ -242,7 +241,8 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     expect(declined.status).toBe(200);
     const ended = (await h.as("ops").get(`/recruitment/offers/${offer.offer_id}`)).body;
     expect(ended).toMatchObject({ status: "declined", end_reason: "I accepted another role." });
-    // At Offer now, with no open offer: a new one may be made.
+    // The card went back from Offer to Shortlist with the reason, and a new offer may be made.
+    expect(await one("SELECT stage FROM application WHERE application_id = $1", [appId])).toEqual({ stage: "shortlist" });
     expect((await h.as("ops").post("/recruitment/offers").send(terms(appId))).status).toBe(201);
   }, 60_000);
 
@@ -256,6 +256,7 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     expect(out.status).toBe(200);
     expect(out.body).toMatchObject({ status: "withdrawn", end_reason: "The role was put on hold." });
     expect((await pub().get(`/sign/${t}`)).status).toBe(404);
+    expect(await one("SELECT stage FROM application WHERE application_id = $1", [appId])).toEqual({ stage: "shortlist" });
 
     const other = await applicant("Femi");
     const draftOffer = (await h.as("ops").post("/recruitment/offers").send(terms(other))).body;

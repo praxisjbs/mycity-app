@@ -332,11 +332,6 @@ const OfferLetterVars = z
   })
   .strict();
 
-/** offer-sent: the candidate's signing link. Queued as it is made; never in the outbox. */
-const OfferSentEmailVars = z
-  .object({ job_title: z.string(), company: z.string(), sign_url: z.string(), expires_at: isoDateTime })
-  .strict();
-
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const ROW = {
   candidate_name: "candidate.first_name and last_name, through application",
@@ -392,7 +387,6 @@ const TABLES = {
   SealedSigner: { table: null, reason: "a signature as the sealed copy prints it" },
   CertificateLine: { table: null, reason: "one signer's evidence on the Signature Certificate" },
   OfferLetterVars: { table: null, reason: "the variables of templates/documents/offer-letter.html" },
-  OfferSentEmailVars: { table: null, reason: "the variables of templates/email/offer-sent.html" },
 };
 
 module.exports = {
@@ -421,5 +415,4 @@ module.exports = {
   SealedSigner,
   CertificateLine,
   OfferLetterVars,
-  OfferSentEmailVars,
 };

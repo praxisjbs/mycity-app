@@ -168,6 +168,12 @@ earlier: M5's forms use help terms.
 
 ## 6 · Log
 
+- 07/11/2026 · AJ · Merged `main` (GE's hand-over to M5, #88): Send now moves the card to Offer;
+  declined, expired and withdrawn offers move it back to Shortlist with `candidates.offerEndedIn`;
+  `offer-sent` is Candidate Emails' template with `candidates.OfferSentEmailVars`. Open for PR 5:
+  `offer-signed` (GE's key) would reach the candidate beside the signatures service's own
+  `signature-completed` mail, which already attaches the sealed copy; PR 5 decides which one the
+  candidate gets.
 - 06/11/2026 · AJ · PR 3 built: `src/modules/offers` (service, repo, render, events, routes,
   controller, ai, search, test), the `offer-letter` standard wording from MyCity's sample letter
   (Markdown, edited on the Offers settings, its version kept on the offer at approval) and the

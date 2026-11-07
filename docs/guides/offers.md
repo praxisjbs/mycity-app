@@ -65,7 +65,10 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    default), makes the candidate's link (`signatures.issueLinks`) and emails `offer-sent` with it
    after commit: the link is never stored and never sits in the outbox. In the same transaction it
    calls `candidates.advanceIn(client, actor, applicationId, "offer")` (GE's), so the card moves to
-   the Offer column once the board has one. Resend makes a fresh link and revokes the earlier one.
+   the Offer column. `offer-sent` is worded on Candidate Emails with M4's other mails; its variables
+   are `candidates.OfferSentEmailVars` (the role, the offer's number, the link, the expiry). An offer
+   that ends unsigned after it was sent (declined, expired, withdrawn) puts the card back at
+   Shortlist through `candidates.offerEndedIn`, with the reason. Resend makes a fresh link and revokes the earlier one.
    The record, the signing page and every PDF read one set of values through one template and one
    Markdown renderer (`offers.render`).
 4. **Sign.** The candidate opens `/sign/<token>`, reads the same text the PDF holds, receives an
@@ -278,3 +281,4 @@ Open:
 - 06/11/2026 · AJ · From MyCity's sample offer letter and New Joiner list: monthly pay lines and the Offer Summary's fields on the offer, the company signing when the offer is approved, the New Joiner checklist, two guarantors with reference checks, BVN a number only (§3, §4, §6). PR 1's migrations named.
 - 06/11/2026 · AJ · PR 2, the signatures service built (§5's signing and verification routes, §7's events and the sealing): `defineSignable` for each signed record type, the company's signatory signing in the hub, the email code, the QR key that outlives a public link.
 - 06/11/2026 · AJ · PR 3, the offers backend (§3 steps 1 to 4, §5, §6, §7, §9): the Offer Signatory setting, the letter generated and its request opened at approval with the wording's version kept, Send making the link after commit, expiry through `signature-reminders` (no `offer-expiry` job), Head of Department's recruitment `approve` grant for the flow's first stage, `offer.accepted` in place of `offer.signed`.
+- 07/11/2026 · AJ · Merged with `main` after GE's hand-over (#88): `offer-sent` uses Candidate Emails' wording and `candidates.OfferSentEmailVars` (the offers contract's own copy removed); Send moves the card to Offer, and an offer ending unsigned moves it back to Shortlist (`offerEndedIn`).
