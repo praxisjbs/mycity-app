@@ -327,14 +327,29 @@ const ProposalContent = z
  * The studio
  * ------------------------------------------------------------------ */
 
+/** An image given with the brief: an upload (POST /documents), what it is for and its alt text. */
+const BriefAsset = z.object({ document_id: uuid, role: AssetRole, alt: text(200) }).strict();
+
 /** New Proposal on a deal: notes and/or a transcript (.md or .txt), images, a saved template. */
 const ProposalStart = z
   .object({
     deal_id: uuid,
     notes: optionalText(20000),
     transcript_document_id: blank(uuid),
-    asset_document_ids: z.array(uuid).max(12).optional(),
+    assets: z.array(BriefAsset).max(12).optional(),
     design_template_id: blank(uuid),
+  })
+  .strict();
+
+/** Where the studio's job stands while Claude asks or writes (§6.10); null when nothing runs. */
+const ProposalProgress = z
+  .object({
+    job: z.enum(["questions", "draft"]),
+    step: z.enum(["reading", "asking", "writing", "checking", "laying_out"]),
+    /** The job failed or could not run: the brief and the answers are kept, and Try Again queues it again. */
+    failed: z.boolean(),
+    reason: z.enum(["off", "limit", "error"]).nullable(),
+    at: isoDateTime,
   })
   .strict();
 
@@ -391,7 +406,60 @@ const ProposalContentEdit = z.discriminatedUnion("op", [
 
 /** Rewrite Section: an instruction for Claude on that section only. Nothing is kept until Use Rewrite. */
 const SectionRewrite = z.object({ instruction: text(500) }).strict();
-const SectionRewriteDraft = z.object({ key: z.string(), section: Section }).strict();
+/** Claude's rewrite of one section, or why there is none (AI Is Off, AI Limit Reached). */
+const SectionRewriteDraft = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    key: z.string(),
+    section: Section.nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** Write With AI in Send Proposal: a subject and a message, or why there is none. Nothing is kept. */
+const ProposalMessageDraft = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    subject: z.string().nullable(),
+    message: z.string().nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/* What Claude answers (src/services/ai/prompts/proposal-*.md), checked before anything is kept. */
+
+/** One question card as Claude proposes it. */
+const QuestionCardDraft = z
+  .object({
+    group_key: QuestionGroup,
+    question: text(240),
+    why: text(200).nullable(),
+    answer_kind: AnswerKind,
+    options: z.array(text(80)).min(2).max(12).nullable(),
+    suggested: AnswerValue,
+    suggested_from: text(80).nullable(),
+    required: z.boolean(),
+  })
+  .strict()
+  .superRefine((card, ctx) => {
+    const picks = ["pick", "multi_pick"].includes(card.answer_kind);
+    if (picks && !card.options) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: "A pick needs its options" });
+    if (!picks && card.options) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: "Only a pick has options" });
+  });
+/** proposal-questions: between 5 and 12 cards. */
+const ProposalQuestionsOutput = z.object({ cards: z.array(QuestionCardDraft).min(5).max(12) }).strict();
+/** A reshuffled card: one question in its place, from the same group. */
+const ProposalReshuffleOutput = z.object({ card: QuestionCardDraft }).strict();
+/** proposal-draft: the proposal's title, its sections and the tone it was written in. */
+const ProposalDraftOutput = z
+  .object({ title: text(150), content: ProposalContent, tone_notes: z.string().max(600).nullable() })
+  .strict();
+/** proposal-rewrite: the one section again. */
+const ProposalRewriteOutput = z.object({ section: Section }).strict();
+/** proposal-message: the covering email's subject and message. */
+const ProposalMessageOutput = z.object({ subject: text(150), message: text(2000) }).strict();
 
 /** Confirm and Send: nothing is sent without the person's press, and `confirm: true` with it. */
 const ProposalSend = z
@@ -534,7 +602,60 @@ const ProposalDetail = ProposalRow.extend({
   link_url: z.string().nullable(),
   /** Whether Claude can be asked: AI Is Off and AI Limit Reached leave the kit to fill by hand. */
   ai: z.enum(["on", "off", "capped"]),
+  progress: ProposalProgress.nullable(),
+  /** Every version of this proposal, the newest first; a sent one is revised as the next. */
+  versions: z
+    .array(
+      z
+        .object({ partnership_proposal_id: uuid, version: z.number().int().min(1), status: ProposalStatus, sent_at: isoDateTime.nullable() })
+        .strict(),
+    )
+    .max(20),
+  /** What the person may do now, so the screen offers only that. */
+  can: z
+    .object({
+      edit: z.boolean(),
+      send: z.boolean(),
+      revise: z.boolean(),
+      decide: z.boolean(),
+      withdraw: z.boolean(),
+      save_template: z.boolean(),
+    })
+    .strict(),
 }).strict();
+
+/** One section of the preview: what the studio's edit controls need beside the page. */
+const PreviewSection = z
+  .object({
+    key: z.string(),
+    layout: LayoutName,
+    /** The section's heading, or its layout's name. */
+    label: z.string(),
+    hidden: z.boolean(),
+    /** The pages it fills: a section longer than a page continues on the next. */
+    pages: z.number().int().min(1),
+    /** The layouts its content fits (Change Layout). */
+    fits: z.array(LayoutName),
+    /** Its image fields, and whether each shows a stand-in. */
+    images: z.array(z.object({ field: z.enum(["image_asset_id", "partner_logo_asset_id", "signer_photo_asset_id"]), stand_in: z.boolean() }).strict()),
+    unconfirmed: z.array(z.string()),
+  })
+  .strict();
+
+/** GET /proposals/:id/preview: the kit's HTML as the partner will see it, and its sections. */
+const ProposalPreview = z
+  .object({
+    html: z.string(),
+    sections: z.array(PreviewSection).max(20),
+    /** Before Send: the stand-in images and the figures nobody has confirmed. */
+    checks: z
+      .object({
+        stand_ins: z.array(z.object({ key: z.string(), label: z.string() }).strict()),
+        unconfirmed: z.array(z.object({ key: z.string(), figure: z.string() }).strict()),
+      })
+      .strict(),
+  })
+  .strict();
 
 const ProposalListQuery = listQuery(
   {
@@ -547,6 +668,10 @@ const ProposalListQuery = listQuery(
   ["sent_at", "created_at", "value"],
 );
 const ProposalPage = Paged(ProposalRow);
+
+/** The saved templates a brief may start from: of the deal's category, or of every category. */
+const ProposalTemplateListQuery = listQuery({ partner_category_id: uuid.optional() }, ["name"]);
+const ProposalTemplatePage = Paged(ProposalTemplate);
 
 /** The cards above Proposals. */
 const ProposalsSummary = z
@@ -610,15 +735,28 @@ const TABLES = {
   ChartSeries: { table: null, reason: "a series of a section's chart, kept in its content" },
   ProposalChart: { table: null, reason: "a section's chart, kept in its content" },
   ProposalContent: { table: null, reason: "partnership_proposal.content: the sections in order" },
+  BriefAsset: { table: "proposal_asset" },
   ProposalStart: {
     table: "partnership_proposal",
     virtual: {
       deal_id: "written as partnership_opportunity_id",
       notes: "a proposal_source of kind notes",
       transcript_document_id: "a proposal_source of kind transcript",
-      asset_document_ids: "proposal_asset rows",
+      assets: "proposal_asset rows",
     },
   },
+  ProposalProgress: { table: null, reason: "partnership_proposal.progress: where the studio's job stands" },
+  ProposalMessageDraft: { table: null, reason: "Write With AI's subject and message; nothing is kept" },
+  QuestionCardDraft: { table: null, reason: "a card as Claude proposes it, checked before it is kept" },
+  ProposalQuestionsOutput: { table: null, reason: "what proposal-questions answers" },
+  ProposalReshuffleOutput: { table: null, reason: "what a reshuffle answers" },
+  ProposalDraftOutput: { table: null, reason: "what proposal-draft answers" },
+  ProposalRewriteOutput: { table: null, reason: "what proposal-rewrite answers" },
+  ProposalMessageOutput: { table: null, reason: "what proposal-message answers" },
+  PreviewSection: { table: null, reason: "a section of the preview and what its edit controls need" },
+  ProposalPreview: { table: null, reason: "the kit's HTML and the checks before Send" },
+  ProposalTemplateListQuery: { table: null, reason: "list controls for the saved templates" },
+  ProposalTemplatePage: { table: null, reason: "a page of saved templates" },
   ProposalQuestion: { table: "proposal_question", virtual: { reshuffles: "the cards that replaced this one's chain" } },
   QuestionParams: { table: null, reason: "the :id and :qid path parameters" },
   QuestionAnswer: { table: "proposal_question" },
@@ -644,8 +782,10 @@ const TABLES = {
       brief: "its proposal_source rows",
       questions: "its proposal_question rows",
       assets: "its proposal_asset rows",
-      link_url: "the public link while its token works",
+      link_url: "the public link while its token works, from link_secret",
       ai: "the AI's switch and the month's cap",
+      versions: "the proposals of its chain of revisions",
+      can: "what its status lets the reader do",
     },
   },
   ProposalListQuery: { table: null, reason: "list controls and filters for the proposals" },
@@ -688,7 +828,9 @@ module.exports = {
   InsightSection,
   Section,
   ProposalContent,
+  BriefAsset,
   ProposalStart,
+  ProposalProgress,
   ProposalQuestion,
   QuestionParams,
   QuestionAnswer,
@@ -696,6 +838,17 @@ module.exports = {
   ProposalContentEdit,
   SectionRewrite,
   SectionRewriteDraft,
+  ProposalMessageDraft,
+  QuestionCardDraft,
+  ProposalQuestionsOutput,
+  ProposalReshuffleOutput,
+  ProposalDraftOutput,
+  ProposalRewriteOutput,
+  ProposalMessageOutput,
+  PreviewSection,
+  ProposalPreview,
+  ProposalTemplateListQuery,
+  ProposalTemplatePage,
   ProposalSend,
   ProposalDecline,
   ProposalTemplateSave,
