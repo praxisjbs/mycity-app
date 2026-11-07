@@ -1,0 +1,10 @@
+---
+subject: "Signed: {{ title }}"
+title: Document Signed
+format: markdown
+---
+{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}
+
+Everyone has signed {{ title }}. Your signed copy is attached.
+
+Its reference is {{ reference }}. Anyone can check it at [{{ verify_url }}]({{ verify_url }}), or by scanning the QR code on the copy.

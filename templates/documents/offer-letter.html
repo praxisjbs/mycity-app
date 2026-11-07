@@ -1,0 +1,127 @@
+---
+title: Offer of Employment
+format: markdown
+---
+**PRIVATE & CONFIDENTIAL**
+
+Dear {{ candidate.first_name }},
+
+## Offer of Employment: {{ job_title }}
+
+We are pleased to offer you employment with {{ company }} ("the Company") as {{ job_title }}, with effect from {{ longdate start_date }}, on the terms and conditions set out in this letter.
+
+A summary of the offer is below. Your full terms of employment follow in Sections 1 to 12{{#if job_description}}, and the description of your role is set out in Schedule A, which forms part of this letter{{/if}}.
+
+### Offer Summary
+
+| Item | Detail |
+|---|---|
+| Position | {{ job_title }} |
+{{#if role_function}}| Function | {{ role_function }} |
+{{/if}}{{#if role_scope}}| Scope | {{ role_scope }} |
+{{/if}}{{#if reports_to}}| Reports to | {{ reports_to }} |
+{{/if}}{{#if location}}| Location | {{ location }}{{#if work_pattern}}. {{ work_pattern }}{{/if}}{{#if office_days}}: {{ number office_days }} days in the office each week{{/if}} |
+{{/if}}| Start date | {{ longdate start_date }} |
+{{#if employment_type}}| Employment type | {{ employment_type }} |
+{{/if}}{{#if probation_months}}| Probation | {{ number probation_months }} months |
+{{/if}}{{#if annual_leave_days}}| Annual leave | {{ number annual_leave_days }} working days |
+{{/if}}| Total monthly compensation | {{ money monthly_total }} (see Section 3) |
+{{#if incentives}}| Incentives | {{ incentives }} (see Section 4) |
+{{/if}}
+
+## Terms and Conditions
+
+### 1. Role and Reporting
+
+1.1 You are employed as {{ job_title }}.{{#if job_description}} Your duties are described in Schedule A.{{/if}} The Company may reasonably update these duties from time to time in line with business needs.
+
+1.2 You will report to {{#if reports_to}}the {{ reports_to }}{{else}}your line manager{{/if}}, or to such other person as the Company may designate in writing.
+
+1.3 You shall devote your full working time and attention to the business of the Company, and such additional time as the needs of the business may reasonably require.
+
+1.4 You shall not take up any other employment, or be engaged directly or indirectly in any business outside the Company, without the Company's prior written consent.
+
+### 2. Place of Work and Working Hours
+
+2.1 {{#if location}}Your place of work is {{ location }}.{{else}}Your place of work will be confirmed to you in writing.{{/if}}{{#if office_days}} You will work from the office {{ number office_days }} days each week and remotely for the remaining working days.{{/if}}
+
+2.2 {{#if working_hours}}Working hours are {{ working_hours }}.{{else}}Working hours are Monday to Friday, 9:00 a.m. to 5:00 p.m.{{/if}} You are entitled to a one-hour lunch break each working day, taken at a time that does not interfere with your duties.
+
+2.3 You may be required to attend meetings, events and engagements in person, to travel, and to be available outside normal working hours as the business reasonably requires, with reasonable notice. Your compensation takes this into account, and no separate overtime is payable.
+
+### 3. Remuneration
+
+3.1 Your monthly compensation is as follows:
+
+| Component | Monthly |
+|---|---|
+{{#each pay_lines}}| {{ name }} | {{ money monthly_amount }} |
+{{/each}}| **Total Monthly Compensation** | **{{ money monthly_total }}** |
+
+3.2 Compensation is paid monthly in arrears, subject to applicable statutory deductions, including PAYE tax and pension contributions where applicable.
+
+3.3 Your compensation is confidential and should not be discussed with anyone other than Management or the People function.
+
+### 4. Incentives
+
+4.1 {{#if incentives}}You are eligible for the following: {{ incentives }}.{{else}}You may be eligible to take part in the Company's incentive scheme as it applies to your role.{{/if}} Incentives are subject to the Company's Incentive Policy and the approved plan in force from time to time.
+
+4.2 Incentives are not guaranteed and do not form part of your fixed compensation. Incentives relating to revenue that is later cancelled, refunded or found ineligible may be withheld, offset or recovered in line with the Policy.
+
+### 5. Business Expenses
+
+5.1 Approved business expenses incurred in the course of your duties will be met by the Company, in line with its expense approval and retirement procedures.
+
+### 6. Probation and Confirmation
+
+6.1 {{#if probation_months}}Your employment is subject to a probationary period of {{ number probation_months }} months from your start date{{else}}Your employment is subject to a probationary period from your start date{{/if}}, during which your performance will be reviewed in line with Company policy.
+
+6.2 Confirmation of employment is subject to satisfactory performance, verification of your documents and satisfactory responses from your two referees. Confirmation will be communicated to you in writing.
+
+6.3 On resumption, you are required to submit copies of your academic qualifications and professional certifications, your NYSC discharge or exemption certificate, a valid means of identification, and any other document the Company reasonably requests.
+
+6.4 You are required to provide two referees: one previous employer, and one notable individual who has known you for at least four years.
+
+### 7. Annual Leave and Public Holidays
+
+7.1 {{#if annual_leave_days}}You are entitled to {{ number annual_leave_days }} working days of annual leave on full pay in each calendar year{{else}}You are entitled to annual leave on full pay in line with Company policy{{/if}}, upon completion of six months of continuous service, in addition to public holidays declared by the Federal Government of Nigeria.
+
+7.2 Where you work less than a full calendar year, your leave entitlement is pro-rated. Leave cannot be carried forward, and must be approved by your line manager at least one month before it starts.
+
+### 8. Confidentiality
+
+8.1 You must keep all Company information, including strategies, data, commercial terms and partnerships, strictly confidential during and after your employment, and use it only for the purposes of your duties.
+
+### 9. Conduct and Conflicts of Interest
+
+9.1 You agree to act in the best interests of the Company at all times, to avoid conflicts of interest unless disclosed and approved in writing, and to comply with Company policies as issued from time to time. A breach of Company policy may result in disciplinary action, up to and including termination.
+
+### 10. Intellectual Property and Company Property
+
+10.1 All work you create in the course of your employment belongs absolutely to the Company. At the Company's request and expense, you will do everything necessary to vest all rights in it fully in the Company.
+
+10.2 All Company property, including equipment, documents, data, accounts and access credentials, must be returned when your employment ends.
+
+### 11. Termination
+
+11.1 During probation, either party may end this employment by giving two weeks' written notice or payment in lieu of notice. After confirmation, either party may end it by giving one month's written notice or payment in lieu of notice.
+
+11.2 The Company may end your employment without notice for gross misconduct, a breach of confidentiality, an undisclosed conflict of interest, conduct that brings the Company into disrepute, or a criminal conviction, or for any reason recognised as sufficient in law.
+
+11.3 On termination, the Company will pay all sums accrued to you up to the termination date, less any amounts you owe the Company.
+
+### 12. General
+
+12.1 Your employment is also governed by the Company's policies and HR handbook, as updated from time to time. This letter{{#if job_description}}, together with Schedule A,{{/if}} sets out the terms of your employment; any variation must be in writing and signed on behalf of both parties.
+
+12.2 This letter is governed by the laws of the Federal Republic of Nigeria.
+
+## Acceptance
+
+Please confirm your acceptance by signing this letter electronically{{#if expires_at}} by {{ longdate expires_at }}{{/if}}.
+
+Congratulations, and welcome on board.
+
+{{#if signatory}}For {{ company }}: {{ signatory.name }}{{#if signatory.title}}, {{ signatory.title }}{{/if}}{{/if}}
+
+I accept the offer of employment on the terms and conditions set out in this letter{{#if job_description}} and Schedule A{{/if}}: {{ candidate.full_name }}

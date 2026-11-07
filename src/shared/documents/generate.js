@@ -58,6 +58,13 @@
  * organisation above the signer, as MyCity's own letters are laid out; it prints no title, the
  * wording carrying its own heading.
  *
+ * A doc type that is signed through the signatures service (M5 offers and contracts, M7 agreements)
+ * may declare `appendix: (data) => [{ title, markdown }]`, printed after the body each on its own page
+ * through the one Markdown renderer (Additional Terms, Schedule A), and `sealing: (data) => ({
+ * signers, certificate, qr, verify_url, reference })` or null: the letterhead then prints every
+ * signature after the body, a Signature Certificate page with each signer's evidence, and the QR that
+ * verifies it (src/modules/signatures/signatures.signed-pdf.js hands these to the doc type's seal).
+ *
  * Brand: the Logo uploaded on Settings · Organisation (else assets/brand/logo.png when
  * present, else the company's name in the letterhead's type) and the Geist fonts
  * (assets/fonts/*.woff2) are embedded as data URLs, because the PDF renderer fetches nothing.
@@ -111,6 +118,10 @@ function defineDocType(docType, spec) {
     throw new Error(`defineDocType(${docType}): signedBy is (data) => the signer`);
   if (spec.letter !== undefined && typeof spec.letter !== "function")
     throw new Error(`defineDocType(${docType}): letter is (data) => ({ date, to })`);
+  if (spec.appendix !== undefined && typeof spec.appendix !== "function")
+    throw new Error(`defineDocType(${docType}): appendix is (data) => [{ title, markdown }]`);
+  if (spec.sealing !== undefined && typeof spec.sealing !== "function")
+    throw new Error(`defineDocType(${docType}): sealing is (data) => { signers, certificate, qr, verify_url, reference } or null`);
   if (DOC_TYPES.has(docType) && DOC_TYPES.get(docType) !== spec)
     throw new Error(`defineDocType: ${docType} is already defined`);
   DOC_TYPES.set(
@@ -246,6 +257,8 @@ function docOf(spec, data, title) {
     title,
     signer: spec.signedBy ? spec.signedBy(data) || null : null,
     letter: letter ? { date: letter.date, to: (letter.to || []).filter(Boolean).map((line) => ({ line })) } : null,
+    appendix: spec.appendix ? (spec.appendix(data) || []).filter((x) => x && x.markdown) : [],
+    sealing: spec.sealing ? spec.sealing(data) || null : null,
   };
 }
 
@@ -284,6 +297,8 @@ async function previewPdf(db, { doc_type: docType, template: chosen, data, numbe
  *          data: object, actor: object|string|null, date?: string, template?: string}} opts
  *   date      the document's business date (numbering period, the date printed); default today in Lagos
  *   template  a template key, for a doc type declared with templateChoice
+ *   template_version  a saved version of the template rather than the current one: a signed
+ *             document sealed with the wording it was approved under (M5 offers), never a later edit
  * @returns {Promise<object>} the document row, render_status "pending"
  */
 async function generate(
@@ -296,6 +311,7 @@ async function generate(
     actor,
     date,
     template: chosen,
+    template_version: wanted = null,
   },
 ) {
   if (!inTransaction(client))
@@ -303,7 +319,12 @@ async function generate(
   const spec = specOf(docType);
   const templateKey = templateKeyOf(docType, spec, chosen);
   const checked = variables.parseData("document", templateKey, data);
-  const template = await templates.current(client, "document", templateKey);
+  const template =
+    wanted === null || wanted === undefined
+      ? await templates.current(client, "document", templateKey)
+      : await templates.version(client, "document", templateKey, wanted);
+  if (!template)
+    throw new Error(`documents.generate: ${templateKey} has no version ${wanted}`);
   const day = date
     ? lagos.assertDate(String(date).slice(0, 10), "date")
     : lagos.today();
