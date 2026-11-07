@@ -120,7 +120,7 @@ const kpiIds = (max) =>
  *
  *   attendance_days  Operations: who was in on each of the last 14 working days
  *   goals            CEO: the organisation's goals this quarter and how far along each is
- *   signed_value     Partnerships: the value of agreements signed each month, Naira
+ *   signed_value     Partnerships: the value of deals signed each month, Naira
  */
 const HomeChart = z.discriminatedUnion("kind", [
   z

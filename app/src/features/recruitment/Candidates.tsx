@@ -1,6 +1,9 @@
 /**
  * Recruitment · Candidates (docs/guides/recruitment.md §6.3, §6.4, §10): every application on a
- * board of the five M4 stages, each column its own server list of 25 with Load More. The vacancy
+ * board of the five M4 stages and Offer, each column its own server list of 25 with Load More. Offer
+ * holds the candidates M5 has sent an offer; nobody moves a card into or out of it by hand, and it
+ * shows once the Offers screen opens in this build (the delivery plan, F14). Hired candidates leave
+ * the board (status `hired`, and the board asks for one status at a time). The vacancy
  * filter narrows the board to one role (and its own columns); on a phone the board shows one stage at
  * a time and Move To sits in the card's menu and the sheet (F19). Invite to Apply and Screen With AI
  * open from the header, the address (`?action=invite|screen`, `?invite=1`) and ⌘K.
@@ -14,6 +17,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
+import { useScreenState } from "@/lib/plan";
 import {
   Bars,
   Button,
@@ -48,6 +52,7 @@ const BOARD: Array<[ApplicationStage, 1 | 2 | 3 | 4 | 5]> = [
   ["assessment", 2],
   ["interview", 5],
   ["shortlist", 1],
+  ["offer", 2],
 ];
 const STATUS: Array<[string, string]> = [
   ["active", "In Progress"],
@@ -57,8 +62,8 @@ const STATUS: Array<[string, string]> = [
 type Filters = Pick<CandidatesCandidateListQuery, "vacancy_id" | "status">;
 
 /** One stage: its own server list, more pages appended under it, highest weighted total first. */
-function useColumn(stage: ApplicationStage, filters: Filters) {
-  return useInfinite("GET /api/v1/recruitment/candidates", { filters: { ...filters, stage }, sort: "-weighted_total" });
+function useColumn(stage: ApplicationStage, filters: Filters, enabled = true) {
+  return useInfinite("GET /api/v1/recruitment/candidates", { filters: { ...filters, stage }, sort: "-weighted_total", enabled });
 }
 
 const daysAt = (n: number) => (n === 0 ? "Today" : n === 1 ? "1 day" : `${n} days`);
@@ -77,17 +82,21 @@ export function Candidates() {
   const role = useApi("GET /api/v1/recruitment/vacancies/:id", { params: { id: vacancy }, enabled: Boolean(vacancy) });
   const ai = useApi("GET /api/v1/recruitment/vacancies/assist", { enabled: mayEdit });
   const move = useMutation("POST /api/v1/recruitment/candidates/:id/move");
+  // Offer is M5's column: it shows once M5's Offers screen opens here (F14), never before.
+  const offers = useScreenState("recruitment", "offers").open;
   const cols = {
     application: useColumn("application", filters),
     screening: useColumn("screening", filters),
     assessment: useColumn("assessment", filters),
     interview: useColumn("interview", filters),
     shortlist: useColumn("shortlist", filters),
+    offer: useColumn("offer", filters, offers),
   };
-  const lists = Object.values(cols);
+  const lists = offers ? Object.values(cols) : Object.values(cols).filter((c) => c !== cols.offer);
   const all = lists.flatMap((c) => c.rows);
   // A role's board has only the columns its scorecard uses (a role with no assessment has none).
-  const board = role.data && vacancy ? BOARD.filter(([s]) => role.data!.board_stages.includes(s)) : BOARD;
+  const columns = offers ? BOARD : BOARD.filter(([s]) => s !== "offer");
+  const board = role.data && vacancy ? columns.filter(([s]) => role.data!.board_stages.includes(s)) : columns;
 
   const open = (id: string, title = "Candidate") => modal.open({ title, wide: true, body: (close) => <CandidateSheet id={id} close={close} /> });
   const invite = () => modal.open({ title: "Invite to Apply", body: (close) => <InviteForm close={close} vacancyId={vacancy} /> });

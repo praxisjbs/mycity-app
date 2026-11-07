@@ -395,6 +395,19 @@ const ACTIONS = Object.freeze([
     capability: "expenses.finance",
     words: ["expense category", "add category"],
   }),
+  // Partnerships (docs/guides/partnerships.md §9): a lead with its first deal; a partner already signed.
+  a("new_lead", "New Lead", {
+    screen: "partnerships.leads",
+    params: { action: "new" },
+    need: ["partnerships", "create"],
+    words: ["lead", "prospect", "add a lead", "new deal", "sponsor", "tracker"],
+  }),
+  a("new_partner", "New Partner", {
+    screen: "partnerships.partners",
+    params: { action: "new" },
+    need: ["partnerships", "create"],
+    words: ["partner", "signed partner", "add a partner"],
+  }),
 ]);
 
 /** The link an action opens, or null for one the app runs itself with no screen. */

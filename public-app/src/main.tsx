@@ -4,7 +4,7 @@ import "./styles/index.css";
 import { configurePreferences, initEnvironment } from "@mycity/ui";
 import { App } from "./App";
 
-/* The public site keeps its visitors' own theme key (index.html reads it before first paint). */
+/* The public site keeps its visitors' own theme key (public/boot.js applies it before first paint). */
 configurePreferences({ themeKey: "mc-public-theme" });
 initEnvironment({ allowQuery: import.meta.env.DEV });
 

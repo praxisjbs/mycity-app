@@ -109,7 +109,7 @@ export function Vacancy({ slug }: { slug: string }) {
   const d = v.data;
   if (!d)
     return (
-      <Page title="Careers">
+      <Page title="Vacancy">
         <div aria-busy="true" className="public-wrap py-12">
           <Skeleton lines={3} />
           <div className="mt-10">

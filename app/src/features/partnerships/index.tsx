@@ -2,24 +2,22 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { Analytics } from "./Analytics";
 import { Contracts } from "./Contracts";
 import { Leads } from "./Leads";
-import { Partner360 } from "./Partner360";
 import { Partners } from "./Partners";
 import { Pipeline } from "./Pipeline";
 import { Proposals } from "./Proposals";
 import { Categories } from "./Categories";
 
 /**
- * Partnerships (docs/guides/partnerships.md §2, §10): routing only, one file a screen. The screens run
- * on the in-browser mock until each one's M7 pull request builds it on the real API (the guide's
- * Appendix A); until then the shell shows Coming Soon outside the mock.
+ * Partnerships (docs/guides/partnerships.md §2, §10): routing only, one file a screen. Pipeline,
+ * Partners and Leads with both 360s run on the generated contract (M7 PR 3); Categories, Proposals,
+ * Contracts & MOUs and Analytics stay on the mock until their pull requests (the guide's Appendix A).
  */
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
-  if (id && (tab === "partners" || tab === "pipeline")) return <Partner360 id={id} back={tab} />;
   switch (tab) {
     case "partners":
-      return <Partners />;
+      return <Partners id={id} />;
     case "leads":
-      return <Leads />;
+      return <Leads id={id} />;
     case "proposals":
       return <Proposals />;
     case "contracts-and-mous":
@@ -29,6 +27,6 @@ export default function Partnerships({ tab, id }: ModuleScreenProps) {
     case "categories":
       return <Categories />;
     default:
-      return <Pipeline />;
+      return <Pipeline id={id} />;
   }
 }

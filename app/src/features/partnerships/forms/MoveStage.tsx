@@ -1,37 +1,51 @@
-import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation } from "@/api/hooks";
-import "@/api/types/partnerships";
-import { Button, Field, FormFooter, SelectField, TextAreaField, toast, useContractForm } from "@mycity/ui";
-import { fail, opts } from "../lib";
+import type { DealDetail, ListValue } from "@mycity/contract/contract.gen.ts";
+import pipeline from "@mycity/contract/schemas/partner_pipeline.js";
+import { useState } from "react";
+import { invalidate, useMutation } from "@/api/hooks";
+import { upload } from "@/api/upload";
+import { Button, Field, FormError, FormFooter, TextAreaField, toast, UploadField, useContractForm } from "@mycity/ui";
+import { failed } from "../lib";
 
-/** Move Stage, on the mock until M7 PR 3 brings the stage switcher. */
-export function MoveStage({ id, current, close }: { id: string; current: string; close: () => void }) {
-  const stages = useApi("GET /api/v1/partnerships/stages");
-  const f = useContractForm(
-    { stage: current, reason: "" },
-    { stage: (v) => (v === current ? "Pick another stage" : null), reason: (v, all) => (all.stage === "On hold" && !v.trim() ? "Give a reason" : null) },
-  );
-  const { stage, reason } = f.values;
-  const move = useMutation("POST /api/v1/partnerships/partners/:id/stage");
+/**
+ * After a press on the stage switcher, what the move needs (docs/guides/partnerships.md §6.5): Why,
+ * for a move back, On Hold or Closed Lost; the signed copy, for a signed stage of a deal not yet
+ * signed. Checked by StageMove; the API decides.
+ */
+export function MoveStage({ deal, to, reason, copy, close }: { deal: Pick<DealDetail, "deal_id">; to: ListValue; reason: boolean; copy: boolean; close: () => void }) {
+  const f = useContractForm({ stage: to.code, reason: "", signed_copy_document_id: "" }, pipeline.StageMove);
+  const [problem, setProblem] = useState<string | null>(null);
+  const move = useMutation("POST /api/v1/partnerships/deals/:id/stage");
   const go = async () => {
     if (!f.check()) return;
+    if (reason && f.values.reason.trim().length < 10) {
+      f.setServerErrors({ reason: ["At least 10 characters"] });
+      return;
+    }
+    if (copy && !f.values.signed_copy_document_id) {
+      setProblem("Attach the signed copy");
+      return;
+    }
     try {
-      await move.run({ params: { id }, body: { stage, ...(reason.trim() && { reason: reason.trim() }) } });
+      await move.run({ params: { id: deal.deal_id }, body: { stage: to.code, ...(f.values.reason.trim() && { reason: f.values.reason.trim() }), ...(f.values.signed_copy_document_id && { signed_copy_document_id: f.values.signed_copy_document_id }) } });
       invalidate("/api/v1/partnerships");
       close();
-      toast(`Moved to ${stage}`);
+      toast(`Moved to ${to.label}`);
     } catch (e) {
-      if (e instanceof ApiError && e.fields) toast(Object.values(e.fields)[0][0]);
-      else fail(e);
+      failed(f)(e);
     }
   };
   return (
     <>
-      <Field label="Stage" {...f.field("stage")}><SelectField {...f.field("stage")} options={opts(stages.data ?? [current])} /></Field>
-      <Field label={stage === "On hold" ? "Why It Is on Hold" : "Note (Optional)"} {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Duplicate entry" /></Field>
+      {reason && <Field label="Why" {...f.status("reason")}><TextAreaField {...f.field("reason")} placeholder="Budget opens January" /></Field>}
+      {copy && (
+        <Field label="Signed Copy" {...f.status("signed_copy_document_id")}>
+          <UploadField purpose="attachment" upload={upload} multiple={false} accept=".pdf,.jpg,.jpeg,.png" kinds="PDF or a photo" compact onUploaded={(docs) => (setProblem(null), f.set("signed_copy_document_id", docs[0]?.document_id ?? ""))} />
+        </Field>
+      )}
+      {problem && <FormError>{problem}</FormError>}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={move.pending} onClick={go}>Move</Button>
+        <Button variant="primary" onClick={go}>Move Stage</Button>
       </FormFooter>
     </>
   );

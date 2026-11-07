@@ -231,6 +231,84 @@
       "screen": null
     },
     {
+      "key": "contacts.create",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partners.ContactCreate",
+      "schema_sha": "48c557c390393dca",
+      "screen": null
+    },
+    {
+      "key": "contacts.update",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partners.ContactChange",
+      "schema_sha": "4bf8da0df01a706c",
+      "screen": null
+    },
+    {
+      "key": "deal_returns.save",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "money",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealReturnChange",
+      "schema_sha": "97f3e8991231c427",
+      "screen": null,
+      "capability": "partnerships.money"
+    },
+    {
+      "key": "deals.create",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealAdd",
+      "schema_sha": "6b60119d7401ada6",
+      "screen": null
+    },
+    {
+      "key": "deals.move_stage",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealStageChange",
+      "schema_sha": "9a4115f085d0cca4",
+      "screen": null
+    },
+    {
+      "key": "deals.set_health",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealHealthChange",
+      "schema_sha": "a8278643b6b607c9",
+      "screen": null
+    },
+    {
+      "key": "deals.update",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealChange",
+      "schema_sha": "78acbdb5fdb43fd8",
+      "screen": null
+    },
+    {
       "key": "departments.create",
       "kind": "action",
       "module_key": "people",
@@ -425,6 +503,17 @@
       "screen": null
     },
     {
+      "key": "interactions.log",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "interactions.InteractionCreate",
+      "schema_sha": "6917df65ce8d1361",
+      "screen": null
+    },
+    {
       "key": "key_results.create",
       "kind": "action",
       "module_key": "performance",
@@ -497,6 +586,39 @@
       "schema_sha": "6bdee254c260e062",
       "screen": null,
       "capability": "workspace.late_reasons"
+    },
+    {
+      "key": "leads.create",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "leads.LeadAdd",
+      "schema_sha": "e4f6f0a5c45c1519",
+      "screen": null
+    },
+    {
+      "key": "leads.lose",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "leads.LeadClose",
+      "schema_sha": "fc5fd106400da469",
+      "screen": null
+    },
+    {
+      "key": "leads.update",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "leads.LeadChange",
+      "schema_sha": "d67d743aacb94e3e",
+      "screen": null
     },
     {
       "key": "leave_types.add",
@@ -782,6 +904,28 @@
       "bulk": 1,
       "schema": "attendance.OvertimePreApprovalCreate",
       "schema_sha": "3f38e2d89a1bf8fa",
+      "screen": null
+    },
+    {
+      "key": "partners.create",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partners.PartnerAdd",
+      "schema_sha": "4271c6c0101ddcff",
+      "screen": null
+    },
+    {
+      "key": "partners.update",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partners.PartnerChange",
+      "schema_sha": "ae6677ae6d905c12",
       "screen": null
     },
     {
@@ -1452,6 +1596,17 @@
       "screen": null
     },
     {
+      "key": "categories.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partner_pipeline.CategoryListQuery",
+      "schema_sha": "7d89061a9ab84adf",
+      "screen": null
+    },
+    {
       "key": "channels.list",
       "kind": "read",
       "module_key": "community",
@@ -1482,6 +1637,28 @@
       "bulk": null,
       "schema": "targets.CommitmentListQuery",
       "schema_sha": "9d407b52eab925fc",
+      "screen": null
+    },
+    {
+      "key": "deals.get",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "deals.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partner_pipeline.DealListQuery",
+      "schema_sha": "38ed60dff143fdf3",
       "screen": null
     },
     {
@@ -1650,6 +1827,17 @@
       "screen": null
     },
     {
+      "key": "interactions.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "interactions.InteractionListQuery",
+      "schema_sha": "897d58ffdc4d066a",
+      "screen": null
+    },
+    {
       "key": "interviews.list",
       "kind": "read",
       "module_key": "recruitment",
@@ -1669,6 +1857,28 @@
       "bulk": null,
       "schema": "kpis.KpiListQuery",
       "schema_sha": "50148826c2b69825",
+      "screen": null
+    },
+    {
+      "key": "leads.get",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "leads.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "leads.LeadListQuery",
+      "schema_sha": "85294e8f5f7ee9ca",
       "screen": null
     },
     {
@@ -1757,6 +1967,28 @@
       "bulk": null,
       "schema": "common.EmptyBody",
       "schema_sha": "32062bdb9024160d",
+      "screen": null
+    },
+    {
+      "key": "partners.get",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "partners.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partners.PartnerListQuery",
+      "schema_sha": "ffe2bf894a6f1134",
       "screen": null
     },
     {
@@ -2396,6 +2628,83 @@
       "schema": null,
       "schema_sha": null,
       "screen": "knowledge.policies"
+    },
+    {
+      "key": "partnerships.route.add_a_partner_already_signed",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.partners"
+    },
+    {
+      "key": "partnerships.route.add_a_partnership_lead_or_prospect",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.leads"
+    },
+    {
+      "key": "partnerships.route.log_a_call_or_meeting_with_a_partner",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.partners"
+    },
+    {
+      "key": "partnerships.route.move_a_deal_or_set_its_health",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.pipeline"
+    },
+    {
+      "key": "partnerships.route.see_the_leads_and_their_status",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.leads"
+    },
+    {
+      "key": "partnerships.route.see_the_partners_and_their_360",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.partners"
+    },
+    {
+      "key": "partnerships.route.see_the_partnership_pipeline_stalled_deals_and_what_has_waited_longest",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.pipeline"
     },
     {
       "key": "partnerships.route.set_up_a_category",

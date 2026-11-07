@@ -11,6 +11,9 @@
  *   move(), notProgressed(), reopen()   the pipeline (candidates.pipeline.js), each a row of
  *                                entity_state_history; Not Progressing spends the candidate's live
  *                                links and mails candidate-not-progressed
+ *   advanceIn(), offerEndedIn(), hireIn()   the steps another module's transaction implies: an
+ *                                assessment sent, an interview scheduled, and M5's offer and
+ *                                onboarding (Offer and after are set only through these)
  *   requestScore(), scoreAll()   Score With AI and Screen With AI: queued, read in the worker
  *                                (candidates.score.js)
  *   invite()                     Invite to Apply: the person kept, the link made and mailed after commit
@@ -87,10 +90,10 @@ function card(row, now = new Date()) {
 
 /**
  * Where a card may move now (pipeline.nextStages on its role's own board): none for one not in
- * progress, past M4's stages, or on a closed role. The sheet narrows it to readers who may edit.
+ * progress, at Offer or after, or on a closed role. The sheet narrows it to readers who may edit.
  */
 function nextOf(row) {
-  if (row.status !== "active" || row.vacancy_status === "closed" || !lifecycle.M4_STAGES.includes(row.stage)) return [];
+  if (row.status !== "active" || row.vacancy_status === "closed" || pipeline.isM5(row.stage)) return [];
   const board = lifecycle.boardStages((row.active_parts || []).map((code) => ({ code, active: true })));
   return pipeline.nextStages(row.stage, board);
 }
@@ -285,25 +288,80 @@ async function move(actor, scope, id, body) {
   });
 }
 
+/** Record a move another module's step made, in the caller's transaction: history, stage, event. */
+async function stepIn(client, actor, row, to, reason = null) {
+  const id = row.application_id;
+  await transition(client, pipeline.MACHINE, { entity_id: id, from: row.stage, to, actor_id: actor.user_id, reason });
+  await repo.setStage(client, id, to);
+  await emit(client, {
+    key: EVENTS.APPLICATION_MOVED,
+    entity: { type: "application", id },
+    actor,
+    payload: { application_id: id, number: row.number, from: row.stage, to },
+  });
+}
+
 /**
  * Move an application forward to `stage` inside the caller's transaction, as another module's step
- * implies it (an interview scheduled, guide §3 step 8). Only forward, only an active application, and
- * only into a column of its board; anything else leaves it where it is. True when it moved.
+ * implies it: an assessment sent or an interview scheduled (guide §3 step 8), and M5's steps past
+ * Shortlist (#79, 06/11/2026): offer when an offer is sent, documentation at acceptance,
+ * pre_onboarding once the checklist is done, onboarding on the start date. Only forward and only an
+ * active application: among the M4 stages, only into a column of its board; from Shortlist on, only
+ * the next stage (Shortlist to Offer, Offer to Documentation...). Anything else leaves it where it is,
+ * so the caller checks the answer. Hired is hireIn's. True when it moved.
  */
 async function advanceIn(client, actor, applicationId, stage) {
   const row = await repo.get(client, applicationId, { lock: true });
-  if (!row || row.status !== "active" || row.stage === stage) return false;
-  const board = lifecycle.boardStages(await vacancyRepo.scorecard(client, row.vacancy_id));
-  if (!board.includes(stage) || board.indexOf(stage) <= board.indexOf(row.stage)) return false;
-  await transition(client, pipeline.MACHINE, { entity_id: applicationId, from: row.stage, to: stage, actor_id: actor.user_id });
-  await repo.setStage(client, applicationId, stage);
+  if (!row || row.status !== "active" || row.stage === stage || stage === "hired") return false;
+  if (pipeline.isM5(stage)) {
+    if (!(pipeline.MACHINE.moves[row.stage] || []).includes(stage)) return false;
+  } else {
+    if (pipeline.isM5(row.stage)) return false;
+    const board = lifecycle.boardStages(await vacancyRepo.scorecard(client, row.vacancy_id));
+    if (!board.includes(stage) || board.indexOf(stage) <= board.indexOf(row.stage)) return false;
+  }
+  await stepIn(client, actor, row, stage);
+  return true;
+}
+
+/**
+ * An offer ended unsigned (declined, lapsed or withdrawn; M5's offers.service), in the caller's
+ * transaction: the card goes back from Offer to Shortlist with the reason, so another offer can be
+ * made or the candidate told. True when it moved; false for one not active at Offer.
+ */
+async function offerEndedIn(client, actor, applicationId, reason) {
+  const row = await repo.get(client, applicationId, { lock: true });
+  if (!row || row.status !== "active" || row.stage !== "offer") return false;
+  await stepIn(client, actor, row, "shortlist", reason || null);
+  return true;
+}
+
+/**
+ * The hire, in the caller's transaction (M5, when onboarding completes; #79, 06/11/2026): the
+ * application moves from Onboarding to Hired with status hired, so it leaves the board and every
+ * count of people in progress, and `application.hired` is recorded. Then the vacancy hears of it
+ * (vacancies.hiredIn): its Organogram seat is filled by the new employee, and it closes as filled
+ * once its openings are. 409 for an application not active at Onboarding.
+ * @param {{employee_id: string}} hire  the employee M5 created at acceptance
+ * @returns {Promise<{application_id: string, seat_filled: boolean, vacancy_closed: boolean}>}
+ */
+async function hireIn(client, actor, applicationId, { employee_id: employeeId }) {
+  const row = await repo.get(client, applicationId, { lock: true });
+  if (!row) throw notFound();
+  if (row.status !== "active" || row.stage !== "onboarding")
+    throw new AppError("MOVE_NOT_ALLOWED", "Only a candidate in onboarding can be hired", 409);
+  if (!employeeId) throw new AppError("VALIDATION_FAILED", "Name the new employee", 422, { employee_id: ["Pick the employee"] });
+  await transition(client, pipeline.MACHINE, { entity_id: applicationId, from: row.stage, to: "hired", actor_id: actor.user_id });
+  await repo.setStage(client, applicationId, "hired");
+  await repo.setStatus(client, applicationId, { status: "hired" });
   await emit(client, {
-    key: EVENTS.APPLICATION_MOVED,
+    key: EVENTS.APPLICATION_HIRED,
     entity: { type: "application", id: applicationId },
     actor,
-    payload: { application_id: applicationId, number: row.number, from: row.stage, to: stage },
+    payload: { application_id: applicationId, number: row.number, vacancy_id: row.vacancy_id, employee_id: employeeId },
   });
-  return true;
+  const v = await vacancies.hiredIn(client, actor, row.vacancy_id, { employee_id: employeeId });
+  return { application_id: applicationId, seat_filled: v.seat_filled, vacancy_closed: v.closed };
 }
 
 /**
@@ -351,12 +409,15 @@ async function notProgressIn(client, actor, row, reason) {
   });
 }
 
-/** Close Vacancy's Not Progressing for all: every candidate of the role still in progress. */
+/**
+ * Close Vacancy's Not Progressing for all: every candidate of the role still at an M4 stage. One at
+ * Offer or after is M5's (an offer out, or a hire on its way) and is left as it stands.
+ */
 async function notProgressAllIn(client, actor, vacancyId, reason) {
   let n = 0;
   for (const id of await repo.activeOf(client, vacancyId)) {
     const row = await repo.get(client, id, { lock: true });
-    if (!row || row.status !== "active") continue;
+    if (!row || row.status !== "active" || pipeline.isM5(row.stage)) continue;
     await notProgressIn(client, actor, row, reason);
     n += 1;
   }
@@ -486,7 +547,7 @@ async function emailRow(db, key) {
   return emailsOf.shape(key, t, updatedAt);
 }
 
-/** The five, with their current wording: one page, as there are five. */
+/** The eight, with their current wording: one page, as there are eight. */
 async function emails(user) {
   const may = await require("../vacancies/vacancies.service").wordsEveryRole(user);
   const data = [];
@@ -541,6 +602,8 @@ module.exports = {
   cv,
   move,
   advanceIn,
+  offerEndedIn,
+  hireIn,
   notProgressed,
   notProgressAllIn,
   reopen,

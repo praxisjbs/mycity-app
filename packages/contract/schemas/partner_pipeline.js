@@ -16,7 +16,7 @@
  * The code lists the service switches on, deal health and interaction types, are seeded (7190).
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { PlaceInput, PlaceView } = require("./maps");
 
@@ -54,6 +54,9 @@ const percent = z
   .string()
   .regex(/^\d{1,3}(\.\d{1,2})?$/, "must be a percentage like 8 or 12.50")
   .refine((v) => Number(v) <= 100, "must be 100 or less");
+
+/** A count a form types (expected attendance): a whole number, or the digits typed. */
+const count = z.union([z.number().int().min(0).max(10000000), z.string().trim().regex(/^\d{1,8}$/, "Whole number").transform(Number)]);
 
 /** A query-string boolean: "true" or "false". */
 const flag = z.enum(["true", "false"]).transform((v) => v === "true");
@@ -567,11 +570,12 @@ const DealFields = z
     event_title: optionalText(150),
     event_starts_on: blank(isoDate),
     event_ends_on: blank(isoDate),
-    venue: PlaceInput.optional(),
-    expected_attendance: z.number().int().min(0).max(10000000).optional(),
+    /** Picked from the address search; null or left out for none. */
+    venue: PlaceInput.nullish(),
+    expected_attendance: blank(count),
     objective: optionalText(2000),
     /** A stage of MyCity's list; the first active stage when left out. */
-    stage: listCode.optional(),
+    stage: blank(listCode),
     /** Projected value: the owner's estimate. */
     estimated_value: blank(money),
     commission_pct: blank(percent),
@@ -583,7 +587,7 @@ const DealFields = z
     member_ids: z.array(uuid).max(20).optional(),
     options: z.array(DealOptionInput).max(5, "At most five options").optional(),
     impact: z.array(listCode).max(9).optional(),
-    impact_rating: ImpactRating.optional(),
+    impact_rating: blank(ImpactRating),
     impact_note: optionalText(500),
     comments: optionalText(2000),
     custom: CustomValues.optional(),
@@ -607,7 +611,7 @@ const DealUpdate = z
     event_starts_on: isoDate.nullable().optional(),
     event_ends_on: isoDate.nullable().optional(),
     venue: PlaceInput.nullable().optional(),
-    expected_attendance: z.number().int().min(0).max(10000000).nullable().optional(),
+    expected_attendance: count.nullable().optional(),
     objective: z.string().trim().max(2000).nullable().optional(),
     estimated_value: money.nullable().optional(),
     commission_pct: percent.nullable().optional(),
@@ -650,6 +654,73 @@ const HealthSet = z
   .strict()
   .refine((v) => v.health !== "stalled" || Boolean(v.blockers), { message: "Say what is in the way", path: ["blockers"] });
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards on deals (§9; docs/guides/praxis-ai.md §6.11, decision 33): flat fields the
+ * chat can carry, each reaching the screen's own service function. A deal's options, venue, team,
+ * validity, commission and custom values are set on its 360.
+ * ------------------------------------------------------------------ */
+
+/** New Deal as a card, on a partner (a lead has the one deal it was captured with). */
+const DealAdd = z
+  .object({
+    partner_id: recordId("partner"),
+    title: text(150),
+    event_title: optionalText(150),
+    event_starts_on: blank(isoDate),
+    event_ends_on: blank(isoDate),
+    objective: optionalText(2000),
+    stage: listCode.optional(),
+    estimated_value: blank(money),
+    expected_close_on: blank(isoDate),
+    next_action: optionalText(300),
+    next_action_on: blank(isoDate),
+    owner_id: uuid,
+  })
+  .strict()
+  .refine(endsOnOrAfter, ENDS_BEFORE);
+
+/** Edit Deal as a card: the deal beside the fields that change. */
+const DealChange = z
+  .object({
+    deal_id: recordId("deal"),
+    title: text(150).optional(),
+    event_title: z.string().trim().max(150).nullable().optional(),
+    event_starts_on: isoDate.nullable().optional(),
+    event_ends_on: isoDate.nullable().optional(),
+    expected_attendance: z.number().int().min(0).max(10000000).nullable().optional(),
+    objective: z.string().trim().max(2000).nullable().optional(),
+    estimated_value: money.nullable().optional(),
+    expected_close_on: isoDate.nullable().optional(),
+    next_action: z.string().trim().max(300).nullable().optional(),
+    next_action_on: isoDate.nullable().optional(),
+    owner_id: uuid.optional(),
+    impact_rating: ImpactRating.nullable().optional(),
+    impact_note: z.string().trim().max(500).nullable().optional(),
+    comments: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["deal_id"]), nothingOn("deal_id"))
+  .refine(endsOnOrAfter, ENDS_BEFORE);
+
+/** The stage switcher as a card. A move into a signed stage needs the signed copy, so the card sends the person to the 360. */
+const DealStageChange = z
+  .object({
+    deal_id: recordId("deal"),
+    stage: listCode,
+    reason: blank(z.string().trim().min(10, "At least 10 characters").max(1000)),
+  })
+  .strict();
+
+/** Set Health as a card. Stalled needs its blockers. */
+const DealHealthChange = z
+  .object({
+    deal_id: recordId("deal"),
+    health: DealHealth,
+    blockers: blank(z.string().trim().min(10, "At least 10 characters").max(1000)),
+  })
+  .strict()
+  .refine((v) => v.health !== "stalled" || Boolean(v.blockers), { message: "Say what is in the way", path: ["blockers"] });
+
 /** One line of a deal's history: a stage move or a health change. */
 const StageHistoryLine = z
   .object({
@@ -665,6 +736,13 @@ const StageHistoryLine = z
     changed_at: isoDateTime,
   })
   .strict();
+
+/** A history line on a record's 360 (the Partner 360's Activity, §6.2): the line and the deal it is about. */
+const RecordHistoryLine = StageHistoryLine.extend({
+  deal_id: uuid,
+  deal_number: z.string(),
+  deal_title: z.string(),
+}).strict();
 
 /** A delivery checklist item raised as a Workspace task on signing (§6.7); its status is its task's. */
 const Deliverable = z
@@ -848,6 +926,9 @@ const DealReturn = z
   })
   .strict();
 
+/** Enter Returns as a card (with `partnerships.money`): the deal and its month beside the figures. */
+const DealReturnChange = ReturnSave.extend({ deal_id: recordId("deal"), month: ReturnMonth }).strict();
+
 const ReturnListQuery = listQuery({ year: z.coerce.number().int().min(2000).max(2100).optional() }, ["month"]);
 const ReturnPage = Paged(DealReturn);
 
@@ -952,6 +1033,10 @@ const TABLES = {
   DealCreate: { table: "partnership_opportunity", virtual: DEAL_FIELDS },
   DealUpdate: { table: "partnership_opportunity", virtual: DEAL_FIELDS },
   StageMove: { table: null, reason: "a stage move: the deal's stage and a partnership_stage_history line" },
+  DealAdd: { table: "partnership_opportunity" },
+  DealChange: { table: "partnership_opportunity", virtual: { deal_id: "partnership_opportunity.partnership_opportunity_id" } },
+  DealStageChange: { table: null, reason: "a stage move as a card: the deal, its stage and a partnership_stage_history line" },
+  DealHealthChange: { table: "partnership_opportunity", virtual: { deal_id: "partnership_opportunity.partnership_opportunity_id" } },
   HealthSet: { table: "partnership_opportunity" },
   StageHistoryLine: {
     table: "partnership_stage_history",
@@ -959,6 +1044,17 @@ const TABLES = {
       from_label: "the from stage's or health's label",
       to_label: "the to stage's or health's label",
       by: "the person behind changed_by",
+    },
+  },
+  RecordHistoryLine: {
+    table: "partnership_stage_history",
+    virtual: {
+      from_label: "the from stage's or health's label",
+      to_label: "the to stage's or health's label",
+      by: "the person behind changed_by",
+      deal_id: "partnership_stage_history.partnership_opportunity_id, named as every later table names it",
+      deal_number: "the deal's number",
+      deal_title: "the deal's title",
     },
   },
   Deliverable: {
@@ -985,6 +1081,7 @@ const TABLES = {
   PipelineSummary: { table: null, reason: "Pipeline's figures over the deals" },
   ReturnParams: { table: null, reason: "the :id and :month path parameters" },
   ReturnSave: { table: "deal_return" },
+  DealReturnChange: { table: "deal_return" },
   DealReturn: { table: "deal_return", virtual: { entered_by_name: "the name behind entered_by" } },
   ReturnListQuery: { table: null, reason: "list controls for a deal's returns" },
   ReturnPage: { table: null, reason: "a page of a deal's returns" },
@@ -1063,7 +1160,12 @@ module.exports = {
   DealUpdate,
   StageMove,
   HealthSet,
+  DealAdd,
+  DealChange,
+  DealStageChange,
+  DealHealthChange,
   StageHistoryLine,
+  RecordHistoryLine,
   Deliverable,
   DealRow,
   DealDetail,
@@ -1075,6 +1177,7 @@ module.exports = {
   ReturnMonth,
   ReturnParams,
   ReturnSave,
+  DealReturnChange,
   DealReturn,
   ReturnListQuery,
   ReturnPage,

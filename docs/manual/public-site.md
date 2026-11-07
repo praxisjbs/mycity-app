@@ -11,8 +11,9 @@ Candidates never sign in: the pages they fill in open from a link of their own. 
 what they see, so you can help a candidate who asks.
 
 Every page has the same bar at the top: the MyCityApp mark, which opens the front page, and the
-links **Careers**, **Vacancy**, **Apply**, **Assessment**, **Sign Offer** and **Verify Document**. On
-a phone they are in the menu at the top right.
+links **Vacancy**, **Apply**, **Assessment**, **Sign Offer** and **Verify Document**. On a phone they
+are in the menu at the top right. The moon or sun beside them switches between light and dark, and the
+site keeps that choice on the device the next time it opens.
 
 The staff side of each page is in [Recruitment](#recruitment-vacancies).
 
@@ -26,27 +27,28 @@ The front page, [go.mycityapp.io](https://go.mycityapp.io), introduces MyCityApp
 2. **Work With Us** fills the first screen, with the cities hiring above it and three figures under
    it: open roles, teams hiring and cities.
    ![The front page](shot:public-home)
-3. Type a role or a city in the box and press **Search Roles**. [Careers](#public-careers) opens on
-   the roles that match.
+3. Type a role or a city in the box and press **Search Roles**. [The open roles](#public-careers) open
+   on the ones that match.
 4. Further down, **About MyCityApp** shows the words kept on Careers Settings, beside what MyCityApp
    builds. **Visit MyCityApp** opens mycityapp.io.
 5. **Closing Soon** shows the three roles closing soonest. Press one to open it, or press
    **See All Roles**.
 6. **Four Steps, Every Time** shows how every role is filled: apply, screening, assessment and
    interview.
-7. **Copy Careers Link** copies the careers page's link to pass on. The button reads
+7. **Copy Careers Link** copies the open roles' link to pass on. The button reads
    **Link Copied** for a moment.
 8. **Verify a Document** opens the page that checks a document MyCity issued.
 
 The figures and the roles change by themselves as roles open and close.
 
-## Careers {#public-careers icon=brief}
+## Open Roles {#public-careers icon=brief}
 
-Careers lists every role open now, closing soonest first. Anyone can open it and share it.
+**Vacancy** in the bar at the top lists every role open now, closing soonest first. Anyone can open it
+and share it.
 
 ### What a visitor sees {#public-careers-read}
 
-1. Open [the careers page](https://go.mycityapp.io/jobs), or press **Careers** in the bar at the top.
+1. Open [the open roles](https://go.mycityapp.io/jobs), or press **Vacancy** in the bar at the top.
 2. **Open Roles** heads the page, with how many roles there are, in how many teams and cities.
    ![The careers page](shot:public-careers)
 3. Each role shows its team, its area, how it is worked (on site, hybrid or remote), its type and the
@@ -100,8 +102,7 @@ role's link to pass on.
 
 A paused, closed or filled role has no **Apply for This Role**.
 
-Pressing **Vacancy** in the bar at the top, with no role open, says *Choose a Role*; **See Open Roles**
-opens the careers page.
+A role stays under **Vacancy** in the bar at the top; **All Roles** goes back to the list.
 
 ## Apply {#public-apply icon=doc}
 
@@ -240,7 +241,7 @@ do:
   - wait: button "Search Roles"
 marks:
   1: searchbox | Type a role or a city
-  2: button "Search Roles" | Opens Careers on what was typed
+  2: button "Search Roles" | Opens the open roles on what was typed
 ```
 
 ```shot public-careers

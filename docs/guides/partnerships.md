@@ -197,6 +197,7 @@ service, in a transaction, with `emit()`.
 | `lead` | `leads` | new | An organisation before signing |
 | `partner` | `partners` | 7000, extended | An organisation with a signed deal |
 | `partner_contact` | `partners` | 7000, extended | A person at a lead or partner |
+| `partner_document` | `partners` | new (`7060`, PR 3) | A vault document of a lead or partner: its kind, deal and origin |
 | `partnership_opportunity` (deal) | `partner_pipeline` | 7000, extended | A deal |
 | `deal_option` | `partner_pipeline` | new | A priced line of a deal |
 | `deal_member` | `partner_pipeline` | new | The deal's team |
@@ -261,13 +262,20 @@ with owner `lead.cities` (one a city, keyed by the lead and the city's place in 
 `logo_document_id`, `since date`, `lead_id`, `custom jsonb`, `closed_at`, `close_reason`; `status`
 becomes `CHECK IN ('active', 'dormant', 'closed')` (default `dormant`; a `prospect` row becomes
 `dormant`); `partner_type` is copied into `partner_category_id` by the migration where rows exist (a
-category named by 7099's label) and stops being required; nothing reads it after PR 1, and a fix-forward
+category named by 7099's label) and stops being required; nothing reads it after PR 1, and `7060`
 drops it one release later, in PR 3 (docs/MIGRATIONS.md §8). Headquarters (an area) and region cities
 are `place` rows (`partner.headquarters`, `partner.cities`).
 
 **`partner_contact`** (7000): `partner_id` becomes nullable; adds `lead_id`; `CHECK (num_nonnulls
 (partner_id, lead_id) = 1)`; `phones text[]` beside `phone`; `signatory boolean`; unique email per
 record.
+
+**`partner_document`** (`7060`, PR 3): `partner_document_id`; `document_id uuid NOT NULL UNIQUE
+REFERENCES document ON DELETE CASCADE`; `partner_id` or `lead_id` (`CHECK (num_nonnulls(partner_id,
+lead_id) = 1)`); `deal_id` (`ON DELETE SET NULL`); `kind text` (a `partner_document_kind` code, null for
+a signed copy); `origin text CHECK IN ('upload', 'proposal', 'agreement', 'signed_copy')`;
+`attached_by`. The vault's row names this row as its entity (`partner_document`), so conversion
+re-points this row and never rewrites the vault (§6.4).
 
 **`partnership_opportunity`**, the deal (7000 has `number`, `partner_id`, `title`, `stage`, `status`,
 `owner_id`, `estimated_value`, `currency`, `probability`, `expected_close_on`, `closed_at`):
@@ -453,12 +461,21 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `ExportAct
   the owner, as Home does: `all` sees every one, `team` the owner's reporting line and the reader's own,
   `own` the reader's. A record with no owner is seen only with `all`.
 - A deal is also seen by its **members**, and its lead or partner with it.
+- A deal is also seen through the **owner of its lead or partner**: whoever may see the record's owner sees
+  and acts on every deal on the record, as an account owner does (TB, 06/11/2026). A member who sees a
+  record only through their own deal sees that deal, not the record's others; the 360's deals and figures
+  are the deals the reader sees.
+- A record or a deal is given only to an owner in the reader's scope (`all`: anyone), so nothing a person
+  makes or edits vanishes from them.
 - Proposals and agreements follow their deal; documents follow their record and keep their sensitivity.
 - **Money is gated:** anyone who may see a record sees its projected and signed values. Commission rates
   and amounts, the merchant's take, returns and payouts need `partnerships.money` (held by Operations &
   People, Management, Implementation, General Management and the CEO). The **server leaves them out**
   of every response without it; the screen never merely hides them.
-- Repos honour scope in SQL. One rule serves the lists, the 360s, ⌘K, Analytics, exports and Praxis AI.
+- Repos honour scope in SQL. One rule serves the lists, the 360s, ⌘K, Analytics, exports, Categories'
+  counts and its partners and leads, and Praxis AI. **The one exception is the duplicate check** (§6.2):
+  it searches every lead and partner whatever the reader's scope and returns only the number and the
+  name, so two people never capture the same organisation twice (TB, 06/11/2026).
 
 ### 6.2 The 360s and duplicates
 
@@ -474,14 +491,16 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `ExportAct
 - **Partner 360 tabs:** **Overview** (each open and live deal with its stage switcher, health, blockers,
   next action and expected close; the next three events; the latest five interactions; open
   deliverables), **Deals**, **Documents**, **Returns** (with `partnerships.money`), **Work**, **Activity**
-  (interactions, linked mail, stage and health history), **Contacts**, **Details** (organisation,
+  (interactions, linked mail, stage and health history: the latest 25 lines of the deals the reader sees,
+  each naming its deal), **Contacts**, **Details** (organisation,
   region, headquarters, website, category, custom fields behind Advanced). **Lead 360 tabs:** Overview,
   Deal, Documents, Work, Activity, Contacts, Details.
 - The stage moves only on a 360 (no board). Pipeline and the lists filter by stage.
 - **Duplicates** are advisory, over leads and partners: name (similar, via `shared/dedup`), email,
   phone, website host; at most 25 candidates, a match from 55. New Lead and New Partner show the likely
   match before saving; a lead whose organisation is already a partner is offered **New Deal** on that
-  partner. Nothing blocks.
+  partner. Nothing blocks. The check reads every lead and partner, whatever the reader's scope, and
+  answers only each candidate's number, name, score and reasons (§6.1).
 
 ### 6.3 Categories, lists and custom fields
 
@@ -489,7 +508,8 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `ExportAct
   Strategic, Tourism, University, Government, Sponsorship, Influencer as MyCity's tracker has them, and
   any MyCity adds; A21). It carries a default commission, a default validity, its agreement templates,
   its delivery checklist and its custom fields; `counts_as_vendor` marks the ones whose leads Analytics
-  counts as vendor leads. A category in use is retired, never deleted.
+  counts as vendor leads. A category in use is retired, never deleted. Its partner and lead counts, and the
+  partners and leads the picked category lists, are those the reader may see (§6.1).
 - **Stages** are MyCity's list; each carries a **meaning**: `prospect`, `contacted`, `meeting`,
   `proposal`, `negotiation`, `signed`, `active`, `closed_lost`, `on_hold`. MyCity's thirteen from the
   tracker's dropdown: Prospect Identified (`prospect`), Initial Contact (`contacted`), Introductory
@@ -523,13 +543,15 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `ExportAct
   shows a pill and keeps the status it had before. The service keeps `lead.status` in step in the same
   transaction as every stage move.
 - **Close as Lost** moves the deal to the first `closed_lost` stage with a reason; the lead is Lost and
-  leaves the default list (the Lost chip shows it).
+  leaves the default list (the Lost chip shows it). Moving the deal on from Closed Lost (a move back, so
+  with a reason) reopens the lead: its status is the new stage's and its lost reason is cleared.
 - **Conversion is a transition** (the donor's rule: reachable from one state only, evidence the database
   enforces, the downstream record in the same transaction). When the lead's deal enters a `signed`
   meaning (a completed signature, Record Signed Copy, or a stage move with a signed copy attached), one
-  transaction: creates the partner (numbered; name, legal name, category, industry, region, website,
-  owner and custom values copied; `lead_id` kept); sets the deal's `partner_id` (its `lead_id` kept);
-  moves contacts, documents (`entity_type`), interactions, linked mail, and Workspace links (through the
+  transaction: creates the partner (numbered; name, category, industry, region, website, owner and
+  custom values copied, a lead having no legal name; `lead_id` kept); sets the deal's `partner_id` (its
+  `lead_id` kept);
+  moves contacts, documents (their `partner_document` rows; the vault untouched), interactions, linked mail, and Workspace links (through the
   workspace services); sets the lead Converted with `converted_partner_id`; raises the deliverables
   (§6.7); makes the calendar event (§6.16); emits `lead.converted` and `deal.signed`.
 - **Convert to Partner** on the Lead 360 is the same transition for a deal signed outside the hub; it
@@ -551,6 +573,11 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `ExportAct
   expected attendance) when it is one; objective; impact; projected value; expected close; next action
   and its date; its team; up to five **options**; its commission rate; its validity; its custom fields.
 - **Days at stage** count from the last stage line, in Lagos days.
+- **On Hold** sits last in the list, so leaving it resumes the deal at any stage and needs no reason.
+- **After signing** a deal moves only to another signed meaning (`signed`, `active`), On Hold or Closed
+  Lost; anything earlier is refused ("Already signed"). Only the first move into a signed meaning asks
+  for the signed copy: a deal already signed, or with a signed agreement, asks for none. Convert to
+  Partner's own move needs no reason; its signed copy is the evidence.
 
 ### 6.6 Partners, value and money terms
 
@@ -558,8 +585,9 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `ExportAct
   one at the first stage on the same partner, and the partner stays active or dormant by its other
   deals.
 - **New Partner** records an organisation whose relationship is already signed (MyCity has about 33): it
-  needs its first deal at a `signed` or `active` stage and either a signed copy or "signed before the
-  hub", which shows on its Documents tab and on verification.
+  needs its first deal at a `signed` or `active` stage (the first `signed` stage when the form names
+  none) and either a signed copy or "signed before the hub", which shows on its Documents tab and on
+  verification.
 - **Status:** `active` while any deal is live; `dormant` when none is; `closed` by Close Partner with a
   reason (its open deals are lost with it, each with that reason). Home reads `active`.
 - **Options** follow MyCity's Deal Merchant Agreement: up to five, each with a label, Original Price,
@@ -785,11 +813,14 @@ studio's preview, the public page and, through Chromium, the PDF.
 
 ### 6.12 Interactions, quiet partners and follow-up
 
-- An interaction is a call, meeting, email, visit or note: a time not in the future, a summary of at
-  least 10 characters, an owner, optionally the contact and the deal. Logging one is contact.
+- An interaction is a call, meeting, email, visit or note: a time not in the future (a minute's grace
+  for a phone's clock), a summary of at least 10 characters, an owner (who logs it), optionally the
+  contact and the deal, each the record's own. Logging one is contact.
 - **Quiet**, as Home defines it: a partner with a live deal and no interaction since the start of the day
   `N` days ago (Lagos); one never contacted counts from when it was made. `N` is the enabled Partner
-  Inactivity rule's threshold on Home · Alerts (30 at go-live); no enabled rule, no follow-up.
+  Inactivity rule's threshold on Home · Alerts (30 at go-live); no enabled rule, no follow-up. Partners'
+  Quiet filter and figures use the same `N`, 30 while no rule is enabled (`PartnersSummary.quiet_days`, which
+  the Quiet card's help names); Home's No Contact 30 Days card counts 30, as its title says.
 - **The follow-up:** the `partner-inactivity` scheduler runs each morning after `home-alert-sweeps`. For
   each newly quiet partner it sets its live deals' health to Follow-up Required (source `system`) and
   creates one Workspace task for the owner, "Follow up with <partner>", due three working days later
@@ -876,10 +907,12 @@ Performance** (headers on row 3, four staff names, no figures).
 
 ### 6.17 Home
 
-- `src/modules/dashboard/sources/partners.source.js` becomes M7's in PR 3: its `TABLES` stay true to the
-  migrated schema, its `OWES` clear, its queries move to the modules' reads, Home's seed tests update.
+- `src/modules/dashboard/sources/partners.source.js` became M7's in PR 3: its `TABLES` true to the
+  migrated schema, its `OWES` clear, every query the owning module's own read (`partner_pipeline.repo`,
+  `partners.repo`, `proposals.repo`), Home's seed tests updated.
 - **Open Opportunities** reads open deals; **Active Partnerships** reads `partner.status = 'active'`;
-  **Signed Value** reads deals' signed values in the year signed (§6.6), NGN only; **No Contact 30 Days**
+  **Signed Value** reads deals' signed values in the year signed (§6.6), NGN only, its records one row a
+  deal (deal, partner, signed, value, owner) opening its lead's or partner's 360; **No Contact 30 Days**
   is §6.12's quiet; **Proposals Out** reads proposals `sent` or `viewed`. The Partnership Pipeline chart
   reads open deals by stage in the list's order.
 - Staging's M7 seed calls `removeHomeStagingRows` for Home's five tables before writing, in the three
@@ -981,21 +1014,28 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
 
 - **AI reads** (`partners.ai.js`, `leads.ai.js`, `partner_pipeline.ai.js`, `proposals.ai.js`,
   `agreements.ai.js`, `partnership_analytics`'s summary): `leads.list`, `leads.get`, `partners.list`,
-  `partners.get`, `deals.list`, `deals.get`, `proposals.list`, `agreements.list`, `agreements.renewals`,
-  and summary reads (20 groups, never a row) for the pipeline by stage, category and region, signed value
+  `partners.get`, `deals.list`, `deals.get`, `categories.list`, `interactions.list`, `proposals.list`,
+  `agreements.list`, `agreements.renewals`, and summary reads (20 groups, never a row) for the pipeline by stage, category and region, signed value
   by partner, and returns by partner and month (with `partnerships.money`). "What is our partnership
   value" and "who is our highest contributing partner" answer from data the reader may see. Scope and the
   money rule apply to every read. Gate 23 keeps the engine told of every schema change.
 - **Cards** (praxis-ai.md decision 33, gate 23): `leads.create`, `leads.update`, `leads.lose`,
   `partners.create`, `partners.update`, `deals.create`, `deals.update`, `deals.move_stage`,
-  `deals.set_health`, `interactions.log`, `contacts.create`, `deal_returns.save` (with
+  `deals.set_health`, `interactions.log`, `contacts.create`, `contacts.update`, `deal_returns.save` (with
   `partnerships.money`), `proposals.start` (opens the studio with the brief), and the Workspace cards for
   projects, tasks and events with their optional partner and deal. Each `run` is the module's own service
   function. **Not in the chat**, each with its `not_offered` reason: Send Proposal, Send for Signature,
   Generate Agreement, Submit for Approval (`design`: a person confirms on screen), signing (`secret`),
   Record Signed Copy and Upload Document (`file`), categories, fields, lists, checklists and proof points
   (`design`), Tidy With AI and Rewrite Section (`ai`), the imports (`file`). `scripts/check/ai-forms-
-  gaps.json` only shrinks.
+  gaps.json` only shrinks. **Built in PR 3:** the reads `leads.list`, `leads.get`, `partners.list`,
+  `partners.get`, `deals.list`, `deals.get`, `categories.list`, `interactions.list`; the cards
+  `leads.create`, `leads.update`, `leads.lose`, `partners.create`, `partners.update`, `contacts.create`,
+  `contacts.update`, `deals.create`, `deals.update`, `deals.move_stage`, `deals.set_health`,
+  `interactions.log` and `deal_returns.save`, each card a small request of its own (`LeadAdd`,
+  `PartnerAdd` signed before the hub, `DealAdd`, `DealReturnChange` and the rest) with the form's own
+  request named by its `via` reason; the category, template, checklist, field and list writes are
+  `design`.
 - **AI routes:** "add a lead" opens Leads with New Lead; "move a deal" opens its 360; "write a proposal for
   X" opens the studio; "renewals due" opens Contracts & MOUs; "set up a category" opens Categories.
 - **Search** (`partners.search.js`, `leads.search.js`, `partner_pipeline.search.js` for deals and
@@ -1006,7 +1046,8 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   `agreement` lose `search:none`; Categories and the public Proposal page are added; New Lead, New
   Partner, New Deal, New Proposal and New Partner Category are ⌘K actions. The last is Categories' New
   Category, named in full in ⌘K and the phone's floating button because Expenses has a New Category too
-  (§13.2).
+  (§13.2). PR 3 built partners, leads and deals (`partner`, `partner_deal`, `lead` off `search:none`) and
+  the New Lead and New Partner actions; New Deal needs its record, so it is the 360's own action.
 
 ## 10 · On screen and mobile
 
@@ -1225,6 +1266,55 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
   - On a phone a category's four sections sit behind a segmented control, one at a time, as the 360s' tabs
     do: a sheet replaces the last one rather than stacking, and rows opening in place would hide the
     sections' buttons, which the Accordion is not for (§10.2).
+- **In PR 3 (06/11/2026, JP):**
+  - A record's documents are a table of their own, `partner_document` (`7060`), naming the vault's row:
+    a document carries its kind, its deal and where it came from, and conversion moves a lead's
+    documents by re-pointing these rows without rewriting the vault (§4.2, §6.4).
+  - The read routes Pipeline, Partners and Leads need from PR 2's lane (`GET /categories`, `GET
+    /fields`, `GET /lists/:list`) were built in PR 3 while PR 2 was open. PR 2 merged first, so its
+    routes and files serve them, and the deals read through them: a stage rule from `.lists`, a
+    category's defaults from `getCategory`, a custom value checked by `.fields`' `checkValue`.
+  - The `deal_return` service and its two routes (behind `partnerships.money`) came with the rest of
+    `partner_pipeline`'s controller, with the `deal_returns.save` card; PR 4 builds the Returns tab,
+    Enter Returns and the import on them. The tab shows its empty state until then.
+  - Leaving On Hold needs no reason, a signed deal moves only among signed meanings, On Hold and Closed
+    Lost, and only the first move into a signed meaning asks for the signed copy (§6.5).
+  - New Partner's deal starts at the first `signed` stage when the form names none (§6.6).
+  - Partners' Quiet uses the enabled rule's `N`, 30 while none is enabled (§6.12).
+  - Screens write Follow-Up Required with both parts capitalised, as Title Case asks (FRONTEND_GUIDE
+    §5.4); the stored code is still `follow_up_required`, and this guide keeps the tracker's spelling.
+    The demonstration stage Follow-Up Ongoing on the mock and staging is written the same way, since the
+    stage switcher draws a stage's name as a button; MyCity's tracker keeps its own spelling.
+  - Home's Signed Value card counts deals (its caption "deal"), each a row of its records (§6.17).
+  - Merged after PR 2 (06/11/2026): PR 2's `7050` is the template's asks, so `partner_document` and the
+    `partner_type` drop are `7060`. PR 3 declares `deals.create`, `deals.update` and `deal_returns.save`,
+    so `DealCreate`, `DealUpdate` and `ReturnSave` carry `via` reasons naming those cards in place of the
+    interim `design:` reasons recorded under PR 2 above; PR 8 has nothing left to declare for them. On
+    the in-browser mock, Categories' data is the one source of the categories and MyCity's lists, which
+    the deals read.
+- **At the audit of PRs 1 to 3 (06/11/2026, TB), before PR 4:**
+  - Who sees a deal: its owner's scope, its team, or the scope of its lead's or partner's owner, one rule
+    for the lists, the 360s, ⌘K, Home, Praxis AI and every write (§6.1). The 360s list and count only the
+    deals the reader sees, so the Overview never drops a deal the Deals tab shows.
+  - The duplicate check stays outside scope, answering numbers and names only; Categories' counts and the
+    picked category's partners and leads follow scope (§6.1, §6.2, §6.3).
+  - New Deal and Edit Deal refuse an owner outside the reader's scope, as New Lead and New Partner do (§6.1).
+  - A lost lead reopened by its deal's move loses its lost reason (§6.4).
+  - The Partner 360's Activity carries the stage and health history of its deals (`Partner360.history`, each
+    line naming its deal); `PartnersSummary.quiet_days` is the `N` Partners' Quiet uses (§6.2, §6.12).
+  - The forms carry what §6.5, §6.6 and §10.1 list and PR 3 left out: Deal Options (up to five rows),
+    Commission (with `partnerships.money`, help when it differs from the category's), Validity and Team on
+    New Deal and Edit Deal; Impact and the custom fields behind Advanced on New Lead, New Partner, New Deal
+    and the edits. The Partners and Leads lists gain Category, Region, Owner, Stage and Health filters and
+    the filterable custom fields (desktop), with Owner and Region columns; Pipeline gains Owner. A deal
+    opened with a new lead takes the lead's identified date. The 360's card reads Days Since Last
+    Contact, as §13.1 item 13 names it.
+  - PR 4's importer writes through the services in the engine's transaction: `leads.createIn` and
+    `partners.createIn` (a lead or a partner with its first deal, the contact optional) and
+    `partner_pipeline.createIn` take `source` (`import`, written on the history line and the events'
+    payloads) and the identified date; `partner_pipeline.returns.saveIn` takes `source` and the import
+    batch. The screens' routes call the same functions.
+  - The Partners and Leads lists' **Export** (§10.1) comes with PR 4's export in the tracker's columns.
 
 ### 13.3 Still open
 
@@ -1303,8 +1393,8 @@ into one file per screen.
 - **Scope:** `partner_pipeline` categories, lists (stages with meanings), fields, checklists, proof
   points, category templates (on the `templates` module and `template_version`), **Tidy With AI**
   (`template-tidy`, its job confirmed first), Start From Tracker (reading data validations through the
-  import engine's reader); the template editor (`RichTextField` tables and field chips, a packages/ui
-  change); the **Categories** screen (#104) on the real API, desktop and phone; the Events category's
+  import engine's reader); the template editor (`DocumentEditor`, a packages/ui component with tables and
+  field chips, §13.2); the **Categories** screen (#104) on the real API, desktop and phone; the Events category's
   Deal Merchant Agreement rebuilt as a staging template.
 - **Docs:** this guide; `docs/guides/foundation.md` if the template store changes; COMPONENTS.md.
 - **Tests:** list rules (meanings kept, last of a meaning), field validation by type, template variable
@@ -1331,9 +1421,12 @@ into one file per screen.
 ### PR 4 · The tracker importer and returns (`m7/importers-returns`) · LA
 
 - **Scope:** **Map Values** in `shared/import` (every importer); `partners.import.js`
-  (`partnership_tracker`, §6.13, all column rules and date shapes); `partnership_returns`; `deal_return`
-  service and the 360's Returns tab with Enter Returns (money-gated); the synthetic fixture; exports in
-  the tracker's columns.
+  (`partnership_tracker`, §6.13, all column rules and date shapes), writing through `leads.createIn` and
+  `partners.createIn` with source `import` (§13.2, the audit); `partnership_returns` through
+  `partner_pipeline.returns.saveIn` (source `import`, the batch); the 360's Returns tab with Enter Returns
+  (money-gated) on the `deal_return` service and routes PR 3 built; the synthetic fixture; exports in the
+  tracker's columns, with the Partners and Leads lists' Export (`partnerships.partners`,
+  `partnerships.leads`; `partnerships.deals` for the deals).
 - **Docs:** this guide; `docs/guides/foundation.md` (imports: Map Values); `docs/manual/settings.md`
   (Imports) with its pictures retaken.
 - **Tests:** each column rule on the synthetic workbook (contacts split, regions placed or listed,
@@ -1471,7 +1564,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   - `ReturnSave` { `units_sold?`, `gross_sales?`, `mycity_commission?`, `paid_to_partner?`, `downloads?`, `note?` }
   - `PipelineQuery`, `DealListQuery` (filters of §5), `PipelineSummary`, `DealPage`, `DealDetail`, `ReturnPage`
 - **`leads.js`**: `LeadCreate` { `name`, `partner_category_id`, `region` ({ `scope`, `cities?: PlaceInput[]` }), `industry?`, `website?`, `objective?`, `source?`, `owner_id`, `identified_on?`, `impact?`, `impact_rating?`, `impact_note?`, `comments?`, `custom?`, `contact` (`ContactInput`), `deal` (the deal fields without `lead_id`) }; `LeadUpdate`; `LeadLose` { `reason` }; `LeadConvert` { `signed_copy_document_id?` }; `LeadListQuery`; `LeadsSummary`; `Lead360`; `LeadConverted` { `partner_id` }
-- **`partners.js`**: `PartnerCreate` (as `LeadCreate`, with `legal_name?`, `headquarters?: PlaceInput`, `logo_document_id?`, and a first deal at a signed or active stage with `signed_copy_document_id?` or `signed_before_hub: true`); `PartnerUpdate`; `PartnerClose` { `reason` }; `ContactInput` { `first_name`, `last_name`, `job_title?`, `email?`, `phones?`, `signatory?` }; `ContactCreate`; `ContactUpdate`; `DuplicateQuery`; `Duplicates`; `PartnerListQuery`; `PartnersSummary`; `Partner360` { `partner`, `kpis` { `signed_value`, `returns_this_year?`, `downloads_this_year`, `active_deals`, `days_since_contact` }, `deals`, `contacts`, `overview`, `deliverables`, `custom_fields` }; `PartnerDocumentQuery`; `PartnerDocumentAttach` { `document_id`, `kind`, `deal_id?` }; `PartnerWorkQuery`; `PartnerWorkPage` (with `hidden` counts)
+- **`partners.js`**: `PartnerCreate` (as `LeadCreate`, with `legal_name?`, `headquarters?: PlaceInput`, `logo_document_id?`, and a first deal at a signed or active stage with `signed_copy_document_id?` or `signed_before_hub: true`); `PartnerUpdate`; `PartnerClose` { `reason` }; `ContactInput` { `first_name`, `last_name`, `job_title?`, `email?`, `phones?`, `signatory?` }; `ContactCreate`; `ContactUpdate`; `DuplicateQuery`; `Duplicates`; `PartnerListQuery`; `PartnersSummary` (with `quiet_days`); `Partner360` { `partner`, `kpis` { `signed_value`, `returns_this_year?`, `downloads_this_year`, `active_deals`, `days_since_contact` }, `deals`, `contacts`, `overview`, `deliverables`, `custom_fields`, `history` (`RecordHistoryLine`: a stage or health line with its deal) }; `PartnerDocumentQuery`; `PartnerDocumentAttach` { `document_id`, `kind`, `deal_id?` }; `PartnerWorkQuery`; `PartnerWorkPage` (with `hidden` counts)
 - **`interactions.js`**: `InteractionCreate` { `partner_id` or `lead_id`, `deal_id?`, `contact_id?`, `interaction_type`, `occurred_at`, `subject`, `summary` }; `InteractionListQuery`; `InteractionPage`; mailbox's `ThreadPartnerBind` { `partner_id` or `lead_id`, `deal_id?` } and `ThreadContext`
 - **`proposals.js`**: `ProposalStart` { `deal_id`, `notes?`, `transcript_document_id?`, `asset_document_ids?`, `design_template_id?` }; `ProposalQuestion`; `QuestionAnswer` { `answer` }; `ProposalContent` { `sections`: `Section[]` } with `Section` a discriminated union on `layout` (one schema per layout of §6.11) carrying `key`, `hidden`, the layout's fields and `sources: FigureSource[]` { `figure`, `source` (`brief`, `answer`, `record`, `proof_point`), `ref` }; `ProposalContentEdit`; `SectionRewrite` { `instruction` }; `ProposalSend` { `to` (1 to 5 emails), `cc?` (up to 5), `subject`, `message`, `confirm: true` }; `ProposalDecline` { `reason` }; `ProposalTemplateSave` { `name` }; `ProofPointCreate`; `ProposalListQuery`; `ProposalsSummary`; `ProposalDetail`; `PublicProposal` { `title`, `partner_name`, `html`, `owner_contact`, `valid_until` }
 - **`agreements.js`**: `AgreementGenerate` { `deal_id`, `template_key?`, `asks?` }; `AgreementUpdate` { `body?`, `fields?`, `starts_on?`, `ends_on?`, `renewal_notice_days?` }; `AgreementSend` { `signers`: [{ `contact_id?`, `name`, `title?`, `email`, `side` (`partner`, `mycity`) }], `message?`, `confirm: true` }; `SignedCopyRecord` { `document_id`, `signed_on`, `signed_by_name`, `signed_by_title?` }; `AgreementRenew` { `starts_on`, `ends_on?`, `new_deal?` }; `AgreementClose` { `reason` }; `AgreementListQuery`; `AgreementsSummary`; `AgreementDetail`; `RenewalPage`; the signing contract (M5): `SignCodeVerify` { `code` }, `SignSubmit` { `full_name`, `title?`, `method` (`draw`, `type`), `signature_png?` (a PNG data URL), `typed?`, `consent: true` }; `VerifyResult` { `status`, `signers`, `verdicts` { `content`, `artifact` }, `document?` }
@@ -1484,8 +1577,10 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   search · test` in each, beyond them):
   - `partners/`: `.360`, `.dedup`, `.import` (the tracker), `.convert` (the conversion transaction),
     `.documents`, `.work`, `.views`
-  - `leads/`: `.360`, `.status` (status from stage), `.views`
-  - `partner_pipeline/`: `.categories`, `.lists`, `.fields`, `.checklists`, `.deals`, `.options`,
+  - `leads/`: `.360`, `.views`; a lead's status from its stage is `partner_pipeline.lists`'
+    `leadStatusOf`, kept in step by `leads.service` `syncStatus` (PR 3)
+  - `partner_pipeline/`: `.categories`, `.lists`, `.fields`, `.checklists`, deals in the template
+    `.service` and `.repo` (PR 3), `.options`,
     `.stages`, `.health`, `.returns`, `.returns.import`, `.deliverables`, `.setup` (Start From Tracker),
     `.inactivity`, `.views`
   - `interactions/`: `.mail` (with `mailbox/binding/`)
@@ -1529,6 +1624,33 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 06/11/2026 · TB · The audit of PRs 1 to 3 before PR 4 (§13.2, the audit): a deal is seen through its
+  lead's or partner's owner too, and the 360s list and count only the deals the reader sees (§6.1, §6.2);
+  the duplicate check recorded as the one read outside scope; Categories' counts and its partners and
+  leads within scope (§6.3); a deal's owner kept in scope; a reopened lead's lost reason cleared and a
+  conversion copies no legal name (§6.4); the Partner 360's stage and health history, Partners' Quiet days
+  (§6.12); the forms' Deal Options, Commission, Validity, Team, Impact and custom fields, and the lists'
+  filters and Owner column, built to §10.1; PR 4's service hooks and its Export (Appendix A PR 4);
+  Appendix A PR 2 names `DocumentEditor`; Appendix C's `Partner360` and `PartnersSummary`.
+- 06/11/2026 · JP · PR 3 merged with `main` after PR 2 (#80) and M4's follow-ups (#79): PR 2's files serve categories, lists and
+  fields, and the deals read through them (one value checker, `checkValue`); `partner_document` is migration
+  `7060`, PR 2's `7050` being the template's asks; PR 3's cards replace the interim reasons PR 2 gave
+  `DealCreate`, `DealUpdate` and `ReturnSave`; on the mock, Categories' data is the one source of the
+  categories and lists, and its demonstration stage Follow-Up Ongoing is in Title Case (§13.2, In PR 3).
+- 06/11/2026 · JP · PR 3, leads, partners, deals and the 360s: `leads`, `partners` and `partner_pipeline`'s
+  deals (options, team, stage moves with history, health and blockers) on the contract, with
+  `interactions` (without mail), contacts, the Documents tab on the vault, duplicates, conversion in one
+  transaction (`partners.convert`), `partners.360` and `leads.360`; the `StageSwitcher` component; the
+  Pipeline (#50), Partners (#51) and Leads (#52) screens with both 360s on the real API, desktop and
+  phone, their forms and the mock (Work and Returns show their empty states until PRs 5 and 4); the
+  reads and cards of §9 PR 3 names; partners, leads and deals in search with New Lead and New Partner;
+  Home's `partners.source.js` on the modules' reads, `OWES` empty (home.md §4.1); migration `7060`.
+  Corrected here, each recorded in §13.2: a record's documents are `partner_document` (§4.1, §4.2, §6.4)
+  and `7060` drops `partner.partner_type`; the read routes of PR 2's lane (`GET /categories`, `GET
+  /fields`, `GET /lists/:list`) built here while PR 2 was open; the `deal_return` service and its two routes came
+  ahead of PR 4; the stage rules (leaving On Hold, moves after signing, the signed copy asked once, §6.5)
+  and New Partner's first stage (§6.6); Partners' Quiet `N` (§6.12); Follow-Up Required written in Title
+  Case on screen; Home's Signed Value counts deals, one row a deal (§6.17); the file map (Appendix D).
 - 06/11/2026 · AJ · The signing and verification shapes (`SignTokenParams`, `SignCodeVerify`,
   `SignaturePng`, `SignSubmit`, `VerifyRefParams`, `VerifyResult`) moved from `agreements.js` to
   `signatures.js` (GE on #79: M5 builds the shared service first, LA reviews), with `SignDecline`,

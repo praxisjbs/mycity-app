@@ -1,50 +1,104 @@
-import { useApi } from "@/api/hooks";
-import "@/api/types/partnerships";
-import { useRouter } from "@/lib/router";
+import type { DealRow, PipelineDeal } from "@mycity/contract/contract.gen.ts";
+import { useEffect, useState } from "react";
+import { useApi, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard } from "@/features/shared/sections";
-import { Button, Card, DataView, formatMoneyShort, Grid, LoadingRows, PageHeader, Pill, StatusPill, useModal } from "@mycity/ui";
-import { PartnerForm } from "./forms/PartnerForm";
-import { short } from "./lib";
+import { BarsCard, PagedTable } from "@/features/shared/sections";
+import { useRouter } from "@/lib/router";
+import { useScreenAction } from "@/shell/screen-action";
+import { Button, Card, Chips, DataView, DesktopOnly, formatMoneyShort, Grid, LoadingRows, PageHeader, PhoneOnly, StatusPill, useModal, Who } from "@mycity/ui";
+import { filterQuery, NO_FILTERS, RecordFilters, type RecordFilterValue } from "./filters";
+import { DealForm } from "./forms/DealForm";
+import { LeadForm } from "./forms/LeadForm";
+import { healthPill, recordHref, useMay } from "./lib";
 
-/** Partnerships · Pipeline (#50), on the mock until M7 PR 3 (docs/guides/partnerships.md §2, §10). */
-export function Pipeline() {
+/**
+ * Partnerships · Pipeline (#50, docs/guides/partnerships.md §2, §10): the KPI strip, deals by stage,
+ * the longest at a stage and the stalled with their blockers, filtered by stage, category, region, owner
+ * and health. No board (§6.5): a row opens its lead's or partner's 360, where the stage moves. A deal
+ * named by the address (`?id=`, ⌘K, Home) opens its record's 360.
+ */
+export function Pipeline({ id }: { id: string | null }) {
   const modal = useModal();
   const { navigate } = useRouter();
-  const s = useApi("GET /api/v1/partnerships/pipeline");
-  const d = s.data;
+  const mayCreate = useMay("create");
+  const [filter, setFilter] = useState<RecordFilterValue>(NO_FILTERS);
+  const filters = filterQuery(filter, false);
+  const p = useApi("GET /api/v1/partnerships/pipeline", { query: filters });
+  const deals = usePaged("GET /api/v1/partnerships/deals", { filters: { ...filters, status: "open" as const }, sort: "expected_close_on" });
+  const named = useApi("GET /api/v1/partnerships/deals/:id", { params: { id: id ?? "" }, enabled: Boolean(id) });
+  useEffect(() => {
+    if (named.data) navigate(recordHref(named.data.record), { replace: true });
+  }, [named.data, navigate]);
+  const newDeal = (partnerId: string) => modal.open({ title: "New Deal", wide: true, body: (close) => <DealForm partnerId={partnerId} close={close} /> });
+  const newLead = () => modal.open({ title: "New Lead", wide: true, body: (close) => <LeadForm close={close} onCreated={(lid) => navigate(`/partnerships?tab=leads&id=${lid}`)} onNewDeal={(pid) => (close(), newDeal(pid))} /> });
+  useScreenAction(mayCreate ? { label: "New Lead", onSelect: newLead } : null);
+  const open = (d: { record: { type: "lead" | "partner"; id: string } }) => navigate(recordHref(d.record));
+  const d = p.data;
+  const top = Math.max(1, ...(d?.by_stage ?? []).map((s) => s.open));
   return (
     <>
-      <PageHeader
-        title="Pipeline"
-        sub={d ? `${d.in_pipeline} in the pipeline · ${d.going_quiet} going quiet` : " "}
-        actions={
-          <>
-            <Button icon="grid" onClick={() => navigate("/partnerships?tab=partners")}>Board</Button>
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Partner", wide: true, body: (close) => <PartnerForm close={close} /> })}>New Partner</Button>
-          </>
-        }
-      />
-      {!d ? <Card><LoadingRows count={6} /></Card> : (
+      <PageHeader title="Pipeline" sub="Every open deal and where it stands" actions={mayCreate ? <Button variant="primary" icon="plus" onClick={newLead}>New Lead</Button> : undefined} />
+      <RecordFilters value={filter} onChange={setFilter} />
+      {!d ? (
+        <Card><LoadingRows count={6} /></Card>
+      ) : (
         <>
-          <KpiTiles items={[{ label: "In the Pipeline", value: String(d.in_pipeline) }, { label: "Signed This Year", value: String(d.signed_this_year), tone: "ok" }, { label: "Signed Value", value: formatMoneyShort(d.signed_value) }, { label: "Going Quiet", value: String(d.going_quiet), tone: d.going_quiet ? "err" : "ok" }]} />
-          <BarsCard title="Stages" rows={d.stages} />
-          <Grid cols={2} className="mt-3">
-            <DataView
-              title="Longest at a Stage"
-              right={<Pill tone="err">{d.longest.filter((x) => x.days_at_stage > 30).length} over 30 days</Pill>}
-              rows={d.longest}
-              rowKey={(r) => r.partner_id}
-              onRowClick={(r) => navigate(`/partnerships?tab=pipeline&id=${r.partner_id}`)}
+          <KpiTiles
+            mobileCols={2}
+            items={[
+              { label: "Open Deals", value: String(d.kpis.open_deals) },
+              { label: "Stalled", value: String(d.kpis.stalled), tone: d.kpis.stalled ? "err" : "ok", help: "Open and live deals with something in the way." },
+              { label: "Signed This Year", value: String(d.kpis.signed_this_year), tone: "ok" },
+              { label: "Signed Value", value: formatMoneyShort(d.kpis.signed_value), help: "Each deal signed this year at its agreement's value, else its projected value." },
+            ]}
+          />
+          <PhoneOnly className="mt-3">
+            <Chips label="Health" value={filter.health} onChange={(v) => setFilter({ ...filter, health: v })} options={[["", "All"], ["stalled", "Stalled"], ["follow_up_required", "Follow-Up"], ["on_track", "On Track"]]} />
+            <PagedTable<DealRow>
+              title="Open Deals"
+              list={deals}
+              rowKey={(x) => x.deal_id}
+              noun="deal"
+              onRowClick={open}
+              empty={{ title: "No Open Deals", text: "New leads start here." }}
               columns={[
-                { key: "p", label: "Partner", render: (r) => <span className="font-semibold">{r.name}</span> },
-                { key: "s", label: "Stage", render: (r) => r.stage, desktop: true },
-                { key: "d", label: "Days at Stage", align: "n", render: (r) => r.days_at_stage },
-                { key: "o", label: "Owner", render: (r) => short(r.owner), desktop: true },
-                { key: "a", label: "Action", render: (r) => <StatusPill s={r.action} /> },
+                { key: "r", label: "Record", render: (x) => <Who name={x.record.name} sub={x.title} /> },
+                { key: "s", label: "Stage", render: (x) => x.stage_label },
+                { key: "h", label: "Health", render: (x) => <StatusPill status={healthPill(x.health)} /> },
+                { key: "d", label: "Days at Stage", align: "n", render: (x) => x.days_at_stage },
               ]}
             />
-          </Grid>
+          </PhoneOnly>
+          <DesktopOnly className="mt-3">
+            <BarsCard title="Stages" rows={d.by_stage.map((s) => ({ label: s.label, pct: Math.round((s.open / top) * 100), value: String(s.open) }))} />
+            <Grid cols={2} className="mt-3">
+              <DataView<PipelineDeal>
+                title="Longest at a Stage"
+                rows={d.longest_at_stage}
+                rowKey={(x) => x.deal_id}
+                onRowClick={open}
+                empty={{ title: "Nothing Waiting", text: "Open deals show here." }}
+                columns={[
+                  { key: "r", label: "Record", render: (x) => <Who name={x.record.name} sub={x.title} /> },
+                  { key: "s", label: "Stage", render: (x) => x.stage_label },
+                  { key: "d", label: "Days", align: "n", render: (x) => x.days_at_stage },
+                  { key: "o", label: "Owner", render: (x) => x.owner?.display_name ?? "No Owner" },
+                ]}
+              />
+              <DataView<PipelineDeal>
+                title="Stalled"
+                rows={d.stalled}
+                rowKey={(x) => x.deal_id}
+                onRowClick={open}
+                empty={{ title: "Nothing Stalled", text: "Stalled deals show here." }}
+                columns={[
+                  { key: "r", label: "Record", render: (x) => <Who name={x.record.name} sub={x.title} /> },
+                  { key: "b", label: "Blockers", render: (x) => x.blockers ?? "None" },
+                  { key: "o", label: "Owner", render: (x) => x.owner?.display_name ?? "No Owner" },
+                ]}
+              />
+            </Grid>
+          </DesktopOnly>
         </>
       )}
     </>

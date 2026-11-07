@@ -104,7 +104,12 @@ mycity-app/
 ├── assets/fonts/             Geist, for PDFs
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
-│   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test)
+│   │                         (--group, --only, --except pick a CI job's share)
+│   ├── lib/deal.js           deals files to CI shards by expected cost (jest's and vitest's shards)
+│   ├── ci-chromium-libs.sh   a CI screens job's Chromium system libraries: the cache, else the mirror
+│   │                         raced against the set another screens job of the run shares (ci.yml)
+│   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test);
+│   │                         in CI one job's shards of them (MYCITY_FE_TESTS)
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md;
 │   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30);
 │   │                         ai-catalogue.js writes src/shared/ai/catalogue.snapshot.json, the AI manifests as
@@ -115,7 +120,8 @@ mycity-app/
 │   │   ├── lib/changes.js    what a change touched (git diff vs main) and its trailers,
 │   │   │                     shared by check/progress.js, check/guides.js, check/readme-map.js
 │   │   ├── lib/scope.js      how much of `npm run ci` a GitHub run needs: full, docs (documents
-│   │   │                     only) or tested (main's tree already passed in its PR); ci.yml asks it
+│   │   │                     only) or tested (main's tree already passed in its PR), the sets a
+│   │   │                     PR's files can affect, and the job matrices (plan()); ci.yml asks it
 │   │   ├── lib/copy.js       the screen copy rules: word LIMITS, word count, Title Case, explainer
 │   │   │                     titles, refused button labels (gates 8, 11, 12, 17; FRONTEND_GUIDE §5)
 │   │   ├── lib/gallery.js    builds packages/ui's gallery when stale and serves it (gates 8, 11, a11y)
@@ -160,7 +166,8 @@ mycity-app/
 ├── tests/
 │   ├── unit/                 cross-module unit tests
 │   ├── integration/          real Postgres + Redis (RUN_DB_TESTS=1)
-│   └── staging/              verify-staging suite, runs against the staging hosts
+│   ├── staging/              verify-staging suite, runs against the staging hosts
+│   └── shard-sequencer.js    deals jest's files to CI's backend shards by expected cost (jest --shard)
 ├── docs/
 │   ├── MyCity-ERP-Documents/ the client document pack
 │   │   └── letter-samples/   MyCity's six disciplinary letters, redacted to placeholders (queries.md §6.7)
@@ -188,7 +195,7 @@ mycity-app/
 │                             fonts) and build.js (the standalone page in dist/; --check fits each
 │                             page to A4, at most 17, and prints the PDF)
 ├── .github/
-│   ├── workflows/            ci.yml (`npm run ci` as four parallel jobs, backend, frontend, screens and checks, and the `ci` check over them; none on a draft PR), release.yml, rollback.yml, uptime.yml, ai-nightly.yml (Praxis AI's attack suite on staging every night, docs/guides/praxis-ai.md §6.17)
+│   ├── workflows/            ci.yml (`npm run ci` as parallel jobs: backend in shards, backend unit, frontend, frontend tests in shards, screens per target and checks, only those a PR's files can affect, and the `ci` check over them; none on a draft PR), release.yml, rollback.yml, uptime.yml, ai-nightly.yml (Praxis AI's attack suite on staging every night, docs/guides/praxis-ai.md §6.17)
 │   │                         (the uptime probe every 10 minutes)
 │   ├── CODEOWNERS            who must approve each path (checked by check/codeowners.js)
 │   └── pull_request_template.md
@@ -525,7 +532,7 @@ Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
 | Module | Files beyond the template |
 |---|---|
 | `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED; the board's stages and How We Hire), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`; New Vacancy's interview: `vacancy-follow-ups`, prompt `services/ai/prompts/vacancy-follow-ups.md`, and its plain draft when the AI cannot write one), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards), `.matrix` (Recruitment's scope probes for the AI access matrix); the staff screens in `app/src/features/recruitment/`, one file per tab (`index.tsx` routes only): `Vacancies.tsx` with `VacancyInterview.tsx` (New Vacancy's ten questions, tested by `VacancyInterview.test.tsx`) and `VacancyForm.tsx` (the editor it opens, and Edit Vacancy), `VacancyQuestions.tsx` (Questions and Scorecard), `CareersSettings.tsx` and `CandidateEmails.tsx`; `Candidates.tsx` (the board, Invite to Apply, Screen With AI) and `CandidateSheet.tsx`; `Assessments.tsx` (library, sittings, Mark Answers) and `AssessmentQuestions.tsx`; `Interviews.tsx`, `MyCard.tsx` (the blind card) and `ScheduleInterview.tsx`; `TalentPool.tsx`; M5's INTERIM `Offers.tsx` and `Onboarding.tsx`; `shared.tsx` (labels, pills, refusals); each tab's `*.test.tsx` on the mock, sharing `testKit.tsx`. The mock is `app/src/api/mock/modules/recruitment.ts` (bodies checked by the contract's schemas) with its fixtures in `app/src/api/mock/data/recruitment.ts` |
-| `candidates` | `.public.routes` (apply, write only) and `.apply` (its service, no staff auth), `.pipeline` (the moves, entity_state_history), `.screening` (the estimate, provisional flag), `.score` (Score With AI and Screen With AI, `cv-screen`, from the outbox), `.scorecard` (A10 weights), `.sla` (days at stage), `.mail` (the candidate emails it sends), `.emails` (Candidate Emails, the editor), `.retention` (CVs left on Apply links that ended without an application, removed nightly by `jobs/schedulers/apply-cv-purge`), `.ai`, `.search` |
+| `candidates` | `.public.routes` (apply, write only) and `.apply` (its service, no staff auth), `.pipeline` (the moves, entity_state_history; Offer and after set only through the service's `advanceIn`, `offerEndedIn` and `hireIn`, which M5 calls), `.screening` (the estimate, provisional flag), `.score` (Score With AI and Screen With AI, `cv-screen`, from the outbox), `.scorecard` (A10 weights), `.sla` (days at stage), `.mail` (the candidate emails it sends), `.emails` (Candidate Emails, the editor, M5's three mails included), `.retention` (CVs left on Apply links that ended without an application, removed nightly by `jobs/schedulers/apply-cv-purge`), `.ai`, `.search` |
 | `assessments` | `.public.routes` (take, token) and `.delivery` (its service, no staff auth), `.authoring` (the library, export and import, Suggest With AI), `.service` (sittings: send, Send to Candidates, marks, cancel), `.timer` (the server's clock and how a sitting ends; `jobs/schedulers/assessment-expiry`), `.scoring` (points sealed in `answer_key_enc`), `.mail` (assessment-invite, the link made after commit), `.ai`, `.search` |
 | `interviews` | `.panel` (the card, blind until the round closes; the predicate is `.repo` BLIND), `.consolidate` (Close Round, the report and the Interview Assessment Form), `.schedule` (schedule, reschedule, cancel, the calendar entry and the candidate's ICS), `.notes` (Tidy With AI), `.reminders` (`jobs/schedulers/interview-reminders`), `.service` (the sheet), `.ai`, `.search` |
 | `talent_pool` | `.service` (Add to Pool and renew, Invite to Apply through candidates `inviteIn`, Remove, Export), `.retention` (24 months then purge, `jobs/schedulers/talent-pool-purge`; moved from M5, decided by TB, owned by GE), `.ai`, `.search` |
@@ -547,7 +554,8 @@ The design is `docs/guides/offers.md`; the build plan and its log `docs/handoff/
 
 Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Templates: `offer-letter`,
 `offer-packet`, `employment-contract`, `signature-certificate`, and the offer and onboarding mails
-(`offer-sent`, `offer-signed`, `onboarding-documents`; the five recruitment mails are M4's, built).
+(`offer-sent`, `offer-signed`, `onboarding-documents`: their wording and variables are M4's, built and
+edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4's, built).
 
 ### 5.9 M6 · Payroll & Notifications · TB, AJ · 23 to 27 Nov
 
@@ -579,18 +587,35 @@ its routes, repo and events; `agreements.tidy.js` (Tidy With AI, route `POST /te
 `app/src/features/partnerships/Categories.tsx`, `PipelineSettings.tsx`, `ProofPoints.tsx` and `forms/`
 (`CategoryForm`, `FieldForm`, `ChecklistForm`, `ListValueForm`, `ProofPointForm`, `TemplateEditor`, `TidyStep`,
 `StartFromTracker`, `template-html.ts`), with its mock `app/src/api/mock/modules/partnerships_categories.ts`.
+PR 3 (06/11/2026) filled `partners`, `leads`, `partner_pipeline`'s deals and `interactions`, template
+files included (`.ai`, `.search`).
 
 | Module | Files beyond the template |
 |---|---|
-| `partners` | `.360` (renders correctly with zero data), `.dedup`, `.convert` (the conversion transaction), `.documents`, `.work`, `.views` (PR 3); `.import` (the tracker, PR 4); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
-| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2); `.deals`, `.options`, `.stages`, `.health`, `.views` (PR 3); `.returns`, `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.types` was deleted with PR 2 (categories replace it); `.events` registers `deal.venue` (PR 1) |
-| `leads` | `.360`, `.status` (status from stage), `.views` (PR 3); `.convert` is not built (conversion is `partners.convert`) and goes with PR 3; `.events` registers `lead.cities` (PR 1) |
+| `partners` | `.360` (the Partner 360, renders correctly with zero data), `.dedup` (on `shared/dedup`), `.convert` (the conversion transaction, a lead's records moved to its partner), `.documents` (the Documents tab: `partner_document` rows naming the vault's, migration `7060_partnership_documents.sql`, which also drops `partner.partner_type`) (PR 3); `.import` (the tracker, PR 4); `.work` (PR 5); `.views` (PR 8); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
+| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2), with the deals' rules added by PR 3: in `.lists` the stages as deals read them (the first stage, signed meanings, a lead's status from its stage, `leadStatusOf`) and in `.fields` a record's custom values checked by `checkValue` (`checkCustom`) and lists narrowed by them (`filterSql`); deals in the template `.service` and `.repo`, `.options` (a deal's priced lines), `.stages` (stage moves, their rules and history), `.health` (health and blockers), `.returns` (the `deal_return` service and its two money-gated routes) (PR 3); `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.views` (PR 8); `.types` was deleted with PR 2 (categories replace it); `.events` registers `deal.venue` (PR 1) |
+| `leads` | `.360` (the Lead 360, renders correctly with zero data) (PR 3); a lead's status is `partner_pipeline.lists`' `leadStatusOf`, kept in step by `leads.service`; conversion is `partners.convert`; `.views` (PR 8); `.events` registers `lead.cities` (PR 1) |
 | `interactions` | `.mail` (with `mailbox/binding/`, PR 8) |
 | `proposals` | `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views` (PR 7; `.proof` with PR 2); `.questionnaire` and `.pdf` are not built and go with PR 7 |
 | `agreements` | `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`), `.renewals`, `.views` (PR 6; `.tidy` with PR 2) |
 | `partnership_analytics` | `.queries` (per lead owner, A21; PR 8) |
 | `signatures` (shared with M5) | built by M5 (§5.8): M7's agreements declare themselves with `defineSignable` and send with `requestIn`; the stamping is each signable's template, given the signatures by `.signed-pdf` |
 | `mailbox/binding/` | `intake.service`, `mail-context.service`, `context-tabs`, `convert.service` (PR 8) |
+
+PR 3's screens: `app/src/features/partnerships/` `Pipeline.tsx`, `Partners.tsx`, `Partner360.tsx`,
+`Leads.tsx`, `Lead360.tsx` on the contract, with `record.tsx` (what both 360s are built from: the deal
+with its stage switcher, and the shared tabs) and `forms/` (`parts.tsx`, the fields New Lead, New
+Partner, New Deal and their edits share; `RecordForm.tsx`, Edit Lead and Edit Partner; `DealForm.tsx`,
+`SetHealth.tsx`, `ContactForm.tsx`, `ConvertLead.tsx`, `ClosePartner.tsx`, `UploadDocument.tsx`,
+beside PR 1's `LeadForm`, `PartnerForm`, `MoveStage`, `LogInteraction`,
+`LoseLead`), tested on the mock by `screens.test.tsx`; `packages/ui/src/navigation/StageSwitcher.tsx`
+(a deal's stages one press at a time, with `StageSwitcher.test.tsx` and `StageSwitcher.gallery.tsx`);
+tested on the real migrations by `tests/integration/partnerships-records.test.js` (scope, money,
+conversion, stage rules, health, the 360s, Home's cards). The audit after PR 3 (06/11/2026) added
+`app/src/features/partnerships/filters.tsx` (the desktop filters Pipeline, Partners and Leads share:
+Stage, Category, Region, Owner, Health and the filterable custom fields) and, for PR 4's importer, the
+in-transaction `leads.service` `createIn`, `partners.service` `createIn` and
+`partner_pipeline.returns` `saveIn`.
 
 Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR 4);
 `shared/documents/render.js` its table loop if missing (PR 6). Prompts (`services/ai/prompts/`):

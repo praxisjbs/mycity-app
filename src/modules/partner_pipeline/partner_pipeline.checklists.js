@@ -32,7 +32,7 @@ async function place(client, categoryId, itemId, to) {
   for (const [i, x] of ids.entries()) await repo.setItemPosition(client, x, i);
 }
 
-async function addItem(actor, categoryId, body) {
+async function addItem(actor, categoryId, body, scope = null) {
   await tx(async (client) => {
     if (!(await repo.getCategory(client, categoryId))) throw notFound();
     const end = (await repo.activeItemIds(client, categoryId)).length;
@@ -47,10 +47,10 @@ async function addItem(actor, categoryId, body) {
       payload: { partner_category_id: categoryId, partner_category_checklist_item_id: id },
     });
   });
-  return detail(categoryId);
+  return detail(categoryId, undefined, scope);
 }
 
-async function updateItem(actor, id, body) {
+async function updateItem(actor, id, body, scope = null) {
   const categoryId = await tx(async (client) => {
     const before = await repo.getItem(client, id);
     if (!before) throw notFound("checklist item");
@@ -70,7 +70,7 @@ async function updateItem(actor, id, body) {
     });
     return before.partner_category_id;
   });
-  return detail(categoryId);
+  return detail(categoryId, undefined, scope);
 }
 
 module.exports = { addItem, updateItem };

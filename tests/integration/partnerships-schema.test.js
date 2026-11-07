@@ -1,6 +1,6 @@
 "use strict";
 /**
- * M7's schema and reference data (migrations 7010 to 7040, seeds/reference/7190_seed_partnerships.sql;
+ * M7's schema and reference data (migrations 7010 to 7060, seeds/reference/7190_seed_partnerships.sql;
  * docs/guides/partnerships.md §4) on the real migrations: the constraints that refuse a bad row, the
  * rows 7020 converts on a database that already holds partners, and 7190 both ways.
  *
@@ -22,6 +22,7 @@ const catalog = require("../../src/shared/access/access.catalog");
 const FILES = Object.fromEntries(migrate.listMigrations().map((f) => [f.name, f]));
 const RECORDS = FILES["7020_partnership_records_and_deals"];
 const SEED = FILES["7190_seed_partnerships"];
+const DOCUMENTS = FILES["7060_partnership_documents"];
 
 const q = (sql, params) => pool.query(sql, params);
 const one = async (sql, params) => (await q(sql, params)).rows[0];
@@ -75,10 +76,11 @@ describeDb("M7 partnerships schema and reference data against the real migration
   afterAll(() => pool.end());
 
   describe("the records", () => {
-    test("a partner is active, dormant or closed, dormant to start, and needs no type", async () => {
+    test("a partner is active, dormant or closed, dormant to start, and has no type (dropped by 7060, M7 PR 3)", async () => {
       await rolledBack(async (c) => {
         const id = await partner(c);
-        expect((await c.query("SELECT status, partner_type FROM partner WHERE partner_id = $1", [id])).rows[0]).toEqual({ status: "dormant", partner_type: null });
+        expect((await c.query("SELECT status FROM partner WHERE partner_id = $1", [id])).rows[0]).toEqual({ status: "dormant" });
+        expect((await c.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'partner' AND column_name = 'partner_type'")).rows[0].n).toBe(0);
         await refused(c.query("UPDATE partner SET status = 'prospect' WHERE partner_id = $1", [id]), "23514", "partner_status_check");
       });
     });
@@ -192,6 +194,8 @@ describeDb("M7 partnerships schema and reference data against the real migration
     test("a partner type becomes a category of 7099's label, a prospect is dormant, an unknown interaction a note", async () => {
       await rolledBack(async (c) => {
         // The rows as Home's staging seed wrote them before 7020: a type, a prospect, an odd interaction.
+        // The type column is back as it was before 7060 dropped it, for these rows to hold one.
+        await c.query(DOCUMENTS.down);
         await c.query("ALTER TABLE partner DROP CONSTRAINT partner_status_check");
         await c.query("ALTER TABLE partner_interaction DROP CONSTRAINT partner_interaction_type_check");
         const gov = await partner(c, { partner_type: "government", status: "prospect" });

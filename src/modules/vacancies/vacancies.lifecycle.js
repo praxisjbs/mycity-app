@@ -6,7 +6,8 @@
  *
  *   assertPublishable(row)   what Publish needs, as field errors (422)
  *   publicState(row, now)    what the careers page says about it: open, paused, closed or filled
- *   boardStages(scorecard)   the board's columns; howWeHire(parts) the careers page's steps
+ *   boardStages(scorecard)   the stages a card is moved through by hand; boardColumns() adds Offer
+ *   howWeHire(parts)         the careers page's steps
  *   blocksOf(text)           a Markdown text as the careers page and the staff sheet draw it
  */
 const { defineMachine } = require("../../shared/state/state-history");
@@ -15,6 +16,8 @@ const md = require("../../shared/documents/markdown");
 
 /** The M4 stages, in board order (contract vacancies.js M4_STAGES). */
 const M4_STAGES = Object.freeze(["application", "screening", "assessment", "interview", "shortlist"]);
+/** M5's stages after Shortlist, in order (contract M5_STAGES): set only by M5's steps, never by hand. */
+const M5_STAGES = Object.freeze(["offer", "documentation", "pre_onboarding", "onboarding", "hired"]);
 
 const MACHINE = defineMachine("vacancy", {
   draft: ["open", "closed"],
@@ -75,7 +78,7 @@ const takesApplications = (row, now = new Date()) => publicState(row, now) === "
 
 const ASSESSED = ["psychometric", "technical", "case_study"];
 
-/** The board's columns for a vacancy: the M4 stages less those whose parts are off (guide §6.3). */
+/** The stages a card moves through by hand: the M4 stages less those whose parts are off (guide §6.3). */
 function boardStages(scorecard) {
   const on = new Set(scorecard.filter((p) => p.active).map((p) => p.code));
   return M4_STAGES.filter((stage) => {
@@ -84,6 +87,12 @@ function boardStages(scorecard) {
     return true;
   });
 }
+
+/**
+ * The board's columns (VacancyDetail.board_stages): the hand-moved stages, then Offer, where M5's sent
+ * offers stand. Nobody drags a card into or out of Offer; the stages after it are the Onboarding screen's.
+ */
+const boardColumns = (scorecard) => [...boardStages(scorecard), "offer"];
 
 /** The steps a role uses, from its scorecard parts switched on (PublicJob.how_we_hire). */
 function howWeHire(activeParts) {
@@ -98,4 +107,16 @@ function howWeHire(activeParts) {
 /** A Markdown text as blocks from the one renderer (PublicJob, VacancyDetail), or null when there is none. */
 const blocksOf = (text) => (text && String(text).trim() ? md.markdownToBlocks(text) : null);
 
-module.exports = { MACHINE, M4_STAGES, assertCanMove, assertPublishable, publicState, takesApplications, boardStages, howWeHire, blocksOf };
+module.exports = {
+  MACHINE,
+  M4_STAGES,
+  M5_STAGES,
+  assertCanMove,
+  assertPublishable,
+  publicState,
+  takesApplications,
+  boardStages,
+  boardColumns,
+  howWeHire,
+  blocksOf,
+};

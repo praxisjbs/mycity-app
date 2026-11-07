@@ -216,6 +216,20 @@ const CASES = Object.freeze([
   { id: "card.message", as: "employee", question: "Tell {person} that the weekly report is ready for them.", shows: ["cards"], action: "community.message" },
   { id: "card.post", as: "employee", question: "Post in general that the office closes at 3 on Friday.", shows: ["cards"], action: "community.post" },
   { id: "card.mail", as: "operations_people", question: "Email ada@partner.test to confirm the venue visit on Thursday at 10.", shows: ["cards"], action: "mail.send" },
+  // Partnerships (docs/guides/partnerships.md §9): each card through the screen's own function.
+  { id: "card.lead", as: "operations_people", question: "Add a lead: Hevix Events, an Event partner working nationally, owned by me, contact Ngozi Adebayo, pursuing their December festival ticketing.", shows: ["cards"], action: "leads.create" },
+  { id: "card.lead-edit", as: "operations_people", question: "Change the industry of the lead {leads.update#lead_id} to Hospitality.", shows: ["cards"], action: "leads.update" },
+  { id: "card.lead-lose", as: "operations_people", question: "Close the lead {leads.lose#lead_id} as lost: they chose another ticketing app.", shows: ["cards"], action: "leads.lose" },
+  { id: "card.partner", as: "operations_people", question: "Record Eko Hotels as a Hospitality partner signed before the hub, national, owned by me, contact Femi Bello, for weekend listings.", shows: ["cards"], action: "partners.create" },
+  { id: "card.partner-edit", as: "operations_people", question: "Set the website of the partner {partners.update#partner_id} to https://ekohotels.example.", shows: ["cards"], action: "partners.update" },
+  { id: "card.contact", as: "operations_people", question: "Add Ada Nwosu, Marketing Manager, as a contact at the partner {contacts.create#partner_id}.", shows: ["cards"], action: "contacts.create" },
+  { id: "card.contact-edit", as: "operations_people", question: "Make Ada Nwosu the primary contact at her partner.", shows: ["cards"], action: "contacts.update" },
+  { id: "card.deal", as: "operations_people", question: "Open a deal with the partner {deals.create#partner_id} for their Easter packages, owned by me.", shows: ["cards"], action: "deals.create" },
+  { id: "card.deal-edit", as: "operations_people", question: "Set the next action on the deal {deals.update#deal_id} to send the rate card by Friday.", shows: ["cards"], action: "deals.update" },
+  { id: "card.deal-stage", as: "operations_people", question: "Move the deal {deals.move_stage#deal_id} to Proposal Sent.", shows: ["cards"], action: "deals.move_stage" },
+  { id: "card.deal-health", as: "operations_people", question: "Mark the deal {deals.set_health#deal_id} as stalled: we are waiting on the venue's insurance papers.", shows: ["cards"], action: "deals.set_health" },
+  { id: "card.deal-returns", as: "operations_people", question: "Enter October 2026's returns for the deal {deal_returns.save#deal_id}: 40 tickets sold and 120 downloads.", shows: ["cards"], action: "deal_returns.save" },
+  { id: "card.interaction", as: "operations_people", question: "Log a call with the partner {interactions.log#partner_id} this morning about the ticket tiers: they agreed to three tiers.", shows: ["cards"], action: "interactions.log" },
   // A change this person may not make is not available, never a card (decision 16).
   { id: "card.not-mine", as: "employee", question: "Approve all the leave requests waiting for a decision.", shows: ["cards"], no_action: ["leave.approve", "approvals.decide"] },
   // Late Reasons are kept by holders of workspace.late_reasons: anyone else is never drawn the card.

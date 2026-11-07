@@ -98,7 +98,8 @@ describe("tokens.css contrast", () => {
 
   /*
    * The public site's own surfaces and inks (public.css): every ink on the site's card and hover tint,
-   * the body's soft ink, the light inks of its Deep Green hero and footer, the white search box's ink
+   * the body's soft ink, its fields and menus, the inks of its hero and footer on the theme's ground (and the
+   * on-deep inks they stand for, on Deep Green), the search box's ink on white and on the site's paper
    * and the solid button's.
    */
   for (const [name, values] of [
@@ -113,8 +114,16 @@ describe("tokens.css contrast", () => {
         ...["on-deep", "on-deep-hero", "on-deep-lede", "on-deep-chip", "on-deep-back", "on-deep-link", "on-deep-note", "on-deep-label", "on-deep-base", "on-deep-gold"].map(
           (t) => [t, "deep"] as [string, string],
         ),
+        ...["canvas-field", "canvas-popover"].flatMap((s) =>
+          ["foreground", "canvas-muted-foreground", "accent-foreground", "subtle-foreground"].map((t) => [t, s] as [string, string]),
+        ),
+        ...["site-ink", "site-ink-hero", "site-ink-lede", "site-ink-chip", "site-ink-back", "site-ink-link", "site-ink-note", "site-ink-label", "site-ink-base", "site-ink-gold", "site-accent"].map(
+          (t) => [t, "site-ground"] as [string, string],
+        ),
         ["search-ink", "paper"],
         ["search-muted", "paper"],
+        ["search-ink", "canvas-paper"],
+        ["search-muted", "canvas-paper"],
         ["solid-foreground", "solid"],
         ["primary-foreground", "primary"],
       ];

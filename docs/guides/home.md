@@ -10,7 +10,7 @@
 | Capabilities | `home.team` (open the Team tab and its figures), `home.reports` (build, schedule, run and receive reports), `alerts.manage` (create, change and switch off alert rules), `alerts.clear` (clear or dismiss an alert, together with the rule's own grant) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 28/10/2026 |
+| Last changed | 06/11/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -186,7 +186,7 @@ column to the migrated schema, and the schema gate holds every query to them.
 | `calendar.source.js` | calendar · M2 · AJ | `calendar_event`: Your Week |
 | `vacancies.source.js` | vacancies and candidates · M4 · GE | `vacancy`: open vacancies; `application`, `candidate`: applications left at one stage too long (Recruitment SLA alerts) |
 | `payroll.source.js` | payroll · M6 · TB | nothing yet: Payroll In Progress is hidden and has no query until M6 creates its tables |
-| `partners.source.js` | partners and pipeline · M7 · LA | `partner` (its type is its category's name, `partner_category`), `lead`, `partner_interaction`, `partnership_opportunity`, `partnership_agreement`, `partnership_proposal`: pipeline, signed value, quiet partners (and Partner Inactivity alerts), proposals out; a deal or agreement on a lead is named by the lead (since M7 PR 1; PR 3 moves the queries to M7's modules, partnerships.md §6.17) |
+| `partners.source.js` | partners and pipeline · M7 · LA | `partner` (its type is its category's name, `partner_category`), `lead`, `partner_interaction`, `partnership_opportunity`, `deal_member`, `partnership_agreement`, `partnership_proposal`: pipeline, signed value, quiet partners (and Partner Inactivity alerts), proposals out; a deal or agreement on a lead is named by the lead. Since M7 PR 3 every query is the owning module's own read (`partner_pipeline.repo`, `partners.repo`, `proposals.repo`), in the Partnerships screens' scope (a deal by its owner, its team or its lead's or partner's owner, partnerships.md §6.1), and it owes nothing (partnerships.md §6.17) |
 | `expenses.source.js` | expenses · M8 · AJ | `expense_request` and `expense_category`: awaiting approval, with each request's category |
 | `budgets.source.js` | budgets · M8 · AJ | `budget`, `budget_line`: budget used (committed and spent over allocated, M8 decision 16), and the budgets past a share spent (Budget Threshold alerts) |
 
@@ -343,12 +343,14 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   - CEO: the organisation's goals this quarter as the main chart, and the Org KPI donut, the
     organisation's score and each active department beside it; the Partnership Pipeline. Goals
     This Quarter is the chart, so it is not drawn twice.
-  - Partnerships: the Naira value signed in each month of this year (the agreements the Signed
-    Value card counts, each in the month it starts until M7 records the signing date). The year is
-    read whole, as the card reads it, so the months add up to the card: they run to this month, or
-    to a later one an agreement already starts in. Beside it the Partnership Pipeline (open
-    opportunities by stage, and active partners with no contact in 30 days) and Goals This
-    Quarter.
+  - Partnerships: the Naira value signed in each month of this year: the deals the Signed Value
+    card counts, each in the Lagos month it was signed (`signed_at`), at its signed agreement's
+    value, else its projected value (partnerships.md §6.6). The year is read whole, as the card
+    reads it, so the months add up to the card: they run to this month, or to a later one a deal
+    is already dated in. The card's caption counts deals, and its records are one row a deal
+    (Deal, Partner, Signed, Value, Owner), the most recent first. Beside it the Partnership
+    Pipeline (open opportunities by stage, and active partners with no contact in 30 days) and
+    Goals This Quarter.
   - Staff: the day strip (Shift Today from the reader's own work schedule, `attendance.schedule.js`
     `dayOn`, or a temporary site's own hours on a day of one (attendance.md §6.11), none on a day
     they do not work; and the reader's own row of today's roster: status,
@@ -852,6 +854,8 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 06/11/2026 · TB · M7's audit after PR 3 (`partnerships.md` §6.1, §13.2): a deal is also seen through its lead's or partner's owner, so Home's partnership cards (Open Opportunities, Signed Value and the pipeline chart) count a deal on a record the reader's scope owns; `partners.source.js` names `lead.owner_id` in `TABLES` (§4.1).
+- 06/11/2026 · JP · M7 PR 3 (`partnerships.md` Appendix A, §6.17): `partners.source.js` reads through the Partnerships modules' own reads (`partner_pipeline.repo`, `partners.repo`, `proposals.repo`), so a card's scope is the screens' scope (a deal by its owner or its team, a partner by its owner or a deal on it the reader may see), and it owes nothing (§4.1). Signed Value and Monthly Signed Value read deals by the Lagos day they were signed, each at its signed agreement's value, else its projected value; the card's caption counts deals and its records are one row a deal (§6 Overview), on the in-browser mock too. `partner_type` is dropped. Home's seed tests updated.
 - 05/11/2026 · GE · Home's staging vacancies are gone from `lib/forward-rows.js` (and the open seats it read for them): Recruitment's own seed, `seeds/staging/55_recruitment.js`, removes them with `removeHomeStagingRows` and makes its roles through its services. Their ids stay in `HOME_STAGING_ROWS`.
 
 - 04/11/2026 · GE · The vacancies adapter (`dashboard/sources/vacancies.source.js`) owes nothing: M4's 4010 and

@@ -43,6 +43,11 @@ let CATEGORIES: Category[] = [
   { partner_category_id: "5a1d0c10-0000-4000-8000-000000000002", name: "Hospitality", description: null, default_commission_pct: "8.00", default_validity_days: 60, counts_as_vendor: false, display_order: 20, active: true, partners: 4, leads: 11, open_deals: 7 },
   { partner_category_id: "5a1d0c10-0000-4000-8000-000000000003", name: "Vendor", description: null, default_commission_pct: null, default_validity_days: null, counts_as_vendor: true, display_order: 30, active: true, partners: 3, leads: 22, open_deals: 12 },
   { partner_category_id: "5a1d0c10-0000-4000-8000-000000000004", name: "Media", description: null, default_commission_pct: null, default_validity_days: null, counts_as_vendor: false, display_order: 40, active: true, partners: 2, leads: 5, open_deals: 3 },
+  // The demonstration partners' other types (partnerships.ts files its leads and partners under these).
+  { partner_category_id: "5a1d0c10-0000-4000-8000-000000000005", name: "Sponsorship", description: null, default_commission_pct: null, default_validity_days: null, counts_as_vendor: false, display_order: 50, active: true, partners: 2, leads: 3, open_deals: 3 },
+  { partner_category_id: "5a1d0c10-0000-4000-8000-000000000006", name: "Strategic", description: null, default_commission_pct: null, default_validity_days: null, counts_as_vendor: false, display_order: 60, active: true, partners: 1, leads: 1, open_deals: 1 },
+  { partner_category_id: "5a1d0c10-0000-4000-8000-000000000007", name: "Government", description: null, default_commission_pct: null, default_validity_days: null, counts_as_vendor: false, display_order: 70, active: true, partners: 3, leads: 6, open_deals: 5 },
+  { partner_category_id: "5a1d0c10-0000-4000-8000-000000000008", name: "Community", description: null, default_commission_pct: null, default_validity_days: null, counts_as_vendor: false, display_order: 80, active: true, partners: 2, leads: 3, open_deals: 2 },
 ];
 
 const EVENT = CATEGORIES[0].partner_category_id;
@@ -95,7 +100,7 @@ const STAGES: Array<[string, Meaning]> = [
   ["Introductory Meeting Scheduled", "meeting"],
   ["Introductory Meeting Held", "meeting"],
   ["Proposal Sent", "proposal"],
-  ["Follow-up Ongoing", "proposal"],
+  ["Follow-Up Ongoing", "proposal"],
   ["Negotiation", "negotiation"],
   ["Verbal Approval", "negotiation"],
   ["Contract Review", "negotiation"],
@@ -109,8 +114,8 @@ const value = (label: string, position: number, meaning: Meaning | null = null):
 const LISTS: Record<string, ListValue[]> = {
   partnership_stage: STAGES.map(([l, m], i) => value(l, (i + 1) * 10, m)),
   partnership_impact: ["App Downloads & Visibility", "Revenue Generation", "Brand Visibility", "User Acquisition", "Vendor Acquisition", "Content Collaboration", "Community Growth", "Business Listings", "Strategic Positioning"].map((l, i) => value(l, (i + 1) * 10)),
-  lead_source: [],
-  partner_document_kind: [],
+  lead_source: ["Referral", "Event", "Inbound", "Outreach"].map((l, i) => value(l, (i + 1) * 10)),
+  partner_document_kind: ["Proposal", "MOU", "Service Agreement", "Contract", "Brief", "Invoice", "Media", "Other"].map((l, i) => value(l, (i + 1) * 10)),
 };
 const REQUIRED: Record<string, string> = { prospect: "starts", signed: "signs", closed_lost: "loses" };
 
@@ -327,6 +332,13 @@ route("PATCH /api/v1/partnerships/fields/:id", (req) => {
 /* MyCity's lists */
 
 const ordered = (list: string) => [...(LISTS[list] ?? [])].sort((a, b) => Number(b.active) - Number(a.active) || a.position - b.position);
+
+/** The categories as Categories holds them now, for the deals' mock (partnerships.ts): one source, so a rename shows on Pipeline too. */
+export const mockCategories = () => CATEGORIES;
+/** The custom field definitions as Categories holds them now, for the deals' mock. */
+export const mockFields = () => FIELDS;
+/** One of MyCity's lists as Categories holds it now, in its order, for the deals' mock. */
+export const mockList = (list: string): ListValue[] => ordered(list);
 route("GET /api/v1/partnerships/lists/:list", (req) => (LISTS[req.params.list] ? ok({ list: req.params.list, values: ordered(req.params.list) }) : notFound()));
 route("POST /api/v1/partnerships/lists/:list", (req) => {
   const list = LISTS[req.params.list];
