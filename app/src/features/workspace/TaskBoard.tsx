@@ -12,7 +12,7 @@ import { CardPills, COLS, type BoardStatus } from "./shared";
 import { useMoveTask } from "./TaskForms";
 
 /** Whose tasks a board holds: the reader's (`mine`), their team's, and one project's when named. */
-export type BoardFilters = { scope: "mine" | "team"; project_id?: string };
+export type BoardFilters = { scope: "mine" | "team"; project_id?: string; partner_id?: string; lead_id?: string };
 
 /** One column: its own server list, more pages appended under it. */
 function useColumn(status: BoardStatus, filters: BoardFilters, q: string) {

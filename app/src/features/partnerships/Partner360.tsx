@@ -12,7 +12,8 @@ import { LogInteraction } from "./forms/LogInteraction";
 import { EditPartner } from "./forms/RecordForm";
 import { UploadDocument } from "./forms/UploadDocument";
 import { daysWord, dealPill, healthPill, partnerPill, useHoldsMoney, useMay } from "./lib";
-import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP, useDeal, WorkTab } from "./record";
+import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP, useDeal } from "./record";
+import { NextEvents, WorkTab } from "./WorkTab";
 
 const TABS = ["overview", "deals", "documents", "returns", "work", "activity", "contacts", "details"] as const;
 type Tab = (typeof TABS)[number];
@@ -99,6 +100,7 @@ export function Partner360({ id }: { id: string }) {
         {tab === "overview" && (
           <>
             {unfinished.length ? unfinished.map((d) => <OverviewDeal key={d.deal_id} id={d.deal_id} readOnly={readOnly} money={money} categoryId={partner.partner_category_id} />) : <EmptyState title="No Open Deals" text="Open a deal for the next edition." />}
+            <NextEvents events={x.overview.events} />
             <InteractionsCard items={x.overview.interactions} />
             {x.deliverables.length > 0 && (
               <DataView title="Our Deliverables" rows={x.deliverables} rowKey={(d) => d.deal_deliverable_id} columns={[{ key: "t", label: "Deliverable", render: (d) => d.title }, { key: "d", label: "Due", render: (d) => (d.due_on ? formatDate(d.due_on) : "None") }, { key: "s", label: "Status", render: (d) => d.status ?? "None" }]} />
@@ -127,7 +129,7 @@ export function Partner360({ id }: { id: string }) {
             <EmptyState bare title="No Returns Yet" text="Monthly returns show here." />
           </Card>
         )}
-        {tab === "work" && <WorkTab />}
+        {tab === "work" && <WorkTab record={record} dealId={unfinished.length === 1 ? unfinished[0]!.deal_id : null} readOnly={readOnly} />}
         {tab === "activity" && <ActivityTab record={record} history={x.history} />}
         {tab === "contacts" && <ContactsTab record={record} contacts={x.contacts} readOnly={readOnly} />}
         {tab === "details" && (
