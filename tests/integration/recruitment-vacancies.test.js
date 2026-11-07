@@ -143,7 +143,7 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
       ["interview", true, 25],
     ]);
     expect(v.questions.filter((x) => x.purpose === "interview").map((x) => x.prompt)).toEqual(TRAITS);
-    expect(v.board_stages).toEqual(["application", "screening", "assessment", "interview", "shortlist"]);
+    expect(v.board_stages).toEqual(["application", "screening", "assessment", "interview", "shortlist", "offer"]);
     expect(v.closes_at).toBe(new Date(lagos.endOfDayExclusive(closesOn()).getTime() - 1000).toISOString());
   });
 
@@ -262,7 +262,7 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
       parts: { screening: { active: true, weight: 30 }, psychometric: off, technical: off, case_study: off, interview: { active: true, weight: 70 } },
     });
     expect(card.status).toBe(200);
-    expect(card.body.board_stages).toEqual(["application", "screening", "interview", "shortlist"]);
+    expect(card.body.board_stages).toEqual(["application", "screening", "interview", "shortlist", "offer"]);
     expect((await pub().get("/jobs/head-sales-revenue-lagos")).body.how_we_hire).toEqual(["apply", "screening", "interview"]);
   });
 

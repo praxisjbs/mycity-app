@@ -147,10 +147,12 @@ A seat holds one draft, open or paused vacancy at a time. Once it has one, it le
 4. Press **Resume** to take applications again.
 5. To end it, press **Close Vacancy** and pick why: filled, cancelled or on hold.
 6. When candidates are still in progress, tick **Not Progress All** to tell them all now. Each gets
-   the not progressing email.
+   the not progressing email. A candidate who has been sent an offer is left as they are.
 7. Press **Close Vacancy**.
 
-The link is made when you first publish and never changes, even after a pause.
+The link is made when you first publish and never changes, even after a pause. When every opening of
+a role is hired, the role closes as filled by itself, and its Organogram role is filled by the new
+person.
 
 | The hub says | Why | What to do |
 |---|---|---|
@@ -202,8 +204,9 @@ three test parts are off, and **Interview** when the interview part is off.
 
 ### Change the candidate emails {#recruitment-vacancies-emails needs="recruitment edit"}
 
-Candidates get five emails: application received, invitation to apply, assessment, interview and
-not progressing.
+Candidates get eight emails: application received, invitation to apply, assessment, interview, not
+progressing, offer sent, offer signed and onboarding documents. The last three go out from Offers and
+Onboarding.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Press **Candidate Emails** at the top.
@@ -247,8 +250,9 @@ Candidates is the board: each application as a card, in a column for its stage.
    **Shortlisted**.
 3. Pick a role in the vacancy filter to see only its candidates.
 4. The columns are **Applied**, **Screening**, **Assessment**, **Interview** and **Shortlist**,
-   side by side in one row. A role that skips a stage has no column for it. On a narrow screen,
-   scroll the board sideways to reach the last columns.
+   side by side in one row, then **Offer** once offers are in use: the candidates sent an offer. A role
+   that skips a stage has no column for it. On a narrow screen, scroll the board sideways to reach the
+   last columns.
 5. Each card shows the name, the role, the screening score and how many days it has been at its
    stage.
 6. On a phone, press a stage at the top to see its cards, one stage at a time.
@@ -318,8 +322,10 @@ The role keeps its conditions. Next time, leave them as they are and they are us
 3. Or open the candidate and press the button for the stage, such as *Move to Interview*. On a phone
    it is at the foot of the sheet.
 
-A card can move to any stage ahead of it, or one stage back. **Shortlist** is the last column for
-now. Each move goes in **Stage History**, and the days at stage start again.
+A card can move to any stage ahead of it, or one stage back, up to **Shortlist**. Nobody drags a card
+into **Offer**: sending an offer moves it there, and an offer declined or lapsed brings it back to
+**Shortlist**. Once the offer is signed, the candidate continues on Onboarding, and a candidate hired
+leaves the board. Each move goes in **Stage History**, and the days at stage start again.
 
 ### Stop a candidate {#recruitment-candidates-not-progressing needs="recruitment edit"}
 

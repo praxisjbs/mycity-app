@@ -1,7 +1,7 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "cc497096cf2c9e2cbe1cc17b5dffed76906f62120d351995b8d981230fa41f0e",
-  "schemas": 1855,
+  "source_hash": "948f237870aa0bce3f0ecda5780260135b89e39b28b8419856779c15677a688d",
+  "schemas": 1858,
   "endpoints": 816,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
@@ -17,7 +17,7 @@
     "packages/contract/schemas/audit.js": "6d89015604235f5d773aae741a069230d68e02bc97aa4120b666d337379fc785",
     "packages/contract/schemas/budgets.js": "d54f3b2721ac85bb1de59db35a89f4ad593bf1a7270256907adaab75250bc876",
     "packages/contract/schemas/calendar.js": "3a54d906b71d7d0e8dba3aef6f116fd83bfc8b0d5daaa54c8638c46a65f6ec07",
-    "packages/contract/schemas/candidates.js": "3d20e4885b3b814dcfd58104398404b4966333ecc46b3dfb28565e40efb9cf4b",
+    "packages/contract/schemas/candidates.js": "b958358e95afe37049ebc0907ec7b4f8879e73777350c57b1cbece1c7a901d40",
     "packages/contract/schemas/common.js": "85351764de094282468fb732d1a9e0486048eadc7728081386b8772498419ccf",
     "packages/contract/schemas/community.js": "1c13986f3dea794ab8e83b461c18e863f8a285a81fa0aad029a0d94b733648fb",
     "packages/contract/schemas/dashboard.js": "30a17b3c0dd8b6fd460b332444be2c2e31047154a16787ddda1346f63a5b4870",
@@ -73,7 +73,7 @@
     "packages/contract/schemas/templates.js": "5c68262e21422e9f522f31ebeab2e9bc0b22faecccb972a28c9631f99738a301",
     "packages/contract/schemas/user_guide.js": "3a14914b7ff89d8ce50a1dbbe921a70370cf5e52d7f41f95f36752c54884b7d1",
     "packages/contract/schemas/users.js": "c62a6bfc703543682f6d190a19a68e86f34363c3f7846a46c54ba905e978064d",
-    "packages/contract/schemas/vacancies.js": "edf0deeb1a5633de9cd279427e9b29fab0d50da1847e9a0ca120b1e95d9c3518",
+    "packages/contract/schemas/vacancies.js": "9547878d282db28286f7a7a44915ebcf691c7ea093f21ffb8528d103f84df680",
     "packages/contract/schemas/workflow.js": "d070ad092b3a3b634ca1076856066d987734f21c1d8e102b4f2605d68fe0e8f8",
     "packages/contract/schemas/worksites.js": "96dd0eb1c22e1930b48f7ab77c85fee88382d38b1e897b6700ba8b999c5f1f76",
     "packages/contract/schemas/workspace.js": "85d46b8095025384afc99f99185149ea69be72ca519022075014e9dd9befa273",

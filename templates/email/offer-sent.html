@@ -1,0 +1,18 @@
+---
+subject: "Your offer for {{ vacancy_title }}"
+title: Offer of Employment
+format: markdown
+---
+{{#if recipient.first_name}}Dear {{ recipient.first_name }},{{else}}Hello,{{/if}}
+
+We are delighted to offer you the role of {{ vacancy_title }} at MyCity App.
+
+Your offer letter, reference **{{ reference }}**, is ready for you to read and sign. The link below opens it.
+
+[Read and Sign Your Offer]({{ sign_url }})
+
+The link is for you alone and works until {{ datetime expires_at }}, Lagos time. If you have a question before you sign, please reply to this email{{#if org.email}} or write to us at {{ org.email }}{{/if}}.
+
+If the link does not open, copy this address into your browser: {{ sign_url }}
+
+We look forward to welcoming you.

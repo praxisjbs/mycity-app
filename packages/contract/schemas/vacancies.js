@@ -72,8 +72,11 @@ const SCORECARD_DEFAULTS = Object.freeze({
 });
 
 /**
- * The pipeline's stages, as the reference list 4099 holds them. M4 uses the first five; offer and
- * after are M5's (decided 04/11/2026), declared here so the column's CHECK is set once.
+ * The pipeline's stages, as the reference list 4099 holds them. M4 moves a card through the first
+ * five by hand; offer and after are M5's (decided 04/11/2026), set only by M5's own steps through
+ * candidates.advanceIn and hireIn (#79, 06/11/2026): offer when an offer is sent, documentation at
+ * acceptance, pre_onboarding once the checklist is done, onboarding on the start date, hired when
+ * onboarding completes. Declared here so the column's CHECK is set once.
  */
 const ApplicationStage = z.enum([
   "application",
@@ -88,6 +91,8 @@ const ApplicationStage = z.enum([
   "hired",
 ]);
 const M4_STAGES = Object.freeze(["application", "screening", "assessment", "interview", "shortlist"]);
+/** M5's stages, in order, after Shortlist. Only Offer is a column of the board; the rest are the Onboarding screen's. */
+const M5_STAGES = Object.freeze(["offer", "documentation", "pre_onboarding", "onboarding", "hired"]);
 
 /* ------------------------------------------------------------------ *
  * Parts
@@ -154,6 +159,7 @@ const Vacancy = z
     work_pattern: WorkPattern.nullable(),
     positions: z.number().int().min(1),
     applicants: z.number().int().min(0),
+    /** Active applications still at an M4 stage: what Close Vacancy's Not Progress All would reach. */
     in_progress: z.number().int().min(0),
     closes_at: isoDateTime.nullable(),
     past_closing: z.boolean(),
@@ -195,8 +201,8 @@ const VacancyDetail = Vacancy.extend({
   working_days: z.string().nullable(),
   /** The must-meet conditions Screen With AI last asked for (guide §6.4). */
   screening_conditions: z.array(z.string()).max(3),
-  /** The board's columns for this role: the M4 stages, less those whose scorecard parts are off. */
-  board_stages: z.array(ApplicationStage).max(5),
+  /** The board's columns for this role: the M4 stages less those whose scorecard parts are off, then Offer. */
+  board_stages: z.array(ApplicationStage).max(6),
   /** The questions in use, in order; a retired one stays only on the answers it was given. */
   questions: z.array(VacancyQuestion).max(30),
   scorecard: z.array(ScorecardWeight).length(5),
@@ -740,7 +746,7 @@ const TABLES = {
       department: "department.name",
       hiring_manager: "the hiring manager, from employee and department",
       applicants: "count of the vacancy's applications",
-      in_progress: "count of its active applications",
+      in_progress: "count of its active applications at an M4 stage (one at offer or after is M5's)",
       past_closing: "open and closes_at is past",
       days_open: "whole Lagos days since published_at, to closed_at or today",
       public_url: "the careers page origin and /jobs/<slug>, once published",
@@ -753,7 +759,7 @@ const TABLES = {
       department: "department.name",
       hiring_manager: "the hiring manager, from employee and department",
       applicants: "count of the vacancy's applications",
-      in_progress: "count of its active applications",
+      in_progress: "count of its active applications at an M4 stage (one at offer or after is M5's)",
       past_closing: "open and closes_at is past",
       days_open: "whole Lagos days since published_at, to closed_at or today",
       public_url: "the careers page origin and /jobs/<slug>, once published",
@@ -764,7 +770,7 @@ const TABLES = {
       questions: "the vacancy_question rows",
       scorecard: "the recruitment_scorecard_criterion rows",
       by_stage: "active applications counted by stage",
-      board_stages: "the M4 stages less those whose scorecard parts are off (guide §6.3)",
+      board_stages: "the M4 stages less those whose scorecard parts are off, then offer (guide §6.3)",
       can_edit: "the reader may edit it: in scope with recruitment edit, and not closed",
     },
   },
@@ -840,6 +846,7 @@ module.exports = {
   SCORECARD_DEFAULTS,
   ApplicationStage,
   M4_STAGES,
+  M5_STAGES,
   VacancyRef,
   VacancyQuestion,
   ScorecardWeight,

@@ -9,6 +9,8 @@
  *                   entity_state_history; the slug is made at the first publish and never changes
  *   saveQuestions(), saveScorecard()        the Apply questions and traits, the parts on or off
  *   settings(user), saveSettings()          Careers Settings: About MyCityApp and the Default Traits, with can_edit
+ *   hiredIn()       a hire made (candidates.hireIn, for M5): the seat filled, the vacancy closed as filled
+ *                   once its openings are
  *
  * The careers page is vacancies.careers.js, which never loads staff auth (public-surface gate).
  *
@@ -147,7 +149,7 @@ async function detailOf(db, row, user) {
     closed_at: row.closed_at,
     working_days: row.working_days,
     screening_conditions: row.screening_conditions || [],
-    board_stages: lifecycle.boardStages(scorecard),
+    board_stages: lifecycle.boardColumns(scorecard),
     questions: qs.filter((q) => q.active).map((q) => ({ ...q, options: Array.isArray(q.options) ? q.options : null })),
     scorecard,
     by_stage: lifecycle.M4_STAGES.map((stage) => ({ stage, count: by.get(stage) || 0 })),
@@ -311,6 +313,49 @@ function move(to, event) {
       }
       return detailOf(client, await repo.get(client, id), actor);
     });
+}
+
+/**
+ * A hire made for this vacancy, inside the caller's transaction (candidates.hireIn, when M5's onboarding
+ * completes; #79, 06/11/2026, Q-TB8). The vacancy's Organogram seat, when it has one and it is still
+ * open, is filled by the new employee (organisation.fillSeat); a vacancy for several openings fills
+ * its one seat with its first hire. Once as many applications are hired as it has openings, the
+ * vacancy closes as filled through its own lifecycle move. Anyone still in progress stays on the
+ * board, as Close Vacancy left unticked leaves them, to be told one by one.
+ * @returns {Promise<{seat_filled: boolean, closed: boolean}>}
+ */
+async function hiredIn(client, actor, vacancyId, { employee_id: employeeId }) {
+  const row = await repo.get(client, vacancyId, { lock: true });
+  if (!row) throw notFound();
+  let seatFilled = false;
+  if (row.org_seat_id) {
+    const organisation = require("../organisation/organisation.service");
+    const seat = await organisation.findSeatById(client, row.org_seat_id);
+    if (seat && seat.status === "vacant") {
+      await organisation.fillSeat(client, row.org_seat_id, employeeId, actor);
+      seatFilled = true;
+    }
+  }
+  const full = (await repo.hiredCount(client, vacancyId)) >= row.positions;
+  const closes = full && row.status !== "closed";
+  if (closes) {
+    lifecycle.assertCanMove(row.status, "closed");
+    await repo.setStatus(client, vacancyId, { status: "closed", close_reason: "filled" });
+    await transition(client, lifecycle.MACHINE, {
+      entity_id: vacancyId,
+      from: row.status,
+      to: "closed",
+      actor_id: actor.user_id,
+      reason: "Every opening is filled",
+    });
+    await emit(client, {
+      key: EVENTS.VACANCY_CLOSED,
+      entity: { type: "vacancy", id: vacancyId },
+      actor,
+      payload: { number: row.number, title: row.title, close_reason: "filled", by_hire: true },
+    });
+  }
+  return { seat_filled: seatFilled, closed: closes };
 }
 
 const publish = move("open", EVENTS.VACANCY_PUBLISHED);
@@ -607,6 +652,7 @@ module.exports = {
   pause,
   resume,
   close,
+  hiredIn,
   saveQuestions,
   saveScorecard,
   keepScreeningConditions,
