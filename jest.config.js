@@ -55,4 +55,7 @@ module.exports = {
   // process, the whole suite outgrew Node 20's heap of about 2 GB and died with "JavaScript heap
   // out of memory" on GitHub, while Node 22's larger default heap hid it locally (27/10/2026).
   workerIdleMemoryLimit: "1GB",
+  // CI's backend jobs each run a slice (`--shard=i/n`); this deals the files out by expected cost
+  // rather than by count. Without --shard it changes nothing.
+  testSequencer: "<rootDir>/tests/shard-sequencer.js",
 };
