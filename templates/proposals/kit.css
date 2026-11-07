@@ -492,6 +492,9 @@ ul, ol { list-style: none; }
   .items, .items--2 { grid-template-columns: 1fr; gap: 22px; }
   .deliv-illus, .tl-illus, .terms-illus { display: none; }
   .cards, .cards--side { grid-template-columns: 1fr; }
+  .pkg { min-height: 0; }
+  .insight-chart { overflow-x: auto; }
+  .insight-chart .chart svg { min-width: 640px; }
   .table { font-size: 14px; }
   .tl { grid-template-columns: 1fr; padding: 0 0 0 36px; row-gap: 22px; margin: 0; }
   .tl::before { left: 8px; right: auto; top: 6px; bottom: 6px; width: 3px; height: auto; }
