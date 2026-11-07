@@ -100,8 +100,15 @@ describe("what a vacancy's scorecard decides", () => {
   const parts = (on) =>
     ["screening", "psychometric", "technical", "case_study", "interview"].map((code) => ({ code, active: on.includes(code) }));
 
-  test("the board leaves out Assessment and Interview when their parts are off", () => {
+  test("the board leaves out Assessment and Interview when their parts are off, and ends at Offer", () => {
     expect(service.boardStages(parts(["screening", "interview"]))).toEqual(["application", "screening", "interview", "shortlist"]);
+    expect(require("./vacancies.lifecycle").boardColumns(parts(["screening", "interview"]))).toEqual([
+      "application",
+      "screening",
+      "interview",
+      "shortlist",
+      "offer",
+    ]);
     expect(service.boardStages(parts(["screening", "technical", "interview"]))).toEqual([
       "application",
       "screening",

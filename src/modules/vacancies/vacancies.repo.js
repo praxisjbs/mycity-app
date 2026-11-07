@@ -18,6 +18,9 @@ const { M4_STAGES } = require("./vacancies.lifecycle");
 /** The setting rows this module keeps (Careers Settings, guide §6.1). */
 const SETTINGS = Object.freeze({ about: "recruitment.about_company", traits: "recruitment.default_traits" });
 
+/** The M4 stages as SQL literals (fixed words, never input): in progress counts only these. */
+const M4_IN = M4_STAGES.map((st) => `'${st}'`).join(", ");
+
 /** Every vacancy with what the list and the sheet show. */
 const ROWS = `
   SELECT v.vacancy_id, v.number::text AS number, v.title, v.slug::text AS slug, v.status, v.close_reason,
@@ -25,7 +28,8 @@ const ROWS = `
          v.hiring_manager_id, ${personJson("hm", "hmd")} AS hiring_manager,
          v.location, v.work_pattern, v.positions,
          (SELECT count(*)::int FROM application a WHERE a.vacancy_id = v.vacancy_id) AS applicants,
-         (SELECT count(*)::int FROM application a WHERE a.vacancy_id = v.vacancy_id AND a.status = 'active') AS in_progress,
+         (SELECT count(*)::int FROM application a
+           WHERE a.vacancy_id = v.vacancy_id AND a.status = 'active' AND a.stage IN (${M4_IN})) AS in_progress,
          v.closes_at, (v.status = 'open' AND v.closes_at IS NOT NULL AND v.closes_at <= now()) AS past_closing,
          v.published_at, v.created_at,
          v.org_seat_id, v.employment_type, v.work_pattern_note, v.probation_months, v.reports_to,
@@ -156,6 +160,12 @@ async function setStatus(client, id, { status, slug = null, close_reason: reason
       WHERE vacancy_id = $1`,
     [id, status, slug, reason],
   );
+}
+
+/** How many of a vacancy's applications ended hired (vacancies.service hiredIn). */
+async function hiredCount(db, vacancyId) {
+  const { rows } = await db.query("SELECT count(*)::int AS n FROM application WHERE vacancy_id = $1 AND status = 'hired'", [vacancyId]);
+  return rows[0].n;
 }
 
 /** The city of the vacancy's picked place, for its slug; null when it has none. */
@@ -558,6 +568,7 @@ async function publicBySlug(db, slug) {
 }
 
 module.exports = {
+  hiredCount,
   M4_STAGES,
   PARTS,
   SETTINGS,

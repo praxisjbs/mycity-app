@@ -552,3 +552,11 @@ packages that need none can start. Tick a package only when its own checks pass 
   footer follow the theme (`--site-*` tokens, light glass teal and a light skyline, the footer's skyline faint
   behind it); no pure white on the light site, a faint sheen on dark cards; the theme kept on reload by
   `public-app/public/boot.js` (the CSP refused the inline script). Next: the `hireIn` follow-up PR for AJ.
+- 06/11/2026 · GE · The hand-over to M5, as agreed with AJ on #79 (branch `m4/hire-handoff`): `MACHINE` takes
+  Offer to Hired one step at a time; `candidates.advanceIn` moves forward past Shortlist one stage at a time,
+  `offerEndedIn` takes an unsigned offer back to Shortlist, `hireIn` (from Onboarding only) marks the
+  application hired and calls `vacancies.hiredIn`, which fills the seat (`organisation.fillSeat`, new) and closes
+  the vacancy as filled once its openings are. The board's Offer column (`board_stages` ends at offer; shown once
+  Offers opens); Not Progress All and `in_progress` skip Offer and after; Candidate Emails gains `offer-sent`,
+  `offer-signed` and `onboarding-documents` (wording and `*EmailVars`). For AJ: call these from `offers.service`
+  and `onboarding.service`; widen the three `*EmailVars` in the contract if a mail needs more.

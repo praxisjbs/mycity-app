@@ -417,27 +417,28 @@ jobs:
           echo "::error::Chromium could not be installed in two tries: its download or the runner's apt mirror stalled each time. Re-run the job."
           exit 1
       # The browser comes from the cache; the system libraries it needs from theirs when it holds
-      # them, else from the mirror, and what the mirror sent is kept for the next run.
+      # them. Otherwise the screens jobs race the mirror and the first to finish shares its set with
+      # the rest of the run, so one slow mirror connection no longer holds a job for minutes
+      # (06/11/2026: four jobs nine minutes, four under 25 seconds). scripts/ci-chromium-libs.sh.
       - name: Chromium's system libraries
+        id: chromium-libs
         if: steps.chromium.outputs.cache-hit == 'true'
         timeout-minutes: 12
-        run: |
-          if ls ~/chromium-debs/*.deb >/dev/null 2>&1 && sudo apt-get install -y -q --no-download ~/chromium-debs/*.deb; then
-            echo "Chromium's system libraries from the cache"; exit 0
-          fi
-          for attempt in 1 2; do
-            if timeout 300 npx playwright install-deps chromium; then
-              mkdir -p ~/chromium-debs && cp /var/cache/apt/archives/*.deb ~/chromium-debs/ 2>/dev/null || true
-              exit 0
-            fi
-            echo "::warning::Installing Chromium's system libraries did not finish (try $attempt of 2)"
-            # The cap ends npx, not the apt-get it started: stop that one and let it go before the next try.
-            sudo pkill -x apt-get || true
-            for _ in $(seq 30); do pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null || break; sleep 2; done
-            sudo dpkg --configure -a || true
-          done
-          echo "::error::Chromium's system libraries could not be installed in two tries: the runner's apt mirror stalled each time. Re-run the job."
-          exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARED: chromium-debs-${{ steps.image.outputs.id }}-${{ steps.playwright.outputs.version }}
+        run: scripts/ci-chromium-libs.sh
+      # The job that fetched them first hands them to the others; a second job finishing at the same
+      # moment finds the name taken, which is fine.
+      - name: Share Chromium's system libraries with the run
+        if: steps.chromium-libs.outputs.source == 'mirror'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-debs-${{ steps.image.outputs.id }}-${{ steps.playwright.outputs.version }}
+          path: ~/chromium-debs/*.deb
+          retention-days: 1
+          if-no-files-found: ignore
 
       # The screen gates on this job's target: the crawl (lib/screens.js) and axe (a11y.js) open
       # only it, and only this job's share of its pages. The gallery's first job crawls it whole
