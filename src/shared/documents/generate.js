@@ -90,7 +90,11 @@ const SENSITIVITIES = new Set(["normal", "personal", "restricted"]);
  * @param {{template: string, numbering?: string|null, sensitivity?: string, title: (data: object) => string,
  *          landscape?: boolean, label?: string, module?: string|null, signable?: boolean, wet?: boolean,
  *          export?: boolean, templateChoice?: boolean,
- *          signedBy?: (data: object) => ({name: string, role: string, signature?: string|null}|null)}} spec
+ *          signedBy?: (data: object) => ({name: string, role: string, signature?: string|null}|null),
+ *          draw?: (data: object, context: {org: object, number: string|null, today: string}) => string}} spec
+ *   draw  a document that draws its own pages instead of a letter on the letterhead (the proposal
+ *         design kit, docs/guides/partnerships.md §6.11): it returns the complete HTML, checks its own
+ *         data, and its PDF carries no letterhead footer, the pages saying where they are themselves.
  */
 function defineDocType(docType, spec) {
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(docType))
@@ -111,6 +115,8 @@ function defineDocType(docType, spec) {
     throw new Error(`defineDocType(${docType}): signedBy is (data) => the signer`);
   if (spec.letter !== undefined && typeof spec.letter !== "function")
     throw new Error(`defineDocType(${docType}): letter is (data) => ({ date, to })`);
+  if (spec.draw !== undefined && typeof spec.draw !== "function")
+    throw new Error(`defineDocType(${docType}): draw is (data, context) => the HTML`);
   if (DOC_TYPES.has(docType) && DOC_TYPES.get(docType) !== spec)
     throw new Error(`defineDocType: ${docType} is already defined`);
   DOC_TYPES.set(
@@ -302,7 +308,8 @@ async function generate(
     throw new Error("documents.generate must run inside atomically()");
   const spec = specOf(docType);
   const templateKey = templateKeyOf(docType, spec, chosen);
-  const checked = variables.parseData("document", templateKey, data);
+  // A document that draws itself checks its own data; a template's data is checked against its variables.
+  const checked = spec.draw ? data : variables.parseData("document", templateKey, data);
   const template = await templates.current(client, "document", templateKey);
   const day = date
     ? lagos.assertDate(String(date).slice(0, 10), "date")
@@ -315,12 +322,14 @@ async function generate(
       .trim()
       .slice(0, 200) || docType;
   const org = await orgProfile(client);
-  const html = renderDocumentHtml(template, checked, {
-    org,
-    number,
-    today: day,
-    doc: docOf(spec, checked, title),
-  });
+  const html = spec.draw
+    ? spec.draw(checked, { org, number, today: day })
+    : renderDocumentHtml(template, checked, {
+        org,
+        number,
+        today: day,
+        doc: docOf(spec, checked, title),
+      });
 
   const id = crypto.randomUUID();
   const doc = await vault.insertRow(client, {
@@ -389,6 +398,7 @@ async function renderPending(
   const bytes = await toPdf(row.render_html, {
     footer: row.number,
     landscape: spec.landscape,
+    bare: Boolean(spec.draw),
   });
   if (
     !Buffer.isBuffer(bytes) ||

@@ -708,6 +708,20 @@ const PublicProposal = z
   })
   .strict();
 
+/** proposal-sent: the mail that carries a proposal's PDF and its private link (templates/email/proposal-sent.html). */
+const ProposalSentEmailVars = z
+  .object({
+    subject: z.string(),
+    message: z.string(),
+    title: z.string(),
+    reference: z.string(),
+    partner_name: z.string(),
+    link: z.string(),
+    valid_until: isoDate.nullable(),
+    owner_name: z.string(),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const KIT = "a section of ProposalContent, kept in partnership_proposal.content";
 const ROW = {
@@ -793,6 +807,7 @@ const TABLES = {
   ProposalsSummary: { table: null, reason: "figures over the proposals" },
   ProposalTokenParams: { table: null, reason: "the public link's :token" },
   PublicProposal: { table: null, reason: "the public page: the kit's HTML and the owner's contact" },
+  ProposalSentEmailVars: { table: null, reason: "what the proposal-sent mail is filled with" },
 };
 
 module.exports = {
@@ -867,4 +882,5 @@ module.exports = {
   ProposalsSummary,
   ProposalTokenParams,
   PublicProposal,
+  ProposalSentEmailVars,
 };

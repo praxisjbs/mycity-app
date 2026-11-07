@@ -257,6 +257,10 @@ describeDb("AI Control against the real migrations", () => {
         "assessment-questions",
         "interview-notes-cleanup",
         "cv-screen",
+        "proposal-questions",
+        "proposal-draft",
+        "proposal-rewrite",
+        "proposal-message",
       ]);
       const by = Object.fromEntries(rows.map((a) => [a.key, a]));
       // Recruitment's (recruitment.md §9), chosen by GE: all personal data, the CV read on Deep Reasoning.
