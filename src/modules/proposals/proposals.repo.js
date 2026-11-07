@@ -211,9 +211,9 @@ function insertProposal(client, p) {
 const PROPOSAL_COLUMNS = [
   "status", "title", "content", "progress", "ai_run_id", "valid_until", "public_token_id", "link_secret", "sent_to", "sent_cc",
   "sent_subject", "sent_message", "sent_at", "first_viewed_at", "last_viewed_at", "view_count", "accepted_at", "declined_at",
-  "decline_reason", "withdrawn_at", "document_id", "value", "currency",
+  "decline_reason", "withdrawn_at", "document_id", "value", "currency", "brief",
 ];
-const JSON_COLUMNS = new Set(["content", "progress"]);
+const JSON_COLUMNS = new Set(["content", "progress", "brief"]);
 
 async function updateProposal(client, id, patch) {
   const params = [id];

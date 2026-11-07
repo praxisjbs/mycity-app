@@ -12,8 +12,18 @@ const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const vault = require("../../shared/documents/vault");
 const documents = require("../documents/documents.service");
+const grantsCache = require("../../shared/rbac/grants-cache");
 const repo = require("./proposals.repo");
 const { EVENTS } = require("./proposals.events");
+
+/** A proof point's picture is MyCity's own: whoever may open Partnerships may see it. */
+vault.defineAccess("proof_point", async (client, user) => {
+  if (!user || !user.user_id) return false;
+  if (user.is_ceo === true) return true;
+  const { scopeFromGrants } = require("../../middleware/rbac");
+  const rows = await grantsCache.getGrants(client, { role_ids: user.role_ids || [], module: "partnerships" });
+  return Boolean(scopeFromGrants(rows, "view"));
+});
 
 async function tx(fn) {
   const client = await pool.connect();

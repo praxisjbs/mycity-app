@@ -16,8 +16,8 @@
  *
  * The owner is told of each through the bell when M7 PR 8 declares the Partnerships notifications
  * (§7, Appendix A PR 8); until then the events are the record. A proof point's image is a logo or a
- * picture, stored against the proof point (`proof_point_image`), readable by anyone who may open
- * Partnerships. A proposal's PDF is drawn by the design kit itself (`proposal`, locked once sent; a
+ * picture, stored against the proof point (`proof_point_image`; its read rule is proposals.proof's). A
+ * proposal's PDF is drawn by the design kit itself (`proposal`, locked once sent; a
  * draft's Download PDF is an export, `proposal_draft_pdf`), and a brief's transcript and pictures are
  * `proposal_source` and `proposal_asset` documents of the proposal.
  */
@@ -27,7 +27,6 @@ const { defineDocType } = require("../../shared/documents/generate");
 const { defineVariables } = require("../../shared/templates/variables");
 const outbox = require("../../shared/events/outbox");
 const vault = require("../../shared/documents/vault");
-const grantsCache = require("../../shared/rbac/grants-cache");
 const c = require("@mycity/contract");
 
 const EVENTS = defineEvents("partnerships", {
@@ -59,15 +58,6 @@ defineDocType("proposal", { template: "proposal", label: "Proposal", module: "pa
 defineDocType("proposal_draft_pdf", { template: "proposal", label: "Proposal draft", module: "partnerships", sensitivity: "normal", export: true, title: titled, draw });
 
 defineVariables("email", "proposal-sent", c.proposals.ProposalSentEmailVars);
-
-/** A proof point's picture is MyCity's own: whoever may open Partnerships may see it. */
-vault.defineAccess("proof_point", async (client, user) => {
-  if (!user || !user.user_id) return false;
-  if (user.is_ceo === true) return true;
-  const { scopeFromGrants } = require("../../middleware/rbac");
-  const rows = await grantsCache.getGrants(client, { role_ids: user.role_ids || [], module: "partnerships" });
-  return Boolean(scopeFromGrants(rows, "view"));
-});
 
 const queues = () => require("../../jobs/queues");
 

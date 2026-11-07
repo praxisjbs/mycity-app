@@ -42,3 +42,7 @@ For each card:
 - `required`: true only for what the proposal cannot be written without (two to four cards at most).
 
 Write warmly and specifically. No exclamation marks, no em dashes, no jargon.
+
+When `reshuffle` is given, the person wants a different question in place of `reshuffle.replace`: return
+one card as `{ "card": { ... } }` instead of the list, in the same group, asking something none of
+`reshuffle.asked` asks, with the same rules. `answers` are what the person has already answered.

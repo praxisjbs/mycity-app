@@ -185,7 +185,7 @@ function outputs() {
     { to: path.join(KIT, "icons.json"), text: iconsJson() },
     { to: path.join(KIT, "fonts", "geist-latin.woff2"), from: path.join(fontDir, "files", "geist-latin-wght-normal.woff2") },
     { to: path.join(KIT, "fonts", "geist-latin-ext.woff2"), from: path.join(fontDir, "files", "geist-latin-ext-wght-normal.woff2") },
-    { to: path.join(KIT, "fonts", "OFL.txt"), from: path.join(fontDir, "LICENSE") },
+    { to: path.join(KIT, "fonts", "LICENSE"), from: path.join(fontDir, "LICENSE") },
     ...CITIES.map((city) => ({
       to: path.join(KIT, "photos", `${city}.webp`),
       from: path.join(UI, "src", "illustrations", "photos", `${city}-1280.webp`),
