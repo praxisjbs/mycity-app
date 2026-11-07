@@ -49,7 +49,7 @@ export function useHoldsMoney() {
 }
 
 /** May the reader do this in Partnerships (their grant)? */
-export function useMay(action: "create" | "edit") {
+export function useMay(action: "create" | "edit" | "export") {
   const { me } = useAuth();
   return !!me?.grants.partnerships?.includes(action);
 }

@@ -16,7 +16,8 @@
  *   deal.health_changed   Set Health (Stalled carries its blockers)
  *   deal.signed           a deal entered a signed meaning: a lead's converts in the same transaction
  *   deal.lost             a deal entered Closed Lost
- *   deal_return.saved     Enter Returns, a month at a time (money: partnerships.money)
+ *   deal_return.saved     Enter Returns, a month at a time, or the Partnership Returns import (money: partnerships.money)
+ *   deal_return.removed   a month the Partnership Returns import made, its import reverted
  *
  * Payloads carry ids, numbers and codes, never money or a contact's details. Who is told about
  * which (the owner when someone else moved a deal, the owner's Head of Department on Stalled) is
@@ -49,6 +50,7 @@ const EVENTS = defineEvents("partnerships", {
   "deal.signed": { summary: "A partnership deal was signed" },
   "deal.lost": { summary: "A partnership deal was closed as lost" },
   "deal_return.saved": { summary: "A month of a deal's returns was entered" },
+  "deal_return.removed": { summary: "A month of a deal's returns was removed by reverting its import" },
 });
 
 places.owner("deal.venue", { rename: async () => {} });

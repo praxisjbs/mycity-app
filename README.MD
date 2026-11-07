@@ -615,6 +615,18 @@ Stage, Category, Region, Owner, Health and the filterable custom fields) and, fo
 in-transaction `leads.service` `createIn`, `partners.service` `createIn` and
 `partner_pipeline.returns` `saveIn`.
 
+PR 4 (07/11/2026) added `partners.import.js` (the Partnership Tracker importer, `partnership_tracker`),
+`partners.export.js` (Export on Partners, Leads and their deals in the tracker's columns, `POST
+/partnerships/exports`, made by the outbox handler `partners.events` registers) and
+`partner_pipeline.returns.import.js` (Partnership Returns, `partnership_returns`); Map Values in
+`shared/import` (`engine.js` `valuesOf` and `setValues`, `registry.js` `mapValues`, routes `GET` and `PUT
+/imports/:id/values`); on screen `app/src/features/partnerships/Returns.tsx` (the Partner 360's Returns tab)
+and `forms/ReturnsForm.tsx` (Enter Returns), and `app/src/features/settings/ImportValues.tsx` (the wizard's
+Map Values step); tested by `tests/integration/partnerships-imports.test.js` and
+`tests/unit/partnerships-import.test.js` on the synthetic workbook
+`tests/fixtures/partnership-tracker.synthetic.xlsx` (the real tracker's headers, dropdowns and value
+shapes, invented organisations and contacts; the real one is never committed).
+
 Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR 4);
 `shared/documents/render.js` its table loop if missing (PR 6). Prompts (`services/ai/prompts/`):
 `proposal-questions`, `proposal-draft`, `proposal-rewrite`, `proposal-message`, `template-tidy`;

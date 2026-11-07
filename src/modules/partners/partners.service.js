@@ -209,7 +209,8 @@ async function insertIn(client, actor, row, { region, headquarters, field = null
  * A partner already signed, its primary contact and its first deal at a signed or active stage, in the
  * caller's transaction: New Partner, and a signed row of the Partnership Tracker import (M7 PR 4,
  * "signed before the hub"), whose row may name no contact. The caller has checked the owners.
- * @param {object} body  PartnerCreate (`contact` optional here)
+ * @param {object} body  PartnerCreate (`contact` optional here; `identified_on`, the import's Date
+ *   Identified, dates its deal)
  * @param {{held: boolean, source?: "person"|"import"}} opts
  * @returns {Promise<{partner_id: string, number: string, deal_id: string}>}
  */
@@ -234,7 +235,13 @@ async function createIn(client, actor, body, { held, source = "person" }) {
   );
   const record = { kind: "partner", id: made.partner_id };
   if (body.contact) await contactIn(client, actor, record, body.contact, { primary: true, field: "contact" });
-  const deal = await pipeline.createIn(client, actor, { ...record, categoryId: body.partner_category_id }, body.deal, { held, field: "deal", allowSigned: true, source });
+  const deal = await pipeline.createIn(client, actor, { ...record, categoryId: body.partner_category_id }, body.deal, {
+    held,
+    field: "deal",
+    allowSigned: true,
+    source,
+    identifiedOn: body.identified_on ?? null,
+  });
   if (body.signed_copy_document_id) {
     await require("./partners.documents").attachIn(client, actor, {
       record,
@@ -329,6 +336,26 @@ async function close(actor, scope, id, body) {
   return get360(id, scope, actor);
 }
 
+/**
+ * Remove a partner the Partnership Tracker import made, reverting that import, in its transaction:
+ * its deal, contacts, region and headquarters go with it. The importer has checked that nothing uses it.
+ */
+async function removeImportedIn(client, actor, id) {
+  const p = await repo.lock(client, id);
+  if (!p) return;
+  await dealRepo.removeDealsOf(client, { kind: "partner", id });
+  await saveCities(client, "partner.cities", id, [], "region.cities");
+  await places.remove(client, "partner.headquarters", id);
+  await repo.remove(client, id);
+  await emit(client, {
+    key: EVENTS.PARTNER_REMOVED,
+    entity: { type: "partner", id },
+    actor,
+    before: { number: p.number, name: p.name },
+    payload: { partner_id: id, number: p.number },
+  });
+}
+
 /** A contact by their name among the records the reader may see; null when none or several. */
 async function contactIdOf(db, words, scope) {
   if (!words || !db) return null;
@@ -356,4 +383,5 @@ module.exports = {
   create,
   update,
   close,
+  removeImportedIn,
 };

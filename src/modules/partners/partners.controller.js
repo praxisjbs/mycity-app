@@ -4,7 +4,7 @@
  * duplicates (docs/guides/partnerships.md §5). Scope comes from the `partnerships` grant (§6.1).
  * The Work tab's route arrives with My Workspace's links (M7 PR 5).
  */
-const { ok, created } = require("../../shared/http/respond");
+const { ok, created, accepted } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { scopeOf } = require("../../shared/rbac/scope");
 const { withActor } = require("../../shared/events/emit");
@@ -26,4 +26,5 @@ module.exports = {
   updateContact: async (req, res) => ok(res, await service.updateContact(withActor(req), scopeOf(req), id(req), req.validated.body)),
   documents: async (req, res) => sendPaged(res, await documents.page(req.validated.query, scopeOf(req))),
   attach: async (req, res) => created(res, await documents.attach(withActor(req), scopeOf(req), req.validated.body)),
+  requestExport: async (req, res) => accepted(res, await require("./partners.export").requestExport(withActor(req), req.validated.body)),
 };

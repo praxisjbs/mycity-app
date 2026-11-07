@@ -56,6 +56,7 @@ const importerOf = (imp) => ({
     masked: Boolean(f.mask),
     example: f.example || null,
     hint: f.hint || null,
+    map_values: f.mapValues ? f.mapValues.kind : null,
   })),
 });
 
@@ -128,6 +129,22 @@ async function setMapping(batchId, body, actor) {
   const row = await tx((client) =>
     engine.setMapping(client, batchId, body, actor),
   );
+  return withBatch(row);
+}
+
+/** Map Values: every distinct value of each list, person or place column, with what it maps to. */
+async function values(user, batchId) {
+  const client = await pool.connect();
+  try {
+    return await engine.valuesOf(client, batchId, user);
+  } finally {
+    client.release();
+  }
+}
+
+/** Save what Map Values chose; the preview runs again after. */
+async function setValues(batchId, body, actor) {
+  const row = await tx((client) => engine.setValues(client, batchId, body, actor));
   return withBatch(row);
 }
 
@@ -205,6 +222,8 @@ module.exports = {
   create,
   get,
   setMapping,
+  values,
+  setValues,
   preview,
   commit,
   revert,

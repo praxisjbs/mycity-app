@@ -17,8 +17,9 @@
  *    (the set of normalised headers), so next month's sheet with the same columns maps
  *    itself, and a renamed column is mapped once and remembered.
  *
- * A mapping is stored as { columns: [{ index, header, field }] }, field null when the
- * column is ignored.
+ * A mapping is stored as { columns: [{ index, header, field }], values? }, field null when the
+ * column is ignored. `values` is what Map Values chose ({ [field]: { [normalised value]:
+ * { to } | { create: true } } }), kept with the profile so next month's values map themselves.
  *
  * Table (migration 0085; BACKEND_STRUCTURE §11.1):
  *   import_mapping_profile  import_mapping_profile_id, importer_key, name, header_signature,
@@ -184,6 +185,7 @@ function applyProfile(profile, headerCells) {
       header: cell === null || cell === undefined ? "" : String(cell),
       field: byHeader.get(normalise(cell)) || null,
     })),
+    ...(profile.values ? { values: profile.values } : {}),
   };
 }
 
