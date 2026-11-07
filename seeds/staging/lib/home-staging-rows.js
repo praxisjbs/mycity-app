@@ -65,6 +65,11 @@ const IDS = Object.freeze({
     "eko-hotels": "a80d3b6d-49ec-5a56-9030-7958dd70cfe8",
     "filmhouse-cinemas": "ac711cf5-a9b2-51bb-ba09-b274572f80f3",
     "kano-trade-council": "1fc6834e-fef4-5066-8d13-0c1d5d17a8a6",
+    // The deal each agreement signed (M7 PR 3: Signed Value reads deals, partnerships.md §6.17).
+    "mtn-nigeria:signed": "c96887a3-9aab-580c-b3de-356119fc2d62",
+    "providusbank:signed": "d468634d-0ff3-5d85-8a2c-519d05e54520",
+    "ikeja-city-mall:signed": "f212aaac-dd4d-5575-b7a8-894309126e78",
+    "access-bank:signed": "b0c4d015-789f-53f1-9e96-db12b48516ae",
   },
   partner: {
     "mtn-nigeria": "c2c82fcf-6088-5999-9e6a-5a37a6e6739a",

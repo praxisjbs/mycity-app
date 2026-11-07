@@ -505,12 +505,14 @@ generated from the template, each with its key, label, type and default; M7 PR 2
 `mou` schemes taken out, the `partnership.agreement` approval (the Head of Department of the deal
 owner's department, then the CEO), `partnerships.configure` (Implementation, Operations & People) and
 `partnerships.money` (Operations & People, Management, Implementation; General Management through
-their department, in code), and 7099's partner types and stages switched off (A26).
-`docs/guides/partnerships.md` §4 is the field-by-field account.
+their department, in code), and 7099's partner types and stages switched off (A26) · `7060` (M7 PR 3)
+`partner_document`, a vault document of a lead or a partner (one of the two) with its kind, its deal
+and its origin (`upload`, `proposal`, `agreement`, `signed_copy`), the vault's row naming it as its
+entity so conversion re-points it and never rewrites the vault; and `partner.partner_type` dropped,
+one release after the code stopped reading it (MIGRATIONS §8; its DOWN copies it back from the
+category). `docs/guides/partnerships.md` §4 is the field-by-field account.
 
 **Owes:**
-- `partner.partner_type`: nothing reads it since 7020; dropped by a fix-forward in M7 PR 3, one
-  release later (MIGRATIONS §8).
 - MyCity's own stages (with their meanings), impact, sources, document kinds and categories: entered
   on Partnerships · Categories or by Start From Tracker (M7 PR 2), never seeded (A26).
 - The writers: every table above is written only through M7's services, PR 2 to PR 8 (the guide's
@@ -518,14 +520,15 @@ their department, in code), and 7099's partner types and stages switched off (A2
 - **Read by Home** (home.md §4.1): `partner` (`partner_id`, `name`, `partner_category_id`, `status`,
   `owner_id`, `created_at`) with `partner_category` (`partner_category_id`, `name`), `lead` (`lead_id`,
   `name`), `partner_interaction` (`partner_id`, `occurred_at`), `partnership_opportunity`
-  (`partnership_opportunity_id`, `partner_id`, `lead_id`, `title`, `stage`, `status`, `owner_id`,
-  `estimated_value`, `currency`, `expected_close_on`), `partnership_proposal`
-  (`partnership_proposal_id`, `partnership_opportunity_id`, `number`, `value`, `currency`, `sent_at`,
-  `accepted_at`) and `partnership_agreement` (`partnership_agreement_id`, `partner_id`, `lead_id`,
-  `number`, `title`, `status`, `starts_on`, `value`, `currency`, `owner_id`) through
-  `src/modules/dashboard/sources/partners.source.js`. M7 PR 3 moves those queries to its modules'
-  reads (open and live deals, signed values in the year signed, proposals `sent` or `viewed`) and
-  clears the adapter's `owes` (partnerships.md §6.17).
+  (`partnership_opportunity_id`, `number`, `partner_id`, `lead_id`, `title`, `stage`, `status`,
+  `owner_id`, `estimated_value`, `currency`, `expected_close_on`, `signed_at`), `deal_member`
+  (`deal_id`, `employee_id`), `partnership_proposal` (`partnership_proposal_id`,
+  `partnership_opportunity_id`, `number`, `status`, `value`, `currency`, `sent_at`) and
+  `partnership_agreement` (`partnership_opportunity_id`, `status`, `value`, `signed_at`) through
+  `src/modules/dashboard/sources/partners.source.js`. Since M7 PR 3 every query there is the owning
+  module's own read (`partner_pipeline.repo`, `partners.repo`, `proposals.repo`: open deals, deals
+  signed in the year at their signed agreement's value else their projected value, proposals `sent`
+  or `viewed`), and the adapter owes nothing (partnerships.md §6.17).
   **Staging holds Home's demonstration rows** in `partner`, `partner_interaction`,
   `partnership_opportunity`, `partnership_proposal` and `partnership_agreement`
   (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`

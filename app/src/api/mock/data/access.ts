@@ -45,7 +45,7 @@ export const GENERAL_MANAGEMENT_CAPABILITIES = ["goals.company", "goals.organisa
 
 /**
  * What a person holds: every capability for the CEO, else the union of their roles' and, for whoever sits in
- * General Management, the plan's three.
+ * General Management, the plan's three and partnerships' money.
  */
 export function capabilitiesOf(roleCodes: string[], isCeo: boolean, inGeneralManagement = false): string[] {
   if (isCeo) return [...EVERY];
