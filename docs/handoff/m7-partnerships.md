@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | LA (Love Adeola), M7's owner as CLAUDE.md, the guide and PROGRESS name it; GE (Godwin-Okoh Elisha) builds most PRs, LA the importers, AJ the Workspace links (the guide's Appendix A) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 5 (`m7/workspace-links`) |
 
 ---
 
@@ -72,9 +72,10 @@ with the date, and add a line to §3.
       `partnerships.deals`)
 
 ### PR 5 · Workspace links and deliverables
-- [ ] workspace.md first; Connect to Partner on projects, tasks, events; Partner filter
-- [ ] Work tab with hidden counts; deliverables on signing; calendar event days; inactivity follow-up
-- [ ] Praxis AI cards; my-workspace.md chapter and pictures retaken
+- [x] workspace.md first; Connect to Partner on projects, tasks, events; Partner filter (07/11/2026)
+- [x] Work tab with hidden counts; deliverables on signing; calendar event days; inactivity follow-up
+      (07/11/2026)
+- [x] Praxis AI cards; my-workspace.md chapter and pictures retaken (07/11/2026)
 
 ### PR 6 · Agreements, approval, signing, verification
 - [ ] Generate, lifecycle, renewals; the approval flow on Settings · Approvals
@@ -98,6 +99,15 @@ with the date, and add a line to §3.
 
 ## 3 · Log
 
+- 07/11/2026 · AJ · PR 5 (`m7/workspace-links`): Connect to Partner on New Project, New Task and New Event and their
+  edits (Partner, leads marked, Deal, Disconnect), checked by `partners.work`; the Partner filter on Tasks and
+  Projects; `partner_link` named only for readers who see the record; `GET /work` with hidden counts, the 360s' Work
+  tab (`WorkTab.tsx`) and Next Events; deliverables and the deal's event days as outbox handlers on `deal.signed`,
+  moved with the deal's dates and called off when it is lost; the `partner-inactivity` follow-up once a quiet spell
+  (`partner_follow_up`, migration `7080`); Praxis AI's Workspace cards with Partner, Lead and Deal; conversion moving
+  Workspace links (`relinkIn`); workspace.md, my-workspace.md (pictures retaken) and praxis-ai.md. TB answered: New
+  Partner's Signed Before the Hub raises no deliverables, its event days still go on the calendar (the guide's §13.2,
+  In PR 5). Tests: eleven integration tests, two screen tests. Next: PR 4, PR 6 and PR 7, then PR 8.
 - 06/11/2026 · TB · Audit of PRs 1 to 3 against the guide before PR 4, with TB's four calls (the guide's
   §13.2, the audit; §14). Who sees a deal: its owner's scope, its team, or its lead's or partner's
   owner's, one rule everywhere, so the 360s list and count only the deals the reader sees; New Deal and
