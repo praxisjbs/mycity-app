@@ -135,6 +135,14 @@ jobs:
       # apt wants, so a new image saves a fresh set instead of downloading on every run (a fixed
       # key never saved again, and on 23/10/2026 a slow mirror ran the whole 94 MB past the job's
       # limit). A new image starts from the last image's files and fetches only what changed.
+      # The runner's apt mirror can stall part way through a download (06/11/2026: Chromium's
+      # libraries, five minutes). The capped try then ended npx but not the apt-get under it, whose
+      # lock failed the second try at once. A stalled fetch now times out and is fetched again, and
+      # apt waits for its lock rather than failing on it.
+      - name: apt retries a stalled mirror and waits for its lock
+        run: |
+          printf '%s\n' 'Acquire::Retries "5";' 'Acquire::http::Timeout "20";' 'Acquire::https::Timeout "20";' \
+            'DPkg::Lock::Timeout "300";' | sudo tee /etc/apt/apt.conf.d/80-ci-mirror >/dev/null
       - name: Which runner image
         id: image
         run: echo "id=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
@@ -250,6 +258,25 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+      # The runner's apt mirror can stall part way through a download (06/11/2026: Chromium's
+      # libraries, five minutes). The capped try then ended npx but not the apt-get under it, whose
+      # lock failed the second try at once. A stalled fetch now times out and is fetched again, and
+      # apt waits for its lock rather than failing on it.
+      - name: apt retries a stalled mirror and waits for its lock
+        run: |
+          printf '%s\n' 'Acquire::Retries "5";' 'Acquire::http::Timeout "20";' 'Acquire::https::Timeout "20";' \
+            'DPkg::Lock::Timeout "300";' | sudo tee /etc/apt/apt.conf.d/80-ci-mirror >/dev/null
+      # Chromium's system libraries are kept as ffmpeg's are, keyed on the runner image (its package
+      # lists decide the versions apt wants) and the browser.
+      - name: Which runner image
+        id: image
+        run: echo "id=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+      - name: Chromium's system libraries, cached
+        uses: actions/cache@v4
+        with:
+          path: ~/chromium-debs
+          key: chromium-debs-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.id }}-${{ steps.playwright.outputs.version }}
+
       # Both install through the runner's apt mirror, which once hung 14 minutes and took the run
       # with it (26/10/2026): each try is capped, a second follows, then the step fails saying so.
       - name: Chromium for the screen gates
@@ -259,22 +286,37 @@ jobs:
           for attempt in 1 2; do
             timeout 600 npx playwright install --with-deps chromium && exit 0
             echo "::warning::Installing Chromium did not finish (try $attempt of 2)"
+            # The cap ends npx, not the apt-get it started: stop that one and let it go before the next try.
+            sudo pkill -x apt-get || true
+            for _ in $(seq 30); do pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null || break; sleep 2; done
             sudo dpkg --configure -a || true
           done
-          echo "::error::Chromium could not be installed in two tries: its download or the runner's apt mirror is not answering. Re-run the job."
+          echo "::error::Chromium could not be installed in two tries: its download or the runner's apt mirror stalled each time. Re-run the job."
           exit 1
-      # The browser comes from the cache; the system libraries it needs do not.
+      # The browser comes from the cache; the system libraries it needs from theirs when it holds
+      # them. Otherwise from the mirror, and once the screens run in several jobs (shards) they race
+      # it: the first to finish shares its set with the rest of the run, so one slow mirror
+      # connection no longer holds a job for minutes (06/11/2026: four jobs nine minutes, four under
+      # 25 seconds). scripts/ci-chromium-libs.sh.
       - name: Chromium's system libraries
+        id: chromium-libs
         if: steps.chromium.outputs.cache-hit == 'true'
         timeout-minutes: 12
-        run: |
-          for attempt in 1 2; do
-            timeout 300 npx playwright install-deps chromium && exit 0
-            echo "::warning::Installing Chromium's system libraries did not finish (try $attempt of 2)"
-            sudo dpkg --configure -a || true
-          done
-          echo "::error::Chromium's system libraries could not be installed in two tries: the runner's apt mirror is not answering. Re-run the job."
-          exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARED: chromium-debs-${{ steps.image.outputs.id }}-${{ steps.playwright.outputs.version }}
+        run: scripts/ci-chromium-libs.sh
+      # The job that fetched them first hands them to the others; a second job finishing at the same
+      # moment finds the name taken, which is fine.
+      - name: Share Chromium's system libraries with the run
+        if: steps.chromium-libs.outputs.source == 'mirror'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-debs-${{ steps.image.outputs.id }}-${{ steps.playwright.outputs.version }}
+          path: ~/chromium-debs/*.deb
+          retention-days: 1
+          if-no-files-found: ignore
 
       - name: Screen gates
         run: npm run ci -- --group=screens

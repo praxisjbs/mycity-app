@@ -104,6 +104,8 @@ mycity-app/
 ├── assets/fonts/             Geist, for PDFs
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
+│   ├── ci-chromium-libs.sh   a CI screens job's Chromium system libraries: the cache, else the mirror
+│   │                         raced against the set another job of the run shares (ci.yml)
 │   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test)
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md;
 │   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30);
