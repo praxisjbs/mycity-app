@@ -1,0 +1,10 @@
+<header class="page-head"><h2 class="h1">{{ heading }}</h2></header>
+<div class="proof-main{{#if visual}} proof-main--side{{/if}}">
+  {{#if logos}}<div class="logos cols-{{ cols }}">
+    {{#each logos}}<div class="logo-tile">{{#if img}}<img src="{{ img }}" alt="{{ label }}">{{else}}<span>{{ label }}</span>{{/if}}</div>{{/each}}
+  </div>{{/if}}
+  {{#if results}}<div class="results cols-{{ rcols }}">
+    {{#each results}}<div><div class="result-value fig">{{ value }}</div><div class="result-label">{{ label }}</div></div>{{/each}}
+  </div>{{/if}}
+</div>
+{{#if visual}}<div class="proof-side"><div class="panel">{{> body}}</div></div>{{/if}}

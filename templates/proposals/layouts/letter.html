@@ -1,0 +1,9 @@
+<aside class="letter-side">
+  {{#if photo}}<img class="signer-photo" src="{{ photo }}" alt="{{ signer_name }}">{{else}}<span class="signer-initials" aria-hidden="true">{{ initials }}</span>{{/if}}
+  <div class="signer-name">{{ signer_name }}</div>
+  <div class="signer-title">{{ signer_title }}</div>
+</aside>
+<div class="letter-body">
+  {{#each paras}}<p class="{{#if lead}}lead{{else}}body{{/if}}">{{ text }}</p>{{/each}}
+  {{#if last}}<p class="letter-sign">Warm regards,<b>{{ signer_name }}</b></p>{{/if}}
+</div>
