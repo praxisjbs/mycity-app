@@ -2,8 +2,8 @@
 /**
  * A deal's returns (docs/guides/partnerships.md §6.14): per month, units sold, gross sales,
  * MyCity's commission, paid to the partner, downloads and a note. Every route here asks for
- * `partnerships.money`; a month saved again replaces its figures, audited. The Returns tab and the
- * Partnership Returns import arrive with M7 PR 4, on this service.
+ * `partnerships.money`; a month saved again replaces its figures, audited. The 360's Returns tab
+ * (Enter Returns) and the Partnership Returns import (partner_pipeline.returns.import.js) write here.
  */
 const { pool } = require("../../config/db");
 const { emit } = require("../../shared/events/emit");
@@ -43,6 +43,24 @@ async function saveIn(client, actor, deal, month, body, { source = "entered", im
   return after;
 }
 
+/**
+ * Remove a month the Partnership Returns import made, reverting it, in the caller's transaction.
+ * @param {{deal_id: string, number: string}} deal
+ * @param {string} day  the month's 1st, `YYYY-MM-DD`
+ */
+async function removeIn(client, actor, deal, day) {
+  const before = await repo.returnOf(client, deal.deal_id, day);
+  if (!before) return;
+  await repo.removeReturn(client, deal.deal_id, day);
+  await emit(client, {
+    key: EVENTS.DEAL_RETURN_REMOVED,
+    entity: { type: "partner_deal", id: deal.deal_id },
+    actor,
+    before: { units_sold: before.units_sold, downloads: before.downloads },
+    payload: { deal_id: deal.deal_id, number: deal.number, month: day },
+  });
+}
+
 /** Enter Returns (PUT /deals/:id/returns/:month): a month at a time, replacing what it held. */
 async function save(actor, scope, id, month, body) {
   return service.tx(async (client) => {
@@ -51,4 +69,4 @@ async function save(actor, scope, id, month, body) {
   });
 }
 
-module.exports = { page, save, saveIn };
+module.exports = { page, save, saveIn, removeIn };

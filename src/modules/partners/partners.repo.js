@@ -153,6 +153,147 @@ async function lock(client, id) {
   return rows[0] || null;
 }
 
+/** Remove a partner an import made and nothing uses (reverting its import); its contacts go with it. */
+async function remove(client, id) {
+  await client.query("DELETE FROM partner WHERE partner_id = $1", [id]);
+}
+
+/* ------------------------------------------------------------------ *
+ * The Partnership Tracker import (M7 PR 4)
+ * ------------------------------------------------------------------ */
+
+/**
+ * The lead or partner a tracker row names, by one match key, whatever the importer's scope (as the
+ * duplicate check reads, §6.1): the name as written (case and spaces aside), the website's host, or
+ * the primary contact's email. A closed partner or a lost lead still counts, so a second import of
+ * the same file makes nothing twice.
+ * @returns {Promise<{kind: "lead"|"partner", id: string, number: string}|null>}
+ */
+async function trackerMatch(db, key, value) {
+  const host = (col) => `NULLIF(split_part(split_part(regexp_replace(regexp_replace(lower(COALESCE(${col}, '')), '^[a-z]+://', ''), '^www\\.', ''), '/', 1), ':', 1), '')`;
+  const where = {
+    name: (a) => `lower(btrim(regexp_replace(${a}.name, '\\s+', ' ', 'g'))) = lower(btrim(regexp_replace($1, '\\s+', ' ', 'g')))`,
+    website: (a) => `${host(`${a}.website`)} = $1`,
+    email: (a, kind) => `EXISTS (SELECT 1 FROM partner_contact c WHERE c.${kind}_id = ${a}.${kind}_id AND c.primary_contact AND lower(c.email::text) = lower($1))`,
+  }[key];
+  if (!where || value === null || value === undefined || value === "") return null;
+  const { rows } = await db.query(
+    `SELECT 'partner' AS kind, p.partner_id AS id, p.number FROM partner p WHERE ${where("p", "partner")}
+     UNION ALL
+     SELECT 'lead', l.lead_id, l.number::text FROM lead l WHERE l.status <> 'converted' AND ${where("l", "lead")}
+     ORDER BY kind DESC, number LIMIT 1`,
+    [String(value)],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Whether a record the tracker import made is in use, so reverting the import would lose work: an
+ * interaction, a proposal, an agreement, a document, a linked mail, a month of returns, or a stage or
+ * health line that did not come from the import.
+ */
+async function trackerInUse(db, kind, id) {
+  const col = `${kind}_id`;
+  const { rows } = await db.query(
+    `WITH deals AS (SELECT partnership_opportunity_id AS id FROM partnership_opportunity WHERE ${col} = $1)
+     SELECT EXISTS (SELECT 1 FROM partner_interaction WHERE ${col} = $1 OR partnership_opportunity_id IN (SELECT id FROM deals))
+         OR EXISTS (SELECT 1 FROM partnership_proposal WHERE partnership_opportunity_id IN (SELECT id FROM deals))
+         OR EXISTS (SELECT 1 FROM partnership_agreement WHERE ${col} = $1 OR partnership_opportunity_id IN (SELECT id FROM deals))
+         OR EXISTS (SELECT 1 FROM partner_document WHERE ${col} = $1)
+         OR EXISTS (SELECT 1 FROM partner_mail_thread WHERE ${col} = $1)
+         OR EXISTS (SELECT 1 FROM deal_return WHERE deal_id IN (SELECT id FROM deals))
+         OR EXISTS (SELECT 1 FROM partnership_stage_history WHERE partnership_opportunity_id IN (SELECT id FROM deals) AND source IS DISTINCT FROM 'import')
+         ${kind === "lead" ? "OR EXISTS (SELECT 1 FROM lead WHERE lead_id = $1 AND status = 'converted')" : ""} AS used`,
+    [id],
+  );
+  return rows[0].used;
+}
+
+/**
+ * The working employee a tracker's Lead Owner names, as the growth team writes one ("JOHN", "Mr. John",
+ * "Ada Obi"): the whole name, else a first name only one person here has; null when none or several.
+ */
+async function employeeNamed(db, words) {
+  const bare = String(words || "")
+    .replace(/\b(mr|mrs|ms|miss|dr|engr|chief|sir|madam)\b\.?/gi, " ")
+    .replace(/[^A-Za-z\s'-]/g, " ")
+    .trim();
+  if (!bare) return null;
+  const { rows } = await db.query(
+    `SELECT employee_id, count(*) OVER () AS n FROM employee
+      WHERE status = 'active'
+        AND (regexp_replace(lower($1), '[^a-z]', '', 'g') IN (
+               regexp_replace(lower(first_name || last_name), '[^a-z]', '', 'g'),
+               regexp_replace(lower(first_name || coalesce(middle_name, '') || last_name), '[^a-z]', '', 'g'))
+             OR ($2 AND regexp_replace(lower(first_name), '[^a-z]', '', 'g') = regexp_replace(lower($1), '[^a-z]', '', 'g')))
+      ORDER BY employee_id LIMIT 1`,
+    [bare, !/\s/.test(bare)],
+  );
+  return rows[0] && Number(rows[0].n) === 1 ? rows[0].employee_id : null;
+}
+
+/** A working employee's name by their id, or null (Map Values' label for a Lead Owner). */
+async function employeeLabel(db, id) {
+  const { rows } = await db.query("SELECT btrim(first_name || ' ' || last_name) AS name FROM employee WHERE employee_id::text = $1 AND status = 'active'", [String(id)]);
+  return rows[0] ? rows[0].name : null;
+}
+
+/** Whether an id is a partner's or a lead's, for reverting an import that made either. */
+async function kindOf(db, id) {
+  const { rows } = await db.query("SELECT 'partner' AS kind FROM partner WHERE partner_id::text = $1 UNION ALL SELECT 'lead' FROM lead WHERE lead_id::text = $1", [String(id)]);
+  return rows[0] ? rows[0].kind : null;
+}
+
+/**
+ * The tracker's columns for some partners, leads or deals the reader's list already chose (exports
+ * in the tracker's columns, §6.13): the record, its primary contact, and the deal the row is about
+ * (a record's open or live deal, else its latest). Money is never among them.
+ * @param {"partner"|"lead"|"deal"} kind
+ * @param {string[]} ids  ids of `kind`
+ */
+async function trackerRows(db, kind, ids) {
+  if (!ids.length) return [];
+  const record = (alias, k) => `${alias}.${k}_id`;
+  const pick = (r) => `
+    r_number, r_name, r_industry, r_region, r_custom, r_kind,
+    (SELECT name::text FROM partner_category WHERE partner_category_id = r_category) AS category,
+    (SELECT btrim(first_name || ' ' || last_name) FROM employee WHERE employee_id = r_owner) AS owner_name,
+    ct.first_name, ct.last_name, ct.job_title, ct.email::text AS email,
+    COALESCE(ct.phones, CASE WHEN ct.phone IS NULL THEN '{}'::text[] ELSE ARRAY[ct.phone] END) AS phones,
+    d.number AS deal_number, d.title AS deal_title, d.objective, d.identified_on, d.next_action, d.expected_close_on, d.health, d.status AS deal_status,
+    d.comments, d.custom AS deal_custom, d.impact_rating, d.impact_note,
+    (SELECT label FROM reference_value WHERE domain = 'partnership_stage' AND code = d.stage) AS stage_label,
+    (SELECT string_agg(label, ', ' ORDER BY display_order) FROM reference_value WHERE domain = 'partnership_impact' AND code = ANY(d.impact::citext[])) AS impact_labels,
+    ${r} AS row_id`;
+  const contactOf = (k) => `LEFT JOIN LATERAL (SELECT * FROM partner_contact c WHERE c.${k}_id = r.r_id ORDER BY c.primary_contact DESC, c.created_at LIMIT 1) ct ON true`;
+  const base = (k, alias) => `SELECT ${alias}.${k}_id AS r_id, ${alias}.number::text AS r_number, ${alias}.name AS r_name, ${alias}.industry AS r_industry,
+      ${deals.regionLabel(`${alias}.region_scope`, `${k}.cities`, `${alias}.${k}_id`)} AS r_region, ${alias}.custom AS r_custom, '${k}' AS r_kind,
+      ${alias}.partner_category_id AS r_category, ${alias}.owner_id AS r_owner FROM ${k} ${alias}`;
+  if (kind === "deal") {
+    const { rows } = await db.query(
+      `SELECT ${pick("d.partnership_opportunity_id")}
+         FROM partnership_opportunity d
+         JOIN (${base("partner", "p")} UNION ALL ${base("lead", "l")}) r ON r.r_id = COALESCE(d.partner_id, d.lead_id)
+         LEFT JOIN LATERAL (SELECT * FROM partner_contact c
+                             WHERE (r.r_kind = 'partner' AND c.partner_id = r.r_id) OR (r.r_kind = 'lead' AND c.lead_id = r.r_id)
+                             ORDER BY c.primary_contact DESC, c.created_at LIMIT 1) ct ON true
+        WHERE d.partnership_opportunity_id = ANY($1::uuid[])`,
+      [ids],
+    );
+    return rows;
+  }
+  const { rows } = await db.query(
+    `SELECT ${pick("r.r_id")}
+       FROM (${base(kind, "x")}) r
+       ${contactOf(kind)}
+       LEFT JOIN LATERAL (SELECT * FROM partnership_opportunity o WHERE ${record("o", kind)} = r.r_id
+                           ORDER BY (o.status IN ('open', 'live')) DESC, o.created_at DESC LIMIT 1) d ON true
+      WHERE r.r_id = ANY($1::uuid[])`,
+    [ids],
+  );
+  return rows;
+}
+
 /* ------------------------------------------------------------------ *
  * Contacts
  * ------------------------------------------------------------------ */
@@ -305,6 +446,13 @@ async function contactsNamed(db, words, scope) {
 }
 
 module.exports = {
+  remove,
+  trackerRows,
+  employeeNamed,
+  employeeLabel,
+  kindOf,
+  trackerMatch,
+  trackerInUse,
   contactsNamed,
   homeActiveCount,
   homeActivePage,

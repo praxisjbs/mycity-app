@@ -22,6 +22,7 @@ test("each route's permission is the one §5 names", () => {
     "PATCH /contacts/:id partnerships.edit",
     "GET /documents partnerships.view",
     "POST /documents partnerships.edit",
+    "POST /exports partnerships.export",
   ]);
 });
 

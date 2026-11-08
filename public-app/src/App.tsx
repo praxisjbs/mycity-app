@@ -6,18 +6,18 @@ import { Careers } from "@/pages/Careers";
 import { Guidance } from "@/pages/Guidance";
 import { Home } from "@/pages/Home";
 import { Proposal } from "@/pages/Proposal";
-import { SignOffer } from "@/pages/SignOffer";
 import { Vacancy } from "@/pages/Vacancy";
 import { Verify } from "@/pages/Verify";
 import { Page } from "@/shell/Page";
 import { PlannedPage } from "@/shell/Planned";
 
 /*
- * The pages reached by a token load on their own: Apply checks its form with the contract's schema,
- * which brings Zod, and a stranger opening Careers or a vacancy should not wait for it.
+ * The pages reached by a token load on their own: Apply and Sign Offer check their forms with the
+ * contract's schemas, which bring Zod, and a stranger opening Careers or a vacancy should not wait for it.
  */
 const Apply = lazy(() => import("@/pages/Apply").then((m) => ({ default: m.Apply })));
 const Assessment = lazy(() => import("@/pages/Assessment").then((m) => ({ default: m.Assessment })));
+const SignOffer = lazy(() => import("@/pages/SignOffer").then((m) => ({ default: m.SignOffer })));
 
 function Loading({ title }: { title: string }) {
   return (
@@ -60,7 +60,7 @@ function Routes() {
     case "guide": return <Guidance key={r.of} of={r.of} />;
     case "apply": return <Suspense fallback={<Loading title="Apply" />}><Apply key={r.token} token={r.token} /></Suspense>;
     case "assess": return <Suspense fallback={<Loading title="Assessment" />}><Assessment key={r.token} token={r.token} /></Suspense>;
-    case "sign": return <SignOffer key={r.token} token={r.token} />;
+    case "sign": return <Suspense fallback={<Loading title="Offer of Employment" />}><SignOffer key={r.token} token={r.token} /></Suspense>;
     case "verify": return <Verify key={r.number ?? ""} number={r.number} />;
     case "verify-qr": return <Verify key={`t-${r.token}`} number={null} qr={r.token} />;
     case "proposal": return <Proposal key={r.token} token={r.token} />;

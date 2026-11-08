@@ -1,7 +1,7 @@
 {
   "recruitment-assessment-new": {
     "spec": "86c75de3720c175b",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "recruitment-assessments": {
     "spec": "80678e604e938b29",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "recruitment-candidate-emails": {
     "spec": "95c76d207babb4d4",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "recruitment-candidate-sheet": {
     "spec": "5609b3bc5f5fa4cb",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "recruitment-candidates": {
     "spec": "56b2fcba90a5d25a",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "recruitment-careers-settings": {
     "spec": "2edac7cf5b76a8de",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "recruitment-interview-schedule": {
     "spec": "3bd99af3c728b705",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "recruitment-interview-sheet": {
     "spec": "1231967ee6a20919",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "recruitment-interviews": {
     "spec": "3c2c6cfed13e8fbd",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "recruitment-invite": {
     "spec": "a36163fe6cba2558",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "recruitment-mark-answers": {
     "spec": "670376c753c69326",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,55 @@
   },
   "recruitment-my-card": {
     "spec": "1f85317a0bf666b0",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "recruitment-offer-email": {
+    "spec": "6f4dcb9a8bf85f12",
+    "source": "9a258878dd195585",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "recruitment-offer-new": {
+    "spec": "4fa9ae450eb28d2d",
+    "source": "9a258878dd195585",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "recruitment-offer-record": {
+    "spec": "6b05f61acedb6518",
+    "source": "9a258878dd195585",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "recruitment-offer-settings": {
+    "spec": "149c0a9c16b0af50",
+    "source": "9a258878dd195585",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "recruitment-offer-sign": {
+    "spec": "0919a289bc17a777",
+    "source": "9a258878dd195585",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "recruitment-offers": {
+    "spec": "8f37621645648f3d",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -97,7 +145,7 @@
   },
   "recruitment-pool": {
     "spec": "fc8b3d55ae25900e",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -105,7 +153,7 @@
   },
   "recruitment-screen-ai": {
     "spec": "b3d3dba573f72266",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -113,7 +161,7 @@
   },
   "recruitment-sittings": {
     "spec": "3483ef795bbdfc96",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -121,7 +169,7 @@
   },
   "recruitment-vacancies": {
     "spec": "b40dc892b4fc41cd",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -129,7 +177,7 @@
   },
   "recruitment-vacancy-new": {
     "spec": "954b7c7173277314",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"
@@ -137,7 +185,7 @@
   },
   "recruitment-vacancy-sheet": {
     "spec": "bc566812497a7aae",
-    "source": "dd61e566b25a8c0c",
+    "source": "9a258878dd195585",
     "devices": [
       "desktop",
       "phone"

@@ -11,6 +11,8 @@
  *   GET   /duplicates               create: likely duplicates over leads and partners (advisory)
  *   POST  /contacts, PATCH /contacts/:id   edit: Add Contact, Edit Contact
  *   GET   /documents, POST /documents      view, edit: a record's documents; Upload Document
+ *   POST  /exports                  export: Partners, Leads or their deals in the tracker's columns (202,
+ *                                   made by the worker and downloaded where it was pressed)
  *
  * The Work tab's GET /work arrives with M7 PR 5.
  */
@@ -38,5 +40,7 @@ route(router, "patch", "/contacts/:id", { params: c.common.IdParams, body: p.Con
 
 route(router, "get", "/documents", { query: p.PartnerDocumentQuery, response: p.PartnerDocumentPage, summary: "A record's documents" }, view(), controller.documents);
 route(router, "post", "/documents", { body: p.PartnerDocumentAttach, response: p.PartnerDocument, summary: "Attach an upload to a lead or partner" }, edit(), controller.attach);
+
+route(router, "post", "/exports", { body: p.PartnershipExportRequest, response: c.documents.ExportFile, summary: "Export partners, leads or deals in the tracker's columns" }, requirePermission("partnerships", "export"), controller.requestExport);
 
 module.exports = { basePath: "/partnerships", surface: "staff", router };

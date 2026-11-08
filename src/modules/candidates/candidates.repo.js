@@ -188,6 +188,11 @@ async function insertCandidate(client, { first_name: first, last_name: last, ema
   return rows[0].candidate_id;
 }
 
+/** A person's address corrected (M5's Change Email on a sent offer, through candidates.correctEmailIn). */
+async function setEmail(client, id, email) {
+  await client.query("UPDATE candidate SET email = $2 WHERE candidate_id = $1", [id, email]);
+}
+
 /** What a later application may add to a person already known: a phone they had not given. */
 async function fillCandidate(client, id, { phone, consented_at: consented }) {
   await client.query(
@@ -431,6 +436,7 @@ module.exports = {
   candidateByEmail,
   insertCandidate,
   fillCandidate,
+  setEmail,
   cvOnLink,
   cvsOnLink,
   applicationOf,

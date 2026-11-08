@@ -932,6 +932,27 @@ const DealReturnChange = ReturnSave.extend({ deal_id: recordId("deal"), month: R
 const ReturnListQuery = listQuery({ year: z.coerce.number().int().min(2000).max(2100).optional() }, ["month"]);
 const ReturnPage = Paged(DealReturn);
 
+/**
+ * One row of the Partnership Returns import (§6.14): a deal's month, named by the deal's number or by
+ * its partner's name and its title, with the month's figures. `line_key` is the deal and the month,
+ * made by the importer's extract so a month imported again replaces itself.
+ */
+const ReturnImportRow = z
+  .object({
+    line_key: text(400),
+    deal_number: optionalText(40),
+    partner: optionalText(150),
+    deal_title: optionalText(150),
+    month: ReturnMonth,
+    units_sold: z.number().int().min(0).optional(),
+    gross_sales: blank(money),
+    mycity_commission: blank(money),
+    paid_to_partner: blank(money),
+    downloads: z.number().int().min(0).optional(),
+    note: optionalText(500),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const DEAL = {
   deal_id: "partnership_opportunity.partnership_opportunity_id, named as every later table names it",
@@ -949,6 +970,7 @@ const DEAL_FIELDS = {
   options: "deal_option rows",
 };
 const TABLES = {
+  ReturnImportRow: { table: null, reason: "one row of the Partnership Returns sheet as the importer reads it; written as a deal_return" },
   RecordRef: { table: null, reason: "the lead or partner a deal, proposal or agreement is on" },
   Category: { table: "partner_category" },
   CategoryRow: {
@@ -1175,6 +1197,7 @@ module.exports = {
   PipelineDeal,
   PipelineSummary,
   ReturnMonth,
+  ReturnImportRow,
   ReturnParams,
   ReturnSave,
   DealReturnChange,

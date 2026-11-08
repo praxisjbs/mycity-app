@@ -393,7 +393,8 @@ export interface MockApplication {
   email: string;
   phone: string | null;
   vacancy_key: string;
-  stage: "application" | "screening" | "assessment" | "interview" | "shortlist";
+  /** Offer and Documentation are M5's: an offer sent, then accepted (mock/modules/offers.ts). */
+  stage: "application" | "screening" | "assessment" | "interview" | "shortlist" | "offer" | "documentation";
   status: "active" | "not_progressed" | "withdrawn" | "hired";
   source: "careers" | "invited" | "pool";
   applied_days: number;

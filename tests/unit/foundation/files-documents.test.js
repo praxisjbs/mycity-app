@@ -327,6 +327,28 @@ describe("markdown and the template language", () => {
     expect(canonical.hash("POLICY_VERSION", { ...version, rules: { ...version.rules, grace_minutes: 10 } }))
       .not.toBe(canonical.hash("POLICY_VERSION", version));
   });
+
+  test("the offer letter's payload: pinned, money normalised, a changed pay line or term changes it", () => {
+    const offer = {
+      number: "OFF-0018", candidate: "Chiamaka Eze", job_title: "Head of PR, Marketing & Brand Strategy",
+      department: "Marketing", reports_to: "Chief Executive Officer", role_function: "Leadership", role_scope: "Company-wide",
+      start_date: "2026-12-01", employment_type: "full_time", work_pattern: "hybrid", office_days: 2, probation_months: 3,
+      annual_leave_days: 15, working_hours: "Monday to Friday, 9:00 to 17:00", currency: "NGN",
+      pay_lines: [
+        { name: "Basic Salary", monthly_amount: "600000" },
+        { name: "Internet & Recharge Allowance", monthly_amount: "50000.00" },
+        { name: "Transportation Allowance", monthly_amount: "100000" },
+      ],
+      monthly_total: "750000", incentives: "Under the Incentive Policy", additional_terms: "", job_description: "## Role Summary", terms_version: 0,
+    };
+    // Pinned: a change to this builder must bump its version, never alter v1 (canonical.js header).
+    expect(canonical.hash("OFFER_LETTER", offer)).toBe("7fc8bed3a93ae8da0e9af549e9cde91dafa4609e48e19c9f2e63f530d8ed5502");
+    expect(canonical.hash("OFFER_LETTER", { ...offer, monthly_total: "750000.00" })).toBe(canonical.hash("OFFER_LETTER", offer));
+    const raised = { ...offer, pay_lines: [{ name: "Basic Salary", monthly_amount: "650000" }, ...offer.pay_lines.slice(1)] };
+    expect(canonical.hash("OFFER_LETTER", raised)).not.toBe(canonical.hash("OFFER_LETTER", offer));
+    expect(canonical.hash("OFFER_LETTER", { ...offer, additional_terms: "On call for media." })).not.toBe(canonical.hash("OFFER_LETTER", offer));
+    expect(canonical.isSignable("OFFER_LETTER")).toBe(true);
+  });
 });
 
 describe("document types, served types, derived file names", () => {

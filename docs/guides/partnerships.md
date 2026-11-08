@@ -1334,6 +1334,47 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
     batch. The screens' routes call the same functions.
   - The Partners and Leads lists' **Export** (§10.1) comes with PR 4's export in the tracker's columns.
 
+- **In PR 4 (07/11/2026, LA), the tracker importer and returns:**
+  - **Map Values** is the engine's (`shared/import`, foundation.md §5): a field declares `mapValues` as a
+    list, a person or a place. The tracker maps Partnership Type and Partnership Stage (lists; a type may be
+    created), Lead Owner (a person; unmatched leaves No Owner, `missing: "leave"`), Region (each city picked
+    from the address search, F27; National, Africa and Worldwide are scopes, not listed) and Status (its five
+    values). The choices are kept on the batch's mapping and its profile; no migration (the mapping is jsonb).
+  - The tracker is read by `extract()` (`partners.import.js`) into the importer's fields, so the person's
+    column map is the engine's own and Map Values reads clean values: Contact Details split into Contact
+    Email and Contact Phones, Partnership Type into the category and the deal's Commission, the dates read
+    day-first (a month alone is its 1st and the comments say so; a missing year is the year most of the
+    sheet's dates name), Expected Close Date text joined to Next Action, Current Stage kept in the comments
+    only when it says more.
+  - A row that matches a record already in the hub (name, website host, primary email, whatever the
+    importer's scope, as the duplicate check reads) is left as it is: the import never overwrites what
+    people entered, so importing the file again makes nothing twice and the importer has no update to undo.
+  - Revert removes what the import made (`leads.service` and `partners.service` `removeImportedIn`, events
+    `lead.removed`, `partner.removed`) until the record is in use: an interaction, a proposal, an agreement,
+    a document, a linked mail, returns, or a stage or health line not from the import.
+  - An imported deal's title is its category's name and Partnership ("Event Partnership"); the tracker has
+    no title column. A signed row's partner is "signed before the hub" and its deal dated by Date
+    Identified. A Closed Lost stage, or Closed on an open deal, makes the lead lost through the stage move
+    (reason "Closed lost in the tracker", source `import`); Closed on a signed row is a note, never a lost
+    live deal. Commission from a type's terms needs `partnerships.money`, else it is left out with a note.
+  - **Any other column** fills the custom field of the same label (lead or partner, or deal); a column with
+    no such field is named on its rows ("add it on Categories to import it") rather than created at commit:
+    the engine's ticks are per value, not per column, and a field needs its type, which a column does not
+    say. Every column of the export reads back.
+  - **Partnership Returns** (`partner_pipeline.returns.import.js`) needs `partnerships.money`; each row's line
+    is its deal (number, or partner and title) and its month, made by `extract()`, so a month imported again
+    is an update (replaced, audited) and the same figures again are unchanged. Revert puts back what the month
+    held, or removes a month it made (`deal_return.removed`), refused once the month was entered or imported
+    again since.
+  - **Export** is `POST /partnerships/exports` (`partnerships` export) with `source` `partnerships.partners`,
+    `partnerships.leads` or `partnerships.deals` and the list's own filters, on the shared export path
+    (foundation.md §6.12; document type `partnership_export`): sheet Master Tracker in the tracker's eighteen
+    columns, then a column a custom field; never money. Partners and Leads offer Export on a computer; a phone
+    leaves it off (§10.2).
+  - The Returns tab (`Returns.tsx`, `forms/ReturnsForm.tsx`): the deal (when the partner has several) and
+    the year, the year's totals (Commission, Gross Sales, Units Sold, Downloads), Commission by Month, the
+    months with Imported or Entered, and Enter Returns a month at a time (the last eighteen months; a row
+    opens its month).
 - **In PR 7 (07/11/2026, JP):**
   - The kit draws its own pages: `documents.generate()` takes a document type with a `draw` hook (the data
     in, the complete HTML out, checked by the type itself instead of the letter's variables), and
@@ -1685,6 +1726,12 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   by Hand, words edited in a panel, views without notifications until PR 8, `.md` attachments,
   `ProposalStart.assets`, tone notes in the brief. Appendix C and D to match. MyCity's sample proposal has
   not arrived, so the kit is not yet checked against it (Appendix A PR 7).
+- 07/11/2026 · LA · PR 4, the tracker importer and returns (`m7/importers-returns`): Map Values on the import
+  engine; the Partnership Tracker importer on the synthetic workbook through `leads.createIn` and
+  `partners.createIn` (source `import`), reversible until a record is in use; the Partnership Returns
+  importer through `partner_pipeline.returns.saveIn`; the 360's Returns tab with Enter Returns; Export on
+  Partners and Leads in the tracker's columns. What it decided is in §13.2, In PR 4.
+
 - 06/11/2026 · TB · The audit of PRs 1 to 3 before PR 4 (§13.2, the audit): a deal is seen through its
   lead's or partner's owner too, and the 360s list and count only the deals the reader sees (§6.1, §6.2);
   the duplicate check recorded as the one read outside scope; Categories' counts and its partners and
@@ -1712,6 +1759,11 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   ahead of PR 4; the stage rules (leaving On Hold, moves after signing, the signed copy asked once, §6.5)
   and New Partner's first stage (§6.6); Partners' Quiet `N` (§6.12); Follow-Up Required written in Title
   Case on screen; Home's Signed Value counts deals, one row a deal (§6.17); the file map (Appendix D).
+- 06/11/2026 · AJ · The signing and verification shapes (`SignTokenParams`, `SignCodeVerify`,
+  `SignaturePng`, `SignSubmit`, `VerifyRefParams`, `VerifyResult`) moved from `agreements.js` to
+  `signatures.js` (GE on #79: M5 builds the shared service first, LA reviews), with `SignDecline`,
+  `SignerView` and `VerifyByToken` added. `VerifyResult` now names the document type and carries
+  `record_status` for an agreement's own state. `docs/guides/offers.md`.
 - 06/11/2026 · GE · (Ose) Public · Proposal's placeholder page moves to the public site's split layout with the rest of
   go.mycityapp.io (the approved design); its Coming Soon is unchanged. Verify Document's QR page,
   `/verify/t/<token>` (§6.9), is drawn on the mock: the record, both verdicts and the document with Download PDF, until

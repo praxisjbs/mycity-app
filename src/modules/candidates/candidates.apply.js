@@ -11,8 +11,10 @@
  * The link works only while its vacancy takes applications; otherwise it is the same 404 as a bad
  * token. The CV is kept against the link until the application is made, then given to it
  * (vault.adopt), so a CV sent on another link is refused. The token is spent in the transaction that
- * makes the application. A second application by the same email to the same role makes nothing and
- * answers the first one's reference, so the form cannot tell anyone who has applied.
+ * makes the application. A second application by the same email to the same role makes nothing,
+ * spends the link and answers the first one's reference and date with `already_applied`, so the
+ * applicant is told they had applied (GE, 08/11/2026: knowing beats a second success screen; anyone
+ * typing that email learns it has applied for this role, and nothing else).
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -133,11 +135,11 @@ function splitName(full) {
  * presses of Submit cannot both use it; the second press finds it spent and is given the receipt the
  * first one made (guide §11), never a 404.
  *
- * Nothing here may tell a stranger whether an email has applied (guide §6.2): the CV and the answers
- * are checked first, for everyone; an email that already has an application on this role makes
- * nothing, spends the link, and is answered as any submission is, now. Two people sending the same
- * new email at once meet the same answer: the second finds the first's application after the
- * candidate row they share is written.
+ * The CV and the answers are checked first, for everyone. An email that already has an application
+ * on this role makes nothing, spends the link, and is answered with the first application's
+ * reference and date, `already_applied` (guide §6.2, GE 08/11/2026). Two people sending the same
+ * new email at once: the second finds the first's application after the candidate row they share
+ * is written, and is told it had applied.
  */
 async function submit(raw, body) {
   return tx(async (client) => {
@@ -158,9 +160,9 @@ async function submit(raw, body) {
       : await repo.insertCandidate(client, { ...name, email: body.email, phone: body.phone, consented_at: now });
     const first = await repo.applicationOf(client, v.vacancy_id, candidateId);
     if (first) {
-      // Applied before (or a moment ago on another link): nothing changes, and the answer looks like any other.
+      // Applied before (or a moment ago on another link): nothing changes, and the applicant is told.
       await publicToken.consume(client, live.public_token_id);
-      return { reference: first.number, submitted_at: now.toISOString() };
+      return { reference: first.number, submitted_at: new Date(first.applied_at).toISOString(), already_applied: true };
     }
     // A stranger's form never renames a person already known: it only fills what is missing.
     if (known) await repo.fillCandidate(client, candidateId, { phone: body.phone, consented_at: now });
@@ -209,7 +211,7 @@ async function submit(raw, body) {
         subject_employee_id: v.hiring_manager_id,
       },
     });
-    return { reference: number, submitted_at: made.applied_at };
+    return { reference: number, submitted_at: made.applied_at, already_applied: false };
   });
 }
 
@@ -224,7 +226,7 @@ async function pressedAgain(client, token, body) {
   const known = await repo.candidateByEmail(client, body.email);
   const first = known ? await repo.applicationOf(client, token.subject_id, known.candidate_id) : null;
   if (!first || !first.cv_document_id || first.cv_document_id !== body.cv_document_id) throw notFound();
-  return { reference: first.number, submitted_at: new Date(first.applied_at).toISOString() };
+  return { reference: first.number, submitted_at: new Date(first.applied_at).toISOString(), already_applied: false };
 }
 
 module.exports = { SCOPE, link, uploadCv, submit, checkAnswers, splitName };
