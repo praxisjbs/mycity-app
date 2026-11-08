@@ -1,11 +1,13 @@
 import type { PartnerRow } from "@mycity/contract/contract.gen.ts";
 import { useState } from "react";
+import { api } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { useApi, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
-import { Button, Chips, formatMoneyShort, formatWhen, ListDetail, PageHeader, StatusPill, useIsPhone, useModal, useSideBySide, Who } from "@mycity/ui";
+import { Button, Chips, DesktopOnly, ExportButton, formatMoneyShort, formatWhen, ListDetail, PageHeader, StatusPill, useIsPhone, useModal, useSideBySide, Who } from "@mycity/ui";
 import { filterQuery, NO_FILTERS, RecordFilters, type RecordFilterValue } from "./filters";
 import { Partner360 } from "./Partner360";
 import { PartnerForm } from "./forms/PartnerForm";
@@ -23,6 +25,7 @@ export function Partners({ id }: { id: string | null }) {
   const beside = useSideBySide();
   const { navigate } = useRouter();
   const mayCreate = useMay("create");
+  const mayExport = useMay("export");
   const [view, setView] = useState<View>("all");
   const [filter, setFilter] = useState<RecordFilterValue>(NO_FILTERS);
   const s = useApi("GET /api/v1/partnerships/partners/summary");
@@ -35,7 +38,16 @@ export function Partners({ id }: { id: string | null }) {
   const shown = id ?? (beside ? (list.rows[0]?.partner_id ?? null) : null);
   return (
     <>
-      <PageHeader title="Partners" sub="Every signed partner and its 360" actions={mayCreate ? <Button variant="primary" icon="plus" onClick={newPartner}>New Partner</Button> : undefined} />
+      <PageHeader title="Partners" sub="Every signed partner and its 360" actions={
+          <>
+            {mayExport && (
+              <DesktopOnly>
+                <ExportButton onExport={() => saveExport(api.call("POST /api/v1/partnerships/exports", { body: { source: "partnerships.partners", filters: { ...filters, ...(list.q ? { q: list.q } : {}) } } }))} />
+              </DesktopOnly>
+            )}
+            {mayCreate && <Button variant="primary" icon="plus" onClick={newPartner}>New Partner</Button>}
+          </>
+        } />
       {s.data && (
         <KpiTiles
           mobileCols={2}

@@ -5,9 +5,10 @@ import type { Endpoints as Contract } from "@mycity/contract/contract.gen.ts";
  *
  * Every route comes from the generated contract (packages/contract/contract.gen.ts, F15), picked
  * by name so the public client can only reach the public surface: Careers, a Vacancy, Apply and
- * an Assessment (M4), Sign Offer and Verify Document (M5, the signatures routes), with their
- * request parts as the API accepts them and their responses as it sends them, and the index's
- * figures (`/jobs/summary`), and Help (`/help`, the User Guide's chapter for people outside MyCity). A page whose routes are not in the contract yet adds its INTERIM
+ * an Assessment (M4), Sign Offer and Verify Document (M5, the signatures routes), a Proposal (M7)
+ * and Help (the User Guide's chapter for people outside MyCity), with their request parts as the API
+ * accepts them and their responses as it sends them, and the index's figures (`/jobs/summary`). A
+ * page whose routes are not in the contract yet adds its INTERIM
  * routes here by declaration merging, from a `types/<page>.ts` of its own:
  *
  *   declare module "@/api/endpoints" {
@@ -38,7 +39,9 @@ type ContractRoute =
   | "POST /api/public/v1/sign/:token/decline"
   | "GET /api/public/v1/verify/:ref"
   | "GET /api/public/v1/verify/t/:token"
-  | "GET /api/public/v1/help";
+  | "GET /api/public/v1/help"
+  | "GET /api/public/v1/proposals/:token"
+  | "GET /api/public/v1/proposals/:token/pdf";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Endpoints extends Pick<Contract, ContractRoute> {}

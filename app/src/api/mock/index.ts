@@ -24,6 +24,7 @@ import "./modules/offers";
 import "./modules/payroll";
 import "./modules/partnerships";
 import "./modules/partnerships_categories";
+import "./modules/partnerships_work";
 import "./modules/expenses";
 import "./modules/knowledge";
 import "./modules/user_guide";

@@ -14,7 +14,20 @@ import { installMatchMedia } from "@mycity/ui/testing";
 
 const m = vi.hoisted(() => ({
   run: vi.fn(async (..._args: unknown[]): Promise<unknown> => ({})),
+  call: vi.fn(async (..._args: unknown[]): Promise<unknown> => ({})),
   importers: [
+    {
+      key: "partnership_tracker",
+      label: "Partnership Tracker",
+      entity: "partner",
+      permission: "partnerships.create",
+      match_keys: ["name"],
+      fields: [
+        { key: "name", label: "Partner Name", type: "text", required: true, aliases: [], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: null, hint: null, map_values: null },
+        { key: "stage", label: "Partnership Stage", type: "reference", required: false, aliases: [], options: [], ref: "partnership_stage", pass: 1, create_missing: false, masked: false, example: null, hint: null, map_values: "list" },
+        { key: "category", label: "Partnership Type", type: "reference", required: false, aliases: [], options: [], ref: "partner_category", pass: 1, create_missing: true, masked: false, example: null, hint: null, map_values: "list" },
+      ],
+    },
     {
       key: "employees",
       label: "Employees",
@@ -37,15 +50,17 @@ vi.mock("@/api/hooks", () => ({
   usePaged: () => ({ rows: [], page: { number: 1, size: 25, total: 0, pages: 1, has_next: false }, loading: false, error: null, q: "", setQ: () => undefined, setPage: () => undefined }),
 }));
 
+vi.mock("@/api/client", async (original) => ({ ...(await original<typeof import("@/api/client")>()), api: { call: m.call } }));
+
 import { ImportWizard } from "./Imports";
 
 /** An uploaded sheet of name, email and phone: Name and Work Email found, phone left out. */
-const batch = (columns: ImportBatch["mapping"]["columns"]): ImportBatch =>
+const batch = (columns: ImportBatch["mapping"]["columns"], key = "employees"): ImportBatch =>
   ({
     import_batch_id: "b1",
     number: "IMP-0004",
-    importer_key: "employees",
-    importer_label: "Employees",
+    importer_key: key,
+    importer_label: key,
     document_id: "d1",
     file_name: "staff.csv",
     sheet: "Sheet1",
@@ -163,5 +178,63 @@ describe("Settings · Imports, Map", () => {
     const sent = m.run.mock.calls[0]![0] as { body: { fields: Record<string, string | null> } };
     expect(Object.values(sent.body.fields).filter((f) => f === "work_email")).toHaveLength(1);
     expect(sent.body.fields).toMatchObject({ "3": null, "4": "work_email" });
+  });
+});
+
+describe("Settings · Imports, Map Values", () => {
+  it("lists each distinct value once with its rows, starts at what it matches, and saves the choices before the preview", async () => {
+    const sheet = batch(
+      [
+        { index: 0, header: "Partner Name", field: "name" },
+        { index: 1, header: "Partnership Stage", field: "stage" },
+        { index: 2, header: "Partnership Type", field: "category" },
+      ],
+      "partnership_tracker",
+    );
+    m.call.mockResolvedValueOnce({
+      fields: [
+        {
+          field: "stage",
+          label: "Partnership Stage",
+          kind: "list",
+          create_missing: false,
+          choices: [
+            { value: "prospect", label: "Prospect Identified" },
+            { value: "proposal_sent", label: "Proposal Sent" },
+          ],
+          values: [
+            { value: "Prospect Identified", rows: 3, target: null, target_label: null, suggested: "prospect", suggested_label: "Prospect Identified" },
+            { value: "Secured", rows: 1, target: null, target_label: null, suggested: null, suggested_label: null },
+          ],
+        },
+        {
+          field: "category",
+          label: "Partnership Type",
+          kind: "list",
+          create_missing: true,
+          choices: [{ value: "c1", label: "Event" }],
+          values: [{ value: "Tourism", rows: 2, target: null, target_label: null, suggested: null, suggested_label: null }],
+        },
+      ],
+    });
+    m.run.mockResolvedValueOnce(sheet).mockResolvedValueOnce(sheet).mockResolvedValueOnce({ batch: { ...sheet, status: "previewed" }, stats: {} });
+    open(sheet);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByRole("heading", { name: /Map Values/ })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Prospect Identified (3)" }).textContent).toContain("Prospect Identified");
+    expect(screen.getByRole("combobox", { name: "Secured (1)" }).textContent).toContain("Leave Empty");
+    expect(screen.getByRole("combobox", { name: "Tourism (2)" }).textContent).toContain("Create Tourism");
+    choose("Secured (1)", "Proposal Sent");
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(m.run).toHaveBeenCalledTimes(3));
+    const sent = m.run.mock.calls[1]![0] as { body: { values: Record<string, Record<string, unknown>>; save_profile: boolean } };
+    expect(sent.body).toEqual({
+      values: {
+        stage: { "Prospect Identified": { to: "prospect" }, Secured: { to: "proposal_sent" } },
+        category: { Tourism: { create: true } },
+      },
+      save_profile: true,
+    });
   });
 });

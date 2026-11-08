@@ -11,8 +11,11 @@
  *   GET   /duplicates               create: likely duplicates over leads and partners (advisory)
  *   POST  /contacts, PATCH /contacts/:id   edit: Add Contact, Edit Contact
  *   GET   /documents, POST /documents      view, edit: a record's documents; Upload Document
- *
- * The Work tab's GET /work arrives with M7 PR 5.
+ *   GET   /work                     view: the Work tab, the record's projects, tasks and events the
+ *                                   reader may see in My Workspace, and how many they may not (§6.16)
+ *   GET   /work/records, /work/deals       view: Connect to Partner's Partner and Deal
+ *   POST  /exports                  export: Partners, Leads or their deals in the tracker's columns (202,
+ *                                   made by the worker and downloaded where it was pressed)
  */
 const router = require("express").Router();
 const c = require("@mycity/contract");
@@ -38,5 +41,10 @@ route(router, "patch", "/contacts/:id", { params: c.common.IdParams, body: p.Con
 
 route(router, "get", "/documents", { query: p.PartnerDocumentQuery, response: p.PartnerDocumentPage, summary: "A record's documents" }, view(), controller.documents);
 route(router, "post", "/documents", { body: p.PartnerDocumentAttach, response: p.PartnerDocument, summary: "Attach an upload to a lead or partner" }, edit(), controller.attach);
+
+route(router, "get", "/work", { query: p.PartnerWorkQuery, response: p.PartnerWorkPage, summary: "A record's projects, tasks and events the reader may see" }, view(), controller.work);
+route(router, "get", "/work/records", { query: p.PartnerLinkRecordQuery, response: p.PartnerLinkRecordPage, summary: "Partners and leads to connect work to" }, view(), controller.workRecords);
+route(router, "get", "/work/deals", { query: p.PartnerLinkDealQuery, response: p.PartnerLinkDealPage, summary: "A record's open and live deals to connect work to" }, view(), controller.workDeals);
+route(router, "post", "/exports", { body: p.PartnershipExportRequest, response: c.documents.ExportFile, summary: "Export partners, leads or deals in the tracker's columns" }, requirePermission("partnerships", "export"), controller.requestExport);
 
 module.exports = { basePath: "/partnerships", surface: "staff", router };

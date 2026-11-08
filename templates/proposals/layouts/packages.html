@@ -1,0 +1,13 @@
+<header class="page-head"><h2 class="h1">{{ heading }}</h2></header>
+{{#if cards}}<div class="cards cols-{{ cols }}{{#if visual}} cards--side{{/if}}">
+  {{#each options}}<article class="pkg{{#if top}} pkg--top{{/if}}">
+    <div class="pkg-label">{{ label }}</div>
+    {{#if price}}<div class="pkg-price fig">{{ money price }}</div>{{#if price_note}}<div class="small">{{ price_note }}</div>{{/if}}{{else}}<div class="pkg-price pkg-price--note">{{ price_note }}</div>{{/if}}
+    <ul class="pkg-includes">{{#each includes}}<li><span class="tick"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.2 5 8.6 9.6 3.6"/></svg></span><span>{{ text }}</span></li>{{/each}}</ul>
+    {{#if terms}}<p class="pkg-terms">{{ terms }}</p>{{/if}}
+  </article>{{/each}}
+</div>{{else}}<table class="table{{#if visual}} table--side{{/if}}">
+  <thead><tr><th>Package</th><th>Includes</th><th>Terms</th><th class="num">Price</th></tr></thead>
+  <tbody>{{#each options}}<tr><td>{{ label }}</td><td>{{ includes_text }}</td><td>{{ terms }}</td><td class="num">{{#if price}}{{ money price }}{{else}}{{ price_note }}{{/if}}</td></tr>{{/each}}</tbody>
+</table>{{/if}}
+{{#if visual}}<div class="pkg-side"><div class="panel">{{> body}}</div></div>{{/if}}

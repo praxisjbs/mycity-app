@@ -35,6 +35,20 @@
  *                  cell of digits shorter than the scheme's padding is padded, as a spreadsheet
  *                  drops the leading zeros of a number it reads as a number (19 → 00019)
  *   example, hint  shown on the template's Reference sheet
+ *   missing        "leave" (a reference): a value nobody matches leaves the field empty, as a note
+ *                  on its row, instead of failing it (a lead owner the staff list does not hold)
+ *   mapValues      Map Values (docs/guides/foundation.md §5, Map Values): every distinct value of
+ *                  the column is shown once with its row count and mapped to a list value, created
+ *                  (a createMissing reference, ticked) or left empty, and the choices are saved
+ *                  with the batch's mapping and its profile. An enum, a reference, or a text field
+ *                  the importer reads itself (ctx.valueOf):
+ *                    { kind: "list" | "person" | "place",
+ *                      choices(client, field, ctx)       list kind on a reference: [{ value, label }]
+ *                      describe(client, field, to)       a target's label (person, place)
+ *                      suggest(client, field, value, ctx) the target a text field's value would get
+ *                      split(text)                       the values one cell holds ("Lagos, PH")
+ *                      skip(value)                       a value not listed ("National") }
+ *                  An enum's choices are its options; a reference's suggestion is resolve()'s
  *
  * Functions the importer supplies (every write goes through the module's SERVICE, so
  * numbering, audit, events and rules apply as on screen):
@@ -76,6 +90,7 @@ const TYPES = new Set([
   "reference",
 ]);
 const REQUIRED_FNS = ["find", "write", "archive", "restore"];
+const VALUE_KINDS = new Set(["list", "person", "place"]);
 const IMPORTERS = new Map();
 
 function fail(key, msg) {
@@ -102,6 +117,25 @@ function checkField(key, f, seen) {
     fail(key, `field "${f.key}": only references resolve in pass 2`);
   if (f.createMissing && f.createMissing !== "confirm")
     fail(key, `field "${f.key}": createMissing is "confirm"`);
+  if (f.missing !== undefined && (f.missing !== "leave" || type !== "reference"))
+    fail(key, `field "${f.key}": missing is "leave", on a reference`);
+  if (f.mapValues !== undefined) {
+    const mv = f.mapValues;
+    if (!mv || !VALUE_KINDS.has(mv.kind))
+      fail(key, `field "${f.key}": mapValues.kind is list, person or place`);
+    if (!["enum", "reference", "text"].includes(type))
+      fail(key, `field "${f.key}": only an enum, a reference or a text field maps values`);
+    if (type === "enum" && mv.kind !== "list")
+      fail(key, `field "${f.key}": an enum maps to its own options (kind list)`);
+    if (type === "reference" && mv.kind === "list" && typeof mv.choices !== "function")
+      fail(key, `field "${f.key}": a list reference needs mapValues.choices()`);
+    if (type === "text" && typeof mv.suggest !== "function")
+      fail(key, `field "${f.key}": a text field needs mapValues.suggest()`);
+    if (f.pass === 2) fail(key, `field "${f.key}": a pass-2 reference does not map values`);
+    for (const fn of ["choices", "describe", "suggest", "split", "skip"])
+      if (mv[fn] !== undefined && typeof mv[fn] !== "function")
+        fail(key, `field "${f.key}": mapValues.${fn} is a function`);
+  }
   if (f.createMissing && f.pass === 2)
     fail(
       key,

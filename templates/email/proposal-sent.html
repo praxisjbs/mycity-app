@@ -1,0 +1,12 @@
+---
+subject: "{{ subject }}"
+title: "{{ title }}"
+format: markdown
+---
+{{ markdown message }}
+
+[Open the Proposal]({{ link }})
+
+The proposal, reference **{{ reference }}**, is attached as a PDF for {{ partner_name }}{{#if valid_until}}, and it holds until {{ longdate valid_until }}{{/if}}. Reply to this email to reach {{ owner_name }}.
+
+If the link does not open, copy this address into your browser: {{ link }}

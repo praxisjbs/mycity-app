@@ -108,6 +108,9 @@ export default function DocumentEditorDraw({ value, onChange, onBlur, placeholde
         "aria-label": label,
         role: "textbox",
         "aria-multiline": "true",
+        // The wording is what a person wrote: content, not interface copy (FRONTEND_GUIDE §5), so a
+        // table in it is part of the document and the gates do not ask for it to be cards.
+        "data-copy": "content",
       },
     },
     onUpdate: ({ editor: e }) => onChange(e.isEmpty ? "" : e.getHTML()),

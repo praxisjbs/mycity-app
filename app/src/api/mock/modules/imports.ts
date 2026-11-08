@@ -17,12 +17,12 @@ const IMPORTERS = [
     permission: "people.create",
     match_keys: ["staff_number", "work_email"],
     fields: [
-      { key: "staff_number", label: "Staff Number", type: "text", required: false, aliases: ["staff id", "staff no", "employee id", "employee number"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "00019", hint: "Left empty, the system issues the next one" },
-      { key: "full_name", label: "Name", type: "text", required: true, aliases: ["full name", "staff name"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "Tobiloba Iyanuoluwa Dada", hint: "VACANT marks a post nobody holds yet" },
-      { key: "job_title", label: "Designation", type: "text", required: true, aliases: ["job title", "role", "position", "title"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "Content & Listing Associate", hint: null },
-      { key: "department", label: "Department", type: "reference", required: true, aliases: ["team", "unit"], options: [], ref: "department", pass: 1, create_missing: true, masked: false, example: "Backend Operations", hint: null },
-      { key: "work_email", label: "Work Email", type: "email", required: false, aliases: ["email"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "name@mycityapp.io", hint: null },
-      { key: "line_manager", label: "Line Manager", type: "reference", required: false, aliases: ["manager", "reports to"], options: [], ref: "employee", pass: 2, create_missing: false, masked: false, example: "Bode Oluwasanmi", hint: "A name, a post, or a post with a dotted line beside it" },
+      { key: "staff_number", label: "Staff Number", type: "text", required: false, aliases: ["staff id", "staff no", "employee id", "employee number"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "00019", hint: "Left empty, the system issues the next one", map_values: null },
+      { key: "full_name", label: "Name", type: "text", required: true, aliases: ["full name", "staff name"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "Tobiloba Iyanuoluwa Dada", hint: "VACANT marks a post nobody holds yet", map_values: null },
+      { key: "job_title", label: "Designation", type: "text", required: true, aliases: ["job title", "role", "position", "title"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "Content & Listing Associate", hint: null, map_values: null },
+      { key: "department", label: "Department", type: "reference", required: true, aliases: ["team", "unit"], options: [], ref: "department", pass: 1, create_missing: true, masked: false, example: "Backend Operations", hint: null, map_values: null },
+      { key: "work_email", label: "Work Email", type: "email", required: false, aliases: ["email"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "name@mycityapp.io", hint: null, map_values: null },
+      { key: "line_manager", label: "Line Manager", type: "reference", required: false, aliases: ["manager", "reports to"], options: [], ref: "employee", pass: 2, create_missing: false, masked: false, example: "Bode Oluwasanmi", hint: "A name, a post, or a post with a dotted line beside it", map_values: null },
     ],
   },
 ];
@@ -111,5 +111,12 @@ route("GET /api/v1/imports/:id/rows", (req) =>
 );
 
 route("POST /api/v1/imports/:id/revert", () =>
+  fail(422, "MOCK_ONLY", "Importing works once the API is connected."),
+);
+
+// Map Values: the mock's one importer has no list, person or place columns to map.
+route("GET /api/v1/imports/:id/values", () => ok({ fields: [] }));
+
+route("PUT /api/v1/imports/:id/values", () =>
   fail(422, "MOCK_ONLY", "Importing works once the API is connected."),
 );

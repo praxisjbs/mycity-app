@@ -4,15 +4,17 @@ import { useApi } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useRouter } from "@/lib/router";
 import { useTrailTitle } from "@/lib/trail";
-import { Button, Card, CardHeader, DataView, EmptyState, formatDate, formatMoney, formatMoneyShort, HelpTerm, Menu, Pill, ProfileHeader, StatusPill, Tabs, useModal } from "@mycity/ui";
+import { Button, DataView, EmptyState, formatDate, formatMoney, formatMoneyShort, HelpTerm, Menu, Pill, ProfileHeader, StatusPill, Tabs, useModal } from "@mycity/ui";
 import { ClosePartner } from "./forms/ClosePartner";
 import { ContactForm } from "./forms/ContactForm";
 import { DealForm } from "./forms/DealForm";
 import { LogInteraction } from "./forms/LogInteraction";
 import { EditPartner } from "./forms/RecordForm";
 import { UploadDocument } from "./forms/UploadDocument";
+import { ReturnsTab } from "./Returns";
 import { daysWord, dealPill, healthPill, partnerPill, useHoldsMoney, useMay } from "./lib";
-import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP, useDeal, WorkTab } from "./record";
+import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP, useDeal } from "./record";
+import { NextEvents, WorkTab } from "./WorkTab";
 
 const TABS = ["overview", "deals", "documents", "returns", "work", "activity", "contacts", "details"] as const;
 type Tab = (typeof TABS)[number];
@@ -52,7 +54,7 @@ export function Partner360({ id }: { id: string }) {
     { label: "Log Interaction", icon: "plus" as const, onSelect: () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={unfinished[0]?.deal_id} close={close} />) },
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
-    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${partner.partner_id}`) },
+    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${partner.partner_id}&record=partner`) },
     { label: "Edit Partner", icon: "doc" as const, onSelect: () => open("Edit Partner", (close) => <EditPartner partner={partner} close={close} />, true) },
     { label: "Close Partner", danger: true, onSelect: () => open("Close Partner", (close) => <ClosePartner id={partner.partner_id} close={close} />) },
   ];
@@ -99,6 +101,7 @@ export function Partner360({ id }: { id: string }) {
         {tab === "overview" && (
           <>
             {unfinished.length ? unfinished.map((d) => <OverviewDeal key={d.deal_id} id={d.deal_id} readOnly={readOnly} money={money} categoryId={partner.partner_category_id} />) : <EmptyState title="No Open Deals" text="Open a deal for the next edition." />}
+            <NextEvents events={x.overview.events} />
             <InteractionsCard items={x.overview.interactions} />
             {x.deliverables.length > 0 && (
               <DataView title="Our Deliverables" rows={x.deliverables} rowKey={(d) => d.deal_deliverable_id} columns={[{ key: "t", label: "Deliverable", render: (d) => d.title }, { key: "d", label: "Due", render: (d) => (d.due_on ? formatDate(d.due_on) : "None") }, { key: "s", label: "Status", render: (d) => d.status ?? "None" }]} />
@@ -121,13 +124,8 @@ export function Partner360({ id }: { id: string }) {
           />
         )}
         {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} signedOutside={partner.signed_outside} />}
-        {tab === "returns" && (
-          <Card>
-            <CardHeader title="Returns" />
-            <EmptyState bare title="No Returns Yet" text="Monthly returns show here." />
-          </Card>
-        )}
-        {tab === "work" && <WorkTab />}
+        {tab === "returns" && <ReturnsTab deals={x.deals} readOnly={readOnly} />}
+        {tab === "work" && <WorkTab record={record} dealId={unfinished.length === 1 ? unfinished[0]!.deal_id : null} readOnly={readOnly} />}
         {tab === "activity" && <ActivityTab record={record} history={x.history} />}
         {tab === "contacts" && <ContactsTab record={record} contacts={x.contacts} readOnly={readOnly} />}
         {tab === "details" && (

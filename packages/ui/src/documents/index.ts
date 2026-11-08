@@ -12,6 +12,7 @@ export { DocumentPreview, type DocumentPreviewProps } from "./DocumentPreview";
 export { ImageViewer, type ImageViewerProps } from "./ImageViewer";
 export { Paper, PaperLogo, PaperTitle, PaperTable, PaperFoot, Signature, type PaperProps, type PaperLogoProps, type PaperTitleProps, type PaperTableProps, type PaperFootProps, type SignatureProps } from "./Paper";
 export { Reader, ArticleBody, type ReaderProps, type ReaderGroup, type ArticleBodyProps } from "./Reader";
+export * from "./DocumentFrame";
 export * from "./EmailFrame";
 export * from "./FileCard";
 export * from "./GuideBody";

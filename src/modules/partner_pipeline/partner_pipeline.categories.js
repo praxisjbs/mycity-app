@@ -57,20 +57,29 @@ async function detail(id, db = pool, scope = null) {
 
 const get = (id, scope = null) => detail(id, pool, scope);
 
+/**
+ * A new category, in the caller's transaction: New Category, and a Partnership Type the tracker import
+ * was told to create (ticked on Map Values or at commit). Returns its id.
+ */
+async function createIn(client, actor, body) {
+  if (await repo.categoryByName(client, body.name)) throw nameTaken();
+  const row = await repo.insertCategory(client, { ...body, display_order: await repo.nextCategoryOrder(client) });
+  const after = await repo.getCategory(client, row.partner_category_id);
+  await emit(client, {
+    key: EVENTS.CATEGORY_CREATED,
+    entity: { type: "partner_category", id: row.partner_category_id },
+    actor,
+    after,
+    payload: { partner_category_id: row.partner_category_id, name: after.name },
+  });
+  return row.partner_category_id;
+}
+
+/** Every active category, by name, as the tracker import's Map Values offers them. */
+const choices = (db) => repo.categoryChoices(db);
+
 async function create(actor, body, scope = null) {
-  const id = await tx(async (client) => {
-    if (await repo.categoryByName(client, body.name)) throw nameTaken();
-    const row = await repo.insertCategory(client, { ...body, display_order: await repo.nextCategoryOrder(client) });
-    const after = await repo.getCategory(client, row.partner_category_id);
-    await emit(client, {
-      key: EVENTS.CATEGORY_CREATED,
-      entity: { type: "partner_category", id: row.partner_category_id },
-      actor,
-      after,
-      payload: { partner_category_id: row.partner_category_id, name: after.name },
-    });
-    return row.partner_category_id;
-  }).catch((err) => {
+  const id = await tx((client) => createIn(client, actor, body)).catch((err) => {
     throw isUnique(err) ? nameTaken() : err;
   });
   return detail(id, pool, scope);
@@ -214,4 +223,4 @@ async function saveTemplateWording(actor, id, body) {
   return getTemplate(id);
 }
 
-module.exports = { list, get, detail, create, update, getTemplate, addTemplate, updateTemplate, saveTemplateWording };
+module.exports = { createIn, choices, list, get, detail, create, update, getTemplate, addTemplate, updateTemplate, saveTemplateWording };

@@ -219,8 +219,9 @@ describeDb("AI Control against the real migrations", () => {
       expect(by.top_tier.chain.links.map((l) => l.model)).toEqual(["gemini-2.5-pro", "claude-sonnet-5-5"]);
       // Tidy Policy, Review Cleanup, Week Summary, Raise a Query's draft, the mailbox's three, Recruitment's five
       // (jd-draft, vacancy-follow-ups, screening-questions, assessment-questions, interview-notes-cleanup), Expenses'
-      // Check Duplicate and Suggest Category, and Partnerships' Tidy Agreement; Data Answers has its own chain.
-      expect(by.default.actions).toBe(15);
+      // Check Duplicate and Suggest Category, and Partnerships' Tidy Agreement and Proposal Message; Data Answers
+      // has its own chain.
+      expect(by.default.actions).toBe(16);
     });
 
     test("the registered actions: their job, personal data, own chain and today's calls", async () => {
@@ -257,6 +258,10 @@ describeDb("AI Control against the real migrations", () => {
         "assessment-questions",
         "interview-notes-cleanup",
         "cv-screen",
+        "proposal-questions",
+        "proposal-draft",
+        "proposal-rewrite",
+        "proposal-message",
       ]);
       const by = Object.fromEntries(rows.map((a) => [a.key, a]));
       // Recruitment's (recruitment.md §9), chosen by GE: all personal data, the CV read on Deep Reasoning.

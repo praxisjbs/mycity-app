@@ -5,6 +5,9 @@
  *
  *   upload    createBatch()   store the file, parse, find the header, map columns (or a saved profile)
  *   map       setMapping()    the person confirms or corrects the mapping
+ *   values    valuesOf(), setValues()   Map Values: each distinct value of a list, person or
+ *                             place column, shown once with its row count, mapped to a list value,
+ *                             created (ticked) or left empty; kept on the mapping and its profile
  *   preview   preview()       the WHOLE commit, run inside a transaction that is rolled back:
  *                             per-row action (create, update, unchanged), field-level changes,
  *                             every problem, "will be created" lists. Not a simulation.
@@ -182,6 +185,24 @@ function coerce(field, raw, opts = {}) {
 
 const fieldMap = (imp) => new Map(imp.fields.map((f) => [f.key, f]));
 
+/** What Map Values chose for one value of a field: { to } (null: left empty), { create: true }, or undefined. */
+function targetOf(values, fieldKey, value) {
+  const byValue = values && values[fieldKey];
+  if (!byValue) return undefined;
+  const hit = byValue[mapping.normalise(value instanceof Date ? value.toISOString().slice(0, 10) : value)];
+  return hit && typeof hit === "object" ? hit : undefined;
+}
+
+/** The values one cell of a Map Values field holds: split when the field says so, empty and skipped ones left out. */
+function piecesOf(field, cell) {
+  if (cell === null || cell === undefined) return [];
+  const text = cell instanceof Date ? cell.toISOString().slice(0, 10) : String(cell).trim();
+  if (!text) return [];
+  const mv = field.mapValues || {};
+  const pieces = typeof mv.split === "function" ? mv.split(text) : [text];
+  return pieces.map((p) => String(p).trim()).filter((p) => p && !(typeof mv.skip === "function" && mv.skip(p)));
+}
+
 /**
  * The data rows under the header, coerced and validated. Pure.
  *
@@ -194,6 +215,7 @@ const fieldMap = (imp) => new Map(imp.fields.map((f) => [f.key, f]));
  */
 function buildRows(imp, grid, headerRow, columnsMap, { options = {}, pads = {} } = {}) {
   const fields = fieldMap(imp);
+  const chosen = (columnsMap && columnsMap.values) || {};
   const header = grid[headerRow] || [];
   const mapped = columnsMap.columns.filter(
     (c) => c.field && fields.has(c.field),
@@ -218,7 +240,14 @@ function buildRows(imp, grid, headerRow, columnsMap, { options = {}, pads = {} }
     const notes = [];
     for (const c of mapped) {
       const f = fields.get(c.field);
-      const { value, error } = coerce(f, cells[c.index], { pad: pads[f.key] });
+      let cell = cells[c.index];
+      // An enum value mapped on Map Values reads as the option it was mapped to, or as empty.
+      if (f.mapValues && (f.type || "text") === "enum" && cell !== null && cell !== undefined) {
+        const target = targetOf(chosen, f.key, cell);
+        if (target && target.to === null) cell = null;
+        else if (target && target.to) cell = target.to;
+      }
+      const { value, error } = coerce(f, cell, { pad: pads[f.key] });
       const optional = !f.required && !imp.matchKeys.includes(f.key);
       if (error && optional && options.skip_unreadable_optional)
         notes.push({ field: f.key, message: `${f.label} ${error}; left out` });
@@ -491,8 +520,10 @@ async function setMapping(client, batchId, input, actor) {
       422,
     );
   const headerCells = sheet.rows[headerRow];
+  // The values a person mapped stay with the batch while its columns are corrected.
+  const keptValues = batch.mapping && batch.mapping.values ? { values: batch.mapping.values } : {};
   if (input.fields === undefined || input.fields === null) {
-    const auto = mapping.autoMap(headerCells, imp.fields);
+    const auto = { ...mapping.autoMap(headerCells, imp.fields), ...keptValues };
     const { rows } = await client.query(
       `UPDATE import_batch SET sheet = $2, header_row = $3, mapping = $4::jsonb, status = 'mapped', previewed_at = NULL
         WHERE import_batch_id = $1 RETURNING ${BATCH_COLUMNS}`,
@@ -508,6 +539,7 @@ async function setMapping(client, batchId, input, actor) {
         ? input.fields[index] || null
         : null,
     })),
+    ...keptValues,
   };
   const problems = mapping.problemsOf(columns, imp.fields);
   if (problems.length)
@@ -527,6 +559,160 @@ async function setMapping(client, batchId, input, actor) {
     `UPDATE import_batch SET sheet = $2, header_row = $3, mapping = $4::jsonb, status = 'mapped', previewed_at = NULL
       WHERE import_batch_id = $1 RETURNING ${BATCH_COLUMNS}`,
     [batchId, sheet.name, headerRow, JSON.stringify(columns)],
+  );
+  return rows[0];
+}
+
+/* ------------------------------------------------------------------ *
+ * Map Values
+ * ------------------------------------------------------------------ */
+
+/** The Map Values fields of an importer that the batch's mapping feeds, with their column. */
+function valueColumns(imp, batch) {
+  const fields = fieldMap(imp);
+  return ((batch.mapping && batch.mapping.columns) || [])
+    .filter((c) => c.field && fields.has(c.field) && fields.get(c.field).mapValues)
+    .map((c) => ({ field: fields.get(c.field), index: c.index }));
+}
+
+/** The list a field's values map to: an enum's options, or the importer's choices. */
+async function choicesOf(client, imp, field, ctx) {
+  if ((field.type || "text") === "enum") return registry.optionsOf(field);
+  if (typeof field.mapValues.choices === "function") return (await field.mapValues.choices(client, field, ctx)) || [];
+  return [];
+}
+
+/** A target's label: its choice's, else the importer's describe(), else none. */
+async function labelOf(client, field, to, choices) {
+  if (to === null || to === undefined) return null;
+  const hit = choices.find((o) => String(o.value) === String(to));
+  if (hit) return hit.label;
+  if (typeof field.mapValues.describe === "function") return (await field.mapValues.describe(client, field, to)) || null;
+  return null;
+}
+
+/** The target a value would get if nobody chose: the enum option it reads as, resolve()'s answer, or suggest()'s. */
+async function suggestionOf(client, imp, field, value, ctx) {
+  const type = field.type || "text";
+  if (type === "enum") {
+    const { value: v, error } = coerce({ ...field, required: false }, value);
+    return error || v === null ? null : v;
+  }
+  if (type === "reference") return (await imp.resolve(client, field, value, ctx)) || null;
+  const s = await field.mapValues.suggest(client, field, value, ctx);
+  return s || null;
+}
+
+/**
+ * Map Values' list (GET /imports/:id/values): for each Map Values field the mapping feeds, every
+ * distinct value of its column once, with its row count, what was chosen for it, and what it would
+ * get unchosen. The values come from the file, not a table: a file of 100 rows holds at most 100.
+ * @returns {Promise<{fields: object[]}>}
+ */
+async function valuesOf(client, batchId, actor) {
+  const batch = await loadBatch(client, batchId);
+  const imp = importerOf(batch.importer_key);
+  await assertMay(client, actor, imp);
+  const columns = valueColumns(imp, batch);
+  if (!columns.length) return { fields: [] };
+  const sheet = sheetOf(await sourceGrid(client, batch), batch.sheet);
+  const chosen = (batch.mapping && batch.mapping.values) || {};
+  const ctx = { actor, batch, importer: imp, preview: true, options: batch.options || {}, values: chosen, valueOf: (k, v) => targetOf(chosen, k, v) };
+  const out = [];
+  for (const { field, index } of columns) {
+    const seen = new Map();
+    for (const row of sheet.rows.slice((batch.header_row ?? 0) + 1)) {
+      // A value counts once a row, however often its cell spells it ("IBADAN, ibadan").
+      const once = new Map();
+      for (const p of piecesOf(field, (row || [])[index])) if (!once.has(mapping.normalise(p))) once.set(mapping.normalise(p), p);
+      for (const [key, piece] of once) {
+        if (!key) continue;
+        const had = seen.get(key);
+        if (had) had.rows += 1;
+        else seen.set(key, { value: piece, rows: 1 });
+      }
+    }
+    const choices = await choicesOf(client, imp, field, ctx);
+    const values = [];
+    for (const [key, v] of [...seen.entries()].sort((a, b) => b[1].rows - a[1].rows || a[1].value.localeCompare(b[1].value))) {
+      const target = chosen[field.key] && chosen[field.key][key] ? chosen[field.key][key] : null;
+      const suggested = await suggestionOf(client, imp, field, v.value, ctx);
+      values.push({
+        value: v.value,
+        rows: v.rows,
+        target: target ? { ...(target.create ? { create: true } : { to: target.to ?? null }) } : null,
+        target_label: target && target.to ? await labelOf(client, field, target.to, choices) : null,
+        suggested,
+        suggested_label: suggested ? await labelOf(client, field, suggested, choices) : null,
+      });
+    }
+    out.push({
+      field: field.key,
+      label: field.label,
+      kind: field.mapValues.kind,
+      create_missing: Boolean(field.createMissing),
+      choices,
+      values,
+    });
+  }
+  return { fields: out };
+}
+
+/**
+ * Save what Map Values chose (PUT /imports/:id/values), replacing the batch's earlier choices, and
+ * with `save_profile` keep them with the columns for the next file of the same header. A list value
+ * is one of the field's choices; a person, a place or a created value is checked as the importer
+ * says; a value left out of the body is left to the importer's own matching.
+ * @param {{values: Record<string, Record<string, {to?: string|null, create?: true}>>, save_profile?: boolean, profile_name?: string}} input
+ */
+async function setValues(client, batchId, input, actor) {
+  if (!inTransaction(client)) throw new Error("import.setValues must run inside atomically()");
+  const batch = await loadBatch(client, batchId, { forUpdate: true });
+  if (!["mapped", "previewed"].includes(batch.status))
+    throw new AppError("IMPORT_CLOSED", `This import is already ${batch.status}`, 409);
+  const imp = importerOf(batch.importer_key);
+  await assertMay(client, actor, imp);
+  const fed = new Map(valueColumns(imp, batch).map((c) => [c.field.key, c.field]));
+  const ctx = { actor, batch, importer: imp, preview: true, options: batch.options || {} };
+  const saved = {};
+  for (const [key, byValue] of Object.entries(input.values || {})) {
+    const field = fed.get(key);
+    if (!field) throw new AppError("IMPORT_VALUES_INVALID", `No column of this file feeds "${key}"`, 422, { values: [`${key} is not mapped`] });
+    const choices = await choicesOf(client, imp, field, ctx);
+    saved[key] = {};
+    for (const [value, target] of Object.entries(byValue || {})) {
+      const norm = mapping.normalise(value);
+      if (!norm) continue;
+      if (target.create) {
+        if (!field.createMissing)
+          throw new AppError("IMPORT_VALUES_INVALID", `${field.label} values cannot be created here`, 422, { values: [`${field.label}: pick a value`] });
+        saved[key][norm] = { create: true };
+        continue;
+      }
+      const to = target.to ?? null;
+      if (to !== null) {
+        const known = field.mapValues.kind === "list" ? choices.some((o) => String(o.value) === String(to)) : Boolean(await labelOf(client, field, to, choices));
+        if (!known)
+          throw new AppError("IMPORT_VALUES_INVALID", `"${value}" is mapped to something ${field.label} does not offer`, 422, { values: [`${field.label}: pick again`] });
+      }
+      saved[key][norm] = { to };
+    }
+  }
+  const next = { ...(batch.mapping || { columns: [] }), values: saved };
+  if (input.save_profile) {
+    const sheet = sheetOf(await sourceGrid(client, batch), batch.sheet);
+    await mapping.saveProfile(client, {
+      importer_key: imp.key,
+      name: input.profile_name,
+      signature: mapping.headerSignature(sheet.rows[batch.header_row] || []),
+      mapping: next,
+      user_id: actor ? actor.user_id : null,
+    });
+  }
+  const { rows } = await client.query(
+    `UPDATE import_batch SET mapping = $2::jsonb, status = 'mapped', previewed_at = NULL
+      WHERE import_batch_id = $1 RETURNING ${BATCH_COLUMNS}`,
+    [batchId, JSON.stringify(next)],
   );
   return rows[0];
 }
@@ -640,12 +826,23 @@ async function processRows(client, imp, rows, ctx) {
     for (const f of refs1) {
       const v = row.values[f.key];
       if (v === undefined || v === null) continue;
-      let id = await imp.resolve(client, f, v, ctx);
+      const target = f.mapValues ? targetOf(ctx.values, f.key, v) : undefined;
+      if (target && target.to === null) {
+        delete write[f.key];
+        continue;
+      }
+      let id = target && target.to ? target.to : await imp.resolve(client, f, v, ctx);
+      if (!id && f.missing === "leave") {
+        delete write[f.key];
+        row.problems.push({ field: f.key, message: `${f.label} "${v}" is not matched; saved without it` });
+        continue;
+      }
       if (!id && f.createMissing) {
         (missing[f.key] = missing[f.key] || new Set()).add(v);
         const ticked =
-          ctx.create_missing[f.key] &&
-          [...ctx.create_missing[f.key]].some((x) => same(x, v));
+          Boolean(target && target.create) ||
+          (ctx.create_missing[f.key] &&
+            [...ctx.create_missing[f.key]].some((x) => same(x, v)));
         if (ticked || ctx.preview) {
           const created = await inSavepoint(client, () =>
             imp.create(client, f, v, ctx),
@@ -716,6 +913,8 @@ async function processRows(client, imp, rows, ctx) {
       continue;
     }
     row.target_id = String(res.out.id);
+    // What the module saved without, or read differently, is a note on the row.
+    if (Array.isArray(res.out.notes)) row.problems.push(...res.out.notes);
     // The module's service may answer that the row needed no write after all (it keeps
     // what a person edited on screen). The batch then reports it as unchanged, not as an
     // update that did nothing.
@@ -920,12 +1119,16 @@ async function run(
       pads,
     });
     markDuplicates(imp, rows);
+    const values = (batch.mapping && batch.mapping.values) || {};
     const ctx = {
       actor,
       batch,
       importer: imp,
       preview: !commit,
       options: batch.options || {},
+      values,
+      /** Map Values' choice for one value of a field the importer reads itself (a text field). */
+      valueOf: (fieldKey, value) => targetOf(values, fieldKey, value),
       create_missing: Object.fromEntries(
         Object.entries(createMissing || {}).map(([k, v]) => [
           k,
@@ -1124,6 +1327,10 @@ module.exports = {
   cycleRows,
   createBatch,
   setMapping,
+  valuesOf,
+  setValues,
+  targetOf,
+  piecesOf,
   preview,
   commit,
   rowsOf,

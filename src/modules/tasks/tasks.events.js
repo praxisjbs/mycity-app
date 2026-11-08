@@ -47,6 +47,7 @@ const EVENTS = defineEvents("workspace", {
   "task.pinged": { summary: "Someone nudged the people on a task" },
   "task.reminder_due": { summary: "A reminder set on a task came due" },
   "task.reordered": { summary: "A card moved within its column" },
+  "task.relinked": { summary: "A lead's tasks moved to its partner" },
   "task_late_reason.created": { summary: "A late reason was added" },
   "task_late_reason.changed": { summary: "A late reason was switched off or on" },
 });

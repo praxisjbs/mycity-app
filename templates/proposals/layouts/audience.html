@@ -1,0 +1,5 @@
+<header class="page-head"><h2 class="h1">{{ heading }}</h2>{{#if intro}}<p class="lead">{{ intro }}</p>{{/if}}</header>
+<div class="stats {{#if visual}}aud-stats cols-{{ cols }}{{else}}aud-stats--wide{{/if}}">
+  {{#each stats}}<div class="stat"><div class="stat-value fig">{{ value }}</div><div class="stat-label">{{ label }}</div></div>{{/each}}
+</div>
+{{#if visual}}<div class="aud-chart"><div class="panel">{{> body}}</div></div>{{/if}}

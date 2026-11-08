@@ -126,6 +126,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
 | Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
+| Forms | [QuestionCard](#questioncard) | `QuestionCard` | One question the Proposal Studio asks before a draft: the question, why it is asked, an answer field matched to its kind, a suggested answer with where it came from, and Skip and Reshuffle. | beta |
 | Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
 | Forms | [RatingField](#ratingfield) | `RatingField` | A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; disabled locks a given rating in place, readOnly draws one already given or a panel's mean. | beta |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
@@ -156,6 +157,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
 | Charts | [TrendChart](#trendchart) | `TrendChart` | One to three figures over time on one scale, with an optional target line, gaps where nothing was recorded, and a readout that follows the pointer. | beta |
+| Documents | [DocumentFrame](#documentframe) | `DocumentFrame` | A document the server drew, a proposal's pages, in a sealed frame exactly as it prints, scaled to its column, its sections pressable for the editor beside it. | beta |
 | Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both. | stable |
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
@@ -4025,6 +4027,48 @@ Several places picked from our own address search, each a chip with Remove: a pr
 <PlacesField {...f.field("cities")} places={places} />
 ```
 
+### QuestionCard
+
+One question the Proposal Studio asks before a draft: the question, why it is asked, an answer field matched to its kind, a suggested answer with where it came from, and Skip and Reshuffle.
+
+| | |
+|---|---|
+| Use | The studio's Questions step (docs/guides/partnerships.md §6.10): cards grouped (The Partner, The Offer, Audience and Reach, Money, Timing, Proof), answered one by one. |
+| Avoid | A form's ordinary field (use Field with its control); a yes or no setting (use Switch); a survey of many fields at once (use a Wizard). |
+| Phone | One card fills the width; the answer field is 16 px and every button a 44 px target, Save Answer full width with Skip and Reshuffle above it. |
+| Accessibility | The question is the field's accessible name; Why is a help term beside it. Save Answer, Use Suggestion, Skip and Reshuffle are buttons that stay busy while their work runs (F26). |
+| Status | beta |
+| Exports | `QuestionCard` |
+| Import | `import { QuestionCard } from "@mycity/ui";` |
+| File | `packages/ui/src/form/QuestionCard.tsx` |
+| Test | `packages/ui/src/form/QuestionCard.test.tsx` |
+| Gallery | `packages/ui/src/form/QuestionCard.gallery.tsx` (`npm run gallery`, `#/QuestionCard`) |
+
+**QuestionCard** props (`QuestionCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `question` | `string` | yes | The question, as Claude asked it. |
+| `why` | `string \| null` |  | Why it is asked, in one line, behind the Why help term; none when null. |
+| `group` | `string` | yes | The card's group as the screen names it ("The Offer"). |
+| `kind` | `"short_text" \| "long_text" \| "number" \| "money" \| "date" \| "pick" \| "multi_pick"` | yes | The answer field it takes. |
+| `options` | `readonly string[] \| null` |  | The choices of a pick or a multi-pick. |
+| `suggested` | `QuestionAnswer` |  | Claude's suggested answer, in the card's kind, or null. |
+| `suggestedFrom` | `string \| null` |  | Where the suggestion comes from ("From the transcript, 00:21:51"). |
+| `required` | `boolean` |  | A required card cannot be skipped. |
+| `answer` | `QuestionAnswer` |  | The answer kept, or null. |
+| `state` | `"open" \| "answered" \| "skipped"` | yes | Where the card stands. |
+| `position` | `string` |  | The card's place among its group's or all cards ("3 of 9"). |
+| `onAnswer` | `(value: QuestionAnswer) => unknown` | yes | Keep an answer: hand back the save (F26). |
+| `onSkip` | `() => unknown` |  | Skip the card; not offered on a required card. |
+| `onReshuffle` | `() => unknown` |  | A different question in its place; left out when none remain. |
+| `error` | `string \| null` |  | The server's word on the answer, at most 4 words. |
+| `className` | `string` |  | Layout classes only (spacing, width). |
+
+```tsx
+<QuestionCard group="The Offer" question="What is the early bird price?" kind="money" state="open" onAnswer={(v) => answer(card, v)} />
+```
+
 ### RadioCards
 
 Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2.
@@ -5218,6 +5262,38 @@ One to three figures over time on one scale, with an optional target line, gaps 
 ```
 
 ## Documents
+
+### DocumentFrame
+
+A document the server drew, a proposal's pages, in a sealed frame exactly as it prints, scaled to its column, its sections pressable for the editor beside it.
+
+| | |
+|---|---|
+| Use | The Proposal Studio's preview and the public Proposal page: complete HTML from the server's document engine, with its own stylesheet and pages (docs/guides/partnerships.md §6.11). |
+| Avoid | A received email (use EmailFrame); our own long text (use Reader); a stored PDF file (use PdfViewer). |
+| Phone | The frame takes the screen's width and the document lays itself out in one column by its own rules; on desktop its pages keep their designed width and are scaled down to fit, never scrolled sideways. Pull to refresh never starts on it. |
+| Accessibility | An iframe named by `title`, as its aria-label so no browser tooltip appears. Nothing in the document runs. With `onSelect`, each section is a focusable button inside the frame: Enter or Space selects it, as a press does. |
+| Status | beta |
+| Exports | `DocumentFrame` |
+| Import | `import { DocumentFrame } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/DocumentFrame.tsx` |
+| Test | `packages/ui/src/documents/DocumentFrame.test.tsx` |
+| Gallery | `packages/ui/src/documents/DocumentFrame.gallery.tsx` (`npm run gallery`, `#/DocumentFrame`) |
+
+**DocumentFrame** props (`DocumentFrameProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `html` | `string` | yes | The document's complete HTML, as the server drew it (its pictures and fonts embedded). |
+| `title` | `string` | yes | What a screen reader announces for the frame: the document's name. |
+| `designWidth` | `number` |  | The width the document is laid out at on desktop, in CSS pixels. Default 1328, the proposal kit's pages and their margin. |
+| `selected` | `string \| null` |  | The section shown as selected (its `data-section`), or none. |
+| `onSelect` | `(key: string) => void` |  | A section was pressed or chosen from the keyboard; without it the document is only read. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the document's own. |
+
+```tsx
+<DocumentFrame title="Proposal PRO-0012" html={preview.html} selected={key} onSelect={setKey} />
+```
 
 ### DocumentPreview
 

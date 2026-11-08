@@ -454,6 +454,25 @@ describe("my workspace", () => {
     await waitFor(() => expect(inStage("To Do", "File the October minutes")).toBeTruthy(), { timeout: 5000 });
   }, 30000);
 
+  it("New Task's Connect to Partner shows Partner and Deal; the task's panel names the partner (partnerships.md §6.16)", async () => {
+    await board();
+    const form = await newTask();
+    named(form, "Book the stage for the partner");
+    fireEvent.click(within(form).getByRole("button", { name: "Connect to Partner" }));
+    expect(await within(form).findByText("Partner")).toBeTruthy();
+    // Partner lists the partners and leads the reader sees, leads marked.
+    const partner = within(form).getByRole("combobox", { name: /^Partner/ });
+    const labels = await optionLabels(partner);
+    expect(labels.some((l) => l.endsWith(" · Lead"))).toBe(true);
+    const name = labels.find((l) => !l.endsWith(" · Lead"))!;
+    await chooseOption(within(form).getByRole("combobox", { name: /^Partner/ }), name);
+    expect(await within(form).findByText("Deal")).toBeTruthy();
+    fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
+    await closed("New Task");
+    const panel = await openCard("Book the stage for the partner");
+    expect(within(panel).getByText(name)).toBeTruthy();
+  }, 30000);
+
   it("New Task names watchers, who are on the task's panel once it is made (JBS Praxis, 01/11/2026)", async () => {
     await board();
     const form = await newTask();

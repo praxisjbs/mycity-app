@@ -69,12 +69,14 @@ async function one(db, id, scope, actor) {
   const interactions = require("../interactions/interactions.service");
   const held = await pipeline.holdsMoney(actor);
   const dealRow = r.deal_id ? await dealRepo.get(db, r.deal_id, null) : null;
-  const [region, deal, contacts, latest, defs] = await Promise.all([
+  const work = require("../partners/partners.work");
+  const [region, deal, contacts, latest, defs, events] = await Promise.all([
     partners.regionViewOf(db, "lead.cities", id, r.region_scope, r.region),
     r.deal_id ? pipeline.detailFor(db, r.deal_id, held) : null,
     partners.contactsOf(db, { kind: "lead", id }),
     interactions.latestOf(db, { kind: "lead", id }),
     fields.defsFor(db, "lead", r.partner_category_id),
+    work.nextEvents(db, actor, { kind: "lead", id }),
   ]);
   return {
     lead: detailOf(r, region),
@@ -86,7 +88,7 @@ async function one(db, id, scope, actor) {
     },
     deal,
     contacts,
-    overview: { events: [], interactions: latest },
+    overview: { events, interactions: latest },
     custom_fields: defs,
   };
 }

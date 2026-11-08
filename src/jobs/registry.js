@@ -137,6 +137,11 @@ const JOBS = Object.freeze([
     summary: "The morning's repeating tasks and due reminders, run again by hand",
   },
   {
+    queue: "partner-inactivity",
+    concurrency: 1,
+    summary: "The morning's follow-ups of quiet partners and leads, run again by hand",
+  },
+  {
     queue: "reminders",
     concurrency: 2,
     summary: "One person's daily digest of what they have not read",
@@ -153,6 +158,17 @@ const JOBS = Object.freeze([
   },
   // query-rule-evaluate is queued by src/modules/query_rules/query_rules.events.js, beside the
   // attendance and review events it listens to, and by the query-rule-sweep schedule.
+  {
+    queue: "proposal-questions",
+    concurrency: 2,
+    summary: "A proposal's question cards asked of Claude from its brief and its record",
+  },
+  {
+    queue: "proposal-draft",
+    concurrency: 2,
+    summary: "A proposal written by Claude into the design kit's layouts, its figures checked",
+  },
+  // proposal-questions and proposal-draft are queued by src/modules/proposals/proposals.events.js.
 ]);
 
 /** Files in jobs/schedulers/. */
@@ -190,6 +206,8 @@ const SCHEDULERS = Object.freeze([
   "query-rule-sweep",
   "user-guide-index",
   "budget-threshold",
+  "partner-inactivity",
+  "proposal-expiry",
   "signature-reminders",
 ]);
 
