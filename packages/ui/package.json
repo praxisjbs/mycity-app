@@ -16,7 +16,8 @@
       "types": "./vite.shared.d.ts",
       "default": "./vite.shared.js"
     },
-    "./testing": "./src/testing/index.ts"
+    "./testing": "./src/testing/index.ts",
+    "./samples/*": "./src/documents/*"
   },
   "engines": {
     "node": ">=20.19"

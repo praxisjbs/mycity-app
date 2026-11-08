@@ -86,9 +86,8 @@ describe("the design kit", () => {
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,6}\b/);
   });
 
-  test("the gallery's page is the sample as the kit draws it", () => {
-    const f = gen.sampleOutput();
-    expect(fs.readFileSync(f.to).equals(f.bytes)).toBe(true);
+  test("the gallery's page is the sample as the kit draws it, its content beside it", () => {
+    for (const f of [gen.sampleOutput(), gen.sampleContentOutput()]) expect(fs.readFileSync(f.to).equals(f.bytes)).toBe(true);
   });
 });
 

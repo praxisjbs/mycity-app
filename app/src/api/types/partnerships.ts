@@ -1,46 +1,12 @@
-import type { PlaceValue } from "@mycity/ui";
 import type { IsoDate, Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
 import type { Status, Step } from "./performance";
 
 /**
  * INTERIM Partnerships shapes (owner GE; docs/guides/partnerships.md), for the screens still on the
- * mock: Proposals (M7 PR 7), Contracts & MOUs (PR 6) and Analytics (PR 8). Pipeline, Partners,
- * Leads and both 360s run on the generated contract since M7 PR 3; this file is deleted in PR 8.
+ * mock: Contracts & MOUs (PR 6) and Analytics (PR 8). Pipeline, Partners, Leads and both 360s run on
+ * the generated contract since M7 PR 3, Proposals and the studio since PR 7; this file is deleted in PR 8.
  */
-export interface Proposal {
-  proposal_id: Uuid;
-  number: string;
-  title: string;
-  partner: string;
-  value: Money;
-  status: Status;
-}
-export interface ProposalDoc {
-  reference: string;
-  title: string;
-  prepared_for: string;
-  sections: Array<{ heading: string; text: string }>;
-  lines: Array<{ label: string; amount: Money }>;
-  total: Money;
-  footnote: string;
-}
-export interface ProposalsSummary {
-  sent_this_year: number;
-  accepted: number;
-  viewed_no_reply: number;
-  acceptance_rate: string;
-}
-export interface ProposalCreate {
-  partner_id: Uuid;
-  what: string;
-  why_now: string;
-  /** Picked from the address search at level city (F27), one or more. */
-  cities: PlaceValue[];
-  weeks: number;
-  value: Money;
-  terms: string;
-}
 export interface Contract {
   contract_id: Uuid;
   title: string;
@@ -81,10 +47,6 @@ export interface PartnershipAnalytics {
 type Q<T = object> = T & { page?: number; q?: string };
 declare module "@/api/endpoints" {
   interface Endpoints {
-    "GET /api/v1/partnerships/proposals/summary": { query: never; body: never; params: never; response: ProposalsSummary };
-    "GET /api/v1/partnerships/proposals": { query: Q; body: never; params: never; response: Paged<Proposal> };
-    "GET /api/v1/partnerships/proposals/:id/document": { query: never; body: never; params: { id: string }; response: ProposalDoc };
-    "POST /api/v1/partnerships/proposals": { query: never; body: ProposalCreate; params: never; response: Proposal };
     "GET /api/v1/partnerships/contracts/summary": { query: never; body: never; params: never; response: ContractsSummary };
     "GET /api/v1/partnerships/contracts": { query: Q; body: never; params: never; response: Paged<Contract> };
     "GET /api/v1/partnerships/contracts/renewals": { query: Q; body: never; params: never; response: Paged<Renewal> };

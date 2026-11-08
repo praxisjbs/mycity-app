@@ -52,7 +52,7 @@ export function Partner360({ id }: { id: string }) {
     { label: "Log Interaction", icon: "plus" as const, onSelect: () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={unfinished[0]?.deal_id} close={close} />) },
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
-    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${partner.partner_id}`) },
+    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${partner.partner_id}&record=partner`) },
     { label: "Edit Partner", icon: "doc" as const, onSelect: () => open("Edit Partner", (close) => <EditPartner partner={partner} close={close} />, true) },
     { label: "Close Partner", danger: true, onSelect: () => open("Close Partner", (close) => <ClosePartner id={partner.partner_id} close={close} />) },
   ];

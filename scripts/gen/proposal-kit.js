@@ -14,7 +14,8 @@
  *                      the PDF, the studio and the public page set the same type.
  *   icons.json         the Lucide icons (ISC licence) a deliverable may name, each as path data.
  *   sample.html        the gallery's page of every layout (packages/ui, `#/ProposalKit`), drawn by the
- *                      kit itself from templates/proposals/sample.json.
+ *                      kit itself from templates/proposals/sample.json, and that content beside it
+ *                      (proposal-kit.sample.json), which the staff app's in-browser mock serves.
  *
  *   npm run gen:proposal-kit                     write them
  *   node scripts/gen/proposal-kit.js --check     exit 1 when one is stale (tests/unit/proposals-kit.test.js)
@@ -194,11 +195,16 @@ function outputs() {
   return files.map((f) => ({ ...f, bytes: f.from ? fs.readFileSync(f.from) : Buffer.from(f.text) }));
 }
 
-/** The gallery's sample, drawn by the kit once its assets are written. */
+/** The gallery's sample, drawn by the kit once its assets are written; and its content, which the staff app's in-browser mock serves. */
 function sampleOutput() {
   const kit = require("../../src/modules/proposals/proposals.kit");
   const sample = JSON.parse(fs.readFileSync(path.join(KIT, "sample.json"), "utf8"));
   return { to: SAMPLE_OUT, bytes: Buffer.from(kit.renderSample(sample)) };
+}
+
+function sampleContentOutput() {
+  const sample = JSON.parse(fs.readFileSync(path.join(KIT, "sample.json"), "utf8"));
+  return { to: SAMPLE_OUT.replace(/\.html$/, ".json"), bytes: Buffer.from(`${JSON.stringify(sample.content, null, 1)}\n`) };
 }
 
 function main() {
@@ -214,6 +220,7 @@ function main() {
   };
   outputs().forEach(write);
   write(sampleOutput());
+  write(sampleContentOutput());
   if (stale.length) {
     console.error(`The proposal kit's assets are stale: ${stale.join(", ")}. Run npm run gen:proposal-kit.`);
     process.exit(1);
@@ -222,4 +229,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { outputs, sampleOutput, tokensCss, CITIES, ICONS, SAMPLE_OUT };
+module.exports = { outputs, sampleOutput, sampleContentOutput, tokensCss, CITIES, ICONS, SAMPLE_OUT };
