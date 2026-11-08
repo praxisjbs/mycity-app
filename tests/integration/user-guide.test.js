@@ -197,6 +197,25 @@ describeDb("the User Guide against the real migrations and chapters", () => {
     expect((await get("ops", "/images/people/..%2F..%2Fsecret.desktop.png")).status).toBe(422);
   });
 
+  test("the public site's Help is read by anyone, never in the hub's guide, with only its own pictures", async () => {
+    expect((await contents("admin")).chapters.map((ch) => ch.slug)).not.toContain("public-site");
+    expect((await contents("staff")).public_help_url).toMatch(/\/help$/);
+    expect((await get("admin", "/chapters/public-site")).status).toBe(404);
+
+    const help = await request(app).get("/api/public/v1/help");
+    expect(help.status).toBe(200);
+    expect(help.headers["cache-control"]).toBe("public, max-age=300");
+    const read = c.user_guide.GuideChapter.parse(help.body);
+    expect(read.kind).toBe("public-help");
+    expect(read.sections.map((s) => s.slug)).toEqual(["public-home", "public-careers", "public-vacancy", "public-apply", "public-assessment", "public-sign", "public-verify"]);
+
+    const pic = await request(app).get("/api/public/v1/help/images/public-home.desktop.png");
+    expect(pic.status).toBe(200);
+    expect(pic.headers["content-type"]).toMatch(/^image\/png/);
+    expect((await request(app).get("/api/public/v1/help/images/people-employees.desktop.png")).status).toBe(404);
+    expect((await request(app).get("/api/public/v1/help/images/..%2Fpeople.desktop.png")).status).toBe(422);
+  });
+
   test("⌘K finds the guide's sections the reader may read, and opens the guide at them", async () => {
     const search = async (who, q) => {
       const res = await request(app).get("/api/v1/search").query({ q, type: "guide_section" }).set("Authorization", `Bearer ${tokens[who]}`);

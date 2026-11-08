@@ -159,12 +159,13 @@ describe("DetailPane", () => {
 });
 
 /** Expenses' layout (F31 as amended): the picked record only, in the dialog, at every width. */
-function ModalRequests() {
+function ModalRequests({ size }: { size?: "md" | "wide" | "xl" }) {
   const [picked, setPicked] = useState<string | null>(null);
   const shown = REQUESTS.find((r) => r.id === picked) ?? null;
   return (
     <ListDetail
       layout="modal"
+      size={size}
       open={picked !== null}
       onClose={() => setPicked(null)}
       title="Expense Request"
@@ -192,6 +193,12 @@ describe("ListDetail in the modal layout", () => {
     await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
     const dialog = await screen.findByRole("dialog", { name: "Expense Request" });
     expect(dialog).toHaveTextContent("Sick request from Chidi Eze");
+  });
+
+  it("opens a record whose cards sit side by side in the widest dialog", async () => {
+    render(<ModalRequests size="xl" />);
+    await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
+    expect((await screen.findByRole("dialog", { name: "Expense Request" })).className).toMatch(/max-w-6xl/);
   });
 
   it("on a phone opens the same record in the sheet", async () => {

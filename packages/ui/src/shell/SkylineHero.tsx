@@ -2,7 +2,7 @@
  * @component SkylineHero
  * @group Shell
  * @summary The public site's hero, glass teal in light and Deep Green in dark: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now.
- * @use size index for the site's front door (the careers index) and size role for a vacancy (the team as a gold pill, the role's facts as chips, its actions and a note), each inside PublicPage layout full. l, m and pane stay for the pages not yet moved to the approved design.
+ * @use size index for the site's front door (the careers index) and size role for a vacancy (the team as a gold pill, the role's facts as chips, its actions and a note), size page for an inner page's short head (Help: its title, at a role's size), each inside PublicPage layout full. l, m and pane stay for the pages not yet moved to the approved design.
  * @avoid The staff app; decoration under a page that has its own heading already; text more than a line.
  * @phone Edge to edge. index: still the first screen, 16 px at the sides, the search's button full width under its box, the figures closer; its lede is hidden (a page subtitle is desktop only). role: All Roles stays at the top left, the actions and the note are left off (the page's bar carries Apply). l and m: the heading 24 px, the skyline shorter, the line under the heading hidden. The pane becomes a compact band above the card (from 1040 px down), its `wide` part left off.
  * @a11y The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline, the scrim and the street grid are decorative (aria-hidden) and still under reduced motion, when the parts no longer rise and the figures show their value at once. A counting figure is read as its final value. All Roles is a link. index and role take the page's theme, their inks AA on its ground (tokens.css --site-*); the earlier panels take the dark theme's tokens, so they keep AA on Deep Green whatever the page's theme.
@@ -11,6 +11,7 @@
  * @example <SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
  * @example <SkylineHero size="pane" record eyebrow="Your Application" title="Partnerships Associate" text="This link is yours until 12/11/2026." />
  * @example <SkylineHero size="index" eyebrow="Hiring in Lagos and Abuja" title="Work With Us" accent="Us" text="Building the app that knows every Nigerian city." stats={[{ value: 12, label: "Open Roles" }]}><SiteSearch tone="hero" ... /></SkylineHero>
+ * @example <SkylineHero size="page" title="Here to Guide" />
  * @example <SkylineHero size="role" record back={{ label: "All Roles", href: "/jobs" }} eyebrow="Marketing & Sales" title="Head, Sales & Revenue" facts={facts} note="12 people have applied">{actions}</SkylineHero>
  */
 import { lazy, Suspense, type ReactNode, type Ref } from "react";
@@ -38,8 +39,8 @@ export interface SkylineHeroProps {
   children?: ReactNode;
   /** The pane only: what it adds where it stands beside the page (1041 px and wider), such as the steps; left off the compact band. */
   wide?: ReactNode;
-  /** `index`: the site's front door, the first screen. `role`: a vacancy's head. `l` (the default), `m` and `pane`: the earlier panels (a front door, a record's page, the context pane PublicPage stands beside a form). */
-  size?: "index" | "role" | "l" | "m" | "pane";
+  /** `index`: the site's front door, the first screen. `role`: a vacancy's head. `page`: a short head for an inner page, its title at a role's size and an optional line (Help). `l` (the default), `m` and `pane`: the earlier panels (a front door, a record's page, the context pane PublicPage stands beside a form). */
+  size?: "index" | "role" | "page" | "l" | "m" | "pane";
   /** index and role: the word of a string `title` drawn in the brand yellow (Work With Us, accent Us). */
   accent?: string;
   /** index: the figures under the search, each counting up from 0 as the hero opens (Open Roles, Teams Hiring, Cities). */
@@ -77,7 +78,7 @@ const TITLE: Record<PanelSize, string> = {
 };
 
 export function SkylineHero(props: SkylineHeroProps) {
-  return props.size === "index" || props.size === "role" ? <SiteHero {...props} /> : <Panel {...props} />;
+  return props.size === "index" || props.size === "role" || props.size === "page" ? <SiteHero {...props} /> : <Panel {...props} />;
 }
 
 /** The title, with its accent word in the brand yellow. */
@@ -102,9 +103,10 @@ function SiteHero({ title, eyebrow, text, facts, children, size, record, titleRe
   const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
   const go = useSiteLink();
   const index = size === "index";
+  const page = size === "page";
   const calm = still || reduced;
   return (
-    <section data-size={size} data-still={calm || undefined} className={cn("ps-hero", index ? "ps-hero-index" : "ps-hero-role", className)}>
+    <section data-size={size} data-still={calm || undefined} className={cn("ps-hero", index ? "ps-hero-index" : "ps-hero-role", page && "ps-hero-page", className)}>
       <div aria-hidden="true" className="ps-hero-art">
         <Skyline still={calm} />
       </div>
@@ -132,7 +134,7 @@ function SiteHero({ title, eyebrow, text, facts, children, size, record, titleRe
         >
           {withAccent(title, accent)}
         </h1>
-        {index && text != null && (
+        {(index || page) && text != null && (
           <p data-ui="page-subtitle" className="ps-lede ps-rise ps-rise-3 phone:hidden">
             {text}
           </p>

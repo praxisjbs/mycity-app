@@ -139,9 +139,10 @@ go.mycityapp.io/assess/<token>                 opaque
 go.mycityapp.io/sign/<token>                   opaque
 go.mycityapp.io/verify/OFF-0018                a reference, not a secret
 go.mycityapp.io/verify/t/<token>               the QR code on a sealed document, opaque
+go.mycityapp.io/help                           how the site works, indexable
 ```
 
-Only the index, the careers list and an open vacancy carry readable addresses, because a careers page exists
+Only the index, the careers list, an open vacancy and Help carry readable addresses, because a careers page exists
 to be found and shared. Everything a single person is invited to is reached by an opaque token that
 cannot be enumerated.
 
@@ -1536,6 +1537,15 @@ below, the public site's routes and `docs/PROGRESS.md` (row #107). The design is
 `docs/MyCity-ERP-Documents/public-site-demo.html`; its engineering shape is in
 `docs/guides/recruitment.md` §10.
 
+**Ratified 08/11/2026 (GE).** One screen joins the inventory, taking it to 106 and the public site to
+nine pages: **Public · Help** (`go.mycityapp.io/help`), M4. It is how the site works for a candidate
+or anyone outside MyCity: the User Guide's public chapter (`docs/manual/public-site.md`), moved out
+of the hub's User Guide, which keeps one link to it (**Public Site Help**). It is indexable, holds no
+personal data and reads only the chapter and its pictures (`GET /api/public/v1/help`). Help is the
+sixth link in the site's header, after Verify Document. Applied to the table below,
+`scripts/check/progress.js`, the public site's routes and `docs/PROGRESS.md` (row #108). Its
+engineering shape is in `docs/guides/user-guide.md` §6.11.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries eight of the
 screens (six of the 92 approved, Proposal, ratified 05/11/2026, and Home, ratified 06/11/2026) and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1563,11 +1573,11 @@ staff never navigates to it to do their job.
 
 | | Site | Pages | Screens | Built in |
 |---|---|---|---|---|
-| Public | **Public site** | 8 | Home · Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026; Home ratified 06/11/2026) |
+| Public | **Public site** | 9 | Home · Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Help · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026; Home ratified 06/11/2026; Help ratified 08/11/2026) |
 
 Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
-(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Home, Careers, Vacancy, Apply and
-Assessment in M4, Sign Offer and Verify Document in M5, and Proposal in M7. **Settings → Notifications** is built
+(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Home, Careers, Vacancy, Apply,
+Assessment and Help in M4, Sign Offer and Verify Document in M5, and Proposal in M7. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
 M0 by TB on 19/10/2026).
 

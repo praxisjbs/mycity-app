@@ -7,7 +7,7 @@ declare module "@mycity/contract/guide.js" {
   export type Need = { kind: "grant"; module: string; action: string } | { kind: "cap"; code: string } | { kind: "manager" } | { kind: "team" } | { kind: "ceo" } | { kind: "any"; of: Need[] };
   export interface ParsedChapter {
     slug: string;
-    kind: "chapter" | "quick-start";
+    kind: "chapter" | "quick-start" | "public-help";
     title: string;
     module: string | null;
     order: number | null;

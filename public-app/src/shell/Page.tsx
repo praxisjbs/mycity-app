@@ -4,7 +4,7 @@ import { NAV, parse, sectionOf, useRouter } from "@/lib/router";
 import { DemoLinks } from "./DemoLinks";
 
 /**
- * Every public page (go.mycityapp.io), on PublicPage from @mycity/ui: the one header with the five
+ * Every public page (go.mycityapp.io), on PublicPage from @mycity/ui: the one header with the six
  * links (the page's own marked), the brand opening the index, the site's router for its links, and in
  * mock mode the demo links at the foot. `title` names the tab and, in the split layout, is the page's
  * small h1. `index` decides whether search engines may list the page: only the index, the careers

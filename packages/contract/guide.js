@@ -345,7 +345,9 @@ function parseChapter(text, file) {
   if (!front.title) problems.push(`${file}: front matter needs a title`);
   if (front.module && !/^[a-z_]+$/.test(front.module)) problems.push(`${file}: module is a module key, like people`);
   const kind = front.kind || "chapter";
-  if (!["chapter", "quick-start"].includes(kind)) problems.push(`${file}: kind is chapter or quick-start`);
+  // public-help: a chapter for people outside MyCity, served on the public site's Help page and not
+  // in the hub's User Guide (docs/guides/user-guide.md §6.11).
+  if (!["chapter", "quick-start", "public-help"].includes(kind)) problems.push(`${file}: kind is chapter, quick-start or public-help`);
   const milestones = splitList(front.milestones);
   for (const m of milestones) if (!/^M\d{1,2}$/.test(m)) problems.push(`${file}: milestone "${m}" reads like M0, M1`);
 

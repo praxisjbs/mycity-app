@@ -59,8 +59,10 @@ describe("Recruitment · Interviews", () => {
     // Halima tomorrow, Tobi yesterday (cards still due), Kunle five days ago.
     expect(at("Halima Yusuf")).toBeLessThan(at("Tobi Adeyemi"));
     expect(at("Tobi Adeyemi")).toBeLessThan(at("Kunle Afolabi"));
-    // Beside the list, the first interview shows unasked.
-    expect(blindPanel()).toBeTruthy();
+    // Nothing opens unasked; a row opens its interview in the wide dialog (F31 as amended 08/11/2026).
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await pick("Halima Yusuf");
+    expect(blindPanel(await screen.findByRole("dialog", { name: "Interview" }))).toBeTruthy();
     expect(copyProblems()).toEqual([]);
   }, 60000);
 

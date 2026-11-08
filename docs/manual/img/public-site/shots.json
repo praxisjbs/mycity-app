@@ -1,7 +1,7 @@
 {
   "public-apply": {
     "spec": "b6f0b9175d8ca747",
-    "source": "abf6d2b591472075",
+    "source": "4827e4bf910ed255",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "public-apply-questions": {
     "spec": "0c5521efda000ca1",
-    "source": "abf6d2b591472075",
+    "source": "4827e4bf910ed255",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "public-assessment-file": {
     "spec": "b71d852a0f0e5354",
-    "source": "c43e766bff47f5ee",
+    "source": "5aaac2ca164aa375",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "public-assessment-question": {
     "spec": "75e88a48e2c6803b",
-    "source": "c43e766bff47f5ee",
+    "source": "5aaac2ca164aa375",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "public-assessment-start": {
     "spec": "7f13a051832c0a7f",
-    "source": "c43e766bff47f5ee",
+    "source": "5aaac2ca164aa375",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "public-assessment-submit": {
     "spec": "5381b60be50114be",
-    "source": "c43e766bff47f5ee",
+    "source": "5aaac2ca164aa375",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "public-careers": {
     "spec": "9318d41f0c7b798b",
-    "source": "6f7477fca6ed0deb",
+    "source": "132dafef5340febf",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "public-home": {
     "spec": "fed174db5e21883c",
-    "source": "d7a78a67e843ba6b",
+    "source": "6635eb09e2c48b4d",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "public-sign": {
     "spec": "d82e693975510176",
-    "source": "ec78bee8cf8245ef",
+    "source": "c01f4211da66effb",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "public-sign-below": {
     "spec": "48c8c3981dea1849",
-    "source": "ec78bee8cf8245ef",
+    "source": "c01f4211da66effb",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "public-vacancy": {
     "spec": "9f254efa0ed9d466",
-    "source": "d861673e216aa1fb",
+    "source": "f8acb721ff81191d",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,7 @@
   },
   "public-verify": {
     "spec": "bdadc6d729a58dae",
-    "source": "23eca4c47132f84a",
+    "source": "dd0ef0847fd9199e",
     "devices": [
       "desktop",
       "phone"

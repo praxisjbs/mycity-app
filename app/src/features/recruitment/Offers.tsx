@@ -1,7 +1,8 @@
 /**
  * Recruitment · Offers (docs/guides/offers.md §2, §3, §10; M5, owner AJ): every offer in the
- * reader's scope with the figures above it, beside the offer picked (ListDetail; on a phone it
- * opens in a sheet). The offer shows its summary and status, the monthly pay lines and total with
+ * reader's scope with the figures above it, across the page; a row opens its offer in a wide dialog
+ * on desktop, its cards side by side over the letter, and in a sheet on a phone (ListDetail `modal`,
+ * F31 as amended 08/11/2026). The offer shows its summary and status, the monthly pay lines and total with
  * the vacancy's range, its approval, signers and history, the letter as the candidate reads it and
  * the PDF. What a person may do comes from the record's `can_*`: Edit and Submit for Approval on a
  * draft, Approve and Reject for the approver the flow waits on, Sign for the Company for the Offer
@@ -37,6 +38,7 @@ import {
   formatMoney,
   FormError,
   FormFooter,
+  Grid,
   HelpTerm,
   KeyValue,
   ListDetail,
@@ -55,8 +57,8 @@ import {
   toast,
   Toolbar,
   useContractForm,
+  useIsPhone,
   useModal,
-  useSideBySide,
   type StatusTone,
   type TimelineItem,
 } from "@mycity/ui";
@@ -89,10 +91,10 @@ export function Offers() {
   const [status, setStatus] = useState(params.get("status") ?? "");
   const summary = useApi("GET /api/v1/recruitment/offers/summary");
   const list = usePaged("GET /api/v1/recruitment/offers", { filters: status ? { status: status as OfferStatus } : {} });
-  const beside = useSideBySide();
+  const phone = useIsPhone();
+  // Nothing opens unasked: a row opens its offer in the dialog, or the sheet on a phone (F31).
   const [picked, setPicked] = useState<string | null>(null);
-  // Beside the list the first offer shows unasked; on a phone one opens only when tapped (F31).
-  const shown = picked ?? (beside ? (list.rows[0]?.offer_id ?? null) : null);
+  const shown = picked;
 
   const newOffer = (applicationId?: string) =>
     modal.open({ title: "New Offer", wide: true, full: true, body: (close) => <OfferForm applicationId={applicationId} close={close} onSaved={(o) => setPicked(o.offer_id)} /> });
@@ -161,6 +163,8 @@ export function Offers() {
         />
       </Toolbar>
       <ListDetail
+        layout="modal"
+        size="xl"
         full
         open={picked !== null}
         onClose={() => setPicked(null)}
@@ -175,22 +179,40 @@ export function Offers() {
             onRowClick={(o) => setPicked(o.offer_id)}
             empty={list.q || status ? undefined : { title: "No Offers Yet" }}
             columns={[
+              { key: "number", label: "Offer", render: (o) => o.number, desktop: true },
               { key: "who", label: "Candidate", render: (o) => <span className={cn(o.offer_id === shown ? "font-semibold" : "font-medium")}>{o.candidate_name}</span> },
               { key: "role", label: "Role", render: (o) => o.job_title, desktop: true },
-              { key: "pay", label: "Annual", align: "n", desktop: true, render: (o) => <Money value={o.annual_compensation} /> },
+              { key: "start", label: "Start Date", desktop: true, render: (o) => (o.start_date ? formatDate(o.start_date) : "–") },
+              {
+                key: "pay",
+                label: "Annual",
+                align: "n",
+                desktop: true,
+                render: (o) => (
+                  <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                    <Money value={o.annual_compensation} />
+                    {o.outside_range && <Pill tone="warn">Outside Range</Pill>}
+                  </span>
+                ),
+              },
               { key: "status", label: "Status", render: (o) => pill(OFFER_STATUS[o.status]) },
+              { key: "sent", label: "Sent", desktop: true, render: (o) => (o.sent_at ? formatDate(o.sent_at) : "–") },
               { key: "ends", label: "Expires", desktop: true, render: (o) => (o.expires_at ? formatDate(o.expires_at) : "–") },
             ]}
           />
         }
-        detail={shown ? <OfferRecord key={shown} id={shown} onPicked={setPicked} /> : null}
+        // The dialog sets the cards side by side over the letter; a phone's sheet stacks them.
+        detail={shown ? <OfferRecord key={shown} id={shown} onPicked={setPicked} wide={!phone} /> : null}
       />
     </>
   );
 }
 
-/** One offer: its summary and actions, pay, approval, signers, history, and the letter. */
-export function OfferRecord({ id, onPicked }: { id: string; onPicked?: (id: string) => void }) {
+/**
+ * One offer: its summary and actions, pay, approval and signers, then its history and the letter.
+ * `wide` (the desktop dialog): the first four two by two, History and the letter across the dialog.
+ */
+export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPicked?: (id: string) => void; wide?: boolean }) {
   const modal = useModal();
   const read = useApi("GET /api/v1/recruitment/offers/:id", { params: { id } });
   const submit = useMutation("POST /api/v1/recruitment/offers/:id/submit");
@@ -226,7 +248,8 @@ export function OfferRecord({ id, onPicked }: { id: string; onPicked?: (id: stri
           The offer email to {o.candidate_email} was refused on {formatDateTime(o.send_refused_at)}.
         </Banner>
       )}
-      <Card as="article">
+      <Pair wide={wide}>
+        <Card as="article">
         <CardHeader record title={o.candidate_name} right={pill(OFFER_STATUS[o.status])} />
         <KeyValue
           items={[
@@ -269,6 +292,7 @@ export function OfferRecord({ id, onPicked }: { id: string; onPicked?: (id: stri
           />
         </Card>
       )}
+      </Pair>
       <Card>
         <CardHeader title="History" />
         <Timeline label="History" items={historyOf(o)} />
@@ -284,6 +308,11 @@ export function OfferRecord({ id, onPicked }: { id: string; onPicked?: (id: stri
       </Paper>
     </Stack>
   );
+}
+
+/** The record's first cards: two by two in the desktop dialog, each at its own height; one under another in a phone's sheet. */
+function Pair({ wide, children }: { wide: boolean; children: React.ReactNode }) {
+  return wide ? <Grid cols={2} scroll={false} flush>{children}</Grid> : <>{children}</>;
 }
 
 /** The monthly pay, line by line, the total and the year, against the vacancy's range. */

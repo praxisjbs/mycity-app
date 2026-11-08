@@ -740,16 +740,16 @@ public-app/
       mock/                   the in-browser mock, laptops and CI only; demo-links.ts lists sample addresses
     shell/                    Page (PublicPage with the header's six links, the router and noindex), Planned
                               (Coming Soon), DemoLinks (mock only)
-    pages/                    Home, Careers, Vacancy, Apply, Assessment, SignOffer, Verify (each with its
-                              test), Guidance (a page opened without its link), LinkProblem, Proposal;
+    pages/                    Home, Careers, Vacancy, Apply, Assessment, SignOffer, Verify, Help (each with
+                              its test), Guidance (a page opened without its link), LinkProblem, Proposal;
                               shared.tsx holds the careers labels and a role's facts
 ```
 
 Addresses are `/` (the index), `/jobs`, `/jobs/<slug>`, `/apply/<token>`, `/assess/<token>`,
-`/sign/<token>`, `/verify/<number>` and `/verify/t/<token>` (the QR on a sealed document) (MILESTONES
-§6); `/vacancy` (and `/jobs/`), `/apply`, `/assess` and `/sign`, the header's links, open a guidance
-screen for a visitor with no link. Only the index, the careers list and an open vacancy may be
-indexed; every other page sets `noindex`. The site has no Prototype View switch: its one header
+`/sign/<token>`, `/verify/<number>`, `/verify/t/<token>` (the QR on a sealed document) and `/help`
+(MILESTONES §6); `/vacancy` (and `/jobs/`), `/apply`, `/assess` and `/sign`, the header's links, open a guidance
+screen for a visitor with no link. Only the index, the careers list, an open vacancy and Help may
+be indexed; every other page sets `noindex`. The site has no Prototype View switch: its one header
 carries the six links (06/11/2026). In mock mode a Demo Links menu at the foot of each page opens every
 state (a used or expired link, a paused or filled role, each verify outcome); the mock keeps its
 state in memory, so a reload starts it again.

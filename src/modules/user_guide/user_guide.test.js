@@ -54,6 +54,19 @@ summary: Signing in and finding your way.
 Open the hub and sign in.
 `;
 
+const HELP = `---
+title: Help
+kind: public-help
+milestones: M4
+summary: How the careers site works.
+---
+
+## Apply {#public-apply}
+
+1. Open the link in your email.
+2. Press **Send Application**.
+`;
+
 const OLD = "# Mailbox\n\nWritten before the guide had its format.\n";
 
 /** A reader as ⌘K builds one: grants by module, capabilities, CEO, manages people. */
@@ -71,6 +84,7 @@ beforeAll(() => {
   fs.writeFileSync(path.join(dir, "settings.md"), SETTINGS);
   fs.writeFileSync(path.join(dir, "getting-started.md"), START);
   fs.writeFileSync(path.join(dir, "mailbox.md"), OLD);
+  fs.writeFileSync(path.join(dir, "public-site.md"), HELP);
   fs.writeFileSync(path.join(dir, "home.md"), "");
 });
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -134,6 +148,20 @@ describe("what a reader receives", () => {
   test("the CEO reads everything", () => {
     const all = service.cut(guide(), ceo());
     expect(all.chapters.map((c) => c.slug)).toEqual(["getting-started", "people", "settings"]);
+  });
+});
+
+describe("the public site's Help (§6.11)", () => {
+  test("is kept out of the hub's chapters and read whole by nobody signed in", () => {
+    expect(service.load({ dir, fresh: true }).chapters.map((c) => c.slug)).not.toContain("public-site");
+    const help = service.publicHelp({ dir, fresh: true });
+    expect(help).toMatchObject({ slug: "public-site", kind: "public-help", title: "Help" });
+    expect(help.sections.map((s) => s.slug)).toEqual(["public-apply"]);
+  });
+
+  test("serves only the pictures its chapter shows", () => {
+    expect(service.publicImage("public-home.desktop.png")).toMatch(/img[\\/]public-site[\\/]public-home\.desktop\.png$/);
+    expect(() => service.publicImage("people-employees.desktop.png")).toThrow("That picture is not there.");
   });
 });
 

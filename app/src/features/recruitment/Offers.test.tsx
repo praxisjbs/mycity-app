@@ -45,10 +45,11 @@ async function pick(name: string) {
   await settled();
 }
 /** The record in view: the article titled by the candidate. */
-const record = (name: string) => screen.getAllByRole("article").find((a) => within(a).queryByText(name))!.parentElement!;
+/** The offer's record: the dialog it opened in (F31 as amended 08/11/2026). */
+const record = (name: string) => screen.getAllByRole("article").find((a) => within(a).queryByText(name))!.closest<HTMLElement>("[role=dialog]")!;
 
 describe("Recruitment · Offers", () => {
-  it("lists the offers with their figures, the first beside the list, and its pay, signers, history and letter", async () => {
+  it("lists the offers with their figures, and a row opens its pay, signers, history and letter in the dialog", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=offers");
     for (const k of ["With Approval", "To Send", "With Candidates", "Accepted This Month"]) expect(screen.getAllByText(k).length).toBeGreaterThan(0);
     await pick("Chiamaka Eze");
@@ -97,7 +98,7 @@ describe("Recruitment · Offers", () => {
     expect(screen.queryAllByRole("dialog").length).toBe(1);
     fireEvent.click(within(dialog()).getByRole("checkbox", { name: "Agree to Sign Electronically" }));
     await press(dialog(), "Sign Offer");
-    await waitFor(() => expect(screen.queryAllByRole("dialog").length).toBe(0));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Sign for the Company" })).toBeNull());
     await waitFor(() => expect(within(record("Tunde Bakare")).getByRole("button", { name: "Send Offer" })).toBeTruthy());
     await press(record("Tunde Bakare"), "Send Offer");
     await waitFor(() => expect(within(record("Tunde Bakare")).getAllByText("With Candidate").length).toBeGreaterThan(0));
@@ -120,7 +121,7 @@ describe("Recruitment · Offers", () => {
     await settled();
     await press(d, "Next");
     await press(dialog(), "Draft Offer");
-    await waitFor(() => expect(screen.queryAllByRole("dialog").length).toBe(0));
+    await waitFor(() => expect(screen.queryAllByRole("dialog").length).toBe(1));
     await waitFor(() => expect(within(record("Seun Okonkwo")).getAllByText("Draft").length).toBeGreaterThan(0));
     expect(within(record("Seun Okonkwo")).getByRole("button", { name: "Submit for Approval" })).toBeTruthy();
   }, 60000);
@@ -141,7 +142,7 @@ describe("Recruitment · Offers", () => {
     expect(copyProblems(d)).toEqual([]);
     fireEvent.change(within(d).getByLabelText("Email"), { target: { value: "dayo.martins@example.org" } });
     await press(d, "Send to Email");
-    await waitFor(() => expect(screen.queryAllByRole("dialog").length).toBe(0));
+    await waitFor(() => expect(screen.queryAllByRole("dialog").length).toBe(1));
     await waitFor(() => expect(within(record("Dayo Martins")).getByText("dayo.martins@example.org")).toBeTruthy());
     expect(within(record("Dayo Martins")).queryByText(/was refused on/)).toBeNull();
   }, 60000);

@@ -4,7 +4,7 @@
  * @summary A list and the record a row opens: side by side on a wide desktop, and on a phone the list alone with the opened record in a bottom sheet, never below the list (F31).
  * @use Any list whose row opens a record on the same screen: leave requests, payslips, proposals, offers, letter templates. DetailPane is the same rule for a record the desktop layout places elsewhere on the page (under the list beside a chart, above the list). `useSideBySide()` says when a first pick may show unasked.
  * @avoid A record with its own screen (navigate to its `id`); a reader read one at a time that fills the screen (SplitPanes: the mailbox, chat); a form (Modal); a record shown below its list on a phone, in any shape.
- * @phone No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `layout="modal"` (Expenses, F31 as amended 04/11/2026) opens the record in the centred dialog at every desktop width too, and the list takes the full width.
+ * @phone No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `layout="modal"` (Expenses, F31 as amended 04/11/2026; Recruitment's Interviews and Offers, amended 08/11/2026, with `size="xl"`) opens the record in the centred dialog at every desktop width too, and the list takes the full width.
  * @a11y The sheet is the shared Modal: titled by `title`, focus moves in and returns to the row on close, Esc and the phone's Back close it (F29). Side by side, the record is a plain column after the list in reading order.
  * @status stable
  * @exports DetailPane
@@ -42,12 +42,12 @@ const shows = (node: ReactNode) => node !== null && node !== undefined && node !
  * The opened record in the shared Modal (a bottom sheet on a phone). It keeps
  * the last record while it slides away, so the sheet never empties as it closes.
  */
-function RecordSheet({ open, onClose, title, full, wide, container, record }: { open: boolean; onClose: () => void; title: ReactNode; full?: boolean; wide?: boolean; container?: HTMLElement | null; record: ReactNode }) {
+function RecordSheet({ open, onClose, title, full, size, container, record }: { open: boolean; onClose: () => void; title: ReactNode; full?: boolean; size?: "md" | "wide" | "xl"; container?: HTMLElement | null; record: ReactNode }) {
   const showing = open && shows(record);
   const last = useRef<ReactNode>(null);
   if (showing) last.current = record;
   return (
-    <Modal open={showing} onClose={onClose} title={title} full={full} wide={wide} container={container} bodyClassName={FLAT}>
+    <Modal open={showing} onClose={onClose} title={title} full={full} size={size} container={container} bodyClassName={FLAT}>
       {showing ? record : last.current}
     </Modal>
   );
@@ -78,9 +78,11 @@ export interface ListDetailProps {
    * dialog on desktop and the sheet on a phone (F31 as amended for Expenses). Nothing shows unasked.
    */
   layout?: "beside" | "modal";
+  /** The dialog's desktop width: `md`, `wide` (the default for `cols="1/1.5"`), or `xl` for a record whose cards sit side by side in the dialog (`layout="modal"`: Recruitment's Interviews and Offers). */
+  size?: "md" | "wide" | "xl";
 }
 
-export function ListDetail({ list, detail, open, onClose, title, cols = "1.4/1", full, container, className, layout = "beside" }: ListDetailProps) {
+export function ListDetail({ list, detail, open, onClose, title, cols = "1.4/1", full, container, className, layout = "beside", size }: ListDetailProps) {
   const wide = useSideBySide();
   const beside = wide && layout === "beside";
   if (beside) {
@@ -94,7 +96,7 @@ export function ListDetail({ list, detail, open, onClose, title, cols = "1.4/1",
   return (
     <>
       <div className={cn("min-w-0", className)}>{list}</div>
-      <RecordSheet open={open} onClose={onClose} title={title} full={full} wide={cols === "1/1.5"} container={container} record={detail} />
+      <RecordSheet open={open} onClose={onClose} title={title} full={full} size={size ?? (cols === "1/1.5" ? "wide" : "md")} container={container} record={detail} />
     </>
   );
 }

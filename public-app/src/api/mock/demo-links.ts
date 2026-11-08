@@ -36,4 +36,5 @@ export const DEMO_LINKS: Array<[string, string]> = [
   ["Verify, QR on OFF-0017", "/verify/t/Qd5mW8rTx3Kp"],
   ["Proposal", "/proposal/Hn5vR2qLx8Tc"],
   ["Proposal, no longer open", "/proposal/Wd3kP9sMb6Ye"],
+  ["Help", "/help"],
 ];
