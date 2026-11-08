@@ -159,11 +159,11 @@ async function proposalFigures(db, scope, year) {
   const params = [year];
   const seen = deals.dealSeen(scope, "po", params);
   const { rows } = await db.query(
-    `SELECT count(*) FILTER (WHERE pp.sent_at IS NOT NULL AND extract(year FROM pp.sent_at AT TIME ZONE 'Africa/Lagos') = $1)::int AS sent_this_year,
-            count(*) FILTER (WHERE pp.status = 'accepted' AND extract(year FROM pp.accepted_at AT TIME ZONE 'Africa/Lagos') = $1)::int AS accepted,
+    `SELECT count(*) FILTER (WHERE pp.sent_at IS NOT NULL AND date_part('year', pp.sent_at AT TIME ZONE 'Africa/Lagos') = $1)::int AS sent_this_year,
+            count(*) FILTER (WHERE pp.status = 'accepted' AND date_part('year', pp.accepted_at AT TIME ZONE 'Africa/Lagos') = $1)::int AS accepted,
             count(*) FILTER (WHERE pp.status = 'viewed')::int AS viewed_no_reply,
             count(*) FILTER (WHERE pp.status IN ('accepted', 'declined')
-                               AND extract(year FROM COALESCE(pp.accepted_at, pp.declined_at) AT TIME ZONE 'Africa/Lagos') = $1)::int AS decided
+                               AND date_part('year', COALESCE(pp.accepted_at, pp.declined_at) AT TIME ZONE 'Africa/Lagos') = $1)::int AS decided
        ${P_FROM} WHERE ${NEWEST} ${seen}`,
     params,
   );
