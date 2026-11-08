@@ -63,7 +63,7 @@ function Routes() {
     case "sign": return <SignOffer key={r.token} token={r.token} />;
     case "verify": return <Verify key={r.number ?? ""} number={r.number} />;
     case "verify-qr": return <Verify key={`t-${r.token}`} number={null} qr={r.token} />;
-    case "proposal": return <Proposal key={r.token} />;
+    case "proposal": return <Proposal key={r.token} token={r.token} />;
     default: return <NotFound />;
   }
 }
