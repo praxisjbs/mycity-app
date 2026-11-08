@@ -64,10 +64,28 @@ async function create(actor, scope, body) {
   return repo.get(pool, id);
 }
 
+/**
+ * A linked thread's message logged as an email interaction on its record, in the caller's
+ * transaction (§6.15; mailbox/binding/intake.service): once a message, owned by the mailbox's owner,
+ * its subject and excerpt as the record's readers see them. It is contact (§6.12).
+ * @returns {Promise<string|null>}  the interaction's id, or null when the message was logged already
+ */
+async function logMailIn(client, m) {
+  const id = await repo.insertMail(client, m);
+  if (!id) return null;
+  await emit(client, {
+    key: EVENTS.INTERACTION_LOGGED,
+    entity: { type: "partner_interaction", id },
+    actor: null,
+    payload: { partner_interaction_id: id, partner_id: m.partner_id || null, lead_id: m.lead_id || null, deal_id: m.deal_id || null, interaction_type: "email", source: "mail" },
+  });
+  return id;
+}
+
 /** A lead's interactions and linked mail become its partner's (a conversion, §6.4, §6.15). */
 async function moveToPartner(client, leadId, partnerId) {
   await client.query("UPDATE partner_interaction SET partner_id = $2, lead_id = NULL WHERE lead_id = $1", [leadId, partnerId]);
-  await client.query("UPDATE partner_mail_thread SET partner_id = $2, lead_id = NULL WHERE lead_id = $1", [leadId, partnerId]);
+  await require("../mailbox/binding/convert.service").moveToPartnerIn(client, leadId, partnerId);
 }
 
-module.exports = { list, latestOf, create, moveToPartner, GRACE_MS };
+module.exports = { list, latestOf, create, logMailIn, moveToPartner, GRACE_MS };

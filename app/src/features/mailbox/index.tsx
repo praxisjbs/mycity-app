@@ -15,6 +15,7 @@ import { ApiError } from "@/api/client";
 import { Avatar, Banner, Button, cn, EmailFrame, EmptyState, ErrorState, Field, fileTypeOf, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, prepareEmail, referencedCids, SearchInput, splitQuoted, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type Mailto, type MenuItem, type SplitState } from "@mycity/ui";
 import { MailSignature } from "./MailSignature";
 import { SummaryCard } from "./Assist";
+import { usePartnerContext } from "./PartnerContext";
 import type { ThreadSummary } from "@mycity/contract/contract.gen.ts";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
@@ -197,6 +198,8 @@ function ThreadReader({ row, mailbox, writes, onBack, compose, onMoved }: { row:
   const mobile = useIsMobile();
   /* Summarise Thread (mailbox.md §3 step 14): the card shows loading lines until the summary arrives. */
   const [summary, setSummary] = useState<{ open: boolean; data: ThreadSummary | null }>({ open: false, data: null });
+  /* Link to Partner (partnerships.md §6.15): the record's line under the header, and the menu's item. */
+  const partner = usePartnerContext(row.mail_thread_id, row.folder === "spam");
   /* Opening a thread marks it read on the server too (mailbox.md §3). */
   useEffect(() => {
     if (row.unread) void api.call("POST /api/v1/mailbox/threads/:id/read", { params: { id: row.mail_thread_id }, body: {} }).then(() => invalidate("/api/v1/mailbox/threads"));
@@ -267,6 +270,7 @@ function ThreadReader({ row, mailbox, writes, onBack, compose, onMoved }: { row:
     ...(row.folder !== "spam" ? [{ label: "Move to Spam", icon: "alert" as const, onSelect: () => void move("spam") }] : []),
     ...(row.folder !== "trash" ? [{ label: "Move to Trash", icon: "x" as const, danger: true, onSelect: () => void move("trash") }] : []),
     ...(lastMsg.images_trusted ? [{ label: "Stop Showing Images", icon: "image" as const, onSelect: () => void trust(lastMsg.from.address, false) }] : []),
+    ...partner.menu,
   ];
 
   return (
@@ -288,6 +292,7 @@ function ThreadReader({ row, mailbox, writes, onBack, compose, onMoved }: { row:
           <Menu trigger={(p) => <IconButton {...p} icon="dots" label="Move this message" />} items={moves} />
         </span>
       </div>
+      {partner.line}
       {summary.open && !spam && <SummaryCard summary={summary.data} close={() => setSummary({ open: false, data: summary.data })} />}
       {thread.messages.map((m, i) => (
         <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} forwardable={!spam && can("community", "create")} />

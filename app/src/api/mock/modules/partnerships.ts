@@ -290,6 +290,7 @@ function seed(p: MockPartner, i: number) {
     occurred_at: at(p.quiet_days, "11:00"),
     owner: refKey(p.owner),
     from_mail: false,
+    mail: null,
     created_at: at(p.quiet_days, "11:00"),
   });
   if (signed) {
@@ -309,6 +310,39 @@ function seed(p: MockPartner, i: number) {
 PARTNERS.forEach(seed);
 
 export const recordOf = (id: string | null | undefined) => RECORDS.find((r) => r.id === id) ?? null;
+
+/**
+ * Link to Partner on the mock (§6.15): each message of the linked conversation logged once on the
+ * record as an email interaction, its excerpt the first 300 characters.
+ */
+export function logLinkedMail(
+  record: { kind: "lead" | "partner"; id: string },
+  dealId: string | null,
+  owner: string,
+  threadId: string,
+  messages: Array<{ id: string; subject: string; text: string; from: string; to: string[]; at: string }>,
+) {
+  for (const m of messages) {
+    const key = sid(`interaction:mail:${m.id}`);
+    if (INTERACTIONS.some((x) => x.partner_interaction_id === key)) continue;
+    const text = m.text.replace(/\s+/g, " ").trim();
+    INTERACTIONS.unshift({
+      partner_interaction_id: key,
+      partner_id: record.kind === "partner" ? record.id : null,
+      lead_id: record.kind === "lead" ? record.id : null,
+      deal_id: dealId,
+      contact: null,
+      interaction_type: "email",
+      subject: m.subject || "(no subject)",
+      summary: text.length > 300 ? `${text.slice(0, 300)}…` : text || null,
+      occurred_at: m.at,
+      owner: refKey(owner),
+      from_mail: true,
+      mail: { from: m.from, to: m.to, mail_thread_id: threadId },
+      created_at: m.at,
+    });
+  }
+}
 export const dealOf = (id: string | null | undefined) => DEALS.find((d) => d.id === id) ?? null;
 const recordOfDeal = (d: MockDeal) => recordOf(d.partner_id ?? d.lead_id)!;
 const regionLabel = (r: MockRecord) =>
@@ -1083,6 +1117,7 @@ route("POST /api/v1/partnerships/interactions", (req) => {
     occurred_at: new Date(String(b.occurred_at)).toISOString(),
     owner: refKey(req.user!),
     from_mail: false,
+    mail: null,
     created_at: now(),
   };
   INTERACTIONS.unshift(x);

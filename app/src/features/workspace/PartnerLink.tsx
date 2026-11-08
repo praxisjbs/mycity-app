@@ -95,22 +95,26 @@ function DealSelect({ value, onChange, valueLabel }: { value: PartnerLinkValue; 
 /**
  * The fields themselves, for a form to place among its own.
  * @param view  the saved link as the server named it (an edit), so a record the person cannot see is said so
+ * @param open  shows Partner and Deal at once, with no Disconnect: a form whose whole purpose is the link
+ *              (Mailbox's Link to Partner, partnerships.md §6.15)
  */
 export function PartnerLinkFields({
   value,
   onChange,
   view = null,
   problem = null,
+  open = false,
 }: {
   value: PartnerLinkValue;
   onChange: (v: PartnerLinkValue) => void;
   view?: PartnerLinkView | null;
   problem?: { record?: string; deal?: string } | null;
+  open?: boolean;
 }) {
   const may = useMayConnect();
   const records = useRecordOptions();
   const connected = Boolean(value.partner_id || value.lead_id);
-  const [shown, setShown] = useState(connected);
+  const [shown, setShown] = useState(connected || open);
   const disconnect = () => {
     onChange(NO_LINK);
     setShown(false);
@@ -148,7 +152,7 @@ export function PartnerLinkFields({
           <DealSelect key={keyOf(value)} value={value} valueLabel={dealNamed} onChange={(deal) => onChange({ ...value, deal_id: deal })} />
         </Field>
       )}
-      <Button size="sm" onClick={disconnect}>Disconnect</Button>
+      {!open && <Button size="sm" onClick={disconnect}>Disconnect</Button>}
     </>
   );
 }
