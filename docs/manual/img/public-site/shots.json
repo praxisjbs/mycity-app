@@ -1,7 +1,7 @@
 {
   "public-apply": {
     "spec": "b6f0b9175d8ca747",
-    "source": "7f323dcf3c6aaa55",
+    "source": "35f704607b190565",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "public-apply-questions": {
     "spec": "0c5521efda000ca1",
-    "source": "7f323dcf3c6aaa55",
+    "source": "35f704607b190565",
     "devices": [
       "desktop",
       "phone"

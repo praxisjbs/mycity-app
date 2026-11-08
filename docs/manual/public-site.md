@@ -145,7 +145,8 @@ the one before.
 3. They quote the reference when they contact MyCity. **See Other Roles** opens the careers page.
 
 The page never shows a score or a stage. Sending the same email to the same role again changes
-nothing and shows the first reference.
+nothing: the page says *You Have Already Applied*, with the first application's reference and the
+day it was sent.
 
 ### When the link does not work {#public-apply-link}
 

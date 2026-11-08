@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "92c74aaeca7520e6bf16f369cfcc644bd776f9264597380328e80dbc57224aee",
+  "source_hash": "2e9d7f625f2fae840e99af36fca9b2dc4656cfb9bca7668132dfd3d0ead39997",
   "schemas": 1922,
   "endpoints": 843,
   "inputs": {
@@ -17,7 +17,7 @@
     "packages/contract/schemas/audit.js": "6d89015604235f5d773aae741a069230d68e02bc97aa4120b666d337379fc785",
     "packages/contract/schemas/budgets.js": "d54f3b2721ac85bb1de59db35a89f4ad593bf1a7270256907adaab75250bc876",
     "packages/contract/schemas/calendar.js": "3a54d906b71d7d0e8dba3aef6f116fd83bfc8b0d5daaa54c8638c46a65f6ec07",
-    "packages/contract/schemas/candidates.js": "b958358e95afe37049ebc0907ec7b4f8879e73777350c57b1cbece1c7a901d40",
+    "packages/contract/schemas/candidates.js": "63318a8737866a318fcddcf89d3ebdd0edfabce44a12c71e5081b1e4c8d84952",
     "packages/contract/schemas/common.js": "85351764de094282468fb732d1a9e0486048eadc7728081386b8772498419ccf",
     "packages/contract/schemas/community.js": "1c13986f3dea794ab8e83b461c18e863f8a285a81fa0aad029a0d94b733648fb",
     "packages/contract/schemas/dashboard.js": "30a17b3c0dd8b6fd460b332444be2c2e31047154a16787ddda1346f63a5b4870",
@@ -73,7 +73,7 @@
     "packages/contract/schemas/templates.js": "5c68262e21422e9f522f31ebeab2e9bc0b22faecccb972a28c9631f99738a301",
     "packages/contract/schemas/user_guide.js": "3a14914b7ff89d8ce50a1dbbe921a70370cf5e52d7f41f95f36752c54884b7d1",
     "packages/contract/schemas/users.js": "c62a6bfc703543682f6d190a19a68e86f34363c3f7846a46c54ba905e978064d",
-    "packages/contract/schemas/vacancies.js": "9547878d282db28286f7a7a44915ebcf691c7ea093f21ffb8528d103f84df680",
+    "packages/contract/schemas/vacancies.js": "8263ca2e2715967295975c4c3f54b1388afbd5827b814d389c7c00c93f2d50be",
     "packages/contract/schemas/workflow.js": "d070ad092b3a3b634ca1076856066d987734f21c1d8e102b4f2605d68fe0e8f8",
     "packages/contract/schemas/worksites.js": "96dd0eb1c22e1930b48f7ab77c85fee88382d38b1e897b6700ba8b999c5f1f76",
     "packages/contract/schemas/workspace.js": "85d46b8095025384afc99f99185149ea69be72ca519022075014e9dd9befa273",

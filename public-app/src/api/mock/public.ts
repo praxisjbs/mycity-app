@@ -349,6 +349,14 @@ const LINKS = new Map<string, Link>([
   ["k7Qm2TxV9pLa", { slug: "head-sales-revenue-lagos", expires_at: inDays(2), receipt: null, email: null }],
   ["Bv3nQ8sLp2Wd", { slug: "graphics-and-motion-designer-lagos", expires_at: inDays(2), receipt: null, email: null }],
   ["Wn4cR8yHj2Zs", { slug: "studio-assistant-lagos", expires_at: inDays(-1), receipt: null, email: null }],
+  ["Hq5tN2wPz8Kc", { slug: "head-sales-revenue-lagos", expires_at: inDays(2), receipt: null, email: null }],
+]);
+/**
+ * Who has applied for which role, by role slug and email: a repeat is told it applied. Chiamaka
+ * applied for Head, Sales & Revenue a few days ago, so applying again as her shows it.
+ */
+const APPLIED = new Map<string, ApplicationReceipt>([
+  ["head-sales-revenue-lagos|chiamaka.eze@example.com", { reference: "APP-0016", submitted_at: inDays(-4), already_applied: false }],
 ]);
 const opaque = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"[b % 56]).join("");
 const liveLink = (token: string) => {
@@ -396,8 +404,17 @@ route("POST /api/public/v1/apply/:token", (req: Req) => {
   if (!checked.success) for (const i of checked.error.issues) (fields[i.path.join(".") || "body"] ??= []).push(i.message);
   Object.assign(fields, answersOf(r, ((req.body as { answers?: Record<string, string> }).answers ?? {}) as Record<string, string>));
   if (Object.keys(fields).length) return invalid(fields);
-  l.receipt = { reference: `APP-${String(++nextApp).padStart(4, "0")}`, submitted_at: new Date().toISOString() };
-  l.email = String((req.body as { email?: string }).email ?? "");
+  const email = String((req.body as { email?: string }).email ?? "").trim().toLowerCase();
+  /* The same email for the same role again: nothing new, and the applicant is told (the API's already_applied). */
+  const first = APPLIED.get(`${l.slug}|${email}`);
+  if (first) {
+    l.receipt = { ...first, already_applied: true };
+    l.email = email;
+    return ok(l.receipt);
+  }
+  l.receipt = { reference: `APP-${String(++nextApp).padStart(4, "0")}`, submitted_at: new Date().toISOString(), already_applied: false };
+  l.email = email;
+  APPLIED.set(`${l.slug}|${email}`, l.receipt);
   r.applicants += 1;
   return ok(l.receipt);
 });

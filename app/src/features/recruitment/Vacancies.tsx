@@ -106,7 +106,7 @@ export function Vacancies() {
         sub={s ? `${s.open} open · ${s.applicants} applicants` : undefined}
         actions={
           <>
-            <Button icon="globe" onClick={() => s && window.open(s.careers_url, "_blank", "noopener")}>Careers Page</Button>
+            <Button icon="globe" onClick={() => s && window.open(s.site_url, "_blank", "noopener")}>Visit Website</Button>
             <Button icon="mail" onClick={emails}>Candidate Emails</Button>
             <Button icon="cog" onClick={settings}>Careers Settings</Button>
             {mayCreate && <Button variant="primary" icon="plus" onClick={() => newVacancy()}>New Vacancy</Button>}

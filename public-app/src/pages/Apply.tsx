@@ -84,7 +84,8 @@ function applySchema(questions: ApplyQuestion[]): ContractSchema {
  * Apply (#82): reached by a one-time token, from Apply for This Role or an invitation. Write only:
  * the candidate sends an application and never reads one back, so there is no score and no stage.
  * The split layout: the role and the link's last day in the aside with the three steps (About You;
- * CV and Questions; Why This Role), the form on its Panel, then the receipt with the reference.
+ * CV and Questions; Why This Role), the form on its Panel, then the receipt with the reference, or
+ * You Have Already Applied with the first application's reference when this email had applied for the role.
  */
 export function Apply({ token }: { token: string }) {
   const link = useApi("GET /api/public/v1/apply/:token", { params: { token } });
@@ -103,7 +104,24 @@ export function Apply({ token }: { token: string }) {
       paragraph={d ? `Your CV, a few questions and why this role. This link works until ${formatDate(d.expires_at)}.` : undefined}
       steps={{ items: STEPS, at: step, complete: sent != null }}
     >
-      {sent ? (
+      {sent?.receipt.already_applied ? (
+        <Panel bare>
+          {/* This email had applied for this role: the first application stands, and nothing new was made. */}
+          <PageMessage
+            icon="info"
+            tone="neutral"
+            title="You Have Already Applied"
+            reference={{ label: "Your Reference", value: sent.receipt.reference }}
+            action={
+              <Button variant="primary" size="lg" onClick={() => navigate("/jobs")}>
+                See Other Roles
+              </Button>
+            }
+          >
+            {sent.email} applied for this role on {formatDate(sent.receipt.submitted_at)}. We kept that application.
+          </PageMessage>
+        </Panel>
+      ) : sent ? (
         <Panel bare>
           <PageMessage
             icon="ok"
