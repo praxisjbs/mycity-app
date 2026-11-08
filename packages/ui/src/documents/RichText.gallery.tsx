@@ -18,12 +18,28 @@ const POLICY: RichTextBlock[] = [
   { kind: "bullets", items: [[span("Write to "), span("people@mycityapp.io", { href: "mailto:people@mycityapp.io" })], [span("Or ask your line manager.", { italic: true })]] },
 ];
 
+const AGREEMENT: RichTextBlock[] = [
+  { kind: "heading", level: 2, spans: [span("Financials")] },
+  {
+    kind: "table",
+    head: [[], [span("Regular")], [span("VIP")], [span("VVIP")]],
+    rows: [
+      [[span("Original Price")], [span("₦12,000.00")], [span("₦30,000.00")], [span("₦75,000.00")]],
+      [[span("Discount")], [span("10%")], [span("10%")], [span("5%")]],
+      [[span("Deal Price")], [span("₦10,800.00")], [span("₦27,000.00")], [span("₦71,250.00")]],
+    ],
+  },
+  { kind: "heading", level: 2, spans: [span("Fine Print")] },
+  { kind: "numbered", items: [[span("Event registration and check-in on MyCityApp.")], [span("Amplification across MyCity's channels.")]] },
+];
+
 export default {
   component: "RichText",
   states: {
     Policy: () => <RichText blocks={POLICY} />,
     "Under A Card Title": () => <RichText blocks={POLICY} top={3} />,
     "Site Look": () => <RichText look="site" blocks={[{ kind: "paragraph", spans: [{ text: "The role will own revenue generation and sales team performance.", bold: false, italic: false, href: null }] }, { kind: "heading", level: 3, spans: [{ text: "1. Sales & Revenue Strategy", bold: false, italic: false, href: null }] }, { kind: "bullets", items: [[{ text: "Set clear sales targets and revenue objectives.", bold: false, italic: false, href: null }]] }]} top={3} />,
+    "Agreement With A Table": () => <RichText blocks={AGREEMENT} top={3} />,
     "One Paragraph": () => <RichText blocks={POLICY.filter((b) => b.kind === "paragraph")} />,
   },
 } satisfies GalleryEntry;

@@ -154,4 +154,41 @@ describe("Partnerships on the contract", () => {
     const sheet = await screen.findByRole("dialog", {}, { timeout: 8000 });
     expect(await within(sheet).findByRole("group", { name: /^Stage of / }, { timeout: 8000 })).toBeTruthy();
   }, 30000);
+
+  it("Contracts & MOUs: the KPI strip, the agreements beside the picked one, its lifecycle, signers, wording and reference", async () => {
+    await open("/partnerships?tab=contracts-and-mous");
+    expect(await screen.findByRole("heading", { level: 1, name: "Contracts & MOUs" }, { timeout: 8000 })).toBeTruthy();
+    for (const k of ["Active", "In Approval", "Awaiting Signature", "Renewals 180 Days"]) expect((await screen.findAllByText(k, {}, { timeout: 8000 })).length).toBeGreaterThan(0);
+    // The first row, an active agreement, opens beside the list: its lifecycle, signer, reference and wording.
+    expect(await screen.findByRole("list", { name: "Agreement lifecycle" }, { timeout: 8000 })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Reference and QR" }, { timeout: 8000 })).toBeTruthy();
+    expect(screen.getByRole("img", { name: /^QR code for AGR-/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Signers" })).toBeTruthy();
+    // The wording's options table, each row named by its term.
+    expect(await screen.findByRole("rowheader", { name: "Deal Price" }, { timeout: 8000 })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Renew" }).length).toBeGreaterThan(0);
+  }, 30000);
+
+  it("Contracts & MOUs: a Draft names its empty field, and Submit for Approval is refused until it is filled", async () => {
+    await open("/partnerships?tab=contracts-and-mous");
+    const chips = await screen.findByRole("group", { name: "Agreements" }, { timeout: 8000 });
+    fireEvent.click(within(chips).getByRole("button", { name: "Draft" }));
+    expect(await screen.findByText(/^Fill Event Title before you submit/, {}, { timeout: 8000 })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Edit Draft" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Submit for Approval" })).toBeNull();
+  }, 30000);
+
+  it("Contracts & MOUs on a phone: two KPI cards, nothing open until a row is tapped, then its sheet with the next step at its foot", async () => {
+    setViewport(390);
+    await open("/partnerships?tab=contracts-and-mous");
+    await screen.findByRole("heading", { level: 1, name: "Contracts & MOUs" }, { timeout: 8000 });
+    expect(await screen.findByText("Awaiting Signature", {}, { timeout: 8000 })).toBeTruthy();
+    expect(screen.getByText("Renewals 180 Days")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Reference and QR" })).toBeNull();
+    await waitFor(() => expect(document.querySelector("[data-row-open]")).toBeTruthy(), { timeout: 8000 });
+    fireEvent.click(document.querySelector("[data-row-open]") as HTMLElement);
+    const sheet = await screen.findByRole("dialog", {}, { timeout: 8000 });
+    expect((await within(sheet).findAllByRole("button", { name: "Renew" }, { timeout: 8000 })).length).toBeGreaterThan(0);
+    expect(within(sheet).queryByRole("table")).toBeNull();
+  }, 30000);
 });

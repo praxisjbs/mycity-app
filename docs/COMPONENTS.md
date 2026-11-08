@@ -166,7 +166,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [PdfViewer](#pdfviewer) | `PdfViewer` | A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom. | beta |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
-| Documents | [RichText](#richtext) | `RichText` | Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML. | beta |
+| Documents | [RichText](#richtext) | `RichText` | Formatted text the server sent as blocks (headings, paragraphs, lists, tables, bold, italic, links), drawn as elements, never as injected HTML. | beta |
 | Maps | [LocationLabel](#locationlabel) | `LocationLabel` | Where a point is, in words: the address our API looks up, with the coordinates until it arrives. | stable |
 | Maps | [MapView](#mapview) | `MapView` | A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves. | stable |
 | Maps | [PlaceSearch](#placesearch) | `PlaceSearch` | Finds an address through our own API and hands back the place with its coordinates. | stable |
@@ -5596,13 +5596,13 @@ An article list beside the article: the Knowledge Hub's shape, and anything else
 
 ### RichText
 
-Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML.
+Formatted text the server sent as blocks (headings, paragraphs, lists, tables, bold, italic, links), drawn as elements, never as injected HTML.
 
 | | |
 |---|---|
-| Use | A policy's text on Policy Updates and Knowledge Hub · Policies; any text a person wrote that the API gives back as blocks. `look="site"` is the public site's: a role's text in its body ink, a numbered heading's number on a Deep Green badge, bullets as small yellow squares. |
+| Use | A policy's text on Policy Updates and Knowledge Hub · Policies; an agreement's wording with its options table on Contracts & MOUs and the signing page; any text a person wrote that the API gives back as blocks. `look="site"` is the public site's: a role's text in its body ink, a numbered heading's number on a Deep Green badge, bullets as small yellow squares. |
 | Avoid | Text being written (use RichTextField); an email's own HTML (use EmailFrame); a short plain answer (a paragraph is enough). |
-| Phone | The same text at the phone's body size; long words and links wrap rather than push the page sideways. |
+| Phone | The same text at the phone's body size; long words and links wrap rather than push the page sideways. A table becomes a card a row, each cell under its column's name, since a phone shows no table. |
 | Accessibility | Real headings, lists and links in reading order, so a screen reader can move by heading; pass `top` so the headings sit under the page's own. |
 | Status | beta |
 | Exports | `RichText` |

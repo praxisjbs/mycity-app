@@ -18,7 +18,7 @@ import type {
   PlaceView,
   StageHistoryLine,
 } from "@mycity/contract/contract.gen.ts";
-import type { Contract, Proposal } from "@/api/types/partnerships";
+import type { Proposal } from "@/api/types/partnerships";
 import type { Status } from "@/api/types/performance";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, refKey } from "../data/people";
@@ -33,8 +33,8 @@ import { exportFile } from "./shared";
  * interactions.js), by the API's own rules where a screen can see them: a lead's status read from its
  * deal's stage, reasons for a move back, On Hold and Closed Lost, the signed copy for a signed stage,
  * Stalled needing blockers, conversion making the partner. Everyone signed in sees every record, as
- * the Operations account the screen gates sign in as does (§6.1). Proposals, Contracts & MOUs and
- * Analytics stay on their INTERIM shapes below until M7 PR 6 to 8.
+ * the Operations account the screen gates sign in as does (§6.1). Proposals and Analytics stay on
+ * their INTERIM shapes below until M7 PR 7 and 8; Contracts & MOUs is partnerships_agreements.ts.
  */
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
@@ -1088,7 +1088,7 @@ route("POST /api/v1/partnerships/interactions", (req) => {
   return created(x);
 });
 
-/** A partner by id for the INTERIM screens below (Proposals, Contracts), by its name. */
+/** A partner by id for the INTERIM Proposals screen below, by its name. */
 const find = (id: string) => {
   const r = recordOf(id);
   return r ? { name: r.name, owner: r.owner ?? "ngozi" } : null;
@@ -1132,38 +1132,6 @@ route("POST /api/v1/partnerships/proposals", (req) => {
   const { _doc, ...out } = p;
   void _doc;
   return created(out);
-});
-
-const CONTRACTS: Contract[] = [
-  ["Platform partnership MOU", "MTN Nigeria", "MOU", "2025-03-13", "2027-03-13", "18400000.00", S("ok", "Active")],
-  ["Sponsorship agreement", "ProvidusBank", "Contract", "2026-09-22", "2026-12-31", "9200000.00", S("ok", "Active")],
-  ["Data sharing MOU", "Lagos State Government", "MOU", null, null, "7500000.00", S("warn", "In review")],
-  ["Activation agreement", "Lonart-DS", "Contract", null, null, "4100000.00", S("neutral", "Draft")],
-].map((c, i) => ({ contract_id: sid(`con:${i}`), title: c[0] as string, partner: c[1] as string, kind: c[2] as Contract["kind"], start_on: c[3] as string | null, renewal_on: c[4] as string | null, value: c[5] as string, status: c[6] as Status }));
-route("GET /api/v1/partnerships/contracts/summary", () =>
-  ok({
-    active: CONTRACTS.filter((c) => c.status.text === "Active").length, in_review: CONTRACTS.filter((c) => c.status.text === "In review").length, draft: CONTRACTS.filter((c) => c.status.text === "Draft").length,
-    renewals_180: CONTRACTS.filter((c) => c.renewal_on && c.renewal_on <= isoDaysAhead(180)).length,
-    chain: ["Draft", "Review", "Approval", "Sent", "Viewed", "Signed", "Active", "Expiring", "Renewed"].map((label, i) => ({ label, state: i < 5 ? "done" : i === 5 ? "now" : null })),
-  }),
-);
-route("GET /api/v1/partnerships/contracts", (req) => paged(CONTRACTS, req, { search: (c) => [c.title, c.partner] }));
-route("GET /api/v1/partnerships/contracts/renewals", (req) => {
-  const today = new Date(`${isoDaysAgo(0)}T00:00:00Z`).getTime();
-  const rows = CONTRACTS.filter((c) => c.renewal_on).map((c) => ({ contract_id: c.contract_id, title: c.title, partner: c.partner, due: c.renewal_on!, days: Math.round((new Date(`${c.renewal_on}T00:00:00Z`).getTime() - today) / 86400000), owner: refKey(RECORDS.find((p) => p.name === c.partner)?.owner ?? "ngozi") })).sort((a, b) => a.days - b.days);
-  return paged(rows, req, { search: (r) => [r.title, r.partner] });
-});
-route("POST /api/v1/partnerships/contracts", (req) => {
-  const b = req.body as Record<string, string>;
-  const p = find(b.partner_id);
-  const f: Record<string, string[]> = {};
-  if (!p) f.partner_id = ["Pick the partner"];
-  if (!b.title?.trim()) f.title = ["Name the document"];
-  if (!(Number(b.value) > 0)) f.value = ["Enter the value"];
-  if (Object.keys(f).length) return invalid(f);
-  const c: Contract = { contract_id: sid(`con:new:${CONTRACTS.length}`), title: b.title.trim(), partner: p!.name, kind: (b.kind as Contract["kind"]) ?? "Contract", start_on: null, renewal_on: null, value: b.value, status: S("neutral", "Draft") };
-  CONTRACTS.unshift(c);
-  return created(c);
 });
 
 route("GET /api/v1/partnerships/analytics", () =>

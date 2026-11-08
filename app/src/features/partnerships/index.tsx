@@ -9,8 +9,8 @@ import { Categories } from "./Categories";
 
 /**
  * Partnerships (docs/guides/partnerships.md §2, §10): routing only, one file a screen. Pipeline,
- * Partners and Leads with both 360s run on the generated contract (M7 PR 3); Categories, Proposals,
- * Contracts & MOUs and Analytics stay on the mock until their pull requests (the guide's Appendix A).
+ * Partners and Leads with both 360s (M7 PR 3), Categories (PR 2) and Contracts & MOUs (PR 6) run on the
+ * generated contract; Proposals and Analytics stay on the mock until their pull requests (Appendix A).
  */
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
   switch (tab) {
@@ -21,7 +21,7 @@ export default function Partnerships({ tab, id }: ModuleScreenProps) {
     case "proposals":
       return <Proposals />;
     case "contracts-and-mous":
-      return <Contracts />;
+      return <Contracts id={id} />;
     case "analytics":
       return <Analytics />;
     case "categories":

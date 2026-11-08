@@ -1,12 +1,12 @@
 import type { PlaceValue } from "@mycity/ui";
-import type { IsoDate, Money, Paged, PersonRef, Uuid } from "./common";
+import type { Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
-import type { Status, Step } from "./performance";
+import type { Status } from "./performance";
 
 /**
  * INTERIM Partnerships shapes (owner GE; docs/guides/partnerships.md), for the screens still on the
- * mock: Proposals (M7 PR 7), Contracts & MOUs (PR 6) and Analytics (PR 8). Pipeline, Partners,
- * Leads and both 360s run on the generated contract since M7 PR 3; this file is deleted in PR 8.
+ * mock: Proposals (M7 PR 7) and Analytics (PR 8). Pipeline, Partners, Leads, both 360s and Contracts
+ * & MOUs run on the generated contract (M7 PR 3, PR 6); this file is deleted in PR 8.
  */
 export interface Proposal {
   proposal_id: Uuid;
@@ -41,31 +41,6 @@ export interface ProposalCreate {
   value: Money;
   terms: string;
 }
-export interface Contract {
-  contract_id: Uuid;
-  title: string;
-  partner: string;
-  kind: "MOU" | "Contract";
-  start_on: IsoDate | null;
-  renewal_on: IsoDate | null;
-  value: Money;
-  status: Status;
-}
-export interface ContractsSummary {
-  active: number;
-  in_review: number;
-  draft: number;
-  renewals_180: number;
-  chain: Step[];
-}
-export interface Renewal {
-  contract_id: Uuid;
-  title: string;
-  partner: string;
-  due: IsoDate;
-  days: number;
-  owner: PersonRef;
-}
 export interface PartnershipAnalytics {
   period: string;
   prospects: number;
@@ -85,10 +60,6 @@ declare module "@/api/endpoints" {
     "GET /api/v1/partnerships/proposals": { query: Q; body: never; params: never; response: Paged<Proposal> };
     "GET /api/v1/partnerships/proposals/:id/document": { query: never; body: never; params: { id: string }; response: ProposalDoc };
     "POST /api/v1/partnerships/proposals": { query: never; body: ProposalCreate; params: never; response: Proposal };
-    "GET /api/v1/partnerships/contracts/summary": { query: never; body: never; params: never; response: ContractsSummary };
-    "GET /api/v1/partnerships/contracts": { query: Q; body: never; params: never; response: Paged<Contract> };
-    "GET /api/v1/partnerships/contracts/renewals": { query: Q; body: never; params: never; response: Paged<Renewal> };
-    "POST /api/v1/partnerships/contracts": { query: never; body: { partner_id: Uuid; title: string; kind: Contract["kind"]; value: Money }; params: never; response: Contract };
     "GET /api/v1/partnerships/analytics": { query: never; body: never; params: never; response: PartnershipAnalytics };
   }
 }

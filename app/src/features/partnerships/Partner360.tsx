@@ -9,6 +9,7 @@ import { ClosePartner } from "./forms/ClosePartner";
 import { ContactForm } from "./forms/ContactForm";
 import { DealForm } from "./forms/DealForm";
 import { LogInteraction } from "./forms/LogInteraction";
+import { GenerateAgreement } from "./forms/AgreementForms";
 import { EditPartner } from "./forms/RecordForm";
 import { UploadDocument } from "./forms/UploadDocument";
 import { ReturnsTab } from "./Returns";
@@ -55,6 +56,9 @@ export function Partner360({ id }: { id: string }) {
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
     { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${partner.partner_id}`) },
+    ...(unfinished.length && mayCreate
+      ? [{ label: "Generate Agreement", icon: "doc" as const, onSelect: () => open("Generate Agreement", (close) => <GenerateAgreement dealId={unfinished.length === 1 ? unfinished[0].deal_id : undefined} close={close} onCreated={(aid) => navigate(`/partnerships?tab=contracts-and-mous&id=${aid}`)} />) }]
+      : []),
     { label: "Edit Partner", icon: "doc" as const, onSelect: () => open("Edit Partner", (close) => <EditPartner partner={partner} close={close} />, true) },
     { label: "Close Partner", danger: true, onSelect: () => open("Close Partner", (close) => <ClosePartner id={partner.partner_id} close={close} />) },
   ];

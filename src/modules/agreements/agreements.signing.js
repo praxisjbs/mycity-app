@@ -531,14 +531,14 @@ async function suggestedSigners(db, a, countersigned) {
   const out = [];
   const contact = await repo.signatoryOf(db, a);
   if (contact && contact.email)
-    out.push({ contact_id: contact.partner_contact_id, name: contact.full_name, title: contact.job_title || null, email: contact.email, side: "partner" });
+    out.push({ contact_id: contact.partner_contact_id, name: contact.full_name, ...(contact.job_title ? { title: contact.job_title } : {}), email: contact.email, side: "partner" });
   if (countersigned) {
     const { rows } = await db.query(
       `SELECT btrim(e.first_name || ' ' || e.last_name) AS name, e.job_title, e.work_email::text AS email
          FROM app_user u JOIN employee e ON e.employee_id = u.employee_id
         WHERE u.is_ceo AND u.status = 'active' ORDER BY u.created_at LIMIT 1`,
     );
-    if (rows[0]) out.push({ contact_id: null, name: rows[0].name, title: rows[0].job_title || null, email: rows[0].email, side: "mycity" });
+    if (rows[0]) out.push({ name: rows[0].name, ...(rows[0].job_title ? { title: rows[0].job_title } : {}), email: rows[0].email, side: "mycity" });
   }
   return out;
 }
