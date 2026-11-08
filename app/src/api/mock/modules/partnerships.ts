@@ -1404,15 +1404,69 @@ route("POST /api/v1/partnerships/proposals/:id/save-as-template", (req) => {
   return created(t);
 });
 
-route("GET /api/v1/partnerships/analytics", () =>
-  ok({
-    period: isoDaysAgo(0).slice(0, 7), prospects: 9, meetings: 14, proposals: 4, signed: 2,
-    by_owner: [["ngozi", 5, 8, 2, 1, 9, 14200], ["bashir", 3, 4, 1, 0, 7, 6800], ["cynthia", 1, 2, 1, 1, 7, 21400]].map(([o, prospects, meetings, proposals, signed, active, downloads]) => ({ owner: refKey(o as string), prospects: prospects as number, meetings: meetings as number, proposals: proposals as number, signed: signed as number, active: active as number, downloads: downloads as number })),
-    signed_per_month: { labels: ["May", "Jun", "Jul", "Aug", "Sep", "Oct"], values: [1, 2, 1, 3, 2, 2] },
-    downloads: [{ label: "MTN Nigeria", pct: 100, value: "18,200" }, { label: "ProvidusBank", pct: 50, value: "9,100" }, { label: "Filmhouse Cinemas", pct: 0, value: "0", emphasis: "warn" }, { label: "Lagos State Government", pct: 0, value: "0", emphasis: "warn" }, { label: "Lonart-DS", pct: 0, value: "0", emphasis: "warn" }],
-    months: [["October", 9, 4, 2, 22], ["September", 7, 3, 2, 29], ["August", 8, 2, 3, 38], ["July", 6, 3, 1, 17], ["June", 5, 2, 2, 40], ["May", 4, 1, 1, 25]].map(([month, prospects, proposals, signed, conversion_pct]) => ({ month: month as string, prospects: prospects as number, proposals: proposals as number, signed: signed as number, conversion_pct: conversion_pct as number })),
-  }),
-);
+// Analytics (§6.18): a period's figures in the contract's shape, the months of the period asked for.
+route("GET /api/v1/partnerships/analytics", (req) => {
+  const q = req.query as { period?: string; from?: string; to?: string };
+  const today = isoDaysAgo(0);
+  const y = Number(today.slice(0, 4));
+  const m = Number(today.slice(5, 7));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const lastOf = (yy: number, mm: number) => `${yy}-${pad(mm)}-${pad(new Date(Date.UTC(yy, mm, 0)).getUTCDate())}`;
+  const qStart = Math.floor((m - 1) / 3) * 3 + 1;
+  const period =
+    q.period === "custom" && q.from && q.to
+      ? { from: q.from, to: q.to }
+      : q.period === "year"
+        ? { from: `${y}-01-01`, to: `${y}-12-31` }
+        : q.period === "quarter"
+          ? { from: `${y}-${pad(qStart)}-01`, to: lastOf(y, qStart + 2) }
+          : { from: `${y}-${pad(m)}-01`, to: lastOf(y, m) };
+  const months: string[] = [];
+  for (let yy = Number(period.from.slice(0, 4)), mm = Number(period.from.slice(5, 7)); `${yy}-${pad(mm)}` <= period.to.slice(0, 7) && months.length < 60; mm === 12 ? ((yy += 1), (mm = 1)) : (mm += 1)) months.push(`${yy}-${pad(mm)}`);
+  const scale = months.length;
+  const owners: Array<[string, number[], string | null]> = [
+    ["ngozi", [5, 8, 2, 1, 9, 14200, 2], "Meets"],
+    ["bashir", [3, 4, 1, 0, 7, 6800, 1], null],
+    ["cynthia", [1, 2, 1, 1, 7, 21400, 0], "Exceeds"],
+  ];
+  const by_owner = owners.map(([key, [p, mt, pr, sg, act, dl, v], rating]) => ({
+    owner: refKey(key),
+    new_prospects: p * scale,
+    meetings_held: mt * scale,
+    proposals_sent: pr * scale,
+    partnerships_signed: sg * scale,
+    active_partnerships: act,
+    downloads: dl * scale,
+    vendor_leads: v * scale,
+    performance_rating: rating,
+  }));
+  const sum = (k: "new_prospects" | "meetings_held" | "proposals_sent" | "partnerships_signed") => by_owner.reduce((n, o) => n + o[k], 0);
+  return ok({
+    period,
+    kpis: { new_prospects: sum("new_prospects"), meetings_held: sum("meetings_held"), proposals_sent: sum("proposals_sent"), partnerships_signed: sum("partnerships_signed") },
+    by_owner,
+    signed_per_month: months.map((month, i) => ({ month, signed: [1, 2, 1, 3, 2, 2][i % 6], value: ["2500000.00", "4100000.00", "1200000.00", "6800000.00", "3000000.00", "2750000.00"][i % 6] })),
+    returns_per_month: months.map((month, i) => ({ month, gross_sales: ["1800000.00", "2400000.00", "960000.00"][i % 3], mycity_commission: ["144000.00", "192000.00", "76800.00"][i % 3], downloads: [14200, 18900, 6800][i % 3] })),
+    by_category: [
+      { partner_category_id: null, name: "Event", open: 6, signed: 2 * scale, value: "6600000.00" },
+      { partner_category_id: null, name: "Hospitality", open: 3, signed: scale, value: "1200000.00" },
+      { partner_category_id: null, name: "Vendor", open: 4, signed: 0, value: "0.00" },
+    ].map((c, i) => ({ ...c, partner_category_id: `00000000-0000-4000-8000-00000000070${i}` })),
+    by_region: [
+      { region: "Lagos", open: 7, signed: 2 * scale },
+      { region: "Abuja", open: 3, signed: scale },
+      { region: "National", open: 2, signed: 0 },
+      { region: "Port Harcourt", open: 1, signed: 0 },
+    ],
+    stage_conversion: [
+      ["prospect_identified", "Prospect Identified", "initial_contact", "Initial Contact", 14, 78],
+      ["initial_contact", "Initial Contact", "introductory_meeting_held", "Introductory Meeting Held", 9, 64],
+      ["introductory_meeting_held", "Introductory Meeting Held", "proposal_sent", "Proposal Sent", 6, 67],
+      ["proposal_sent", "Proposal Sent", "negotiation", "Negotiation", 4, 67],
+      ["negotiation", "Negotiation", "partnership_signed", "Partnership Signed", 3, 75],
+    ].map(([from_stage, from_label, to_stage, to_label, moved, rate]) => ({ from_stage: String(from_stage), from_label: String(from_label), to_stage: String(to_stage), to_label: String(to_label), moved: Number(moved), rate: Number(rate) })),
+  });
+});
 
 // Export on Partners and Leads, in the tracker's columns: a file made for the person who pressed it.
 route("POST /api/v1/partnerships/exports", (req) => exportFile(req.user!, String(req.body.source).replace("partnerships.", "")));

@@ -1504,7 +1504,30 @@ async function saveCheckInLine(actor, values) {
   }
 }
 
+/**
+ * Each person's latest monthly rating between two days, as Performance shows it to `actor`: only for
+ * the people whose reviews the actor may list in Performance (their `performance` view scope, or a
+ * review naming them), else no entry. Partnership Analytics reads it (docs/guides/partnerships.md
+ * §6.18); the rating's words are Performance's.
+ * @param {{query: Function}} db
+ * @param {{from: string, to: string}} range
+ * @param {string[]} employeeIds
+ * @param {object} actor  the signed-in user
+ * @returns {Promise<Map<string, string>>}  employee_id → "Exceeds", "Meets", "Partly Meets" or "Below"
+ */
+async function ratingsFor(db, range, employeeIds, actor) {
+  const out = new Map();
+  if (!actor || !employeeIds.length) return out;
+  const { scopeFor } = require("../../middleware/rbac");
+  const scope = await scopeFor(actor, "performance", "view");
+  if (!scope) return out;
+  const rows = await repo.latestRatings(db, { ...range, employee_ids: employeeIds }, scope, actor, await roleCodes(actor));
+  for (const r of rows) out.set(r.employee_id, RATING_WORDS[r.rating] || r.rating);
+  return out;
+}
+
 module.exports = {
+  ratingsFor,
   aiSummary,
   reviewView,
   itemView,
