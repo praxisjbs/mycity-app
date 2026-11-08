@@ -33,7 +33,6 @@ const canonical = require("../../shared/documents/canonical");
 const documents = require("../../shared/documents/generate");
 const md = require("../../shared/documents/markdown");
 const { fillMarkdown } = require("../../shared/documents/render");
-const vault = require("../../shared/documents/vault");
 const profile = require("../../shared/organisation/profile");
 const lagos = require("../../shared/time/lagos");
 const signatures = require("../signatures/signatures.service");

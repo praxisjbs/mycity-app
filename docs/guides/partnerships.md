@@ -1443,7 +1443,8 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
   - Renew drafts from a signed, active or expiring agreement (its asks kept, one open renewal at a time), on a
     new deal "<deal> (Renewal)" on the partner when asked. Close withdraws an open approval as its opener and
     ends an open signature request.
-  - ⌘K finds agreements, MOUs and contracts by kind (three providers in `agreements.search.js`). Praxis AI reads
+  - ⌘K finds agreements, MOUs and contracts by kind (three providers in `agreements.search.js`) and offers
+    Generate Agreement, which opens its form on Contracts & MOUs to pick the deal. Praxis AI reads
     `agreements.list` and `agreements.renewals`; every agreement form is `design`, Record Signed Copy `file` and
     signing `secret` (§9).
   - The public signing page's words follow the document (Partnership Agreement, Sign Agreement, Decline to
