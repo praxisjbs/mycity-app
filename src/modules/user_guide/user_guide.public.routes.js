@@ -11,7 +11,7 @@ const express = require("express");
 const c = require("@mycity/contract");
 const { publicRoute } = require("../../http/route");
 const { ok } = require("../../shared/http/respond");
-const service = require("./user_guide.service");
+const chapters = require("./user_guide.chapters");
 
 const router = express.Router();
 
@@ -19,13 +19,13 @@ publicRoute(router, "get", "/",
   { response: c.user_guide.GuideChapter, summary: "The public site's Help" },
   async (req, res) => {
     res.set("Cache-Control", "public, max-age=300");
-    ok(res, service.publicHelp());
+    ok(res, chapters.publicHelp());
   });
 
 publicRoute(router, "get", "/images/:file",
   { params: c.user_guide.PublicHelpImageParams, no_content: true, summary: "A picture of the public site's Help" },
   async (req, res) => {
-    const file = service.publicImage(req.validated.params.file);
+    const file = chapters.publicImage(req.validated.params.file);
     res.set("Cache-Control", "public, max-age=3600");
     res.type("png").sendFile(file);
   });

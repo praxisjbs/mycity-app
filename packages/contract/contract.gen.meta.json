@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "3444df87bcb69a1fe4cbe2f0a9456abf568601c217dbf5cf92ae54d4d42c4f00",
+  "source_hash": "102bf7fa847e825bd09c65912fe579a68d535c7274aa8b67d35791f35e873ce9",
   "schemas": 1962,
   "endpoints": 887,
   "inputs": {
@@ -135,7 +135,7 @@
     "src/modules/targets/targets.routes.js": "e7c6091372ecf23ae3ff46ddc1678a33475548d0dadad04f078a7533dc3e2031",
     "src/modules/tasks/tasks.routes.js": "c9d2d773299b1b4b754f850b95ea661b15fb837fa70f57f5d2c6ce2ffc9a27a1",
     "src/modules/templates/templates.routes.js": "4dc159605fd892f5003d7f57afdac92131ec4a2e40ab3d3c3173b67fae2ddcc9",
-    "src/modules/user_guide/user_guide.public.routes.js": "6df300afd8d4a5e7f1b317c3d30adc47780c09e177a0b01540a5fd2b2f61ba95",
+    "src/modules/user_guide/user_guide.public.routes.js": "7be5f10945c7e37408e6c2e48eb96e9b626a6162e2f7a5f71c168c8ea044e76e",
     "src/modules/user_guide/user_guide.routes.js": "c1a679cf2b6339a9d9f474f59834026bc8752c84f3e83106726e40307b73d2aa",
     "src/modules/users/users.routes.js": "7ae43569a5eba7045ba4e0da675f395051f0a576ca2002dd5885cd9c1f1651df",
     "src/modules/vacancies/vacancies.public.routes.js": "1a46ee714d056994d86aae188997d2b78e23c8d08b7307bbf1bab4325b1dff12",

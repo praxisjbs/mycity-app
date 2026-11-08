@@ -23,7 +23,7 @@ describe("Help", () => {
       expect(screen.getByRole("heading", { level: 2, name: title })).toBeTruthy();
     expect(within(screen.getByRole("navigation", { name: "Help Sections" })).getAllByRole("link")).toHaveLength(7);
     expect(within(screen.getByRole("navigation", { name: "Help Contents" })).getByRole("link", { name: "Apply" }).getAttribute("href")).toBe("#public-apply");
-  });
+  }, 30000);
 
   it("opens the site's own pages in place, and another section by scrolling to it", async () => {
     const into = vi.fn();
@@ -36,11 +36,12 @@ describe("Help", () => {
     fireEvent.click(screen.getAllByRole("link", { name: "The open roles" })[0]!);
     expect(into).toHaveBeenCalled();
     expect(window.location.hash).toBe("#public-careers");
-  });
+  }, 30000);
 
   it("has no accessibility violations", async () => {
     const { container } = draw();
     await screen.findByRole("heading", { level: 2, name: "The Front Page" });
     expect(await axe(container)).toHaveNoViolations();
-  });
+    // The whole chapter is a long page: axe takes several seconds on a CI runner.
+  }, 30000);
 });

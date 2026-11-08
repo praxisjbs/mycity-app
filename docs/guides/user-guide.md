@@ -4,7 +4,7 @@
 |---|---|
 | Owner | TB |
 | Milestone | M0 (brought forward from M11 by JBS Praxis, 25/10/2026; written milestone by milestone as each is approved) |
-| Backend modules | `user_guide` (and its search: `user_guide.meaning.js`, `user_guide.repo.js`, `user_guide.ai.js`; the shared engine `packages/contract/guide-search.js`) |
+| Backend modules | `user_guide` (the chapters in `user_guide.chapters.js`, which the public route reads without staff access; and its search: `user_guide.meaning.js`, `user_guide.repo.js`, `user_guide.ai.js`; the shared engine `packages/contract/guide-search.js`) |
 | Frontend paths | `app/src/features/knowledge/UserGuide.tsx`, `app/src/features/knowledge/guide/` (the way back, the search), `packages/ui/src/documents/GuideBody.tsx`, `packages/ui/src/documents/GuideResults.tsx`, the chip in `app/src/shell/Notices.tsx`; the public site's Help, `public-app/src/pages/Help.tsx` with `packages/ui/src/navigation/SectionNav.tsx` (§6.11) |
 | Permission key(s) | `knowledge` (view); every chapter, section, task, step and picture is filtered by the reader's own grants |
 | Capabilities | none of its own; the guide reads every module's grants and capabilities to decide what each reader receives |
@@ -422,7 +422,9 @@ One chapter is written for people outside MyCity: `docs/manual/public-site.md`, 
 search, and `/chapters/public-site` is 404. The public route reads it whole for a reader nobody signed
 in (`screen` always true, no need held), so a step that names a need is not sent; the gate still
 checks its bold names against `public-app/src` (§6.6) and its pictures are taken signed out (`site:
-public`, §6.5). Only the pictures that chapter shows are served, from `docs/manual/img/public-site/`.
+public`, §6.5). Only the pictures that chapter shows are served, from `docs/manual/img/public-site/`. The
+chapters are read in `user_guide.chapters.js`, apart from the service, so the public route's imports
+hold no staff access (`check/public-surface.js`).
 
 On the site it is **Help** (`/help`, the header's sixth link). Its links to `https://go.mycityapp.io/...`
 open in place (GuideBody `home`), `#slug` scrolls to the section. The hub's User Guide keeps one link
