@@ -38,7 +38,7 @@ const scrollToPart = (id: string) => {
 
 /**
  * Help (`/help`, #108): how the site works, for anyone outside MyCity. The User Guide's public
- * chapter (docs/manual/public-site.md, `kind: public-help`), as the API sends it: Here to Guide You over
+ * chapter (docs/manual/public-site.md, `kind: public-help`), as the API sends it: Here to Guide over
  * the skyline at a role's title size, then its sections, each a card of numbered steps with the site's own pictures. On desktop
  * the contents stand at the left and mark the section being read; on a phone they are a row under the
  * header. A link to another section scrolls to it, a link to a page of the site opens it here.
@@ -64,7 +64,7 @@ export function Help() {
 
   return (
     <Page title="Help" index>
-      <SkylineHero size="page" title="Here to Guide You" />
+      <SkylineHero size="page" title="Here to Guide" />
       <section aria-label="Help" className="pt-9 pb-24 phone:pt-0 phone:pb-18">
         <div className="public-wrap">
           {help.error ? (

@@ -32,6 +32,7 @@ describe("job registry", () => {
 
   test("the queue list is the README §5.15 list: M0, and the M1, M2, M3, M5, M7 and M8 jobs built so far", () => {
     expect(registry.JOBS.map((j) => j.queue).sort()).toEqual([
+      "agreement-renewal",
       "ai-find-prices",
       "announcement-publish",
       "attendance-day-close",
@@ -60,6 +61,7 @@ describe("job registry", () => {
       "task-recurrence",
     ]);
     expect([...registry.SCHEDULERS].sort()).toEqual([
+      "agreement-renewals",
       "alert-ageing",
       "announcement-release",
       "apply-cv-purge",

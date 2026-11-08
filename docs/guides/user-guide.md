@@ -473,7 +473,7 @@ No restricted field appears in the guide's text or pictures (the demo's data onl
 | The search's results | Get Answer; the Answer card (its sentences, their source numbers, the sources); each result's title, where it sits, its Step pill and its line with the words found marked; the pager; No Matches | None | How results are ranked and answers written: §6.8, §6.9 |
 | Back to Guide chip | Back to Guide · Step N, and a close button | None | Where the return is kept: this guide §3 |
 | Knowledge Hub · User Guide header | Public Site Help | None | Why the public chapter lives on the site: §6.11 |
-| Public · Help | Here to Guide You over the skyline, at a role's title size; the contents (On This Page); each section's icon, title, text, tasks, steps, pictures and legends | None | How the chapter is chosen and cut: §6.11 |
+| Public · Help | Here to Guide over the skyline, at a role's title size; the contents (On This Page); each section's icon, title, text, tasks, steps, pictures and legends | None | How the chapter is chosen and cut: §6.11 |
 
 The guide's own text is content a person reads (`data-copy="content"`), not interface copy: gate 8's
 word limits do not count it, as they do not count an article.
@@ -485,7 +485,7 @@ word limits do not count it, as they do not count an article.
 | Knowledge Hub · User Guide | The Quick Start and Full Guide switch, the search box with the microphone, then the role groups' cards (Quick Start) or the chapter chips over the section (Full Guide) | The side contents list (the chips replace it) | Open on a step, full width under it | Bottom bar More, Knowledge; the tabs scroll sideways |
 | The search's results | Get Answer, the Answer card, then the results as full width rows | A source's chapter and section (its title stays) | Open a result | Opening one shows the guide at it; changing the words brings the results back |
 | Back to Guide chip | A pill above the bottom bar and left of the floating button | Nothing | Back to Guide | Pressing it returns to the step |
-| Public · Help | Here to Guide You over the skyline, then the row of section pills that sticks under the header, then the sections as full width cards | The contents column (the pills replace it) | A section's steps; pictures are the phone's | The header's menu; a pill scrolls to its section and the row keeps the one being read in sight |
+| Public · Help | Here to Guide over the skyline, then the row of section pills that sticks under the header, then the sections as full width cards | The contents column (the pills replace it) | A section's steps; pictures are the phone's | The header's menu; a pill scrolls to its section and the row keeps the one being read in sight |
 
 ## 11 · Edge cases
 

@@ -83,7 +83,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [ThemePreview](#themepreview) | `ThemePreview` | A small copy of the hub drawn in a dark palette and two faces: the rail, a page title, two KPI cards, a list with a selected row, status pills, a field and the yellow button. | beta |
 | Display | [Tile](#tile) | `Tile` | A small bordered tile: a heading, a line, and whatever sits under them. | stable |
 | Display | [Timeline](#timeline) | `Timeline` | What happened to a record, newest or oldest first: a rail of dated events, each with its own dot. | stable |
-| Display | [VerifyCard](#verifycard) | `VerifyCard`, `Match` | What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself with its download. | beta |
+| Display | [VerifyCard](#verifycard) | `VerifyCard`, `Match` | What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself (an agreement's headings, clauses and tables included) with its download. | beta |
 | Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, drawn from its measured loudness, which fill as it plays. | stable |
 | Display | [YearsMedal](#yearsmedal) | `YearsMedal` | The years a person has been at MyCity, large, inside a gold laurel. | beta |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
@@ -169,7 +169,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [PdfViewer](#pdfviewer) | `PdfViewer` | A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom. | beta |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
-| Documents | [RichText](#richtext) | `RichText` | Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML. | beta |
+| Documents | [RichText](#richtext) | `RichText` | Formatted text the server sent as blocks (headings, paragraphs, lists, tables, bold, italic, links), drawn as elements, never as injected HTML. | beta |
 | Maps | [LocationLabel](#locationlabel) | `LocationLabel` | Where a point is, in words: the address our API looks up, with the coordinates until it arrives. | stable |
 | Maps | [MapView](#mapview) | `MapView` | A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves. | stable |
 | Maps | [PlaceSearch](#placesearch) | `PlaceSearch` | Finds an address through our own API and hands back the place with its coordinates. | stable |
@@ -2464,7 +2464,7 @@ What happened to a record, newest or oldest first: a rail of dated events, each 
 
 ### VerifyCard
 
-What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself with its download.
+What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself (an agreement's headings, clauses and tables included) with its download.
 
 | | |
 |---|---|
@@ -2488,7 +2488,7 @@ What a check of a document found, on the site's large card: before any check a D
 | `text` | `ReactNode` |  | One line under it (This document is genuine and unchanged.). |
 | `items` | `ReadonlyArray<KeyValueItem>` |  | The record, label and value (Document, Reference, Signed By, Signed On, Issued By, Content Hash, Artifact Hash). |
 | `note` | `ReactNode` |  | A line under the rows (what to do when nothing was found). |
-| `document` | `{ heading: string; title: string; paragraphs: ReadonlyArray<string>; action?: ReactNode }` |  | A QR check's document: its heading, title, opening words and its download. |
+| `document` | `{ heading: string; title: string; paragraphs: ReadonlyArray<string>; blocks?: RichTextBlock[] \| null; action?: ReactNode }` |  | A QR check's document: its heading, title, opening words and its download; or, for a document with headings, clauses and tables (an agreement), the whole text as `blocks`, drawn in place of the words. |
 | `empty` | `{ title: string; text: string }` |  | Before a check: the title and line under the shield. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -5707,13 +5707,13 @@ An article list beside the article: the Knowledge Hub's shape, and anything else
 
 ### RichText
 
-Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML.
+Formatted text the server sent as blocks (headings, paragraphs, lists, tables, bold, italic, links), drawn as elements, never as injected HTML.
 
 | | |
 |---|---|
-| Use | A policy's text on Policy Updates and Knowledge Hub · Policies; any text a person wrote that the API gives back as blocks. `look="site"` is the public site's: a role's text in its body ink, a numbered heading's number on a Deep Green badge, bullets as small yellow squares. |
+| Use | A policy's text on Policy Updates and Knowledge Hub · Policies; an agreement's wording with its options table on Contracts & MOUs and the signing page; any text a person wrote that the API gives back as blocks. `look="site"` is the public site's: a role's text in its body ink, a numbered heading's number on a Deep Green badge, bullets as small yellow squares. |
 | Avoid | Text being written (use RichTextField); an email's own HTML (use EmailFrame); a short plain answer (a paragraph is enough). |
-| Phone | The same text at the phone's body size; long words and links wrap rather than push the page sideways. |
+| Phone | The same text at the phone's body size; long words and links wrap rather than push the page sideways. A table becomes a card a row, each cell under its column's name, since a phone shows no table. |
 | Accessibility | Real headings, lists and links in reading order, so a screen reader can move by heading; pass `top` so the headings sit under the page's own. |
 | Status | beta |
 | Exports | `RichText` |
@@ -6463,7 +6463,7 @@ The public site's hero, glass teal in light and Deep Green in dark: the page's h
 <SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
 <SkylineHero size="pane" record eyebrow="Your Application" title="Partnerships Associate" text="This link is yours until 12/11/2026." />
 <SkylineHero size="index" eyebrow="Hiring in Lagos and Abuja" title="Work With Us" accent="Us" text="Building the app that knows every Nigerian city." stats={[{ value: 12, label: "Open Roles" }]}><SiteSearch tone="hero" ... /></SkylineHero>
-<SkylineHero size="page" title="Here to Guide You" />
+<SkylineHero size="page" title="Here to Guide" />
 <SkylineHero size="role" record back={{ label: "All Roles", href: "/jobs" }} eyebrow="Marketing & Sales" title="Head, Sales & Revenue" facts={facts} note="12 people have applied">{actions}</SkylineHero>
 ```
 

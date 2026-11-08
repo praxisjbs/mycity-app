@@ -65,7 +65,7 @@
   },
   "public-sign": {
     "spec": "d82e693975510176",
-    "source": "b99af95eda198b63",
+    "source": "c01f4211da66effb",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "public-sign-below": {
     "spec": "48c8c3981dea1849",
-    "source": "b99af95eda198b63",
+    "source": "c01f4211da66effb",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "public-vacancy": {
     "spec": "9f254efa0ed9d466",
-    "source": "a3447fb00090b13b",
+    "source": "f8acb721ff81191d",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,7 @@
   },
   "public-verify": {
     "spec": "bdadc6d729a58dae",
-    "source": "8d74f8298bc83039",
+    "source": "dd0ef0847fd9199e",
     "devices": [
       "desktop",
       "phone"

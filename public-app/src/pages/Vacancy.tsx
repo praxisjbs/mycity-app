@@ -39,7 +39,7 @@ const NOT_OPEN: Record<Exclude<PublicJob["state"], "open">, { tone: "warn" | "in
 };
 
 /** The words of a block, compared without case or spacing. */
-const textOf = (b: Block | undefined) => (b && b.kind !== "bullets" && b.kind !== "numbered" ? b.spans.map((s) => s.text).join("").trim() : "");
+const textOf = (b: Block | undefined) => (b && (b.kind === "heading" || b.kind === "paragraph") ? b.spans.map((s) => s.text).join("").trim() : "");
 const fold = (t: string) => t.toLowerCase().replace(/\s+/g, " ");
 /** A description's own heading for how the role is measured (`## Key Performance Indicators (KPIs)`). */
 const KPI = /key performance indicators/i;

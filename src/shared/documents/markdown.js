@@ -50,6 +50,13 @@ const BULLET = /^\s*[-*]\s+/;
 const NUMBERED = /^\s*\d+\.\s+/;
 const TABLE_ROW = /^\|(.+)\|\s*$/;
 const TABLE_RULE = /^\|[\s:|-]+\|\s*$/;
+/** A pipe row's cells, trimmed: "| a | b |" → ["a", "b"]. */
+const cellsOf = (row) =>
+  String(row)
+    .trim()
+    .replace(/^\||\|$/g, "")
+    .split("|")
+    .map((c) => c.trim());
 
 /** Markdown to safe HTML. */
 function markdownToHtml(md) {
@@ -89,17 +96,11 @@ function markdownToHtml(md) {
     }
     if (TABLE_ROW.test(line) && TABLE_RULE.test((lines[i + 1] || "").trim())) {
       flush();
-      const cells = (r) =>
-        r
-          .trim()
-          .replace(/^\||\|$/g, "")
-          .split("|")
-          .map((c) => c.trim());
-      const header = cells(line);
+      const header = cellsOf(line);
       i += 2;
       const body = [];
       while (i < lines.length && TABLE_ROW.test(lines[i].trim())) {
-        body.push(cells(lines[i].trim()));
+        body.push(cellsOf(lines[i]));
         i += 1;
       }
       const thead = `<tr>${header.map((c) => `<th>${inline(esc(c))}</th>`).join("")}</tr>`;
@@ -199,8 +200,9 @@ function spansOf(raw) {
 
 /**
  * Markdown to blocks (contract policies.RichTextBlock): the forms markdownToHtml draws, for a
- * screen that renders text as elements rather than HTML. A table's rows become paragraphs, its cells
- * joined; a rule is dropped.
+ * screen that renders text as elements rather than HTML. A table is a table block (a header and its
+ * rows, as markdownToHtml draws it); a pipe row with no rule under its first row is a paragraph, its
+ * cells joined; a rule is dropped.
  */
 function markdownToBlocks(md) {
   const lines = String(md || "").replace(/\r\n/g, "\n").split("\n");
@@ -225,10 +227,25 @@ function markdownToBlocks(md) {
       i += 1;
       continue;
     }
+    if (TABLE_ROW.test(line) && TABLE_RULE.test((lines[i + 1] || "").trim())) {
+      flush();
+      // A table as markdownToHtml draws one: its header, the rule under it, then its rows, each cut
+      // or padded to the header's width (an agreement's Financials grid).
+      const head = cellsOf(line);
+      const width = Math.min(head.length, 12);
+      const fit = (row) => Array.from({ length: width }, (_, k) => spansOf(row[k] || ""));
+      const rows = [];
+      i += 2;
+      while (i < lines.length && TABLE_ROW.test(lines[i].trim())) {
+        if (rows.length < 100) rows.push(fit(cellsOf(lines[i])));
+        i += 1;
+      }
+      out.push({ kind: "table", head: fit(head), rows });
+      continue;
+    }
     if (TABLE_ROW.test(line)) {
       flush();
-      const cells = line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim()).filter(Boolean);
-      out.push({ kind: "paragraph", spans: spansOf(cells.join(" · ")) });
+      out.push({ kind: "paragraph", spans: spansOf(cellsOf(line).filter(Boolean).join(" · ")) });
       i += 1;
       continue;
     }

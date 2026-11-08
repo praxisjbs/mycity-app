@@ -34,6 +34,21 @@ async function insertSignature(client, s) {
   return rows[0].signature_id;
 }
 
+/**
+ * A signature made on paper and recorded (Record Signed Copy): written signed, with no email (nobody was
+ * sent a link; migration 7100), on the day the signer dated it, with the content it attests to.
+ */
+async function insertPaperSignature(client, s) {
+  const { rows } = await client.query(
+    `INSERT INTO signature (signature_request_id, signer_type, signer_id, signer_name, signer_email, signer_title, signer_role,
+                            position, status, signed_at, method, content_hash, evidence)
+     VALUES ($1, 'paper', NULL, $2, NULL, $3, $4, $5, 'signed', $6, 'paper', $7, $8::jsonb)
+     RETURNING signature_id`,
+    [s.signature_request_id, s.signer_name, s.signer_title || null, s.signer_role, s.position, s.signed_at, s.content_hash, JSON.stringify(s.evidence)],
+  );
+  return rows[0].signature_id;
+}
+
 async function request(db, id, { forUpdate = false } = {}) {
   const { rows } = await db.query(
     `SELECT ${REQUEST_COLS} FROM signature_request r WHERE r.signature_request_id = $1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -62,6 +77,18 @@ async function requestByVerifyKey(db, keyHash) {
 async function requestBySealedDocument(db, documentId) {
   const { rows } = await db.query(`SELECT ${REQUEST_COLS} FROM signature_request r WHERE r.sealed_document_id = $1`, [documentId]);
   return rows[0] || null;
+}
+
+/** Every signature of a record's requests, whatever they came to (to stop their links when it is sent again). */
+async function signaturesForSubject(client, subjectType, subjectId) {
+  const { rows } = await client.query(
+    `SELECT s.signature_id FROM signature s JOIN signature_request r ON r.signature_request_id = s.signature_request_id
+      WHERE r.subject_type = $1 AND r.subject_id = $2
+      ORDER BY s.signature_id
+      LIMIT 200 -- pagination:batch a record has a handful of requests of up to four signers each; 200 is far beyond any`,
+    [subjectType, subjectId],
+  );
+  return rows.map((r) => r.signature_id);
 }
 
 /** The open requests for a record (to end them when it is withdrawn). */
@@ -216,6 +243,8 @@ async function lapsed(db) {
 }
 
 module.exports = {
+  insertPaperSignature,
+  signaturesForSubject,
   setSignerEmail,
   insertRequest,
   insertSignature,

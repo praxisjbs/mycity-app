@@ -89,7 +89,7 @@ const LETTERS: Array<LetterTemplateDetail> = (
 const htmlOfWording = (body: string | null) => (body ? body.split(/\n\n+/).map((p) => `<p>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>`).join("") : null);
 const wordingOfHtml = (html: string) =>
   blocksOf(html)
-    .map((b) => (b.kind === "bullets" || b.kind === "numbered" ? b.items.map((i) => `- ${i.map((x) => x.text).join("")}`).join("\n") : b.spans.map((x) => x.text).join("")))
+    .map((b) => (b.kind === "bullets" || b.kind === "numbered" ? b.items.map((i) => `- ${i.map((x) => x.text).join("")}`).join("\n") : b.kind === "table" ? b.rows.map((r) => r.map((c) => c.map((x) => x.text).join("")).join(" · ")).join("\n") : b.spans.map((x) => x.text).join("")))
     .join("\n\n");
 LETTERS.forEach((t) => (t.body_html = htmlOfWording(t.body)));
 
@@ -802,7 +802,7 @@ route("POST /api/v1/ess/queries/:id/response", (req) => {
   if (!q) return notFound();
   if (q.status !== "awaiting_response" || q.response) return fail(409, "QUERY_ALREADY_ANSWERED", "You have already responded");
   const blocks = blocksOf(String(req.body.body_html ?? ""));
-  const words = blocks.flatMap((b) => (b.kind === "bullets" || b.kind === "numbered" ? b.items.flat() : b.spans)).map((s) => s.text).join(" ").trim();
+  const words = blocks.flatMap((b) => (b.kind === "bullets" || b.kind === "numbered" ? b.items.flat() : b.kind === "table" ? [...b.head, ...b.rows.flat()].flat() : b.spans)).map((s) => s.text).join(" ").trim();
   if (words.length < 20) return invalid({ body_html: ["Write your response"] });
   Object.assign(q, { response: { body: words, blocks, submitted_at: now() }, responded_at: now(), status: "under_review" });
   return ok(myQuery(q));

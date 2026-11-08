@@ -47,4 +47,19 @@ describe("VerifyCard", () => {
     );
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it("draws a QR check's document as blocks where it has them (an agreement's table)", () => {
+    const span = (text: string) => ({ text, bold: false, italic: false, href: null });
+    render(
+      <VerifyCard
+        tone="ok"
+        title="Document Verified"
+        text="This document is genuine and unchanged."
+        document={{ heading: "The Document", title: "Deal Merchant Agreement", paragraphs: ["Ignored when there are blocks"], blocks: [{ kind: "heading", level: 2, spans: [span("Financials")] }, { kind: "table", head: [[], [span("Regular")]], rows: [[[span("Deal Price")], [span("₦10,800.00")]]] }] }}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Financials" })).toBeInTheDocument();
+    expect(screen.getByText("₦10,800.00")).toBeInTheDocument();
+    expect(screen.queryByText("Ignored when there are blocks")).toBeNull();
+  });
 });

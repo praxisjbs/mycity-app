@@ -20,6 +20,7 @@ import {
   OtpField,
   PageMessage,
   Panel,
+  RichText,
   SignatureField,
   Skeleton,
   TextAreaField,
@@ -31,36 +32,51 @@ import {
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
 
-/** The three steps in the aside: the letter is read, the email confirmed, then signed. */
-const STEPS = ["Read the Letter", "Confirm Your Email", "Sign Below"] as const;
-const CODE_HELP = "A six-digit code goes to the address your offer came to. It works for ten minutes.";
+type DocumentType = SigningView["document_type"];
+
+/**
+ * The page's words follow the document it signs (docs/guides/partnerships.md §13.2): an offer of
+ * employment or a contract for a candidate, a partnership agreement for a partner's signatory.
+ */
+const WORDS: Record<DocumentType, { heading: string; read: string; ready: string; label: string; sign: string; decline: string; reason: string; back: string; signed: string; declined: string; expired: string; withdrawn: string; told: string }> = {
+  offer_letter: { heading: "Offer of Employment", read: "Read the Letter", ready: "Your offer, ready to sign.", label: "The offer letter", sign: "Accept and Sign", decline: "Decline the Offer", reason: "Reason for Declining", back: "Back to the Offer", signed: "Offer Signed", declined: "Offer Declined", expired: "This Offer Has Expired", withdrawn: "Offer Withdrawn", told: "We told the hiring team. Thank you for letting us know." },
+  employment_contract: { heading: "Employment Contract", read: "Read the Contract", ready: "Your contract, ready to sign.", label: "The contract", sign: "Accept and Sign", decline: "Decline to Sign", reason: "Reason for Declining", back: "Back to the Contract", signed: "Contract Signed", declined: "Contract Declined", expired: "This Contract Has Expired", withdrawn: "Contract Withdrawn", told: "We told the People team. Thank you for letting us know." },
+  agreement: { heading: "Partnership Agreement", read: "Read the Agreement", ready: "Your agreement, ready to sign.", label: "The agreement", sign: "Sign Agreement", decline: "Decline to Sign", reason: "Reason for Declining", back: "Back to the Agreement", signed: "Agreement Signed", declined: "Agreement Declined", expired: "This Link Has Expired", withdrawn: "Agreement Withdrawn", told: "We told the partnerships team. Thank you for letting us know." },
+};
+
+/** The three steps in the aside: the document is read, the email confirmed, then signed. */
+const stepsOf = (t: DocumentType) => [WORDS[t].read, "Confirm Your Email", "Sign Below"];
+const CODE_HELP = "A six-digit code goes to the address this link was sent to. It works for ten minutes.";
 const METHODS: Array<["draw" | "type", string]> = [
   ["draw", "Draw"],
   ["type", "Type"],
 ];
 
 /**
- * Sign Offer (#84, M5; docs/guides/offers.md §3 step 4): the candidate reads the same text the PDF
- * holds, receives an email code, types full name and title, draws or types a signature, ticks the
- * consent and presses Accept and Sign, from a phone. Signing is acceptance; the sealed copy is
- * emailed and verifiable. Decline the Offer takes a reason. No account: the token is the key, and
- * the signatures routes answer it (SigningView).
+ * Sign Offer (#84, M5; docs/guides/offers.md §3 step 4; docs/guides/partnerships.md §6.9): the one
+ * signing page for every signed document, its heading and words following the document. The signer
+ * reads the same text the PDF holds (an agreement as its headings, clauses and tables), receives an
+ * email code, types full name and title, draws or types a signature, ticks Agree to Sign
+ * Electronically and signs, from a phone. A later signer waits for the earlier ones. The sealed copy
+ * is emailed and verifiable. Declining takes a reason. No account: the token is the key, and the
+ * signatures routes answer it (SigningView).
  */
 export function SignOffer({ token }: { token: string }) {
   const o = useApi("GET /api/public/v1/sign/:token", { params: { token } });
   const [sent, setSent] = useState<SignCodeSent | null>(null);
-  if (o.error) return <LinkProblem error={o.error} title="Offer of Employment" retry={o.reload} />;
+  const w = WORDS[o.data?.document_type ?? "offer_letter"];
+  if (o.error) return <LinkProblem error={o.error} title="Sign a Document" retry={o.reload} />;
   const d = o.data;
-  const role = d ? d.title.replace(/^Offer of Employment:\s*/, "") : undefined;
+  const name = d ? d.title.replace(/^[^:]*:\s*/, "") : undefined;
   return (
     <Page
-      title="Offer of Employment"
+      title={d ? w.heading : "Sign a Document"}
       layout="split"
-      name={role}
-      line={d ? `Offer of Employment, ${d.reference}` : undefined}
-      text="Your offer, ready to sign."
+      name={name}
+      line={d ? `${w.heading}, ${d.reference}` : undefined}
+      text={w.ready}
       paragraph={d ? `For ${d.signer_name}, from ${d.company}.${d.expires_at ? ` It expires on ${formatDate(d.expires_at)}.` : ""}` : undefined}
-      steps={{ items: STEPS, at: d?.code_verified ? 2 : sent ? 1 : 0, complete: d != null && d.state === "signed" }}
+      steps={{ items: stepsOf(d?.document_type ?? "offer_letter"), at: d?.code_verified ? 2 : sent ? 1 : 0, complete: d != null && d.state === "signed" }}
     >
       {!d ? (
         <Panel>
@@ -82,36 +98,61 @@ function Signers({ signers }: { signers: SignerView[] }) {
       <KeyValue
         layout="rows"
         items={signers.map((s) => [
-          s.role === "mycity" ? `${s.name}, for the Company` : s.name,
-          s.status === "signed" ? (s.signed_at ? `Signed ${formatDate(s.signed_at)}` : "Signed") : s.status === "pending" ? "Waiting" : s.status === "declined" ? "Declined" : "Not Signed",
+          s.role === "mycity" ? `${s.name}, for the Company` : s.role === "partner" && s.title ? `${s.name}, ${s.title}` : s.name,
+          s.status === "signed"
+            ? s.signed_at
+              ? `Signed ${formatDate(s.signed_at)}`
+              : "Signed"
+            : s.status === "void"
+              ? "Void"
+              : s.status === "pending"
+                ? "Waiting"
+                : s.status === "declined"
+                  ? "Declined"
+                  : "Not Signed",
         ])}
       />
     </Panel>
   );
 }
 
+/** The document as it will be signed: an agreement's headings, clauses and tables, or the letter's paragraphs. */
+function Document({ d }: { d: SigningView }) {
+  const w = WORDS[d.document_type];
+  if (d.blocks)
+    return (
+      <Panel as="section" title={w.heading}>
+        <p className="mb-3 text-sm text-subtle-foreground">{`${d.company} · ${d.reference} · ${formatDate(d.issued_at)}`}</p>
+        <RichText blocks={d.blocks} top={3} />
+      </Panel>
+    );
+  return <IssuedLetter label={w.label} meta={[d.company, "Lagos, Nigeria", formatDate(d.issued_at)]} title={w.heading} paragraphs={d.letter.slice(1)} />;
+}
+
 function Sign({ d, token, sent, onSent, onView }: { d: SigningView; token: string; sent: SignCodeSent | null; onSent: (s: SignCodeSent) => void; onView: (d: SigningView) => void }) {
   const [declining, setDeclining] = useState(false);
-  const letter = (
-    <IssuedLetter label="The offer letter" meta={[d.company, "Lagos, Nigeria", formatDate(d.issued_at)]} title="Offer of Employment" paragraphs={d.letter.slice(1)} />
-  );
+  // Signers sign in their order: a later one waits for those before them.
+  const mine = d.signers.findIndex((s) => s.name === d.signer_name && s.status === "pending");
+  const before = mine > 0 ? d.signers.slice(0, mine).filter((s) => s.status !== "signed") : [];
   return (
     <div className="flex flex-col gap-7">
-      {letter}
+      <Document d={d} />
       <Signers signers={d.signers} />
-      {declining ? (
-        <Decline token={token} onView={onView} back={() => setDeclining(false)} />
+      {before.length > 0 ? (
+        <Banner tone="info">{`You sign after ${before.map((s) => s.name).join(" and ")}. Open this link again once they have.`}</Banner>
+      ) : declining ? (
+        <Decline d={d} token={token} onView={onView} back={() => setDeclining(false)} />
       ) : d.code_verified ? (
         <SignBelow d={d} token={token} onView={onView} decline={() => setDeclining(true)} />
       ) : (
-        <ConfirmEmail token={token} sent={sent} onSent={onSent} onView={onView} decline={() => setDeclining(true)} />
+        <ConfirmEmail d={d} token={token} sent={sent} onSent={onSent} onView={onView} decline={() => setDeclining(true)} />
       )}
     </div>
   );
 }
 
 /** Send Code, then the six digits: the email the link was sent to is the signer's. */
-function ConfirmEmail({ token, sent, onSent, onView, decline }: { token: string; sent: SignCodeSent | null; onSent: (s: SignCodeSent) => void; onView: (d: SigningView) => void; decline: () => void }) {
+function ConfirmEmail({ d, token, sent, onSent, onView, decline }: { d: SigningView; token: string; sent: SignCodeSent | null; onSent: (s: SignCodeSent) => void; onView: (d: SigningView) => void; decline: () => void }) {
   const [code, setCode] = useState("");
   const [mark, setMark] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -159,7 +200,7 @@ function ConfirmEmail({ token, sent, onSent, onView, decline }: { token: string;
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <ActionGroup>
           <Button variant="line" size="lg" className="phone:w-full" onClick={decline}>
-            Decline the Offer
+            {WORDS[d.document_type].decline}
           </Button>
           {sent ? (
             <>
@@ -258,10 +299,10 @@ function SignBelow({ d, token, onView, decline }: { d: SigningView; token: strin
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <ActionGroup>
           <Button variant="line" size="lg" className="phone:w-full" onClick={decline}>
-            Decline the Offer
+            {WORDS[d.document_type].decline}
           </Button>
           <Button variant="primary" size="lg" className="phone:w-full" onClick={sign}>
-            Accept and Sign
+            {WORDS[d.document_type].sign}
           </Button>
         </ActionGroup>
       </div>
@@ -269,7 +310,8 @@ function SignBelow({ d, token, onView, decline }: { d: SigningView; token: strin
   );
 }
 
-function Decline({ token, onView, back }: { token: string; onView: (d: SigningView) => void; back: () => void }) {
+function Decline({ d, token, onView, back }: { d: SigningView; token: string; onView: (d: SigningView) => void; back: () => void }) {
+  const w = WORDS[d.document_type];
   const f = useContractForm({ reason: "" }, signatureSchemas.SignDecline as unknown as ContractSchema);
   const [problem, setProblem] = useState<string | null>(null);
   const decline = async () => {
@@ -282,15 +324,15 @@ function Decline({ token, onView, back }: { token: string; onView: (d: SigningVi
     }
   };
   return (
-    <Panel as="section" title="Decline the Offer">
-      <Field label="Reason for Declining" {...f.status("reason")}>
+    <Panel as="section" title={w.decline}>
+      <Field label={w.reason} {...f.status("reason")}>
         <TextAreaField {...f.field("reason")} rows={4} maxLength={500} />
       </Field>
       {problem && <Banner tone="err" className="mt-4">{problem}</Banner>}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <ActionGroup>
           <Button variant="ghost" size="lg" onClick={back}>
-            Back to the Offer
+            {w.back}
           </Button>
           <Button variant="line" size="lg" className="phone:w-full" onClick={decline}>
             Confirm Decline
@@ -303,6 +345,7 @@ function Decline({ token, onView, back }: { token: string; onView: (d: SigningVi
 
 function Closed({ d }: { d: SigningView }) {
   const { navigate } = useRouter();
+  const w = WORDS[d.document_type];
   return (
     <div className="flex flex-col gap-7">
       <Panel bare>
@@ -310,7 +353,7 @@ function Closed({ d }: { d: SigningView }) {
           <PageMessage
             icon="ok"
             tone="ok"
-            title="Offer Signed"
+            title={w.signed}
             reference={d.verify_number ? { label: "Reference", value: d.verify_number } : undefined}
             action={
               d.verify_number ? (
@@ -327,21 +370,25 @@ function Closed({ d }: { d: SigningView }) {
               </p>
             )}
           </PageMessage>
+        ) : d.state === "void" ? (
+          <PageMessage icon="alert" tone="warn" title="Signature Void">
+            Another signer declined, or signing ended, before everyone signed, so your signature binds nobody. A new link comes if it is sent again.
+          </PageMessage>
         ) : d.state === "declined" ? (
-          <PageMessage icon="ok" title="Offer Declined">
-            We told the hiring team. Thank you for letting us know.
+          <PageMessage icon="ok" title={w.declined}>
+            {w.told}
           </PageMessage>
         ) : d.state === "expired" ? (
-          <PageMessage icon="clock" tone="warn" title="This Offer Has Expired">
-            {d.expires_at ? `It expired on ${formatDate(d.expires_at)} without a signature.` : "It expired without a signature."} If you still want the role, reply to the email the offer came with.
+          <PageMessage icon="clock" tone="warn" title={w.expired}>
+            {d.expires_at ? `It expired on ${formatDate(d.expires_at)} without a signature.` : "It expired without a signature."} Reply to the email the link came with to have it sent again.
           </PageMessage>
         ) : (
-          <PageMessage icon="alert" title="Offer Withdrawn">
-            It can no longer be signed. If you think this is a mistake, reply to the email the offer came with.
+          <PageMessage icon="alert" title={w.withdrawn}>
+            It can no longer be signed. If you think this is a mistake, reply to the email the link came with.
           </PageMessage>
         )}
       </Panel>
-      {d.state === "signed" && <Signers signers={d.signers} />}
+      {(d.state === "signed" || d.state === "void") && <Signers signers={d.signers} />}
     </div>
   );
 }

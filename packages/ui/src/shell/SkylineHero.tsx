@@ -11,7 +11,7 @@
  * @example <SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
  * @example <SkylineHero size="pane" record eyebrow="Your Application" title="Partnerships Associate" text="This link is yours until 12/11/2026." />
  * @example <SkylineHero size="index" eyebrow="Hiring in Lagos and Abuja" title="Work With Us" accent="Us" text="Building the app that knows every Nigerian city." stats={[{ value: 12, label: "Open Roles" }]}><SiteSearch tone="hero" ... /></SkylineHero>
- * @example <SkylineHero size="page" title="Here to Guide You" />
+ * @example <SkylineHero size="page" title="Here to Guide" />
  * @example <SkylineHero size="role" record back={{ label: "All Roles", href: "/jobs" }} eyebrow="Marketing & Sales" title="Head, Sales & Revenue" facts={facts} note="12 people have applied">{actions}</SkylineHero>
  */
 import { lazy, Suspense, type ReactNode, type Ref } from "react";

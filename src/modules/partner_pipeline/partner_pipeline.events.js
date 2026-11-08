@@ -59,6 +59,7 @@ const EVENTS = defineEvents("partnerships", {
   "deal.health_changed": { summary: "A partnership deal's health was set" },
   "deal.signed": { summary: "A partnership deal was signed" },
   "deal.lost": { summary: "A partnership deal was closed as lost" },
+  "deal.completed": { summary: "A signed deal ran past its validity and its event, and was completed" },
   "deal.deliverables_raised": { summary: "A signed deal's delivery checklist was raised as tasks" },
   "follow_up.raised": { summary: "A quiet partner or lead was followed up: its deals Follow-Up Required, a task for its owner" },
   "deal_return.saved": { summary: "A month of a deal's returns was entered" },

@@ -11,8 +11,9 @@ import { useRouter } from "@/lib/router";
  * a changed record from a changed file. Anyone with the reference may look (`/verify/<number>`): the
  * type, the signer and the verdicts, never the content. The QR printed on each page of a sealed
  * document (`/verify/t/<token>`) also shows the document itself (docs/guides/partnerships.md §6.9).
- * The signatures routes answer it (VerifyResult, VerifyByToken): the record's status, every signer
- * and when they signed, and the two verdicts.
+ * The signatures routes answer it (VerifyResult, VerifyByToken): the record's status (an agreement's
+ * own too: active, expiring, expired), every signer and when they signed (a paper signature by its
+ * day, "signed outside the hub"), and the two verdicts; from the QR, an agreement's whole text.
  */
 export function Verify({ number, qr }: { number: string | null; qr?: string }) {
   return (
@@ -59,12 +60,20 @@ function verdict(r: VerifyResult): { tone: "ok" | "warn"; title: string; text: s
 const TYPE: Record<VerifyResult["document_type"], string> = { offer_letter: "Offer of employment", employment_contract: "Employment contract", agreement: "Partnership agreement" };
 const STATUS: Record<VerifyResult["status"], string> = { pending: "Awaiting signatures", completed: "Signed by everyone", declined: "Declined", expired: "Expired unsigned", revoked: "Withdrawn" };
 const when = (iso: string) => `${formatDate(iso)}, ${formatTime(iso)}`;
+/** An agreement's own state beyond signing (record_status): active, expiring, expired past its end, renewed, closed. */
+const RECORD: Record<string, string> = { signed: "Signed", active: "Active", expiring: "Expiring", expired: "Expired", renewed: "Renewed", closed: "Closed" };
+const signerLabel = (role: VerifyResult["signers"][number]["role"]) => (role === "mycity" ? "For the Company" : role === "partner" ? "For the Partner" : "Signed By");
 
 const rowsOf = (r: VerifyResult) => [
   { label: "Document", value: TYPE[r.document_type] },
   { label: "Reference", value: r.reference },
-  { label: "Status", value: r.signed_outside ? `${STATUS[r.status]}, on paper` : STATUS[r.status] },
-  ...r.signers.map((s, i) => ({ key: `signer-${i}`, label: s.role === "mycity" ? "For the Company" : "Signed By", value: s.signed_at ? `${s.name}, ${when(s.signed_at)}` : `${s.name}, not signed` })),
+  { label: "Status", value: r.signed_outside ? "Signed outside the hub" : STATUS[r.status] },
+  ...(r.record_status && RECORD[r.record_status] ? [{ label: TYPE[r.document_type].replace(/^Partnership /, "").replace(/^./, (c) => c.toUpperCase()), value: RECORD[r.record_status] }] : []),
+  ...r.signers.map((s, i) => ({
+    key: `signer-${i}`,
+    label: signerLabel(s.role),
+    value: s.signed_at ? `${s.name}, ${s.method === "paper" ? formatDate(s.signed_at) : when(s.signed_at)}` : `${s.name}, not signed`,
+  })),
   { label: "Issued By", value: r.issued_by },
   { label: "Content Hash", value: <Match value={r.content} /> },
   { label: "Artifact Hash", value: <Match value={r.artifact} /> },
@@ -102,6 +111,7 @@ function ByToken({ token }: { token: string }) {
         heading: "The Document",
         title: d.document.title,
         paragraphs: opening,
+        blocks: d.document.blocks,
         action: (
           <Button variant="line" size="sm" icon="download" asChild>
             <a href={d.document.url} download={d.document.file_name}>
