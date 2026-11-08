@@ -4,7 +4,8 @@
  * @summary Labelled rows, each a bar and its figure: pipeline stages, a department's spend, progress against a target.
  * @use A handful of named measures a person reads top to bottom, where the label matters as much as the figure.
  * @avoid A figure over time (use AreaChart); comparing one measure across categories (use BarChart); a single measure (use Meter).
- * @phone The same rows, with a narrower label column; the bar keeps its figure beside it.
+ * @phone Each row stacks: the label and its figure on one line, the bar under them at full width, so a long
+ *   label or a figure with a pill (89, Provisional) never runs past the card.
  * @a11y Each row is a meter with its own name and figure, so the proportion is read rather than guessed from a colour.
  * @status stable
  * @example <Bars rows={[{ label: "Qualified", percent: 64, value: "18 leads" }]} />
@@ -45,8 +46,8 @@ export function Bars({ rows, note, className }: BarsProps) {
           const percent = clamp(row.percent);
           const fill = { "--bar-fill": `${percent}%`, "--bar-ink": seriesInk(row.series ?? 1) } as CSSProperties;
           return (
-            <li key={row.label} {...content} className="flex items-center gap-2.5 py-1.5">
-              <span className="w-32 flex-none text-xs font-semibold phone:w-24">{row.label}</span>
+            <li key={row.label} {...content} className="flex items-center gap-2.5 py-1.5 phone:flex-wrap phone:gap-x-3 phone:gap-y-1.5">
+              <span className="w-32 flex-none text-xs font-semibold phone:w-auto phone:min-w-0 phone:flex-1">{row.label}</span>
               <span
                 role="meter"
                 aria-label={row.label}
@@ -54,11 +55,12 @@ export function Bars({ rows, note, className }: BarsProps) {
                 aria-valuemin={0}
                 aria-valuemax={100}
                 style={fill}
-                className="h-5 min-w-0 flex-1 overflow-hidden rounded-box bg-muted"
+                className="h-5 min-w-0 flex-1 overflow-hidden rounded-box bg-muted phone:order-last phone:h-3 phone:basis-full"
               >
                 <span className="block h-full w-(--bar-fill) rounded-box bg-(--bar-ink)" />
               </span>
-              <span className="w-20 flex-none text-right text-xs font-strong tabular-nums">{row.value}</span>
+              {/* At least the figure column's width, wider when the figure carries a pill: never past the card. */}
+              <span className="min-w-20 flex-none whitespace-nowrap text-right text-xs font-strong tabular-nums phone:min-w-0">{row.value}</span>
             </li>
           );
         })}

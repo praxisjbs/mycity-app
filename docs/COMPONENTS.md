@@ -905,7 +905,7 @@ Labelled rows, each a bar and its figure: pipeline stages, a department's spend,
 |---|---|
 | Use | A handful of named measures a person reads top to bottom, where the label matters as much as the figure. |
 | Avoid | A figure over time (use AreaChart); comparing one measure across categories (use BarChart); a single measure (use Meter). |
-| Phone | The same rows, with a narrower label column; the bar keeps its figure beside it. |
+| Phone | Each row stacks: the label and its figure on one line, the bar under them at full width, so a long label or a figure with a pill (89, Provisional) never runs past the card. |
 | Accessibility | Each row is a meter with its own name and figure, so the proportion is read rather than guessed from a colour. |
 | Status | stable |
 | Exports | `Bars` |
