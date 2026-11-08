@@ -23,13 +23,14 @@ import type {
   VacancyDetail,
   VacancyQuestion,
 } from "@mycity/contract/contract.gen.ts";
-import type { OfferRow, OnboardingDetail } from "@/api/types/recruitment";
+import type { OnboardingDetail } from "@/api/types/recruitment";
 import type { Status } from "@/api/types/performance";
 import type { RawResponse } from "../../client";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, DEPARTMENTS, grantsFor, PEOPLE, ref, refKey } from "../data/people";
 import * as D from "../data/recruitment";
 import { pickAnAddress, placeOf } from "./maps";
+import { withdrawOffersOf } from "./offers";
 import { WORKSITES as SITES } from "./worksites";
 import { exportFile } from "./shared";
 import { UPLOADS } from "../uploads";
@@ -38,7 +39,8 @@ import { UPLOADS } from "../uploads";
  * Recruitment on the mock (docs/guides/recruitment.md §5), in the contract's shapes: Vacancies, Careers
  * Settings, Candidates and their emails, Assessments and sittings, Interviews with the blind card, and
  * the Talent Pool. Bodies are checked by the contract's own schemas, so a form meets the API's words.
- * Fixtures live in data/recruitment.ts. M5's Offers and Onboarding stay INTERIM at the end of the file.
+ * Fixtures live in data/recruitment.ts. M5's Offers are in offers.ts; its Onboarding stays INTERIM at
+ * the end of this file.
  */
 
 /* ------------------------------------------------------------------ *
@@ -94,7 +96,12 @@ const vref = (v: VacancyDetail) => ({ vacancy_id: v.vacancy_id, number: v.number
 const appsOf = (v: VacancyDetail) => D.APPLICATIONS.filter((a) => vacancyOfApp(a).vacancy_id === v.vacancy_id);
 const traitsOf = (v: VacancyDetail) => v.questions.filter((q) => q.active && q.purpose === "interview");
 const STAGES = D.M4_STAGES;
-const reached = (a: D.MockApplication, stage: string) => STAGES.indexOf(a.stage) >= STAGES.indexOf(stage as (typeof STAGES)[number]);
+/** Where a stage sits on the board; M5's Offer and after are past every M4 stage. */
+const rank = (stage: string) => {
+  const i = (STAGES as readonly string[]).indexOf(stage);
+  return i < 0 ? STAGES.length : i;
+};
+const reached = (a: D.MockApplication, stage: string) => rank(a.stage) >= rank(stage);
 
 /** A line's spans: **bold** and *italic* only, which is what the vacancy texts use. */
 const spansOf = (line: string): RichTextSpan[] =>
@@ -754,6 +761,8 @@ function notProgress(a: D.MockApplication, reason: string, by: string | null) {
   a.history.push({ to: "not_progressed", days: 0, by: by ?? undefined, reason });
   sittingsOf(a).filter((s) => s.status === "sent" || s.status === "in_progress").forEach((s) => (s.status = "cancelled"));
   roundsOf(a).filter((x) => x.status === "scheduled").forEach(cancelRound);
+  // M5: the open offer is withdrawn with it (the API's outbox handler on application.not_progressed).
+  withdrawOffersOf(a.application_id);
 }
 
 // On a closed role too, as the API allows: a role closed with people still in it lets them be told.
@@ -1034,7 +1043,7 @@ function send(a: D.MockApplication, d: AssessmentDetail, startWithin: number, du
   };
   SITTINGS.unshift(s);
   // Sent an assessment, they are at Assessment, as the API moves them (only forward, only on its board).
-  if (STAGES.indexOf(a.stage) < STAGES.indexOf("assessment") && vacancyOfApp(a).board_stages.includes("assessment")) moveTo(a, "assessment", null);
+  if (rank(a.stage) < rank("assessment") && vacancyOfApp(a).board_stages.includes("assessment")) moveTo(a, "assessment", null);
   return s;
 }
 
@@ -1488,7 +1497,7 @@ R("POST /api/v1/recruitment/interviews", "edit", (req) =>
     if (refused) return refused;
     INTERVIEWS.unshift(x);
     logged(x, "scheduled", req.user);
-    if (STAGES.indexOf(a.stage) < STAGES.indexOf("interview") && vacancyOfApp(a).board_stages.includes("interview")) moveTo(a, "interview", req.user);
+    if (rank(a.stage) < rank("interview") && vacancyOfApp(a).board_stages.includes("interview")) moveTo(a, "interview", req.user);
     return created(interviewDetail(x, req));
   }),
 );
@@ -1763,62 +1772,10 @@ R("POST /api/v1/recruitment/pool/:id/remove", "edit", (req) => {
 });
 
 /* ------------------------------------------------------------------ *
- * M5 (INTERIM, owner AJ): Offers and Onboarding, until M5 puts them on the contract
+ * M5 (INTERIM, owner AJ): Onboarding, until M5 puts it on the contract (PR 7). Offers are in offers.ts.
  * ------------------------------------------------------------------ */
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
-
-const OFFERS: OfferRow[] = [
-  ["OFF-0018", "Kunle Afolabi", "Head, Sales & Revenue", "1200000.00", 2, -5, S("warn", "Awaiting signature")],
-  ["OFF-0017", "Dayo Martins", "Content Producer", "460000.00", 30, 15, S("ok", "Signed")],
-  ["OFF-0016", "Kemi Bello", "Partnerships Associate", "440000.00", 38, 23, S("err", "Declined")],
-].map((o, i) => ({ offer_id: sid(`off:${i}`), number: o[0] as string, candidate: o[1] as string, role: o[2] as string, salary: o[3] as string, issued_on: o[4] == null ? null : isoDaysAgo(o[4] as number), expires_on: o[5] == null ? null : isoDaysAgo(o[5] as number), status: o[6] as Status }));
-route("GET /api/v1/recruitment/offers/summary", () => ok({ awaiting_signature: OFFERS.filter((o) => o.status.text === "Awaiting signature").length, signed_this_year: 11, declined: OFFERS.filter((o) => o.status.tone === "err").length, average_days_to_sign: "2.4 days" }));
-route("GET /api/v1/recruitment/offers", (req) => paged(OFFERS, req, { search: (o) => [o.candidate, o.role, o.number] }));
-route("GET /api/v1/recruitment/offers/:id/letter", (req) => {
-  const o = OFFERS.find((x) => x.offer_id === req.params.id);
-  if (!o) return notFound();
-  const d = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "on sending");
-  const first = o.candidate.split(" ")[0];
-  const money = `₦${Number(o.salary).toLocaleString("en-NG")}`;
-  return ok({
-    reference: o.number,
-    title: "Offer of Employment",
-    date_line: `${o.candidate} · ${o.role} · Issued ${d(o.issued_on)} · Expires ${d(o.expires_on)}`,
-    paragraphs: [
-      [{ text: "Dear " }, { text: first, filled: true }, { text: "," }],
-      [{ text: "We are pleased to offer you the position of " }, { text: o.role, filled: true }, { text: " at MyCity App Ltd, with a start date to be agreed with you." }],
-      [{ text: "Your gross monthly salary will be " }, { text: money, filled: true }, { text: ", subject to a probationary period of six months. Working days are Monday to Saturday." }],
-      [{ text: "This offer is conditional upon satisfactory documentation, and expires on " }, { text: d(o.expires_on), filled: true }, { text: "." }],
-      [{ text: "Yours sincerely," }],
-    ],
-    signer: "C. Osakunih",
-    signer_role: "For MyCity App Ltd",
-    fields_note: o.status.text === "Signed" ? "Signed. Payload and stored bytes verified" : `Awaiting signature · go.mycityapp.io/sign/${o.number}`,
-  });
-});
-route("POST /api/v1/recruitment/offers", (req) => {
-  const b = req.body as { candidate_id?: string; salary?: string; start_date?: string; expires_on?: string };
-  const a = APPS.find((x) => x.candidate_id === b.candidate_id || x.application_id === b.candidate_id);
-  const f: Record<string, string[]> = {};
-  if (!a) f.candidate_id = ["Pick the candidate"];
-  if (!(Number(b.salary) > 0)) f.salary = ["Enter the gross monthly salary"];
-  if (!b.start_date) f.start_date = ["Pick the start date"];
-  if (!b.expires_on) f.expires_on = ["Pick when the offer expires"];
-  if (Object.keys(f).length) return invalid(f);
-  const n = Math.max(...OFFERS.map((o) => Number(o.number.slice(4)))) + 1;
-  const o: OfferRow = { offer_id: sid(`off:new:${n}`), number: `OFF-${String(n).padStart(4, "0")}`, candidate: fullName(a!), role: vacancyOfApp(a!).title, salary: b.salary!, issued_on: null, expires_on: b.expires_on!, status: S("neutral", "Draft") };
-  OFFERS.unshift(o);
-  return created(o);
-});
-route("POST /api/v1/recruitment/offers/:id/send", (req) => {
-  const o = OFFERS.find((x) => x.offer_id === req.params.id);
-  if (!o) return notFound();
-  if (o.status.text !== "Draft") return fail(409, "NOT_DRAFT", "Only a draft offer can be sent.");
-  o.issued_on = isoDaysAgo(0);
-  o.status = S("warn", "Awaiting signature");
-  return ok(o);
-});
 
 const DOCS = ["Signed offer letter", "Employment contract", "Valid ID", "Passport photograph", "Bank verification number", "Academic certificates", "Data privacy acknowledgement"];
 const ONB: OnboardingDetail[] = [

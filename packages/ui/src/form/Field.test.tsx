@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "../testing/axe";
 import { Field, FormError, FormRow } from "./Field";
-import { TextField } from "./TextField";
+import { TextAreaField, TextField } from "./TextField";
 
 const noop = () => undefined;
 
@@ -55,6 +55,20 @@ describe("Field", () => {
         </Field>
         <Field label="Work Email" state="bad" message="Check the email">
           <TextField value="ada" onChange={noop} />
+        </Field>
+      </FormRow>,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with a help term on the label", async () => {
+    const { container } = render(
+      <FormRow>
+        <Field label="Schedule A" help="The final job description, printed as Schedule A." optional>
+          <TextAreaField value="" onChange={noop} />
+        </Field>
+        <Field label="Reports To" help="Who the hire reports to.">
+          <TextField value="CEO" onChange={noop} />
         </Field>
       </FormRow>,
     );

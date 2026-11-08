@@ -15,12 +15,28 @@
 # A try is capped at five minutes, and the apt-get it started is stopped before the next. apt itself
 # retries a stalled fetch and waits for its lock (ci.yml's "apt retries a stalled mirror").
 #
+#   4. When both tries fail, the mirror is usually missing a few files rather than slow (07/11/2026:
+#      fonts-ipafont-mincho and fonts-tlwg-loma could not be fetched, in seconds, on three jobs
+#      and two re-runs). The last try installs Playwright's own list from a fresh package index
+#      with --fix-missing, less the Japanese, Chinese and Thai fonts (OPTIONAL_FONTS), which no
+#      screen of the hub or the public site uses. That set is neither shared nor cached
+#      (source=fallback, ~/chromium-debs left empty), so the next run tries the whole set again.
+#
 # Needs: SHARED (the artifact's name), GH_TOKEN (actions: read), GITHUB_RUN_ID, GITHUB_REPOSITORY,
 # GITHUB_OUTPUT. Writes the set it used to ~/chromium-debs.
 set -u
 
 DEBS="$HOME/chromium-debs"
 out() { echo "source=$1" >> "$GITHUB_OUTPUT"; }
+
+# Fonts Playwright lists for pages in other scripts; the gates render English, with emoji.
+OPTIONAL_FONTS="fonts-ipafont-gothic fonts-wqy-zenhei fonts-tlwg-loma-otf"
+
+# Playwright's apt package list for Chromium, as its own install would ask for (its dry run).
+playwright_packages() {
+  npx playwright install-deps --dry-run chromium 2>/dev/null |
+    sed -n 's/.*--no-install-recommends \(.*\)"$/\1/p' | tr ' ' '\n' | grep -v '^$'
+}
 
 # The apt-get an ended try left running holds the lock: stop it and let it go.
 stop_apt() {
@@ -78,5 +94,18 @@ for attempt in 1 2; do
   echo "::warning::Installing Chromium's system libraries did not finish (try $attempt of 2)"
   stop_apt
 done
-echo "::error::Chromium's system libraries could not be installed in two tries: the runner's apt mirror stalled each time and no other job shared its set. Re-run the job."
+
+# 4. The mirror cannot serve the whole set: everything but the optional fonts, from a fresh index.
+packages="$(playwright_packages | grep -vxF -f <(tr ' ' '\n' <<<"$OPTIONAL_FONTS"))"
+if [ -n "$packages" ]; then
+  # shellcheck disable=SC2086 # one word a package
+  if timeout 300 sudo apt-get update -q && timeout 300 sudo apt-get install -y -q --no-install-recommends --fix-missing $packages; then
+    rm -rf "$DEBS"
+    echo "::warning::Chromium's system libraries installed without the optional fonts ($OPTIONAL_FONTS): the runner's apt mirror could not serve them"
+    out fallback
+    exit 0
+  fi
+  stop_apt
+fi
+echo "::error::Chromium's system libraries could not be installed in two tries, nor without the optional fonts: the runner's apt mirror could not serve them and no other job shared its set. Re-run the job."
 exit 1

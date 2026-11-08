@@ -1699,6 +1699,11 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   ahead of PR 4; the stage rules (leaving On Hold, moves after signing, the signed copy asked once, §6.5)
   and New Partner's first stage (§6.6); Partners' Quiet `N` (§6.12); Follow-Up Required written in Title
   Case on screen; Home's Signed Value counts deals, one row a deal (§6.17); the file map (Appendix D).
+- 06/11/2026 · AJ · The signing and verification shapes (`SignTokenParams`, `SignCodeVerify`,
+  `SignaturePng`, `SignSubmit`, `VerifyRefParams`, `VerifyResult`) moved from `agreements.js` to
+  `signatures.js` (GE on #79: M5 builds the shared service first, LA reviews), with `SignDecline`,
+  `SignerView` and `VerifyByToken` added. `VerifyResult` now names the document type and carries
+  `record_status` for an agreement's own state. `docs/guides/offers.md`.
 - 06/11/2026 · GE · (Ose) Public · Proposal's placeholder page moves to the public site's split layout with the rest of
   go.mycityapp.io (the approved design); its Coming Soon is unchanged. Verify Document's QR page,
   `/verify/t/<token>` (§6.9), is drawn on the mock: the record, both verdicts and the document with Download PDF, until

@@ -440,18 +440,36 @@ Home's staging vacancies are gone (`seeds/staging/55_recruitment.js` removes the
 
 **Unused, to drop in a later release:** `candidate.location` and `profile`;
 `application.provisional_ai_run_id`; `vacancy.description_ai_run_id`; `application_assessment.starts_at`;
-`interview.location`; `interview_feedback.recommendation` and `scorecard`; and 5000's `talent_pool` and
-`talent_pool_member` (M4 numbers below 5000 and keeps its pool in 4060's tables).
+`interview.location`; `interview_feedback.recommendation` and `scorecard`. (5000's `talent_pool` and `talent_pool_member`
+were dropped by M5's `5090`.)
 
 ### M5 Offers, Documentation & Onboarding · 5000 to 5999 · AJ
 
 **Built:** `5000` offers, signature requests and signatures, document requirements, onboarding
-cases and checklist items, employment contracts, talent pool · `5099` seed.
+cases and checklist items, employment contracts · `5099` seed · `5010` the offer summary's terms
+(`reports_to`, `role_function`, `role_scope`, `employment_type`, `work_pattern`, `office_days`,
+`annual_leave_days`, `incentives`, `working_hours`, `probation_months`), the final
+`job_description`, `offer_pay_line` (the monthly compensation line by line; `annual_compensation`
+is twelve times their sum), `workflow_instance_id`, `signature_request_id`, the score and decision
+snapshots, `sent_at`, `withdrawn_at`, `end_reason`, `outside_range` and `range_reason` (pay outside
+the vacancy's monthly range, with why), `additional_terms`, `terms_version` (the standard wording's
+version at approval), `submitted_at`, the status CHECK (with `approved`), one open offer per
+application (a declined, expired or withdrawn one leaves room for the next), FK indexes · `5020`
+both hashes on every signature row (A12: `content_hash`, `artifact_hash`), the signer's title,
+role, order, method, signature image, view time and email code (its hash, lapse, tries, when sent),
+the request's reference, title, document type, sealed copy and QR verification key (its hash),
+status CHECKs; a signed row must carry its time, method and content hash · `5030` requirement `kind` (file, number, both) and
+order, the case's phases (`documentation`, `pre_onboarding`, `onboarding`, `completed`,
+`cancelled`) and privacy acknowledgement, each item's typed value and verification,
+`onboarding_guarantor` (two a hire, each with its reference check), the contract's statuses, FK
+indexes · `5040` `employee.bvn` (eleven digits, masked under `employee.bank`; organisation's table,
+TB reviews) · `5090` 5000's unused `talent_pool` and `talent_pool_member` dropped · `5199` the
+statuses `5010` and `5030` add · `5299` the `recruitment.offer` flow, version 1 (Head of
+Department, then the CEO; the same definition as `shared/workflow/definitions.js`), and Head of
+Department's `approve` on recruitment in its team scope, each only while it is as an earlier seed
+left it. Every CHECK equals the contract's enums (`docs/guides/offers.md` §4).
 
-**Owes:**
-- **The two hashes on every signature row** (A12): `content_hash` and `artifact_hash`.
-- Offer approval: `workflow_instance_id` and its workflow definition.
-- The data-privacy acknowledgement, documentation verification status, onboarding plans and SOPs.
+**Owes:** onboarding plans and their steps (PR 6, linked to the department's SOPs).
 
 ### M6 Payroll & Notifications · 6000 to 6999 · TB
 

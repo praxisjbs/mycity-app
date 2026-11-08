@@ -6,8 +6,8 @@ import { RouterProvider } from "@/lib/router";
 import { Verify } from "./Verify";
 
 /**
- * Verify a Document on the in-browser mock (INTERIM until M5): OFF-0016 genuine, OFF-0012 its file
- * altered, OFF-0011 its record altered, OFF-0009 both, OFF-0099 not found, and OFF-0016's QR.
+ * Verify a Document on the in-browser mock (the signatures routes): OFF-0017 genuine, OFF-0012 its
+ * file altered, OFF-0011 its record altered, OFF-0009 both, OFF-0099 not found, and OFF-0017's QR.
  */
 const draw = (number: string | null, qr?: string) =>
   render(
@@ -18,7 +18,7 @@ const draw = (number: string | null, qr?: string) =>
 
 afterEach(() => window.history.replaceState({}, "", "/"));
 
-const row = (label: string) => screen.getByText(label, { selector: "dt" }).nextElementSibling?.textContent;
+const row = (label: string) => screen.getAllByText(label, { selector: "dt" })[0]!.nextElementSibling?.textContent;
 
 describe("Verify", () => {
   it("waits for a reference, and a reference opens its own address", async () => {
@@ -26,17 +26,18 @@ describe("Verify", () => {
     const aside = screen.getByRole("complementary", { name: "Verify a Document" });
     expect(within(aside).getByText("Check any document we issued.")).toBeTruthy();
     expect(screen.getByText("Enter a Reference")).toBeTruthy();
-    fireEvent.change(within(aside).getByRole("textbox", { name: "Reference" }), { target: { value: "off-0016" } });
+    fireEvent.change(within(aside).getByRole("textbox", { name: "Reference" }), { target: { value: "off-0017" } });
     fireEvent.click(within(aside).getByRole("button", { name: "Verify" }));
-    await waitFor(() => expect(window.location.pathname).toBe("/verify/OFF-0016"));
+    await waitFor(() => expect(window.location.pathname).toBe("/verify/OFF-0017"));
   });
 
-  it("a genuine document: verified, its record, both hashes matching", async () => {
-    draw("OFF-0016");
+  it("a genuine document: verified, its record and signers, both hashes matching", async () => {
+    draw("OFF-0017");
     expect(await screen.findByRole("heading", { level: 2, name: "Document Verified" })).toBeTruthy();
     expect(screen.getByText("This document is genuine and unchanged.")).toBeTruthy();
-    expect(row("Signed By")).toBe("Obinna Chukwu");
-    expect(row("Signed On")).toBe("21/10/2026, 14:05");
+    expect(row("Status")).toBe("Signed by everyone");
+    expect(row("For the Company")).toMatch(/^Cynthia Osakunih, \d{2}\/\d{2}\/2026, \d{2}:\d{2}$/);
+    expect(row("Signed By")).toBe("Chiamaka Eze, 23/10/2026, 20:12");
     expect(row("Content Hash")).toBe("Matches");
     expect(row("Artifact Hash")).toBe("Matches");
     expect(screen.queryByText("The Document")).toBeNull();
@@ -66,9 +67,9 @@ describe("Verify", () => {
     draw(null, "Qd5mW8rTx3Kp");
     expect(await screen.findByRole("heading", { level: 2, name: "Document Verified" })).toBeTruthy();
     const doc = screen.getByText("The Document").parentElement!;
-    expect(within(doc).getByText("Offer of Employment")).toBeTruthy();
-    expect(within(doc).getByText("Dear Obinna,")).toBeTruthy();
-    expect(within(doc).getByRole("link", { name: "Download PDF" }).getAttribute("download")).toBe("OFF-0016.pdf");
+    expect(within(doc).getByText("Offer of Employment: Content Producer")).toBeTruthy();
+    expect(within(doc).getByText("Dear Chiamaka,")).toBeTruthy();
+    expect(within(doc).getByRole("link", { name: "Download PDF" }).getAttribute("download")).toBe("OFF-0017.pdf");
   });
 
   it("has no accessibility violations", async () => {

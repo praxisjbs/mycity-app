@@ -12,6 +12,8 @@ import type { ApplicationStage, CandidateDetail } from "@mycity/contract/contrac
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import { saveFile } from "@/api/download";
 import { useAuth } from "@/auth/AuthProvider";
+import { useScreenState } from "@/lib/plan";
+import { useRouter } from "@/lib/router";
 import { paging } from "@/features/shared/wire";
 import {
   Button,
@@ -61,6 +63,9 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
   const score = useMutation("POST /api/v1/recruitment/candidates/:id/score");
   const move = useMutation("POST /api/v1/recruitment/candidates/:id/move");
   const reopen = useMutation("POST /api/v1/recruitment/candidates/:id/reopen");
+  // M5's Offers screen, once it opens in this build (F14): a shortlisted card makes an offer, one at Offer or after opens it.
+  const offers = useScreenState("recruitment", "offers").open;
+  const { navigate } = useRouter();
   const c = read.data;
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!c) return <LoadingRows count={8} />;
@@ -186,6 +191,12 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
       </Card>
       <FormFooter>
         <Button onClick={close}>Close</Button>
+        {offers && STAGE_ORDER.indexOf(c.stage) >= STAGE_ORDER.indexOf("offer") && (
+          <Button onClick={() => (close(), navigate(`/recruitment?tab=offers&application=${c.application_id}`))}>Open Offer</Button>
+        )}
+        {offers && mayAdd && live && c.stage === "shortlist" && (
+          <Button onClick={() => (close(), navigate(`/recruitment?tab=offers&new=1&application=${c.application_id}`))}>Make Offer</Button>
+        )}
         {c.can_edit && live && (
           <>
             {mayScore && <Button icon="spark" onClick={act(() => score.run({ params: { id }, body: {} }), "CV read")}>Score With AI</Button>}

@@ -7,8 +7,10 @@ import { RouterProvider } from "@/lib/router";
 import { SignOffer } from "./SignOffer";
 
 /**
- * Sign Offer on the in-browser mock (INTERIM until M5): OFF-0018 for Chiamaka Eze waiting, one
- * already signed and one past its day. The letter, the box to sign in, Decline the Offer.
+ * Sign Offer on the in-browser mock (the signatures routes): OFF-0018 for Dayo Martins waiting, the
+ * company having signed; OFF-0017 signed by both; OFF-0013 past its day. Read the letter, confirm the
+ * email with the code (482913 on the mock), then name, draw or type, the consent, Accept and Sign;
+ * Decline the Offer with its reason.
  */
 beforeAll(() => {
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
@@ -41,21 +43,32 @@ async function signIn(box: HTMLElement) {
   fireEvent.pointerUp(box, { pointerId: 1 });
 }
 
+/** Send Code, then the six digits pasted: a full code checks itself. */
+async function confirmEmail(code = "482913") {
+  fireEvent.click(await screen.findByRole("button", { name: "Send Code" }));
+  expect(await screen.findByText(/^Sent to d•••@example\.test$/)).toBeTruthy();
+  const boxes = screen.getAllByRole("textbox").filter((b) => b.getAttribute("inputmode") === "numeric");
+  fireEvent.paste(boxes[0]!, { clipboardData: { getData: () => code } });
+}
+
 describe("SignOffer", () => {
-  it("shows the offer in the aside, the letter as issued, and the box to sign in", async () => {
+  it("shows the offer in the aside, the letter as issued, the signers, and asks to confirm the email", async () => {
     draw("Rt8wN2kPz5Gb");
     expect(await within(aside()).findByText("Content Producer")).toBeTruthy();
     expect(within(aside()).getByText("Offer of Employment, OFF-0018")).toBeTruthy();
     expect(within(aside()).getByText("Your offer, ready to sign.")).toBeTruthy();
-    expect(within(aside()).getByText(/^For Chiamaka Eze, from MyCity App Ltd\. It expires on \d{2}\/\d{2}\/\d{4}\.$/)).toBeTruthy();
+    expect(within(aside()).getByText(/^For Dayo Martins, from MyCity App Ltd\. It expires on \d{2}\/\d{2}\/\d{4}\.$/)).toBeTruthy();
     const letter = screen.getByRole("article", { name: "The offer letter" });
-    expect(within(letter).getByText("Dear Chiamaka,")).toBeTruthy();
-    expect(within(letter).getByText(/^Cynthia Osakunih/).className).toContain("ps-sig-from");
-    expect(screen.getByRole("region", { name: "Sign Below" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+    expect(within(letter).getByText("Dear Dayo,")).toBeTruthy();
+    const signers = screen.getByRole("region", { name: "Signers" });
+    expect(within(signers).getByText(/^Signed \d{2}\/\d{2}\/\d{4}$/)).toBeTruthy();
+    expect(within(signers).getByText("Waiting")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Confirm Your Email" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Accept and Sign" })).toBeNull();
+    expect(await axe(document.body)).toHaveNoViolations();
   });
 
-  it("Decline the Offer asks for an optional reason, goes back to the offer, and declines", async () => {
+  it("a wrong code is marked on the code; Decline the Offer asks for a reason and goes back", async () => {
     /* The mock's one waiting offer is signed by the test below; the decline is answered here so it stays waiting. */
     const call = api.call.bind(api);
     vi.spyOn(api, "call").mockImplementation(((key: string, opts: never) =>
@@ -63,26 +76,37 @@ describe("SignOffer", () => {
         ? call("GET /api/public/v1/sign/:token" as never, opts).then((o) => ({ ...(o as object), state: "declined" }))
         : call(key as never, opts)) as never);
     draw("Rt8wN2kPz5Gb");
-    fireEvent.click(await screen.findByRole("button", { name: "Decline the Offer" }));
-    expect(screen.getByLabelText(/Reason for Declining/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Back to the Offer" }));
-    expect(screen.getByRole("button", { name: "Accept and Sign" })).toBeTruthy();
+    await confirmEmail("111111");
+    expect(await screen.findByText("Wrong code")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Decline the Offer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Decline" }));
+    expect(await screen.findByText("Required")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back to the Offer" }));
+    expect(screen.getByRole("region", { name: "Confirm Your Email" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Decline the Offer" }));
+    fireEvent.change(screen.getByLabelText(/Reason for Declining/), { target: { value: "I took another role" } });
     fireEvent.click(screen.getByRole("button", { name: "Confirm Decline" }));
     expect(await screen.findByRole("heading", { name: "Offer Declined" })).toBeTruthy();
     expect(screen.getByText("We told the hiring team. Thank you for letting us know.")).toBeTruthy();
     vi.restoreAllMocks();
   });
 
-  it("asks for a signature first, then signs, and says so with the reference and Verify This Document", async () => {
+  it("after the code, asks for a signature and the consent, then signs, with the reference and Verify This Document", async () => {
     draw("Rt8wN2kPz5Gb");
-    fireEvent.click(await screen.findByRole("button", { name: "Accept and Sign" }));
+    // The previous test asked for a code a moment ago; the next one may be asked for after a minute.
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 120000);
+    await confirmEmail();
+    vi.restoreAllMocks();
+    expect(await screen.findByRole("region", { name: "Sign Below" })).toBeTruthy();
+    const steps = within(aside()).getByRole("list", { name: "Steps" });
+    expect(within(steps).getAllByRole("listitem")[2]!.getAttribute("aria-current")).toBe("step");
+    expect((screen.getByLabelText("Full Name") as HTMLInputElement).value).toBe("Dayo Martins");
+    fireEvent.click(screen.getByRole("button", { name: "Accept and Sign" }));
     expect(await screen.findByText("Draw your signature")).toBeTruthy();
     const box = screen.getByRole("img", { name: /^Signature box/ });
     await signIn(box);
     expect(await screen.findByRole("button", { name: "Clear" })).toBeTruthy();
-    const steps = within(aside()).getByRole("list", { name: "Steps" });
-    expect(within(steps).getAllByRole("listitem")[1]!.getAttribute("aria-current")).toBe("step");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Agree to Sign Electronically" }));
     fireEvent.click(screen.getByRole("button", { name: "Accept and Sign" }));
     expect(await screen.findByRole("heading", { name: "Offer Signed" })).toBeTruthy();
     expect(screen.getByText("We emailed you a signed copy.")).toBeTruthy();
@@ -94,7 +118,7 @@ describe("SignOffer", () => {
   it("an offer signed already says so, one past its day has expired, and an unknown link does not open", async () => {
     const signed = draw("Yc3vB6mQh9Ls");
     expect(await screen.findByRole("heading", { name: "Offer Signed" })).toBeTruthy();
-    expect(screen.getByText("OFF-0016")).toBeTruthy();
+    expect(screen.getByText("OFF-0017")).toBeTruthy();
     signed.unmount();
     const expired = draw("Gz7kT4pXw2Nd");
     expect(await screen.findByRole("heading", { name: "This Offer Has Expired" })).toBeTruthy();
