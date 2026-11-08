@@ -9,6 +9,8 @@
  *   signatures.defineSignable("offer", {
  *     document_type: "offer_letter",
  *     letter: (db, offerId) => [...lines],              // the text the PDF holds, one renderer
+ *     blocks: (db, offerId) => [...RichTextBlock] | null, // optional: the same text with headings,
+ *                                                        // clauses and tables (an agreement)
  *     contentHash: (db, offerId) => "<sha256 hex>",      // canonical payload (shared/documents/canonical)
  *     seal: (client, ctx) => documentRow,                // documents.generate with the signatures,
  *                                                        // the certificate and the QR (ctx below)
@@ -31,6 +33,15 @@
  * and title, a drawn or typed signature, I Agree to Sign Electronically. Each signed row keeps its
  * evidence and the content hash (A12); when the last one signs the copy is sealed from the outbox
  * (signatures.signed-pdf.js) and every row gains the artifact hash.
+ *
+ * A document signed on paper is recorded instead (recordPaperIn, Record Signed Copy): a request that is
+ * completed and sealed at once over the uploaded scan, each signature `paper` with the content it attests
+ * to and the scan's stored hash as its artifact hash. It has no QR, so it verifies by reference only,
+ * and verification says it was signed outside the hub.
+ *
+ * A request that ends before everyone signed (declined by one signer, lapsed, withdrawn) voids the
+ * signatures already on it: the pages show them `void`. Correcting a signer means ending the request
+ * (endFor, revoked, which kills its links) and opening a new one (requestIn): an agreement's Send Again.
  */
 const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
@@ -59,14 +70,21 @@ const origin = () => String(config.PUBLIC_ORIGIN).replace(/\/+$/, "");
 /**
  * Declare a record type that is signed through this service.
  * @param {string} subjectType  e.g. "offer", "employment_contract", "partnership_agreement"
- * @param {{document_type: string, letter: Function, contentHash: Function, seal: Function,
+ * @param {{document_type: string, letter: Function, blocks?: Function, contentHash: Function, seal: Function,
  *          onSigned?: Function, onCompleted?: Function, onDeclined?: Function, onEnded?: Function,
- *          recordStatus?: Function}} adapter
+ *          recordStatus?: Function, sealedTo?: Function}} adapter
+ *   blocks    (db, id) => RichTextBlock[] | null: the document as blocks, where it has headings,
+ *             numbered clauses or tables; the pages draw these instead of the letter's lines
+ *   sealedTo  (db, id) => [{ name, email }]: who besides the signers receives the sealed copy (the
+ *             record's owner), mailed with the signers once it is sealed
  */
 function defineSignable(subjectType, adapter) {
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(subjectType)) throw new Error(`defineSignable: "${subjectType}" is snake_case`);
   for (const fn of ["letter", "contentHash", "seal"])
     if (typeof adapter[fn] !== "function") throw new Error(`defineSignable(${subjectType}): ${fn} is a function`);
+  for (const fn of ["blocks", "onSigned", "onCompleted", "onDeclined", "onEnded", "recordStatus", "sealedTo"])
+    if (adapter[fn] !== undefined && typeof adapter[fn] !== "function")
+      throw new Error(`defineSignable(${subjectType}): ${fn} is a function`);
   if (!["offer_letter", "employment_contract", "agreement"].includes(adapter.document_type))
     throw new Error(`defineSignable(${subjectType}): document_type is offer_letter, employment_contract or agreement`);
   if (SIGNABLE.has(subjectType) && SIGNABLE.get(subjectType) !== adapter)
@@ -194,7 +212,30 @@ async function setSignerEmailIn(client, signatureRequestId, role, email) {
 
 /** The signers of a request as a record shows them (SignerView), in signing order. */
 async function signersOf(db, signatureRequestId) {
-  return (await repo.signaturesOf(db, signatureRequestId)).map(signerView);
+  const r = await repo.request(db, signatureRequestId);
+  return (await repo.signaturesOf(db, signatureRequestId)).map((x) => signerView(x, r));
+}
+
+/**
+ * Where a request stands, for the record that sent it (an agreement's signers on Contracts & MOUs):
+ * its status and why it ended, and each signer as SignerView with the address their link went to,
+ * whether they opened it, and whether it is their turn. Null for no request.
+ */
+async function progressOf(db, signatureRequestId) {
+  const r = await repo.request(db, signatureRequestId);
+  if (!r) return null;
+  const rows = await repo.signaturesOf(db, signatureRequestId);
+  return {
+    status: r.status,
+    end_reason: r.end_reason || null,
+    sealed: Boolean(r.sealed_at),
+    signers: rows.map((x) => ({
+      ...signerView(x, r),
+      email: x.signer_email || null,
+      viewed: Boolean(x.viewed_at),
+      turn: x.status === "pending" && r.status === "pending" && rows.filter((y) => y.position < x.position).every((y) => y.status === "signed"),
+    })),
+  };
 }
 
 /**
@@ -221,6 +262,78 @@ async function endOne(client, actor, r, status, reason) {
   const a = SIGNABLE.get(r.subject_type);
   if (a && a.onEnded) await a.onEnded(client, { request: r, status, reason, actor });
   return true;
+}
+
+/**
+ * Record a document signed on paper (Record Signed Copy), in the caller's transaction: a request completed
+ * and sealed at once over the scan, which the upload engine has already vaulted and hashed. Each signer
+ * is a `paper` signature dated `signed_on`, carrying the content hash (A12) of the record as it stands;
+ * the scan's stored hash is its artifact hash, so both verdicts hold until either changes. The record's
+ * onCompleted runs as for a signature made in the hub. End any open request first (endFor).
+ * @param {import("pg").PoolClient} client
+ * @param {object} actor  who recorded it
+ * @param {{document_id: string, subject_type: string, subject_id: string, reference: string, title: string,
+ *          signed_on: string, signers: Array<{name: string, title?: string|null, role: string}>}} req
+ * @returns {Promise<{signature_request_id: string}>}
+ */
+async function recordPaperIn(client, actor, req) {
+  const adapter = adapterOf(req.subject_type);
+  if (!Array.isArray(req.signers) || req.signers.length < 1 || req.signers.length > 4)
+    throw new Error("signatures.recordPaperIn: one to four signers");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(req.signed_on))) throw new Error("signatures.recordPaperIn: signed_on is a date");
+  const scan = await vault.get(client, req.document_id);
+  if (!scan || !/^[0-9a-f]{64}$/.test(String(scan.content_hash || "")))
+    throw new AppError("VALIDATION_FAILED", "Upload the signed copy", 422, { document_id: ["Upload the signed copy"] });
+  const contentHash = await adapter.contentHash(client, req.subject_id);
+  if (!/^[0-9a-f]{64}$/.test(String(contentHash))) throw new Error(`signatures: ${req.subject_type}.contentHash gave no sha256`);
+  const requestId = await repo.insertRequest(client, {
+    document_id: req.document_id,
+    subject_type: req.subject_type,
+    subject_id: req.subject_id,
+    expires_at: null,
+    created_by: actor.user_id,
+    reference: req.reference,
+    title: req.title,
+    document_type: adapter.document_type,
+  });
+  // Noon in Lagos on the day it was signed: a date on paper has no hour.
+  const signedAt = new Date(`${req.signed_on}T12:00:00+01:00`);
+  let position = 0;
+  for (const s of req.signers) {
+    position += 1;
+    await repo.insertPaperSignature(client, {
+      signature_request_id: requestId,
+      signer_name: s.name,
+      signer_title: s.title || null,
+      signer_role: s.role,
+      position,
+      signed_at: signedAt,
+      content_hash: contentHash,
+      evidence: { signed_on: req.signed_on, recorded_by: actor.user_id, recorded_at: new Date().toISOString(), consent: null },
+    });
+  }
+  await repo.completeRequest(client, requestId);
+  await repo.setSealing(client, requestId, { sealed_document_id: req.document_id, verify_key_hash: null });
+  await repo.setSealed(client, requestId, scan.content_hash);
+  const r = await repo.request(client, requestId);
+  await emit(client, {
+    key: EVENTS.SIGNATURE_COMPLETED,
+    entity: { type: "signature_request", id: requestId },
+    actor,
+    payload: { signature_request_id: requestId, subject_type: req.subject_type, subject_id: req.subject_id, paper: true },
+  });
+  if (adapter.onCompleted) await adapter.onCompleted(client, { request: r, signature_id: null, actor, paper: true });
+  return { signature_request_id: requestId };
+}
+
+/**
+ * Stop every signing link a record was ever sent, in the caller's transaction: when it is sent again,
+ * a link from an earlier request (one another signer declined, or that lapsed) opens nothing, as the
+ * guide's "the old link stops working" asks (partnerships.md §11). End its open request first (endFor).
+ */
+async function stopLinksFor(client, { subject_type: subjectType, subject_id: subjectId }) {
+  for (const id of await repo.signaturesForSubject(client, subjectType, subjectId))
+    await publicToken.revokeFor(client, { subject_type: SIGNATURE_ENTITY, subject_id: id, scope: SCOPE });
 }
 
 /** Requests past their end, ended (signature-reminders, daily). */
@@ -250,8 +363,11 @@ async function opened(db, token, { forUpdate = false } = {}) {
   return { s, r };
 }
 
+/** A request that ended before everyone signed: a signature on it binds nobody. */
+const endedUnsigned = (r) => Boolean(r) && ["declined", "expired", "revoked"].includes(r.status);
+
 function stateOf(r, s) {
-  if (s.status === "signed") return "signed";
+  if (s.status === "signed") return endedUnsigned(r) ? "void" : "signed";
   if (s.status === "declined" || r.status === "declined") return "declined";
   if (r.status === "revoked") return "withdrawn";
   if (r.status === "expired" || s.status === "expired" || (r.expires_at && new Date(r.expires_at) <= new Date())) return "expired";
@@ -261,13 +377,25 @@ function stateOf(r, s) {
 const verifiedRecently = (s) =>
   Boolean(s.code_verified_at) && Date.now() - new Date(s.code_verified_at).getTime() < code.VERIFIED_MINUTES * 60000;
 
-const signerView = (x) => ({
+/**
+ * One signer as the pages and records list them (SignerView). Given its request, a signature on a
+ * request that ended unsigned (declined by another, lapsed, withdrawn) reads `void`, and says so.
+ */
+const signerView = (x, r = null) => ({
   name: x.signer_name,
   title: x.signer_title || null,
   role: x.signer_role,
-  status: x.status,
+  status: x.status === "signed" && endedUnsigned(r) ? "void" : x.status,
   signed_at: x.signed_at ? new Date(x.signed_at).toISOString() : null,
+  method: x.method || null,
 });
+
+/** The document as blocks where its type has them (an agreement), else null. */
+async function blocksOf(db, adapter, subjectId) {
+  if (!adapter.blocks) return null;
+  const blocks = await adapter.blocks(db, subjectId);
+  return Array.isArray(blocks) && blocks.length > 0 ? blocks : null;
+}
 
 /** SigningView for one signer's link. */
 async function viewOf(db, r, s) {
@@ -275,6 +403,7 @@ async function viewOf(db, r, s) {
   // One after another: inside a write, `db` is one client.
   const org = await profile.readProfile(db);
   const letter = await adapter.letter(db, r.subject_id);
+  const blocks = await blocksOf(db, adapter, r.subject_id);
   const all = await repo.signaturesOf(db, r.signature_request_id);
   const signedAt = s.signed_at ? new Date(s.signed_at).toISOString() : null;
   return {
@@ -287,8 +416,9 @@ async function viewOf(db, r, s) {
     expires_at: r.expires_at ? new Date(r.expires_at).toISOString() : null,
     state: stateOf(r, s),
     letter,
+    blocks,
     code_verified: verifiedRecently(s),
-    signers: all.map(signerView),
+    signers: all.map((x) => signerView(x, r)),
     signed_at: signedAt,
     verify_number: r.sealed_at ? r.reference : null,
   };
@@ -508,6 +638,9 @@ module.exports = {
   issueLinks,
   setExpiryIn,
   setSignerEmailIn,
+  recordPaperIn,
+  stopLinksFor,
+  progressOf,
   signersOf,
   endFor,
   expireLapsed,
@@ -520,6 +653,7 @@ module.exports = {
   documentFor,
   verifyKey,
   signerView,
+  blocksOf,
   /** Tests only. */
   __reset: () => SIGNABLE.clear(),
 };

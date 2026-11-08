@@ -173,6 +173,28 @@ const BUILDER_SOURCE = Object.assign(Object.create(null), {
     body_markdown: str(d.body_markdown),
     rules: d.rules ? sortedKeys(d.rules) : null,
   }),
+
+  /**
+   * A partnership agreement as its signers sign it (docs/guides/partnerships.md §6.8, §6.9): the
+   * reference, title and kind, the wording as it was frozen at Send for Signature (Markdown, the
+   * record's values already in it, the signer's own names still to fill), its term, its value, and
+   * the version of the category template it was written from. The signers, their evidence, the
+   * approval and the record's later edits (a partner renamed) are about the agreement, not in it.
+   */
+  PARTNERSHIP_AGREEMENT: (d) => ({
+    v: 1,
+    type: "PARTNERSHIP_AGREEMENT",
+    number: str(d.number),
+    title: str(d.title),
+    kind: str(d.kind),
+    body_markdown: str(d.body_markdown),
+    starts_on: str(d.starts_on),
+    ends_on: str(d.ends_on),
+    currency: str(d.currency || m.CURRENCY),
+    value: money(d.value),
+    template_key: str(d.template_key),
+    template_version: int(d.template_version),
+  }),
 });
 
 /** The only thing anything looks a builder up in. Insertion order preserved. */

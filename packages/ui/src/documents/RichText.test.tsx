@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "../testing/axe";
 import { RichText, type RichTextBlock } from "./RichText";
@@ -62,5 +62,48 @@ describe("RichText", () => {
   it("has no accessibility violations", async () => {
     const { container } = render(<RichText blocks={BLOCKS} />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  describe("a table", () => {
+    const OPTIONS: RichTextBlock[] = [
+      {
+        kind: "table",
+        head: [[], [span("Regular")], [span("VIP")]],
+        rows: [
+          [[span("Original Price")], [span("₦12,000.00")], [span("₦30,000.00")]],
+          [[span("Deal Price")], [span("₦10,800.00")], [span("App Download")]],
+        ],
+      },
+    ];
+    const asPhone = (phone: boolean) =>
+      vi.spyOn(window, "matchMedia").mockImplementation((query: string) => ({
+        matches: phone && /max-width/.test(query),
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }));
+    afterEach(() => vi.restoreAllMocks());
+
+    it("is a table on a computer, each row named by its first cell", async () => {
+      asPhone(false);
+      const { container } = render(<RichText blocks={OPTIONS} />);
+      expect(screen.getByRole("table")).toBeInTheDocument();
+      expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Regular", "VIP"]);
+      expect(screen.getByRole("rowheader", { name: "Deal Price" })).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+
+    it("is a card a row on a phone, each value under its column's name, with no table", () => {
+      asPhone(true);
+      render(<RichText blocks={OPTIONS} />);
+      expect(screen.queryByRole("table")).toBeNull();
+      expect(screen.getByText("Deal Price").tagName).toBe("P");
+      expect(screen.getAllByText("VIP")).toHaveLength(2);
+      expect(screen.getByText("App Download")).toBeInTheDocument();
+    });
   });
 });

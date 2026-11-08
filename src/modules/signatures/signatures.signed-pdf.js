@@ -7,10 +7,12 @@
  *
  *   seal(requestId)        outbox, on signature.completed: generate the sealed copy (pending render)
  *   sealed(documentId)     outbox, on document.generated: record the artifact hash, emit signature.sealed
- *   mailSealed(requestId)  outbox, on signature.sealed: the copy to each signer
+ *   mailSealed(requestId)  outbox, on signature.sealed: the copy to each signer, and to whoever the
+ *                          record names besides (its adapter's sealedTo: an agreement's owner)
  *
  * Each step is safe to run twice: a request already sealed is left alone.
  */
+const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
 const { config } = require("../../config/env");
 const { atomically } = require("../../shared/db/tx");
@@ -96,20 +98,23 @@ async function mailSealed(requestId) {
   const r = await repo.request(pool, requestId);
   if (!r || !r.sealed_at) return 0;
   const queues = require("../../jobs/queues");
+  const data = { title: r.title, reference: r.reference, verify_url: `${origin()}/verify/${encodeURIComponent(r.reference)}` };
+  const mail = (to, jobId) =>
+    queues.enqueue("email-send", EMAILS.completed, { to, template: EMAILS.completed, data, attachments: [{ document_id: r.sealed_document_id }] }, { jobId });
+  const mailed = new Set();
   let sent = 0;
   for (const s of await repo.signaturesOf(pool, requestId)) {
-    if (s.status !== "signed") continue;
-    await queues.enqueue(
-      "email-send",
-      EMAILS.completed,
-      {
-        to: { name: s.signer_name, email: s.signer_email },
-        template: EMAILS.completed,
-        data: { title: r.title, reference: r.reference, verify_url: `${origin()}/verify/${encodeURIComponent(r.reference)}` },
-        attachments: [{ document_id: r.sealed_document_id }],
-      },
-      { jobId: `signature-completed-${s.signature_id}` },
-    );
+    // A signature recorded from paper has no address: nobody was sent a link.
+    if (s.status !== "signed" || !s.signer_email) continue;
+    await mail({ name: s.signer_name, email: s.signer_email }, `signature-completed-${s.signature_id}`);
+    mailed.add(String(s.signer_email).toLowerCase());
+    sent += 1;
+  }
+  const adapter = service().adapterOf(r.subject_type);
+  for (const to of adapter.sealedTo ? (await adapter.sealedTo(pool, r.subject_id)) || [] : []) {
+    if (!to || !to.email || mailed.has(String(to.email).toLowerCase())) continue;
+    mailed.add(String(to.email).toLowerCase());
+    await mail({ name: to.name || to.email, email: to.email }, `signature-completed-${requestId}-${crypto.createHash("sha256").update(String(to.email).toLowerCase()).digest("hex").slice(0, 16)}`);
     sent += 1;
   }
   return sent;

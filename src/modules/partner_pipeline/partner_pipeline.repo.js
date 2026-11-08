@@ -871,6 +871,21 @@ async function unfinishedOf(client, { kind, id }) {
   return rows.map((r) => r.deal_id);
 }
 
+/**
+ * Live deals past the later of their validity and their event's end (§6.6): the daily job completes
+ * them. A deal with neither date runs on.
+ */
+async function lapsedLive(db) {
+  const { rows } = await db.query(
+    `SELECT partnership_opportunity_id AS deal_id FROM partnership_opportunity
+      WHERE status = 'live' AND (valid_until IS NOT NULL OR event_ends_on IS NOT NULL)
+        AND GREATEST(valid_until, event_ends_on) < (now() AT TIME ZONE 'Africa/Lagos')::date
+      ORDER BY partnership_opportunity_id
+      LIMIT 500 -- pagination:batch the daily sweep completes at most 500 a run; the rest wait for the next`,
+  );
+  return rows.map((r) => r.deal_id);
+}
+
 /** Whether a deal has a signed agreement (one sealed, or a signed copy recorded on it). */
 async function hasSignedAgreement(db, dealId) {
   const { rows } = await db.query(
@@ -1098,6 +1113,7 @@ async function homeSignedByMonth(db, { from, to }, scope) {
 }
 
 module.exports = {
+  lapsedLive,
   removeReturn,
   returnById,
   dealForReturns,

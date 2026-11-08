@@ -5,6 +5,7 @@ import { useRouter } from "@/lib/router";
 import { useTrailTitle } from "@/lib/trail";
 import { Banner, Button, EmptyState, formatDate, formatMoneyShort, HelpTerm, Menu, Pill, ProfileHeader, StatusPill, Tabs, useModal } from "@mycity/ui";
 import { ContactForm } from "./forms/ContactForm";
+import { GenerateAgreement } from "./forms/AgreementForms";
 import { ConvertLead } from "./forms/ConvertLead";
 import { LogInteraction } from "./forms/LogInteraction";
 import { LoseLead } from "./forms/LoseLead";
@@ -43,6 +44,9 @@ export function Lead360({ id }: { id: string }) {
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
     { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${lead.lead_id}&record=lead`) },
+    ...(x.deal && x.deal.status === "open"
+      ? [{ label: "Generate Agreement", icon: "doc" as const, onSelect: () => open("Generate Agreement", (close) => <GenerateAgreement dealId={x.deal!.deal_id} close={close} onCreated={(aid) => navigate(`/partnerships?tab=contracts-and-mous&id=${aid}`)} />) }]
+      : []),
     { label: "Edit Lead", icon: "doc" as const, onSelect: () => open("Edit Lead", (close) => <EditLead lead={lead} close={close} />, true) },
     ...(done ? [] : [{ label: "Close as Lost", danger: true, onSelect: () => open("Close as Lost", (close) => <LoseLead id={lead.lead_id} close={close} />) }]),
   ];

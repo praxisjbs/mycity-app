@@ -422,6 +422,13 @@ const ACTIONS = Object.freeze([
     need: ["partnerships", "create"],
     words: ["proposal", "write a proposal", "pitch", "deck", "sponsor"],
   }),
+  // An agreement is generated from a deal's category template (§6.8): the form picks the deal.
+  a("new_agreement", "Generate Agreement", {
+    screen: "partnerships.contracts-and-mous",
+    params: { action: "new" },
+    need: ["partnerships", "create"],
+    words: ["agreement", "mou", "contract", "deal merchant", "new agreement", "new mou", "new contract"],
+  }),
 ]);
 
 /** The link an action opens, or null for one the app runs itself with no screen. */

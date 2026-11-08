@@ -530,7 +530,10 @@ entity so conversion re-points it and never rewrites the vault; and `partner.par
 one release after the code stopped reading it (MIGRATIONS §8; its DOWN copies it back from the
 category) · `7080` (M7 PR 5) `partner_follow_up`, the `partner-inactivity` job's record of each quiet
 spell it followed up (a partner or a lead, the day of its last contact, the task it gave the owner;
-unique `dedup_key` `partner-inactivity:<record>:<day>`, so one follow-up a spell). The Workspace link
+unique `dedup_key` `partner-inactivity:<record>:<day>`, so one follow-up a spell) · `7100` (M7 PR 6)
+`signature.signer_email` nullable for a signature recorded from paper only (`method = 'paper'`, a CHECK),
+the shared signatures service's Record Signed Copy · `7101` (M7 PR 6) `partnership_agreement`
+`returned_reason` and `returned_at`: why an agreement came back to Draft from its approval. The Workspace link
 columns of `7040` are written by the Workspace services since PR 5. `docs/guides/partnerships.md` §4 is
 the field-by-field account.
 
