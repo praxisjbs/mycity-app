@@ -56,10 +56,16 @@ exists, and the payslip template is empty.
 - [x] MILESTONES §11 amended (08/11/2026)
 - [x] `docs/guides/ess.md` payroll lines updated; a pointer in `docs/guides/attendance.md` §6.17 (08/11/2026)
 - [x] Guides index row, the guide's CODEOWNERS line, `docs/DATABASE_SCHEMA.md` M6 pointer, PROGRESS note (08/11/2026)
+- [x] JBS Praxis's second round of answers recorded in the guide (§13.1 items 7 and 15 to 20), MILESTONES §11 and
+      the ESS guide: the CEO alone approves; a leaver's final run takes every outstanding instalment and a negative
+      net blocks Submit; no recurring allowances in simple mode; both payslips as modals; staging demos with test
+      people (08/11/2026)
+- [x] The payslip sample drafted (`docs/MyCity-ERP-Documents/payroll-samples/payslip-sample.html` and its README,
+      listed in `docs/MyCity-ERP-Documents/INDEX.md`) (08/11/2026)
 - [ ] TB reads the guide; tick Written in `docs/guides/README.md`
-- [ ] TB's payslip sample (HTML) stored under `docs/MyCity-ERP-Documents/payroll-samples/`, shown to MyCity
-- [ ] The guide's §13.3 items answered as they come (approver, statutory rates, allowances, pay day, salary and bank
-      data, leavers' instalments, staging mail, ESS modal, who builds the screens)
+- [ ] TB shows MyCity the payslip sample and records the answers (guide §13.3 item 2; the README lists what to confirm)
+- [ ] The guide's §13.3 items answered as they come: statutory rates, pay day, salary and bank data, who builds
+      the screens
 
 ### PR 1 · Contract, data and scaffolding
 - [ ] Contracts for the simple mode (`payroll.js`, `payslips.js`, `deductions.js`), `gen:contract`
@@ -98,7 +104,8 @@ exists, and the payslip template is empty.
 
 ### PR 7 · Frontend
 - [ ] `features/payroll/` rebuilt (the four tabs), ESS · My Payslips on the contract, the mock in contract shapes
-- [ ] `MonthField`; F31's amendment recorded; every form on `useContractForm`
+- [ ] `MonthField`; F31 amended for both payslips (Payroll · Payslips and ESS · My Payslips in a modal at every
+      desktop width); every form on `useContractForm`
 - [ ] Screen gates at 390 and 1440 px; PROGRESS UI and Mobile ticked; the PR body's Native app feel section
 
 ### PR 8 · Staging seed, User Guide, release check
@@ -109,6 +116,14 @@ exists, and the payslip template is empty.
 
 ## 3 · Log
 
+- 08/11/2026 · JP · PR 0, second round: JBS Praxis answered the open questions (the CEO alone approves; a leaver's
+  final run takes every outstanding instalment and a negative net blocks Submit; no recurring allowances in simple
+  mode; both payslips in a modal; staging demos with test people; the payslip sample drafted; the guide stays Agreed).
+  Recorded in the guide (§13.1, §10.3, Appendix A and B, its Change log), MILESTONES §11, the ESS guide's §10.2 row,
+  this tracker and PROGRESS; the sample, its README and an INDEX row added under
+  `docs/MyCity-ERP-Documents/payroll-samples/`. Documentation only. Left open for people: TB reads the guide and ticks
+  Written; MyCity signs off the sample; the statutory rates, the pay day, every person's salary and bank details, and
+  who builds the screens.
 - 08/11/2026 · JP · PR 0: `docs/guides/payroll.md` written as M6's single source of truth (the rules, the data, the
   API, the screens, the build plan, the demo); this tracker; MILESTONES §11 amended with the 4 November and 08/11
   decisions; `docs/guides/ess.md` and `docs/guides/attendance.md` brought into line; the guides index, CODEOWNERS,

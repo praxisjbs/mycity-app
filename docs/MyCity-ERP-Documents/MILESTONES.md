@@ -1006,8 +1006,12 @@ record and M6's only source of truth.
   accepts a fine for this month, spreads it over months or waives it. **Salary advances** are recorded by
   Operations & People and recovered as instalments; there is no employee request flow.
 - **No salary grading in simple mode:** salaries are negotiated.
-- The approver is still the CEO or the COO (the one open question); the seeded stage is the CEO and the
-  flow is editable on Settings · Approvals.
+- **The CEO approves the run** (the open CEO-or-COO question, answered 08/11/2026). The seeded stage is the
+  CEO alone; MyCity can add a stage or a role (a COO) on Settings · Approvals without code.
+- **A leaver's final run takes every outstanding instalment, and a negative net blocks Submit.** Simple mode
+  has one monthly gross plus one-off adjustments and no recurring allowances. Both payslips (Payroll ·
+  Payslips and ESS · My Payslips) open in a modal. Staging demos use test people, because staging sends
+  real mail (A4).
 
 ### Definition of done
 
