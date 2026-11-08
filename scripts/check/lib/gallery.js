@@ -155,10 +155,18 @@ async function openComponent(page, url, name) {
     { timeout: 15000 },
   );
   await page.evaluate(() => document.fonts.ready.then(() => true));
-  // Settle entrance animations: an overlay fading in reads as invisible (opacity 0).
-  await page.evaluate(() => {
-    for (const a of document.getAnimations()) {
-      if (a.effect && a.effect.getComputedTiming().endTime !== Infinity) a.finish();
+  // Settle entrance animations: an overlay fading in reads as invisible (opacity 0). A block that
+  // rises into view (Reveal) starts its fade only once its observer has seen it, a frame or two
+  // after the page drew, so finish what runs until two frames in a row start nothing new: read
+  // mid-fade, its text measures the contrast of its own animation (FeatureGrid, 08/11/2026).
+  await page.evaluate(async () => {
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const finite = () => document.getAnimations().filter((a) => a.playState !== "finished" && a.effect && a.effect.getComputedTiming().endTime !== Infinity);
+    for (let quiet = 0, i = 0; quiet < 2 && i < 20; i += 1) {
+      const running = finite();
+      for (const a of running) a.finish();
+      quiet = running.length ? 0 : quiet + 1;
+      await frame();
     }
   });
 }
