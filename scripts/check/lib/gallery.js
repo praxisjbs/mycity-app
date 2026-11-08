@@ -1,5 +1,5 @@
 "use strict";
-/* global document */
+/* global document, window */
 /**
  * The component gallery as a gate target (FRONTEND_FOUNDATION F10, F23): build
  * packages/ui's gallery when its build is missing or stale, serve it on a local
@@ -160,7 +160,7 @@ async function openComponent(page, url, name) {
   // after the page drew, so finish what runs until two frames in a row start nothing new: read
   // mid-fade, its text measures the contrast of its own animation (FeatureGrid, 08/11/2026).
   await page.evaluate(async () => {
-    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const frame = () => new Promise((r) => window.requestAnimationFrame(() => r()));
     const finite = () => document.getAnimations().filter((a) => a.playState !== "finished" && a.effect && a.effect.getComputedTiming().endTime !== Infinity);
     for (let quiet = 0, i = 0; quiet < 2 && i < 20; i += 1) {
       const running = finite();
