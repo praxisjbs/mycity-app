@@ -163,33 +163,13 @@ describe("the rows", () => {
     }
   });
 
-  test("numbers carry STG, so none can be one the owning module gives", () => {
-    const numbers = written.filter((w) => "number" in w.values).map((w) => w.values.number);
-    expect(numbers.length).toBeGreaterThan(0);
-    for (const n of numbers) expect(n).toMatch(/^[A-Z]{3}-STG-\d{2}$/);
-    expect(new Set(numbers).size).toBe(numbers.length);
-  });
-
-  test("dates count from the run's day: agreements inside the year", () => {
-    expect(x.quarterName).toBe("Q4 2026");
-    for (const { row, values } of written) {
-      if (row.table === "partnership_agreement") expect(values.starts_on >= "2026-01-01").toBe(true);
-    }
+  test("every forward table is its owner's own now: Home writes no row there (M7's partners are 70_partnerships.js)", () => {
+    expect(forward.ROWS).toEqual([]);
+    expect(written).toEqual([]);
   });
 
   test("a post nobody holds is refused", () => {
     expect(() => forward.personOf(staff, "chairman")).toThrow(/no post/);
-  });
-
-  test("a row whose unique key would take a value a row before it holds is left out", () => {
-    const keys = new Map(forward.DELETE_ORDER.map((table) => [table, []]));
-    // A key of one agreement per partner owner: each owner's first agreement is written, the rest left out.
-    keys.set("partnership_agreement", [["owner_id"]]);
-    const plan = forward.planOf(forward.ROWS, x, staff, keys);
-    const agreements = [...plan.values()].filter((p) => p.row.table === "partnership_agreement").map((p) => p.row.key);
-    expect(agreements.length).toBeLessThan(forward.ROWS.filter((r) => r.table === "partnership_agreement").length);
-    keys.set("partnership_agreement", []);
-    expect(forward.planOf(forward.ROWS, x, staff, keys).size).toBe(forward.ROWS.length);
   });
 });
 

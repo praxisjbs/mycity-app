@@ -36,12 +36,12 @@ const performanceSeed = require("../../seeds/staging/45_performance_plan");
 const reviewsSeed = require("../../seeds/staging/46_performance_reviews");
 const recruitmentSeed = require("../../seeds/staging/55_recruitment");
 const expensesSeed = require("../../seeds/staging/80_expenses");
+const partnershipsSeed = require("../../seeds/staging/70_partnerships");
 const forward = require("../../seeds/staging/lib/forward-rows");
 const { removeHomeStagingRows } = require("../../seeds/staging/lib/home-staging-rows");
 const { realStaff } = require("../../seeds/staging/lib/staff");
 const { atomically } = require("../../src/shared/db/tx");
 const { createAdmin, BUILD_ACCOUNT } = require("../../scripts/db/create-admin");
-const sweeps = require("../../src/modules/alerts/alerts.sweeps");
 const { KEY_PREFIX } = require("../../seeds/staging/lib/attendance");
 
 // The queues and the socket emitter would hold Redis connections open past the run.
@@ -143,12 +143,13 @@ describeDb("Home's staging seed against the real migrations", () => {
 
   test("running it twice leaves every table as the first run left it", () => {
     expect(second).toEqual(first);
-    // Recruitment's tables are its own seed's now (55_recruitment.js): Home writes none of them.
-    for (const table of TABLES.filter((t) => !recruitmentSeed.RECRUITMENT_TABLES.includes(t))) expect([table, first[table] > 0]).toEqual([table, true]);
+    // Recruitment's and Partnerships' tables are their own seeds' now (55_recruitment.js, 70_partnerships.js): Home writes none of them.
+    const theirs = [...recruitmentSeed.RECRUITMENT_TABLES, ...partnershipsSeed.PARTNERSHIP_TABLES];
+    for (const table of TABLES.filter((t) => !theirs.includes(t))) expect([table, first[table] > 0]).toEqual([table, true]);
   });
 
   test("every id the manifest lists is there, in the column it names", async () => {
-    const taken = [...workspaceSeed.M2_TABLES, ...performanceSeed.PLAN_TABLES, ...reviewsSeed.REVIEW_TABLES, ...recruitmentSeed.RECRUITMENT_TABLES, ...expensesSeed.EXPENSE_TABLES];
+    const taken = [...workspaceSeed.M2_TABLES, ...performanceSeed.PLAN_TABLES, ...reviewsSeed.REVIEW_TABLES, ...recruitmentSeed.RECRUITMENT_TABLES, ...expensesSeed.EXPENSE_TABLES, ...partnershipsSeed.PARTNERSHIP_TABLES];
     for (const { table, id_column: idColumn, ids } of home.HOME_STAGING_ROWS.filter((e) => !taken.includes(e.table))) {
       const { n } = await one(`SELECT count(*)::int AS n FROM ${table} WHERE ${idColumn} = ANY($1::uuid[])`, [ids]);
       expect([table, n]).toEqual([table, ids.length]);
@@ -237,7 +238,8 @@ describeDb("Home's staging seed against the real migrations", () => {
          JOIN home_alert_rule r ON r.home_alert_rule_id = a.home_alert_rule_id`,
     );
     const metrics = new Set(alerts.rows.map((a) => a.metric));
-    for (const metric of ["partner_inactivity", "budget_threshold"]) expect([metric, metrics.has(metric)]).toEqual([metric, true]);
+    // Quiet partners are M7's own seed's (70_partnerships.js), raised by the next morning's sweep.
+    for (const metric of ["budget_threshold"]) expect([metric, metrics.has(metric)]).toEqual([metric, true]);
     // Attendance's alerts are the Attendance policy's breaches: no version is seeded (A26), so none.
     expect(rules.rows.map((r) => r.metric)).not.toContain("late_arrivals");
     expect(rules.rows.map((r) => r.metric)).not.toContain("missing_clock_out");
@@ -274,7 +276,8 @@ describeDb("Home's staging seed against the real migrations", () => {
       const o = await overviewOf(staff.operations);
       const cards = cardsOf(o);
       expect(Object.keys(cards)).toEqual(["attendance_today", "tasks_overdue", "expenses_pending", "partnerships_active"]);
-      for (const card of o.cards) expect([card.key, figure(card) > 0]).toEqual([card.key, true]);
+      // Partnerships' figures are M7's own seed's (70_partnerships.js), which this run does not load.
+      for (const card of o.cards.filter((k) => k.key !== "partnerships_active")) expect([card.key, figure(card) > 0]).toEqual([card.key, true]);
       expect(o.clocked_in.present).toBeGreaterThan(0);
       expect(o.chart.kind).toBe("attendance_days");
       expect(o.chart.days).toHaveLength(14);
@@ -282,8 +285,6 @@ describeDb("Home's staging seed against the real migrations", () => {
       expect(o.donut).toMatchObject({ kind: "on_time" });
       expect(o.donut.on_time).toBeGreaterThan(0);
       expect(o.donut.late).toBeGreaterThan(0);
-      expect(o.pipeline.stages.length).toBeGreaterThan(0);
-      expect(o.pipeline.quiet_30d).toBeGreaterThan(0);
       expect(o.goals.length).toBeGreaterThan(0);
       expect(o.week.some((day) => day.items.length > 0)).toBe(true);
       expect(o.alerts_to_clear).toBeGreaterThan(0);
@@ -292,18 +293,16 @@ describeDb("Home's staging seed against the real migrations", () => {
     test("CEO: signed value, open High alerts and who is in; the goals chart, the Org KPI and the pipeline", async () => {
       const o = await overviewOf(staff.ceo);
       const cards = cardsOf(o);
-      for (const key of ["partnerships_signed_value", "alerts_high_open"])
-        expect([key, figure(cards[key]) > 0]).toEqual([key, true]);
+      for (const key of ["alerts_high_open"]) expect([key, figure(cards[key]) > 0]).toEqual([key, true]);
       // Goals On Track counts the quarter's key results the Performance seed loads.
       expect(cards.goals_on_track.denominator).toBeGreaterThan(0);
       expect(o.chart.kind).toBe("goals");
       expect(o.chart.goals.length).toBeGreaterThan(0);
       expect(o.donut.departments.length).toBeGreaterThan(0);
-      expect(o.pipeline.stages.length).toBeGreaterThan(0);
       expect(o.week.some((day) => day.items.length > 0)).toBe(true);
     });
 
-    test("Partnerships: every card, the value signed by month, the pipeline and the goals", async () => {
+    test("Partnerships: every card and the goals (the figures are M7's own seed's, 70_partnerships.js)", async () => {
       const o = await overviewOf(staff.head);
       expect(Object.keys(cardsOf(o))).toEqual([
         "partnerships_active",
@@ -311,10 +310,7 @@ describeDb("Home's staging seed against the real migrations", () => {
         "partnerships_quiet_30d",
         "proposals_out",
       ]);
-      for (const card of o.cards) expect([card.key, figure(card) > 0]).toEqual([card.key, true]);
       expect(o.chart.kind).toBe("signed_value");
-      expect(o.chart.months.some((m) => Number(m.amount) > 0)).toBe(true);
-      expect(o.pipeline.stages.length).toBeGreaterThan(0);
       expect(o.goals.length).toBeGreaterThan(0);
       expect(o.week.some((day) => day.items.length > 0)).toBe(true);
     });
@@ -349,41 +345,22 @@ describeDb("Home's staging seed against the real migrations", () => {
     });
   });
 
-  test("M7 and M8 following their steps once leave none of Home's rows in their tables and no alert about one", async () => {
+  test("M7 and M8 have taken their tables: Home's seed leaves none of its rows there and no alert about one", async () => {
     const TAKEN = [
       ...["partner_interaction", "partnership_agreement", "partnership_proposal", "partnership_opportunity", "partner"],
       ...["expense_request", "budget_line", "budget"],
     ];
     const ids = home.HOME_STAGING_ROWS.filter((e) => TAKEN.includes(e.table)).flatMap((e) => e.ids);
-    const about = () => one("SELECT count(*)::int AS n FROM home_alert WHERE subject_id = ANY($1::text[])", [ids]);
-    expect((await about()).n).toBeGreaterThan(0);
-    const inTx = async (fn) => {
-      const client = await pool.connect();
-      try {
-        return await atomically(client, () => fn(client));
-      } finally {
-        client.release();
-      }
-    };
-
-    // Step 1, each owner's own seed; step 2, the Home seed with their rows taken out; then the morning sweep.
-    const removed = await inTx((client) => removeHomeStagingRows(client, TAKEN));
-    expect(removed.rows).toBeGreaterThan(0);
-    const rows = forward.ROWS.filter((r) => !TAKEN.includes(r.table));
-    const today = await realStaff(pool);
-    await inTx((client) => forward.writeForwardRows({ db: client, staff: today, now: NOW, rows }));
-    await sweeps.sweep({ now: NOW, db: pool });
-
+    expect(forward.ROWS.filter((r) => TAKEN.includes(r.table))).toEqual([]);
+    expect((await one("SELECT count(*)::int AS n FROM home_alert WHERE subject_id = ANY($1::text[])", [ids])).n).toBe(0);
     for (const table of TABLES.filter((t) => TAKEN.includes(t)))
       expect([table, (await one(`SELECT count(*)::int AS n FROM ${table} WHERE ${table}_id = ANY($1::uuid[])`, [ids])).n]).toEqual([table, 0]);
-    expect((await about()).n).toBe(0);
-    const orphans = await one(
-      `SELECT count(*)::int AS n FROM home_alert a
-        WHERE (a.subject_type = 'partner' AND NOT EXISTS (SELECT 1 FROM partner p WHERE p.partner_id::text = a.subject_id))
-           OR (a.subject_type = 'budget' AND NOT EXISTS (SELECT 1 FROM budget b WHERE b.budget_id::text = a.subject_id))`,
-    );
-    expect(orphans.n).toBe(0);
-    expect(await inTx((client) => removeHomeStagingRows(client, TAKEN))).toEqual({ rows: 0, alerts: 0 });
+    const client = await pool.connect();
+    try {
+      expect(await atomically(client, () => removeHomeStagingRows(client, TAKEN))).toEqual({ rows: 0, alerts: 0 });
+    } finally {
+      client.release();
+    }
   });
 
   describe("never on production", () => {
