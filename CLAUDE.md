@@ -131,7 +131,8 @@ silently.
   desktop the list and the record sit side by side. A list and the record it opens are always
   `ListDetail` from `@mycity/ui` (`DetailPane` where desktop puts the record elsewhere). The gate
   taps each phone screen's rows and has no exemption. Expenses records open in the modal on desktop
-  too (F31 amended 04/11/2026, AJ; `docs/guides/expenses.md` §10).
+  too (F31 amended 04/11/2026, AJ; `docs/guides/expenses.md` §10), and so do Recruitment's Interviews
+  and Offers, in the widest dialog (F31 amended 08/11/2026, GE).
 - **Components only from `@mycity/ui`** (`packages/ui`, listed in `docs/COMPONENTS.md`). A missing
   one is added in `packages/ui` with `npm run new:component` (header, test and gallery page), never
   inside a feature; nothing new goes in `app/src/components/` or `public-app/src/components/`.

@@ -538,9 +538,12 @@ the others' cards until the round closes.
 1. Open [Recruitment · Interviews](/recruitment?tab=interviews).
 2. **Upcoming and Recent** lists what is coming first, soonest first, then those held. Press
    **My Panels** for the ones you sit on, or **All Interviews** for every one you may see.
-3. Each shows the candidate, the role, the date, the panel, and the round: **Scheduled**, how many
-   cards are in, **Closed** or **Cancelled**.
-4. Press an interview. On a computer it shows beside the list; on a phone it opens in a sheet.
+3. Each shows the candidate, the role, the date, when it ends, how it is held, the panel, and the
+   round: **Scheduled**, how many cards are in, **Closed** or **Cancelled**. On a phone the list
+   keeps the candidate, the date, the panel and the round.
+4. Press an interview. On a computer it opens in a wide window: the interview, **Blind Panel**,
+   **Weighted Scorecard** and **Candidate Details** sit two by two, with **Round Activity** across
+   the window under them. On a phone it opens in a sheet, one part under another.
    ![An interview's sheet](shot:recruitment-interview-sheet)
 5. It shows when and where, or the video link, and the **Candidate Details**.
 6. **Blind Panel** shows each person as **Submitted** or **Waiting**. A submitted score reads
@@ -697,16 +700,21 @@ An offer goes through these, in order:
 2. The tiles count the offers **With Approval**, with the drafts under it, those **To Send**, those
    **With Candidates** and those **Accepted This Month**.
 3. Pick a **Status** to see only those offers, or search by number, name or role.
-4. Press an offer. On a computer it shows beside the list; on a phone it opens in a sheet.
+4. Each row shows the offer's number, the candidate, the role, the start date, the year's pay
+   (with **Outside Range** when it is), the status, when it was sent and when it expires. On a phone
+   the list keeps the candidate and the status.
+5. Press an offer. On a computer it opens in a wide window: the offer, **Monthly Pay**, **Approval**
+   and **Signers** sit two by two, with **History** and the letter across the window under them. On
+   a phone it opens in a sheet, one part under another.
    ![An offer](shot:recruitment-offer-record)
-5. The top shows the role, the department, the start date, when it expires, and the **Score** the
-   candidate had when the offer was made.
-6. **Monthly Pay** lists each pay line, the **Monthly Total** and the year's pay. **Vacancy Range**
+6. The offer shows the role, the department, the start date, when it expires, and the **Score**
+   the candidate had when the offer was made.
+7. **Monthly Pay** lists each pay line, the **Monthly Total** and the year's pay. **Vacancy Range**
    is the role's monthly range. A total outside it shows **Outside Range**, with the reason.
-7. **Approval** shows each stage and who approved or rejected it, with any reason.
-8. **Signers** shows who signs for MyCity and the candidate, and whether each has signed.
-9. **History** lists when it was made, submitted, approved, signed, sent and how it ended.
-10. Under them is the letter, as the candidate will read it. Press **Download PDF** for the PDF.
+8. **Approval** shows each stage and who approved or rejected it, with any reason.
+9. **Signers** shows who signs for MyCity and the candidate, and whether each has signed.
+10. **History** lists when it was made, submitted, approved, signed, sent and how it ended.
+11. Under it is the letter, as the candidate will read it. Press **Download PDF** for the PDF.
 
 ### Make an offer {#recruitment-offers-new needs="recruitment create"}
 
@@ -989,6 +997,7 @@ as: operations
 do:
   - click: row 1
   - wait: text "Candidate Details"
+crop: modal
 marks:
   1: text "Candidate Details" | Filled once for the whole panel
 ```
@@ -1035,6 +1044,7 @@ as: operations
 do:
   - click: text "Tunde Bakare"
   - wait: button "Sign for Company"
+crop: modal
 marks:
   1: text "Outside Range" | Pay outside the role's range
   2: button "Sign for Company" | The Offer Signatory signs here
@@ -1075,6 +1085,7 @@ as: operations
 do:
   - click: text "Dayo Martins"
   - wait: button "Change Email"
+crop: modal
 marks:
   1: button "Change Email" | Correct the address
 ```

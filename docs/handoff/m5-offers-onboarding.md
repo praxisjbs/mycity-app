@@ -175,6 +175,10 @@ earlier: M5's forms use help terms.
 
 ## 6 · Log
 
+- 08/11/2026 · GE · (Ose) Offers on desktop, at GE's ask (F31 amended 08/11/2026): the list takes the page's width
+  (number, start date, Outside Range and sent added) and a row opens the offer in a wide dialog (ListDetail `modal`,
+  size `xl`), the offer, Monthly Pay, Approval and Signers two by two, History and the letter across it. Phone
+  unchanged. `docs/guides/offers.md` §10 and the Recruitment chapter follow.
 - 07/11/2026 · AJ · The open reviews, taken by AJ (every M5 item falls to AJ): nothing in PR 1 to 3
   breaks an existing structure. 5020's CHECKs on `signature_request` and `signature` meet no other
   writer (M7's agreements do not write them yet) and no row older than 5020; 5090 drops tables no

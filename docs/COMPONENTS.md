@@ -412,7 +412,7 @@ A list and the record a row opens: side by side on a wide desktop, and on a phon
 |---|---|
 | Use | Any list whose row opens a record on the same screen: leave requests, payslips, proposals, offers, letter templates. DetailPane is the same rule for a record the desktop layout places elsewhere on the page (under the list beside a chart, above the list). `useSideBySide()` says when a first pick may show unasked. |
 | Avoid | A record with its own screen (navigate to its `id`); a reader read one at a time that fills the screen (SplitPanes: the mailbox, chat); a form (Modal); a record shown below its list on a phone, in any shape. |
-| Phone | No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `layout="modal"` (Expenses, F31 as amended 04/11/2026) opens the record in the centred dialog at every desktop width too, and the list takes the full width. |
+| Phone | No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `layout="modal"` (Expenses, F31 as amended 04/11/2026; Recruitment's Interviews and Offers, amended 08/11/2026, with `size="xl"`) opens the record in the centred dialog at every desktop width too, and the list takes the full width. |
 | Accessibility | The sheet is the shared Modal: titled by `title`, focus moves in and returns to the row on close, Esc and the phone's Back close it (F29). Side by side, the record is a plain column after the list in reading order. |
 | Status | stable |
 | Exports | `ListDetail`, `DetailPane` |
@@ -435,6 +435,7 @@ A list and the record a row opens: side by side on a wide desktop, and on a phon
 | `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
 | `className` | `string` |  | Layout classes only (spacing), on the side-by-side grid. |
 | `layout` | `"beside" \| "modal"` |  | `beside` (the default): the record beside the list on a wide desktop. `modal`: the list takes the full width and a picked record opens in the shared Modal at every width, the centred dialog on desktop and the sheet on a phone (F31 as amended for Expenses). Nothing shows unasked. |
+| `size` | `"md" \| "wide" \| "xl"` |  | The dialog's desktop width: `md`, `wide` (the default for `cols="1/1.5"`), or `xl` for a record whose cards sit side by side in the dialog (`layout="modal"`: Recruitment's Interviews and Offers). |
 
 **DetailPane** props (`DetailPaneProps`)
 
@@ -2937,7 +2938,7 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 | `children` | `ModalContent` |  | The body, or a function of `close`. |
 | `footer` | `ModalContent` |  | Footer buttons only (Cancel, then the primary), or a function of `close`. A body can also use ModalFooter. |
 | `wide` | `boolean` |  | The wider desktop dialog (tables, documents). Same as size="wide". |
-| `size` | `"sm" \| "md" \| "wide"` |  | Desktop width: `sm` a confirmation, `md` a form (the default), `wide` a table or document. |
+| `size` | `"sm" \| "md" \| "wide" \| "xl"` |  | Desktop width: `sm` a confirmation, `md` a form (the default), `wide` a table or document, `xl` a record whose cards sit side by side (an interview, an offer). |
 | `full` | `boolean` |  | A full-screen sheet on a phone (a composer, a long form, a reader). No change on desktop. |
 | `side` | `boolean` |  | A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. |
 | `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. Forms inside can also say so with useUnsavedChanges. |
@@ -6426,7 +6427,7 @@ The public site's hero, glass teal in light and Deep Green in dark: the page's h
 
 | | |
 |---|---|
-| Use | size index for the site's front door (the careers index) and size role for a vacancy (the team as a gold pill, the role's facts as chips, its actions and a note), size page for an inner page's short head (Help: its title and one line), each inside PublicPage layout full. l, m and pane stay for the pages not yet moved to the approved design. |
+| Use | size index for the site's front door (the careers index) and size role for a vacancy (the team as a gold pill, the role's facts as chips, its actions and a note), size page for an inner page's short head (Help: its title, at a role's size), each inside PublicPage layout full. l, m and pane stay for the pages not yet moved to the approved design. |
 | Avoid | The staff app; decoration under a page that has its own heading already; text more than a line. |
 | Phone | Edge to edge. index: still the first screen, 16 px at the sides, the search's button full width under its box, the figures closer; its lede is hidden (a page subtitle is desktop only). role: All Roles stays at the top left, the actions and the note are left off (the page's bar carries Apply). l and m: the heading 24 px, the skyline shorter, the line under the heading hidden. The pane becomes a compact band above the card (from 1040 px down), its `wide` part left off. |
 | Accessibility | The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline, the scrim and the street grid are decorative (aria-hidden) and still under reduced motion, when the parts no longer rise and the figures show their value at once. A counting figure is read as its final value. All Roles is a link. index and role take the page's theme, their inks AA on its ground (tokens.css --site-*); the earlier panels take the dark theme's tokens, so they keep AA on Deep Green whatever the page's theme. |
@@ -6447,7 +6448,7 @@ The public site's hero, glass teal in light and Deep Green in dark: the page's h
 | `facts` | `ReadonlyArray<{ icon: IconName; text: string }>` |  | The record's facts as chips on the panel, each a glyph and a few words (Lagos, Hybrid, Full Time). |
 | `children` | `ReactNode` |  | What sits under the heading: a search field; on the pane, the clock and the progress. |
 | `wide` | `ReactNode` |  | The pane only: what it adds where it stands beside the page (1041 px and wider), such as the steps; left off the compact band. |
-| `size` | `"index" \| "role" \| "page" \| "l" \| "m" \| "pane"` |  | `index`: the site's front door, the first screen. `role`: a vacancy's head. `page`: a short head for an inner page, its title and one line (Help). `l` (the default), `m` and `pane`: the earlier panels (a front door, a record's page, the context pane PublicPage stands beside a form). |
+| `size` | `"index" \| "role" \| "page" \| "l" \| "m" \| "pane"` |  | `index`: the site's front door, the first screen. `role`: a vacancy's head. `page`: a short head for an inner page, its title at a role's size and an optional line (Help). `l` (the default), `m` and `pane`: the earlier panels (a front door, a record's page, the context pane PublicPage stands beside a form). |
 | `accent` | `string` |  | index and role: the word of a string `title` drawn in the brand yellow (Work With Us, accent Us). |
 | `stats` | `ReadonlyArray<{ value: number; label: string }>` |  | index: the figures under the search, each counting up from 0 as the hero opens (Open Roles, Teams Hiring, Cities). |
 | `back` | `{ label: string; href: string }` |  | role: the link back at the top left (All Roles); it goes through PublicPage's navigate. |
@@ -6462,7 +6463,7 @@ The public site's hero, glass teal in light and Deep Green in dark: the page's h
 <SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
 <SkylineHero size="pane" record eyebrow="Your Application" title="Partnerships Associate" text="This link is yours until 12/11/2026." />
 <SkylineHero size="index" eyebrow="Hiring in Lagos and Abuja" title="Work With Us" accent="Us" text="Building the app that knows every Nigerian city." stats={[{ value: 12, label: "Open Roles" }]}><SiteSearch tone="hero" ... /></SkylineHero>
-<SkylineHero size="page" title="Help" text="How to apply, take an assessment and sign an offer." />
+<SkylineHero size="page" title="Here to Guide You" />
 <SkylineHero size="role" record back={{ label: "All Roles", href: "/jobs" }} eyebrow="Marketing & Sales" title="Head, Sales & Revenue" facts={facts} note="12 people have applied">{actions}</SkylineHero>
 ```
 
