@@ -1400,6 +1400,56 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
     months with Imported or Entered, and Enter Returns a month at a time (the last eighteen months; a row
     opens its month).
 
+- **In PR 6 (08/11/2026, TB; TB's calls of 07/11/2026), agreements, approval, signing and verification:**
+  - AJ's #85 merged into `main` before this PR, so the one signatures service and its `5020` reached `main`
+    through M5, unchanged; this PR improves it on top. The branch adds no M5 file, so gate 3 needs no
+    exception and #85 needs no second merge.
+  - Generate Agreement keeps a field with no value as its chip in the Draft (`fillMarkdown` `keepEmpty`), so
+    the person sees it and Submit names it: the missing fields are the chips still in the wording, `signer.*`
+    aside. Submit also needs the start date, since the term is part of what is signed (the content hash).
+    Draft edits are the editor's HTML (`AgreementUpdate.body_html`); a value given in `fields` fills its chip.
+  - The agreement's PDF is its own wording through the one renderer and letterhead (`generate.js`
+    `ownWording`, `heading: false`), recorded with its category template's key and version. When sealed, the
+    partner's signature is stamped into the wording's `signer.*`; any other signer prints after it, then the
+    certificate; the QR prints in the letterhead's header, so on every page (offers' sealed copies too).
+  - `review` while the first stage waits, `approval` while a later one waits and once every stage approved
+    (`approval.state` `approved`), which Send for Signature then accepts. Rejected, not decided in time, the
+    approval withdrawn, or changes asked for (withdrawn as its opener, as expenses' Send Back) return it to
+    Draft with the reason (`returned_reason`, migration `7101`) until it is submitted again.
+  - Send for Signature: the partner's signatory contact first, then MyCity's when the template is
+    countersigned (the CEO offered; the person may change either). Every signer is mailed at once, after
+    commit; a later signer's page says whom they sign after. A link lasts 30 days. Send Again ends the open
+    request as withdrawn and stops every earlier link of the agreement, a declined one's included; a corrected
+    address is Send for Signature again from Sent.
+  - A decline or a lapse returns it to Sent with Send Again; a signature already on that request reads Void,
+    on the signing page and on the agreement. The last signature makes it Signed and moves its deal to the
+    first `signed` stage (source `signature`), which converts a lead; the agreement it renews becomes Renewed.
+    The sealed copy is mailed to the owner too (the adapter's `sealedTo`) and filed among the partner's
+    documents (origin `agreement`, `partners.documents.fileIn`), the vault's row unchanged.
+  - Record Signed Copy is offered once approved, and while Sent or Viewed: the scan joins the record's
+    documents (origin `signed_copy`) and `signatures.recordPaperIn` records a completed, sealed request over it
+    (signature `paper`, no email: migration `7100` allows one only then). It has no QR, so it verifies by
+    reference only and reads Signed outside the hub.
+  - An agreement's wording is the agreement its partner signs, so whoever sees the agreement reads the terms it
+    states, commission included; `partnerships.money` keeps gating the deal's own commission fields and its
+    returns (§6.1).
+  - `AgreementDetail.verify` is the reference, the by-reference page and that page as a QR: only the sealed
+    copy's QR key's hash is kept, so the screen cannot show the QR's own link.
+  - The daily job runs at 06:45 Lagos: Signed to Active on its start, to Expiring at its notice date, live deals
+    past the later of validity and event end Completed (`deal.completed`, `partner_pipeline.completeLapsed`,
+    each partner's status kept). An agreement past its end stays Expiring until renewed or closed and reads
+    Expired on verification. The owner is reminded at the notice date, then 30, 7 and 1 days before the end.
+    Proposals' expiry is PR 7's.
+  - Renew drafts from a signed, active or expiring agreement (its asks kept, one open renewal at a time), on a
+    new deal "<deal> (Renewal)" on the partner when asked. Close withdraws an open approval as its opener and
+    ends an open signature request.
+  - ⌘K finds agreements, MOUs and contracts by kind (three providers in `agreements.search.js`). Praxis AI reads
+    `agreements.list` and `agreements.renewals`; every agreement form is `design`, Record Signed Copy `file` and
+    signing `secret` (§9).
+  - The public signing page's words follow the document (Partnership Agreement, Sign Agreement, Decline to
+    Sign); its consent box keeps the label it shipped with, Agree to Sign Electronically, as the public site's
+    User Guide chapter and its pictures name it.
+
 ### 13.3 Still open
 
 - **AI job** for `proposal-message` (Fast recommended, before PR 7): the person confirms (CLAUDE.md).
@@ -1708,6 +1758,11 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 08/11/2026 · TB · PR 6, agreements, approval, signing and verification (`m7/agreements-signing`): the agreements
+  module (generate, Draft, Submit through `partnership.agreement`, Send for Signature, Send Again, Record Signed
+  Copy, Renew, Close), signing converting a lead, the seal filed with the partner's documents, the
+  `agreement-renewals` job and reminder, Contracts & MOUs (#54) on the real API, and the public Sign and Verify
+  pages for agreements; migrations `7100` and `7101`. What it decided is in §13.2, In PR 6.
 - 07/11/2026 · AJ · PR 5, work for a partner (`m7/workspace-links`): Connect to Partner on New Project, New Task, New
   Event and their edits, with Disconnect, checked by `partners.work`; the Partner filter on Tasks and Projects; `GET
   /work` with hidden counts, the Work tab in its own file (`WorkTab.tsx`) and the Overview's Next Events; deliverables on

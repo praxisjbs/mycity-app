@@ -13,8 +13,8 @@ const { sha256, sameHash } = require("../../../src/shared/files/hash");
 const storage = require("../../../src/services/storage/storage.service");
 const images = require("../../../src/services/media/image-pipeline");
 const scan = require("../../../src/services/media/scan");
-const { markdownToHtml, markdownToText, stripTrailingAcceptanceBlock } = require("../../../src/shared/documents/markdown");
-const { render, parse, variablesOf } = require("../../../src/shared/documents/render");
+const { markdownToHtml, markdownToText, markdownToBlocks, stripTrailingAcceptanceBlock } = require("../../../src/shared/documents/markdown");
+const { render, renderMarkdown, fillMarkdown, parse, variablesOf } = require("../../../src/shared/documents/render");
 const canonical = require("../../../src/shared/documents/canonical");
 const vault = require("../../../src/shared/documents/vault");
 const variables = require("../../../src/shared/templates/variables");
@@ -233,6 +233,42 @@ describe("markdown and the template language", () => {
     expect(markdownToHtml("| <b>x</b> |\n|---|\n| y |")).toContain("<th>&lt;b&gt;x&lt;/b&gt;</th>");
     expect(stripTrailingAcceptanceBlock("Body.\nTo accept, please sign below.\n\n**Accepted and Agreed**\n______\nDate:")).toBe("Body.\nTo accept, please sign below.");
     expect(stripTrailingAcceptanceBlock("No block here.")).toBe("No block here.");
+  });
+
+  test("markdown as blocks keeps a table, its rows fitted to its header (an agreement's options)", () => {
+    const blocks = markdownToBlocks("## Financials\n\n|  | Regular | VIP |\n| --- | --- | --- |\n| Deal Price | **₦10,800.00** | ₦27,000.00 | extra |\n| Discount | 10% |\n\n1. Check-in on MyCityApp");
+    expect(blocks.map((b) => b.kind)).toEqual(["heading", "table", "numbered"]);
+    const t = blocks[1];
+    const words = (cell) => cell.map((x) => x.text).join("");
+    expect(t.head.map(words)).toEqual(["", "Regular", "VIP"]);
+    expect(t.rows.map((r) => r.map(words))).toEqual([["Deal Price", "₦10,800.00", "₦27,000.00"], ["Discount", "10%", ""]]);
+    expect(t.rows[0][1][0].bold).toBe(true);
+    // A pipe line with no rule under it is a paragraph, not a table.
+    expect(markdownToBlocks("| a | b |\nplain").map((b) => b.kind)).toEqual(["paragraph", "paragraph"]);
+  });
+
+  test("block values: a grid as a table, a list as numbered clauses, a stamped signature as its image or typed name", () => {
+    const grid = { head: ["", "Regular"], rows: [["Deal Price", "₦10,800.00"], ["<b>x</b>", "| pipe"]] };
+    const md = renderMarkdown("{{ grid }}\n\n{{ items }}\n\nSigned: {{ sig }}", { grid, items: ["One", "Two"], sig: { signature: "data:image/png;base64,iVBORw0KGgo=", typed: null, name: "Ngozi" } });
+    expect(md).toContain("<table><tr><th></th><th>Regular</th></tr><tr><td>Deal Price</td><td>₦10,800.00</td></tr><tr><td>&lt;b&gt;x&lt;/b&gt;</td><td>| pipe</td></tr></table>");
+    expect(md).toContain("<ol><li>One</li><li>Two</li></ol>");
+    expect(md).toContain('<img class="doc-signature" src="data:image/png;base64,iVBORw0KGgo=" alt="Signature of Ngozi">');
+    expect(renderMarkdown("{{ sig }}", { sig: { signature: "javascript:alert(1)", typed: "Ngozi A", name: "Ngozi" } })).toContain('<span class="doc-signature-typed">Ngozi A</span>');
+    expect(render("{{ sig }}", { sig: { signature: "https://evil/x.png", typed: null, name: "N" } })).toBe("");
+  });
+
+  test("fillMarkdown fills a Draft: values as written, signer kept, an empty field kept as its chip, no value opens a name", () => {
+    const t = "Business: {{ partner.name }}\nEvent: {{ deal.event_title }}\nValid: {{ longdate deal.valid_until }}\nSigner: {{ signer.name }}\n{{ deal.options }}";
+    const out = fillMarkdown(t, { partner: { name: "Harbour {{ x }} *Lights*" }, deal: { event_title: "", valid_until: "2026-11-26", options: { head: ["", "VIP"], rows: [["Deal Price", "₦27,000.00"]] } } }, { keep: ["signer"], keepEmpty: true });
+    expect(out).toContain("Business: Harbour { { x } } *Lights*");
+    expect(out).toContain("Event: {{ deal.event_title }}");
+    expect(out).toContain("Valid: 26 November 2026");
+    expect(out).toContain("Signer: {{ signer.name }}");
+    expect(out).toContain("| Deal Price | ₦27,000.00 |");
+    // Without keepEmpty an empty value is simply empty.
+    expect(fillMarkdown("Event: {{ deal.event_title }}", { deal: {} })).toBe("Event: ");
+    // The filled wording parses again with only the names it kept.
+    expect([...variablesOf(parse(out))].sort()).toEqual(["deal.event_title", "signer.name"]);
   });
 
   test("values are escaped; house formats; if, else, each", () => {

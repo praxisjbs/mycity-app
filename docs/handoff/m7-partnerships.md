@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | LA (Love Adeola), M7's owner as CLAUDE.md, the guide and PROGRESS name it; GE (Godwin-Okoh Elisha) builds most PRs, LA the importers, AJ the Workspace links (the guide's Appendix A) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 5 (`m7/workspace-links`) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 4 (#90, merged); PR 5 (#91, merged); PR 6 (#92, `m7/agreements-signing`) |
 
 ---
 
@@ -80,9 +80,9 @@ with the date, and add a line to §3.
 - [x] Praxis AI cards; my-workspace.md chapter and pictures retaken (07/11/2026)
 
 ### PR 6 · Agreements, approval, signing, verification
-- [ ] Generate, lifecycle, renewals; the approval flow on Settings · Approvals
-- [ ] The shared signatures service to §6.9 (agreed with LA); Sign and Verify pages
-- [ ] Contracts & MOUs (#54)
+- [x] Generate, lifecycle, renewals; the approval flow on Settings · Approvals (08/11/2026)
+- [x] The shared signatures service to §6.9 (agreed with LA); Sign and Verify pages (08/11/2026)
+- [x] Contracts & MOUs (#54) (08/11/2026)
 
 ### PR 7 · Proposal Studio and design kit
 - [ ] The person confirms the `proposal-message` job
@@ -101,6 +101,15 @@ with the date, and add a line to §3.
 
 ## 3 · Log
 
+- 08/11/2026 · TB · PR 6 (`m7/agreements-signing`, #92) built: `main` merged after #85, #90, #91 and #95 (#85 had already landed
+  AJ's signatures service and `5020` unchanged, so no gate 3 exception was needed); the agreements module (generate
+  with empty fields kept as chips, Draft in the document editor, Submit through `partnership.agreement`, Send for
+  Signature and Send Again, Record Signed Copy, Renew, Close), signing converting a lead, the seal stamped and filed with
+  the partner's documents and mailed to the owner, the `agreement-renewals` job and the `agreement_renewal` reminder,
+  canonical `PARTNERSHIP_AGREEMENT` v1, migrations `7100` and `7101`; Contracts & MOUs (#54) on the real API, desktop and
+  phone, with Generate Agreement on both 360s; the public Sign and Verify pages for agreements; `RichText` and
+  `VerifyCard` draw tables. The calls are in the guide's §13.2, In PR 6. Tests: six integration, renderer, RichText,
+  VerifyCard, three screen and four public page tests. Next: PR 7, then PR 8 (the staging seed's agreements).
 - 07/11/2026 · AJ · PR 5 (`m7/workspace-links`): Connect to Partner on New Project, New Task and New Event and their
   edits (Partner, leads marked, Deal, Disconnect), checked by `partners.work`; the Partner filter on Tasks and
   Projects; `partner_link` named only for readers who see the record; `GET /work` with hidden counts, the 360s' Work
