@@ -344,23 +344,28 @@ function renderMarkdown(template, data = {}) {
  * from its record for the person to edit in Draft. Values are held exactly as renderMarkdown holds
  * them and released afterwards, so a value prints as written but can never close a name or open a
  * new one ("{{" in a partner's name is kept as text). `keep` names the roots left as they are, to be
- * filled later (`signer`, at signing).
+ * filled later (`signer`, at signing); with `keepEmpty` a name with no value is kept too, so the
+ * Draft shows it as a field still to fill and Submit can name it.
  * @param {string} template
  * @param {object} data
- * @param {{keep?: string[]}} [opts]
+ * @param {{keep?: string[], keepEmpty?: boolean}} [opts]
  * @returns {string}
  */
-function fillMarkdown(template, data = {}, { keep = [] } = {}) {
+function fillMarkdown(template, data = {}, { keep = [], keepEmpty = false } = {}) {
   const tree = Array.isArray(template) ? template : parse(template);
   const kept = new Set(keep);
   // A value never opens or closes a name, however it was typed.
   const value = (v) => holdMarkdown(v).replace(/\{\{/g, "{ {").replace(/\}\}/g, "} }");
   const out = [];
+  const tag = (n) => `{{ ${n.helper ? `${n.helper} ` : ""}${n.path} }}`;
+  const blank = (v) =>
+    v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0) || (isGrid(v) && v.rows.length === 0);
   const walk = (nodes, scopes) => {
     for (const n of nodes) {
       const waits = n.path && kept.has(n.path.split(".")[0]);
       if (n.kind === "text") out.push(n.text);
-      else if (n.kind === "var" && waits) out.push(`{{ ${n.helper ? `${n.helper} ` : ""}${n.path} }}`);
+      else if (n.kind === "var" && waits) out.push(tag(n));
+      else if (n.kind === "var" && keepEmpty && n.helper !== "markdown" && scopes.length === 1 && blank(lookup(scopes, n.path))) out.push(tag(n));
       else if (n.kind === "var") {
         const v = lookup(scopes, n.path);
         if (n.helper === "markdown") out.push(String(v || "").replace(/\{\{/g, "{ {").replace(/\}\}/g, "} }"));

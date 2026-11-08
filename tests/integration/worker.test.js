@@ -590,6 +590,7 @@ describe("schedules and heartbeat", () => {
       .map((s) => s.key || s.id)
       .sort();
     expect(ids).toEqual([
+      "agreement-renewals",
       "alert-ageing",
       "announcement-release",
       "apply-cv-purge",

@@ -56,6 +56,8 @@
   .lh-cert-signer img { height: 32px; }
   .lh-qr { display: flex; gap: 6mm; align-items: center; margin-top: 8mm; font-size: 8.5pt; color: #71717A; }
   .lh-qr img { width: 28mm; height: 28mm; }
+  /* A sealed copy's QR on every page, in the header the table repeats (partnerships.md §6.9 step 7). */
+  .lh-meta-qr { width: 16mm; height: 16mm; display: block; margin: 0 0 2px auto; }
   .lh-staging { position: fixed; top: 40%; left: 0; right: 0; text-align: center; font-size: 64pt; font-weight: 700; color: rgba(218, 30, 16, 0.12); transform: rotate(-24deg); pointer-events: none; }
 </style>
 {{#if staging}}<div class="lh-staging">STAGING</div>{{/if}}
@@ -66,6 +68,7 @@
     {{#if org.logo}}<img src="{{ org.logo }}" alt="{{ org.display_name }}">{{else}}<div class="lh-wordmark">{{ org.display_name }}</div>{{/if}}
   </div>
   <div class="lh-meta">
+    {{#if doc.sealing.qr}}<img class="lh-meta-qr" src="{{ doc.sealing.qr }}" alt="Verification code">{{/if}}
     {{#if number}}<div><strong>{{ number }}</strong></div>{{/if}}
     {{#if doc.letter}}{{else}}<div>{{ longdate today }}</div>{{/if}}
   </div>

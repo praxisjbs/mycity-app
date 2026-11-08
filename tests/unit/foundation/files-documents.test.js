@@ -349,6 +349,21 @@ describe("markdown and the template language", () => {
     expect(canonical.hash("OFFER_LETTER", { ...offer, additional_terms: "On call for media." })).not.toBe(canonical.hash("OFFER_LETTER", offer));
     expect(canonical.isSignable("OFFER_LETTER")).toBe(true);
   });
+
+  test("a partnership agreement's payload: pinned, money normalised, edited wording or term changes it", () => {
+    const agreement = {
+      number: "AGR-2026-0001", title: "Deal Merchant Agreement: Harbour Lights Festival", kind: "deal_merchant",
+      body_markdown: "# Deal Merchant Agreement\n\n1. MyCity lists the event.\n\nName of Representative: {{ signer.name }}",
+      starts_on: "2026-12-01", ends_on: "2027-11-30", currency: "NGN", value: "2500000",
+      template_key: "events-deal-merchant-agreement", template_version: 3,
+    };
+    // Pinned: a change to this builder must bump its version, never alter v1 (canonical.js header).
+    expect(canonical.hash("PARTNERSHIP_AGREEMENT", agreement)).toBe("fbb83ba45248ad0e72b58ad087fc0975bdbdae929c76be55025a3ce64a1cee38");
+    expect(canonical.hash("PARTNERSHIP_AGREEMENT", { ...agreement, value: "2500000.00" })).toBe(canonical.hash("PARTNERSHIP_AGREEMENT", agreement));
+    expect(canonical.hash("PARTNERSHIP_AGREEMENT", { ...agreement, body_markdown: `${agreement.body_markdown} ` })).not.toBe(canonical.hash("PARTNERSHIP_AGREEMENT", agreement));
+    expect(canonical.hash("PARTNERSHIP_AGREEMENT", { ...agreement, ends_on: "2028-11-30" })).not.toBe(canonical.hash("PARTNERSHIP_AGREEMENT", agreement));
+    expect(canonical.isSignable("PARTNERSHIP_AGREEMENT")).toBe(true);
+  });
 });
 
 describe("document types, served types, derived file names", () => {

@@ -1409,6 +1409,28 @@
       "screen": null
     },
     {
+      "key": "agreements.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "agreements.AgreementListQuery",
+      "schema_sha": "9f87a20111fd770c",
+      "screen": null
+    },
+    {
+      "key": "agreements.renewals",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "agreements.RenewalQuery",
+      "schema_sha": "4c6b8d294ce83781",
+      "screen": null
+    },
+    {
       "key": "alerts.mine",
       "kind": "read",
       "module_key": "home",
@@ -2652,6 +2674,17 @@
       "screen": "partnerships.leads"
     },
     {
+      "key": "partnerships.route.generate_send_or_renew_an_agreement",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.contracts-and-mous"
+    },
+    {
       "key": "partnerships.route.log_a_call_or_meeting_with_a_partner",
       "kind": "route",
       "module_key": "partnerships",
@@ -2672,6 +2705,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "partnerships.pipeline"
+    },
+    {
+      "key": "partnerships.route.see_agreements_mous_and_contracts_or_which_renewals_are_due",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.contracts-and-mous"
     },
     {
       "key": "partnerships.route.see_the_leads_and_their_status",
