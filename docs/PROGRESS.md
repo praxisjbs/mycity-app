@@ -1268,6 +1268,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 08/11/2026 · JP · M6's engineering guide written as its single source of truth (`docs/guides/payroll.md`, with the tracker `docs/handoff/m6-payroll.md`), after the 4 November Modules Review and JBS Praxis's answers of 08/11/2026: four tabs (Payroll Runs, Payslips, Deductions, Configurations; Salary Structure #47 and Statutory #49 fold into Configurations, to be marked Dropped and #107 added by PR 1 with the inventory), simple by default, statutory built and shipped off, advances recorded by Operations & People. MILESTONES §11 amended. No row moved and no status changed; no code. Next: PR 1, contract and data.
 - 25/10/2026 · JP · Payslips (#46), on the mock: a tapped payslip opens as a full sheet on a phone (F31: `DetailPane`), never under the list; on desktop the first with a deduction still shows under it. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/payroll/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/payroll.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 

@@ -1016,6 +1016,27 @@ tasks and calendars use (`docs/handoff/notifications-everywhere.md`). Due invoic
 reminders with the module that owns them. M6 keeps payroll's own notices and the definition of
 done below.
 
+### Amended 08/11/2026 (JBS Praxis)
+
+The Modules Review of 4 November and JBS Praxis's answers of 08/11/2026 settle how M6 meets this
+section; where they differ from it, they win, and `docs/guides/payroll.md` (its §13.1) is the full
+record and M6's only source of truth.
+
+- **Four tabs.** Payroll Runs, Payslips, Deductions and Configurations. Salary Structure and Statutory fold
+  into Configurations (their slugs are retired). §18's Payroll row changes with PR 1.
+- **Simple by default.** No statutory deduction and no statutory word on any screen or payslip until the
+  advanced option is switched on. The advanced option (PAYE, pension, NHF, ITF, NSITF and salary grades) is
+  built and shipped off: the engine, the report and the rate tables exist behind the Configurations switch,
+  and rates are entered only once MyCity's accountant confirms them. The definition of done's statutory
+  clause is met when the switch computes against rates entered there, not before.
+- **Payslips** are designed PDFs that open in a modal, with Download PDF, Email All and Download All.
+- **Deductions** come from consequence management (fines) and attendance, and a person with payroll rights
+  accepts a fine for this month, spreads it over months or waives it. **Salary advances** are recorded by
+  Operations & People and recovered as instalments; there is no employee request flow.
+- **No salary grading in simple mode:** salaries are negotiated.
+- The approver is still the CEO or the COO (the one open question); the seeded stage is the CEO and the
+  flow is editable on Settings · Approvals.
+
 ### Definition of done
 
 A payroll run computes from attendance, deductions and approved consequences; payslips generate and
