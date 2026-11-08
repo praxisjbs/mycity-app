@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 "use strict";
+/* global document */
 /**
  * The proposal design kit, looked at (docs/guides/partnerships.md §6.11): its gallery sample
  * (templates/proposals/sample.json, every layout) drawn by the kit and opened in Chromium.

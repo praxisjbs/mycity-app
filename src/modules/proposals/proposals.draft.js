@@ -134,8 +134,8 @@ const off = (reason, key) => ({ available: false, reason, key, section: null, ai
 async function rewrite(actor, proposal, key, instruction) {
   const section = proposal.content.sections.find((s) => s.key === key);
   if (!section) throw new AppError("NOT_FOUND", "That page is not in this proposal", 404);
-  const now = await drafts.availability(pool, MODULE);
-  if (!now.available) return off(now.reason, key);
+  const open = await drafts.availability(pool, MODULE);
+  if (!open.available) return off(open.reason, key);
   const { input, deal, proofPoints } = await studio.inputFor(pool, proposal, { actorUser: actor, answers: true });
   const output = c.proposals.ProposalRewriteOutput.superRefine((v, ctx) => {
     if (v.section.key !== key || v.section.layout !== section.layout)
@@ -166,8 +166,8 @@ async function rewrite(actor, proposal, key, instruction) {
 /** Write With AI: the covering email's subject and message; nothing kept. */
 async function message(actor, proposal) {
   const none = (reason) => ({ available: false, reason, subject: null, message: null, ai_run_id: null });
-  const now = await drafts.availability(pool, MODULE);
-  if (!now.available) return none(now.reason);
+  const open = await drafts.availability(pool, MODULE);
+  if (!open.available) return none(open.reason);
   const kind = proposal.partner_id ? "partner" : "lead";
   const contacts = await partnersRepo.contactsOf(pool, { kind, id: proposal.partner_id || proposal.lead_id });
   const primary = contacts.find((ct) => ct.primary_contact) || contacts[0] || null;

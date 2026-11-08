@@ -87,8 +87,8 @@ async function ask(id, { last = true } = {}) {
  * press, outside any transaction. AI off or capped is refused in the person's words.
  */
 async function reshuffle(actor, proposal, card, cards) {
-  const now = await drafts.availability(pool, MODULE);
-  if (!now.available) throw new AppError("AI_UNAVAILABLE", now.reason === "limit" ? "AI Limit Reached" : "AI Is Off", 409);
+  const open = await drafts.availability(pool, MODULE);
+  if (!open.available) throw new AppError("AI_UNAVAILABLE", open.reason === "limit" ? "AI Limit Reached" : "AI Is Off", 409);
   const { input } = await studio.inputFor(pool, proposal, { actorUser: actor, answers: true });
   const output = c.proposals.ProposalReshuffleOutput.superRefine((v, ctx) => {
     if (v.card.group_key !== card.group_key) ctx.addIssue({ code: "custom", path: ["card", "group_key"], message: `must be ${card.group_key}` });

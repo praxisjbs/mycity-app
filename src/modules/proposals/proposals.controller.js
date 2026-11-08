@@ -29,7 +29,7 @@ module.exports = {
   list: async (req, res) => sendPaged(res, await service.list(req.validated.query, scopeOf(req))),
   get: async (req, res) => ok(res, await service.get(actor(req), id(req), scopeOf(req))),
   preview: async (req, res) => {
-    const out = await service.preview(actor(req), id(req), scopeOf(req));
+    const out = await service.previewOf(actor(req), id(req), scopeOf(req));
     return ok(res, { html: out.html, sections: out.sections, checks: out.checks });
   },
   start: async (req, res) => created(res, await service.start(actor(req), req.validated.body, scopeOf(req))),

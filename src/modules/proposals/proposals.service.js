@@ -197,7 +197,7 @@ async function get(actor, id, scope) {
 }
 
 /** The kit's HTML of a proposal as it stands, and what the studio's controls need beside it. */
-async function preview(actor, id, scope) {
+async function previewOf(actor, id, scope) {
   const r = await seen(pool, id, scope);
   if (!r.content) throw refuse("This proposal has no draft yet");
   const deal = await pipelineRepo.get(pool, r.deal_id, null);
@@ -216,7 +216,7 @@ async function transcriptText(client, documentId) {
   if (!TRANSCRIPT_TYPES.has(doc.mime)) throw new AppError("VALIDATION", "Upload Markdown or text", 422, { transcript_document_id: ["Upload Markdown or text"] });
   if (Number(doc.bytes) > TRANSCRIPT_BYTES) throw new AppError("VALIDATION", "At most 1 MB", 422, { transcript_document_id: ["At most 1 MB"] });
   const storage = require("../../services/storage/storage.service");
-  return Buffer.from(await storage.get(doc.storage_key)).toString("utf8").replace(/^﻿/, "");
+  return Buffer.from(await storage.get(doc.storage_key)).toString("utf8").replace(/^\uFEFF/, "");
 }
 
 async function start(actor, body, scope) {
@@ -298,31 +298,31 @@ async function retry(actor, id, scope) {
  * ------------------------------------------------------------------ */
 
 /** An answer held to its card's kind. */
-function checkAnswer(q, answer) {
+function checkAnswer(q, value) {
   const bad = (m) => new AppError("VALIDATION", m, 422, { answer: [m] });
-  if (answer === null || answer === "" || (Array.isArray(answer) && !answer.length)) throw bad("Give an answer");
+  if (value === null || value === "" || (Array.isArray(value) && !value.length)) throw bad("Give an answer");
   switch (q.answer_kind) {
     case "short_text":
-      if (typeof answer !== "string" || answer.trim().length > 200) throw bad("At most 200 characters");
-      return answer.trim();
+      if (typeof value !== "string" || value.trim().length > 200) throw bad("At most 200 characters");
+      return value.trim();
     case "long_text":
-      if (typeof answer !== "string") throw bad("Give an answer");
-      return answer.trim();
+      if (typeof value !== "string") throw bad("Give an answer");
+      return value.trim();
     case "number":
-      if (typeof answer !== "number" || !Number.isFinite(answer)) throw bad("Give a number");
-      return answer;
+      if (typeof value !== "number" || !Number.isFinite(value)) throw bad("Give a number");
+      return value;
     case "money":
-      if (!c.common.money.safeParse(answer).success) throw bad("Give an amount");
-      return answer;
+      if (!c.common.money.safeParse(value).success) throw bad("Give an amount");
+      return value;
     case "date":
-      if (!c.common.isoDate.safeParse(answer).success) throw bad("Not a real date");
-      return answer;
+      if (!c.common.isoDate.safeParse(value).success) throw bad("Not a real date");
+      return value;
     case "pick":
-      if (typeof answer !== "string" || !(q.options || []).includes(answer)) throw bad("Pick an option");
-      return answer;
+      if (typeof value !== "string" || !(q.options || []).includes(value)) throw bad("Pick an option");
+      return value;
     case "multi_pick":
-      if (!Array.isArray(answer) || answer.some((a) => !(q.options || []).includes(a))) throw bad("Pick the options");
-      return answer;
+      if (!Array.isArray(value) || value.some((a) => !(q.options || []).includes(a))) throw bad("Pick the options");
+      return value;
     default:
       throw bad("Give an answer");
   }
@@ -584,7 +584,7 @@ module.exports = {
   list,
   summary,
   get,
-  preview,
+  previewOf,
   start,
   retry,
   answer,

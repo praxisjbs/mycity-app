@@ -19,6 +19,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const c = require("@mycity/contract");
 const { render } = require("../../shared/documents/render");
+const money = require("../../shared/money/money");
 const charts = require("./proposals.charts");
 
 const KIT = path.resolve(__dirname, "..", "..", "..", "templates", "proposals");
@@ -264,8 +265,12 @@ function pagesOf(s, ctx) {
     }
     case "packages": {
       const cards = s.display === "cards" && s.options.length <= 3;
-      const prices = s.options.map((o) => Number(o.price || 0));
-      const topAt = cards && s.options.length === 3 && Math.max(...prices) > 0 ? prices.indexOf(Math.max(...prices)) : -1;
+      // Three cards: the dearest, the first of equals, is drawn as the top one; none when nothing has a price.
+      let topAt = -1;
+      if (cards && s.options.length === 3)
+        s.options.forEach((o, i) => {
+          if (o.price && money.compare(o.price, "0") > 0 && (topAt < 0 || money.compare(o.price, s.options[topAt].price) > 0)) topAt = i;
+        });
       return [
         {
           vm: {
