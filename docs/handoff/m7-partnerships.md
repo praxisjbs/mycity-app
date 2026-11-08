@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | LA (Love Adeola), M7's owner as CLAUDE.md, the guide and PROGRESS name it; GE (Godwin-Okoh Elisha) builds most PRs, LA the importers, AJ the Workspace links (the guide's Appendix A) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 4 (#90, merged); PR 5 (#91, merged); PR 6 (#92, merged); PR 7 (#94, merged); PR 8 (`m7/analytics-finish`, draft) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 4 (#90, merged); PR 5 (#91, merged); PR 6 (#92, merged); PR 7 (#94, merged); PR 8 (`m7/analytics-finish`, ready for review) |
 
 ---
 
