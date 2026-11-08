@@ -929,7 +929,8 @@ describe("the worker process", () => {
           [id],
         );
         return r.render_status !== "pending" && r;
-      }, 30_000);
+        // The worker's own Chromium starts here; a cold start may take a while (chromium.js).
+      }, 60_000);
       expect(row.render_status).toBe("done");
       expect(Number(row.bytes)).toBeGreaterThan(1000);
       expect(row.content_hash).toMatch(/^[0-9a-f]{64}$/);
@@ -940,5 +941,5 @@ describe("the worker process", () => {
     expect(await exited).toBe(0);
     expect(await registry.workerHealth()).toMatchObject({ workers: 0 });
     expect(output).not.toMatch(/"level":(50|60)/);
-  }, 60_000);
+  }, 120_000);
 });

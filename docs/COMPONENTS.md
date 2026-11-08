@@ -412,7 +412,7 @@ A list and the record a row opens: side by side on a wide desktop, and on a phon
 |---|---|
 | Use | Any list whose row opens a record on the same screen: leave requests, payslips, proposals, offers, letter templates. DetailPane is the same rule for a record the desktop layout places elsewhere on the page (under the list beside a chart, above the list). `useSideBySide()` says when a first pick may show unasked. |
 | Avoid | A record with its own screen (navigate to its `id`); a reader read one at a time that fills the screen (SplitPanes: the mailbox, chat); a form (Modal); a record shown below its list on a phone, in any shape. |
-| Phone | No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `layout="modal"` (Expenses, F31 as amended 04/11/2026; Recruitment's Interviews and Offers, amended 08/11/2026, with `size="xl"`) opens the record in the centred dialog at every desktop width too, and the list takes the full width. |
+| Phone | No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `layout="modal"` (Expenses, F31 as amended 04/11/2026; Recruitment's Interviews and Offers, amended 08/11/2026, with `size="xl"` and `closeButton`, a Close button at the dialog's foot on desktop) opens the record in the centred dialog at every desktop width too, and the list takes the full width. |
 | Accessibility | The sheet is the shared Modal: titled by `title`, focus moves in and returns to the row on close, Esc and the phone's Back close it (F29). Side by side, the record is a plain column after the list in reading order. |
 | Status | stable |
 | Exports | `ListDetail`, `DetailPane` |
@@ -436,6 +436,7 @@ A list and the record a row opens: side by side on a wide desktop, and on a phon
 | `className` | `string` |  | Layout classes only (spacing), on the side-by-side grid. |
 | `layout` | `"beside" \| "modal"` |  | `beside` (the default): the record beside the list on a wide desktop. `modal`: the list takes the full width and a picked record opens in the shared Modal at every width, the centred dialog on desktop and the sheet on a phone (F31 as amended for Expenses). Nothing shows unasked. |
 | `size` | `"md" \| "wide" \| "xl"` |  | The dialog's desktop width: `md`, `wide` (the default for `cols="1/1.5"`), or `xl` for a record whose cards sit side by side in the dialog (`layout="modal"`: Recruitment's Interviews and Offers). |
+| `closeButton` | `boolean` |  | A Close button in the dialog's footer on desktop, for a long record read top to bottom (`layout="modal"`: Interviews and Offers). A phone's sheet drags down instead. |
 
 **DetailPane** props (`DetailPaneProps`)
 

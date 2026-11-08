@@ -157,6 +157,7 @@ export function Interviews() {
       </Toolbar>
       <ListDetail
         layout="modal"
+        closeButton
         size="xl"
         open={picked !== null}
         onClose={() => setPicked(null)}

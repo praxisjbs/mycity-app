@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { axe } from "../testing/axe";
@@ -159,13 +159,14 @@ describe("DetailPane", () => {
 });
 
 /** Expenses' layout (F31 as amended): the picked record only, in the dialog, at every width. */
-function ModalRequests({ size }: { size?: "md" | "wide" | "xl" }) {
+function ModalRequests({ size, closeButton }: { size?: "md" | "wide" | "xl"; closeButton?: boolean }) {
   const [picked, setPicked] = useState<string | null>(null);
   const shown = REQUESTS.find((r) => r.id === picked) ?? null;
   return (
     <ListDetail
       layout="modal"
       size={size}
+      closeButton={closeButton}
       open={picked !== null}
       onClose={() => setPicked(null)}
       title="Expense Request"
@@ -199,6 +200,17 @@ describe("ListDetail in the modal layout", () => {
     render(<ModalRequests size="xl" />);
     await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
     expect((await screen.findByRole("dialog", { name: "Expense Request" })).className).toMatch(/max-w-6xl/);
+  });
+
+  it("closes from the Close button at the foot of the dialog on desktop", async () => {
+    render(<ModalRequests size="xl" closeButton />);
+    await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
+    const dialog = await screen.findByRole("dialog", { name: "Expense Request" });
+    // The header's close icon is named Close too: the footer's button is the last.
+    const close = within(dialog).getAllByRole("button", { name: "Close" });
+    expect(close).toHaveLength(2);
+    await userEvent.click(close.at(-1)!);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("on a phone opens the same record in the sheet", async () => {

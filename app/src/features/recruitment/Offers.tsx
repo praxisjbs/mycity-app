@@ -164,6 +164,7 @@ export function Offers() {
       </Toolbar>
       <ListDetail
         layout="modal"
+        closeButton
         size="xl"
         full
         open={picked !== null}
@@ -240,6 +241,18 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
   const sign = () => modal.open({ title: "Sign for the Company", wide: true, body: (close) => <SignForm offer={o} close={close} onSaved={reload} /> });
   const changeEmail = () => modal.open({ title: "Change Email", body: (close) => <EmailForm offer={o} close={close} onSaved={reload} /> });
   const primary = "max-md:w-full";
+  const signers =
+    o.signers.length > 0 ? (
+      <KeyValue
+        items={o.signers.map((s) => [
+          s.role === "mycity" ? `For the Company${s.title ? `, ${s.title}` : ""}` : "Candidate",
+          <span key={s.name} className="inline-flex flex-wrap items-center justify-end gap-1.5">
+            {s.name}
+            {s.status === "signed" ? pill(["ok", s.signed_at ? `Signed ${formatDate(s.signed_at)}` : "Signed"]) : s.status === "pending" ? pill(["warn", "Waiting"]) : pill(["neutral", s.status === "declined" ? "Declined" : "Not Signed"])}
+          </span>,
+        ])}
+      />
+    ) : null;
 
   return (
     <Stack>
@@ -263,6 +276,14 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
             ...(o.end_reason ? [["Reason", <span key="r" data-copy="content">{o.end_reason}</span>] as [string, React.ReactNode]] : []),
           ]}
         />
+        {wide && signers && (
+          <section aria-labelledby={`signers-${id}`} className="mt-4 border-t border-border pt-4">
+            <h3 id={`signers-${id}`} data-ui="title" className="mb-3 text-base font-strong text-foreground">
+              Signers
+            </h3>
+            {signers}
+          </section>
+        )}
         <ActionGroup>
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             {o.document && <Button icon="download" onClick={() => saveFile(`/api/v1/recruitment/offers/${id}/document`, o.document!.file_name)}>Download PDF</Button>}
@@ -276,20 +297,20 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
           </div>
         </ActionGroup>
       </Card>
-      <PayCard o={o} />
-      {o.workflow_instance_id && <OfferApproval instanceId={o.workflow_instance_id} onDecided={reload} />}
-      {o.signers.length > 0 && (
+      {/* In the dialog the approval sits under Monthly Pay, in the same card; a phone's sheet keeps its own card. */}
+      {wide ? (
+        <PayCard o={o}>{o.workflow_instance_id && <OfferApproval instanceId={o.workflow_instance_id} onDecided={reload} inCard />}</PayCard>
+      ) : (
+        <>
+          <PayCard o={o} />
+          {o.workflow_instance_id && <OfferApproval instanceId={o.workflow_instance_id} onDecided={reload} />}
+        </>
+      )}
+      {/* In the dialog the signers sit in the offer's own card; a phone's sheet keeps their card. */}
+      {!wide && signers && (
         <Card>
           <CardHeader title="Signers" />
-          <KeyValue
-            items={o.signers.map((s) => [
-              s.role === "mycity" ? `For the Company${s.title ? `, ${s.title}` : ""}` : "Candidate",
-              <span key={s.name} className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                {s.name}
-                {s.status === "signed" ? pill(["ok", s.signed_at ? `Signed ${formatDate(s.signed_at)}` : "Signed"]) : s.status === "pending" ? pill(["warn", "Waiting"]) : pill(["neutral", s.status === "declined" ? "Declined" : "Not Signed"])}
-              </span>,
-            ])}
-          />
+          {signers}
         </Card>
       )}
       </Pair>
@@ -315,8 +336,8 @@ function Pair({ wide, children }: { wide: boolean; children: React.ReactNode }) 
   return wide ? <Grid cols={2} scroll={false} flush>{children}</Grid> : <>{children}</>;
 }
 
-/** The monthly pay, line by line, the total and the year, against the vacancy's range. */
-function PayCard({ o }: { o: OfferDetail }) {
+/** The monthly pay, line by line, the total and the year, against the vacancy's range; in the dialog, the approval under it. */
+function PayCard({ o, children }: { o: OfferDetail; children?: React.ReactNode }) {
   const range = o.salary_min || o.salary_max ? `${o.salary_min ? formatMoney(o.salary_min) : "Any"} to ${o.salary_max ? formatMoney(o.salary_max) : "Any"}` : null;
   return (
     <Card>
@@ -330,6 +351,7 @@ function PayCard({ o }: { o: OfferDetail }) {
           ...(o.outside_range && o.range_reason ? [["Why Outside", <span key="w" data-copy="content">{o.range_reason}</span>] as [string, React.ReactNode]] : []),
         ]}
       />
+      {children}
     </Card>
   );
 }
@@ -361,8 +383,11 @@ const MOVE: Record<string, (who: string) => string> = {
   reassign: (who) => `Passed on by ${who}`,
 };
 
-/** The offer's approval: its stages, each move with its reason, and Approve and Reject for whom it waits on. */
-function OfferApproval({ instanceId, onDecided }: { instanceId: string; onDecided: () => void }) {
+/**
+ * The offer's approval: its stages, each move with its reason, and Approve and Reject for whom it waits on.
+ * Its own card, or (`inCard`) a part of Monthly Pay's under a hairline.
+ */
+function OfferApproval({ instanceId, onDecided, inCard = false }: { instanceId: string; onDecided: () => void; inCard?: boolean }) {
   const modal = useModal();
   const flow = useApi("GET /api/v1/workflow/instances/:id", { params: { id: instanceId } });
   const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
@@ -382,9 +407,8 @@ function OfferApproval({ instanceId, onDecided }: { instanceId: string; onDecide
     }
   };
   const no = () => modal.open({ title: "Reject Offer", body: (close) => <RejectForm instanceId={instanceId} close={close} onSaved={done} /> });
-  return (
-    <Card>
-      <CardHeader title="Approval" />
+  const body = (
+    <>
       {f ? (
         <>
           <Chain steps={f.route.map((s) => ({ label: s.name, state: s.state === "done" || s.state === "now" ? s.state : undefined }))} />
@@ -413,6 +437,21 @@ function OfferApproval({ instanceId, onDecided }: { instanceId: string; onDecide
       ) : (
         <LoadingRows count={2} />
       )}
+    </>
+  );
+  if (inCard)
+    return (
+      <section aria-labelledby={`approval-${instanceId}`} className="mt-4 border-t border-border pt-4">
+        <h3 id={`approval-${instanceId}`} data-ui="title" className="mb-3 text-base font-strong text-foreground">
+          Approval
+        </h3>
+        {body}
+      </section>
+    );
+  return (
+    <Card>
+      <CardHeader title="Approval" />
+      {body}
     </Card>
   );
 }

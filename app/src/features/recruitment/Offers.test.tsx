@@ -46,7 +46,7 @@ async function pick(name: string) {
 }
 /** The record in view: the article titled by the candidate. */
 /** The offer's record: the dialog it opened in (F31 as amended 08/11/2026). */
-const record = (name: string) => screen.getAllByRole("article").find((a) => within(a).queryByText(name))!.closest<HTMLElement>("[role=dialog]")!;
+const record = (name: string) => screen.getAllByRole("article").find((a) => within(a).queryAllByText(name).length > 0)!.closest<HTMLElement>("[role=dialog]")!;
 
 describe("Recruitment · Offers", () => {
   it("lists the offers with their figures, and a row opens its pay, signers, history and letter in the dialog", async () => {
