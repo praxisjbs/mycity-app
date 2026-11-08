@@ -22,7 +22,10 @@ describe("CityShowcase", () => {
     expect(cities).toHaveTextContent("Accra18:42");
     expect(cities).toHaveTextContent("Nairobi21:42");
     expect(cities).toHaveTextContent("Johannesburg20:42");
-    expect(cities).toHaveTextContent("Rabat19:42");
+    // Morocco's offset is the time-zone database's to say (it has changed between releases), so the
+    // test asks the same database the component does rather than fixing an hour.
+    const rabat = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date("2026-10-14T18:42:00Z"));
+    expect(cities).toHaveTextContent(`Rabat${rabat}`);
     expect(cities).toHaveTextContent("Abidjan18:42");
     expect(cities).toHaveTextContent("Douala19:42");
     expect(screen.getAllByRole("button")).toHaveLength(8);

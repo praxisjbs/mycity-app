@@ -1,7 +1,7 @@
 {
   "public-apply": {
     "spec": "b6f0b9175d8ca747",
-    "source": "7f323dcf3c6aaa55",
+    "source": "35f704607b190565",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "public-apply-questions": {
     "spec": "0c5521efda000ca1",
-    "source": "7f323dcf3c6aaa55",
+    "source": "35f704607b190565",
     "devices": [
       "desktop",
       "phone"
@@ -63,9 +63,33 @@
       "phone"
     ]
   },
+  "public-sign": {
+    "spec": "d82e693975510176",
+    "source": "3dac49eaf4970b7d",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-sign-below": {
+    "spec": "48c8c3981dea1849",
+    "source": "3dac49eaf4970b7d",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "public-vacancy": {
     "spec": "9f254efa0ed9d466",
     "source": "a8f10436aacf7c3c",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-verify": {
+    "spec": "bdadc6d729a58dae",
+    "source": "a58096fdfb6825ad",
     "devices": [
       "desktop",
       "phone"

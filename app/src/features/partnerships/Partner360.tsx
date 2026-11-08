@@ -4,13 +4,14 @@ import { useApi } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useRouter } from "@/lib/router";
 import { useTrailTitle } from "@/lib/trail";
-import { Button, Card, CardHeader, DataView, EmptyState, formatDate, formatMoney, formatMoneyShort, HelpTerm, Menu, Pill, ProfileHeader, StatusPill, Tabs, useModal } from "@mycity/ui";
+import { Button, DataView, EmptyState, formatDate, formatMoney, formatMoneyShort, HelpTerm, Menu, Pill, ProfileHeader, StatusPill, Tabs, useModal } from "@mycity/ui";
 import { ClosePartner } from "./forms/ClosePartner";
 import { ContactForm } from "./forms/ContactForm";
 import { DealForm } from "./forms/DealForm";
 import { LogInteraction } from "./forms/LogInteraction";
 import { EditPartner } from "./forms/RecordForm";
 import { UploadDocument } from "./forms/UploadDocument";
+import { ReturnsTab } from "./Returns";
 import { daysWord, dealPill, healthPill, partnerPill, useHoldsMoney, useMay } from "./lib";
 import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP, useDeal } from "./record";
 import { NextEvents, WorkTab } from "./WorkTab";
@@ -123,12 +124,7 @@ export function Partner360({ id }: { id: string }) {
           />
         )}
         {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} signedOutside={partner.signed_outside} />}
-        {tab === "returns" && (
-          <Card>
-            <CardHeader title="Returns" />
-            <EmptyState bare title="No Returns Yet" text="Monthly returns show here." />
-          </Card>
-        )}
+        {tab === "returns" && <ReturnsTab deals={x.deals} readOnly={readOnly} />}
         {tab === "work" && <WorkTab record={record} dealId={unfinished.length === 1 ? unfinished[0]!.deal_id : null} readOnly={readOnly} />}
         {tab === "activity" && <ActivityTab record={record} history={x.history} />}
         {tab === "contacts" && <ContactsTab record={record} contacts={x.contacts} readOnly={readOnly} />}

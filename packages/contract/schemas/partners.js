@@ -542,7 +542,53 @@ const DEAL_NESTED = {
   table: "partnership_opportunity",
   virtual: { venue: "a place row, owner deal.venue", validity: "validity_days or valid_until", member_ids: "deal_member rows", options: "deal_option rows" },
 };
+/* ------------------------------------------------------------------ *
+ * The Partnership Tracker import and the exports in its columns (§6.13, M7 PR 4)
+ * ------------------------------------------------------------------ */
+
+/**
+ * One row of MyCity's tracker, as the importer's extract reads it from the workbook: each cell as
+ * written (the contact details already split into an email and phones, Partnership Type into its
+ * category and commission, the dates read day-first), checked by the importer's own rules.
+ */
+const TrackerImportRow = z
+  .object({
+    name: text(150),
+    industry: optionalText(80),
+    contact_name: optionalText(160),
+    position: optionalText(120),
+    email: optionalText(200),
+    phones: optionalText(200),
+    region: optionalText(500),
+    objective: optionalText(2000),
+    category: optionalText(120),
+    commission_pct: z.number().min(0).max(100).optional(),
+    stage: optionalText(120),
+    impact: optionalText(1000),
+    owner: optionalText(120),
+    identified_on: blank(isoDate),
+    current_stage: optionalText(200),
+    next_action: optionalText(300),
+    expected_close_on: blank(isoDate),
+    status: z.enum(["on_track", "follow_up_required", "stalled", "active", "closed"]).optional(),
+    comments: optionalText(2000),
+    website: optionalText(200),
+    other: optionalText(4000),
+  })
+  .strict();
+
+/** What an export of Partners, Leads or their deals is made from: the list's own filters, in the tracker's columns. */
+const PartnershipExportRequest = z
+  .object({
+    source: z.enum(["partnerships.partners", "partnerships.leads", "partnerships.deals"]),
+    /** The list's filters as its screen holds them (PartnerListQuery, LeadListQuery or DealListQuery, without the page). */
+    filters: z.record(z.unknown()).optional(),
+  })
+  .strict();
+
 const TABLES = {
+  TrackerImportRow: { table: null, reason: "one row of MyCity's tracker workbook as the importer reads it; written as a lead or a partner" },
+  PartnershipExportRequest: { table: null, reason: "which list to export and its filters; nothing is kept but the file" },
   RegionInput: { table: null, reason: "a record's region_scope and the place rows of its cities" },
   RegionView: { table: null, reason: "a record's region_scope and its cities' places" },
   ContactInput: { table: "partner_contact" },
@@ -631,6 +677,8 @@ const TABLES = {
 };
 
 module.exports = {
+  TrackerImportRow,
+  PartnershipExportRequest,
   TABLES,
   PartnerStatus,
   RegionInput,

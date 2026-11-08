@@ -16,7 +16,8 @@
  *   deal.health_changed   Set Health (Stalled carries its blockers)
  *   deal.signed           a deal entered a signed meaning: a lead's converts in the same transaction
  *   deal.lost             a deal entered Closed Lost
- *   deal_return.saved     Enter Returns, a month at a time (money: partnerships.money)
+ *   deal_return.saved     Enter Returns, a month at a time, or the Partnership Returns import (money: partnerships.money)
+ *   deal_return.removed   a month the Partnership Returns import made, its import reverted
  *
  * Work on signing (M7 PR 5, §6.7, §6.16), outbox handlers after the change commits:
  *   partner_pipeline.deliverables   deal.signed: the category's delivery checklist raised as tasks
@@ -61,6 +62,7 @@ const EVENTS = defineEvents("partnerships", {
   "deal.deliverables_raised": { summary: "A signed deal's delivery checklist was raised as tasks" },
   "follow_up.raised": { summary: "A quiet partner or lead was followed up: its deals Follow-Up Required, a task for its owner" },
   "deal_return.saved": { summary: "A month of a deal's returns was entered" },
+  "deal_return.removed": { summary: "A month of a deal's returns was removed by reverting its import" },
 });
 
 places.owner("deal.venue", { rename: async () => {} });

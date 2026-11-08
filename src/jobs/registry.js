@@ -196,6 +196,7 @@ const SCHEDULERS = Object.freeze([
   "user-guide-index",
   "budget-threshold",
   "partner-inactivity",
+  "signature-reminders",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

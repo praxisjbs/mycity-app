@@ -134,7 +134,10 @@ async function runAxe(page) {
 }
 
 async function checkCombo(browser, url, names, width, density, axe) {
-  const ctx = await browser.newContext(WIDTHS[width]);
+  // Reduced motion: what is read is each page at rest. A block that rises into view (Reveal) fades in
+  // whenever its observer sees it again, so with motion on, axe met text mid-fade (FeatureGrid and
+  // RoleTiles at 1.68:1 to 3.17:1, 08/11/2026): the contrast of an animation, not of the page.
+  const ctx = await browser.newContext({ ...WIDTHS[width], reducedMotion: "reduce" });
   await ctx.addInitScript(
     ([key, value]) => {
       try {
@@ -177,7 +180,7 @@ async function runAxeDocument(page, where) {
 /** Every app screen at one width: sign in, move through the screens without a reload, axe each. */
 async function checkApp(browser, origin, list, width, axe) {
   const target = screens.APP_TARGET;
-  const ctx = await browser.newContext({ ...WIDTHS[width], serviceWorkers: "block" });
+  const ctx = await browser.newContext({ ...WIDTHS[width], serviceWorkers: "block", reducedMotion: "reduce" });
   const page = await ctx.newPage();
   page.setDefaultTimeout(8000);
   const found = [];

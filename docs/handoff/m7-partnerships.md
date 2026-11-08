@@ -64,12 +64,14 @@ with the date, and add a line to §3.
 - [x] Audit of PRs 1 to 3 against the guide, TB's four calls applied (the guide's §13.2, the audit) (06/11/2026)
 
 ### PR 4 · Importers and returns
-- [ ] Map Values in `shared/import`; foundation.md
-- [ ] Partnership Tracker and Partnership Returns importers, through `leads.createIn`, `partners.createIn`
+- [x] Map Values in `shared/import`; foundation.md (07/11/2026)
+- [x] Partnership Tracker and Partnership Returns importers, through `leads.createIn`, `partners.createIn`
       and `partner_pipeline.returns.saveIn` with source `import` (ready since the audit); synthetic fixture
-- [ ] Returns tab and Enter Returns on PR 3's service and routes; settings.md chapter pictures retaken
-- [ ] Export on Partners and Leads in the tracker's columns (`partnerships.partners`, `partnerships.leads`,
-      `partnerships.deals`)
+      (07/11/2026)
+- [x] Returns tab and Enter Returns on PR 3's service and routes; settings.md chapter pictures retaken
+      (07/11/2026)
+- [x] Export on Partners and Leads in the tracker's columns (`partnerships.partners`, `partnerships.leads`,
+      `partnerships.deals`) (07/11/2026)
 
 ### PR 5 · Workspace links and deliverables
 - [x] workspace.md first; Connect to Partner on projects, tasks, events; Partner filter (07/11/2026)
@@ -107,7 +109,17 @@ with the date, and add a line to §3.
   (`partner_follow_up`, migration `7080`); Praxis AI's Workspace cards with Partner, Lead and Deal; conversion moving
   Workspace links (`relinkIn`); workspace.md, my-workspace.md (pictures retaken) and praxis-ai.md. TB answered: New
   Partner's Signed Before the Hub raises no deliverables, its event days still go on the calendar (the guide's §13.2,
-  In PR 5). Tests: eleven integration tests, two screen tests. Next: PR 4, PR 6 and PR 7, then PR 8.
+  In PR 5). Tests: eleven integration tests, two screen tests. Next: PR 6 and PR 7, then PR 8.
+- 07/11/2026 · LA · PR 4 (`m7/importers-returns`): Map Values on the import engine (`GET` and `PUT
+  /imports/:id/values`, kept on the mapping and its profile); `partnership_tracker` (`partners.import.js`) on
+  `tests/fixtures/partnership-tracker.synthetic.xlsx`, every column rule of §6.13, signed rows to partners and
+  the rest to leads through the services with source `import` (a signed row's `deal.signed` carries it, for PR
+  5 to skip), revert until referenced; `partnership_returns` (`partner_pipeline.returns.import.js`) with
+  `partnerships.money`; the Partner 360's Returns tab with Enter Returns; Export on Partners and Leads
+  (`POST /partnerships/exports`) in the tracker's columns, reading back through the importer. The calls are in
+  the guide's §13.2, In PR 4. Tests: ten integration, ten unit, two screen. Left: the real tracker is imported
+  on staging by a person (Appendix B); PRs 5 to 7 run beside this one.
+
 - 06/11/2026 · TB · Audit of PRs 1 to 3 against the guide before PR 4, with TB's four calls (the guide's
   §13.2, the audit; §14). Who sees a deal: its owner's scope, its team, or its lead's or partner's
   owner's, one rule everywhere, so the 360s list and count only the deals the reader sees; New Deal and

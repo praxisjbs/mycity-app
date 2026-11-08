@@ -614,6 +614,7 @@ describe("schedules and heartbeat", () => {
       "reminders",
       "review-cycles",
       "scheduled-reports",
+      "signature-reminders",
       "system-health",
       "system-health-digest",
       "system-health-purge",

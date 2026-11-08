@@ -53,6 +53,16 @@ route(router, "put", "/:id/mapping",
     summary: "Set which column feeds which field" },
   controller.setMapping);
 
+route(router, "get", "/:id/values",
+  { response: c.imports.ImportValueList, self: true,
+    summary: "Map Values: each distinct value of a list, person or place column" },
+  controller.values);
+
+route(router, "put", "/:id/values",
+  { body: c.imports.ImportValuesSet, response: c.imports.ImportBatch, self: true,
+    summary: "Set what each value maps to" },
+  controller.setValues);
+
 route(router, "post", "/:id/preview",
   { body: c.imports.ImportRun, response: c.imports.ImportResult, self: true,
     summary: "Run the import and roll it back" },

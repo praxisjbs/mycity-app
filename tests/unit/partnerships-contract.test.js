@@ -165,14 +165,14 @@ describe("the rules a request is held to", () => {
   });
 
   test("signing is a six-digit code, a drawn or typed signature, and consent", () => {
-    ok(c.agreements.SignCodeVerify, { code: "042917" });
-    no(c.agreements.SignCodeVerify, { code: "42917" }, "code");
+    ok(c.signatures.SignCodeVerify, { code: "042917" });
+    no(c.signatures.SignCodeVerify, { code: "42917" }, "code");
     const sign = { full_name: "Bola Ade", method: "draw", signature_png: "data:image/png;base64,iVBORw0KGgo=", consent: true };
-    ok(c.agreements.SignSubmit, sign);
-    no(c.agreements.SignSubmit, { ...sign, signature_png: undefined }, "signature_png");
-    no(c.agreements.SignSubmit, { ...sign, signature_png: "data:image/svg+xml;base64,PHN2Zz4=" }, "signature_png");
-    no(c.agreements.SignSubmit, { ...sign, method: "type" }, "typed");
-    no(c.agreements.SignSubmit, { ...sign, consent: false }, "consent");
+    ok(c.signatures.SignSubmit, sign);
+    no(c.signatures.SignSubmit, { ...sign, signature_png: undefined }, "signature_png");
+    no(c.signatures.SignSubmit, { ...sign, signature_png: "data:image/svg+xml;base64,PHN2Zz4=" }, "signature_png");
+    no(c.signatures.SignSubmit, { ...sign, method: "type" }, "typed");
+    no(c.signatures.SignSubmit, { ...sign, consent: false }, "consent");
     no(c.agreements.AgreementSend, { signers: [{ name: "Bola Ade", email: "bola@ekoarts.ng", side: "partner" }] }, "confirm");
   });
 

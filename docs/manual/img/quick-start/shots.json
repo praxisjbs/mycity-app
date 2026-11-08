@@ -121,7 +121,7 @@
   },
   "qs-invite": {
     "spec": "c132ae2880d47414",
-    "source": "ca1341bbef881736",
+    "source": "7002a286e78940c2",
     "devices": [
       "desktop",
       "phone"
@@ -129,7 +129,7 @@
   },
   "qs-login-help": {
     "spec": "a5b16cc1c0b9bd35",
-    "source": "ca1341bbef881736",
+    "source": "7002a286e78940c2",
     "devices": [
       "desktop",
       "phone"
@@ -201,7 +201,7 @@
   },
   "qs-roles": {
     "spec": "1e08ac44f16d1790",
-    "source": "ca1341bbef881736",
+    "source": "7002a286e78940c2",
     "devices": [
       "desktop",
       "phone"
@@ -233,7 +233,7 @@
   },
   "qs-status": {
     "spec": "71c97deb789ceec7",
-    "source": "ca1341bbef881736",
+    "source": "7002a286e78940c2",
     "devices": [
       "desktop",
       "phone"

@@ -350,7 +350,7 @@ const ENTITY_ROUTES = Object.freeze({
   // A sitting and its file answers belong to Recruitment (the vault's moduleFor); it opens on Assessments · Sittings.
   application_assessment: { ...screen("recruitment", "assessments"), param: "sitting" }, // search:none a sitting is found through its candidate (src/modules/candidates/candidates.search.js)
   interview: screen("recruitment", "interviews"),
-  offer: screen("recruitment", "offers"), // search:none not built yet (src/modules/offers)
+  offer: screen("recruitment", "offers"),
   // search:none not built yet (src/modules/onboarding)
   onboarding: {
     ...screen("recruitment", "onboarding"),

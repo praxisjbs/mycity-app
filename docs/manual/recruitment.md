@@ -2,7 +2,7 @@
 title: Recruitment
 module: recruitment
 milestones: M4
-summary: From an empty seat to a shortlist: vacancies, candidates, assessments, interviews and the talent pool.
+summary: From an empty seat to a signed offer: vacancies, candidates, assessments, interviews, offers and the talent pool.
 icon: brief
 ---
 
@@ -11,9 +11,9 @@ page. Anyone can apply there with a CV. You screen the applications, send tests,
 and keep good people for later.
 
 Open it from **Recruitment** in the menu on a computer. On a phone, press **More** in the bar at the
-bottom, then **Recruitment**. This chapter covers five tabs along the top: **Vacancies**,
-**Candidates**, **Assessments**, **Interviews** and **Talent Pool**. What candidates see is in
-[The Public Site](#public-careers).
+bottom, then **Recruitment**. This chapter covers six tabs along the top: **Vacancies**,
+**Candidates**, **Assessments**, **Interviews**, **Offers** and **Talent Pool**. What candidates see
+is in [The Public Site](#public-careers).
 
 > **Important:** Operations & People, Management, Implementation and the CEO see every vacancy. A
 > Head of Department sees the vacancies whose hiring manager is in their team, and their candidates.
@@ -41,7 +41,7 @@ Vacancies lists each role MyCity is hiring for, and the seats on the organogram 
    description, required experience and what we look for read with their headings and lists, as
    the careers page shows them.
 7. Press **See Candidates** to open its candidates on the board.
-8. Press **Careers Page** at the top to open the careers page as a candidate sees it.
+8. Press **Careers Page** at the top to open the public website as a candidate sees it.
 
 | Status | What it means |
 |---|---|
@@ -275,6 +275,10 @@ The best weighted total comes first. A score never moves, rejects or hides anyon
    many parts have a score yet.
 5. **Stage History** lists each move, who made it and when.
 6. Press **View CV** to open the CV.
+7. {needs="recruitment create"} At **Shortlist**, press **Make Offer** to start an offer for them on
+   [Offers](#recruitment-offers-new).
+8. At **Offer** or after, press **Open Offer** to see their offer on
+   [Recruitment · Offers](/recruitment?tab=offers).
 
 A CV that is *Being checked* is still being scanned for viruses. It opens once it is clean. A CV
 with a virus never opens, and the sheet says so.
@@ -669,6 +673,148 @@ To change it later, press **Edit Report**. Each save makes the form again.
 A candidate the panel selects moves to **Shortlist** on the
 [board](#recruitment-candidates-move).
 
+## Offers {#recruitment-offers screen=recruitment/offers icon=doc}
+
+Offers is where a shortlisted candidate's offer of employment is made, approved, signed for MyCity and
+sent. The candidate reads and signs it on their phone, and signing it is accepting it.
+
+![The Offers screen](shot:recruitment-offers)
+
+An offer goes through these, in order:
+
+| Status | What it means |
+|---|---|
+| **Draft** | Being written. Only a draft can change |
+| **With Approval** | Waiting for the Head of Department, then the CEO |
+| **Approved** | Approved. The Offer Signatory signs it for MyCity, then it can be sent |
+| **With Candidate** | Sent. The candidate has until it expires to sign |
+| **Accepted** | Signed by the candidate. It is locked |
+| **Declined**, **Expired**, **Withdrawn** | Ended. Another offer can be made for the same candidate |
+
+### Read the offers {#recruitment-offers-read}
+
+1. Open [Recruitment · Offers](/recruitment?tab=offers).
+2. The tiles count the offers **With Approval**, with the drafts under it, those **To Send**, those
+   **With Candidates** and those **Accepted This Month**.
+3. Pick a **Status** to see only those offers, or search by number, name or role.
+4. Press an offer. On a computer it shows beside the list; on a phone it opens in a sheet.
+   ![An offer](shot:recruitment-offer-record)
+5. The top shows the role, the department, the start date, when it expires, and the **Score** the
+   candidate had when the offer was made.
+6. **Monthly Pay** lists each pay line, the **Monthly Total** and the year's pay. **Vacancy Range**
+   is the role's monthly range. A total outside it shows **Outside Range**, with the reason.
+7. **Approval** shows each stage and who approved or rejected it, with any reason.
+8. **Signers** shows who signs for MyCity and the candidate, and whether each has signed.
+9. **History** lists when it was made, submitted, approved, signed, sent and how it ended.
+10. Under them is the letter, as the candidate will read it. Press **Download PDF** for the PDF.
+
+### Make an offer {#recruitment-offers-new needs="recruitment create"}
+
+Only a candidate at **Shortlist** can get an offer, and only one open offer at a time.
+
+1. Open [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **New Offer**. On a phone it is in **Quick Actions**.
+   ![New Offer](shot:recruitment-offer-new)
+3. Pick the **Candidate**. The form fills in from their vacancy: the **Job Title**, the
+   **Department**, who they report to, the work pattern and the job description.
+4. Change anything that differs for this offer, then press **Next**.
+5. Under **Pay Lines**, type each line's name and its **Monthly Amount**. Press **Add Pay Line** for
+   another, such as an allowance. The **Monthly Total** adds them up.
+6. If the total is outside the vacancy's range, type **Why Outside the Range**. The approvers read
+   it. Press **Next**.
+7. Pick the **Start Date**. **Days to Sign** is how long the candidate has once it is sent, 15 unless
+   you change it. Fill in the rest that applies, then press **Next**.
+8. Type any **Additional Terms** for this offer alone. **Schedule A** is the job description printed
+   at the end; change it if this role differs.
+9. Press **Draft Offer**. It shows as **Draft**.
+
+To change a draft, press **Edit Offer**, change it and press **Save Offer**.
+
+> **Tip:** From [Recruitment · Candidates](/recruitment?tab=candidates), **Make Offer** on a
+> shortlisted candidate's sheet opens New Offer with them picked.
+
+### Send it for approval {#recruitment-offers-submit needs="recruitment edit"}
+
+1. Open the draft on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Submit for Approval**. It shows as **With Approval**.
+
+It needs a **Department** and a **Start Date**, and an Offer Signatory named in
+[Offer settings](#recruitment-offers-settings). The Head of Department approves first, then the CEO.
+If one rejects it, it comes back as **Draft** with their reason under **Approval**.
+
+### Approve or reject an offer {#recruitment-offers-approve}
+
+You approve an offer only when it waits for you. It is also on My Approvals.
+
+1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Read the pay, the reason if it is outside the range, and the letter.
+3. Press **Approve Offer**. Or press **Reject Offer**, type the **Reason** and press **Reject Offer**.
+
+When the CEO approves, the letter is made with the standard wording then in force, and the Offer
+Signatory is told.
+
+### Sign it for MyCity {#recruitment-offers-sign}
+
+Only the Offer Signatory signs, once the offer is **Approved**. You are already signed in, so no code
+is asked for.
+
+1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Sign for Company**.
+   ![Sign for the company](shot:recruitment-offer-sign)
+3. Check your **Full Name** and **Title**.
+4. Under **Signature**, pick **Draw** and sign in the box, or **Type** and type it under
+   **Typed Signature**.
+5. Tick **Agree to Sign Electronically**.
+6. Press **Sign Offer**. **Signers** shows you as signed.
+
+### Send it to the candidate {#recruitment-offers-send needs="recruitment edit"}
+
+1. Open the signed offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Send Offer**. The candidate gets an email with their own signing link.
+3. It shows as **With Candidate**, with the day it expires. The candidate's card moves to **Offer** on
+   the [board](#recruitment-candidates-read).
+
+If they cannot find the email, press **Resend Offer**. A new link goes out and the old one stops
+working. What the candidate sees is in [Sign an offer](#public-sign).
+
+When they sign, it shows as **Accepted** and both of you get the signed copy by email. If they
+decline, or it expires, their card goes back to **Shortlist** and you can make another offer.
+
+### When the email does not arrive {#recruitment-offers-email needs="recruitment edit"}
+
+If the mail server refuses the candidate's address, the offer says so in red at the top, with the
+address and when.
+
+1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Change Email**, at the top or beside **Resend Offer**.
+   ![Change Email](shot:recruitment-offer-email)
+3. Type the right **Email** and press **Send to Email**.
+4. A new link goes to the new address and the old one stops working. The candidate's address
+   changes on every application of theirs.
+
+An address another candidate already uses is refused with *Another candidate has it*. A refusal that
+arrives later as a mail of its own does not show here: if the candidate says nothing arrived, check
+the address with them and use **Change Email** or **Resend Offer**.
+
+### Withdraw an offer {#recruitment-offers-withdraw needs="recruitment edit"}
+
+1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Withdraw Offer**, type the **Reason** and press **Withdraw Offer**.
+
+Its link stops working. An offer still **With Approval** can be withdrawn only by who submitted it,
+or the CEO. An accepted offer cannot be withdrawn.
+
+### Offer settings {#recruitment-offers-settings needs="recruitment edit"}
+
+1. Open [Recruitment · Offers](/recruitment?tab=offers) and press **Offer Settings**.
+   ![Offer Settings](shot:recruitment-offer-settings)
+2. Press **Offer Signatory**, pick who **Signs for the Company** and press **Save Signatory**. They
+   need a login to sign.
+3. Press **Standard Offer Letter** to change the letter's wording. It is Markdown; the names in
+   braces under it, such as `{{ job_title }}`, are filled from each offer.
+4. Press **Save Letter**. Offers approved from now on use it; those already approved keep theirs.
+5. **Restore Default** puts MyCity's own wording back. Yours stays in the history.
+
 ## Talent Pool {#recruitment-pool screen=recruitment/talent-pool icon=star}
 
 The Talent Pool keeps good candidates who were not hired this time, for 24 months.
@@ -873,4 +1019,62 @@ open: /recruitment?tab=talent-pool
 as: operations
 marks:
   1: row 1 | A person kept for later
+```
+
+```shot recruitment-offers
+open: /recruitment?tab=offers
+as: operations
+marks:
+  1: button "New Offer" | Make an offer
+  2: row 1 | An offer: press it to open
+```
+
+```shot recruitment-offer-record
+open: /recruitment?tab=offers
+as: operations
+do:
+  - click: text "Tunde Bakare"
+  - wait: button "Sign for Company"
+marks:
+  1: text "Outside Range" | Pay outside the role's range
+  2: button "Sign for Company" | The Offer Signatory signs here
+```
+
+```shot recruitment-offer-new
+open: /recruitment?tab=offers&new=1
+as: operations
+do:
+  - wait: label "Candidate"
+crop: modal
+marks:
+  1: label "Candidate" | Shortlisted candidates only
+```
+
+```shot recruitment-offer-sign
+open: /recruitment?tab=offers
+as: operations
+do:
+  - click: text "Tunde Bakare"
+  - click: button "Sign for Company"
+  - wait: label "Full Name"
+crop: modal
+marks:
+  1: role radio "Type" | Or type your signature
+```
+
+```shot recruitment-offer-settings
+open: /recruitment?tab=offers&panel=settings
+as: operations
+do:
+  - wait: text "Offer Signatory"
+```
+
+```shot recruitment-offer-email
+open: /recruitment?tab=offers
+as: operations
+do:
+  - click: text "Dayo Martins"
+  - wait: button "Change Email"
+marks:
+  1: button "Change Email" | Correct the address
 ```

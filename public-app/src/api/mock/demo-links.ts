@@ -28,10 +28,10 @@ export const DEMO_LINKS: Array<[string, string]> = [
   ["Offer already signed", "/sign/Yc3vB6mQh9Ls"],
   ["Offer expired", "/sign/Gz7kT4pXw2Nd"],
   ["Verify", "/verify"],
-  ["Verify, matches", "/verify/OFF-0016"],
+  ["Verify, matches", "/verify/OFF-0017"],
   ["Verify, file altered", "/verify/OFF-0012"],
   ["Verify, record altered", "/verify/OFF-0011"],
   ["Verify, not this document", "/verify/OFF-0009"],
   ["Verify, not found", "/verify/OFF-0099"],
-  ["Verify, QR on OFF-0016", "/verify/t/Qd5mW8rTx3Kp"],
+  ["Verify, QR on OFF-0017", "/verify/t/Qd5mW8rTx3Kp"],
 ];

@@ -25,6 +25,7 @@ test("each route's permission is the one §5 names", () => {
     "GET /work partnerships.view",
     "GET /work/records partnerships.view",
     "GET /work/deals partnerships.view",
+    "POST /exports partnerships.export",
   ]);
 });
 
