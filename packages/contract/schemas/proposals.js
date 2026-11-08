@@ -28,8 +28,17 @@ const QuestionState = z.enum(["open", "answered", "skipped", "replaced"]);
 const SourceKind = z.enum(["notes", "transcript"]);
 const AssetRole = z.enum(["cover", "gallery", "logo", "section"]);
 const ProofPointKind = z.enum(["stat", "partner_logo", "endorsement", "result"]);
-/** The design kit's layouts (§6.11). */
-const LayoutName = z.enum(["cover", "letter", "opportunity", "why_mycity", "audience", "deliverables", "packages", "timeline", "proof", "terms", "next_steps", "closing"]);
+/** The design kit's layouts (§6.11): twelve, and Insight, a page for one chart (TB, 07/11/2026). */
+const LayoutName = z.enum(["cover", "letter", "opportunity", "why_mycity", "audience", "deliverables", "packages", "timeline", "proof", "terms", "next_steps", "closing", "insight"]);
+/** The kit's own drawings, in MyCity's colours, named as icons are (§6.11; TB, 07/11/2026). */
+const ILLUSTRATIONS = [
+  "skyline", "stage", "ticket", "phone_app", "map_pins", "crowd", "handshake", "growth",
+  "calendar", "megaphone", "camera", "check_in", "souvenirs", "storefront", "hotel", "dining",
+  "mobility", "flight", "campus", "civic", "media", "trophy", "globe", "target",
+];
+const IllustrationName = z.enum(ILLUSTRATIONS);
+/** The charts the kit draws as SVG (§6.11): columns, bars, stacked columns, a line, an area, a donut, progress rings. */
+const ChartKind = z.enum(["bar", "hbar", "stacked", "line", "area", "donut", "progress"]);
 
 /** An answer, a suggestion or an ask's value: by its card's kind; money as a string, a date ISO. */
 const AnswerValue = z.union([z.string().max(5000), z.number(), z.array(z.string().max(200)).max(20), z.null()]);
@@ -62,6 +71,44 @@ const para = text(1200);
 const asset = uuid.nullable();
 const stat = z.object({ value: text(40), label: text(120) }).strict();
 const lucide = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/, "must be a Lucide icon's name");
+/** A section's drawing from the kit's set, or none. */
+const illustration = IllustrationName.nullable().default(null);
+
+const ChartPoint = z.object({ label: text(60), value: z.number().min(0).max(1e12) }).strict();
+/** One series of a chart; its name shows in the legend when a chart has more than one. */
+const ChartSeries = z.object({ name: text(60).nullable().default(null), points: z.array(ChartPoint).min(1).max(12) }).strict();
+
+/**
+ * A chart, drawn by the renderer as SVG from these figures (§6.11). Every value is a figure, so each
+ * carries its source in the section's `sources` like any other. A donut and progress rings take one
+ * series (rings are percentages, 0 to 100); a stacked chart takes two or more; a line or an area at
+ * least two points; series side by side name the same points in the same order.
+ */
+const ProposalChart = z
+  .object({
+    kind: ChartKind,
+    title: text(80),
+    /** What a value counts, written after it: "%", "downloads". */
+    unit: z.string().trim().max(20).nullable().default(null),
+    series: z.array(ChartSeries).min(1).max(4),
+  })
+  .strict()
+  .superRefine((chart, ctx) => {
+    const issue = (message, path = ["series"]) => ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
+    const [first] = chart.series;
+    if (["donut", "progress"].includes(chart.kind) && chart.series.length > 1) issue("One series only");
+    if (chart.kind === "donut" && (first.points.length < 2 || first.points.length > 6)) issue("Two to six slices");
+    if (chart.kind === "progress") {
+      if (first.points.length > 4) issue("At most four rings");
+      if (first.points.some((p) => p.value > 100)) issue("Rings are percentages");
+    }
+    if (chart.kind === "stacked" && chart.series.length < 2) issue("Two series or more");
+    if (["line", "area"].includes(chart.kind) && first.points.length < 2) issue("Two points or more");
+    const labels = first.points.map((p) => p.label).join("\u0000");
+    if (chart.series.some((s) => s.points.map((p) => p.label).join("\u0000") !== labels)) issue("Series name the same points");
+  });
+/** A section's chart, or none. */
+const chart = ProposalChart.nullable().default(null);
 
 const CoverSection = z
   .object({
@@ -94,6 +141,8 @@ const OpportunitySection = z
     heading,
     paragraphs: z.array(para).min(1).max(4),
     pull_quote: text(240).nullable(),
+    chart,
+    illustration,
   })
   .strict();
 
@@ -106,6 +155,7 @@ const WhyMyCitySection = z
       .array(z.object({ proof_point_id: uuid.nullable(), value: text(40), label: text(120) }).strict())
       .min(3)
       .max(6),
+    chart,
   })
   .strict();
 
@@ -116,18 +166,7 @@ const AudienceSection = z
     heading,
     intro: para.nullable(),
     stats: z.array(stat).min(1).max(6),
-    /** Drawn by the renderer as SVG from these figures. */
-    chart: z
-      .object({
-        kind: z.enum(["bar", "donut"]),
-        title: text(80),
-        series: z
-          .array(z.object({ label: text(60), value: z.number().min(0) }).strict())
-          .min(2)
-          .max(8),
-      })
-      .strict()
-      .nullable(),
+    chart,
   })
   .strict();
 
@@ -140,6 +179,7 @@ const DeliverablesSection = z
       .array(z.object({ title: text(120), detail: text(400).nullable(), icon: lucide }).strict())
       .min(1)
       .max(12),
+    illustration,
   })
   .strict();
 
@@ -165,6 +205,7 @@ const PackagesSection = z
       )
       .min(1)
       .max(5),
+    chart,
   })
   .strict();
 
@@ -186,6 +227,7 @@ const TimelineSection = z
       )
       .min(1)
       .max(6),
+    illustration,
   })
   .strict();
 
@@ -198,6 +240,7 @@ const ProofSection = z
       .array(z.object({ proof_point_id: uuid, label: text(80) }).strict())
       .max(12),
     results: z.array(stat).max(6),
+    chart,
   })
   .strict();
 
@@ -210,6 +253,7 @@ const TermsSection = z
       .array(z.object({ label: text(60), detail: text(400) }).strict())
       .min(1)
       .max(8),
+    illustration,
   })
   .strict();
 
@@ -229,6 +273,7 @@ const NextStepsSection = z
       .strict(),
     /** A QR to the web version. */
     show_qr: z.boolean(),
+    illustration,
   })
   .strict();
 
@@ -238,6 +283,20 @@ const ClosingSection = z
     layout: z.literal("closing"),
     message: text(240).nullable(),
     image_asset_id: asset,
+    /** Drawn in place of the photograph when set. */
+    illustration,
+  })
+  .strict();
+
+/** A page for one chart: what it shows in a line, the chart, and an optional note (TB, 07/11/2026). */
+const InsightSection = z
+  .object({
+    ...sectionBase,
+    layout: z.literal("insight"),
+    heading,
+    takeaway: text(160),
+    chart: ProposalChart,
+    note: text(240).nullable().default(null),
   })
   .strict();
 
@@ -255,6 +314,7 @@ const Section = z.discriminatedUnion("layout", [
   TermsSection,
   NextStepsSection,
   ClosingSection,
+  InsightSection,
 ]);
 
 /** The proposal's content: its sections in order, each key once. */
@@ -267,14 +327,29 @@ const ProposalContent = z
  * The studio
  * ------------------------------------------------------------------ */
 
+/** An image given with the brief: an upload (POST /documents), what it is for and its alt text. */
+const BriefAsset = z.object({ document_id: uuid, role: AssetRole, alt: text(200) }).strict();
+
 /** New Proposal on a deal: notes and/or a transcript (.md or .txt), images, a saved template. */
 const ProposalStart = z
   .object({
     deal_id: uuid,
     notes: optionalText(20000),
     transcript_document_id: blank(uuid),
-    asset_document_ids: z.array(uuid).max(12).optional(),
+    assets: z.array(BriefAsset).max(12).optional(),
     design_template_id: blank(uuid),
+  })
+  .strict();
+
+/** Where the studio's job stands while Claude asks or writes (§6.10); null when nothing runs. */
+const ProposalProgress = z
+  .object({
+    job: z.enum(["questions", "draft"]),
+    step: z.enum(["reading", "asking", "writing", "checking", "laying_out"]),
+    /** The job failed or could not run: the brief and the answers are kept, and Try Again queues it again. */
+    failed: z.boolean(),
+    reason: z.enum(["off", "limit", "error"]).nullable(),
+    at: isoDateTime,
   })
   .strict();
 
@@ -331,7 +406,60 @@ const ProposalContentEdit = z.discriminatedUnion("op", [
 
 /** Rewrite Section: an instruction for Claude on that section only. Nothing is kept until Use Rewrite. */
 const SectionRewrite = z.object({ instruction: text(500) }).strict();
-const SectionRewriteDraft = z.object({ key: z.string(), section: Section }).strict();
+/** Claude's rewrite of one section, or why there is none (AI Is Off, AI Limit Reached). */
+const SectionRewriteDraft = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    key: z.string(),
+    section: Section.nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** Write With AI in Send Proposal: a subject and a message, or why there is none. Nothing is kept. */
+const ProposalMessageDraft = z
+  .object({
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    subject: z.string().nullable(),
+    message: z.string().nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/* What Claude answers (src/services/ai/prompts/proposal-*.md), checked before anything is kept. */
+
+/** One question card as Claude proposes it. */
+const QuestionCardDraft = z
+  .object({
+    group_key: QuestionGroup,
+    question: text(240),
+    why: text(200).nullable(),
+    answer_kind: AnswerKind,
+    options: z.array(text(80)).min(2).max(12).nullable(),
+    suggested: AnswerValue,
+    suggested_from: text(80).nullable(),
+    required: z.boolean(),
+  })
+  .strict()
+  .superRefine((card, ctx) => {
+    const picks = ["pick", "multi_pick"].includes(card.answer_kind);
+    if (picks && !card.options) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: "A pick needs its options" });
+    if (!picks && card.options) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: "Only a pick has options" });
+  });
+/** proposal-questions: between 5 and 12 cards. */
+const ProposalQuestionsOutput = z.object({ cards: z.array(QuestionCardDraft).min(5).max(12) }).strict();
+/** A reshuffled card: one question in its place, from the same group. */
+const ProposalReshuffleOutput = z.object({ card: QuestionCardDraft }).strict();
+/** proposal-draft: the proposal's title, its sections and the tone it was written in. */
+const ProposalDraftOutput = z
+  .object({ title: text(150), content: ProposalContent, tone_notes: z.string().max(600).nullable() })
+  .strict();
+/** proposal-rewrite: the one section again. */
+const ProposalRewriteOutput = z.object({ section: Section }).strict();
+/** proposal-message: the covering email's subject and message. */
+const ProposalMessageOutput = z.object({ subject: text(150), message: text(2000) }).strict();
 
 /** Confirm and Send: nothing is sent without the person's press, and `confirm: true` with it. */
 const ProposalSend = z
@@ -474,7 +602,60 @@ const ProposalDetail = ProposalRow.extend({
   link_url: z.string().nullable(),
   /** Whether Claude can be asked: AI Is Off and AI Limit Reached leave the kit to fill by hand. */
   ai: z.enum(["on", "off", "capped"]),
+  progress: ProposalProgress.nullable(),
+  /** Every version of this proposal, the newest first; a sent one is revised as the next. */
+  versions: z
+    .array(
+      z
+        .object({ partnership_proposal_id: uuid, version: z.number().int().min(1), status: ProposalStatus, sent_at: isoDateTime.nullable() })
+        .strict(),
+    )
+    .max(20),
+  /** What the person may do now, so the screen offers only that. */
+  can: z
+    .object({
+      edit: z.boolean(),
+      send: z.boolean(),
+      revise: z.boolean(),
+      decide: z.boolean(),
+      withdraw: z.boolean(),
+      save_template: z.boolean(),
+    })
+    .strict(),
 }).strict();
+
+/** One section of the preview: what the studio's edit controls need beside the page. */
+const PreviewSection = z
+  .object({
+    key: z.string(),
+    layout: LayoutName,
+    /** The section's heading, or its layout's name. */
+    label: z.string(),
+    hidden: z.boolean(),
+    /** The pages it fills: a section longer than a page continues on the next. */
+    pages: z.number().int().min(1),
+    /** The layouts its content fits (Change Layout). */
+    fits: z.array(LayoutName),
+    /** Its image fields, and whether each shows a stand-in. */
+    images: z.array(z.object({ field: z.enum(["image_asset_id", "partner_logo_asset_id", "signer_photo_asset_id"]), stand_in: z.boolean() }).strict()),
+    unconfirmed: z.array(z.string()),
+  })
+  .strict();
+
+/** GET /proposals/:id/preview: the kit's HTML as the partner will see it, and its sections. */
+const ProposalPreview = z
+  .object({
+    html: z.string(),
+    sections: z.array(PreviewSection).max(20),
+    /** Before Send: the stand-in images and the figures nobody has confirmed. */
+    checks: z
+      .object({
+        stand_ins: z.array(z.object({ key: z.string(), label: z.string() }).strict()),
+        unconfirmed: z.array(z.object({ key: z.string(), figure: z.string() }).strict()),
+      })
+      .strict(),
+  })
+  .strict();
 
 const ProposalListQuery = listQuery(
   {
@@ -487,6 +668,10 @@ const ProposalListQuery = listQuery(
   ["sent_at", "created_at", "value"],
 );
 const ProposalPage = Paged(ProposalRow);
+
+/** The saved templates a brief may start from: of the deal's category, or of every category. */
+const ProposalTemplateListQuery = listQuery({ partner_category_id: uuid.optional() }, ["name"]);
+const ProposalTemplatePage = Paged(ProposalTemplate);
 
 /** The cards above Proposals. */
 const ProposalsSummary = z
@@ -523,6 +708,20 @@ const PublicProposal = z
   })
   .strict();
 
+/** proposal-sent: the mail that carries a proposal's PDF and its private link (templates/email/proposal-sent.html). */
+const ProposalSentEmailVars = z
+  .object({
+    subject: z.string(),
+    message: z.string(),
+    title: z.string(),
+    reference: z.string(),
+    partner_name: z.string(),
+    link: z.string(),
+    valid_until: isoDate.nullable(),
+    owner_name: z.string(),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const KIT = "a section of ProposalContent, kept in partnership_proposal.content";
 const ROW = {
@@ -545,16 +744,33 @@ const TABLES = {
   TermsSection: { table: null, reason: KIT },
   NextStepsSection: { table: null, reason: KIT },
   ClosingSection: { table: null, reason: KIT },
+  InsightSection: { table: null, reason: KIT },
+  ChartPoint: { table: null, reason: "a point of a section's chart, kept in its content" },
+  ChartSeries: { table: null, reason: "a series of a section's chart, kept in its content" },
+  ProposalChart: { table: null, reason: "a section's chart, kept in its content" },
   ProposalContent: { table: null, reason: "partnership_proposal.content: the sections in order" },
+  BriefAsset: { table: "proposal_asset" },
   ProposalStart: {
     table: "partnership_proposal",
     virtual: {
       deal_id: "written as partnership_opportunity_id",
       notes: "a proposal_source of kind notes",
       transcript_document_id: "a proposal_source of kind transcript",
-      asset_document_ids: "proposal_asset rows",
+      assets: "proposal_asset rows",
     },
   },
+  ProposalProgress: { table: null, reason: "partnership_proposal.progress: where the studio's job stands" },
+  ProposalMessageDraft: { table: null, reason: "Write With AI's subject and message; nothing is kept" },
+  QuestionCardDraft: { table: null, reason: "a card as Claude proposes it, checked before it is kept" },
+  ProposalQuestionsOutput: { table: null, reason: "what proposal-questions answers" },
+  ProposalReshuffleOutput: { table: null, reason: "what a reshuffle answers" },
+  ProposalDraftOutput: { table: null, reason: "what proposal-draft answers" },
+  ProposalRewriteOutput: { table: null, reason: "what proposal-rewrite answers" },
+  ProposalMessageOutput: { table: null, reason: "what proposal-message answers" },
+  PreviewSection: { table: null, reason: "a section of the preview and what its edit controls need" },
+  ProposalPreview: { table: null, reason: "the kit's HTML and the checks before Send" },
+  ProposalTemplateListQuery: { table: null, reason: "list controls for the saved templates" },
+  ProposalTemplatePage: { table: null, reason: "a page of saved templates" },
   ProposalQuestion: { table: "proposal_question", virtual: { reshuffles: "the cards that replaced this one's chain" } },
   QuestionParams: { table: null, reason: "the :id and :qid path parameters" },
   QuestionAnswer: { table: "proposal_question" },
@@ -580,8 +796,10 @@ const TABLES = {
       brief: "its proposal_source rows",
       questions: "its proposal_question rows",
       assets: "its proposal_asset rows",
-      link_url: "the public link while its token works",
+      link_url: "the public link while its token works, from link_secret",
       ai: "the AI's switch and the month's cap",
+      versions: "the proposals of its chain of revisions",
+      can: "what its status lets the reader do",
     },
   },
   ProposalListQuery: { table: null, reason: "list controls and filters for the proposals" },
@@ -589,6 +807,7 @@ const TABLES = {
   ProposalsSummary: { table: null, reason: "figures over the proposals" },
   ProposalTokenParams: { table: null, reason: "the public link's :token" },
   PublicProposal: { table: null, reason: "the public page: the kit's HTML and the owner's contact" },
+  ProposalSentEmailVars: { table: null, reason: "what the proposal-sent mail is filled with" },
 };
 
 module.exports = {
@@ -601,6 +820,12 @@ module.exports = {
   AssetRole,
   ProofPointKind,
   LayoutName,
+  ILLUSTRATIONS,
+  IllustrationName,
+  ChartKind,
+  ChartPoint,
+  ChartSeries,
+  ProposalChart,
   AnswerValue,
   FigureSource,
   CoverSection,
@@ -615,9 +840,12 @@ module.exports = {
   TermsSection,
   NextStepsSection,
   ClosingSection,
+  InsightSection,
   Section,
   ProposalContent,
+  BriefAsset,
   ProposalStart,
+  ProposalProgress,
   ProposalQuestion,
   QuestionParams,
   QuestionAnswer,
@@ -625,6 +853,17 @@ module.exports = {
   ProposalContentEdit,
   SectionRewrite,
   SectionRewriteDraft,
+  ProposalMessageDraft,
+  QuestionCardDraft,
+  ProposalQuestionsOutput,
+  ProposalReshuffleOutput,
+  ProposalDraftOutput,
+  ProposalRewriteOutput,
+  ProposalMessageOutput,
+  PreviewSection,
+  ProposalPreview,
+  ProposalTemplateListQuery,
+  ProposalTemplatePage,
   ProposalSend,
   ProposalDecline,
   ProposalTemplateSave,
@@ -643,4 +882,5 @@ module.exports = {
   ProposalsSummary,
   ProposalTokenParams,
   PublicProposal,
+  ProposalSentEmailVars,
 };

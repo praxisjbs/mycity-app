@@ -1,6 +1,7 @@
-import type { ApplicationReceipt, ApplyLink, ApplyQuestion, AssessmentSession, PublicJob, PublicJobCard, PublicJobsSummary, PublicQuestion, SignCodeSent, SignerView, SigningView, VerifyByToken, VerifyResult } from "@mycity/contract/contract.gen.ts";
+import type { ApplicationReceipt, ApplyLink, ApplyQuestion, AssessmentSession, PublicJob, PublicJobCard, PublicJobsSummary, PublicProposal, PublicQuestion, SignCodeSent, SignerView, SigningView, VerifyByToken, VerifyResult } from "@mycity/contract/contract.gen.ts";
 import signatureSchemas from "@mycity/contract/schemas/signatures.js";
 import candidates from "@mycity/contract/schemas/candidates.js";
+import PROPOSAL_HTML from "@mycity/ui/samples/proposal-kit.sample.html?raw";
 import { fail, inDays, invalid, ok, paged, route, type Req } from "./core";
 
 /**
@@ -760,4 +761,26 @@ route("GET /api/public/v1/verify/t/:token", (req) => {
   if (!r || !offer) return fail(404, "NOT_FOUND", "This link is not valid. Check you scanned the whole code.");
   const out: VerifyByToken = { ...r, document: { title: offer.view.title, letter: offer.view.letter, file_name: `${r.reference}.pdf`, url: `/api/public/v1/verify/t/${req.params.token}/document` } };
   return ok(out);
+});
+
+/* ── A proposal's private link ──
+ * The kit's own sample (packages/ui/src/documents/proposal-kit.sample.html, drawn by the kit from
+ * templates/proposals/sample.json), as the server would send it. A second link stands for a declined,
+ * expired or withdrawn proposal: the same 404 the API answers with.
+ */
+const PROPOSALS = new Map<string, PublicProposal>([
+  [
+    "Hn5vR2qLx8Tc",
+    {
+      title: "Selling Out Harmattan Jazz Weekend, Together",
+      partner_name: "Harmattan Jazz Weekend",
+      html: PROPOSAL_HTML,
+      owner_contact: { name: "Ngozi Eze", title: "Partnerships Lead, MyCity", email: "ngozi.eze@mycityapp.io", phone: "+234 803 555 0142" },
+      valid_until: inDays(30).slice(0, 10),
+    },
+  ],
+]);
+route("GET /api/public/v1/proposals/:token", (req) => {
+  const r = PROPOSALS.get(req.params.token);
+  return r ? ok(r) : fail(404, "TOKEN_INVALID", "This proposal is no longer available");
 });

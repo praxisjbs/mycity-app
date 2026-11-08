@@ -1,0 +1,7 @@
+<div class="{{#if side}}opp-main{{else}}opp-main opp-main--wide{{/if}}">
+  <h2 class="h1">{{ heading }}</h2>
+  <div class="prose">{{#each paras}}<p class="{{#if lead}}lead{{else}}body{{/if}}">{{ text }}</p>{{/each}}</div>
+</div>
+{{#if side_quote}}<aside class="opp-side"><div class="quote"><svg class="quote-mark" viewBox="0 0 44 36" aria-hidden="true"><path d="M0 36V22C0 9.6 6.4 2.3 18 0l2 5.4C13.3 7.6 10.2 11.6 10 18h9v18H0Zm24 0V22C24 9.6 30.4 2.3 42 0l2 5.4C37.3 7.6 34.2 11.6 34 18h9v18H24Z"/></svg><p>{{ quote }}</p>{{#if visual}}{{> body}}{{/if}}</div></aside>{{/if}}
+{{#if side_chart}}<aside class="opp-side"><div class="panel">{{> body}}</div></aside>{{/if}}
+{{#if side_illus}}<aside class="opp-side"><div class="illus-wrap">{{> body}}</div></aside>{{/if}}

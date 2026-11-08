@@ -427,12 +427,15 @@ The schemas and their fields are catalogued in Appendix C.
 | `GET /work` | `PartnerWorkQuery` (`partner_id` or `lead_id`, `deal_id`, `kind`) → `PartnerWorkPage` | view · §6.1 | yes | Projects, tasks, events the reader may see, and the hidden counts (§6.16) |
 | `GET /proposals/summary`, `GET /proposals`, `GET /proposals/:id` | → `ProposalsSummary`; `ProposalListQuery` → `ProposalPage`; → `ProposalDetail` | view · §6.1 | yes | |
 | `POST /proposals` | `ProposalStart` → `ProposalDetail` | create · §6.1 | | Opens the studio, queues the questions |
+| `GET /proposals/:id/preview` | → `ProposalPreview` | view · §6.1 | | The kit's HTML of the proposal as it stands, and the layouts each section may take (§6.11) |
+| `POST /proposals/:id/questions/retry` | `EmptyBody` → `ProposalDetail` | edit · §6.1 | | Try Again after the questions failed |
 | `POST /proposals/:id/questions/:qid/answer`, `/skip`, `/reshuffle` | `QuestionAnswer`; `EmptyBody` → `ProposalDetail` | edit · §6.1 | | |
 | `POST /proposals/:id/draft` | `EmptyBody` → `ProposalDetail` | edit · §6.1 | | Queues the writing; refused while a required card is open |
 | `PATCH /proposals/:id/content` | `ProposalContentEdit` → `ProposalDetail` | edit · §6.1 | | A section's text, layout, order, visibility, image |
 | `POST /proposals/:id/sections/:key/rewrite` | `SectionRewrite` → `SectionRewriteDraft` | edit · §6.1 | | Nothing kept until Use Rewrite |
 | `POST /proposals/:id/send` | `ProposalSend` → `ProposalDetail` | edit · §6.1 | | The person confirms the addresses (§6.10) |
-| `GET /proposals/:id/pdf` | → PDF | view · §6.1 | | Download PDF |
+| `POST /proposals/:id/message` | `EmptyBody` → `ProposalMessageDraft` | edit · §6.1 | | Write With AI: a subject and message for Send (`proposal-message`, Default); nothing kept |
+| `POST /proposals/:id/pdf` | `EmptyBody` → `ExportFile` | view · §6.1 | | Download PDF: the sent PDF, or the draft's made in the worker (foundation.md §6.12) |
 | `POST /proposals/:id/accept`, `/decline`, `/withdraw` | `EmptyBody`, `ProposalDecline`, `EmptyBody` → `ProposalDetail` | edit · §6.1 | | |
 | `POST /proposals/:id/revise` | `EmptyBody` → `ProposalDetail` | edit · §6.1 | | A new version from a sent one |
 | `POST /proposals/:id/save-as-template` | `ProposalTemplateSave` → `ProposalTemplate` | edit · `partnerships.configure` | | |
@@ -445,7 +448,7 @@ The schemas and their fields are catalogued in Appendix C.
 | `POST /agreements/:id/renew`, `/close`, `/resend` | `AgreementRenew`, `AgreementClose`, `EmptyBody` → `AgreementDetail` | edit · §6.1 | | |
 | `GET /analytics` | `AnalyticsQuery` → `PartnershipAnalytics` | view · §6.1; money with `partnerships.money` | no | §6.18 |
 | `POST /mailbox/threads/:id/partner`, `DELETE` | `ThreadPartnerBind` → `ThreadContext` | `mailbox` view and `partnerships` view | | On the mailbox's routes, schemas in `interactions.js` (§6.15) |
-| Public `GET /public/proposals/:token`, `GET /public/proposals/:token/pdf` | → `PublicProposal`; → PDF | none, the token | no | Records a view (§6.10); public routes never import auth |
+| Public `GET /public/proposals/:token`, `GET /public/proposals/:token/pdf` | → `PublicProposal`; → PDF | none, the token | no | Records a view (§6.10); the PDF is the one sent; public routes never import auth |
 | Public `GET /public/sign/:token`, `POST .../code`, `POST .../code/verify`, `POST .../sign`, `GET .../signed` | M5's signing contract, extended (§6.9) | none, the token | | |
 | Public `GET /public/verify/:ref`, `GET /public/verify/t/:token` | → `VerifyResult` | none | | By reference: no content; by QR token: the document (§6.9) |
 
@@ -731,9 +734,10 @@ studio (`StepBar`: Brief, Questions, Draft, Edit, Send):
 3. **Draft.** Claude writes the proposal as **structured content** (`ProposalContent`): an ordered list
    of sections, each naming a layout of the design kit (§6.11) and filling that layout's fields. The
    server validates it against the contract, checks its figures (below), renders it, and stores version
-   1 as Draft. Writing runs as a job (`proposal-draft`): the studio shows its progress section by
-   section, and the owner is notified when it is ready (it may take minutes). A failure keeps the brief
-   and answers and offers Try Again.
+   1 as Draft. Writing runs as a job (`proposal-draft`): the studio shows its progress step by step
+   (Reading, Writing, Checking Figures, Laying Out), since Claude writes the content in one answer, and
+   the owner is notified when it is ready (it may take minutes). A failure keeps the brief and answers
+   and offers Try Again.
 4. **Edit.** On screen, as the partner will see it, in a sandboxed preview. Per section: edit the text in
    place (`RichTextField` limited to the layout's marks), **Change Layout** (among layouts that fit the
    section's content), Move Up, Move Down, Hide, **Replace Image**, **Rewrite Section** (an instruction
@@ -742,7 +746,7 @@ studio (`StepBar`: Brief, Questions, Draft, Edit, Send):
    version (Revise).
 5. **Send.** **Send Proposal** opens a sheet that must be confirmed: **To** (the primary contact's
    email by default; other contacts to pick, or an address typed and checked; 1 to 5), **Cc** (up to 5),
-   **Subject**, **Message** (Write With AI may draft it). It lists stand-in images and unconfirmed figures
+   **Subject**, **Message** (Write With AI drafts both, `proposal-message`). It lists stand-in images and unconfirmed figures
    first. **Confirm and Send** mails the PDF attached and the private link from the system sender with
    the owner as reply-to. Nothing is sent without that press. **Download PDF** and **Copy Link** are
    always there.
@@ -781,9 +785,11 @@ studio's preview, the public page and, through Chromium, the PDF.
 - **Brand:** MyCity's tokens (MILESTONES §5.1) and Geist with tabular figures; colours only from
   `packages/ui/src/styles/tokens.css`, exported to the kit at build (F4, gate 13); AA contrast on every
   pairing, including text on images, which always sits on a scrim.
-- **Page:** A4 portrait, a 12-column grid, fixed margins; no heading left at a page's foot; a table never
-  split without its header repeated; page numbers and the reference in the footer from page 2. The web
-  version reflows to one column on a phone.
+- **Page:** 16:9 landscape, 338.7 × 190.5 mm (1280 × 720 at 96 dpi; TB, 07/11/2026), a 12-column grid,
+  fixed margins, one section a page; a section longer than its page continues on the next with its
+  heading repeated, and a table's header repeats; the reference and the page's place in the proposal in
+  the footer from page 2. The web shows the same pages scaled to the window and reflows them to one
+  column on a phone.
 - **Layouts**, each with its own content schema in the contract, so Claude fills fields, never markup:
 
 | Layout | Holds |
@@ -799,7 +805,19 @@ studio's preview, the public page and, through Chromium, the PDF.
 | `proof` | Partner logos and past results from proof points |
 | `terms` | Validity, payment and commission terms, plainly |
 | `next_steps` | What happens after yes; the owner's contact card; a QR to the web version |
-| `closing` | A back cover |
+| `closing` | A back cover: a photograph, or one of the kit's drawings |
+| `insight` | One chart across the page, the takeaway in a line, an optional note (TB, 07/11/2026) |
+
+- **Charts anywhere** (TB, 07/11/2026): `opportunity`, `why_mycity`, `audience`, `packages` and `proof`
+  may carry one chart, and `insight` is a page for one. Seven kinds: columns, bars, stacked columns, a
+  line, an area, a donut and progress rings, drawn by the renderer as SVG in the kit's chart colours from
+  figures (`ProposalChart`); every plotted value is a figure with its source like any other.
+- **Drawings** (TB, 07/11/2026): the kit's own set of 24 line drawings in MyCity's colours (`skyline`,
+  `stage`, `ticket`, `phone_app`, `map_pins`, `crowd`, `handshake`, `growth`, `calendar`, `megaphone`,
+  `camera`, `check_in`, `souvenirs`, `storefront`, `hotel`, `dining`, `mobility`, `flight`, `campus`,
+  `civic`, `media`, `trophy`, `globe`, `target`), named by Claude as it names icons and changed by a
+  person in Edit, on `opportunity`, `deliverables`, `timeline`, `terms`, `next_steps` and `closing`.
+  Nothing is generated: no image model is in the chain.
 
 - **Rhythm:** one display size for the cover, three heading sizes, one body size, lines of 60 to 75
   characters, figures right-aligned in tables.
@@ -1009,7 +1027,7 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
 | Action | Job and chain | Chosen |
 |---|---|---|
 | `proposal-questions`, `proposal-draft`, `proposal-rewrite` | Top Tier: Anthropic Sonnet, then Gemini Pro | JBS Praxis, 05/11/2026 |
-| `proposal-message` | Fast | To confirm before PR 7 (recommended Fast) |
+| `proposal-message` | Default (`personal_data: true`, so DeepSeek is never in its chain): ai-control §6.2 keeps Fast from drafts a person reads | TB, 07/11/2026 |
 | `template-tidy` | Default (`personal_data: true`, so DeepSeek is never in its chain) | JP, 06/11/2026 |
 
 - **AI reads** (`partners.ai.js`, `leads.ai.js`, `partner_pipeline.ai.js`, `proposals.ai.js`,
@@ -1399,11 +1417,39 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
     the year, the year's totals (Commission, Gross Sales, Units Sold, Downloads), Commission by Month, the
     months with Imported or Entered, and Enter Returns a month at a time (the last eighteen months; a row
     opens its month).
+- **In PR 7 (07/11/2026, JP):**
+  - The kit draws its own pages: `documents.generate()` takes a document type with a `draw` hook (the data
+    in, the complete HTML out, checked by the type itself instead of the letter's variables), and
+    `pdf.render` a `bare` option (no letterhead, header or footer: the kit's pages carry their own), so the
+    studio's preview, the public page and the PDF are one HTML (§6.11).
+  - **Download PDF** is an export (foundation.md §6.12): `POST /proposals/:id/pdf` answers `202` with the
+    `ExportFile`, the sent PDF when there is one, else the draft's made in the worker.
+  - The public link's token is kept encrypted on the proposal (`partnership_proposal.link_secret`,
+    migration `7110`, bound to the proposal's id), so the worker can mail the link once the PDF is ready
+    and the studio can show Copy Link; it is cleared when the link stops.
+  - A proposal is valid for 30 days from sending (`valid_until`). The daily scheduler `proposal-expiry`
+    expires it after, until PR 6's `agreement-renewals` takes the job over.
+  - Sending version 2 withdraws version 1 and stops its link, so a partner never holds two live versions.
+  - Skip is refused on a required card (`409`, the card says so); Write Draft waits while one is open.
+  - With AI off or the month's cap reached, **Build by Hand** (Write Draft's route) fills the pages the
+    record can without Claude (the cover, MyCity's figures, the packages, the timeline, the next steps and
+    the back cover) and opens Edit, where a person writes the rest (§6.10).
+  - Words are edited in a panel beside the page (**Edit Words**, one field a part of the layout), not in
+    place: a section's content is plain text, so the kit's look cannot be broken by an edit.
+  - The `proposal.viewed` notification to the owner and Home's views are left for PR 8; PR 7 records the
+    views and sets Viewed.
+  - `.md` is accepted as an attachment by the upload engine, so a Gemini notes export uploads as it comes.
+  - `ProposalStart.assets` (each a `document_id`, its role and alt text) replaces `asset_document_ids`, so
+    a brief's images carry what the kit needs to place them.
+  - The tone notes Claude draws from the brief are kept in `partnership_proposal.brief` (`tone_notes`);
+    Save as Template copies them into the template's `structure`.
+  - `proposals`' controller carries `// ai:none`: Praxis AI's `proposals.start` card arrives with PR 8, so
+    the studio's create and edit schemas carry `design:` reasons until then (gate 23).
 
 ### 13.3 Still open
 
-- **AI job** for `proposal-message` (Fast recommended, before PR 7): the person confirms (CLAUDE.md).
-  `template-tidy` is Default, confirmed by JP on 06/11/2026 (§13.2).
+- **AI jobs:** settled. `template-tidy` is Default (JP, 06/11/2026) and `proposal-message` is Default (TB,
+  07/11/2026) (§13.2).
 - **MyCity's samples** (Edidiong Etudor is to send them, 5 November). The **Deal Merchant Agreement** is
   in hand, redacted in `docs/MyCity-ERP-Documents/partnership-samples/`. The **ticketing template**
   (Regular, VIP, VVIP) was wanted by **PR 2** as a second Events template; it had not arrived when PR 2 was
@@ -1650,7 +1696,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 - **`leads.js`**: `LeadCreate` { `name`, `partner_category_id`, `region` ({ `scope`, `cities?: PlaceInput[]` }), `industry?`, `website?`, `objective?`, `source?`, `owner_id`, `identified_on?`, `impact?`, `impact_rating?`, `impact_note?`, `comments?`, `custom?`, `contact` (`ContactInput`), `deal` (the deal fields without `lead_id`) }; `LeadUpdate`; `LeadLose` { `reason` }; `LeadConvert` { `signed_copy_document_id?` }; `LeadListQuery`; `LeadsSummary`; `Lead360`; `LeadConverted` { `partner_id` }
 - **`partners.js`**: `PartnerCreate` (as `LeadCreate`, with `legal_name?`, `headquarters?: PlaceInput`, `logo_document_id?`, and a first deal at a signed or active stage with `signed_copy_document_id?` or `signed_before_hub: true`); `PartnerUpdate`; `PartnerClose` { `reason` }; `ContactInput` { `first_name`, `last_name`, `job_title?`, `email?`, `phones?`, `signatory?` }; `ContactCreate`; `ContactUpdate`; `DuplicateQuery`; `Duplicates`; `PartnerListQuery`; `PartnersSummary` (with `quiet_days`); `Partner360` { `partner`, `kpis` { `signed_value`, `returns_this_year?`, `downloads_this_year`, `active_deals`, `days_since_contact` }, `deals`, `contacts`, `overview`, `deliverables`, `custom_fields`, `history` (`RecordHistoryLine`: a stage or health line with its deal) }; `PartnerDocumentQuery`; `PartnerDocumentAttach` { `document_id`, `kind`, `deal_id?` }; `PartnerWorkQuery`; `PartnerWorkPage` (with `hidden` counts)
 - **`interactions.js`**: `InteractionCreate` { `partner_id` or `lead_id`, `deal_id?`, `contact_id?`, `interaction_type`, `occurred_at`, `subject`, `summary` }; `InteractionListQuery`; `InteractionPage`; mailbox's `ThreadPartnerBind` { `partner_id` or `lead_id`, `deal_id?` } and `ThreadContext`
-- **`proposals.js`**: `ProposalStart` { `deal_id`, `notes?`, `transcript_document_id?`, `asset_document_ids?`, `design_template_id?` }; `ProposalQuestion`; `QuestionAnswer` { `answer` }; `ProposalContent` { `sections`: `Section[]` } with `Section` a discriminated union on `layout` (one schema per layout of §6.11) carrying `key`, `hidden`, the layout's fields and `sources: FigureSource[]` { `figure`, `source` (`brief`, `answer`, `record`, `proof_point`), `ref` }; `ProposalContentEdit`; `SectionRewrite` { `instruction` }; `ProposalSend` { `to` (1 to 5 emails), `cc?` (up to 5), `subject`, `message`, `confirm: true` }; `ProposalDecline` { `reason` }; `ProposalTemplateSave` { `name` }; `ProofPointCreate`; `ProposalListQuery`; `ProposalsSummary`; `ProposalDetail`; `PublicProposal` { `title`, `partner_name`, `html`, `owner_contact`, `valid_until` }
+- **`proposals.js`**: `ProposalStart` { `deal_id`, `notes?`, `transcript_document_id?`, `assets?: BriefAsset[]` ({ `document_id`, `role` (`cover`, `gallery`, `logo`, `section`), `alt` }, at most 12), `design_template_id?` }; `ProposalQuestion`; `QuestionAnswer` { `answer` }; `ProposalContent` { `sections`: `Section[]` } with `Section` a discriminated union on `layout` (one schema per layout of §6.11) carrying `key`, `hidden`, the layout's fields and `sources: FigureSource[]` { `figure`, `source` (`brief`, `answer`, `record`, `proof_point`), `ref` }; `ProposalContentEdit`; `SectionRewrite` { `instruction` }; `ProposalSend` { `to` (1 to 5 emails), `cc?` (up to 5), `subject`, `message`, `confirm: true` }; `ProposalDecline` { `reason` }; `ProposalTemplateSave` { `name` }; `ProofPointCreate`; `ProposalListQuery`; `ProposalsSummary`; `ProposalDetail` (with `progress: ProposalProgress`, `link_url`, `ai`, `versions`, `can`); `ProposalPreview` { `html`, `sections` with the layouts each may take }; `ProposalMessageDraft` { `subject`, `message` }; `ProposalChart` { `kind` (`bar`, `hbar`, `stacked`, `line`, `area`, `donut`, `progress`), `series`, `sources` } on `opportunity`, `why_mycity`, `audience`, `packages`, `proof` and `insight`; `IllustrationName` (the kit's 24 drawings); `PublicProposal` { `title`, `partner_name`, `html`, `owner_contact`, `valid_until` }; `ProposalSentEmailVars` (the `proposal-sent` mail)
 - **`agreements.js`**: `AgreementGenerate` { `deal_id`, `template_key?`, `asks?` }; `AgreementUpdate` { `body?`, `fields?`, `starts_on?`, `ends_on?`, `renewal_notice_days?` }; `AgreementSend` { `signers`: [{ `contact_id?`, `name`, `title?`, `email`, `side` (`partner`, `mycity`) }], `message?`, `confirm: true` }; `SignedCopyRecord` { `document_id`, `signed_on`, `signed_by_name`, `signed_by_title?` }; `AgreementRenew` { `starts_on`, `ends_on?`, `new_deal?` }; `AgreementClose` { `reason` }; `AgreementListQuery`; `AgreementsSummary`; `AgreementDetail`; `RenewalPage`; the signing contract (M5): `SignCodeVerify` { `code` }, `SignSubmit` { `full_name`, `title?`, `method` (`draw`, `type`), `signature_png?` (a PNG data URL), `typed?`, `consent: true` }; `VerifyResult` { `status`, `signers`, `verdicts` { `content`, `artifact` }, `document?` }
 - **`partnership_analytics.js`**: `AnalyticsQuery` { `period` (`month`, `quarter`, `year`, `custom`), `from?`, `to?`, `partner_category_id?` }; `PartnershipAnalytics` { `kpis`, `by_owner` (the eight measures), `signed_per_month`, `returns_per_month?`, `by_category`, `by_region`, `stage_conversion` }
 - **Workspace** (`projects.js`, `tasks.js`, `calendar.js`): create and update schemas gain `partner_id?`, `lead_id?`, `deal_id?`; list queries gain `partner_id?`. Declared once in PR 1 as `partners.js` `PartnerLink` (a partner or a lead, not both; a deal only with one) and `PartnerLinkQuery`; PR 5 spreads them into `ProjectCreate`, `ProjectEditFields`, `TaskCreate`, `TaskEditFields`, `CalendarEventCreate`, `CalendarEventEditFields` and the three list queries, with the services that write them
@@ -1669,7 +1715,9 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
     `.inactivity`, `.views`
   - `interactions/`: `.mail` (with `mailbox/binding/`)
   - `proposals/`: `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure
-    check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views`
+    check), `.kit` (rendering), `.charts` (the charts as SVG), `.send`, `.public` with `.public.routes`,
+    `.proof`; saved templates sit in `.service`, and the PDF is the document engine's (no `.templates`
+    or `.pdf`; PR 7)
   - `agreements/`: `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`),
     `.renewals`, `.views`
   - `templates/` (M3's, shared): `.agreements` (the wording of a category's templates: its fields, chips and
@@ -1679,7 +1727,8 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
     `.signed-pdf`, `.verify`, `.public.routes`
   - `mailbox/binding/`: `intake.service`, `mail-context.service`, `context-tabs`, `convert.service`
 - **Jobs** (`src/jobs/`): handlers `proposal-questions`, `proposal-draft`, `partner-inactivity`,
-  `agreement-renewal`; schedulers `partner-inactivity`, `agreement-renewals`, each in `SCHEDULERS`.
+  `agreement-renewal`; schedulers `partner-inactivity`, `agreement-renewals`, and `proposal-expiry` until
+  `agreement-renewals` takes it (PR 7), each in `SCHEDULERS`.
 - **Shared:** `shared/import` (Map Values), `shared/documents/render.js` (table loop if missing),
   `shared/workflow/definitions.js` (`partnership.agreement`), `shared/numbering/schemes.js`.
 - **Templates:** `templates/documents/` (`deal-merchant-agreement.html`, `mou.html`,
@@ -1708,6 +1757,17 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · PR 7, the Proposal Studio and design kit (`m7/proposal-studio`, #94): `proposals` on the
+  contract (brief, questions with reshuffle, the writing job and its progress, the figure check, edits,
+  rewrites, versions, send with confirmation, the public link and its views, accept, decline, withdraw,
+  expire, save as template); the four AI actions and their prompts (§9); the design kit at 16:9 with
+  charts, the `insight` layout and the kit's 24 drawings (§6.11; TB, 07/11/2026); `QuestionCard` and
+  `DocumentFrame`; Proposals (#53) and the public Proposal page (#105), desktop and phone; migration `7110`.
+  Recorded in §13.2 (In PR 7): the `draw` hook and `bare` PDF, Download PDF as an export, the encrypted link
+  token, 30 days' validity and `proposal-expiry`, v2 withdrawing v1, Skip refused on a required card, Build
+  by Hand, words edited in a panel, views without notifications until PR 8, `.md` attachments,
+  `ProposalStart.assets`, tone notes in the brief. Appendix C and D to match. MyCity's sample proposal has
+  not arrived, so the kit is not yet checked against it (Appendix A PR 7).
 - 07/11/2026 · AJ · PR 5, work for a partner (`m7/workspace-links`): Connect to Partner on New Project, New Task, New
   Event and their edits, with Disconnect, checked by `partners.work`; the Partner filter on Tasks and Projects; `GET
   /work` with hidden counts, the Work tab in its own file (`WorkTab.tsx`) and the Overview's Next Events; deliverables on

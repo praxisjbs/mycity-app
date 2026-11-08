@@ -42,7 +42,7 @@ export function Lead360({ id }: { id: string }) {
     { label: "Log Interaction", icon: "plus" as const, onSelect: () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={x.deal?.deal_id} close={close} />) },
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
-    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${lead.lead_id}`) },
+    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${lead.lead_id}&record=lead`) },
     { label: "Edit Lead", icon: "doc" as const, onSelect: () => open("Edit Lead", (close) => <EditLead lead={lead} close={close} />, true) },
     ...(done ? [] : [{ label: "Close as Lost", danger: true, onSelect: () => open("Close as Lost", (close) => <LoseLead id={lead.lead_id} close={close} />) }]),
   ];

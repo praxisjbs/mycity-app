@@ -42,6 +42,8 @@ const ALLOW = Object.freeze({
     TYPES.pptx,
     TYPES.csv,
     TYPES.txt,
+    // A meeting's notes or transcript, as Google Meet exports them (docs/guides/partnerships.md §6.10).
+    TYPES.md,
     ...AUDIO,
     ...VIDEO,
   ],

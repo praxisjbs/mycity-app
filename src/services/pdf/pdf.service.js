@@ -28,11 +28,13 @@ function footerTemplate(ref) {
 
 /**
  * @param {string} html  a complete HTML document
- * @param {{footer?: string|null, landscape?: boolean}} [opts]
+ * @param {{footer?: string|null, landscape?: boolean, bare?: boolean}} [opts]
  *   footer  a reference printed bottom-left on every page (the document number)
+ *   bare    no footer at all: pages that say where they are themselves (the proposal kit's), sized by
+ *           their own @page rule
  * @returns {Promise<Buffer>}
  */
-async function render(html, { footer = null, landscape = false } = {}) {
+async function render(html, { footer = null, landscape = false, bare = false } = {}) {
   if (typeof html !== "string" || !html.trim())
     throw new Error("pdf.render: give the HTML");
   return chromium.withPage(async (page) => {
@@ -54,7 +56,7 @@ async function render(html, { footer = null, landscape = false } = {}) {
       landscape,
       printBackground: true,
       preferCSSPageSize: true,
-      displayHeaderFooter: true,
+      displayHeaderFooter: !bare,
       headerTemplate: "<span></span>",
       footerTemplate: footerTemplate(footer),
       timeout: RENDER_TIMEOUT_MS,
