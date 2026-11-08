@@ -464,6 +464,9 @@ and pay components, deductions (pending, accepted, in a run, including M3 fines 
 statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, and the payroll approval
 workflow (reminder settings are `0480`). The `payroll_run` and `payslip` numbering schemes are already seeded.
 The earlier note that payroll was "deliberately not modelled" was not a decision and is withdrawn.
+The tables, their columns, the migration files (`6000`, `6010`, `6020`, `6030`) and the reference seed
+(`6099`) are designed in `docs/guides/payroll.md` §4 (08/11/2026); this block says what is built, and
+nothing is yet.
 
 **Read by Home** (home.md §4.1): nothing yet. Payroll In Progress is a hidden card with no query and
 `src/modules/dashboard/sources/payroll.source.js` declares no table. The PR that creates

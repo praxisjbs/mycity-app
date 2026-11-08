@@ -186,7 +186,9 @@ check ownership, not the `settings` grant (README §5.2).
 - A payslip is visible only once its run is approved and locked. The preview is the PDF the
   document engine produces for that payslip, not a screen layout.
 - MyCity runs simple payroll: staff are treated as contractors and consultants, so no screen
-  mentions PAYE or pension, and Payroll sits behind an advanced option (12 October).
+  mentions PAYE or pension in simple mode (12 October). Payroll itself is visible; only its advanced option
+  (statutory deductions and salary grades) is switched on from a date on Payroll · Configurations (4
+  November; `docs/guides/payroll.md` §13.1 is the record, and the single source for M6).
 - A deduction reaches a payslip only from an upheld query. The Deductions figure opens every month
   that carried one, with its query reference.
 - My Queries is one tab with a switch, Queries and Sanctions (meeting 26/10/2026: ESS has twelve
@@ -427,10 +429,14 @@ Deductions figure and every form open the shared modal.
   sign off before the inventory, the route table and the permission catalogue are changed. TB.
 - **Device approval**: the 12 October meeting said a registered device is accepted without People
   approving it; My Devices (LA) currently says People review a new device. LA and TB to agree.
-- **My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?
+- ~~**My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?~~ Settled
+  08/11/2026: Payroll is not hidden behind the advanced option (that is only statutory and grades,
+  `docs/guides/payroll.md` §13.1). The tab shows to every employee; with no published payslip it says so,
+  and Coming Soon stays until M6's API is built.
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · Payroll's lines brought into line with the 4 November review and `docs/guides/payroll.md` (M6's single source of truth): §6's simple-payroll bullet, §13's My Payslips visibility settled. No screen of ESS changed.
 - 05/11/2026 · AJ · My Requests (#56) moved from Expenses into ESS, after My Leave (M8 handoff decision 8). Its screen, rules and API are M8's, in `docs/guides/expenses.md`; `app/src/features/ess/index.tsx` renders `features/expenses/MyRequests.tsx`.
 
 - 03/11/2026 · JP · Record Leave, Add Type, Save Type and Send Response are Praxis AI cards (§9;
