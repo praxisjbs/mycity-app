@@ -293,7 +293,7 @@ src/
 │   ├── media/         image-pipeline · av-pipeline · pdf-pipeline (a PDF's page count and first page) ·
 │   │                  pdf-page (the first page drawn by PDF.js in its own process) · pdf-text (a PDF's
 │   │                  text, for the CV reader, in its own process) · scan · reconcile
-│   ├── pdf/           chromium · pdf.service
+│   ├── pdf/           chromium (one browser; a slow first launch waited for and tried once more, tests/unit/pdf-chromium.test.js) · pdf.service
 │   ├── mail/          system-mail.service · pace (the hourly sending limit) · smtp-errors (what a mail
 │   │                  server's refusal means) · tls-check (a server's TLS and certificate) ·
 │   │                  deliverability/{check, route-check, dns-check, dmarc, ptr, rbl, evaluate}

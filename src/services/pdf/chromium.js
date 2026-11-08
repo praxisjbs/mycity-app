@@ -12,6 +12,10 @@
  *  - ONE browser per process, launched on first use, relaunched if it dies, closed on
  *    shutdown. Each render opens and closes its own page.
  *  - At most two renders at once per process; the rest wait their turn.
+ *  - A slow first launch is waited for. Chromium's first start on a machine builds the
+ *    font cache before it answers: 10 s with 335 fonts, past puppeteer's 30 s default on a
+ *    CI runner with thousands (08/11/2026). So a launch waits LAUNCH_TIMEOUT_MS, tries once
+ *    more if that runs out, and never waits on a D-Bus session a server does not have.
  *
  * puppeteer-core is used, not puppeteer: it never downloads a browser of its own.
  */
@@ -29,6 +33,8 @@ const KNOWN_PATHS = Object.freeze([
 ]);
 
 const MAX_CONCURRENT = 2;
+/** How long a launch may take before it is tried once more (the font cache, above). */
+const LAUNCH_TIMEOUT_MS = 90_000;
 
 const exists = (p) => {
   try {
@@ -81,10 +87,24 @@ async function launch() {
     throw new Error(
       "Chromium is not installed; set CHROMIUM_PATH (ops/provision installs it)",
     );
+  try {
+    return await start(executablePath);
+  } catch (err) {
+    if (err?.name !== "TimeoutError") throw err;
+    logger.warn({ err: err.message }, "chromium was slow to start; trying once more");
+    return start(executablePath);
+  }
+}
+
+/** One launch of the browser at `executablePath`, watched until it dies. */
+async function start(executablePath) {
   const puppeteer = require("puppeteer-core");
   const instance = await puppeteer.launch({
     executablePath,
     headless: true,
+    timeout: LAUNCH_TIMEOUT_MS,
+    // No session bus on a server or a runner: Chromium fails fast instead of waiting on one.
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: "disabled:" },
     // The background-networking flags stop Chromium itself calling out (Google sign-in,
     // component updates, sync): a PDF renderer on our server talks to nobody.
     args: [
@@ -169,4 +189,4 @@ function health() {
   }
 }
 
-module.exports = { KNOWN_PATHS, resolvePath, browser, withPage, close, health };
+module.exports = { KNOWN_PATHS, LAUNCH_TIMEOUT_MS, resolvePath, browser, withPage, close, health };

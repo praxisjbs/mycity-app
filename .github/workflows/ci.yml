@@ -200,6 +200,23 @@ jobs:
           fi
           ffmpeg -version | head -1
 
+      # Chromium's first launch on a fresh runner builds the font cache before it answers: 10 s
+      # with 335 fonts on a laptop, and on this image's thousands it ran past puppeteer's launch
+      # limit, failing whichever file rendered a PDF first (documents-import, worker; 08/11/2026).
+      # The cache is built here, once, so every launch in the suite takes a second or two.
+      - name: Chromium's font cache, built before the suite
+        run: |
+          start=$(date +%s)
+          fc-cache || true
+          chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          if [ -n "$chrome" ]; then
+            DBUS_SESSION_BUS_ADDRESS=disabled: timeout 180 "$chrome" --headless=new --no-sandbox --disable-gpu \
+              --no-first-run --dump-dom about:blank >/dev/null 2>&1 || echo "::warning::Chromium did not finish its first launch"
+          else
+            echo "::warning::No Chromium on this runner: the PDF tests will fail"
+          fi
+          echo "Font cache and Chromium ready in $(( $(date +%s) - start )) s"
+
       # The job prints the service's log after its steps, and the transaction probe in
       # src/shared/db/tx.js has PostgreSQL log an ERROR on every call outside a transaction:
       # thousands of lines that buried the failing test at the end of each red backend log
