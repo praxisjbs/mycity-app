@@ -81,7 +81,7 @@ no decision.
 | Requirements meeting, 10 October 2026 (Cynthia Osakunih for MyCity, 01:10:41) | Simple payroll by default, a run is a month, payslips computed from base pay and additions, submitted to the CEO or COO; Cynthia agreed | Client agreement |
 | Discovery call, 2 September 2026 | MyCity's payroll today is simple; ITF and NSITF "as we scale"; confirmed the system can switch to a full statutory mode | Client intent |
 | Module demos, 12 October 2026 (00:38:05) | Staff are mostly contractors and consultants who handle their own tax and pension, so no screen mentions PAYE or pension in simple mode | Rule kept (§6.10); "hidden behind an advanced option" is superseded by §13.1 |
-| JBS Praxis's answers, 08/11/2026 | Statutory built and shipped off; advances recorded by Operations & People; who builds the screens left open | Decisions (§13.1) |
+| JBS Praxis's answers, 08/11/2026 | Statutory built and shipped off; advances recorded by Operations & People; the CEO approves; a leaver's instalments and a negative net; no recurring allowances in simple mode; both payslips as modals; test people on staging; the payslip sample drafted; who builds the screens left open | Decisions (§13.1) |
 | `docs/guides/attendance.md` §6.17, `queries.md` §6.6, `ess.md` | What attendance and queries hand to payroll and what My Payslips shows | Contracts this guide meets |
 | `docs/DATABASE_SCHEMA.md` M1, M3 and M6 | What exists and what payroll owes | Facts |
 | Not sources | `demo.html` (look only), the mock, the donors' rates and bands, the demo's PAYE bands, Gemini's summaries where the transcript says otherwise | Never |
@@ -606,7 +606,7 @@ suspension into absent days), so payroll does, from the owners' records:
    (403 `OWN_RECORD`); someone else with `payroll` edit does it.
 9. **A person who leaves.** The run for their last month takes every outstanding instalment of theirs
    (`left_on` in or before that month), so what is owed is recovered from final pay; if that would make the net
-   negative, §6.7 rule 3 stands and Operations & People decide (§13.3).
+   negative, §6.7 rule 3 stands and Operations & People decide (settled 08/11/2026, §13.1 item 16).
 
 ### 6.7 Adjustments and the net
 
@@ -981,7 +981,7 @@ Both tables are read by `scripts/check/guides.js`.
 | Payroll · Payslips | Four figures two to a row, then payslip cards (person, net, status pill) | The Gross and Deductions columns | Download PDF, full width at the foot of a payslip's full sheet; Email All Payslips and Download All in the run's overflow | As above |
 | Payroll · Deductions | Four figures two to a row, then deduction cards (person, reason, amount, status pill) | The Source column, the subtitle | Accept This Month at the foot of a pending fine's sheet, Spread Over Months and Waive beside it | As above |
 | Payroll · Configurations | Pay Day, the Advanced Payroll row; when on, cards for each section | The band chart | Switch On or Off, opening its date sheet | As above |
-| ESS · My Payslips | The year switch (44 px targets), Email a Copy, Download All; the figures two to a row; the months as a list with a status pill | The subtitle and the preview beside the list: a month opens its payslip as a full sheet (F31) | Download PDF at the foot of the month's sheet | ESS tabs |
+| ESS · My Payslips | The year switch (44 px targets), Email a Copy, Download All; the figures two to a row; the months as a list with a status pill | The subtitle; the payslip opens in a modal on desktop and as a full sheet on a phone (F31 as amended, §10.3) | Download PDF at the foot of the month's sheet | ESS tabs |
 | Home · Payroll In Progress | The card as every Home card | Nothing | Open the run | Bottom bar Home |
 
 ### 10.3 Components, and the amendments this guide asks for
@@ -1003,10 +1003,11 @@ is added there with `npm run new:component` (header, test and gallery page), nev
 
 **Amendments to ask for in PR 7 (record them where the Expenses ones are recorded: FRONTEND_FOUNDATION F31, FRONTEND_GUIDE §7 and CLAUDE.md):**
 
-1. **F31 for Payroll · Payslips.** A payslip opens in the shared Modal at every width (the centred dialog on
-   desktop, a bottom sheet on a phone), as an Expenses record does, because TB asked for "a modal" on both. ESS ·
-   My Payslips is unchanged (its payslip sits beside the list on desktop, a dialog from 761 to 1180 px, a sheet
-   on a phone), until TB says otherwise (§13.3).
+1. **F31 for Payroll · Payslips and ESS · My Payslips.** A payslip opens in the shared Modal at every width (the
+   centred dialog on desktop, a bottom sheet on a phone), as an Expenses record does, because TB asked for "a modal"
+   (4 Nov) and JBS Praxis settled both screens on 08/11/2026 (§13.1 item 18). Both use `ListDetail` with
+   `layout="modal"`; ESS · My Payslips stops placing the payslip beside its list on wide screens. Record the amendment
+   where the Expenses one is recorded.
 2. **The Advanced Payroll switch opens a form.** FRONTEND_GUIDE §8.1 says a setting that applies at once is a
    switch that saves on change; this one needs an effective date, so pressing it opens a small form with the
    date and saves on Switch On.
@@ -1067,7 +1068,7 @@ emailed", "Deduction scheduled", "Advance recorded". Money is `₦450,000.00` (`
 - **A public holiday set after Compute.** Submit's recompute reads the holidays again; the daily rate moves with
   them; the totals change and `RUN_CHANGED` says so.
 - **Staging sends real mail (A4).** Email All on staging reaches real inboxes with demonstration figures; staging
-  demos use test people (§13.3), and the staging seed never emails.
+  demos use test people (§13.1 item 19), and the staging seed never emails.
 - **A payroll reader without the salary grant** sees counts and statuses and Restricted for money, in the screen,
   exports and the assistant alike.
 - **Export expiry.** A Download All or statutory report is kept 24 hours (`export-cleanup`); pressing again makes
@@ -1119,21 +1120,36 @@ Binding; never re-opened. Timestamps are the meeting's transcript.
 6. **Deductions come from consequence management** (a sanction's fine, a damaged laptop): they appear on the Deductions
    tab once approved, and a person with payroll rights accepts them for this month, spreads them over months or waives
    them; salary advances appear there too (4 Nov, 00:38:54).
-7. **The run is submitted for approval to the CEO or the COO** (10 Oct, 01:11:42; MILESTONES §11). Which one stays
-   open (§13.3); the seeded stage is the CEO and the flow is editable.
+7. **The run is approved by the CEO** (JBS Praxis, 08/11/2026; the 10 Oct meeting, 01:11:42, and MILESTONES §11 said
+   the CEO or the COO). The seeded stage is the CEO only; MyCity can add a stage or a role (a COO, Operations & People)
+   on Settings · Approvals without code.
 8. **Statutory is built and shipped off** (JBS Praxis, 08/11/2026): the engine, the report and the rate tables exist
    behind the toggle, off by default; rates are entered only once MyCity's accountant confirms them.
 9. **Advances are recorded by Operations & People** on the Deductions tab with their repayment months; there is no
    employee request flow (JBS Praxis, 08/11/2026).
 10. **Who builds the screens is left open** (JBS Praxis, 08/11/2026): this guide names no frontend builder; MILESTONES
     still records TB with AJ as M6's owners.
-11. **TB creates the payslip sample** and shows it to MyCity before PR 4 (4 Nov, action item).
+11. **A payslip sample goes to MyCity for sign-off before PR 4** (4 Nov, TB's action item); item 20 records that JBS Praxis
+    drafted it.
 12. **Two release gates** apply to every module: the Playwright User Guide pictures and the AI-form gate (4 Nov,
     00:31:50); both are in Appendix B's release items.
 13. **A document keeps the approval flow in force when it was created** (4 Nov, 00:10:50): a run keeps the `payroll.run`
     version it opened with (§6.9 rule 5).
 14. **Simple payroll applies to staff treated as contractors and consultants**, who handle their own tax and pension
     (12 Oct, 00:38:05).
+15. **The seeded approval is the CEO alone** (JBS Praxis, 08/11/2026): see item 7.
+16. **A leaver's final run takes every outstanding instalment, and a negative net blocks Submit** (JBS Praxis,
+    08/11/2026): nothing is deducted silently and nothing is dropped silently; Operations & People spread a
+    deduction, add an adjustment or exclude the person (§6.6 rule 9, §6.7 rule 3).
+17. **Simple mode has no recurring allowances** (JBS Praxis, 08/11/2026): one Monthly Pay line plus one-off adjustments;
+    recurring splits (basic, housing, transport) exist only in advanced mode. The 10 October "predefined employee
+    advantages" are not built in simple mode.
+18. **Both payslips open in a modal at every desktop width** (JBS Praxis, 08/11/2026): Payroll · Payslips and ESS · My
+    Payslips, a centred dialog on desktop and a bottom sheet on a phone. PR 7 amends F31 for both (§10.3).
+19. **Staging demos and the staging seed use test people only** (JBS Praxis, 08/11/2026): staging sends real mail (A4,
+    no sink and no flag), so Email All is never pressed on staging against real staff; the staging seed sends no mail.
+20. **The payslip sample is drafted** (JBS Praxis, 08/11/2026) at `docs/MyCity-ERP-Documents/payroll-samples/payslip-sample.html`
+    for MyCity's sign-off; PR 4 turns the approved version into `templates/documents/payslip.html`.
 
 ### 13.2 Decided in writing this guide (change here if wrong)
 
@@ -1152,9 +1168,10 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
    grants), not line managers.
 7. **Unpaid leave and unpaid suspension are deducted by payroll** at the daily rate (nothing deducts them today);
    `leave_type.unpaid` is a column, seeded true for Unpaid.
-8. **Joiners and leavers are prorated by working days; a leaver's outstanding instalments** are taken in their final run.
+8. **Joiners and leavers are prorated by working days; a leaver's outstanding instalments** are taken in their final run
+   (settled 08/11/2026, §13.1 item 16).
 9. **One-off adjustments are in scope** (bonuses, corrections after lock); recurring allowances are not, in simple mode
-   (§13.3 asks whether MyCity has any).
+   (settled 08/11/2026, §13.1 item 17).
 10. **Download All is one multi-page PDF; Email All sends one mail per person** to the work email with the PDF
     attached and no amount in the body; a repeat sends only to those not yet emailed unless Email Again is chosen.
 11. **Payslips publish at approval.** Paid is bookkeeping (a date, an optional reference) and does not gate visibility.
@@ -1163,7 +1180,8 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
 13. **Never your own**: nobody accepts, waives, releases or records a deduction or advance for themselves.
 14. **The advanced mode is decided by the run's period**, switching on needs a rate in force (`NO_RATES`), and PR 5 adds the
     employee tax and pension number columns the statutory mask already names, written through the organisation service.
-15. **The payslip opens in a modal at every width** on Payroll · Payslips (F31 amended, PR 7); ESS is unchanged.
+15. **The payslip opens in a modal at every width** on Payroll · Payslips and ESS · My Payslips (settled 08/11/2026,
+    §13.1 item 18; F31 amended in PR 7).
 16. **A payslip's PDF is a restricted file**: its owner and `payroll` edit holders open it; Management does not.
 17. **No AI job of M6's own**; its cards are risk `payroll` and run on the assistant engine's job.
 18. **Wire names follow the salary mask** (`gross_pay`, `total_deductions`, `net_pay`, `pay_amount`) and `employer_cost` is
@@ -1176,16 +1194,14 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
 
 | # | Question | Decides | Needed before | Meanwhile |
 |---|---|---|---|---|
-| 1 | CEO or COO as the approver | TB with Cynthia Osakunih | PR 2's `6099` (not blocking: the flow is editable on Settings · Approvals) | The seeded stage is the CEO |
-| 2 | MyCity's real statutory rates, PAYE band convention and the pension base | MyCity's accountant, through Cynthia | The advanced demo; MILESTONES §11 requires it | PR 5 builds and tests on labelled test rates; nothing is seeded |
-| 3 | Does MyCity pay recurring allowances ("advantages", 10 Oct) today | Cynthia, with the payslip sample | PR 4 | None in simple mode; one-off adjustments exist |
-| 4 | Sign-off of the payslip sample | TB shows Cynthia | PR 4 | The sample is stored beside the other samples |
-| 5 | The pay day (27th in the ESS guide and the demo) | Cynthia | The demo | Configurations starts empty; Next Payday shows nothing |
-| 6 | Salaries and bank details of every person loaded | MyCity, through the staff list (`seeds/staff/`); I did not open `staff-list.xlsx` to see whether it carries them | The demo | Staging uses test people with pay |
-| 7 | A leaver's outstanding instalments and what happens when taking them would make the net negative | TB | PR 2 | §6.6 rule 9 and §6.7 rule 3 stand |
-| 8 | Email All on staging reaches real inboxes (A4) | TB | PR 8 | Demo with test people only |
-| 9 | Should ESS · My Payslips also open its payslip in a modal at every width | TB | PR 7 | Unchanged (F31 as it is) |
-| 10 | Who builds the screens | JBS Praxis and TB | PR 7 | Decision 10 of §13.1: not named |
+| 1 | MyCity's real statutory rates, PAYE band convention and the pension base | MyCity's accountant, through Cynthia | The advanced demo; MILESTONES §11 requires it | PR 5 builds and tests on labelled test rates; nothing is seeded |
+| 2 | Sign-off of the payslip sample (§13.1 item 20) | TB shows Cynthia | PR 4 | The sample is the draft in `docs/MyCity-ERP-Documents/payroll-samples/` |
+| 3 | The pay day (27th in the ESS guide and the demo) | Cynthia | The demo | Configurations starts empty; Next Payday shows nothing |
+| 4 | Salaries and bank details of every person loaded | MyCity, through the staff list (`seeds/staff/`); I did not open `staff-list.xlsx` to see whether it carries them | The demo | Staging uses test people with pay |
+| 5 | Who builds the screens (§13.1 item 10) | JBS Praxis and TB | PR 7 | Not named |
+
+Answered on 08/11/2026 and moved to §13.1: the approver (item 7), the leavers and negative net rule (item 16),
+recurring allowances (item 17), the ESS modal (item 18) and staging mail (item 19).
 
 ---
 
@@ -1214,10 +1230,12 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
 ### PR 0 · This guide (`m6/guide`) · documentation only
 
 - This guide; `docs/handoff/m6-payroll.md`; MILESTONES §11's amendment of 08/11/2026; the ESS guide's payroll
-  lines (§6, §13) and a pointer in the attendance guide's §6.17; the guides index row; the guide's CODEOWNERS
-  line; DATABASE_SCHEMA M6's pointer; a PROGRESS note.
+  lines (§6, §10, §13) and a pointer in the attendance guide's §6.17; the guides index row; the guide's CODEOWNERS
+  line; DATABASE_SCHEMA M6's pointer; a PROGRESS note; the payslip sample for MyCity's sign-off
+  (`docs/MyCity-ERP-Documents/payroll-samples/payslip-sample.html` with its README, listed in
+  `docs/MyCity-ERP-Documents/INDEX.md`).
 - Not in PR 0 (they change code the gates read): the PROGRESS rows, MILESTONES §18's table and the shell's tabs
-  (PR 1); the payslip sample's HTML (TB, stored under `docs/MyCity-ERP-Documents/payroll-samples/`).
+  (PR 1).
 - Done when: `node scripts/check/guides.js`, `progress.js`, `readme-map.js` and `user-guide.js` pass; TB reads the
   guide and ticks Written in `docs/guides/README.md`.
 
@@ -1338,8 +1356,8 @@ screen; Email All and Download All work; advances are recorded by Operations & P
    as not set); next month's run shows the statutory lines and the Statutory Report.
 
 **Prerequisites to confirm with MyCity before the demo:** the pay day; every person's salary and bank details; the
-payslip sample's sign-off; the statutory rates (or agreement to demonstrate the switch with rates not set); the
-approver (CEO or COO).
+payslip sample's sign-off; the statutory rates (or agreement to demonstrate the switch with rates not set). The
+approver is settled (the CEO, §13.1 item 7); the demo uses test people only (§13.1 item 19).
 
 **Gates and release items (every one):** `npm run ci` green; the Playwright User Guide pictures taken and none stale;
 the AI-form gate with no M6 form on the gaps list; the money gate (20); pagination at 25; search coverage; two
@@ -1391,6 +1409,7 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · JBS Praxis's second round of answers recorded: the CEO alone approves (§13.1 items 7 and 15), a leaver's final run takes every outstanding instalment and a negative net blocks Submit (item 16), no recurring allowances in simple mode (item 17), both payslips open in a modal at every desktop width (item 18, §10.3, §10.2), staging demos use test people only (item 19), the payslip sample drafted under `docs/MyCity-ERP-Documents/payroll-samples/` (item 20); §13.3 now holds five questions; Appendix A's PR 0 and Appendix B follow.
 - 08/11/2026 · JP · Written as M6's single source of truth from MILESTONES §11, the 4 November Modules Review (the
   transcript, not the Gemini summary), the 10 October and 2 September meetings, JBS Praxis's answers of 08/11/2026,
   and the built attendance, sanctions and leave code; the handoff `docs/handoff/m6-payroll.md` ticks and logs only.
