@@ -83,7 +83,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [ThemePreview](#themepreview) | `ThemePreview` | A small copy of the hub drawn in a dark palette and two faces: the rail, a page title, two KPI cards, a list with a selected row, status pills, a field and the yellow button. | beta |
 | Display | [Tile](#tile) | `Tile` | A small bordered tile: a heading, a line, and whatever sits under them. | stable |
 | Display | [Timeline](#timeline) | `Timeline` | What happened to a record, newest or oldest first: a rail of dated events, each with its own dot. | stable |
-| Display | [VerifyCard](#verifycard) | `VerifyCard`, `Match` | What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself with its download. | beta |
+| Display | [VerifyCard](#verifycard) | `VerifyCard`, `Match` | What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself (an agreement's headings, clauses and tables included) with its download. | beta |
 | Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, drawn from its measured loudness, which fill as it plays. | stable |
 | Display | [YearsMedal](#yearsmedal) | `YearsMedal` | The years a person has been at MyCity, large, inside a gold laurel. | beta |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
@@ -2460,7 +2460,7 @@ What happened to a record, newest or oldest first: a rail of dated events, each 
 
 ### VerifyCard
 
-What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself with its download.
+What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself (an agreement's headings, clauses and tables included) with its download.
 
 | | |
 |---|---|
@@ -2484,7 +2484,7 @@ What a check of a document found, on the site's large card: before any check a D
 | `text` | `ReactNode` |  | One line under it (This document is genuine and unchanged.). |
 | `items` | `ReadonlyArray<KeyValueItem>` |  | The record, label and value (Document, Reference, Signed By, Signed On, Issued By, Content Hash, Artifact Hash). |
 | `note` | `ReactNode` |  | A line under the rows (what to do when nothing was found). |
-| `document` | `{ heading: string; title: string; paragraphs: ReadonlyArray<string>; action?: ReactNode }` |  | A QR check's document: its heading, title, opening words and its download. |
+| `document` | `{ heading: string; title: string; paragraphs: ReadonlyArray<string>; blocks?: RichTextBlock[] \| null; action?: ReactNode }` |  | A QR check's document: its heading, title, opening words and its download; or, for a document with headings, clauses and tables (an agreement), the whole text as `blocks`, drawn in place of the words. |
 | `empty` | `{ title: string; text: string }` |  | Before a check: the title and line under the shield. |
 | `className` | `string` |  | Layout classes only (spacing). |
 

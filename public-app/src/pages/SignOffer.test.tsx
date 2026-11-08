@@ -35,7 +35,7 @@ const draw = (token: string) =>
     </RouterProvider>,
   );
 
-const aside = () => screen.getByRole("complementary", { name: "Offer of Employment" });
+const aside = (name = "Offer of Employment") => screen.getByRole("complementary", { name });
 
 async function signIn(box: HTMLElement) {
   fireEvent.pointerDown(box, { clientX: 10, clientY: 10, pointerId: 1 });
@@ -54,6 +54,8 @@ async function confirmEmail(code = "482913") {
 describe("SignOffer", () => {
   it("shows the offer in the aside, the letter as issued, the signers, and asks to confirm the email", async () => {
     draw("Rt8wN2kPz5Gb");
+    // The heading follows the document once it loads (an offer here).
+    expect(await screen.findByRole("complementary", { name: "Offer of Employment" })).toBeTruthy();
     expect(await within(aside()).findByText("Content Producer")).toBeTruthy();
     expect(within(aside()).getByText("Offer of Employment, OFF-0018")).toBeTruthy();
     expect(within(aside()).getByText("Your offer, ready to sign.")).toBeTruthy();
@@ -131,5 +133,38 @@ describe("SignOffer", () => {
     const { container } = draw("Gz7kT4pXw2Nd");
     await screen.findByRole("heading", { name: "This Offer Has Expired" });
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  describe("an agreement (docs/guides/partnerships.md §6.9)", () => {
+    // First: the signing test below signs for the partner, which opens the countersignatory's turn.
+    it("MyCity's countersignatory waits for the partner first", async () => {
+      draw("Ab8sK2vNe5Wq");
+      expect(await screen.findByText(/^You sign after Ngozi Adebayo\./)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Send Code" })).toBeNull();
+    });
+    it("its heading and words follow the document, which reads as its headings, clauses and options table", async () => {
+      draw("Ag4pR7wLm2Qx");
+      expect(await screen.findByRole("complementary", { name: "Partnership Agreement" })).toBeTruthy();
+      expect(within(aside("Partnership Agreement")).getByText("Partnership Agreement, AGR-2026-0007")).toBeTruthy();
+      const doc = screen.getByRole("region", { name: "Partnership Agreement" });
+      expect(within(doc).getByRole("heading", { name: "Financials" })).toBeTruthy();
+      expect(within(doc).getByRole("rowheader", { name: "Deal Price" })).toBeTruthy();
+      expect(within(doc).getAllByRole("listitem")).toHaveLength(3);
+      const signers = screen.getByRole("region", { name: "Signers" });
+      expect(within(signers).getByText("Ngozi Adebayo, Founder")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Decline to Sign" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Send Code" }));
+      expect(await screen.findByText(/^Sent to n•••@harbourlights\.example\.test$/)).toBeTruthy();
+      const boxes = screen.getAllByRole("textbox").filter((b) => b.getAttribute("inputmode") === "numeric");
+      fireEvent.paste(boxes[0]!, { clipboardData: { getData: () => "482913" } });
+      expect(await screen.findByRole("button", { name: "Sign Agreement" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("radio", { name: "Type" }));
+      fireEvent.change(screen.getByLabelText("Typed Signature"), { target: { value: "Ngozi Adebayo" } });
+      fireEvent.click(screen.getByRole("checkbox", { name: "Agree to Sign Electronically" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sign Agreement" }));
+      expect(await screen.findByRole("heading", { name: "Agreement Signed" })).toBeTruthy();
+      expect(await axe(document.body)).toHaveNoViolations();
+    });
+
   });
 });
