@@ -238,6 +238,35 @@ you act on them.
 | **Your mail server has no folder for that** | Your mailbox on the mail server lacks that folder, often Archive. Ask IT to add it, then press **Refresh** |
 | **Not moved. Try again.** | The move did not reach the hub. Check your connection and try again |
 
+### Link a conversation to a partner {#mailbox-link-partner needs="partnerships view"}
+
+Link a conversation with a partner or a lead, and each of its emails is kept in that record's history
+in Partnerships. The people who can see the record see each email's subject, who it was from and to,
+when, and its first lines. The whole conversation stays yours: only you can open it.
+
+1. Open the conversation and press the three dots, **Move this message**.
+2. Press **Link to Partner**.
+   ![Link to Partner, with Partner and Deal](shot:mailbox-link-partner)
+3. Pick the partner or lead in **Partner**. Leads are marked Lead.
+4. Pick one of its deals in **Deal** if the emails are about one. It is optional.
+5. Press **Link to Partner**. The hub says Linked to, then the name.
+6. A line under the subject now names the partner, and the deal. Press the name to open it in
+   [Partnerships · Partners](/partnerships?tab=partners).
+
+New emails in the conversation, sent or received, join the record by themselves. Spam never does.
+
+- To link it to another partner, press **Change Partner** in the same menu.
+- To stop, press **Unlink** on the line under the subject. The emails already kept stay on the record.
+
+> **Tip:** On the partner's page, the **Activity** tab lists each email. Press one to read its first
+> lines, and press **Open in Mailbox** to open the whole conversation. Only you see that link.
+
+| The screen says | What to do |
+|---|---|
+| **Now a partner** | The lead has signed and is a partner now. Pick the partner instead |
+| **Not this record's deal** | Pick a deal of the partner or lead you chose |
+| **Not linked. Try again.** | The link did not reach the hub. Check your connection and try again |
+
 ### Send an attachment to a chat {#mailbox-to-chat needs="community create"}
 
 1. Open the message and find the attachment.
@@ -540,6 +569,19 @@ marks:
   1: text "Key Points" | What matters
   2: button "Copy Summary" | Copy it
   3: button "Close Summary" | Close it
+```
+
+```shot mailbox-link-partner
+open: /mailbox?tab=inbox
+as: operations
+do:
+  - click: button "Move this message"
+  - click: role menuitem "Link to Partner"
+  - wait: label "Partner"
+crop: modal
+marks:
+  1: label "Partner" | The partner or lead
+  2: label "Deal" | One of its deals
 ```
 
 ```shot mailbox-configure-social

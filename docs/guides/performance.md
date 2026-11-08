@@ -1893,6 +1893,7 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · M7 PR 8 (`partnerships.md` §6.18): `reviews.service.ratingsFor` gives Partnership Analytics each lead owner's latest closed monthly rating in its period, in Performance's words, only for the people whose reviews the reader may list (Performance's own `readable` rule, `reviews.repo.latestRatings`). Nothing on the Performance screens changes.
 - 03/11/2026 · JP · From the evaluation set on staging: a figure is read as the number in the person's words, so Set KPI's "95%" is 95 (`named.quantityOf`, on every figure a card carries), and Save Key Result offers only the key results it can change (`listKeyResultRefs`' `plan_statuses`). Nothing on the Performance screens changes.
 - 03/11/2026 · JP · Every Performance form in the chat (`praxis-ai.md` decisions 33 and 40, §6.11): 23
   cards through the screens' own services (§9): the quarter, the organisational goal, the objective,

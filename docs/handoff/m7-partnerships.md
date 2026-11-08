@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | LA (Love Adeola), M7's owner as CLAUDE.md, the guide and PROGRESS name it; GE (Godwin-Okoh Elisha) builds most PRs, LA the importers, AJ the Workspace links (the guide's Appendix A) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 4 (#90, merged); PR 5 (#91, merged); PR 6 (#92, `m7/agreements-signing`); PR 7 (#94, merged) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 4 (#90, merged); PR 5 (#91, merged); PR 6 (#92, merged); PR 7 (#94, merged); PR 8 (`m7/analytics-finish`, draft) |
 
 ---
 
@@ -94,14 +94,32 @@ with the date, and add a line to §3.
 - [x] Proposals (#53) and the public Proposal page (#105) (08/11/2026)
 
 ### PR 8 · Analytics, mail, Praxis AI, search, finish
-- [ ] Analytics (#55); mail binding; manifests, cards and search; views and notifications
-- [ ] Staging seed; INTERIM types deleted; empty stubs filled or deleted
-- [ ] PROGRESS rows and counts; the demo walked (Appendix B)
+- [x] Analytics (#55); mail binding; manifests, cards and search; views and notifications (08/11/2026)
+- [x] Staging seed; INTERIM types deleted; empty stubs filled or deleted (08/11/2026)
+- [x] PROGRESS rows and counts; the demo walked (Appendix B) on a database seeded as staging is, through the
+      real API (08/11/2026; steps 2 to 11, step 1 by the imports and Categories suites)
+- [ ] The staging walk of Appendix B after merge (§4 below), by a person
 
 ### PR 9 · User Guide chapter (after acceptance)
 - [ ] `docs/manual/partnerships.md` with pictures; the Quick Start card
 
 ## 3 · Log
+
+- 08/11/2026 · JP · PR 8 (`m7/analytics-finish`): Analytics (#55) on the contract, desktop and phone, with Export
+  (the period's workbook); Performance's rating through `reviews.service.ratingsFor`. Link to Partner in Mailbox
+  (`mailbox/binding/` filled, `GET`, `POST`, `DELETE /mailbox/threads/:id/partner`), each email of a linked thread
+  logged once on the record with the excerpt rule, the 360's Activity opening it, migration `7120`. Praxis AI:
+  `partnerships.summary`, `partnership_returns.summary`, `proposals.list`, the `proposals.start` card; proposals in
+  ⌘K. Notices for deals, leads and proposals (`proposal.viewed` among them, PR 7's left item); `leads.views.js`
+  and `agreements.views.js`; Home's Proposals Out with Last Viewed and Views. The synthetic staging seed
+  `70_partnerships.js` through the services (Build by Hand proposals, an agreement approved and recorded signed
+  to Active), Home's M7 rows handed over (`forward-rows.js` writes nothing now). Fixed on the way: Submit for
+  Approval failed on a deal of a category with no default rate (the flow's context now reads the category's).
+  INTERIM `app/src/api/types/partnerships.ts`, `templates/documents/mou.html` and
+  `templates/email/agreement-renewal.html` deleted; `proposals.test.js` and `agreements.test.js` filled. The calls
+  are in the guide's §13.2, In PR 8; Status Built. Tests: `partnerships-analytics` (5), `-mail` (5), `-notices`
+  (3), `-staging-records` (4), the proposals suite's card and view notice, unit and screen tests. Demo walked
+  through the API on a seeded database: every step passed. Left: the staging walk (§4), PR 9, MyCity's samples.
 
 - 08/11/2026 · TB · PR 6 (`m7/agreements-signing`, #92) built: `main` merged after #85, #90, #91 and #95 (#85 had already landed
   AJ's signatures service and `5020` unchanged, so no gate 3 exception was needed); the agreements module (generate
@@ -222,3 +240,42 @@ with the date, and add a line to §3.
   truth. This file reduced to the checklist and the log; the decisions that were proposed here on
   04/11/2026 are superseded by the guide's §13.
 - 04/11/2026 · JP · PR 0 first written from the documents alone.
+
+## 4 · The staging walk (after PR 8 merges)
+
+Appendix B on staging, by a person, once the deploy has run the seeds (`10_staff`, `65_partnership_setup`,
+`70_partnerships`). Tick each line with the date and who walked it; a line that fails goes in §3 with what
+the screen said. Use a phone for the lines that name one.
+
+- [ ] 0. Staging holds the seed: Partnerships · Partners lists Lumen Arts Festival, Harbourline Hotels, Kora
+      Street Kitchens, Brightwave Radio and Tallow Tech Summit; Leads lists Gidi Food Carnival and six more; no
+      MTN Nigeria, ProvidusBank or other Home demonstration partner remains
+- [ ] 1. Categories · **Start From Tracker** on the synthetic tracker; Settings · Imports · Partnership Tracker:
+      column map, Map Values (stages, owners, types), duplicate report, preview, import; revert; import again
+- [ ] 2. **New Partner** (Signed Before the Hub), then open it: zeros and empty tabs, not a broken page
+- [ ] 3. **New Lead** with its first deal (Deal Options, event dates, a venue picked from the address
+      search); move it through stages on the 360; **Set Health** Stalled with blockers; **Log Interaction**
+      a call. The deal's owner, if someone else, gets Deal Moved; their Head of Department gets Deal Stalled
+- [ ] 4. From its 360's Work tab, **New Project** and **New Task**: both listed there, connected
+- [ ] 5. **New Proposal** with notes and a `.md` transcript; with MyCity's Anthropic key on Settings ·
+      Integrations, answer, **Use Suggestion**, **Skip** and **Reshuffle** cards, **Write Draft** (without it,
+      Write Draft builds it by hand); edit a section and **Change Layout**; **Send Proposal**, confirming the
+      address; open the link on a phone; the proposal reads Viewed and the owner gets Proposal Viewed;
+      Home's Proposals Out shows its Last Viewed and Views
+- [ ] 6. **Generate Agreement** from the Events template; **Submit for Approval**; approve as the Head of
+      Department, then the CEO (My Approvals); **Send for Signature**; sign on a phone with the emailed code
+      and a drawn signature (and MyCity's countersignature); scan the QR: the document and both verdicts;
+      by reference: status and verdicts, no content
+- [ ] 7. The lead is now a partner (Lead Signed to its owner and Operations & People); its five deliverables
+      are tasks; the event days are on the team's calendar
+- [ ] 8. **Enter Returns** for this month; the 360's Returns This Year moves; ask Praxis AI "who is our
+      highest contributing partner" and "what is our partnership value this year"
+- [ ] 9. In Mailbox, a conversation's menu: **Link to Partner**; the line under its subject names the partner;
+      its emails on the partner's Activity, each opening with its first lines and **Open in Mailbox** (yours
+      only); **Unlink**
+- [ ] 10. Kora Street Kitchens (quiet 45 days in the seed): the next morning, Home's Partner Inactivity alert
+       and its follow-up task, the deal Follow-Up Required
+- [ ] 11. Analytics for This Quarter: a lead owner's row against the records behind it (their leads, meetings,
+       proposals sent, deals signed); Export the workbook; Returns per Month only for a holder of See
+       Commission and Returns
+
