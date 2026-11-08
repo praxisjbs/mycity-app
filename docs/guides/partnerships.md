@@ -1334,6 +1334,35 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
     batch. The screens' routes call the same functions.
   - The Partners and Leads lists' **Export** (§10.1) comes with PR 4's export in the tracker's columns.
 
+- **In PR 7 (07/11/2026, JP):**
+  - The kit draws its own pages: `documents.generate()` takes a document type with a `draw` hook (the data
+    in, the complete HTML out, checked by the type itself instead of the letter's variables), and
+    `pdf.render` a `bare` option (no letterhead, header or footer: the kit's pages carry their own), so the
+    studio's preview, the public page and the PDF are one HTML (§6.11).
+  - **Download PDF** is an export (foundation.md §6.12): `POST /proposals/:id/pdf` answers `202` with the
+    `ExportFile`, the sent PDF when there is one, else the draft's made in the worker.
+  - The public link's token is kept encrypted on the proposal (`partnership_proposal.link_secret`,
+    migration `7110`, bound to the proposal's id), so the worker can mail the link once the PDF is ready
+    and the studio can show Copy Link; it is cleared when the link stops.
+  - A proposal is valid for 30 days from sending (`valid_until`). The daily scheduler `proposal-expiry`
+    expires it after, until PR 6's `agreement-renewals` takes the job over.
+  - Sending version 2 withdraws version 1 and stops its link, so a partner never holds two live versions.
+  - Skip is refused on a required card (`409`, the card says so); Write Draft waits while one is open.
+  - With AI off or the month's cap reached, **Build by Hand** (Write Draft's route) fills the pages the
+    record can without Claude (the cover, MyCity's figures, the packages, the timeline, the next steps and
+    the back cover) and opens Edit, where a person writes the rest (§6.10).
+  - Words are edited in a panel beside the page (**Edit Words**, one field a part of the layout), not in
+    place: a section's content is plain text, so the kit's look cannot be broken by an edit.
+  - The `proposal.viewed` notification to the owner and Home's views are left for PR 8; PR 7 records the
+    views and sets Viewed.
+  - `.md` is accepted as an attachment by the upload engine, so a Gemini notes export uploads as it comes.
+  - `ProposalStart.assets` (each a `document_id`, its role and alt text) replaces `asset_document_ids`, so
+    a brief's images carry what the kit needs to place them.
+  - The tone notes Claude draws from the brief are kept in `partnership_proposal.brief` (`tone_notes`);
+    Save as Template copies them into the template's `structure`.
+  - `proposals`' controller carries `// ai:none`: Praxis AI's `proposals.start` card arrives with PR 8, so
+    the studio's create and edit schemas carry `design:` reasons until then (gate 23).
+
 ### 13.3 Still open
 
 - **AI jobs:** settled. `template-tidy` is Default (JP, 06/11/2026) and `proposal-message` is Default (TB,
@@ -1584,7 +1613,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 - **`leads.js`**: `LeadCreate` { `name`, `partner_category_id`, `region` ({ `scope`, `cities?: PlaceInput[]` }), `industry?`, `website?`, `objective?`, `source?`, `owner_id`, `identified_on?`, `impact?`, `impact_rating?`, `impact_note?`, `comments?`, `custom?`, `contact` (`ContactInput`), `deal` (the deal fields without `lead_id`) }; `LeadUpdate`; `LeadLose` { `reason` }; `LeadConvert` { `signed_copy_document_id?` }; `LeadListQuery`; `LeadsSummary`; `Lead360`; `LeadConverted` { `partner_id` }
 - **`partners.js`**: `PartnerCreate` (as `LeadCreate`, with `legal_name?`, `headquarters?: PlaceInput`, `logo_document_id?`, and a first deal at a signed or active stage with `signed_copy_document_id?` or `signed_before_hub: true`); `PartnerUpdate`; `PartnerClose` { `reason` }; `ContactInput` { `first_name`, `last_name`, `job_title?`, `email?`, `phones?`, `signatory?` }; `ContactCreate`; `ContactUpdate`; `DuplicateQuery`; `Duplicates`; `PartnerListQuery`; `PartnersSummary` (with `quiet_days`); `Partner360` { `partner`, `kpis` { `signed_value`, `returns_this_year?`, `downloads_this_year`, `active_deals`, `days_since_contact` }, `deals`, `contacts`, `overview`, `deliverables`, `custom_fields`, `history` (`RecordHistoryLine`: a stage or health line with its deal) }; `PartnerDocumentQuery`; `PartnerDocumentAttach` { `document_id`, `kind`, `deal_id?` }; `PartnerWorkQuery`; `PartnerWorkPage` (with `hidden` counts)
 - **`interactions.js`**: `InteractionCreate` { `partner_id` or `lead_id`, `deal_id?`, `contact_id?`, `interaction_type`, `occurred_at`, `subject`, `summary` }; `InteractionListQuery`; `InteractionPage`; mailbox's `ThreadPartnerBind` { `partner_id` or `lead_id`, `deal_id?` } and `ThreadContext`
-- **`proposals.js`**: `ProposalStart` { `deal_id`, `notes?`, `transcript_document_id?`, `asset_document_ids?`, `design_template_id?` }; `ProposalQuestion`; `QuestionAnswer` { `answer` }; `ProposalContent` { `sections`: `Section[]` } with `Section` a discriminated union on `layout` (one schema per layout of §6.11) carrying `key`, `hidden`, the layout's fields and `sources: FigureSource[]` { `figure`, `source` (`brief`, `answer`, `record`, `proof_point`), `ref` }; `ProposalContentEdit`; `SectionRewrite` { `instruction` }; `ProposalSend` { `to` (1 to 5 emails), `cc?` (up to 5), `subject`, `message`, `confirm: true` }; `ProposalDecline` { `reason` }; `ProposalTemplateSave` { `name` }; `ProofPointCreate`; `ProposalListQuery`; `ProposalsSummary`; `ProposalDetail`; `PublicProposal` { `title`, `partner_name`, `html`, `owner_contact`, `valid_until` }
+- **`proposals.js`**: `ProposalStart` { `deal_id`, `notes?`, `transcript_document_id?`, `assets?: BriefAsset[]` ({ `document_id`, `role` (`cover`, `gallery`, `logo`, `section`), `alt` }, at most 12), `design_template_id?` }; `ProposalQuestion`; `QuestionAnswer` { `answer` }; `ProposalContent` { `sections`: `Section[]` } with `Section` a discriminated union on `layout` (one schema per layout of §6.11) carrying `key`, `hidden`, the layout's fields and `sources: FigureSource[]` { `figure`, `source` (`brief`, `answer`, `record`, `proof_point`), `ref` }; `ProposalContentEdit`; `SectionRewrite` { `instruction` }; `ProposalSend` { `to` (1 to 5 emails), `cc?` (up to 5), `subject`, `message`, `confirm: true` }; `ProposalDecline` { `reason` }; `ProposalTemplateSave` { `name` }; `ProofPointCreate`; `ProposalListQuery`; `ProposalsSummary`; `ProposalDetail` (with `progress: ProposalProgress`, `link_url`, `ai`, `versions`, `can`); `ProposalPreview` { `html`, `sections` with the layouts each may take }; `ProposalMessageDraft` { `subject`, `message` }; `ProposalChart` { `kind` (`bar`, `hbar`, `stacked`, `line`, `area`, `donut`, `progress`), `series`, `sources` } on `opportunity`, `why_mycity`, `audience`, `packages`, `proof` and `insight`; `IllustrationName` (the kit's 24 drawings); `PublicProposal` { `title`, `partner_name`, `html`, `owner_contact`, `valid_until` }; `ProposalSentEmailVars` (the `proposal-sent` mail)
 - **`agreements.js`**: `AgreementGenerate` { `deal_id`, `template_key?`, `asks?` }; `AgreementUpdate` { `body?`, `fields?`, `starts_on?`, `ends_on?`, `renewal_notice_days?` }; `AgreementSend` { `signers`: [{ `contact_id?`, `name`, `title?`, `email`, `side` (`partner`, `mycity`) }], `message?`, `confirm: true` }; `SignedCopyRecord` { `document_id`, `signed_on`, `signed_by_name`, `signed_by_title?` }; `AgreementRenew` { `starts_on`, `ends_on?`, `new_deal?` }; `AgreementClose` { `reason` }; `AgreementListQuery`; `AgreementsSummary`; `AgreementDetail`; `RenewalPage`; the signing contract (M5): `SignCodeVerify` { `code` }, `SignSubmit` { `full_name`, `title?`, `method` (`draw`, `type`), `signature_png?` (a PNG data URL), `typed?`, `consent: true` }; `VerifyResult` { `status`, `signers`, `verdicts` { `content`, `artifact` }, `document?` }
 - **`partnership_analytics.js`**: `AnalyticsQuery` { `period` (`month`, `quarter`, `year`, `custom`), `from?`, `to?`, `partner_category_id?` }; `PartnershipAnalytics` { `kpis`, `by_owner` (the eight measures), `signed_per_month`, `returns_per_month?`, `by_category`, `by_region`, `stage_conversion` }
 - **Workspace** (`projects.js`, `tasks.js`, `calendar.js`): create and update schemas gain `partner_id?`, `lead_id?`, `deal_id?`; list queries gain `partner_id?`. Declared once in PR 1 as `partners.js` `PartnerLink` (a partner or a lead, not both; a deal only with one) and `PartnerLinkQuery`; PR 5 spreads them into `ProjectCreate`, `ProjectEditFields`, `TaskCreate`, `TaskEditFields`, `CalendarEventCreate`, `CalendarEventEditFields` and the three list queries, with the services that write them
@@ -1603,7 +1632,9 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
     `.inactivity`, `.views`
   - `interactions/`: `.mail` (with `mailbox/binding/`)
   - `proposals/`: `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure
-    check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views`
+    check), `.kit` (rendering), `.charts` (the charts as SVG), `.send`, `.public` with `.public.routes`,
+    `.proof`; saved templates sit in `.service`, and the PDF is the document engine's (no `.templates`
+    or `.pdf`; PR 7)
   - `agreements/`: `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`),
     `.renewals`, `.views`
   - `templates/` (M3's, shared): `.agreements` (the wording of a category's templates: its fields, chips and
@@ -1613,7 +1644,8 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
     `.signed-pdf`, `.verify`, `.public.routes`
   - `mailbox/binding/`: `intake.service`, `mail-context.service`, `context-tabs`, `convert.service`
 - **Jobs** (`src/jobs/`): handlers `proposal-questions`, `proposal-draft`, `partner-inactivity`,
-  `agreement-renewal`; schedulers `partner-inactivity`, `agreement-renewals`, each in `SCHEDULERS`.
+  `agreement-renewal`; schedulers `partner-inactivity`, `agreement-renewals`, and `proposal-expiry` until
+  `agreement-renewals` takes it (PR 7), each in `SCHEDULERS`.
 - **Shared:** `shared/import` (Map Values), `shared/documents/render.js` (table loop if missing),
   `shared/workflow/definitions.js` (`partnership.agreement`), `shared/numbering/schemes.js`.
 - **Templates:** `templates/documents/` (`deal-merchant-agreement.html`, `mou.html`,
@@ -1642,6 +1674,17 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · PR 7, the Proposal Studio and design kit (`m7/proposal-studio`, #94): `proposals` on the
+  contract (brief, questions with reshuffle, the writing job and its progress, the figure check, edits,
+  rewrites, versions, send with confirmation, the public link and its views, accept, decline, withdraw,
+  expire, save as template); the four AI actions and their prompts (§9); the design kit at 16:9 with
+  charts, the `insight` layout and the kit's 24 drawings (§6.11; TB, 07/11/2026); `QuestionCard` and
+  `DocumentFrame`; Proposals (#53) and the public Proposal page (#105), desktop and phone; migration `7110`.
+  Recorded in §13.2 (In PR 7): the `draw` hook and `bare` PDF, Download PDF as an export, the encrypted link
+  token, 30 days' validity and `proposal-expiry`, v2 withdrawing v1, Skip refused on a required card, Build
+  by Hand, words edited in a panel, views without notifications until PR 8, `.md` attachments,
+  `ProposalStart.assets`, tone notes in the brief. Appendix C and D to match. MyCity's sample proposal has
+  not arrived, so the kit is not yet checked against it (Appendix A PR 7).
 - 06/11/2026 · TB · The audit of PRs 1 to 3 before PR 4 (§13.2, the audit): a deal is seen through its
   lead's or partner's owner too, and the 360s list and count only the deals the reader sees (§6.1, §6.2);
   the duplicate check recorded as the one read outside scope; Categories' counts and its partners and

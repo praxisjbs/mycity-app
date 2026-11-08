@@ -13,7 +13,8 @@ import Partnerships from "./index";
 /**
  * Pipeline, Partners and Leads with both 360s on the in-browser mock (docs/guides/partnerships.md §10):
  * each screen draws from the contract's shapes, a row opens its record beside the list, a lead's
- * stage moves on its switcher, and a phone opens the record in a sheet (F31).
+ * stage moves on its switcher, and a phone opens the record in a sheet (F31). Proposals: the list beside
+ * the studio, each proposal at its step (Questions, Edit, Sent), and on a phone the studio in a sheet.
  */
 installMatchMedia();
 if (!("ResizeObserver" in window)) {
@@ -126,5 +127,40 @@ describe("Partnerships on the contract", () => {
     fireEvent.click(document.querySelector("[data-row-open]") as HTMLElement);
     const sheet = await screen.findByRole("dialog", {}, { timeout: 8000 });
     expect(await within(sheet).findByRole("group", { name: /^Stage of / }, { timeout: 8000 })).toBeTruthy();
+  }, 30000);
+
+  it("Proposals: the list beside the studio, the sent proposal's pages and its outcome", async () => {
+    await open("/partnerships?tab=proposals");
+    expect(await screen.findByRole("heading", { level: 1, name: "Proposals" }, { timeout: 8000 })).toBeTruthy();
+    expect((await screen.findAllByText("Sent This Year", {}, { timeout: 8000 })).length).toBeGreaterThan(0);
+    expect(screen.getByText("Acceptance Rate")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Mark Accepted" }, { timeout: 8000 })).toBeTruthy();
+    expect(await screen.findByLabelText("Proposal PRO-0027", { selector: "iframe" }, { timeout: 8000 })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send Proposal" })).toBeNull();
+  }, 30000);
+
+  it("Proposals: the studio's steps, Questions with their cards and Edit with Send", async () => {
+    await open("/partnerships?tab=proposals");
+    fireEvent.click(await screen.findByText("PRO-0030", {}, { timeout: 8000 }));
+    expect(await screen.findByText("What would make this season a success for them?", {}, { timeout: 8000 })).toBeTruthy();
+    expect(screen.getByText("0 of 6 answered")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Write Draft" })).toBeTruthy();
+    fireEvent.click(screen.getByText("PRO-0028"));
+    expect(await screen.findByRole("button", { name: "Send Proposal" }, { timeout: 8000 })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Edit Words" }, { timeout: 8000 })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Send Proposal" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+    expect(within(dialog).getByRole("button", { name: "Confirm and Send" })).toBeTruthy();
+  }, 30000);
+
+  it("Proposals on a phone: nothing opens until a row is tapped, then the studio opens in a sheet", async () => {
+    setViewport(390);
+    await open("/partnerships?tab=proposals");
+    await screen.findByRole("heading", { level: 1, name: "Proposals" }, { timeout: 8000 });
+    await waitFor(() => expect(document.querySelector("[data-row-open]")).toBeTruthy(), { timeout: 8000 });
+    expect(screen.queryByRole("button", { name: "Mark Accepted" })).toBeNull();
+    fireEvent.click(document.querySelector("[data-row-open]") as HTMLElement);
+    const sheet = await screen.findByRole("dialog", {}, { timeout: 8000 });
+    expect(await within(sheet).findByRole("button", { name: "Mark Accepted" }, { timeout: 8000 })).toBeTruthy();
   }, 30000);
 });

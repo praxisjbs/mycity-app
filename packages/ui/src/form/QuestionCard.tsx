@@ -73,7 +73,7 @@ function draftOf(kind: QuestionKind, value: QuestionAnswer): string | string[] {
 export function moneyOf(typed: string): string | null {
   const plain = typed.replace(/[,\s₦]/g, "");
   if (!/^\d+(\.\d{0,2})?$/.test(plain)) return null;
-  const [whole, part = ""] = plain.split(".");
+  const [whole = "", part = ""] = plain.split(".");
   return `${whole.replace(/^0+(?=\d)/, "")}.${`${part}00`.slice(0, 2)}`;
 }
 

@@ -185,9 +185,9 @@ export function Edit({ p, preview, done }: { p: ProposalDetail; preview: Proposa
   const hidden = preview.sections.filter((x) => x.hidden);
   return (
     <div className="flex flex-col gap-3">
-      <div className={phone ? "flex flex-col gap-3" : "grid grid-cols-[minmax(0,1fr)_18rem] items-start gap-4"}>
-        <DocumentFrame title={`Proposal ${p.number}`} html={preview.html} selected={key} onSelect={setKey} />
-        <div className="flex flex-col gap-3">
+      <div className={phone ? "flex flex-col gap-3" : "grid grid-cols-12 items-start gap-4"}>
+        <DocumentFrame title={`Proposal ${p.number}`} html={preview.html} selected={key} onSelect={setKey} className={phone ? undefined : "col-span-8 min-w-0"} />
+        <div className={phone ? "flex flex-col gap-3" : "col-span-4 flex flex-col gap-3"}>
           {panel}
           {hidden.length > 0 && (
             <div className="flex flex-wrap gap-2">

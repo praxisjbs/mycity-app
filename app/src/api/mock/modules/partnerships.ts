@@ -1238,7 +1238,13 @@ route("GET /api/v1/partnerships/proposals", (req) =>
   paged(
     PROPOSALS.filter((p) => !PROPOSALS.some((n) => n.supersedes_id === p.partnership_proposal_id)).map(rowOfProposal),
     req,
-    { search: (p) => [p.title ?? "", p.number, p.record.name, p.deal_title], filters: { status: (p, v) => p.status === v, deal_id: (p, v) => p.deal_id === v, partner_id: (p, v) => p.record.type === "partner" && p.record.id === v, lead_id: (p, v) => p.record.type === "lead" && p.record.id === v } },
+    { search: (p) => [p.title ?? "", p.number, p.record.name, p.deal_title], filters: { status: (p, v) => p.status === v, deal_id: (p, v) => p.deal_id === v, partner_id: (p, v) => p.record.type === "partner" && p.record.id === v, lead_id: (p, v) => p.record.type === "lead" && p.record.id === v },
+      sort: {
+        created_at: (a, b) => a.created_at.localeCompare(b.created_at),
+        sent_at: (a, b) => (a.sent_at ?? "").localeCompare(b.sent_at ?? ""),
+        value: (a, b) => Number(a.value ?? 0) - Number(b.value ?? 0),
+      },
+    },
   ),
 );
 route("GET /api/v1/partnerships/proposal-templates", (req) => paged(TEMPLATES, req, { search: (t) => [t.name], filters: { partner_category_id: () => true } }));

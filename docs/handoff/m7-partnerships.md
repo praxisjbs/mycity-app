@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | LA (Love Adeola), M7's owner as CLAUDE.md, the guide and PROGRESS name it; GE (Godwin-Okoh Elisha) builds most PRs, LA the importers, AJ the Workspace links (the guide's Appendix A) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 7 (#94) |
 
 ---
 
@@ -82,11 +82,13 @@ with the date, and add a line to §3.
 - [ ] Contracts & MOUs (#54)
 
 ### PR 7 · Proposal Studio and design kit
-- [ ] The person confirms the `proposal-message` job
+- [x] The person confirms the `proposal-message` job: Default, TB, 07/11/2026
 - [ ] MyCity's sample proposal uploaded in this PR's chat and stored redacted in `partnership-samples/`;
-      the kit checked against it (does not block the start)
-- [ ] Studio, AI actions (Top Tier, Sonnet then Gemini Pro), the figure check, the kit and its gallery
-- [ ] Proposals (#53) and the public Proposal page (#105)
+      the kit checked against it (does not block the start): not yet received; the kit is checked against
+      it when it arrives
+- [x] Studio, AI actions (Top Tier, Sonnet then Gemini Pro), the figure check, the kit and its gallery
+      (08/11/2026)
+- [x] Proposals (#53) and the public Proposal page (#105) (08/11/2026)
 
 ### PR 8 · Analytics, mail, Praxis AI, search, finish
 - [ ] Analytics (#55); mail binding; manifests, cards and search; views and notifications
@@ -98,6 +100,17 @@ with the date, and add a line to §3.
 
 ## 3 · Log
 
+- 08/11/2026 · JP · PR 7 (`m7/proposal-studio`, #94): the Proposal Studio and design kit. TB's calls of
+  07/11/2026: `proposal-message` on Default; the kit's pages 16:9 (338.7 × 190.5 mm); charts on
+  opportunity, why_mycity, audience, packages and proof, and a 13th layout `insight` (seven kinds); the
+  kit's own 24 drawings, no image AI; the design in `templates/proposals/`. Built: the contract, migration
+  `7110`, the kit with `npm run gen:proposal-kit` and its visual gate; `proposals` (brief, cards with
+  reshuffle, the writing job and the figure check, edits, rewrites, versions, Send with confirmation, the
+  public link and its views, accept, decline, withdraw, expiry, save as template), the jobs and
+  `proposal-expiry`, four prompts and four AI actions; `QuestionCard` and `DocumentFrame`; Proposals (#53)
+  and the public Proposal page (#105), desktop and phone. The calls the guide records (§13.2, In PR 7).
+  Left: MyCity's sample proposal (not received, so the kit is not yet checked against it); notifications,
+  views on Home and `proposals.start` (PR 8); the chapter (PR 9). Next: PR 4 to PR 6, then PR 8.
 - 06/11/2026 · TB · Audit of PRs 1 to 3 against the guide before PR 4, with TB's four calls (the guide's
   §13.2, the audit; §14). Who sees a deal: its owner's scope, its team, or its lead's or partner's
   owner's, one rule everywhere, so the 360s list and count only the deals the reader sees; New Deal and
