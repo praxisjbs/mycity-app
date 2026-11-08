@@ -65,6 +65,7 @@ describe("an importer as the screen reads it", () => {
       masked: false,
       example: "Kettle",
       hint: null,
+      map_values: null,
     });
     expect(JSON.stringify(shaped)).not.toContain("function");
   });

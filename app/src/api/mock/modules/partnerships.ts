@@ -25,6 +25,7 @@ import { byId, byKey, refKey } from "../data/people";
 import { PARTNERS, type MockPartner } from "../data/partners";
 import { pickedPlace, placeOf } from "./maps";
 import { mockCategories, mockFields, mockList } from "./partnerships_categories";
+import { exportFile } from "./shared";
 
 /**
  * Partnerships on the mock (docs/guides/partnerships.md): Pipeline, Partners, Leads and both 360s in
@@ -1172,3 +1173,6 @@ route("GET /api/v1/partnerships/analytics", () =>
     months: [["October", 9, 4, 2, 22], ["September", 7, 3, 2, 29], ["August", 8, 2, 3, 38], ["July", 6, 3, 1, 17], ["June", 5, 2, 2, 40], ["May", 4, 1, 1, 25]].map(([month, prospects, proposals, signed, conversion_pct]) => ({ month: month as string, prospects: prospects as number, proposals: proposals as number, signed: signed as number, conversion_pct: conversion_pct as number })),
   }),
 );
+
+// Export on Partners and Leads, in the tracker's columns: a file made for the person who pressed it.
+route("POST /api/v1/partnerships/exports", (req) => exportFile(req.user!, String(req.body.source).replace("partnerships.", "")));

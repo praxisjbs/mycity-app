@@ -41,6 +41,11 @@ module.exports = {
   setMapping: async (req, res) =>
     ok(res, await service.setMapping(id(req), body(req), withActor(req))),
 
+  values: async (req, res) => ok(res, await service.values(req.user, id(req))),
+
+  setValues: async (req, res) =>
+    ok(res, await service.setValues(id(req), body(req), withActor(req))),
+
   preview: async (req, res) =>
     ok(res, await service.preview(id(req), body(req), withActor(req))),
 

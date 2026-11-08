@@ -73,6 +73,22 @@ function listCategories(db, query, scope = null) {
 
 const getCategory = (db, id) => one(db, `SELECT ${CATEGORY} FROM partner_category c WHERE c.partner_category_id = $1`, [id]);
 
+/** Every active category's id and name, by name: a handful MyCity keeps, offered whole on Map Values. */
+async function categoryChoices(db) {
+  // pagination:complete MyCity's categories, whole: a list of a dozen or so, mapped one by one on Map Values
+  const { rows } = await completeQuery(
+    db,
+    "SELECT partner_category_id::text AS value, name::text AS label FROM partner_category WHERE active ORDER BY name, partner_category_id",
+    [],
+    { label: "The categories", ceiling: 200 },
+  );
+  return rows;
+}
+
+/** An active or retired category by its name, case aside, or null. */
+const categoryNamed = (db, name) =>
+  one(db, "SELECT partner_category_id::text AS id, name::text AS name, active FROM partner_category WHERE lower(name::text) = lower($1)", [name]);
+
 const categoryByName = (db, name) =>
   one(db, `SELECT ${CATEGORY} FROM partner_category c WHERE c.name = $1`, [name]);
 
@@ -918,6 +934,51 @@ async function upsertReturn(client, row) {
   );
 }
 
+/** Remove a month of returns (reverting the Partnership Returns import that made it). */
+async function removeReturn(client, dealId, month) {
+  await client.query("DELETE FROM deal_return WHERE deal_id = $1 AND month = $2", [dealId, month]);
+}
+
+/** A month of returns by its id, with its deal's number, or null. */
+async function returnById(db, id) {
+  const { rows } = await db.query(
+    `SELECT ${RETURN_ROW}, r.import_batch_id, po.number AS deal_number ${RETURN_FROM} JOIN partnership_opportunity po ON po.partnership_opportunity_id = r.deal_id WHERE r.deal_return_id = $1`,
+    [id],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * The deal a returns row names: by its number, else by its lead's or partner's name and its title
+ * (case and spaces aside). Two deals answering the same name and title name none, never a guess.
+ * @returns {Promise<{deal_id: string, number: string}|null>}
+ */
+async function dealForReturns(db, { number, partner, title }) {
+  if (number) {
+    const { rows } = await db.query("SELECT partnership_opportunity_id AS deal_id, number FROM partnership_opportunity WHERE upper(number) = upper($1)", [number]);
+    return rows[0] || null;
+  }
+  if (!partner || !title) return null;
+  const fold = (x) => `lower(btrim(regexp_replace(${x}, '\\s+', ' ', 'g')))`;
+  const { rows } = await db.query(
+    `SELECT po.partnership_opportunity_id AS deal_id, po.number, count(*) OVER () AS n
+       FROM partnership_opportunity po
+       LEFT JOIN partner p ON p.partner_id = po.partner_id
+       LEFT JOIN lead l ON l.lead_id = po.lead_id
+      WHERE ${fold("po.title")} = ${fold("$2")} AND ${fold("COALESCE(p.name, l.name)")} = ${fold("$1")}
+      ORDER BY po.number LIMIT 1`,
+    [partner, title],
+  );
+  return rows[0] && Number(rows[0].n) === 1 ? { deal_id: rows[0].deal_id, number: rows[0].number } : null;
+}
+
+/** Remove the deals of a record an import made and nothing uses (their options, team, history and venue go with them). */
+async function removeDealsOf(client, { kind, id }) {
+  const { rows } = await client.query(`DELETE FROM partnership_opportunity WHERE ${kind}_id = $1 RETURNING partnership_opportunity_id AS id`, [id]);
+  for (const r of rows) await client.query("DELETE FROM place WHERE owner = 'deal.venue' AND owner_key = $1", [r.id]);
+  return rows.map((r) => r.id);
+}
+
 /* ------------------------------------------------------------------ *
  * Praxis AI's cards (docs/guides/praxis-ai.md decision 32): the records a card's ids name
  * ------------------------------------------------------------------ */
@@ -1037,9 +1098,15 @@ async function homeSignedByMonth(db, { from, to }, scope) {
 }
 
 module.exports = {
+  removeReturn,
+  returnById,
+  dealForReturns,
+  removeDealsOf,
   listCategories,
   getCategory,
   categoryByName,
+  categoryChoices,
+  categoryNamed,
   categoryCounts,
   nextCategoryOrder,
   insertCategory,

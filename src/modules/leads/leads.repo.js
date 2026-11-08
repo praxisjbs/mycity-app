@@ -138,4 +138,9 @@ async function lock(client, id) {
   return rows[0] || null;
 }
 
-module.exports = { list, get, summary, insert, update, lock, COLUMNS };
+/** Remove a lead an import made and nothing uses (reverting its import); its contacts go with it. */
+async function remove(client, id) {
+  await client.query("DELETE FROM lead WHERE lead_id = $1", [id]);
+}
+
+module.exports = { list, get, summary, insert, update, lock, remove, COLUMNS };
