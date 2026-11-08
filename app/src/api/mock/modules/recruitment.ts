@@ -183,7 +183,7 @@ R("GET /api/v1/recruitment/vacancies/summary", "view", () => {
     applicants: VACANCIES.filter((v) => v.status === "open" || v.status === "paused").reduce((n, v) => n + appsOf(v).length, 0),
     in_interview: live.filter((a) => a.stage === "interview").length,
     past_closing: VACANCIES.filter((v) => v.status === "open" && v.closes_at && Date.parse(v.closes_at) < Date.now()).length,
-    careers_url: "https://go.mycityapp.io/jobs",
+    site_url: "https://go.mycityapp.io/",
     funnel: STAGES.map((stage) => ({ stage, count: D.APPLICATIONS.filter((a) => reached(a, stage)).length })),
   });
 });

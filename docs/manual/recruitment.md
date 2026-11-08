@@ -41,7 +41,7 @@ Vacancies lists each role MyCity is hiring for, and the seats on the organogram 
    description, required experience and what we look for read with their headings and lists, as
    the careers page shows them.
 7. Press **See Candidates** to open its candidates on the board.
-8. Press **Careers Page** at the top to open the careers page as a candidate sees it.
+8. Press **Careers Page** at the top to open the public website as a candidate sees it.
 
 | Status | What it means |
 |---|---|

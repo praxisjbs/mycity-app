@@ -106,7 +106,7 @@ async function list(query, scope) {
 }
 
 /** The figures above Vacancies, and the careers page on this environment (Careers Page). */
-const summary = async (scope) => ({ ...(await repo.summary(pool, scope)), careers_url: `${String(config.PUBLIC_ORIGIN).replace(/\/+$/, "")}/jobs` });
+const summary = async (scope) => ({ ...(await repo.summary(pool, scope)), site_url: `${String(config.PUBLIC_ORIGIN).replace(/\/+$/, "")}/` });
 const suggested = (query, scope) => repo.suggested(pool, query, scope);
 
 /** The row behind a vacancy the reader may see, or 404. */

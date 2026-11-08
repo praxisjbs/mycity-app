@@ -219,7 +219,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /recruitment/vacancies/summary` | `VacanciesSummary` | `recruitment` view · all/team | no | Open, applicants (every application to an open or paused role, whatever became of it: the list's Applicants summed over those roles), in interview, past closing date; funnel by stage (active applications only); `careers_url`, this environment's careers page (Careers Page) |
+| `GET /recruitment/vacancies/summary` | `VacanciesSummary` | `recruitment` view · all/team | no | Open, applicants (every application to an open or paused role, whatever became of it: the list's Applicants summed over those roles), in interview, past closing date; funnel by stage (active applications only); `site_url`, this environment's public site, its index (Careers Page) |
 | `GET /recruitment/vacancies` | `VacancyListQuery` → `VacancyPage` | `recruitment` view · all/team | yes | Filters `status`, `department_id`, `q`; sort `closes_at`, `title`, `created_at`, `published_at` |
 | `GET /recruitment/vacancies/suggested` | `SeatSuggestionListQuery` → `SeatSuggestionPage` | `recruitment` view · all/team | yes | Vacant seats with no draft, open or paused vacancy, each with its line manager (`line_manager`); `org_seat_id` finds one (the Organogram's Create Vacancy); a team reader sees the seats whose line manager is in their scope |
 | `GET /recruitment/vacancies/:id` | `VacancyDetail` | `recruitment` view · all/team | no | With its questions in use (a retired one is left out) and scorecard weights; the description, must have and nice to have both as written (Markdown, for Edit) and as blocks (`*_blocks`, for the sheet) |
@@ -396,9 +396,11 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   passes it. It belongs to the token's vacancy; a CV uploaded on another token is refused.
 - The candidate is found by email (case-insensitive) or created. A stranger's form never renames a
   person already known; it only fills a missing phone. A second application by the same email to the same vacancy does not
-  create anything: it answers the first application's reference and changes nothing, so the form
-  cannot be used to learn whether someone applied. The answer is the reference and nothing more: no
-  date, no stage (GE, 05/11/2026, keeping the reference so the person can still quote it).
+  create anything: it spends the link and answers the first application's reference and date with
+  `already_applied`, and Apply says You Have Already Applied instead of Application Sent (GE,
+  08/11/2026: the applicant needs to know rather than see a second success; it replaces 05/11/2026's
+  answer that looked like any other). Anyone typing that email learns only that it has applied for
+  this role: no stage, no score.
 - A CV sent on an Apply link that ends without an application (it lapsed, was revoked, or a second
   application from the same email spent it) is removed a day later by `apply-cv-purge` (§7; GE,
   05/11/2026): nothing a stranger sends is kept without an application.
@@ -708,7 +710,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 | Home (`/`) | Work With Us with Search Roles; the pill naming the cities hiring; three figures counting up: Open Roles, Teams Hiring, Cities; What We Build (One App, Every City; About MyCityApp from Careers Settings with Visit MyCityApp; four tiles, fixed copy); Closing Soon, the three roles closing soonest (team, title, place, closing date) with See All Roles; How We Hire's four steps; Know Someone Great? with Copy Careers Link (Link Copied for a moment); Verify a Document | None | Where the figures come from: §6.1 |
 | Careers (`/jobs`, the header's Vacancy; `/vacancy` and `/jobs/` put back to `/jobs`) | Open Roles with its line (roles, teams, cities) and the search; Teams, All Teams first, each with its count, one picked at a time; Know someone for one of these? Recommend them (to Home's Know Someone Great?); Showing n of m and Closing soonest first; each role a row: team, title, place, arrangement with its note, employment type, Closes and its date; the pager | None | Indexing, slugs, the order: §6.1 |
 | Vacancy (`/jobs/<slug>`) | The hero: All Roles, the team, the title, chips for the place, arrangement, employment type, salary when shown and Closes; Apply for This Role and Share Role; how many have applied. Then Role Overview (the description; one that opens with its own `## Role Overview` shows the heading once), the KPIs as tiles, Required Experience and Qualifications, What We Are Looking For (its first sentence large), How We Hire as numbered tiles; The Role card (Employment, Working Days, Experience, Reports To, Probation; Closes; Apply for This Role; how many have applied) and Know Someone for This? with Copy Role Link; More Roles, up to three others of its team; a paused, closed or filled banner. About MyCityApp is Home's, not each role's | None | Why a paused link still works: §6.1 |
-| Apply (`/apply/<token>`) | The aside: the role's title, team and place; Apply; Your application, in three steps; the day the link ends; the three steps, the one in hand in yellow. The Panel: Step n of m over the step's title; About You (Full Name, Email, Phone, Years of Experience with its minus and plus); CV and Questions (Choose Your CV, then the file with Replace; the role's own questions); Why This Role and the privacy tick; Back and Next, Submit Application; then Application Sent with Your Reference and See Other Roles | Help on Privacy Notice: "We use what you send only to consider you for roles at MyCityApp. Ask us at any time to delete it." | Write-only, no score: §6.2 |
+| Apply (`/apply/<token>`) | The aside: the role's title, team and place; Apply; Your application, in three steps; the day the link ends; the three steps, the one in hand in yellow. The Panel: Step n of m over the step's title; About You (Full Name, Email, Phone, Years of Experience with its minus and plus); CV and Questions (Choose Your CV, then the file with Replace; the role's own questions); Why This Role and the privacy tick; Back and Next, Submit Application; then Application Sent with Your Reference and See Other Roles, or You Have Already Applied (the first application's reference, the email and the day it applied) for an email that had applied for the role | Help on Privacy Notice: "We use what you send only to consider you for roles at MyCityApp. Ask us at any time to delete it." | Write-only, no score: §6.2 |
 | Assessment (`/assess/<token>`) | The aside: the role, Your assessment for this role, the assessment's name; before it starts the greeting and the day to start by, while it runs the clock as a ring (timed) or the due day (take-home) and the question map. The Panel: The Assessment (Type, Time, Questions, the instructions, Start the Assessment); Question n of m with Saved, the question, the answer (for a file question: Upload a File, up to 25 MB, or Paste a Link), Back, Next, and Submit Assessment, confirmed in a dialog; Assessment Submitted or The Time Is Up | Help on Paste a Link: "For anything over 25 MB: a Google Drive, video or portfolio link anyone can open." | Server clock, autosave mechanics: §6.7 |
 | Without a link (`/apply`, `/assess`; `/sign` is M5's) | The page's name, one line, one heading and one button: Start From a Role or Use Your Email Link, each with See Open Roles; Use Your Offer Email with Verify a Document | None | Why these pages need a link: §6.2, §6.7 |
 
@@ -783,6 +785,9 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 08/11/2026 · GE · A repeat application (same email, same role) is told so: `ApplicationReceipt.already_applied`
+  with the first application's reference and date, and Apply shows You Have Already Applied (§6.2). Vacancies'
+  Careers Page opens the public site's index (`VacanciesSummary.site_url`, was `careers_url` to `/jobs`).
 - 07/11/2026 · AJ · M5: `candidates.correctEmailIn` and the `application.email_corrected` event, for an
   offer's Change Email (§6.3); the mock's Not Progressing withdraws the candidate's open offer, as the
   API's handler does.
