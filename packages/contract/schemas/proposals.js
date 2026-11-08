@@ -341,6 +341,18 @@ const ProposalStart = z
   })
   .strict();
 
+/**
+ * Praxis AI's New Proposal card (docs/guides/partnerships.md §9): the deal and the notes from the
+ * conversation, which open the studio with that brief and Claude's questions. A transcript and images
+ * are files, added on the studio's Brief.
+ */
+const ProposalBriefAdd = z
+  .object({
+    deal_id: uuid,
+    notes: optionalText(20000),
+  })
+  .strict();
+
 /** Where the studio's job stands while Claude asks or writes (§6.10); null when nothing runs. */
 const ProposalProgress = z
   .object({
@@ -750,6 +762,7 @@ const TABLES = {
   ProposalChart: { table: null, reason: "a section's chart, kept in its content" },
   ProposalContent: { table: null, reason: "partnership_proposal.content: the sections in order" },
   BriefAsset: { table: "proposal_asset" },
+  ProposalBriefAdd: { table: "partnership_proposal", virtual: { deal_id: "partnership_proposal.partnership_opportunity_id", notes: "a proposal_source of kind notes" } },
   ProposalStart: {
     table: "partnership_proposal",
     virtual: {
@@ -845,6 +858,7 @@ module.exports = {
   ProposalContent,
   BriefAsset,
   ProposalStart,
+  ProposalBriefAdd,
   ProposalProgress,
   ProposalQuestion,
   QuestionParams,

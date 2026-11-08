@@ -376,7 +376,7 @@ const ENTITY_ROUTES = Object.freeze({
   partner: screen("partnerships", "partners"),
   partner_deal: screen("partnerships", "pipeline"),
   lead: screen("partnerships", "leads"),
-  proposal: screen("partnerships", "proposals"), // search:none proposals are found by proposals.search.js once M7 PR 7 builds the studio; until then the module holds proof points, which are cited, not looked for
+  proposal: screen("partnerships", "proposals"),
   contract: screen("partnerships", "contracts-and-mous"),
   mou: screen("partnerships", "contracts-and-mous"),
   agreement: screen("partnerships", "contracts-and-mous"),

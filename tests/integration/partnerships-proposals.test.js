@@ -378,4 +378,31 @@ describeDb("partnerships: the Proposal Studio", () => {
     expect((await one("SELECT status, link_secret FROM partnership_proposal WHERE partnership_proposal_id = $1", [res.body.partnership_proposal_id]))).toEqual({ status: "expired", link_secret: null });
     expect((await request(app).get(`/api/public/v1/proposals/${sent.body.link_url.split("/").pop()}`)).status).toBe(404);
   });
+  test("Praxis AI: proposals.list reads within scope, and the proposals.start card opens the studio with its brief", async () => {
+    const registry = require("../../src/shared/ai/registry");
+    const authorise = require("../../src/shared/ai/authorise");
+    const roles = async (who) => (await one("SELECT COALESCE(array_agg(role_id), '{}') AS ids FROM user_role WHERE user_id = $1", [people[who].user.user_id])).ids;
+    const actorOf = async (who, key) => {
+      const u = { user_id: people[who].user.user_id, employee_id: emp(who), role_ids: await roles(who), is_ceo: false };
+      return { ...u, scope: (await authorise.checkAction(u, key, {}, pool)).scope };
+    };
+    on();
+    const staff = await actorOf("staff", "proposals.start");
+    const checked = await authorise.checkAction(staff, "proposals.start", { deal_id: deal.deal_id, notes: "From the chat: they want the VIP tables named after the sponsors." }, pool);
+    expect(checked.problems).toEqual({});
+    const action = registry.action("proposals.start");
+    await action.check(pool, checked.values, staff);
+    const made = await action.run(checked.values, staff);
+    expect(made).toMatchObject({ status: "questions", brief: { notes: "From the chat: they want the VIP tables named after the sponsors." } });
+    expect(action.readback(made)[0]).toMatchObject({ type: "proposal", id: made.partnership_proposal_id, link: expect.stringContaining(made.partnership_proposal_id) });
+
+    // Another reader's card on a deal they cannot see is refused by its check, never run.
+    const other = await actorOf("other", "proposals.start");
+    await expect(action.check(pool, { deal_id: deal.deal_id }, other)).rejects.toMatchObject({ status: 404 });
+
+    const read = registry.read("proposals.list");
+    const mine = await read.run(pool, { page: 1 }, { ...staff, scope: staff.scope });
+    expect(mine.data.some((p) => p.partnership_proposal_id === made.partnership_proposal_id)).toBe(true);
+    expect((await read.run(pool, { page: 1 }, other)).data).toEqual([]);
+  });
 });

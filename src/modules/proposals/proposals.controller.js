@@ -1,6 +1,4 @@
 "use strict";
-// ai:none design: proof points are MyCity's facts, entered on Categories with the whole set in view, and the studio is built on screen (a brief, cards, pages, a confirmed Send); M7 PR 8 declares the proposals.list read and the proposals.start card
-// search:none proof points are cited by proposals, not looked for; proposals are found by proposals.search.js when M7 PR 8 builds search
 /**
  * Proposals: the HTTP edge (docs/guides/partnerships.md §5, §6.10, §6.11). Proof points (M7 PR 2) and
  * the Proposal Studio (PR 7). Reads need `partnerships` view; the studio's writes need edit (New Proposal
