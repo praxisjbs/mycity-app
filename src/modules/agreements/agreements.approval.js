@@ -16,10 +16,18 @@ const cond = require("../../shared/workflow/conditions");
 const organisation = require("../organisation/organisation.service");
 const { FLOW, ENTITY } = require("./agreements.events");
 
-/** What the flow's conditions read, from the agreement and its deal. */
+/**
+ * What the flow's conditions read, from the agreement and its deal. The rate is the deal's, else its
+ * category's default (§6.6), else none (0): a deal that names no rate is never refused its approval.
+ */
 async function contextOf(client, a) {
   const { rows } = await client.query(
-    "SELECT commission_pct::text AS commission_pct, commission_deviates FROM partnership_opportunity WHERE partnership_opportunity_id = $1",
+    `SELECT COALESCE(po.commission_pct, pc.default_commission_pct, 0)::text AS commission_pct, po.commission_deviates
+       FROM partnership_opportunity po
+       LEFT JOIN partner p ON p.partner_id = po.partner_id
+       LEFT JOIN lead l ON l.lead_id = po.lead_id
+       LEFT JOIN partner_category pc ON pc.partner_category_id = COALESCE(p.partner_category_id, l.partner_category_id)
+      WHERE po.partnership_opportunity_id = $1`,
     [a.deal_id],
   );
   const deal = rows[0] || {};

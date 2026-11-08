@@ -694,8 +694,15 @@ const CARDS: MockCard[] = [
     module: "partnerships",
     records: {
       title: "Proposals Out",
-      columns: [["proposal", "Proposal"], ["opportunity", "Opportunity"], ["partner", "Partner", { phone: true }], ["sent", "Sent", { phone: true }], ["value", "Value", { numeric: true }]],
-      rows: () => PARTNERS.filter((p) => p.stage === "Proposal sent").map((p) => rec(sid(`proposal:${p.name}`), { proposal: text(`${p.name} Proposal`), opportunity: text(`${p.name}, ${p.type}`), partner: text(p.name), sent: time(at(p.days_at_stage, "10:00")), value: money(p.value) }, "/partnerships?tab=proposals")),
+      columns: [["proposal", "Proposal"], ["opportunity", "Opportunity"], ["partner", "Partner", { phone: true }], ["sent", "Sent", { phone: true }], ["viewed", "Last Viewed"], ["views", "Views", { numeric: true }], ["value", "Value", { numeric: true }]],
+      rows: () =>
+        PARTNERS.filter((p) => p.stage === "Proposal sent").map((p, i) =>
+          rec(
+            sid(`proposal:${p.name}`),
+            { proposal: text(`${p.name} Proposal`), opportunity: text(`${p.name}, ${p.type}`), partner: text(p.name), sent: time(at(p.days_at_stage, "10:00")), viewed: i % 2 ? time(at(Math.max(0, p.days_at_stage - 1), "15:20")) : { kind: "pill", tone: "neutral", text: "Not Yet" }, views: { kind: "number", value: i % 2 ? 3 : 0 }, value: money(p.value) },
+            "/partnerships?tab=proposals",
+          ),
+        ),
     },
   },
   /* Finance */

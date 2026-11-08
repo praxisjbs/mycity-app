@@ -26,6 +26,7 @@ const { defineDocumentType } = require("../../shared/documents/types");
 const { defineDocType } = require("../../shared/documents/generate");
 const { defineVariables } = require("../../shared/templates/variables");
 const outbox = require("../../shared/events/outbox");
+const { defineNotification } = require("../../shared/notifications/fanout");
 const vault = require("../../shared/documents/vault");
 const c = require("@mycity/contract");
 
@@ -78,6 +79,67 @@ outbox.register(EVENTS.PROPOSAL_DRAFT_REQUESTED, "proposals.write", async (event
 outbox.register(vault.EVENTS.DOCUMENT_GENERATED, "proposals.mail_sent", async (event) => {
   if (event.payload.doc_type !== "proposal") return;
   await require("./proposals.send").mail(event.payload.document_id);
+});
+
+/* ------------------------------------------------------------------ *
+ * Who is told (§7): the deal's owner, who is never told of their own press.
+ * ------------------------------------------------------------------ */
+
+/** The owner of the proposal's deal. */
+async function dealOwner(e, db) {
+  const { rows } = await db.query(
+    `SELECT u.user_id FROM partnership_proposal pp
+       JOIN partnership_opportunity po ON po.partnership_opportunity_id = pp.partnership_opportunity_id
+       JOIN app_user u ON u.employee_id = po.owner_id AND u.status = 'active'
+      WHERE pp.partnership_proposal_id = $1`,
+    [e.entity.id],
+  );
+  return rows.map((r) => r.user_id);
+}
+const owner = [{ users: dealOwner }];
+const WHO = "The owner of the proposal's deal";
+
+defineNotification(EVENTS.PROPOSAL_QUESTIONS_READY, {
+  to: owner,
+  title: "Questions Ready",
+  body: (e) => `${e.payload.number}: Claude has ${e.payload.cards || "some"} questions before writing.`,
+  who: WHO,
+});
+defineNotification(EVENTS.PROPOSAL_DRAFTED, {
+  to: [{ users: (e, db) => (e.payload.by_hand ? [] : dealOwner(e, db)) }],
+  title: "Draft Ready",
+  body: (e) => `${e.payload.number} is drafted. Read it and edit any page.`,
+  who: WHO,
+});
+defineNotification(EVENTS.PROPOSAL_VIEWED, {
+  to: owner,
+  title: "Proposal Viewed",
+  body: (e) => `${e.payload.number} was opened for the first time.`,
+  who: WHO,
+});
+defineNotification(EVENTS.PROPOSAL_ACCEPTED, {
+  to: owner,
+  title: "Proposal Accepted",
+  body: (e) => `${e.payload.number} was marked accepted. Move its deal on.`,
+  who: WHO,
+});
+defineNotification(EVENTS.PROPOSAL_DECLINED, {
+  to: owner,
+  title: "Proposal Declined",
+  body: (e) => `${e.payload.number} was marked declined.`,
+  who: WHO,
+});
+defineNotification(EVENTS.PROPOSAL_WITHDRAWN, {
+  to: [{ users: (e, db) => (e.payload.revised ? [] : dealOwner(e, db)) }],
+  title: "Proposal Withdrawn",
+  body: (e) => `${e.payload.number} was withdrawn. Its link no longer opens.`,
+  who: WHO,
+});
+defineNotification(EVENTS.PROPOSAL_EXPIRED, {
+  to: owner,
+  title: "Proposal Expired",
+  body: (e) => `${e.payload.number} passed its validity. Revise it to send again.`,
+  who: WHO,
 });
 
 module.exports = { EVENTS };

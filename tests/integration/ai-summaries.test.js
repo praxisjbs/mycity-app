@@ -289,8 +289,18 @@ describeDb("Praxis AI summaries, the read timeout and Download Excel against the
 
   test("a member of staff is neither offered nor served the people's summaries; the Audit Log's needs the whole log", async () => {
     const staff = await userOf("staff");
-    // Every login holds ess and performance (own) and workspace: those summaries are offered; the people's and the log's are not.
-    expect((await authorise.allowedSummaries(staff)).map((s) => s.key).sort()).toEqual(["approvals.summary", "goals.summary", "reviews.summary", "sample.count", "sample.slow", "tasks.summary"]);
+    // Every login holds ess and performance (own), workspace and partnerships (own): those summaries are offered,
+    // the partnerships' over their own records (partnerships.md §8, §9); the people's and the log's are not.
+    expect((await authorise.allowedSummaries(staff)).map((s) => s.key).sort()).toEqual([
+      "approvals.summary",
+      "goals.summary",
+      "partnership_returns.summary",
+      "partnerships.summary",
+      "reviews.summary",
+      "sample.count",
+      "sample.slow",
+      "tasks.summary",
+    ]);
     await expect(summaryOf("staff", "attendance.summary")).rejects.toMatchObject({ code: "AI_READ_FORBIDDEN" });
     await expect(summaryOf("staff", "audit.summary")).rejects.toMatchObject({ code: "AI_READ_FORBIDDEN" });
     await expect(audit.aiSummary(pool, { by: "module" }, { scope: "team", scope_ids: [] })).rejects.toMatchObject({ code: "AI_READ_FORBIDDEN" });

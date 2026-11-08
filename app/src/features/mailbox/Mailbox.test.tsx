@@ -36,7 +36,7 @@ afterEach(() => {
 
 let auth: ReturnType<typeof useAuth> | null = null;
 
-async function signedIn(tab: string) {
+async function signedIn(tab: string, email = "kemi@mycityapp.io") {
   window.history.replaceState(null, "", `/mailbox?tab=${tab}`);
   mockSession.set(null);
   invalidate("/api/v1");
@@ -58,7 +58,7 @@ async function signedIn(tab: string) {
   );
   await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 10000 });
   await act(async () => {
-    const next = await auth!.signIn("kemi@mycityapp.io", "demo1234");
+    const next = await auth!.signIn(email, "demo1234");
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
   });
 }
@@ -93,4 +93,34 @@ describe("a mailbox press the server refuses", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Empty Trash" }));
     await waitFor(() => expect(call.mock.calls.filter(([p]) => p === "POST /api/v1/mailbox/folders/:kind/empty")).toHaveLength(2));
   });
+});
+
+describe("Link to Partner (partnerships.md §6.15)", () => {
+  it("links the open conversation to a partner from its menu, names it under the header, and unlinks it", async () => {
+    await signedIn("inbox", "cynthia@mycityapp.io");
+    const menu = await screen.findByRole("button", { name: "Move this message" }, { timeout: 10000 });
+    fireEvent.pointerDown(menu, { button: 0, pointerType: "mouse" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Link to Partner" }, { timeout: 5000 }));
+    const form = await screen.findByRole("dialog", { name: "Link to Partner" }, { timeout: 5000 });
+    // The page's own message list is a listbox too: the select's is the one with options.
+    Element.prototype.scrollIntoView ??= () => undefined;
+    Element.prototype.hasPointerCapture ??= () => false;
+    fireEvent.click(within(form).getByRole("combobox", { name: /^Partner/ }));
+    const option = await waitFor(
+      () => {
+        const found = screen.getAllByRole("listbox").flatMap((l) => within(l).queryAllByRole("option")).find((o) => !(o.textContent ?? "").endsWith(" · Lead"));
+        if (!found) throw new Error("no partner yet");
+        return found;
+      },
+      { timeout: 5000 },
+    );
+    const name = (option.textContent ?? "").trim();
+    fireEvent.click(option);
+    expect(await within(form).findByText("Deal")).toBeTruthy();
+    expect(within(form).queryByRole("button", { name: "Disconnect" })).toBeNull();
+    fireEvent.click(within(form).getByRole("button", { name: "Link to Partner" }));
+    expect(await screen.findByRole("link", { name }, { timeout: 5000 })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Unlink" }));
+    await waitFor(() => expect(screen.queryByRole("link", { name })).toBeNull(), { timeout: 5000 });
+  }, 30000);
 });

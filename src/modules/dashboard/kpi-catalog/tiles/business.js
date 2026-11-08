@@ -185,6 +185,9 @@ const ENTRIES = [
         { key: "opportunity", label: "Opportunity" },
         { key: "partner", label: "Partner", phone: true },
         { key: "sent", label: "Sent", phone: true },
+        // The views the public link recorded (partnerships.md §6.10): when it was last opened, how often.
+        { key: "viewed", label: "Last Viewed" },
+        { key: "views", label: "Views", numeric: true },
         { key: "value", label: "Value", numeric: true },
       ],
       groups: [],
@@ -197,6 +200,8 @@ const ENTRIES = [
               opportunity: cell.text(r.opportunity),
               partner: cell.text(r.partner),
               sent: cell.time(r.sent_at),
+              viewed: r.last_viewed_at ? cell.time(r.last_viewed_at) : cell.pill("neutral", "Not Yet"),
+              views: cell.number(r.view_count || 0),
               value: cell.money(r.value, r.currency),
             },
             linkTo("proposal", r.partnership_proposal_id),

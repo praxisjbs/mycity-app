@@ -20,8 +20,11 @@
  * does not write is deleted with the alerts about it, and a row whose unique key now gives it
  * a value another listed row holds takes it from that row, which is written again after it.
  *
- * Numbers carry STG ("PAR-STG-01"): the owning modules' counters are theirs to start, and no
- * number they give can collide with one of these. Money is Naira, numeric(18,2) as text.
+ * Numbers carried STG ("PAR-STG-01"), so no number an owning module gives could collide with one.
+ *
+ * Every table it wrote is now its owner's (M2, M4, M7, M8 and Performance each seed their own), so
+ * ROWS is empty: a run writes nothing here and deletes every listed row still standing, with the
+ * alerts about it. The machinery stays for a later milestone's table that Home reads first.
  */
 const lagos = require("../../../src/shared/time/lagos");
 const workingWeek = require("../../../src/shared/time/working-week");
@@ -66,51 +69,7 @@ function personOf(staff, slot) {
  * The records
  * ------------------------------------------------------------------ */
 
-/** Partners and their pipeline (M7): four active, four dormant with an open opportunity each. */
-const PARTNERS = [
-  { key: "mtn-nigeria", name: "MTN Nigeria", status: "active", owner: "head", added: 240, industry: "Telecoms", site: "mtn.ng" },
-  { key: "providusbank", name: "ProvidusBank", status: "active", owner: "head_team:1", added: 200, industry: "Banking", site: "providusbank.com" },
-  { key: "ikeja-city-mall", name: "Ikeja City Mall", status: "active", owner: "head_team:2", added: 280, industry: "Retail", site: "ikejacitymall.com" },
-  { key: "access-bank", name: "Access Bank", status: "active", owner: "head", added: 150, industry: "Banking", site: "accessbankplc.com" },
-  { key: "lagos-state-government", name: "Lagos State Government", status: "dormant", owner: "head", added: 60, industry: "Government", site: "lagosstate.gov.ng" },
-  { key: "eko-hotels", name: "Eko Hotels", status: "dormant", owner: "head_team:3", added: 50, industry: "Hospitality", site: "ekohotels.com" },
-  { key: "filmhouse-cinemas", name: "Filmhouse Cinemas", status: "dormant", owner: "head_team:1", added: 40, industry: "Entertainment", site: "filmhouseng.com" },
-  { key: "kano-trade-council", name: "Kano Trade Council", status: "dormant", owner: "head", added: 35, industry: "Government", site: "kanocc.org.ng" },
-];
-
-/** Contact recorded with a partner, days ago. Access Bank has none, so it counts from when it was added. */
-const INTERACTIONS = [
-  { partner: "mtn-nigeria", type: "meeting", subject: "Venue walkthrough", ago: 2, owner: "head" },
-  { partner: "providusbank", type: "call", subject: "Ticket email branding", ago: 1, owner: "head_team:1" },
-  { partner: "ikeja-city-mall", type: "email", subject: "Renewal terms", ago: 45, owner: "head_team:2" },
-  { partner: "lagos-state-government", type: "meeting", subject: "Contract review", ago: 6, owner: "head" },
-];
-
-/** Open opportunities, one a stage, closing in `closes` days. */
-const OPPORTUNITIES = [
-  { partner: "lagos-state-government", title: "Lagos tourism listings", stage: "negotiation", value: "7500000.00", chance: 60, closes: 30, owner: "head" },
-  { partner: "eko-hotels", title: "Eko Hotels weekend features", stage: "proposal", value: "2800000.00", chance: 40, closes: 45, owner: "head_team:3" },
-  { partner: "filmhouse-cinemas", title: "Filmhouse ticket bundles", stage: "qualified", value: "3600000.00", chance: 30, closes: 60, owner: "head_team:1" },
-  { partner: "kano-trade-council", title: "Kano trade fair listings", stage: "lead", value: "1900000.00", chance: 10, closes: 90, owner: "head" },
-];
-
-/** Proposals sent days ago and not yet accepted. */
-const PROPOSALS = [
-  { opportunity: "lagos-state-government", value: "7500000.00", sent: 6, by: "head" },
-  { opportunity: "eko-hotels", value: "2800000.00", sent: 34, by: "head_team:3" },
-];
-
-/**
- * Agreements signed this year, starting `started` days ago (never before the 1st of January), each
- * on the deal it signed: a live deal signed that day, which Signed Value counts at the agreement's
- * value (partnerships.md §6.6, §6.17).
- */
-const AGREEMENTS = [
-  { partner: "mtn-nigeria", title: "MTN Nigeria sponsorship", status: "active", value: "18400000.00", started: 200, owner: "head" },
-  { partner: "providusbank", title: "ProvidusBank ticketing", status: "signed", value: "9200000.00", started: 26, owner: "head_team:1" },
-  { partner: "ikeja-city-mall", title: "Ikeja City Mall listings", status: "active", value: "1350000.00", started: 270, owner: "head_team:2" },
-  { partner: "access-bank", title: "Access Bank cardholder offers", status: "active", value: "1100000.00", started: 230, owner: "head" },
-];
+/* Partners and their pipeline are M7's own staging seed now (70_partnerships.js). */
 
 /* Expense requests and budgets are M8's own staging seed now (80_expenses.js). */
 
@@ -126,8 +85,6 @@ const AGREEMENTS = [
  * The rows, in the order they are written (parents first)
  * ------------------------------------------------------------------ */
 
-const stg = (prefix, n) => `${prefix}-STG-${String(n).padStart(2, "0")}`;
-
 /**
  * Every row this file can write: `{ table, key, needs, parents, values(x, who) }`. `needs`
  * names the people a row hangs off, and one missing leaves it out; `parents` the rows that
@@ -135,114 +92,7 @@ const stg = (prefix, n) => `${prefix}-STG-${String(n).padStart(2, "0")}`;
  * people it needs, or null to leave it out (a row that records who made it needs that
  * person's login, an expense or a budget line its category).
  */
-const ROWS = Object.freeze([
-  ...PARTNERS.map((p, i) => ({
-    table: "partner",
-    key: p.key,
-    needs: [p.owner],
-    values: (x, [owner]) => ({
-      number: stg("PAR", i + 1),
-      name: p.name,
-      status: p.status,
-      industry: p.industry,
-      country_code: "NG",
-      website: p.site,
-      owner_id: owner.employee_id,
-      created_at: x.at(x.daysFrom(-p.added), "10:00"),
-    }),
-  })),
-  ...OPPORTUNITIES.map((o, i) => ({
-    table: "partnership_opportunity",
-    key: o.partner,
-    needs: [o.owner],
-    parents: [["partner", o.partner]],
-    values: (x, [owner]) => ({
-      number: stg("POP", i + 1),
-      partner_id: idOf("partner", o.partner),
-      title: o.title,
-      stage: o.stage,
-      status: "open",
-      owner_id: owner.employee_id,
-      estimated_value: o.value,
-      currency: "NGN",
-      probability: o.chance,
-      expected_close_on: x.daysFrom(o.closes),
-    }),
-  })),
-  ...PROPOSALS.map((p, i) => ({
-    table: "partnership_proposal",
-    key: p.opportunity,
-    needs: [p.by],
-    parents: [["partnership_opportunity", p.opportunity]],
-    values: (x, [by]) =>
-      by.user_id
-        ? {
-            partnership_opportunity_id: idOf("partnership_opportunity", p.opportunity),
-            number: stg("PRO", i + 1),
-            version: 1,
-            status: "sent",
-            value: p.value,
-            currency: "NGN",
-            sent_at: x.at(x.daysFrom(-p.sent), "11:00"),
-            created_by: by.user_id,
-          }
-        : null,
-  })),
-  ...AGREEMENTS.map((a, i) => ({
-    table: "partnership_opportunity",
-    key: `${a.partner}:signed`,
-    needs: [a.owner],
-    parents: [["partner", a.partner]],
-    values: (x, [owner]) => ({
-      number: stg("POP", OPPORTUNITIES.length + i + 1),
-      partner_id: idOf("partner", a.partner),
-      title: a.title,
-      stage: "active",
-      status: "live",
-      owner_id: owner.employee_id,
-      estimated_value: a.value,
-      currency: "NGN",
-      signed_at: x.at(x.inYear(x.daysFrom(-a.started)), "10:00"),
-    }),
-  })),
-  ...AGREEMENTS.map((a, i) => ({
-    table: "partnership_agreement",
-    key: a.partner,
-    needs: [a.owner],
-    parents: [
-      ["partner", a.partner],
-      ["partnership_opportunity", `${a.partner}:signed`],
-    ],
-    values: (x, [owner]) => {
-      const starts = x.inYear(x.daysFrom(-a.started));
-      return {
-        partner_id: idOf("partner", a.partner),
-        partnership_opportunity_id: idOf("partnership_opportunity", `${a.partner}:signed`),
-        number: stg("AGR", i + 1),
-        title: a.title,
-        status: a.status,
-        starts_on: starts,
-        ends_on: lagos.addDays(lagos.addMonths(starts, 12), -1),
-        value: a.value,
-        currency: "NGN",
-        owner_id: owner.employee_id,
-      };
-    },
-  })),
-  ...INTERACTIONS.map((t) => ({
-    table: "partner_interaction",
-    key: t.partner,
-    needs: [t.owner],
-    parents: [["partner", t.partner]],
-    values: (x, [owner]) => ({
-      partner_id: idOf("partner", t.partner),
-      interaction_type: t.type,
-      subject: t.subject,
-      occurred_at: x.at(x.daysFrom(-t.ago), "11:00"),
-      owner_id: owner.employee_id,
-    }),
-  })),
-]);
+const ROWS = Object.freeze([]);
 
 /** The ids HOME_STAGING_ROWS lists, by table. A row it does not list is never written. */
 const LISTED = new Map(HOME_STAGING_ROWS.map((e) => [e.table, e.ids]));

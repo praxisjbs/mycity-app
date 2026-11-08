@@ -38,6 +38,7 @@
  */
 const { defineEvents } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
+const { defineNotification } = require("../../shared/notifications/fanout");
 const places = require("../../shared/places/owners");
 
 const EVENTS = defineEvents("partnerships", {
@@ -80,4 +81,46 @@ outbox.register(EVENTS.DEAL_UPDATED, "partner_pipeline.event_days", daysUpdated)
 outbox.register(EVENTS.DEAL_STAGE_CHANGED, "partner_pipeline.event_days", daysMoved);
 outbox.register(EVENTS.DEAL_LOST, "partner_pipeline.event_days", daysMoved);
 
-module.exports = { EVENTS };
+/* ------------------------------------------------------------------ *
+ * Who is told (§7). Settings · Notifications lists each under Partnerships.
+ * ------------------------------------------------------------------ */
+
+/** The active logins of these employees. */
+async function usersOf(db, employeeIds) {
+  const ids = employeeIds.filter(Boolean);
+  if (!ids.length) return [];
+  const { rows } = await db.query("SELECT user_id FROM app_user WHERE employee_id = ANY($1::uuid[]) AND status = 'active' ORDER BY user_id", [ids]);
+  return rows.map((r) => r.user_id);
+}
+
+/** A deal's owner, from the event's payload. */
+const dealOwner = (e, db) => usersOf(db, [e.payload.owner_id]);
+
+/** The Head of Department of the deal owner's department. */
+async function ownersHead(e, db) {
+  if (!e.payload.owner_id) return [];
+  const { rows } = await db.query(
+    "SELECT d.head_employee_id FROM employee e JOIN department d ON d.department_id = e.department_id WHERE e.employee_id = $1 AND d.head_employee_id IS DISTINCT FROM e.employee_id",
+    [e.payload.owner_id],
+  );
+  return usersOf(db, rows.map((r) => r.head_employee_id));
+}
+
+// The owner, when someone else moved their deal by hand (the actor is never told of their own move).
+defineNotification(EVENTS.DEAL_STAGE_CHANGED, {
+  to: [{ users: (e, db) => (e.payload.source === "person" ? dealOwner(e, db) : []) }],
+  title: "Deal Moved",
+  body: (e) => `${e.payload.number} ${e.payload.title || ""} moved to ${e.payload.to_label || e.payload.to}.`.replace(/\s+/g, " "),
+  who: "The deal's owner, when someone else moved it",
+});
+
+// Stalled tells the owner's Head of Department, with what is in the way.
+defineNotification(EVENTS.DEAL_HEALTH_CHANGED, {
+  to: [{ users: (e, db) => (e.payload.to === "stalled" ? ownersHead(e, db) : []) }],
+  title: "Deal Stalled",
+  body: (e) => `${e.payload.number} ${e.payload.title || ""} is stalled: ${e.payload.blockers || "no blockers given"}`.replace(/\s+/g, " "),
+  priority: "high",
+  who: "The Head of Department of the deal's owner",
+});
+
+module.exports = { EVENTS, usersOf };

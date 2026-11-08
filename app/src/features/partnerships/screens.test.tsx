@@ -227,4 +227,26 @@ describe("Partnerships on the contract", () => {
     const sheet = await screen.findByRole("dialog", {}, { timeout: 8000 });
     expect(await within(sheet).findByRole("button", { name: "Mark Accepted" }, { timeout: 8000 })).toBeTruthy();
   }, 30000);
+  it("Analytics: the period, the KPI strip, each lead owner's eight measures and the tables beside them", async () => {
+    await open("/partnerships?tab=analytics");
+    expect(await screen.findByRole("heading", { level: 1, name: "Analytics" }, { timeout: 8000 })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "By Lead Owner" }, { timeout: 8000 })).toBeTruthy();
+    for (const k of ["New Prospects", "Partnerships Signed", "Meetings Held", "Proposals Sent"]) expect(screen.getAllByText(k).length).toBeGreaterThan(0);
+    for (const h of ["Signed per Month", "Returns per Month", "By Category", "By Region", "Stage Conversion"]) expect(screen.getByRole("heading", { name: h })).toBeTruthy();
+    expect(screen.getAllByText("Vendor Leads").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "This Year" }));
+    await waitFor(() => expect(screen.getByText(/^01\/01\/\d{4} to 31\/12\/\d{4}$/)).toBeTruthy(), { timeout: 8000 });
+  }, 30000);
+
+  it("Analytics on a phone: two KPI cards, a card a lead owner, and Signed per Month only", async () => {
+    setViewport(390);
+    await open("/partnerships?tab=analytics");
+    await screen.findByRole("heading", { level: 1, name: "Analytics" }, { timeout: 8000 });
+    expect(await screen.findByText("Partnerships Signed", {}, { timeout: 8000 })).toBeTruthy();
+    expect(screen.queryByText("Meetings Held", { selector: "h3, h2, [data-kpi-title]" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Signed per Month" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Stage Conversion" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
+  }, 30000);
 });

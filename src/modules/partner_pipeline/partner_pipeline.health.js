@@ -33,7 +33,7 @@ async function setIn(client, actor, deal, body, { source = "person" } = {}) {
     actor,
     before: { health: deal.health },
     after: { health: body.health },
-    payload: { deal_id: deal.deal_id, number: deal.number, from: deal.health, to: body.health, owner_id: deal.owner_id, set_by: actor ? actor.user_id : null },
+    payload: { deal_id: deal.deal_id, number: deal.number, title: deal.title, from: deal.health, to: body.health, blockers: body.health === "stalled" ? blockers : null, owner_id: deal.owner_id, set_by: actor ? actor.user_id : null, source },
   });
 }
 

@@ -62,6 +62,8 @@ const CASES = Object.freeze([
   { id: "summary.tasks-overdue", as: "operations_people", question: "Who on my team has the most overdue tasks?", reads: ["tasks.summary"], shows: ["pane"] },
   { id: "summary.leave-days", as: "operations_people", question: "How many leave days have been taken this year?", reads: ["leave.summary"], shows: ["pane"] },
   { id: "summary.headcount", as: "ceo", question: "How many people do we have in each department?", reads: ["employees.summary"], shows: ["pane"] },
+  { id: "summary.partnership-value", as: "ceo", question: "What is our partnership value this year, and who is our highest contributing partner?", reads: ["partnerships.summary"], shows: ["pane"] },
+  { id: "summary.partnership-returns", as: "operations_people", question: "Which partners brought in the most commission this quarter?", reads: ["partnership_returns.summary"], shows: ["pane"] },
   { id: "summary.approvals", as: "ceo", question: "How many requests are waiting on me, and how old is the oldest?", reads: ["approvals.summary"], shows: ["pane"] },
   { id: "privacy.summary", as: "employee", question: "How many days was each person in my department late this month?", never: ["attendance.summary", "attendance.register", "employees.list"] },
   { id: "privacy.salaries", as: "employee", question: "What does everyone in my department earn?", never: ["employees.list", "attendance.register", "leave.requests"] },
@@ -229,6 +231,7 @@ const CASES = Object.freeze([
   { id: "card.deal-stage", as: "operations_people", question: "Move the deal {deals.move_stage#deal_id} to Proposal Sent.", shows: ["cards"], action: "deals.move_stage" },
   { id: "card.deal-health", as: "operations_people", question: "Mark the deal {deals.set_health#deal_id} as stalled: we are waiting on the venue's insurance papers.", shows: ["cards"], action: "deals.set_health" },
   { id: "card.deal-returns", as: "operations_people", question: "Enter October 2026's returns for the deal {deal_returns.save#deal_id}: 40 tickets sold and 120 downloads.", shows: ["cards"], action: "deal_returns.save" },
+  { id: "card.proposal", as: "operations_people", question: "Start a proposal for the deal {proposals.start#deal_id}: they want three sold-out nights and VIP tables.", shows: ["cards"], action: "proposals.start" },
   { id: "card.interaction", as: "operations_people", question: "Log a call with the partner {interactions.log#partner_id} this morning about the ticket tiers: they agreed to three tiers.", shows: ["cards"], action: "interactions.log" },
   // A change this person may not make is not available, never a card (decision 16).
   { id: "card.not-mine", as: "employee", question: "Approve all the leave requests waiting for a decision.", shows: ["cards"], no_action: ["leave.approve", "approvals.decide"] },

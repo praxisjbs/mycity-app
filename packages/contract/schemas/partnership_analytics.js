@@ -83,11 +83,50 @@ const PartnershipAnalytics = z
   })
   .strict();
 
+/**
+ * The assistant's partnership summary (docs/guides/partnerships.md §9): figures over a period, never a
+ * row, grouped as asked. A period is `from` and `to`, or a `month`, else this month.
+ */
+const PartnershipSummaryBy = z.enum(["stage", "category", "region", "partner", "owner"]);
+const PartnershipSummaryQuery = z
+  .object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    month: month.optional(),
+    partner_category_id: uuid.optional(),
+    by: PartnershipSummaryBy.default("stage"),
+  })
+  .strict();
+
+/** The assistant's returns summary: by partner or by month; money with `partnerships.money`, downloads to every reader. */
+const ReturnsSummaryBy = z.enum(["partner", "month"]);
+const ReturnsSummaryQuery = z
+  .object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    month: month.optional(),
+    partner_category_id: uuid.optional(),
+    by: ReturnsSummaryBy.default("partner"),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   AnalyticsQuery: { table: null, reason: "the period and category Analytics reads" },
   OwnerMeasures: { table: null, reason: "one lead owner's measures over the period" },
   PartnershipAnalytics: { table: null, reason: "Analytics' figures over leads, deals, proposals, interactions and returns" },
+  PartnershipSummaryQuery: { table: null, reason: "the period, category and grouping of the assistant's partnership summary; figures, never a row" },
+  ReturnsSummaryQuery: { table: null, reason: "the period, category and grouping of the assistant's returns summary; figures, never a row" },
 };
 
-module.exports = { TABLES, AnalyticsPeriod, AnalyticsQuery, OwnerMeasures, PartnershipAnalytics };
+module.exports = {
+  TABLES,
+  AnalyticsPeriod,
+  AnalyticsQuery,
+  OwnerMeasures,
+  PartnershipAnalytics,
+  PartnershipSummaryBy,
+  PartnershipSummaryQuery,
+  ReturnsSummaryBy,
+  ReturnsSummaryQuery,
+};

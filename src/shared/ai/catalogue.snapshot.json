@@ -1014,6 +1014,17 @@
       "screen": null
     },
     {
+      "key": "proposals.start",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "proposals.ProposalBriefAdd",
+      "schema_sha": "647c6a7f7fb5d46c",
+      "screen": null
+    },
+    {
       "key": "quarters.create",
       "kind": "action",
       "module_key": "performance",
@@ -2058,6 +2069,17 @@
       "screen": null
     },
     {
+      "key": "proposals.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "proposals.ProposalListQuery",
+      "schema_sha": "a9535cfd812e2930",
+      "screen": null
+    },
+    {
       "key": "queries.get",
       "kind": "read",
       "module_key": "queries",
@@ -2718,6 +2740,28 @@
       "screen": "partnerships.contracts-and-mous"
     },
     {
+      "key": "partnerships.route.see_partnership_analytics_each_lead_owner_s_prospects_meetings_proposals_and_signings",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.analytics"
+    },
+    {
+      "key": "partnerships.route.see_proposals_sent_viewed_accepted_or_declined",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.proposals"
+    },
+    {
       "key": "partnerships.route.see_the_leads_and_their_status",
       "kind": "route",
       "module_key": "partnerships",
@@ -2760,6 +2804,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "partnerships.categories"
+    },
+    {
+      "key": "partnerships.route.write_a_proposal_for_a_partner_or_lead",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.proposals"
     },
     {
       "key": "people.route.add_a_department",
@@ -3595,6 +3650,28 @@
       "bulk": null,
       "schema": "leave.LeaveSummaryQuery",
       "schema_sha": "69b79fd857991372",
+      "screen": null
+    },
+    {
+      "key": "partnership_returns.summary",
+      "kind": "summary",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partnership_analytics.ReturnsSummaryQuery",
+      "schema_sha": "b84e01db0752ef79",
+      "screen": null
+    },
+    {
+      "key": "partnerships.summary",
+      "kind": "summary",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partnership_analytics.PartnershipSummaryQuery",
+      "schema_sha": "a8a9d28b3fbc7b38",
       "screen": null
     },
     {
