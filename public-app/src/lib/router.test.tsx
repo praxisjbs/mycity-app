@@ -20,6 +20,8 @@ describe("router", () => {
     ["/verify/OFF-0016", { page: "verify", number: "OFF-0016" }, "Verify Document"],
     ["/verify/t/Qd5mW8rTx3Kp", { page: "verify-qr", token: "Qd5mW8rTx3Kp" }, "Verify Document"],
     ["/proposal/abc", { page: "proposal", token: "abc" }, null],
+    ["/help", { page: "help" }, "Help"],
+    ["/help/", { page: "help" }, "Help"],
     ["/nowhere/at/all", { page: "not-found" }, null],
   ] as const)("%s", (path, route, section) => {
     expect(parse(path)).toEqual(route);

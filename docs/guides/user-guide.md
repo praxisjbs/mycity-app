@@ -5,12 +5,12 @@
 | Owner | TB |
 | Milestone | M0 (brought forward from M11 by JBS Praxis, 25/10/2026; written milestone by milestone as each is approved) |
 | Backend modules | `user_guide` (and its search: `user_guide.meaning.js`, `user_guide.repo.js`, `user_guide.ai.js`; the shared engine `packages/contract/guide-search.js`) |
-| Frontend paths | `app/src/features/knowledge/UserGuide.tsx`, `app/src/features/knowledge/guide/` (the way back, the search), `packages/ui/src/documents/GuideBody.tsx`, `packages/ui/src/documents/GuideResults.tsx`, the chip in `app/src/shell/Notices.tsx` |
+| Frontend paths | `app/src/features/knowledge/UserGuide.tsx`, `app/src/features/knowledge/guide/` (the way back, the search), `packages/ui/src/documents/GuideBody.tsx`, `packages/ui/src/documents/GuideResults.tsx`, the chip in `app/src/shell/Notices.tsx`; the public site's Help, `public-app/src/pages/Help.tsx` with `packages/ui/src/navigation/SectionNav.tsx` (§6.11) |
 | Permission key(s) | `knowledge` (view); every chapter, section, task, step and picture is filtered by the reader's own grants |
 | Capabilities | none of its own; the guide reads every module's grants and capabilities to decide what each reader receives |
-| Screens (PROGRESS.md rows) | #102 Knowledge Hub · User Guide |
+| Screens (PROGRESS.md rows) | #102 Knowledge Hub · User Guide, #108 Public · Help |
 | Status | Agreed |
-| Last changed | 26/10/2026 |
+| Last changed | 08/11/2026 |
 
 Sources: MILESTONES §16 (M11: "a user manual written per module against the screens as shipped",
 "the manual covers every module with screenshots from the shipped build"), FRONTEND_GUIDE §5.1 (tier 3
@@ -60,6 +60,7 @@ by naming itself in its own chapters' front matter, not in a shared list.
 | The account menu (desktop) | Staff app | Everyone with `knowledge` view | User Guide, opening the section for the screen in view | Open the guide where they are |
 | ⌘K Search | Everywhere | Everyone, by permission | A User Guide group: the sections and tasks the guide's own search finds (§6.8; by meaning too for three words or more), "guide" or "how to" before the words narrowing to it | Open the guide at that section, at the step that answers |
 | Praxis AI · Ask | Staff app | `praxis_ai` view | A how-to question answered from the guide, citing its sections (§9) | Open a cited section |
+| Public · Help (`/help`) | go.mycityapp.io | Anyone, no sign-in | The public chapter (`kind: public-help`, §6.11): its sections as cards of numbered steps and pictures, beside contents that mark the section being read | Jump to a section, follow a link to another section or a page of the site |
 
 ## 3 · How the screens relate
 
@@ -135,9 +136,13 @@ kind is `migrations/10320_ai_run_step_embedding.sql` (AI Control's). Reference-d
 | `POST /api/v1/user-guide/answer` | `GuideAnswerBody` → `GuideAnswer` | `knowledge` view · the reader's own cut | no: up to 3 sentences, 6 sources | `found: false` with the sources when AI is off or the passages do not answer it, never an error; `guideAnswerLimiter`, 20 a minute |
 | `POST /api/v1/user-guide/transcribe` | `DocumentUpload` → `assistant.AiTranscript` | `knowledge` view | no | The recording through the upload engine, removed whatever happens; `draft: true` is a placeholder the screen drops |
 
+| `GET /api/public/v1/help` | → `GuideChapter` (kind `public-help`) | none: public (A9) | no: one chapter | The public chapter whole, for a reader nobody signed in; `Cache-Control: public, max-age=300`; 404 when there is none |
+| `GET /api/public/v1/help/images/:file` | `PublicHelpImageParams`, file (`no_content`) | none: public | no | `file` is `<shot>.<desktop or phone>.png`; 404 unless the public chapter shows it on that device; `public, max-age=3600` |
+
 `GET /api/v1/user-guide` also says whether an answer (`answers`) and a spoken search (`voice`) can be
 had now (AI on for the Knowledge Hub, a Ready model on the action's chain), so the screen offers Get
-Answer and the microphone only then.
+Answer and the microphone only then, and where the public site's Help is (`public_help_url`,
+`PUBLIC_ORIGIN/help`), for **Public Site Help**.
 
 ## 6 · Rules and calculations
 
@@ -209,8 +214,8 @@ marks:
 ```
 ~~~
 
-- **Front matter**: `title` (required), `module` (a catalogue key; orders the chapter as the rail
-  does), `order` (for a chapter with no module: Getting Started is 0), `milestones` (the milestones
+- **Front matter**: `title` (required), `kind` (`chapter` unless set; `quick-start`, §6.4;
+  `public-help`, §6.11), `module` (a catalogue key; orders the chapter as the rail does), `order` (for a chapter with no module: Getting Started is 0), `milestones` (the milestones
   whose screens this chapter is responsible for, §6.6), `summary` (one line), `covers` (extra code
   paths whose change must touch this chapter; the screens' feature folders are always covered).
 - **Section**: `## Title {#slug ...}`. `screen=<module>/<tab>` ties it to a tab; `needs="..."` adds
@@ -409,6 +414,20 @@ Search action (`guide-voice`, Transcription job, personal data) and removes it w
 words land in the box and are searched. A placeholder (no provider answered) is dropped. The
 microphone shows only while a model is Ready on the chain (`GuideContents.voice`).
 
+### 6.11 The public site's Help
+
+One chapter is written for people outside MyCity: `docs/manual/public-site.md`, `kind: public-help`
+(decided by GE, 08/11/2026). It speaks to the candidate ("you") and names no hub screen and no grant.
+`load()` keeps it apart from the chapters: it is never in the hub's contents, chapters, Quick Start or
+search, and `/chapters/public-site` is 404. The public route reads it whole for a reader nobody signed
+in (`screen` always true, no need held), so a step that names a need is not sent; the gate still
+checks its bold names against `public-app/src` (§6.6) and its pictures are taken signed out (`site:
+public`, §6.5). Only the pictures that chapter shows are served, from `docs/manual/img/public-site/`.
+
+On the site it is **Help** (`/help`, the header's sixth link). Its links to `https://go.mycityapp.io/...`
+open in place (GuideBody `home`), `#slug` scrolls to the section. The hub's User Guide keeps one link
+to it, **Public Site Help**, which opens it in a new tab.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -453,6 +472,8 @@ No restricted field appears in the guide's text or pictures (the demo's data onl
 | Knowledge Hub · User Guide | Quick Start and Full Guide switch; the search box and the microphone; the contents (chapters and sections); the section's chapter, title and Open Screen; its text, tasks, steps, pictures and their numbered legends; the screen links in steps | None | How the guide is filtered, written and checked: this guide §6 |
 | The search's results | Get Answer; the Answer card (its sentences, their source numbers, the sources); each result's title, where it sits, its Step pill and its line with the words found marked; the pager; No Matches | None | How results are ranked and answers written: §6.8, §6.9 |
 | Back to Guide chip | Back to Guide · Step N, and a close button | None | Where the return is kept: this guide §3 |
+| Knowledge Hub · User Guide header | Public Site Help | None | Why the public chapter lives on the site: §6.11 |
+| Public · Help | Help and its line (desktop); the contents (On This Page); each section's icon, title, text, tasks, steps, pictures and legends | None | How the chapter is chosen and cut: §6.11 |
 
 The guide's own text is content a person reads (`data-copy="content"`), not interface copy: gate 8's
 word limits do not count it, as they do not count an article.
@@ -464,6 +485,7 @@ word limits do not count it, as they do not count an article.
 | Knowledge Hub · User Guide | The Quick Start and Full Guide switch, the search box with the microphone, then the role groups' cards (Quick Start) or the chapter chips over the section (Full Guide) | The side contents list (the chips replace it) | Open on a step, full width under it | Bottom bar More, Knowledge; the tabs scroll sideways |
 | The search's results | Get Answer, the Answer card, then the results as full width rows | A source's chapter and section (its title stays) | Open a result | Opening one shows the guide at it; changing the words brings the results back |
 | Back to Guide chip | A pill above the bottom bar and left of the floating button | Nothing | Back to Guide | Pressing it returns to the step |
+| Public · Help | Help over the skyline, then the row of section pills that sticks under the header, then the sections as full width cards | The hero's line; the contents column (the pills replace it) | A section's steps; pictures are the phone's | The header's menu; a pill scrolls to its section and the row keeps the one being read in sight |
 
 ## 11 · Edge cases
 
@@ -499,6 +521,7 @@ word limits do not count it, as they do not count an article.
 
 ## 14 · Change log
 
+- 08/11/2026 · GE · (Ose) The public site's Help (§6.11, #108): `public-site.md` becomes `kind: public-help`, written to the candidate, kept out of the hub's guide and served at `GET /api/public/v1/help` with its pictures; `GuideContents.public_help_url` and **Public Site Help** on the User Guide; `go.mycityapp.io/help` with `SectionNav` and SkylineHero size `page`; GuideBody's `home`.
 - 05/11/2026 · GE · (Ose) Pictures of the public site: a spec with `site: public` is taken signed out on the public app's demo build (`node_modules/.cache/mycity/demo-public`, `ensurePublicBuild`), its address a public one; it goes stale when its page file or the public shell changes. `public-site.md` has its eight.
 - 05/11/2026 · GE · (Ose) A bold name is also found in `public-app/src`, so the public site's chapter (`public-site.md`) is held to its own pages' words.
 - 26/10/2026 · JP · A picture enlarged on a phone is the phone's, as the text showed it, when the chapter has one (it was always the computer's).

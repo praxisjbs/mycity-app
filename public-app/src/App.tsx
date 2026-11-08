@@ -4,6 +4,7 @@ import { useScreenState } from "@/lib/plan";
 import { parse, RouterProvider, useRouter } from "@/lib/router";
 import { Careers } from "@/pages/Careers";
 import { Guidance } from "@/pages/Guidance";
+import { Help } from "@/pages/Help";
 import { Home } from "@/pages/Home";
 import { Proposal } from "@/pages/Proposal";
 import { Vacancy } from "@/pages/Vacancy";
@@ -29,7 +30,7 @@ function Loading({ title }: { title: string }) {
   );
 }
 
-/** The public site: the index and seven pages under one header, no sign-in (A9). */
+/** The public site: the index, its pages and Help under one header, no sign-in (A9). */
 export function App() {
   return (
     <RouterProvider>
@@ -39,7 +40,7 @@ export function App() {
 }
 
 /** Which page's PROGRESS row decides whether a route opens yet (F14). */
-const ROW: Record<string, string> = { home: "home", careers: "careers", vacancy: "vacancy", apply: "apply", assess: "assess", sign: "sign", verify: "verify", "verify-qr": "verify", proposal: "proposal" };
+const ROW: Record<string, string> = { home: "home", careers: "careers", vacancy: "vacancy", apply: "apply", assess: "assess", sign: "sign", verify: "verify", "verify-qr": "verify", proposal: "proposal", help: "help" };
 
 function Routes() {
   const { path, search, navigate } = useRouter();
@@ -64,11 +65,12 @@ function Routes() {
     case "verify": return <Verify key={r.number ?? ""} number={r.number} />;
     case "verify-qr": return <Verify key={`t-${r.token}`} number={null} qr={r.token} />;
     case "proposal": return <Proposal key={r.token} />;
+    case "help": return <Help />;
     default: return <NotFound />;
   }
 }
 
-const TITLE: Record<string, string> = { home: "Work With Us", careers: "Vacancy", vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer", verify: "Verify a Document", proposal: "Proposal" };
+const TITLE: Record<string, string> = { home: "Work With Us", careers: "Vacancy", vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer", verify: "Verify a Document", proposal: "Proposal", help: "Help" };
 
 function NotFound() {
   const { navigate } = useRouter();

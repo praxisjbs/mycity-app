@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 105 screens (97 in the staff app, 8 on the public site) plus
+**The single record of what is built.** 106 screens (97 in the staff app, 9 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -46,14 +46,14 @@ saying who agreed and when.
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 0 | 0 | 5 | 0 | 0 |
-| M4 Recruitment End to End | 10 | 0 | 0 | 10 | 0 | 0 |
+| M4 Recruitment End to End | 11 | 0 | 0 | 11 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 4 | 1 | 0 | 3 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 8 | 4 | 0 | 4 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **105** | **14** | **0** | **91** | **0** | **0** |
+| **Total** | **106** | **14** | **0** | **92** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
@@ -1661,10 +1661,12 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 83 | Assessment | `/assess/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
 | 84 | Sign Offer | `/sign/<token>` | M5 | AJ | ☑ | ☑ | ☑ | Built | 07/11/2026 |
 | 85 | Verify Document | `/verify/<number>` | M5 | AJ | ☑ | ☑ | ☑ | Built | 07/11/2026 |
+| 108 | Help | `/help` | M4 | GE | ☑ | ☑ | ☑ | Built | 08/11/2026 |
 | 105 | Proposal | `/proposal/<token>` | M7 | LA | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 08/11/2026 · GE · (Ose) Help (#108, ratified 08/11/2026): `go.mycityapp.io/help`, the header's sixth link after Verify Document. The User Guide's public chapter (`docs/manual/public-site.md`, now `kind: public-help`, written to the candidate) leaves the hub's guide, which keeps **Public Site Help** opening it; the API serves it with no sign-in (`GET /api/public/v1/help`, its pictures at `/help/images/:file`). The page: a short SkylineHero (new size `page`), then the sections as cards beside a contents column that marks the section being read (new `SectionNav`; on a phone a row of pills under the header); GuideBody follows the site's own links in place (`home`). Tests: Help, router, SectionNav, GuideBody, UserGuide, the service and the API. Left: nothing.
 - 07/11/2026 · AJ · M5 PR 4, Sign Offer (#84) and Verify Document (#85) API, UI and Mobile, on the signatures routes (`docs/guides/offers.md` §3 step 4, §5): the public INTERIM types gone, the endpoint map picking the contract's sign and verify routes. Sign Offer: the letter, Signers, then Confirm Your Email (Send Code, the six digits, Send Again) and Sign Below (full name, title, Draw or Type, Agree to Sign Electronically, Accept and Sign); Decline the Offer with its reason at either step; it loads as its own chunk. Verify: the status, every signer with when they signed, the two verdicts; by QR, the letter's opening and Download PDF. The public mock follows the staff mock's offers (OFF-0018 waiting, OFF-0017 signed). Tests: SignOffer and Verify (11). The public chapter's Sign Offer and Verify a Document sections and pictures. Left: none for these rows.
 - 06/11/2026 · GE · (Ose) Public site follow-ups (branch `m4/public-site`): one **Vacancy** link in the header for the open roles (`/jobs`) and a role's page, `/vacancy` and `/jobs/` put back to `/jobs`, the Choose a Role guidance gone; the hero and the footer on the theme's ground (light glass teal with a light skyline, Deep Green in dark; tokens.css `--site-*`), the footer's skyline faint behind it; no pure white in light (cards, fields, menus, the search box and the letter in glass teal), a faint sheen on dark cards; the theme toggle kept on reload (`public-app/public/boot.js`; the inline script was refused by the CSP). Router, Guidance, PublicPage, SkylineHero and token tests; the public chapter and its pictures. No ticks changed. Left: nothing.
 - 06/11/2026 · GE · (Ose) The approved public site design applied to the pages (`public-site-demo.html`, branch `m4/public-site`): Home (#107, new, at `/`: Work With Us with Search Roles and the three figures counting up, What We Build with About MyCityApp, Closing Soon, How We Hire, Know Someone Great? and Verify a Document), Careers (#80: Open Roles, the teams list one at a time, the role rows, both columns sticky), Vacancy (#81: the role's hero with Share Role, its text part by part with the KPIs as tiles and What We Are Looking For as a statement, The Role card and Know Someone for This?, More Roles, Apply in the phone's bar; About MyCityApp only on Home, and dropped from `PublicJob`), Apply (#82) and Assessment (#83: the ring clock and the question map in the aside) on PublicPage's split layout, Sign Offer (#84: the letter, Sign Below with Clear in the box, Decline the Offer) and Verify Document (#85: by reference and by its QR at `/verify/t/<token>`). One header with six links on every page (the old prototype view switch gone); `/vacancy` (and `/jobs/`), `/apply`, `/assess` and `/sign` open a guidance screen without a link. New in `@mycity/ui`: Panel, SectionHead, FeatureGrid, RoleRow, TeamList, RoleTile, HireSteps, CtaCard, RolePart, IconList, RoleCard, QuestionMap, IssuedLetter, VerifyCard; looks for Wizard, KeyValue, Quote, RichText, Countdown, SignatureField, UploadField and NumberField; PublicPage's `pane`, `brand`, `links` and its card and open layouts removed. Page and router tests; the public chapter and its pictures retaken. #84 and #85 stay unticked: their screens run on the INTERIM shapes and the mock until AJ's M5 signing and verify API. Left: that API (M5, AJ); MILESTONES §18 to list Home beside the public pages (GE).

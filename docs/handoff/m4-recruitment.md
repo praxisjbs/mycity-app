@@ -560,3 +560,7 @@ packages that need none can start. Tick a package only when its own checks pass 
   Offers opens); Not Progress All and `in_progress` skip Offer and after; Candidate Emails gains `offer-sent`,
   `offer-signed` and `onboarding-documents` (wording and `*EmailVars`). For AJ: call these from `offers.service`
   and `onboarding.service`; widen the three `*EmailVars` in the contract if a mail needs more.
+- 08/11/2026 · GE · (Ose) Help (#108, ratified 08/11/2026): `go.mycityapp.io/help`, the header's sixth link. The
+  public chapter (`docs/manual/public-site.md`, `kind: public-help`, rewritten to the candidate) leaves the hub's User
+  Guide (which keeps **Public Site Help**) and is served at `GET /api/public/v1/help` with its pictures. New in
+  `@mycity/ui`: `SectionNav`, SkylineHero size `page`, GuideBody `home` (`docs/guides/user-guide.md` §6.11).

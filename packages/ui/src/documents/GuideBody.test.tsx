@@ -32,6 +32,17 @@ describe("GuideBody", () => {
     expect(a).toHaveAccessibleName(/^MyCity ?\(opens in a new tab\)$/);
   });
 
+  it("follows a link to the site it is read on in place, by its path", async () => {
+    const onLink = vi.fn();
+    const here = [{ kind: "paragraph", spans: [{ text: "the open roles", bold: false, italic: false, code: false, href: "https://go.mycityapp.io/jobs" }] }] as GuideBlock[];
+    render(<GuideBody blocks={here} anchor="public-careers" onLink={onLink} home="https://go.mycityapp.io" />);
+    const a = screen.getByRole("link", { name: "the open roles" });
+    expect(a).toHaveAttribute("href", "/jobs");
+    expect(a).not.toHaveAttribute("target");
+    await userEvent.click(a);
+    expect(onLink).toHaveBeenCalledWith("/jobs", { anchor: "public-careers", step: null });
+  });
+
   it("shows a picture with its marks listed under it, and enlarges it", async () => {
     const onZoom = vi.fn();
     render(<GuideBody blocks={blocks} anchor="a" picture={() => GUIDE_PICTURE} onZoom={onZoom} />);

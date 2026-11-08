@@ -13,6 +13,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type Ancho
  *   /verify/<number>       a reference, not a secret
  *   /verify/t/<token>      the QR on a sealed document: the record and the document itself
  *   /proposal/<token>      opaque, one proposal, not indexable (M7)
+ *   /help                  how the site works, indexable (the User Guide's public chapter)
  *
  * The header's links reach every page, so the three a person is sent to by a link of their own
  * have a guidance screen when opened without one: /apply, /assess, /sign. Vacancy needs none: its
@@ -29,6 +30,7 @@ export type Route =
   | { page: "verify"; number: string | null }
   | { page: "verify-qr"; token: string }
   | { page: "proposal"; token: string }
+  | { page: "help" }
   | { page: "not-found" };
 
 export function parse(path: string): Route {
@@ -37,6 +39,7 @@ export function parse(path: string): Route {
   if (p === "/jobs" || p === "/vacancy") return { page: "careers" };
   if (p === "/apply" || p === "/assess" || p === "/sign") return { page: "guide", of: p.slice(1) as "apply" | "assess" | "sign" };
   if (p === "/verify") return { page: "verify", number: null };
+  if (p === "/help") return { page: "help" };
   const qr = /^\/verify\/t\/([^/]+)$/.exec(p);
   if (qr) return { page: "verify-qr", token: decodeURIComponent(qr[1]!) };
   const m = /^\/(jobs|apply|assess|sign|verify|proposal)\/([^/]+)$/.exec(p);
@@ -52,13 +55,14 @@ export function parse(path: string): Route {
   }
 }
 
-/** The header's five links, left to right, and the one each page marks as current. */
+/** The header's six links, left to right, and the one each page marks as current. */
 export const NAV = [
   { label: "Vacancy", href: "/jobs" },
   { label: "Apply", href: "/apply" },
   { label: "Assessment", href: "/assess" },
   { label: "Sign Offer", href: "/sign" },
   { label: "Verify Document", href: "/verify" },
+  { label: "Help", href: "/help" },
 ] as const;
 
 /** Which header link a route belongs to; the index belongs to none. */
@@ -72,6 +76,7 @@ export function sectionOf(r: Route): (typeof NAV)[number]["label"] | null {
     case "sign": return "Sign Offer";
     case "verify":
     case "verify-qr": return "Verify Document";
+    case "help": return "Help";
     default: return null;
   }
 }

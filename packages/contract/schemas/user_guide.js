@@ -79,7 +79,8 @@ const GuidePicture = z
 const GuideChapter = z
   .object({
     slug,
-    kind: z.enum(["chapter", "quick-start"]),
+    /** public-help: the public site's Help page (GET /api/public/v1/help), never in the hub's guide. */
+    kind: z.enum(["chapter", "quick-start", "public-help"]),
     title: z.string(),
     module: z.string().nullable(),
     icon: z.string().nullable(),
@@ -123,8 +124,13 @@ const GuideContents = z
     answers: z.boolean(),
     /** Whether a search can be spoken now: a model ready on Guide Voice Search's chain. */
     voice: z.boolean(),
+    /** The public site's Help page (go.mycityapp.io/help), where the chapter for candidates lives. */
+    public_help_url: z.string(),
   })
   .strict();
+
+/** A picture of the public site's Help page: `<shot>.<desktop|phone>.png`. */
+const PublicHelpImageParams = z.object({ file: z.string().regex(/^[a-z0-9-]+\.(desktop|phone)\.png$/) }).strict();
 
 /**
  * POST /user-guide/search: the words of a search (at most 200 characters) and the page. Under
@@ -217,6 +223,7 @@ const TABLES = {
   GuideContents: { table: null, reason: "the outline of every chapter the reader may read" },
   GuideChapterParams: { table: null, reason: "a chapter's file name" },
   GuideImageParams: { table: null, reason: "a picture's chapter and file name" },
+  PublicHelpImageParams: { table: null, reason: "a picture of the public site's Help page, from docs/manual/img" },
   GuideSearchBody: { table: null, reason: "the words of a search and its page; never kept" },
   GuideSnippetRun: { table: null, reason: "a run of a passage's text, from docs/manual" },
   GuideHit: { table: null, reason: "a section or task of docs/manual that answers a search" },
@@ -240,6 +247,7 @@ module.exports = {
   GuideContents,
   GuideChapterParams,
   GuideImageParams,
+  PublicHelpImageParams,
   GuideSearchBody,
   GuideSnippetRun,
   GuideHit,

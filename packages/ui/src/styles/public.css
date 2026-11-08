@@ -670,6 +670,46 @@
     .ps-side-note { display: none; }
   }
 
+  /* ---- SectionNav: a long page's contents, the section in view marked; a column on desktop, a row of pills on a phone ---- */
+  .ps-secnav ul { list-style: none; margin: 24px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .ps-secnav a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+    color: var(--canvas-soft);
+    font: 500 15px var(--face-body);
+    text-decoration: none;
+    transition: background .2s, color .2s;
+  }
+  .ps-secnav a > svg { width: 18px; height: 18px; flex: none; color: var(--muted-foreground); transition: color .2s; }
+  .ps-secnav a:hover { background: var(--canvas-hover); color: var(--foreground); }
+  .ps-secnav a[aria-current="location"] { background: var(--deep); color: var(--on-deep); }
+  .ps-secnav a[aria-current="location"] > svg { color: var(--primary); }
+  .ps-secnav-bar {
+    position: sticky;
+    top: var(--stick-top, 64px);
+    z-index: 5;
+    margin: 0 -16px;
+    padding: 10px 16px;
+    background: var(--canvas);
+    border-bottom: 1px solid var(--canvas-line);
+  }
+  .ps-secnav-bar ul { margin: 0; flex-direction: row; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .ps-secnav-bar ul::-webkit-scrollbar { display: none; }
+  .ps-secnav-bar li { flex: none; }
+  .ps-secnav-bar a { border: 1px solid var(--canvas-line-strong); border-radius: 999px; white-space: nowrap; gap: 8px; font-size: 14px; }
+  @media (min-width: 761px) and (max-width: 1040px) { .ps-secnav-bar { margin: 0 -32px; padding-inline: 32px; } }
+  /* The phone's header is 60 px (.ps-header-in), so the bar sits right under it. */
+  @media (max-width: 760px) { .ps-secnav-bar { top: 60px; } }
+
+  /* ---- SkylineHero size page: an inner page's short head, its title and one line ---- */
+  .ps-hero-page .ps-hero-in { padding: 48px 32px 56px; }
+  .ps-hero-page h1 { margin-top: 0; }
+  @media (max-width: 760px) { .ps-hero-page .ps-hero-in { padding: 28px 16px 36px; } }
+
   /* ---- RoleTile: a role in a few lines (Closing Soon, More Roles) ---- */
   .ps-mini {
     height: 100%;

@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "f44b5dc7b2b60d35cae747aa5b248c5182359864896f9095211cc554940a9843",
-  "schemas": 1922,
-  "endpoints": 843,
+  "source_hash": "4bc95f707340117af6b3645663f5df0267f8d1aafb8f65659651c05bf33f69a6",
+  "schemas": 1923,
+  "endpoints": 845,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "21c1dd7833ceff90bacf317e3f091b7d48682a46291670949e3069435e570de2",
@@ -71,7 +71,7 @@
     "packages/contract/schemas/targets.js": "eff6112a0f0268c5ec65807b359ceff164c6bfc3ddab0a4bde80dfa23962a869",
     "packages/contract/schemas/tasks.js": "b3796ffa74c140d5e3ee94b994e26f73f88adda4b8f7a906d634134fd381aa8c",
     "packages/contract/schemas/templates.js": "5c68262e21422e9f522f31ebeab2e9bc0b22faecccb972a28c9631f99738a301",
-    "packages/contract/schemas/user_guide.js": "3a14914b7ff89d8ce50a1dbbe921a70370cf5e52d7f41f95f36752c54884b7d1",
+    "packages/contract/schemas/user_guide.js": "c56cfa7fc4883be90d1b14446c4918f77a912e75d2dd87826ed17a500aa9571f",
     "packages/contract/schemas/users.js": "c62a6bfc703543682f6d190a19a68e86f34363c3f7846a46c54ba905e978064d",
     "packages/contract/schemas/vacancies.js": "6e468b2769ae8ef23d8962eea1e67e31ef3a00230276f9bc5d180e2d362ae22e",
     "packages/contract/schemas/workflow.js": "d070ad092b3a3b634ca1076856066d987734f21c1d8e102b4f2605d68fe0e8f8",
@@ -134,6 +134,7 @@
     "src/modules/targets/targets.routes.js": "e7c6091372ecf23ae3ff46ddc1678a33475548d0dadad04f078a7533dc3e2031",
     "src/modules/tasks/tasks.routes.js": "c9d2d773299b1b4b754f850b95ea661b15fb837fa70f57f5d2c6ce2ffc9a27a1",
     "src/modules/templates/templates.routes.js": "4dc159605fd892f5003d7f57afdac92131ec4a2e40ab3d3c3173b67fae2ddcc9",
+    "src/modules/user_guide/user_guide.public.routes.js": "6df300afd8d4a5e7f1b317c3d30adc47780c09e177a0b01540a5fd2b2f61ba95",
     "src/modules/user_guide/user_guide.routes.js": "c1a679cf2b6339a9d9f474f59834026bc8752c84f3e83106726e40307b73d2aa",
     "src/modules/users/users.routes.js": "7ae43569a5eba7045ba4e0da675f395051f0a576ca2002dd5885cd9c1f1651df",
     "src/modules/vacancies/vacancies.public.routes.js": "1a46ee714d056994d86aae188997d2b78e23c8d08b7307bbf1bab4325b1dff12",

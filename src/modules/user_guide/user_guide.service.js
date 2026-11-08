@@ -30,6 +30,7 @@ const { readerOf } = require("../../shared/search/search.service");
 const { pageOf, envelope, PAGE_SIZE } = require("../../shared/http/paged");
 const { tabVisible } = require("../../shared/search/screens");
 const { scopeFor } = require("../../middleware/rbac");
+const { config } = require("../../config/env");
 
 const MANUAL = path.resolve(__dirname, "../../../docs/manual");
 const IMAGES = path.join(MANUAL, "img");
@@ -48,6 +49,7 @@ function load({ dir = MANUAL, fresh = false } = {}) {
   if (cached && !fresh && dir === MANUAL) return cached;
   const chapters = [];
   let quick = null;
+  let help = null;
   const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".md") && f !== "README.md").sort() : [];
   for (const file of files) {
     const text = fs.readFileSync(path.join(dir, file), "utf8");
@@ -55,13 +57,14 @@ function load({ dir = MANUAL, fresh = false } = {}) {
     const { chapter: parsed, problems } = parseChapter(text, file);
     if (problems.length) logger.warn({ file, problems: problems.slice(0, 5) }, "a User Guide chapter has problems");
     if (parsed.kind === "quick-start") quick = parsed;
+    else if (parsed.kind === "public-help") help = parsed;
     else chapters.push(parsed);
   }
   const rail = new Map(catalog.MODULES.map((m, i) => [m, i]));
   /* Chapters with no module first, by their own order (Getting Started is 0); then the rail's. */
   const key = (c) => (c.module && rail.has(c.module) ? 1000 + rail.get(c.module) : c.order ?? 999);
   chapters.sort((a, b) => key(a) - key(b) || a.title.localeCompare(b.title));
-  const out = { chapters, quickStart: quick };
+  const out = { chapters, quickStart: quick, publicHelp: help };
   if (dir === MANUAL) cached = out;
   return out;
 }
@@ -161,7 +164,40 @@ async function contents(db, user, opts) {
     quick_start: mine.quickStart
       ? mine.quickStart.sections.map((s) => ({ slug: s.slug, title: s.title, role: s.role }))
       : [],
+    public_help_url: `${String(config.PUBLIC_ORIGIN).replace(/\/+$/, "")}/help`,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * The public site's Help page (§6.11)
+ * ------------------------------------------------------------------ */
+
+/** Nobody signed in: every section is read, nothing that needs a grant. */
+const PUBLIC_READER = { screen: () => true, holds: () => false };
+
+/**
+ * The chapter for people outside MyCity (`kind: public-help`, docs/manual/public-site.md), as the
+ * public site's Help page reads it. 404 while there is none.
+ */
+function publicHelp(opts) {
+  const help = load(opts).publicHelp;
+  const read = help ? filterChapter(help, PUBLIC_READER) : null;
+  if (!read) throw new AppError("NOT_FOUND", "Help is not there.", 404);
+  return read;
+}
+
+/**
+ * A picture the Help page shows, by its file (`<shot>.<desktop|phone>.png`): only one its chapter
+ * names, from that chapter's own folder.
+ * @returns {string} the file's path on disk
+ */
+function publicImage(file, opts = {}) {
+  const [shot, device] = file.replace(/\.png$/, "").split(".");
+  const help = publicHelp(opts);
+  const shown = help.pictures.some((p) => p.shot === shot && p.devices.includes(device));
+  const full = path.join(opts.images || IMAGES, help.slug, file);
+  if (!shown || !fs.existsSync(full)) throw new AppError("NOT_FOUND", "That picture is not there.", 404);
+  return full;
 }
 
 /** One chapter as this person may read it; 404 when it does not exist or nothing in it is theirs. */
@@ -338,4 +374,4 @@ async function transcribe(file, actor) {
   }
 }
 
-module.exports = { MANUAL, IMAGES, load, asReader, guideReaderOf, cut, contents, chapter, quickStart, image, indexOf, hitsFor, search, answer, transcribe };
+module.exports = { MANUAL, IMAGES, load, asReader, guideReaderOf, cut, contents, chapter, quickStart, image, publicHelp, publicImage, indexOf, hitsFor, search, answer, transcribe };

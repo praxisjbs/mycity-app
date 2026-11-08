@@ -88,6 +88,14 @@ export function UserGuide({ id }: { id: string | null }) {
   return (
     <>
       <PageHeader title="User Guide" subtitle="How to use every screen">
+        {/* The careers site's own guide is read there, by candidates as by staff (docs/guides/user-guide.md §6.11). */}
+        {contents.data?.public_help_url && (
+          <Button icon="external" asChild>
+            <a href={contents.data.public_help_url} target="_blank" rel="noopener noreferrer">
+              Public Site Help
+            </a>
+          </Button>
+        )}
         <SegmentedControl label="Guide View" value={view} onChange={(v) => setParams({ view: v })} options={VIEWS} />
       </PageHeader>
       {contents.error ? (

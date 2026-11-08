@@ -723,7 +723,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 | Recruitment · Assessments (`assessments`) | Assessments and Sittings as a segmented control; cards | The average-by-assessment chart | New Assessment in the floating button; Mark Answers in a sitting's sheet | Bottom bar; the Recruitment tabs |
 | Recruitment · Interviews (`interviews`) | Upcoming and Recent as cards (candidate, date, panel, round state), upcoming first; nothing open until a card is tapped | Role on the card; the interview beside the list (it opens in a sheet instead, Blind Panel and Weighted Scorecard one under the other) | A tapped interview opens its sheet, its actions at the top full width; My Card full width, opening as its own full sheet, one trait a row with ten 44 px stars, in two rows of five (ten do not fit 390 px) | Bottom bar; the Recruitment tabs |
 | Recruitment · Talent Pool (`talent-pool`) | Two KPI cards a row, then pool cards (name, applied for, score, kept until) | Added and Reason columns (in the sheet) | A tapped card opens its sheet with Invite to Apply full width | Bottom bar; the Recruitment tabs |
-| Home, Careers, Vacancy, Apply, Assessment | One column, full width buttons, 44 px targets; Home's hero still the first screen, its search button under the box; on Careers the teams as a row of pills above the roles; on Vacancy The Role card above the text; on Apply and Assessment the aside as a band above the Panel | The hero's line and The Role card's Apply (the bar carries it), Share Role and Know Someone for This?; the aside's steps, skyline and credit | Search Roles; Apply in a bar fixed at the foot of a vacancy; Next, Submit Application, Submit Assessment | The public site's header, its five links in the menu |
+| Home, Careers, Vacancy, Apply, Assessment | One column, full width buttons, 44 px targets; Home's hero still the first screen, its search button under the box; on Careers the teams as a row of pills above the roles; on Vacancy The Role card above the text; on Apply and Assessment the aside as a band above the Panel | The hero's line and The Role card's Apply (the bar carries it), Share Role and Know Someone for This?; the aside's steps, skyline and credit | Search Roles; Apply in a bar fixed at the foot of a vacancy; Next, Submit Application, Submit Assessment | The public site's header, its six links in the menu (Help last) |
 
 ## 11 · Edge cases
 
@@ -785,6 +785,8 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 08/11/2026 · GE · (Ose) The site's header gains **Help** after Verify Document (`/help`, #108): the public chapter of
+  the User Guide, moved out of the hub (`docs/guides/user-guide.md` §6.11).
 - 08/11/2026 · GE · A repeat application (same email, same role) is told so: `ApplicationReceipt.already_applied`
   with the first application's reference and date, and Apply shows You Have Already Applied (§6.2). Vacancies'
   Careers Page opens the public site's index (`VacanciesSummary.site_url`, was `careers_url` to `/jobs`).

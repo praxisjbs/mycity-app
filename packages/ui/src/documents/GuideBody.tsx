@@ -69,6 +69,8 @@ export interface GuideBodyProps {
   onLink?: (href: string, from: GuideLinkFrom) => void;
   /** Called when a picture is pressed, to show it full size. */
   onZoom?: (shot: string) => void;
+  /** The site the guide is read on (`https://go.mycityapp.io` on its Help page): a link to it is followed in place through onLink, by its path, not opened in a new tab. */
+  home?: string;
   /** The step to mark as the one the reader came back to. */
   highlight?: number | null;
   /** Layout classes only (spacing). */
@@ -77,7 +79,10 @@ export interface GuideBodyProps {
 
 const outside = (href: string) => /^(https:|mailto:)/.test(href);
 
-function Spans({ spans, from, onLink }: { spans: GuideSpan[]; from: GuideLinkFrom; onLink?: GuideBodyProps["onLink"] }) {
+/** A link to the site the guide is read on, as its path (`/jobs`); null for any other. */
+const within = (href: string, home?: string) => (home && (href === home || href.startsWith(`${home}/`) || href.startsWith(`${home}#`)) ? href.slice(home.length) || "/" : null);
+
+function Spans({ spans, from, onLink, home }: { spans: GuideSpan[]; from: GuideLinkFrom; onLink?: GuideBodyProps["onLink"]; home?: string }) {
   return (
     <>
       {spans.map((s, i) => {
@@ -88,7 +93,8 @@ function Spans({ spans, from, onLink }: { spans: GuideSpan[]; from: GuideLinkFro
         );
         const marked = s.bold ? <strong className="font-semibold text-foreground">{text}</strong> : s.italic ? <em>{text}</em> : text;
         if (!s.href) return <span key={i}>{marked}</span>;
-        if (outside(s.href))
+        const href = within(s.href, home) ?? s.href;
+        if (outside(href))
           return (
             <a key={i} href={s.href} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent-foreground underline underline-offset-2">
               {marked}
@@ -100,10 +106,10 @@ function Spans({ spans, from, onLink }: { spans: GuideSpan[]; from: GuideLinkFro
           // A new tab or window is the browser's own; a plain press stays in the app and remembers the line.
           if (!onLink || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
           e.preventDefault();
-          onLink(s.href as string, from);
+          onLink(href, from);
         };
         return (
-          <a key={i} href={s.href} onClick={follow} className="font-semibold text-accent-foreground underline underline-offset-2">
+          <a key={i} href={href} onClick={follow} className="font-semibold text-accent-foreground underline underline-offset-2">
             {marked}
           </a>
         );
@@ -185,7 +191,7 @@ const NOTE: Record<"tip" | "important" | "note", { box: string; icon: IconName; 
   note: { box: "bg-info-soft text-info", icon: "info", label: null },
 };
 
-export function GuideBody({ blocks, anchor, picture, fetchImage, onLink, onZoom, highlight, className }: GuideBodyProps) {
+export function GuideBody({ blocks, anchor, picture, fetchImage, onLink, onZoom, highlight, home, className }: GuideBodyProps) {
   const at = (step: number | null): GuideLinkFrom => ({ anchor, step });
   return (
     <div {...content} className={cn("text-sm leading-relaxed text-muted-foreground", className)}>
@@ -193,7 +199,7 @@ export function GuideBody({ blocks, anchor, picture, fetchImage, onLink, onZoom,
         if (b.kind === "paragraph")
           return (
             <p key={i} className="my-2 first:mt-0">
-              <Spans spans={b.spans} from={at(null)} onLink={onLink} />
+              <Spans spans={b.spans} from={at(null)} onLink={onLink} home={home} />
             </p>
           );
         if (b.kind === "bullets")
@@ -201,7 +207,7 @@ export function GuideBody({ blocks, anchor, picture, fetchImage, onLink, onZoom,
             <ul key={i} className="my-2 list-disc space-y-1 pl-5">
               {b.items.map((spans, j) => (
                 <li key={j}>
-                  <Spans spans={spans} from={at(null)} onLink={onLink} />
+                  <Spans spans={spans} from={at(null)} onLink={onLink} home={home} />
                 </li>
               ))}
             </ul>
@@ -213,7 +219,7 @@ export function GuideBody({ blocks, anchor, picture, fetchImage, onLink, onZoom,
               <Icon name={t.icon} className="mt-0.5 flex-none" />
               <p className="min-w-0 text-foreground">
                 {t.label && <strong className="font-semibold">{t.label}: </strong>}
-                <Spans spans={b.spans} from={at(null)} onLink={onLink} />
+                <Spans spans={b.spans} from={at(null)} onLink={onLink} home={home} />
               </p>
             </div>
           );
@@ -227,7 +233,7 @@ export function GuideBody({ blocks, anchor, picture, fetchImage, onLink, onZoom,
                   <tr>
                     {b.head.map((cell, j) => (
                       <th key={j} scope="col" className="px-3 py-2 text-xs font-strong text-foreground">
-                        <Spans spans={cell} from={at(null)} onLink={onLink} />
+                        <Spans spans={cell} from={at(null)} onLink={onLink} home={home} />
                       </th>
                     ))}
                   </tr>
@@ -237,7 +243,7 @@ export function GuideBody({ blocks, anchor, picture, fetchImage, onLink, onZoom,
                     <tr key={r} className="border-t border-border">
                       {row.map((cell, j) => (
                         <td key={j} className="px-3 py-2 align-top">
-                          <Spans spans={cell} from={at(null)} onLink={onLink} />
+                          <Spans spans={cell} from={at(null)} onLink={onLink} home={home} />
                         </td>
                       ))}
                     </tr>
@@ -262,7 +268,7 @@ export function GuideBody({ blocks, anchor, picture, fetchImage, onLink, onZoom,
                   <div className="min-w-0 flex-1">
                     <span className="sr-only">Step {s.n}: </span>
                     <span className="text-foreground">
-                      <Spans spans={s.spans} from={at(s.n)} onLink={onLink} />
+                      <Spans spans={s.spans} from={at(s.n)} onLink={onLink} home={home} />
                     </span>
                     {s.figure && <Figure figure={s.figure} picture={picture} fetchImage={fetchImage} onZoom={onZoom} />}
                   </div>
