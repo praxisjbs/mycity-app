@@ -19,7 +19,7 @@ export default {
     Verified: () => <VerifyCard tone="ok" title="Document Verified" text="This document is genuine and unchanged." items={rows("matches", "matches")} />,
     Altered: () => <VerifyCard tone="warn" title="Not This Document" text="The stored file was altered." items={rows("matches", "differs")} />,
     "Not Found": () => <VerifyCard tone="err" title="Not Found" text="No document has this reference." items={[{ label: "Reference", value: "OFF-0099" }]} note="Check the reference on the document and try again. It looks like OFF-0018." />,
-    "An Agreement By Its QR": () => (
+    "Agreement By QR": () => (
       <VerifyCard
         tone="ok"
         title="Document Verified"
