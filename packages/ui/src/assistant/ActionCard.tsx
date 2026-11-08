@@ -38,7 +38,7 @@ export interface CardField {
   /** A text of several lines (a message, a note, a reason). */
   long: boolean;
   /** What an id field, or a list of ids, is picked with on Edit (AiCardPicks); the screen's `picker` draws it. */
-  picks?: "colleague" | "task_assignee" | "task_member" | "department" | "project" | "leave_type" | "task" | "employee" | "worksite" | "policy" | "place" | "site_member" | null;
+  picks?: "colleague" | "task_assignee" | "task_member" | "department" | "project" | "leave_type" | "task" | "employee" | "worksite" | "policy" | "place" | "site_member" | "partner" | "lead" | "partner_deal" | null;
 }
 
 /**

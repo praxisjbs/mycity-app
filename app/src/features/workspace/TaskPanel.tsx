@@ -35,6 +35,7 @@ import {
 import { CADENCE, LABEL, PRIORITY, STATUS_TONE, refresh, say, usePages, type Status } from "./shared";
 import { CommitmentActions, commitmentItems, COUNTS_HELP } from "./Commitment";
 import { BlockForm, CancelForm, LateReasonForm, LEAD_HELP, OverrideForm, PingForm, RemindersForm, RepeatForm, repeatText, StepForm, TaskForm, UnblockForm, WaitingForm, WatcherForm } from "./TaskForms";
+import { PartnerLinkLine } from "./PartnerLink";
 
 type View = "details" | "steps" | "comments" | "history";
 
@@ -158,6 +159,7 @@ function TaskDetails({ t, changed, form, onOpenTask }: { t: TaskDetail; changed:
     ...(t.project
       ? [["Project", <Link key="pj" className="font-semibold text-primary underline" to={hrefFor("workspace", "projects", { id: t.project.project_id })} data-copy="content">{t.project.name}</Link>] as [ReactNode, ReactNode]]
       : []),
+    ...(t.partner_link ? [["Partner", <PartnerLinkLine key="pl" link={t.partner_link} />] as [ReactNode, ReactNode]] : []),
     ["Set By", t.set_by?.display_name ?? "Nobody"],
     ["Due", t.due_at ? formatDateTime(t.due_at) : "No date"],
     ["Priority", PRIORITY[t.priority]],

@@ -68,6 +68,9 @@ const SETTER_FIELDS = Object.freeze([
   "entity_id",
   "project_id",
   "recurrence",
+  "partner_id",
+  "lead_id",
+  "deal_id",
 ]);
 
 module.exports = { inScope, maySetFor, assertMaySetFor, maySee, mayManage, SETTER_FIELDS };

@@ -31,6 +31,7 @@ const EVENTS = defineEvents("workspace", {
   "calendar_event.invited": { summary: "Someone was added to an event" },
   "calendar_event.uninvited": { summary: "Someone was taken off an event" },
   "calendar_event.reminder_due": { summary: "An event is about to start" },
+  "calendar_event.relinked": { summary: "A lead's events moved to its partner" },
 });
 
 /** The reminder engine's key for an event's reminders (up to three, before it starts). */

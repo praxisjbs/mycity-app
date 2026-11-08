@@ -7,7 +7,7 @@ import { useFreshSignIn, type ConfirmedWay } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
 import { schemas, type AiActionCard, type AiActionResult, type Department } from "@mycity/contract/contract.gen.ts";
 import { LeaveTypeSelect } from "@/features/people/Leave";
-import { ColleaguePicker, DepartmentPicker, EmployeePicker, PolicyPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, WorksitePicker, type PolicyChoice, type ProjectChoice, type TaskChoice, type WorksiteChoice } from "@/features/shared/pickers";
+import { ColleaguePicker, DepartmentPicker, EmployeePicker, PartnerDealPicker, PartnerRecordPicker, PolicyPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, WorksitePicker, type PartnerDealChoice, type PartnerRecordChoice, type PolicyChoice, type ProjectChoice, type TaskChoice, type WorksiteChoice } from "@/features/shared/pickers";
 import { places } from "@/features/shared/places";
 import { hrefFor } from "@/lib/routes";
 import { useRouter } from "@/lib/router";
@@ -108,6 +108,8 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
   const [tasks, setTasks] = useState<TaskChoice[]>(() => ids.map((id) => ({ task_id: id, number: "", title: nameOf(id) })));
   const [worksites, setWorksites] = useState<WorksiteChoice[]>(() => ids.map((id) => ({ worksite_id: id, name: nameOf(id), code: "" })));
   const [policies, setPolicies] = useState<PolicyChoice[]>(() => ids.map((id) => ({ policy_id: id, number: "", title: nameOf(id) })));
+  const [records, setRecords] = useState<PartnerRecordChoice[]>(() => ids.map((id) => ({ id, number: "", name: nameOf(id) })));
+  const [deals, setDeals] = useState<PartnerDealChoice[]>(() => ids.map((id) => ({ deal_id: id, number: "", title: nameOf(id) })));
   const set = (picked: string[]) => onChange(many ? picked : (picked[0] ?? null));
   const pickPeople = (p: PersonRef[]) => (setPeople(p), set(p.map((x) => x.employee_id)));
   switch (field.picks) {
@@ -133,6 +135,11 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
       return <WorksitePicker value={worksites} onChange={(w) => (setWorksites(w), set(w.map((x) => x.worksite_id)))} />;
     case "policy":
       return <PolicyPicker value={policies} onChange={(p) => (setPolicies(p), set(p.map((x) => x.policy_id)))} />;
+    case "partner":
+    case "lead":
+      return <PartnerRecordPicker kind={field.picks} value={records} onChange={(r) => (setRecords(r), set(r.map((x) => x.id)))} />;
+    case "partner_deal":
+      return <PartnerDealPicker value={deals} onChange={(d) => (setDeals(d), set(d.map((x) => x.deal_id)))} />;
     case "place":
       // The card holds the place's token alone; a device location while search is down holds none, so the field asks again.
       return <AddressField value={ids[0] ? { token: ids[0] } : null} onChange={(v) => set(v?.token ? [v.token] : [])} places={places} />;

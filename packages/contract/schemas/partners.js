@@ -422,6 +422,8 @@ const PartnerWorkItem = z
   .object({
     kind: WorkKind,
     id: uuid,
+    /** A project's or task's number; null for an event. */
+    number: z.string().nullable(),
     title: z.string(),
     status: z.string(),
     /** A task's or project's due day, an event's day. */
@@ -447,21 +449,85 @@ const PartnerWorkPage = Paged(PartnerWorkItem)
 
 /**
  * Connect to Partner (§6.16): the link a project, task or event carries, to a partner or a lead and
- * one of its deals. Joins ProjectCreate, TaskCreate, CalendarEventCreate and their edit fields in M7
- * PR 5, with the Workspace services that write it, so no request takes a field nothing writes.
+ * one of its deals. Its keys join ProjectCreate, TaskCreate and CalendarEventCreate (and their edit
+ * fields as `partnerLinkEditFields`), written by the Workspace services after Partnerships checks the
+ * person sees the record and the deal (partners.work checkLink).
  */
-const PartnerLink = z
-  .object({
-    partner_id: blank(uuid),
-    lead_id: blank(uuid),
-    deal_id: blank(uuid),
-  })
-  .strict()
-  .refine((v) => !(v.partner_id && v.lead_id), { message: "A partner or a lead, not both", path: ["lead_id"] })
-  .refine((v) => !v.deal_id || Boolean(v.partner_id || v.lead_id), { message: "Pick the partner first", path: ["partner_id"] });
+const partnerLinkFields = {
+  partner_id: blank(uuid),
+  lead_id: blank(uuid),
+  deal_id: blank(uuid),
+};
+/** A link's two rules, on a create body: a partner or a lead, not both; a deal only with one of them. */
+const linkRules = (schema) =>
+  schema
+    .refine((v) => !(v.partner_id && v.lead_id), { message: "A partner or a lead, not both", path: ["lead_id"] })
+    .refine((v) => !v.deal_id || Boolean(v.partner_id || v.lead_id), { message: "Pick the partner first", path: ["partner_id"] });
+const PartnerLink = linkRules(z.object(partnerLinkFields).strict());
 
-/** The Partner filter My Workspace's lists gain with it (PR 5). */
-const PartnerLinkQuery = z.object({ partner_id: uuid.optional() }).strict();
+/**
+ * The link on an edit: only what changes. A new partner or lead clears the other and, unless one is
+ * given, the deal; `null` on both disconnects (the service decides against the work as it stands).
+ */
+const partnerLinkEditFields = {
+  partner_id: uuid.nullable().optional(),
+  lead_id: uuid.nullable().optional(),
+  deal_id: uuid.nullable().optional(),
+};
+/** An edit names a partner or a lead, not both. */
+const linkEditRules = (schema) => schema.refine((v) => !(v.partner_id && v.lead_id), { message: "A partner or a lead, not both", path: ["lead_id"] });
+
+/**
+ * The link as a task, project or event carries it on the way out. The names are filled only for a
+ * reader who sees the record (and the deal) in Partnerships; anyone else reads the ids alone, so
+ * connecting never shows a partner to someone who could not open it (§6.16, A24).
+ */
+const PartnerLinkView = z
+  .object({
+    partner_id: uuid.nullable(),
+    lead_id: uuid.nullable(),
+    deal_id: uuid.nullable(),
+    name: z.string().nullable(),
+    number: z.string().nullable(),
+    deal_number: z.string().nullable(),
+    deal_title: z.string().nullable(),
+  })
+  .strict();
+
+/** The Partner filter on My Workspace's Tasks and Projects: a partner or a lead. */
+const PartnerLinkQuery = z.object({ partner_id: uuid.optional(), lead_id: uuid.optional() }).strict();
+
+const LinkKind = z.enum(["partner", "lead"]);
+
+/** Connect to Partner's Partner (GET /work/records): partners not closed and leads still open, that the reader sees; `kind` one of the two. */
+const PartnerLinkRecordQuery = listQuery({ kind: LinkKind.optional() }, ["name"]);
+const PartnerLinkRecord = z
+  .object({
+    kind: LinkKind,
+    id: uuid,
+    number: z.string(),
+    name: z.string(),
+    category: z.string().nullable(),
+  })
+  .strict();
+const PartnerLinkRecordPage = Paged(PartnerLinkRecord);
+
+/**
+ * Connect to Partner's Deal (GET /work/deals): the record's open and live deals the reader sees; with
+ * no record (a Praxis AI card's Deal), every open and live deal they see.
+ */
+const PartnerLinkDealQuery = listQuery({ partner_id: uuid.optional(), lead_id: uuid.optional() });
+const PartnerLinkDeal = z
+  .object({
+    deal_id: uuid,
+    number: z.string(),
+    title: z.string(),
+    status: z.enum(["open", "live"]),
+    /** The partner's or lead's name. */
+    record_name: z.string(),
+  })
+  .strict();
+const PartnerLinkDealPage = Paged(PartnerLinkDeal);
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const ORGANISATION = {
@@ -600,7 +666,14 @@ const TABLES = {
   PartnerWorkItem: { table: null, reason: "a project, task or event connected to a record" },
   PartnerWorkPage: { table: null, reason: "a page of a record's work and the counts hidden from the reader" },
   PartnerLink: { table: "task" },
+  PartnerLinkView: { table: null, reason: "the partner or lead and deal a project, task or event is for, named for the reader" },
   PartnerLinkQuery: { table: null, reason: "the Partner filter on My Workspace's lists" },
+  PartnerLinkRecordQuery: { table: null, reason: "list controls for Connect to Partner's Partner" },
+  PartnerLinkRecord: { table: null, reason: "a partner or a lead Connect to Partner offers" },
+  PartnerLinkRecordPage: { table: null, reason: "a page of partners and leads to connect work to" },
+  PartnerLinkDealQuery: { table: null, reason: "list controls for Connect to Partner's Deal" },
+  PartnerLinkDeal: { table: null, reason: "an open or live deal Connect to Partner offers" },
+  PartnerLinkDealPage: { table: null, reason: "a page of a record's deals to connect work to" },
 };
 
 module.exports = {
@@ -638,6 +711,18 @@ module.exports = {
   PartnerWorkQuery,
   PartnerWorkItem,
   PartnerWorkPage,
+  partnerLinkFields,
+  partnerLinkEditFields,
+  linkRules,
+  linkEditRules,
   PartnerLink,
+  PartnerLinkView,
   PartnerLinkQuery,
+  LinkKind,
+  PartnerLinkRecordQuery,
+  PartnerLinkRecord,
+  PartnerLinkRecordPage,
+  PartnerLinkDealQuery,
+  PartnerLinkDeal,
+  PartnerLinkDealPage,
 };

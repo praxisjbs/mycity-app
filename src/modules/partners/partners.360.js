@@ -9,8 +9,8 @@
  *              Active Deals (live); Days Since Last Contact (its latest interaction, else since made)
  *   deals      the first 25 it has, open and live first
  *   contacts   the first 25, the primary first
- *   overview   its next three events (connected through My Workspace, M7 PR 5) and its latest five
- *              interactions
+ *   overview   its next three connected events the reader may see in My Workspace (partners.work)
+ *              and its latest five interactions
  *   deliverables  what MyCity owes on its signed deals (raised on signing, M7 PR 5)
  *   custom_fields the fields its category and every category give partners, retired ones included
  *   history    the latest 25 stage and health lines of its deals, each naming its deal (Activity)
@@ -73,7 +73,8 @@ async function one(db, id, scope, actor) {
   const interactions = require("../interactions/interactions.service");
   const held = await pipeline.holdsMoney(actor);
   const year = lagos.today().slice(0, 4);
-  const [region, headquarters, logo, figures, deals, contacts, latest, defs, history] = await Promise.all([
+  const work = require("./partners.work");
+  const [region, headquarters, logo, figures, deals, contacts, latest, defs, history, events] = await Promise.all([
     service.regionViewOf(db, "partner.cities", id, r.region_scope, r.region),
     places.view(db, "partner.headquarters", id),
     logoOf(db, r.logo_document_id),
@@ -83,6 +84,7 @@ async function one(db, id, scope, actor) {
     interactions.latestOf(db, { kind: "partner", id }),
     fields.defsFor(db, "partner", r.partner_category_id),
     dealRepo.historyOfRecord(db, { kind: "partner", id }, scope),
+    work.nextEvents(db, actor, { kind: "partner", id }),
   ]);
   const signed = deals.data.filter((d) => d.status === "live" || d.status === "completed").map((d) => d.deal_id);
   const delivered = signed.length ? (await dealRepo.deliverables(db, signed)).data : [];
@@ -98,7 +100,7 @@ async function one(db, id, scope, actor) {
     kpis,
     deals: deals.data.map(pipeline.rowOf),
     contacts,
-    overview: { events: [], interactions: latest },
+    overview: { events, interactions: latest },
     deliverables: delivered,
     custom_fields: defs,
     history,

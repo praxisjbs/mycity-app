@@ -60,6 +60,9 @@ const probe = {
   },
 };
 
+// Connect to Partner on the card (M7, workspace.md §9): Partnerships names and finds the partner, lead and deal.
+const partnerCard = require("../partners/partners.work").card;
+
 const eventLink = (id) => (routeMap.linkFor("calendar_event", id) || {}).path || null;
 
 module.exports = defineManifest({
@@ -74,20 +77,21 @@ module.exports = defineManifest({
       risk: "standard",
       // New Event's form takes a day and two clock times and joins them into starts_at and ends_at before it sends.
       form: "none: New Event's form takes a day and two clock times, joined into starts_at and ends_at as it sends",
-      fields: ["title", "starts_at", "ends_at", "all_day", "attendee_ids", "event_type", "location", "visibility", "description", "reminder_minutes"],
-      picks: { attendee_ids: "colleague" },
+      fields: ["title", "starts_at", "ends_at", "all_day", "attendee_ids", "event_type", "location", "visibility", "description", "reminder_minutes", ...partnerCard.fields],
+      picks: { attendee_ids: "colleague", ...partnerCard.picks },
       // One event is made, so the verb counts nothing; the people invited are named, never counted.
-      names: (values, _actor, db) => attendeeNames(db, values.attendee_ids),
+      names: async (values, actor, db) => [...(await attendeeNames(db, values.attendee_ids)), ...(await partnerCard.names(values, actor, db))],
       asks: [
         { field: "title", question: "What is the meeting about?" },
         { field: "starts_at", question: "When is it?" },
         { field: "ends_at", question: "How long is it?", choices: ["30 Minutes", "1 Hour", "2 Hours"] },
         { field: "attendee_ids", question: "Who should come?", choices: ["Just Me"], none: true },
       ],
+      resolve: partnerCard.resolve,
       // The same function Create Event calls; someone invited who is not on the staff is refused on the field (§6).
       run: (values, actor) => service.create(actor, values),
       readback: (event) => [{ type: "calendar_event", id: event.calendar_event_id, label: event.title, status: "booked", link: eventLink(event.calendar_event_id) }],
-      labels: { title: "Title", description: "Notes", event_type: "Kind", starts_at: "Starts", ends_at: "Ends", all_day: "All Day", location: "Location", visibility: "Visibility", attendee_ids: "Attendees", reminder_minutes: "Reminders" },
+      labels: { title: "Title", description: "Notes", event_type: "Kind", starts_at: "Starts", ends_at: "Ends", all_day: "All Day", location: "Location", visibility: "Visibility", attendee_ids: "Attendees", reminder_minutes: "Reminders", ...partnerCard.labels },
     },
     {
       key: "calendar.edit",
@@ -98,13 +102,13 @@ module.exports = defineManifest({
       permission: ["workspace", "edit"],
       risk: "standard",
       form: "none: Edit Event's form takes a day and two clock times, joined into starts_at and ends_at as it sends, and changes the event open; the card names it",
-      fields: ["calendar_event_id", "title", "starts_at", "ends_at", "all_day", "attendee_ids", "event_type", "location", "visibility", "description", "reminder_minutes"],
-      picks: { attendee_ids: "colleague" },
+      fields: ["calendar_event_id", "title", "starts_at", "ends_at", "all_day", "attendee_ids", "event_type", "location", "visibility", "description", "reminder_minutes", ...partnerCard.fields],
+      picks: { attendee_ids: "colleague", ...partnerCard.picks },
       // Which event, when the person did not say (praxis-ai.md decision 34): their events from today, matched by title.
       asks: [{ field: "calendar_event_id", question: "Which event is it?", options: ({ actor }) => service.eventChoices(actor.employee_id) }],
-      resolve: { calendar_event_id: (value, actor) => service.eventIdOf(actor.employee_id, value) },
+      resolve: { calendar_event_id: (value, actor) => service.eventIdOf(actor.employee_id, value), ...partnerCard.resolve },
       // The event is what the press changes; the people invited are named, never counted.
-      names: (values, _actor, db) => attendeeNames(db, values.attendee_ids),
+      names: async (values, actor, db) => [...(await attendeeNames(db, values.attendee_ids)), ...(await partnerCard.names(values, actor, db))],
       records: (values, actor, db) => (db ? service.cardRecords(db, values.calendar_event_id, actor.employee_id) : values.calendar_event_id ? [{ type: "calendar_event", id: values.calendar_event_id }] : []),
       check: (client, values, actor) => service.assertCardEvent(client, values.calendar_event_id, actor.employee_id),
       // The same function Save Event calls; someone invited who is not on the staff is refused on the field (§6).
@@ -113,7 +117,7 @@ module.exports = defineManifest({
         return service.edit(actor, id, changes);
       },
       readback: (event) => [{ type: "calendar_event", id: event.calendar_event_id, label: event.title, status: "saved", link: eventLink(event.calendar_event_id) }],
-      labels: { calendar_event_id: "Event", title: "Title", description: "Notes", event_type: "Kind", starts_at: "Starts", ends_at: "Ends", all_day: "All Day", location: "Location", visibility: "Visibility", attendee_ids: "Attendees", reminder_minutes: "Reminders" },
+      labels: { calendar_event_id: "Event", title: "Title", description: "Notes", event_type: "Kind", starts_at: "Starts", ends_at: "Ends", all_day: "All Day", location: "Location", visibility: "Visibility", attendee_ids: "Attendees", reminder_minutes: "Reminders", ...partnerCard.labels },
     },
   ],
   // Edit Event's own form, reached through the card that names its event (gate 23, praxis-ai.md decision 33).

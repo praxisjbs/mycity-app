@@ -137,6 +137,11 @@ const JOBS = Object.freeze([
     summary: "The morning's repeating tasks and due reminders, run again by hand",
   },
   {
+    queue: "partner-inactivity",
+    concurrency: 1,
+    summary: "The morning's follow-ups of quiet partners and leads, run again by hand",
+  },
+  {
     queue: "reminders",
     concurrency: 2,
     summary: "One person's daily digest of what they have not read",
@@ -190,6 +195,7 @@ const SCHEDULERS = Object.freeze([
   "query-rule-sweep",
   "user-guide-index",
   "budget-threshold",
+  "partner-inactivity",
   "signature-reminders",
 ]);
 

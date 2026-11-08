@@ -265,7 +265,9 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
     expect(card).toMatchObject({ action_key: "tasks.edit", label: "Save Task", schema: "tasks.TaskChange", problems: {} });
     expect(card.records).toEqual([expect.objectContaining({ type: "task", id: t.task_id, label: `${t.number} Draft the budget` })]);
     expect(card.names).toEqual([expect.objectContaining({ type: "employee", id: staff, label: "Tunde Ade" })]);
-    expect(card.fields.map((f) => f.name)).toEqual(["task_id", "title", "description", "due_on", "priority", "cadence", "primary_assignee_id", "member_ids", "department_id", "project_id"]);
+    expect(card.fields.map((f) => f.name)).toEqual(["task_id", "title", "description", "due_on", "priority", "cadence", "primary_assignee_id", "member_ids", "department_id", "project_id", "partner_id", "lead_id", "deal_id"]);
+    // Connect to Partner on the card (M7 PR 5): picked on Edit as the form picks them.
+    expect(card.fields.filter((f) => ["partner_id", "lead_id", "deal_id"].includes(f.name)).map((f) => [f.label, f.picks])).toEqual([["Partner", "partner"], ["Lead", "lead"], ["Deal", "partner_deal"]]);
     expect(card.fields[0]).toMatchObject({ name: "task_id", label: "Task", picks: null });
     expect(card.fields.find((f) => f.name === "primary_assignee_id")).toMatchObject({ label: "For", picks: "task_assignee" });
     // A commitment, a repeat and Counts Towards stay on the panel: never carried, whatever the model wrote.

@@ -224,13 +224,15 @@ function validityOf(validity, category) {
  * @param {object} actor
  * @param {{kind: "lead"|"partner", id: string, categoryId: string|null}} record
  * @param {object} body  DealFields
- * @param {{held: boolean, field?: string, allowSigned?: boolean, source?: string, identifiedOn?: string|null}} opts
+ * @param {{held: boolean, field?: string, allowSigned?: boolean, source?: string, identifiedOn?: string|null, signedBeforeHub?: boolean}} opts
  *   field: where a refusal lands ("deal" inside New Lead); allowSigned: New Partner's first deal;
+ *   signedBeforeHub: New Partner's "signed before the hub", carried on deal.signed so no delivery
+ *   checklist is raised for it (§13.2, In PR 5);
  *   source: where it came from, on its first history line and its events (`person`, or `import` from
  *   the tracker importer, M7 PR 4); identifiedOn: the day it was identified (its lead's), else today
  * @returns {Promise<{deal_id: string, number: string, stage: object}>}
  */
-async function createIn(client, actor, record, body, { held, field = null, allowSigned = false, source = "person", identifiedOn = null } = {}) {
+async function createIn(client, actor, record, body, { held, field = null, allowSigned = false, source = "person", identifiedOn = null, signedBeforeHub = false } = {}) {
   const at = (k) => (field ? `${field}.${k}` : k);
   refuseMoney(body, held);
   const stages = await lists.stagesOf(client);
@@ -297,7 +299,7 @@ async function createIn(client, actor, record, body, { held, field = null, allow
       key: EVENTS.DEAL_SIGNED,
       entity: { type: "partner_deal", id: dealId },
       actor,
-      payload: { deal_id: dealId, number, partner_id: record.kind === "partner" ? record.id : null, owner_id: body.owner_id, source },
+      payload: { deal_id: dealId, number, partner_id: record.kind === "partner" ? record.id : null, owner_id: body.owner_id, source, ...(signedBeforeHub ? { signed_before_hub: true } : {}) },
     });
   }
   return { deal_id: dealId, number, stage };
