@@ -844,7 +844,7 @@ its error file.
 
 ![Settings, Imports](shot:settings-imports)
 
-### Import a spreadsheet {#settings-imports-run needs="people create or performance create"}
+### Import a spreadsheet {#settings-imports-run needs="people create or performance create or partnerships create"}
 
 1. Press **Start Import**. **Import Records** opens.
 2. On **Upload**, choose **What To Import**. You only see the imports your role may run.
@@ -853,23 +853,31 @@ its error file.
    [People · Employees](/people?tab=employees) opens it already set to **Employees**.
 4. {needs="performance create"} **OKR Workbook**, **OKR Workbook KPIs** and
    **Scorecards Workbook** import a performance plan.
-5. **Blank Sheet** downloads a sheet with the right columns and notes.
-6. Drop your file on **Drop files here, or browse**, or press it to pick one. Excel up to 10 MB, or
+5. {needs="partnerships create"} **Partnership Tracker** imports MyCity's tracker workbook as it is
+   kept. A signed or active row becomes a partner, the rest leads. **Partnership Returns** imports a
+   month's returns for each deal, by its deal number, or its partner and deal title; it needs See
+   Commission and Returns.
+6. **Blank Sheet** downloads a sheet with the right columns and notes.
+7. Drop your file on **Drop files here, or browse**, or press it to pick one. Excel up to 10 MB, or
    CSV up to 5 MB. Press **Next** once its name shows; before that it says *Upload a sheet first*.
-7. On **Map**, check which field each column fills. **Leave Out** skips a column. A field fills one
+8. On **Map**, check which field each column fills. **Leave Out** skips a column. A field fills one
    column: picked for another, it moves there, and the hub says, for example, *Moved from Email*.
    The hub finds the row with the column names among the first 20 rows. If it is wrong, or reads
    **Choose Row**, pick the right row in **Column Names Row**. The columns are matched again.
    **Required** names the fields that need a column, each marked once one fills it. Press
    **Next**. If one still has no column, **Map** stays open and says which, such as *Choose a
    column for Designation*.
-8. **Preview** shows what would happen: how many rows **To Create**, **To Update**, **Unchanged**
-   and with **Problems**. On a computer, choose **Problems** or **Changes** under **Show** to read
-   the rows. On a phone, press **Download Errors** to read them in the sheet. Nothing is saved yet.
-   **Every Row Is Fine** under **Problems** means nothing needs fixing. Press **Next**.
-9. On **Commit**, tick any new value to create, such as a new department.
-10. If some rows have problems, switch on **Commit Valid Rows** to save the others.
-11. Press **Commit Import**. A message such as *12 created, 3 updated* confirms it, and the bell
+9. {needs="partnerships create"} On **Map Values**, each value of a list, person or city column
+   shows once, with how many rows hold it, such as *Mr. John (2)*. Each starts at what the hub
+   matched. Pick the right one, **Create** it, or **Leave Empty**. A city is picked from the
+   address search. Press **Next**. Your choices are kept for the next file with the same columns.
+10. **Preview** shows what would happen: how many rows **To Create**, **To Update**, **Unchanged**
+    and with **Problems**. On a computer, choose **Problems** or **Changes** under **Show** to read
+    the rows. On a phone, press **Download Errors** to read them in the sheet. Nothing is saved yet.
+    **Every Row Is Fine** under **Problems** means nothing needs fixing. Press **Next**.
+11. On **Commit**, tick any new value to create, such as a new department.
+12. If some rows have problems, switch on **Commit Valid Rows** to save the others.
+13. Press **Commit Import**. A message such as *12 created, 3 updated* confirms it, and the bell
     says **Your import finished**.
 
 If the window says **Nothing To Import**, your role may run no import. Ask People and Operations to
@@ -894,6 +902,21 @@ run it. Pressed before the list of imports has loaded, the window waits for it.
 | **Choose the row that holds the column names** | The row picked is past the sheet's end | Pick a row that has the names |
 | *Choose a column for Designation* | A required field has no column | Choose that field for one column |
 | *3 rows have problems. Fix them in the file, or commit the valid rows only.* | Some rows cannot be saved | Fix them and import again, or switch on **Commit Valid Rows** |
+
+### When a partnership file is refused {#settings-imports-partnerships needs="partnerships create"}
+
+| The message | What it means | What to do |
+|---|---|---|
+| **This is not the partnership tracker: no sheet has a Partner Name column** | The file chosen is not the tracker | Choose the tracker workbook |
+| *Partnership Stage: map it on Map Values* | A stage the hub has no stage for | Pick its stage on **Map Values** |
+| *Lead Owner "JANE" is not matched; saved without it* | Nobody here has that name | Pick the person on **Map Values**, or give the record an owner later |
+| *Region: Owerri not placed; pick on Map Values or the record* | The city search found no one city | Pick the city on **Map Values** |
+| *No custom field for Instagram Handle; add it on Categories to import it* | A column with no custom field | [Add the field](/partnerships?tab=categories) and import again |
+| **This is not a returns report: no sheet has a Month column beside a Deal Number or Partner** | The file chosen is not a returns report | Choose the report |
+| *No deal DEAL-2026-0099 you can see* | The deal number is wrong, or not yours to see | Correct the number in the file |
+
+A record already in the hub, by its name, website or contact email, is left as it is. Importing the
+same tracker again makes nothing twice.
 
 ### When a performance workbook is refused {#settings-imports-performance needs="performance create"}
 
@@ -924,10 +947,10 @@ run it. Pressed before the list of imports has loaded, the window waits for it.
    **Status** and **Problem** column on each row. Correct the rows and import them again.
 3. On an unfinished import (**Uploaded**, **Mapped** or **Previewed**) you may run, press
    **Continue**: **Import Records** opens at **Map**, or at **Preview** for one previewed.
-4. {needs="people create or performance create"} On a **Committed** import you may run, press
-   **Revert**, then **Revert Import** to confirm. People it created are archived and records it
-   changed go back.
-5. {needs="people create or performance create"} A message such as *12 archived, 3 put back*
+4. {needs="people create or performance create or partnerships create"} On a **Committed** import
+   you may run, press **Revert**, then **Revert Import** to confirm. Records it created are archived
+   or removed, and records it changed go back.
+5. {needs="people create or performance create or partnerships create"} A message such as *12 archived, 3 put back*
    confirms it, and the bell says **Your import was undone**.
 
 | The message | What it means | What to do |

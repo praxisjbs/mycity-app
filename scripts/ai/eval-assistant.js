@@ -245,6 +245,8 @@ const CASES = Object.freeze([
   { id: "recruitment.to-mark", as: "operations_people", question: "Which assessments are waiting for their answers to be marked?", reads: ["assessments.sittings"] },
   { id: "recruitment.interviews-week", as: "operations_people", question: "Which interviews are coming up, and who has not submitted their card?", reads: ["interviews.list"] },
   { id: "recruitment.pool", as: "operations_people", question: "Who is in the talent pool, and who has been invited back?", reads: ["talent_pool.list"] },
+  { id: "recruitment.offers", as: "operations_people", question: "Which offers are with candidates, and when do they expire?", reads: ["offers.list"] },
+  { id: "card.offer", as: "operations_people", question: "Draft an offer for {offers.create#application_id}, starting on the first of next month at 450,000 naira a month basic.", shows: ["cards"], action: "offers.create" },
   { id: "recruitment.not-staff", as: "employee", question: "Who has applied for our open vacancies?", never: ["candidates.list"] },
   { id: "targets.expenses", as: "ceo", question: "Which expenses are awaiting approval?", needs: "expenses" },
   { id: "targets.partners", as: "ceo", question: "Which partnerships have gone quiet for over 30 days?", needs: "partnerships" },

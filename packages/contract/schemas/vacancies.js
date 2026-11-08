@@ -231,7 +231,8 @@ const VacanciesSummary = z
     in_interview: z.number().int().min(0),
     past_closing: z.number().int().min(0),
     funnel: z.array(StageCount).max(10),
-    careers_url: z.string(),
+    /** This environment's public site, its index (go.mycityapp.io/): Careers Page opens it. */
+    site_url: z.string(),
   })
   .strict();
 

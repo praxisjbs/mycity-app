@@ -1,6 +1,6 @@
-import type { ApplicationReceipt, ApplyLink, ApplyQuestion, AssessmentSession, PublicJob, PublicJobCard, PublicJobsSummary, PublicQuestion } from "@mycity/contract/contract.gen.ts";
+import type { ApplicationReceipt, ApplyLink, ApplyQuestion, AssessmentSession, PublicJob, PublicJobCard, PublicJobsSummary, PublicQuestion, SignCodeSent, SignerView, SigningView, VerifyByToken, VerifyResult } from "@mycity/contract/contract.gen.ts";
+import signatureSchemas from "@mycity/contract/schemas/signatures.js";
 import candidates from "@mycity/contract/schemas/candidates.js";
-import type { OfferToSign, VerifyByToken, VerifyResult } from "@/api/types/public";
 import { fail, inDays, invalid, ok, paged, route, type Req } from "./core";
 
 /**
@@ -349,6 +349,14 @@ const LINKS = new Map<string, Link>([
   ["k7Qm2TxV9pLa", { slug: "head-sales-revenue-lagos", expires_at: inDays(2), receipt: null, email: null }],
   ["Bv3nQ8sLp2Wd", { slug: "graphics-and-motion-designer-lagos", expires_at: inDays(2), receipt: null, email: null }],
   ["Wn4cR8yHj2Zs", { slug: "studio-assistant-lagos", expires_at: inDays(-1), receipt: null, email: null }],
+  ["Hq5tN2wPz8Kc", { slug: "head-sales-revenue-lagos", expires_at: inDays(2), receipt: null, email: null }],
+]);
+/**
+ * Who has applied for which role, by role slug and email: a repeat is told it applied. Chiamaka
+ * applied for Head, Sales & Revenue a few days ago, so applying again as her shows it.
+ */
+const APPLIED = new Map<string, ApplicationReceipt>([
+  ["head-sales-revenue-lagos|chiamaka.eze@example.com", { reference: "APP-0016", submitted_at: inDays(-4), already_applied: false }],
 ]);
 const opaque = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"[b % 56]).join("");
 const liveLink = (token: string) => {
@@ -396,8 +404,17 @@ route("POST /api/public/v1/apply/:token", (req: Req) => {
   if (!checked.success) for (const i of checked.error.issues) (fields[i.path.join(".") || "body"] ??= []).push(i.message);
   Object.assign(fields, answersOf(r, ((req.body as { answers?: Record<string, string> }).answers ?? {}) as Record<string, string>));
   if (Object.keys(fields).length) return invalid(fields);
-  l.receipt = { reference: `APP-${String(++nextApp).padStart(4, "0")}`, submitted_at: new Date().toISOString() };
-  l.email = String((req.body as { email?: string }).email ?? "");
+  const email = String((req.body as { email?: string }).email ?? "").trim().toLowerCase();
+  /* The same email for the same role again: nothing new, and the applicant is told (the API's already_applied). */
+  const first = APPLIED.get(`${l.slug}|${email}`);
+  if (first) {
+    l.receipt = { ...first, already_applied: true };
+    l.email = email;
+    return ok(l.receipt);
+  }
+  l.receipt = { reference: `APP-${String(++nextApp).padStart(4, "0")}`, submitted_at: new Date().toISOString(), already_applied: false };
+  l.email = email;
+  APPLIED.set(`${l.slug}|${email}`, l.receipt);
   r.applicants += 1;
   return ok(l.receipt);
 });
@@ -556,78 +573,191 @@ route("POST /api/public/v1/assess/:token/submit", (req) => {
   return ok(view(s));
 });
 
-/* ── Offer signing ── */
-type Offer = OfferToSign & { signature?: string };
-const LETTER = (first: string, role: string, pay: string, start: string, manager: string) => [
+/* ── Offer signing (docs/guides/offers.md §3 step 4; the signatures routes) ──
+ * The staff mock's offers, as their candidates' links open them: OFF-0018 for Dayo Martins waiting
+ * (the company has signed), OFF-0017 for Chiamaka Eze signed by both, OFF-0013 past its day. The
+ * emailed code on the mock is always 482913; a code is good for ten minutes and five tries, another
+ * may be asked for after a minute.
+ */
+const CODE = "482913";
+const SIGNATORY = { name: "Cynthia Osakunih", title: "Operations and People Lead" };
+interface Offer {
+  view: SigningView;
+  email: string;
+  code_sent_at: number | null;
+  tries: number;
+  signature?: string;
+}
+const LETTER = (name: string, first: string, role: string, pay: string, start: string, manager: string) => [
+  name,
+  "PRIVATE & CONFIDENTIAL",
   `Dear ${first},`,
-  `We are pleased to offer you the position of ${role} at MyCity App Ltd, reporting to the ${manager}, with a start date of ${start}.`,
-  `Your gross monthly salary will be ${pay}, subject to a probationary period of three months. Working hours are 09:00 to 17:00 Monday to Friday and 09:00 to 15:00 on Saturday.`,
+  `Offer of Employment: ${role}`,
+  `We are pleased to offer you employment with MyCity App Ltd ("the Company") as ${role}, with effect from ${start}, on the terms and conditions set out in this letter.`,
+  "Offer Summary",
+  `Position · ${role}`,
+  `Reports to · ${manager}`,
+  `Total monthly compensation · ${pay} (see Section 3)`,
+  "Terms and Conditions",
+  "1.1 You are employed as the role above. The Company may reasonably update these duties from time to time in line with business needs.",
+  "Acceptance",
   "This offer is conditional upon satisfactory documentation. Once you sign, we will send you a list of the documents to upload before your first day.",
-  "We look forward to working with you.",
-  "Cynthia Osakunih, Operations and People Lead, for MyCity App Ltd",
+  "Yours sincerely,",
+  `${SIGNATORY.name}, ${SIGNATORY.title}, for MyCity App Ltd`,
 ];
-/* The approved design's offer (OFF-0018, for Chiamaka Eze), one already signed and one past its day. */
-const OFF_0016_SIGNED = "2026-10-21T13:05:00.000Z"; // 21/10/2026, 14:05 in Lagos
+const signers = (candidate: string, signed: string | null, company = "2026-10-30T15:05:00.000Z"): SignerView[] => [
+  { name: SIGNATORY.name, title: SIGNATORY.title, role: "mycity", status: "signed", signed_at: company },
+  { name: candidate, title: null, role: "candidate", status: signed ? "signed" : "pending", signed_at: signed },
+];
+const OFF_0017_SIGNED = "2026-10-23T19:12:00.000Z"; // 23/10/2026, 20:12 in Lagos
+const offerOf = (reference: string, name: string, first: string, role: string, pay: string, start: string, manager: string, issued_at: string, expires_at: string, signed: string | null, email: string): Offer => ({
+  email,
+  code_sent_at: null,
+  tries: 0,
+  view: {
+    reference,
+    document_type: "offer_letter",
+    title: `Offer of Employment: ${role}`,
+    company: "MyCity App Ltd",
+    signer_name: name,
+    issued_at,
+    expires_at,
+    state: signed ? "signed" : "awaiting",
+    letter: LETTER(name, first, role, pay, start, manager),
+    code_verified: false,
+    signers: signers(name, signed),
+    signed_at: signed,
+    verify_number: signed ? reference : null,
+  },
+});
 const OFFERS = new Map<string, Offer>([
-  ["Rt8wN2kPz5Gb", { reference: "OFF-0018", candidate_name: "Chiamaka Eze", role: "Content Producer", company: "MyCity App Ltd", issued_at: new Date().toISOString(), expires_at: inDays(7), state: "awaiting", letter: LETTER("Chiamaka", "Content Producer", "₦480,000", "20 October 2026", "Head of Content"), signed_at: null, verify_number: null }],
-  ["Yc3vB6mQh9Ls", { reference: "OFF-0016", candidate_name: "Obinna Chukwu", role: "Content Producer", company: "MyCity App Ltd", issued_at: "2026-10-17T09:00:00.000Z", expires_at: "2026-10-24T22:59:59.000Z", state: "signed", letter: LETTER("Obinna", "Content Producer", "₦460,000", "1 November 2026", "Head of Content"), signed_at: OFF_0016_SIGNED, verify_number: "OFF-0016" }],
-  ["Gz7kT4pXw2Nd", { reference: "OFF-0013", candidate_name: "Kemi Adebayo", role: "Studio Assistant", company: "MyCity App Ltd", issued_at: inDays(-9), expires_at: inDays(-2), state: "awaiting", letter: LETTER("Kemi", "Studio Assistant", "₦200,000", "1 October 2026", "Studio Manager"), signed_at: null, verify_number: null }],
+  ["Rt8wN2kPz5Gb", offerOf("OFF-0018", "Dayo Martins", "Dayo", "Content Producer", "₦500,000.00", "1 December 2026", "Content Lead", new Date().toISOString(), inDays(9), null, "dayo.martins@example.test")],
+  ["Yc3vB6mQh9Ls", offerOf("OFF-0017", "Chiamaka Eze", "Chiamaka", "Content Producer", "₦480,000.00", "16 November 2026", "Content Lead", "2026-10-21T09:00:00.000Z", "2026-11-05T22:59:59.000Z", OFF_0017_SIGNED, "chiamaka.eze@example.test")],
+  ["Gz7kT4pXw2Nd", offerOf("OFF-0013", "Kemi Adebayo", "Kemi", "Studio Assistant", "₦200,000.00", "1 October 2026", "Studio Manager", inDays(-9), inDays(-2), null, "kemi.adebayo@example.test")],
 ]);
-const offerView = (o: Offer): OfferToSign => {
-  if (o.state === "awaiting" && new Date(o.expires_at).getTime() < Date.now()) o.state = "expired";
-  const { signature: _s, ...rest } = o;
-  return rest;
+const viewOf = (o: Offer): SigningView => {
+  if (o.view.state === "awaiting" && o.view.expires_at && new Date(o.view.expires_at).getTime() < Date.now()) o.view.state = "expired";
+  return { ...o.view, signers: o.view.signers.map((x) => ({ ...x })) };
 };
-const badOffer = () => fail(404, "TOKEN_INVALID", "This link is not valid. Check you opened the whole address from the email.");
+const masked = (email: string) => email.replace(/^(.)[^@]*(@.*)$/, "$1•••$2");
+const badOffer = () => fail(404, "NOT_FOUND", "This link is not valid. Check you opened the whole address from the email.");
+interface Issue {
+  path: PropertyKey[];
+  message: string;
+}
+function parsed<T>(schema: unknown, body: unknown, then: (b: T) => ReturnType<typeof ok>) {
+  const r = (schema as { safeParse(v: unknown): { success: true; data: T } | { success: false; error: { issues: Issue[] } } }).safeParse(body);
+  if (r.success) return then(r.data);
+  const fields: Record<string, string[]> = {};
+  for (const i of r.error.issues) fields[i.path.map(String).join(".") || "body"] ??= [i.message];
+  return invalid(fields);
+}
+/** Only a waiting link may act: one signed says so, an ended one cannot be signed. */
+const mayAct = (o: Offer) => {
+  const v = viewOf(o);
+  if (v.state === "signed") return fail(409, "ALREADY_SIGNED", "You have already signed");
+  if (v.state !== "awaiting") return fail(409, "NOT_OPEN", "This document can no longer be signed");
+  return null;
+};
+
 route("GET /api/public/v1/sign/:token", (req) => {
   const o = OFFERS.get(req.params.token);
-  return o ? ok(offerView(o)) : badOffer();
+  return o ? ok(viewOf(o)) : badOffer();
+});
+route("POST /api/public/v1/sign/:token/code", (req) => {
+  const o = OFFERS.get(req.params.token);
+  if (!o) return badOffer();
+  const refused = mayAct(o);
+  if (refused) return refused;
+  const now = Date.now();
+  if (o.code_sent_at && now - o.code_sent_at < 60000) {
+    return fail(429, "TOO_SOON", "Wait a minute, then ask again", { resend_after: [new Date(o.code_sent_at + 60000).toISOString()] });
+  }
+  o.code_sent_at = now;
+  o.tries = 0;
+  const sent: SignCodeSent = { sent_to: masked(o.email), expires_at: new Date(now + 600000).toISOString(), resend_after: new Date(now + 60000).toISOString() };
+  return ok(sent);
+});
+route("POST /api/public/v1/sign/:token/code/verify", (req) => {
+  const o = OFFERS.get(req.params.token);
+  if (!o) return badOffer();
+  const refused = mayAct(o);
+  if (refused) return refused;
+  return parsed<{ code: string }>(signatureSchemas.SignCodeVerify, req.body, (b) => {
+    if (!o.code_sent_at || Date.now() - o.code_sent_at > 600000 || o.tries >= 5) return invalid({ code: ["Ask for another code"] });
+    if (b.code !== CODE) {
+      o.tries += 1;
+      return invalid({ code: [o.tries >= 5 ? "Ask for another code" : "Wrong code"] });
+    }
+    o.view.code_verified = true;
+    return ok(viewOf(o));
+  });
 });
 route("POST /api/public/v1/sign/:token/sign", (req) => {
   const o = OFFERS.get(req.params.token);
   if (!o) return badOffer();
-  const v = offerView(o);
-  if (v.state !== "awaiting") return fail(409, "OFFER_CLOSED", v.state === "expired" ? "This offer expired before it was signed." : "This offer has already been answered.");
-  const png = String(req.body.signature_png ?? "");
-  if (!png.startsWith("data:image/png;base64,") || png.length < 300) return invalid({ signature_png: ["Sign in the box first"] });
-  Object.assign(o, { state: "signed", signed_at: new Date().toISOString(), verify_number: o.reference, signature: png });
-  VERIFY.set(o.reference, { number: o.reference, document_type: "Offer of employment", signed_by: o.candidate_name, signed_at: o.signed_at!, issued_by: o.company, content: "matches", artifact: "matches" });
-  return ok(offerView(o));
+  // A second press after signing answers with the signed state, not an error (guide §11).
+  if (viewOf(o).state === "signed") return ok(viewOf(o));
+  const refused = mayAct(o);
+  if (refused) return refused;
+  if (!o.view.code_verified) return fail(409, "CODE_NEEDED", "Enter the code we emailed you first");
+  return parsed<{ signature_png?: string; typed?: string }>(signatureSchemas.SignSubmit, req.body, (b) => {
+    const at = new Date().toISOString();
+    o.signature = b.signature_png ?? b.typed;
+    Object.assign(o.view, { state: "signed", signed_at: at, verify_number: o.view.reference, signers: o.view.signers.map((x) => (x.role === "candidate" ? { ...x, status: "signed", signed_at: at } : x)) });
+    VERIFY.set(o.view.reference, record(o.view.reference, o.view.title, o.view.signers, "matches", "matches"));
+    return ok(viewOf(o));
+  });
 });
 route("POST /api/public/v1/sign/:token/decline", (req) => {
   const o = OFFERS.get(req.params.token);
   if (!o) return badOffer();
-  const v = offerView(o);
-  if (v.state !== "awaiting") return fail(409, "OFFER_CLOSED", "This offer has already been answered.");
-  o.state = "declined";
-  return ok(offerView(o));
+  const refused = mayAct(o);
+  if (refused) return refused;
+  return parsed(signatureSchemas.SignDecline, req.body, () => {
+    Object.assign(o.view, { state: "declined", signers: o.view.signers.map((x) => (x.role === "candidate" ? { ...x, status: "declined" } : x)) });
+    return ok(viewOf(o));
+  });
 });
 
 /* ── Verification: two hashes, two verdicts ──
- * The approved design's cases: OFF-0016 genuine, OFF-0012 its stored file altered (the artifact hash
- * differs), OFF-0011 its record altered (the content hash differs), OFF-0099 not found; OFF-0018 is
- * added genuine when it is signed above. OFF-0009 has both changed. Signed times are Lagos's.
+ * OFF-0017 genuine, OFF-0012 its stored file altered (the artifact hash differs), OFF-0011 its record
+ * altered (the content hash differs), OFF-0009 both, OFF-0099 not found; OFF-0018 is added genuine
+ * when it is signed above. Signed times are Lagos's.
  */
+const record = (reference: string, title: string, people: SignerView[], content: VerifyResult["content"], artifact: VerifyResult["artifact"]): VerifyResult => ({
+  reference,
+  document_type: "offer_letter",
+  title,
+  issued_by: "MyCity App Ltd",
+  issued_at: people[0]?.signed_at ?? new Date().toISOString(),
+  status: "completed",
+  record_status: null,
+  signers: people.map((x) => ({ ...x })),
+  signed_outside: false,
+  content,
+  artifact,
+});
 const VERIFY = new Map<string, VerifyResult>(
   ([
-    ["OFF-0016", "Obinna Chukwu", OFF_0016_SIGNED, "matches", "matches"],
-    ["OFF-0012", "Ifeanyi Okafor", "2026-09-27T09:42:00.000Z", "matches", "differs"],
-    ["OFF-0011", "Halima Bello", "2026-09-15T15:20:00.000Z", "differs", "matches"],
-    ["OFF-0009", "Seun Ajayi", "2026-08-28T10:10:00.000Z", "differs", "differs"],
-  ] as const).map(([number, signed_by, signed_at, content, artifact]) => [number, { number, document_type: "Offer of employment", signed_by, signed_at, issued_by: "MyCity App Ltd", content, artifact }]),
+    ["OFF-0017", "Chiamaka Eze", "Content Producer", OFF_0017_SIGNED, "matches", "matches"],
+    ["OFF-0012", "Ifeanyi Okafor", "Partnerships Associate", "2026-09-27T09:42:00.000Z", "matches", "differs"],
+    ["OFF-0011", "Halima Bello", "Support Officer", "2026-09-15T15:20:00.000Z", "differs", "matches"],
+    ["OFF-0009", "Seun Ajayi", "Video Editor", "2026-08-28T10:10:00.000Z", "differs", "differs"],
+  ] as const).map(([ref, who, role, at, content, artifact]) => [ref, record(ref, `Offer of Employment: ${role}`, signers(who, at, new Date(Date.parse(at) - 3 * 86400000).toISOString()), content, artifact)]),
 );
-route("GET /api/public/v1/verify/:number", (req) => {
-  const r = VERIFY.get(req.params.number.trim().toUpperCase());
+route("GET /api/public/v1/verify/:ref", (req) => {
+  const r = VERIFY.get(req.params.ref.trim().toUpperCase());
   return r ? ok(r) : fail(404, "NOT_FOUND", "No signed document has this reference.");
 });
 
-/* The QR printed on each page of a sealed document opens it by token, with the document itself. */
-const QR = new Map<string, string>([["Qd5mW8rTx3Kp", "OFF-0016"]]);
+/* The QR printed on each page of a sealed document opens it by its key, with the document itself. */
+const QR = new Map<string, string>([["Qd5mW8rTx3Kp", "OFF-0017"]]);
 route("GET /api/public/v1/verify/t/:token", (req) => {
-  const number = QR.get(req.params.token);
-  const r = number ? VERIFY.get(number) : undefined;
-  const offer = [...OFFERS.values()].find((o) => o.reference === number);
+  const ref = QR.get(req.params.token);
+  const r = ref ? VERIFY.get(ref) : undefined;
+  const offer = [...OFFERS.values()].find((o) => o.view.reference === ref);
   if (!r || !offer) return fail(404, "NOT_FOUND", "This link is not valid. Check you scanned the whole code.");
-  const out: VerifyByToken = { ...r, document: { title: "Offer of Employment", letter: offer.letter, file_name: `${r.number}.pdf`, url: `/api/public/v1/verify/t/${req.params.token}/file` } };
+  const out: VerifyByToken = { ...r, document: { title: offer.view.title, letter: offer.view.letter, file_name: `${r.reference}.pdf`, url: `/api/public/v1/verify/t/${req.params.token}/document` } };
   return ok(out);
 });

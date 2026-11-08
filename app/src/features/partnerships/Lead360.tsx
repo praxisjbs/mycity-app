@@ -11,7 +11,8 @@ import { LoseLead } from "./forms/LoseLead";
 import { EditLead } from "./forms/RecordForm";
 import { UploadDocument } from "./forms/UploadDocument";
 import { daysWord, HEALTH, leadPill, useHoldsMoney, useMay } from "./lib";
-import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP, WorkTab } from "./record";
+import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP } from "./record";
+import { NextEvents, WorkTab } from "./WorkTab";
 
 const TABS = ["overview", "deal", "documents", "work", "activity", "contacts", "details"] as const;
 type Tab = (typeof TABS)[number];
@@ -89,12 +90,13 @@ export function Lead360({ id }: { id: string }) {
         {tab === "overview" && (
           <>
             {x.deal ? <DealPanel deal={x.deal} readOnly={readOnly} money={money} categoryId={lead.partner_category_id} /> : <EmptyState title="No Deal Yet" text="A lead is captured with its deal." />}
+            <NextEvents events={x.overview.events} />
             <InteractionsCard items={x.overview.interactions} />
           </>
         )}
         {tab === "deal" && (x.deal ? <DealPanel deal={x.deal} readOnly={readOnly} money={money} categoryId={lead.partner_category_id} /> : <EmptyState title="No Deal Yet" />)}
         {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} />}
-        {tab === "work" && <WorkTab />}
+        {tab === "work" && <WorkTab record={record} dealId={x.deal && (x.deal.status === "open" || x.deal.status === "live") ? x.deal.deal_id : null} readOnly={readOnly || done} />}
         {tab === "activity" && <ActivityTab record={record} history={x.deal?.history} />}
         {tab === "contacts" && <ContactsTab record={record} contacts={x.contacts} readOnly={readOnly} />}
         {tab === "details" && (

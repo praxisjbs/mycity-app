@@ -16,6 +16,7 @@ import { SendCommitmentsForm } from "./Commitment";
 import { TaskForm } from "./TaskForms";
 import { TaskBoard, usePaused } from "./TaskBoard";
 import { LateReasons, useKeepsReasons } from "./LateReasons";
+import { filterOf, NO_LINK, PartnerFilter, useMayConnect, type PartnerLinkValue } from "./PartnerLink";
 
 type Scope = "mine" | "team";
 const WHOSE: Array<[Scope, string]> = [
@@ -35,11 +36,14 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
   const [q, setQ] = useState("");
   const sent = usePaused(q);
   const [cancelled, setCancelled] = useState(false);
+  // The Partner filter (workspace.md §10.1), for a reader who may view Partnerships.
+  const [partner, setPartner] = useState<PartnerLinkValue>(NO_LINK);
+  const mayConnect = useMayConnect();
   const summary = useApi("GET /api/v1/tasks/summary", { query: { scope } });
   const keeps = useKeepsReasons();
   useLiveTasks();
-  const list = usePaged("GET /api/v1/tasks", { filters: { scope }, sort: "due_at", enabled: layout === "list" });
-  const gone = usePaged("GET /api/v1/tasks", { filters: { status: "cancelled", scope }, enabled: cancelled });
+  const list = usePaged("GET /api/v1/tasks", { filters: { scope, ...filterOf(partner) }, sort: "due_at", enabled: layout === "list" });
+  const gone = usePaged("GET /api/v1/tasks", { filters: { status: "cancelled", scope, ...filterOf(partner) }, enabled: cancelled });
   const panel = useTaskPanel();
   /* A task opened from a link (?id=): the bell, ⌘K, the Commitments view, a calendar date. */
   const [, setParams] = useSearchParams();
@@ -105,11 +109,12 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
       )}
       <Toolbar>
         <SearchInput value={q} onChange={search} placeholder="Search tasks" className="w-full md:w-64" />
+        {mayConnect && <PartnerFilter value={partner} onChange={setPartner} />}
         <CheckboxField label="Show Cancelled" value={cancelled} onChange={setCancelled} />
       </Toolbar>
       {layout === "board" ? (
         <TaskBoard
-          filters={{ scope }}
+          filters={{ scope, ...filterOf(partner) }}
           q={sent}
           onOpen={panel.open}
           newsOf={at}

@@ -638,8 +638,11 @@ describeDb("documents and imports through the API", () => {
       expect(fields.map((f) => f.key)).toEqual(["name", "colour"]);
       expect(fields[0]).toMatchObject({ label: "Name", required: true, type: "text", pass: 1 });
 
-      // An employee holds no people.create grant, so there is nothing to import.
-      expect((await as(tokens.staff).get("/imports/importers")).body.importers).toHaveLength(0);
+      // An employee holds no people.create grant, so neither of People's imports is theirs (the
+      // Partnership Tracker is, with their own partnerships grant).
+      const theirs = (await as(tokens.staff).get("/imports/importers")).body.importers.map((i) => i.key);
+      expect(theirs).not.toContain("test_pets");
+      expect(theirs).not.toContain("employees");
     });
 
     test("the blank template comes back as a workbook", async () => {

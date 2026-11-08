@@ -89,7 +89,34 @@ describe("Partnerships on the contract", () => {
     expect(await screen.findByText("Active Deals", {}, { timeout: 8000 })).toBeTruthy();
     for (const t of ["Overview", "Deals", "Documents", "Returns", "Work", "Activity", "Contacts", "Details"]) expect(screen.getByRole("tab", { name: t })).toBeTruthy();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Work" }), { button: 0 });
-    expect(await screen.findByText("No Work Yet")).toBeTruthy();
+    expect(await screen.findByText("No Tasks Yet")).toBeTruthy();
+  }, 30000);
+
+  it("Partners: the Work tab's New Task opens My Workspace's form already connected, and lists the task (§6.16)", async () => {
+    await open("/partnerships?tab=partners");
+    expect(await screen.findByText("Active Deals", {}, { timeout: 8000 })).toBeTruthy();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Work" }), { button: 0 });
+    fireEvent.click(await screen.findByRole("button", { name: "New Task" }));
+    const dialog = await screen.findByRole("dialog");
+    // Connected already: Partner names the record, with Disconnect beside it.
+    expect(within(dialog).getByText("Partner")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Disconnect" })).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText("Task"), { target: { value: "Print the festival banners" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create Task" }));
+    expect(await screen.findByText("Print the festival banners", {}, { timeout: 8000 })).toBeTruthy();
+  }, 30000);
+
+  it("Partners: the Returns tab, with the money, lists the months and opens Enter Returns", async () => {
+    await open("/partnerships?tab=partners");
+    expect(await screen.findByText("Active Deals", {}, { timeout: 8000 })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Export" }).length).toBeGreaterThan(0);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Returns" }), { button: 0 });
+    expect(await screen.findByRole("heading", { name: "Months" }, { timeout: 8000 })).toBeTruthy();
+    for (const k of ["Commission", "Gross Sales", "Units Sold", "Downloads"]) expect(screen.getAllByText(k).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Enter Returns" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+    for (const label of ["Month", "Units Sold", "Gross Sales", "MyCity Commission", "Paid to Partner", "Downloads", "Note"]) expect(within(dialog).getAllByText(label).length).toBeGreaterThan(0);
+    expect(within(dialog).getByRole("button", { name: "Save Returns" })).toBeTruthy();
   }, 30000);
 
   it("Partners: the desktop filters, the Owner column, and the 360's Activity naming each deal's history", async () => {

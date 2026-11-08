@@ -232,4 +232,23 @@ async function convert(actor, scope, id, body) {
   });
 }
 
-module.exports = { assertOwner, list, summary, get360, createIn, create, update, syncStatus, lose, convert };
+/**
+ * Remove a lead the Partnership Tracker import made, reverting that import, in its transaction: its
+ * deal, contacts and region go with it. The importer has checked that nothing uses it.
+ */
+async function removeImportedIn(client, actor, id) {
+  const lead = await repo.lock(client, id);
+  if (!lead) return;
+  await dealRepo.removeDealsOf(client, { kind: "lead", id });
+  await partnersService().saveCities(client, "lead.cities", id, [], "region.cities");
+  await repo.remove(client, id);
+  await emit(client, {
+    key: EVENTS.LEAD_REMOVED,
+    entity: { type: "lead", id },
+    actor,
+    before: { number: lead.number, name: lead.name },
+    payload: { lead_id: id, number: lead.number },
+  });
+}
+
+module.exports = { removeImportedIn, assertOwner, list, summary, get360, createIn, create, update, syncStatus, lose, convert };

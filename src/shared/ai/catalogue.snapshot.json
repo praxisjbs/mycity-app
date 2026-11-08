@@ -104,7 +104,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "calendar.CalendarEventCreate",
-      "schema_sha": "a1b44f32963ed280",
+      "schema_sha": "42e4eaf0ea455dd3",
       "screen": null
     },
     {
@@ -115,7 +115,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "calendar.CalendarEventChange",
-      "schema_sha": "b7dd14dc6346a129",
+      "schema_sha": "5bf73146c3770618",
       "screen": null
     },
     {
@@ -874,6 +874,17 @@
       "capability": "goals.company"
     },
     {
+      "key": "offers.create",
+      "kind": "action",
+      "module_key": "recruitment",
+      "permission": "recruitment.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "offers.OfferCard",
+      "schema_sha": "3468c73acb8be089",
+      "screen": null
+    },
+    {
       "key": "organisation.edit",
       "kind": "action",
       "module_key": "settings",
@@ -988,7 +999,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "projects.ProjectCreate",
-      "schema_sha": "85b29429e9515f5e",
+      "schema_sha": "82bf7627fcbcf3d6",
       "screen": null
     },
     {
@@ -999,7 +1010,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "projects.ProjectChange",
-      "schema_sha": "d303b1595834209f",
+      "schema_sha": "4951b2c8c23b9aa3",
       "screen": null
     },
     {
@@ -1273,7 +1284,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "tasks.TaskCreate",
-      "schema_sha": "b3dbd57183abcb9e",
+      "schema_sha": "d1d898d1fbebb669",
       "screen": null
     },
     {
@@ -1284,7 +1295,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "tasks.TaskChange",
-      "schema_sha": "3d22d47b2634a7b2",
+      "schema_sha": "a516f20e7e5bacf6",
       "screen": null
     },
     {
@@ -1937,6 +1948,17 @@
       "screen": null
     },
     {
+      "key": "offers.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "offers.OfferListQuery",
+      "schema_sha": "1ef2069374a40ace",
+      "screen": null
+    },
+    {
       "key": "organisation.get",
       "kind": "read",
       "module_key": "settings",
@@ -2010,7 +2032,7 @@
       "risk": null,
       "bulk": null,
       "schema": "projects.ProjectListQuery",
-      "schema_sha": "8008489de893e83c",
+      "schema_sha": "7b679d616863a888",
       "screen": null
     },
     {
@@ -2175,7 +2197,7 @@
       "risk": null,
       "bulk": null,
       "schema": "tasks.TaskListQuery",
-      "schema_sha": "94baf39feea179dd",
+      "schema_sha": "f0e4156454d0c367",
       "screen": null
     },
     {
@@ -3180,6 +3202,17 @@
       "screen": "recruitment.vacancies"
     },
     {
+      "key": "recruitment.route.change_who_signs_offers_for_the_company",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.offers"
+    },
+    {
       "key": "recruitment.route.fill_in_my_interview_card",
       "kind": "route",
       "module_key": "recruitment",
@@ -3213,6 +3246,17 @@
       "screen": "recruitment.candidates"
     },
     {
+      "key": "recruitment.route.make_an_offer_to_a_candidate",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.offers"
+    },
+    {
       "key": "recruitment.route.mark_the_answers_of_finished_assessments",
       "kind": "route",
       "module_key": "recruitment",
@@ -3244,6 +3288,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "recruitment.candidates"
+    },
+    {
+      "key": "recruitment.route.see_offers_waiting_to_be_sent",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.offers"
     },
     {
       "key": "recruitment.route.send_an_assessment_to_the_candidates_of_a_role",

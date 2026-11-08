@@ -1315,6 +1315,90 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
     payloads) and the identified date; `partner_pipeline.returns.saveIn` takes `source` and the import
     batch. The screens' routes call the same functions.
   - The Partners and Leads lists' **Export** (§10.1) comes with PR 4's export in the tracker's columns.
+- **In PR 5 (07/11/2026, AJ with GE; TB's answer on deliverables):**
+  - New Partner's **Signed Before the Hub** raises no deliverables: delivery of a relationship signed
+    outside the hub already runs outside it. Its deal's event days still go on the team's calendar. A
+    New Partner with only a signed copy raises them as any signing does (TB, 07/11/2026). A deal the
+    tracker import signed (source `import`, PR 4) raises neither deliverables nor event days.
+    `deal.signed` carries `signed_before_hub` so the handler can tell (§6.6, §6.7).
+  - Deliverables and the event days are outbox handlers on `deal.signed` (`partner_pipeline.
+    deliverables`, `partner_pipeline.event_days`), after the signing commits, never inside the
+    conversion's transaction; each reads the deal as it stands, so a retry raises nothing twice
+    (`deal_deliverable_item_uq`). A deliverable is set by the deal's owner for themselves, so they may
+    reassign it (A24); an `event_start` item on a deal with no event date counts from signing; the
+    batch emits `deal.deliverables_raised` (§6.7).
+  - The deal's event days are one all-day event kept by its **partner** (`entity_type` `partner`,
+    found by its `deal_id`): M2's `calendar_event_entity_check` allows `interview`, `partner` and
+    `vacancy`, so no Workspace table changes, and the event opens the Partner 360. Edit Event and Call
+    Off refuse it (`EVENT_OWNED_BY_RECORD`). It follows `deal.updated` (dates, title, venue, owner,
+    team), is called off on `deal.lost` (Closed Lost, a lost lead, a closed partner), and comes back
+    when a lost signed deal goes live again. A **completed** deal keeps its event, whose days have
+    passed; §7's "calendar event cancelled" on `deal.completed` reads as §6.16's lost or closed (§6.16).
+  - The inactivity follow-up keeps its spells in `partner_follow_up` (migration `7080`, unique
+    `dedup_key`), since the outbox purges its own dedup keys sooner than a spell can last. It runs at
+    06:30 Lagos, after `home-alert-sweeps`; a Stalled deal keeps its health and blockers; the task is
+    High priority; an owner with no login gets no task (the spell is still recorded); `follow_up.raised`
+    (§6.12).
+  - Connect to Partner reads two pickers of its own on `partners.work` (`GET /work/records`: partners
+    not closed and leads neither converted nor lost; `GET /work/deals`: a record's open and live
+    deals, or every one the reader sees for a card), 25 a page; `PartnerLinkQuery` takes `lead_id`
+    beside `partner_id`, since the filter offers leads too. The Calendar takes no Partner filter (a
+    month of the reader's own), so Appendix C's three list queries are Tasks' and Projects' (§5).
+  - Every task, project and event carries `partner_link`, its names filled only for a reader who sees
+    the record (and the deal) in Partnerships, on the Workspace routes; anyone else reads the ids and
+    the screen says A Partner You Cannot See (A24). An edit sends only what changes, a new record
+    clearing the deal, and a link left as it was is never checked again. Who may connect is who may
+    change the work: a task's manager (the link is a setter field), a project's owner, an event's owner.
+  - The Work tab lists the work its reader may open in My Workspace (every project; a task they lead,
+    set, share, watch or reach through scope; an event they own, are invited to or everyone sees),
+    never cancelled tasks or called-off events, and counts the rest by kind. Its New Project, New Task
+    and New Event (both 360s) open My Workspace's own forms in place, already connected; the Overview's
+    Next Events shows the next three connected events the reader may see.
+  - Praxis AI's task, project and event cards carry Partner, Lead and Deal, picked on Edit (`AiCardPicks`
+    `partner`, `lead`, `partner_deal`), named by number and name, and found from words among the records
+    the person sees (`partners.work.card`); the press checks the link as the form's save does.
+
+- **In PR 4 (07/11/2026, LA), the tracker importer and returns:**
+  - **Map Values** is the engine's (`shared/import`, foundation.md §5): a field declares `mapValues` as a
+    list, a person or a place. The tracker maps Partnership Type and Partnership Stage (lists; a type may be
+    created), Lead Owner (a person; unmatched leaves No Owner, `missing: "leave"`), Region (each city picked
+    from the address search, F27; National, Africa and Worldwide are scopes, not listed) and Status (its five
+    values). The choices are kept on the batch's mapping and its profile; no migration (the mapping is jsonb).
+  - The tracker is read by `extract()` (`partners.import.js`) into the importer's fields, so the person's
+    column map is the engine's own and Map Values reads clean values: Contact Details split into Contact
+    Email and Contact Phones, Partnership Type into the category and the deal's Commission, the dates read
+    day-first (a month alone is its 1st and the comments say so; a missing year is the year most of the
+    sheet's dates name), Expected Close Date text joined to Next Action, Current Stage kept in the comments
+    only when it says more.
+  - A row that matches a record already in the hub (name, website host, primary email, whatever the
+    importer's scope, as the duplicate check reads) is left as it is: the import never overwrites what
+    people entered, so importing the file again makes nothing twice and the importer has no update to undo.
+  - Revert removes what the import made (`leads.service` and `partners.service` `removeImportedIn`, events
+    `lead.removed`, `partner.removed`) until the record is in use: an interaction, a proposal, an agreement,
+    a document, a linked mail, returns, or a stage or health line not from the import.
+  - An imported deal's title is its category's name and Partnership ("Event Partnership"); the tracker has
+    no title column. A signed row's partner is "signed before the hub" and its deal dated by Date
+    Identified. A Closed Lost stage, or Closed on an open deal, makes the lead lost through the stage move
+    (reason "Closed lost in the tracker", source `import`); Closed on a signed row is a note, never a lost
+    live deal. Commission from a type's terms needs `partnerships.money`, else it is left out with a note.
+  - **Any other column** fills the custom field of the same label (lead or partner, or deal); a column with
+    no such field is named on its rows ("add it on Categories to import it") rather than created at commit:
+    the engine's ticks are per value, not per column, and a field needs its type, which a column does not
+    say. Every column of the export reads back.
+  - **Partnership Returns** (`partner_pipeline.returns.import.js`) needs `partnerships.money`; each row's line
+    is its deal (number, or partner and title) and its month, made by `extract()`, so a month imported again
+    is an update (replaced, audited) and the same figures again are unchanged. Revert puts back what the month
+    held, or removes a month it made (`deal_return.removed`), refused once the month was entered or imported
+    again since.
+  - **Export** is `POST /partnerships/exports` (`partnerships` export) with `source` `partnerships.partners`,
+    `partnerships.leads` or `partnerships.deals` and the list's own filters, on the shared export path
+    (foundation.md §6.12; document type `partnership_export`): sheet Master Tracker in the tracker's eighteen
+    columns, then a column a custom field; never money. Partners and Leads offer Export on a computer; a phone
+    leaves it off (§10.2).
+  - The Returns tab (`Returns.tsx`, `forms/ReturnsForm.tsx`): the deal (when the partner has several) and
+    the year, the year's totals (Commission, Gross Sales, Units Sold, Downloads), Commission by Month, the
+    months with Imported or Entered, and Enter Returns a month at a time (the last eighteen months; a row
+    opens its month).
 
 ### 13.3 Still open
 
@@ -1624,6 +1708,18 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 07/11/2026 · AJ · PR 5, work for a partner (`m7/workspace-links`): Connect to Partner on New Project, New Task, New
+  Event and their edits, with Disconnect, checked by `partners.work`; the Partner filter on Tasks and Projects; `GET
+  /work` with hidden counts, the Work tab in its own file (`WorkTab.tsx`) and the Overview's Next Events; deliverables on
+  `deal.signed` and the deal's event days on its team's calendar, moved and called off with the deal; the
+  `partner-inactivity` follow-up (`partner_follow_up`, migration `7080`); Praxis AI's Workspace cards with the
+  optional partner and deal; conversion moving Workspace links (`relinkIn`). Recorded in §13.2, In PR 5.
+- 07/11/2026 · LA · PR 4, the tracker importer and returns (`m7/importers-returns`): Map Values on the import
+  engine; the Partnership Tracker importer on the synthetic workbook through `leads.createIn` and
+  `partners.createIn` (source `import`), reversible until a record is in use; the Partnership Returns
+  importer through `partner_pipeline.returns.saveIn`; the 360's Returns tab with Enter Returns; Export on
+  Partners and Leads in the tracker's columns. What it decided is in §13.2, In PR 4.
+
 - 06/11/2026 · TB · The audit of PRs 1 to 3 before PR 4 (§13.2, the audit): a deal is seen through its
   lead's or partner's owner too, and the 360s list and count only the deals the reader sees (§6.1, §6.2);
   the duplicate check recorded as the one read outside scope; Categories' counts and its partners and
@@ -1651,6 +1747,11 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   ahead of PR 4; the stage rules (leaving On Hold, moves after signing, the signed copy asked once, §6.5)
   and New Partner's first stage (§6.6); Partners' Quiet `N` (§6.12); Follow-Up Required written in Title
   Case on screen; Home's Signed Value counts deals, one row a deal (§6.17); the file map (Appendix D).
+- 06/11/2026 · AJ · The signing and verification shapes (`SignTokenParams`, `SignCodeVerify`,
+  `SignaturePng`, `SignSubmit`, `VerifyRefParams`, `VerifyResult`) moved from `agreements.js` to
+  `signatures.js` (GE on #79: M5 builds the shared service first, LA reviews), with `SignDecline`,
+  `SignerView` and `VerifyByToken` added. `VerifyResult` now names the document type and carries
+  `record_status` for an agreement's own state. `docs/guides/offers.md`.
 - 06/11/2026 · GE · (Ose) Public · Proposal's placeholder page moves to the public site's split layout with the rest of
   go.mycityapp.io (the approved design); its Coming Soon is unchanged. Verify Document's QR page,
   `/verify/t/<token>` (§6.9), is drawn on the mock: the record, both verdicts and the document with Download PDF, until

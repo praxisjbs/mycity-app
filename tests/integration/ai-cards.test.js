@@ -217,7 +217,7 @@ describeDb("Praxis AI action cards against the real migrations", () => {
     });
     expect(body.card.fields.find((f) => f.name === "due_on")).toEqual({ name: "due_on", label: "Due Day", kind: "date", required: false, options: null, long: false, picks: null });
     // The card carries New Task's own fields alone (decision 31), each id field with the picker Edit uses.
-    expect(body.card.fields.map((f) => f.name)).toEqual(["title", "description", "primary_assignee_id", "member_ids", "department_id", "watcher_ids", "watcher_department_id", "due_on", "priority", "cadence", "project_id"]);
+    expect(body.card.fields.map((f) => f.name)).toEqual(["title", "description", "primary_assignee_id", "member_ids", "department_id", "watcher_ids", "watcher_department_id", "due_on", "priority", "cadence", "project_id", "partner_id", "lead_id", "deal_id"]);
     expect(body.card.fields.find((f) => f.name === "watcher_ids")).toMatchObject({ label: "Watchers", kind: "list", picks: "colleague" });
     expect(body.card.names).toEqual([]);
     expect(body.choices).toEqual([]);

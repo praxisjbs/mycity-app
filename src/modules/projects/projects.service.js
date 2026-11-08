@@ -27,6 +27,9 @@ const numbering = require("../../shared/numbering/numbering");
 const repo = require("./projects.repo");
 const { EVENTS } = require("./projects.events");
 
+/** Connect to Partner: Partnerships decides what work may be linked to (workspace.md §6). */
+const links = () => require("../partners/partners.work");
+
 async function tx(fn) {
   const client = await pool.connect();
   try {
@@ -57,6 +60,7 @@ function toProject(row, scope) {
     open: row.open || 0,
     done: row.done || 0,
     can_edit: mayEdit(scope, row),
+    partner_link: links().viewOf(row),
     created_at: iso(row.created_at),
   };
 }
@@ -75,8 +79,11 @@ async function getFor(id, scope, db = pool) {
 async function create(actor, scope, body) {
   if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee can start a project", 403);
   return tx(async (client) => {
+    const link = { partner_id: body.partner_id || null, lead_id: body.lead_id || null, deal_id: body.deal_id || null };
+    await links().checkLink(client, actor, link);
     const { number } = await numbering.allocate(client, "project");
     const id = await repo.insert(client, {
+      ...link,
       number,
       name: body.name,
       description: body.description || null,
@@ -105,6 +112,12 @@ async function edit(actor, scope, id, body) {
     const changes = {};
     for (const k of ["name", "due_on"]) if (k in body) changes[k] = body[k];
     if ("description" in body) changes.description = body.description || null;
+    // Connect to Partner: only what changes, checked (workspace.md §6).
+    const relinked = links().merged(locked, body);
+    if (relinked.changed) {
+      if (relinked.link.partner_id || relinked.link.lead_id) await links().checkLink(client, actor, relinked.link);
+      Object.assign(changes, relinked.link);
+    }
     let key = EVENTS.PROJECT_EDITED;
     if (body.status && body.status !== locked.status) {
       changes.status = body.status;
@@ -165,6 +178,28 @@ async function assertCardProject(db, id, scope) {
   if (!mayEdit(scope, row)) throw new AppError("FORBIDDEN", "Only its owner can change this project", 403, { project_id: ["Not yours to change"] });
 }
 
+/** The partner, lead and deal a project is for: a task made in it takes them (workspace.md §6). */
+const linkOf = (db, id) => repo.linkOf(db, id);
+
+/** The most recent active project connected to a deal, or null (partnerships.md §6.7). */
+const ofDeal = (db, dealId) => repo.ofDeal(db, dealId);
+
+/**
+ * A lead's projects now its partner's (workspace.md §6, partnerships.md §6.4): in the conversion's own
+ * transaction, one event for them all. Returns how many moved.
+ */
+async function relinkIn(client, actor, { lead_id: leadId, partner_id: partnerId }) {
+  const moved = await repo.relinkLead(client, leadId, partnerId);
+  if (!moved.length) return 0;
+  await emit(client, {
+    key: EVENTS.PROJECT_RELINKED,
+    entity: { type: "lead", id: leadId },
+    actor,
+    payload: { lead_id: leadId, partner_id: partnerId, count: moved.length },
+  });
+  return moved.length;
+}
+
 /** A task joins only an open project: 422 on `project_id` otherwise. */
 async function assertOpen(db, id) {
   const status = await repo.statusOf(db, id);
@@ -172,4 +207,4 @@ async function assertOpen(db, id) {
   if (status !== "active") throw invalid("project_id", "Project is closed");
 }
 
-module.exports = { list, getFor, create, edit, setBudget, assertOpen, toProject, cardRecords, assertCardProject };
+module.exports = { list, getFor, create, edit, setBudget, assertOpen, toProject, cardRecords, assertCardProject, linkOf, ofDeal, relinkIn };

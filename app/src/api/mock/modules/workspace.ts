@@ -5,6 +5,7 @@ import type {
   CommitmentSetRow,
   CountsTowardsOption,
   LateReasonOption,
+  PartnerWorkItem,
   Project,
   Task,
   TaskActivity,
@@ -22,6 +23,7 @@ import { byId, byKey, DEPARTMENTS, PEOPLE, ref, refKey, teamOf } from "../data/p
 import { me as meOf } from "./identity";
 import { leaveRequests } from "./organisation";
 import { exportFile } from "./shared";
+import { current, linkedTo, linkFrom, merged, problemOf, touches, viewOf, type LinkValue } from "./partnerships_work";
 import { personalExport, personalRun } from "./home";
 import workspaceContract from "@mycity/contract/schemas/workspace.js";
 import reportsContract from "@mycity/contract/schemas/reports.js";
@@ -101,6 +103,7 @@ function newTask(fields: Pick<Task, "task_id" | "number" | "title" | "assignee" 
     late_reason_label: null,
     counts_towards: null,
     project: null,
+    partner_link: null,
     assignee_left: false,
     entity_type: null,
     entity_id: null,
@@ -172,6 +175,7 @@ const PROJECTS: MockProject[] = [
   due_on: isoDaysAhead(dueIn as number),
   status: status as Project["status"],
   completed_at: status === "completed" ? at(12, "16:00") : null,
+  partner_link: null,
   created_at: at(30 - i, "09:00"),
 }));
 const projectRef = (p: MockProject) => ({ project_id: p.project_id, number: p.number, name: p.name });
@@ -232,6 +236,7 @@ const fresh = (t: Task): Task => {
     waiting: EDGES.some((e) => e.task_id === t.task_id && !satisfied(e)),
     late_reason_label: t.late_reason ? (REASONS.find((r) => r.code === t.late_reason)?.label ?? t.late_reason) : null,
     project: t.project ? projectRefOf(t.project.project_id) : null,
+    partner_link: viewOf(t.partner_link),
   };
 };
 const me = (user?: string | null) => byKey(user)!.employee_id;
@@ -343,6 +348,8 @@ route("GET /api/v1/tasks", (req) => {
       is_commitment: (t, v) => t.is_commitment === (v === "true"),
       commitment_month: (t, v) => t.commitment_month === v,
       project_id: (t, v) => t.project?.project_id === v,
+      partner_id: (t, v) => linkedTo(t.partner_link, "partner", v),
+      lead_id: (t, v) => linkedTo(t.partner_link, "lead", v),
       due: (t, v) => (v === "overdue" ? t.overdue : v === "today" ? Boolean(t.due_at?.startsWith(today)) : Boolean(t.due_at && t.due_at >= from && t.due_at < to)),
     },
     sort: {
@@ -408,6 +415,7 @@ const projectFor = (user: string, p: MockProject): Project => {
   const role = meOf(user).roles[0]?.code ?? "employee";
   return {
     ...p,
+    partner_link: viewOf(p.partner_link),
     open: seen.filter(open).length,
     done: seen.filter((t) => t.status === "done").length,
     can_edit: p.owner?.employee_id === me(user) || meOf(user).is_ceo || ["management", "operations_people", "implementation"].includes(role),
@@ -418,6 +426,10 @@ route("GET /api/v1/projects", (req) => {
   const list = PROJECTS.filter((p) => p.status === status).map((p) => projectFor(req.user!, p));
   return paged(list, { ...req, query }, {
     search: (p) => [p.name, p.number],
+    filters: {
+      partner_id: (p, v) => linkedTo(p.partner_link, "partner", v),
+      lead_id: (p, v) => linkedTo(p.partner_link, "lead", v),
+    },
     sort: {
       name: (a, b) => a.name.localeCompare(b.name),
       due_on: (a, b) => (a.due_on ?? "9").localeCompare(b.due_on ?? "9"),
@@ -432,6 +444,9 @@ route("GET /api/v1/projects/:id", (req) => {
 route("POST /api/v1/projects", (req) => {
   const b = req.body as { name?: string; description?: string; due_on?: string };
   if (!b.name || !b.name.trim()) return invalid({ name: ["Name the project"] });
+  const link = linkFrom(req.body as Record<string, unknown>);
+  const linkBad = problemOf(link);
+  if (linkBad) return invalid(linkBad);
   const p: MockProject = {
     project_id: uuid(),
     number: `PRJ-2026-${String(PROJECTS.length + 1).padStart(6, "0")}`,
@@ -441,6 +456,7 @@ route("POST /api/v1/projects", (req) => {
     due_on: b.due_on || null,
     status: "active",
     completed_at: null,
+    partner_link: link.partner_id || link.lead_id ? viewOf(link) : null,
     created_at: new Date().toISOString(),
   };
   PROJECTS.unshift(p);
@@ -454,6 +470,12 @@ route("PATCH /api/v1/projects/:id", (req) => {
   if (typeof b.name === "string") p.name = b.name.trim();
   if ("description" in b) p.description = b.description || null;
   if ("due_on" in b) p.due_on = b.due_on || null;
+  if (touches(b)) {
+    const relinked = merged(current(p.partner_link), b);
+    const bad = relinked.partner_id || relinked.lead_id ? problemOf(relinked) : null;
+    if (bad) return invalid(bad);
+    p.partner_link = relinked.partner_id || relinked.lead_id ? viewOf(relinked) : null;
+  }
   if (b.status && b.status !== p.status) {
     p.status = b.status;
     p.completed_at = b.status === "completed" ? new Date().toISOString() : null;
@@ -474,6 +496,11 @@ route("POST /api/v1/tasks", (req) => {
   if (!b.title || !b.title.trim()) return invalid({ title: ["Name the task"] });
   const joins = b.project_id ? projectProblem(b.project_id) : null;
   if (joins) return invalid(joins);
+  // Connect to Partner: the one named, checked; else, in a connected project, the project's (workspace.md §6).
+  const named = linkFrom(req.body as Record<string, unknown>);
+  const linkBad = problemOf(named);
+  if (linkBad) return invalid(linkBad);
+  const link: LinkValue | null = named.partner_id || named.lead_id ? named : b.project_id ? current(PROJECTS.find((p) => p.project_id === b.project_id)?.partner_link) : null;
   if (b.member_ids && b.department_id) return invalid({ department_id: ["People or a department"] });
   if (b.department_id && !b.primary_assignee_id) return invalid({ primary_assignee_id: ["Pick a lead"] });
   const assignee = b.primary_assignee_id ? byId(b.primary_assignee_id) : byKey(req.user);
@@ -510,6 +537,7 @@ route("POST /api/v1/tasks", (req) => {
     acceptance_criteria: b.is_commitment ? (b.acceptance_criteria ?? null) : null,
     commitment_month: b.is_commitment ? (b.commitment_month ?? null) : null,
     project: b.project_id ? projectRef(PROJECTS.find((p) => p.project_id === b.project_id)!) : null,
+    partner_link: link ? viewOf(link) : null,
   });
   TASKS.unshift(t);
   log(req.user!, t, "created", null, "todo");
@@ -520,7 +548,7 @@ route("POST /api/v1/tasks", (req) => {
   return created(fresh(t));
 });
 /** What only whoever manages a task changes (the API's SETTER_FIELDS). */
-const SETTER_FIELDS = ["title", "cadence", "due_on", "primary_assignee_id", "member_ids", "department_id", "employee_target_id", "entity_type", "entity_id", "project_id", "recurrence"];
+const SETTER_FIELDS = ["title", "cadence", "due_on", "primary_assignee_id", "member_ids", "department_id", "employee_target_id", "entity_type", "entity_id", "project_id", "recurrence", "partner_id", "lead_id", "deal_id"];
 const COMMITMENT_FIELDS = ["is_commitment", "acceptance_criteria", "commitment_month"];
 
 route("PATCH /api/v1/tasks/:id", (req) => {
@@ -571,6 +599,11 @@ route("PATCH /api/v1/tasks/:id", (req) => {
     if (joins) return invalid(joins);
   }
   if (b.late_reason && !reasonOn(String(b.late_reason))) return invalid({ late_reason: ["Pick a reason"] });
+  // Connect to Partner: only what changes, checked.
+  const relinked = touches(b) ? merged(current(t.partner_link), b) : null;
+  const relinkBad = relinked && (relinked.partner_id || relinked.lead_id) ? problemOf(relinked) : null;
+  if (relinkBad) return invalid(relinkBad);
+  if (relinked) t.partner_link = relinked.partner_id || relinked.lead_id ? viewOf(relinked) : null;
 
   if (reassigned) t.assignee = ref(byId(leadId))!;
   t.members = members;
@@ -806,7 +839,7 @@ const EVENTS: CalendarEvent[] = EVENT_ROWS.map(([d, title, type, hm, mins], i) =
   return {
     calendar_event_id: sid(`ev:${i}`), title, description: null, event_type: type, owner: refKey("cynthia"),
     starts_at: starts, ends_at: new Date(Date.parse(starts) + mins * 60000).toISOString(), all_day: false, location: null,
-    visibility: "everyone", attendees: [], my_response: null, entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [15], can_edit: false,
+    visibility: "everyone", attendees: [], my_response: null, entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [15], partner_link: null, can_edit: false,
     created_at: at(20, "09:00"),
   };
 });
@@ -817,7 +850,7 @@ const invitation = (i: number, owner: string, title: string, daysAhead: number, 
     calendar_event_id: sid(`ev:invite:${i}`), title, description: null, event_type: "meeting", owner: refKey(owner),
     starts_at: starts, ends_at: new Date(Date.parse(starts) + mins * 60000).toISOString(), all_day: false, location: "Victoria Island office",
     visibility: "attendees", attendees: answers.map(([key, response]) => ({ employee: refKey(key), response })), my_response: null,
-    entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [15], can_edit: false, created_at: at(3, "09:00"),
+    entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [15], partner_link: null, can_edit: false, created_at: at(3, "09:00"),
   };
 };
 EVENTS.push(
@@ -855,7 +888,7 @@ const leaveItems = (user: string, month: string): CalendarItem[] =>
       link: { module: "people", tab: "leave", id: l.leave_request_id, path: `/people?tab=leave&id=${l.leave_request_id}` },
     }));
 const sees = (user: string, e: CalendarEvent) => e.visibility === "everyone" || e.owner?.employee_id === me(user) || e.attendees.some((a) => a.employee.employee_id === me(user));
-const view = (user: string, e: CalendarEvent): CalendarEvent => ({ ...e, my_response: e.attendees.find((a) => a.employee.employee_id === me(user))?.response ?? null, can_edit: e.owner?.employee_id === me(user) && !e.cancelled_at });
+const view = (user: string, e: CalendarEvent): CalendarEvent => ({ ...e, partner_link: viewOf(e.partner_link), my_response: e.attendees.find((a) => a.employee.employee_id === me(user))?.response ?? null, can_edit: e.owner?.employee_id === me(user) && !e.cancelled_at });
 
 route("GET /api/v1/calendar", (req) => {
   const { month } = req.query;
@@ -884,12 +917,14 @@ route("POST /api/v1/calendar", (req) => {
   if (!b.title) f.title = ["Name the event"];
   if (!b.starts_at) f.starts_at = ["Pick a start"];
   if (b.starts_at && b.ends_at && Date.parse(b.ends_at) <= Date.parse(b.starts_at)) f.ends_at = ["Ends before it starts"];
+  const link = linkFrom(req.body as Record<string, unknown>);
+  Object.assign(f, problemOf(link) ?? {});
   if (Object.keys(f).length) return invalid(f);
   const e: CalendarEvent = {
     calendar_event_id: sid(`ev:${Date.now()}`), title: b.title!, description: null, event_type: b.event_type ?? "meeting", owner: refKey(req.user!),
     starts_at: b.starts_at!, ends_at: b.ends_at!, all_day: Boolean(b.all_day), location: b.location || null, visibility: b.visibility ?? "attendees",
     attendees: (b.attendee_ids ?? []).map((id) => ({ employee: ref(byId(id))!, response: "pending" as const })), my_response: null,
-    entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [...(b.reminder_minutes ?? [])].sort((x, y) => x - y), can_edit: true, created_at: new Date().toISOString(),
+    entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [...(b.reminder_minutes ?? [])].sort((x, y) => x - y), partner_link: link.partner_id || link.lead_id ? viewOf(link) : null, can_edit: true, created_at: new Date().toISOString(),
   };
   EVENTS.push(e);
   return created(view(req.user!, e));
@@ -898,7 +933,13 @@ route("PATCH /api/v1/calendar/:id", (req) => {
   const e = EVENTS.find((x) => x.calendar_event_id === req.params.id);
   if (!e || !sees(req.user!, e)) return notFound();
   if (e.owner?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only the person who made this event can change it");
-  const { attendee_ids: ids, ...rest } = req.body as Partial<CalendarEvent> & { attendee_ids?: string[] };
+  const { attendee_ids: ids, partner_id: _p, lead_id: _l, deal_id: _d, ...rest } = req.body as Partial<CalendarEvent> & { attendee_ids?: string[]; partner_id?: string | null; lead_id?: string | null; deal_id?: string | null };
+  if (touches(req.body as Record<string, unknown>)) {
+    const relinked = merged(current(e.partner_link), req.body as Record<string, unknown>);
+    const bad = relinked.partner_id || relinked.lead_id ? problemOf(relinked) : null;
+    if (bad) return invalid(bad);
+    e.partner_link = relinked.partner_id || relinked.lead_id ? viewOf(relinked) : null;
+  }
   // The end comes after the start as a time, whatever offset each is written in.
   if (Date.parse(rest.ends_at ?? e.ends_at) <= Date.parse(rest.starts_at ?? e.starts_at)) return invalid({ ends_at: ["Ends before it starts"] });
   Object.assign(e, rest);
@@ -922,6 +963,35 @@ route("POST /api/v1/calendar/:id/respond", (req) => {
 });
 
 /* Today and Analytics */
+/*
+ * The 360's Work tab (partnerships.md §6.16): a record's projects, tasks or events the reader may see
+ * on My Workspace, and how many of each they may not. Connecting never widens who sees the work.
+ */
+route("GET /api/v1/partnerships/work", (req) => {
+  const { partner_id: partnerId, lead_id: leadId, deal_id: dealId, kind, ...query } = req.query;
+  if (!partnerId === !leadId) return invalid({ partner_id: ["Pick the partner first"] });
+  const recordKind = partnerId ? "partner" : "lead";
+  const recordId = (partnerId ?? leadId)!;
+  const on = (link: Task["partner_link"]) => linkedTo(link, recordKind, recordId) && (!dealId || current(link)?.deal_id === dealId);
+  const user = req.user!;
+  const tasksOf = TASKS.filter((t) => t.status !== "cancelled" && on(t.partner_link));
+  const projectsOf = PROJECTS.filter((p) => on(p.partner_link));
+  const eventsOf = EVENTS.filter((e) => !e.cancelled_at && on(e.partner_link));
+  const seenTasks = tasksOf.filter((t) => seesTask(user, t) || watches(user, t));
+  const seenEvents = eventsOf.filter((e) => sees(user, e));
+  const day = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
+  const rows: PartnerWorkItem[] =
+    kind === "project"
+      ? projectsOf.map((p) => ({ kind: "project" as const, id: p.project_id, number: p.number, title: p.name, status: p.status, due_on: p.due_on, starts_at: null, deal_id: current(p.partner_link)?.deal_id ?? null, owner: p.owner }))
+      : kind === "event"
+        ? seenEvents.map((e) => ({ kind: "event" as const, id: e.calendar_event_id, number: null, title: e.title, status: Date.parse(e.ends_at) < Date.now() ? "past" : "upcoming", due_on: day(e.starts_at), starts_at: e.starts_at, deal_id: current(e.partner_link)?.deal_id ?? null, owner: e.owner }))
+        : seenTasks.map((t) => ({ kind: "task" as const, id: t.task_id, number: t.number, title: t.title, status: t.status, due_on: day(t.due_at), starts_at: null, deal_id: current(t.partner_link)?.deal_id ?? null, owner: t.assignee }));
+  const res = paged(rows, { ...req, query }, { sort: { due_on: (a, b) => (a.due_on ?? "9").localeCompare(b.due_on ?? "9") } });
+  if (res.status !== 200) return res;
+  const body = res.body as { data: unknown[]; page: unknown };
+  return ok({ ...body, hidden: { projects: 0, tasks: tasksOf.length - seenTasks.length, events: eventsOf.length - seenEvents.length } });
+});
+
 route("GET /api/v1/workspace/today", (req) => {
   const id = me(req.user);
   const today = isoDaysAgo(0);
