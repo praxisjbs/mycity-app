@@ -543,7 +543,8 @@ the others' cards until the round closes.
    keeps the candidate, the date, the panel and the round.
 4. Press an interview. On a computer it opens in a wide window: the interview, **Blind Panel**,
    **Weighted Scorecard** and **Candidate Details** sit two by two, with **Round Activity** across
-   the window under them. On a phone it opens in a sheet, one part under another.
+   the window under them. Press **Close** at its foot to go back to the list. On a phone it opens
+   in a sheet, one part under another.
    ![An interview's sheet](shot:recruitment-interview-sheet)
 5. It shows when and where, or the video link, and the **Candidate Details**.
 6. **Blind Panel** shows each person as **Submitted** or **Waiting**. A submitted score reads
@@ -703,15 +704,16 @@ An offer goes through these, in order:
 4. Each row shows the offer's number, the candidate, the role, the start date, the year's pay
    (with **Outside Range** when it is), the status, when it was sent and when it expires. On a phone
    the list keeps the candidate and the status.
-5. Press an offer. On a computer it opens in a wide window: the offer, **Monthly Pay**, **Approval**
-   and **Signers** sit two by two, with **History** and the letter across the window under them. On
-   a phone it opens in a sheet, one part under another.
+5. Press an offer. On a computer it opens in a wide window: the offer beside **Monthly Pay**, with
+   **Approval** under the pay, then **Signers**, and **History** and the letter across the window
+   under them. Press **Close** at its foot to go back to the list. On a phone it opens in a sheet,
+   one part under another.
    ![An offer](shot:recruitment-offer-record)
 6. The offer shows the role, the department, the start date, when it expires, and the **Score**
    the candidate had when the offer was made.
 7. **Monthly Pay** lists each pay line, the **Monthly Total** and the year's pay. **Vacancy Range**
    is the role's monthly range. A total outside it shows **Outside Range**, with the reason.
-8. **Approval** shows each stage and who approved or rejected it, with any reason.
+8. **Approval**, under the pay on a computer, shows each stage and who approved or rejected it, with any reason.
 9. **Signers** shows who signs for MyCity and the candidate, and whether each has signed.
 10. **History** lists when it was made, submitted, approved, signed, sent and how it ended.
 11. Under it is the letter, as the candidate will read it. Press **Download PDF** for the PDF.
