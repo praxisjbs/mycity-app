@@ -14,6 +14,7 @@
  */
 const { defineEvents } = require("../../shared/events/catalogue");
 const places = require("../../shared/places/owners");
+const { defineNotification } = require("../../shared/notifications/fanout");
 
 const EVENTS = defineEvents("partnerships", {
   "lead.created": { summary: "A partnership lead was captured" },
@@ -24,5 +25,25 @@ const EVENTS = defineEvents("partnerships", {
 });
 
 places.owner("lead.cities", { rename: async () => {} });
+
+/** The active holders of the Operations & People role. */
+async function operationsPeople(db) {
+  const { rows } = await db.query(
+    `SELECT DISTINCT ur.user_id FROM user_role ur JOIN role r ON r.role_id = ur.role_id JOIN app_user u ON u.user_id = ur.user_id
+      WHERE r.code = 'operations_people' AND u.status = 'active' ORDER BY ur.user_id`,
+  );
+  return rows.map((r) => r.user_id);
+}
+
+// The lead's owner and Operations & People, opening the lead (which shows its partner) (§7).
+defineNotification(EVENTS.LEAD_CONVERTED, {
+  to: [
+    { users: (e, db) => require("../partner_pipeline/partner_pipeline.events").usersOf(db, [e.payload.owner_id]) },
+    { users: (_e, db) => operationsPeople(db) },
+  ],
+  title: "Lead Signed",
+  body: (e) => `${e.payload.number} ${e.payload.name || ""} signed and is now a partner.`.replace(/\s+/g, " "),
+  who: "The lead's owner and Operations & People",
+});
 
 module.exports = { EVENTS };

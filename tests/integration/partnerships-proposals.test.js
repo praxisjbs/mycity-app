@@ -327,6 +327,10 @@ describeDb("partnerships: the Proposal Studio", () => {
     expect([p.status, p.view_count]).toEqual(["viewed", 2]);
     const viewed = await q("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'proposal.viewed'");
     expect(viewed.rows[0].n).toBe(1);
+    // The first opening tells the deal's owner, once, opening the proposal (§7).
+    await drain();
+    const told = await q("SELECT user_id, title, entity_type, entity_id FROM notification WHERE event_key = 'proposal.viewed'");
+    expect(told.rows).toEqual([{ user_id: people.staff.user.user_id, title: "Proposal Viewed", entity_type: "partnership_proposal", entity_id: proposal.partnership_proposal_id }]);
     const pdf = await request(app).get(`/api/public/v1/proposals/${token}/pdf`);
     expect([pdf.status, pdf.headers["content-type"]]).toEqual([200, "application/pdf"]);
   });

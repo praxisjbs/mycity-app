@@ -99,7 +99,7 @@ async function convertIn(client, actor, { lead_id, deal_id, signed_copy_document
     actor,
     before: { status: lead.status },
     after: { status: "converted", converted_partner_id: partnerId },
-    payload: { lead_id, number: lead.number, partner_id: partnerId, deal_id, owner_id: lead.owner_id },
+    payload: { lead_id, number: lead.number, name: lead.name, partner_id: partnerId, deal_id, owner_id: lead.owner_id },
   });
   return { partner_id: partnerId, converted: true };
 }

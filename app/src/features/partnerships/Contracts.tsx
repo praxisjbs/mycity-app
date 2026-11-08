@@ -37,6 +37,7 @@ import {
 } from "@mycity/ui";
 import { CloseAgreement, EditDraft, GenerateAgreement, RecordSignedCopy, RenewAgreement, SendForSignature } from "./forms/AgreementForms";
 import { agreementPill, fail, KIND_LABEL, SIGNER_STATE, useMay } from "./lib";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { RecordState } from "./record";
 
 type View = "all" | AgreementStatus;
@@ -81,6 +82,9 @@ export function Contracts({ id }: { id: string | null }) {
   const [view, setView] = useState<View>("all");
   const s = useApi("GET /api/v1/partnerships/agreements/summary");
   const list = usePaged("GET /api/v1/partnerships/agreements", { filters: view === "all" ? {} : { status: view } });
+  // Where news waits (notifications.md §6): each chip carries its share; it opens where the news is.
+  const news = useViewNews();
+  useOpenWhereNews({ value: view, onChange: setView, values: VIEWS.map(([v]) => v), all: "all", skip: Boolean(id) });
   const openOne = (aid: string) => navigate(`/partnerships?tab=contracts-and-mous&id=${aid}`);
   const generate = () => modal.open({ title: "Generate Agreement", body: (close) => <GenerateAgreement close={close} onCreated={openOne} /> });
   useScreenAction(mayCreate ? { label: "Generate Agreement", onSelect: generate } : null);
@@ -103,7 +107,7 @@ export function Contracts({ id }: { id: string | null }) {
           ]}
         />
       )}
-      <Chips label="Agreements" value={view} onChange={setView} options={VIEWS} className="mt-3" />
+      <Chips label="Agreements" value={view} onChange={setView} options={withNews(news, VIEWS, { all: "all" })} className="mt-3" />
       <ListDetail
         open={Boolean(id)}
         onClose={() => navigate("/partnerships?tab=contracts-and-mous")}

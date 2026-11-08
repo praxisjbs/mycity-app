@@ -90,7 +90,7 @@ function homeOutPage(db, scope, query) {
   return pageQuery(
     db,
     `SELECT pp.partnership_proposal_id, pp.number, po.title AS opportunity, COALESCE(p.name, l.name) AS partner, pp.sent_at,
-            pp.value, pp.currency, ${TOTAL_COL}
+            pp.value, pp.currency, pp.status, pp.view_count, pp.last_viewed_at, ${TOTAL_COL}
        FROM partnership_proposal pp
        JOIN partnership_opportunity po ON po.partnership_opportunity_id = pp.partnership_opportunity_id
        LEFT JOIN partner p ON p.partner_id = po.partner_id

@@ -377,6 +377,8 @@ const ENTITY_ROUTES = Object.freeze({
   partner_deal: screen("partnerships", "pipeline"),
   lead: screen("partnerships", "leads"),
   proposal: screen("partnerships", "proposals"),
+  // search:none the same record as proposal, found under that type (proposals.search.js); its events and notices name it this way
+  partnership_proposal: screen("partnerships", "proposals"),
   contract: screen("partnerships", "contracts-and-mous"),
   mou: screen("partnerships", "contracts-and-mous"),
   agreement: screen("partnerships", "contracts-and-mous"),
