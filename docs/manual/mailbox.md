@@ -246,7 +246,7 @@ when, and its first lines. The whole conversation stays yours: only you can open
 
 1. Open the conversation and press the three dots, **Move this message**.
 2. Press **Link to Partner**.
-   ![Link to Partner, with Partner and Deal](shot:mailbox-link-partner)
+   ![Link to Partner, with Partner](shot:mailbox-link-partner)
 3. Pick the partner or lead in **Partner**. Leads are marked Lead.
 4. Pick one of its deals in **Deal** if the emails are about one. It is optional.
 5. Press **Link to Partner**. The hub says Linked to, then the name.
@@ -575,13 +575,14 @@ marks:
 open: /mailbox?tab=inbox
 as: operations
 do:
+  - click: css [data-ui=page] button[data-copy=content]
   - click: button "Move this message"
-  - click: role menuitem "Link to Partner"
+  - click: text "Link to Partner"
   - wait: label "Partner"
 crop: modal
 marks:
   1: label "Partner" | The partner or lead
-  2: label "Deal" | One of its deals
+  2: button "Cancel" | Close without linking
 ```
 
 ```shot mailbox-configure-social
