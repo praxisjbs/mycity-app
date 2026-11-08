@@ -19,7 +19,7 @@ export default function Partnerships({ tab, id }: ModuleScreenProps) {
     case "leads":
       return <Leads id={id} />;
     case "proposals":
-      return <Proposals />;
+      return <Proposals id={id} />;
     case "contracts-and-mous":
       return <Contracts id={id} />;
     case "analytics":

@@ -415,6 +415,13 @@ const ACTIONS = Object.freeze([
     need: ["partnerships", "create"],
     words: ["partner", "signed partner", "add a partner"],
   }),
+  // The Proposal Studio's brief (§6.10 step 1): a lead or partner and its deal, then the notes.
+  a("new_proposal", "New Proposal", {
+    screen: "partnerships.proposals",
+    params: { action: "new" },
+    need: ["partnerships", "create"],
+    words: ["proposal", "write a proposal", "pitch", "deck", "sponsor"],
+  }),
   // An agreement is generated from a deal's category template (§6.8): the form picks the deal.
   a("new_agreement", "Generate Agreement", {
     screen: "partnerships.contracts-and-mous",

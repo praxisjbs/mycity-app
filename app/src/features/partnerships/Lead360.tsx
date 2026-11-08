@@ -43,7 +43,7 @@ export function Lead360({ id }: { id: string }) {
     { label: "Log Interaction", icon: "plus" as const, onSelect: () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={x.deal?.deal_id} close={close} />) },
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
-    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${lead.lead_id}`) },
+    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${lead.lead_id}&record=lead`) },
     ...(x.deal && x.deal.status === "open"
       ? [{ label: "Generate Agreement", icon: "doc" as const, onSelect: () => open("Generate Agreement", (close) => <GenerateAgreement dealId={x.deal!.deal_id} close={close} onCreated={(aid) => navigate(`/partnerships?tab=contracts-and-mous&id=${aid}`)} />) }]
       : []),

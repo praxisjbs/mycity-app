@@ -1,0 +1,5 @@
+<header class="page-head"><h2 class="h1">{{ heading }}</h2></header>
+<dl class="terms{{#if visual}}{{else}} terms--wide{{/if}}">
+  {{#each items}}<div class="term"><dt class="term-label">{{ label }}</dt><dd class="term-detail">{{ detail }}</dd></div>{{/each}}
+</dl>
+{{#if visual}}<div class="terms-illus">{{> body}}</div>{{/if}}

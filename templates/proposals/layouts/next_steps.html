@@ -1,0 +1,10 @@
+<header class="page-head"><h2 class="h1">{{ heading }}</h2></header>
+<ol class="steps">{{#each steps}}<li class="step"><span>{{ text }}</span></li>{{/each}}</ol>
+<aside class="contact">
+  <div>
+    <div class="contact-name">{{ contact.name }}</div>
+    {{#if contact.title}}<div class="contact-title">{{ contact.title }}</div>{{/if}}
+    <dl class="contact-lines">{{#if contact.email}}<div><dt>Email</dt><dd>{{ contact.email }}</dd></div>{{/if}}{{#if contact.phone}}<div><dt>Phone</dt><dd>{{ contact.phone }}</dd></div>{{/if}}</dl>
+  </div>
+  {{#if qr}}<div class="qr"><img src="{{ qr }}" alt="QR code to this proposal online"><span>Scan to open this proposal online</span></div>{{else}}{{#if visual}}{{> body}}{{/if}}{{/if}}
+</aside>

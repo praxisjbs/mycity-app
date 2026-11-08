@@ -55,7 +55,7 @@ export function Partner360({ id }: { id: string }) {
     { label: "Log Interaction", icon: "plus" as const, onSelect: () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={unfinished[0]?.deal_id} close={close} />) },
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
-    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${partner.partner_id}`) },
+    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${partner.partner_id}&record=partner`) },
     ...(unfinished.length && mayCreate
       ? [{ label: "Generate Agreement", icon: "doc" as const, onSelect: () => open("Generate Agreement", (close) => <GenerateAgreement dealId={unfinished.length === 1 ? unfinished[0].deal_id : undefined} close={close} onCreated={(aid) => navigate(`/partnerships?tab=contracts-and-mous&id=${aid}`)} />) }]
       : []),

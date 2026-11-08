@@ -1,7 +1,7 @@
 {
   "public-apply": {
     "spec": "b6f0b9175d8ca747",
-    "source": "35f704607b190565",
+    "source": "abf6d2b591472075",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "public-apply-questions": {
     "spec": "0c5521efda000ca1",
-    "source": "35f704607b190565",
+    "source": "abf6d2b591472075",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "public-assessment-file": {
     "spec": "b71d852a0f0e5354",
-    "source": "657f086cc67635fb",
+    "source": "c43e766bff47f5ee",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "public-assessment-question": {
     "spec": "75e88a48e2c6803b",
-    "source": "657f086cc67635fb",
+    "source": "c43e766bff47f5ee",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "public-assessment-start": {
     "spec": "7f13a051832c0a7f",
-    "source": "657f086cc67635fb",
+    "source": "c43e766bff47f5ee",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "public-assessment-submit": {
     "spec": "5381b60be50114be",
-    "source": "657f086cc67635fb",
+    "source": "c43e766bff47f5ee",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "public-sign": {
     "spec": "d82e693975510176",
-    "source": "e909dc3363143f05",
+    "source": "ec78bee8cf8245ef",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "public-sign-below": {
     "spec": "48c8c3981dea1849",
-    "source": "e909dc3363143f05",
+    "source": "ec78bee8cf8245ef",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,7 @@
   },
   "public-verify": {
     "spec": "bdadc6d729a58dae",
-    "source": "7bce21369f3d675d",
+    "source": "23eca4c47132f84a",
     "devices": [
       "desktop",
       "phone"
