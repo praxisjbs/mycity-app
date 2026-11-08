@@ -4,8 +4,8 @@ import pipeline from "@mycity/contract/schemas/partner_pipeline.js";
 import { useEffect, useRef, useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { Banner, Button, toast, useContractForm, Wizard, type PlaceValue } from "@mycity/ui";
-import { failed, useStages } from "../lib";
-import { ContactPart, contactStart, DealPart, dealBody, dealStart, OrganisationPart, useMeAsPerson, type Bound } from "./parts";
+import { failed, useCategoryDefaults, useFieldDefs, useHoldsMoney, useStages } from "../lib";
+import { ContactPart, contactStart, customForCreate, DealPart, dealBody, dealStart, OrganisationPart, useMeAsPerson, type Bound, type CustomDraft } from "./parts";
 
 /** A likely duplicate of what is being entered (§6.2): advisory, never blocking. */
 export function DuplicateNotice({ name, email, onNewDeal }: { name: string; email?: string; onNewDeal?: (partnerId: string) => void }) {
@@ -36,10 +36,28 @@ export function LeadForm({ close, onCreated, onNewDeal }: { close: () => void; o
   const open = stages.filter((s) => !["signed", "active", "closed_lost"].includes(s.meaning ?? ""));
   const key = useRef(crypto.randomUUID());
   const [step, setStep] = useState(0);
+  const money = useHoldsMoney();
   const org = useContractForm(
-    { name: "", partner_category_id: "", region: { scope: "national" } as { scope: string; cities?: PlaceValue[] }, industry: "", owner_id: me?.employee_id ?? "", website: "", source: "", impact_rating: "", impact_note: "", comments: "" },
+    {
+      name: "",
+      partner_category_id: "",
+      region: { scope: "national" } as { scope: string; cities?: PlaceValue[] },
+      industry: "",
+      owner_id: me?.employee_id ?? "",
+      website: "",
+      source: "",
+      impact: [] as string[],
+      impact_rating: "",
+      impact_note: "",
+      comments: "",
+      custom: {} as CustomDraft,
+    },
     leads.LeadFields,
   );
+  const category = org.values.partner_category_id || null;
+  const leadDefs = useFieldDefs("lead", category);
+  const dealDefs = useFieldDefs("deal", category);
+  const defaults = useCategoryDefaults(category);
   const contact = useContractForm(contactStart(), partners.ContactInput);
   const deal = useContractForm(dealStart(open[0]?.code ?? "", me?.employee_id ?? ""), pipeline.DealFields);
   useEffect(() => {
@@ -54,8 +72,9 @@ export function LeadForm({ close, onCreated, onNewDeal }: { close: () => void; o
         body: {
           ...(dealBody(v as Record<string, unknown>) as Record<string, never>),
           region: v.region,
+          custom: customForCreate(leadDefs, v.custom),
           contact: dealBody(contact.values as Record<string, unknown>) as never,
-          deal: { ...(dealBody(deal.values as Record<string, unknown>) as Record<string, never>), owner_id: v.owner_id },
+          deal: { ...(dealBody(deal.values as Record<string, unknown>, { money, custom: dealDefs }) as Record<string, never>), owner_id: v.owner_id },
         } as never,
       });
       invalidate("/api/v1/partnerships");
@@ -88,12 +107,16 @@ export function LeadForm({ close, onCreated, onNewDeal }: { close: () => void; o
           body: (
             <>
               <DuplicateNotice name={org.values.name} onNewDeal={onNewDeal} />
-              <OrganisationPart f={org as unknown as Bound} kind="lead" owner={me} />
+              <OrganisationPart f={org as unknown as Bound} kind="lead" owner={me} custom={leadDefs} />
             </>
           ),
         },
         { title: "Contact", check: () => contact.check(), body: <ContactPart f={contact as unknown as Bound} /> },
-        { title: "Deal", check: () => deal.check(), body: <DealPart f={deal as unknown as Bound} stages={open} /> },
+        {
+          title: "Deal",
+          check: () => deal.check(),
+          body: <DealPart f={deal as unknown as Bound} stages={open} terms={{ money, categoryRate: defaults?.commission ?? null, custom: dealDefs, validityNone: "Category Default" }} />,
+        },
       ]}
     />
   );

@@ -119,6 +119,40 @@ const BUILDER_SOURCE = Object.assign(Object.create(null), {
   }),
 
   /**
+   * An offer of employment as the candidate signs it (docs/guides/offers.md §3, §6): the Offer
+   * Summary, the monthly pay line by line, the final job description (Schedule A), the Additional
+   * Terms, and the version of the standard wording it was written in (template_version), so an edit
+   * to the standard letter after signing never makes a signed offer read as amended, while an edited
+   * figure, line or clause does. The approvers, the signers and the dates of sending are about the
+   * offer, not in it.
+   */
+  OFFER_LETTER: (d) => ({
+    v: 1,
+    type: "OFFER_LETTER",
+    number: str(d.number),
+    candidate: str(d.candidate),
+    job_title: str(d.job_title),
+    department: str(d.department),
+    reports_to: str(d.reports_to),
+    role_function: str(d.role_function),
+    role_scope: str(d.role_scope),
+    start_date: str(d.start_date),
+    employment_type: str(d.employment_type),
+    work_pattern: str(d.work_pattern),
+    office_days: int(d.office_days),
+    probation_months: int(d.probation_months),
+    annual_leave_days: int(d.annual_leave_days),
+    working_hours: str(d.working_hours),
+    currency: str(d.currency || m.CURRENCY),
+    pay_lines: (Array.isArray(d.pay_lines) ? d.pay_lines : []).map((l) => ({ name: str(l && l.name), monthly_amount: money(l && l.monthly_amount) })),
+    monthly_total: money(d.monthly_total),
+    incentives: str(d.incentives),
+    additional_terms: str(d.additional_terms),
+    job_description: str(d.job_description),
+    terms_version: int(d.terms_version),
+  }),
+
+  /**
    * A policy version as staff read it and its signers sign it (docs/guides/policies.md §6.3):
    * the policy, the version, its first day, who it applies to and what it says. `rules` is the
    * rules document AS STORED, its keys sorted at every depth, never the rules parsed with today's

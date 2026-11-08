@@ -18,8 +18,12 @@ export const short = (p: { display_name: string }) => {
   return `${a} ${b?.[0] ?? ""}.`;
 };
 
-/** A refusal in a toast: its own words, or a plain line. */
-export const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : "Something went wrong");
+/** A refusal in a toast: what the API said about the first field it named, else its own words, or a plain line. */
+export const fail = (e: unknown) => {
+  if (!(e instanceof ApiError)) return toast("Something went wrong");
+  const first = Object.values(e.fields ?? {})[0]?.[0];
+  toast(first ?? e.message);
+};
 
 /**
  * A save that failed: on the fields of this form when the API named them (a nested request's
@@ -63,19 +67,45 @@ export function useListOptions(list: "lead_source" | "partnership_impact" | "par
   return (values.data?.values ?? []).filter((v) => v.active).map((v) => [v.code, v.label] as [string, string]);
 }
 
+/** The custom fields a lead, partner or deal of a category is given, in use (§6.3): its category's and every category's. */
+export function useFieldDefs(appliesTo: "lead" | "partner" | "deal", categoryId: string | null | undefined): Field[] {
+  // Without a category the form waits for one: every category's own fields would be offered otherwise.
+  const defs = useApi("GET /api/v1/partnerships/fields", { query: { applies_to: appliesTo, active: "true", partner_category_id: categoryId ?? "" }, enabled: Boolean(categoryId) });
+  return categoryId ? (defs.data?.data ?? []) : [];
+}
+
+/** A category's defaults (its commission and validity) for a deal's form, or null while none is picked. */
+export function useCategoryDefaults(categoryId?: string | null) {
+  const c = useApi("GET /api/v1/partnerships/categories/:id", { params: { id: categoryId ?? "" }, enabled: Boolean(categoryId) });
+  return c.data ? { commission: c.data.default_commission_pct, validity: c.data.default_validity_days } : null;
+}
+
+/** The people a list may be narrowed to by owner, 25 at a time as the menu nears its end (F32). */
+export function useOwnerOptions() {
+  const list = useInfinite("GET /api/v1/employees", { filters: { status: "active" } });
+  return { options: list.rows.map((e) => [e.employee_id, e.display_name] as [string, string]), ...paging(list) };
+}
+
 /** The categories as options, 25 at a time as the menu nears its end (F32). */
 export function useCategoryOptions() {
   const list = useInfinite("GET /api/v1/partnerships/categories", { filters: { active: "true" } });
   return { options: list.rows.map((c) => [c.partner_category_id, c.name] as [string, string]), ...paging(list) };
 }
 
-/** A stage's place in the list; a move to an earlier one, On Hold or Closed Lost needs a reason (§6.5). */
+/** The meanings a signed deal may still move to: another signed one, On Hold or Closed Lost (§6.5). */
+const AFTER_SIGNING = new Set(["signed", "active", "on_hold", "closed_lost"]);
+
+/**
+ * A stage's place in the list; a move to an earlier one, On Hold or Closed Lost needs a reason, and a
+ * signed deal goes back before signing never (§6.5): `refused` says so before anything is asked.
+ */
 export function moveNeeds(stages: ListValue[], deal: Pick<DealDetail, "stage" | "signed_at">, code: string) {
   const from = stages.find((s) => s.code === deal.stage);
   const to = stages.find((s) => s.code === code);
   const back = !!from && !!to && from.meaning !== "on_hold" && to.position < from.position;
   const signs = !!to && (to.meaning === "signed" || to.meaning === "active") && !deal.signed_at;
-  return { to, reason: back || to?.meaning === "on_hold" || to?.meaning === "closed_lost", copy: signs };
+  const refused = !!to && !!deal.signed_at && !AFTER_SIGNING.has(to.meaning ?? "") ? "Already signed" : null;
+  return { to, reason: back || to?.meaning === "on_hold" || to?.meaning === "closed_lost", copy: signs, refused };
 }
 
 /** The stage after the current one, for the phone's Next Stage at the foot of a record. */

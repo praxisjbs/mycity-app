@@ -4,8 +4,8 @@ import partners from "@mycity/contract/schemas/partners.js";
 import { invalidate, useMutation } from "@/api/hooks";
 import { placeValue } from "@/features/shared/places";
 import { Button, FormFooter, toast, useContractForm, type PlaceValue } from "@mycity/ui";
-import { failed } from "../lib";
-import { OrganisationPart, type Bound } from "./parts";
+import { failed, useFieldDefs } from "../lib";
+import { customForEdit, OrganisationPart, type Bound, type CustomDraft } from "./parts";
 
 const regionOf = (r: { scope: string | null; cities: Array<Parameters<typeof placeValue>[0]> }) => ({
   scope: r.scope ?? "national",
@@ -25,12 +25,15 @@ export function EditLead({ lead, close }: { lead: LeadDetail; close: () => void 
       owner_id_person: lead.owner ? [lead.owner] : [],
       website: lead.website ?? "",
       source: lead.source ?? "",
+      impact: lead.impact,
       impact_rating: lead.impact_rating ?? "",
       impact_note: lead.impact_note ?? "",
       comments: lead.comments ?? "",
+      custom: { ...lead.custom } as CustomDraft,
     },
     leads.LeadFields,
   );
+  const defs = useFieldDefs("lead", f.values.partner_category_id || null);
   const save = useMutation("PATCH /api/v1/partnerships/leads/:id");
   const submit = async () => {
     if (!f.check()) return;
@@ -38,7 +41,20 @@ export function EditLead({ lead, close }: { lead: LeadDetail; close: () => void 
     try {
       await save.run({
         params: { id: lead.lead_id },
-        body: { name: v.name, partner_category_id: v.partner_category_id, region: v.region as never, owner_id: v.owner_id, industry: orNull(v.industry), website: orNull(v.website), source: orNull(v.source), impact_rating: orNull(v.impact_rating), impact_note: orNull(v.impact_note), comments: orNull(v.comments) } as never,
+        body: {
+          name: v.name,
+          partner_category_id: v.partner_category_id,
+          region: v.region as never,
+          owner_id: v.owner_id,
+          industry: orNull(v.industry),
+          website: orNull(v.website),
+          source: orNull(v.source),
+          impact: v.impact,
+          impact_rating: orNull(v.impact_rating),
+          impact_note: orNull(v.impact_note),
+          comments: orNull(v.comments),
+          custom: customForEdit(defs, v.custom, lead.custom),
+        } as never,
       });
       invalidate("/api/v1/partnerships");
       close();
@@ -49,7 +65,7 @@ export function EditLead({ lead, close }: { lead: LeadDetail; close: () => void 
   };
   return (
     <>
-      <OrganisationPart f={f as unknown as Bound} kind="lead" owner={lead.owner} />
+      <OrganisationPart f={f as unknown as Bound} kind="lead" owner={lead.owner} custom={defs} />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Save Lead</Button>
@@ -72,9 +88,11 @@ export function EditPartner({ partner, close }: { partner: PartnerDetail; close:
       website: partner.website ?? "",
       headquarters: placeValue(partner.headquarters),
       since: partner.since ?? "",
+      custom: { ...partner.custom } as CustomDraft,
     },
     partners.PartnerFields,
   );
+  const defs = useFieldDefs("partner", f.values.partner_category_id || null);
   const save = useMutation("PATCH /api/v1/partnerships/partners/:id");
   const submit = async () => {
     if (!f.check()) return;
@@ -82,7 +100,18 @@ export function EditPartner({ partner, close }: { partner: PartnerDetail; close:
     try {
       await save.run({
         params: { id: partner.partner_id },
-        body: { name: v.name, partner_category_id: v.partner_category_id, region: v.region as never, owner_id: v.owner_id, legal_name: orNull(v.legal_name), industry: orNull(v.industry), website: orNull(v.website), headquarters: v.headquarters ?? null, since: orNull(v.since) } as never,
+        body: {
+          name: v.name,
+          partner_category_id: v.partner_category_id,
+          region: v.region as never,
+          owner_id: v.owner_id,
+          legal_name: orNull(v.legal_name),
+          industry: orNull(v.industry),
+          website: orNull(v.website),
+          headquarters: v.headquarters ?? null,
+          since: orNull(v.since),
+          custom: customForEdit(defs, v.custom, partner.custom),
+        } as never,
       });
       invalidate("/api/v1/partnerships");
       close();
@@ -93,7 +122,7 @@ export function EditPartner({ partner, close }: { partner: PartnerDetail; close:
   };
   return (
     <>
-      <OrganisationPart f={f as unknown as Bound} kind="partner" owner={partner.owner} />
+      <OrganisationPart f={f as unknown as Bound} kind="partner" owner={partner.owner} custom={defs} />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Save Partner</Button>

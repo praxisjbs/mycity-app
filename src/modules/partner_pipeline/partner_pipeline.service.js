@@ -51,6 +51,15 @@ async function tx(fn) {
 const notFound = () => new AppError("NOT_FOUND", "That deal does not exist, or you cannot see it.", 404);
 const invalid = (field, message) => new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, { [field]: [message] });
 
+/**
+ * An owner the reader may give a lead, a partner or a deal to (§6.1): anyone with `all`, else someone in
+ * their scope, so nothing a person makes or edits vanishes from them.
+ */
+function assertOwner(scope, ownerId, field = "owner_id") {
+  if (!scope || scope.scope === "all") return;
+  if (!(scope.scope_ids || []).includes(ownerId)) throw invalid(field, "Outside your team");
+}
+
 /** Whether the person sees and enters commission and returns (§6.1): `partnerships.money`, or the CEO. */
 async function holdsMoney(actor) {
   if (!actor) return false;
@@ -215,11 +224,13 @@ function validityOf(validity, category) {
  * @param {object} actor
  * @param {{kind: "lead"|"partner", id: string, categoryId: string|null}} record
  * @param {object} body  DealFields
- * @param {{held: boolean, field?: string, allowSigned?: boolean, signedAt?: Date|null}} opts
- *   field: where a refusal lands ("deal" inside New Lead); allowSigned: New Partner's first deal
+ * @param {{held: boolean, field?: string, allowSigned?: boolean, source?: string, identifiedOn?: string|null}} opts
+ *   field: where a refusal lands ("deal" inside New Lead); allowSigned: New Partner's first deal;
+ *   source: where it came from, on its first history line and its events (`person`, or `import` from
+ *   the tracker importer, M7 PR 4); identifiedOn: the day it was identified (its lead's), else today
  * @returns {Promise<{deal_id: string, number: string, stage: object}>}
  */
-async function createIn(client, actor, record, body, { held, field = null, allowSigned = false } = {}) {
+async function createIn(client, actor, record, body, { held, field = null, allowSigned = false, source = "person", identifiedOn = null } = {}) {
   const at = (k) => (field ? `${field}.${k}` : k);
   refuseMoney(body, held);
   const stages = await lists.stagesOf(client);
@@ -248,7 +259,7 @@ async function createIn(client, actor, record, body, { held, field = null, allow
     status: signed ? "live" : "open",
     health: "on_track",
     currency: "NGN",
-    identified_on: lagos.today(),
+    identified_on: identifiedOn || lagos.today(),
     signed_at: signedAt,
     title: body.title,
     event_title: body.event_title ?? null,
@@ -273,20 +284,20 @@ async function createIn(client, actor, record, body, { held, field = null, allow
   if (body.venue) await places.save(client, "deal.venue", dealId, body.venue, { field: at("venue") });
   await repo.replaceOptions(client, dealId, options.withDefaults(body.options, rate));
   await repo.setTeam(client, dealId, body.owner_id, body.member_ids);
-  await repo.addHistory(client, { deal_id: dealId, kind: "stage", from: null, to: stage.code, source: "person", user_id: actor.user_id });
+  await repo.addHistory(client, { deal_id: dealId, kind: "stage", from: null, to: stage.code, source, user_id: actor ? actor.user_id : null });
   await emit(client, {
     key: EVENTS.DEAL_CREATED,
     entity: { type: "partner_deal", id: dealId },
     actor,
     after: { number, title: body.title, stage: stage.code, owner_id: body.owner_id },
-    payload: { deal_id: dealId, number, [`${record.kind}_id`]: record.id, owner_id: body.owner_id },
+    payload: { deal_id: dealId, number, [`${record.kind}_id`]: record.id, owner_id: body.owner_id, source },
   });
   if (signed) {
     await emit(client, {
       key: EVENTS.DEAL_SIGNED,
       entity: { type: "partner_deal", id: dealId },
       actor,
-      payload: { deal_id: dealId, number, partner_id: record.kind === "partner" ? record.id : null, owner_id: body.owner_id },
+      payload: { deal_id: dealId, number, partner_id: record.kind === "partner" ? record.id : null, owner_id: body.owner_id, source },
     });
   }
   return { deal_id: dealId, number, stage };
@@ -314,6 +325,7 @@ async function recordFor(client, body, scope) {
 
 /** New Deal (POST /deals): on a partner, or on a lead without one, at the first stage unless an open one is given. */
 async function create(actor, scope, body) {
+  assertOwner(scope, body.owner_id);
   const held = await holdsMoney(actor);
   const id = await tx(async (client) => {
     const record = await recordFor(client, body, scope);
@@ -324,6 +336,7 @@ async function create(actor, scope, body) {
 
 /** Edit Deal (PATCH /deals/:id): its terms, options, team and custom values. The stage and health move on their own routes. */
 async function update(actor, scope, id, body) {
+  if (body.owner_id) assertOwner(scope, body.owner_id);
   const held = await holdsMoney(actor);
   refuseMoney(body, held);
   await tx(async (client) => {
@@ -343,7 +356,13 @@ async function update(actor, scope, id, body) {
       changes.commission_pct = body.commission_pct ?? (category ? category.default_commission_pct : null);
       changes.commission_deviates = options.deviates(changes.commission_pct, category && category.default_commission_pct);
     }
-    if (body.validity !== undefined) Object.assign(changes, validityOf(body.validity, category));
+    if (body.validity !== undefined) {
+      Object.assign(changes, validityOf(body.validity, category));
+      // A signed deal's days are dated from its signing, as the move into a signed stage dates them.
+      if (deal.signed_at && changes.validity_days && !changes.valid_until) {
+        changes.valid_until = lagos.addDays(lagos.dateOf(deal.signed_at), changes.validity_days);
+      }
+    }
     if (body.custom !== undefined) changes.custom = await fields.checkCustom(client, { appliesTo: "deal", categoryId: seen.partner_category_id, values: body.custom, had: deal.custom });
     await repo.update(client, id, changes);
     if (body.venue !== undefined) {
@@ -395,6 +414,7 @@ async function cardNames(db, ids) {
 module.exports = {
   MONEY,
   cardNames,
+  assertOwner,
   holdsMoney,
   rowOf,
   detailFor,

@@ -4,7 +4,7 @@ import { useApi } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useRouter } from "@/lib/router";
 import { useTrailTitle } from "@/lib/trail";
-import { Button, Card, CardHeader, DataView, EmptyState, formatDate, formatMoney, formatMoneyShort, Menu, Pill, ProfileHeader, StatusPill, Tabs, useModal } from "@mycity/ui";
+import { Button, Card, CardHeader, DataView, EmptyState, formatDate, formatMoney, formatMoneyShort, HelpTerm, Menu, Pill, ProfileHeader, StatusPill, Tabs, useModal } from "@mycity/ui";
 import { ClosePartner } from "./forms/ClosePartner";
 import { ContactForm } from "./forms/ContactForm";
 import { DealForm } from "./forms/DealForm";
@@ -19,9 +19,9 @@ type Tab = (typeof TABS)[number];
 const LABEL: Record<Tab, string> = { overview: "Overview", deals: "Deals", documents: "Documents", returns: "Returns", work: "Work", activity: "Activity", contacts: "Contacts", details: "Details" };
 
 /** One open or live deal on the Overview, whole. */
-function OverviewDeal({ id, readOnly, money }: { id: string; readOnly: boolean; money: boolean }) {
+function OverviewDeal({ id, readOnly, money, categoryId }: { id: string; readOnly: boolean; money: boolean; categoryId: string | null }) {
   const d = useDeal(id);
-  return d.data ? <DealPanel deal={d.data} readOnly={readOnly} money={money} /> : null;
+  return d.data ? <DealPanel deal={d.data} readOnly={readOnly} money={money} categoryId={categoryId} /> : null;
 }
 
 /**
@@ -65,7 +65,13 @@ export function Partner360({ id }: { id: string }) {
         role={[partner.category, partner.region, partner.owner?.display_name].filter(Boolean).join(" · ")}
         chips={
           <>
-            <StatusPill status={partnerPill(partner.status)} />
+            {partner.status === "dormant" ? (
+              <HelpTerm help="No live deal now. A newly signed deal makes it Active.">
+                <StatusPill status={partnerPill(partner.status)} />
+              </HelpTerm>
+            ) : (
+              <StatusPill status={partnerPill(partner.status)} />
+            )}
             {partner.signed_outside && <Pill>Signed Before the Hub</Pill>}
             {primary && <Pill>{`${primary.first_name} ${primary.last_name}`}</Pill>}
           </>
@@ -74,7 +80,7 @@ export function Partner360({ id }: { id: string }) {
           readOnly ? undefined : (
             <>
               <Menu label="Partner Actions" trigger={<Button icon="dots">More</Button>} items={menu} />
-              {mayCreate && <Button variant="primary" icon="plus" onClick={() => open("New Deal", (close) => <DealForm partnerId={partner.partner_id} close={close} />, true)}>New Deal</Button>}
+              {mayCreate && <Button variant="primary" icon="plus" onClick={() => open("New Deal", (close) => <DealForm partnerId={partner.partner_id} categoryId={partner.partner_category_id} close={close} />, true)}>New Deal</Button>}
             </>
           )
         }
@@ -85,14 +91,14 @@ export function Partner360({ id }: { id: string }) {
           { label: "Signed Value", value: formatMoneyShort(x.kpis.signed_value) },
           x.kpis.returns_this_year !== undefined ? { label: "Returns This Year", value: formatMoneyShort(x.kpis.returns_this_year) } : { label: "Downloads This Year", value: x.kpis.downloads_this_year.toLocaleString("en-NG") },
           { label: "Active Deals", value: String(x.kpis.active_deals) },
-          { label: "Days Since Contact", value: daysWord(x.kpis.days_since_contact), help: SINCE_CONTACT_HELP, tone: (x.kpis.days_since_contact ?? 0) >= 30 ? "err" : undefined },
+          { label: "Days Since Last Contact", value: daysWord(x.kpis.days_since_contact), help: SINCE_CONTACT_HELP, tone: (x.kpis.days_since_contact ?? 0) >= 30 ? "err" : undefined },
         ]}
       />
       <Tabs label={partner.name} items={tabs.map((t) => ({ value: t, label: LABEL[t] }))} value={tab} onValueChange={(v) => setTab(v as Tab)} className="mt-3" />
       <div className="mt-3 grid gap-3">
         {tab === "overview" && (
           <>
-            {unfinished.length ? unfinished.map((d) => <OverviewDeal key={d.deal_id} id={d.deal_id} readOnly={readOnly} money={money} />) : <EmptyState title="No Open Deals" text="Open a deal for the next edition." />}
+            {unfinished.length ? unfinished.map((d) => <OverviewDeal key={d.deal_id} id={d.deal_id} readOnly={readOnly} money={money} categoryId={partner.partner_category_id} />) : <EmptyState title="No Open Deals" text="Open a deal for the next edition." />}
             <InteractionsCard items={x.overview.interactions} />
             {x.deliverables.length > 0 && (
               <DataView title="Our Deliverables" rows={x.deliverables} rowKey={(d) => d.deal_deliverable_id} columns={[{ key: "t", label: "Deliverable", render: (d) => d.title }, { key: "d", label: "Due", render: (d) => (d.due_on ? formatDate(d.due_on) : "None") }, { key: "s", label: "Status", render: (d) => d.status ?? "None" }]} />
@@ -114,7 +120,7 @@ export function Partner360({ id }: { id: string }) {
             ]}
           />
         )}
-        {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} />}
+        {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} signedOutside={partner.signed_outside} />}
         {tab === "returns" && (
           <Card>
             <CardHeader title="Returns" />
@@ -122,7 +128,7 @@ export function Partner360({ id }: { id: string }) {
           </Card>
         )}
         {tab === "work" && <WorkTab />}
-        {tab === "activity" && <ActivityTab record={record} />}
+        {tab === "activity" && <ActivityTab record={record} history={x.history} />}
         {tab === "contacts" && <ContactsTab record={record} contacts={x.contacts} readOnly={readOnly} />}
         {tab === "details" && (
           <DetailsTab

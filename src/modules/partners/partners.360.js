@@ -13,6 +13,10 @@
  *              interactions
  *   deliverables  what MyCity owes on its signed deals (raised on signing, M7 PR 5)
  *   custom_fields the fields its category and every category give partners, retired ones included
+ *   history    the latest 25 stage and health lines of its deals, each naming its deal (Activity)
+ *
+ * The deals, the figures and the history are the deals the reader sees (§6.1): its owner's scope
+ * sees every one; a member who sees the partner only through their own deal sees that deal alone.
  */
 const { AppError } = require("../../shared/errors");
 const places = require("../../shared/places/places");
@@ -69,15 +73,16 @@ async function one(db, id, scope, actor) {
   const interactions = require("../interactions/interactions.service");
   const held = await pipeline.holdsMoney(actor);
   const year = lagos.today().slice(0, 4);
-  const [region, headquarters, logo, figures, deals, contacts, latest, defs] = await Promise.all([
+  const [region, headquarters, logo, figures, deals, contacts, latest, defs, history] = await Promise.all([
     service.regionViewOf(db, "partner.cities", id, r.region_scope, r.region),
     places.view(db, "partner.headquarters", id),
     logoOf(db, r.logo_document_id),
-    repo.figures(db, id, { yearStart: `${year}-01-01`, yearEnd: `${year}-12-31` }),
-    dealRepo.ofRecord(db, { kind: "partner", id }, null),
+    repo.figures(db, id, { yearStart: `${year}-01-01`, yearEnd: `${year}-12-31` }, scope),
+    dealRepo.ofRecord(db, { kind: "partner", id }, scope),
     service.contactsOf(db, { kind: "partner", id }),
     interactions.latestOf(db, { kind: "partner", id }),
     fields.defsFor(db, "partner", r.partner_category_id),
+    dealRepo.historyOfRecord(db, { kind: "partner", id }, scope),
   ]);
   const signed = deals.data.filter((d) => d.status === "live" || d.status === "completed").map((d) => d.deal_id);
   const delivered = signed.length ? (await dealRepo.deliverables(db, signed)).data : [];
@@ -96,6 +101,7 @@ async function one(db, id, scope, actor) {
     overview: { events: [], interactions: latest },
     deliverables: delivered,
     custom_fields: defs,
+    history,
   };
 }
 

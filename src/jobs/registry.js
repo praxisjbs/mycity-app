@@ -190,6 +190,7 @@ const SCHEDULERS = Object.freeze([
   "query-rule-sweep",
   "user-guide-index",
   "budget-threshold",
+  "signature-reminders",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

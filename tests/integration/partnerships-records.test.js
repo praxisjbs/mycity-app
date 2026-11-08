@@ -182,7 +182,7 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
       const p = await as("staff").get(`/partnerships/partners/${bare.partner_id}`);
       expect(p.status).toBe(200);
       expect(p.body.kpis).toEqual({ signed_value: "0.00", downloads_this_year: 0, active_deals: 0, days_since_contact: 0 });
-      expect([p.body.deals, p.body.contacts, p.body.overview, p.body.deliverables, p.body.custom_fields]).toEqual([[], [], { events: [], interactions: [] }, [], []]);
+      expect([p.body.deals, p.body.contacts, p.body.overview, p.body.deliverables, p.body.custom_fields, p.body.history]).toEqual([[], [], { events: [], interactions: [] }, [], [], []]);
       expect(p.body.partner).toMatchObject({ status: "dormant", stage_label: null, health: null, signed_outside: false, region_view: { scope: null, cities: [], label: null } });
 
       const lead = await one("INSERT INTO lead (number, name, owner_id) VALUES ('LED-9001', 'Bare Lead Ltd', $1) RETURNING lead_id", [emp("staff")]);
@@ -466,6 +466,117 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
       });
       expect(future.status).toBe(422);
       expect(future.body.error.fields.occurred_at).toEqual(["Not in the future"]);
+    });
+  });
+
+  describe("the rules settled at the audit before PR 4 (§6.1, §6.4, §6.12, §13.2)", () => {
+    let partnerId;
+    let mineDeal;
+    let theirDeal;
+    beforeAll(async () => {
+      const made = await as("staff").post("/partnerships/partners", {
+        name: "Ikoyi Lights Festival",
+        partner_category_id: cat.event,
+        region: { scope: "national" },
+        owner_id: emp("staff"),
+        contact: { first_name: "Chidi", last_name: "Eze", email: "chidi@ikoyi.example.test" },
+        deal: { title: "Lights 2026", owner_id: emp("staff") },
+        signed_before_hub: true,
+      });
+      expect(made.status).toBe(201);
+      partnerId = made.body.partner.partner_id;
+      mineDeal = made.body.deals[0].deal_id;
+      // A colleague outside the owner's team opens the next edition on the same partner.
+      const theirs = await as("ops").post("/partnerships/deals", { partner_id: partnerId, title: "Lights 2027", owner_id: emp("other") });
+      expect(theirs.status).toBe(201);
+      theirDeal = theirs.body.deal_id;
+    });
+
+    test("a partner's owner sees and moves every deal on it; a member of one sees only that one", async () => {
+      expect((await as("staff").get(`/partnerships/deals/${theirDeal}`)).status).toBe(200);
+      const moved = await as("staff").post(`/partnerships/deals/${theirDeal}/stage`, { stage: "initial_contact" });
+      expect(moved.status).toBe(200);
+      const owner360 = (await as("staff").get(`/partnerships/partners/${partnerId}`)).body;
+      expect(owner360.deals.map((d) => d.deal_id).sort()).toEqual([mineDeal, theirDeal].sort());
+      expect(owner360.kpis.active_deals).toBe(1);
+      expect(owner360.history.map((h) => h.deal_title)).toEqual(expect.arrayContaining(["Lights 2026", "Lights 2027"]));
+      expect(owner360.history[0]).toMatchObject({ kind: "stage", to_label: "Initial Contact", deal_id: theirDeal, deal_title: "Lights 2027" });
+      // The colleague sees the partner through their own deal, and only that deal.
+      const member360 = (await as("other").get(`/partnerships/partners/${partnerId}`)).body;
+      expect(member360.deals.map((d) => d.deal_id)).toEqual([theirDeal]);
+      expect(member360.kpis.active_deals).toBe(0);
+      expect(member360.history.every((h) => h.deal_id === theirDeal)).toBe(true);
+      expect((await as("other").get(`/partnerships/deals/${mineDeal}`)).status).toBe(404);
+      expect((await as("other").get(`/partnerships/deals?partner_id=${partnerId}`)).body.data.map((d) => d.deal_id)).toEqual([theirDeal]);
+    });
+
+    test("New Deal and Edit Deal refuse an owner outside the reader's team", async () => {
+      const made = await as("staff").post("/partnerships/deals", { partner_id: partnerId, title: "Lights Pop-Up", owner_id: emp("other") });
+      expect(made.status).toBe(422);
+      expect(made.body.error.fields).toHaveProperty("owner_id");
+      const edited = await as("staff").patch(`/partnerships/deals/${mineDeal}`, { owner_id: emp("other") });
+      expect(edited.status).toBe(422);
+      expect(edited.body.error.fields).toHaveProperty("owner_id");
+      expect((await as("manager").patch(`/partnerships/deals/${mineDeal}`, { owner_id: emp("peer") })).status).toBe(200);
+    });
+
+    test("a lost lead reopened by its deal's move is no longer lost", async () => {
+      const lead = (await newLead("staff", "Badagry Heritage Walk")).lead;
+      const lost = await as("staff").post(`/partnerships/leads/${lead.lead_id}/lose`, { reason: "They went with a tour operator" });
+      expect(lost.body.lead).toMatchObject({ status: "lost", lost_reason: "They went with a tour operator" });
+      const back = await as("staff").post(`/partnerships/deals/${lost.body.deal.deal_id}/stage`, { stage: "initial_contact", reason: "They came back after the season" });
+      expect(back.status).toBe(200);
+      const view = (await as("staff").get(`/partnerships/leads/${lead.lead_id}`)).body.lead;
+      expect(view).toMatchObject({ status: "contacted", lost_reason: null });
+    });
+
+    test("Categories' counts follow scope; the duplicate check reads beyond it, names and numbers only", async () => {
+      const count = async (who) => (await as(who).get("/partnerships/categories")).body.data.find((c) => c.name === "Event");
+      const staffs = await count("staff");
+      const all = await count("ops");
+      expect(all.leads).toBeGreaterThan(staffs.leads);
+      const detail = (await as("staff").get(`/partnerships/categories/${cat.event}`)).body.counts;
+      expect([detail.partners, detail.leads]).toEqual([staffs.partners, staffs.leads]);
+      const dup = await as("staff").get("/partnerships/duplicates?name=Enugu%20Coal%20City%20Expo");
+      expect(dup.body.candidates[0]).toEqual({ type: "lead", id: expect.any(String), number: expect.any(String), name: "Enugu Coal City Expo", score: expect.any(Number), reasons: ["name"] });
+      expect((await as("staff").get(`/partnerships/leads/${dup.body.candidates[0].id}`)).status).toBe(404);
+    });
+
+    test("Partners' Quiet names the days in use", async () => {
+      expect((await as("staff").get("/partnerships/partners/summary")).body.quiet_days).toBe(30);
+    });
+
+    test("PR 4's hooks write a lead, a partner and a month of returns in the caller's transaction, marked as imported", async () => {
+      const leads = require("../../src/modules/leads/leads.service");
+      const partners = require("../../src/modules/partners/partners.service");
+      const returns = require("../../src/modules/partner_pipeline/partner_pipeline.returns");
+      const dealRepo = require("../../src/modules/partner_pipeline/partner_pipeline.repo");
+      const actor = { user_id: user("ops"), employee_id: emp("ops") };
+      const lead = await tx((client) =>
+        leads.createIn(
+          client,
+          actor,
+          { name: "Imported Lead Ltd", partner_category_id: cat.event, region: { scope: "national" }, owner_id: emp("staff"), identified_on: "2026-06-25", deal: { title: "Imported Deal", owner_id: emp("staff") } },
+          { held: true, source: "import" },
+        ),
+      );
+      expect(await one("SELECT identified_on::text AS d, (SELECT count(*)::int FROM partner_contact WHERE lead_id = $1) AS contacts FROM lead WHERE lead_id = $1", [lead.lead_id])).toEqual({ d: "2026-06-25", contacts: 0 });
+      expect(await one("SELECT identified_on::text AS d FROM partnership_opportunity WHERE partnership_opportunity_id = $1", [lead.deal_id])).toEqual({ d: "2026-06-25" });
+      expect(await one("SELECT source FROM partnership_stage_history WHERE partnership_opportunity_id = $1", [lead.deal_id])).toEqual({ source: "import" });
+
+      const partner = await tx((client) =>
+        partners.createIn(
+          client,
+          actor,
+          { name: "Imported Partner Ltd", partner_category_id: cat.event, region: { scope: "national" }, owner_id: emp("staff"), signed_before_hub: true, deal: { title: "Imported Listing", owner_id: emp("staff") } },
+          { held: true, source: "import" },
+        ),
+      );
+      expect(await one("SELECT status FROM partner WHERE partner_id = $1", [partner.partner_id])).toEqual({ status: "active" });
+      expect(await one("SELECT source FROM partnership_stage_history WHERE partnership_opportunity_id = $1", [partner.deal_id])).toEqual({ source: "import" });
+
+      const saved = await tx(async (client) => returns.saveIn(client, actor, await dealRepo.lock(client, partner.deal_id), "2026-08", { units_sold: 12, downloads: 30 }, { source: "import" }));
+      expect(saved).toMatchObject({ month: "2026-08-01", units_sold: 12, downloads: 30, source: "import" });
     });
   });
 

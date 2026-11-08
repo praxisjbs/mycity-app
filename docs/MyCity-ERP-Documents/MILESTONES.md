@@ -922,6 +922,31 @@ public URL with a data-privacy acknowledgement; verification status tracks each.
 automatically at each phase from an editable template. Onboarding does not open until documentation
 completes.
 
+
+**Decided 06/11/2026 (AJ, who owns M5; with GE on #79; `docs/guides/offers.md`,
+`docs/handoff/m5-offers-onboarding.md` §2).** From the internal Modules Review of 04/11/2026:
+
+- **Offers are approved before they are sent**, on a `recruitment.offer` flow in Settings · Approvals
+  (A11); an offer keeps the flow active when it was created.
+- **The offer letter is the template plus the offer's fields** (salary, start date, working hours,
+  probation, the final job description copied from the vacancy). No AI drafts it.
+- **On acceptance the employment contract is generated** from the offer, the job description, the
+  vacancy and the hire's details, and **the hire signs it too**, on its own signing link.
+- **The employee is created at acceptance**, without a login until onboarding completes; the hire's
+  documents sit on the Employee 360's Documents tab from then. M4's `hireIn` moves the application
+  to Hired and fills the Organogram seat; the vacancy closes as filled when its openings are hired.
+- **The checklist is MyCity's New Joiner list** (entered on screen, A26): proof of address, a valid
+  ID, certificates with NYSC, evidence of separation, birth certificate, the Employee Data Form, the
+  MyLagosApp Wallet ID, a passport photograph and the bank Account Opening Form, with the signed
+  offer and the contract added by the system; **two guarantors**, each reference-checked; the BVN as
+  a restricted number on the employee record. The hire uploads through a public link with the
+  privacy acknowledgement.
+- **Pay is monthly, line by line**, and the company signs the offer when it is approved, before the
+  candidate.
+- **Onboarding works through a department plan**: steps with an owner and a due date, linked to the
+  department's SOPs.
+- **The signing service is built in M5 and shared with M7** (`docs/guides/partnerships.md` §6.9).
+
 ---
 
 ## 11 · M6 — Payroll & Notifications · 11%

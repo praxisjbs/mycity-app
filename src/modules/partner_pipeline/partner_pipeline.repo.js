@@ -9,12 +9,14 @@
  *
  * Deals (M7 PR 3): their options, team, history and returns. A deal is a row of
  * `partnership_opportunity`; on the wire its id is `deal_id`. Who sees what (§6.1), the one rule the
- * lists, the 360s, ⌘K and Praxis AI share:
- *   a deal         its owner is in the reader's scope (shared/rbac/scope), or one of its team is
- *   a lead or a    its owner is in the reader's scope, or the reader may see one of its deals
+ * lists, the 360s, ⌘K, Home and Praxis AI share:
+ *   a deal         its owner is in the reader's scope (shared/rbac/scope), or one of its team is, or
+ *                  the owner of the lead or partner it is on (the partner's, once it has one)
+ *   a lead or a    its owner is in the reader's scope, or one of its deals' owner or team is
  *   partner
  * A record with no owner and no team in scope is seen only with `all`. The ids come from
- * scopeClause, the one translation of a scope into SQL; this file only widens it to the team.
+ * scopeClause, the one translation of a scope into SQL; this file only widens it to the team and the
+ * record's owner.
  *
  * Money is numeric(18,2), read as its two-place string. Sums count Naira only (§6.19). Never emits.
  */
@@ -46,18 +48,25 @@ const CATEGORY = `c.partner_category_id, c.name::text AS name, c.description,
 
 const CATEGORY_SORTS = { display_order: "c.display_order", name: "c.name" };
 
-function listCategories(db, query) {
+/**
+ * A page of categories, each with the partners and leads in it the reader may see (§6.1, §6.3).
+ * @param {object|null} scope  null: every record (a check, never a screen)
+ */
+function listCategories(db, query, scope = null) {
+  const params = [query.active === undefined ? null : query.active, query.q || null];
+  const seenP = scope ? recordSeen(scope, { alias: "p", kind: "partner" }, params) : "";
+  const seenL = scope ? recordSeen(scope, { alias: "l", kind: "lead" }, params) : "";
   return pageQuery(
     db,
     `SELECT ${CATEGORY},
-            (SELECT count(*)::int FROM partner p WHERE p.partner_category_id = c.partner_category_id) AS partners,
-            (SELECT count(*)::int FROM lead l WHERE l.partner_category_id = c.partner_category_id) AS leads,
+            (SELECT count(*)::int FROM partner p WHERE p.partner_category_id = c.partner_category_id ${seenP}) AS partners,
+            (SELECT count(*)::int FROM lead l WHERE l.partner_category_id = c.partner_category_id ${seenL}) AS leads,
             ${TOTAL_COL}
        FROM partner_category c
       WHERE ($1::boolean IS NULL OR c.active = $1)
         AND ($2::text IS NULL OR search_fold(c.name::text) LIKE '%' || search_fold($2) || '%')
       ORDER BY ${orderBy(query, CATEGORY_SORTS, "c.partner_category_id")}`,
-    [query.active === undefined ? null : query.active, query.q || null],
+    params,
     query,
   );
 }
@@ -67,18 +76,27 @@ const getCategory = (db, id) => one(db, `SELECT ${CATEGORY} FROM partner_categor
 const categoryByName = (db, name) =>
   one(db, `SELECT ${CATEGORY} FROM partner_category c WHERE c.name = $1`, [name]);
 
-/** What is in a category: partners, leads, and deals still being pursued (their lead's or partner's category). */
-const categoryCounts = (db, id) =>
-  one(
+/**
+ * What is in a category that the reader may see: partners, leads, and deals still being pursued (their
+ * lead's or partner's category).
+ * @param {object|null} scope  null: every record (a check, never a screen)
+ */
+function categoryCounts(db, id, scope = null) {
+  const params = [id];
+  const seenP = scope ? recordSeen(scope, { alias: "p", kind: "partner" }, params) : "";
+  const seenL = scope ? recordSeen(scope, { alias: "l", kind: "lead" }, params) : "";
+  const seenD = scope ? dealSeen(scope, "d", params) : "";
+  return one(
     db,
-    `SELECT (SELECT count(*)::int FROM partner p WHERE p.partner_category_id = $1) AS partners,
-            (SELECT count(*)::int FROM lead l WHERE l.partner_category_id = $1) AS leads,
+    `SELECT (SELECT count(*)::int FROM partner p WHERE p.partner_category_id = $1 ${seenP}) AS partners,
+            (SELECT count(*)::int FROM lead l WHERE l.partner_category_id = $1 ${seenL}) AS leads,
             (SELECT count(*)::int FROM partnership_opportunity d
                LEFT JOIN partner p ON p.partner_id = d.partner_id
                LEFT JOIN lead l ON l.lead_id = d.lead_id
-              WHERE d.status = 'open' AND COALESCE(p.partner_category_id, l.partner_category_id) = $1) AS open_deals`,
-    [id],
+              WHERE d.status = 'open' AND COALESCE(p.partner_category_id, l.partner_category_id) = $1 ${seenD}) AS open_deals`,
+    params,
   );
+}
 
 const nextCategoryOrder = async (db) =>
   Number((await one(db, "SELECT COALESCE(max(display_order), 0) + 10 AS next FROM partner_category", [])).next);
@@ -369,8 +387,14 @@ const stageInUse = async (db, code) =>
 const teamOf = (d, n) =>
   `EXISTS (SELECT 1 FROM deal_member dm WHERE dm.deal_id = ${d}.partnership_opportunity_id AND dm.employee_id = ANY($${n}::uuid[]))`;
 
+/** The record clause of a deal `d`: the owner of its partner (once it has one), else of its lead, against `$n`. */
+const recordOwnerOf = (d, n) => `(CASE WHEN ${d}.partner_id IS NOT NULL
+    THEN EXISTS (SELECT 1 FROM partner rp WHERE rp.partner_id = ${d}.partner_id AND rp.owner_id = ANY($${n}::uuid[]))
+    ELSE EXISTS (SELECT 1 FROM lead rl WHERE rl.lead_id = ${d}.lead_id AND rl.owner_id = ANY($${n}::uuid[])) END)`;
+
 /**
  * The condition a deal `alias` is seen by: "" for `all`, else "AND (...)". Appends the ids to params.
+ * A deal is seen through its owner, its team, or its lead's or partner's owner (§6.1).
  * @param {{scope: string, scope_ids: string[]|null}} scope
  * @param {string} alias
  * @param {Array} params
@@ -379,7 +403,7 @@ function dealSeen(scope, alias, params) {
   const s = scopeClause(scope, { column: `${alias}.owner_id` }, params);
   if (!s.and) return "";
   const n = params.length;
-  return `AND (${alias}.owner_id = ANY($${n}::uuid[]) OR ${teamOf(alias, n)})`;
+  return `AND (${alias}.owner_id = ANY($${n}::uuid[]) OR ${teamOf(alias, n)} OR ${recordOwnerOf(alias, n)})`;
 }
 
 /**
@@ -584,6 +608,38 @@ async function history(db, dealId) {
       WHERE h.partnership_opportunity_id = $1
       ORDER BY h.changed_at DESC, h.partnership_stage_history_id`,
     [dealId],
+    { page: 1 },
+  );
+  return page.data;
+}
+
+/**
+ * The latest 25 stage and health lines of a record's deals the reader may see, newest first, each with
+ * its deal (the Partner 360's Activity, §6.2).
+ * @param {{kind: "lead"|"partner", id: string}} record
+ */
+async function historyOfRecord(db, { kind, id }, scope) {
+  const params = [id];
+  const seen = scope ? dealSeen(scope, "po", params) : "";
+  const page = await pageQuery(
+    db,
+    `SELECT h.partnership_stage_history_id, h.kind, h.from_stage, h.to_stage,
+            CASE WHEN h.kind = 'health' THEN hf.label ELSE COALESCE(sf.label, h.from_stage) END AS from_label,
+            CASE WHEN h.kind = 'health' THEN COALESCE(ht.label, h.to_stage) ELSE COALESCE(st.label, h.to_stage) END AS to_label,
+            h.reason, h.source, ${personJson("e", "d")} AS by, h.changed_at,
+            po.partnership_opportunity_id AS deal_id, po.number AS deal_number, po.title AS deal_title, ${TOTAL_COL}
+       FROM partnership_stage_history h
+       JOIN partnership_opportunity po ON po.partnership_opportunity_id = h.partnership_opportunity_id
+       LEFT JOIN reference_value sf ON h.kind = 'stage' AND sf.domain = 'partnership_stage' AND sf.code = h.from_stage
+       LEFT JOIN reference_value st ON h.kind = 'stage' AND st.domain = 'partnership_stage' AND st.code = h.to_stage
+       LEFT JOIN reference_value hf ON h.kind = 'health' AND hf.domain = 'deal_health' AND hf.code = h.from_stage
+       LEFT JOIN reference_value ht ON h.kind = 'health' AND ht.domain = 'deal_health' AND ht.code = h.to_stage
+       LEFT JOIN app_user u ON u.user_id = h.changed_by
+       LEFT JOIN employee e ON e.employee_id = u.employee_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE po.${kind}_id = $1 ${seen}
+      ORDER BY h.changed_at DESC, h.partnership_stage_history_id`,
+    params,
     { page: 1 },
   );
   return page.data;
@@ -834,16 +890,31 @@ async function returnOf(db, dealId, month) {
   return rows[0] || null;
 }
 
-/** Save a month: a month saved again replaces its figures. */
+/**
+ * Save a month: a month saved again replaces its figures, and where they came from (`entered` on the
+ * 360, `import` with its batch from Partnership Returns).
+ */
 async function upsertReturn(client, row) {
   await client.query(
-    `INSERT INTO deal_return (deal_id, month, units_sold, gross_sales, mycity_commission, paid_to_partner, downloads, note, source, entered_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'entered', $9)
+    `INSERT INTO deal_return (deal_id, month, units_sold, gross_sales, mycity_commission, paid_to_partner, downloads, note, source, import_batch_id, entered_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      ON CONFLICT (deal_id, month) DO UPDATE SET
        units_sold = EXCLUDED.units_sold, gross_sales = EXCLUDED.gross_sales, mycity_commission = EXCLUDED.mycity_commission,
        paid_to_partner = EXCLUDED.paid_to_partner, downloads = EXCLUDED.downloads, note = EXCLUDED.note,
-       source = 'entered', import_batch_id = NULL, entered_by = EXCLUDED.entered_by`,
-    [row.deal_id, row.month, row.units_sold ?? null, row.gross_sales ?? null, row.mycity_commission ?? null, row.paid_to_partner ?? null, row.downloads ?? null, row.note ?? null, row.entered_by],
+       source = EXCLUDED.source, import_batch_id = EXCLUDED.import_batch_id, entered_by = EXCLUDED.entered_by`,
+    [
+      row.deal_id,
+      row.month,
+      row.units_sold ?? null,
+      row.gross_sales ?? null,
+      row.mycity_commission ?? null,
+      row.paid_to_partner ?? null,
+      row.downloads ?? null,
+      row.note ?? null,
+      row.source || "entered",
+      row.import_batch_id ?? null,
+      row.entered_by,
+    ],
   );
 }
 
@@ -1023,6 +1094,7 @@ module.exports = {
   members,
   deliverables,
   history,
+  historyOfRecord,
   ofRecord,
   ofLead,
   pipelineFigures,

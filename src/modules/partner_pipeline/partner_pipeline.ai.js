@@ -172,7 +172,7 @@ module.exports = defineManifest({
       description: "List the partnership categories (Event, Hospitality, Vendor and the rest), with how many partners and leads each has",
       params: c.partner_pipeline.CategoryListQuery,
       permission: ["partnerships", "view"],
-      run: (_client, params) => service.listCategories(params),
+      run: (_client, params, actor) => service.listCategories(params, actor.scope),
       cite: (row) => ({ type: "partner_category", id: row.partner_category_id, label: row.name }),
     },
   ],

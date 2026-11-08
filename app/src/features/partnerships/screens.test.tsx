@@ -92,6 +92,31 @@ describe("Partnerships on the contract", () => {
     expect(await screen.findByText("No Work Yet")).toBeTruthy();
   }, 30000);
 
+  it("Partners: the desktop filters, the Owner column, and the 360's Activity naming each deal's history", async () => {
+    await open("/partnerships?tab=partners");
+    expect(await screen.findByRole("heading", { level: 1, name: "Partners" }, { timeout: 8000 })).toBeTruthy();
+    for (const f of ["Stage", "Category", "Region", "Owner", "Health"]) expect(screen.getAllByText(f).length).toBeGreaterThan(0);
+    expect(await screen.findByRole("columnheader", { name: "Owner" }, { timeout: 8000 })).toBeTruthy();
+    expect(await screen.findByText("Days Since Last Contact", {}, { timeout: 8000 })).toBeTruthy();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Activity" }), { button: 0 });
+    expect(await screen.findByRole("heading", { name: "Stage History" }, { timeout: 8000 })).toBeTruthy();
+    expect(screen.getAllByText(/ · Moved to /).length).toBeGreaterThan(0);
+  }, 30000);
+
+  it("New Deal: Deal Options up to five, and the deal's terms behind Advanced for a holder of the money", async () => {
+    await open("/partnerships?tab=partners");
+    fireEvent.click(await screen.findByRole("button", { name: "New Deal" }, { timeout: 8000 }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+    for (let i = 0; i < 5; i += 1) fireEvent.click(within(dialog).getByRole("button", { name: "Add Option" }));
+    expect(within(dialog).getByText("Option 5")).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Add Option" })).toBeNull();
+    expect(within(dialog).getAllByText("MyCity's Commission").length).toBe(5);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove Option 5" }));
+    expect(within(dialog).getByRole("button", { name: "Add Option" })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: /Advanced/ }));
+    for (const label of ["Impact Rating", "Commission %", "Validity", "Team"]) expect(await within(dialog).findByText(label)).toBeTruthy();
+  }, 30000);
+
   it("on a phone nothing opens until a row is tapped, then the record opens in a sheet", async () => {
     setViewport(390);
     await open("/partnerships?tab=leads");

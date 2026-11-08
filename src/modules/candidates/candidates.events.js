@@ -32,6 +32,7 @@ const EVENTS = defineEvents("recruitment", {
   "application.not_progressed": { summary: "A candidate was not progressed" },
   "application.reopened": { summary: "A candidate was reopened" },
   "application.hired": { summary: "A candidate was hired" },
+  "application.email_corrected": { summary: "A candidate's email address was corrected" },
   "application.score_requested": { summary: "An AI read of an application was asked for" },
   "application.scored": { summary: "An application was scored with AI" },
   "recruitment.candidate_email_saved": { summary: "A candidate email's wording was saved" },

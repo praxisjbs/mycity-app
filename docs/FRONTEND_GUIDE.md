@@ -99,7 +99,7 @@ per real UI element, shared where the demo repeats itself. The HTML file stays i
   A wrong path, a wrong field name or a wrong response shape is a TypeScript error. Never edit
   `contract.gen.ts`.
 - **Interim types retire module by module.** Until a module's schemas exist, its screens run on
-  INTERIM types (`app/src/api/types/<module>.ts`, `public-app/src/api/types/public.ts`).
+  INTERIM types (`app/src/api/types/<module>.ts`, `public-app/src/api/types/<page>.ts`).
   `npm run contract:status` (from `app/`) says which modules are Interim, Partly or Ready to
   switch; §9.5 says how to switch one.
 - **One data client, shared by both apps**, in `@mycity/ui`: `ApiError`, `createApiClient`,
@@ -728,16 +728,15 @@ public-app/
   eslint.config.js            extends @mycity/ui/eslint
   src/
     main.tsx  App.tsx         entry; the index and the seven pages, the guidance screens and a not-found
-                              page; Apply and Assessment load on their own (Apply's contract schema brings Zod)
+                              page; Apply, Assessment and Sign Offer load on their own (a contract schema brings Zod)
     test-setup.ts             every test file: the 4 second wait, matchMedia and the rest jsdom lacks
     styles/index.css          Tailwind and the @mycity/ui styles
     lib/                      plan (the delivery plan bound to this site), router (the addresses and the
                               header's six links), copy (a link copied, Link Copied for a moment)
     api/
       client.ts               fetch to /api/public/v1 only, made with createApiClient; no session, no cookie
-      hooks.ts  endpoints.ts  the shared hooks bound to this client; the endpoint map: the M4 routes picked
-                              from contract.gen.ts, the M5 ones from types/public.ts
-      types/public.ts         INTERIM shapes for the M5 routes (sign, verify) until their contract lands
+      hooks.ts  endpoints.ts  the shared hooks bound to this client; the endpoint map: the public routes
+                              picked by name from contract.gen.ts (M4's pages; M5's sign and verify)
       mock/                   the in-browser mock, laptops and CI only; demo-links.ts lists sample addresses
     shell/                    Page (PublicPage with the header's six links, the router and noindex), Planned
                               (Coming Soon), DemoLinks (mock only)

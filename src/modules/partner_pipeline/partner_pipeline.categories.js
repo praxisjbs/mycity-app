@@ -36,23 +36,28 @@ const isUnique = (err) => err && err.code === "23505";
  * Categories
  * ------------------------------------------------------------------ */
 
-const list = (query) => repo.listCategories(pool, query);
+/** A page of categories with the partners and leads in each the reader may see (§6.1, §6.3). */
+const list = (query, scope = null) => repo.listCategories(pool, query, scope);
 
-async function detail(id, db = pool) {
+/**
+ * A category whole: its templates, checklist and fields, and what is in it that the reader may see.
+ * @param {object|null} [scope]  the reader's; null counts every record
+ */
+async function detail(id, db = pool, scope = null) {
   const category = await repo.getCategory(db, id);
   if (!category) throw notFound();
   const [templates, checklist, fields, counts] = await Promise.all([
     repo.templatesOf(db, id),
     repo.checklistOf(db, id),
     repo.listFields(db, { partner_category_id: id }),
-    repo.categoryCounts(db, id),
+    repo.categoryCounts(db, id, scope),
   ]);
   return { ...category, templates, checklist, fields, counts };
 }
 
-const get = (id) => detail(id);
+const get = (id, scope = null) => detail(id, pool, scope);
 
-async function create(actor, body) {
+async function create(actor, body, scope = null) {
   const id = await tx(async (client) => {
     if (await repo.categoryByName(client, body.name)) throw nameTaken();
     const row = await repo.insertCategory(client, { ...body, display_order: await repo.nextCategoryOrder(client) });
@@ -68,10 +73,10 @@ async function create(actor, body) {
   }).catch((err) => {
     throw isUnique(err) ? nameTaken() : err;
   });
-  return detail(id);
+  return detail(id, pool, scope);
 }
 
-async function update(actor, id, body) {
+async function update(actor, id, body, scope = null) {
   await tx(async (client) => {
     const before = await repo.getCategory(client, id);
     if (!before) throw notFound();
@@ -92,7 +97,7 @@ async function update(actor, id, body) {
   }).catch((err) => {
     throw isUnique(err) ? nameTaken() : err;
   });
-  return detail(id);
+  return detail(id, pool, scope);
 }
 
 /* ------------------------------------------------------------------ *
@@ -112,7 +117,7 @@ async function getTemplate(id, db = pool) {
   return { ...row, version: read.version || row.version || 0, title: read.title, body_html: read.body_html, record_fields: [...wording.RECORD_FIELDS] };
 }
 
-async function addTemplate(actor, categoryId, body) {
+async function addTemplate(actor, categoryId, body, scope = null) {
   await tx(async (client) => {
     const category = await repo.getCategory(client, categoryId);
     if (!category) throw notFound();
@@ -150,10 +155,10 @@ async function addTemplate(actor, categoryId, body) {
       payload: { partner_category_id: categoryId, partner_category_template_id: id, template_key: key, kind: body.kind },
     });
   });
-  return detail(categoryId);
+  return detail(categoryId, pool, scope);
 }
 
-async function updateTemplate(actor, id, body) {
+async function updateTemplate(actor, id, body, scope = null) {
   const categoryId = await tx(async (client) => {
     const before = await repo.getTemplate(client, id);
     if (!before) throw templateNotFound();
@@ -181,7 +186,7 @@ async function updateTemplate(actor, id, body) {
     });
     return before.partner_category_id;
   });
-  return detail(categoryId);
+  return detail(categoryId, pool, scope);
 }
 
 /** PUT /category-templates/:id/wording: the next version of the wording; asks replaced when given. */

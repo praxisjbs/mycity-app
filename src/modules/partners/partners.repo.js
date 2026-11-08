@@ -99,17 +99,24 @@ async function summary(db, scope, { quietFrom }) {
   return rows[0];
 }
 
-/** A partner's figures for its 360: signed value, the year's returns and downloads, live deals. */
-async function figures(db, id, { yearStart, yearEnd }) {
+/**
+ * A partner's figures for its 360, over the deals the reader sees (§6.1): signed value, the year's
+ * returns and downloads, live deals.
+ * @param {object|null} scope  null: every deal
+ */
+async function figures(db, id, { yearStart, yearEnd }, scope = null) {
+  const params = [id, yearStart, yearEnd];
+  const seen = scope ? deals.dealSeen(scope, "po", params) : "";
   const { rows } = await db.query(
-    `SELECT COALESCE((SELECT sum(${deals.signedValue("sv")}) FROM partnership_opportunity sv
-                       WHERE sv.partner_id = $1 AND sv.currency = 'NGN' AND sv.signed_at IS NOT NULL), 0)::numeric(18,2)::text AS signed_value,
-            COALESCE((SELECT sum(r.mycity_commission) FROM deal_return r JOIN partnership_opportunity o ON o.partnership_opportunity_id = r.deal_id
-                       WHERE o.partner_id = $1 AND r.month BETWEEN $2::date AND $3::date), 0)::numeric(18,2)::text AS returns_this_year,
-            COALESCE((SELECT sum(r.downloads) FROM deal_return r JOIN partnership_opportunity o ON o.partnership_opportunity_id = r.deal_id
-                       WHERE o.partner_id = $1 AND r.month BETWEEN $2::date AND $3::date), 0)::int AS downloads_this_year,
-            (SELECT count(*) FROM partnership_opportunity lv WHERE lv.partner_id = $1 AND lv.status = 'live')::int AS active_deals`,
-    [id, yearStart, yearEnd],
+    `WITH sv AS (SELECT po.* FROM partnership_opportunity po WHERE po.partner_id = $1 ${seen})
+     SELECT COALESCE((SELECT sum(${deals.signedValue("sv")}) FROM sv
+                       WHERE sv.currency = 'NGN' AND sv.signed_at IS NOT NULL), 0)::numeric(18,2)::text AS signed_value,
+            COALESCE((SELECT sum(r.mycity_commission) FROM deal_return r JOIN sv ON sv.partnership_opportunity_id = r.deal_id
+                       WHERE r.month BETWEEN $2::date AND $3::date), 0)::numeric(18,2)::text AS returns_this_year,
+            COALESCE((SELECT sum(r.downloads) FROM deal_return r JOIN sv ON sv.partnership_opportunity_id = r.deal_id
+                       WHERE r.month BETWEEN $2::date AND $3::date), 0)::int AS downloads_this_year,
+            (SELECT count(*) FROM sv WHERE sv.status = 'live')::int AS active_deals`,
+    params,
   );
   return rows[0];
 }

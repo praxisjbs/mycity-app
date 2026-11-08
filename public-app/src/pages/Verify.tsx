@@ -1,7 +1,6 @@
 import { useState } from "react";
+import type { VerifyByToken, VerifyResult } from "@mycity/contract/contract.gen.ts";
 import { useApi } from "@/api/hooks";
-import "@/api/types/public";
-import type { VerifyByToken, VerifyResult } from "@/api/types/public";
 import { Button, Form, formatDate, formatTime, Match, PageMessage, Panel, Skeleton, TextField, VerifyCard } from "@mycity/ui";
 import { Page } from "@/shell/Page";
 import { useRouter } from "@/lib/router";
@@ -12,7 +11,8 @@ import { useRouter } from "@/lib/router";
  * a changed record from a changed file. Anyone with the reference may look (`/verify/<number>`): the
  * type, the signer and the verdicts, never the content. The QR printed on each page of a sealed
  * document (`/verify/t/<token>`) also shows the document itself (docs/guides/partnerships.md §6.9).
- * Built on the INTERIM shapes and the mock until M5's verify API lands (types/public.ts).
+ * The signatures routes answer it (VerifyResult, VerifyByToken): the record's status, every signer
+ * and when they signed, and the two verdicts.
  */
 export function Verify({ number, qr }: { number: string | null; qr?: string }) {
   return (
@@ -56,18 +56,22 @@ function verdict(r: VerifyResult): { tone: "ok" | "warn"; title: string; text: s
   return { tone: "warn", title: "Not This Document", text: "The record and the stored file were altered." };
 }
 
+const TYPE: Record<VerifyResult["document_type"], string> = { offer_letter: "Offer of employment", employment_contract: "Employment contract", agreement: "Partnership agreement" };
+const STATUS: Record<VerifyResult["status"], string> = { pending: "Awaiting signatures", completed: "Signed by everyone", declined: "Declined", expired: "Expired unsigned", revoked: "Withdrawn" };
+const when = (iso: string) => `${formatDate(iso)}, ${formatTime(iso)}`;
+
 const rowsOf = (r: VerifyResult) => [
-  { label: "Document", value: r.document_type },
-  { label: "Reference", value: r.number },
-  { label: "Signed By", value: r.signed_by },
-  { label: "Signed On", value: `${formatDate(r.signed_at)}, ${formatTime(r.signed_at)}` },
+  { label: "Document", value: TYPE[r.document_type] },
+  { label: "Reference", value: r.reference },
+  { label: "Status", value: r.signed_outside ? `${STATUS[r.status]}, on paper` : STATUS[r.status] },
+  ...r.signers.map((s, i) => ({ key: `signer-${i}`, label: s.role === "mycity" ? "For the Company" : "Signed By", value: s.signed_at ? `${s.name}, ${when(s.signed_at)}` : `${s.name}, not signed` })),
   { label: "Issued By", value: r.issued_by },
   { label: "Content Hash", value: <Match value={r.content} /> },
   { label: "Artifact Hash", value: <Match value={r.artifact} /> },
 ];
 
 function ByNumber({ number }: { number: string }) {
-  const r = useApi("GET /api/public/v1/verify/:number", { params: { number } });
+  const r = useApi("GET /api/public/v1/verify/:ref", { params: { ref: number } });
   if (r.error)
     return r.error.status === 404 ? (
       <VerifyCard tone="err" title="Not Found" text="No document has this reference." items={[{ label: "Reference", value: number.toUpperCase() }]} note="Check the reference on the document and try again. It looks like OFF-0018." />
@@ -88,7 +92,8 @@ function ByToken({ token }: { token: string }) {
     );
   const d: VerifyByToken | undefined = r.data;
   if (!d) return <Waiting />;
-  const [dear, offer] = d.document.letter;
+  // The opening of the letter: the line after the addressee, and the offer itself.
+  const opening = d.document.letter.filter((l) => /^Dear |^We are pleased/.test(l));
   return (
     <VerifyCard
       {...verdict(d)}
@@ -96,7 +101,7 @@ function ByToken({ token }: { token: string }) {
       document={{
         heading: "The Document",
         title: d.document.title,
-        paragraphs: [dear, offer].filter((p): p is string => !!p),
+        paragraphs: opening,
         action: (
           <Button variant="line" size="sm" icon="download" asChild>
             <a href={d.document.url} download={d.document.file_name}>

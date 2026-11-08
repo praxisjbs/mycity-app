@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { upload } from "@/api/upload";
 import { invalidate, useMutation } from "@/api/hooks";
 import { CheckboxField, Field, toast, UploadField, useContractForm, Wizard, type PlaceValue } from "@mycity/ui";
-import { failed, useStages } from "../lib";
+import { failed, useCategoryDefaults, useFieldDefs, useHoldsMoney, useStages } from "../lib";
 import { DuplicateNotice } from "./LeadForm";
-import { ContactPart, contactStart, DealPart, dealBody, dealStart, OrganisationPart, useMeAsPerson, type Bound } from "./parts";
+import { ContactPart, contactStart, customForCreate, DealPart, dealBody, dealStart, OrganisationPart, useMeAsPerson, type Bound, type CustomDraft } from "./parts";
 
 /**
  * New Partner (docs/guides/partnerships.md §6.6, §10.1): an organisation whose relationship is already
@@ -22,10 +22,26 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
   const [step, setStep] = useState(0);
   const [evidence, setEvidence] = useState<{ copy: string | null; before: boolean }>({ copy: null, before: false });
   const [problem, setProblem] = useState<string | null>(null);
+  const money = useHoldsMoney();
   const org = useContractForm(
-    { name: "", legal_name: "", partner_category_id: "", region: { scope: "national" } as { scope: string; cities?: PlaceValue[] }, industry: "", owner_id: me?.employee_id ?? "", website: "", headquarters: null as PlaceValue | null, since: "" },
+    {
+      name: "",
+      legal_name: "",
+      partner_category_id: "",
+      region: { scope: "national" } as { scope: string; cities?: PlaceValue[] },
+      industry: "",
+      owner_id: me?.employee_id ?? "",
+      website: "",
+      headquarters: null as PlaceValue | null,
+      since: "",
+      custom: {} as CustomDraft,
+    },
     partners.PartnerFields,
   );
+  const category = org.values.partner_category_id || null;
+  const partnerDefs = useFieldDefs("partner", category);
+  const dealDefs = useFieldDefs("deal", category);
+  const defaults = useCategoryDefaults(category);
   const contact = useContractForm(contactStart(), partners.ContactInput);
   const deal = useContractForm(dealStart(signed[0]?.code ?? "", me?.employee_id ?? ""), pipeline.DealFields);
   useEffect(() => {
@@ -44,8 +60,9 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
         body: {
           ...(dealBody(v as Record<string, unknown>) as Record<string, never>),
           region: v.region,
+          custom: customForCreate(partnerDefs, v.custom),
           contact: dealBody(contact.values as Record<string, unknown>) as never,
-          deal: { ...(dealBody(deal.values as Record<string, unknown>) as Record<string, never>), owner_id: v.owner_id },
+          deal: { ...(dealBody(deal.values as Record<string, unknown>, { money, custom: dealDefs }) as Record<string, never>), owner_id: v.owner_id },
           ...(evidence.copy ? { signed_copy_document_id: evidence.copy } : { signed_before_hub: true }),
         } as never,
       });
@@ -77,7 +94,7 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
           body: (
             <>
               <DuplicateNotice name={org.values.name} />
-              <OrganisationPart f={org as unknown as Bound} kind="partner" owner={me} />
+              <OrganisationPart f={org as unknown as Bound} kind="partner" owner={me} custom={partnerDefs} />
             </>
           ),
         },
@@ -87,7 +104,7 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
           check: () => deal.check(),
           body: (
             <>
-              <DealPart f={deal as unknown as Bound} stages={signed} />
+              <DealPart f={deal as unknown as Bound} stages={signed} terms={{ money, categoryRate: defaults?.commission ?? null, custom: dealDefs, validityNone: "Category Default" }} />
               <Field label="Signed Copy" optional>
                 <UploadField
                   purpose="attachment"

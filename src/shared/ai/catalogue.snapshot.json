@@ -874,6 +874,17 @@
       "capability": "goals.company"
     },
     {
+      "key": "offers.create",
+      "kind": "action",
+      "module_key": "recruitment",
+      "permission": "recruitment.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "offers.OfferCard",
+      "schema_sha": "3468c73acb8be089",
+      "screen": null
+    },
+    {
       "key": "organisation.edit",
       "kind": "action",
       "module_key": "settings",
@@ -1934,6 +1945,17 @@
       "bulk": null,
       "schema": "settings.NumberingListQuery",
       "schema_sha": "8ecadf8c0ec5c318",
+      "screen": null
+    },
+    {
+      "key": "offers.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "offers.OfferListQuery",
+      "schema_sha": "1ef2069374a40ace",
       "screen": null
     },
     {
@@ -3180,6 +3202,17 @@
       "screen": "recruitment.vacancies"
     },
     {
+      "key": "recruitment.route.change_who_signs_offers_for_the_company",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.offers"
+    },
+    {
       "key": "recruitment.route.fill_in_my_interview_card",
       "kind": "route",
       "module_key": "recruitment",
@@ -3213,6 +3246,17 @@
       "screen": "recruitment.candidates"
     },
     {
+      "key": "recruitment.route.make_an_offer_to_a_candidate",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.offers"
+    },
+    {
       "key": "recruitment.route.mark_the_answers_of_finished_assessments",
       "kind": "route",
       "module_key": "recruitment",
@@ -3244,6 +3288,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "recruitment.candidates"
+    },
+    {
+      "key": "recruitment.route.see_offers_waiting_to_be_sent",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.offers"
     },
     {
       "key": "recruitment.route.send_an_assessment_to_the_candidates_of_a_role",
