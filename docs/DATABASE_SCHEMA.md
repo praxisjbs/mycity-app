@@ -552,7 +552,8 @@ the field-by-field account.
   (`partnership_opportunity_id`, `number`, `partner_id`, `lead_id`, `title`, `stage`, `status`,
   `owner_id`, `estimated_value`, `currency`, `expected_close_on`, `signed_at`), `deal_member`
   (`deal_id`, `employee_id`), `partnership_proposal` (`partnership_proposal_id`,
-  `partnership_opportunity_id`, `number`, `status`, `value`, `currency`, `sent_at`) and
+  `partnership_opportunity_id`, `number`, `status`, `value`, `currency`, `sent_at`, `view_count`,
+  `last_viewed_at`) and
   `partnership_agreement` (`partnership_opportunity_id`, `status`, `value`, `signed_at`) through
   `src/modules/dashboard/sources/partners.source.js`. Since M7 PR 3 every query there is the owning
   module's own read (`partner_pipeline.repo`, `partners.repo`, `proposals.repo`: open deals, deals
