@@ -19,6 +19,15 @@
  *   deal_return.saved     Enter Returns, a month at a time, or the Partnership Returns import (money: partnerships.money)
  *   deal_return.removed   a month the Partnership Returns import made, its import reverted
  *
+ * Work on signing (M7 PR 5, §6.7, §6.16), outbox handlers after the change commits:
+ *   partner_pipeline.deliverables   deal.signed: the category's delivery checklist raised as tasks
+ *                                   (deal.deliverables_raised), never for an import or "signed
+ *                                   before the hub"
+ *   partner_pipeline.event_days     deal.signed, deal.updated, deal.stage_changed, deal.lost: the
+ *                                   deal's event days on its team's calendar, moved and called off
+ *                                   with the deal
+ * The morning's follow-up (§6.12, the partner-inactivity scheduler): follow_up.raised
+ *
  * Payloads carry ids, numbers and codes, never money or a contact's details. Who is told about
  * which (the owner when someone else moved a deal, the owner's Head of Department on Stalled) is
  * declared with the module's views and notification types (§7, M7 PR 8).
@@ -28,6 +37,7 @@
  * places.view, so a place named by the places-name job has nothing else to rewrite.
  */
 const { defineEvents } = require("../../shared/events/catalogue");
+const outbox = require("../../shared/events/outbox");
 const places = require("../../shared/places/owners");
 
 const EVENTS = defineEvents("partnerships", {
@@ -49,10 +59,24 @@ const EVENTS = defineEvents("partnerships", {
   "deal.health_changed": { summary: "A partnership deal's health was set" },
   "deal.signed": { summary: "A partnership deal was signed" },
   "deal.lost": { summary: "A partnership deal was closed as lost" },
+  "deal.deliverables_raised": { summary: "A signed deal's delivery checklist was raised as tasks" },
+  "follow_up.raised": { summary: "A quiet partner or lead was followed up: its deals Follow-Up Required, a task for its owner" },
   "deal_return.saved": { summary: "A month of a deal's returns was entered" },
   "deal_return.removed": { summary: "A month of a deal's returns was removed by reverting its import" },
 });
 
 places.owner("deal.venue", { rename: async () => {} });
+
+// Work on signing, after the change commits (§6.7, §6.16). Required when called, so loading the
+// catalogue never loads the services.
+const deliverables = (event) => require("./partner_pipeline.deliverables").raise(event);
+const daysSigned = (event) => require("./partner_pipeline.calendar").onSigned(event);
+const daysUpdated = (event) => require("./partner_pipeline.calendar").onUpdated(event);
+const daysMoved = (event) => require("./partner_pipeline.calendar").onMoved(event);
+outbox.register(EVENTS.DEAL_SIGNED, "partner_pipeline.deliverables", deliverables);
+outbox.register(EVENTS.DEAL_SIGNED, "partner_pipeline.event_days", daysSigned);
+outbox.register(EVENTS.DEAL_UPDATED, "partner_pipeline.event_days", daysUpdated);
+outbox.register(EVENTS.DEAL_STAGE_CHANGED, "partner_pipeline.event_days", daysMoved);
+outbox.register(EVENTS.DEAL_LOST, "partner_pipeline.event_days", daysMoved);
 
 module.exports = { EVENTS };

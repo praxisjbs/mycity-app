@@ -50,6 +50,7 @@ const ROWS = `
          t.is_commitment, t.acceptance_criteria, t.commitment_month, t.original_due_at, t.rescoped_at,
          t.rescope_reason, t.commitment_set_id, cs.status AS set_status, t.late_reason,
          lr.label AS late_reason_label, t.project_id, pr.number::text AS project_number, pr.name AS project_name,
+         t.partner_id, t.lead_id, t.deal_id,
          COALESCE(ae.status IN ('left', 'archived'), false) AS assignee_left,
          ${COMMITMENT_STATE("t")} AS commitment_state,
          ${personJson("ae", "ad")} AS assignee,
@@ -90,7 +91,7 @@ const OUT = `v.task_id, v.number, v.title, v.description, v.status, v.priority, 
   v.assignee, v.members, v.set_by, v.target_title, v.kr_code, v.kr_statement, v.comment_count, v.is_commitment,
   v.acceptance_criteria, v.commitment_month, v.original_due_at, v.rescoped_at, v.rescope_reason,
   v.commitment_set_id, v.set_status, v.commitment_state, v.late_reason, v.late_reason_label,
-  v.project_id, v.project_number, v.project_name, v.assignee_left,
+  v.project_id, v.project_number, v.project_name, v.partner_id, v.lead_id, v.deal_id, v.assignee_left,
   v.steps_total, v.steps_done, v.waiting`;
 
 /** The SQL for each field TaskListQuery allow-lists. The first is the default order. */
@@ -149,6 +150,8 @@ function list(db, query, scope, at, only = {}) {
     query.is_commitment === undefined ? null : query.is_commitment === "true",
     query.commitment_month || null,
     query.project_id || null,
+    query.partner_id || null,
+    query.lead_id || null,
   ];
   const who = audience(query.scope, scope, params);
   const narrower = [];
@@ -176,6 +179,8 @@ function list(db, query, scope, at, only = {}) {
         AND ($13::boolean IS NULL OR v.is_commitment = $13)
         AND ($14::date IS NULL OR v.commitment_month = $14)
         AND ($15::uuid IS NULL OR v.project_id = $15)
+        AND ($16::uuid IS NULL OR v.partner_id = $16)
+        AND ($17::uuid IS NULL OR v.lead_id = $17)
         ${who} ${narrower.join(" ")}
       ORDER BY ${orderBy(query, SORTS, "v.task_id")}`,
     params,
@@ -457,6 +462,9 @@ const WRITABLE = [
   "sort_order",
   "late_reason",
   "project_id",
+  "partner_id",
+  "lead_id",
+  "deal_id",
   "is_commitment",
   "acceptance_criteria",
   "commitment_month",
@@ -1129,6 +1137,15 @@ async function cardNames(db, { employeeIds = [], departmentIds = [], projectIds 
   return out;
 }
 
+/**
+ * A lead's tasks now its partner's (Connect to Partner, workspace.md §6): the conversion's own
+ * transaction. Returns the tasks moved.
+ */
+async function relinkLead(client, leadId, partnerId) {
+  const { rows } = await client.query("UPDATE task SET partner_id = $2, lead_id = NULL WHERE lead_id = $1 RETURNING task_id", [leadId, partnerId]);
+  return rows.map((r) => r.task_id);
+}
+
 async function addWatcher(client, { task_id, employee_id, created_by }) {
   const { rows } = await client.query(
     `INSERT INTO task_watcher (task_id, employee_id, created_by) VALUES ($1, $2, $3)
@@ -1251,6 +1268,7 @@ module.exports = {
   isWatcher,
   cardNames,
   addWatcher,
+  relinkLead,
   removeWatcher,
   openBlockage,
   blockages,

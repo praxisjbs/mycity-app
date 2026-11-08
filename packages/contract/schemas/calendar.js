@@ -21,6 +21,7 @@ const {
 } = require("./common");
 const { PersonRef } = require("./organisation");
 const { Link } = require("./tasks");
+const { partnerLinkFields, partnerLinkEditFields, linkRules, linkEditRules, PartnerLinkView } = require("./partners");
 
 const CalendarEventType = z.enum(["meeting", "deadline", "campaign", "event", "interview"]);
 const CalendarVisibility = z.enum(["private", "attendees", "everyone"]);
@@ -57,6 +58,8 @@ const CalendarEvent = z
     link: Link.nullable(),
     cancelled_at: isoDateTime.nullable(),
     reminder_minutes: ReminderMinutes,
+    /** The partner or lead and deal it is for (Connect to Partner, M7), named only for a reader who sees them. */
+    partner_link: PartnerLinkView.nullable(),
     can_edit: z.boolean(),
     created_at: isoDateTime,
   })
@@ -102,8 +105,8 @@ const endsAfterStart = (v) => !v.starts_at || !v.ends_at || Date.parse(v.ends_at
 const ENDS_BEFORE = { message: "Ends before it starts", path: ["ends_at"] };
 
 /** POST /calendar */
-const CalendarEventCreate = z
-  .object({
+const CalendarEventCreate = linkRules(
+  z.object({
     title: text(200),
     description: optionalText(2000),
     event_type: CalendarEventType.default("meeting"),
@@ -115,9 +118,10 @@ const CalendarEventCreate = z
     visibility: CalendarVisibility.default("attendees"),
     attendee_ids: z.array(uuid).max(50).default([]),
     reminder_minutes: ReminderMinutes.default([]),
+    ...partnerLinkFields,
   })
-  .strict()
-  .refine(endsAfterStart, ENDS_BEFORE);
+  .strict(),
+).refine(endsAfterStart, ENDS_BEFORE);
 
 /**
  * What a screen button may fill on New Event through the address (docs/guides/praxis-ai.md
@@ -167,16 +171,17 @@ const CalendarEventEditFields = z
     visibility: CalendarVisibility.optional(),
     attendee_ids: z.array(uuid).max(50).optional(),
     reminder_minutes: ReminderMinutes.optional(),
+    ...partnerLinkEditFields,
   })
   .strict();
-const CalendarEventEdit = CalendarEventEditFields.refine((v) => Object.keys(v).length > 0, "Change at least one field").refine(endsAfterStart, ENDS_BEFORE);
+const CalendarEventEdit = linkEditRules(CalendarEventEditFields).refine((v) => Object.keys(v).length > 0, "Change at least one field").refine(endsAfterStart, ENDS_BEFORE);
 
 /**
  * Edit Event as Praxis AI's card (docs/guides/praxis-ai.md §6.11): the event beside the form's
  * fields, which the open event's own form never names; its start and end as instants, as New
  * Event's card takes them.
  */
-const CalendarEventChange = CalendarEventEditFields.extend({ calendar_event_id: recordId("event") })
+const CalendarEventChange = linkEditRules(CalendarEventEditFields.extend({ calendar_event_id: recordId("event") }))
   .refine(changesBeside(["calendar_event_id"]), nothingOn("calendar_event_id"))
   .refine(endsAfterStart, ENDS_BEFORE);
 
@@ -200,6 +205,7 @@ const TABLES = {
       link: "linkFor(calendar_event.entity_type, calendar_event.entity_id), never stored",
       reminder_minutes: "the event's pending occurrences in the shared reminder engine",
       can_edit: "the caller owns the event",
+      partner_link: "calendar_event.partner_id, lead_id and deal_id, named from partner, lead and partnership_opportunity for a reader who sees them",
     },
   },
   CalendarItem: {

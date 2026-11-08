@@ -763,7 +763,8 @@ whom the person may set a task for or share one with, as New Task's; `department
 On Task's; `employee`, someone on People's register, as People's forms pick them; `worksite`, a
 worksite in use; `policy`, a policy with a version in force, as Raise a Query's; `place`, a place
 picked as every address is, with AddressField; `site_member`, the people Add Work Site may put on a
-site, the person included). A picked field that is not a list reads as an id whatever its type
+site, the person included; `partner` and `lead`, the partners and leads the person sees, and
+`partner_deal`, the open and live deals they see, as Connect to Partner offers them, M7). A picked field that is not a list reads as an id whatever its type
 (`fieldsOf`), so a place's token is read by its line and never printed.
 `names(values, actor, db)` names the ids the fields hold through the module's own repo, kept apart
 from `records`: the records are what a press acts on (the verb's count, the chips, the re-check), the
@@ -1441,6 +1442,11 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 07/11/2026 · AJ · M7 PR 5 (`partnerships.md` §9, §13.2 In PR 5): the Workspace cards (Create Task, Save Task,
+  Create Project, Save Project, Create Event, Save Event) carry Connect to Partner's optional `partner_id` or `lead_id`
+  and `deal_id`, picked on Edit with three new `AiCardPicks` (`partner`, `lead`, `partner_deal`), named by number and
+  name and found from words among the records the person sees (`partners.work.card`); the press checks the link as the
+  form's own save does. No action was added or taken away.
 - 03/11/2026 · JP · The evaluation set run on staging with the real model (100 card questions, 9
   asking ones) and what it found. Fixed: an action the person may make, called as though it were a
   read, was answered "not available" and the model told the person so (Save Targets); it is now

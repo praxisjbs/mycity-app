@@ -528,13 +528,17 @@ their department, in code), and 7099's partner types and stages switched off (A2
 and its origin (`upload`, `proposal`, `agreement`, `signed_copy`), the vault's row naming it as its
 entity so conversion re-points it and never rewrites the vault; and `partner.partner_type` dropped,
 one release after the code stopped reading it (MIGRATIONS §8; its DOWN copies it back from the
-category). `docs/guides/partnerships.md` §4 is the field-by-field account.
+category) · `7080` (M7 PR 5) `partner_follow_up`, the `partner-inactivity` job's record of each quiet
+spell it followed up (a partner or a lead, the day of its last contact, the task it gave the owner;
+unique `dedup_key` `partner-inactivity:<record>:<day>`, so one follow-up a spell). The Workspace link
+columns of `7040` are written by the Workspace services since PR 5. `docs/guides/partnerships.md` §4 is
+the field-by-field account.
 
 **Owes:**
 - MyCity's own stages (with their meanings), impact, sources, document kinds and categories: entered
   on Partnerships · Categories or by Start From Tracker (M7 PR 2), never seeded (A26).
 - The writers: every table above is written only through M7's services, PR 2 to PR 8 (the guide's
-  Appendix A); the Workspace link columns through the Workspace services, PR 5.
+  Appendix A); the Workspace link columns through the Workspace services (done in PR 5).
 - **Read by Home** (home.md §4.1): `partner` (`partner_id`, `name`, `partner_category_id`, `status`,
   `owner_id`, `created_at`) with `partner_category` (`partner_category_id`, `name`), `lead` (`lead_id`,
   `name`, `owner_id`), `partner_interaction` (`partner_id`, `occurred_at`), `partnership_opportunity`

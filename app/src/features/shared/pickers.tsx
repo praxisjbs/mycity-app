@@ -1,4 +1,4 @@
-import type { CitablePolicy, Department, EmployeeListQuery, Project, Task, Worksite } from "@mycity/contract/contract.gen.ts";
+import type { CitablePolicy, Department, EmployeeListQuery, PartnerLinkDeal, PartnerLinkRecord, Project, Task, Worksite } from "@mycity/contract/contract.gen.ts";
 import { usePhotos } from "@/api/download";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
@@ -221,6 +221,42 @@ export function RolePicker({ value, onChange }: { value: RoleRef[]; onChange: (v
       sub={(r) => ("description" in r && r.description ? r.description : "")}
       multiple
       placeholder="Search roles"
+    />
+  );
+}
+
+export type PartnerRecordChoice = Pick<PartnerLinkRecord, "id" | "number" | "name">;
+
+/** The partners (or the leads) the person sees, searched by name or number on the server (one): a card's Partner or Lead. */
+export function PartnerRecordPicker({ kind, value, onChange }: { kind: "partner" | "lead"; value: PartnerRecordChoice[]; onChange: (value: PartnerRecordChoice[]) => void }) {
+  const list = usePaged("GET /api/v1/partnerships/work/records", { filters: { kind } });
+  return (
+    <RecordPicker
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value as PartnerLinkRecord[]}
+      onChange={(rows) => onChange(rows.map((r) => ({ id: r.id, number: r.number, name: r.name })))}
+      id={(r) => r.id}
+      title={(r) => r.name}
+      sub={(r) => r.number}
+      placeholder={kind === "lead" ? "Search leads" : "Search partners"}
+    />
+  );
+}
+
+export type PartnerDealChoice = Pick<PartnerLinkDeal, "deal_id" | "number" | "title">;
+
+/** The open and live deals the person sees, searched by title or number on the server (one): a card's Deal. */
+export function PartnerDealPicker({ value, onChange }: { value: PartnerDealChoice[]; onChange: (value: PartnerDealChoice[]) => void }) {
+  const list = usePaged("GET /api/v1/partnerships/work/deals");
+  return (
+    <RecordPicker
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value as PartnerLinkDeal[]}
+      onChange={(rows) => onChange(rows.map((d) => ({ deal_id: d.deal_id, number: d.number, title: d.title })))}
+      id={(d) => d.deal_id}
+      title={(d) => `${d.number} ${d.title}`}
+      sub={(d) => d.record_name}
+      placeholder="Search deals"
     />
   );
 }

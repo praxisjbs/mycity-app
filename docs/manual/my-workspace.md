@@ -152,12 +152,14 @@ A card shows the task's title, small pills and the round initials of the person 
    goes, but it is not their work (see [Watch a task](#workspace-watch)).
 7. {needs="people view"} To have a whole department follow it, pick it in **Watching Department**.
 8. To put it in a project, pick it in **Project**.
-9. Choose a **Cadence** if it helps: **Daily** is due by the end of the day, **Weekly** by the end
-   of the week.
-10. Choose the **Due** date, and the **Priority**: **Urgent**, **High**, **Normal** or **Low**.
-11. If it is work for one of your scorecard lines, pick it in **Counts Towards** (see
+9. {needs="partnerships view"} If the task is for a partner or a lead, press **Connect to Partner**
+   and pick it (see [Connect work to a partner](#workspace-partner)).
+10. Choose a **Cadence** if it helps: **Daily** is due by the end of the day, **Weekly** by the end
+    of the week.
+11. Choose the **Due** date, and the **Priority**: **Urgent**, **High**, **Normal** or **Low**.
+12. If it is work for one of your scorecard lines, pick it in **Counts Towards** (see
     [Counts Towards](#workspace-counts-towards)).
-12. Add anything else in **Notes**, and press **Create Task**.
+13. Add anything else in **Notes**, and press **Create Task**.
 
 The hub gives the task its number, such as TSK-0412, and says so. A task you set for someone else
 says *TSK-0412 set for* and their name, and they are told.
@@ -170,6 +172,8 @@ says *TSK-0412 set for* and their name, and they are told.
 | **Watchers** | Colleagues who follow the task, up to 25 | No |
 | **Watching Department** | A department whose people all follow it | No |
 | **Project** | One of the active projects | No |
+| **Partner** | After **Connect to Partner**: a partner or a lead you see in Partnerships | No |
+| **Deal** | One of that partner's open deals | No |
 | **Cadence** | **None**, **Daily** or **Weekly** | No |
 | **Due** | The day it is due, today or later | No, but a commitment needs one |
 | **Priority** | **Normal** unless you change it | Yes |
@@ -179,6 +183,30 @@ says *TSK-0412 set for* and their name, and they are told.
 
 > **Tip:** A field marked **Required** must be filled before **Create Task** works. **Type**
 > only shows when there is someone you could share the task with.
+
+### Connect work to a partner {#workspace-partner needs="workspace create, partnerships view"}
+
+A task, a project or an event can be for one of MyCity's partners or leads, and one of its deals.
+It then shows on that partner's **Work** tab in Partnerships.
+
+1. In **New Task**, **New Project** or **New Event**, press **Connect to Partner**.
+2. Pick the partner in **Partner**. A lead says *Lead* beside its name.
+3. If the work is about one of its deals, pick it in **Deal**.
+4. Save as usual: **Create Task**, **Create Project** or **Add Event**.
+
+A task you add to a project that is connected takes the project's partner and deal. To take a
+connection off, open **Edit Task**, **Edit Project** or **Edit Event**, press **Disconnect** and save.
+
+To see only one partner's work, pick it in **Partner** above the board on
+[My Workspace · Tasks](/workspace?tab=tasks), or above the list on
+[My Workspace · Projects](/workspace?tab=projects). Pick **All** to see everything again.
+
+A connected task shows **Partner** on its panel, and pressing the name opens the partner. Someone
+who cannot see that partner in Partnerships reads *A Partner You Cannot See*: connecting never
+shows them the partner, and never shows anyone a task they could not see before.
+
+> **Tip:** From a partner's or a lead's **Work** tab in Partnerships, **New Task**, **New Project**
+> and **New Event** open these forms already connected.
 
 ### Share a task {#workspace-share needs="workspace create"}
 
@@ -633,6 +661,10 @@ Review**; press one to open its record.
 
 Everyone you invite is told in the hub. Those with a work email also get the invitation by email,
 which adds it to Outlook, Gmail or their phone's calendar.
+
+> **Tip:** When a partnership deal with event dates is signed, its days go on the calendar of the
+> deal's team as one **Event**, at the deal's venue. It follows the deal: it moves when the deal's
+> dates change and is called off if the deal is lost, so it has no **Edit Event** or **Call Off**.
 
 | The field says | What to do |
 |---|---|
