@@ -2,7 +2,7 @@
  * My Workspace · Calendar (docs/guides/workspace.md §10.1): the month, the week or the day, and
  * what is coming up in the next 30 days. Events, task deadlines and approved leave, Africa/Lagos.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { CalendarEvent, CalendarItem } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import calendar from "@mycity/contract/schemas/calendar.js";
@@ -47,6 +47,7 @@ import {
 import { say } from "./shared";
 import { TaskForm } from "./TaskForms";
 import { useTaskPanel } from "./TaskPanel";
+import { linkBody, linkEdit, linkOf, linkProblem, NO_LINK, PartnerLinkFields, PartnerLinkLine, type PartnerLinkValue } from "./PartnerLink";
 
 type View = "month" | "week" | "day";
 
@@ -322,11 +323,12 @@ function EventPanel({ id, close }: { id: string; close: () => void }) {
     <>
       <KeyValue
         items={[
-          ["When", e.all_day ? formatDate(e.starts_at) : `${formatDateTime(e.starts_at)} to ${formatTime(e.ends_at)}`],
+          ["When", e.all_day ? daysOf(e.starts_at, e.ends_at) : `${formatDateTime(e.starts_at)} to ${formatTime(e.ends_at)}`],
           ["Kind", KIND[e.event_type] ?? "Event"],
           ["Organiser", e.owner?.display_name ?? ""],
           ...(e.reminder_minutes.length ? ([["Reminder", e.reminder_minutes.map((m) => remindText(m, e.starts_at)).join(", ")]] as Array<[string, string]>) : []),
           ...(e.location ? ([["Where", e.location]] as Array<[string, string]>) : []),
+          ...(e.partner_link ? ([["Partner", <PartnerLinkLine key="pl" link={e.partner_link} />]] as Array<[string, ReactNode]>) : []),
           ["Attendees", e.attendees.map((a) => `${a.employee.display_name}${a.response === "accepted" ? "" : a.response === "declined" ? " (declined)" : " (pending)"}`).join(", ") || "Nobody invited"],
         ]}
       />
@@ -367,8 +369,17 @@ function eventMarks(fields: Record<string, string[]>) {
   return { marks, attendees, rest };
 }
 
-function EventForm({ close, day = "", event }: { close: () => void; day?: string; event?: CalendarEvent }) {
+/** An all-day entry's days: one day, or its first to its last (a signed deal's event days). */
+function daysOf(startsAt: string, endsAt: string) {
+  const last = new Date(Date.parse(endsAt) - 60_000).toISOString();
+  return formatDate(last) === formatDate(startsAt) ? formatDate(startsAt) : `${formatDate(startsAt)} to ${formatDate(last)}`;
+}
+
+/** New Event and Edit Event; from a Partner 360 or a Lead 360 it opens already connected (`link`). */
+function EventForm({ close, day = "", event, link: inLink }: { close: () => void; day?: string; event?: CalendarEvent; link?: PartnerLinkValue }) {
   const [who, setWho] = useState<PersonRef[]>(event ? event.attendees.map((a) => a.employee) : []);
+  const [link, setLink] = useState<PartnerLinkValue>(event ? linkOf(event.partner_link) : (inLink ?? NO_LINK));
+  const [linkMark, setLinkMark] = useState<{ record?: string; deal?: string } | null>(null);
   const [whoMark, setWhoMark] = useState<string | null>(null);
   // A new event takes what the address names (the assistant, Home's New button); a start with no end is an hour long.
   const filled = useAddressPrefill(calendar.CalendarEventPrefill, !event);
@@ -439,6 +450,7 @@ function EventForm({ close, day = "", event }: { close: () => void; day?: string
         const lead = v.remind === "custom" ? leadOf(v) : Number(v.remind);
         return event && first === lead ? event.reminder_minutes : [lead];
       })(),
+      ...(event ? linkEdit(linkOf(event.partner_link), link) : linkBody(link)),
     };
     try {
       if (event) await edit.run({ params: { id: event.calendar_event_id }, body: body as never });
@@ -448,6 +460,9 @@ function EventForm({ close, day = "", event }: { close: () => void; day?: string
       close();
       toast(event ? "Event changed" : "Added to the calendar");
     } catch (e) {
+      const onLink = linkProblem(e);
+      setLinkMark(onLink);
+      if (onLink) return;
       if (!(e instanceof ApiError) || !Object.keys(e.fields).length) {
         say(e);
         return;
@@ -481,6 +496,15 @@ function EventForm({ close, day = "", event }: { close: () => void; day?: string
           <Field label="Remind At"><TimeField {...f.field("remind_time")} /></Field>
         </Grid>
       )}
+      <PartnerLinkFields
+        value={link}
+        onChange={(v) => {
+          setLink(v);
+          setLinkMark(null);
+        }}
+        view={event?.partner_link}
+        problem={linkMark}
+      />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>{event ? "Save Event" : "Add Event"}</Button>

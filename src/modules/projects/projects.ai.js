@@ -30,32 +30,41 @@ const probe = {
   },
 };
 
+// Connect to Partner on the card (M7, workspace.md §9): Partnerships names and finds the partner, lead and deal.
+const partnerCard = require("../partners/partners.work").card;
+
 module.exports = defineManifest({
   module: "workspace",
   actions: [
     {
       key: "projects.create",
-      description: "Start a project of mine: its name, notes and due day",
+      description: "Start a project of mine: its name, notes and due day, and the partner and deal it is for",
       input: c.projects.ProjectCreate,
       permission: ["workspace", "create"],
       risk: "standard",
       asks: [{ field: "name", question: "What is the project called?" }],
+      picks: partnerCard.picks,
+      resolve: partnerCard.resolve,
+      names: partnerCard.names,
       // The same function Create Project calls: the person owns it.
       run: (values, actor) => service.create(actor, actor.scope, values),
       readback: projectLine("started"),
-      labels: { name: "Name", description: "Notes", due_on: "Due Day" },
+      labels: { name: "Name", description: "Notes", due_on: "Due Day", ...partnerCard.labels },
     },
     {
       key: "projects.edit",
       label: "Save Project",
       matrix: probe,
-      description: "Change a project I own: its name, notes or due day, or complete it (status completed) or reopen it (active); only what changes",
+      description: "Change a project I own: its name, notes, due day or the partner and deal it is for, or complete it (status completed) or reopen it (active); only what changes",
       input: c.projects.ProjectChange,
       permission: ["workspace", "edit"],
       risk: "standard",
       form: "none: Edit Project's form changes the project open on its page and never names it, and Complete Project and Reopen Project are buttons; the card names the project",
       // Which project, when the person did not say (praxis-ai.md decision 34): the projects list's own rows to tap.
       asks: [{ field: "project_id", question: "Which project is it?", read: "projects.list" }],
+      picks: partnerCard.picks,
+      resolve: partnerCard.resolve,
+      names: partnerCard.names,
       records: (values, actor, db) => (db ? service.cardRecords(db, values.project_id, actor.scope) : values.project_id ? [{ type: "project", id: values.project_id }] : []),
       check: (client, values, actor) => service.assertCardProject(client, values.project_id, actor.scope),
       run: (values, actor) => {
@@ -63,7 +72,7 @@ module.exports = defineManifest({
         return service.edit(actor, actor.scope, id, changes);
       },
       readback: projectLine("saved"),
-      labels: { project_id: "Project", name: "Name", description: "Notes", due_on: "Due Day", status: "Status" },
+      labels: { project_id: "Project", name: "Name", description: "Notes", due_on: "Due Day", status: "Status", ...partnerCard.labels },
     },
   ],
   // Edit Project's own form, reached through the card that names its project (gate 23, praxis-ai.md decision 33).

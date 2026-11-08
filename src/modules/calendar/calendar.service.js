@@ -22,6 +22,9 @@ const repo = require("./calendar.repo");
 const reminders = require("../notifications/notifications.reminders");
 const { EVENTS, REMINDER_KEY } = require("./calendar.events");
 
+/** Connect to Partner: Partnerships decides what work may be linked to (workspace.md §6). */
+const links = () => require("../partners/partners.work");
+
 const iso = (v) => (v instanceof Date ? v.toISOString() : v || null);
 
 async function tx(fn) {
@@ -79,6 +82,7 @@ function toEvent(row, employeeId) {
     link: row.entity_type ? linkFor(row.entity_type, row.entity_id) : null,
     cancelled_at: iso(row.cancelled_at),
     reminder_minutes: row.reminder_minutes || [],
+    partner_link: links().viewOf(row),
     // An entry another module's record keeps (an interview) changes only there (EVENT_OWNED_BY_RECORD).
     can_edit: row.owner_employee_id === employeeId && !row.cancelled_at && !row.entity_type,
     created_at: iso(row.created_at),
@@ -228,9 +232,11 @@ const payloadOf = (row, attendeeIds) => ({
  * for a module whose record has a calendar entry (an interview, docs/guides/recruitment.md §3 step 8).
  * `entity` ties the entry to that record, which its link then opens.
  */
-async function createIn(client, actor, body, { entity = null } = {}) {
+async function createIn(client, actor, body, { entity = null, trusted = false } = {}) {
   if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee has a calendar", 403);
   {
+    const link = { partner_id: body.partner_id || null, lead_id: body.lead_id || null, deal_id: body.deal_id || null };
+    await links().checkLink(client, actor, link, { trusted });
     const attendees = await checkAttendees(client, body.attendee_ids || [], actor.employee_id);
     const id = await repo.insert(client, {
       title: body.title,
@@ -245,6 +251,7 @@ async function createIn(client, actor, body, { entity = null } = {}) {
       entity_type: entity ? entity.type : undefined,
       entity_id: entity ? entity.id : undefined,
       created_by: actor.user_id,
+      ...link,
     });
     await repo.setAttendees(client, id, attendees);
     await scheduleReminders(client, id, body.starts_at, body.reminder_minutes || []);
@@ -295,7 +302,10 @@ async function editIn(client, actor, id, body, { asOwner = false } = {}) {
     const changes = {};
     for (const k of ["title", "description", "event_type", "starts_at", "ends_at", "all_day", "location", "visibility"])
       if (k in body) changes[k] = body[k];
-    await repo.update(client, id, changes);
+    // Connect to Partner: only what changes, checked, unless the record that keeps the event changes it.
+    const relinked = links().merged(before, body);
+    if (relinked.changed && !asOwner && (relinked.link.partner_id || relinked.link.lead_id)) await links().checkLink(client, actor, relinked.link);
+    await repo.update(client, id, relinked.changed ? { ...changes, ...relinked.link } : changes);
     const was = await repo.attendeeIds(client, id);
     if (body.attendee_ids)
       await repo.setAttendees(client, id, await checkAttendees(client, body.attendee_ids, ownerId));
@@ -400,4 +410,23 @@ async function assertCardEvent(db, id, employeeId) {
   if (row.cancelled_at) throw new AppError("EVENT_CANCELLED", "This event was called off", 409, { calendar_event_id: ["Called off"] });
 }
 
-module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, createIn, edit, editIn, cancel, cancelIn, respond, reminderCheck, cardRecords, assertCardEvent, eventChoices, eventIdOf };
+/**
+ * A lead's events now its partner's (workspace.md §6, partnerships.md §6.4): in the conversion's own
+ * transaction, one event for them all. Returns how many moved.
+ */
+async function relinkIn(client, actor, { lead_id: leadId, partner_id: partnerId }) {
+  const moved = await repo.relinkLead(client, leadId, partnerId);
+  if (!moved.length) return 0;
+  await emit(client, {
+    key: EVENTS.CALENDAR_EVENT_RELINKED,
+    entity: { type: "lead", id: leadId },
+    actor,
+    payload: { lead_id: leadId, partner_id: partnerId, count: moved.length },
+  });
+  return moved.length;
+}
+
+/** The event a partner keeps for a signed deal's days, or null: for the module whose record it is. */
+const keptForDeal = (db, dealId) => repo.keptForDeal(db, dealId);
+
+module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, createIn, edit, editIn, cancel, cancelIn, respond, reminderCheck, cardRecords, assertCardEvent, eventChoices, eventIdOf, relinkIn, keptForDeal };

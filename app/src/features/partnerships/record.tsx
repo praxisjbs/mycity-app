@@ -227,11 +227,6 @@ export function ContactsTab({ record, contacts, readOnly }: { record: RecordKey;
   );
 }
 
-/** Work: projects, tasks and events connected to the record (My Workspace's links arrive with M7 PR 5). */
-export function WorkTab() {
-  return <EmptyState title="No Work Yet" text="Projects, tasks and events show here." />;
-}
-
 /** A custom field's value as a person reads it. */
 const shownValue = (v: unknown) => (v === null || v === undefined || v === "" ? "None" : typeof v === "boolean" ? (v ? "Yes" : "No") : Array.isArray(v) ? v.join(", ") : String(v));
 

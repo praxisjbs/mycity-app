@@ -240,6 +240,7 @@ async function createIn(client, actor, body, { held, source = "person" }) {
     field: "deal",
     allowSigned: true,
     source,
+    signedBeforeHub: body.signed_before_hub === true,
     identifiedOn: body.identified_on ?? null,
   });
   if (body.signed_copy_document_id) {

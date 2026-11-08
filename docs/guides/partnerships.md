@@ -1315,6 +1315,48 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
     payloads) and the identified date; `partner_pipeline.returns.saveIn` takes `source` and the import
     batch. The screens' routes call the same functions.
   - The Partners and Leads lists' **Export** (§10.1) comes with PR 4's export in the tracker's columns.
+- **In PR 5 (07/11/2026, AJ with GE; TB's answer on deliverables):**
+  - New Partner's **Signed Before the Hub** raises no deliverables: delivery of a relationship signed
+    outside the hub already runs outside it. Its deal's event days still go on the team's calendar. A
+    New Partner with only a signed copy raises them as any signing does (TB, 07/11/2026). A deal the
+    tracker import signed (source `import`, PR 4) raises neither deliverables nor event days.
+    `deal.signed` carries `signed_before_hub` so the handler can tell (§6.6, §6.7).
+  - Deliverables and the event days are outbox handlers on `deal.signed` (`partner_pipeline.
+    deliverables`, `partner_pipeline.event_days`), after the signing commits, never inside the
+    conversion's transaction; each reads the deal as it stands, so a retry raises nothing twice
+    (`deal_deliverable_item_uq`). A deliverable is set by the deal's owner for themselves, so they may
+    reassign it (A24); an `event_start` item on a deal with no event date counts from signing; the
+    batch emits `deal.deliverables_raised` (§6.7).
+  - The deal's event days are one all-day event kept by its **partner** (`entity_type` `partner`,
+    found by its `deal_id`): M2's `calendar_event_entity_check` allows `interview`, `partner` and
+    `vacancy`, so no Workspace table changes, and the event opens the Partner 360. Edit Event and Call
+    Off refuse it (`EVENT_OWNED_BY_RECORD`). It follows `deal.updated` (dates, title, venue, owner,
+    team), is called off on `deal.lost` (Closed Lost, a lost lead, a closed partner), and comes back
+    when a lost signed deal goes live again. A **completed** deal keeps its event, whose days have
+    passed; §7's "calendar event cancelled" on `deal.completed` reads as §6.16's lost or closed (§6.16).
+  - The inactivity follow-up keeps its spells in `partner_follow_up` (migration `7080`, unique
+    `dedup_key`), since the outbox purges its own dedup keys sooner than a spell can last. It runs at
+    06:30 Lagos, after `home-alert-sweeps`; a Stalled deal keeps its health and blockers; the task is
+    High priority; an owner with no login gets no task (the spell is still recorded); `follow_up.raised`
+    (§6.12).
+  - Connect to Partner reads two pickers of its own on `partners.work` (`GET /work/records`: partners
+    not closed and leads neither converted nor lost; `GET /work/deals`: a record's open and live
+    deals, or every one the reader sees for a card), 25 a page; `PartnerLinkQuery` takes `lead_id`
+    beside `partner_id`, since the filter offers leads too. The Calendar takes no Partner filter (a
+    month of the reader's own), so Appendix C's three list queries are Tasks' and Projects' (§5).
+  - Every task, project and event carries `partner_link`, its names filled only for a reader who sees
+    the record (and the deal) in Partnerships, on the Workspace routes; anyone else reads the ids and
+    the screen says A Partner You Cannot See (A24). An edit sends only what changes, a new record
+    clearing the deal, and a link left as it was is never checked again. Who may connect is who may
+    change the work: a task's manager (the link is a setter field), a project's owner, an event's owner.
+  - The Work tab lists the work its reader may open in My Workspace (every project; a task they lead,
+    set, share, watch or reach through scope; an event they own, are invited to or everyone sees),
+    never cancelled tasks or called-off events, and counts the rest by kind. Its New Project, New Task
+    and New Event (both 360s) open My Workspace's own forms in place, already connected; the Overview's
+    Next Events shows the next three connected events the reader may see.
+  - Praxis AI's task, project and event cards carry Partner, Lead and Deal, picked on Edit (`AiCardPicks`
+    `partner`, `lead`, `partner_deal`), named by number and name, and found from words among the records
+    the person sees (`partners.work.card`); the press checks the link as the form's save does.
 
 - **In PR 4 (07/11/2026, LA), the tracker importer and returns:**
   - **Map Values** is the engine's (`shared/import`, foundation.md §5): a field declares `mapValues` as a
@@ -1666,6 +1708,12 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 07/11/2026 · AJ · PR 5, work for a partner (`m7/workspace-links`): Connect to Partner on New Project, New Task, New
+  Event and their edits, with Disconnect, checked by `partners.work`; the Partner filter on Tasks and Projects; `GET
+  /work` with hidden counts, the Work tab in its own file (`WorkTab.tsx`) and the Overview's Next Events; deliverables on
+  `deal.signed` and the deal's event days on its team's calendar, moved and called off with the deal; the
+  `partner-inactivity` follow-up (`partner_follow_up`, migration `7080`); Praxis AI's Workspace cards with the
+  optional partner and deal; conversion moving Workspace links (`relinkIn`). Recorded in §13.2, In PR 5.
 - 07/11/2026 · LA · PR 4, the tracker importer and returns (`m7/importers-returns`): Map Values on the import
   engine; the Partnership Tracker importer on the synthetic workbook through `leads.createIn` and
   `partners.createIn` (source `import`), reversible until a record is in use; the Partnership Returns

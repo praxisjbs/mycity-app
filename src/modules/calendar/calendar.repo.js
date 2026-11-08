@@ -116,6 +116,7 @@ const EVENT = `
   SELECT ce.calendar_event_id, ce.title, ce.description, ce.event_type, ce.owner_employee_id,
          ${personJson("e", "d")} AS owner, ce.starts_at, ce.ends_at, ce.all_day, ce.location,
          ce.visibility, ce.entity_type, ce.entity_id, ce.cancelled_at, ce.created_at,
+         ce.partner_id, ce.lead_id, ce.deal_id,
          COALESCE((SELECT json_agg(json_build_object('employee', ${personJson("ae", "ad")}, 'response', a.response)
                                    ORDER BY ae.first_name, ae.last_name)
                      FROM calendar_event_attendee a
@@ -135,14 +136,14 @@ async function getFor(db, id, employeeId) {
 
 async function lock(client, id) {
   const { rows } = await client.query(
-    "SELECT calendar_event_id, owner_employee_id, cancelled_at, entity_type FROM calendar_event WHERE calendar_event_id = $1 FOR UPDATE",
+    "SELECT calendar_event_id, owner_employee_id, cancelled_at, entity_type, partner_id, lead_id, deal_id FROM calendar_event WHERE calendar_event_id = $1 FOR UPDATE",
     [id],
   );
   return rows[0] || null;
 }
 
 const COLUMNS = ["title", "description", "event_type", "owner_employee_id", "starts_at", "ends_at",
-  "all_day", "location", "visibility", "entity_type", "entity_id", "created_by", "cancelled_at"];
+  "all_day", "location", "visibility", "entity_type", "entity_id", "created_by", "cancelled_at", "partner_id", "lead_id", "deal_id"];
 
 async function insert(client, row) {
   const keys = COLUMNS.filter((k) => row[k] !== undefined);
@@ -249,4 +250,23 @@ async function namesOf(db, ids) {
   return new Map(rows.map((r) => [r.employee_id, r.display_name]));
 }
 
-module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf, namesOf };
+/** A lead's events now its partner's, in the conversion's transaction. Returns the events moved. */
+async function relinkLead(client, leadId, partnerId) {
+  const { rows } = await client.query("UPDATE calendar_event SET partner_id = $2, lead_id = NULL WHERE lead_id = $1 RETURNING calendar_event_id", [leadId, partnerId]);
+  return rows.map((r) => r.calendar_event_id);
+}
+
+/**
+ * The event a partner keeps for one of its deals (a signed deal's days: `entity_type` partner, with its
+ * `deal_id`), called off or not, or null. Connect to Partner never sets `entity_type`, so a meeting
+ * connected to the same deal is never taken for it.
+ */
+async function keptForDeal(db, dealId) {
+  const { rows } = await db.query(
+    "SELECT calendar_event_id, owner_employee_id, cancelled_at FROM calendar_event WHERE entity_type = 'partner' AND deal_id = $1 ORDER BY created_at DESC, calendar_event_id LIMIT 1",
+    [dealId],
+  );
+  return rows[0] || null;
+}
+
+module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf, namesOf, relinkLead, keptForDeal };
