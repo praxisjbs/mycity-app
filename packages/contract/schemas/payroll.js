@@ -251,8 +251,9 @@ const PayrollSettingsVersion = z
 /**
  * GET /payroll/settings: the setting as it stands today. With no row the run is simple, the pay day is the
  * default 30 (`pay_day_is_default`), bank details are a warning and the conventions are unset (null). The
- * pieces that need the advanced option (Statutory Items, PAYE Bands, Salary Structure, Pay Components) show
- * once it is on or has been (`advanced_has_been_on`). `current` is the version in force and `next` the one
+ * conventions, Salary Structure and Pay Components show once the option is on or has been
+ * (`advanced_has_been_on`); Statutory Items and PAYE Bands always show, so the first rates are entered
+ * before it is switched on (guide §13.1 item 25). `current` is the version in force and `next` the one
  * that starts later, each null when there is none.
  */
 const PayrollSettings = z
