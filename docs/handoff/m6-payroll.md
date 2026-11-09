@@ -8,7 +8,7 @@ requirement and settles no decision. Tick a line when it is done, with the date,
 |---|---|
 | Source of truth | `docs/guides/payroll.md` (Status Agreed, 08/11/2026) |
 | Build plan | The guide's Appendix A (PR 0 to PR 8, lanes and order) |
-| Owner | TB (Tom-Blake Asaah), with AJ named in MILESTONES §11; who builds the screens is left open (guide §13.1 item 10) |
+| Owner | TB (Tom-Blake Asaah) owns the milestone and its backend; LA (Love Adeola) builds the screens (guide §13.1 item 22, JBS Praxis, 09/11/2026) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 27 Nov 2026 (MILESTONES §4) |
 | Pull requests | PR 0 (this documentation) is on `claude/cool-goldberg-uszqmn`, not opened; no other PR yet |
@@ -62,17 +62,18 @@ exists, and the payslip template is empty.
       people (08/11/2026)
 - [x] The payslip sample drafted (`docs/MyCity-ERP-Documents/payroll-samples/payslip-sample.html` and its README,
       listed in `docs/MyCity-ERP-Documents/INDEX.md`) (08/11/2026)
-- [ ] TB reads the guide; tick Written in `docs/guides/README.md`
-- [ ] TB shows MyCity the payslip sample and records the answers (guide §13.3 item 2; the README lists what to confirm)
-- [ ] The guide's §13.3 items answered as they come: statutory rates, pay day, salary and bank data, who builds
-      the screens
+- [ ] **After this pull request merges**, the first chat ticks Written for `payroll.md` in `docs/guides/README.md` (JBS Praxis, 09/11/2026; not before)
+- [ ] TB shows MyCity the payslip sample and records the answers (guide §13.3 item 1; the README lists what to confirm)
+- [x] The statutory rates, the accountant's conventions, the pay day and every person's salary and bank details are
+      configuration MyCity enters in the app (guide §13.1 item 21); LA builds the screens (item 22) (09/11/2026)
 
 ### PR 1 · Contract, data and scaffolding
 - [ ] Contracts for the simple mode (`payroll.js`, `payslips.js`, `deductions.js`), `gen:contract`
 - [ ] Migrations `6000`, `6010` (with the `attendance_pay_item.payroll_run_id` foreign key), `6030`; seed `6099`
 - [ ] `payroll.run` in `DEFAULTS`, `payroll.configure` in the capability catalogue, `employer_cost` in the field mask
 - [ ] The four tabs in the route map, ⌘K screens, Coming Soon, catalogue and their tests; PROGRESS #47 and #49 Dropped,
-      #107 added, `SCREENS` and the counts; MILESTONES §18's Payroll row
+      #107 added, the Payroll screens' Owner set to LA, `SCREENS` and the counts; MILESTONES §18's Payroll row
+- [ ] `payroll_setting` carries the option columns (Pay Day, Bank Details Required, the three conventions)
 - [ ] DATABASE_SCHEMA M6 as built; README §5.9; gates 3 to 6 green
 
 ### PR 2 · Calculation and the run
@@ -94,7 +95,8 @@ exists, and the payslip template is empty.
 
 ### PR 5 · Configurations and the advanced option
 - [ ] `6020`, the advanced contracts, `salary_structure` and `statutory`, `computeStatutory`, the report template
-- [ ] The settings route with `payroll.configure`; the employee tax and pension columns through `organisation`
+- [ ] The settings route with `payroll.configure` (the conventions, `NO_RATES`, `NO_CONVENTIONS`); the employee tax
+      and pension columns through `organisation`
 - [ ] Tests on labelled test rates; no rate, band or grade in any seed
 
 ### PR 6 · AI, search, Home and notices
@@ -102,7 +104,7 @@ exists, and the payslip template is empty.
 - [ ] A test and an evaluation case per action; the Submit notices checked in-app, push and email
 - [ ] Gates 9, 10, 19 and 23 green; no M6 form on `ai-forms-gaps.json`
 
-### PR 7 · Frontend
+### PR 7 · Frontend (LA)
 - [ ] `features/payroll/` rebuilt (the four tabs), ESS · My Payslips on the contract, the mock in contract shapes
 - [ ] `MonthField`; F31 amended for both payslips (Payroll · Payslips and ESS · My Payslips in a modal at every
       desktop width); every form on `useContractForm`
@@ -116,6 +118,13 @@ exists, and the payslip template is empty.
 
 ## 3 · Log
 
+- 09/11/2026 · JP · PR 0, third round: JBS Praxis answered the rest. The statutory rates, the accountant's conventions,
+  the pay day and every person's salary and bank details are configuration MyCity enters in the app, so none is an
+  open question (Configurations gains Bank Details Required and, in advanced mode, three conventions: PAYE basis,
+  pension reduces taxable pay, NHF reduces taxable pay; guide §4.2, §5, §6.11 rule 3a, §6.12 rule 1, §6.15, §10.1,
+  `NO_CONVENTIONS`). LA builds the screens (PR 7; MILESTONES §4 and §11, the guide's header, CODEOWNERS). Written is
+  ticked once the pull request merges, by the first chat after it. The guide's §13.3 holds one question, the payslip
+  sample's sign-off. Documentation only.
 - 08/11/2026 · JP · PR 0, second round: JBS Praxis answered the open questions (the CEO alone approves; a leaver's
   final run takes every outstanding instalment and a negative net blocks Submit; no recurring allowances in simple
   mode; both payslips in a modal; staging demos with test people; the payslip sample drafted; the guide stays Agreed).

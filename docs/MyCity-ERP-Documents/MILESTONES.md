@@ -245,7 +245,7 @@ start and still land on 18 December.
 | 3 | Queries & Consequence Management | 5% | 26–30 Oct | Fri 30 Oct | **GE** |
 | 4 | Recruitment End to End | 13% | 2–13 Nov | Fri 13 Nov | **GE** |
 | 5 | Offers, Documentation & Onboarding | 11% | 16–20 Nov | Fri 20 Nov | **AJ** · GE |
-| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **TB** · AJ |
+| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **TB** · LA |
 | 7 | Partnerships, CRM & Trackers | 10% | 30 Nov–4 Dec | Fri 4 Dec | **LA** · GE |
 | 8 | Expenses & Budget Control | 8% | 7–11 Dec | Fri 11 Dec | **AJ** |
 | 9 | Settings & Governance | 7% | 7–11 Dec ∥ | Fri 11 Dec | **TB** |
@@ -924,7 +924,7 @@ completes.
 
 ## 11 · M6 — Payroll & Notifications · 11%
 
-**Owner TB** with **AJ** (from 05/11/2026; first planned as LA). **23–27 Nov. Demo Fri 27 Nov.**
+**Owner TB** with **LA** for the screens (JBS Praxis, 09/11/2026; AJ from 05/11/2026, first planned as LA). **23–27 Nov. Demo Fri 27 Nov.**
 
 ### Jurisdiction decides the donor
 
@@ -1012,6 +1012,12 @@ record and M6's only source of truth.
   has one monthly gross plus one-off adjustments and no recurring allowances. Both payslips (Payroll ·
   Payslips and ESS · My Payslips) open in a modal. Staging demos use test people, because staging sends
   real mail (A4).
+- **Configuration, entered by MyCity in the app (09/11/2026):** the statutory rates and bands, the accountant's
+  conventions (PAYE basis, whether pension and NHF reduce taxable pay), the pay day and a Bank Details Required
+  switch live on Configurations, and every person's salary and bank details on People · Employees or the staff
+  import. None is seeded (A26) and none blocks the build.
+- **LA builds the screens** (Payroll Runs, Payslips, Deductions, Configurations and ESS · My Payslips); TB owns the
+  milestone and its backend.
 
 ### Definition of done
 
