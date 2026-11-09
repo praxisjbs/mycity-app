@@ -55,7 +55,11 @@ const FIELDS = Object.freeze({
       "total_deductions",
       "salary_grade_amount",
       // An attendance deduction or overtime priced from the salary (docs/guides/attendance.md §6.17).
+      // A payroll line's, an instalment's or an adjustment's amount is named the same way, so a bare
+      // `amount` (a budget, an expense) is never masked (docs/guides/payroll.md §6.13).
       "pay_amount",
+      // A payroll run's employer total: what MyCity pays on top of the net (docs/guides/payroll.md §6.13).
+      "employer_cost",
     ],
   },
   "employee.bank": {
@@ -67,6 +71,8 @@ const FIELDS = Object.freeze({
       "bank_account_number",
       "account_name",
       "bvn",
+      // The last four digits a payslip keeps (docs/guides/payroll.md §6.13 rule 2).
+      "account_last4",
     ],
   },
   "employee.personal": {

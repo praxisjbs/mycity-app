@@ -1023,7 +1023,7 @@ section; where they differ from it, they win, and `docs/guides/payroll.md` (its 
 record and M6's only source of truth.
 
 - **Four tabs.** Payroll Runs, Payslips, Deductions and Configurations. Salary Structure and Statutory fold
-  into Configurations (their slugs are retired). §18's Payroll row changes with PR 1.
+  into Configurations (their slugs are retired). §18's Payroll row was changed by PR 1 (09/11/2026).
 - **Simple by default.** No statutory deduction and no statutory word on any screen or payslip until the
   advanced option is switched on. The advanced option (PAYE, pension, NHF, ITF, NSITF and salary grades) is
   built and shipped off: the engine, the report and the rate tables exist behind the Configurations switch,
@@ -1578,6 +1578,16 @@ sixth link in the site's header, after Verify Document. Applied to the table bel
 `scripts/check/progress.js`, the public site's routes and `docs/PROGRESS.md` (row #108). Its
 engineering shape is in `docs/guides/user-guide.md` §6.11.
 
+**Amended 09/11/2026 (JBS Praxis, M6 PR 1).** Payroll has four tabs, taking the inventory to 105 and the admin
+surface to 96: **Payroll · Configurations** (`configurations`, M6) joins, and **Payroll · Salary Structure**
+(`salary-structure`) and **Payroll · Statutory** (`statutory`) are dropped, folded into it (the 4 November
+Modules Review; `docs/guides/payroll.md` §13.1 item 1). Their slugs are retired, not renamed: both were Coming Soon, so no
+link in the wild breaks. Configurations holds the pay day, the Bank Details Required choice and the Advanced
+Payroll switch, and, once the option is on, the statutory items, the PAYE bands, the salary structure and the pay
+components. It reuses the `payroll` permission key, its writes behind the new capability `payroll.configure`.
+Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.js`, `src/shared/search/screens.js`,
+the app's catalogue and `docs/PROGRESS.md` (rows #47 and #49 Dropped, #109 added).
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries eight of the
 screens (six of the 92 approved, Proposal, ratified 05/11/2026, and Home, ratified 06/11/2026) and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1594,7 +1604,7 @@ staff never navigates to it to do their job.
 | People | **Performance** | 5 | Goals · Scorecards · KPIs · Reviews · Analytics | M2 |
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
 | People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |
-| People | **Payroll** | 5 | Payroll Runs · Payslips · Salary Structure · Deductions · Statutory | M6 |
+| People | **Payroll** | 4 | Payroll Runs · Payslips · Deductions · Configurations | M6 (Salary Structure and Statutory folded into Configurations, 09/11/2026) |
 | Business | **Partnerships** | 7 | Pipeline · Categories · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 (Categories ratified 05/11/2026) |
 | Business | **Expenses** | 7 | My Requests (shown in ESS) · Requisitions · Approvals · Disbursements · Projects · Budgets · Categories | M8 (Projects added 04/11/2026, AJ; its tab and PROGRESS row in M8 PR 7) |
 | System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · User Guide | M1 (Policies), M10, M0 (User Guide) |

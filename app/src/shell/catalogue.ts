@@ -48,7 +48,7 @@ export const MODULES: ModuleDef[] = [
     key: "recruitment", label: "Recruitment", short: "Recruitment", icon: "brief", area: "People",
     tabs: [t("Vacancies", "vacancies"), t("Candidates", "candidates"), t("Assessments", "assessments"), t("Interviews", "interviews"), t("Offers", "offers"), t("Onboarding", "onboarding"), t("Talent Pool", "talent-pool")],
   },
-  { key: "payroll", label: "Payroll", short: "Payroll", icon: "wallet", area: "People", tabs: [t("Payroll Runs", "payroll-runs"), t("Payslips", "payslips"), t("Salary Structure", "salary-structure"), t("Deductions", "deductions"), t("Statutory", "statutory")] },
+  { key: "payroll", label: "Payroll", short: "Payroll", icon: "wallet", area: "People", tabs: [t("Payroll Runs", "payroll-runs"), t("Payslips", "payslips"), t("Deductions", "deductions"), t("Configurations", "configurations")] },
   {
     key: "partnerships", label: "Partnerships", short: "Partnerships", icon: "link", area: "Business",
     tabs: [t("Pipeline", "pipeline"), t("Categories", "categories"), t("Partners", "partners"), t("Leads", "leads"), t("Proposals", "proposals"), t("Contracts & MOUs", "contracts-and-mous"), t("Analytics", "analytics")],

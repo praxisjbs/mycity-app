@@ -71,13 +71,9 @@ const SCREENS = Object.freeze({
     "onboarding",
     "talent-pool",
   ],
-  payroll: [
-    "payroll-runs",
-    "payslips",
-    "salary-structure",
-    "deductions",
-    "statutory",
-  ],
+  // Salary Structure and Statutory folded into Configurations; their slugs are retired, not renamed
+  // (docs/guides/payroll.md §2, §13.1 item 1).
+  payroll: ["payroll-runs", "payslips", "deductions", "configurations"],
   partnerships: [
     "pipeline",
     "categories",
@@ -365,9 +361,10 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("payroll", "payslips"),
     self: screen("ess", "my-payslips"),
   },
-  salary_structure: screen("payroll", "salary-structure"), // search:none not built yet (src/modules/salary_structure)
   deduction: screen("payroll", "deductions"), // search:none not built yet (src/modules/deductions)
-  statutory_return: screen("payroll", "statutory"), // search:none not built yet (src/modules/statutory)
+  // Grades and statutory rates are settings, not records: the retired entries open Configurations.
+  salary_structure: screen("payroll", "configurations"), // search:none not built yet (src/modules/salary_structure)
+  statutory_return: screen("payroll", "configurations"), // search:none not built yet (src/modules/statutory)
 
   // Partnerships
   // A partner and a lead open their 360 beside their list; a deal opens on Pipeline, which opens

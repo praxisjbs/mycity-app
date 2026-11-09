@@ -81,9 +81,8 @@ const SCREENS = Object.freeze([
 
   s("payroll", "payroll-runs", "Payroll Runs", ["payroll", "run payroll", "salaries"]),
   s("payroll", "payslips", "Payslips", ["payslip", "pay slip", "salary slip"]),
-  s("payroll", "salary-structure", "Salary Structure", ["grades", "salary bands", "pay scale"]),
-  s("payroll", "deductions", "Deductions", ["deduction", "loans", "advances"]),
-  s("payroll", "statutory", "Statutory", ["paye", "pension", "nhf", "tax", "remittance"]),
+  s("payroll", "deductions", "Deductions", ["deduction", "fines", "advances", "salary advance"]),
+  s("payroll", "configurations", "Configurations", ["advanced payroll", "statutory", "paye", "pension", "nhf", "grades", "pay day", "salary structure", "pay components"]),
 
   s("partnerships", "pipeline", "Pipeline", ["deals", "partnership pipeline", "crm"]),
   s("partnerships", "categories", "Categories", ["partnership types", "partner categories", "pipeline settings", "stages", "agreement templates", "delivery checklist", "custom fields", "proof points"]),

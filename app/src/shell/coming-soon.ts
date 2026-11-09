@@ -78,11 +78,10 @@ export const COMING: Record<string, string[]> = {
   "recruitment/talent-pool": ["Strong candidates kept for future roles", "Why each was not hired this time", "Invite them to apply when a role opens"],
 
   /* Payroll */
-  "payroll/payroll-runs": ["Run payroll for the month, previewed before it is approved", "Operations, then the CEO, approve each run", "Bank file and payslips generated on approval"],
-  "payroll/payslips": ["Every payslip in every run", "Email payslips to staff in one step", "Correct and reissue with a full trail"],
-  "payroll/salary-structure": ["Grades, bands and allowances", "Effective dates, so history stays right", "Who is on which grade"],
-  "payroll/deductions": ["Loans, advances and sanction deductions", "Each linked to its source", "Recovered over the months you set"],
-  "payroll/statutory": ["PAYE, pension and NHF, calculated for Nigeria", "Remittance schedules for each authority", "Year-end figures for each employee"],
+  "payroll/payroll-runs": ["Run payroll for the month, previewed before it is approved", "Operations prepare each run and the CEO approves it", "Payslips publish to each person on approval"],
+  "payroll/payslips": ["Every payslip in every run", "Email payslips to staff in one step", "Download them all as one PDF"],
+  "payroll/deductions": ["Fines, advances and attendance deductions", "Each linked to its source", "Recovered over the months you set"],
+  "payroll/configurations": ["The pay day, 30 unless you choose another", "Advanced payroll, switched on from a date you pick", "Statutory rates and salary grades, entered when ready"],
 
   /* Partnerships */
   "partnerships/pipeline": ["Every deal by stage, from first contact to signed", "Value signed this year, and what has stalled", "Filter by stage, category, region, owner and health"],

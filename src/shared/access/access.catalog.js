@@ -314,6 +314,14 @@ const CAPABILITY_CATALOG = [
     description:
       "Group approved requests into requisitions, record disbursements, set budgets and manage the expense categories.",
   },
+  // M6 Payroll (docs/guides/payroll.md §8), seeded in 6099.
+  {
+    code: "payroll.configure",
+    module: "payroll",
+    label: "Configure Payroll",
+    description:
+      "Switch the advanced option on or off, set the pay day and the bank rule, and enter the statutory rates, bands, salary grades and pay components.",
+  },
 ];
 
 /**

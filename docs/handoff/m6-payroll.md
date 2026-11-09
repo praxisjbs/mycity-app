@@ -11,7 +11,7 @@ requirement and settles no decision. Tick a line when it is done, with the date,
 | Owner | TB (Tom-Blake Asaah) owns the milestone and its backend; LA (Love Adeola) builds the screens (guide §13.1 item 22, JBS Praxis, 09/11/2026) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 27 Nov 2026 (MILESTONES §4) |
-| Pull requests | PR 0 (this documentation) merged as praxisjbs/mycity-app#100 on 09/11/2026 (`1352338`); no other PR yet |
+| Pull requests | PR 0 (this documentation) merged as praxisjbs/mycity-app#100 on 09/11/2026 (`1352338`); PR 1 (contract, data and scaffolding) built on branch `claude/lucid-meitner-c4eh9j` on 09/11/2026, in review |
 
 ---
 
@@ -68,13 +68,14 @@ exists, and the payslip template is empty.
       configuration MyCity enters in the app (guide §13.1 item 21); LA builds the screens (item 22) (09/11/2026)
 
 ### PR 1 · Contract, data and scaffolding
-- [ ] Contracts for the simple mode (`payroll.js`, `payslips.js`, `deductions.js`), `gen:contract`
-- [ ] Migrations `6000`, `6010` (with the `attendance_pay_item.payroll_run_id` foreign key), `6030`; seed `6099`
-- [ ] `payroll.run` in `DEFAULTS`, `payroll.configure` in the capability catalogue, `employer_cost` in the field mask
-- [ ] The four tabs in the route map, ⌘K screens, Coming Soon, catalogue and their tests; PROGRESS #47 and #49 Dropped,
-      Configurations added in the next free row (#109 while free), the Payroll screens' Owner set to LA, `SCREENS` and the counts; MILESTONES §18's Payroll row
-- [ ] `payroll_setting` carries the option columns (Pay Day, default 30 and 1 to 31 with the month-end rule; Bank Details Required; the three conventions)
-- [ ] DATABASE_SCHEMA M6 as built; README §5.9; gates 3 to 6 green
+- [x] Contracts for the simple mode (`payroll.js`, `payslips.js`, `deductions.js`), `gen:contract` (09/11/2026)
+- [x] Migrations `6000`, `6010` (with the `attendance_pay_item.payroll_run_id` foreign key), `6030`; seed `6099` (09/11/2026)
+- [x] `payroll.run` in `DEFAULTS`, `payroll.configure` in the capability catalogue, `employer_cost` in the field mask (09/11/2026)
+- [x] The four tabs in the route map, ⌘K screens, Coming Soon, catalogue and their tests; PROGRESS #47 and #49 Dropped,
+      Configurations added as #109, the Payroll screens' Owner set to LA (#11's Owner left, see the log), `SCREENS` and the counts; MILESTONES §18's Payroll row (09/11/2026)
+- [x] `payroll_setting` carries the option columns (Pay Day, default 30 and 1 to 31 with the month-end rule; Bank Details Required; the three conventions) (09/11/2026)
+- [x] DATABASE_SCHEMA M6 as built; README §5.2 and §5.9; gates 3 to 6 green (09/11/2026)
+- [ ] `npm run ci` green on the PR head and the PR marked ready (PR 1 is not merged until JBS Praxis says so)
 
 ### PR 2 · Calculation and the run
 - [ ] `payroll.calc.js`, `.inputs`, `.run`, `.lock`, `.config.repo`, repo, service, controller, routes
@@ -118,6 +119,7 @@ exists, and the payslip template is empty.
 
 ## 3 · Log
 
+- 09/11/2026 · JP · PR 1 built (`claude/lucid-meitner-c4eh9j`, draft until `npm run ci` is green): the simple-mode contract (`payroll.js`, `payslips.js`, `deductions.js`, `common.js` gains `positiveMoney` and `monthStart`), migrations `6000` (setting, run, payslip, line, adjustment), `6010` (deduction, instalment, the `attendance_pay_item` foreign key, `ON DELETE SET NULL`) and `6030` (`leave_type.unpaid`), seed `6099` (the `payroll.run` approval, `payroll.configure`, the Unpaid flag; nothing else), the definition, the capability, `employer_cost` and `account_last4` in the field mask, the four tabs everywhere they are listed, PROGRESS (#47 and #49 Dropped, #109 Configurations, Owner LA on #45, #46, #48 and #109, `SCREENS` 109, 105 screens), MILESTONES §18, DATABASE_SCHEMA M6, README. Tests: `tests/integration/payroll-schema.test.js` (21: shape, constraints, numbers, seed both ways, UP/DOWN/UP), `tests/unit/payroll-contract.test.js` (18), the capability lists in `settings.test.js` and `home-schema.test.js`, the screen count in `events-workflow.test.js`. Decisions taken, each in the guide's Change log: a fine may be accepted again after Release (unique among live deductions), `PayrollSettings.advanced_has_been_on`, `account_last4` masked as bank. Left open for people: #11's Owner column was not changed (the guide's "#11's build" does not say whether the Owner moves); the guide's §13.3 question 2 (where the first statutory rates are entered, for PR 5); `leave_type.unpaid` has no switch on People · Leave yet, only the seed. The prototype under `app/src/features/payroll/` shows its Salary Structure and Statutory pieces on the Configurations tab until PR 7 rebuilds it. Next: PR 2, the run.
 - 09/11/2026 · JP · PR 0 merged as praxisjbs/mycity-app#100 (`1352338`, squashed; the local CI run passed its 50 gates and the backend group after pgvector was installed, and GitHub's `ci` check was green on the head). Written ticked for `payroll.md` in `docs/guides/README.md` as JBS Praxis asked (once the pull request merged). Left for people: MyCity signs off the payslip sample. Next: PR 1, contract and data (guide Appendix A).
 - 09/11/2026 · JP · PR 0, pay day: confirmed with JBS Praxis that the pay day defaults to the 30th, configurable 1 to 31, a day past a month's end falling on its last day (guide §13.1 item 24, §6.11 rule 1); the statutory rates and conventions are data entered from a date and only the items and the formula's shape are code (§6.12 rule 7); a person's salary and bank are set on People · Employees' Pay and Bank step, already built (§2). The ESS guide's "27th" and the payslip sample's date moved to the 30th. Documentation only.
 - 09/11/2026 · JP · PR 0, third round: JBS Praxis answered the rest. The statutory rates, the accountant's conventions,
