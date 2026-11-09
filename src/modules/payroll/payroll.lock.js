@@ -25,6 +25,7 @@
  */
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
+const lagos = require("../../shared/time/lagos");
 const attendancePay = require("../attendance/attendance.pay");
 const fines = require("../sanctions/sanctions.fines");
 const repo = require("./payroll.repo");
@@ -89,6 +90,52 @@ function defineCreate(name, fn) {
   if (WRITES.has(name)) throw new Error(`payroll.lock.defineCreate: "${name}" is already defined`);
   WRITES.set(name, "none");
   return fn;
+}
+
+/* ------------------------------------------------------------------ *
+ * The months a deduction may be scheduled in (§6.6 rule 2)
+ * ------------------------------------------------------------------ */
+
+/** The statuses of a run that no longer takes an instalment: with the approver, or locked. */
+const CLOSED = Object.freeze(["submitted", "approved", "paid"]);
+
+/**
+ * The open month: the period of the newest run still a Draft or Computed one; with none, the current Lagos
+ * month if it has no run, else the next month. A fine is accepted into it unless the person picks a later one.
+ * @param {{query: Function}} db
+ * @param {string} [today]  a Lagos date, for a test
+ * @returns {Promise<string>} a month's first day
+ */
+async function openPeriod(db, today = lagos.today()) {
+  const newest = await repo.newestOpenPeriod(db);
+  if (newest) return newest;
+  const current = lagos.monthBounds(today).first;
+  return (await repo.runOfPeriod(db, current)) ? lagos.addMonths(current, 1) : current;
+}
+
+/**
+ * Lock the runs of the months named, in month order, and answer them. With a run's row locked, a Compute or
+ * a Submit of that month queues behind the write and reads its instalments after it, never between a read
+ * and a freeze. A write takes the runs first and its own rows after, the order a run's lock takes them in.
+ * @param {import("pg").PoolClient} client
+ * @param {string[]} periods  months' first days
+ */
+const lockRunsOf = (client, periods) => repo.lockRunsOfPeriods(client, periods);
+
+/**
+ * Lock the runs of the months a deduction's instalments would fall in, and refuse (422 START_NOT_ALLOWED)
+ * when one of them is already Submitted, Approved or Paid: nothing is added to a run the approver has seen,
+ * and a month with no run is still free.
+ * @param {import("pg").PoolClient} client
+ * @param {string[]} periods  months' first days
+ */
+async function lockMonths(client, periods) {
+  const runs = await lockRunsOf(client, periods);
+  if (runs.some((r) => CLOSED.includes(r.status)))
+    throw new AppError("START_NOT_ALLOWED", "A month of this deduction already has a run sent for approval", 422, {
+      start_period: ["Pick a later month"],
+    });
+  return runs;
 }
 
 /* ------------------------------------------------------------------ *
@@ -183,4 +230,4 @@ const returnToDraft = defineWrite("returnToDraft", "submitted", async (client, r
   return { items: items.released, instalments };
 });
 
-module.exports = { EDITABLE, WRITES, assertEditable, defineWrite, defineCreate, applyApproval, returnToDraft };
+module.exports = { EDITABLE, CLOSED, WRITES, assertEditable, defineWrite, defineCreate, openPeriod, lockRunsOf, lockMonths, applyApproval, returnToDraft };

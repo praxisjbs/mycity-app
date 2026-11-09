@@ -72,6 +72,30 @@ function runOfPeriod(client, period) {
   return one(client, `SELECT payroll_run_id, status FROM payroll_run WHERE period = $1::date`, [period]);
 }
 
+/** The period of the newest run still a Draft or a Computed one: the month deductions are accepted into (§6.6 rule 2). */
+async function newestOpenPeriod(db) {
+  const r = await one(db, `SELECT period::text AS period FROM payroll_run WHERE status IN ('draft', 'computed') ORDER BY period DESC LIMIT 1`, []);
+  return r ? r.period : null;
+}
+
+/**
+ * The runs of the months named, locked for the rest of the transaction and in month order, so a deduction
+ * scheduled, released or cancelled in a month queues behind a Compute or a Submit of that month's run and
+ * never lands between its read and its freeze (deductions.acceptance, payroll.lock.lockMonths).
+ * @param {string[]} periods  months' first days
+ */
+async function lockRunsOfPeriods(client, periods) {
+  // pagination:complete the runs of the at most twelve months one deduction's instalments fall in
+  const { rows } = await completeQuery(
+    client,
+    `SELECT payroll_run_id, period::text AS period, status FROM payroll_run
+      WHERE period = ANY($1::date[]) ORDER BY period FOR UPDATE`,
+    [periods],
+    { label: "The runs of a deduction's months", ceiling: 24 },
+  );
+  return rows;
+}
+
 /** The first month anyone started: no run is opened for an earlier month (§5, PERIOD_NOT_ALLOWED). */
 async function earliestStart(client) {
   const r = await one(client, `SELECT date_trunc('month', min(start_date))::date::text AS first FROM employee`, []);
@@ -524,6 +548,8 @@ module.exports = {
   getRun,
   lockRun,
   runOfPeriod,
+  newestOpenPeriod,
+  lockRunsOfPeriods,
   earliestStart,
   insertRun,
   setRun,

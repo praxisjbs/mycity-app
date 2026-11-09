@@ -415,7 +415,7 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
 | `sanction.proposed` | A sanction is proposed from a query's decision | Opens `queries.consequence`; the engine tells the first approvers, who decide on the query's card |
 | `query_rule.fired` | A rule raised a query | Recent Firings refresh |
 | `query_rule.saved`, `query_rule.activated`, `query_rule.paused` | Rules writes | Audit |
-| `sanction.issued` | `queries.consequence` approved | Numbered; letter generated, filed, emailed with the PDF once rendered (`templates/email/sanction-issued.html`); fine pending; query resolved; notification to the employee |
+| `sanction.issued` | `queries.consequence` approved | Numbered; letter generated, filed, emailed with the PDF once rendered (`templates/email/sanction-issued.html`); fine pending; query resolved; notification to the employee; and, when it carries a fine, payroll edit holders are told "Fine Waiting for Payroll" after commit (an outbox handler of `deductions.events.js`, M6 PR 3) |
 | `sanction.rejected` | The approval rejected it | Query back under review; the proposer is told |
 | `sanction.withdrawn` | The approval was withdrawn | Query back under review |
 | `consequence_step.saved` | Chain Settings writes | Audit |
@@ -597,6 +597,7 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 09/11/2026 · JP · M6 PR 3 (`payroll.md` §6.6, §7): a sanction issued with a fine now tells the holders of `payroll` edit "Fine Waiting for Payroll", from an outbox handler of `deductions.events.js` on `sanction.issued` (§7); the fine's events `sanction_fine.accepted`, `.waived` and `.released` are written by `sanctions.fines` when Payroll · Deductions accepts, waives or releases it. Nothing in the sanctions module changed.
 - 09/11/2026 · JP · M6 PR 2 (`payroll.md` §6.6 rule 5): `sanctions.fines.release(client, id, actor, reason)` returns a fine payroll had accepted to `pending`, so it can be accepted again or waived (§6.6); it writes `sanction_fine.released` and refuses a fine not accepted (409 `FINE_NOT_MOVABLE`). That no instalment is yet in a run is payroll's rule to hold, not the fine's. The run's lock settles a fine whose last instalment applied through the existing `settle`.
 - 06/11/2026 · JP · The `templates` module gains `templates.agreements`, the wording of Partnerships' agreement templates on the same `template_version` store (`docs/guides/partnerships.md` §6.8, M7 PR 2). Letter templates, their routes, variables and screen are unchanged.
 - 04/11/2026 · GE · (Ose) A letter template edited in Settings (Markdown) and its preview escape each name once
